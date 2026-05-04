@@ -50,6 +50,7 @@ import {
   upsertGenerationActivityEntry,
 } from "/lib/generation-activity-feed.mjs?v=20260504-vercel-static-lib-1";
 import { getStudioDensitySettings, getStudioLayoutMode, ALL_VARIABLE_NAMES } from "/lib/studio-density.mjs?v=20260504-vercel-static-lib-1";
+import { injectSpeedInsights } from "/lib/speed-insights.mjs";
 
 const SURPRISE_PROMPTS = [
   {
@@ -5340,6 +5341,9 @@ async function bootstrap() {
     showError(error instanceof Error ? error.message : String(error));
     setConnectionState("error", "初始化失败");
   }
+  
+  // Initialize Vercel Speed Insights
+  injectSpeedInsights();
 }
 
 bootstrap();
