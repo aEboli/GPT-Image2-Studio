@@ -8,10 +8,10 @@ import { normalizeReferenceAnalysisLanguage, } from "/lib/reference-analysis-lan
 import { getPreviewLoadingShellTheme, shouldReusePreviewLoadingShell } from "/lib/preview-loading-shell.mjs";
 import { isGenerationRequestRetryMessage, } from "/lib/generation-request-retry.mjs";
 import { cancelQueuedGenerationJob, isQueuedGenerationJob, selectNextQueuedGenerationJobs } from "/lib/generation-queue.mjs?v=20260504-vercel-static-lib-1";
-import { buildCanceledGenerationActivityDetail, buildGenerationTaskActivityDetail, buildGenerationTaskStatusText, sanitizeGenerationActivityDetail, sortGenerationActivityFeed, upsertGenerationActivityEntry } from "/lib/generation-activity-feed.mjs?v=20260504-vercel-static-lib-1";
+import { buildCanceledGenerationActivityDetail, buildGenerationTaskActivityDetail, buildGenerationTaskStatusText, formatGenerationActivityModeLabel, getGenerationActivityDisplayText, sanitizeGenerationActivityDetail, sortGenerationActivityFeed, upsertGenerationActivityEntry } from "/lib/generation-activity-feed.mjs?v=20260504-vercel-static-lib-1";
 import { GENERATION_STREAM_EVENTS, recordFinalImageChunk } from "/lib/generation-stream-protocol.mjs";
 import { getStudioDensitySettings, getStudioLayoutMode, ALL_VARIABLE_NAMES } from "/lib/studio-density.mjs?v=20260519-topbar-reveal-2";
-import { ensureLazyViewModule, getMountedLazyViewModule } from "/lib/view-mode-loader.mjs?v=20260530-quick-blend-fix-2";
+import { ensureLazyViewModule, getMountedLazyViewModule } from "/lib/view-mode-loader.mjs?v=20260606-quick-blend-pair-delete-1";
 import { appendBrowserConfigToFormData, getBrowserPrivateConfigRequestPayload, getOrCreateClientSessionId, readBrowserPrivateConfig, saveBrowserPrivateConfig, toPublicBrowserConfig } from "/lib/browser-config.mjs";
 import { cacheBrowserGalleryItem, clearBrowserImageCache, dataUrlToBlob, deleteBrowserCachedGalleryItem, fetchServerImageAsDataUrl, getBrowserCachedImageData, getImageUrl, getServerImageUrl, getServerThumbnailUrl, isCacheableBrowserImageUrl, mergeServerAndBrowserGalleryItems, readBrowserCachedGalleryItems } from "/lib/browser-image-cache.mjs";
 import { createCreationLogoLibraryController } from "/lib/creation-logo-library.mjs";
@@ -22,7 +22,7 @@ import { appendPptDeckDownloadLinks } from "/lib/ppt-record-links.mjs";
 import { buildCreationSkuSubjectsForPayload, normalizeCreationSkuBundleCountForPayload, normalizeCreationSkuSubjectForPayload } from "/lib/creation-sku-subjects.mjs";
 import { bindCreationReferenceDrag, reorderCreationReferenceFiles } from "/lib/creation-reference-drag.mjs";
 import { isCreationSubjectReferenceRole } from "/lib/creation-reference-roles.mjs";
-import { appendCreationVisualLanguageSuggestionCard, getCreationReferenceAnalysisGroupedSubjectUnitCount, getCreationReferenceAnalysisRoleCorrectionReason, getCreationReferenceAnalysisVisualLanguageReason, getCreationReferenceAnalysisVisualLanguageSource, normalizeCreationReferenceAnalysisUnitCountNote, shouldDowngradeReferenceProductAnalysisRole, summarizeCreationReferenceAnalysisRoleCorrections, syncCreationReferenceVisualLanguageButton } from "/lib/creation-reference-analysis-view.mjs";
+import { appendCreationVisualLanguageSuggestionCard, buildCreationReferenceAnalysisAppliedFeedbackMessage, getCreationReferenceAnalysisGroupedSubjectUnitCount, getCreationReferenceAnalysisRoleCorrectionReason, getCreationReferenceAnalysisVisualLanguageReason, getCreationReferenceAnalysisVisualLanguageSource, normalizeCreationReferenceAnalysisUnitCountNote, shouldDowngradeReferenceProductAnalysisRole, syncCreationReferenceVisualLanguageButton } from "/lib/creation-reference-analysis-view.mjs";
 import { createCreationListingController, getCreationRecordListingMetaLabel, getCreationListingSearchValues, normalizeCreationListingDraftForView, renderCreationListingDrafts } from "/lib/creation-listing-view.mjs";
 import { getCreationAutoRepairNotice, getCreationCompletionFeedback, getCreationIncompleteItems, shouldAutoRepairCreationSet } from "/lib/creation-auto-repair.mjs";
 import { canRepairCreationItem as canRepairCreationItemFromQueue, getCreationRepairButtonText as getCreationRepairButtonTextFromQueue, isCreationItemRepairActive as isCreationItemRepairActiveInQueue, queueCreationItemRepair as queueCreationItemRepairInState, removeQueuedCreationItemRepair, shiftNextQueuedCreationItemRepair } from "/lib/creation-item-repair-queue.mjs";
@@ -87,7 +87,7 @@ const REASONING_ESTIMATES = {
 };
 const DEFAULT_LIMITS = {
   maxParallelTasksPerSession: 15,
-  maxReferenceImages: 6,
+  maxReferenceImages: 15,
   maxCreationReferenceImages: 15,
   maxCreationStyleReferenceImages: 3,
   maxPortraitPersonReferenceImages: 3,
@@ -399,6 +399,7 @@ const state = {
     queue: [],
     queuedRepairItemIds: [],
     recordQuery: "",
+    recordDetailExpanded: false,
     recordSetId: "",
     repairingItemId: "",
     selectedQueueId: "",
@@ -787,6 +788,7 @@ const refs = {
   galleryView: document.querySelector(".gallery-view"),
   generateButton: document.querySelector("#generateButton"),
   generateForm: document.querySelector("#generateForm"),
+  generationModeStatus: document.querySelector("#generationModeStatus"),
   globalNav: document.querySelector(".global-nav"),
   globalNavItems: [...document.querySelectorAll("[data-nav-section]")],
   lightbox: document.querySelector("#lightbox"),
@@ -1357,7 +1359,7 @@ function formatCompactRatioLabel(ratio) {
 
   return /^\d+:\d+$/.test(normalized) ? normalized : "";
 }
-
+function getGenerationActivityRelayText(value) { const relayLine = String(value || "").split(/\r?\n/).map((line) => line.trim()).find((line) => /^中转[：:]/.test(line)); return relayLine || ""; } function buildGenerationActivityRelayText(item = {}) { const route = String(item?.imageRoute || item?.generationRoute || "").toLowerCase(); const relayUrl = String(item?.baseUrl || (route === "b" ? state.config?.directBaseUrl : state.config?.baseUrl) || state.config?.baseUrl || "").trim(); return relayUrl ? `中转：${relayUrl}` : ""; }
 function formatFilmstripSizeLabel(item) {
   return formatCompactSizeLabel(item?.size);
 }
@@ -1384,6 +1386,7 @@ function normalizeActivityEntry(entry) {
     detail,
     ratio: formatCompactRatioLabel(entry?.ratio),
     size: formatCompactSizeLabel(entry?.size),
+    modeLabel: String(entry?.modeLabel || "").trim(), imageUrl: String(entry?.imageUrl || "").trim(), paramsText: getGenerationActivityRelayText(entry?.paramsText),
     status: ["active", "done", "error", "pending"].includes(entry?.status) ? entry.status : "active",
     at: String(entry?.at || ""),
     orderAt: String(entry?.orderAt || entry?.at || ""),
@@ -5023,6 +5026,14 @@ function getSelectedImageRoute() {
   return refs.imageRouteInputs.find((input) => input.checked)?.value === "b" ? "b" : "a";
 }
 
+function updateGenerationModeStatus() {
+  if (!refs.generationModeStatus) return;
+  const imageRoute = getSelectedImageRoute();
+  const label = formatGenerationActivityModeLabel(imageRoute) || "路由模式";
+  refs.generationModeStatus.textContent = label; refs.generationModeStatus.dataset.imageRoute = imageRoute; refs.generationModeStatus.title = `当前生图调用模式：${label}`;
+  refs.generationModeStatus.setAttribute("aria-label", `当前生图调用模式：${label}`);
+}
+
 function getCurrentPrivateConfigRequestPayload() {
   const browserPayload = getBrowserPrivateConfigRequestPayload();
   return {
@@ -5049,6 +5060,7 @@ function syncConfigUi(config) {
   refs.imageRouteInputs.forEach((input) => {
     input.checked = input.value === (config.imageRoute === "b" ? "b" : "a");
   });
+  updateGenerationModeStatus();
   refs.savedKeyMask.textContent = config.apiKeyConfigured ? `已保存 ${config.apiKeyMask || ""}` : "未保存";
   refs.directSavedKeyMask.textContent = config.directApiKeyConfigured ? `已保存 ${config.directApiKeyMask || ""}` : "未保存";
   const activeRouteConfigured = config.imageRoute === "b" ? config.directApiKeyConfigured : config.apiKeyConfigured;
@@ -5231,19 +5243,15 @@ function getJobActivityRatio(jobId) {
   return state.jobs.find((job) => job.id === jobId)?.ratio || "";
 }
 
-function recordActivity({ key, title, detail, ratio, size, status, at }) {
+function recordActivity({ key, title, detail, ratio, size, modeLabel, imageUrl, paramsText, status, at }) {
   const nextAt = at || nowIso();
   const nextRatio = formatCompactRatioLabel(ratio);
   const nextSize = formatCompactSizeLabel(size);
   const existing = state.activityFeed.find((item) => item.key === key);
   state.activityFeed = upsertGenerationActivityEntry(state.activityFeed, {
-    key,
-    title,
-    detail: sanitizeGenerationActivityDetail(detail),
-    ratio: nextRatio || existing?.ratio || "",
-    size: nextSize || existing?.size || "",
-    status,
-    at: nextAt,
+    key, title, detail: sanitizeGenerationActivityDetail(detail), ratio: nextRatio || existing?.ratio || "", size: nextSize || existing?.size || "", modeLabel: modeLabel || existing?.modeLabel || "",
+    imageUrl: imageUrl || existing?.imageUrl || "", paramsText: getGenerationActivityRelayText(paramsText || existing?.paramsText),
+    status, at: nextAt,
   });
   writeGenerationActivityFeed();
 }
@@ -5264,24 +5272,18 @@ async function copyLightboxPrompt() {
 
 function recordJobQueued(job) {
   recordActivity({
-    key: `${job.id}:task`,
-    title: GENERATION_TASK_STATUS_LABELS.running,
+    key: `${job.id}:task`, title: GENERATION_TASK_STATUS_LABELS.running,
     detail: buildGenerationTaskActivityDetail({ statusStage: "queued", statusText: "等待资源分配" }),
-    ratio: job.ratio,
-    size: job.size,
-    status: "active",
-    at: job.createdAt,
+    ratio: job.ratio, size: job.size, modeLabel: formatGenerationActivityModeLabel(job.imageRoute || getSelectedImageRoute()), status: "active", at: job.createdAt,
   });
 }
 
-function recordJobTaskActivity(jobId, { title = GENERATION_TASK_STATUS_LABELS.running, detail, status = "active" }) {
-  recordActivity({ key: `${jobId}:task`, title, detail, ratio: getJobActivityRatio(jobId), size: getJobActivitySize(jobId), status, at: nowIso() });
+function recordJobTaskActivity(jobId, { title = GENERATION_TASK_STATUS_LABELS.running, detail, imageUrl, paramsText, status = "active" }) {
+  recordActivity({ key: `${jobId}:task`, title, detail, ratio: getJobActivityRatio(jobId), size: getJobActivitySize(jobId), imageUrl, paramsText, status, at: nowIso() });
 }
 
 function handleActivityStatus(jobId, stage, message) {
-  recordJobTaskActivity(jobId, {
-    detail: buildGenerationTaskActivityDetail({ statusStage: stage, statusText: message, fallback: stage === "saving" ? "正在保存到本地图片目录" : "正在生成图片" }),
-  });
+  recordJobTaskActivity(jobId, { detail: buildGenerationTaskActivityDetail({ statusStage: stage, statusText: message, fallback: stage === "saving" ? "正在保存到本地图片目录" : "正在生成图片" }) });
 }
 
 function handleActivityPartial(jobId) {
@@ -5292,20 +5294,14 @@ function handleActivityFinal(jobId) {
   recordJobTaskActivity(jobId, { detail: "正在写入本地 output" });
 }
 
-function handleActivitySuccess(jobId) {
-  recordJobTaskActivity(jobId, {
-    title: GENERATION_TASK_STATUS_LABELS.completed,
-    detail: "图像已成功生成",
-    status: "done",
-  });
+function handleActivitySuccess(jobId, item) {
+  recordJobTaskActivity(jobId, { title: GENERATION_TASK_STATUS_LABELS.completed, detail: "图像已成功生成", imageUrl: getImageUrl(item), paramsText: buildGenerationActivityRelayText(item), status: "done" });
 }
 
 function handleActivityFailure(jobId, message) {
   const detail = compactErrorMessage(message, "生成请求失败");
   recordJobTaskActivity(jobId, {
-    title: GENERATION_TASK_STATUS_LABELS.error,
-    detail: buildGenerationTaskActivityDetail({ status: "error", statusStage: "error", statusText: detail, errorMessage: detail }),
-    status: "error",
+    title: GENERATION_TASK_STATUS_LABELS.error, detail: buildGenerationTaskActivityDetail({ status: "error", statusStage: "error", statusText: detail, errorMessage: detail }), status: "error",
   });
 }
 
@@ -5335,6 +5331,7 @@ function recordGenerationTaskActivity(task) {
     detail,
     ratio: formatCompactRatioLabel(task?.ratio),
     size: formatCompactSizeLabel(task?.size),
+    modeLabel: formatGenerationActivityModeLabel(task?.imageRoute), imageUrl: getImageUrl(task?.item), paramsText: task?.item ? buildGenerationActivityRelayText(task.item) : "",
     status: GENERATION_TASK_TIMELINE_STATUS[status],
     at: task.updatedAt || task.createdAt,
   });
@@ -5354,6 +5351,7 @@ function getTimelineItems() {
         detail: "图像已成功生成",
         ratio: current.ratio || current.json?.aspect_ratio,
         size: current.size,
+        imageUrl: getImageUrl(current), modeLabel: formatGenerationActivityModeLabel(current.imageRoute || current.generationRoute), paramsText: buildGenerationActivityRelayText(current),
         status: "done",
         at: current.createdAt,
       },
@@ -5390,7 +5388,7 @@ function isTimelineAtTop() {
 }
 
 function getTimelineItemSignature(item) {
-  return [item.key, item.title, item.detail, item.ratio || "", item.size || "", item.status, item.at || ""].join("\u001f");
+  return [item.key, item.title, item.detail, item.modeLabel || "", item.imageUrl || "", item.paramsText || "", item.ratio || "", item.size || "", item.status, item.at || ""].join("\u001f");
 }
 
 function countTimelineChanges(items) {
@@ -5480,11 +5478,13 @@ function renderTimeline() {
     const copy = document.createElement("div");
     copy.className = "timeline-copy";
 
-    const detail = document.createElement("span");
-    detail.textContent = item.detail;
-    copy.appendChild(detail);
-
+    const displayText = getGenerationActivityDisplayText(item.detail);
+    copy.appendChild(Object.assign(document.createElement("span"), { className: "timeline-summary", textContent: displayText.summary || item.title || "" }));
+    if (item.imageUrl) { row.classList.add("has-url"); copy.appendChild(Object.assign(document.createElement("a"), { className: "timeline-url", href: item.imageUrl, textContent: item.imageUrl })); }
+    if (displayText.detail) { row.classList.add("has-detail"); copy.appendChild(Object.assign(document.createElement("p"), { className: "timeline-detail", textContent: displayText.detail })); }
+    if (item.paramsText) { row.classList.add("has-params"); copy.appendChild(Object.assign(document.createElement("pre"), { className: "timeline-params", textContent: item.paramsText })); }
     row.appendChild(copy);
+    row.appendChild(Object.assign(document.createElement("span"), { className: "timeline-mode", textContent: item.modeLabel || "" }));
 
     const ratio = document.createElement("span");
     ratio.className = "timeline-ratio";
@@ -9418,28 +9418,30 @@ function renderCreationRecordDetail(set) {
   }
 
   const progress = getCreationProgressSummary(set);
-  const detailItems = [
-    ["商品", set.productName || "未命名商品"],
-    ["场景", set.scenarioLabel || CREATION_SCENARIO_LABELS[set.scenario] || "标准电商"],
-    ["行业", set.industryTemplateLabel || CREATION_INDUSTRY_TEMPLATE_LABELS[set.industryTemplate] || "通用电商"],
-    ["类目路径", set.industryTemplatePath || ""],
-    ["视觉语言", set.visualLanguageLabel || formatCreationVisualLanguageLabel(set.visualLanguage)],
-    ["尺寸规格", set.dimensionSpecs || ""],
-    ["规格单位", set.dimensionUnitModeLabel || formatCreationDimensionUnitModeLabel(set.dimensionUnitMode)],
-    ["语言", set.targetLanguageLabel || set.targetLanguage || "English"],
-    ["进度", `${progress.completed}/${progress.total}`],
-    ["参考图", set.referenceImageNames.length > 0 ? set.referenceImageNames.join("、") : "未使用"],
-    ["参考用途", formatCreationReferenceRoleSummary(set.referenceImageRoles)],
-    ["Logo", formatCreationLogoSummary(set.logo)],
+  const detailSections = [
+    { items: [["商品", set.productName || "未命名商品"], ["场景", set.scenarioLabel || CREATION_SCENARIO_LABELS[set.scenario] || "标准电商"], ["行业", set.industryTemplateLabel || CREATION_INDUSTRY_TEMPLATE_LABELS[set.industryTemplate] || "通用电商"]] },
+    { items: [["视觉语言", set.visualLanguageLabel || formatCreationVisualLanguageLabel(set.visualLanguage)], ["尺寸规格", set.dimensionSpecs || ""], ["规格单位", set.dimensionUnitModeLabel || formatCreationDimensionUnitModeLabel(set.dimensionUnitMode)], ["语言", set.targetLanguageLabel || set.targetLanguage || "English"], ["进度", `${progress.completed}/${progress.total}`]] },
+    { wide: true, items: [["类目路径", set.industryTemplatePath || ""]] },
+    { wide: true, items: [["参考图", set.referenceImageNames.length > 0 ? set.referenceImageNames.join("、") : "未使用"]] },
+    { wide: true, items: [["参考用途", formatCreationReferenceRoleSummary(set.referenceImageRoles)], ["Logo", formatCreationLogoSummary(set.logo)]] },
   ];
 
-  detailItems.filter(([, value]) => value).forEach(([label, value]) => {
-    const item = document.createElement("span");
-    const strong = document.createElement("strong");
-    strong.textContent = `${label}: `;
-    item.appendChild(strong);
-    item.append(document.createTextNode(value));
-    refs.creationRecordDetail.appendChild(item);
+  detailSections.forEach(({ items, wide = false }) => {
+    const visibleItems = items.filter(([, value]) => value);
+    if (visibleItems.length === 0) return;
+
+    const section = document.createElement("div");
+    section.className = `creation-record-section${wide ? " is-wide" : ""}`;
+    visibleItems.forEach(([label, value]) => {
+      const item = document.createElement("span");
+      item.className = "creation-record-field";
+      const labelNode = document.createElement("strong");
+      labelNode.className = "creation-record-label"; labelNode.textContent = `${label}:`;
+      const valueNode = document.createElement("span");
+      valueNode.className = "creation-record-value"; valueNode.textContent = value;
+      item.append(labelNode, valueNode); section.appendChild(item);
+    });
+    refs.creationRecordDetail.appendChild(section);
   });
 }
 
@@ -10090,6 +10092,7 @@ function selectCreationRecord(setId) {
   }
 
   state.creation.recordSetId = set.setId;
+  state.creation.recordDetailExpanded = false;
   setCreationRecordFeedback();
   renderCreationRecordView();
 }
@@ -10153,23 +10156,18 @@ function reuseCreationRecordSet() {
 
 async function repairCreationRecordIncompleteImages() { if (state.creation.generating) return; const selectedSet = getCreationRecordSelectedSet(); if (!canRepairCreationSet(selectedSet)) { setCreationRecordFeedback("请先选择一个已保存的套图记录。", "error"); return; } const targetItems = getCreationIncompleteItems(selectedSet); if (targetItems.length === 0) { setCreationRecordFeedback("当前套图没有需要补齐的图像。", "success"); renderCreationRecordView(); return; } clearError(); applyCreationSetToForm(selectedSet); state.creation.currentSet = normalizeCreationSetForView(selectedSet); state.creation.recordSetId = selectedSet.setId; state.creation.generating = true; state.creation.generationScope = "repair"; state.creation.editingItemId = ""; targetItems.forEach((item) => updateCreationCurrentItem(item.itemId, { status: "generating", error: "", updatedAt: nowIso() })); setCreationRecordFeedback(`正在补齐未生成图像 ${targetItems.length} 张...`, "busy"); renderCreationView(); renderCreationRecordView(); try { await runCreationRepairRequest({ scope: "incomplete", set: selectedSet }); const refreshedSet = getCreationRecordSelectedSet(); const remainingCount = getCreationIncompleteItems(refreshedSet).length; setCreationRecordFeedback(remainingCount > 0 ? `仍有 ${remainingCount} 张图像未生成。` : "未生成图像已补齐。", remainingCount > 0 ? "error" : "success"); } catch (error) { const message = compactErrorMessage(error instanceof Error ? error.message : String(error), "套图补图请求失败"); setCreationRecordFeedback(message, "error"); showError(message); } finally { state.creation.generating = false; state.creation.generationScope = ""; renderCreationView(); renderCreationRecordView(); } }
 
+function toggleCreationRecordArchiveDetail() { state.creation.recordDetailExpanded = !state.creation.recordDetailExpanded; renderCreationRecordView(); }
+
 function renderCreationRecordArchiveDetail(set) {
-  if (!refs.creationRecordArchiveDetail) {
-    return;
-  }
+  if (!refs.creationRecordArchiveDetail) return;
+  refs.creationRecordArchiveDetail.innerHTML = ""; const archive = refs.creationRecordArchiveDetail.closest(".creation-record-archive"); archive?.classList.toggle("is-empty", !set); refs.creationRecordArchiveDetail.classList.remove("is-toggleable", "is-expanded", "is-collapsed");
+  if (!set) { const empty = document.createElement("span"); empty.textContent = "还没有套图记录。"; refs.creationRecordArchiveDetail.appendChild(empty); return; }
+  const progress = getCreationProgressSummary(set); const isExpanded = state.creation.recordDetailExpanded === true; refs.creationRecordArchiveDetail.classList.add("is-toggleable", isExpanded ? "is-expanded" : "is-collapsed");
+  const detailSummary = document.createElement("div"); detailSummary.className = "creation-record-detail-summary"; const summaryTitle = document.createElement("strong"); summaryTitle.textContent = set.productName || "未命名商品"; const summaryMeta = document.createElement("span"); summaryMeta.textContent = [set.scenarioLabel || CREATION_SCENARIO_LABELS[set.scenario] || "标准电商", `${progress.completed}/${progress.total}`, formatClock(set.createdAt)].filter(Boolean).join(" / "); detailSummary.append(summaryTitle, summaryMeta);
+  const detailToggle = document.createElement("button"); detailToggle.className = "creation-record-detail-toggle"; detailToggle.type = "button"; detailToggle.dataset.creationRecordDetailToggle = "true"; detailToggle.setAttribute("aria-expanded", String(isExpanded)); detailToggle.setAttribute("aria-label", isExpanded ? "折叠套图详情" : "展开套图详情"); detailToggle.title = isExpanded ? "折叠套图详情" : "展开套图详情";
+  const detailBody = document.createElement("div"); detailBody.className = "creation-record-detail-body"; refs.creationRecordArchiveDetail.append(detailSummary, detailToggle, detailBody);
+  if (!isExpanded) return;
 
-  refs.creationRecordArchiveDetail.innerHTML = "";
-  const archive = refs.creationRecordArchiveDetail.closest(".creation-record-archive");
-  archive?.classList.toggle("is-empty", !set);
-
-  if (!set) {
-    const empty = document.createElement("span");
-    empty.textContent = "还没有套图记录。";
-    refs.creationRecordArchiveDetail.appendChild(empty);
-    return;
-  }
-
-  const progress = getCreationProgressSummary(set);
   const detailItems = [
     ["商品", set.productName || "未命名商品"],
     ["场景", set.scenarioLabel || CREATION_SCENARIO_LABELS[set.scenario] || "标准电商"],
@@ -10185,14 +10183,7 @@ function renderCreationRecordArchiveDetail(set) {
     ["参考用途", formatCreationReferenceRoleSummary(set.referenceImageRoles)],
   ];
 
-  detailItems.filter(([, value]) => value).forEach(([label, value]) => {
-    const item = document.createElement("span");
-    const strong = document.createElement("strong");
-    strong.textContent = `${label}: `;
-    item.appendChild(strong);
-    item.append(document.createTextNode(value));
-    refs.creationRecordArchiveDetail.appendChild(item);
-  });
+  detailItems.filter(([, value]) => value).forEach(([label, value]) => { const item = document.createElement("span"); const strong = document.createElement("strong"); strong.textContent = `${label}: `; item.appendChild(strong); item.append(document.createTextNode(value)); detailBody.appendChild(item); });
 }
 
 function renderCreationRecordView() {
@@ -11056,16 +11047,14 @@ function applyCreationReferenceAnalysisRecommendations() {
       : item;
   });
   const productNameApplied = applyCreationReferenceAnalysisProductNameSuggestion(analysis);
-  const roleCorrectionSummary = summarizeCreationReferenceAnalysisRoleCorrections(analysis.recommendations);
   state.creationReferenceAnalysis.applied = true;
   state.creationReferenceAnalysis.collapsed = true;
-  const appliedMessage = productNameApplied
-    ? `已应用 ${analysis.recommendations.length} 张参考图用途建议，商品名称已填入四级类目。`
-    : `已应用 ${analysis.recommendations.length} 张参考图用途建议。`;
-  setCreationReferenceAnalysisFeedback(
-    roleCorrectionSummary ? `${appliedMessage}${roleCorrectionSummary}` : appliedMessage,
-    "success",
-  );
+  const appliedMessage = buildCreationReferenceAnalysisAppliedFeedbackMessage({
+    recommendationCount: analysis.recommendations.length,
+    productNameApplied,
+    recommendations: analysis.recommendations,
+  });
+  setCreationReferenceAnalysisFeedback(appliedMessage, "success");
   setCreationSelectValue(refs.creationVisualLanguageInput, previousVisualLanguage, "classic-commercial");
   renderCreationReferenceGrid();
   renderCreationReferenceAnalysis();
@@ -14188,7 +14177,7 @@ async function saveConfig(event) {
   state.config = toPublicBrowserConfig(browserConfig, state.config || {});
   refs.apiKeyInput.value = "";
   refs.directApiKeyInput.value = "";
-  configModelPicker.setFeedback("配置已保存到当前浏览器，本项目不会把 API Key 写入源码或 Cloudflare 环境变量。", "success");
+  configModelPicker.setFeedback("配置已保存到当前浏览器。", "success");
   syncConfigUi(state.config);
 }
 
@@ -14687,7 +14676,7 @@ async function runGeneration(job) {
           upsertGalleryItem(payload.item);
           state.selectedPreviewKey = makeGalleryPreviewKey(payload.item.filename);
         }
-        handleActivitySuccess(job.id);
+        handleActivitySuccess(job.id, payload.item);
         removeJob(job.id);
         renderAll();
         return;
@@ -15063,7 +15052,10 @@ function bindEvents() {
   refs.openConfigButton.addEventListener("click", () => setDrawerOpen(true));
   refs.closeConfigButton.addEventListener("click", () => setDrawerOpen(false));
   refs.closeConfigBackdrop.addEventListener("click", () => setDrawerOpen(false));
-  refs.uiLanguageInput.addEventListener("change", (event) => { setUiLanguage(event.target.value); });
+  refs.uiLanguageInput.addEventListener("change", (event) => {
+    setUiLanguage(event.target.value);
+    event.target.closest(".config-language-menu")?.removeAttribute("open");
+  });
   refs.openPromptAgentButton.addEventListener("click", () => setPromptAgentOpen(true));
   refs.promptAgentCloseButton.addEventListener("click", () => setPromptAgentOpen(false));
   refs.promptAgentBackdrop.addEventListener("click", () => setPromptAgentOpen(false));
@@ -15076,6 +15068,7 @@ function bindEvents() {
   refs.configForm.addEventListener("submit", (event) => {
     saveConfig(event).catch((error) => showError(error.message));
   });
+  refs.imageRouteInputs.forEach((input) => input.addEventListener("change", updateGenerationModeStatus));
   configModelPicker.bindEvents();
   refs.generateForm.addEventListener("submit", startGeneration);
   refs.articleIllustrationPlanButton.addEventListener("click", () => {
@@ -15261,8 +15254,10 @@ function bindEvents() {
   refs.creationRecordExportPromptsButton.addEventListener("click", exportCreationRecordPrompts);
   refs.creationRecordExportManifestButton.addEventListener("click", exportCreationRecordManifest);
   creationListingController.bindEvents();
+  refs.creationRecordArchiveDetail.addEventListener("click", (event) => { const detailToggle = event.target.closest("[data-creation-record-detail-toggle]"); if (detailToggle) toggleCreationRecordArchiveDetail(); });
   refs.creationRecordSearchInput.addEventListener("input", (event) => {
     state.creation.recordQuery = event.target.value;
+    state.creation.recordDetailExpanded = false;
     renderCreationRecordView();
   });
   refs.creationRecordSetList.addEventListener("click", (event) => {
@@ -16220,6 +16215,7 @@ async function bootstrap() {
   renderReferenceAnalysisSizeOptions();
   renderCreationIndustryTemplateBrowser(); void creationLogoLibrary.load();
   updateGenerateButton();
+  updateGenerationModeStatus();
   renderReferenceGrid();
   renderQuickBlendView();
   renderStyleTransferReferences();

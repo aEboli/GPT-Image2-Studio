@@ -1671,6 +1671,7 @@ test("Cloudflare generation reports the server image URL after best-effort R2 st
   assert.match(serverImageEvent.payload.item.imageUrl, /^\/api\/images\/images%2F/);
   assert.equal(serverImageEvent.payload.item.thumbnailUrl, serverImageEvent.payload.item.imageUrl);
   assert.equal(imageBucket.objects.size, 1);
+  assert.equal([...imageBucket.objects.values()][0].customMetadata.imageRoute, "a");
 });
 
 test("Cloudflare generation still returns chunked browser image when R2 image storage fails", async () => {

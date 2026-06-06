@@ -12,6 +12,7 @@ test("gallery metadata recovery stores only meaningful metadata fields in cache 
   const entry = buildGalleryMetadataCacheEntry({
     filename: "sample.jpeg",
     prompt: "直播带货主视觉",
+    imageRoute: "b",
     responsesModel: "gpt-5.4",
     imageModel: "gpt-image-2",
     ratio: "4:5",
@@ -28,6 +29,7 @@ test("gallery metadata recovery stores only meaningful metadata fields in cache 
 
   assert.deepEqual(entry, {
     prompt: "直播带货主视觉",
+    imageRoute: "b",
     responsesModel: "gpt-5.4",
     imageModel: "gpt-image-2",
     ratio: "4:5",
@@ -58,6 +60,7 @@ test("gallery metadata recovery fills missing server fields from local cache wit
   };
   const cachedEntry = {
     prompt: "直播带货主视觉",
+    imageRoute: "b",
     responsesModel: "gpt-5.4",
     imageModel: "gpt-image-2",
     ratio: "4:5",
@@ -74,6 +77,7 @@ test("gallery metadata recovery fills missing server fields from local cache wit
   const merged = mergeGalleryItemWithCachedMetadata(serverItem, cachedEntry);
 
   assert.equal(merged.prompt, "直播带货主视觉");
+  assert.equal(merged.imageRoute, "b");
   assert.equal(merged.responsesModel, "gpt-5.4");
   assert.equal(merged.imageModel, "gpt-image-2");
   assert.equal(merged.ratio, "4:5");
@@ -107,6 +111,7 @@ test("gallery metadata recovery only requests repair fields that are missing on 
   const mergedItem = {
     ...serverItem,
     prompt: "直播带货主视觉",
+    imageRoute: "b",
     responsesModel: "gpt-5.4",
     imageModel: "gpt-image-2",
     ratio: "4:5",
@@ -123,6 +128,7 @@ test("gallery metadata recovery only requests repair fields that are missing on 
 
   assert.deepEqual(patch, {
     prompt: "直播带货主视觉",
+    imageRoute: "b",
     baseUrl: "https://api.openai.com/v1",
     responsesModel: "gpt-5.4",
     imageModel: "gpt-image-2",

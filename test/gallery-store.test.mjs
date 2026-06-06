@@ -183,6 +183,7 @@ test("gallery store writes images into dated folders and persists searchable met
       prompt: "older prompt",
       createdAt: "2026-04-22T10:00:00.000Z",
       baseUrl: "https://api.openai.com/v1",
+      imageRoute: "b",
       responsesModel: "gpt-5.4",
       imageModel: "gpt-image-2",
       size: "1024x1536",
@@ -204,6 +205,7 @@ test("gallery store writes images into dated folders and persists searchable met
       prompt: "newer prompt",
       createdAt: "2026-04-22T12:00:00.000Z",
       baseUrl: "https://api.openai.com/v1",
+      imageRoute: "b",
       responsesModel: "gpt-5.4",
       imageModel: "gpt-image-2",
       size: "1536x1024",
@@ -256,6 +258,7 @@ test("gallery store writes images into dated folders and persists searchable met
   assert.deepEqual(metadataEntries.sort(), ["newer.json", "older.json"]);
   assert.deepEqual(Object.keys(indexPayload).sort(), ["newer.png", "older.jpeg"]);
   assert.equal(newerMetadata.prompt, "newer prompt");
+  assert.equal(newerMetadata.imageRoute, "b");
   assert.equal(newerMetadata.size, "1536x1024");
   assert.equal(newerMetadata.referenceImageName, "reference-a.png");
   assert.equal(newerMetadata.generationDurationMs, "7345");
@@ -268,6 +271,7 @@ test("gallery store writes images into dated folders and persists searchable met
   assert.equal(items[0].absolutePath, join(outputDir, "2026-04", "04-22", "2026-04-22-prompt", "newer.png"));
   assert.equal(items[0].imageUrl, items[0].thumbnailUrl);
   assert.equal(items[0].baseUrl, "https://api.openai.com/v1");
+  assert.equal(items[0].imageRoute, "b");
   assert.equal(items[0].responsesModel, "gpt-5.4");
   assert.equal(items[0].imageModel, "gpt-image-2");
   assert.equal(items[0].quality, "medium");
@@ -332,6 +336,7 @@ test("gallery store restores metadata from json sidecars when the index file is 
       prompt: "persist me",
       createdAt: "2026-04-24T09:30:00.000Z",
       baseUrl: "https://api.openai.com/v1",
+      imageRoute: "b",
       responsesModel: "gpt-5.4",
       imageModel: "gpt-image-2",
       size: "1024x1536",
@@ -358,6 +363,7 @@ test("gallery store restores metadata from json sidecars when the index file is 
   assert.equal(items[0].prompt, "persist me");
   assert.equal(items[0].size, "1024x1536");
   assert.equal(items[0].referenceImageName, "reference-a.png");
+  assert.equal(items[0].imageRoute, "b");
   assert.equal(items[0].responsesModel, "gpt-5.4");
 });
 

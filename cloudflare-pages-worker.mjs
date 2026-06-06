@@ -601,6 +601,7 @@ function buildStoredImageMetadata({ filename, createdAt, expiresAt, item = {} })
     "size",
     "quality",
     "format",
+    "imageRoute",
     "responsesModel",
     "imageModel",
   ];

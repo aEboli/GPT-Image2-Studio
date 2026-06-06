@@ -53,6 +53,39 @@ test("buildParameterText explicitly shows when no reference image was used", () 
   assert.match(result, /参考图：无/);
 });
 
+test("buildParameterText shows call mode and omits Responses-only fields for direct image calls", () => {
+  const result = buildParameterText(
+    {
+      imageRoute: "b",
+      size: "1024x1024",
+      imageModel: "gpt-image-2",
+      baseUrl: "https://direct-item.example/v1",
+      responsesModel: "gpt-5.4-mini",
+      reasoningEffort: "xhigh",
+    },
+    {
+      baseUrl: "https://route-a.example/v1",
+      directBaseUrl: "https://direct-config.example/v1",
+      responsesModel: "gpt-5.5",
+    },
+  );
+
+  assert.match(result, /调用模式：直接调用模式/);
+  assert.doesNotMatch(result, /思考等级：/);
+  assert.doesNotMatch(result, /外层模型：/);
+  assert.match(result, /中转：https:\/\/direct-item\.example\/v1/);
+
+  const fallbackResult = buildParameterText(
+    { generationRoute: "direct", size: "1024x1024", imageModel: "gpt-image-2" },
+    { baseUrl: "https://route-a.example/v1", directBaseUrl: "https://direct-config.example/v1" },
+  );
+
+  assert.match(fallbackResult, /调用模式：直接调用模式/);
+  assert.doesNotMatch(fallbackResult, /外层模型：/);
+  assert.doesNotMatch(fallbackResult, /中转：https:\/\/route-a\.example\/v1/);
+  assert.match(fallbackResult, /中转：https:\/\/direct-config\.example\/v1/);
+});
+
 test("formatRecentOutputMeta composes canvas and model summary", () => {
   const result = formatRecentOutputMeta({
     size: "1024 x 1280",

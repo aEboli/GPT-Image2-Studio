@@ -5,6 +5,8 @@ import {
   buildCanceledGenerationActivityDetail,
   buildGenerationTaskActivityDetail,
   buildGenerationTaskStatusText,
+  formatGenerationActivityModeLabel,
+  getGenerationActivityDisplayText,
   sanitizeGenerationActivityDetail,
   upsertGenerationActivityEntry,
 } from "../lib/generation-activity-feed.mjs";
@@ -120,6 +122,44 @@ test("generation activity canceled details omit prompt text", () => {
     }),
     "已取消排队任务",
   );
+});
+
+test("generation activity display text splits event details from status summary", () => {
+  assert.deepEqual(
+    getGenerationActivityDisplayText(
+      "最终失败：上游响应结束，但没有拿到最终图片。已收到事件：unknown, response.created, response.completed。请降低分辨率或并发后重试。",
+    ),
+    {
+      summary: "生成失败",
+      detail: "上游响应结束，但没有拿到最终图片。已收到事件：unknown, response.created, response.completed。请降低分辨率或并发后重试。",
+    },
+  );
+  assert.deepEqual(getGenerationActivityDisplayText("最终失败：fetch failed"), {
+    summary: "生成失败",
+    detail: "fetch failed",
+  });
+  assert.deepEqual(getGenerationActivityDisplayText("图像已成功生成"), {
+    summary: "图片已生成",
+    detail: "",
+  });
+  assert.deepEqual(getGenerationActivityDisplayText("正在生成图片"), {
+    summary: "图片生成中",
+    detail: "",
+  });
+  assert.deepEqual(getGenerationActivityDisplayText("已收到中途预览"), {
+    summary: "图片生成中",
+    detail: "",
+  });
+  assert.deepEqual(getGenerationActivityDisplayText("排队中：等待资源分配"), {
+    summary: "图片生成中",
+    detail: "等待资源分配",
+  });
+});
+
+test("generation activity mode label distinguishes route and direct calls", () => {
+  assert.equal(formatGenerationActivityModeLabel("a"), "路由模式");
+  assert.equal(formatGenerationActivityModeLabel("b"), "直接调用模式");
+  assert.equal(formatGenerationActivityModeLabel(""), "");
 });
 
 test("generation activity sanitizes prompt suffixes from persisted details", () => {

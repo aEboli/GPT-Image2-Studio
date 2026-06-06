@@ -29,7 +29,7 @@ test("config store returns empty public config before any save", async () => {
   });
   assert.deepEqual(config.limits, {
     maxParallelTasksPerSession: 15,
-    maxReferenceImages: 6,
+    maxReferenceImages: 15,
     maxCreationReferenceImages: 15,
     maxCreationStyleReferenceImages: 3,
     maxPortraitPersonReferenceImages: 3,

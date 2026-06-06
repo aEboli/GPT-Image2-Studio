@@ -65,7 +65,7 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Sora:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260528-creation-sku-rule-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260607-creation-record-detail-toggle-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -153,6 +153,8 @@
           </div>
         </nav>
 
+        <div id="generationModeStatus" class="header-pill generation-mode-status" aria-label="当前生图调用模式：路由模式" title="当前生图调用模式：路由模式">路由模式</div>
+
         <div class="topbar-api-check" aria-label="API、LOG">
           <button class="header-pill status-ready" id="connectionStatus" data-state="idle" type="button" aria-label="待填写API、LOG，打开 API、LOG">
             <span class="status-dot"></span>
@@ -187,7 +189,7 @@
                     <div>
                       <span>参考图</span>
                     </div>
-                    <small id="referenceCount">0 / 6</small>
+                    <small id="referenceCount">0 / 15</small>
                   </summary>
 
                   <label class="reference-dropzone" id="referenceDropzone">
@@ -395,7 +397,7 @@
                 <div>
                   <h2>融图分析</h2>
                 </div>
-                <span class="count-pill small" id="referenceAnalysisCount">0 / 6</span>
+                <span class="count-pill small" id="referenceAnalysisCount">0 / 15</span>
               </div>
 
               <label class="reference-dropzone reference-analysis-dropzone" id="referenceAnalysisDropzone">
@@ -1117,7 +1119,7 @@
                     <div>
                       <span>待加 Logo 图片</span>
                     </div>
-                    <small id="creationLogoBatchSourceCount">0 / 6</small>
+                    <small id="creationLogoBatchSourceCount">0 / 15</small>
                   </div>
                   <label class="reference-dropzone creation-logo-batch-source-dropzone" id="creationLogoBatchSourceDropzone">
                     <input id="creationLogoBatchSourceInput" name="logoBatchSourceImages" type="file" accept="image/*" multiple />
@@ -1161,7 +1163,7 @@
                     name="dimensionSpecs"
                     rows="1"
                     maxlength="360"
-                    placeholder="例如：高 14.5 cm，直径 11 cm，容量 350 ml"
+                    placeholder="例如：长 13 cm，宽 2 cm，高 3 cm，重 42 g"
                   ></textarea>
                 </label>
 
@@ -2395,112 +2397,129 @@
 
     <aside class="config-drawer" id="configDrawer" aria-hidden="true">
       <div class="drawer-backdrop" id="closeConfigBackdrop"></div>
-      <div class="drawer-panel">
+      <div class="drawer-panel config-panel">
         <div class="drawer-head">
           <div>
-            <p class="drawer-eyebrow">Config</p>
-            <h2>本地连接配置</h2>
+            <h2>连接配置</h2>
           </div>
           <div class="drawer-head-actions config-actions-row">
-            <button class="header-button" id="testConnectionButton" type="button">测试连接</button>
+            <details class="config-language-menu">
+              <summary class="header-button config-language-trigger" aria-label="切换界面语言">
+                <span aria-hidden="true">文</span>
+              </summary>
+              <div class="config-language-popover">
+                <label class="config-language-field">
+                  <span>界面语言</span>
+                  <select id="uiLanguageInput" name="uiLanguage">
+                    <option value="zh-CN" selected>简体中文</option>
+                    <option value="en">English</option>
+                  </select>
+                </label>
+              </div>
+            </details>
             <button class="header-button" id="closeConfigButton" type="button">关闭</button>
           </div>
         </div>
 
-        <form class="config-form" id="configForm">
-          <fieldset class="route-selector" aria-label="生图调用模式">
-            <legend>生图调用模式</legend>
-            <label>
-              <input name="imageRoute" type="radio" value="a" checked />
-              <span>路由模式</span>
-            </label>
-            <label>
-              <input name="imageRoute" type="radio" value="b" />
-              <span>直接调用模式</span>
-            </label>
-          </fieldset>
-
-          <div class="route-config-panel" data-route-panel="a">
-            <label class="field">
-              <span>路由模式 URL</span>
-              <input id="baseUrlInput" name="baseUrl" type="url" placeholder="https://api.openai.com/v1" required />
-            </label>
-
-            <label class="field">
-              <div class="field-heading inline">
-                <span>路由模式 API Key</span>
-                <small id="savedKeyMask">未保存</small>
+        <div class="config-drawer-body">
+          <form class="config-form" id="configForm">
+            <section class="config-card config-connection-card" aria-labelledby="configConnectionTitle">
+              <div class="config-card-head">
+                <h3 id="configConnectionTitle">调用通道</h3>
               </div>
-              <input id="apiKeyInput" name="apiKey" type="password" placeholder="留空则保持当前浏览器已保存的 key" />
-            </label>
 
-            <div class="field model-field">
-              <div class="field-heading inline">
-                <label for="responsesModelInput">路由模式 Responses 模型</label>
-                <button class="inline-button" id="fetchModelsButton" type="button">获取模型列表</button>
+              <fieldset class="route-selector" aria-label="生图调用模式">
+                <legend>生图调用模式</legend>
+                <label>
+                  <input name="imageRoute" type="radio" value="a" checked />
+                  <span>路由模式</span>
+                </label>
+                <label>
+                  <input name="imageRoute" type="radio" value="b" />
+                  <span>直接调用模式</span>
+                </label>
+              </fieldset>
+
+              <div class="config-route-fields">
+                <div class="route-config-panel" data-route-panel="a">
+                  <label class="field">
+                    <span>接口地址</span>
+                    <input id="baseUrlInput" name="baseUrl" type="url" placeholder="https://api.openai.com/v1" required />
+                  </label>
+
+                  <label class="field">
+                    <div class="field-heading inline">
+                      <span>API Key</span>
+                      <small id="savedKeyMask">未保存</small>
+                    </div>
+                    <input id="apiKeyInput" name="apiKey" type="password" placeholder="保持已保存 Key" />
+                  </label>
+
+                  <div class="field model-field">
+                    <div class="field-heading inline">
+                      <label for="responsesModelInput">Responses 模型</label>
+                      <button class="inline-button" id="fetchModelsButton" type="button">获取模型列表</button>
+                    </div>
+                    <div class="model-picker-control">
+                      <input id="responsesModelInput" name="responsesModel" type="text" placeholder="gpt-5.5" autocomplete="off" aria-controls="modelOptionsList" />
+                      <button class="model-picker-toggle" id="modelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="modelOptionsList" hidden></button>
+                      <div class="model-options-list" id="modelOptionsList" role="listbox" hidden></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="route-config-panel" data-route-panel="b">
+                  <label class="field">
+                    <span>接口地址</span>
+                    <input id="directBaseUrlInput" name="directBaseUrl" type="url" placeholder="https://api.openai.com/v1" required />
+                  </label>
+
+                  <label class="field">
+                    <div class="field-heading inline">
+                      <span>API Key</span>
+                      <small id="directSavedKeyMask">未保存</small>
+                    </div>
+                    <input id="directApiKeyInput" name="directApiKey" type="password" placeholder="保持已保存 Key" />
+                  </label>
+
+                  <div class="field model-field">
+                    <div class="field-heading inline">
+                      <label for="directImageModelInput">生图模型</label>
+                      <button class="inline-button" id="directFetchModelsButton" type="button">获取模型列表</button>
+                    </div>
+                    <div class="model-picker-control">
+                      <input id="directImageModelInput" name="directImageModel" type="text" placeholder="gpt-image-2" autocomplete="off" aria-controls="directModelOptionsList" />
+                      <button class="model-picker-toggle" id="directModelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="directModelOptionsList" hidden></button>
+                      <div class="model-options-list" id="directModelOptionsList" role="listbox" hidden></div>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div class="model-picker-control">
-                <input id="responsesModelInput" name="responsesModel" type="text" placeholder="gpt-5.5" autocomplete="off" aria-controls="modelOptionsList" />
-                <button class="model-picker-toggle" id="modelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="modelOptionsList" hidden></button>
-                <div class="model-options-list" id="modelOptionsList" role="listbox" hidden></div>
-              </div>
+            </section>
+
+            <div class="config-action-bar">
+              <p class="config-note" id="configFeedback" aria-live="polite"></p>
+              <button class="header-button" id="testConnectionButton" type="button">测试连接</button>
+              <button class="generate-button" type="submit">保存</button>
             </div>
-          </div>
+          </form>
 
-          <div class="route-config-panel" data-route-panel="b">
-            <label class="field">
-              <span>直接调用模式 URL</span>
-              <input id="directBaseUrlInput" name="directBaseUrl" type="url" placeholder="https://api.openai.com/v1" required />
-            </label>
-
-            <label class="field">
-              <div class="field-heading inline">
-                <span>直接调用模式 API Key</span>
-                <small id="directSavedKeyMask">未保存</small>
+          <section class="config-log-panel live-panel config-card" id="configGenerationLogPanel" aria-label="生成日志">
+            <div class="panel-title between">
+              <div>
+                <h2>生成日志</h2>
               </div>
-              <input id="directApiKeyInput" name="directApiKey" type="password" placeholder="留空则保持当前浏览器已保存的 key" />
-            </label>
-
-            <div class="field model-field">
-              <div class="field-heading inline">
-                <label for="directImageModelInput">直接调用模式生图模型</label>
-                <button class="inline-button" id="directFetchModelsButton" type="button">获取模型列表</button>
-              </div>
-              <div class="model-picker-control">
-                <input id="directImageModelInput" name="directImageModel" type="text" placeholder="gpt-image-2" autocomplete="off" aria-controls="directModelOptionsList" />
-                <button class="model-picker-toggle" id="directModelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="directModelOptionsList" hidden></button>
-                <div class="model-options-list" id="directModelOptionsList" role="listbox" hidden></div>
-              </div>
+              <span class="count-pill small" id="liveCount">0 / 15</span>
             </div>
-          </div>
 
-          <label class="field ui-language-field">
-            <span>界面语言</span>
-            <select id="uiLanguageInput" name="uiLanguage">
-              <option value="zh-CN" selected>简体中文</option>
-              <option value="en">English</option>
-            </select>
-          </label>
-
-          <button class="generate-button" type="submit">保存配置</button>
-          <p class="config-note" id="configFeedback">API Key 只保存在当前浏览器，不会写入源码或 Cloudflare 环境变量。</p>
-        </form>
-
-        <section class="config-log-panel live-panel" id="configGenerationLogPanel" aria-label="生成日志">
-          <div class="panel-title between">
-            <div>
-              <h2>生成日志</h2>
-            </div>
-            <span class="count-pill small" id="liveCount">0 / 15</span>
-          </div>
-
-          <div class="error-banner hidden" id="errorBanner" role="alert" aria-live="assertive"></div>
-          <ol class="timeline-list" id="timelineList"></ol>
-          <button class="timeline-new-indicator hidden" id="timelineNewIndicator" type="button" aria-label="查看新动态">
-            <span aria-hidden="true">↑</span>
-            <strong id="timelineNewCount">0</strong>
-          </button>
-        </section>
+            <div class="error-banner hidden" id="errorBanner" role="alert" aria-live="assertive"></div>
+            <ol class="timeline-list" id="timelineList"></ol>
+            <button class="timeline-new-indicator hidden" id="timelineNewIndicator" type="button" aria-label="查看新动态">
+              <span aria-hidden="true">↑</span>
+              <strong id="timelineNewCount">0</strong>
+            </button>
+          </section>
+        </div>
       </div>
     </aside>
 
@@ -2594,6 +2613,6 @@
       </div>
     </aside>
 
-    <script type="module" src="./app.js?v=20260603-creation-reference-15-drag-1"></script>
+    <script type="module" src="./app.js?v=20260607-creation-record-detail-toggle-1"></script>
   </body>
 </html>

@@ -2,7 +2,7 @@ export const VIEW_MODULE_URLS = Object.freeze({
   "style-transfer": "/lib/views/style-transfer-view.mjs",
   "reference-analysis": "/lib/views/reference-analysis-view.mjs",
   "image-decomposition": "/lib/views/image-decomposition-view.mjs",
-  "quick-blend": "/lib/views/quick-blend-view.mjs?v=20260530-quick-blend-fix-2",
+  "quick-blend": "/lib/views/quick-blend-view.mjs?v=20260606-quick-blend-pair-delete-1",
   "image-compress": "/lib/views/image-compress-view.mjs",
   "article-illustration": "/lib/views/article-illustration-view.mjs",
   "creation": "/lib/views/creation-view.mjs",

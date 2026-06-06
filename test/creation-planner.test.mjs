@@ -491,7 +491,7 @@ test("creation planner defaults to English copy and metric-plus-imperial specs",
   assert.equal(plan.targetLanguage, "en");
   assert.equal(plan.targetLanguageLabel, "English");
   assert.equal(plan.dimensionUnitMode, "both");
-  assert.match(plan.items[0].prompt, /13cm \(5\.12 in\)\/35g \(1\.23 oz\)/);
+  assert.match(plan.items[0].prompt, /Length 13cm \(5\.12 in\) \/ Weight 35g \(1\.23 oz\)/);
   assert.match(plan.items[0].prompt, /Use concise English marketing copy/);
 });
 
@@ -1067,8 +1067,9 @@ test("creation planner only injects selected size specifications into the dimens
   const comparisonPrompt = plan.items.find((item) => item.role === "comparison").prompt;
   const dimensionsPrompt = plan.items.find((item) => item.role === "dimensions").prompt;
 
-  assert.equal(plan.dimensionSpecs, "Height 145mm\nDiameter 110mm\nCapacity 350ml");
-  assert.match(dimensionsPrompt, /Dimension specifications for this size chart only: Height 145mm \/ Diameter 110mm \/ Capacity 350ml\./);
+  assert.equal(plan.dimensionSpecs, "Height 145mm");
+  assert.match(dimensionsPrompt, /Dimension specifications for this size chart only: Height 145mm\./);
+  assert.doesNotMatch(dimensionsPrompt, /Diameter 110mm|Capacity 350ml/);
   assert.match(dimensionsPrompt, /The dimensions\/specification image must visibly present these exact specifications/);
   assert.match(dimensionsPrompt, /Render all recognized dimension values in metric units only\./);
   assert.doesNotMatch(heroPrompt, /145mm|110mm|350ml|Dimension specifications for this size chart only|Set-level dimension/);
@@ -1096,10 +1097,12 @@ test("creation planner converts dimension specs to the selected unit mode", () =
   });
 
   assert.equal(metricPlan.dimensionUnitMode, "metric");
-  assert.match(metricPlan.items[0].prompt, /Height 14\.48 cm \/ Diameter 10\.92 cm \/ Capacity 354\.88 ml/);
+  assert.match(metricPlan.items[0].prompt, /Height 14\.48 cm/);
+  assert.doesNotMatch(metricPlan.items[0].prompt, /Diameter 10\.92 cm|Capacity 354\.88 ml/);
   assert.doesNotMatch(metricPlan.items[0].prompt, /5\.7 in|4\.3 in|12 fl oz/);
   assert.equal(bothPlan.dimensionUnitMode, "both");
-  assert.match(bothPlan.items[0].prompt, /Height 14\.5 cm \(5\.71 in\) \/ Capacity 350 ml \(11\.83 fl oz\)/);
+  assert.match(bothPlan.items[0].prompt, /Height 14\.5 cm \(5\.71 in\)/);
+  assert.doesNotMatch(bothPlan.items[0].prompt, /Capacity 350 ml|11\.83 fl oz/);
 });
 
 test("creation planner converts compact metric weight specs in selected unit mode", () => {
@@ -1113,7 +1116,7 @@ test("creation planner converts compact metric weight specs in selected unit mod
     dimensionUnitMode: "both",
   });
 
-  assert.match(plan.items[0].prompt, /13cm \(5\.12 in\)\/35g \(1\.23 oz\)/);
+  assert.match(plan.items[0].prompt, /Length 13cm \(5\.12 in\) \/ Weight 35g \(1\.23 oz\)/);
 });
 
 test("creation planner applies selected unit mode to dimensions recognized from reference notes", () => {
@@ -1138,9 +1141,10 @@ test("creation planner applies selected unit mode to dimensions recognized from 
 
   assert.equal(plan.dimensionUnitMode, "both");
   assert.match(dimensionsPrompt, /Dimension specifications recognized from reference notes/);
-  assert.match(dimensionsPrompt, /Length 130mm \(5\.12 in\) \/ Weight 35g \(1\.23 oz\) \/ Hook Size 4# \/ Sinking Rate slow sinking/);
+  assert.match(dimensionsPrompt, /Length 130mm \(5\.12 in\) \/ Weight 35g \(1\.23 oz\)/);
+  assert.doesNotMatch(dimensionsPrompt, /Hook Size|Sinking Rate|slow sinking/);
   assert.match(dimensionsPrompt, /Render each recognized dimension value with metric first and imperial in parentheses/);
-  assert.equal(plan.dimensionSpecs, "Length 130mm (5.12 in)\nWeight 35g (1.23 oz)\nHook Size 4#\nSinking Rate slow sinking");
+  assert.equal(plan.dimensionSpecs, "Length 130mm (5.12 in)\nWeight 35g (1.23 oz)");
   assert.doesNotMatch(
     heroPrompt,
     /130mm|35g|5\.12 in|1\.23 oz|Set-level dimension|Dimension specifications recognized/,
@@ -1214,12 +1218,13 @@ test("creation planner dedupes noisy reference-derived dimensions and stores sel
 
   assert.equal(
     plan.dimensionSpecs,
-    "Model F4J16\nLength 13cm (5.12 in)\nWeight 42g (1.48 oz)\nHook Size 2#",
+    "Length 13cm (5.12 in)\nWeight 42g (1.48 oz)",
   );
   assert.match(
     dimensionsPrompt,
-    /Dimension specifications recognized from reference notes: Model F4J16 \/ Length 13cm \(5\.12 in\) \/ Weight 42g \(1\.48 oz\) \/ Hook Size 2#\./,
+    /Dimension specifications recognized from reference notes: Length 13cm \(5\.12 in\) \/ Weight 42g \(1\.48 oz\)\./,
   );
+  assert.doesNotMatch(dimensionsPrompt, /Model F4J16|Hook Size 2#/);
   assert.doesNotMatch(dimensionsPrompt, /Package checklist area|Main product card also shows|Size & Specs card/);
   assert.equal((dimensionsPrompt.match(/13cm/g) || []).length, 1);
   assert.equal((dimensionsPrompt.match(/42g/g) || []).length, 1);
@@ -1261,9 +1266,10 @@ test("creation planner prefers dimensions reference values over incidental image
 
   assert.equal(
     plan.dimensionSpecs,
-    "Model F4J16\nLength 13cm (5.12 in)\nWeight 42g (1.48 oz)\nHook Size 2#",
+    "Length 13cm (5.12 in)\nWeight 42g (1.48 oz)",
   );
   assert.match(dimensionsPrompt, /Length 13cm \(5\.12 in\)/);
+  assert.doesNotMatch(dimensionsPrompt, /Model F4J16|Hook Size 2#/);
   assert.doesNotMatch(dimensionsPrompt, /12cm|14cm|Package icon row|Hero image has/);
 });
 
@@ -1290,7 +1296,8 @@ test("creation planner reserves product analyst-note specifications for the dime
   const dimensionsPrompt = plan.items.find((item) => item.role === "dimensions").prompt;
 
   assert.match(dimensionsPrompt, /Dimension specifications recognized from reference notes/);
-  assert.match(dimensionsPrompt, /Length 130mm \(5\.12 in\) \/ Weight 35g \(1\.23 oz\) \/ Hook Size 4#/);
+  assert.match(dimensionsPrompt, /Length 130mm \(5\.12 in\) \/ Weight 35g \(1\.23 oz\)/);
+  assert.doesNotMatch(dimensionsPrompt, /Hook Size|Sinking Rate|slow sinking/);
   assert.ok(
     nonDimensionPrompts.every(
       (prompt) =>
@@ -1299,7 +1306,7 @@ test("creation planner reserves product analyst-note specifications for the dime
   );
   assert.ok(
     nonDimensionPrompts.every((prompt) =>
-      prompt.includes("reserve all exact specifications for the dimensions/specification image only."),
+      prompt.includes("reserve these exact size and weight values for the dimensions/specification image only."),
     ),
   );
 });
@@ -1324,15 +1331,14 @@ test("creation planner carries exact lure specification table values into dimens
   const heroPrompt = plan.items.find((item) => item.role === "hero").prompt;
   const dimensionsPrompt = plan.items.find((item) => item.role === "dimensions").prompt;
 
-  assert.match(dimensionsPrompt, /型号 F4J16/);
   assert.match(dimensionsPrompt, /长度 13cm/);
   assert.match(dimensionsPrompt, /重量 42g/);
-  assert.match(dimensionsPrompt, /钩号 2#/);
+  assert.doesNotMatch(dimensionsPrompt, /型号 F4J16|钩号 2#/);
   assert.match(dimensionsPrompt, /Dimension specifications recognized from reference notes/);
   assert.doesNotMatch(heroPrompt, /型号 F4J16、长度 13cm、重量 42g、钩号 2#/);
 });
 
-test("creation planner forces every recognized lure dimension and action attribute into the dimensions prompt", () => {
+test("creation planner limits recognized lure specs to length height width depth and weight", () => {
   const plan = buildCreationPlan({
     productName: "Electric jointed fishing lure",
     productDescription: "Segmented bionic swim bait with hooks",
@@ -1354,12 +1360,38 @@ test("creation planner forces every recognized lure dimension and action attribu
 
   assert.equal(
     plan.dimensionSpecs,
-    "Length 130mm (5.12 in)\nWeight 35g (1.23 oz)\nHook Size 4#\nSinking Rate slow sinking",
+    "Length 130mm (5.12 in)\nWeight 35g (1.23 oz)",
   );
-  assert.match(dimensionsPrompt, /Length 130mm \(5\.12 in\) \/ Weight 35g \(1\.23 oz\) \/ Hook Size 4# \/ Sinking Rate slow sinking/);
+  assert.match(dimensionsPrompt, /Length 130mm \(5\.12 in\) \/ Weight 35g \(1\.23 oz\)/);
+  assert.doesNotMatch(dimensionsPrompt, /Hook Size 4#|Sinking Rate slow sinking/);
   assert.match(dimensionsPrompt, /Mandatory visible specification labels/);
-  assert.match(dimensionsPrompt, /Do not omit, merge, blur, replace, or paraphrase any listed specification/);
+  assert.match(dimensionsPrompt, /Do not omit, merge, blur, replace, or paraphrase any listed size or weight value/);
   assert.doesNotMatch(heroPrompt, /130mm|35g|Hook Size 4#|slow sinking/);
+});
+
+test("creation planner removes model hook capacity and other non-size facts from manual dimensions", () => {
+  const plan = buildCreationPlan({
+    productName: "F4J16 jointed fishing lure",
+    productDescription: "Multi-section bionic swim bait",
+    sellingPoints: "realistic finish",
+    targetLanguage: "en",
+    selectedRoles: ["dimensions"],
+    dimensionUnitMode: "both",
+    dimensionSpecs:
+      "Model F4J16, Length 13cm, Width 2cm, Height 3cm, Weight 42g, Hook Size 2#, Capacity 350 ml, Sinking Rate 0.5m/s",
+  });
+
+  const dimensionsPrompt = plan.items.find((item) => item.role === "dimensions").prompt;
+
+  assert.equal(
+    plan.dimensionSpecs,
+    "Length 13cm (5.12 in)\nHeight 3cm (1.18 in)\nWidth 2cm (0.79 in)\nWeight 42g (1.48 oz)",
+  );
+  assert.match(
+    dimensionsPrompt,
+    /Length 13cm \(5\.12 in\) \/ Height 3cm \(1\.18 in\) \/ Width 2cm \(0\.79 in\) \/ Weight 42g \(1\.48 oz\)/,
+  );
+  assert.doesNotMatch(dimensionsPrompt, /Model F4J16|Hook Size 2#|Capacity 350 ml|Sinking Rate|0\.5m/);
 });
 
 test("creation planner exposes scenario-specific role presets", () => {
@@ -2100,6 +2132,41 @@ test("creation reference analysis treats grouped white-background SKU references
   assert.match(analysis.recommendations[0].roleCorrectionReason, /reference-product 调整为 product/);
   assert.match(analysis.recommendations[0].roleCorrectionReason, /2 个完整产品单位/);
   assert.equal(analysis.skuSubjects[0].subjectUnitCount, 2);
+});
+
+test("creation reference analysis preserves a single full-set main subject anchor", () => {
+  const analysis = normalizeCreationReferenceAnalysis(
+    {
+      summary: "识别到一张整套主主体锚点参考图。",
+      reference_roles: [
+        {
+          index: 1,
+          filename: "hero-anchor.png",
+          role: "reference-product",
+          title: "Single full-set main subject anchor",
+          note: "Use this as the single full-set main subject anchor; keep SKU colorway fidelity, but it is not an ordinary SKU card.",
+        },
+      ],
+      sku_subjects: [
+        {
+          id: "hero-anchor",
+          title: "整套主体锚点",
+          reference_indexes: [1],
+          filenames: ["hero-anchor.png"],
+          subject_unit_count: 1,
+          note: "单一完整主体锚点。",
+        },
+      ],
+      risks: [],
+    },
+    ["hero-anchor.png"],
+  );
+
+  assert.deepEqual(
+    analysis.recommendations.map((entry) => [entry.filename, entry.role, entry.roleLabel]),
+    [["hero-anchor.png", "reference-product", "参考主体"]],
+  );
+  assert.equal(analysis.recommendations[0].roleCorrectionReason, undefined);
 });
 
 test("creation planner applies one SKU series consistency lock across all SKU prompts", () => {

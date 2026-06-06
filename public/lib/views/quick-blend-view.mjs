@@ -310,6 +310,46 @@ function removeQuickBlendFile(group, itemId) {
   renderQuickBlendView();
 }
 
+function removeQuickBlendPair(pairIndex) {
+  const normalizedIndex = Number(pairIndex);
+  if (!Number.isInteger(normalizedIndex) || normalizedIndex < 0) {
+    return false;
+  }
+
+  let removedAny = false;
+  for (const group of QUICK_BLEND_GROUPS) {
+    const key = getQuickBlendGroupKey(group);
+    const files = state.quickBlend[key] || [];
+    if (normalizedIndex >= files.length) {
+      continue;
+    }
+
+    const next = [...files];
+    const [removedItem] = next.splice(normalizedIndex, 1);
+    state.quickBlend[key] = next;
+    if (!removedItem) {
+      continue;
+    }
+
+    removedAny = true;
+    if (state.quickBlendPreviewItem?.id === removedItem.id) {
+      closeReferencePreview();
+    }
+    revokeReferencePreview(removedItem);
+    const input = getQuickBlendGroupInput(group);
+    if (input) input.value = "";
+  }
+
+  if (!removedAny) {
+    return false;
+  }
+
+  state.quickBlend.feedback = "";
+  state.quickBlend.feedbackKind = "";
+  renderQuickBlendView();
+  return true;
+}
+
 function openQuickBlendPreview(group, itemId) {
   const item = getQuickBlendGroupFiles(group).find((entry) => entry.id === itemId);
   if (!item?.previewUrl) {
@@ -486,6 +526,15 @@ function renderQuickBlendPairList() {
       groupName.textContent = pair[group]?.file?.name || `缺少 ${label} 图`;
       row.append(groupLabel, groupName);
     }
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.className = "quick-blend-pair-remove";
+    removeButton.dataset.quickBlendPairRemoveIndex = String(pair.index);
+    removeButton.textContent = "x";
+    removeButton.setAttribute("aria-label", `删除第 ${pair.index + 1} 对参考图`);
+    removeButton.title = `删除第 ${pair.index + 1} 对`;
+    removeButton.addEventListener("click", () => removeQuickBlendPair(pair.index));
+    row.appendChild(removeButton);
     refs.quickBlendPairList.appendChild(row);
   });
 }
@@ -890,7 +939,18 @@ function renderQuickBlendGenerationStrip() {
     } else {
       const ghost = document.createElement("div");
       ghost.className = "filmstrip-ghost";
-      ghost.textContent = item?.isRunning || item?.started ? "生成中" : "等待";
+      if (item?.isRunning || item?.started) {
+        const loader = document.createElement("div");
+        loader.className = "quick-blend-thumb-loader";
+        loader.setAttribute("aria-hidden", "true");
+        const label = document.createElement("span");
+        label.textContent = "生成中";
+        loader.appendChild(label);
+        ghost.appendChild(loader);
+        ghost.setAttribute("aria-label", label.textContent);
+      } else {
+        ghost.textContent = "等待";
+      }
       button.appendChild(ghost);
     }
 

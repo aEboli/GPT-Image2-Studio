@@ -19,11 +19,11 @@ const publicConfigModelPickerPath = new URL("../public/lib/config-model-picker.m
 const publicCreationListingViewPath = new URL("../public/lib/creation-listing-view.mjs", import.meta.url);
 const generationClientPath = new URL("../lib/generation-client.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20260528-creation-sku-rule-1";
-const appAssetVersion = "20260603-creation-reference-15-drag-1";
+const stylesAssetVersion = "20260607-creation-record-detail-toggle-1";
+const appAssetVersion = "20260607-creation-record-detail-toggle-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
 const creationQueueModuleAssetVersion = "20260530-creation-queue-role-sync-1";
-const quickBlendModuleAssetVersion = "20260530-quick-blend-fix-2";
+const quickBlendModuleAssetVersion = "20260606-quick-blend-pair-delete-1";
 
 test("static assets use the current cache-busting version", async () => {
   const html = await readFile(indexPath, "utf8");
@@ -426,22 +426,52 @@ test("generation activity moves into settings while studio workspace reflows to 
   assert.match(html, /data-nav-action="activity-log"[\s\S]*生成日志/);
   assert.match(
     html,
-    /<form class="config-form" id="configForm">[\s\S]*<\/form>\s*<section class="config-log-panel live-panel" id="configGenerationLogPanel" aria-label="生成日志">[\s\S]*id="timelineList"/,
+    /<form class="config-form" id="configForm">[\s\S]*<\/form>\s*<section class="config-log-panel live-panel config-card" id="configGenerationLogPanel" aria-label="生成日志">[\s\S]*id="timelineList"/,
   );
   assert.match(styles, /\.studio-grid\s*\{[\s\S]*grid-template-columns:\s*var\(--studio-grid-left,\s*392px\)\s*minmax\(0,\s*1fr\);/);
   assert.match(styles, /html\[data-ui-layout="narrow-desktop"\] \.studio-grid\s*\{[\s\S]*grid-template-columns:\s*360px\s*minmax\(0,\s*1fr\);/);
-  assert.match(styles, /\.config-log-panel\.live-panel\s*\{[\s\S]*min-height:\s*320px;[\s\S]*height:\s*min\(52svh,\s*520px\);/);
+  assert.match(styles, /\.config-log-panel\.live-panel\s*\{[\s\S]*min-height:\s*180px;[\s\S]*height:\s*auto;/);
+  assert.match(styles, /\.timeline-item\s*\{[\s\S]*grid-template-columns:\s*24px\s+minmax\(0,\s*1fr\)\s+88px\s+42px\s+78px\s+64px;/);
   assert.match(styles, /\.timeline-copy\s*\{[\s\S]*display:\s*contents;/);
-  assert.match(styles, /\.timeline-copy > span\s*\{[\s\S]*grid-column:\s*2;[\s\S]*grid-row:\s*1;/);
-  assert.match(styles, /\.timeline-ratio\s*\{[\s\S]*grid-column:\s*3;[\s\S]*grid-row:\s*1;/);
-  assert.match(styles, /\.timeline-resolution\s*\{[\s\S]*grid-column:\s*4;[\s\S]*grid-row:\s*1;/);
-  assert.match(styles, /\.timeline-item time\s*\{[\s\S]*grid-column:\s*5;[\s\S]*grid-row:\s*1;/);
+  assert.match(styles, /\.timeline-summary\s*\{[\s\S]*grid-column:\s*2;[\s\S]*grid-row:\s*1;/);
+  assert.match(readCssRule(styles, ".timeline-summary"), /white-space:\s*nowrap;/);
+  assert.doesNotMatch(readCssRule(styles, ".timeline-summary"), /text-overflow:\s*ellipsis|overflow:\s*hidden/);
+  assert.match(styles, /\.timeline-detail\s*\{[\s\S]*grid-column:\s*2 \/ -1;[\s\S]*grid-row:\s*2;/);
+  assert.match(styles, /\.timeline-params\s*\{[\s\S]*grid-column:\s*2 \/ -1;[\s\S]*white-space:\s*pre-wrap;/);
+  assert.match(styles, /\.timeline-url\s*\{[\s\S]*grid-column:\s*2 \/ -1;[\s\S]*grid-row:\s*2;/);
+  assert.match(readCssRule(styles, ".timeline-url"), /white-space:\s*normal;/);
+  assert.match(readCssRule(styles, ".timeline-url"), /overflow-wrap:\s*anywhere;/);
+  assert.doesNotMatch(readCssRule(styles, ".timeline-url"), /text-overflow:\s*ellipsis|white-space:\s*nowrap/);
+  assert.match(styles, /\.timeline-item\.has-url \.timeline-detail\s*\{[\s\S]*grid-row:\s*3;/);
+  assert.match(styles, /\.timeline-mode\s*\{[\s\S]*grid-column:\s*3;[\s\S]*grid-row:\s*1;/);
+  assert.match(styles, /\.timeline-ratio\s*\{[\s\S]*grid-column:\s*4;[\s\S]*grid-row:\s*1;/);
+  assert.match(styles, /\.timeline-resolution\s*\{[\s\S]*grid-column:\s*5;[\s\S]*grid-row:\s*1;/);
+  assert.match(styles, /\.timeline-item time\s*\{[\s\S]*grid-column:\s*6;[\s\S]*grid-row:\s*1;/);
+  assert.match(styles, /\.timeline-summary,\s*\.timeline-url,\s*\.timeline-mode,\s*\.timeline-ratio,\s*\.timeline-resolution,\s*\.timeline-item time\s*\{[\s\S]*font-size:\s*0\.72rem;/);
+  assert.match(styles, /\.timeline-mode,\s*\.timeline-ratio,\s*\.timeline-resolution,\s*\.timeline-item time\s*\{[\s\S]*white-space:\s*normal;[\s\S]*overflow-wrap:\s*anywhere;/);
+  assert.match(styles, /\.timeline-ratio,\s*\.timeline-resolution,\s*\.timeline-item time\s*\{[\s\S]*font-variant-numeric:\s*tabular-nums;/);
   assert.match(app, /configGenerationLogPanel:\s*document\.querySelector\("#configGenerationLogPanel"\),/);
   assert.match(app, /function openConfigGenerationLog\(\) \{[\s\S]*setDrawerOpen\(true\);[\s\S]*refs\.configGenerationLogPanel\?\.scrollIntoView/);
   assert.match(app, /if \(action === "activity-log"\) \{[\s\S]*openConfigGenerationLog\(\);[\s\S]*return;/);
   assert.match(app, /function formatCompactRatioLabel\(ratio\) \{[\s\S]*return \/\^\\d\+:\\d\+\$\/\.test\(normalized\) \? normalized : "";/);
+  assert.match(app, /formatGenerationActivityModeLabel/);
   assert.doesNotMatch(app, /title\.textContent = item\.title;[\s\S]*copy\.appendChild\(title\);/);
-  assert.match(app, /const ratio = document\.createElement\("span"\);[\s\S]*ratio\.className = "timeline-ratio";[\s\S]*ratio\.textContent = formatCompactRatioLabel\(item\.ratio\);[\s\S]*row\.appendChild\(ratio\);[\s\S]*const resolution = document\.createElement\("span"\);[\s\S]*resolution\.className = "timeline-resolution";[\s\S]*resolution\.textContent = formatCompactSizeLabel\(item\.size\);[\s\S]*row\.appendChild\(resolution\);[\s\S]*row\.appendChild\(time\);/);
+  assert.match(app, /const displayText = getGenerationActivityDisplayText\(item\.detail\);/);
+  assert.match(app, /className: "timeline-summary", textContent: displayText\.summary \|\| item\.title \|\| ""/);
+  assert.match(app, /if \(item\.imageUrl\) \{[\s\S]*row\.classList\.add\("has-url"\);[\s\S]*className: "timeline-url", href: item\.imageUrl, textContent: item\.imageUrl[\s\S]*\}/);
+  assert.match(app, /if \(displayText\.detail\) \{[\s\S]*className: "timeline-detail", textContent: displayText\.detail[\s\S]*\}/);
+  assert.match(app, /if \(item\.paramsText\) \{[\s\S]*row\.classList\.add\("has-params"\);[\s\S]*className: "timeline-params", textContent: item\.paramsText[\s\S]*\}/);
+  assert.match(app, /className: "timeline-mode", textContent: item\.modeLabel \|\| ""[\s\S]*const ratio = document\.createElement\("span"\);[\s\S]*ratio\.className = "timeline-ratio";[\s\S]*ratio\.textContent = formatCompactRatioLabel\(item\.ratio\);[\s\S]*row\.appendChild\(ratio\);[\s\S]*const resolution = document\.createElement\("span"\);[\s\S]*resolution\.className = "timeline-resolution";[\s\S]*resolution\.textContent = formatCompactSizeLabel\(item\.size\);[\s\S]*row\.appendChild\(resolution\);[\s\S]*row\.appendChild\(time\);/);
+  assert.match(app, /function getGenerationActivityRelayText\(value\) \{[\s\S]*find\(\(line\) => \/\^中转\[：:\]\/\.test\(line\)\)/);
+  assert.match(app, /function buildGenerationActivityRelayText\(item = \{\}\) \{[\s\S]*return relayUrl \? `中转：\$\{relayUrl\}` : "";/);
+  assert.match(app, /imageUrl: getImageUrl\(current\), modeLabel: formatGenerationActivityModeLabel\(current\.imageRoute \|\| current\.generationRoute\), paramsText: buildGenerationActivityRelayText\(current\),/);
+  assert.match(app, /modeLabel: formatGenerationActivityModeLabel\(task\?\.imageRoute\),/);
+  assert.match(app, /imageUrl: getImageUrl\(task\?\.item\),/);
+  assert.match(app, /paramsText: task\?\.item \? buildGenerationActivityRelayText\(task\.item\) : "",/);
+  assert.match(app, /paramsText: getGenerationActivityRelayText\(entry\?\.paramsText\),/);
+  assert.match(app, /paramsText: getGenerationActivityRelayText\(paramsText \|\| existing\?\.paramsText\),/);
+  assert.match(app, /paramsText: buildGenerationActivityRelayText\(item\)/);
+  assert.doesNotMatch(app, /paramsText: buildParameterText/);
   assert.match(app, /ratio: formatCompactRatioLabel\(task\?\.ratio\),/);
   assert.match(app, /size: formatCompactSizeLabel\(task\?\.size\),/);
 });
@@ -515,10 +545,45 @@ test("creation workbench layouts inherit the prompt studio column split", async 
   );
 });
 
-test("config drawer opens with a wider panel for form editing", async () => {
+test("config drawer uses a quieter structured settings layout", async () => {
+  const html = await readFile(indexPath, "utf8");
   const styles = await readFile(stylesPath, "utf8");
 
-  assert.match(styles, /\.drawer-panel\s*\{[\s\S]*width:\s*min\(468px,\s*100vw\);/);
+  assert.match(html, /<div class="drawer-panel config-panel">/);
+  assert.match(html, /<div class="config-drawer-body">[\s\S]*<section class="config-card config-connection-card" aria-labelledby="configConnectionTitle">/);
+  assert.match(html, /<h3 id="configConnectionTitle">调用通道<\/h3>/);
+  assert.doesNotMatch(html, /config-drawer-summary/);
+  assert.doesNotMatch(html, /选择当前生成请求的调用路径/);
+  assert.doesNotMatch(html, /API Key 只保存在当前浏览器/);
+  assert.doesNotMatch(html, /Cloudflare 环境变量/);
+  assert.match(html, /<div class="config-route-fields">[\s\S]*data-route-panel="a"[\s\S]*data-route-panel="b"[\s\S]*<\/div>/);
+  assert.doesNotMatch(html, /config-preferences-card|configPreferencesTitle|<h3 id="configPreferencesTitle">偏好<\/h3>/);
+  assert.match(
+    html,
+    /<div class="drawer-head-actions config-actions-row">[\s\S]*<details class="config-language-menu">[\s\S]*<summary class="header-button config-language-trigger" aria-label="切换界面语言">[\s\S]*<span aria-hidden="true">文<\/span>[\s\S]*<select id="uiLanguageInput"[\s\S]*<\/select>[\s\S]*<\/details>[\s\S]*<button class="header-button" id="closeConfigButton" type="button">关闭<\/button>/,
+  );
+  assert.match(html, /<div class="config-action-bar">[\s\S]*id="configFeedback"[^>]*aria-live="polite"[^>]*><\/p>[\s\S]*id="testConnectionButton"[\s\S]*type="submit">保存<\/button>[\s\S]*<\/div>/);
+  assert.match(html, /<\/form>\s*<section class="config-log-panel live-panel config-card" id="configGenerationLogPanel" aria-label="生成日志">/);
+  assert.match(styles, /\.config-drawer \.drawer-panel\s*\{[\s\S]*width:\s*min\(560px,\s*calc\(100vw - 24px\)\);/);
+  assert.match(styles, /\.config-panel\s*\{[\s\S]*display:\s*grid;[\s\S]*grid-template-rows:\s*auto minmax\(0,\s*1fr\);[\s\S]*overflow:\s*hidden;/);
+  assert.match(styles, /\.config-actions-row\s*\{[\s\S]*flex-wrap:\s*nowrap;/);
+  assert.match(styles, /html\[data-ui-layout="tablet"\]\s+\.config-panel \.drawer-head,[\s\S]*html\[data-ui-layout="mobile"\]\s+\.config-panel \.drawer-head\s*\{[\s\S]*align-items:\s*center;[\s\S]*flex-direction:\s*row;/);
+  assert.match(readCssRule(styles, ".config-drawer-body"), /overflow-y:\s*auto;[\s\S]*overflow-x:\s*hidden;[\s\S]*display:\s*grid;[\s\S]*gap:\s*12px;/);
+  assert.match(styles, /\.config-language-menu\s*\{[\s\S]*position:\s*relative;/);
+  assert.match(styles, /\.config-language-menu\[open\]\s+\.config-language-popover\s*\{[\s\S]*display:\s*grid;/);
+  assert.match(styles, /\.config-language-trigger\s*\{[\s\S]*width:\s*42px;[\s\S]*padding:\s*0;/);
+  assert.match(readCssRule(styles, 'html[data-ui-layout="mobile"] .config-language-popover'), /right:\s*0;[\s\S]*left:\s*auto;/);
+  assert.match(styles, /\.route-selector\s*\{[\s\S]*padding:\s*4px;[\s\S]*border-radius:\s*10px;/);
+  assert.match(styles, /\.route-selector label:has\(input:checked\)\s*\{[\s\S]*box-shadow:/);
+  assert.match(styles, /\.config-route-fields\s*\{[\s\S]*padding:\s*12px;[\s\S]*border-radius:\s*8px;/);
+  assert.match(styles, /\.config-log-panel\.live-panel\s*\{[\s\S]*min-height:\s*180px;[\s\S]*height:\s*auto;/);
+  assert.match(styles, /\.config-note:empty\s*\{[\s\S]*display:\s*none;/);
+  assert.match(styles, /\.config-action-bar\s*\{[\s\S]*position:\s*sticky;[\s\S]*bottom:\s*0;[\s\S]*grid-template-columns:\s*minmax\(124px,\s*0\.42fr\)\s*minmax\(0,\s*1fr\);/);
+  assert.match(styles, /html\[data-ui-layout="mobile"\]\s+\.config-action-bar\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);/);
+  assert.match(
+    readCssRule(styles, 'html[data-ui-layout="mobile"] .config-drawer .drawer-panel'),
+    /left:\s*0;[\s\S]*right:\s*0;[\s\S]*width:\s*auto;[\s\S]*scrollbar-gutter:\s*auto;/,
+  );
 });
 
 test("reference upload appears above prompt and generate action below prompt", async () => {
@@ -844,6 +909,12 @@ test("quick blend mode implements upload pairing queue preview and cleanup contr
   assert.match(styles, /\.quick-blend-pair-row\s*\{[\s\S]*min-height:\s*34px;[\s\S]*font-size:\s*0\.82rem;/);
   assert.match(styles, /\.quick-blend-generation-canvas\.has-image\s*\{[\s\S]*cursor:\s*zoom-in;/);
   assert.match(styles, /\.quick-blend-generation-thumb\.is-running\s*\{/);
+  assert.match(styles, /\.quick-blend-thumb-loader\s*\{[\s\S]*background:[\s\S]*radial-gradient/);
+  assert.match(styles, /\.quick-blend-thumb-loader::before\s*\{[\s\S]*animation:\s*quick-blend-thumb-ring/);
+  assert.match(styles, /\.quick-blend-thumb-loader::after\s*\{[\s\S]*animation:\s*quick-blend-thumb-scan/);
+  assert.match(styles, /\.quick-blend-thumb-loader\s*span\s*\{[\s\S]*z-index:\s*1;/);
+  assert.match(styles, /@keyframes quick-blend-thumb-ring\s*\{/);
+  assert.match(styles, /@keyframes quick-blend-thumb-scan\s*\{/);
 
   assert.match(quickBlendView, /function createQuickBlendItem\(group, file\) \{/);
   assert.match(quickBlendView, /function renderQuickBlendFeedback\(message = "", kind = ""\) \{/);
@@ -883,6 +954,7 @@ test("quick blend mode implements upload pairing queue preview and cleanup contr
   assert.match(quickBlendView, /function getQuickBlendGenerationEntries\(\) \{/);
   assert.match(quickBlendView, /function renderQuickBlendGenerationPreview\(\) \{/);
   assert.match(quickBlendView, /function openQuickBlendGeneratedPreview\(\) \{/);
+  assert.match(quickBlendView, /loader\.className = "quick-blend-thumb-loader";[\s\S]*loader\.setAttribute\("aria-hidden", "true"\);[\s\S]*label\.textContent = "生成中";/);
   assert.match(app, /if \(canceledJob\.mode === "quick-blend"\) \{[\s\S]*removeQuickBlendGenerationKey\(makeJobPreviewKey\(canceledJob\.id\)\);/);
   assert.match(app, /if \(task\.mode === "quick-blend"\) \{[\s\S]*task\.item\.mode = "quick-blend";[\s\S]*storeQuickBlendGenerationItem\(task\.item\);[\s\S]*replaceQuickBlendGenerationKey\(taskPreviewKey, makeGalleryPreviewKey\(task\.item\.filename\)\);/);
   assert.match(app, /function setQuickBlendFeedback\(message = "", kind = ""\) \{[\s\S]*state\.quickBlend\.feedback = message;[\s\S]*state\.quickBlend\.feedbackKind = kind;/);
@@ -939,6 +1011,26 @@ test("quick blend generation thumbnails keep submitted pair order while completi
     "file:pair-4.png",
     "file:older.png",
   ]);
+});
+
+test("quick blend pair preview can remove the same index across all reference groups", async () => {
+  const styles = await readFile(stylesPath, "utf8");
+  const quickBlendView = await readFile(quickBlendViewPath, "utf8");
+
+  assert.match(quickBlendView, /function removeQuickBlendPair\(pairIndex\) \{/);
+  assert.match(
+    quickBlendView,
+    /for \(const group of QUICK_BLEND_GROUPS\) \{[\s\S]*const \[removedItem\] = next\.splice\(normalizedIndex, 1\);[\s\S]*state\.quickBlend\[key\] = next;/,
+  );
+  assert.match(
+    quickBlendView,
+    /const removeButton = document\.createElement\("button"\);[\s\S]*removeButton\.className = "quick-blend-pair-remove";[\s\S]*removeButton\.dataset\.quickBlendPairRemoveIndex = String\(pair\.index\);[\s\S]*removeButton\.addEventListener\("click", \(\) => removeQuickBlendPair\(pair\.index\)\);/,
+  );
+  assert.match(
+    styles,
+    /\.quick-blend-pair-row\s*\{[\s\S]*grid-template-columns:\s*repeat\(var\(--quick-blend-pair-groups,\s*2\), auto minmax\(0,\s*1fr\)\) auto;/,
+  );
+  assert.match(styles, /\.quick-blend-pair-remove\s*\{[\s\S]*width:\s*28px;[\s\S]*height:\s*28px;[\s\S]*border-radius:\s*999px;/);
 });
 
 test("quick blend upload groups keep the first pending upload slot full size", async () => {
@@ -1460,8 +1552,9 @@ test("theme language switch supports English from the config drawer", async () =
   assert.match(html, /const languageKey = "image-studio-ui-language-v1";/);
   assert.match(
     html,
-    /<label class="field ui-language-field">[\s\S]*<span>界面语言<\/span>[\s\S]*<select id="uiLanguageInput" name="uiLanguage">[\s\S]*<option value="zh-CN" selected>简体中文<\/option>[\s\S]*<option value="en">English<\/option>/,
+    /<details class="config-language-menu">[\s\S]*<summary class="header-button config-language-trigger" aria-label="切换界面语言">[\s\S]*<span aria-hidden="true">文<\/span>[\s\S]*<label class="config-language-field">[\s\S]*<span>界面语言<\/span>[\s\S]*<select id="uiLanguageInput" name="uiLanguage">[\s\S]*<option value="zh-CN" selected>简体中文<\/option>[\s\S]*<option value="en">English<\/option>/,
   );
+  assert.doesNotMatch(html, /<label class="field ui-language-field">/);
   assert.match(html, /<button class="mega-menu-action" id="themeNavAction" type="button" data-nav-action="theme">主题颜色<\/button>/);
   assert.match(app, /const UI_LANGUAGE_STORAGE_KEY = "image-studio-ui-language-v1";/);
   assert.match(app, /function normalizeUiLanguage\(language\) \{[\s\S]*return language === "en" \? "en" : "zh-CN";/);
@@ -1472,6 +1565,7 @@ test("theme language switch supports English from the config drawer", async () =
     /refs\.themeToggleLabel\.textContent = getUiLanguageText\(isLight \? "themeDark" : "themeLight"\);/,
   );
   assert.match(app, /refs\.uiLanguageInput\.addEventListener\("change",\s*\(event\) => \{/);
+  assert.match(app, /event\.target\.closest\("\.config-language-menu"\)\?\.removeAttribute\("open"\);/);
 });
 
 test("floating dialogs and popovers use theme-aware overlay surface tokens", async () => {
@@ -1992,7 +2086,8 @@ test("studio stores API settings in the browser and sends them with cloud genera
   const app = await readFile(appPath, "utf8");
   const browserConfig = await readFile(browserConfigPath, "utf8");
 
-  assert.match(html, /id="configFeedback"[\s\S]*API Key 只保存在当前浏览器/);
+  assert.match(html, /id="configFeedback"[^>]*aria-live="polite"[^>]*><\/p>/);
+  assert.match(app, /configModelPicker\.setFeedback\("配置已保存到当前浏览器。", "success"\);/);
   assert.match(app, /from "\/lib\/browser-config\.mjs";/);
   assert.match(app, /appendBrowserConfigToFormData,\s*[\s\S]*getBrowserPrivateConfigRequestPayload,\s*[\s\S]*readBrowserPrivateConfig,\s*[\s\S]*saveBrowserPrivateConfig,/);
   assert.match(browserConfig, /export const BROWSER_CONFIG_STORAGE_KEY = "image-studio-browser-config-v1";/);
@@ -2564,7 +2659,7 @@ test("creation mode has independent references count and scenario controls", asy
   assert.ok(creationIndustrySearchInput);
   assert.doesNotMatch(creationIndustrySearchInput, /placeholder=/);
   assert.doesNotMatch(html, /placeholder="搜索三级\/四级类目名或编码"/);
-  assert.match(html, /id="creationSellingPointsInput"[\s\S]*id="creationDimensionSpecsInput"[\s\S]*name="dimensionSpecs"[\s\S]*例如：高 14\.5 cm，直径 11 cm，容量 350 ml/);
+  assert.match(html, /id="creationSellingPointsInput"[\s\S]*id="creationDimensionSpecsInput"[\s\S]*name="dimensionSpecs"[\s\S]*例如：长 13 cm，宽 2 cm，高 3 cm，重 42 g/);
   assert.match(html, /id="creationDimensionSpecsInput"[\s\S]*id="creationDimensionUnitModeInput"[\s\S]*name="dimensionUnitMode"[\s\S]*<option value="metric">[\s\S]*<option value="imperial">[\s\S]*<option value="both" selected>/);
   assert.doesNotMatch(html, /写清商品是什么|每行或用逗号分隔|只用于尺寸规格图/);
   assert.match(html, /id="creationProductDescriptionInput"[\s\S]*rows="2"/);
@@ -2760,15 +2855,16 @@ test("creation mode has independent references count and scenario controls", asy
   assert.match(creationReferenceAnalysisView, /export function shouldDowngradeReferenceProductAnalysisRole\(entry = \{\}, subjectUnitCount = 0\) \{/);
   assert.match(creationReferenceAnalysisView, /export function getCreationReferenceAnalysisRoleCorrectionReason\(entry = \{\}, subjectUnitCount = 0\) \{/);
   assert.match(creationReferenceAnalysisView, /export function summarizeCreationReferenceAnalysisRoleCorrections\(recommendations = \[\]\) \{/);
+  assert.match(creationReferenceAnalysisView, /export function buildCreationReferenceAnalysisAppliedFeedbackMessage\(/);
   assert.match(creationReferenceAnalysisView, /export function normalizeCreationReferenceAnalysisUnitCountNote\(note = "", subjectUnitCount = 0\) \{/);
   assert.match(app, /getCreationReferenceAnalysisGroupedSubjectUnitCount/);
   assert.match(app, /shouldDowngradeReferenceProductAnalysisRole/);
   assert.match(app, /getCreationReferenceAnalysisRoleCorrectionReason/);
-  assert.match(app, /summarizeCreationReferenceAnalysisRoleCorrections/);
+  assert.match(app, /buildCreationReferenceAnalysisAppliedFeedbackMessage/);
   assert.match(app, /normalizeCreationReferenceAnalysisUnitCountNote/);
   assert.match(app, /normalizeCreationReferenceAnalysisRecommendation\(entry = \{\}, index = 0, skuSubjects = \[\]\)/);
   assert.match(app, /roleCorrectionReason:\s*roleCorrectionReason/);
-  assert.match(app, /const roleCorrectionSummary = summarizeCreationReferenceAnalysisRoleCorrections\(analysis\.recommendations\);/);
+  assert.match(app, /const appliedMessage = buildCreationReferenceAnalysisAppliedFeedbackMessage\(\{/);
   assert.match(app, /setCreationSelectValue\(refs\.creationVisualLanguageInput,\s*analysis\.visualLanguage,\s*"classic-commercial"\)/);
   assert.match(creationReferenceAnalysisView, /export function syncCreationReferenceVisualLanguageButton/);
   assert.match(
@@ -3048,7 +3144,17 @@ test("creation mode exposes record detail and item repair actions", async () => 
   assert.match(html, /id="creationRecordDetail"/);
 
   assert.match(styles, /\.creation-record-detail\s*\{/);
-  assert.match(styles, /\.creation-record-detail span\s*\{[\s\S]*overflow-wrap:\s*anywhere;/);
+  assert.match(styles, /#creationRecordDetail\.creation-record-detail\s*\{[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);/);
+  assert.match(styles, /#creationRecordDetail \.creation-record-section\s*\{[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/);
+  assert.match(styles, /#creationRecordDetail \.creation-record-section\.is-wide\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);/);
+  assert.match(styles, /#creationRecordDetail \.creation-record-field\s*\{[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*auto minmax\(0,\s*1fr\);/);
+  assert.match(styles, /#creationRecordDetail \.creation-record-label\s*\{[\s\S]*white-space:\s*nowrap;/);
+  assert.match(styles, /#creationRecordDetail \.creation-record-value\s*\{[\s\S]*overflow-wrap:\s*anywhere;/);
+  assert.match(styles, /#creationRecordArchiveDetail\.creation-record-detail\.is-toggleable\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*auto;/);
+  assert.match(styles, /\.creation-record-detail-toggle\s*\{[\s\S]*width:\s*32px;[\s\S]*height:\s*32px;/);
+  assert.match(styles, /\.creation-record-detail-toggle::before\s*\{[\s\S]*transform:\s*rotate\(45deg\);/);
+  assert.match(styles, /#creationRecordArchiveDetail\.creation-record-detail\.is-expanded \.creation-record-detail-toggle::before\s*\{[\s\S]*transform:\s*rotate\(-135deg\);/);
+  assert.match(styles, /#creationRecordArchiveDetail\.creation-record-detail\.is-collapsed \.creation-record-detail-body\s*\{[\s\S]*display:\s*none;/);
   assert.match(styles, /\.creation-card-actions\s*\{/);
   assert.match(styles, /\.creation-card-path\s*\{/);
   assert.match(styles, /\.creation-card\s*\{[\s\S]*position:\s*relative;[\s\S]*isolation:\s*isolate;[\s\S]*gap:\s*8px;[\s\S]*min-height:\s*max-content;[\s\S]*padding:\s*8px;/);
@@ -3069,6 +3175,17 @@ test("creation mode exposes record detail and item repair actions", async () => 
   assert.match(app, /function formatCreationReferenceRoleSummary\(referenceImageRoles = \[\]\) \{/);
   assert.match(app, /function getCreationRepairReferenceRolePayload\(set = getCreationCurrentSet\(\)\) \{/);
   assert.match(app, /function renderCreationRecordDetail\(set\) \{/);
+  assert.match(app, /recordDetailExpanded:\s*false,/);
+  assert.match(app, /function toggleCreationRecordArchiveDetail\(\) \{/);
+  assert.match(app, /state\.creation\.recordDetailExpanded = !state\.creation\.recordDetailExpanded;/);
+  assert.match(app, /state\.creation\.recordDetailExpanded = false;[\s\S]*renderCreationRecordView\(\);/);
+  assert.match(app, /const detailToggle = document\.createElement\("button"\);[\s\S]*detailToggle\.dataset\.creationRecordDetailToggle = "true";/);
+  assert.match(app, /refs\.creationRecordArchiveDetail\.addEventListener\("click",[\s\S]*closest\("\[data-creation-record-detail-toggle\]"\)[\s\S]*toggleCreationRecordArchiveDetail\(\);/);
+  assert.match(app, /const detailSections = \[/);
+  assert.match(app, /section\.className = `creation-record-section\$\{wide \? " is-wide" : ""\}`;/);
+  assert.match(app, /item\.className = "creation-record-field";/);
+  assert.match(app, /labelNode\.className = "creation-record-label";/);
+  assert.match(app, /valueNode\.className = "creation-record-value";/);
   assert.match(app, /renderCreationRecordDetail\(set\)[\s\S]*formatCreationReferenceRoleSummary\(set\.referenceImageRoles\)/);
   assert.match(app, /function repairCreationItems\(/);
   assert.match(app, /formData\.set\("referenceImageRoles", JSON\.stringify\(getCreationRepairReferenceRolePayload\(currentSet\)\)\);/);

@@ -6,7 +6,7 @@ const appPath = new URL("../public/app.js", import.meta.url);
 const indexPath = new URL("../public/index.html", import.meta.url);
 const assetModulePath = new URL("../lib/portrait-accessory-assets.mjs", import.meta.url);
 const attributionPath = new URL("../public/assets/portrait-accessories/ATTRIBUTION.md", import.meta.url);
-const shellAssetVersion = "20260603-creation-reference-15-drag-1";
+const shellAssetVersion = "20260607-creation-record-detail-toggle-1";
 
 const COSPLAY_ASSETS = [
   ["cosplay-shrine-miko", "巫女COS", "cosplay-shrine-miko.png", /cosplay portrait[\s\S]*costume[\s\S]*props/],

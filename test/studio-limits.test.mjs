@@ -29,8 +29,8 @@ test("studio task limits keep the local queue unbounded and cap generation at fi
   assert.doesNotMatch(app, /最多排队/);
 });
 
-test("studio reference limits keep standard references at six and creation references at fifteen", async () => {
-  assert.equal(MAX_REFERENCE_IMAGES, 6);
+test("studio reference limits keep standard references and creation references at fifteen", async () => {
+  assert.equal(MAX_REFERENCE_IMAGES, 15);
   assert.equal(MAX_CREATION_REFERENCE_IMAGES, 15);
   assert.equal(MAX_CREATION_STYLE_REFERENCE_IMAGES, 3);
   assert.equal(MAX_PORTRAIT_PERSON_REFERENCE_IMAGES, 3);
@@ -39,11 +39,13 @@ test("studio reference limits keep standard references at six and creation refer
   const app = await readFile(appPath, "utf8");
   const index = await readFile(indexPath, "utf8");
 
-  assert.match(app, /maxReferenceImages:\s*6/);
+  assert.match(app, /maxReferenceImages:\s*15/);
   assert.match(app, /maxCreationReferenceImages:\s*15/);
   assert.match(app, /maxCreationStyleReferenceImages:\s*3/);
   assert.match(app, /maxPortraitPersonReferenceImages:\s*3/);
   assert.match(app, /maxPortraitAccessoryReferenceImages:\s*9/);
+  assert.match(index, /id="referenceCount">0 \/ 15<\/small>/);
+  assert.match(index, /id="referenceAnalysisCount">0 \/ 15<\/span>/);
   assert.match(index, /id="creationReferenceCount">0 \/ 15<\/small>/);
 });
 

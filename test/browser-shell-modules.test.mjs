@@ -135,7 +135,7 @@ test("public app shell delegates browser config and cache behavior to public mod
 
   assert.match(app, /from "\/lib\/browser-config\.mjs"/);
   assert.match(app, /from "\/lib\/browser-image-cache\.mjs"/);
-  assert.match(app, /from "\/lib\/view-mode-loader\.mjs\?v=20260530-quick-blend-fix-2"/);
+  assert.match(app, /from "\/lib\/view-mode-loader\.mjs\?v=20260606-quick-blend-pair-delete-1"/);
   assert.match(app, /from "\/lib\/generation-client\.mjs"/);
   assert.match(app, /from "\/lib\/creation-listing-view\.mjs"/);
   assert.match(app, /from "\/lib\/creation-reference-drag\.mjs"/);
@@ -147,18 +147,20 @@ test("public app shell delegates browser config and cache behavior to public mod
 
 test("config drawer shows image route settings as exclusive mode tabs", async () => {
   const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
+  const app = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
   const styles = await readFile(new URL("../public/styles.css", import.meta.url), "utf8");
 
   assert.match(html, /<fieldset class="route-selector" aria-label="生图调用模式">/);
   assert.match(html, /<span>路由模式<\/span>/);
   assert.match(html, /<span>直接调用模式<\/span>/);
+  assert.match(html, /id="generationModeStatus"[\s\S]*路由模式/);
   assert.match(
     html,
-    /data-route-panel="a"[\s\S]*路由模式 URL[\s\S]*路由模式 API Key[\s\S]*路由模式 Responses 模型/,
+    /data-route-panel="a"[\s\S]*接口地址[\s\S]*API Key[\s\S]*Responses 模型/,
   );
   assert.match(
     html,
-    /data-route-panel="b"[\s\S]*直接调用模式 URL[\s\S]*直接调用模式 API Key[\s\S]*直接调用模式生图模型[\s\S]*id="directFetchModelsButton"[\s\S]*获取模型列表/,
+    /data-route-panel="b"[\s\S]*接口地址[\s\S]*API Key[\s\S]*生图模型[\s\S]*id="directFetchModelsButton"[\s\S]*获取模型列表/,
   );
   assert.doesNotMatch(html, /线路A|线路B/);
   assert.match(styles, /\.route-config-panel\s*\{[\s\S]*display:\s*grid;/);
@@ -170,6 +172,11 @@ test("config drawer shows image route settings as exclusive mode tabs", async ()
     styles,
     /\.config-form:has\(input\[name="imageRoute"\]\[value="b"\]:checked\)\s*\[data-route-panel="a"\]/,
   );
+  assert.match(styles, /\.generation-mode-status\s*\{/);
+  assert.match(app, /generationModeStatus:\s*document\.querySelector\("#generationModeStatus"\),/);
+  assert.match(app, /function updateGenerationModeStatus\(\) \{/);
+  assert.match(app, /const imageRoute = getSelectedImageRoute\(\);/);
+  assert.match(app, /formatGenerationActivityModeLabel\(imageRoute\)/);
 });
 
 test("creation reference drag helper reorders product items as whole records only", () => {

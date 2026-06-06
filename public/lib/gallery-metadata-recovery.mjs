@@ -2,6 +2,7 @@ const STRING_METADATA_FIELDS = [
   "prompt",
   "createdAt",
   "baseUrl",
+  "imageRoute",
   "responsesModel",
   "imageModel",
   "generationMode",

@@ -1,6 +1,6 @@
 {
   "name": "gpt-image2-studio",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "private": true,
   "type": "module",
   "description": "使用 Responses API 和 gpt-image-2 的本地图片生成工作台",
