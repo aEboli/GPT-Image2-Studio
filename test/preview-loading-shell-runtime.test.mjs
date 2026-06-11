@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { getPreviewLoadingShellTheme } from "../lib/preview-loading-shell.mjs";
+import {
+  getPreviewLoadingOrbLimit,
+  getPreviewLoadingOrbRenderState,
+  getPreviewLoadingShellItems,
+  getPreviewLoadingShellTheme,
+} from "../lib/preview-loading-shell.mjs";
 
 const appPath = new URL("../public/app.js", import.meta.url);
 
@@ -123,10 +128,19 @@ test("preview loading shell shows one centered orb per active job up to six", as
   };
   const createRuntime = new Function(
     "document",
+    "getPreviewLoadingOrbLimit",
+    "getPreviewLoadingShellItems",
+    "getPreviewLoadingOrbRenderState",
     "getPreviewLoadingShellTheme",
     `${loadingShellRuntime}\nreturn { createPreviewLoadingShellNodes, updatePreviewLoadingShell };`,
   );
-  const runtime = createRuntime(document, getPreviewLoadingShellTheme);
+  const runtime = createRuntime(
+    document,
+    getPreviewLoadingOrbLimit,
+    getPreviewLoadingShellItems,
+    getPreviewLoadingOrbRenderState,
+    getPreviewLoadingShellTheme,
+  );
   const nodes = runtime.createPreviewLoadingShellNodes();
 
   runtime.updatePreviewLoadingShell(nodes, {
@@ -168,10 +182,19 @@ test("preview loading shell preserves existing orb nodes when a new job appears"
   };
   const createRuntime = new Function(
     "document",
+    "getPreviewLoadingOrbLimit",
+    "getPreviewLoadingShellItems",
+    "getPreviewLoadingOrbRenderState",
     "getPreviewLoadingShellTheme",
     `${loadingShellRuntime}\nreturn { createPreviewLoadingShellNodes, updatePreviewLoadingShell };`,
   );
-  const runtime = createRuntime(document, getPreviewLoadingShellTheme);
+  const runtime = createRuntime(
+    document,
+    getPreviewLoadingOrbLimit,
+    getPreviewLoadingShellItems,
+    getPreviewLoadingOrbRenderState,
+    getPreviewLoadingShellTheme,
+  );
   const nodes = runtime.createPreviewLoadingShellNodes();
   const baseState = {
     mode: "loading",

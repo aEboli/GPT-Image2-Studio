@@ -5,7 +5,7 @@ import { buildGalleryMetadataCacheEntry, collectGalleryMetadataRepairPatch, merg
 import { getDefaultGenerationSize, getGenerationSizeOptions, normalizeGenerationSize } from "/lib/generation-size-options.mjs?v=20260512-one-megapixel-sizes-4";
 import { getOutputFormatOptions, normalizeOutputFormat, } from "/lib/output-format-options.mjs?v=20260504-vercel-static-lib-1";
 import { normalizeReferenceAnalysisLanguage, } from "/lib/reference-analysis-language.mjs?v=20260522-reference-language-1";
-import { getPreviewLoadingShellTheme, shouldReusePreviewLoadingShell } from "/lib/preview-loading-shell.mjs";
+import { getPreviewLoadingOrbLimit, getPreviewLoadingOrbRenderState, getPreviewLoadingShellItems, getPreviewLoadingShellTheme, shouldReusePreviewLoadingShell } from "/lib/preview-loading-shell.mjs";
 import { createCreationCardLoading as createCreationCardLoadingShell, getCreationCardDomKey, syncCreationLoadingCard, syncCreationResultGrid as syncCreationResultGridShell } from "/lib/creation-card-loading.mjs";
 import { isGenerationRequestRetryMessage, } from "/lib/generation-request-retry.mjs";
 import { cancelQueuedGenerationJob, getQueuedGenerationJobCount, getRunningGenerationJobCount, isQueuedGenerationJob, selectNextQueuedGenerationJobsByMode } from "/lib/generation-queue.mjs?v=20260611-mode-route-queue-1";
@@ -5587,14 +5587,11 @@ function createPreviewMotionNode(orbId = "") {
   motion.className = "preview-loading-motion is-entering";
   motion.setAttribute("aria-hidden", "true");
   motion.dataset.previewLoadingOrbId = String(orbId || "");
-
   const fillShell = document.createElement("span");
   fillShell.className = "preview-loading-fill-shell";
-
   const fill = document.createElement("span");
   fill.className = "preview-loading-fill";
   fillShell.appendChild(fill);
-
   const ring = document.createElement("span");
   ring.className = "preview-loading-ring";
   for (let index = 0; index < 4; index += 1) {
@@ -5602,117 +5599,44 @@ function createPreviewMotionNode(orbId = "") {
     line.className = "preview-loading-ring-line";
     ring.appendChild(line);
   }
-
   motion.append(fillShell, ring);
-
   return motion;
 }
 
-const PREVIEW_LOADING_ORB_LIMIT = 6;
-const PREVIEW_LOADING_STAGES = ["uploading", "connecting", "generating", "saving"];
-
-function getPreviewLoadingShellItems(placeholderState = {}) {
-  const loadingItems = Array.isArray(placeholderState.loadingItems) ? placeholderState.loadingItems : [];
-  const activeJobCount = Math.max(1, Number(placeholderState.activeJobCount) || loadingItems.length || 1);
-  const visibleCount = Math.min(PREVIEW_LOADING_ORB_LIMIT, activeJobCount);
-  return Array.from({ length: visibleCount }, (_, index) => {
-    const item = loadingItems[index] || {};
-    return {
-      id: String(item.id || `preview-loading-${index + 1}`),
-      stage: normalizePreviewLoadingOrbStage(item.stage || item.statusStage || placeholderState.stage),
-      statusText: String(item.statusText || placeholderState.statusText || "").trim(),
-    };
-  });
-}
-
-function normalizePreviewLoadingOrbStage(stage) {
-  const value = String(stage || "");
-  return PREVIEW_LOADING_STAGES.includes(value) ? value : "connecting";
-}
-
-function getPreviewLoadingOrbLayout(count, index) {
-  if (count <= 1) {
-    return { x: 0, y: 0 };
-  }
-
-  if (count === 2) {
-    return { x: index === 0 ? -40 : 40, y: 0 };
-  }
-
-  const radius = count <= 4 ? 48 : 58;
-  const startAngle = count === 4 ? -135 : -90;
-  const angle = ((startAngle + (360 / count) * index) * Math.PI) / 180;
-  return {
-    x: Math.round(Math.cos(angle) * radius),
-    y: Math.round(Math.sin(angle) * radius),
-  };
-}
-
-function getPreviewLoadingOrbEntryOffset(id, index) {
-  let hash = 0;
-  const text = `${id}:${index}`;
-  for (let charIndex = 0; charIndex < text.length; charIndex += 1) {
-    hash = (hash * 31 + text.charCodeAt(charIndex)) % 9973;
-  }
-
-  const angle = ((hash % 360) * Math.PI) / 180;
-  const distance = 150 + (hash % 70);
-  return {
-    x: Math.round(Math.cos(angle) * distance),
-    y: Math.round(Math.sin(angle) * distance),
-  };
-}
-
 function applyPreviewLoadingOrbState(orb, item, index, count, placeholderState = {}) {
-  const stageIndex = Math.max(0, PREVIEW_LOADING_STAGES.indexOf(item.stage));
-  const theme = getPreviewLoadingShellTheme({
-    ...placeholderState,
-    stage: item.stage,
-    stageIndex,
-    stageCount: PREVIEW_LOADING_STAGES.length,
-  });
-  const layout = getPreviewLoadingOrbLayout(count, index);
-  const entry = getPreviewLoadingOrbEntryOffset(item.id, index);
-
-  orb.dataset.stage = theme.stage;
-  orb.setAttribute("aria-label", item.statusText || placeholderState.statusText || "Generation running");
-  orb.style.setProperty("--loading-progress", theme.progress);
-  orb.style.setProperty("--loading-ring-duration", theme.ringDuration);
-  orb.style.setProperty("--loading-counter-ring-duration", theme.counterRingDuration);
-  orb.style.setProperty("--loading-fill-duration", theme.fillDuration);
-  orb.style.setProperty("--loading-float-duration", theme.floatDuration);
-  orb.style.setProperty("--loading-motion-scale", theme.motionScale);
-  orb.style.setProperty("--preview-loading-orb-x", `${layout.x}px`);
-  orb.style.setProperty("--preview-loading-orb-y", `${layout.y}px`);
-  orb.style.setProperty("--preview-loading-orb-enter-x", `${entry.x}px`);
-  orb.style.setProperty("--preview-loading-orb-enter-y", `${entry.y}px`);
-  orb.style.setProperty("--preview-loading-orb-delay", `${index * 42}ms`);
+  const renderState = getPreviewLoadingOrbRenderState(item, index, count, placeholderState);
+  orb.dataset.stage = renderState.stage;
+  orb.setAttribute("aria-label", renderState.ariaLabel);
+  Object.entries({
+    "--loading-progress": renderState.progress, "--loading-ring-duration": renderState.ringDuration,
+    "--loading-counter-ring-duration": renderState.counterRingDuration, "--loading-fill-duration": renderState.fillDuration,
+    "--loading-float-duration": renderState.floatDuration, "--loading-motion-scale": renderState.motionScale,
+    "--preview-loading-orb-x": renderState.x, "--preview-loading-orb-y": renderState.y,
+    "--preview-loading-orb-enter-x": renderState.enterX, "--preview-loading-orb-enter-y": renderState.enterY,
+    "--preview-loading-orb-delay": renderState.delay,
+  }).forEach(([name, value]) => orb.style.setProperty(name, value));
 }
 
 function syncPreviewLoadingShellItems(nodes, placeholderState = {}) {
-  const currentNodes = new Map(
-    Array.from(nodes.field.children).map((child) => [child.dataset.previewLoadingOrbId, child]),
-  );
-  const nextNodes = getPreviewLoadingShellItems(placeholderState).map((item, index) => {
+  const currentNodes = new Map(Array.from(nodes.field.children).map((child) => [child.dataset.previewLoadingOrbId, child]));
+  const nextItems = getPreviewLoadingShellItems(placeholderState);
+  const nextIds = new Set(nextItems.map((item) => item.id));
+  nextItems.forEach((item, index) => {
     const existing = currentNodes.get(item.id);
     const orb = existing || createPreviewMotionNode(item.id);
     orb.dataset.previewLoadingOrbId = item.id;
-    applyPreviewLoadingOrbState(orb, item, index, Math.min(PREVIEW_LOADING_ORB_LIMIT, placeholderState.activeJobCount || 1), placeholderState);
+    applyPreviewLoadingOrbState(orb, item, index, Math.min(getPreviewLoadingOrbLimit(), placeholderState.activeJobCount || 1), placeholderState);
     orb.style.setProperty("--preview-loading-orb-index", String(index));
-    orb.classList.toggle("is-entering", !existing);
-    return orb;
+    if (!existing) {
+      orb.classList.add("is-entering");
+      nodes.field.appendChild(orb);
+    }
   });
 
-  nodes.field.style.setProperty("--preview-loading-orb-count", String(nextNodes.length));
-  if (typeof nodes.field.replaceChildren === "function") {
-    nodes.field.replaceChildren(...nextNodes);
-    return;
-  }
-
-  while (nodes.field.children.length > 0) {
-    nodes.field.removeChild(nodes.field.children[0]);
-  }
-  nextNodes.forEach((orb) => nodes.field.appendChild(orb));
+  currentNodes.forEach((orb, id) => {
+    if (!nextIds.has(id)) orb.remove();
+  });
+  nodes.field.style.setProperty("--preview-loading-orb-count", String(nextItems.length));
 }
 
 function createPreviewLoadingShellNodes() {
@@ -5723,7 +5647,6 @@ function createPreviewLoadingShellNodes() {
   field.className = "preview-loading-orb-field";
   field.appendChild(createPreviewMotionNode("preview-loading-1"));
   shell.appendChild(field);
-
   return {
     shell,
     field,
