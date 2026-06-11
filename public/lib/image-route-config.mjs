@@ -3,6 +3,7 @@ import { normalizeApiBaseUrl } from "./api-base-url.mjs";
 export const IMAGE_ROUTE_A = "a";
 export const IMAGE_ROUTE_B = "b";
 export const DEFAULT_DIRECT_IMAGE_MODEL = "gpt-image-2";
+export const DEFAULT_DIRECT_RESPONSES_MODEL = "gpt-5.5";
 
 function firstString(values, fallback = "") {
   for (const value of values) {
@@ -43,6 +44,10 @@ export function normalizeImageRouteConfig(
     [routeB.imageModel, source.directImageModel, source.imageModel],
     DEFAULT_DIRECT_IMAGE_MODEL,
   );
+  const directResponsesModel = firstString(
+    [routeB.responsesModel, source.directResponsesModel],
+    DEFAULT_DIRECT_RESPONSES_MODEL,
+  );
 
   return {
     imageRoute: normalizeImageRoute(source.imageRoute || source.generationRoute),
@@ -52,6 +57,7 @@ export function normalizeImageRouteConfig(
     directBaseUrl: directBaseUrl || defaultBaseUrl,
     directApiKey: firstString([routeB.apiKey, source.directApiKey]),
     directImageModel: directImageModel || DEFAULT_DIRECT_IMAGE_MODEL,
+    directResponsesModel: directResponsesModel || DEFAULT_DIRECT_RESPONSES_MODEL,
   };
 }
 
@@ -77,5 +83,28 @@ export function getSelectedImageGenerationConfig(config = {}) {
     apiKey: normalized.apiKey,
     responsesModel: normalized.responsesModel,
     imageModel: DEFAULT_DIRECT_IMAGE_MODEL,
+  };
+}
+
+export function getSelectedTextVisionConfig(config = {}) {
+  const normalized = normalizeImageRouteConfig(config, {
+    defaultBaseUrl: config.baseUrl || config.directBaseUrl || "https://api.openai.com/v1",
+    defaultResponsesModel: config.responsesModel || "gpt-5.4",
+  });
+
+  if (normalized.imageRoute === IMAGE_ROUTE_B) {
+    return {
+      imageRoute: IMAGE_ROUTE_B,
+      baseUrl: normalized.directBaseUrl,
+      apiKey: normalized.directApiKey,
+      responsesModel: normalized.directResponsesModel,
+    };
+  }
+
+  return {
+    imageRoute: IMAGE_ROUTE_A,
+    baseUrl: normalized.baseUrl,
+    apiKey: normalized.apiKey,
+    responsesModel: normalized.responsesModel,
   };
 }

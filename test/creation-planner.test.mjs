@@ -2125,13 +2125,80 @@ test("creation reference analysis treats grouped white-background SKU references
 
   assert.deepEqual(
     analysis.recommendations.map((entry) => [entry.filename, entry.role, entry.roleLabel]),
-    [["orange-silver-pair.png", "product", "商品主体"]],
+    [["orange-silver-pair.png", "product", "商品主体组"]],
   );
   assert.doesNotMatch(analysis.recommendations[0].note, /图中共\s*1\s*个完整产品单位/);
   assert.match(analysis.recommendations[0].note, /图中共 2 个完整产品单位/);
   assert.match(analysis.recommendations[0].roleCorrectionReason, /reference-product 调整为 product/);
   assert.match(analysis.recommendations[0].roleCorrectionReason, /2 个完整产品单位/);
+  assert.equal(analysis.recommendations[0].subjectUnitCount, 2);
   assert.equal(analysis.skuSubjects[0].subjectUnitCount, 2);
+});
+
+test("creation reference analysis removes singular note copy for grouped SKU references", () => {
+  const analysis = normalizeCreationReferenceAnalysis(
+    {
+      summary: "识别到一张普通白底 SKU 参考图。",
+      reference_roles: [
+        {
+          index: 1,
+          filename: "red-silver-pair.png",
+          role: "product",
+          note: "单个鱼形分节路亚白底主体图，需保留橙红变鳞片配色、金属鱼钩和仿真眼细节。",
+        },
+      ],
+      sku_subjects: [
+        {
+          id: "red-silver-pair",
+          title: "红银双路亚 SKU",
+          reference_indexes: [1],
+          filenames: ["red-silver-pair.png"],
+          subject_unit_count: 2,
+          note: "图中共 2 个完整产品单位，上方橙红路亚和下方银色路亚都要保留。",
+        },
+      ],
+      risks: [],
+    },
+    ["red-silver-pair.png"],
+  );
+
+  assert.doesNotMatch(analysis.recommendations[0].note, /单个|单一|1\s*个|一个/);
+  assert.match(analysis.recommendations[0].note, /图中共 2 个完整产品单位/);
+  assert.equal(analysis.recommendations[0].roleLabel, "商品主体组");
+  assert.equal(analysis.recommendations[0].subjectUnitCount, 2);
+});
+
+test("creation reference analysis removes singular product-body count copy from role notes", () => {
+  const analysis = normalizeCreationReferenceAnalysis(
+    {
+      summary: "识别到一张普通白底 SKU 参考图。",
+      reference_roles: [
+        {
+          index: 1,
+          filename: "silver-lure.png",
+          role: "product",
+          note: "这张图应主要影响银鲤色仿生鱼形路亚的外观配色、分节鱼身、三本钩和尾鳍细节，画面为1个完整产品单体。",
+        },
+      ],
+      sku_subjects: [
+        {
+          id: "silver-lure",
+          title: "银鲤色路亚 SKU",
+          reference_indexes: [1],
+          filenames: ["silver-lure.png"],
+          subject_unit_count: 1,
+          note: "银鲤色路亚主体。",
+        },
+      ],
+      risks: [],
+    },
+    ["silver-lure.png"],
+  );
+
+  assert.equal(
+    analysis.recommendations[0].note,
+    "这张图应主要影响银鲤色仿生鱼形路亚的外观配色、分节鱼身、三本钩和尾鳍细节",
+  );
 });
 
 test("creation reference analysis preserves a single full-set main subject anchor", () => {

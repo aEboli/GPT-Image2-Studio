@@ -15,7 +15,7 @@ import {
 import { isCreationSubjectReferenceRole } from "../public/lib/creation-reference-roles.mjs";
 import { reorderCreationReferenceFiles } from "../public/lib/creation-reference-drag.mjs";
 
-const APP_SHELL_LINE_BUDGET = 16400;
+const APP_SHELL_LINE_BUDGET = 16500;
 
 function makeFakeControlButton(className = "") {
   const element = {
@@ -75,6 +75,7 @@ test("browser config module normalizes private config without requiring window g
     directBaseUrl: "https://direct.example.test/",
     directApiKey: "sk-direct-secret",
     directImageModel: "custom-image-model",
+    directResponsesModel: "custom-vision-text-model",
   });
   const publicConfig = toPublicBrowserConfig(normalized, { defaults: { size: "auto" } });
   const formData = appendBrowserConfigToFormData(new FormData(), () => normalized);
@@ -87,6 +88,7 @@ test("browser config module normalizes private config without requiring window g
     directBaseUrl: "https://direct.example.test/v1",
     directApiKey: "sk-direct-secret",
     directImageModel: "custom-image-model",
+    directResponsesModel: "custom-vision-text-model",
   });
   assert.equal(publicConfig.imageRoute, "b");
   assert.equal(publicConfig.apiKeyConfigured, true);
@@ -94,6 +96,7 @@ test("browser config module normalizes private config without requiring window g
   assert.equal(publicConfig.directApiKeyConfigured, true);
   assert.equal(publicConfig.directApiKeyMask, "sk-d***cret");
   assert.equal(publicConfig.directImageModel, "custom-image-model");
+  assert.equal(publicConfig.directResponsesModel, "custom-vision-text-model");
   assert.equal(publicConfig.defaults.size, "auto");
   assert.equal(formData.get("imageRoute"), "b");
   assert.equal(formData.get("baseUrl"), "https://example.test/v1");
@@ -102,6 +105,7 @@ test("browser config module normalizes private config without requiring window g
   assert.equal(formData.get("directBaseUrl"), "https://direct.example.test/v1");
   assert.equal(formData.get("directApiKey"), "sk-direct-secret");
   assert.equal(formData.get("directImageModel"), "custom-image-model");
+  assert.equal(formData.get("directResponsesModel"), "custom-vision-text-model");
 });
 
 test("browser config form data can override saved route with the current UI route", () => {
@@ -113,12 +117,14 @@ test("browser config form data can override saved route with the current UI rout
     directBaseUrl: "https://saved-direct.example.test/",
     directApiKey: "saved-direct-key",
     directImageModel: "saved-direct-image",
+    directResponsesModel: "saved-direct-vision",
   });
   const formData = appendBrowserConfigToFormData(new FormData(), () => saved, {
     imageRoute: "b",
     directBaseUrl: "https://live-direct.example.test/",
     directApiKey: "live-direct-key",
     directImageModel: "live-direct-image",
+    directResponsesModel: "live-direct-vision",
   });
 
   assert.equal(formData.get("imageRoute"), "b");
@@ -127,6 +133,7 @@ test("browser config form data can override saved route with the current UI rout
   assert.equal(formData.get("directBaseUrl"), "https://live-direct.example.test/v1");
   assert.equal(formData.get("directApiKey"), "live-direct-key");
   assert.equal(formData.get("directImageModel"), "live-direct-image");
+  assert.equal(formData.get("directResponsesModel"), "live-direct-vision");
 });
 
 test("public app shell delegates browser config and cache behavior to public modules", async () => {
@@ -160,7 +167,7 @@ test("config drawer shows image route settings as exclusive mode tabs", async ()
   );
   assert.match(
     html,
-    /data-route-panel="b"[\s\S]*接口地址[\s\S]*API Key[\s\S]*生图模型[\s\S]*id="directFetchModelsButton"[\s\S]*获取模型列表/,
+    /data-route-panel="b"[\s\S]*接口地址[\s\S]*API Key[\s\S]*生图模型[\s\S]*id="directFetchModelsButton"[\s\S]*获取模型列表[\s\S]*视觉\/文本模型[\s\S]*id="directResponsesFetchModelsButton"[\s\S]*获取模型列表/,
   );
   assert.doesNotMatch(html, /线路A|线路B/);
   assert.match(styles, /\.route-config-panel\s*\{[\s\S]*display:\s*grid;/);

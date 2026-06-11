@@ -158,6 +158,35 @@ test("listing sources multiply visible subject units by SKU pack count", () => {
   assert.equal(sources[0].skuBundleCount, 8);
 });
 
+test("listing sources preserve mixed grouped SKU quantities as quantity options", () => {
+  const sources = buildCreationListingSources({
+    setId: "set-mixed-quantities",
+    productName: "Electronic Fishing Lure",
+    productDescription: "Two SKU subjects represent different grouped pack quantities.",
+    skuBundleCount: 1,
+    skuSubjects: [
+      {
+        id: "two-lures.png",
+        title: "Two lure colorways",
+        filenames: ["two-lures.png"],
+        subjectUnitCount: 2,
+        note: "2 complete visible product units in one grouped SKU subject.",
+      },
+      {
+        id: "three-lures.png",
+        title: "Three lure colorways",
+        filenames: ["three-lures.png"],
+        subjectUnitCount: 3,
+        note: "3 complete visible product units in one grouped SKU subject.",
+      },
+    ],
+  });
+
+  assert.equal(sources.length, 1);
+  assert.deepEqual(sources[0].skuQuantityOptions, [2, 3]);
+  assert.equal(sources[0].skuVariantCount, 2);
+});
+
 test("listing sources fall back to one input-only product package when no SKU and no image exists", () => {
   const sources = buildCreationListingSources({
     setId: "set-main",

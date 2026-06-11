@@ -419,6 +419,8 @@ test("prompt agent request can identify ecommerce creation reference roles", () 
   assert.match(input[0].content[0].text, /do not split them into multiple sku_subjects/i);
   assert.match(input[0].content[0].text, /ordinary white-background SKU\/colorway images[\s\S]*role=product[\s\S]*not role=reference-product/i);
   assert.match(input[0].content[0].text, /reference_roles\[\]\.note[\s\S]*same exact visible product unit count/i);
+  assert.match(input[0].content[0].text, /不要写成“单个”或“单一”/);
+  assert.match(input[0].content[0].text, /画面为1个完整产品单体/);
   assert.match(requestBody.text.format.schema.properties.reference_roles.items.properties.note.description, /13cm/);
   assert.match(requestBody.text.format.schema.properties.sku_subjects.items.properties.note.description, /visible product unit count/i);
   assert.match(

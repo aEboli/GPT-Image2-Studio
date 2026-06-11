@@ -151,6 +151,23 @@ export function getCreationReferenceAnalysisRoleCorrectionReason(entry = {}, sub
   return "已从 reference-product 调整为 product：该图是普通白底 SKU、色款图或可售商品图。只有用户明确指定的单一全套主主体锚点才保留 reference-product。";
 }
 
+function normalizeCreationReferenceAnalysisDisplaySubjectUnitCount(value) {
+  const count = Number.parseInt(String(value || "").trim(), 10);
+  return Number.isFinite(count) && count > 1 ? Math.min(20, Math.round(count)) : 0;
+}
+
+export function getCreationReferenceAnalysisDisplayRoleLabel(entry = {}) {
+  const role = String(entry.role || "").trim();
+  const roleLabel = String(entry.roleLabel || "").trim();
+  const subjectUnitCount = normalizeCreationReferenceAnalysisDisplaySubjectUnitCount(
+    entry.subjectUnitCount ?? entry.subject_unit_count,
+  );
+  if (role === "product" && subjectUnitCount > 1) {
+    return "商品主体组";
+  }
+  return roleLabel || (role === "product" ? "商品主体" : role);
+}
+
 export function summarizeCreationReferenceAnalysisRoleCorrections(recommendations = []) {
   const reasons = [
     ...new Set(
@@ -183,17 +200,31 @@ export function buildCreationReferenceAnalysisAppliedFeedbackMessage({
   return roleCorrectionSummary ? `${appliedMessage}${roleCorrectionSummary}` : appliedMessage;
 }
 
-export function normalizeCreationReferenceAnalysisUnitCountNote(note = "", subjectUnitCount = 0) {
-  if (subjectUnitCount <= 1) {
-    return String(note || "").trim();
-  }
-  const cleanedNote = String(note || "")
-    .trim()
-    .replace(/(?:[，,；;\s]*)?图中共\s*(?:[一二两三四五六七八九十]|\d{1,2})\s*个完整产品单位[。.]?/gu, "")
+const CREATION_REFERENCE_ANALYSIS_ANY_UNIT_COUNT_PATTERN =
+  /(?:[，,；;\s]*)?(?:图中|画面中|图片中|画面|图片)?\s*(?:共|为|是|仅|只有|包含|展示|显示|呈现)?\s*(?:[一二两三四五六七八九十]|\d{1,2})\s*(?:个|件|只|条|款)?\s*完整(?:可见)?(?:产品|商品)?(?:单位|单体|单元|主体)[。.]?/gu;
+const CREATION_REFERENCE_ANALYSIS_SINGULAR_UNIT_COUNT_PATTERN =
+  /(?:[，,；;\s]*)?(?:图中|画面中|图片中|画面|图片)?\s*(?:共|为|是|仅|只有|包含|展示|显示|呈现)?\s*(?:一|1)\s*(?:个|件|只|条|款)?\s*完整(?:可见)?(?:产品|商品)?(?:单位|单体|单元|主体)[。.]?/gu;
+
+function normalizeCreationReferenceAnalysisNotePunctuation(note = "") {
+  return String(note || "")
     .replace(/[，,；;\s]+$/u, "")
     .trim();
+}
+
+export function normalizeCreationReferenceAnalysisUnitCountNote(note = "", subjectUnitCount = 0) {
+  const noteWithoutSingularCount = normalizeCreationReferenceAnalysisNotePunctuation(
+    String(note || "").trim().replace(CREATION_REFERENCE_ANALYSIS_SINGULAR_UNIT_COUNT_PATTERN, ""),
+  );
+  if (subjectUnitCount <= 1) {
+    return noteWithoutSingularCount;
+  }
+  const cleanedNote = noteWithoutSingularCount
+    .replace(CREATION_REFERENCE_ANALYSIS_ANY_UNIT_COUNT_PATTERN, "")
+    .replace(/(?:^|([，,；;\s]))(?:单个|单件|单只|单条|单款|单一|一个|一件|一只|一条|一款|1\s*(?:个|件|只|条|款))\s*(?=[^，,；;。.!?！？]{0,24}(?:商品|产品|主体|单位|单元|色款|配色|款式|路亚|鱼饵|拟饵|主图|主体图|白底主体图))/gu, "$1")
+    .trim();
   const countNote = `图中共 ${subjectUnitCount} 个完整产品单位。`;
-  return cleanedNote ? `${cleanedNote.replace(/[.!?。！？]+$/u, "").trim()}；${countNote}` : countNote;
+  const cleanedPrefix = normalizeCreationReferenceAnalysisNotePunctuation(cleanedNote).replace(/[.!?。！？]+$/u, "").trim();
+  return cleanedPrefix ? `${cleanedPrefix}；${countNote}` : countNote;
 }
 
 export function syncCreationReferenceVisualLanguageButton({

@@ -66,4 +66,13 @@ test("creation auto repair treats reconciled missing assets as incomplete", () =
   };
 
   assert.deepEqual(getCreationIncompleteItems(set).map((item) => item.itemId), ["missing-file"]);
+  assert.equal(
+    shouldAutoRepairCreationSet({
+      set,
+      generationScope: "full",
+      autoRepairAttemptCount: 0,
+      canRepair: true,
+    }),
+    false,
+  );
 });

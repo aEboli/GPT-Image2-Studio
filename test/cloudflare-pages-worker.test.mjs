@@ -223,6 +223,49 @@ test("Cloudflare creation listing route uses payload API settings outside mock m
   assert.doesNotMatch(JSON.stringify(body), /payload-key/);
 });
 
+test("Cloudflare creation listing route uses direct text vision settings in direct mode", async () => {
+  const seenRequests = [];
+  const response = await handleApiRequest(new Request("https://studio.example/api/creation/listings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      imageRoute: "b",
+      directBaseUrl: "https://direct.example.test",
+      directApiKey: "direct-payload-key",
+      directImageModel: "vendor-image-pro",
+      directResponsesModel: "vendor-vision-text",
+      set: {
+        setId: "worker-set-direct-upstream",
+        productName: "Travel Bottle",
+        dimensionSpecs: "12 oz",
+        skuSubjects: [{ id: "blue", title: "Blue Bottle", bundleCount: 1 }],
+        items: [{ itemId: "1-hero", role: "hero", status: "failed" }],
+      },
+    }),
+  }), {
+    async fetchImpl(url, init) {
+      seenRequests.push({
+        url,
+        auth: init.headers.Authorization,
+        body: JSON.parse(init.body),
+      });
+      return new Response(JSON.stringify({ output_text: JSON.stringify(makeListingDraft()) }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(seenRequests.length, 1);
+  assert.equal(seenRequests[0].url, "https://direct.example.test/v1/responses");
+  assert.equal(seenRequests[0].auth, "Bearer direct-payload-key");
+  assert.equal(seenRequests[0].body.model, "vendor-vision-text");
+  assert.equal(body.listingDrafts[0].evidenceMode, "input-only");
+  assert.doesNotMatch(JSON.stringify(body), /direct-payload-key/);
+});
+
 test("Cloudflare creation listing route uses env API settings outside mock mode", async () => {
   const seenRequests = [];
   const response = await handleApiRequest(new Request("https://studio.example/api/creation/listings", {
@@ -320,6 +363,54 @@ test("Cloudflare generation uses browser-provided API settings without echoing t
   assert.equal(imageBucket.objects.size, 1);
   assert.doesNotMatch(text, /data:image\/png;base64,ZmluYWw=/);
   assert.doesNotMatch(text, /test-browser-key/);
+});
+
+test("Cloudflare generation uses direct image model endpoint in direct mode", async () => {
+  const seenRequests = [];
+  const imageBucket = makeImageBucket();
+  const formData = new FormData();
+  formData.set("jobId", "job-cloudflare-direct");
+  formData.set("prompt", "Create a direct model product poster");
+  formData.set("ratio", "1:1");
+  formData.set("size", "1024x1024");
+  formData.set("format", "png");
+  formData.set("imageRoute", "b");
+  formData.set("directBaseUrl", "https://direct.example.test");
+  formData.set("directApiKey", "direct-browser-key");
+  formData.set("directImageModel", "vendor-image-pro");
+  formData.set("directResponsesModel", "vendor-vision-text");
+
+  const response = await handleApiRequest(new Request("https://studio.example/api/generate", {
+    method: "POST",
+    body: formData,
+  }), {
+    imageBucket,
+    async fetchImpl(url, init) {
+      seenRequests.push({
+        url,
+        auth: init.headers.Authorization,
+        body: JSON.parse(init.body),
+      });
+      return new Response(JSON.stringify({ data: [{ b64_json: "ZGlyZWN0LWZpbmFs" }] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
+  });
+
+  const text = await response.text();
+  const events = parseSseEvents(text);
+  const savedEvent = events.find((event) => event.eventName === "saved");
+
+  assert.equal(response.status, 200);
+  assert.equal(seenRequests.length, 1);
+  assert.equal(seenRequests[0].url, "https://direct.example.test/v1/images/generations");
+  assert.equal(seenRequests[0].auth, "Bearer direct-browser-key");
+  assert.equal(seenRequests[0].body.model, "vendor-image-pro");
+  assert.equal("tools" in seenRequests[0].body, false);
+  assert.equal(savedEvent.payload.item.imageRoute, "b");
+  assert.equal(savedEvent.payload.item.imageModel, "vendor-image-pro");
+  assert.doesNotMatch(text, /direct-browser-key/);
 });
 
 test("Cloudflare prompt generation labels uploaded reference images and saves reference metadata", async () => {
@@ -500,6 +591,74 @@ test("Cloudflare creation reference analysis route uses browser API settings", a
   assert.equal(payload.ok, true);
   assert.equal(payload.analysis.reference_roles[0].role, "product");
   assert.doesNotMatch(JSON.stringify(payload), /test-browser-key/);
+});
+
+test("Cloudflare creation reference analysis route uses direct text vision settings in direct mode", async () => {
+  const seenRequests = [];
+  const formData = new FormData();
+  formData.set("imageRoute", "b");
+  formData.set("directBaseUrl", "https://direct.example.test");
+  formData.set("directApiKey", "direct-browser-key");
+  formData.set("directImageModel", "vendor-image-pro");
+  formData.set("directResponsesModel", "vendor-vision-text");
+  formData.append("referenceImages", new File(["lure"], "lure.png", { type: "image/png" }));
+
+  const response = await handleApiRequest(
+    new Request("https://studio.example/api/creation/reference/analyze", {
+      method: "POST",
+      body: formData,
+    }),
+    {
+      async fetchImpl(url, init) {
+        seenRequests.push({
+          url,
+          auth: init.headers.Authorization,
+          body: JSON.parse(init.body),
+        });
+        return new Response(
+          [
+            "event: response.output_text.done",
+            `data: {"type":"response.output_text.done","text":${JSON.stringify(
+              JSON.stringify({
+                summary: "Direct route reference",
+                category_hint: "Fishing Lures",
+                category_path: "Sports > Fishing > Fishing Lures",
+                reference_roles: [
+                  {
+                    index: 1,
+                    filename: "lure.png",
+                    role: "product",
+                    note: "Use this image to preserve the lure body and finish.",
+                  },
+                ],
+                sku_subjects: [],
+                risks: [],
+              }),
+            )}}`,
+            "",
+            "",
+            "data: [DONE]",
+            "",
+            "",
+          ].join("\n"),
+          {
+            status: 200,
+            headers: { "content-type": "text/event-stream" },
+          },
+        );
+      },
+    },
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(seenRequests.length, 1);
+  assert.equal(seenRequests[0].url, "https://direct.example.test/v1/responses");
+  assert.equal(seenRequests[0].auth, "Bearer direct-browser-key");
+  assert.equal(seenRequests[0].body.model, "vendor-vision-text");
+  assert.equal(payload.ok, true);
+  assert.equal(payload.analysis.reference_roles[0].role, "product");
+  assert.doesNotMatch(JSON.stringify(payload), /direct-browser-key/);
 });
 
 test("Cloudflare creation reference analysis route rejects missing reference images with readable Chinese", async () => {
@@ -1802,6 +1961,116 @@ test("Cloudflare interactive generation streams chunks even when a queue binding
   assert.doesNotMatch(text, /test-browser-key/);
 });
 
+test("Cloudflare generation modes keep interactive streaming when a queue binding exists", async () => {
+  const cases = [
+    {
+      name: "prompt",
+      expectedGenerationMode: "",
+      setup(formData) {
+        formData.set("prompt", "Create a simple poster");
+      },
+    },
+    {
+      name: "style-transfer",
+      expectedGenerationMode: "style-transfer",
+      setup(formData) {
+        formData.set("mode", "style-transfer");
+        formData.set("prompt", "Transfer the second image style onto the first image");
+        formData.append("referenceImages", new File(["source"], "source.png", { type: "image/png" }));
+        formData.append("referenceImages", new File(["style"], "style.png", { type: "image/png" }));
+      },
+    },
+    {
+      name: "reference-analysis",
+      expectedGenerationMode: "reference-analysis",
+      setup(formData) {
+        formData.set("mode", "reference-analysis");
+        formData.set("prompt", "Create a composed product scene");
+        formData.set("targetLanguage", "zh-CN");
+        formData.set("targetLanguageLabel", "简体中文");
+        formData.append("referenceImages", new File(["reference"], "reference.png", { type: "image/png" }));
+      },
+    },
+    {
+      name: "image-decomposition",
+      expectedGenerationMode: "image-decomposition",
+      setup(formData) {
+        formData.set("mode", "image-decomposition");
+        formData.set("targetLanguage", "en");
+        formData.append("referenceImages", new File(["source"], "source.png", { type: "image/png" }));
+      },
+    },
+    {
+      name: "quick-blend",
+      expectedGenerationMode: "quick-blend",
+      setup(formData) {
+        formData.set("mode", "quick-blend");
+        formData.set("quickBlendPairIndex", "1");
+        formData.set("quickBlendAImageName", "a.png");
+        formData.set("quickBlendBImageName", "b.png");
+        formData.append("referenceImages", new File(["a"], "a.png", { type: "image/png" }));
+        formData.append("referenceImages", new File(["b"], "b.png", { type: "image/png" }));
+      },
+    },
+    {
+      name: "image-edit",
+      expectedGenerationMode: "image-edit",
+      setup(formData) {
+        formData.set("mode", "image-edit");
+        formData.set("prompt", "Replace the background with a clean studio wall");
+        formData.append("referenceImages", new File(["source"], "source.png", { type: "image/png" }));
+      },
+      makeFetchResponse() {
+        return new Response(JSON.stringify({ data: [{ b64_json: "ZWRpdC1maW5hbA==" }] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    },
+  ];
+
+  for (const testCase of cases) {
+    const seenRequests = [];
+    const imageBucket = makeImageBucket();
+    const generationQueue = makeGenerationQueue();
+    const formData = new FormData();
+    formData.set("jobId", `job-${testCase.name}`);
+    formData.set("clientSessionId", `session-${testCase.name}`);
+    formData.set("ratio", "1:1");
+    formData.set("size", "1024x1024");
+    formData.set("format", "png");
+    formData.set("reasoningEffort", "low");
+    formData.set("baseUrl", "https://example.test/v1");
+    formData.set("apiKey", "test-browser-key");
+    formData.set("responsesModel", "gpt-5.5");
+    testCase.setup(formData);
+
+    const response = await handleApiRequest(new Request("https://studio.example/api/generate", {
+      method: "POST",
+      body: formData,
+    }), {
+      imageBucket,
+      generationQueue,
+      async fetchImpl(url, init) {
+        seenRequests.push({ url, init });
+        return testCase.makeFetchResponse?.() || makeSseResponse();
+      },
+    });
+    const text = await response.text();
+    const events = parseSseEvents(text);
+    const savedEvent = events.find((event) => event.eventName === "saved");
+
+    assert.equal(response.status, 200, `${testCase.name}: response status`);
+    assert.equal(generationQueue.messages.length, 0, `${testCase.name}: should not enqueue`);
+    assert.equal(seenRequests.length, 1, `${testCase.name}: should call upstream once`);
+    assert.equal(events.some((event) => event.eventName === "queued"), false, `${testCase.name}: should not emit queued`);
+    assert.ok(savedEvent, `${testCase.name}: expected saved event`);
+    assert.equal(savedEvent.payload.item.generationMode, testCase.expectedGenerationMode);
+    assert.ok(events.some((event) => event.eventName === "complete"), `${testCase.name}: expected complete event`);
+    assert.doesNotMatch(text, /test-browser-key/, `${testCase.name}: should not echo API key`);
+  }
+});
+
 test("Cloudflare style transfer generation labels source and style references", async () => {
   const seenRequests = [];
   const imageBucket = makeImageBucket();
@@ -1894,6 +2163,7 @@ test("Cloudflare config endpoint never returns a saved API key", async () => {
   assert.equal(payload.apiKeyConfigured, false);
   assert.equal("apiKey" in payload, false);
   assert.equal(payload.responsesModel, "gpt-5.5");
+  assert.equal(payload.directResponsesModel, "gpt-5.5");
   assert.equal(payload.defaults.size, "896x1120");
 });
 

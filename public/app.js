@@ -6,8 +6,9 @@ import { getDefaultGenerationSize, getGenerationSizeOptions, normalizeGeneration
 import { getOutputFormatOptions, normalizeOutputFormat, } from "/lib/output-format-options.mjs?v=20260504-vercel-static-lib-1";
 import { normalizeReferenceAnalysisLanguage, } from "/lib/reference-analysis-language.mjs?v=20260522-reference-language-1";
 import { getPreviewLoadingShellTheme, shouldReusePreviewLoadingShell } from "/lib/preview-loading-shell.mjs";
+import { createCreationCardLoading as createCreationCardLoadingShell, getCreationCardDomKey, syncCreationLoadingCard, syncCreationResultGrid as syncCreationResultGridShell } from "/lib/creation-card-loading.mjs";
 import { isGenerationRequestRetryMessage, } from "/lib/generation-request-retry.mjs";
-import { cancelQueuedGenerationJob, isQueuedGenerationJob, selectNextQueuedGenerationJobs } from "/lib/generation-queue.mjs?v=20260504-vercel-static-lib-1";
+import { cancelQueuedGenerationJob, getQueuedGenerationJobCount, getRunningGenerationJobCount, isQueuedGenerationJob, selectNextQueuedGenerationJobsByMode } from "/lib/generation-queue.mjs?v=20260611-mode-route-queue-1";
 import { buildCanceledGenerationActivityDetail, buildGenerationTaskActivityDetail, buildGenerationTaskStatusText, formatGenerationActivityModeLabel, getGenerationActivityDisplayText, sanitizeGenerationActivityDetail, sortGenerationActivityFeed, upsertGenerationActivityEntry } from "/lib/generation-activity-feed.mjs?v=20260504-vercel-static-lib-1";
 import { GENERATION_STREAM_EVENTS, recordFinalImageChunk } from "/lib/generation-stream-protocol.mjs";
 import { getStudioDensitySettings, getStudioLayoutMode, ALL_VARIABLE_NAMES } from "/lib/studio-density.mjs?v=20260519-topbar-reveal-2";
@@ -23,7 +24,7 @@ import { appendPptDeckDownloadLinks } from "/lib/ppt-record-links.mjs";
 import { buildCreationSkuSubjectsForPayload, normalizeCreationSkuBundleCountForPayload, normalizeCreationSkuSubjectForPayload } from "/lib/creation-sku-subjects.mjs";
 import { bindCreationReferenceDrag, reorderCreationReferenceFiles } from "/lib/creation-reference-drag.mjs";
 import { isCreationSubjectReferenceRole } from "/lib/creation-reference-roles.mjs";
-import { appendCreationVisualLanguageSuggestionCard, buildCreationReferenceAnalysisAppliedFeedbackMessage, getCreationReferenceAnalysisGroupedSubjectUnitCount, getCreationReferenceAnalysisRoleCorrectionReason, getCreationReferenceAnalysisVisualLanguageReason, getCreationReferenceAnalysisVisualLanguageSource, normalizeCreationReferenceAnalysisUnitCountNote, shouldDowngradeReferenceProductAnalysisRole, syncCreationReferenceVisualLanguageButton } from "/lib/creation-reference-analysis-view.mjs";
+import { appendCreationVisualLanguageSuggestionCard, buildCreationReferenceAnalysisAppliedFeedbackMessage, getCreationReferenceAnalysisDisplayRoleLabel, getCreationReferenceAnalysisGroupedSubjectUnitCount, getCreationReferenceAnalysisRoleCorrectionReason, getCreationReferenceAnalysisVisualLanguageReason, getCreationReferenceAnalysisVisualLanguageSource, normalizeCreationReferenceAnalysisUnitCountNote, shouldDowngradeReferenceProductAnalysisRole, syncCreationReferenceVisualLanguageButton } from "/lib/creation-reference-analysis-view.mjs";
 import { createCreationListingController, getCreationRecordListingMetaLabel, getCreationListingSearchValues, normalizeCreationListingDraftForView, renderCreationListingDrafts } from "/lib/creation-listing-view.mjs";
 import { getCreationAutoRepairNotice, getCreationCompletionFeedback, getCreationIncompleteItems, shouldAutoRepairCreationSet } from "/lib/creation-auto-repair.mjs";
 import { canRepairCreationItem as canRepairCreationItemFromQueue, getCreationRepairButtonText as getCreationRepairButtonTextFromQueue, isCreationItemRepairActive as isCreationItemRepairActiveInQueue, queueCreationItemRepair as queueCreationItemRepairInState, removeQueuedCreationItemRepair, shiftNextQueuedCreationItemRepair } from "/lib/creation-item-repair-queue.mjs";
@@ -453,6 +454,8 @@ const state = {
   creationReferencePreviewItem: null,
   creationSelectedRoles: [],
   gallery: [],
+  galleryLoading: true,
+  galleryLoadError: "",
   galleryMetadataCache: {},
   galleryControls: { ...DEFAULT_GALLERY_CONTROLS },
   galleryHistoryPage: 0,
@@ -585,6 +588,10 @@ const refs = {
   directImageModelInput: document.querySelector("#directImageModelInput"),
   directModelOptionsList: document.querySelector("#directModelOptionsList"),
   directModelPickerToggle: document.querySelector("#directModelPickerToggle"),
+  directResponsesFetchModelsButton: document.querySelector("#directResponsesFetchModelsButton"),
+  directResponsesModelInput: document.querySelector("#directResponsesModelInput"),
+  directResponsesModelOptionsList: document.querySelector("#directResponsesModelOptionsList"),
+  directResponsesModelPickerToggle: document.querySelector("#directResponsesModelPickerToggle"),
   directSavedKeyMask: document.querySelector("#directSavedKeyMask"),
   imageRouteInputs: [...document.querySelectorAll('input[name="imageRoute"]')],
   clearHistoryButton: document.querySelector("#clearHistoryButton"),
@@ -1902,9 +1909,10 @@ function setConnectionState(kind, label, entryLabel = CONNECTION_STATUS_ENTRY_LA
 }
 
 function syncConnectionState() {
-  const queuedCount = getQueuedJobCount();
-  if (queuedCount > 0) {
-    setConnectionState("busy", `并发 ${getRunningJobCount()}/${getMaxParallelJobCount()} · 队列 ${queuedCount}`);
+  const queuedCount = getTotalQueuedJobCount();
+  const runningCount = getTotalRunningJobCount();
+  if (queuedCount > 0 || runningCount > 0) {
+    setConnectionState("busy", `并发 ${runningCount}/${getMaxParallelJobCount()} · 队列 ${queuedCount}`);
     return;
   }
 
@@ -2187,14 +2195,6 @@ function updatePromptCounter() {
   refs.promptCounter.textContent = `${refs.promptInput.value.length} 字`;
 }
 
-function getQueuedJobCount() {
-  return state.jobs.length;
-}
-
-function getRunningJobCount() {
-  return state.jobs.filter((job) => job.isRunning).length;
-}
-
 function getMaxQueuedJobCount() {
   return Number.POSITIVE_INFINITY;
 }
@@ -2202,6 +2202,13 @@ function getMaxQueuedJobCount() {
 function getMaxParallelJobCount() {
   return state.limits.maxParallelTasksPerSession || DEFAULT_LIMITS.maxParallelTasksPerSession;
 }
+
+function getCurrentGenerationQueueMode() { return ["style-transfer", "reference-analysis", "image-decomposition", "image-edit", "quick-blend"].includes(state.activeView) ? state.activeView : state.activeView === "studio" && state.studioMode === "style-transfer" ? "style-transfer" : "prompt"; }
+function getCurrentGenerationQueueRoute() { return getSelectedImageRoute(); }
+function getQueuedJobCount(mode = getCurrentGenerationQueueMode(), route = getCurrentGenerationQueueRoute()) { return getQueuedGenerationJobCount(state.jobs, mode, route); }
+function getRunningJobCount(mode = getCurrentGenerationQueueMode(), route = getCurrentGenerationQueueRoute()) { return getRunningGenerationJobCount(state.jobs, mode, route); }
+function getTotalQueuedJobCount() { return getQueuedGenerationJobCount(state.jobs); }
+function getTotalRunningJobCount() { return getRunningGenerationJobCount(state.jobs); }
 
 function getCreationMaxReferenceImageCount() { return state.limits.maxCreationReferenceImages || DEFAULT_LIMITS.maxCreationReferenceImages || state.limits.maxReferenceImages || DEFAULT_LIMITS.maxReferenceImages; }
 function getCreationMaxProductReferenceImageCount() { return Math.max(0, getCreationMaxReferenceImageCount() - state.creationStyleReferenceFiles.length); }
@@ -5073,20 +5080,18 @@ function updateGenerationModeStatus() {
 
 function getCurrentPrivateConfigRequestPayload() {
   const browserPayload = getBrowserPrivateConfigRequestPayload();
-  return {
-    imageRoute: getSelectedImageRoute(),
-    baseUrl: refs.baseUrlInput.value.trim() || browserPayload.baseUrl || state.config?.baseUrl || "",
-    apiKey: refs.apiKeyInput.value.trim() || browserPayload.apiKey || "",
-    responsesModel: refs.responsesModelInput.value.trim() || browserPayload.responsesModel || state.config?.responsesModel || "gpt-5.5",
-    directBaseUrl: refs.directBaseUrlInput.value.trim() || browserPayload.directBaseUrl || state.config?.directBaseUrl || "",
-    directApiKey: refs.directApiKeyInput.value.trim() || browserPayload.directApiKey || "",
-    directImageModel: refs.directImageModelInput.value.trim() || browserPayload.directImageModel || state.config?.directImageModel || "gpt-image-2",
-  };
+  return { imageRoute: getSelectedImageRoute(), baseUrl: refs.baseUrlInput.value.trim() || browserPayload.baseUrl || state.config?.baseUrl || "", apiKey: refs.apiKeyInput.value.trim() || browserPayload.apiKey || "", responsesModel: refs.responsesModelInput.value.trim() || browserPayload.responsesModel || state.config?.responsesModel || "gpt-5.5", directBaseUrl: refs.directBaseUrlInput.value.trim() || browserPayload.directBaseUrl || state.config?.directBaseUrl || "", directApiKey: refs.directApiKeyInput.value.trim() || browserPayload.directApiKey || "", directImageModel: refs.directImageModelInput.value.trim() || browserPayload.directImageModel || state.config?.directImageModel || "gpt-image-2", directResponsesModel: refs.directResponsesModelInput.value.trim() || browserPayload.directResponsesModel || state.config?.directResponsesModel || "gpt-5.5" };
 }
 
-function appendCurrentConfigToFormData(formData) {
-  appendBrowserConfigToFormData(formData, undefined, getCurrentPrivateConfigRequestPayload());
-  return formData;
+function appendCurrentConfigToFormData(formData) { appendBrowserConfigToFormData(formData, undefined, getCurrentPrivateConfigRequestPayload()); return formData; }
+
+function applyQueuedJobConfigSnapshot(job) { if (!job) return job; const { imageRoute, baseUrl, responsesModel, directBaseUrl, directImageModel, directResponsesModel } = getCurrentPrivateConfigRequestPayload(); Object.assign(job, { imageRoute, generationRoute: imageRoute, baseUrl, responsesModel, directBaseUrl, directImageModel, directResponsesModel }); return job; }
+
+function appendJobConfigToFormData(formData, job) {
+  const payload = getCurrentPrivateConfigRequestPayload();
+  ["baseUrl", "responsesModel", "directBaseUrl", "directImageModel", "directResponsesModel"].forEach((key) => { if (job?.[key]) payload[key] = job[key]; });
+  payload.imageRoute = job?.imageRoute || job?.generationRoute || payload.imageRoute;
+  appendBrowserConfigToFormData(formData, undefined, payload); return formData;
 }
 
 function syncConfigUi(config) {
@@ -5094,6 +5099,7 @@ function syncConfigUi(config) {
   refs.responsesModelInput.value = config.responsesModel || "gpt-5.5";
   refs.directBaseUrlInput.value = config.directBaseUrl || config.baseUrl || "";
   refs.directImageModelInput.value = config.directImageModel || "gpt-image-2";
+  refs.directResponsesModelInput.value = config.directResponsesModel || "gpt-5.5";
   refs.imageRouteInputs.forEach((input) => {
     input.checked = input.value === (config.imageRoute === "b" ? "b" : "a");
   });
@@ -5308,6 +5314,7 @@ async function copyLightboxPrompt() {
 }
 
 function recordJobQueued(job) {
+  applyQueuedJobConfigSnapshot(job);
   recordActivity({
     key: `${job.id}:task`, title: GENERATION_TASK_STATUS_LABELS.running,
     detail: buildGenerationTaskActivityDetail({ statusStage: "queued", statusText: "等待资源分配" }),
@@ -5619,7 +5626,6 @@ function createPreviewLoadingShellNodes() {
     jobMetric,
     progressMetric,
     status,
-    missingAsset: Boolean(item.missingAsset || item.missing_asset),
     detail,
     steps,
     state: null,
@@ -5795,6 +5801,59 @@ function getFilmstripItems() {
   return [...activeJobs, ...recentGallery].slice(0, 14);
 }
 
+function getFilmstripPlaceholderState() {
+  if (state.galleryLoading) {
+    return {
+      kind: "loading",
+      label: "缩略图加载中",
+      count: 4,
+    };
+  }
+
+  if (state.galleryLoadError) {
+    return {
+      kind: "error",
+      label: "缩略图加载失败",
+      count: 1,
+    };
+  }
+
+  return {
+    kind: "empty",
+    label: "暂无缩略图",
+    count: 1,
+  };
+}
+
+function createFilmstripPlaceholderEntry(placeholderState, index) {
+  const shell = document.createElement("div");
+  shell.className = "filmstrip-entry filmstrip-placeholder-entry";
+  shell.dataset.filmstripPlaceholder = placeholderState.kind;
+
+  const ghost = document.createElement("div");
+  ghost.className = `filmstrip-ghost filmstrip-placeholder-ghost${placeholderState.kind === "loading" ? " is-loading" : ""}`;
+  ghost.setAttribute("aria-hidden", "true");
+  shell.appendChild(ghost);
+
+  const label = document.createElement("span");
+  label.className = "filmstrip-placeholder-label";
+  label.textContent = index === 0 ? placeholderState.label : "";
+  shell.appendChild(label);
+
+  return shell;
+}
+
+function renderFilmstripPlaceholder() {
+  const placeholderState = getFilmstripPlaceholderState();
+  const fragment = document.createDocumentFragment();
+
+  for (let index = 0; index < placeholderState.count; index += 1) {
+    fragment.appendChild(createFilmstripPlaceholderEntry(placeholderState, index));
+  }
+
+  refs.filmstrip.replaceChildren(fragment);
+}
+
 function createFilmstripEntry(key) {
   const shell = document.createElement("div");
   shell.className = "filmstrip-entry";
@@ -5881,6 +5940,12 @@ function syncFilmstripEntry(shell, { key, item, label }) {
 }
 
 function renderFilmstrip() {
+  const entries = getFilmstripItems();
+  if (entries.length === 0) {
+    renderFilmstripPlaceholder();
+    return;
+  }
+
   const existingEntries = new Map(
     [...refs.filmstrip.querySelectorAll(".filmstrip-entry[data-filmstrip-key]")].map((entry) => [
       entry.dataset.filmstripKey,
@@ -5889,7 +5954,7 @@ function renderFilmstrip() {
   );
   const fragment = document.createDocumentFragment();
 
-  getFilmstripItems().forEach((entry) => {
+  entries.forEach((entry) => {
     const shell = existingEntries.get(entry.key) || createFilmstripEntry(entry.key);
     syncFilmstripEntry(shell, entry);
     fragment.appendChild(shell);
@@ -8547,7 +8612,7 @@ function buildArticleIllustrationPlanFormData() {
       formData.append("sourceFiles", item.file);
     }
   });
-  appendBrowserConfigToFormData(formData);
+  appendCurrentConfigToFormData(formData);
   return formData;
 }
 
@@ -9653,27 +9718,9 @@ function shouldHideCreationCardDetails(item = {}, showRecordActions = false) {
   return true;
 }
 
-function createCreationCardLoading(status = "generating") {
+function createCreationCardLoading(status = "generating", sequenceIndex = 0) {
   const isQueued = status === "queued";
-  const loading = document.createElement("div");
-  loading.className = "creation-card-loading";
-
-  const motion = document.createElement("div");
-  motion.className = "creation-card-loading-motion";
-  motion.setAttribute("aria-hidden", "true");
-  for (let index = 0; index < 3; index += 1) {
-    motion.appendChild(document.createElement("span"));
-  }
-
-  const label = document.createElement("strong");
-  label.textContent = isQueued ? "排队中" : "生成中";
-
-  const detail = document.createElement("span");
-  detail.className = "creation-card-loading-detail";
-  detail.textContent = isQueued ? "等待并发槽位，超过 10 张会自动接续" : "正在生成套图图片";
-
-  loading.append(motion, label, detail);
-  return loading;
+  return createCreationCardLoadingShell(isQueued ? "queued" : "generating", null, { sequenceIndex });
 }
 
 function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
@@ -9683,6 +9730,7 @@ function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
   const hideGenerationDetails = shouldHideCreationCardDetails(item, showRecordActions);
   const card = document.createElement("article");
   card.className = "creation-card";
+  card.dataset.creationCardKey = getCreationCardDomKey(item, fallbackIndex);
   card.classList.toggle("is-record-card", showRecordActions);
   card.classList.toggle("is-generating", isLoadingCard);
   card.classList.toggle("is-sku", item.role === "sku"); card.classList.toggle("is-sku-start", options.isSkuStart === true);
@@ -9691,11 +9739,13 @@ function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
   head.className = "creation-card-head";
 
   const title = document.createElement("strong");
+  title.dataset.creationCardTitle = "true";
   title.textContent = item.title || CREATION_PREVIEW_SLOTS[fallbackIndex]?.title || `第 ${fallbackIndex + 1} 张`;
   head.appendChild(title);
 
   const status = document.createElement("span");
   status.className = "creation-card-status";
+  status.dataset.creationCardStatus = "true";
   status.textContent = getCreationItemStatusLabel(item);
   head.appendChild(status);
 
@@ -9704,6 +9754,7 @@ function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
   const imageUrl = getImageUrl(item);
   const media = document.createElement(showRecordActions && imageUrl ? "button" : "div");
   media.className = "creation-card-media";
+  media.dataset.creationCardMedia = "true";
   if (showRecordActions && imageUrl) {
     media.type = "button";
     media.classList.add("creation-record-preview-media");
@@ -9714,7 +9765,7 @@ function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
   if (isLoadingCard) {
     media.classList.add("is-loading");
     media.setAttribute("aria-busy", "true");
-    media.appendChild(createCreationCardLoading(item.status));
+    media.appendChild(createCreationCardLoading(item.status, fallbackIndex));
   } else if (imageUrl) {
     const image = document.createElement("img");
     image.loading = "lazy";
@@ -9829,6 +9880,22 @@ function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
   }
 
   return card;
+}
+
+function syncCreationResultGrid(items = []) {
+  syncCreationResultGridShell({
+    grid: refs.creationResultGrid,
+    items,
+    createCard: (item, index, options) => createCreationCard(item, index, options),
+    getItemOptions: (item, _index, { firstSkuItem }) => ({ isSkuStart: item === firstSkuItem }),
+    syncCard: (card, item, index, options) => syncCreationLoadingCard(card, item, index, {
+      ...options,
+      getFallbackTitle: (slotIndex) => CREATION_PREVIEW_SLOTS[slotIndex]?.title || "",
+      getImageUrl,
+      getStatusLabel: getCreationItemStatusLabel,
+      shouldShowLoading: (entry) => shouldShowCreationCardLoading(entry, false),
+    }),
+  });
 }
 
 function getCreationRecordSearchText(set = {}) {
@@ -10782,7 +10849,7 @@ function renderCreationReferenceGrid() {
     CREATION_REFERENCE_ROLE_OPTIONS.forEach((option) => {
       const choice = document.createElement("option");
       choice.value = option.value;
-      choice.textContent = option.label;
+      choice.textContent = getCreationReferenceAnalysisDisplayRoleLabel({ role: option.value, roleLabel: option.label, subjectUnitCount: item.subjectUnitCount });
       choice.selected = (item.role || "product") === option.value;
       roleSelect.appendChild(choice);
     });
@@ -10890,6 +10957,7 @@ function buildCreationReferenceRolePayload() {
     filename: item.file?.name || `reference-image-${index + 1}`,
     role: item.role || "product",
     note: item.note || "",
+    subjectUnitCount: item.subjectUnitCount || 0,
   }));
 }
 
@@ -10985,7 +11053,7 @@ function normalizeCreationReferenceAnalysisRecommendation(entry = {}, index = 0,
   const shouldCorrectRole = Boolean(roleCorrectionReason) || shouldDowngradeReferenceProductAnalysisRole(normalizedEntry, subjectUnitCount);
   const role = shouldCorrectRole ? "product" : inferCreationReferenceAnalysisRole(normalizedEntry);
   const suppliedRole = String(entry.role || "").trim();
-  return { index: Number(entry.index) || index + 1, filename, role, roleLabel: String(role !== suppliedRole ? getCreationReferenceRoleLabel(role) : entry.roleLabel || getCreationReferenceRoleLabel(role)), roleCorrectionReason: roleCorrectionReason, note: normalizeCreationReferenceAnalysisUnitCountNote(entry.note, subjectUnitCount) };
+  return { index: Number(entry.index) || index + 1, filename, role, subjectUnitCount, roleLabel: getCreationReferenceAnalysisDisplayRoleLabel({ role, roleLabel: String(role !== suppliedRole ? getCreationReferenceRoleLabel(role) : entry.roleLabel || getCreationReferenceRoleLabel(role)), subjectUnitCount }), roleCorrectionReason: roleCorrectionReason, note: normalizeCreationReferenceAnalysisUnitCountNote(entry.note, subjectUnitCount) };
 }
 
 function normalizeCreationReferenceAnalysisPayload(payload = {}) {
@@ -11111,6 +11179,7 @@ function applyCreationReferenceAnalysisRecommendations() {
           ...item,
           role: recommendation.role || item.role || "product",
           note: recommendation.note || "",
+          subjectUnitCount: recommendation.subjectUnitCount || 0,
         }
       : item;
   });
@@ -11241,7 +11310,7 @@ async function buildCreationReferenceAnalysisFormData() {
   analysisFiles.forEach((file) => {
     formData.append("referenceImages", file);
   });
-  appendBrowserConfigToFormData(formData);
+  appendCurrentConfigToFormData(formData);
   return formData;
 }
 
@@ -11411,10 +11480,8 @@ function renderCreationView() {
   renderCreationQueueStrip();
   renderCreationRecordDetail(currentSet);
 
-  refs.creationResultGrid.innerHTML = "";
   refs.creationPromptEditorLayer?.replaceChildren();
-  const firstSkuItem = items.find((item) => item.role === "sku");
-  items.forEach((item, index) => refs.creationResultGrid.appendChild(createCreationCard(item, index, { isSkuStart: item === firstSkuItem })));
+  syncCreationResultGrid(items);
   renderCreationListingDrafts({ refs: getCreationInlineListingRefs(), state, set: currentSet });
 }
 
@@ -14042,20 +14109,33 @@ async function loadConfig() {
 }
 
 async function loadGallery() {
-  const response = await fetch("/api/gallery");
-  if (!response.ok) {
-    throw new Error("读取本地画廊失败");
-  }
+  state.galleryLoading = true;
+  state.galleryLoadError = "";
+  renderActiveView();
 
-  const payload = await response.json();
-  const browserCachedItems = await readBrowserCachedGalleryItems();
-  const sortedItems = sortGalleryItemsByCreatedAtDesc(
-    mergeServerAndBrowserGalleryItems(Array.isArray(payload) ? payload : [], browserCachedItems),
-  );
-  const hydratedGallery = hydrateGalleryItems(sortedItems);
-  state.gallery = sortGalleryItemsByCreatedAtDesc(hydratedGallery.items);
-  renderAll();
-  void repairGalleryMetadataQueue(hydratedGallery.repairQueue);
+  try {
+    const response = await fetch("/api/gallery");
+    if (!response.ok) {
+      throw new Error("读取本地画廊失败");
+    }
+
+    const payload = await response.json();
+    const browserCachedItems = await readBrowserCachedGalleryItems();
+    const sortedItems = sortGalleryItemsByCreatedAtDesc(
+      mergeServerAndBrowserGalleryItems(Array.isArray(payload) ? payload : [], browserCachedItems),
+    );
+    const hydratedGallery = hydrateGalleryItems(sortedItems);
+    state.gallery = sortGalleryItemsByCreatedAtDesc(hydratedGallery.items);
+    state.galleryLoading = false;
+    state.galleryLoadError = "";
+    renderAll();
+    void repairGalleryMetadataQueue(hydratedGallery.repairQueue);
+  } catch (error) {
+    state.galleryLoading = false;
+    state.galleryLoadError = error instanceof Error ? error.message : String(error);
+    renderAll();
+    throw error;
+  }
 }
 
 function normalizeGenerationTaskSnapshot(task) {
@@ -14183,6 +14263,7 @@ function applyGenerationTaskSnapshots(tasks, { render = true } = {}) {
       };
     });
   const localTransientJobs = state.jobs.filter((job) => !snapshotIds.has(job.id) && (job.isRunning || !job.started));
+  const hasLocalQueuedJobs = localTransientJobs.some((job) => isQueuedGenerationJob(job));
 
   state.generationTasks = snapshots;
   state.jobs = sortGalleryItemsByCreatedAtDesc([...remoteRunningJobs, ...localTransientJobs]);
@@ -14193,6 +14274,10 @@ function applyGenerationTaskSnapshots(tasks, { render = true } = {}) {
 
   if (render) {
     renderAll();
+  }
+
+  if (hasLocalQueuedJobs) {
+    scheduleGenerationQueue();
   }
 
   scheduleGenerationTaskPolling();
@@ -14258,6 +14343,7 @@ async function saveConfig(event) {
     directBaseUrl: refs.directBaseUrlInput.value.trim(),
     directApiKey: refs.directApiKeyInput.value.trim(),
     directImageModel: refs.directImageModelInput.value.trim() || "gpt-image-2",
+    directResponsesModel: refs.directResponsesModelInput.value.trim() || "gpt-5.5",
   };
 
   const browserConfig = saveBrowserPrivateConfig(payload);
@@ -14484,7 +14570,7 @@ async function buildPromptAgentFormData() {
   const formData = new FormData();
   formData.set("image", await preparePromptAnalysisImageFile(state.promptAgent.file));
   formData.set("reasoningEffort", PROMPT_AGENT_ANALYSIS_REASONING_EFFORT);
-  appendBrowserConfigToFormData(formData);
+  appendJobConfigToFormData(formData, job);
   return formData;
 }
 
@@ -14504,7 +14590,7 @@ async function buildReferenceAnalysisFormData() {
   analysisFiles.forEach((file) => {
     formData.append("image", file);
   });
-  appendBrowserConfigToFormData(formData);
+  appendCurrentConfigToFormData(formData);
   return formData;
 }
 
@@ -14670,12 +14756,7 @@ async function copyPromptAgentJson(itemId) {
 }
 
 function scheduleGenerationQueue() {
-  const availableSlots = Math.max(0, getMaxParallelJobCount() - getRunningJobCount());
-  if (availableSlots === 0) {
-    return;
-  }
-
-  const nextJobs = selectNextQueuedGenerationJobs(state.jobs, availableSlots);
+  const nextJobs = selectNextQueuedGenerationJobsByMode(state.jobs, getMaxParallelJobCount());
   nextJobs.forEach((job) => {
     job.started = true;
     job.isRunning = true;

@@ -8,12 +8,16 @@ export function createConfigModelPickerController({
   const documentRef = refs?.modelOptionsList?.ownerDocument || globalThis.document;
   const MODEL_TARGET_RESPONSES = "responses";
   const MODEL_TARGET_DIRECT = "direct";
-  const MODEL_TARGETS = [MODEL_TARGET_RESPONSES, MODEL_TARGET_DIRECT];
+  const MODEL_TARGET_DIRECT_RESPONSES = "direct-responses";
+  const MODEL_TARGETS = [MODEL_TARGET_RESPONSES, MODEL_TARGET_DIRECT, MODEL_TARGET_DIRECT_RESPONSES];
 
   state.configModels ||= { items: [], loading: false, loadingMode: "", open: false };
   state.configModels.targets ||= {};
 
   function normalizeTarget(target) {
+    if (target === MODEL_TARGET_DIRECT_RESPONSES) {
+      return MODEL_TARGET_DIRECT_RESPONSES;
+    }
     return target === MODEL_TARGET_DIRECT ? MODEL_TARGET_DIRECT : MODEL_TARGET_RESPONSES;
   }
 
@@ -56,23 +60,33 @@ export function createConfigModelPickerController({
   }
 
   function getImageRouteForTarget(target = getTargetForSelectedRoute()) {
-    return normalizeTarget(target) === MODEL_TARGET_DIRECT ? "b" : "a";
+    return normalizeTarget(target) === MODEL_TARGET_RESPONSES ? "a" : "b";
   }
 
   function getTargetRefs(target = getTargetForSelectedRoute()) {
-    return normalizeTarget(target) === MODEL_TARGET_DIRECT
-      ? {
-          input: refs.directImageModelInput,
-          toggle: refs.directModelPickerToggle,
-          list: refs.directModelOptionsList,
-          fetchButton: refs.directFetchModelsButton,
-        }
-      : {
-          input: refs.responsesModelInput,
-          toggle: refs.modelPickerToggle,
-          list: refs.modelOptionsList,
-          fetchButton: refs.fetchModelsButton,
-        };
+    const normalizedTarget = normalizeTarget(target);
+    if (normalizedTarget === MODEL_TARGET_DIRECT) {
+      return {
+        input: refs.directImageModelInput,
+        toggle: refs.directModelPickerToggle,
+        list: refs.directModelOptionsList,
+        fetchButton: refs.directFetchModelsButton,
+      };
+    }
+    if (normalizedTarget === MODEL_TARGET_DIRECT_RESPONSES) {
+      return {
+        input: refs.directResponsesModelInput,
+        toggle: refs.directResponsesModelPickerToggle,
+        list: refs.directResponsesModelOptionsList,
+        fetchButton: refs.directResponsesFetchModelsButton,
+      };
+    }
+    return {
+      input: refs.responsesModelInput,
+      toggle: refs.modelPickerToggle,
+      list: refs.modelOptionsList,
+      fetchButton: refs.fetchModelsButton,
+    };
   }
 
   function setFeedback(message = "", kind = "") {
@@ -104,6 +118,11 @@ export function createConfigModelPickerController({
         browserPayload.directImageModel ||
         state.config?.directImageModel ||
         "gpt-image-2",
+      directResponsesModel:
+        getInputValue(refs.directResponsesModelInput) ||
+        browserPayload.directResponsesModel ||
+        state.config?.directResponsesModel ||
+        "gpt-5.5",
     };
   }
 
@@ -117,6 +136,7 @@ export function createConfigModelPickerController({
     formData.set("directBaseUrl", payload.directBaseUrl);
     formData.set("directApiKey", payload.directApiKey);
     formData.set("directImageModel", payload.directImageModel);
+    formData.set("directResponsesModel", payload.directResponsesModel);
     return formData;
   }
 
@@ -200,8 +220,19 @@ export function createConfigModelPickerController({
     });
   }
 
+  function getActiveTarget() {
+    if (state.configModels.loading) {
+      return normalizeTarget(state.configModels.loadingTarget);
+    }
+    const currentTarget = normalizeTarget(state.configModels.target || getTargetForSelectedRoute());
+    if (getModelState(currentTarget).open) {
+      return currentTarget;
+    }
+    return getTargetForSelectedRoute();
+  }
+
   function render() {
-    const activeTarget = normalizeTarget(state.configModels.loading ? state.configModels.loadingTarget : getTargetForSelectedRoute());
+    const activeTarget = normalizeTarget(getActiveTarget());
     syncLegacyModelState(activeTarget);
     MODEL_TARGETS.forEach((target) => renderTarget(target, activeTarget));
 
@@ -317,8 +348,14 @@ export function createConfigModelPickerController({
     refs.directFetchModelsButton?.addEventListener("click", () => {
       fetchConfigModels({ openAfterFetch: true, mode: "models", target: MODEL_TARGET_DIRECT });
     });
+    refs.directResponsesFetchModelsButton?.addEventListener("click", () => {
+      fetchConfigModels({ openAfterFetch: true, mode: "models", target: MODEL_TARGET_DIRECT_RESPONSES });
+    });
     refs.modelPickerToggle.addEventListener("click", () => toggleModelPicker(MODEL_TARGET_RESPONSES));
     refs.directModelPickerToggle?.addEventListener("click", () => toggleModelPicker(MODEL_TARGET_DIRECT));
+    refs.directResponsesModelPickerToggle?.addEventListener("click", () =>
+      toggleModelPicker(MODEL_TARGET_DIRECT_RESPONSES),
+    );
     refs.modelOptionsList.addEventListener("click", (event) => {
       const option = event.target?.closest("[data-model-id]");
       if (option) {
@@ -331,11 +368,20 @@ export function createConfigModelPickerController({
         selectModelOption(option.dataset.modelId, MODEL_TARGET_DIRECT);
       }
     });
+    refs.directResponsesModelOptionsList?.addEventListener("click", (event) => {
+      const option = event.target?.closest("[data-model-id]");
+      if (option) {
+        selectModelOption(option.dataset.modelId, MODEL_TARGET_DIRECT_RESPONSES);
+      }
+    });
     refs.responsesModelInput.addEventListener("input", () => {
       handleModelInput(MODEL_TARGET_RESPONSES);
     });
     refs.directImageModelInput?.addEventListener("input", () => {
       handleModelInput(MODEL_TARGET_DIRECT);
+    });
+    refs.directResponsesModelInput?.addEventListener("input", () => {
+      handleModelInput(MODEL_TARGET_DIRECT_RESPONSES);
     });
     refs.imageRouteInputs?.forEach((input) => {
       input.addEventListener?.("change", () => {

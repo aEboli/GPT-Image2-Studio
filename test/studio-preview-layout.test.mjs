@@ -14,13 +14,14 @@ const configModelPickerPath = new URL("../lib/config-model-picker.mjs", import.m
 const creationListingViewPath = new URL("../lib/creation-listing-view.mjs", import.meta.url);
 const creationReferenceDragPath = new URL("../lib/creation-reference-drag.mjs", import.meta.url);
 const creationReferenceAnalysisViewPath = new URL("../lib/creation-reference-analysis-view.mjs", import.meta.url);
+const creationCardLoadingPath = new URL("../lib/creation-card-loading.mjs", import.meta.url);
 const creationSuiteQueuePath = new URL("../lib/creation-suite-queue.mjs", import.meta.url);
 const publicConfigModelPickerPath = new URL("../public/lib/config-model-picker.mjs", import.meta.url);
 const publicCreationListingViewPath = new URL("../public/lib/creation-listing-view.mjs", import.meta.url);
 const generationClientPath = new URL("../lib/generation-client.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20260608-quick-blend-group-clear-1";
-const appAssetVersion = "20260608-quick-blend-time-sort-1";
+const stylesAssetVersion = "20260611-filmstrip-loading-1";
+const appAssetVersion = "20260611-filmstrip-loading-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
 const creationQueueModuleAssetVersion = "20260530-creation-queue-role-sync-1";
 const quickBlendModuleAssetVersion = "20260608-quick-blend-time-sort-1";
@@ -193,6 +194,10 @@ function createModelPickerHarness() {
     directImageModelInput: createTestElement("input", documentRef),
     directModelOptionsList: createTestElement("div", documentRef),
     directModelPickerToggle: createTestElement("button", documentRef),
+    directResponsesFetchModelsButton: createTestElement("button", documentRef),
+    directResponsesModelInput: createTestElement("input", documentRef),
+    directResponsesModelOptionsList: createTestElement("div", documentRef),
+    directResponsesModelPickerToggle: createTestElement("button", documentRef),
     fetchModelsButton: createTestElement("button", documentRef),
     imageRouteInputs: [
       { value: "a", checked: true },
@@ -208,6 +213,7 @@ function createModelPickerHarness() {
   refs.directApiKeyInput.value = "direct-key";
   refs.directBaseUrlInput.value = "https://direct.example.test/v1";
   refs.directImageModelInput.value = "gpt-image-2";
+  refs.directResponsesModelInput.value = "gpt-5.5";
   refs.responsesModelInput.value = "gpt-5.5";
   return { documentRef, refs };
 }
@@ -400,6 +406,25 @@ test("filmstrip rendering reuses keyed thumbnail nodes instead of clearing the r
   assert.match(app, /refs\.filmstrip\.replaceChildren\(fragment\);/);
   assert.match(app, /if \(image\.getAttribute\("src"\) !== imageUrl\) \{[\s\S]*image\.src = imageUrl;[\s\S]*\}/);
   assert.doesNotMatch(app, /refs\.filmstrip\.innerHTML = "";/);
+});
+
+test("studio filmstrip shows a visible placeholder while prompt thumbnails load", async () => {
+  const styles = await readFile(stylesPath, "utf8");
+  const app = await readFile(appPath, "utf8");
+
+  assert.match(app, /galleryLoading:\s*true,/);
+  assert.match(app, /galleryLoadError:\s*"",/);
+  assert.match(app, /function getFilmstripPlaceholderState\(\) \{[\s\S]*state\.galleryLoading[\s\S]*state\.galleryLoadError/);
+  assert.match(app, /function renderFilmstripPlaceholder\(\) \{[\s\S]*refs\.filmstrip\.replaceChildren\(fragment\);/);
+  assert.match(app, /if \(entries\.length === 0\) \{[\s\S]*renderFilmstripPlaceholder\(\);[\s\S]*return;/);
+  assert.match(app, /state\.galleryLoading = false;[\s\S]*state\.galleryLoadError = "";/);
+  assert.match(
+    app,
+    /catch \(error\) \{[\s\S]*state\.galleryLoading = false;[\s\S]*state\.galleryLoadError = error instanceof Error \? error\.message : String\(error\);[\s\S]*throw error;/,
+  );
+  assert.match(styles, /\.filmstrip-placeholder-entry\s*\{[\s\S]*pointer-events:\s*none;/);
+  assert.match(styles, /\.filmstrip-placeholder-ghost\.is-loading::before\s*\{[\s\S]*animation:\s*filmstrip-placeholder-sweep/);
+  assert.match(styles, /@keyframes filmstrip-placeholder-sweep/);
 });
 
 test("studio prompt thumbnails exclude quick blend gallery items", async () => {
@@ -1973,7 +1998,7 @@ test("reference orchestration analysis is a separate studio mode outside prompt 
   );
   assert.match(app, /state\.referenceAnalysis\.files\.map\(\(item\) => preparePromptAnalysisImageFile\(item\.file\)\)/);
   assert.match(app, /formData\.append\("image", file\);/);
-  assert.match(app, /appendBrowserConfigToFormData\(formData\);/);
+  assert.match(app, /appendCurrentConfigToFormData\(formData\);/);
   assert.match(app, /body: await buildReferenceAnalysisFormData\(\),/);
   assert.match(app, /fetch\("\/api\/prompt-agent\/analyze"/);
   assert.match(app, /button\.dataset\.referenceAnalysisPromptIndex = String\(index\);/);
@@ -2211,6 +2236,11 @@ test("studio stores API settings in the browser and sends them with cloud genera
   assert.match(browserConfig, /formData\.set\("baseUrl", config\.baseUrl\);/);
   assert.match(browserConfig, /formData\.set\("apiKey", config\.apiKey\);/);
   assert.match(browserConfig, /formData\.set\("responsesModel", config\.responsesModel\);/);
+  assert.match(browserConfig, /formData\.set\("directResponsesModel", config\.directResponsesModel\);/);
+  assert.match(app, /directResponsesModelInput:\s*document\.querySelector\("#directResponsesModelInput"\),/);
+  assert.match(app, /directResponsesModel:\s*refs\.directResponsesModelInput\.value\.trim\(\) \|\| browserPayload\.directResponsesModel/);
+  assert.match(app, /refs\.directResponsesModelInput\.value = config\.directResponsesModel \|\| "gpt-5\.5";/);
+  assert.match(app, /directResponsesModel:\s*refs\.directResponsesModelInput\.value\.trim\(\) \|\| "gpt-5\.5"/);
   assert.match(app, /function buildPptFormData\(\) \{[\s\S]*appendCurrentConfigToFormData\(formData\);[\s\S]*return formData;/);
   assert.match(app, /function buildPptCompletionRequest\(slideNumbers\) \{[\s\S]*\.\.\.getCurrentPrivateConfigRequestPayload\(\),/);
 });
@@ -2228,10 +2258,13 @@ test("config drawer can test the connection and reveal fetched models in a picke
   assert.match(app, /testConnectionButton:\s*document\.querySelector\("#testConnectionButton"\),/);
   assert.match(app, /fetchModelsButton:\s*document\.querySelector\("#fetchModelsButton"\),/);
   assert.match(app, /directFetchModelsButton:\s*document\.querySelector\("#directFetchModelsButton"\),/);
+  assert.match(app, /directResponsesFetchModelsButton:\s*document\.querySelector\("#directResponsesFetchModelsButton"\),/);
   assert.match(app, /modelPickerToggle:\s*document\.querySelector\("#modelPickerToggle"\),/);
   assert.match(app, /modelOptionsList:\s*document\.querySelector\("#modelOptionsList"\),/);
   assert.match(app, /directModelPickerToggle:\s*document\.querySelector\("#directModelPickerToggle"\),/);
   assert.match(app, /directModelOptionsList:\s*document\.querySelector\("#directModelOptionsList"\),/);
+  assert.match(app, /directResponsesModelPickerToggle:\s*document\.querySelector\("#directResponsesModelPickerToggle"\),/);
+  assert.match(app, /directResponsesModelOptionsList:\s*document\.querySelector\("#directResponsesModelOptionsList"\),/);
   assert.match(app, /from "\/lib\/config-model-picker\.mjs";/);
   assert.match(app, /const configModelPicker = createConfigModelPickerController\(/);
   assert.match(app, /configModelPicker\.bindEvents\(\);/);
@@ -2242,13 +2275,16 @@ test("config drawer can test the connection and reveal fetched models in a picke
   assert.match(configModelPicker, /formData\.set\("directBaseUrl", payload\.directBaseUrl\);/);
   assert.match(configModelPicker, /formData\.set\("directApiKey", payload\.directApiKey\);/);
   assert.match(configModelPicker, /formData\.set\("directImageModel", payload\.directImageModel\);/);
+  assert.match(configModelPicker, /formData\.set\("directResponsesModel", payload\.directResponsesModel\);/);
   assert.match(configModelPicker, /function render\(\)/);
   assert.match(configModelPicker, /function renderTarget\(target, activeTarget\)/);
   assert.match(configModelPicker, /function getVisibleModels\(target = getTargetForSelectedRoute\(\)\)/);
   assert.match(configModelPicker, /targetRefs\.toggle\.hidden = !hasModels;/);
   assert.match(configModelPicker, /fetchConfigModels\(\{ openAfterFetch: true, mode: "models", target: MODEL_TARGET_RESPONSES \}\);/);
   assert.match(configModelPicker, /refs\.directFetchModelsButton\?\.addEventListener\("click"/);
+  assert.match(configModelPicker, /refs\.directResponsesFetchModelsButton\?\.addEventListener\("click"/);
   assert.match(configModelPicker, /toggleModelPicker\(MODEL_TARGET_DIRECT\)/);
+  assert.match(configModelPicker, /toggleModelPicker\(MODEL_TARGET_DIRECT_RESPONSES\)/);
   assert.match(configModelPicker, /handleModelInput\(MODEL_TARGET_RESPONSES\)/);
   assert.match(styles, /\.config-actions-row\s*\{/);
   assert.match(styles, /\.model-picker-control\s*\{/);
@@ -2316,6 +2352,7 @@ test("direct mode fetch models uses direct API settings and direct model picker"
       directBaseUrl: "https://saved-direct.example.test/v1",
       directApiKey: "saved-direct-key",
       directImageModel: "saved-direct-image",
+      directResponsesModel: "saved-direct-vision",
     }),
   });
 
@@ -2328,12 +2365,62 @@ test("direct mode fetch models uses direct API settings and direct model picker"
   assert.equal(capturedBodies[0].get("directBaseUrl"), "https://direct.example.test/v1");
   assert.equal(capturedBodies[0].get("directApiKey"), "direct-key");
   assert.equal(capturedBodies[0].get("directImageModel"), "gpt-image-2");
+  assert.equal(capturedBodies[0].get("directResponsesModel"), "gpt-5.5");
   assert.equal(refs.directModelOptionsList.hidden, false);
   assert.equal(refs.modelOptionsList.hidden, true);
+  assert.equal(refs.directResponsesModelOptionsList.hidden, true);
   assert.deepEqual(
     refs.directModelOptionsList.children.map((child) => child.textContent),
     ["vendor-image-pro", "gpt-image-2"],
   );
+});
+
+test("direct text and vision model picker uses direct API settings and its own options", async () => {
+  const { createConfigModelPickerController } = await import(publicConfigModelPickerPath);
+  const { refs } = createModelPickerHarness();
+  refs.imageRouteInputs[0].checked = false;
+  refs.imageRouteInputs[1].checked = true;
+  const capturedBodies = [];
+  const state = { config: {}, configModels: { items: [], loading: false, loadingMode: "", open: false } };
+  const fetchImpl = async (_url, init) => {
+    capturedBodies.push(init.body);
+    return {
+      ok: true,
+      json: async () => ({ ok: true, models: ["gpt-5.5", "gpt-5.4"] }),
+    };
+  };
+  const controller = createConfigModelPickerController({
+    refs,
+    state,
+    FormDataCtor: TestFormData,
+    fetchImpl,
+    getBrowserPrivateConfigRequestPayload: () => ({}),
+  });
+
+  controller.bindEvents();
+  refs.directResponsesFetchModelsButton.dispatchEvent({ type: "click" });
+  await waitForAsyncHandlers();
+
+  assert.equal(capturedBodies.length, 1);
+  assert.equal(capturedBodies[0].get("imageRoute"), "b");
+  assert.equal(capturedBodies[0].get("directBaseUrl"), "https://direct.example.test/v1");
+  assert.equal(capturedBodies[0].get("directApiKey"), "direct-key");
+  assert.equal(capturedBodies[0].get("directImageModel"), "gpt-image-2");
+  assert.equal(capturedBodies[0].get("directResponsesModel"), "gpt-5.5");
+  assert.equal(refs.directResponsesModelOptionsList.hidden, false);
+  assert.equal(refs.directModelOptionsList.hidden, true);
+  assert.equal(refs.modelOptionsList.hidden, true);
+  assert.deepEqual(
+    refs.directResponsesModelOptionsList.children.map((child) => child.textContent),
+    ["gpt-5.5", "gpt-5.4"],
+  );
+
+  refs.directResponsesModelInput.value = "5.4";
+  refs.directResponsesModelInput.dispatchEvent({ type: "input" });
+  refs.directResponsesModelOptionsList.children[0].dispatchEvent({ type: "click", bubbles: true });
+
+  assert.equal(refs.directResponsesModelInput.value, "gpt-5.4");
+  assert.equal(refs.directResponsesModelOptionsList.hidden, true);
 });
 
 test("test connection uses the currently selected direct mode settings", async () => {
@@ -2366,6 +2453,7 @@ test("test connection uses the currently selected direct mode settings", async (
   assert.equal(capturedBodies[0].get("imageRoute"), "b");
   assert.equal(capturedBodies[0].get("directBaseUrl"), "https://direct.example.test/v1");
   assert.equal(capturedBodies[0].get("directApiKey"), "direct-key");
+  assert.equal(capturedBodies[0].get("directResponsesModel"), "gpt-5.5");
   assert.equal(state.configModels.open, false);
 });
 
@@ -2497,6 +2585,19 @@ test("studio keeps queued Cloudflare jobs alive for task polling after the SSE r
   assert.match(app, /scheduleGenerationTaskPolling\(\);/);
   assert.match(app, /currentJob\.isRunning = queuedForPolling;/);
   assert.match(app, /生成连接已中断，未收到完成事件/);
+});
+
+test("task polling restarts preserved local queued jobs when remote snapshots omit them", async () => {
+  const app = await readFile(appPath, "utf8");
+  const applySnapshotsBody = extractFunctionBefore(app, "applyGenerationTaskSnapshots", "loadGenerationTasks");
+
+  assert.match(
+    applySnapshotsBody,
+    /const localTransientJobs = state\.jobs\.filter\(\(job\) => !snapshotIds\.has\(job\.id\) && \(job\.isRunning \|\| !job\.started\)\);/,
+  );
+  assert.match(applySnapshotsBody, /const hasLocalQueuedJobs = localTransientJobs\.some\(\(job\) => isQueuedGenerationJob\(job\)\);/);
+  assert.match(applySnapshotsBody, /if \(hasLocalQueuedJobs\) \{\s*scheduleGenerationQueue\(\);\s*\}/);
+  assert.match(applySnapshotsBody, /scheduleGenerationTaskPolling\(\);/);
 });
 
 test("studio lazy-loads non-default view modules and renders only the active view", async () => {
@@ -2649,6 +2750,7 @@ test("creation mode is a separate studio view with isolated state and routes", a
   const html = await readFile(indexPath, "utf8");
   const styles = await readFile(stylesPath, "utf8");
   const app = await readFile(appPath, "utf8");
+  const loadingModule = await readFile(creationCardLoadingPath, "utf8");
   const queueModule = await readFile(creationSuiteQueuePath, "utf8");
   const creationPanel = html.match(/data-view-panel="creation"[\s\S]*?(?=<section class="view-panel ppt-view)/)?.[0] || "";
 
@@ -2810,6 +2912,8 @@ test("creation mode has independent references count and scenario controls", asy
   assert.match(styles, /\.creation-reference-analysis-actions #creationReferenceApplyAnalysisButton\s*\{[\s\S]*background:[\s\S]*color-mix\(in srgb, var\(--success\) 24%, var\(--control-bg\)\)/);
   assert.match(styles, /\.creation-reference-analysis-role-correction\s*\{/);
   assert.match(styles, /\.creation-reference-note\s*\{/);
+  assert.match(readCssRule(styles, ".creation-reference-note"), /padding:\s*0\s+8px\s+10px;/);
+  assert.doesNotMatch(readCssRule(styles, ".creation-reference-note"), /max-height|-webkit-line-clamp/);
   assert.match(styles, /\.creation-template-search\s*\{/);
   assert.match(styles, /\.creation-industry-browser\s*\{/);
   assert.match(styles, /\.creation-industry-browser-head\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*minmax\(112px,\s*128px\);[\s\S]*gap:\s*10px;/);
@@ -3120,6 +3224,7 @@ test("creation mode exposes optional logo upload placement and background contro
   const html = await readFile(indexPath, "utf8");
   const styles = await readFile(stylesPath, "utf8");
   const app = await readFile(appPath, "utf8");
+  const loadingModule = await readFile(creationCardLoadingPath, "utf8");
   const queueModule = await readFile(creationSuiteQueuePath, "utf8");
 
   assert.match(html, /id="creationLogoLibraryButton"[\s\S]*aria-controls="creationLogoLibraryPanel"/);
@@ -3246,6 +3351,16 @@ test("creation reference analysis apply fills product name from fourth-level cat
   );
 });
 
+test("creation reference analysis preserves grouped product labels on reference cards", async () => {
+  const app = await readFile(appPath, "utf8");
+
+  assert.match(app, /getCreationReferenceAnalysisDisplayRoleLabel/);
+  assert.match(app, /choice\.textContent = getCreationReferenceAnalysisDisplayRoleLabel\(\{ role: option\.value, roleLabel: option\.label, subjectUnitCount: item\.subjectUnitCount \}\);/);
+  assert.match(app, /subjectUnitCount,\s*roleLabel: getCreationReferenceAnalysisDisplayRoleLabel/);
+  assert.match(app, /subjectUnitCount: recommendation\.subjectUnitCount \|\| 0/);
+  assert.match(app, /subjectUnitCount: item\.subjectUnitCount \|\| 0/);
+});
+
 test("creation reference analysis ignores stale in-flight image batches", async () => {
   const app = await readFile(appPath, "utf8");
 
@@ -3273,6 +3388,7 @@ test("creation mode exposes record detail and item repair actions", async () => 
   const html = await readFile(indexPath, "utf8");
   const styles = await readFile(stylesPath, "utf8");
   const app = await readFile(appPath, "utf8");
+  const loadingModule = await readFile(creationCardLoadingPath, "utf8");
   const queueModule = await readFile(creationSuiteQueuePath, "utf8");
 
   assert.match(html, /id="creationRepairFailedButton"[\s\S]*补齐未完成项/);
@@ -3340,8 +3456,8 @@ test("creation mode exposes record detail and item repair actions", async () => 
   assert.match(app, /path\.className = "creation-card-path";/);
   assert.match(app, /card\.classList\.toggle\("is-sku", item\.role === "sku"\);/);
   assert.match(app, /card\.classList\.toggle\("is-sku-start", options\.isSkuStart === true\);/);
-  assert.match(app, /const firstSkuItem = items\.find\(\(item\) => item\.role === "sku"\);/);
-  assert.match(app, /createCreationCard\(item, index, \{ isSkuStart: item === firstSkuItem \}\)/);
+  assert.match(loadingModule, /const firstSkuItem = items\.find\(\(item\) => item\.role === "sku"\);/);
+  assert.match(app, /getItemOptions: \(item, _index, \{ firstSkuItem \}\) => \(\{ isSkuStart: item === firstSkuItem \}\)/);
   assert.match(app, /const firstRecordSkuItem = selectedSet\.items\.find\(\(item\) => item\.role === "sku"\);/);
   assert.match(app, /createCreationCard\(item, index, \{ showActions: false, showRecordActions: true, isSkuStart: item === firstRecordSkuItem \}\)/);
   assert.match(app, /const shouldRenderPath = !imageUrl && !showRecordActions && !hideGenerationDetails;/);
@@ -3363,12 +3479,12 @@ test("creation generation cards replace plan details with loading animation", as
   assert.match(app, /if \(getImageUrl\(item\)\) \{\s*return false;\s*\}/);
   assert.doesNotMatch(app, /state\.creation\.generationScope === "full"[\s\S]*return status !== "failed";/);
   assert.match(app, /function shouldHideCreationCardDetails\(item = \{\}, showRecordActions = false\) \{/);
-  assert.match(app, /function createCreationCardLoading\(status = "generating"\) \{/);
+  assert.match(app, /function createCreationCardLoading\(status = "generating", sequenceIndex = 0\) \{/);
   assert.match(app, /const isQueued = status === "queued";/);
-  assert.match(app, /label\.textContent = isQueued \? "排队中" : "生成中";/);
+  assert.match(app, /createCreationCardLoadingShell\(isQueued \? "queued" : "generating",\s*null,\s*\{ sequenceIndex \}\)/);
   assert.match(app, /card\.classList\.toggle\("is-generating", isLoadingCard\);/);
   assert.match(app, /status\.textContent = getCreationItemStatusLabel\(item\);/);
-  assert.match(app, /media\.classList\.add\("is-loading"\);[\s\S]*media\.appendChild\(createCreationCardLoading\(item\.status\)\);/);
+  assert.match(app, /media\.classList\.add\("is-loading"\);[\s\S]*media\.appendChild\(createCreationCardLoading\(item\.status,\s*fallbackIndex\)\);/);
   assert.match(app, /const shouldRenderPath = !imageUrl && !showRecordActions && !hideGenerationDetails;/);
   assert.match(app, /if \(shouldRenderPath\) \{/);
   assert.match(app, /if \(showActions && !hideGenerationDetails\) \{/);
@@ -3383,8 +3499,43 @@ test("creation generation cards replace plan details with loading animation", as
   assert.match(styles, /\.creation-card-media\.is-loading\s*\{/);
   assert.match(styles, /\.creation-card-media\.is-loading\s*\{[\s\S]*width:\s*min\(100%,\s*220px\);/);
   assert.match(styles, /\.creation-card-loading\s*\{[\s\S]*min-height:\s*132px;[\s\S]*padding:\s*12px;/);
-  assert.match(styles, /\.creation-card-loading-motion span\s*\{[\s\S]*animation:\s*creation-card-loading-bar/);
-  assert.match(styles, /@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*\.creation-card-loading-motion span[\s\S]*animation:\s*none;/);
+  assert.match(styles, /\.creation-card-loading-sketch-ring\s*\{[\s\S]*place-items:\s*center;/);
+  assert.match(styles, /\.creation-card-loading-order\s*\{[\s\S]*position:\s*relative;[\s\S]*z-index:\s*2;/);
+  assert.match(styles, /\.creation-card-loading-sketch-line\s*\{[\s\S]*animation:\s*creation-card-loading-sketch-spin/);
+  assert.match(styles, /@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*\.creation-card-loading-sketch-line[\s\S]*animation:\s*none;/);
+});
+
+test("creation result grid keeps running card loading DOM stable across rerenders", async () => {
+  const styles = await readFile(stylesPath, "utf8");
+  const app = await readFile(appPath, "utf8");
+  const loadingModule = await readFile(creationCardLoadingPath, "utf8");
+
+  assert.match(app, /from "\/lib\/creation-card-loading\.mjs"/);
+  assert.match(app, /function syncCreationResultGrid\(items = \[\]\) \{/);
+  assert.match(app, /syncCreationResultGridShell\(\{/);
+  assert.match(app, /syncCreationLoadingCard\(card,\s*item,\s*index/);
+  assert.match(app, /createCreationCardLoadingShell\([^,]+,\s*null,\s*\{ sequenceIndex \}\)/);
+  assert.match(app, /syncCreationResultGrid\(items\);/);
+  const renderCreationViewBody = extractFunctionBefore(app, "renderCreationView", "getCreationPlanOverrides");
+  assert.doesNotMatch(renderCreationViewBody, /refs\.creationResultGrid\.innerHTML = "";/);
+  assert.match(loadingModule, /export function getCreationCardDomKey\(item = \{\}, fallbackIndex = 0\) \{/);
+  assert.match(loadingModule, /export function syncCreationResultGrid\(\{/);
+  assert.match(loadingModule, /\.querySelectorAll\("\.creation-card\[data-creation-card-key\]"\)/);
+  assert.match(loadingModule, /updateCreationCardLoading\(loadingShell,\s*item\.status,\s*\{ sequenceIndex: fallbackIndex \}\)/);
+
+  assert.match(styles, /\.creation-card-loading-sketch-ring\s*\{/);
+  assert.match(styles, /\.creation-card-loading-sketch-line\s*\{[\s\S]*border-radius:\s*46%\s+54%\s+48%\s+52%/);
+  assert.match(styles, /\.creation-card-loading-sketch-line:nth-child\(2\)\s*\{[\s\S]*animation-duration:\s*2100ms/);
+  assert.match(styles, /\.creation-card-loading-sketch-line:nth-child\(4\)\s*\{[\s\S]*animation-direction:\s*reverse/);
+  assert.doesNotMatch(styles, /\.creation-card-loading-progress\s*\{/);
+  assert.doesNotMatch(styles, /\.creation-card-loading-signal\s*\{/);
+  assert.doesNotMatch(styles, /\.creation-card-loading-orbit\s*\{/);
+  assert.doesNotMatch(styles, /content:\s*attr\(data-creation-card-loading-sequence-step\)/);
+  assert.match(styles, /\.creation-card-loading-step\.is-active\s*\{/);
+  assert.match(
+    styles,
+    /@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*\.creation-card-loading-sketch-line[\s\S]*animation:\s*none;/,
+  );
 });
 
 test("creation single-item repair keeps other action buttons available while one item runs", async () => {
@@ -3625,8 +3776,10 @@ test("asset record views include PPT records and Creation set records", async ()
   assert.match(app, /function renderCreationRecordView\(\) \{/);
   assert.match(app, /function renderCreationRecordSetList\(\) \{/);
   assert.match(app, /function filterCreationRecordSets\(\) \{/);
-  assert.match(app, /missingAsset:\s*Boolean\(item\.missingAsset \|\| item\.missing_asset\)/);
-  assert.match(app, /function isCreationMissingAssetItem\(item = \{\}\) \{/);
+  assert.match(
+    app,
+    /function isCreationMissingAssetItem\(item = \{\}\) \{\s*return Boolean\(item\.missingAsset \|\| item\.missing_asset\);\s*\}/,
+  );
   assert.match(app, /status\.textContent = getCreationItemStatusLabel\(item\);/);
   assert.match(app, /placeholder\.textContent = isCreationMissingAssetItem\(item\) \? "历史图片文件缺失，可一键补图" : item\.status === "failed" \? item\.error \|\| "生成失败" : "等待生成";/);
   assert.match(app, /renderCreationRecordArchiveDetail\(set\)[\s\S]*formatCreationReferenceRoleSummary\(set\.referenceImageRoles\)/);

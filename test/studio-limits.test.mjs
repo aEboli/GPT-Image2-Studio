@@ -60,7 +60,7 @@ test("local server counts active generation slots per request mode", async () =>
   const articleGenerateHandler =
     server.match(/async function handleArticleIllustrationGenerate[\s\S]*?\r?\n}\r?\n\r?\nasync function handleCreationSetsGet/)?.[0] || "";
 
-  assert.match(server, /function getStudioGenerationRequestScope\(generationMode\) \{/);
+  assert.match(server, /function getStudioGenerationRequestScope\(generationMode, imageRoute\) \{/);
   assert.match(server, /function getGenerationTaskSlotScopeKey\(sessionId, requestScope\) \{/);
   assert.match(server, /function claimSessionTaskSlot\(sessionId, taskId, requestScope\) \{/);
   assert.match(server, /const sessionTaskSlotLimiter = createSessionTaskSlotLimiter\(/);
@@ -72,7 +72,7 @@ test("local server counts active generation slots per request mode", async () =>
   assert.doesNotMatch(server, /const activeTasksBySessionScope = new Map\(\);/);
   assert.doesNotMatch(server, /activeTasksBySession = new Map\(\)/);
 
-  assert.match(generateHandler, /generationRequestScope = getStudioGenerationRequestScope\(generationMode\);/);
+  assert.match(generateHandler, /generationRequestScope = getStudioGenerationRequestScope\(generationMode, generationConfig\.imageRoute\);/);
   assert.match(generateHandler, /waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response\)/);
   assert.match(generateHandler, /releaseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope\)/);
 

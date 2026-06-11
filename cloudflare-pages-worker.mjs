@@ -71,9 +71,14 @@ import {
 } from "./lib/ppt-completion.mjs";
 import { normalizePptMotionOptions } from "./lib/ppt-motion-presets.mjs";
 import { normalizeBase64, requestDirectImageGeneration, requestImageEdit, requestImageGeneration } from "./lib/responses-workflow.mjs";
-import { IMAGE_ROUTE_B, getSelectedImageGenerationConfig, normalizeImageRouteConfig } from "./lib/image-route-config.mjs";
+import {
+  DEFAULT_DIRECT_RESPONSES_MODEL,
+  IMAGE_ROUTE_B,
+  getSelectedImageGenerationConfig,
+  getSelectedTextVisionConfig,
+  normalizeImageRouteConfig,
+} from "./lib/image-route-config.mjs";
 import { fetchAvailableModels } from "./lib/model-list-client.mjs";
-import { normalizeApiBaseUrl } from "./lib/api-base-url.mjs";
 import { runWithConcurrency } from "./lib/limited-concurrency.mjs";
 import {
   CREATION_REFERENCE_ANALYSIS_MODE,
@@ -150,6 +155,7 @@ const DEFAULT_CONFIG = {
   imageRoute: "a",
   directBaseUrl: DEFAULT_BASE_URL,
   directImageModel: "gpt-image-2",
+  directResponsesModel: DEFAULT_DIRECT_RESPONSES_MODEL,
   defaults: {
     size: "896x1120",
     quality: "high",
@@ -205,6 +211,7 @@ function buildPublicConfig() {
     directBaseUrl: DEFAULT_CONFIG.directBaseUrl,
     directApiKeyConfigured: false,
     directImageModel: DEFAULT_CONFIG.directImageModel,
+    directResponsesModel: DEFAULT_CONFIG.directResponsesModel,
     defaults: { ...DEFAULT_CONFIG.defaults },
     limits: {
       maxParallelTasksPerSession: MAX_PARALLEL_TASKS_PER_SESSION,
@@ -268,21 +275,22 @@ async function handlePromptAgentAnalyze(request, fetchImpl) {
     return jsonResponse({ message: `参考图最多支持 ${maxReferenceImages} 张。` }, 400);
   }
 
-  const config = normalizePrivateConfig(formData);
+  const config = normalizePrivateConfig(formData, { allowDirectTextVisionRoute: true });
+  const textVisionConfig = getSelectedTextVisionConfig(config);
   const reasoningFallback =
     mode === REFERENCE_ORCHESTRATION_MODE
       ? REFERENCE_ORCHESTRATION_REASONING_EFFORT
       : PROMPT_AGENT_ANALYSIS_REASONING_EFFORT;
   const reasoningEffort = normalizeReasoningEffort(formData.get("reasoningEffort") || reasoningFallback);
   const json = await requestPromptAgentAnalysis({
-    baseUrl: config.baseUrl,
-    apiKey: config.apiKey,
+    baseUrl: textVisionConfig.baseUrl,
+    apiKey: textVisionConfig.apiKey,
     image: images[0],
     images,
     mode,
     targetLanguage: targetLanguageInput,
     targetLanguageLabel: targetLanguageLabelInput,
-    responsesModel: config.responsesModel,
+    responsesModel: textVisionConfig.responsesModel,
     reasoningEffort,
     fetchImpl,
   });
@@ -295,7 +303,7 @@ async function handlePromptAgentAnalyze(request, fetchImpl) {
       filename: images.map((image) => image.filename).filter(Boolean).join(" + "),
       imageMimeType: images.map((image) => image.mimeType).filter(Boolean).join(", "),
       imageSize: 0,
-      responsesModel: config.responsesModel,
+      responsesModel: textVisionConfig.responsesModel,
       reasoningEffort,
       json,
     },
@@ -313,7 +321,10 @@ function normalizeReasoningEffort(value, fallback = DEFAULT_REASONING_EFFORT) {
   return normalized;
 }
 
-function normalizePrivateConfig(formData, { allowDirectImageRoute = false } = {}) {
+function normalizePrivateConfig(
+  formData,
+  { allowDirectImageRoute = false, allowDirectTextVisionRoute = false } = {},
+) {
   const routeConfig = normalizeImageRouteConfig(
     {
       imageRoute: formData.get("imageRoute"),
@@ -323,6 +334,7 @@ function normalizePrivateConfig(formData, { allowDirectImageRoute = false } = {}
       directBaseUrl: formData.get("directBaseUrl"),
       directApiKey: formData.get("directApiKey"),
       directImageModel: formData.get("directImageModel"),
+      directResponsesModel: formData.get("directResponsesModel"),
     },
     {
       defaultBaseUrl: DEFAULT_CONFIG.baseUrl,
@@ -330,8 +342,13 @@ function normalizePrivateConfig(formData, { allowDirectImageRoute = false } = {}
     },
   );
   const generationConfig = getSelectedImageGenerationConfig(routeConfig);
+  const textVisionConfig = getSelectedTextVisionConfig(routeConfig);
 
-  if (!routeConfig.apiKey && (!allowDirectImageRoute || !generationConfig.apiKey)) {
+  if (
+    !routeConfig.apiKey &&
+    (!allowDirectImageRoute || !generationConfig.apiKey) &&
+    (!allowDirectTextVisionRoute || !textVisionConfig.apiKey)
+  ) {
     throw new Error("褰撳墠娴忚鍣ㄦ湭淇濆瓨 API Key锛岃鍏堝湪閰嶇疆涓繚瀛樸€?");
   }
 
@@ -1064,12 +1081,12 @@ function buildQueuedGenerationTask(context) {
   };
 }
 
-function normalizePrivateConfigPayload(payload = {}) {
+function normalizePrivateConfigPayload(payload = {}, options = {}) {
   return normalizePrivateConfig({
     get(name) {
       return payload?.[name];
     },
-  });
+  }, options);
 }
 
 async function handleModelList(request, fetchImpl) {
@@ -1105,9 +1122,18 @@ function firstConfigString(values, fallback = "") {
 
 function buildCloudCreationListingConfig(payload = {}, env = {}) {
   const nestedConfig = payload.config && typeof payload.config === "object" ? payload.config : {};
-  return {
-    baseUrl: normalizeApiBaseUrl(
-      firstConfigString(
+  const routeConfig = normalizeImageRouteConfig(
+    {
+      imageRoute: firstConfigString([
+        payload.imageRoute,
+        nestedConfig.imageRoute,
+        env.imageRoute,
+        env.IMAGE_ROUTE,
+        env.IMAGE_STUDIO_IMAGE_ROUTE,
+      ]),
+      routeA: payload.routeA || nestedConfig.routeA,
+      routeB: payload.routeB || nestedConfig.routeB,
+      baseUrl: firstConfigString(
         [
           payload.baseUrl,
           nestedConfig.baseUrl,
@@ -1117,25 +1143,72 @@ function buildCloudCreationListingConfig(payload = {}, env = {}) {
         ],
         DEFAULT_CONFIG.baseUrl,
       ),
-      { defaultBaseUrl: DEFAULT_CONFIG.baseUrl },
-    ),
-    apiKey: firstConfigString([
-      payload.apiKey,
-      nestedConfig.apiKey,
-      env.apiKey,
-      env.OPENAI_API_KEY,
-      env.IMAGE_STUDIO_API_KEY,
-    ]),
-    responsesModel: firstConfigString(
-      [
-        payload.responsesModel,
-        nestedConfig.responsesModel,
-        env.responsesModel,
-        env.RESPONSES_MODEL,
-        env.IMAGE_STUDIO_RESPONSES_MODEL,
-      ],
-      DEFAULT_CONFIG.responsesModel,
-    ),
+      apiKey: firstConfigString([
+        payload.apiKey,
+        nestedConfig.apiKey,
+        env.apiKey,
+        env.OPENAI_API_KEY,
+        env.IMAGE_STUDIO_API_KEY,
+      ]),
+      responsesModel: firstConfigString(
+        [
+          payload.responsesModel,
+          nestedConfig.responsesModel,
+          env.responsesModel,
+          env.RESPONSES_MODEL,
+          env.IMAGE_STUDIO_RESPONSES_MODEL,
+        ],
+        DEFAULT_CONFIG.responsesModel,
+      ),
+      directBaseUrl: firstConfigString(
+        [
+          payload.directBaseUrl,
+          nestedConfig.directBaseUrl,
+          env.directBaseUrl,
+          env.DIRECT_BASE_URL,
+          env.IMAGE_STUDIO_DIRECT_BASE_URL,
+        ],
+        DEFAULT_CONFIG.directBaseUrl,
+      ),
+      directApiKey: firstConfigString([
+        payload.directApiKey,
+        nestedConfig.directApiKey,
+        env.directApiKey,
+        env.DIRECT_API_KEY,
+        env.IMAGE_STUDIO_DIRECT_API_KEY,
+      ]),
+      directImageModel: firstConfigString(
+        [
+          payload.directImageModel,
+          nestedConfig.directImageModel,
+          env.directImageModel,
+          env.DIRECT_IMAGE_MODEL,
+          env.IMAGE_STUDIO_DIRECT_IMAGE_MODEL,
+        ],
+        DEFAULT_CONFIG.directImageModel,
+      ),
+      directResponsesModel: firstConfigString(
+        [
+          payload.directResponsesModel,
+          nestedConfig.directResponsesModel,
+          env.directResponsesModel,
+          env.DIRECT_RESPONSES_MODEL,
+          env.IMAGE_STUDIO_DIRECT_RESPONSES_MODEL,
+        ],
+        DEFAULT_CONFIG.directResponsesModel,
+      ),
+    },
+    {
+      defaultBaseUrl: DEFAULT_CONFIG.baseUrl,
+      defaultResponsesModel: DEFAULT_CONFIG.responsesModel,
+    },
+  );
+  const textVisionConfig = getSelectedTextVisionConfig(routeConfig);
+
+  return {
+    baseUrl: textVisionConfig.baseUrl,
+    apiKey: textVisionConfig.apiKey,
+    responsesModel: textVisionConfig.responsesModel,
     reasoningEffort: normalizeReasoningEffort(firstConfigString(
       [
         payload.reasoningEffort,
@@ -1498,6 +1571,7 @@ function buildCloudPptDeck({
   const sortedSlides = [...slides].sort((left, right) => Number(left.slideNumber) - Number(right.slideNumber));
   const pptxFilename = buildCloudPptFilename({ deckId, title: outline.title });
   const pptxBase64 = createPptxBase64({ title: outline.title, slides: sortedSlides });
+  const textVisionConfig = getSelectedTextVisionConfig(config);
   return {
     deckId,
     title: outline.title,
@@ -1513,8 +1587,8 @@ function buildCloudPptDeck({
     editablePptxFilename: "",
     editablePptxWarnings: [],
     exportMode: normalizePptExportMode(exportMode),
-    baseUrl: config.baseUrl,
-    responsesModel: config.responsesModel,
+    baseUrl: textVisionConfig.baseUrl,
+    responsesModel: textVisionConfig.responsesModel,
     reasoningEffort,
     motion,
   };
@@ -2158,17 +2232,18 @@ async function handleCreationReferenceAnalyze(request, fetchImpl) {
     return jsonResponse({ message: "仅支持图片参考文件。" }, 400);
   }
 
-  const config = normalizePrivateConfig(formData);
+  const config = normalizePrivateConfig(formData, { allowDirectTextVisionRoute: true });
+  const textVisionConfig = getSelectedTextVisionConfig(config);
   const reasoningEffort = normalizeReasoningEffort(
     formData.get("reasoningEffort") || CREATION_REFERENCE_ANALYSIS_REASONING_EFFORT,
   );
   const analysis = await requestPromptAgentAnalysis({
-    baseUrl: config.baseUrl,
-    apiKey: config.apiKey,
+    baseUrl: textVisionConfig.baseUrl,
+    apiKey: textVisionConfig.apiKey,
     image: referenceImages[0],
     images: referenceImages,
     mode: CREATION_REFERENCE_ANALYSIS_MODE,
-    responsesModel: config.responsesModel,
+    responsesModel: textVisionConfig.responsesModel,
     reasoningEffort,
     fetchImpl,
   });
@@ -2226,18 +2301,19 @@ async function handlePortraitReferenceAnalyze(request, fetchImpl) {
     return jsonResponse({ message: "仅支持图片文件。" }, 400);
   }
 
-  const config = normalizePrivateConfig(formData);
+  const config = normalizePrivateConfig(formData, { allowDirectTextVisionRoute: true });
+  const textVisionConfig = getSelectedTextVisionConfig(config);
   const reasoningEffort = normalizeReasoningEffort(
     formData.get("reasoningEffort") || PORTRAIT_REFERENCE_ANALYSIS_REASONING_EFFORT,
   );
   const analysis = await requestPromptAgentAnalysis({
-    baseUrl: config.baseUrl,
-    apiKey: config.apiKey,
+    baseUrl: textVisionConfig.baseUrl,
+    apiKey: textVisionConfig.apiKey,
     image: personReferenceImages[0],
     images: referenceImages,
     imageLabels: referenceImageLabels,
     mode: PORTRAIT_REFERENCE_ANALYSIS_MODE,
-    responsesModel: config.responsesModel,
+    responsesModel: textVisionConfig.responsesModel,
     reasoningEffort,
     fetchImpl,
   });
@@ -3349,7 +3425,11 @@ async function runPptGenerate(request, writer, fetchImpl) {
   await writeSseEvent(writer, "status", { stage: "uploading", message: "Reading PPT input" });
 
   const formData = await request.formData();
-  const config = normalizePrivateConfig(formData);
+  const config = normalizePrivateConfig(formData, {
+    allowDirectImageRoute: true,
+    allowDirectTextVisionRoute: true,
+  });
+  const textVisionConfig = getSelectedTextVisionConfig(config);
   const sourceDocuments = await toPptSourceDocuments([
     ...formData.getAll("sourceFiles"),
     ...formData.getAll("sourceFiles[]"),
@@ -3373,9 +3453,9 @@ async function runPptGenerate(request, writer, fetchImpl) {
 
   await writeSseEvent(writer, "status", { stage: "outline", message: "Generating PPT outline" });
   const outline = await generatePptDeckOutline({
-    baseUrl: config.baseUrl,
-    apiKey: config.apiKey,
-    responsesModel: config.responsesModel,
+    baseUrl: textVisionConfig.baseUrl,
+    apiKey: textVisionConfig.apiKey,
+    responsesModel: textVisionConfig.responsesModel,
     reasoningEffort,
     sourceDocuments,
     sourceText,
@@ -3445,7 +3525,8 @@ async function runPptGenerate(request, writer, fetchImpl) {
 async function handlePptAnalyze(request, fetchImpl) {
   try {
     const formData = await request.formData();
-    const config = normalizePrivateConfig(formData);
+    const config = normalizePrivateConfig(formData, { allowDirectTextVisionRoute: true });
+    const textVisionConfig = getSelectedTextVisionConfig(config);
     const sourceDocuments = await toPptSourceDocuments([
       ...formData.getAll("sourceFiles"),
       ...formData.getAll("sourceFiles[]"),
@@ -3459,9 +3540,9 @@ async function handlePptAnalyze(request, fetchImpl) {
     );
 
     const analysis = await analyzePptDocument({
-      baseUrl: config.baseUrl,
-      apiKey: config.apiKey,
-      responsesModel: config.responsesModel,
+      baseUrl: textVisionConfig.baseUrl,
+      apiKey: textVisionConfig.apiKey,
+      responsesModel: textVisionConfig.responsesModel,
       reasoningEffort,
       sourceDocuments,
       sourceText,
@@ -3485,7 +3566,7 @@ async function handlePptAnalyze(request, fetchImpl) {
 
 async function runPptComplete(request, writer, fetchImpl) {
   const payload = await request.json();
-  const config = normalizePrivateConfigPayload(payload);
+  const config = normalizePrivateConfigPayload(payload, { allowDirectImageRoute: true });
   const exportMode = normalizePptExportMode(payload.exportMode || payload.sources?.exportMode);
   const motion = normalizePptMotionOptions({
     dynamicPreset: payload.dynamicPreset,
@@ -3568,7 +3649,7 @@ async function runPptComplete(request, writer, fetchImpl) {
 
 async function runPptSlideEdit(request, writer, fetchImpl) {
   const formData = await request.formData();
-  const config = normalizePrivateConfig(formData);
+  const config = normalizePrivateConfig(formData, { allowDirectImageRoute: true });
   const sourceSlideImage = formData.get("sourceSlideImage");
   const annotatedSlideImage = formData.get("annotatedSlideImage");
   const referenceImages = await toReferenceImages([sourceSlideImage, annotatedSlideImage]);

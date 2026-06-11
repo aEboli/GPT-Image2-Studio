@@ -45,6 +45,7 @@ test("request private config keeps route B direct image settings separate from r
     directBaseUrl: "https://api.openai.com/v1",
     directApiKey: "",
     directImageModel: "gpt-image-2",
+    directResponsesModel: "gpt-5.5",
   };
   const fields = {
     imageRoute: "b",
@@ -54,6 +55,7 @@ test("request private config keeps route B direct image settings separate from r
     directBaseUrl: "https://route-b.example.test",
     directApiKey: "browser-b-key",
     directImageModel: "vendor-image-pro",
+    directResponsesModel: "vendor-vision-text",
   };
 
   const config = mergeRequestPrivateConfig(fields, fallback);
@@ -65,6 +67,7 @@ test("request private config keeps route B direct image settings separate from r
   assert.equal(config.directBaseUrl, "https://route-b.example.test/v1");
   assert.equal(config.directApiKey, "browser-b-key");
   assert.equal(config.directImageModel, "vendor-image-pro");
+  assert.equal(config.directResponsesModel, "vendor-vision-text");
 });
 
 test("request private config applies selected image route even when request keeps saved keys", () => {
@@ -76,6 +79,7 @@ test("request private config applies selected image route even when request keep
     directBaseUrl: "https://route-b-server.example.test/v1",
     directApiKey: "",
     directImageModel: "server-image-model",
+    directResponsesModel: "server-vision-model",
   };
 
   const config = mergeRequestPrivateConfig(
@@ -84,6 +88,7 @@ test("request private config applies selected image route even when request keep
       baseUrl: "https://browser-route-a.example.test",
       directBaseUrl: "https://browser-route-b.example.test",
       directImageModel: "browser-image-model",
+      directResponsesModel: "browser-vision-model",
     },
     fallback,
   );
@@ -95,4 +100,5 @@ test("request private config applies selected image route even when request keep
   assert.equal(config.directBaseUrl, "https://route-b-server.example.test/v1");
   assert.equal(config.directApiKey, "");
   assert.equal(config.directImageModel, "server-image-model");
+  assert.equal(config.directResponsesModel, "server-vision-model");
 });

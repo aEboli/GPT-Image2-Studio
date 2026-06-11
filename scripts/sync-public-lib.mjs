@@ -15,6 +15,7 @@ export const PUBLIC_LIB_SYNC_TARGETS = [
   "browser-image-cache.mjs",
   "config-model-picker.mjs",
   "creation-auto-repair.mjs",
+  "creation-card-loading.mjs",
   "creation-category-templates.mjs",
   "creation-item-repair-queue.mjs",
   "creation-logo-library.mjs",

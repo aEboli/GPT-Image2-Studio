@@ -21,6 +21,7 @@ test("config store returns empty public config before any save", async () => {
   assert.equal(config.directApiKeyConfigured, false);
   assert.equal(config.directApiKeyMask, undefined);
   assert.equal(config.directImageModel, "gpt-image-2");
+  assert.equal(config.directResponsesModel, "gpt-5.5");
   assert.deepEqual(config.defaults, {
     size: "896x1120",
     quality: "high",
@@ -91,11 +92,13 @@ test("config store keeps route A and route B image API settings independent", as
     directBaseUrl: "https://route-b.example.com",
     directApiKey: "route-b-key-1234567890",
     directImageModel: "vendor-image-pro",
+    directResponsesModel: "vendor-vision-text",
   });
 
   await store.saveConfig({
     directBaseUrl: "https://route-b-2.example.com/v1",
     directImageModel: "vendor-image-ultra",
+    directResponsesModel: "vendor-vision-ultra",
   });
 
   const publicConfig = await store.readPublicConfig();
@@ -110,9 +113,11 @@ test("config store keeps route A and route B image API settings independent", as
   assert.equal(publicConfig.directApiKeyConfigured, true);
   assert.match(publicConfig.directApiKeyMask, /^rout.*7890$/);
   assert.equal(publicConfig.directImageModel, "vendor-image-ultra");
+  assert.equal(publicConfig.directResponsesModel, "vendor-vision-ultra");
 
   assert.equal(privateConfig.apiKey, "route-a-key-1234567890");
   assert.equal(privateConfig.directApiKey, "route-b-key-1234567890");
   assert.equal(privateConfig.directBaseUrl, "https://route-b-2.example.com/v1");
   assert.equal(privateConfig.directImageModel, "vendor-image-ultra");
+  assert.equal(privateConfig.directResponsesModel, "vendor-vision-ultra");
 });

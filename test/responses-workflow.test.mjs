@@ -13,12 +13,40 @@ import {
   requestImageGeneration,
 } from "../lib/responses-workflow.mjs";
 
-test("buildResponsesInput returns plain text for prompt-only generation", () => {
+test("buildResponsesInput returns structured content for prompt-only generation", () => {
   const input = buildResponsesInput({
     prompt: "鐢熸垚涓€寮犲浘",
   });
 
-  assert.equal(input, "鐢熸垚涓€寮犲浘");
+  assert.deepEqual(input, [
+    {
+      role: "user",
+      content: [
+        {
+          type: "input_text",
+          text: "鐢熸垚涓€寮犲浘",
+        },
+      ],
+    },
+  ]);
+});
+
+test("buildResponsesInput uses message content for prompt-only route A requests", () => {
+  const input = buildResponsesInput({
+    prompt: "Create a prompt-only image",
+  });
+
+  assert.deepEqual(input, [
+    {
+      role: "user",
+      content: [
+        {
+          type: "input_text",
+          text: "Create a prompt-only image",
+        },
+      ],
+    },
+  ]);
 });
 
 test("status heartbeat messages label the 59 second upstream wait", () => {
@@ -130,7 +158,7 @@ test("createResponsesRequestBody keeps gpt-5.4 on the outer model and passes rea
   assert.equal(requestBody.stream, true);
   assert.deepEqual(requestBody.tool_choice, { type: "image_generation" });
   assert.equal(requestBody.tools[0].type, "image_generation");
-  assert.equal(requestBody.tools[0].model, "gpt-image-2");
+  assert.equal("model" in requestBody.tools[0], false);
 });
 
 test("createResponsesRequestBody defaults to png output and leaves compression unset", () => {
@@ -491,9 +519,9 @@ test("requestImageGeneration retries prompt-only generation when an attempt has 
     quality: "high",
     responsesModel: "gpt-5.4",
     transientHttpRetryDelayMs: 0,
-    async fetchImpl(_url, init) {
+    async fetchImpl(url, init) {
       const body = JSON.parse(init.body);
-      requests.push({ stream: body.stream, input: body.input });
+      requests.push({ url, stream: body.stream, input: body.input });
 
       if (requests.length === 1) {
         return new Response(noFinalStream, {
@@ -526,8 +554,26 @@ test("requestImageGeneration retries prompt-only generation when an attempt has 
   });
 
   assert.deepEqual(requests.map((request) => request.stream), [true, false, true]);
-  assert.equal(requests[0].input, "Create a resilient prompt image");
-  assert.equal(requests[2].input, "Create a resilient prompt image");
+  assert.deepEqual(
+    requests.map((request) => request.url),
+    [
+      "https://example.test/v1/responses",
+      "https://example.test/v1/responses",
+      "https://example.test/v1/responses",
+    ],
+  );
+  assert.deepEqual(requests[0].input, [
+    {
+      role: "user",
+      content: [
+        {
+          type: "input_text",
+          text: "Create a resilient prompt image",
+        },
+      ],
+    },
+  ]);
+  assert.deepEqual(requests[2].input, requests[0].input);
   assert.equal(result.finalImageBase64, "cHJvbXB0LXJldHJ5LWZpbmFs");
   assert.equal(
     events.filter((event) => event.type === "status" && event.stage === "retrying_upstream").length,

@@ -883,6 +883,43 @@ test("generateCreationListingDrafts uses visible subject unit count for swimbait
   assert.equal(validateListingAgentDraft(drafts[0], "4 Pack").ok, true);
 });
 
+test("generateCreationListingDrafts writes mixed grouped SKU quantities as slash pack titles", async () => {
+  const drafts = await generateCreationListingDrafts({
+    set: {
+      setId: "set-mixed-lure-packs",
+      productName: "Electronic Fishing Lure",
+      productDescription: "Two grouped SKU subjects represent two-pack and three-pack choices.",
+      sellingPoints: ["propeller action", "multi-color grouped choices"],
+      skuBundleCount: 1,
+      skuSubjects: [
+        {
+          id: "two-lures.png",
+          title: "Two lure colorways",
+          filenames: ["two-lures.png"],
+          subjectUnitCount: 2,
+          note: "2 complete visible product units in one grouped SKU subject.",
+        },
+        {
+          id: "three-lures.png",
+          title: "Three lure colorways",
+          filenames: ["three-lures.png"],
+          subjectUnitCount: 3,
+          note: "3 complete visible product units in one grouped SKU subject.",
+        },
+      ],
+    },
+    config: { baseUrl: "https://example.test/v1", apiKey: "test-key", responsesModel: "gpt-5.4" },
+    fetchImpl() {
+      throw new Error("mock mode should not request the network");
+    },
+    mock: true,
+  });
+
+  assert.equal(drafts.length, 1);
+  assert.match(drafts[0].title, /^2\/3 Pack Electronic Fishing Lure\b/);
+  assert.equal(validateListingAgentDraft(drafts[0], "2/3 Pack").ok, true);
+});
+
 test("mock listing drafts describe grouped two-unit subjects", () => {
   const draft = makeMockCreationListingDraft({
     setId: "set-two-lure-pair",

@@ -69,7 +69,7 @@ import {
 } from "./lib/gallery-store.mjs";
 import { normalizeBase64, requestDirectImageGeneration, requestImageEdit, requestImageGeneration } from "./lib/responses-workflow.mjs";
 import { mergeRequestPrivateConfig } from "./lib/request-private-config.mjs";
-import { IMAGE_ROUTE_B, getSelectedImageGenerationConfig } from "./lib/image-route-config.mjs";
+import { IMAGE_ROUTE_B, getSelectedImageGenerationConfig, getSelectedTextVisionConfig } from "./lib/image-route-config.mjs";
 import { fetchAvailableModels } from "./lib/model-list-client.mjs";
 import { createGenerationTaskStore } from "./lib/generation-task-store.mjs";
 import { createSessionTaskSlotLimiter } from "./lib/generation-task-slots.mjs";
@@ -255,8 +255,10 @@ function normalizeGenerationMode(value) {
   return GENERATION_MODES.has(mode) ? mode : "";
 }
 
-function getStudioGenerationRequestScope(generationMode) {
-  return generationMode || "prompt";
+function getStudioGenerationRequestScope(generationMode, imageRoute) {
+  const mode = generationMode || "prompt";
+  const route = String(imageRoute || "").trim().toLowerCase();
+  return route === "a" || route === "b" ? `${mode}:${route}` : mode;
 }
 
 function getGenerationTaskSlotScopeKey(sessionId, requestScope) {
@@ -956,6 +958,7 @@ async function saveCompletedPptDeck({
   let editablePptxRelativePath = "";
   let editablePptxFilename = "";
   let editablePptxWarnings = [];
+  const textVisionConfig = getSelectedTextVisionConfig(config);
 
   await exportPptxDeck({
     outputPath: pptxAbsolutePath,
@@ -976,9 +979,9 @@ async function saveCompletedPptDeck({
       title: outline.title,
       outline,
       slides: sortedSlides,
-      baseUrl: config.baseUrl,
-      apiKey: config.apiKey,
-      responsesModel: config.responsesModel,
+      baseUrl: textVisionConfig.baseUrl,
+      apiKey: textVisionConfig.apiKey,
+      responsesModel: textVisionConfig.responsesModel,
       reasoningEffort,
       onEvent: async (type, payload) => {
         writeSseEventPayload(onEvent, type, payload);
@@ -1014,7 +1017,7 @@ async function saveCompletedPptDeck({
     editablePptxFilename,
     editablePptxWarnings,
     exportMode: normalizedExportMode,
-    responsesModel: config.responsesModel,
+    responsesModel: textVisionConfig.responsesModel,
     imageModel: "gpt-image-2",
     reasoningEffort,
     motion,
@@ -1047,14 +1050,15 @@ async function handlePptAnalyze(request, response) {
       formData.get("reasoningEffort") || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
     );
 
-    if (!config.apiKey) {
+    const textVisionConfig = getSelectedTextVisionConfig(config);
+    if (!textVisionConfig.apiKey) {
       throw new Error("当前未保存 API Key，请先在配置中保存。");
     }
 
     const analysis = await analyzePptDocument({
-      baseUrl: config.baseUrl,
-      apiKey: config.apiKey,
-      responsesModel: config.responsesModel,
+      baseUrl: textVisionConfig.baseUrl,
+      apiKey: textVisionConfig.apiKey,
+      responsesModel: textVisionConfig.responsesModel,
       reasoningEffort,
       sourceDocuments,
       sourceText,
@@ -1118,7 +1122,8 @@ async function handlePptGenerate(request, response) {
       formData.get("reasoningEffort") || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
     );
 
-    if (!config.apiKey) {
+    const textVisionConfig = getSelectedTextVisionConfig(config);
+    if (!textVisionConfig.apiKey) {
       throw new Error("当前未保存 API Key，请先在配置中保存。");
     }
 
@@ -1126,9 +1131,9 @@ async function handlePptGenerate(request, response) {
     const createdAt = new Date().toISOString();
     writeSseEvent(response, "status", { stage: "outline", message: "正在生成 PPT 大纲" });
     const outline = await generatePptDeckOutline({
-      baseUrl: config.baseUrl,
-      apiKey: config.apiKey,
-      responsesModel: config.responsesModel,
+      baseUrl: textVisionConfig.baseUrl,
+      apiKey: textVisionConfig.apiKey,
+      responsesModel: textVisionConfig.responsesModel,
       reasoningEffort,
       sourceDocuments,
       sourceText,
@@ -1222,8 +1227,9 @@ async function handlePptComplete(request, response) {
       payload.reasoningEffort || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
     );
 
-    if (!config.apiKey) {
-      throw new Error("当前未保存 API Key，请先在配置中保存。");
+    const generationConfig = getSelectedImageGenerationConfig(config);
+    if (!generationConfig.apiKey) {
+      throw new Error("Missing API key for the selected image generation route.");
     }
 
     const deckId = completion.deckId || `ppt-deck-${randomUUID()}`;
@@ -1341,8 +1347,9 @@ async function handlePptSlideEdit(request, response) {
       formData.get("reasoningEffort") || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
     );
 
-    if (!config.apiKey) {
-      throw new Error("当前未保存 API Key，请先在配置中保存。");
+    const generationConfig = getSelectedImageGenerationConfig(config);
+    if (!generationConfig.apiKey) {
+      throw new Error("Missing API key for the selected image generation route.");
     }
 
     const deckId = completion.deckId || `ppt-deck-${randomUUID()}`;
@@ -1453,7 +1460,8 @@ async function handlePromptAgentAnalyze(request, response) {
   }
 
   const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
-  if (!config.apiKey) {
+  const textVisionConfig = getSelectedTextVisionConfig(config);
+  if (!textVisionConfig.apiKey) {
     return sendJson(response, 400, {
       message: "当前未保存 API Key，请先在配置中保存。",
     });
@@ -1466,14 +1474,14 @@ async function handlePromptAgentAnalyze(request, response) {
   const reasoningEffort = normalizeReasoningEffort(formData.get("reasoningEffort") || reasoningFallback);
   const createdAt = new Date().toISOString();
   const json = await requestPromptAgentAnalysis({
-    baseUrl: config.baseUrl,
-    apiKey: config.apiKey,
+    baseUrl: textVisionConfig.baseUrl,
+    apiKey: textVisionConfig.apiKey,
     image: images[0],
     images,
     mode,
     targetLanguage: targetLanguageInput,
     targetLanguageLabel: targetLanguageLabelInput,
-    responsesModel: config.responsesModel,
+    responsesModel: textVisionConfig.responsesModel,
     reasoningEffort,
   });
   const filenames = images.map((image) => image.filename).filter(Boolean);
@@ -1483,7 +1491,7 @@ async function handlePromptAgentAnalyze(request, response) {
     filename: filenames.join(" + "),
     imageMimeType: images.map((image) => image.mimeType).filter(Boolean).join(", "),
     imageSize: images.reduce((total, image) => total + image.buffer.length, 0),
-    responsesModel: config.responsesModel,
+    responsesModel: textVisionConfig.responsesModel,
     reasoningEffort,
     json,
   });
@@ -1987,7 +1995,8 @@ async function handleArticleIllustrationPlan(request, response) {
       supplementalPrompt: formData.get("supplementalPrompt"),
     });
     const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
-    if (!config.apiKey) {
+    const textVisionConfig = getSelectedTextVisionConfig(config);
+    if (!textVisionConfig.apiKey) {
       return sendJson(response, 400, {
         message: "当前未保存 API Key，请先在配置中保存。",
       });
@@ -1997,9 +2006,9 @@ async function handleArticleIllustrationPlan(request, response) {
       formData.get("reasoningEffort") || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
     );
     const plan = await generateArticleIllustrationPlan({
-      baseUrl: config.baseUrl,
-      apiKey: config.apiKey,
-      responsesModel: config.responsesModel,
+      baseUrl: textVisionConfig.baseUrl,
+      apiKey: textVisionConfig.apiKey,
+      responsesModel: textVisionConfig.responsesModel,
       reasoningEffort,
       bundle: articleBundle,
       contentType: formData.get("contentType") || "auto",
@@ -2655,7 +2664,8 @@ async function handleCreationListingsGenerate(request, response) {
 
   const mock = process.env.IMAGE_STUDIO_MOCK_LISTING_AGENT === "1";
   const config = mergeRequestPrivateConfig(payload, await configStore.readPrivateConfig());
-  if (!mock && !config.apiKey) {
+  const textVisionConfig = getSelectedTextVisionConfig(config);
+  if (!mock && !textVisionConfig.apiKey) {
     return sendJson(response, 400, {
       message: "Missing API key. Save API configuration before generating listings.",
     });
@@ -2676,9 +2686,9 @@ async function handleCreationListingsGenerate(request, response) {
     const listingDrafts = await generateCreationListingDrafts({
       set,
       config: {
-        baseUrl: config.baseUrl,
-        apiKey: config.apiKey,
-        responsesModel: config.responsesModel,
+        baseUrl: textVisionConfig.baseUrl,
+        apiKey: textVisionConfig.apiKey,
+        responsesModel: textVisionConfig.responsesModel,
         reasoningEffort,
       },
       mock,
@@ -2847,7 +2857,8 @@ async function handlePortraitReferenceAnalyze(request, response) {
   }
 
   const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
-  if (!config.apiKey) {
+  const textVisionConfig = getSelectedTextVisionConfig(config);
+  if (!textVisionConfig.apiKey) {
     return sendJson(response, 400, {
       message: "当前未保存 API Key，请先在配置中保存。",
     });
@@ -2857,13 +2868,13 @@ async function handlePortraitReferenceAnalyze(request, response) {
     formData.get("reasoningEffort") || PORTRAIT_REFERENCE_ANALYSIS_REASONING_EFFORT,
   );
   const json = await requestPromptAgentAnalysis({
-    baseUrl: config.baseUrl,
-    apiKey: config.apiKey,
+    baseUrl: textVisionConfig.baseUrl,
+    apiKey: textVisionConfig.apiKey,
     image: personReferenceImages[0],
     images: referenceImages,
     imageLabels: referenceImageLabels,
     mode: PORTRAIT_REFERENCE_ANALYSIS_MODE,
-    responsesModel: config.responsesModel,
+    responsesModel: textVisionConfig.responsesModel,
     reasoningEffort,
   });
   const analysis = normalizePortraitReferenceAnalysis(
@@ -2920,7 +2931,8 @@ async function handleCreationReferenceAnalyze(request, response) {
   }
 
   const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
-  if (!config.apiKey) {
+  const textVisionConfig = getSelectedTextVisionConfig(config);
+  if (!textVisionConfig.apiKey) {
     return sendJson(response, 400, {
       message: "当前未保存 API Key，请先在配置中保存。",
     });
@@ -2930,12 +2942,12 @@ async function handleCreationReferenceAnalyze(request, response) {
     formData.get("reasoningEffort") || CREATION_REFERENCE_ANALYSIS_REASONING_EFFORT,
   );
   const json = await requestPromptAgentAnalysis({
-    baseUrl: config.baseUrl,
-    apiKey: config.apiKey,
+    baseUrl: textVisionConfig.baseUrl,
+    apiKey: textVisionConfig.apiKey,
     image: referenceImages[0],
     images: referenceImages,
     mode: CREATION_REFERENCE_ANALYSIS_MODE,
-    responsesModel: config.responsesModel,
+    responsesModel: textVisionConfig.responsesModel,
     reasoningEffort,
   });
   const analysis = normalizeCreationReferenceAnalysis(
@@ -4665,7 +4677,6 @@ async function handleGenerate(request, response) {
     const requestedFormatInput = String(formData.get("format") || "").trim().toLowerCase();
     const generationModeInput = String(formData.get("mode") || "").trim();
     const generationMode = normalizeGenerationMode(generationModeInput);
-    generationRequestScope = getStudioGenerationRequestScope(generationMode);
     const isImageDecomposition = generationMode === IMAGE_DECOMPOSITION_MODE;
     const isImageEdit = generationMode === IMAGE_EDIT_MODE;
     const imageEditMode = String(formData.get("editMode") || "").trim();
@@ -4937,6 +4948,7 @@ async function handleGenerate(request, response) {
 
     const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
     const generationConfig = getSelectedImageGenerationConfig(config);
+    generationRequestScope = getStudioGenerationRequestScope(generationMode, generationConfig.imageRoute);
     if (!generationConfig.apiKey) {
       generationTaskStore.failTask(clientSessionId, taskId, {
         errorMessage: "当前未保存 API Key，请先在配置中保存。",

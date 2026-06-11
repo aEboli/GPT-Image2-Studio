@@ -347,6 +347,22 @@ test("creation SKU payload infers visible unit count from Chinese product subjec
   assert.equal(subjects[0].subjectUnitCount, 4);
 });
 
+test("creation SKU payload preserves explicit grouped product unit counts from reference roles", () => {
+  const subjects = buildCreationSkuSubjectsForPayload({
+    referenceRoles: [
+      {
+        filename: "paired-reference.png",
+        role: "product",
+        note: "成对路亚配色需要同时保留。",
+        subjectUnitCount: 2,
+      },
+    ],
+  });
+
+  assert.equal(subjects.length, 1);
+  assert.equal(subjects[0].subjectUnitCount, 2);
+});
+
 test("creation SKU payload falls back to current product roles when applied analysis collapses multiple subjects", () => {
   const subjects = buildCreationSkuSubjectsForPayload({
     analysis: {

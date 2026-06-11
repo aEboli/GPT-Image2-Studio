@@ -65,7 +65,7 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Sora:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260608-quick-blend-group-clear-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260611-filmstrip-loading-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -2644,6 +2644,18 @@
                       <div class="model-options-list" id="directModelOptionsList" role="listbox" hidden></div>
                     </div>
                   </div>
+
+                  <div class="field model-field">
+                    <div class="field-heading inline">
+                      <label for="directResponsesModelInput">视觉/文本模型</label>
+                      <button class="inline-button" id="directResponsesFetchModelsButton" type="button">获取模型列表</button>
+                    </div>
+                    <div class="model-picker-control">
+                      <input id="directResponsesModelInput" name="directResponsesModel" type="text" placeholder="gpt-5.5" autocomplete="off" aria-controls="directResponsesModelOptionsList" />
+                      <button class="model-picker-toggle" id="directResponsesModelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="directResponsesModelOptionsList" hidden></button>
+                      <div class="model-options-list" id="directResponsesModelOptionsList" role="listbox" hidden></div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </section>
@@ -2764,6 +2776,6 @@
       </div>
     </aside>
 
-    <script type="module" src="./app.js?v=20260608-quick-blend-time-sort-1"></script>
+    <script type="module" src="./app.js?v=20260611-filmstrip-loading-1"></script>
   </body>
 </html>
