@@ -5,7 +5,7 @@
 ## 本次更新
 
 - 安装包版本同步到 `0.1.5`，用于 GitHub Release 分发。
-- 调用通道配置继续细化，直接调用模式可单独保存图片模型和视觉文本模型。
+- 调用通道配置继续细化，直接调用模式可单独保存图片模型和视觉文本模型，接口地址可选择请求后缀并自动拆分供应商完整 URL。
 - 队列任务会保存提交时的调用通道快照，并按模式和通道分别计算并发。
 - 套图卡片新增排队中、生成中的稳定 loading 外观，减少批量生成时的布局跳动。
 - 胶片栏增加加载、失败和空状态占位，历史缩略图加载过程更清晰。
@@ -35,6 +35,19 @@ API Key 和配置只保存在本机。服务端保存的配置位于安装目录
 ```text
 %LOCALAPPDATA%\GPT-Image2-Studio\.local\config.json
 ```
+
+## 接口后缀与完整 URL
+
+安装包里的配置面板把接口地址拆成两部分保存：左侧输入框保存 Base URL，右侧下拉框保存请求后缀。一般只需要把地址填到 `/v1`，例如 `https://api.openai.com/v1`。
+
+| 后缀 | 适用场景 |
+| --- | --- |
+| `responses` | 路由模式默认值，通过 Responses API 的 `image_generation` 工具完成生图和多步流程。 |
+| `chat/completions` | 供应商只兼容 Chat Completions 风格的视觉/生图协议时使用；路由模式和直接调用模式都可以用。 |
+| `images/generations` | 直接调用模式默认值，适合标准图片生成端点。 |
+| `images/edits` | 图片编辑专用端点。普通生图不要选它；图片编辑页会在上传源图或 mask 时自动调用 `/images/edits`。 |
+
+如果供应商复制给你的是完整地址，例如 `https://vendor.example/openai/v1/responses` 或 `https://vendor.example/openai/v1/images/generations`，可以直接粘贴到接口地址输入框。Studio 保存时会识别末尾的 `responses`、`chat/completions`、`images/generations`、`images/edits`，自动拆成 Base URL 和接口后缀，并保存到当前通道配置里；URL 里的查询参数和 hash 不会保存。遇到无法识别的末尾路径时，Studio 会把整段当作 Base URL，并在缺少 `/v1` 时自动补上 `/v1`。
 
 生成图片保存到：
 

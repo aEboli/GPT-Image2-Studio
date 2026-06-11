@@ -72,6 +72,8 @@ import {
 import { normalizePptMotionOptions } from "./lib/ppt-motion-presets.mjs";
 import { normalizeBase64, requestDirectImageGeneration, requestImageEdit, requestImageGeneration } from "./lib/responses-workflow.mjs";
 import {
+  API_ENDPOINT_IMAGE_GENERATIONS,
+  API_ENDPOINT_RESPONSES,
   DEFAULT_DIRECT_RESPONSES_MODEL,
   IMAGE_ROUTE_B,
   getSelectedImageGenerationConfig,
@@ -151,9 +153,11 @@ const PROMPT_AGENT_ANALYSIS_REASONING_EFFORT = "medium";
 const REFERENCE_ORCHESTRATION_REASONING_EFFORT = "low";
 const DEFAULT_CONFIG = {
   baseUrl: DEFAULT_BASE_URL,
+  endpointPath: API_ENDPOINT_RESPONSES,
   responsesModel: DEFAULT_RESPONSES_MODEL,
   imageRoute: "a",
   directBaseUrl: DEFAULT_BASE_URL,
+  directEndpointPath: API_ENDPOINT_IMAGE_GENERATIONS,
   directImageModel: "gpt-image-2",
   directResponsesModel: DEFAULT_DIRECT_RESPONSES_MODEL,
   defaults: {
@@ -206,10 +210,12 @@ function buildPublicConfig() {
   return {
     baseUrl: DEFAULT_CONFIG.baseUrl,
     apiKeyConfigured: false,
+    endpointPath: DEFAULT_CONFIG.endpointPath,
     responsesModel: DEFAULT_CONFIG.responsesModel,
     imageRoute: DEFAULT_CONFIG.imageRoute,
     directBaseUrl: DEFAULT_CONFIG.directBaseUrl,
     directApiKeyConfigured: false,
+    directEndpointPath: DEFAULT_CONFIG.directEndpointPath,
     directImageModel: DEFAULT_CONFIG.directImageModel,
     directResponsesModel: DEFAULT_CONFIG.directResponsesModel,
     defaults: { ...DEFAULT_CONFIG.defaults },
@@ -284,6 +290,7 @@ async function handlePromptAgentAnalyze(request, fetchImpl) {
   const reasoningEffort = normalizeReasoningEffort(formData.get("reasoningEffort") || reasoningFallback);
   const json = await requestPromptAgentAnalysis({
     baseUrl: textVisionConfig.baseUrl,
+    endpointPath: textVisionConfig.endpointPath,
     apiKey: textVisionConfig.apiKey,
     image: images[0],
     images,
@@ -329,9 +336,11 @@ function normalizePrivateConfig(
     {
       imageRoute: formData.get("imageRoute"),
       baseUrl: formData.get("baseUrl"),
+      endpointPath: formData.get("endpointPath"),
       apiKey: formData.get("apiKey"),
       responsesModel: formData.get("responsesModel"),
       directBaseUrl: formData.get("directBaseUrl"),
+      directEndpointPath: formData.get("directEndpointPath"),
       directApiKey: formData.get("directApiKey"),
       directImageModel: formData.get("directImageModel"),
       directResponsesModel: formData.get("directResponsesModel"),
@@ -818,6 +827,7 @@ function buildGalleryItem({
     responsesModel: config.responsesModel,
     imageRoute: generationConfig.imageRoute,
     imageModel: generationConfig.imageModel,
+    endpointPath: generationConfig.endpointPath,
     hasReferenceImage: referenceImages.length > 0,
     referenceImageNames: referenceImages.map((image) => image.filename),
     referenceImageName: referenceImages[0]?.filename || "",
@@ -1143,6 +1153,13 @@ function buildCloudCreationListingConfig(payload = {}, env = {}) {
         ],
         DEFAULT_CONFIG.baseUrl,
       ),
+      endpointPath: firstConfigString([
+        payload.endpointPath,
+        nestedConfig.endpointPath,
+        env.endpointPath,
+        env.ENDPOINT_PATH,
+        env.IMAGE_STUDIO_ENDPOINT_PATH,
+      ], DEFAULT_CONFIG.endpointPath),
       apiKey: firstConfigString([
         payload.apiKey,
         nestedConfig.apiKey,
@@ -1170,6 +1187,13 @@ function buildCloudCreationListingConfig(payload = {}, env = {}) {
         ],
         DEFAULT_CONFIG.directBaseUrl,
       ),
+      directEndpointPath: firstConfigString([
+        payload.directEndpointPath,
+        nestedConfig.directEndpointPath,
+        env.directEndpointPath,
+        env.DIRECT_ENDPOINT_PATH,
+        env.IMAGE_STUDIO_DIRECT_ENDPOINT_PATH,
+      ], DEFAULT_CONFIG.directEndpointPath),
       directApiKey: firstConfigString([
         payload.directApiKey,
         nestedConfig.directApiKey,
@@ -1207,6 +1231,7 @@ function buildCloudCreationListingConfig(payload = {}, env = {}) {
 
   return {
     baseUrl: textVisionConfig.baseUrl,
+    endpointPath: textVisionConfig.endpointPath,
     apiKey: textVisionConfig.apiKey,
     responsesModel: textVisionConfig.responsesModel,
     reasoningEffort: normalizeReasoningEffort(firstConfigString(
@@ -1289,6 +1314,7 @@ async function generateCloudflarePptSlide({
     responsesModel: config.responsesModel,
     imageRoute: generationConfig.imageRoute,
     imageModel: generationConfig.imageModel,
+    endpointPath: generationConfig.endpointPath,
     reasoningEffort,
     statusHeartbeatMs: UPSTREAM_STATUS_HEARTBEAT_MS,
     fetchImpl,
@@ -1882,6 +1908,7 @@ async function runGenerate(request, writer, { fetchImpl, imageBucket } = {}) {
           responsesModel: config.responsesModel,
           imageRoute: generationConfig.imageRoute,
           imageModel: generationConfig.imageModel,
+          endpointPath: generationConfig.endpointPath,
           generationMode,
           sourceImage: currentSourceImage,
           mask: localMasks[index],
@@ -1972,6 +1999,7 @@ async function runGenerate(request, writer, { fetchImpl, imageBucket } = {}) {
     responsesModel: config.responsesModel,
     imageRoute: generationConfig.imageRoute,
     imageModel: generationConfig.imageModel,
+    endpointPath: generationConfig.endpointPath,
     generationMode,
     sourceImage: isImageEdit ? referenceImages[0] : null,
     mask: isLocalMaskImageEdit ? localMask : null,
@@ -2239,6 +2267,7 @@ async function handleCreationReferenceAnalyze(request, fetchImpl) {
   );
   const analysis = await requestPromptAgentAnalysis({
     baseUrl: textVisionConfig.baseUrl,
+    endpointPath: textVisionConfig.endpointPath,
     apiKey: textVisionConfig.apiKey,
     image: referenceImages[0],
     images: referenceImages,
@@ -2308,6 +2337,7 @@ async function handlePortraitReferenceAnalyze(request, fetchImpl) {
   );
   const analysis = await requestPromptAgentAnalysis({
     baseUrl: textVisionConfig.baseUrl,
+    endpointPath: textVisionConfig.endpointPath,
     apiKey: textVisionConfig.apiKey,
     image: personReferenceImages[0],
     images: referenceImages,
@@ -2489,6 +2519,7 @@ async function runCreationGenerate(request, writer, { fetchImpl, imageBucket } =
         responsesModel: config.responsesModel,
         imageRoute: generationConfig.imageRoute,
         imageModel: generationConfig.imageModel,
+        endpointPath: generationConfig.endpointPath,
         reasoningEffort,
         statusHeartbeatMs: UPSTREAM_STATUS_HEARTBEAT_MS,
         fetchImpl,
@@ -2707,6 +2738,7 @@ async function runPortraitGenerate(request, writer, { fetchImpl, imageBucket } =
         responsesModel: config.responsesModel,
         imageRoute: generationConfig.imageRoute,
         imageModel: generationConfig.imageModel,
+        endpointPath: generationConfig.endpointPath,
         reasoningEffort,
         statusHeartbeatMs: UPSTREAM_STATUS_HEARTBEAT_MS,
         fetchImpl,
@@ -2918,6 +2950,7 @@ async function runCreationLogoBatchGenerate(request, writer, { fetchImpl, imageB
         responsesModel: config.responsesModel,
         imageRoute: generationConfig.imageRoute,
         imageModel: generationConfig.imageModel,
+        endpointPath: generationConfig.endpointPath,
         reasoningEffort,
         statusHeartbeatMs: UPSTREAM_STATUS_HEARTBEAT_MS,
         fetchImpl,
@@ -3203,6 +3236,7 @@ async function processQueuedGenerationMessage(messageBody, { imageBucket, fetchI
           responsesModel: storedRequest.config.responsesModel,
           imageRoute: generationConfig.imageRoute,
           imageModel: generationConfig.imageModel,
+          endpointPath: generationConfig.endpointPath,
           generationMode: storedRequest.generationMode,
           sourceImage: currentSourceImage,
           mask: localMasks[index],
@@ -3289,6 +3323,7 @@ async function processQueuedGenerationMessage(messageBody, { imageBucket, fetchI
       responsesModel: storedRequest.config.responsesModel,
       imageRoute: generationConfig.imageRoute,
       imageModel: generationConfig.imageModel,
+      endpointPath: generationConfig.endpointPath,
       generationMode: storedRequest.generationMode,
       sourceImage:
         storedRequest.generationMode === IMAGE_EDIT_MODE ? (storedRequest.referenceImages || [])[0] : null,
@@ -3454,6 +3489,7 @@ async function runPptGenerate(request, writer, fetchImpl) {
   await writeSseEvent(writer, "status", { stage: "outline", message: "Generating PPT outline" });
   const outline = await generatePptDeckOutline({
     baseUrl: textVisionConfig.baseUrl,
+    endpointPath: textVisionConfig.endpointPath,
     apiKey: textVisionConfig.apiKey,
     responsesModel: textVisionConfig.responsesModel,
     reasoningEffort,
@@ -3541,6 +3577,7 @@ async function handlePptAnalyze(request, fetchImpl) {
 
     const analysis = await analyzePptDocument({
       baseUrl: textVisionConfig.baseUrl,
+      endpointPath: textVisionConfig.endpointPath,
       apiKey: textVisionConfig.apiKey,
       responsesModel: textVisionConfig.responsesModel,
       reasoningEffort,

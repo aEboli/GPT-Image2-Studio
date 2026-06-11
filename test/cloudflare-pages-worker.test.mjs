@@ -164,6 +164,50 @@ test("Cloudflare creation listing route accepts explicit set metadata and return
   assert.equal(body.listingDrafts[0].evidenceMode, "input-only");
 });
 
+test("Cloudflare creation listing route preserves mixed grouped SKU pack wording", async () => {
+  const request = new Request("https://studio.example/api/creation/listings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      set: {
+        setId: "worker-mixed-pack-set",
+        productName: "Electronic Fishing Lure",
+        productDescription: "Two grouped SKU subjects represent two-pack and three-pack choices.",
+        skuBundleCount: 1,
+        skuSubjects: [
+          {
+            id: "two-lures",
+            title: "Two lure colorways",
+            subjectUnitCount: 2,
+            note: "2 complete visible product units in one grouped SKU subject.",
+          },
+          {
+            id: "three-lures",
+            title: "Three lure colorways",
+            subjectUnitCount: 3,
+            note: "3 complete visible product units in one grouped SKU subject.",
+          },
+        ],
+        items: [{ itemId: "1-hero", role: "hero", status: "failed" }],
+      },
+    }),
+  });
+
+  const response = await handleApiRequest(request, {
+    env: { IMAGE_STUDIO_MOCK_LISTING_AGENT: "1" },
+    fetchImpl() {
+      throw new Error("mock listing route should not call upstream fetch");
+    },
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.listingDrafts.length, 1);
+  assert.match(body.listingDrafts[0].title, /^2 Pack \/ 3 Pack Electronic Fishing Lure\b/);
+  assert.match(body.set.listingDrafts[0].title, /^2 Pack \/ 3 Pack Electronic Fishing Lure\b/);
+});
+
 test("Cloudflare creation listing route requires explicit set metadata with setId", async () => {
   for (const payload of [{}, { set: { productName: "Travel Bottle" } }, { set: { setId: " " } }]) {
     const response = await handleApiRequest(new Request("https://studio.example/api/creation/listings", {

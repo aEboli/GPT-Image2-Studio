@@ -104,6 +104,8 @@ export function createConfigModelPickerController({
       ...browserPayload,
       imageRoute: getImageRouteForTarget(target),
       baseUrl: getInputValue(refs.baseUrlInput) || browserPayload.baseUrl || state.config?.baseUrl || "",
+      endpointPath:
+        getInputValue(refs.endpointPathSelect) || browserPayload.endpointPath || state.config?.endpointPath || "responses",
       apiKey: getInputValue(refs.apiKeyInput) || browserPayload.apiKey || "",
       responsesModel:
         getInputValue(refs.responsesModelInput) ||
@@ -112,6 +114,11 @@ export function createConfigModelPickerController({
         "gpt-5.5",
       directBaseUrl:
         getInputValue(refs.directBaseUrlInput) || browserPayload.directBaseUrl || state.config?.directBaseUrl || "",
+      directEndpointPath:
+        getInputValue(refs.directEndpointPathSelect) ||
+        browserPayload.directEndpointPath ||
+        state.config?.directEndpointPath ||
+        "images/generations",
       directApiKey: getInputValue(refs.directApiKeyInput) || browserPayload.directApiKey || "",
       directImageModel:
         getInputValue(refs.directImageModelInput) ||
@@ -131,9 +138,11 @@ export function createConfigModelPickerController({
     const formData = new FormDataCtor();
     formData.set("imageRoute", payload.imageRoute);
     formData.set("baseUrl", payload.baseUrl);
+    formData.set("endpointPath", payload.endpointPath);
     formData.set("apiKey", payload.apiKey);
     formData.set("responsesModel", payload.responsesModel);
     formData.set("directBaseUrl", payload.directBaseUrl);
+    formData.set("directEndpointPath", payload.directEndpointPath);
     formData.set("directApiKey", payload.directApiKey);
     formData.set("directImageModel", payload.directImageModel);
     formData.set("directResponsesModel", payload.directResponsesModel);

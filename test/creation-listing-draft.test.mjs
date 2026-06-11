@@ -184,6 +184,7 @@ test("listing sources preserve mixed grouped SKU quantities as quantity options"
 
   assert.equal(sources.length, 1);
   assert.deepEqual(sources[0].skuQuantityOptions, [2, 3]);
+  assert.equal(sources[0].skuPackQuantityText, "2 Pack / 3 Pack");
   assert.equal(sources[0].skuVariantCount, 2);
 });
 
@@ -352,6 +353,33 @@ test("listing draft validation accepts quantity-first titles with size after the
   const validation = validateCreationListingDraft(draft, { expectedQuantity: "2 Pack", expectedSize: "3.5 in" });
 
   assert.equal(validation.ok, true);
+});
+
+test("listing draft validation accepts equivalent mixed pack quantity prefixes", () => {
+  const draft = normalizeCreationListingDraft({
+    id: "listing-mixed-pack-wording",
+    title: "2 Pack / 3 Pack Electronic Fishing Lure Bass Trout Freshwater Swimbait",
+    sellingPoints: ["Grouped lure choices keep pack options clear for shoppers."],
+    painPoints: ["Dead-looking bait can get ignored during slow retrieves; visible colorway options help the lure stand out."],
+    fiveBullets: validBullets,
+    description: "Electronic fishing lure options cover two-pack and three-pack grouped SKU choices.",
+    backendSearchTerms: "electronic fishing lure bass trout swimbait",
+  });
+
+  const spacedValidation = validateCreationListingDraft(draft, {
+    expectedQuantity: "2/3 Pack",
+    forbidTitleSpecs: true,
+  });
+  const compactValidation = validateCreationListingDraft({
+    ...draft,
+    title: "2/3 Pack Electronic Fishing Lure Bass Trout Freshwater Swimbait",
+  }, {
+    expectedQuantity: "2 Pack / 3 Pack",
+    forbidTitleSpecs: true,
+  });
+
+  assert.equal(spacedValidation.ok, true);
+  assert.equal(compactValidation.ok, true);
 });
 
 test("listing draft validation rejects size immediately after quantity", () => {

@@ -2593,10 +2593,21 @@
 
               <div class="config-route-fields">
                 <div class="route-config-panel" data-route-panel="a">
-                  <label class="field">
-                    <span>接口地址</span>
-                    <input id="baseUrlInput" name="baseUrl" type="url" placeholder="https://api.openai.com/v1" required />
-                  </label>
+                  <div class="field endpoint-field">
+                    <div class="field-heading inline endpoint-heading">
+                      <label for="baseUrlInput">接口地址</label>
+                      <div class="endpoint-toolbar">
+                        <button class="inline-button endpoint-full-toggle" id="baseUrlFullToggle" type="button" aria-pressed="false">完整 URL</button>
+                        <select class="endpoint-suffix-select" id="endpointPathSelect" name="endpointPath" aria-label="路由模式请求协议后缀">
+                          <option value="responses">responses</option>
+                          <option value="chat/completions">chat/completions</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="endpoint-address-control">
+                      <input id="baseUrlInput" name="baseUrl" type="url" placeholder="https://api.openai.com/v1" required />
+                    </div>
+                  </div>
 
                   <label class="field">
                     <div class="field-heading inline">
@@ -2620,10 +2631,21 @@
                 </div>
 
                 <div class="route-config-panel" data-route-panel="b">
-                  <label class="field">
-                    <span>接口地址</span>
-                    <input id="directBaseUrlInput" name="directBaseUrl" type="url" placeholder="https://api.openai.com/v1" required />
-                  </label>
+                  <div class="field endpoint-field">
+                    <div class="field-heading inline endpoint-heading">
+                      <label for="directBaseUrlInput">接口地址</label>
+                      <div class="endpoint-toolbar">
+                        <button class="inline-button endpoint-full-toggle" id="directBaseUrlFullToggle" type="button" aria-pressed="false">完整 URL</button>
+                        <select class="endpoint-suffix-select" id="directEndpointPathSelect" name="directEndpointPath" aria-label="直接调用模式请求协议后缀">
+                          <option value="images/generations">images/generations</option>
+                          <option value="chat/completions">chat/completions</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="endpoint-address-control">
+                      <input id="directBaseUrlInput" name="directBaseUrl" type="url" placeholder="https://api.openai.com/v1" required />
+                    </div>
+                  </div>
 
                   <label class="field">
                     <div class="field-heading inline">

@@ -41,8 +41,10 @@ test("request private config keeps route B direct image settings separate from r
     baseUrl: "https://api.openai.com/v1",
     apiKey: "server-a-key",
     responsesModel: "gpt-5.4",
+    endpointPath: "responses",
     imageRoute: "a",
     directBaseUrl: "https://api.openai.com/v1",
+    directEndpointPath: "images/generations",
     directApiKey: "",
     directImageModel: "gpt-image-2",
     directResponsesModel: "gpt-5.5",
@@ -52,7 +54,9 @@ test("request private config keeps route B direct image settings separate from r
     baseUrl: "https://route-a.example.test",
     apiKey: "browser-a-key",
     responsesModel: "gpt-5.5",
+    endpointPath: "chat/completions",
     directBaseUrl: "https://route-b.example.test",
+    directEndpointPath: "chat/completions",
     directApiKey: "browser-b-key",
     directImageModel: "vendor-image-pro",
     directResponsesModel: "vendor-vision-text",
@@ -64,7 +68,9 @@ test("request private config keeps route B direct image settings separate from r
   assert.equal(config.baseUrl, "https://route-a.example.test/v1");
   assert.equal(config.apiKey, "browser-a-key");
   assert.equal(config.responsesModel, "gpt-5.5");
+  assert.equal(config.endpointPath, "chat/completions");
   assert.equal(config.directBaseUrl, "https://route-b.example.test/v1");
+  assert.equal(config.directEndpointPath, "chat/completions");
   assert.equal(config.directApiKey, "browser-b-key");
   assert.equal(config.directImageModel, "vendor-image-pro");
   assert.equal(config.directResponsesModel, "vendor-vision-text");
@@ -75,8 +81,10 @@ test("request private config applies selected image route even when request keep
     baseUrl: "https://route-a-server.example.test/v1",
     apiKey: "server-a-key",
     responsesModel: "gpt-5.4",
+    endpointPath: "responses",
     imageRoute: "a",
     directBaseUrl: "https://route-b-server.example.test/v1",
+    directEndpointPath: "images/generations",
     directApiKey: "",
     directImageModel: "server-image-model",
     directResponsesModel: "server-vision-model",
@@ -97,7 +105,9 @@ test("request private config applies selected image route even when request keep
   assert.equal(config.imageRoute, "b");
   assert.equal(config.baseUrl, "https://route-a-server.example.test/v1");
   assert.equal(config.apiKey, "server-a-key");
+  assert.equal(config.endpointPath, "responses");
   assert.equal(config.directBaseUrl, "https://route-b-server.example.test/v1");
+  assert.equal(config.directEndpointPath, "images/generations");
   assert.equal(config.directApiKey, "");
   assert.equal(config.directImageModel, "server-image-model");
   assert.equal(config.directResponsesModel, "server-vision-model");

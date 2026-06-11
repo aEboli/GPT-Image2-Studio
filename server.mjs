@@ -503,7 +503,14 @@ async function handleConfigPost(request, response) {
   await configStore.saveConfig({
     baseUrl: payload.baseUrl,
     apiKey: payload.apiKey,
+    endpointPath: payload.endpointPath,
     responsesModel: payload.responsesModel,
+    imageRoute: payload.imageRoute,
+    directBaseUrl: payload.directBaseUrl,
+    directApiKey: payload.directApiKey,
+    directEndpointPath: payload.directEndpointPath,
+    directImageModel: payload.directImageModel,
+    directResponsesModel: payload.directResponsesModel,
     defaults: payload.defaults,
   });
 
@@ -871,6 +878,7 @@ async function generateAndSavePptSlide({
     responsesModel: config.responsesModel,
     imageRoute: generationConfig.imageRoute,
     imageModel: generationConfig.imageModel,
+    endpointPath: generationConfig.endpointPath,
     reasoningEffort,
     async onEvent(event) {
       if (event.type === "partial_image") {
@@ -912,6 +920,7 @@ async function generateAndSavePptSlide({
       responsesModel: config.responsesModel,
       imageRoute: generationConfig.imageRoute,
       imageModel: generationConfig.imageModel,
+      endpointPath: generationConfig.endpointPath,
       ratio: "16:9",
       ratioLabel: "PPT 16:9",
       size: savedSize,
@@ -980,6 +989,7 @@ async function saveCompletedPptDeck({
       outline,
       slides: sortedSlides,
       baseUrl: textVisionConfig.baseUrl,
+      endpointPath: textVisionConfig.endpointPath,
       apiKey: textVisionConfig.apiKey,
       responsesModel: textVisionConfig.responsesModel,
       reasoningEffort,
@@ -1057,6 +1067,7 @@ async function handlePptAnalyze(request, response) {
 
     const analysis = await analyzePptDocument({
       baseUrl: textVisionConfig.baseUrl,
+      endpointPath: textVisionConfig.endpointPath,
       apiKey: textVisionConfig.apiKey,
       responsesModel: textVisionConfig.responsesModel,
       reasoningEffort,
@@ -1132,6 +1143,7 @@ async function handlePptGenerate(request, response) {
     writeSseEvent(response, "status", { stage: "outline", message: "正在生成 PPT 大纲" });
     const outline = await generatePptDeckOutline({
       baseUrl: textVisionConfig.baseUrl,
+      endpointPath: textVisionConfig.endpointPath,
       apiKey: textVisionConfig.apiKey,
       responsesModel: textVisionConfig.responsesModel,
       reasoningEffort,
@@ -1475,6 +1487,7 @@ async function handlePromptAgentAnalyze(request, response) {
   const createdAt = new Date().toISOString();
   const json = await requestPromptAgentAnalysis({
     baseUrl: textVisionConfig.baseUrl,
+    endpointPath: textVisionConfig.endpointPath,
     apiKey: textVisionConfig.apiKey,
     image: images[0],
     images,
@@ -2007,6 +2020,7 @@ async function handleArticleIllustrationPlan(request, response) {
     );
     const plan = await generateArticleIllustrationPlan({
       baseUrl: textVisionConfig.baseUrl,
+      endpointPath: textVisionConfig.endpointPath,
       apiKey: textVisionConfig.apiKey,
       responsesModel: textVisionConfig.responsesModel,
       reasoningEffort,
@@ -2298,6 +2312,7 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
       responsesModel: config.responsesModel,
       imageRoute: generationConfig.imageRoute,
       imageModel: generationConfig.imageModel,
+      endpointPath: generationConfig.endpointPath,
       generationMode,
       reasoningEffort,
     };
@@ -2399,6 +2414,7 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
             responsesModel: config.responsesModel,
             imageRoute: generationConfig.imageRoute,
             imageModel: generationConfig.imageModel,
+            endpointPath: generationConfig.endpointPath,
             ratio: ratioOption.value,
             ratioLabel: ratioOption.label,
             size: savedSize,
@@ -2687,6 +2703,7 @@ async function handleCreationListingsGenerate(request, response) {
       set,
       config: {
         baseUrl: textVisionConfig.baseUrl,
+        endpointPath: textVisionConfig.endpointPath,
         apiKey: textVisionConfig.apiKey,
         responsesModel: textVisionConfig.responsesModel,
         reasoningEffort,
@@ -2869,6 +2886,7 @@ async function handlePortraitReferenceAnalyze(request, response) {
   );
   const json = await requestPromptAgentAnalysis({
     baseUrl: textVisionConfig.baseUrl,
+    endpointPath: textVisionConfig.endpointPath,
     apiKey: textVisionConfig.apiKey,
     image: personReferenceImages[0],
     images: referenceImages,
@@ -2943,6 +2961,7 @@ async function handleCreationReferenceAnalyze(request, response) {
   );
   const json = await requestPromptAgentAnalysis({
     baseUrl: textVisionConfig.baseUrl,
+    endpointPath: textVisionConfig.endpointPath,
     apiKey: textVisionConfig.apiKey,
     image: referenceImages[0],
     images: referenceImages,
@@ -3131,6 +3150,7 @@ async function handlePortraitGenerate(request, response) {
           responsesModel: config.responsesModel,
           imageRoute: generationConfig.imageRoute,
           imageModel: generationConfig.imageModel,
+          endpointPath: generationConfig.endpointPath,
           reasoningEffort,
           async onEvent(event) {
             if (event.type === "status") {
@@ -3182,6 +3202,7 @@ async function handlePortraitGenerate(request, response) {
             responsesModel: config.responsesModel,
             imageRoute: generationConfig.imageRoute,
             imageModel: generationConfig.imageModel,
+            endpointPath: generationConfig.endpointPath,
             generationMode: "portrait",
             ratio: ratioOption.value,
             ratioLabel: ratioOption.label,
@@ -3469,6 +3490,7 @@ async function handleCreationGenerate(request, response) {
           responsesModel: config.responsesModel,
           imageRoute: generationConfig.imageRoute,
           imageModel: generationConfig.imageModel,
+          endpointPath: generationConfig.endpointPath,
           reasoningEffort,
           async onEvent(event) {
             if (event.type === "status") {
@@ -3525,6 +3547,7 @@ async function handleCreationGenerate(request, response) {
             responsesModel: config.responsesModel,
             imageRoute: generationConfig.imageRoute,
             imageModel: generationConfig.imageModel,
+            endpointPath: generationConfig.endpointPath,
             ratio: ratioOption.value,
             ratioLabel: ratioOption.label,
             size: savedSize,
@@ -3785,6 +3808,7 @@ async function handleCreationLogoBatchGenerate(request, response) {
           responsesModel: config.responsesModel,
           imageRoute: generationConfig.imageRoute,
           imageModel: generationConfig.imageModel,
+          endpointPath: generationConfig.endpointPath,
           reasoningEffort,
           async onEvent(event) {
             if (event.type === "status") {
@@ -3841,6 +3865,7 @@ async function handleCreationLogoBatchGenerate(request, response) {
             responsesModel: config.responsesModel,
             imageRoute: generationConfig.imageRoute,
             imageModel: generationConfig.imageModel,
+            endpointPath: generationConfig.endpointPath,
             ratio: ratioOption.value,
             ratioLabel: ratioOption.label,
             size: savedSize,
@@ -4085,6 +4110,7 @@ async function handlePortraitRepair(request, response) {
           responsesModel: config.responsesModel,
           imageRoute: generationConfig.imageRoute,
           imageModel: generationConfig.imageModel,
+          endpointPath: generationConfig.endpointPath,
           reasoningEffort,
           async onEvent(event) {
             if (event.type === "status") {
@@ -4134,6 +4160,7 @@ async function handlePortraitRepair(request, response) {
             responsesModel: config.responsesModel,
             imageRoute: generationConfig.imageRoute,
             imageModel: generationConfig.imageModel,
+            endpointPath: generationConfig.endpointPath,
             generationMode: "portrait",
             ratio: ratioOption.value,
             ratioLabel: ratioOption.label,
@@ -4459,6 +4486,7 @@ async function handleCreationRepair(request, response) {
           responsesModel: config.responsesModel,
           imageRoute: generationConfig.imageRoute,
           imageModel: generationConfig.imageModel,
+          endpointPath: generationConfig.endpointPath,
           reasoningEffort,
           async onEvent(event) {
             if (event.type === "status") {
@@ -4518,6 +4546,7 @@ async function handleCreationRepair(request, response) {
             responsesModel: config.responsesModel,
             imageRoute: generationConfig.imageRoute,
             imageModel: generationConfig.imageModel,
+            endpointPath: generationConfig.endpointPath,
             ratio: ratioOption.value,
             ratioLabel: ratioOption.label,
             size: savedSize,
@@ -4989,6 +5018,7 @@ async function handleGenerate(request, response) {
       responsesModel: config.responsesModel,
       imageRoute: generationConfig.imageRoute,
       imageModel: generationConfig.imageModel,
+      endpointPath: generationConfig.endpointPath,
       hasReferenceImage: referenceImages.length > 0,
       referenceImageNames: referenceImages.map((image) => image.filename),
       referenceImageName: referenceImages[0]?.filename || "",
@@ -5065,6 +5095,7 @@ async function handleGenerate(request, response) {
       responsesModel: config.responsesModel,
       imageRoute: generationConfig.imageRoute,
       imageModel: generationConfig.imageModel,
+      endpointPath: generationConfig.endpointPath,
       generationMode,
       reasoningEffort,
     };
@@ -5183,6 +5214,7 @@ async function handleGenerate(request, response) {
         responsesModel: config.responsesModel,
         imageRoute: generationConfig.imageRoute,
         imageModel: generationConfig.imageModel,
+        endpointPath: generationConfig.endpointPath,
         ratio: ratioOption.value,
         ratioLabel: ratioOption.label,
         size: savedSize,
@@ -5225,6 +5257,7 @@ async function handleGenerate(request, response) {
       responsesModel: config.responsesModel,
       imageRoute: generationConfig.imageRoute,
       imageModel: generationConfig.imageModel,
+      endpointPath: generationConfig.endpointPath,
       ratioOption,
       size: savedSize,
       quality: finalQuality,

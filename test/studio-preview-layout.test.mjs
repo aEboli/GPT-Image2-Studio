@@ -187,9 +187,11 @@ function createModelPickerHarness() {
   const refs = {
     apiKeyInput: createTestElement("input", documentRef),
     baseUrlInput: createTestElement("input", documentRef),
+    endpointPathSelect: createTestElement("select", documentRef),
     configFeedback: createTestElement("p", documentRef),
     directApiKeyInput: createTestElement("input", documentRef),
     directBaseUrlInput: createTestElement("input", documentRef),
+    directEndpointPathSelect: createTestElement("select", documentRef),
     directFetchModelsButton: createTestElement("button", documentRef),
     directImageModelInput: createTestElement("input", documentRef),
     directModelOptionsList: createTestElement("div", documentRef),
@@ -210,8 +212,10 @@ function createModelPickerHarness() {
   };
   refs.apiKeyInput.value = "test-key";
   refs.baseUrlInput.value = "https://api.example.test/v1";
+  refs.endpointPathSelect.value = "responses";
   refs.directApiKeyInput.value = "direct-key";
   refs.directBaseUrlInput.value = "https://direct.example.test/v1";
+  refs.directEndpointPathSelect.value = "chat/completions";
   refs.directImageModelInput.value = "gpt-image-2";
   refs.directResponsesModelInput.value = "gpt-5.5";
   refs.responsesModelInput.value = "gpt-5.5";
@@ -1433,24 +1437,28 @@ test("studio rendering preserves the settings form scroll position during genera
   assert.match(app, /function syncStudioHeight\(\) \{[\s\S]*const settingsScrollTop = getSettingsFormScrollTop\(\);[\s\S]*restoreSettingsFormScrollTop\(settingsScrollTop\);[\s\S]*\}/);
 });
 
-test("generation loading shell uses light DOM and transform-only motion", async () => {
+test("generation loading shell renders textless progress rings", async () => {
   const styles = await readFile(stylesPath, "utf8");
   const app = await readFile(appPath, "utf8");
   const loadingStart = styles.indexOf(".preview-loading-shell");
   const loadingStyles = styles.slice(loadingStart, styles.indexOf(".preview-panel", loadingStart));
 
-  assert.match(app, /"preview-loading-progress"/);
-  assert.match(app, /"preview-loading-signal"/);
-  assert.doesNotMatch(app, /preview-loading-aura|preview-loading-morph|preview-loading-trace|preview-loading-core/);
+  assert.match(app, /"preview-loading-ring"/);
+  assert.match(app, /"preview-loading-fill"/);
+  assert.doesNotMatch(app, /preview-loading-progress|preview-loading-signal|preview-loading-copy|preview-loading-status|preview-loading-step/);
   assert.match(
     loadingStyles,
-    /\.preview-loading-progress\s*\{[\s\S]*transform:\s*scaleX\(var\(--loading-progress,\s*0\.25\)\);[\s\S]*animation:\s*preview-loading-progress-sweep/,
+    /\.preview-loading-fill\s*\{[\s\S]*transform:\s*scaleY\(var\(--loading-progress,\s*0\.25\)\);[\s\S]*transform-origin:\s*center bottom;/,
   );
-  assert.match(loadingStyles, /\.preview-loading-signal\s*\{[\s\S]*animation:\s*preview-loading-signal/);
+  assert.match(loadingStyles, /\.preview-loading-ring-line\s*\{[\s\S]*animation:\s*preview-loading-ring-spin/);
+  assert.match(loadingStyles, /\.preview-loading-ring-line:nth-child\(2\)\s*\{[\s\S]*animation-direction:\s*reverse/);
+  assert.match(loadingStyles, /\.preview-loading-motion\s*>\s*\*\s*\{[\s\S]*animation:\s*preview-loading-float/);
+  assert.match(loadingStyles, /\.preview-loading-motion\.is-entering\s*\{[\s\S]*animation:\s*preview-loading-orb-enter/);
+  assert.match(loadingStyles, /@keyframes preview-loading-color-shift/);
   assert.doesNotMatch(loadingStyles, /preview-loading-morph|preview-loading-aura|filter:\s*blur|mix-blend-mode/);
   assert.match(
     loadingStyles,
-    /@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*\.preview-loading-progress,[\s\S]*\.preview-loading-signal[\s\S]*animation:\s*none;/,
+    /@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*\.preview-loading-motion,[\s\S]*\.preview-loading-ring-line,[\s\S]*\.preview-loading-fill[\s\S]*animation:\s*none;/,
   );
 });
 
@@ -2234,13 +2242,15 @@ test("studio stores API settings in the browser and sends them with cloud genera
   assert.match(browserConfig, /storage\?\.setItem\?\.\(BROWSER_CONFIG_STORAGE_KEY, JSON\.stringify/);
   assert.match(browserConfig, /\.\.\.\(browserConfig \|\| \{\}\),[\s\S]*\.\.\.overrideConfig,/);
   assert.match(browserConfig, /formData\.set\("baseUrl", config\.baseUrl\);/);
+  assert.match(browserConfig, /formData\.set\("endpointPath", config\.endpointPath\);/);
   assert.match(browserConfig, /formData\.set\("apiKey", config\.apiKey\);/);
   assert.match(browserConfig, /formData\.set\("responsesModel", config\.responsesModel\);/);
+  assert.match(browserConfig, /formData\.set\("directEndpointPath", config\.directEndpointPath\);/);
   assert.match(browserConfig, /formData\.set\("directResponsesModel", config\.directResponsesModel\);/);
   assert.match(app, /directResponsesModelInput:\s*document\.querySelector\("#directResponsesModelInput"\),/);
   assert.match(app, /directResponsesModel:\s*refs\.directResponsesModelInput\.value\.trim\(\) \|\| browserPayload\.directResponsesModel/);
   assert.match(app, /refs\.directResponsesModelInput\.value = config\.directResponsesModel \|\| "gpt-5\.5";/);
-  assert.match(app, /directResponsesModel:\s*refs\.directResponsesModelInput\.value\.trim\(\) \|\| "gpt-5\.5"/);
+  assert.match(app, /const payload = getCurrentPrivateConfigRequestPayload\(\);/);
   assert.match(app, /function buildPptFormData\(\) \{[\s\S]*appendCurrentConfigToFormData\(formData\);[\s\S]*return formData;/);
   assert.match(app, /function buildPptCompletionRequest\(slideNumbers\) \{[\s\S]*\.\.\.getCurrentPrivateConfigRequestPayload\(\),/);
 });
@@ -2404,6 +2414,7 @@ test("direct text and vision model picker uses direct API settings and its own o
   assert.equal(capturedBodies.length, 1);
   assert.equal(capturedBodies[0].get("imageRoute"), "b");
   assert.equal(capturedBodies[0].get("directBaseUrl"), "https://direct.example.test/v1");
+  assert.equal(capturedBodies[0].get("directEndpointPath"), "chat/completions");
   assert.equal(capturedBodies[0].get("directApiKey"), "direct-key");
   assert.equal(capturedBodies[0].get("directImageModel"), "gpt-image-2");
   assert.equal(capturedBodies[0].get("directResponsesModel"), "gpt-5.5");
@@ -2452,6 +2463,7 @@ test("test connection uses the currently selected direct mode settings", async (
   assert.equal(capturedBodies.length, 1);
   assert.equal(capturedBodies[0].get("imageRoute"), "b");
   assert.equal(capturedBodies[0].get("directBaseUrl"), "https://direct.example.test/v1");
+  assert.equal(capturedBodies[0].get("directEndpointPath"), "chat/completions");
   assert.equal(capturedBodies[0].get("directApiKey"), "direct-key");
   assert.equal(capturedBodies[0].get("directResponsesModel"), "gpt-5.5");
   assert.equal(state.configModels.open, false);

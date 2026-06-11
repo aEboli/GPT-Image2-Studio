@@ -188,6 +188,39 @@ test("listing agent derives 2 Pack from grouped subject units when bundle count 
   assert.match(draft.description, /two complete visible lure bodies/i);
 });
 
+test("listing agent prompt uses readable mixed pack quantity wording", async () => {
+  const prompts = [];
+  const fetchImpl = async (_url, init) => {
+    prompts.push(JSON.parse(init.body).input);
+    return new Response(JSON.stringify({
+      output_text: JSON.stringify(makeValidDraft({
+        title: "2 Pack / 3 Pack Electronic Fishing Lure Bass Trout Freshwater Swimbait",
+        description: "Electronic fishing lure options cover two-pack and three-pack grouped SKU choices.",
+      })),
+    }), { status: 200 });
+  };
+
+  const draft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    source: {
+      ...standardSource,
+      productName: "Electronic Fishing Lure",
+      skuBundleCount: 2,
+      skuQuantityOptions: [2, 3],
+      skuSubjects: [
+        { id: "two-lures", title: "Two lure colorways", subjectUnitCount: 2 },
+        { id: "three-lures", title: "Three lure colorways", subjectUnitCount: 3 },
+      ],
+    },
+    fetchImpl,
+  });
+
+  assert.match(prompts[0], /Title formula: start with 2 Pack \/ 3 Pack/i);
+  assert.match(draft.title, /^2 Pack \/ 3 Pack Electronic Fishing Lure\b/);
+});
+
 test("listing agent retries when grouped subject description omits unit count", async () => {
   const prompts = [];
   let callCount = 0;
@@ -847,6 +880,35 @@ test("generateCreationListingDrafts uses grouped SKU subject unit count and sear
   assert.equal(validateListingAgentDraft(drafts[0], "3 Pack").ok, true);
 });
 
+test("generateCreationListingDrafts honors set-level same-SKU pack counts for grouped subjects", async () => {
+  const drafts = await generateCreationListingDrafts({
+    set: {
+      setId: "set-two-three-lure-groups",
+      productName: "Electronic Fishing Lure",
+      productDescription: "One grouped SKU subject contains three complete lure bodies and is sold as two identical grouped sets.",
+      skuBundleCount: 2,
+      skuSubjects: [
+        {
+          id: "three-lures.png",
+          title: "Three lure colorways",
+          filenames: ["three-lures.png"],
+          subjectUnitCount: 3,
+          note: "One product-subject reference image contains three complete visible lure bodies: silver, gold, and green.",
+        },
+      ],
+    },
+    config: { baseUrl: "https://example.test/v1", apiKey: "test-key", responsesModel: "gpt-5.4" },
+    fetchImpl() {
+      throw new Error("mock mode should not request the network");
+    },
+    mock: true,
+  });
+
+  assert.equal(drafts.length, 1);
+  assert.match(drafts[0].title, /^6 Pack Electronic Fishing Lure\b/);
+  assert.equal(validateListingAgentDraft(drafts[0], "6 Pack").ok, true);
+});
+
 test("generateCreationListingDrafts uses visible subject unit count for swimbait titles", async () => {
   const drafts = await generateCreationListingDrafts({
     set: {
@@ -916,8 +978,8 @@ test("generateCreationListingDrafts writes mixed grouped SKU quantities as slash
   });
 
   assert.equal(drafts.length, 1);
-  assert.match(drafts[0].title, /^2\/3 Pack Electronic Fishing Lure\b/);
-  assert.equal(validateListingAgentDraft(drafts[0], "2/3 Pack").ok, true);
+  assert.match(drafts[0].title, /^2 Pack \/ 3 Pack Electronic Fishing Lure\b/);
+  assert.equal(validateListingAgentDraft(drafts[0], "2 Pack / 3 Pack").ok, true);
 });
 
 test("mock listing drafts describe grouped two-unit subjects", () => {

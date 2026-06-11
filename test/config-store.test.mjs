@@ -16,8 +16,10 @@ test("config store returns empty public config before any save", async () => {
   assert.equal(config.apiKeyConfigured, false);
   assert.equal(config.apiKeyMask, undefined);
   assert.equal(config.responsesModel, "gpt-5.4");
+  assert.equal(config.endpointPath, "responses");
   assert.equal(config.imageRoute, "a");
   assert.equal(config.directBaseUrl, "https://api.openai.com/v1");
+  assert.equal(config.directEndpointPath, "images/generations");
   assert.equal(config.directApiKeyConfigured, false);
   assert.equal(config.directApiKeyMask, undefined);
   assert.equal(config.directImageModel, "gpt-image-2");
@@ -88,15 +90,18 @@ test("config store keeps route A and route B image API settings independent", as
     baseUrl: "https://route-a.example.com",
     apiKey: "route-a-key-1234567890",
     responsesModel: "gpt-5.4",
+    endpointPath: "responses",
     imageRoute: "b",
     directBaseUrl: "https://route-b.example.com",
+    directEndpointPath: "images/generations",
     directApiKey: "route-b-key-1234567890",
     directImageModel: "vendor-image-pro",
     directResponsesModel: "vendor-vision-text",
   });
 
   await store.saveConfig({
-    directBaseUrl: "https://route-b-2.example.com/v1",
+    directBaseUrl: "https://route-b-2.example.com/v1/chat/completions",
+    directEndpointPath: "chat/completions",
     directImageModel: "vendor-image-ultra",
     directResponsesModel: "vendor-vision-ultra",
   });
@@ -109,7 +114,9 @@ test("config store keeps route A and route B image API settings independent", as
   assert.equal(publicConfig.apiKeyConfigured, true);
   assert.match(publicConfig.apiKeyMask, /^rout.*7890$/);
   assert.equal(publicConfig.responsesModel, "gpt-5.4");
+  assert.equal(publicConfig.endpointPath, "responses");
   assert.equal(publicConfig.directBaseUrl, "https://route-b-2.example.com/v1");
+  assert.equal(publicConfig.directEndpointPath, "chat/completions");
   assert.equal(publicConfig.directApiKeyConfigured, true);
   assert.match(publicConfig.directApiKeyMask, /^rout.*7890$/);
   assert.equal(publicConfig.directImageModel, "vendor-image-ultra");
@@ -118,6 +125,7 @@ test("config store keeps route A and route B image API settings independent", as
   assert.equal(privateConfig.apiKey, "route-a-key-1234567890");
   assert.equal(privateConfig.directApiKey, "route-b-key-1234567890");
   assert.equal(privateConfig.directBaseUrl, "https://route-b-2.example.com/v1");
+  assert.equal(privateConfig.directEndpointPath, "chat/completions");
   assert.equal(privateConfig.directImageModel, "vendor-image-ultra");
   assert.equal(privateConfig.directResponsesModel, "vendor-vision-ultra");
 });

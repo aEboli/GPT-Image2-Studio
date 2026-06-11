@@ -69,10 +69,12 @@ function makeFakeDocumentElement(tagName) {
 test("browser config module normalizes private config without requiring window globals", () => {
   const normalized = normalizeBrowserPrivateConfig({
     imageRoute: "b",
-    baseUrl: "https://example.test/",
+    baseUrl: "https://example.test/v1/responses",
     apiKey: "sk-browser-secret",
+    endpointPath: "responses",
     responsesModel: "gpt-5.5",
-    directBaseUrl: "https://direct.example.test/",
+    directBaseUrl: "https://direct.example.test/v1/chat/completions",
+    directEndpointPath: "images/generations",
     directApiKey: "sk-direct-secret",
     directImageModel: "custom-image-model",
     directResponsesModel: "custom-vision-text-model",
@@ -84,9 +86,11 @@ test("browser config module normalizes private config without requiring window g
     imageRoute: "b",
     baseUrl: "https://example.test/v1",
     apiKey: "sk-browser-secret",
+    endpointPath: "responses",
     responsesModel: "gpt-5.5",
     directBaseUrl: "https://direct.example.test/v1",
     directApiKey: "sk-direct-secret",
+    directEndpointPath: "chat/completions",
     directImageModel: "custom-image-model",
     directResponsesModel: "custom-vision-text-model",
   });
@@ -100,9 +104,11 @@ test("browser config module normalizes private config without requiring window g
   assert.equal(publicConfig.defaults.size, "auto");
   assert.equal(formData.get("imageRoute"), "b");
   assert.equal(formData.get("baseUrl"), "https://example.test/v1");
+  assert.equal(formData.get("endpointPath"), "responses");
   assert.equal(formData.get("apiKey"), "sk-browser-secret");
   assert.equal(formData.get("responsesModel"), "gpt-5.5");
   assert.equal(formData.get("directBaseUrl"), "https://direct.example.test/v1");
+  assert.equal(formData.get("directEndpointPath"), "chat/completions");
   assert.equal(formData.get("directApiKey"), "sk-direct-secret");
   assert.equal(formData.get("directImageModel"), "custom-image-model");
   assert.equal(formData.get("directResponsesModel"), "custom-vision-text-model");
@@ -112,9 +118,11 @@ test("browser config form data can override saved route with the current UI rout
   const saved = normalizeBrowserPrivateConfig({
     imageRoute: "a",
     baseUrl: "https://saved-route.example.test/",
+    endpointPath: "responses",
     apiKey: "saved-route-key",
     responsesModel: "gpt-5.5",
     directBaseUrl: "https://saved-direct.example.test/",
+    directEndpointPath: "images/generations",
     directApiKey: "saved-direct-key",
     directImageModel: "saved-direct-image",
     directResponsesModel: "saved-direct-vision",
@@ -122,6 +130,7 @@ test("browser config form data can override saved route with the current UI rout
   const formData = appendBrowserConfigToFormData(new FormData(), () => saved, {
     imageRoute: "b",
     directBaseUrl: "https://live-direct.example.test/",
+    directEndpointPath: "chat/completions",
     directApiKey: "live-direct-key",
     directImageModel: "live-direct-image",
     directResponsesModel: "live-direct-vision",
@@ -131,6 +140,7 @@ test("browser config form data can override saved route with the current UI rout
   assert.equal(formData.get("baseUrl"), "https://saved-route.example.test/v1");
   assert.equal(formData.get("apiKey"), "saved-route-key");
   assert.equal(formData.get("directBaseUrl"), "https://live-direct.example.test/v1");
+  assert.equal(formData.get("directEndpointPath"), "chat/completions");
   assert.equal(formData.get("directApiKey"), "live-direct-key");
   assert.equal(formData.get("directImageModel"), "live-direct-image");
   assert.equal(formData.get("directResponsesModel"), "live-direct-vision");
@@ -169,8 +179,14 @@ test("config drawer shows image route settings as exclusive mode tabs", async ()
     html,
     /data-route-panel="b"[\s\S]*接口地址[\s\S]*API Key[\s\S]*生图模型[\s\S]*id="directFetchModelsButton"[\s\S]*获取模型列表[\s\S]*视觉\/文本模型[\s\S]*id="directResponsesFetchModelsButton"[\s\S]*获取模型列表/,
   );
+  assert.match(html, /id="endpointPathSelect"[\s\S]*value="responses"[\s\S]*responses/);
+  assert.match(html, /id="directEndpointPathSelect"[\s\S]*value="chat\/completions"[\s\S]*chat\/completions/);
+  assert.match(html, /id="baseUrlFullToggle"[\s\S]*完整 URL/);
+  assert.match(html, /id="directBaseUrlFullToggle"[\s\S]*完整 URL/);
   assert.doesNotMatch(html, /线路A|线路B/);
   assert.match(styles, /\.route-config-panel\s*\{[\s\S]*display:\s*grid;/);
+  assert.match(styles, /\.endpoint-address-control\s*\{/);
+  assert.match(styles, /\.endpoint-suffix-select\s*\{/);
   assert.match(
     styles,
     /\.config-form:has\(input\[name="imageRoute"\]\[value="a"\]:checked\)\s*\[data-route-panel="b"\]/,
@@ -181,6 +197,10 @@ test("config drawer shows image route settings as exclusive mode tabs", async ()
   );
   assert.match(styles, /\.generation-mode-status\s*\{/);
   assert.match(app, /generationModeStatus:\s*document\.querySelector\("#generationModeStatus"\),/);
+  assert.match(app, /endpointPathSelect:\s*document\.querySelector\("#endpointPathSelect"\),/);
+  assert.match(app, /directEndpointPathSelect:\s*document\.querySelector\("#directEndpointPathSelect"\),/);
+  assert.match(app, /function toggleEndpointFullUrlMode\(/);
+  assert.match(app, /function syncEndpointFieldsFromFullUrlModes\(/);
   assert.match(app, /function updateGenerationModeStatus\(\) \{/);
   assert.match(app, /const imageRoute = getSelectedImageRoute\(\);/);
   assert.match(app, /formatGenerationActivityModeLabel\(imageRoute\)/);

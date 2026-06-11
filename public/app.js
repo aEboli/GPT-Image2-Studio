@@ -19,6 +19,13 @@ import { createImageEditShellBridge } from "/lib/image-edit-shell-bridge.mjs";
 import { createCreationLogoLibraryController } from "/lib/creation-logo-library.mjs";
 import { consumeSse, requestGenerationStream } from "/lib/generation-client.mjs";
 import { createConfigModelPickerController } from "/lib/config-model-picker.mjs";
+import {
+  API_ENDPOINT_IMAGE_GENERATIONS,
+  API_ENDPOINT_RESPONSES,
+  appendApiEndpointPath,
+  normalizeApiEndpointPath,
+  splitApiEndpointUrl,
+} from "/lib/image-route-config.mjs";
 import { createPptAnalysisController } from "/lib/ppt-analysis-client.mjs?v=20260527-density-overlap-1";
 import { appendPptDeckDownloadLinks } from "/lib/ppt-record-links.mjs";
 import { buildCreationSkuSubjectsForPayload, normalizeCreationSkuBundleCountForPayload, normalizeCreationSkuSubjectForPayload } from "/lib/creation-sku-subjects.mjs";
@@ -582,8 +589,11 @@ let creationReferenceAnalysisRequestToken = 0;
 const refs = {
   apiKeyInput: document.querySelector("#apiKeyInput"),
   baseUrlInput: document.querySelector("#baseUrlInput"),
+  baseUrlFullToggle: document.querySelector("#baseUrlFullToggle"),
   directApiKeyInput: document.querySelector("#directApiKeyInput"),
   directBaseUrlInput: document.querySelector("#directBaseUrlInput"),
+  directBaseUrlFullToggle: document.querySelector("#directBaseUrlFullToggle"),
+  directEndpointPathSelect: document.querySelector("#directEndpointPathSelect"),
   directFetchModelsButton: document.querySelector("#directFetchModelsButton"),
   directImageModelInput: document.querySelector("#directImageModelInput"),
   directModelOptionsList: document.querySelector("#directModelOptionsList"),
@@ -593,6 +603,7 @@ const refs = {
   directResponsesModelOptionsList: document.querySelector("#directResponsesModelOptionsList"),
   directResponsesModelPickerToggle: document.querySelector("#directResponsesModelPickerToggle"),
   directSavedKeyMask: document.querySelector("#directSavedKeyMask"),
+  endpointPathSelect: document.querySelector("#endpointPathSelect"),
   imageRouteInputs: [...document.querySelectorAll('input[name="imageRoute"]')],
   clearHistoryButton: document.querySelector("#clearHistoryButton"),
   closeConfigBackdrop: document.querySelector("#closeConfigBackdrop"),
@@ -3297,6 +3308,7 @@ function renderImageDecompositionGenerationLoading(item) {
       imageUrl: "",
       prompt: item ? getDisplayPrompt(item) : "",
       runningCount: state.jobs.length,
+      runningItems: state.jobs,
       maxConcurrentTasks: getMaxParallelJobCount(),
     }),
     eyebrow: "Image Decomposition",
@@ -4371,6 +4383,7 @@ function renderReferenceAnalysisGenerationLoading(item) {
       imageUrl: "",
       prompt: item ? getDisplayPrompt(item) : "",
       runningCount: state.jobs.length,
+      runningItems: state.jobs,
       maxConcurrentTasks: getMaxParallelJobCount(),
     }),
     eyebrow: "Reference Analysis",
@@ -5078,26 +5091,36 @@ function updateGenerationModeStatus() {
   refs.generationModeStatus.setAttribute("aria-label", `当前生图调用模式：${label}`);
 }
 
+function getEndpointControls(imageRoute = "a") { return imageRoute === "b" ? { input: refs.directBaseUrlInput, select: refs.directEndpointPathSelect, toggle: refs.directBaseUrlFullToggle, defaultEndpointPath: API_ENDPOINT_IMAGE_GENERATIONS, fallbackBaseUrl: state.config?.directBaseUrl || state.config?.baseUrl || "https://api.openai.com/v1" } : { input: refs.baseUrlInput, select: refs.endpointPathSelect, toggle: refs.baseUrlFullToggle, defaultEndpointPath: API_ENDPOINT_RESPONSES, fallbackBaseUrl: state.config?.baseUrl || "https://api.openai.com/v1" }; }
+function isEndpointFullUrlMode(imageRoute = "a") { return getEndpointControls(imageRoute).toggle?.getAttribute("aria-pressed") === "true"; }
+function readEndpointFields(imageRoute = "a") { const controls = getEndpointControls(imageRoute); return splitApiEndpointUrl(controls.input?.value || controls.fallbackBaseUrl, { fallbackBaseUrl: controls.fallbackBaseUrl, fallbackEndpointPath: controls.select?.value || controls.defaultEndpointPath }); }
+function setEndpointSelectValue(select, endpointPath, fallbackEndpointPath) { if (select) select.value = normalizeApiEndpointPath(endpointPath, fallbackEndpointPath); }
+function syncEndpointInputDisplay(imageRoute = "a", baseUrl = "", endpointPath = "") { const controls = getEndpointControls(imageRoute); const fullMode = isEndpointFullUrlMode(imageRoute); const normalizedEndpointPath = normalizeApiEndpointPath(endpointPath, controls.defaultEndpointPath); setEndpointSelectValue(controls.select, normalizedEndpointPath, controls.defaultEndpointPath); if (controls.input) { controls.input.value = fullMode ? appendApiEndpointPath(baseUrl || controls.fallbackBaseUrl, normalizedEndpointPath) : baseUrl || controls.fallbackBaseUrl; controls.input.placeholder = fullMode ? appendApiEndpointPath("https://api.openai.com/v1", normalizedEndpointPath) : "https://api.openai.com/v1"; } if (controls.toggle) controls.toggle.textContent = fullMode ? "基础 URL" : "完整 URL"; }
+function toggleEndpointFullUrlMode(imageRoute = "a") { const controls = getEndpointControls(imageRoute); if (!controls.toggle) return; const endpoint = readEndpointFields(imageRoute); controls.toggle.setAttribute("aria-pressed", String(!isEndpointFullUrlMode(imageRoute))); syncEndpointInputDisplay(imageRoute, endpoint.baseUrl, endpoint.endpointPath); }
+function syncEndpointFieldsFromFullUrlModes() { ["a", "b"].forEach((imageRoute) => { const endpoint = readEndpointFields(imageRoute); syncEndpointInputDisplay(imageRoute, endpoint.baseUrl, endpoint.endpointPath); }); }
+
 function getCurrentPrivateConfigRequestPayload() {
   const browserPayload = getBrowserPrivateConfigRequestPayload();
-  return { imageRoute: getSelectedImageRoute(), baseUrl: refs.baseUrlInput.value.trim() || browserPayload.baseUrl || state.config?.baseUrl || "", apiKey: refs.apiKeyInput.value.trim() || browserPayload.apiKey || "", responsesModel: refs.responsesModelInput.value.trim() || browserPayload.responsesModel || state.config?.responsesModel || "gpt-5.5", directBaseUrl: refs.directBaseUrlInput.value.trim() || browserPayload.directBaseUrl || state.config?.directBaseUrl || "", directApiKey: refs.directApiKeyInput.value.trim() || browserPayload.directApiKey || "", directImageModel: refs.directImageModelInput.value.trim() || browserPayload.directImageModel || state.config?.directImageModel || "gpt-image-2", directResponsesModel: refs.directResponsesModelInput.value.trim() || browserPayload.directResponsesModel || state.config?.directResponsesModel || "gpt-5.5" };
+  const routeAEndpoint = readEndpointFields("a");
+  const routeBEndpoint = readEndpointFields("b");
+  return { imageRoute: getSelectedImageRoute(), baseUrl: routeAEndpoint.baseUrl || browserPayload.baseUrl || state.config?.baseUrl || "", endpointPath: routeAEndpoint.endpointPath || browserPayload.endpointPath || state.config?.endpointPath || API_ENDPOINT_RESPONSES, apiKey: refs.apiKeyInput.value.trim() || browserPayload.apiKey || "", responsesModel: refs.responsesModelInput.value.trim() || browserPayload.responsesModel || state.config?.responsesModel || "gpt-5.5", directBaseUrl: routeBEndpoint.baseUrl || browserPayload.directBaseUrl || state.config?.directBaseUrl || "", directEndpointPath: routeBEndpoint.endpointPath || browserPayload.directEndpointPath || state.config?.directEndpointPath || API_ENDPOINT_IMAGE_GENERATIONS, directApiKey: refs.directApiKeyInput.value.trim() || browserPayload.directApiKey || "", directImageModel: refs.directImageModelInput.value.trim() || browserPayload.directImageModel || state.config?.directImageModel || "gpt-image-2", directResponsesModel: refs.directResponsesModelInput.value.trim() || browserPayload.directResponsesModel || state.config?.directResponsesModel || "gpt-5.5" };
 }
 
 function appendCurrentConfigToFormData(formData) { appendBrowserConfigToFormData(formData, undefined, getCurrentPrivateConfigRequestPayload()); return formData; }
 
-function applyQueuedJobConfigSnapshot(job) { if (!job) return job; const { imageRoute, baseUrl, responsesModel, directBaseUrl, directImageModel, directResponsesModel } = getCurrentPrivateConfigRequestPayload(); Object.assign(job, { imageRoute, generationRoute: imageRoute, baseUrl, responsesModel, directBaseUrl, directImageModel, directResponsesModel }); return job; }
+function applyQueuedJobConfigSnapshot(job) { if (!job) return job; const { imageRoute, baseUrl, endpointPath, responsesModel, directBaseUrl, directEndpointPath, directImageModel, directResponsesModel } = getCurrentPrivateConfigRequestPayload(); Object.assign(job, { imageRoute, generationRoute: imageRoute, baseUrl, endpointPath, responsesModel, directBaseUrl, directEndpointPath, directImageModel, directResponsesModel }); return job; }
 
 function appendJobConfigToFormData(formData, job) {
   const payload = getCurrentPrivateConfigRequestPayload();
-  ["baseUrl", "responsesModel", "directBaseUrl", "directImageModel", "directResponsesModel"].forEach((key) => { if (job?.[key]) payload[key] = job[key]; });
+  ["baseUrl", "endpointPath", "responsesModel", "directBaseUrl", "directEndpointPath", "directImageModel", "directResponsesModel"].forEach((key) => { if (job?.[key]) payload[key] = job[key]; });
   payload.imageRoute = job?.imageRoute || job?.generationRoute || payload.imageRoute;
   appendBrowserConfigToFormData(formData, undefined, payload); return formData;
 }
 
 function syncConfigUi(config) {
-  refs.baseUrlInput.value = config.baseUrl || "";
+  syncEndpointInputDisplay("a", config.baseUrl || "", config.endpointPath || API_ENDPOINT_RESPONSES);
   refs.responsesModelInput.value = config.responsesModel || "gpt-5.5";
-  refs.directBaseUrlInput.value = config.directBaseUrl || config.baseUrl || "";
+  syncEndpointInputDisplay("b", config.directBaseUrl || config.baseUrl || "", config.directEndpointPath || API_ENDPOINT_IMAGE_GENERATIONS);
   refs.directImageModelInput.value = config.directImageModel || "gpt-image-2";
   refs.directResponsesModelInput.value = config.directResponsesModel || "gpt-5.5";
   refs.imageRouteInputs.forEach((input) => {
@@ -5559,111 +5582,167 @@ function renderTimeline() {
   renderTimelineNewIndicator();
 }
 
-function createPreviewMotionNode() {
+function createPreviewMotionNode(orbId = "") {
   const motion = document.createElement("div");
-  motion.className = "preview-loading-motion";
+  motion.className = "preview-loading-motion is-entering";
   motion.setAttribute("aria-hidden", "true");
+  motion.dataset.previewLoadingOrbId = String(orbId || "");
 
-  const track = document.createElement("span");
-  track.className = "preview-loading-track";
+  const fillShell = document.createElement("span");
+  fillShell.className = "preview-loading-fill-shell";
 
-  const progress = document.createElement("span");
-  progress.className = "preview-loading-progress";
-  track.appendChild(progress);
+  const fill = document.createElement("span");
+  fill.className = "preview-loading-fill";
+  fillShell.appendChild(fill);
 
-  const signal = document.createElement("span");
-  signal.className = "preview-loading-signal";
+  const ring = document.createElement("span");
+  ring.className = "preview-loading-ring";
+  for (let index = 0; index < 4; index += 1) {
+    const line = document.createElement("span");
+    line.className = "preview-loading-ring-line";
+    ring.appendChild(line);
+  }
 
-  motion.append(track, signal);
+  motion.append(fillShell, ring);
 
   return motion;
 }
 
+const PREVIEW_LOADING_ORB_LIMIT = 6;
+const PREVIEW_LOADING_STAGES = ["uploading", "connecting", "generating", "saving"];
+
+function getPreviewLoadingShellItems(placeholderState = {}) {
+  const loadingItems = Array.isArray(placeholderState.loadingItems) ? placeholderState.loadingItems : [];
+  const activeJobCount = Math.max(1, Number(placeholderState.activeJobCount) || loadingItems.length || 1);
+  const visibleCount = Math.min(PREVIEW_LOADING_ORB_LIMIT, activeJobCount);
+  return Array.from({ length: visibleCount }, (_, index) => {
+    const item = loadingItems[index] || {};
+    return {
+      id: String(item.id || `preview-loading-${index + 1}`),
+      stage: normalizePreviewLoadingOrbStage(item.stage || item.statusStage || placeholderState.stage),
+      statusText: String(item.statusText || placeholderState.statusText || "").trim(),
+    };
+  });
+}
+
+function normalizePreviewLoadingOrbStage(stage) {
+  const value = String(stage || "");
+  return PREVIEW_LOADING_STAGES.includes(value) ? value : "connecting";
+}
+
+function getPreviewLoadingOrbLayout(count, index) {
+  if (count <= 1) {
+    return { x: 0, y: 0 };
+  }
+
+  if (count === 2) {
+    return { x: index === 0 ? -40 : 40, y: 0 };
+  }
+
+  const radius = count <= 4 ? 48 : 58;
+  const startAngle = count === 4 ? -135 : -90;
+  const angle = ((startAngle + (360 / count) * index) * Math.PI) / 180;
+  return {
+    x: Math.round(Math.cos(angle) * radius),
+    y: Math.round(Math.sin(angle) * radius),
+  };
+}
+
+function getPreviewLoadingOrbEntryOffset(id, index) {
+  let hash = 0;
+  const text = `${id}:${index}`;
+  for (let charIndex = 0; charIndex < text.length; charIndex += 1) {
+    hash = (hash * 31 + text.charCodeAt(charIndex)) % 9973;
+  }
+
+  const angle = ((hash % 360) * Math.PI) / 180;
+  const distance = 150 + (hash % 70);
+  return {
+    x: Math.round(Math.cos(angle) * distance),
+    y: Math.round(Math.sin(angle) * distance),
+  };
+}
+
+function applyPreviewLoadingOrbState(orb, item, index, count, placeholderState = {}) {
+  const stageIndex = Math.max(0, PREVIEW_LOADING_STAGES.indexOf(item.stage));
+  const theme = getPreviewLoadingShellTheme({
+    ...placeholderState,
+    stage: item.stage,
+    stageIndex,
+    stageCount: PREVIEW_LOADING_STAGES.length,
+  });
+  const layout = getPreviewLoadingOrbLayout(count, index);
+  const entry = getPreviewLoadingOrbEntryOffset(item.id, index);
+
+  orb.dataset.stage = theme.stage;
+  orb.setAttribute("aria-label", item.statusText || placeholderState.statusText || "Generation running");
+  orb.style.setProperty("--loading-progress", theme.progress);
+  orb.style.setProperty("--loading-ring-duration", theme.ringDuration);
+  orb.style.setProperty("--loading-counter-ring-duration", theme.counterRingDuration);
+  orb.style.setProperty("--loading-fill-duration", theme.fillDuration);
+  orb.style.setProperty("--loading-float-duration", theme.floatDuration);
+  orb.style.setProperty("--loading-motion-scale", theme.motionScale);
+  orb.style.setProperty("--preview-loading-orb-x", `${layout.x}px`);
+  orb.style.setProperty("--preview-loading-orb-y", `${layout.y}px`);
+  orb.style.setProperty("--preview-loading-orb-enter-x", `${entry.x}px`);
+  orb.style.setProperty("--preview-loading-orb-enter-y", `${entry.y}px`);
+  orb.style.setProperty("--preview-loading-orb-delay", `${index * 42}ms`);
+}
+
+function syncPreviewLoadingShellItems(nodes, placeholderState = {}) {
+  const currentNodes = new Map(
+    Array.from(nodes.field.children).map((child) => [child.dataset.previewLoadingOrbId, child]),
+  );
+  const nextNodes = getPreviewLoadingShellItems(placeholderState).map((item, index) => {
+    const existing = currentNodes.get(item.id);
+    const orb = existing || createPreviewMotionNode(item.id);
+    orb.dataset.previewLoadingOrbId = item.id;
+    applyPreviewLoadingOrbState(orb, item, index, Math.min(PREVIEW_LOADING_ORB_LIMIT, placeholderState.activeJobCount || 1), placeholderState);
+    orb.style.setProperty("--preview-loading-orb-index", String(index));
+    orb.classList.toggle("is-entering", !existing);
+    return orb;
+  });
+
+  nodes.field.style.setProperty("--preview-loading-orb-count", String(nextNodes.length));
+  if (typeof nodes.field.replaceChildren === "function") {
+    nodes.field.replaceChildren(...nextNodes);
+    return;
+  }
+
+  while (nodes.field.children.length > 0) {
+    nodes.field.removeChild(nodes.field.children[0]);
+  }
+  nextNodes.forEach((orb) => nodes.field.appendChild(orb));
+}
+
 function createPreviewLoadingShellNodes() {
-  const eyebrow = document.createElement("p");
   const shell = document.createElement("div");
   shell.className = "preview-loading-shell";
-  shell.appendChild(createPreviewMotionNode());
-
-  const copy = document.createElement("div");
-  copy.className = "preview-loading-copy";
-
-  const title = document.createElement("h3");
-  copy.appendChild(title);
-
-  const metrics = document.createElement("div");
-  metrics.className = "preview-loading-metrics";
-
-  const jobMetric = document.createElement("span");
-  jobMetric.className = "preview-loading-metric";
-  metrics.appendChild(jobMetric);
-
-  const progressMetric = document.createElement("span");
-  progressMetric.className = "preview-loading-metric";
-  metrics.appendChild(progressMetric);
-
-  copy.appendChild(metrics);
-
-  const status = document.createElement("strong");
-  status.className = "preview-loading-status";
-  copy.appendChild(status);
-
-  const detail = document.createElement("span");
-  detail.className = "preview-loading-detail";
-  copy.appendChild(detail);
-
-  shell.appendChild(copy);
-
-  const steps = document.createElement("div");
-  steps.className = "preview-loading-steps";
-  steps.setAttribute("aria-hidden", "true");
-  shell.appendChild(steps);
+  shell.setAttribute("role", "status");
+  const field = document.createElement("div");
+  field.className = "preview-loading-orb-field";
+  field.appendChild(createPreviewMotionNode("preview-loading-1"));
+  shell.appendChild(field);
 
   return {
-    eyebrow,
     shell,
-    title,
-    jobMetric,
-    progressMetric,
-    status,
-    detail,
-    steps,
+    field,
     state: null,
   };
 }
 
-function syncPreviewLoadingSteps(container, steps) {
-  const signature = steps.map((step) => `${step.key}:${step.state}:${step.label}`).join("|");
-  if (container.dataset.stepsSignature === signature) {
-    return;
-  }
-
-  container.replaceChildren();
-  steps.forEach((step) => {
-    const chip = document.createElement("span");
-    chip.className = `preview-loading-step is-${step.state}`;
-    chip.textContent = step.label;
-    container.appendChild(chip);
-  });
-  container.dataset.stepsSignature = signature;
-}
-
 function updatePreviewLoadingShell(nodes, placeholderState) {
   const theme = getPreviewLoadingShellTheme(placeholderState);
-  nodes.eyebrow.textContent = placeholderState.eyebrow;
   nodes.shell.dataset.stage = theme.stage;
   nodes.shell.dataset.jobs = String(placeholderState.activeJobCount);
+  nodes.shell.setAttribute("aria-label", placeholderState.statusText || placeholderState.title || "Generation running");
   nodes.shell.style.setProperty("--loading-progress", theme.progress);
-  nodes.shell.style.setProperty("--loading-progress-position", theme.progressPosition);
-  nodes.shell.style.setProperty("--loading-sweep-duration", theme.sweepDuration);
-  nodes.shell.style.setProperty("--loading-signal-duration", theme.signalDuration);
+  nodes.shell.style.setProperty("--loading-ring-duration", theme.ringDuration);
+  nodes.shell.style.setProperty("--loading-counter-ring-duration", theme.counterRingDuration);
+  nodes.shell.style.setProperty("--loading-fill-duration", theme.fillDuration);
+  nodes.shell.style.setProperty("--loading-float-duration", theme.floatDuration);
   nodes.shell.style.setProperty("--loading-motion-scale", theme.motionScale);
-  nodes.title.textContent = placeholderState.title;
-  nodes.jobMetric.textContent = placeholderState.jobCountLabel;
-  nodes.progressMetric.textContent = placeholderState.progressLabel;
-  nodes.status.textContent = placeholderState.statusText;
-  nodes.detail.textContent = placeholderState.detail;
-  syncPreviewLoadingSteps(nodes.steps, placeholderState.steps);
+  syncPreviewLoadingShellItems(nodes, placeholderState);
   nodes.state = {
     mode: placeholderState.mode,
     stage: placeholderState.stage,
@@ -5685,10 +5764,10 @@ function renderPreviewPlaceholder(placeholderState) {
     updatePreviewLoadingShell(previewLoadingShellNodes, placeholderState);
 
     if (
-      refs.previewPlaceholder.firstChild !== previewLoadingShellNodes.eyebrow ||
-      refs.previewPlaceholder.lastChild !== previewLoadingShellNodes.shell
+      refs.previewPlaceholder.firstChild !== previewLoadingShellNodes.shell ||
+      refs.previewPlaceholder.childElementCount !== 1
     ) {
-      refs.previewPlaceholder.replaceChildren(previewLoadingShellNodes.eyebrow, previewLoadingShellNodes.shell);
+      refs.previewPlaceholder.replaceChildren(previewLoadingShellNodes.shell);
     }
 
     return;
@@ -5718,6 +5797,7 @@ function renderPreview() {
     imageUrl,
     prompt: item ? getDisplayPrompt(item) : "",
     runningCount: state.jobs.length,
+    runningItems: state.jobs,
     maxConcurrentTasks: getMaxParallelJobCount(),
   });
 
@@ -14335,16 +14415,8 @@ async function saveConfig(event) {
   event.preventDefault();
   clearError();
 
-  const payload = {
-    imageRoute: getSelectedImageRoute(),
-    baseUrl: refs.baseUrlInput.value.trim(),
-    apiKey: refs.apiKeyInput.value.trim(),
-    responsesModel: refs.responsesModelInput.value.trim() || "gpt-5.5",
-    directBaseUrl: refs.directBaseUrlInput.value.trim(),
-    directApiKey: refs.directApiKeyInput.value.trim(),
-    directImageModel: refs.directImageModelInput.value.trim() || "gpt-image-2",
-    directResponsesModel: refs.directResponsesModelInput.value.trim() || "gpt-5.5",
-  };
+  syncEndpointFieldsFromFullUrlModes();
+  const payload = getCurrentPrivateConfigRequestPayload();
 
   const browserConfig = saveBrowserPrivateConfig(payload);
   state.config = toPublicBrowserConfig(browserConfig, state.config || {});
@@ -15296,7 +15368,20 @@ function bindEvents() {
   refs.configForm.addEventListener("submit", (event) => {
     saveConfig(event).catch((error) => showError(error.message));
   });
-  refs.imageRouteInputs.forEach((input) => input.addEventListener("change", updateGenerationModeStatus));
+  refs.imageRouteInputs.forEach((input) => input.addEventListener("change", () => {
+    updateGenerationModeStatus();
+    syncEndpointFieldsFromFullUrlModes();
+  }));
+  refs.baseUrlFullToggle?.addEventListener("click", () => toggleEndpointFullUrlMode("a"));
+  refs.directBaseUrlFullToggle?.addEventListener("click", () => toggleEndpointFullUrlMode("b"));
+  refs.endpointPathSelect?.addEventListener("change", () => {
+    const endpoint = readEndpointFields("a");
+    syncEndpointInputDisplay("a", endpoint.baseUrl, refs.endpointPathSelect.value || endpoint.endpointPath);
+  });
+  refs.directEndpointPathSelect?.addEventListener("change", () => {
+    const endpoint = readEndpointFields("b");
+    syncEndpointInputDisplay("b", endpoint.baseUrl, refs.directEndpointPathSelect.value || endpoint.endpointPath);
+  });
   configModelPicker.bindEvents();
   refs.generateForm.addEventListener("submit", startGeneration);
   refs.articleIllustrationPlanButton.addEventListener("click", () => {

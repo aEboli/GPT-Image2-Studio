@@ -1,4 +1,5 @@
 const LOADING_STAGES = ["uploading", "connecting", "generating", "saving"];
+const PREVIEW_LOADING_ITEM_LIMIT = 6;
 
 const LOADING_STAGE_LABELS = {
   uploading: "准备请求",
@@ -12,6 +13,7 @@ export function getPreviewPlaceholderState({
   imageUrl = "",
   prompt = "",
   runningCount = 0,
+  runningItems = [],
   maxConcurrentTasks = 5,
 } = {}) {
   if (imageUrl) {
@@ -35,8 +37,13 @@ export function getPreviewPlaceholderState({
 
   const stage = normalizeStage(item.statusStage);
   const activeIndex = LOADING_STAGES.indexOf(stage);
-  const activeJobCount = Math.max(1, Number.isFinite(runningCount) ? runningCount : 1);
+  const rawRunningItems = Array.isArray(runningItems) ? runningItems : [];
+  const activeJobCount = Math.max(1, Number.isFinite(runningCount) ? runningCount : rawRunningItems.length || 1);
   const maxCount = Math.max(activeJobCount, Number.isFinite(maxConcurrentTasks) ? maxConcurrentTasks : activeJobCount);
+  const loadingItems = normalizeLoadingItems(rawRunningItems.length > 0 ? rawRunningItems : [item]).slice(
+    0,
+    PREVIEW_LOADING_ITEM_LIMIT,
+  );
 
   return {
     mode: "loading",
@@ -50,6 +57,7 @@ export function getPreviewPlaceholderState({
     stageCount: LOADING_STAGES.length,
     activeJobCount,
     maxConcurrentTasks: maxCount,
+    loadingItems,
     jobCountLabel: `并发 ${activeJobCount} / ${maxCount}`,
     progressLabel: `阶段 ${activeIndex + 1} / ${LOADING_STAGES.length}`,
     steps: LOADING_STAGES.map((key, index) => ({
@@ -58,6 +66,23 @@ export function getPreviewPlaceholderState({
       state: index < activeIndex ? "done" : index === activeIndex ? "active" : "pending",
     })),
   };
+}
+
+function normalizeLoadingItems(items) {
+  return items
+    .map((entry, index) => {
+      const id = String(entry?.id || entry?.taskId || `preview-loading-${index + 1}`).trim();
+      if (!id) {
+        return null;
+      }
+
+      return {
+        id,
+        stage: normalizeStage(entry?.statusStage || entry?.stage),
+        statusText: String(entry?.statusText || "").trim(),
+      };
+    })
+    .filter(Boolean);
 }
 
 function normalizeStage(stage) {

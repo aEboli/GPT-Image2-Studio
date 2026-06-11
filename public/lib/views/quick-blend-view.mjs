@@ -884,6 +884,7 @@ function renderQuickBlendGenerationLoading(item) {
       imageUrl: "",
       prompt: item ? getDisplayPrompt(item) : "",
       runningCount: state.jobs.length,
+      runningItems: state.jobs,
       maxConcurrentTasks: getMaxParallelJobCount(),
     }),
     eyebrow: "Quick Blend",

@@ -11,6 +11,8 @@ import { once } from "node:events";
 import { File } from "node:buffer";
 import { setTimeout as delay } from "node:timers/promises";
 
+import { validateCreationListingDraft } from "../lib/creation-listing-draft.mjs";
+
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 async function getFreePort() {
@@ -101,6 +103,10 @@ function parseSseEvents(text) {
       return eventName && data ? { eventName, payload: JSON.parse(data) } : null;
     })
     .filter(Boolean);
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function makeReferenceFile(filename = "front.png") {
@@ -518,6 +524,106 @@ test("creation listing endpoint degrades to input-only when images failed", asyn
   const persistedManifest = JSON.parse(await readFile(join(manifestsDir, "creation-set-failed.json"), "utf8"));
   assert.equal(persistedManifest.listingDrafts.length, 1);
   assert.equal(persistedManifest.listingDrafts[0].evidenceMode, "input-only");
+});
+
+test("creation listing endpoint preserves grouped mixed pack wording through validation and persistence", async (t) => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "creation-listing-mixed-packs-"));
+  const outputDir = join(tempRoot, "output");
+  const localDataRootDir = join(tempRoot, "local-data");
+  const port = await getFreePort();
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const server = spawn(process.execPath, ["server.mjs"], {
+    cwd: rootDir,
+    env: {
+      ...process.env,
+      PORT: String(port),
+      VERCEL: "1",
+      TMP: tempRoot,
+      TEMP: tempRoot,
+      IMAGE_STUDIO_MOCK_LISTING_AGENT: "1",
+      IMAGE_STUDIO_OUTPUT_DIR: outputDir,
+      IMAGE_STUDIO_LOCAL_DATA_DIR: localDataRootDir,
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const diagnostics = collectDiagnostics(server);
+
+  t.after(async () => {
+    await stopServer(server);
+    await rm(tempRoot, { recursive: true, force: true });
+  });
+
+  await waitForServer(baseUrl, server, diagnostics);
+
+  const manifestsDir = join(outputDir, "json", "creation-sets");
+  await mkdir(manifestsDir, { recursive: true });
+
+  const writeGroupedManifest = async ({ setId, skuBundleCount }) => {
+    await writeFile(
+      join(manifestsDir, `${setId}.json`),
+      `${JSON.stringify({
+        setId,
+        productName: "Electronic Fishing Lure",
+        productDescription: "Two grouped SKU subjects represent two-pack and three-pack choices.",
+        sellingPoints: ["propeller action", "multi-color grouped choices"],
+        skuBundleCount,
+        status: "completed",
+        skuSubjects: [
+          {
+            id: "two-lures",
+            title: "Two lure colorways",
+            filenames: ["two-lures.png"],
+            subjectUnitCount: 2,
+            note: "2 complete visible product units in one grouped SKU subject.",
+          },
+          {
+            id: "three-lures",
+            title: "Three lure colorways",
+            filenames: ["three-lures.png"],
+            subjectUnitCount: 3,
+            note: "3 complete visible product units in one grouped SKU subject.",
+          },
+        ],
+        items: [{ itemId: "1-hero", role: "hero", status: "failed", error: "upstream failed" }],
+      }, null, 2)}\n`,
+      "utf8",
+    );
+  };
+
+  const assertListingPackText = async ({ setId, expectedPackText }) => {
+    const listingResponse = await postJson(baseUrl, "/api/creation/listings", { setId });
+    assert.equal(listingResponse.response.status, 200);
+    assert.equal(listingResponse.body.ok, true);
+    assert.equal(listingResponse.body.listingDrafts.length, 1);
+    assert.equal(listingResponse.body.set.listingDrafts.length, 1);
+
+    const responseDraft = listingResponse.body.listingDrafts[0];
+    const setDraft = listingResponse.body.set.listingDrafts[0];
+    const validationOptions = {
+      expectedQuantity: expectedPackText,
+      forbidTitleSpecs: true,
+    };
+    assert.match(responseDraft.title, new RegExp(`^${escapeRegExp(expectedPackText)} Electronic Fishing Lure\\b`));
+    assert.equal(setDraft.title, responseDraft.title);
+    assert.deepEqual(validateCreationListingDraft(responseDraft, validationOptions).errors, []);
+
+    const persistedManifest = JSON.parse(await readFile(join(manifestsDir, `${setId}.json`), "utf8"));
+    assert.equal(persistedManifest.listingDrafts.length, 1);
+    assert.equal(persistedManifest.listingDrafts[0].title, responseDraft.title);
+    assert.deepEqual(validateCreationListingDraft(persistedManifest.listingDrafts[0], validationOptions).errors, []);
+  };
+
+  await writeGroupedManifest({ setId: "creation-set-mixed-pack-plain", skuBundleCount: 1 });
+  await assertListingPackText({
+    setId: "creation-set-mixed-pack-plain",
+    expectedPackText: "2 Pack / 3 Pack",
+  });
+
+  await writeGroupedManifest({ setId: "creation-set-mixed-pack-bundled", skuBundleCount: 2 });
+  await assertListingPackText({
+    setId: "creation-set-mixed-pack-bundled",
+    expectedPackText: "4 Pack / 6 Pack",
+  });
 });
 
 test("creation listing endpoint merges drafts into latest manifest after upstream delay", async (t) => {

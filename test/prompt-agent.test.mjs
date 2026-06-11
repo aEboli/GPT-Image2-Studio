@@ -833,6 +833,48 @@ test("prompt agent retries without structured output when provider rejects stric
   assert.equal(result.prompt, "白底产品摄影，柔光棚拍，高级商业质感");
 });
 
+test("prompt agent posts to the configured endpoint path", async () => {
+  const calls = [];
+  const result = await requestPromptAgentAnalysis({
+    baseUrl: "https://direct.example.test/v1",
+    endpointPath: "chat/completions",
+    apiKey: "test-key",
+    image: {
+      filename: "product.png",
+      mimeType: "image/png",
+      base64: "ZmFrZQ==",
+    },
+    responsesModel: "vendor-vision-text",
+    async fetchImpl(url, options) {
+      calls.push({ url, body: JSON.parse(options.body) });
+      return new Response(
+        JSON.stringify({
+          output_text: JSON.stringify({
+            title: "Product image",
+            prompt: "Clean product photo on white background.",
+            negative_prompt: "blur",
+            style_tags: ["product"],
+            subject: "Product",
+            scene: "White studio",
+            composition: "Centered",
+            lighting: "Softbox",
+            color_palette: "White and gray",
+            camera: "Commercial macro",
+            aspect_ratio: "1:1",
+            notes: [],
+          }),
+        }),
+        { status: 200 },
+      );
+    },
+  });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "https://direct.example.test/v1/chat/completions");
+  assert.equal(calls[0].body.model, "vendor-vision-text");
+  assert.equal(result.prompt, "Clean product photo on white background.");
+});
+
 test("prompt agent retries creation reference analysis when the model returns prose instead of JSON", async () => {
   const calls = [];
   const validAnalysis = {

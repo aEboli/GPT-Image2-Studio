@@ -7,6 +7,7 @@ import {
   consumeResponsesSse,
   createDirectImageRequestBody,
   createResponsesRequestBody,
+  createChatCompletionsImageRequestBody,
   formatStatusHeartbeatMessage,
   normalizeBaseUrl,
   requestDirectImageGeneration,
@@ -241,6 +242,140 @@ test("requestDirectImageGeneration posts once to image generations and emits the
     type: "final_image",
     base64: "ZGlyZWN0LWZpbmFs",
   });
+});
+
+test("chat completions image request body omits image generations response_format", () => {
+  const requestBody = createChatCompletionsImageRequestBody({
+    prompt: "Create a chat image",
+    size: "1024x1024",
+    quality: "high",
+    format: "png",
+    imageModel: "vendor-chat-image",
+  });
+
+  assert.equal(requestBody.model, "vendor-chat-image");
+  assert.deepEqual(requestBody.messages, [{ role: "user", content: "Create a chat image" }]);
+  assert.equal(requestBody.size, "1024x1024");
+  assert.equal(requestBody.quality, "high");
+  assert.equal(requestBody.output_format, "png");
+  assert.equal("response_format" in requestBody, false);
+});
+
+test("chat completions image request body includes reference image labels and data URLs", () => {
+  const requestBody = createChatCompletionsImageRequestBody({
+    prompt: "Use the references to create a unified product image.",
+    referenceImageLabels: [
+      "Reference image 1: product body.",
+      "Reference image 2: packaging style.",
+    ],
+    referenceImages: [
+      { mimeType: "image/png", base64: "cHJvZHVjdA==" },
+      { mimeType: "image/jpeg", base64: "cGFja2FnZQ==" },
+    ],
+    size: "1024x1024",
+    quality: "high",
+    format: "jpeg",
+    imageModel: "vendor-chat-image",
+  });
+
+  assert.deepEqual(requestBody.messages, [
+    {
+      role: "user",
+      content: [
+        { type: "text", text: "Use the references to create a unified product image." },
+        { type: "text", text: "Reference image 1: product body." },
+        {
+          type: "image_url",
+          image_url: { url: "data:image/png;base64,cHJvZHVjdA==" },
+        },
+        { type: "text", text: "Reference image 2: packaging style." },
+        {
+          type: "image_url",
+          image_url: { url: "data:image/jpeg;base64,cGFja2FnZQ==" },
+        },
+      ],
+    },
+  ]);
+});
+
+test("direct image generation can target chat completions and read image data from the message", async () => {
+  const requests = [];
+  const result = await requestDirectImageGeneration({
+    baseUrl: "https://direct.example.test/v1",
+    endpointPath: "chat/completions",
+    apiKey: "route-b-key",
+    prompt: "Direct chat image",
+    size: "1024x1024",
+    quality: "high",
+    format: "png",
+    imageModel: "vendor-chat-image",
+    async fetchImpl(url, init) {
+      requests.push({ url, init, body: JSON.parse(init.body) });
+      return new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: "data:image/png;base64,Y2hhdC1pbWFnZQ==",
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      );
+    },
+  });
+
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].url, "https://direct.example.test/v1/chat/completions");
+  assert.equal(requests[0].body.model, "vendor-chat-image");
+  assert.equal("response_format" in requests[0].body, false);
+  assert.equal(result.finalImageBase64, "Y2hhdC1pbWFnZQ==");
+});
+
+test("route A chat completions image generation forwards reference images", async () => {
+  const requests = [];
+  const result = await requestImageGeneration({
+    baseUrl: "https://route-a.example.test/v1",
+    endpointPath: "chat/completions",
+    apiKey: "route-a-key",
+    prompt: "Create a campaign image from these references.",
+    referenceImageLabels: ["Reference image 1: hero product."],
+    referenceImages: [
+      { mimeType: "image/png", base64: "aGVyby1wcm9kdWN0" },
+    ],
+    size: "1024x1024",
+    quality: "high",
+    format: "png",
+    responsesModel: "vendor-chat-image",
+    async fetchImpl(url, init) {
+      requests.push({ url, body: JSON.parse(init.body) });
+      return new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: "data:image/png;base64,cm91dGUtYS1jaGF0",
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      );
+    },
+  });
+
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].url, "https://route-a.example.test/v1/chat/completions");
+  assert.deepEqual(requests[0].body.messages[0].content, [
+    { type: "text", text: "Create a campaign image from these references." },
+    { type: "text", text: "Reference image 1: hero product." },
+    {
+      type: "image_url",
+      image_url: { url: "data:image/png;base64,aGVyby1wcm9kdWN0" },
+    },
+  ]);
+  assert.equal(result.finalImageBase64, "cm91dGUtYS1jaGF0");
 });
 
 test("normalizeBaseUrl appends v1 when the configured API URL omits it", () => {
@@ -688,6 +823,51 @@ test("requestImageGeneration falls back to non-streaming when streaming is block
   assert.equal(requests[0].stream, true);
   assert.equal(requests[1].stream, false);
   assert.equal(result.finalImageBase64, "bm9uc3RyZWFtLWZpbmFs");
+  assert.equal(result.fallbackUsed, true);
+  assert.equal(result.streamFallbackUsed, true);
+});
+
+test("requestImageGeneration falls back to non-streaming after transient 503 stream failures", async () => {
+  const requests = [];
+
+  const result = await requestImageGeneration({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    prompt: "Create a Vercel routed image",
+    size: "1024x1536",
+    quality: "high",
+    responsesModel: "gpt-5.4",
+    transientHttpRetryDelayMs: 0,
+    async fetchImpl(_url, init) {
+      const body = JSON.parse(init.body);
+      requests.push(body);
+
+      if (body.stream) {
+        return new Response(
+          JSON.stringify({
+            error: {
+              code: "service_unavailable",
+              message: "Streaming route is temporarily unavailable.",
+            },
+          }),
+          { status: 503 },
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          output: [{ type: "image_generation_call", result: "dmVyY2VsLWZhbGxiYWNr" }],
+        }),
+        { status: 200 },
+      );
+    },
+  });
+
+  assert.deepEqual(
+    requests.map((request) => request.stream),
+    [true, true, true, false],
+  );
+  assert.equal(result.finalImageBase64, "dmVyY2VsLWZhbGxiYWNr");
   assert.equal(result.fallbackUsed, true);
   assert.equal(result.streamFallbackUsed, true);
 });

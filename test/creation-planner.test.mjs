@@ -947,6 +947,44 @@ test("creation planner renders same-SKU combination packs without changing the s
   assert.match(skuItem.prompt, /do not introduce a second distinct SKU/);
 });
 
+test("creation planner multiplies grouped SKU subject units by same-SKU pack count", () => {
+  const plan = buildCreationPlan({
+    productName: "Fishing lure assortment",
+    productDescription: "One grouped SKU subject contains three complete lure colorways",
+    sellingPoints: "lifelike swim action, sharp hooks",
+    targetLanguage: "en",
+    selectedRoles: ["hero"],
+    referenceImageRoles: [
+      {
+        filename: "three-lures.png",
+        role: "product",
+        note: "One product-subject reference image contains three complete visible lure bodies: silver, gold, and green.",
+      },
+    ],
+    skuSubjects: [
+      {
+        id: "three-lures",
+        title: "Three lure colorways",
+        filenames: ["three-lures.png"],
+        subjectUnitCount: 3,
+        note: "One product-subject reference image contains three complete visible lure bodies: silver, gold, and green.",
+      },
+    ],
+    skuBundleCount: 2,
+  });
+
+  const skuItem = plan.items.find((item) => item.role === "sku");
+
+  assert.equal(skuItem.skuSubject.subjectUnitCount, 3);
+  assert.equal(skuItem.skuSubject.bundleCount, 2);
+  assert.match(skuItem.prompt, /SKU SUBJECT UNIT COUNT LOCK: This grouped SKU subject contains 3 complete visible product units/);
+  assert.doesNotMatch(skuItem.prompt, /Preserve the same number of complete visible product units from the supplied SKU subject reference/);
+  assert.match(skuItem.prompt, /Preserve 3 complete visible product units inside each duplicated grouped set/);
+  assert.match(skuItem.prompt, /Render exactly 2 identical grouped sets of this same SKU subject/);
+  assert.match(skuItem.prompt, /The final SKU image must show exactly 6 complete visible product units/);
+  assert.match(skuItem.prompt, /Do not output only the original 3-unit grouped subject when the requested combination count is 2/);
+});
+
 test("creation planner accepts Chinese numerals for same-SKU combination packs", () => {
   const plan = buildCreationPlan({
     productName: "Fishing lure assortment",
