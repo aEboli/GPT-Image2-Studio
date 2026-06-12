@@ -179,12 +179,17 @@ export function getSelectedImageGenerationConfig(config = {}) {
   });
 
   if (normalized.imageRoute === IMAGE_ROUTE_B) {
+    const selectedResponsesModel =
+      normalized.directEndpointPath === API_ENDPOINT_RESPONSES
+        ? normalized.directResponsesModel
+        : normalized.responsesModel;
+
     return {
       imageRoute: IMAGE_ROUTE_B,
       baseUrl: normalized.directBaseUrl,
       endpointPath: normalized.directEndpointPath,
       apiKey: normalized.directApiKey,
-      responsesModel: normalized.responsesModel,
+      responsesModel: selectedResponsesModel,
       imageModel: normalized.directImageModel,
     };
   }

@@ -40,7 +40,7 @@ GPT-Image2-Studio 是一个面向创作者、电商运营、内容团队和产�
 ## v0.1.5 更新
 
 - Windows 安装包版本同步到 `GPT-Image2-Studio-Setup-v0.1.5.exe`，用于 GitHub Release 分发。
-- 调用通道继续细化：直接调用模式新增独立视觉文本模型配置，接口地址支持后缀选择和完整 URL 自动拆分，队列任务会保存提交时的通道快照。
+- 调用通道继续细化：直接调用模式新增独立视觉文本模型配置，接口地址支持 `images/generations`、`responses`、`chat/completions` 后缀选择和完整 URL 自动拆分；选择 `responses` 时会用直接调用模式的视觉/文本模型发起 `Responses API + image_generation` 请求。
 - 生成队列按模式和通道分别计算并发，配置状态栏会显示总运行数和总排队数。
 - 套图结果卡片加入排队中、生成中的稳定 loading 外观，减少补图和 SKU 生成时的布局跳动。
 - 胶片栏增加加载、失败和空状态占位，避免历史缩略图尚未加载时界面空白。
@@ -180,10 +180,10 @@ Studio 是默认入口，用于快速生图、风格迁移、参考图编排和�
 | 路由模式 API Key | 空 | 本地保存，不提交到仓库 |
 | 路由模式 Responses 模型 | 本地默认 `gpt-5.4`，Cloudflare 默认 `gpt-5.5` | 负责文本规划、结构化输出和调用图片工具 |
 | 直接调用模式接口地址 | `https://api.openai.com/v1` | 可替换为兼容生图接口的私有端点 |
-| 直接调用模式接口后缀 | `images/generations` | 常规直接生图使用 `images/generations`；如果供应商把生图结果放在 Chat Completions 响应里，可改为 `chat/completions` |
+| 直接调用模式接口后缀 | `images/generations` | 常规直接生图使用 `images/generations`；如果供应商支持 Responses 或把生图结果放在 Chat Completions 响应里，可改为 `responses` 或 `chat/completions` |
 | 直接调用模式 API Key | 空 | 可与路由模式分开保存 |
 | 直接调用模式生图模型 | `gpt-image-2` | 可通过模型列表选择或手动填写 |
-| 直接调用模式视觉文本模型 | `gpt-5.5` | 用于参考图分析、规划和文本视觉任务 |
+| 直接调用模式视觉文本模型 | `gpt-5.5` | 用于参考图分析、规划和文本视觉任务；当直接调用模式接口后缀为 `responses` 时，也作为 Responses 请求模型 |
 | 推理强度 | `xhigh` | 可选 `low` / `medium` / `high` / `xhigh` |
 
 ### 接口后缀怎么选
@@ -192,7 +192,7 @@ Studio 会把请求地址拆成 `Base URL + 接口后缀`。官方 OpenAI API �
 
 | 后缀 | 什么时候用 |
 | --- | --- |
-| `responses` | 路由模式默认值。适合使用 Responses API 的 `image_generation` 工具，由外层 Responses 模型负责理解提示词、参考图和多步流程。 |
+| `responses` | 路由模式默认值，也可用于直接调用模式连接兼容 Responses API 的中转或供应商。它会使用 `image_generation` 工具，由对应通道的视觉/文本模型负责理解提示词、参考图和多步流程。 |
 | `chat/completions` | 兼容供应商只提供 Chat Completions 风格的视觉/生图协议时使用。路由模式和直接调用模式都可以选择它；Studio 会按 Chat Completions 请求体发送，并从返回消息里提取图片。 |
 | `images/generations` | 直接调用模式默认值。适合供应商提供标准图片生成端点，Studio 会直接把提示词、尺寸、质量、格式和生图模型发给图片模型。 |
 | `images/edits` | 图片编辑专用端点。普通生图不要选它；进入 `/#image-edit` 后，Studio 会在上传源图或 mask 时自动调用 `/images/edits`。如果供应商只给了编辑端点完整 URL，可以粘贴它来提取同一个供应商的 Base URL。 |

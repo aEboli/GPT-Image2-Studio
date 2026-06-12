@@ -10520,6 +10520,16 @@ html[data-ui-layout="mobile"] .portrait-accessory-asset-panel {
   color: var(--text);
 }
 
+.endpoint-suffix-select option {
+  background: #ffffff;
+  color: #111827;
+}
+
+.endpoint-suffix-select option:checked {
+  background: #9fc4f5;
+  color: #111827;
+}
+
 .inline-button {
   min-height: 32px;
   padding: 0 12px;

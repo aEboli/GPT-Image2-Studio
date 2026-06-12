@@ -333,6 +333,48 @@ test("direct image generation can target chat completions and read image data fr
   assert.equal(result.finalImageBase64, "Y2hhdC1pbWFnZQ==");
 });
 
+test("direct image generation can target responses with the direct text and vision model", async () => {
+  const requests = [];
+  const result = await requestDirectImageGeneration({
+    baseUrl: "https://direct.example.test/v1",
+    endpointPath: "responses",
+    apiKey: "route-b-key",
+    prompt: "Direct responses image",
+    referenceImageLabels: ["Reference image 1: product body."],
+    referenceImages: [{ mimeType: "image/png", base64: "cHJvZHVjdA==" }],
+    size: "1024x1024",
+    quality: "high",
+    format: "png",
+    imageModel: "vendor-image-pro",
+    responsesModel: "vendor-vision-text",
+    async fetchImpl(url, init) {
+      requests.push({ url, init, body: JSON.parse(init.body) });
+      return new Response(
+        JSON.stringify({
+          output: [{ type: "image_generation_call", result: "ZGlyZWN0LXJlc3BvbnNlcw==" }],
+        }),
+        { status: 200 },
+      );
+    },
+  });
+
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].url, "https://direct.example.test/v1/responses");
+  assert.equal(requests[0].init.headers.Accept, "application/json");
+  assert.equal(requests[0].body.model, "vendor-vision-text");
+  assert.equal(requests[0].body.stream, false);
+  assert.deepEqual(requests[0].body.tool_choice, { type: "image_generation" });
+  assert.equal(requests[0].body.tools[0].type, "image_generation");
+  assert.equal("response_format" in requests[0].body, false);
+  assert.deepEqual(
+    requests[0].body.input[0].content.map((item) => item.type),
+    ["input_text", "input_text", "input_image"],
+  );
+  assert.equal(result.finalImageBase64, "ZGlyZWN0LXJlc3BvbnNlcw==");
+  assert.equal(result.responsesModel, "vendor-vision-text");
+  assert.equal(result.endpointPath, "responses");
+});
+
 test("route A chat completions image generation forwards reference images", async () => {
   const requests = [];
   const result = await requestImageGeneration({

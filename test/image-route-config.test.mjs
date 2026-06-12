@@ -104,6 +104,27 @@ test("selected text and vision config uses direct API settings in direct mode", 
   });
 });
 
+test("selected direct image generation config uses direct responses model for responses protocol", () => {
+  const config = {
+    imageRoute: "b",
+    responsesModel: "route-a-model",
+    directBaseUrl: "https://direct.example.test/v1",
+    directEndpointPath: "responses",
+    directApiKey: "direct-key",
+    directImageModel: "vendor-image-pro",
+    directResponsesModel: "vendor-vision-text",
+  };
+
+  assert.deepEqual(getSelectedImageGenerationConfig(config), {
+    imageRoute: "b",
+    baseUrl: "https://direct.example.test/v1",
+    apiKey: "direct-key",
+    responsesModel: "vendor-vision-text",
+    imageModel: "vendor-image-pro",
+    endpointPath: "responses",
+  });
+});
+
 test("selected text and vision config preserves route A behavior", () => {
   assert.deepEqual(
     getSelectedTextVisionConfig({

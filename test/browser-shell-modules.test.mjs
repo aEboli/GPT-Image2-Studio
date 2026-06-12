@@ -180,13 +180,14 @@ test("config drawer shows image route settings as exclusive mode tabs", async ()
     /data-route-panel="b"[\s\S]*接口地址[\s\S]*API Key[\s\S]*生图模型[\s\S]*id="directFetchModelsButton"[\s\S]*获取模型列表[\s\S]*视觉\/文本模型[\s\S]*id="directResponsesFetchModelsButton"[\s\S]*获取模型列表/,
   );
   assert.match(html, /id="endpointPathSelect"[\s\S]*value="responses"[\s\S]*responses/);
-  assert.match(html, /id="directEndpointPathSelect"[\s\S]*value="chat\/completions"[\s\S]*chat\/completions/);
+  assert.match(html, /id="directEndpointPathSelect"[\s\S]*value="images\/generations"[\s\S]*value="responses"[\s\S]*value="chat\/completions"/);
   assert.match(html, /id="baseUrlFullToggle"[\s\S]*完整 URL/);
   assert.match(html, /id="directBaseUrlFullToggle"[\s\S]*完整 URL/);
   assert.doesNotMatch(html, /线路A|线路B/);
   assert.match(styles, /\.route-config-panel\s*\{[\s\S]*display:\s*grid;/);
   assert.match(styles, /\.endpoint-address-control\s*\{/);
   assert.match(styles, /\.endpoint-suffix-select\s*\{/);
+  assert.match(styles, /\.endpoint-suffix-select option\s*\{[\s\S]*background:\s*#ffffff;[\s\S]*color:\s*#111827;/);
   assert.match(
     styles,
     /\.config-form:has\(input\[name="imageRoute"\]\[value="a"\]:checked\)\s*\[data-route-panel="b"\]/,
