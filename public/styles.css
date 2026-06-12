@@ -7766,8 +7766,8 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
 .preview-loading-orb-field {
   --preview-loading-orb-count: 1;
   position: relative;
-  width: min(100%, 320px);
-  min-height: clamp(152px, 20vw, 230px);
+  width: min(100%, 360px);
+  min-height: clamp(312px, 30vw, 340px);
   isolation: isolate;
 }
 
@@ -7780,7 +7780,7 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: clamp(82px, 12vw, 124px);
+  width: clamp(76px, 10vw, 102px);
   aspect-ratio: 1;
   display: grid;
   place-items: center;

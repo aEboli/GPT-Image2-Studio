@@ -3,6 +3,8 @@ function clamp(min, value, max) {
 }
 
 const PREVIEW_LOADING_ORB_LIMIT = 6;
+const PREVIEW_LOADING_ORB_MIN_CENTER_SPACING_PX = 112;
+const PREVIEW_LOADING_ORB_ENTRY_GAP_PX = 168;
 const PREVIEW_LOADING_STAGES = ["uploading", "connecting", "generating", "saving"];
 
 export function shouldReusePreviewLoadingShell(previousState = {}, nextState = {}) {
@@ -54,7 +56,7 @@ export function getPreviewLoadingOrbRenderState(item, index, count, placeholderS
     stageCount: PREVIEW_LOADING_STAGES.length,
   });
   const layout = getPreviewLoadingOrbLayout(count, index);
-  const entry = getPreviewLoadingOrbEntryOffset(item.id, index);
+  const entry = getPreviewLoadingOrbEntryOffset(item.id, index, layout);
 
   return {
     stage: theme.stage,
@@ -88,23 +90,33 @@ function getPreviewLoadingOrbLayout(count, index) {
   }
 
   if (count === 2) {
-    return { x: index === 0 ? -40 : 40, y: 0 };
+    return { x: index === 0 ? -56 : 56, y: 0 };
   }
 
-  const radius = count <= 4 ? 48 : 58;
+  const visibleCount = Math.min(PREVIEW_LOADING_ORB_LIMIT, Math.max(2, count));
+  const radius = Math.ceil(PREVIEW_LOADING_ORB_MIN_CENTER_SPACING_PX / (2 * Math.sin(Math.PI / visibleCount))) + 2;
   const startAngle = count === 4 ? -135 : -90;
-  const angle = ((startAngle + (360 / count) * index) * Math.PI) / 180;
+  const angle = ((startAngle + (360 / visibleCount) * index) * Math.PI) / 180;
   return {
     x: Math.round(Math.cos(angle) * radius),
     y: Math.round(Math.sin(angle) * radius),
   };
 }
 
-function getPreviewLoadingOrbEntryOffset(id, index) {
+function getPreviewLoadingOrbEntryOffset(id, index, layout = { x: 0, y: 0 }) {
   let hash = 0;
   const text = `${id}:${index}`;
   for (let charIndex = 0; charIndex < text.length; charIndex += 1) {
     hash = (hash * 31 + text.charCodeAt(charIndex)) % 9973;
+  }
+
+  const layoutDistance = Math.hypot(layout.x, layout.y);
+  if (layoutDistance > 0) {
+    const entryGap = PREVIEW_LOADING_ORB_ENTRY_GAP_PX + (hash % 36);
+    return {
+      x: Math.round(layout.x + (layout.x / layoutDistance) * entryGap),
+      y: Math.round(layout.y + (layout.y / layoutDistance) * entryGap),
+    };
   }
 
   const angle = ((hash % 360) * Math.PI) / 180;

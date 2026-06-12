@@ -85,6 +85,14 @@ function createTestElement(tagName = "div") {
   return element;
 }
 
+function parsePixelValue(value) {
+  return Number.parseFloat(String(value || "0").replace(/px$/, ""));
+}
+
+function getPointDistance(left, right) {
+  return Math.hypot(parsePixelValue(left.x) - parsePixelValue(right.x), parsePixelValue(left.y) - parsePixelValue(right.y));
+}
+
 test("preview loading shell can be created before any preview item exists", async () => {
   const app = await readFile(appPath, "utf8");
   const loadingShellRuntime = extractFunctionBefore(app, "createPreviewMotionNode", "renderPreviewPlaceholder");
@@ -228,4 +236,95 @@ test("preview loading shell preserves existing orb nodes when a new job appears"
   assert.equal(nodes.field.children[1], secondOrb);
   assert.equal(nodes.field.children[2].dataset.previewLoadingOrbId, "job-c");
   assert.ok(nodes.field.children[2].classList.contains("is-entering"));
+});
+
+test("preview loading shell spaces six visible orbs with collision-safe gaps", () => {
+  const placeholderState = {
+    mode: "loading",
+    stage: "generating",
+    stageIndex: 2,
+    stageCount: 4,
+    activeJobCount: 6,
+    maxConcurrentTasks: 6,
+    loadingItems: Array.from({ length: 6 }, (_, index) => ({
+      id: `job-${index + 1}`,
+      statusStage: "generating",
+    })),
+  };
+  const items = getPreviewLoadingShellItems(placeholderState);
+  const states = items.map((item, index) => getPreviewLoadingOrbRenderState(item, index, items.length, placeholderState));
+
+  for (let leftIndex = 0; leftIndex < states.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < states.length; rightIndex += 1) {
+      assert.ok(
+        getPointDistance(states[leftIndex], states[rightIndex]) >= 112,
+        `orbs ${leftIndex + 1} and ${rightIndex + 1} should not overlap`,
+      );
+    }
+  }
+});
+
+test("preview loading shell holds the first six orbs until a visible job completes", async () => {
+  const app = await readFile(appPath, "utf8");
+  const loadingShellRuntime = extractFunctionBefore(app, "createPreviewMotionNode", "renderPreviewPlaceholder");
+  const document = {
+    createElement: createTestElement,
+  };
+  const createRuntime = new Function(
+    "document",
+    "getPreviewLoadingOrbLimit",
+    "getPreviewLoadingShellItems",
+    "getPreviewLoadingOrbRenderState",
+    "getPreviewLoadingShellTheme",
+    `${loadingShellRuntime}\nreturn { createPreviewLoadingShellNodes, updatePreviewLoadingShell };`,
+  );
+  const runtime = createRuntime(
+    document,
+    getPreviewLoadingOrbLimit,
+    getPreviewLoadingShellItems,
+    getPreviewLoadingOrbRenderState,
+    getPreviewLoadingShellTheme,
+  );
+  const nodes = runtime.createPreviewLoadingShellNodes();
+  const baseItems = Array.from({ length: 6 }, (_, index) => ({
+    id: `job-${index + 1}`,
+    statusStage: "generating",
+  }));
+  const baseState = {
+    mode: "loading",
+    stage: "generating",
+    stageIndex: 2,
+    stageCount: 4,
+    activeJobCount: 6,
+    maxConcurrentTasks: 7,
+    loadingItems: baseItems,
+  };
+
+  runtime.updatePreviewLoadingShell(nodes, baseState);
+  const visibleNodes = [...nodes.field.children];
+
+  runtime.updatePreviewLoadingShell(nodes, {
+    ...baseState,
+    activeJobCount: 7,
+    loadingItems: [...baseItems, { id: "job-7", statusStage: "uploading" }],
+  });
+
+  assert.deepEqual([...nodes.field.children], visibleNodes);
+  assert.deepEqual(
+    nodes.field.children.map((child) => child.dataset.previewLoadingOrbId),
+    ["job-1", "job-2", "job-3", "job-4", "job-5", "job-6"],
+  );
+
+  runtime.updatePreviewLoadingShell(nodes, {
+    ...baseState,
+    activeJobCount: 6,
+    loadingItems: [...baseItems.slice(1), { id: "job-7", statusStage: "uploading" }],
+  });
+
+  assert.deepEqual(
+    nodes.field.children.map((child) => child.dataset.previewLoadingOrbId),
+    ["job-2", "job-3", "job-4", "job-5", "job-6", "job-7"],
+  );
+  assert.equal(nodes.field.children[5].dataset.previewLoadingOrbId, "job-7");
+  assert.ok(nodes.field.children[5].classList.contains("is-entering"));
 });
