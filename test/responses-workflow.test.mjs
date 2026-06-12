@@ -244,6 +244,86 @@ test("requestDirectImageGeneration posts once to image generations and emits the
   });
 });
 
+test("direct image generation uploads a single reference image with the image field for edits compatibility", async () => {
+  const requests = [];
+  await requestDirectImageGeneration({
+    baseUrl: "https://direct.example.test/v1",
+    endpointPath: "images/generations",
+    apiKey: "route-b-key",
+    prompt: "Create from one reference.",
+    referenceImages: [
+      { filename: "single-reference.png", mimeType: "image/png", base64: "c2luZ2xl" },
+    ],
+    size: "1024x1024",
+    quality: "high",
+    format: "png",
+    imageModel: "gpt-image-2",
+    async fetchImpl(url, init) {
+      requests.push({ url, body: init.body });
+      return new Response(
+        JSON.stringify({
+          data: [{ b64_json: "c2luZ2xlLWZpbmFs" }],
+        }),
+        { status: 200 },
+      );
+    },
+  });
+
+  assert.equal(requests[0].url, "https://direct.example.test/v1/images/edits");
+  assert.equal(requests[0].body.getAll("image").length, 1);
+  assert.equal(requests[0].body.get("image").name, "single-reference.png");
+  assert.equal(requests[0].body.getAll("image[]").length, 0);
+});
+
+test("direct image generation submits reference image requests to image edits", async () => {
+  const requests = [];
+  const result = await requestDirectImageGeneration({
+    baseUrl: "https://direct.example.test/v1",
+    endpointPath: "images/generations",
+    apiKey: "route-b-key",
+    prompt: "Create a campaign image from this reference.",
+    referenceImageLabels: ["Reference image 1: product body.", "Reference image 2: package style."],
+    referenceImages: [
+      { filename: "product.png", mimeType: "image/png", base64: "cHJvZHVjdA==" },
+      { filename: "package.jpg", mimeType: "image/jpeg", base64: "cGFja2FnZQ==" },
+    ],
+    size: "1024x1024",
+    quality: "high",
+    format: "png",
+    imageModel: "gpt-image-2",
+    responsesModel: "vendor-vision-text",
+    reasoningEffort: "high",
+    async fetchImpl(url, init) {
+      requests.push({ url, init, body: init.body });
+      return new Response(
+        JSON.stringify({
+          data: [{ b64_json: "cmVmZXJlbmNlLWZpbmFs" }],
+        }),
+        { status: 200 },
+      );
+    },
+  });
+
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].url, "https://direct.example.test/v1/images/edits");
+  assert.equal(requests[0].init.headers.Accept, "application/json");
+  assert.equal(requests[0].init.headers["Content-Type"], undefined);
+  assert.ok(requests[0].body instanceof FormData);
+  assert.equal(requests[0].body.get("model"), "gpt-image-2");
+  assert.match(requests[0].body.get("prompt"), /^Create a campaign image from this reference\./);
+  assert.match(requests[0].body.get("prompt"), /Reference image 1: product body\./);
+  assert.match(requests[0].body.get("prompt"), /Reference image 2: package style\./);
+  assert.equal(requests[0].body.get("size"), "1024x1024");
+  assert.equal(requests[0].body.get("quality"), "high");
+  assert.equal(requests[0].body.get("output_format"), "png");
+  const images = requests[0].body.getAll("image[]");
+  assert.equal(images.length, 2);
+  assert.equal(images[0].name, "product.png");
+  assert.equal(images[1].name, "package.jpg");
+  assert.equal(result.finalImageBase64, "cmVmZXJlbmNlLWZpbmFs");
+  assert.equal(result.endpointPath, "images/edits");
+});
+
 test("chat completions image request body omits image generations response_format", () => {
   const requestBody = createChatCompletionsImageRequestBody({
     prompt: "Create a chat image",
@@ -347,6 +427,7 @@ test("direct image generation can target responses with the direct text and visi
     format: "png",
     imageModel: "vendor-image-pro",
     responsesModel: "vendor-vision-text",
+    reasoningEffort: "xhigh",
     async fetchImpl(url, init) {
       requests.push({ url, init, body: JSON.parse(init.body) });
       return new Response(
@@ -362,6 +443,7 @@ test("direct image generation can target responses with the direct text and visi
   assert.equal(requests[0].url, "https://direct.example.test/v1/responses");
   assert.equal(requests[0].init.headers.Accept, "application/json");
   assert.equal(requests[0].body.model, "vendor-vision-text");
+  assert.equal(requests[0].body.reasoning.effort, "xhigh");
   assert.equal(requests[0].body.stream, false);
   assert.deepEqual(requests[0].body.tool_choice, { type: "image_generation" });
   assert.equal(requests[0].body.tools[0].type, "image_generation");

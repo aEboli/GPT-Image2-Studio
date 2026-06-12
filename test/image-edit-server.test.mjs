@@ -256,6 +256,28 @@ function makeImageEditForm(overrides = {}) {
   return formData;
 }
 
+function makeDirectReferenceGenerationForm({ baseUrl }) {
+  const formData = new FormData();
+  formData.set("jobId", "direct-reference-local");
+  formData.set("clientSessionId", "direct-reference-session");
+  formData.set("prompt", "Create a phone snapshot from this product reference.");
+  formData.set("ratio", "1:1");
+  formData.set("size", "1024x1024");
+  formData.set("format", "png");
+  formData.set("reasoningEffort", "high");
+  formData.set("imageRoute", "b");
+  formData.set("baseUrl", baseUrl);
+  formData.set("apiKey", "route-a-key");
+  formData.set("responsesModel", "gpt-5.5");
+  formData.set("directBaseUrl", baseUrl);
+  formData.set("directApiKey", "direct-key");
+  formData.set("directEndpointPath", "images/generations");
+  formData.set("directImageModel", "gpt-image-2");
+  formData.set("directResponsesModel", "gpt-5.5");
+  formData.append("referenceImages", new File(["source-image"], "source-product.png", { type: "image/png" }));
+  return formData;
+}
+
 function makeLocalMaskForm(options = {}) {
   const executionStrategy = options.executionStrategy || "merge";
   const regions = options.regions || makeLocalMaskRegions();
@@ -357,6 +379,38 @@ test("local generate sends image edit requests to the edits endpoint and saves m
     entry.sourceImageName === "source-product.png" &&
     entry.editInstruction === "把背景改成干净的白色摄影棚，保留主体材质和比例。"
   ));
+});
+
+test("local direct generation with one reference uses image edits and the image field", async (t) => {
+  const upstream = await createUpstreamEditServer();
+  const { baseUrl, outputDir } = await startLocalStudioServer(t, {
+    upstream,
+    tempPrefix: "direct-reference-edit-",
+  });
+
+  const response = await fetch(`${baseUrl}/api/generate`, {
+    method: "POST",
+    body: makeDirectReferenceGenerationForm({ baseUrl: upstream.baseUrl }),
+  });
+  const text = await response.text();
+  const events = parseSseEvents(text);
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(events.filter((event) => event.eventName === "error"), [], text);
+  assert.equal(upstream.requests.length, 1);
+  assert.equal(upstream.requests[0].url, "/v1/images/edits");
+  assert.match(upstream.requests[0].body, /name="image"; filename="source-product\.png"/);
+  assert.doesNotMatch(upstream.requests[0].body, /name="image\[\]"/);
+
+  const saved = events.find((event) => event.eventName === "saved");
+  assert.equal(saved?.payload?.item?.endpointPath, "images/edits");
+
+  const metadata = await readSavedMetadataEntries(outputDir);
+  assert.ok(metadata.some((entry) =>
+    entry.imageRoute === "b" &&
+    entry.endpointPath === "images/edits" &&
+    entry.referenceImageName === "source-product.png"
+  ), JSON.stringify(metadata, null, 2));
 });
 
 test("local generate rejects invalid local-mask requests before upstream edits", async (t) => {

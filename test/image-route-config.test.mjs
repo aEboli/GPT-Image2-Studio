@@ -125,6 +125,27 @@ test("selected direct image generation config uses direct responses model for re
   });
 });
 
+test("selected direct image generation config keeps route A responses model for image protocol", () => {
+  const config = {
+    imageRoute: "b",
+    responsesModel: "route-a-model",
+    directBaseUrl: "https://direct.example.test/v1",
+    directEndpointPath: "images/generations",
+    directApiKey: "direct-key",
+    directImageModel: "vendor-image-pro",
+    directResponsesModel: "vendor-vision-text",
+  };
+
+  assert.deepEqual(getSelectedImageGenerationConfig(config), {
+    imageRoute: "b",
+    baseUrl: "https://direct.example.test/v1",
+    apiKey: "direct-key",
+    responsesModel: "route-a-model",
+    imageModel: "vendor-image-pro",
+    endpointPath: "images/generations",
+  });
+});
+
 test("selected text and vision config preserves route A behavior", () => {
   assert.deepEqual(
     getSelectedTextVisionConfig({

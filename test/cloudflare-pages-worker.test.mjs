@@ -2005,6 +2005,74 @@ test("Cloudflare interactive generation streams chunks even when a queue binding
   assert.doesNotMatch(text, /test-browser-key/);
 });
 
+test("Cloudflare direct mode sends reference generations to image edits", async () => {
+  const seenRequests = [];
+  const imageBucket = makeImageBucket();
+  const formData = new FormData();
+  formData.set("jobId", "job-direct-reference");
+  formData.set("clientSessionId", "session-direct-reference");
+  formData.set("prompt", "Create a campaign poster from this product reference");
+  formData.set("ratio", "1:1");
+  formData.set("size", "1024x1024");
+  formData.set("format", "png");
+  formData.set("reasoningEffort", "high");
+  formData.set("imageRoute", "b");
+  formData.set("baseUrl", "https://route-a.example.test/v1");
+  formData.set("apiKey", "route-a-key");
+  formData.set("responsesModel", "route-a-model");
+  formData.set("directBaseUrl", "https://direct.example.test/v1");
+  formData.set("directApiKey", "direct-key");
+  formData.set("directEndpointPath", "images/generations");
+  formData.set("directImageModel", "gpt-image-2");
+  formData.set("directResponsesModel", "direct-vision-text");
+  formData.append("referenceImages", new File(["product"], "product.png", { type: "image/png" }));
+
+  const response = await handleApiRequest(new Request("https://studio.example/api/generate", {
+    method: "POST",
+    body: formData,
+  }), {
+    imageBucket,
+    async fetchImpl(url, init) {
+      seenRequests.push({
+        url,
+        auth: init.headers.Authorization,
+        contentType: init.headers["Content-Type"],
+        body: init.body,
+      });
+      return new Response(
+        JSON.stringify({
+          data: [{ b64_json: "ZGlyZWN0LXJlZi1maW5hbA==" }],
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      );
+    },
+  });
+  const text = await response.text();
+  const events = parseSseEvents(text);
+
+  assert.equal(response.status, 200);
+  assert.equal(seenRequests.length, 1);
+  assert.equal(seenRequests[0].url, "https://direct.example.test/v1/images/edits");
+  assert.equal(seenRequests[0].auth, "Bearer direct-key");
+  assert.equal(seenRequests[0].contentType, undefined);
+  assert.ok(seenRequests[0].body instanceof FormData);
+  assert.equal(seenRequests[0].body.get("model"), "gpt-image-2");
+  assert.match(seenRequests[0].body.get("prompt"), /Create a campaign poster from this product reference/);
+  assert.match(seenRequests[0].body.get("prompt"), /Prompt mode reference image 1 of 1: product\.png/);
+  const images = seenRequests[0].body.getAll("image");
+  assert.equal(images.length, 1);
+  assert.equal(images[0].name, "product.png");
+  assert.equal(seenRequests[0].body.getAll("image[]").length, 0);
+  const savedEvent = events.find((event) => event.eventName === "saved");
+  assert.equal(savedEvent?.payload?.item?.endpointPath, "images/edits");
+  assert.ok(events.some((event) => event.eventName === "saved"));
+  assert.doesNotMatch(text, /direct-key/);
+  assert.doesNotMatch(text, /route-a-key/);
+});
+
 test("Cloudflare generation modes keep interactive streaming when a queue binding exists", async () => {
   const cases = [
     {
