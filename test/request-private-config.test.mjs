@@ -76,7 +76,46 @@ test("request private config keeps route B direct image settings separate from r
   assert.equal(config.directResponsesModel, "vendor-vision-text");
 });
 
-test("request private config applies selected image route even when request keeps saved keys", () => {
+test("request private config preserves complete root endpoint URLs", () => {
+  const fallback = {
+    baseUrl: "https://api.openai.com/v1",
+    apiKey: "server-a-key",
+    responsesModel: "gpt-5.4",
+    endpointPath: "responses",
+    imageRoute: "a",
+    directBaseUrl: "https://api.openai.com/v1",
+    directEndpointPath: "images/generations",
+    directApiKey: "",
+    directImageModel: "gpt-image-2",
+    directResponsesModel: "gpt-5.5",
+    protocolBaseUrl: "https://api.openai.com/v1",
+    protocolApiKey: "",
+    protocolImageModel: "server-protocol-image",
+  };
+
+  const config = mergeRequestPrivateConfig(
+    {
+      imageRoute: "c",
+      baseUrl: "https://browser-route.example.test/responses?debug=true#trace",
+      endpointPath: "chat/completions",
+      apiKey: "browser-a-key",
+      directBaseUrl: "https://browser-direct.example.test/images/generations?debug=true#trace",
+      directEndpointPath: "responses",
+      directApiKey: "browser-direct-key",
+      protocolBaseUrl: "https://browser-protocol.example.test/images/edits?debug=true#trace",
+      protocolImageModel: "browser-protocol-image",
+    },
+    fallback,
+  );
+
+  assert.equal(config.baseUrl, "https://browser-route.example.test");
+  assert.equal(config.endpointPath, "responses");
+  assert.equal(config.directBaseUrl, "https://browser-direct.example.test");
+  assert.equal(config.directEndpointPath, "images/generations");
+  assert.equal(config.protocolBaseUrl, "https://browser-protocol.example.test");
+});
+
+test("request private config applies selected image route while reusing saved route keys", () => {
   const fallback = {
     baseUrl: "https://route-a-server.example.test/v1",
     apiKey: "server-a-key",
@@ -108,7 +147,76 @@ test("request private config applies selected image route even when request keep
   assert.equal(config.endpointPath, "responses");
   assert.equal(config.directBaseUrl, "https://route-b-server.example.test/v1");
   assert.equal(config.directEndpointPath, "images/generations");
-  assert.equal(config.directApiKey, "");
+  assert.equal(config.directApiKey, "server-a-key");
   assert.equal(config.directImageModel, "server-image-model");
   assert.equal(config.directResponsesModel, "server-vision-model");
+});
+
+test("request private config keeps model protocol settings separate from route A and route B", () => {
+  const fallback = {
+    baseUrl: "https://route-a-server.example.test/v1",
+    apiKey: "server-a-key",
+    responsesModel: "gpt-5.4",
+    endpointPath: "responses",
+    imageRoute: "a",
+    directBaseUrl: "https://route-b-server.example.test/v1",
+    directEndpointPath: "images/generations",
+    directApiKey: "server-b-key",
+    directImageModel: "gpt-image-2",
+    directResponsesModel: "server-vision-model",
+    protocolBaseUrl: "https://protocol-server.example.test/v1",
+    protocolApiKey: "server-protocol-key",
+    protocolImageModel: "server-gemini-image",
+  };
+
+  const config = mergeRequestPrivateConfig(
+    {
+      imageRoute: "c",
+      protocolBaseUrl: "https://protocol-browser.example.test/v1",
+      protocolApiKey: "browser-protocol-key",
+      protocolImageModel: "gemini-3.1-flash-image-preview",
+    },
+    fallback,
+  );
+
+  assert.equal(config.imageRoute, "c");
+  assert.equal(config.protocolBaseUrl, "https://protocol-browser.example.test/v1");
+  assert.equal(config.protocolApiKey, "browser-protocol-key");
+  assert.equal(config.protocolImageModel, "gemini-3.1-flash-image-preview");
+  assert.equal(config.baseUrl, "https://route-a-server.example.test/v1");
+  assert.equal(config.directBaseUrl, "https://route-b-server.example.test/v1");
+});
+
+test("request private config lets model protocol requests reuse an existing route key", () => {
+  const fallback = {
+    baseUrl: "https://route-a-server.example.test/v1",
+    apiKey: "",
+    responsesModel: "gpt-5.4",
+    endpointPath: "responses",
+    imageRoute: "a",
+    directBaseUrl: "https://route-b-server.example.test/v1",
+    directEndpointPath: "images/generations",
+    directApiKey: "",
+    directImageModel: "gpt-image-2",
+    directResponsesModel: "server-vision-model",
+    protocolBaseUrl: "https://protocol-server.example.test/v1",
+    protocolApiKey: "",
+    protocolImageModel: "server-gemini-image",
+  };
+
+  const config = mergeRequestPrivateConfig(
+    {
+      imageRoute: "c",
+      baseUrl: "https://browser-route-a.example.test/v1",
+      apiKey: "browser-route-key",
+      protocolBaseUrl: "https://browser-protocol.example.test/v1",
+      protocolImageModel: "gemini-3.1-flash-image-preview",
+    },
+    fallback,
+  );
+
+  assert.equal(config.imageRoute, "c");
+  assert.equal(config.protocolBaseUrl, "https://browser-protocol.example.test/v1");
+  assert.equal(config.protocolApiKey, "browser-route-key");
+  assert.equal(config.protocolImageModel, "gemini-3.1-flash-image-preview");
 });

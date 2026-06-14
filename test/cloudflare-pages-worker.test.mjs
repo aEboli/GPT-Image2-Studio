@@ -464,7 +464,7 @@ test("Cloudflare prompt generation labels uploaded reference images and saves re
   formData.set("jobId", "job-prompt-reference");
   formData.set("prompt", "鎻愬崌鐢昏川");
   formData.set("ratio", "16:9");
-  formData.set("size", "1536x864");
+  formData.set("size", "1824x1024");
   formData.set("format", "png");
   formData.set("baseUrl", "https://example.test/v1");
   formData.set("apiKey", "test-browser-key");
@@ -2276,7 +2276,7 @@ test("Cloudflare config endpoint never returns a saved API key", async () => {
   assert.equal("apiKey" in payload, false);
   assert.equal(payload.responsesModel, "gpt-5.5");
   assert.equal(payload.directResponsesModel, "gpt-5.5");
-  assert.equal(payload.defaults.size, "896x1120");
+  assert.equal(payload.defaults.size, "1024x1280");
 });
 
 test("Cloudflare model list route uses browser API settings without echoing the key", async () => {

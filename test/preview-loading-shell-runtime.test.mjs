@@ -7,6 +7,7 @@ import {
   getPreviewLoadingShellItems,
   getPreviewLoadingShellTheme,
 } from "../lib/preview-loading-shell.mjs";
+import { getPreviewPlaceholderState } from "../lib/preview-placeholder-state.mjs";
 
 const appPath = new URL("../public/app.js", import.meta.url);
 
@@ -327,4 +328,59 @@ test("preview loading shell holds the first six orbs until a visible job complet
   );
   assert.equal(nodes.field.children[5].dataset.previewLoadingOrbId, "job-7");
   assert.ok(nodes.field.children[5].classList.contains("is-entering"));
+});
+
+test("preview loading placeholder keeps older visible jobs when the queue stores newest first", () => {
+  const runningItems = Array.from({ length: 7 }, (_, index) => ({
+    id: `job-${index + 1}`,
+    createdAt: `2026-06-13T00:00:0${index}.000Z`,
+    statusStage: "generating",
+  })).reverse();
+
+  const state = getPreviewPlaceholderState({
+    item: runningItems[0],
+    runningCount: runningItems.length,
+    runningItems,
+    maxConcurrentTasks: 7,
+  });
+
+  assert.deepEqual(
+    state.loadingItems.map((item) => item.id),
+    ["job-1", "job-2", "job-3", "job-4", "job-5", "job-6"],
+  );
+});
+
+test("preview loading placeholder keeps stable slots when newest-first jobs share timestamps", () => {
+  const cases = [
+    {
+      name: "missing timestamps",
+      runningItems: Array.from({ length: 7 }, (_, index) => ({
+        id: `job-${index + 1}`,
+        statusStage: "generating",
+      })).reverse(),
+    },
+    {
+      name: "matching timestamps",
+      runningItems: Array.from({ length: 7 }, (_, index) => ({
+        id: `job-${index + 1}`,
+        createdAt: "2026-06-13T00:00:00.000Z",
+        statusStage: "generating",
+      })).reverse(),
+    },
+  ];
+
+  for (const { name, runningItems } of cases) {
+    const state = getPreviewPlaceholderState({
+      item: runningItems[0],
+      runningCount: runningItems.length,
+      runningItems,
+      maxConcurrentTasks: 7,
+    });
+
+    assert.deepEqual(
+      state.loadingItems.map((item) => item.id),
+      ["job-1", "job-2", "job-3", "job-4", "job-5", "job-6"],
+      name,
+    );
+  }
 });

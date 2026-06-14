@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import dns from "node:dns";
 import { createServer } from "node:http";
 import { createReadStream } from "node:fs";
 import { mkdir, readFile, stat } from "node:fs/promises";
@@ -16,7 +17,9 @@ import {
 } from "./lib/aspect-ratios.mjs";
 import {
   getDefaultGenerationSize,
+  getDefaultModelProtocolImageSize,
   normalizeGenerationSize,
+  normalizeModelProtocolImageSize,
 } from "./lib/generation-size-options.mjs";
 import {
   IMAGE_DECOMPOSITION_ASSET_KIND,
@@ -67,9 +70,9 @@ import {
   repairGeneratedAssetMetadata,
   saveGeneratedAsset,
 } from "./lib/gallery-store.mjs";
-import { normalizeBase64, requestDirectImageGeneration, requestImageEdit, requestImageGeneration } from "./lib/responses-workflow.mjs";
+import { normalizeBase64, requestDirectImageGeneration, requestImageEdit, requestImageGeneration, requestModelProtocolImageGeneration } from "./lib/responses-workflow.mjs";
 import { mergeRequestPrivateConfig } from "./lib/request-private-config.mjs";
-import { IMAGE_ROUTE_B, getSelectedImageGenerationConfig, getSelectedTextVisionConfig } from "./lib/image-route-config.mjs";
+import { IMAGE_ROUTE_B, IMAGE_ROUTE_C, getSelectedImageGenerationConfig, getSelectedTextVisionConfig } from "./lib/image-route-config.mjs";
 import { fetchAvailableModels } from "./lib/model-list-client.mjs";
 import { createGenerationTaskStore } from "./lib/generation-task-store.mjs";
 import { createSessionTaskSlotLimiter } from "./lib/generation-task-slots.mjs";
@@ -96,6 +99,13 @@ import { generatePptDeckOutline } from "./lib/ppt-deck-workflow.mjs";
 import { analyzePptDocument } from "./lib/ppt-document-analysis.mjs";
 import { buildSlideEditPrompt, buildSlideImagePrompts } from "./lib/ppt-slide-prompts.mjs";
 import { createPptDeckStore } from "./lib/ppt-deck-store.mjs";
+import { configureNodeDnsFallback } from "./lib/node-dns-fallback.mjs";
+
+try {
+  configureNodeDnsFallback({ dns });
+} catch (error) {
+  console.warn(`DNS fallback 配置失败：${error instanceof Error ? error.message : String(error)}`);
+}
 import { exportPptxDeck } from "./lib/ppt-export.mjs";
 import { buildEditablePptxFilename, buildEditablePptxReconstruction } from "./lib/ppt-editable-reconstruction.mjs";
 import { isEditablePptExportMode, normalizePptExportMode } from "./lib/ppt-export-mode.mjs";
@@ -258,7 +268,7 @@ function normalizeGenerationMode(value) {
 function getStudioGenerationRequestScope(generationMode, imageRoute) {
   const mode = generationMode || "prompt";
   const route = String(imageRoute || "").trim().toLowerCase();
-  return route === "a" || route === "b" ? `${mode}:${route}` : mode;
+  return route === "a" || route === "b" || route === "c" ? `${mode}:${route}` : mode;
 }
 
 function getGenerationTaskSlotScopeKey(sessionId, requestScope) {
@@ -282,6 +292,9 @@ function sendText(response, statusCode, message) {
 
 async function requestStudioImageGeneration(options) {
   if (!MOCK_IMAGE_GENERATION_ENABLED) {
+    if (options.imageRoute === IMAGE_ROUTE_C) {
+      return requestModelProtocolImageGeneration(options);
+    }
     if (options.generationMode === IMAGE_EDIT_MODE) {
       return requestImageEdit(options);
     }
@@ -460,6 +473,11 @@ function getClientSessionIdFromRequest(request, url) {
   return resolved || "global-default-session";
 }
 
+function isBackgroundGenerationRequest(formData) {
+  const value = String(formData.get("background") || formData.get("backgroundGeneration") || "").trim().toLowerCase();
+  return value === "1" || value === "true" || value === "yes";
+}
+
 function claimSessionTaskSlot(sessionId, taskId, requestScope) {
   return sessionTaskSlotLimiter.claimSessionTaskSlot(sessionId, taskId, requestScope);
 }
@@ -491,6 +509,24 @@ function normalizeReasoningEffort(value, fallback = DEFAULT_REASONING_EFFORT) {
   return normalized;
 }
 
+function resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, imageRoute) {
+  if (imageRoute === IMAGE_ROUTE_C) {
+    const requestedSize = normalizeModelProtocolImageSize(requestedSizeInput || "auto");
+    const finalSize = requestedSize === "auto" ? getDefaultModelProtocolImageSize() : requestedSize;
+    return { requestedSize, finalSize };
+  }
+
+  const requestedSize = normalizeGenerationSize(ratioOption.value, requestedSizeInput);
+  if (requestedSize !== requestedSizeInput && requestedSizeInput !== "") {
+    throw new Error(`当前比例 ${ratioOption.value} 不支持分辨率 ${requestedSizeInput}`);
+  }
+
+  return {
+    requestedSize,
+    finalSize: requestedSize === "auto" ? getDefaultGenerationSize(ratioOption.value) : requestedSize,
+  };
+}
+
 async function handleConfigGet(response) {
   sendJson(response, 200, {
     ...(await configStore.readPublicConfig()),
@@ -511,6 +547,9 @@ async function handleConfigPost(request, response) {
     directEndpointPath: payload.directEndpointPath,
     directImageModel: payload.directImageModel,
     directResponsesModel: payload.directResponsesModel,
+    protocolBaseUrl: payload.protocolBaseUrl,
+    protocolApiKey: payload.protocolApiKey,
+    protocolImageModel: payload.protocolImageModel,
     defaults: payload.defaults,
   });
 
@@ -873,6 +912,7 @@ async function generateAndSavePptSlide({
     prompt: slidePrompt.prompt,
     referenceImages,
     size: PPT_SLIDE_SIZE,
+    aspectRatio: "16:9",
     quality: config.defaults?.quality || "high",
     format: toApiOutputFormat(PPT_SLIDE_FORMAT),
     responsesModel: generationConfig.responsesModel,
@@ -2182,12 +2222,7 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
     const generationRequestScope = "article-illustration";
     const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || "3:2"));
     const requestedSizeInput = String(formData.get("size") || "auto").trim().toLowerCase();
-    const requestedSize = normalizeGenerationSize(ratioOption.value, requestedSizeInput);
-    if (requestedSize !== requestedSizeInput && requestedSizeInput !== "") {
-      throw new Error(`当前比例 ${ratioOption.value} 不支持分辨率 ${requestedSizeInput}`);
-    }
-
-    const finalSize = requestedSize === "auto" ? getDefaultGenerationSize(ratioOption.value) : requestedSize;
+    const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
     const finalQuality = config.defaults?.quality || "high";
     const finalFormat = normalizeOutputFormat(String(formData.get("format") || config.defaults?.format || ARTICLE_ILLUSTRATION_FORMAT));
     const reasoningEffort = normalizeReasoningEffort(
@@ -2309,6 +2344,7 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
       baseUrl: generationConfig.baseUrl,
       apiKey: generationConfig.apiKey,
       size: finalSize,
+      aspectRatio: ratioOption.value,
       quality: finalQuality,
       format: toApiOutputFormat(finalFormat),
       responsesModel: generationConfig.responsesModel,
@@ -3081,12 +3117,7 @@ async function handlePortraitGenerate(request, response) {
     const generationRequestScope = "portrait";
     const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || plan.ratio || "4:5"));
     const requestedSizeInput = String(formData.get("size") || plan.size || "auto").trim().toLowerCase();
-    const requestedSize = normalizeGenerationSize(ratioOption.value, requestedSizeInput);
-    if (requestedSize !== requestedSizeInput && requestedSizeInput !== "") {
-      throw new Error(`当前比例 ${ratioOption.value} 不支持分辨率 ${requestedSizeInput}`);
-    }
-
-    const finalSize = requestedSize === "auto" ? getDefaultGenerationSize(ratioOption.value) : requestedSize;
+    const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
     const finalQuality = config.defaults?.quality || "high";
     const finalFormat = normalizeOutputFormat(String(formData.get("format") || plan.format || config.defaults?.format || "png"));
     const reasoningEffort = normalizeReasoningEffort(
@@ -3147,6 +3178,7 @@ async function handlePortraitGenerate(request, response) {
           referenceImages,
           referenceImageLabels,
           size: finalSize,
+          aspectRatio: ratioOption.value,
           quality: finalQuality,
           format: toApiOutputFormat(finalFormat),
           responsesModel: generationConfig.responsesModel,
@@ -3414,12 +3446,7 @@ async function handleCreationGenerate(request, response) {
     const generationRequestScope = "creation";
     const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || "1:1"));
     const requestedSizeInput = String(formData.get("size") || "auto").trim().toLowerCase();
-    const requestedSize = normalizeGenerationSize(ratioOption.value, requestedSizeInput);
-    if (requestedSize !== requestedSizeInput && requestedSizeInput !== "") {
-      throw new Error(`当前比例 ${ratioOption.value} 不支持分辨率 ${requestedSizeInput}`);
-    }
-
-    const finalSize = requestedSize === "auto" ? getDefaultGenerationSize(ratioOption.value) : requestedSize;
+    const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
     const finalQuality = config.defaults?.quality || "high";
     const finalFormat = normalizeOutputFormat(String(formData.get("format") || config.defaults?.format || "png"));
     const reasoningEffort = normalizeReasoningEffort(
@@ -3487,6 +3514,7 @@ async function handleCreationGenerate(request, response) {
             styleReferenceImages,
           ),
           size: finalSize,
+          aspectRatio: ratioOption.value,
           quality: finalQuality,
           format: toApiOutputFormat(finalFormat),
           responsesModel: generationConfig.responsesModel,
@@ -3735,12 +3763,7 @@ async function handleCreationLogoBatchGenerate(request, response) {
     const generationRequestScope = "creation";
     const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || "1:1"));
     const requestedSizeInput = String(formData.get("size") || "auto").trim().toLowerCase();
-    const requestedSize = normalizeGenerationSize(ratioOption.value, requestedSizeInput);
-    if (requestedSize !== requestedSizeInput && requestedSizeInput !== "") {
-      throw new Error(`当前比例 ${ratioOption.value} 不支持分辨率 ${requestedSizeInput}`);
-    }
-
-    const finalSize = requestedSize === "auto" ? getDefaultGenerationSize(ratioOption.value) : requestedSize;
+    const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
     const finalQuality = config.defaults?.quality || "high";
     const finalFormat = normalizeOutputFormat(String(formData.get("format") || config.defaults?.format || "png"));
     const reasoningEffort = normalizeReasoningEffort(
@@ -3805,6 +3828,7 @@ async function handleCreationLogoBatchGenerate(request, response) {
           referenceImages: [sourceImage, logoImage],
           referenceImageLabels: CREATION_LOGO_BATCH_REFERENCE_LABELS,
           size: finalSize,
+          aspectRatio: ratioOption.value,
           quality: finalQuality,
           format: toApiOutputFormat(finalFormat),
           responsesModel: generationConfig.responsesModel,
@@ -4062,11 +4086,7 @@ async function handlePortraitRepair(request, response) {
     const generationRequestScope = "portrait";
     const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || setManifest.ratio || "4:5"));
     const requestedSizeInput = String(formData.get("size") || setManifest.size || "auto").trim().toLowerCase();
-    const requestedSize = normalizeGenerationSize(ratioOption.value, requestedSizeInput);
-    if (requestedSize !== requestedSizeInput && requestedSizeInput !== "") {
-      throw new Error(`当前比例 ${ratioOption.value} 不支持分辨率 ${requestedSizeInput}`);
-    }
-    const finalSize = requestedSize === "auto" ? getDefaultGenerationSize(ratioOption.value) : requestedSize;
+    const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
     const finalQuality = config.defaults?.quality || "high";
     const finalFormat = normalizeOutputFormat(String(formData.get("format") || setManifest.format || config.defaults?.format || "png"));
     const reasoningEffort = normalizeReasoningEffort(
@@ -4107,6 +4127,7 @@ async function handlePortraitRepair(request, response) {
           referenceImages,
           referenceImageLabels,
           size: finalSize,
+          aspectRatio: ratioOption.value,
           quality: finalQuality,
           format: toApiOutputFormat(finalFormat),
           responsesModel: generationConfig.responsesModel,
@@ -4401,12 +4422,7 @@ async function handleCreationRepair(request, response) {
     const generationRequestScope = "creation";
     const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || "1:1"));
     const requestedSizeInput = String(formData.get("size") || "auto").trim().toLowerCase();
-    const requestedSize = normalizeGenerationSize(ratioOption.value, requestedSizeInput);
-    if (requestedSize !== requestedSizeInput && requestedSizeInput !== "") {
-      throw new Error(`当前比例 ${ratioOption.value} 不支持分辨率 ${requestedSizeInput}`);
-    }
-
-    const finalSize = requestedSize === "auto" ? getDefaultGenerationSize(ratioOption.value) : requestedSize;
+    const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
     const finalQuality = config.defaults?.quality || "high";
     const finalFormat = normalizeOutputFormat(String(formData.get("format") || config.defaults?.format || "png"));
     const reasoningEffort = normalizeReasoningEffort(
@@ -4483,6 +4499,7 @@ async function handleCreationRepair(request, response) {
             styleReferenceImages,
           ),
           size: finalSize,
+          aspectRatio: ratioOption.value,
           quality: finalQuality,
           format: toApiOutputFormat(finalFormat),
           responsesModel: generationConfig.responsesModel,
@@ -4701,6 +4718,7 @@ async function handleGenerate(request, response) {
     });
 
     const formData = await readFormDataBody(request);
+    const backgroundGeneration = isBackgroundGenerationRequest(formData);
     taskId = String(formData.get("jobId") || fallbackTaskId).trim() || fallbackTaskId;
     let prompt = String(formData.get("prompt") || "").trim();
     const ratio = String(formData.get("ratio") || "4:5");
@@ -4994,17 +5012,24 @@ async function handleGenerate(request, response) {
       formData.get("reasoningEffort") || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
     );
 
-    await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response);
+    async function runPreparedGeneration({ streamToResponse = true } = {}) {
+      function emitGenerationEvent(eventName, payload) {
+        if (streamToResponse && isResponseWritable(response)) {
+          writeSseEvent(response, eventName, payload);
+        }
+      }
+
+    if (streamToResponse) {
+      await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response);
+    } else {
+      await waitForSessionTaskSlot(clientSessionId, taskId, generationRequestScope);
+    }
     slotClaimed = true;
 
     const ratioOption = resolveAspectRatioOption(ratio);
-    const requestedSize = normalizeGenerationSize(ratioOption.value, requestedSizeInput);
-    if (requestedSize !== requestedSizeInput && requestedSizeInput !== "") {
-      throw new Error(`当前比例 ${ratioOption.value} 不支持分辨率 ${requestedSizeInput}`);
-    }
+    const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
 
     const finalPrompt = appendRatioHintToPrompt(prompt, ratioOption);
-    const finalSize = requestedSize === "auto" ? getDefaultGenerationSize(ratioOption.value) : requestedSize;
     const finalQuality = config.defaults?.quality || "high";
     const finalFormat = normalizeOutputFormat(requestedFormatInput || config.defaults?.format || "png");
     let finalBase64 = "";
@@ -5053,7 +5078,7 @@ async function handleGenerate(request, response) {
           statusStage: event.stage,
           statusText: message,
         });
-        writeSseEvent(response, "status", {
+        emitGenerationEvent("status", {
           stage: event.stage,
           message,
         });
@@ -5066,7 +5091,7 @@ async function handleGenerate(request, response) {
           statusStage: "generating",
           statusText: "已收到中途预览",
         });
-        writeSseEvent(response, "partial_image", {
+        emitGenerationEvent("partial_image", {
           dataUrl: event.dataUrl,
         });
         return;
@@ -5082,7 +5107,7 @@ async function handleGenerate(request, response) {
           statusStage: "saving",
           statusText: "已拿到最终图像，正在写入本地",
         });
-        writeSseEvent(response, "final_image", {
+        emitGenerationEvent("final_image", {
           dataUrl: `data:${toOutputFormatMimeType(finalFormat)};base64,${normalizeBase64(event.base64)}`,
         });
       }
@@ -5092,6 +5117,7 @@ async function handleGenerate(request, response) {
       baseUrl: generationConfig.baseUrl,
       apiKey: generationConfig.apiKey,
       size: finalSize,
+      aspectRatio: ratioOption.value,
       quality: finalQuality,
       format: toApiOutputFormat(finalFormat),
       responsesModel: generationConfig.responsesModel,
@@ -5132,7 +5158,7 @@ async function handleGenerate(request, response) {
                   statusStage: "generating",
                   statusText: `${statusPrefix}: completed. Preparing next region.`,
                 });
-                writeSseEvent(response, "status", {
+                emitGenerationEvent("status", {
                   stage: "generating",
                   message: `${statusPrefix}: completed. Preparing next region.`,
                 });
@@ -5191,7 +5217,7 @@ async function handleGenerate(request, response) {
       statusStage: "saving",
       statusText: "正在保存到本地图片目录",
     });
-    writeSseEvent(response, "status", {
+    emitGenerationEvent("status", {
       stage: "saving",
       message: "正在保存到本地图片目录",
     });
@@ -5299,7 +5325,7 @@ async function handleGenerate(request, response) {
       item,
     });
 
-    writeSseEvent(response, GENERATION_STREAM_EVENTS.SAVED, {
+    emitGenerationEvent(GENERATION_STREAM_EVENTS.SAVED, {
       filename,
       absolutePath: saved.absolutePath,
       ratio: ratioOption.value,
@@ -5308,10 +5334,44 @@ async function handleGenerate(request, response) {
       item,
     });
 
-    writeSseEvent(response, GENERATION_STREAM_EVENTS.COMPLETE, {
+    emitGenerationEvent(GENERATION_STREAM_EVENTS.COMPLETE, {
       filename,
       absolutePath: saved.absolutePath,
     });
+
+    }
+
+    if (backgroundGeneration) {
+      const queuedTask = generationTaskStore.updateTask(clientSessionId, taskId, {
+        status: "running",
+        statusStage: "queued",
+        statusText: "已提交到服务器队列，等待后台生成",
+      });
+      writeSseEvent(response, GENERATION_STREAM_EVENTS.QUEUED, {
+        task: queuedTask,
+      });
+      if (!response.destroyed && !response.writableEnded) {
+        response.end();
+      }
+      void runPreparedGeneration({ streamToResponse: false })
+        .catch((error) => {
+          const message = error instanceof Error ? error.message : String(error);
+          if (clientSessionId && taskRegistered) {
+            generationTaskStore.failTask(clientSessionId, taskId, {
+              errorMessage: message,
+            });
+          }
+        })
+        .finally(() => {
+          if (clientSessionId && slotClaimed) {
+            releaseSessionTaskSlot(clientSessionId, taskId, generationRequestScope);
+            slotClaimed = false;
+          }
+        });
+      return;
+    }
+
+    await runPreparedGeneration();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (clientSessionId && taskRegistered) {

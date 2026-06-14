@@ -1,8 +1,8 @@
 import { buildParameterText, formatImageModelLabel, formatRecentOutputMeta } from "/lib/studio-formatters.mjs";
-import { getPreviewPlaceholderState } from "/lib/preview-placeholder-state.mjs?v=20260510-activity-log-1";
+import { getPreviewPlaceholderState, getStablePreviewLoadingItems } from "/lib/preview-placeholder-state.mjs?v=20260510-activity-log-1";
 import { buildGalleryReferenceFilterOptions, buildGallerySections, buildGallerySizeFilterOptions, buildGalleryTimeFilterOptions, distributeGalleryItemsIntoColumns, filterGalleryItems, getGalleryLayoutModeForWidth, getPromptGenerationGalleryItems, getRecentGalleryItems, normalizeGalleryFilters, paginateGallerySections, sortGalleryItemsByCreatedAtDesc } from "/lib/gallery-organizer.mjs";
 import { buildGalleryMetadataCacheEntry, collectGalleryMetadataRepairPatch, mergeGalleryItemWithCachedMetadata, pruneGalleryMetadataCache } from "/lib/gallery-metadata-recovery.mjs";
-import { getDefaultGenerationSize, getGenerationSizeOptions, normalizeGenerationSize } from "/lib/generation-size-options.mjs?v=20260512-one-megapixel-sizes-4";
+import { getDefaultGenerationSize, getGenerationSizeOptions, getModelProtocolImageSizeOptions, normalizeGenerationSize, normalizeModelProtocolImageSize } from "/lib/generation-size-options.mjs?v=20260614-image2-sizes-1";
 import { getOutputFormatOptions, normalizeOutputFormat, } from "/lib/output-format-options.mjs?v=20260504-vercel-static-lib-1";
 import { normalizeReferenceAnalysisLanguage, } from "/lib/reference-analysis-language.mjs?v=20260522-reference-language-1";
 import { getPreviewLoadingOrbLimit, getPreviewLoadingOrbRenderState, getPreviewLoadingShellItems, getPreviewLoadingShellTheme, shouldReusePreviewLoadingShell } from "/lib/preview-loading-shell.mjs";
@@ -20,11 +20,14 @@ import { createCreationLogoLibraryController } from "/lib/creation-logo-library.
 import { consumeSse, requestGenerationStream } from "/lib/generation-client.mjs";
 import { createConfigModelPickerController } from "/lib/config-model-picker.mjs";
 import {
+  API_ENDPOINT_CHAT_COMPLETIONS,
+  API_ENDPOINT_IMAGE_EDITS,
   API_ENDPOINT_IMAGE_GENERATIONS,
   API_ENDPOINT_RESPONSES,
   appendApiEndpointPath,
   normalizeApiEndpointPath,
   splitApiEndpointUrl,
+  splitModelProtocolUrl,
 } from "/lib/image-route-config.mjs";
 import { createPptAnalysisController } from "/lib/ppt-analysis-client.mjs?v=20260527-density-overlap-1";
 import { appendPptDeckDownloadLinks } from "/lib/ppt-record-links.mjs";
@@ -164,7 +167,7 @@ const PORTRAIT_SHOT_TYPE_LABELS = {
   "close-up": "近景",
   "extreme-close-up": "特写",
 };
-const DEFAULT_UI_RATIO_LABEL = "方形 1:1";
+const DEFAULT_UI_RATIO_LABEL = "电商主图、头像、社交媒体 · 方形 1:1";
 const CREATION_LOGO_PLACEMENTS = new Set([
   "top-left",
   "top-center",
@@ -605,6 +608,14 @@ const refs = {
   directSavedKeyMask: document.querySelector("#directSavedKeyMask"),
   endpointPathSelect: document.querySelector("#endpointPathSelect"),
   imageRouteInputs: [...document.querySelectorAll('input[name="imageRoute"]')],
+  protocolApiKeyInput: document.querySelector("#protocolApiKeyInput"),
+  protocolBaseUrlInput: document.querySelector("#protocolBaseUrlInput"),
+  protocolEndpointPreview: document.querySelector("#protocolEndpointPreview"),
+  protocolFetchModelsButton: document.querySelector("#protocolFetchModelsButton"),
+  protocolImageModelInput: document.querySelector("#protocolImageModelInput"),
+  protocolModelOptionsList: document.querySelector("#protocolModelOptionsList"),
+  protocolModelPickerToggle: document.querySelector("#protocolModelPickerToggle"),
+  protocolSavedKeyMask: document.querySelector("#protocolSavedKeyMask"),
   clearHistoryButton: document.querySelector("#clearHistoryButton"),
   closeConfigBackdrop: document.querySelector("#closeConfigBackdrop"),
   closeConfigButton: document.querySelector("#closeConfigButton"),
@@ -1396,7 +1407,7 @@ function formatCompactRatioLabel(ratio) {
 
   return /^\d+:\d+$/.test(normalized) ? normalized : "";
 }
-function getGenerationActivityRelayText(value) { const relayLine = String(value || "").split(/\r?\n/).map((line) => line.trim()).find((line) => /^中转[：:]/.test(line)); return relayLine || ""; } function buildGenerationActivityRelayText(item = {}) { const route = String(item?.imageRoute || item?.generationRoute || "").toLowerCase(); const relayUrl = String(item?.baseUrl || (route === "b" ? state.config?.directBaseUrl : state.config?.baseUrl) || state.config?.baseUrl || "").trim(); return relayUrl ? `中转：${relayUrl}` : ""; }
+function getGenerationActivityRelayText(value) { const relayLine = String(value || "").split(/\r?\n/).map((line) => line.trim()).find((line) => /^中转[：:]/.test(line)); return relayLine || ""; } function buildGenerationActivityRelayText(item = {}) { const route = String(item?.imageRoute || item?.generationRoute || "").toLowerCase(); const relayUrl = String(item?.baseUrl || (route === "c" ? item?.protocolBaseUrl || state.config?.protocolBaseUrl : route === "b" ? state.config?.directBaseUrl : state.config?.baseUrl) || state.config?.baseUrl || "").trim(); return relayUrl ? `中转：${relayUrl}` : ""; }
 function formatFilmstripSizeLabel(item) {
   return formatCompactSizeLabel(item?.size);
 }
@@ -1654,7 +1665,7 @@ function syncRatioOrientationSummary() {
   }
 
   const ratioOption = getRatioOption(refs.ratioInput.value || DEFAULT_UI_RATIO);
-  refs.ratioOrientationSummary.textContent = getRatioOrientationLabel(ratioOption?.orientation);
+  refs.ratioOrientationSummary.textContent = ratioOption?.label || getRatioOrientationLabel(ratioOption?.orientation);
   refs.ratioOrientationSummary.dataset.orientation = ratioOption?.orientation || "square";
 }
 
@@ -1828,6 +1839,7 @@ async function ensureActiveViewModule(view) {
         makeGalleryPreviewKey,
         makeJobPreviewKey,
         nowIso,
+        normalizeSizeForSelectedRoute,
         openLightbox,
         prepareGenerationReferenceImageFile,
         recordJobQueued,
@@ -1835,6 +1847,7 @@ async function ensureActiveViewModule(view) {
         renderRatioGrid,
         renderers: VIEW_RENDERERS,
         renderSizeOptions,
+        resolveGenerationSizeForSelectedRoute,
         revokeReferencePreview,
         scheduleGenerationQueue,
         setActiveView,
@@ -3598,13 +3611,13 @@ function renderImageDecompositionSizeOptions() {
 
 function syncImageDecompositionSize(value) {
   const ratioValue = refs.imageDecompositionRatioInput.value || DEFAULT_UI_RATIO;
-  refs.imageDecompositionSizeInput.value = normalizeGenerationSize(ratioValue, value || "auto");
+  refs.imageDecompositionSizeInput.value = normalizeSizeForSelectedRoute(ratioValue, value || "auto");
 }
 
 function createImageDecompositionJob() {
   const ratioOption = getRatioOption(refs.imageDecompositionRatioInput.value || DEFAULT_UI_RATIO);
   const sourceItem = state.imageDecomposition.file;
-  const sizeSetting = normalizeGenerationSize(ratioOption.value, refs.imageDecompositionSizeInput.value || "auto");
+  const sizeSetting = normalizeSizeForSelectedRoute(ratioOption.value, refs.imageDecompositionSizeInput.value || "auto");
   const size = sizeSetting === "auto" ? ratioOption?.baseSize || getDefaultGenerationSize(ratioOption?.value) : sizeSetting;
 
   return {
@@ -4594,7 +4607,7 @@ function renderOutputFormatOptions() {
 
 function syncGenerationSize(value) {
   const ratioValue = refs.ratioInput.value || DEFAULT_UI_RATIO;
-  const nextValue = normalizeGenerationSize(ratioValue, value || "auto");
+  const nextValue = normalizeSizeForSelectedRoute(ratioValue, value || "auto");
   refs.sizeInput.value = nextValue;
   if (refs.referenceAnalysisSizeInput) {
     refs.referenceAnalysisSizeInput.value = nextValue;
@@ -4607,10 +4620,11 @@ function renderSizeOptions(sizeInput = refs.sizeInput, ratioInput = refs.ratioIn
   }
 
   const ratioValue = ratioInput.value || DEFAULT_UI_RATIO;
-  const currentValue = normalizeGenerationSize(ratioValue, sizeInput.value || "auto");
+  const currentValue = normalizeSizeForSelectedRoute(ratioValue, sizeInput.value || "auto");
   sizeInput.innerHTML = "";
 
-  getGenerationSizeOptions(ratioValue).forEach((option) => {
+  const sizeOptions = isModelProtocolImageRoute() ? getModelProtocolImageSizeOptions() : getGenerationSizeOptions(ratioValue);
+  sizeOptions.forEach((option) => {
     const element = document.createElement("option");
     element.value = option.value;
     element.textContent = option.label;
@@ -4646,7 +4660,7 @@ function renderCreationRatioOptions() {
   options.forEach((option) => {
     const element = document.createElement("option");
     element.value = option.value;
-    element.textContent = option.value;
+    element.textContent = option.label;
     refs.creationRatioInput.appendChild(element);
   });
 
@@ -4658,10 +4672,11 @@ function renderCreationRatioOptions() {
 
 function renderCreationSizeOptions() {
   const ratioValue = refs.creationRatioInput.value || DEFAULT_UI_RATIO;
-  const currentValue = normalizeGenerationSize(ratioValue, refs.creationSizeInput.value || "auto");
+  const currentValue = normalizeSizeForSelectedRoute(ratioValue, refs.creationSizeInput.value || "auto");
   refs.creationSizeInput.innerHTML = "";
 
-  getGenerationSizeOptions(ratioValue).forEach((option) => {
+  const sizeOptions = isModelProtocolImageRoute() ? getModelProtocolImageSizeOptions() : getGenerationSizeOptions(ratioValue);
+  sizeOptions.forEach((option) => {
     const element = document.createElement("option");
     element.value = option.value;
     element.textContent = option.label;
@@ -4682,7 +4697,7 @@ function renderPortraitRatioOptions() {
   options.forEach((option) => {
     const element = document.createElement("option");
     element.value = option.value;
-    element.textContent = option.value;
+    element.textContent = option.label;
     refs.portraitRatioInput.appendChild(element);
   });
 
@@ -4697,10 +4712,11 @@ function renderPortraitSizeOptions() {
     return;
   }
   const ratioValue = refs.portraitRatioInput.value || DEFAULT_PORTRAIT_RATIO;
-  const currentValue = normalizeGenerationSize(ratioValue, refs.portraitSizeInput.value || "auto");
+  const currentValue = normalizeSizeForSelectedRoute(ratioValue, refs.portraitSizeInput.value || "auto");
   refs.portraitSizeInput.innerHTML = "";
 
-  getGenerationSizeOptions(ratioValue).forEach((option) => {
+  const sizeOptions = isModelProtocolImageRoute() ? getModelProtocolImageSizeOptions() : getGenerationSizeOptions(ratioValue);
+  sizeOptions.forEach((option) => {
     const element = document.createElement("option");
     element.value = option.value;
     element.textContent = option.label;
@@ -4719,7 +4735,7 @@ function syncPortraitRatio(value) {
 
 function syncPortraitSize(value) {
   const ratioValue = refs.portraitRatioInput.value || DEFAULT_PORTRAIT_RATIO;
-  refs.portraitSizeInput.value = normalizeGenerationSize(ratioValue, value || "auto");
+  refs.portraitSizeInput.value = normalizeSizeForSelectedRoute(ratioValue, value || "auto");
 }
 
 function getSettingsFormScrollTop() {
@@ -4906,7 +4922,10 @@ function scheduleGalleryScrollSync() {
 }
 
 function getSelectedGenerationSize() {
-  return normalizeGenerationSize(refs.ratioInput.value || DEFAULT_UI_RATIO, refs.sizeInput.value || "auto");
+  if (isModelProtocolImageRoute()) {
+    return normalizeModelProtocolImageSize(refs.sizeInput.value || "auto");
+  }
+  return normalizeSizeForSelectedRoute(refs.ratioInput.value || DEFAULT_UI_RATIO, refs.sizeInput.value || "auto");
 }
 
 function scrollGalleryBy(direction) {
@@ -5058,7 +5077,7 @@ function renderRatioGrid(ratioGrid = refs.ratioGrid, ratioInput = refs.ratioInpu
     button.type = "button";
     button.className = "ratio-chip";
     button.dataset.orientation = option.orientation || "square";
-    button.setAttribute("aria-label", `${option.value} ${orientationLabel}`);
+    button.setAttribute("aria-label", option.label || `${option.value} ${orientationLabel}`);
     if (ratioInput.value === option.value) {
       button.classList.add("active");
     }
@@ -5080,7 +5099,27 @@ function renderReferenceAnalysisRatioGrid() {
 }
 
 function getSelectedImageRoute() {
-  return refs.imageRouteInputs.find((input) => input.checked)?.value === "b" ? "b" : "a";
+  const route = refs.imageRouteInputs.find((input) => input.checked)?.value;
+  return route === "c" ? "c" : route === "b" ? "b" : "a";
+}
+
+function isModelProtocolImageRoute() {
+  return getSelectedImageRoute() === "c";
+}
+
+function normalizeSizeForSelectedRoute(ratioValue, sizeValue = "auto") {
+  return isModelProtocolImageRoute()
+    ? normalizeModelProtocolImageSize(sizeValue || "auto")
+    : normalizeGenerationSize(ratioValue || DEFAULT_UI_RATIO, sizeValue || "auto");
+}
+
+function resolveGenerationSizeForSelectedRoute(ratioOption, sizeValue = "auto") {
+  const ratioValue = ratioOption?.value || DEFAULT_UI_RATIO;
+  const normalizedSize = normalizeSizeForSelectedRoute(ratioValue, sizeValue || "auto");
+  if (isModelProtocolImageRoute()) {
+    return normalizedSize;
+  }
+  return normalizedSize === "auto" ? ratioOption?.baseSize || getDefaultGenerationSize(ratioValue) : normalizedSize;
 }
 
 function updateGenerationModeStatus() {
@@ -5093,26 +5132,44 @@ function updateGenerationModeStatus() {
 
 function getEndpointControls(imageRoute = "a") { return imageRoute === "b" ? { input: refs.directBaseUrlInput, select: refs.directEndpointPathSelect, toggle: refs.directBaseUrlFullToggle, defaultEndpointPath: API_ENDPOINT_IMAGE_GENERATIONS, fallbackBaseUrl: state.config?.directBaseUrl || state.config?.baseUrl || "https://api.openai.com/v1" } : { input: refs.baseUrlInput, select: refs.endpointPathSelect, toggle: refs.baseUrlFullToggle, defaultEndpointPath: API_ENDPOINT_RESPONSES, fallbackBaseUrl: state.config?.baseUrl || "https://api.openai.com/v1" }; }
 function isEndpointFullUrlMode(imageRoute = "a") { return getEndpointControls(imageRoute).toggle?.getAttribute("aria-pressed") === "true"; }
-function readEndpointFields(imageRoute = "a") { const controls = getEndpointControls(imageRoute); return splitApiEndpointUrl(controls.input?.value || controls.fallbackBaseUrl, { fallbackBaseUrl: controls.fallbackBaseUrl, fallbackEndpointPath: controls.select?.value || controls.defaultEndpointPath }); }
-function setEndpointSelectValue(select, endpointPath, fallbackEndpointPath) { if (select) select.value = normalizeApiEndpointPath(endpointPath, fallbackEndpointPath); }
-function syncEndpointInputDisplay(imageRoute = "a", baseUrl = "", endpointPath = "") { const controls = getEndpointControls(imageRoute); const fullMode = isEndpointFullUrlMode(imageRoute); const normalizedEndpointPath = normalizeApiEndpointPath(endpointPath, controls.defaultEndpointPath); setEndpointSelectValue(controls.select, normalizedEndpointPath, controls.defaultEndpointPath); if (controls.input) { controls.input.value = fullMode ? appendApiEndpointPath(baseUrl || controls.fallbackBaseUrl, normalizedEndpointPath) : baseUrl || controls.fallbackBaseUrl; controls.input.placeholder = fullMode ? appendApiEndpointPath("https://api.openai.com/v1", normalizedEndpointPath) : "https://api.openai.com/v1"; } if (controls.toggle) controls.toggle.textContent = fullMode ? "基础 URL" : "完整 URL"; }
+function normalizeEndpointSelectValue(imageRoute = "a", endpointPath = "", fallbackEndpointPath = "") {
+  const normalizedEndpointPath = normalizeApiEndpointPath(endpointPath, fallbackEndpointPath);
+  return imageRoute === "b" && normalizedEndpointPath === API_ENDPOINT_IMAGE_EDITS ? API_ENDPOINT_IMAGE_GENERATIONS : normalizedEndpointPath;
+}
+function readEndpointFields(imageRoute = "a") {
+  const controls = getEndpointControls(imageRoute);
+  const endpoint = splitApiEndpointUrl(controls.input?.value || controls.fallbackBaseUrl, {
+    fallbackBaseUrl: controls.fallbackBaseUrl,
+    fallbackEndpointPath: controls.select?.value || controls.defaultEndpointPath,
+  });
+  return {
+    ...endpoint,
+    endpointPath: normalizeEndpointSelectValue(imageRoute, endpoint.endpointPath, controls.defaultEndpointPath),
+  };
+}
+function setEndpointSelectValue(select, endpointPath, fallbackEndpointPath, imageRoute = "a") {
+  if (select) select.value = normalizeEndpointSelectValue(imageRoute, endpointPath, fallbackEndpointPath);
+}
+function syncEndpointInputDisplay(imageRoute = "a", baseUrl = "", endpointPath = "") { const controls = getEndpointControls(imageRoute); const fullMode = isEndpointFullUrlMode(imageRoute); const normalizedEndpointPath = normalizeEndpointSelectValue(imageRoute, endpointPath, controls.defaultEndpointPath); setEndpointSelectValue(controls.select, normalizedEndpointPath, controls.defaultEndpointPath, imageRoute); if (controls.input) { controls.input.value = fullMode ? appendApiEndpointPath(baseUrl || controls.fallbackBaseUrl, normalizedEndpointPath) : baseUrl || controls.fallbackBaseUrl; controls.input.placeholder = fullMode ? appendApiEndpointPath("https://api.openai.com/v1", normalizedEndpointPath) : "https://api.openai.com/v1"; } if (controls.toggle) controls.toggle.textContent = fullMode ? "基础 URL" : "完整 URL"; }
 function toggleEndpointFullUrlMode(imageRoute = "a") { const controls = getEndpointControls(imageRoute); if (!controls.toggle) return; const endpoint = readEndpointFields(imageRoute); controls.toggle.setAttribute("aria-pressed", String(!isEndpointFullUrlMode(imageRoute))); syncEndpointInputDisplay(imageRoute, endpoint.baseUrl, endpoint.endpointPath); }
 function syncEndpointFieldsFromFullUrlModes() { ["a", "b"].forEach((imageRoute) => { const endpoint = readEndpointFields(imageRoute); syncEndpointInputDisplay(imageRoute, endpoint.baseUrl, endpoint.endpointPath); }); }
+function getProtocolImageGenerationsUrlPreview(baseUrl = refs.protocolBaseUrlInput?.value || "") { const normalizedProtocolEndpoint = splitModelProtocolUrl(String(baseUrl || state.config?.protocolBaseUrl || "https://api.openai.com/v1").trim(), { fallbackBaseUrl: state.config?.protocolBaseUrl || "https://api.openai.com/v1" }); return appendApiEndpointPath(normalizedProtocolEndpoint.baseUrl, API_ENDPOINT_IMAGE_GENERATIONS); }
+function syncProtocolEndpointPreview() { if (refs.protocolEndpointPreview) refs.protocolEndpointPreview.textContent = getProtocolImageGenerationsUrlPreview(); }
 
 function getCurrentPrivateConfigRequestPayload() {
   const browserPayload = getBrowserPrivateConfigRequestPayload();
   const routeAEndpoint = readEndpointFields("a");
   const routeBEndpoint = readEndpointFields("b");
-  return { imageRoute: getSelectedImageRoute(), baseUrl: routeAEndpoint.baseUrl || browserPayload.baseUrl || state.config?.baseUrl || "", endpointPath: routeAEndpoint.endpointPath || browserPayload.endpointPath || state.config?.endpointPath || API_ENDPOINT_RESPONSES, apiKey: refs.apiKeyInput.value.trim() || browserPayload.apiKey || "", responsesModel: refs.responsesModelInput.value.trim() || browserPayload.responsesModel || state.config?.responsesModel || "gpt-5.5", directBaseUrl: routeBEndpoint.baseUrl || browserPayload.directBaseUrl || state.config?.directBaseUrl || "", directEndpointPath: routeBEndpoint.endpointPath || browserPayload.directEndpointPath || state.config?.directEndpointPath || API_ENDPOINT_IMAGE_GENERATIONS, directApiKey: refs.directApiKeyInput.value.trim() || browserPayload.directApiKey || "", directImageModel: refs.directImageModelInput.value.trim() || browserPayload.directImageModel || state.config?.directImageModel || "gpt-image-2", directResponsesModel: refs.directResponsesModelInput.value.trim() || browserPayload.directResponsesModel || state.config?.directResponsesModel || "gpt-5.5" };
+  return { imageRoute: getSelectedImageRoute(), baseUrl: routeAEndpoint.baseUrl || browserPayload.baseUrl || state.config?.baseUrl || "", endpointPath: routeAEndpoint.endpointPath || browserPayload.endpointPath || state.config?.endpointPath || API_ENDPOINT_RESPONSES, apiKey: refs.apiKeyInput.value.trim() || browserPayload.apiKey || "", responsesModel: refs.responsesModelInput.value.trim() || browserPayload.responsesModel || state.config?.responsesModel || "gpt-5.5", directBaseUrl: routeBEndpoint.baseUrl || browserPayload.directBaseUrl || state.config?.directBaseUrl || "", directEndpointPath: routeBEndpoint.endpointPath || browserPayload.directEndpointPath || state.config?.directEndpointPath || API_ENDPOINT_IMAGE_GENERATIONS, directApiKey: refs.directApiKeyInput.value.trim() || browserPayload.directApiKey || "", directImageModel: refs.directImageModelInput.value.trim() || browserPayload.directImageModel || state.config?.directImageModel || "gpt-image-2", directResponsesModel: refs.directResponsesModelInput.value.trim() || browserPayload.directResponsesModel || state.config?.directResponsesModel || "gpt-5.5", protocolBaseUrl: refs.protocolBaseUrlInput.value.trim() || browserPayload.protocolBaseUrl || state.config?.protocolBaseUrl || "", protocolApiKey: refs.protocolApiKeyInput.value.trim() || browserPayload.protocolApiKey || "", protocolImageModel: refs.protocolImageModelInput.value.trim() || browserPayload.protocolImageModel || state.config?.protocolImageModel || "gemini-3.1-flash-image-preview" };
 }
 
 function appendCurrentConfigToFormData(formData) { appendBrowserConfigToFormData(formData, undefined, getCurrentPrivateConfigRequestPayload()); return formData; }
 
-function applyQueuedJobConfigSnapshot(job) { if (!job) return job; const { imageRoute, baseUrl, endpointPath, responsesModel, directBaseUrl, directEndpointPath, directImageModel, directResponsesModel } = getCurrentPrivateConfigRequestPayload(); Object.assign(job, { imageRoute, generationRoute: imageRoute, baseUrl, endpointPath, responsesModel, directBaseUrl, directEndpointPath, directImageModel, directResponsesModel }); return job; }
+function applyQueuedJobConfigSnapshot(job) { if (!job) return job; const { imageRoute, baseUrl, endpointPath, responsesModel, directBaseUrl, directEndpointPath, directImageModel, directResponsesModel, protocolBaseUrl, protocolImageModel } = getCurrentPrivateConfigRequestPayload(); Object.assign(job, { imageRoute, generationRoute: imageRoute, baseUrl, endpointPath, responsesModel, directBaseUrl, directEndpointPath, directImageModel, directResponsesModel, protocolBaseUrl, protocolImageModel }); return job; }
 
 function appendJobConfigToFormData(formData, job) {
   const payload = getCurrentPrivateConfigRequestPayload();
-  ["baseUrl", "endpointPath", "responsesModel", "directBaseUrl", "directEndpointPath", "directImageModel", "directResponsesModel"].forEach((key) => { if (job?.[key]) payload[key] = job[key]; });
+  ["baseUrl", "endpointPath", "responsesModel", "directBaseUrl", "directEndpointPath", "directImageModel", "directResponsesModel", "protocolBaseUrl", "protocolImageModel"].forEach((key) => { if (job?.[key]) payload[key] = job[key]; });
   payload.imageRoute = job?.imageRoute || job?.generationRoute || payload.imageRoute;
   appendBrowserConfigToFormData(formData, undefined, payload); return formData;
 }
@@ -5123,13 +5180,17 @@ function syncConfigUi(config) {
   syncEndpointInputDisplay("b", config.directBaseUrl || config.baseUrl || "", config.directEndpointPath || API_ENDPOINT_IMAGE_GENERATIONS);
   refs.directImageModelInput.value = config.directImageModel || "gpt-image-2";
   refs.directResponsesModelInput.value = config.directResponsesModel || "gpt-5.5";
+  refs.protocolBaseUrlInput.value = config.protocolBaseUrl || config.baseUrl || "https://api.openai.com/v1";
+  refs.protocolImageModelInput.value = config.protocolImageModel || "gemini-3.1-flash-image-preview";
+  syncProtocolEndpointPreview();
   refs.imageRouteInputs.forEach((input) => {
-    input.checked = input.value === (config.imageRoute === "b" ? "b" : "a");
+    input.checked = input.value === (config.imageRoute === "c" ? "c" : config.imageRoute === "b" ? "b" : "a");
   });
   updateGenerationModeStatus();
   refs.savedKeyMask.textContent = config.apiKeyConfigured ? `已保存 ${config.apiKeyMask || ""}` : "未保存";
   refs.directSavedKeyMask.textContent = config.directApiKeyConfigured ? `已保存 ${config.directApiKeyMask || ""}` : "未保存";
-  const activeRouteConfigured = config.imageRoute === "b" ? config.directApiKeyConfigured : config.apiKeyConfigured;
+  if (refs.protocolSavedKeyMask) refs.protocolSavedKeyMask.textContent = config.protocolApiKeyConfigured ? `已保存 ${config.protocolApiKeyMask || ""}` : "未保存";
+  const activeRouteConfigured = config.imageRoute === "c" ? config.protocolApiKeyConfigured : config.imageRoute === "b" ? config.directApiKeyConfigured : config.apiKeyConfigured;
   refs.configStatus.textContent = activeRouteConfigured ? "配置已保存" : "配置未保存";
   configModelPicker.render();
   state.aspectRatios = config.aspectRatios || [];
@@ -5789,7 +5850,7 @@ function renderPreview() {
 }
 
 function getFilmstripItems() {
-  const activeJobs = sortGalleryItemsByCreatedAtDesc(state.jobs).map((job) => ({
+  const activeJobs = getStablePreviewLoadingItems(state.jobs).slice(0, 6).map((job) => ({
     key: makeJobPreviewKey(job.id),
     item: job,
     label: formatFilmstripSizeLabel(job) || job.statusText || formatClock(job.createdAt),
@@ -14000,7 +14061,7 @@ function createStyleTransferJob() {
 }
 
 function getSelectedReferenceAnalysisGenerationSize() {
-  return normalizeGenerationSize(refs.referenceAnalysisRatioInput.value || DEFAULT_UI_RATIO, refs.referenceAnalysisSizeInput.value || "auto");
+  return normalizeSizeForSelectedRoute(refs.referenceAnalysisRatioInput.value || DEFAULT_UI_RATIO, refs.referenceAnalysisSizeInput.value || "auto");
 }
 
 function getReferenceAnalysisSelectedLanguage() {
@@ -14345,6 +14406,7 @@ async function saveConfig(event) {
   state.config = toPublicBrowserConfig(browserConfig, state.config || {});
   refs.apiKeyInput.value = "";
   refs.directApiKeyInput.value = "";
+  refs.protocolApiKeyInput.value = "";
   configModelPicker.setFeedback("配置已保存到当前浏览器。", "success");
   syncConfigUi(state.config);
 }
@@ -14451,6 +14513,7 @@ async function clearHistory() {
 function buildGenerationFormData(job) {
   const formData = new FormData();
   formData.set("jobId", job.id);
+  formData.set("background", "1");
   formData.set("prompt", job.prompt);
   formData.set("ratio", job.ratio);
   formData.set("size", job.size);
@@ -15294,7 +15357,15 @@ function bindEvents() {
   refs.imageRouteInputs.forEach((input) => input.addEventListener("change", () => {
     updateGenerationModeStatus();
     syncEndpointFieldsFromFullUrlModes();
+    syncProtocolEndpointPreview();
+    renderSizeOptions();
+    renderReferenceAnalysisSizeOptions();
+    renderImageDecompositionSizeOptions();
+    renderCreationSizeOptions();
+    renderPortraitSizeOptions();
   }));
+  refs.protocolBaseUrlInput?.addEventListener("input", syncProtocolEndpointPreview);
+  refs.protocolImageModelInput?.addEventListener("input", syncProtocolEndpointPreview);
   refs.baseUrlFullToggle?.addEventListener("click", () => toggleEndpointFullUrlMode("a"));
   refs.directBaseUrlFullToggle?.addEventListener("click", () => toggleEndpointFullUrlMode("b"));
   refs.endpointPathSelect?.addEventListener("change", () => {

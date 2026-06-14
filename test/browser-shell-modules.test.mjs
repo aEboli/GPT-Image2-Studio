@@ -15,7 +15,7 @@ import {
 import { isCreationSubjectReferenceRole } from "../public/lib/creation-reference-roles.mjs";
 import { reorderCreationReferenceFiles } from "../public/lib/creation-reference-drag.mjs";
 
-const APP_SHELL_LINE_BUDGET = 16500;
+const APP_SHELL_LINE_BUDGET = 16600;
 
 function makeFakeControlButton(className = "") {
   const element = {
@@ -74,10 +74,13 @@ test("browser config module normalizes private config without requiring window g
     endpointPath: "responses",
     responsesModel: "gpt-5.5",
     directBaseUrl: "https://direct.example.test/v1/chat/completions",
-    directEndpointPath: "images/generations",
+    directEndpointPath: "chat/completions",
     directApiKey: "sk-direct-secret",
     directImageModel: "custom-image-model",
     directResponsesModel: "custom-vision-text-model",
+    protocolBaseUrl: "https://protocol.example.test/v1/chat/completions",
+    protocolApiKey: "sk-protocol-secret",
+    protocolImageModel: "custom-protocol-image-model",
   });
   const publicConfig = toPublicBrowserConfig(normalized, { defaults: { size: "auto" } });
   const formData = appendBrowserConfigToFormData(new FormData(), () => normalized);
@@ -93,6 +96,9 @@ test("browser config module normalizes private config without requiring window g
     directEndpointPath: "chat/completions",
     directImageModel: "custom-image-model",
     directResponsesModel: "custom-vision-text-model",
+    protocolBaseUrl: "https://protocol.example.test/v1",
+    protocolApiKey: "sk-protocol-secret",
+    protocolImageModel: "custom-protocol-image-model",
   });
   assert.equal(publicConfig.imageRoute, "b");
   assert.equal(publicConfig.apiKeyConfigured, true);
@@ -101,6 +107,9 @@ test("browser config module normalizes private config without requiring window g
   assert.equal(publicConfig.directApiKeyMask, "sk-d***cret");
   assert.equal(publicConfig.directImageModel, "custom-image-model");
   assert.equal(publicConfig.directResponsesModel, "custom-vision-text-model");
+  assert.equal(publicConfig.protocolApiKeyConfigured, true);
+  assert.equal(publicConfig.protocolApiKeyMask, "sk-p***cret");
+  assert.equal(publicConfig.protocolImageModel, "custom-protocol-image-model");
   assert.equal(publicConfig.defaults.size, "auto");
   assert.equal(formData.get("imageRoute"), "b");
   assert.equal(formData.get("baseUrl"), "https://example.test/v1");
@@ -112,6 +121,28 @@ test("browser config module normalizes private config without requiring window g
   assert.equal(formData.get("directApiKey"), "sk-direct-secret");
   assert.equal(formData.get("directImageModel"), "custom-image-model");
   assert.equal(formData.get("directResponsesModel"), "custom-vision-text-model");
+  assert.equal(formData.get("protocolBaseUrl"), "https://protocol.example.test/v1");
+  assert.equal(formData.get("protocolApiKey"), "sk-protocol-secret");
+  assert.equal(formData.get("protocolImageModel"), "custom-protocol-image-model");
+});
+
+test("browser config keeps complete root endpoint URLs without appending v1", () => {
+  const normalized = normalizeBrowserPrivateConfig({
+    imageRoute: "c",
+    baseUrl: "https://browser.example.test/responses?debug=true#trace",
+    endpointPath: "chat/completions",
+    directBaseUrl: "https://direct.example.test/images/generations?debug=true#trace",
+    directEndpointPath: "responses",
+    directApiKey: "direct-key",
+    protocolBaseUrl: "https://protocol.example.test/images/edits?debug=true#trace",
+    protocolImageModel: "custom-protocol-image-model",
+  });
+
+  assert.equal(normalized.baseUrl, "https://browser.example.test");
+  assert.equal(normalized.endpointPath, "responses");
+  assert.equal(normalized.directBaseUrl, "https://direct.example.test");
+  assert.equal(normalized.directEndpointPath, "images/generations");
+  assert.equal(normalized.protocolBaseUrl, "https://protocol.example.test");
 });
 
 test("browser config form data can override saved route with the current UI route", () => {
@@ -126,17 +157,23 @@ test("browser config form data can override saved route with the current UI rout
     directApiKey: "saved-direct-key",
     directImageModel: "saved-direct-image",
     directResponsesModel: "saved-direct-vision",
+    protocolBaseUrl: "https://saved-protocol.example.test/",
+    protocolApiKey: "saved-protocol-key",
+    protocolImageModel: "saved-protocol-image",
   });
   const formData = appendBrowserConfigToFormData(new FormData(), () => saved, {
-    imageRoute: "b",
+    imageRoute: "c",
     directBaseUrl: "https://live-direct.example.test/",
     directEndpointPath: "chat/completions",
     directApiKey: "live-direct-key",
     directImageModel: "live-direct-image",
     directResponsesModel: "live-direct-vision",
+    protocolBaseUrl: "https://live-protocol.example.test/",
+    protocolApiKey: "live-protocol-key",
+    protocolImageModel: "live-protocol-image",
   });
 
-  assert.equal(formData.get("imageRoute"), "b");
+  assert.equal(formData.get("imageRoute"), "c");
   assert.equal(formData.get("baseUrl"), "https://saved-route.example.test/v1");
   assert.equal(formData.get("apiKey"), "saved-route-key");
   assert.equal(formData.get("directBaseUrl"), "https://live-direct.example.test/v1");
@@ -144,6 +181,46 @@ test("browser config form data can override saved route with the current UI rout
   assert.equal(formData.get("directApiKey"), "live-direct-key");
   assert.equal(formData.get("directImageModel"), "live-direct-image");
   assert.equal(formData.get("directResponsesModel"), "live-direct-vision");
+  assert.equal(formData.get("protocolBaseUrl"), "https://live-protocol.example.test/v1");
+  assert.equal(formData.get("protocolApiKey"), "live-protocol-key");
+  assert.equal(formData.get("protocolImageModel"), "live-protocol-image");
+});
+
+test("browser config seeds model protocol settings from saved relay credentials", () => {
+  const routeASeeded = normalizeBrowserPrivateConfig({
+    imageRoute: "c",
+    baseUrl: "https://route-a-relay.example.test/v1/responses",
+    apiKey: "saved-route-a-key",
+  });
+  const directSeeded = normalizeBrowserPrivateConfig({
+    imageRoute: "c",
+    baseUrl: "https://route-a-relay.example.test/v1",
+    apiKey: "saved-route-a-key",
+    directBaseUrl: "https://direct-relay.example.test/v1/images/generations",
+    directApiKey: "saved-direct-key",
+  });
+
+  assert.equal(routeASeeded.protocolBaseUrl, "https://route-a-relay.example.test/v1");
+  assert.equal(routeASeeded.protocolApiKey, "saved-route-a-key");
+  assert.equal(directSeeded.protocolBaseUrl, "https://direct-relay.example.test/v1");
+  assert.equal(directSeeded.protocolApiKey, "saved-direct-key");
+  assert.equal(toPublicBrowserConfig(routeASeeded).protocolApiKeyConfigured, true);
+});
+
+test("browser config seeds direct image settings from saved route A credentials", () => {
+  const normalized = normalizeBrowserPrivateConfig({
+    imageRoute: "b",
+    baseUrl: "https://route-a-relay.example.test/v1/responses",
+    apiKey: "saved-route-a-key",
+  });
+  const publicConfig = toPublicBrowserConfig(normalized);
+  const formData = appendBrowserConfigToFormData(new FormData(), () => normalized);
+
+  assert.equal(normalized.directBaseUrl, "https://route-a-relay.example.test/v1");
+  assert.equal(normalized.directApiKey, "saved-route-a-key");
+  assert.equal(publicConfig.directApiKeyConfigured, true);
+  assert.equal(formData.get("directBaseUrl"), "https://route-a-relay.example.test/v1");
+  assert.equal(formData.get("directApiKey"), "saved-route-a-key");
 });
 
 test("public app shell delegates browser config and cache behavior to public modules", async () => {

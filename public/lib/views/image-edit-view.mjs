@@ -12,7 +12,7 @@ import { shouldReusePreviewLoadingShell } from "../preview-loading-shell.mjs";
 import { createViewRendererController } from "./view-renderer.mjs";
 
 const DEFAULT_IMAGE_EDIT_RATIO = "1:1";
-const DEFAULT_IMAGE_EDIT_RATIO_LABEL = "方形 1:1";
+const DEFAULT_IMAGE_EDIT_RATIO_LABEL = "电商主图、头像、社交媒体 · 方形 1:1";
 
 const LOCAL_MASK_COLORS = ["#f5506e", "#14b8a6", "#f59e0b", "#6366f1", "#22c55e", "#ec4899"];
 const LOCAL_MASK_UNDO_LIMIT = 24;
@@ -93,12 +93,15 @@ export function createImageEditController(options = {}) {
     makeGalleryPreviewKey = (filename) => "file:" + filename,
     makeJobPreviewKey = (jobId) => "job:" + jobId,
     nowIso = () => new Date().toISOString(),
+    normalizeSizeForSelectedRoute = normalizeGenerationSize,
     openLightbox = () => {},
     prepareGenerationReferenceImageFile,
     recordJobQueued = () => {},
     renderAll = () => {},
     renderRatioGrid,
     renderSizeOptions,
+    resolveGenerationSizeForSelectedRoute = (ratioOption, sizeSetting) =>
+      sizeSetting === "auto" ? ratioOption?.baseSize || getDefaultGenerationSize(ratioOption?.value) : sizeSetting,
     revokeReferencePreview = () => {},
     scheduleGenerationQueue = () => {},
     setActiveView = () => {},
@@ -1145,15 +1148,15 @@ export function createImageEditController(options = {}) {
 
   function syncImageEditSize(value) {
     const ratioValue = refs.imageEditRatioInput.value || DEFAULT_IMAGE_EDIT_RATIO;
-    refs.imageEditSizeInput.value = normalizeGenerationSize(ratioValue, value || "auto");
+    refs.imageEditSizeInput.value = normalizeSizeForSelectedRoute(ratioValue, value || "auto");
   }
 
   function createImageEditJob(payload = null) {
     const prompt = payload?.prompt || refs.imageEditPromptInput.value.trim();
     const ratioOption = getRatioOption(refs.imageEditRatioInput.value || DEFAULT_IMAGE_EDIT_RATIO);
     const ratioValue = ratioOption?.value || DEFAULT_IMAGE_EDIT_RATIO;
-    const sizeSetting = normalizeGenerationSize(ratioValue, refs.imageEditSizeInput.value || "auto");
-    const size = sizeSetting === "auto" ? ratioOption?.baseSize || getDefaultGenerationSize(ratioValue) : sizeSetting;
+    const sizeSetting = normalizeSizeForSelectedRoute(ratioValue, refs.imageEditSizeInput.value || "auto");
+    const size = resolveGenerationSizeForSelectedRoute(ratioOption, sizeSetting);
     const sourceItem = state.imageEdit.source;
 
     return {

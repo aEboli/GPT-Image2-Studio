@@ -5,7 +5,9 @@
 } from "./lib/aspect-ratios.mjs";
 import {
   getDefaultGenerationSize,
+  getDefaultModelProtocolImageSize,
   normalizeGenerationSize,
+  normalizeModelProtocolImageSize,
 } from "./lib/generation-size-options.mjs";
 import {
   IMAGE_DECOMPOSITION_ASSET_KIND,
@@ -70,12 +72,14 @@ import {
   normalizePptCompletionRequest,
 } from "./lib/ppt-completion.mjs";
 import { normalizePptMotionOptions } from "./lib/ppt-motion-presets.mjs";
-import { normalizeBase64, requestDirectImageGeneration, requestImageEdit, requestImageGeneration } from "./lib/responses-workflow.mjs";
+import { normalizeBase64, requestDirectImageGeneration, requestImageEdit, requestImageGeneration, requestModelProtocolImageGeneration } from "./lib/responses-workflow.mjs";
 import {
   API_ENDPOINT_IMAGE_GENERATIONS,
   API_ENDPOINT_RESPONSES,
   DEFAULT_DIRECT_RESPONSES_MODEL,
+  DEFAULT_PROTOCOL_IMAGE_MODEL,
   IMAGE_ROUTE_B,
+  IMAGE_ROUTE_C,
   getSelectedImageGenerationConfig,
   getSelectedTextVisionConfig,
   normalizeImageRouteConfig,
@@ -160,8 +164,10 @@ const DEFAULT_CONFIG = {
   directEndpointPath: API_ENDPOINT_IMAGE_GENERATIONS,
   directImageModel: "gpt-image-2",
   directResponsesModel: DEFAULT_DIRECT_RESPONSES_MODEL,
+  protocolBaseUrl: DEFAULT_BASE_URL,
+  protocolImageModel: DEFAULT_PROTOCOL_IMAGE_MODEL,
   defaults: {
-    size: "896x1120",
+    size: "1024x1280",
     quality: "high",
     format: "png",
     reasoningEffort: DEFAULT_REASONING_EFFORT,
@@ -197,11 +203,14 @@ async function writeSseEvent(writer, type, payload) {
 }
 
 function requestCloudImageGeneration(options) {
-  if (options.generationMode === IMAGE_EDIT_MODE) {
-    return requestImageEdit(options);
+  if (options.imageRoute === IMAGE_ROUTE_C) {
+    return requestModelProtocolImageGeneration(options);
   }
   if (options.imageRoute === IMAGE_ROUTE_B) {
     return requestDirectImageGeneration(options);
+  }
+  if (options.generationMode === IMAGE_EDIT_MODE) {
+    return requestImageEdit(options);
   }
   return requestImageGeneration(options);
 }
@@ -218,6 +227,9 @@ function buildPublicConfig() {
     directEndpointPath: DEFAULT_CONFIG.directEndpointPath,
     directImageModel: DEFAULT_CONFIG.directImageModel,
     directResponsesModel: DEFAULT_CONFIG.directResponsesModel,
+    protocolBaseUrl: DEFAULT_CONFIG.protocolBaseUrl,
+    protocolApiKeyConfigured: false,
+    protocolImageModel: DEFAULT_CONFIG.protocolImageModel,
     defaults: { ...DEFAULT_CONFIG.defaults },
     limits: {
       maxParallelTasksPerSession: MAX_PARALLEL_TASKS_PER_SESSION,
@@ -328,6 +340,22 @@ function normalizeReasoningEffort(value, fallback = DEFAULT_REASONING_EFFORT) {
   return normalized;
 }
 
+function resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, imageRoute) {
+  if (imageRoute === IMAGE_ROUTE_C) {
+    const requestedSize = normalizeModelProtocolImageSize(requestedSizeInput || "auto");
+    const finalSize = requestedSize === "auto" ? getDefaultModelProtocolImageSize() : requestedSize;
+    return { requestedSize, finalSize };
+  }
+
+  const requestedSize = normalizeGenerationSize(ratioOption.value, requestedSizeInput);
+  if (requestedSize !== requestedSizeInput && requestedSizeInput !== "") {
+    throw new Error(`当前比例 ${ratioOption.value} 不支持分辨率 ${requestedSizeInput}`);
+  }
+
+  const finalSize = requestedSize === "auto" ? getDefaultGenerationSize(ratioOption.value) : requestedSize;
+  return { requestedSize, finalSize };
+}
+
 function normalizePrivateConfig(
   formData,
   { allowDirectImageRoute = false, allowDirectTextVisionRoute = false } = {},
@@ -344,6 +372,9 @@ function normalizePrivateConfig(
       directApiKey: formData.get("directApiKey"),
       directImageModel: formData.get("directImageModel"),
       directResponsesModel: formData.get("directResponsesModel"),
+      protocolBaseUrl: formData.get("protocolBaseUrl"),
+      protocolApiKey: formData.get("protocolApiKey"),
+      protocolImageModel: formData.get("protocolImageModel"),
     },
     {
       defaultBaseUrl: DEFAULT_CONFIG.baseUrl,
@@ -1002,12 +1033,7 @@ async function buildGenerationRequestContext(request, formData) {
 
   const reasoningEffort = normalizeReasoningEffort(formData.get("reasoningEffort"));
   const ratioOption = resolveAspectRatioOption(ratio);
-  const requestedSize = normalizeGenerationSize(ratioOption.value, requestedSizeInput);
-  if (requestedSize !== requestedSizeInput && requestedSizeInput !== "") {
-    throw new Error(`当前比例 ${ratioOption.value} 不支持分辨率 ${requestedSizeInput}`);
-  }
-
-  const finalSize = requestedSize === "auto" ? getDefaultGenerationSize(ratioOption.value) : requestedSize;
+  const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
   const finalQuality = config.defaults.quality;
   const finalFormat = normalizeOutputFormat(requestedFormatInput || config.defaults.format);
   const finalPrompt = appendRatioHintToPrompt(prompt, ratioOption);
@@ -1222,6 +1248,33 @@ function buildCloudCreationListingConfig(payload = {}, env = {}) {
         ],
         DEFAULT_CONFIG.directResponsesModel,
       ),
+      protocolBaseUrl: firstConfigString(
+        [
+          payload.protocolBaseUrl,
+          nestedConfig.protocolBaseUrl,
+          env.protocolBaseUrl,
+          env.PROTOCOL_BASE_URL,
+          env.IMAGE_STUDIO_PROTOCOL_BASE_URL,
+        ],
+        DEFAULT_CONFIG.protocolBaseUrl,
+      ),
+      protocolApiKey: firstConfigString([
+        payload.protocolApiKey,
+        nestedConfig.protocolApiKey,
+        env.protocolApiKey,
+        env.PROTOCOL_API_KEY,
+        env.IMAGE_STUDIO_PROTOCOL_API_KEY,
+      ]),
+      protocolImageModel: firstConfigString(
+        [
+          payload.protocolImageModel,
+          nestedConfig.protocolImageModel,
+          env.protocolImageModel,
+          env.PROTOCOL_IMAGE_MODEL,
+          env.IMAGE_STUDIO_PROTOCOL_IMAGE_MODEL,
+        ],
+        DEFAULT_CONFIG.protocolImageModel,
+      ),
     },
     {
       defaultBaseUrl: DEFAULT_CONFIG.baseUrl,
@@ -1310,6 +1363,7 @@ async function generateCloudflarePptSlide({
     prompt: slidePrompt.prompt,
     referenceImages,
     size: PPT_SLIDE_SIZE,
+    aspectRatio: "16:9",
     quality: config.defaults?.quality || "high",
     format: toApiOutputFormat(PPT_SLIDE_FORMAT),
     responsesModel: generationConfig.responsesModel,
@@ -1871,13 +1925,8 @@ async function runGenerate(request, writer, { fetchImpl, imageBucket } = {}) {
 
   const reasoningEffort = normalizeReasoningEffort(formData.get("reasoningEffort"));
   const ratioOption = resolveAspectRatioOption(ratio);
-  const requestedSize = normalizeGenerationSize(ratioOption.value, requestedSizeInput);
-  if (requestedSize !== requestedSizeInput && requestedSizeInput !== "") {
-    throw new Error(`当前比例 ${ratioOption.value} 不支持分辨率 ${requestedSizeInput}`);
-  }
-
   const finalPrompt = appendRatioHintToPrompt(prompt, ratioOption);
-  const finalSize = requestedSize === "auto" ? getDefaultGenerationSize(ratioOption.value) : requestedSize;
+  const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
   const finalQuality = config.defaults.quality;
   const finalFormat = normalizeOutputFormat(requestedFormatInput || config.defaults.format);
   const finalImageFilename = buildCloudFilename({ taskId, createdAt, format: finalFormat, filenameToken });
@@ -1904,6 +1953,7 @@ async function runGenerate(request, writer, { fetchImpl, imageBucket } = {}) {
           referenceImages: [currentSourceImage],
           referenceImageLabels: [],
           size: finalSize,
+          aspectRatio: ratioOption.value,
           quality: finalQuality,
           format: toApiOutputFormat(finalFormat),
           responsesModel: generationConfig.responsesModel,
@@ -1995,6 +2045,7 @@ async function runGenerate(request, writer, { fetchImpl, imageBucket } = {}) {
         .filter(Boolean),
     ),
     size: finalSize,
+    aspectRatio: ratioOption.value,
     quality: finalQuality,
     format: toApiOutputFormat(finalFormat),
     responsesModel: generationConfig.responsesModel,
@@ -2459,12 +2510,7 @@ async function runCreationGenerate(request, writer, { fetchImpl, imageBucket } =
   const generationConfig = getSelectedImageGenerationConfig(config);
   const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || "1:1"));
   const requestedSizeInput = String(formData.get("size") || "auto").trim().toLowerCase();
-  const requestedSize = normalizeGenerationSize(ratioOption.value, requestedSizeInput);
-  if (requestedSize !== requestedSizeInput && requestedSizeInput !== "") {
-    throw new Error(`当前比例 ${ratioOption.value} 不支持分辨率 ${requestedSizeInput}`);
-  }
-
-  const finalSize = requestedSize === "auto" ? getDefaultGenerationSize(ratioOption.value) : requestedSize;
+  const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
   const finalQuality = config.defaults.quality;
   const finalFormat = normalizeOutputFormat(formData.get("format") || config.defaults.format);
   const reasoningEffort = normalizeReasoningEffort(
@@ -2516,6 +2562,7 @@ async function runCreationGenerate(request, writer, { fetchImpl, imageBucket } =
           styleReferenceImages,
         ),
         size: finalSize,
+        aspectRatio: ratioOption.value,
         quality: finalQuality,
         format: toApiOutputFormat(finalFormat),
         responsesModel: generationConfig.responsesModel,
@@ -2685,12 +2732,7 @@ async function runPortraitGenerate(request, writer, { fetchImpl, imageBucket } =
   const generationConfig = getSelectedImageGenerationConfig(config);
   const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || plan.ratio || "4:5"));
   const requestedSizeInput = String(formData.get("size") || plan.size || "auto").trim().toLowerCase();
-  const requestedSize = normalizeGenerationSize(ratioOption.value, requestedSizeInput);
-  if (requestedSize !== requestedSizeInput && requestedSizeInput !== "") {
-    throw new Error(`当前比例 ${ratioOption.value} 不支持分辨率 ${requestedSizeInput}`);
-  }
-
-  const finalSize = requestedSize === "auto" ? getDefaultGenerationSize(ratioOption.value) : requestedSize;
+  const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
   const finalQuality = config.defaults.quality;
   const finalFormat = normalizeOutputFormat(formData.get("format") || plan.format || config.defaults.format);
   const reasoningEffort = normalizeReasoningEffort(
@@ -2735,6 +2777,7 @@ async function runPortraitGenerate(request, writer, { fetchImpl, imageBucket } =
         referenceImages,
         referenceImageLabels,
         size: finalSize,
+        aspectRatio: ratioOption.value,
         quality: finalQuality,
         format: toApiOutputFormat(finalFormat),
         responsesModel: generationConfig.responsesModel,
@@ -2892,12 +2935,7 @@ async function runCreationLogoBatchGenerate(request, writer, { fetchImpl, imageB
   const generationConfig = getSelectedImageGenerationConfig(config);
   const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || "1:1"));
   const requestedSizeInput = String(formData.get("size") || "auto").trim().toLowerCase();
-  const requestedSize = normalizeGenerationSize(ratioOption.value, requestedSizeInput);
-  if (requestedSize !== requestedSizeInput && requestedSizeInput !== "") {
-    throw new Error(`当前比例 ${ratioOption.value} 不支持分辨率 ${requestedSizeInput}`);
-  }
-
-  const finalSize = requestedSize === "auto" ? getDefaultGenerationSize(ratioOption.value) : requestedSize;
+  const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
   const finalQuality = config.defaults.quality;
   const finalFormat = normalizeOutputFormat(formData.get("format") || config.defaults.format);
   const reasoningEffort = normalizeReasoningEffort(
@@ -2947,6 +2985,7 @@ async function runCreationLogoBatchGenerate(request, writer, { fetchImpl, imageB
         referenceImages: [sourceImage, logoImage],
         referenceImageLabels: CREATION_LOGO_BATCH_REFERENCE_LABELS,
         size: finalSize,
+        aspectRatio: ratioOption.value,
         quality: finalQuality,
         format: toApiOutputFormat(finalFormat),
         responsesModel: generationConfig.responsesModel,
@@ -3233,6 +3272,7 @@ async function processQueuedGenerationMessage(messageBody, { imageBucket, fetchI
           referenceImages: [currentSourceImage],
           referenceImageLabels: [],
           size: storedRequest.finalSize,
+          aspectRatio: resolveAspectRatioOption(storedRequest.ratio).value,
           quality: storedRequest.finalQuality,
           format: toApiOutputFormat(storedRequest.finalFormat),
           responsesModel: generationConfig.responsesModel,
@@ -3320,6 +3360,7 @@ async function processQueuedGenerationMessage(messageBody, { imageBucket, fetchI
           .filter(Boolean),
       ),
       size: storedRequest.finalSize,
+      aspectRatio: resolveAspectRatioOption(storedRequest.ratio).value,
       quality: storedRequest.finalQuality,
       format: toApiOutputFormat(storedRequest.finalFormat),
       responsesModel: generationConfig.responsesModel,

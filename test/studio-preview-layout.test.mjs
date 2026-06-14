@@ -20,8 +20,8 @@ const publicConfigModelPickerPath = new URL("../public/lib/config-model-picker.m
 const publicCreationListingViewPath = new URL("../public/lib/creation-listing-view.mjs", import.meta.url);
 const generationClientPath = new URL("../lib/generation-client.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20260611-filmstrip-loading-1";
-const appAssetVersion = "20260611-filmstrip-loading-1";
+const stylesAssetVersion = "20260613-endpoint-url-row-1";
+const appAssetVersion = "20260613-endpoint-url-row-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
 const creationQueueModuleAssetVersion = "20260530-creation-queue-role-sync-1";
 const quickBlendModuleAssetVersion = "20260608-quick-blend-time-sort-1";
@@ -204,9 +204,16 @@ function createModelPickerHarness() {
     imageRouteInputs: [
       { value: "a", checked: true },
       { value: "b", checked: false },
+      { value: "c", checked: false },
     ],
     modelOptionsList: createTestElement("div", documentRef),
     modelPickerToggle: createTestElement("button", documentRef),
+    protocolApiKeyInput: createTestElement("input", documentRef),
+    protocolBaseUrlInput: createTestElement("input", documentRef),
+    protocolFetchModelsButton: createTestElement("button", documentRef),
+    protocolImageModelInput: createTestElement("input", documentRef),
+    protocolModelOptionsList: createTestElement("div", documentRef),
+    protocolModelPickerToggle: createTestElement("button", documentRef),
     responsesModelInput: createTestElement("input", documentRef),
     testConnectionButton: createTestElement("button", documentRef),
   };
@@ -218,6 +225,9 @@ function createModelPickerHarness() {
   refs.directEndpointPathSelect.value = "chat/completions";
   refs.directImageModelInput.value = "gpt-image-2";
   refs.directResponsesModelInput.value = "gpt-5.5";
+  refs.protocolApiKeyInput.value = "protocol-key";
+  refs.protocolBaseUrlInput.value = "https://protocol.example.test/v1";
+  refs.protocolImageModelInput.value = "gemini-3.1-flash-image-preview";
   refs.responsesModelInput.value = "gpt-5.5";
   return { documentRef, refs };
 }
@@ -399,6 +409,95 @@ test("filmstrip thumbnails stay square, fill the available rail, and keep labels
   assert.match(app, /function formatFilmstripSizeLabel\(item\) \{[\s\S]*return formatCompactSizeLabel\(item\?\.size\);/);
   assert.match(app, /label: formatFilmstripSizeLabel\(job\) \|\| job\.statusText \|\| formatClock\(job\.createdAt\)/);
   assert.match(app, /label: formatFilmstripSizeLabel\(item\) \|\| formatClock\(item\.createdAt\)/);
+});
+
+test("filmstrip limits visible running jobs to stable preview loading slots", async () => {
+  const app = await readFile(appPath, "utf8");
+  const getFilmstripItemsRuntime = extractFunctionBefore(app, "getFilmstripItems", "getFilmstripPlaceholderState");
+  const state = {
+    jobs: Array.from({ length: 7 }, (_, index) => ({
+      id: `job-${index + 1}`,
+      createdAt: "",
+      statusText: `job ${index + 1}`,
+    })).reverse(),
+    gallery: [],
+  };
+  const getFilmstripItems = new Function(
+    "state",
+    "sortGalleryItemsByCreatedAtDesc",
+    "makeJobPreviewKey",
+    "formatFilmstripSizeLabel",
+    "formatClock",
+    "getPromptGenerationGalleryItems",
+    "getStablePreviewLoadingItems",
+    `${getFilmstripItemsRuntime}\nreturn getFilmstripItems;`,
+  )(
+    state,
+    (items) => [...items],
+    (id) => `job:${id}`,
+    () => "",
+    () => "",
+    () => [],
+    (items) => [...items].reverse(),
+  );
+
+  const entries = getFilmstripItems();
+
+  assert.deepEqual(
+    entries.map((entry) => entry.item.id),
+    ["job-1", "job-2", "job-3", "job-4", "job-5", "job-6"],
+  );
+});
+
+test("filmstrip keeps gallery thumbnails separate after limiting running placeholders", async () => {
+  const app = await readFile(appPath, "utf8");
+  const getFilmstripItemsRuntime = extractFunctionBefore(app, "getFilmstripItems", "getFilmstripPlaceholderState");
+  const state = {
+    jobs: Array.from({ length: 7 }, (_, index) => ({
+      id: `job-${index + 1}`,
+      createdAt: "",
+      statusText: `job ${index + 1}`,
+    })).reverse(),
+    gallery: [
+      { filename: "latest.png", createdAt: "2026-06-13T00:00:10.000Z", size: "1024x1024" },
+      { filename: "older.png", createdAt: "2026-06-13T00:00:09.000Z", size: "1024x1024" },
+    ],
+  };
+  const getFilmstripItems = new Function(
+    "state",
+    "sortGalleryItemsByCreatedAtDesc",
+    "makeJobPreviewKey",
+    "makeGalleryPreviewKey",
+    "formatFilmstripSizeLabel",
+    "formatClock",
+    "getPromptGenerationGalleryItems",
+    "getStablePreviewLoadingItems",
+    `${getFilmstripItemsRuntime}\nreturn getFilmstripItems;`,
+  )(
+    state,
+    (items) => [...items],
+    (id) => `job:${id}`,
+    (filename) => `file:${filename}`,
+    (item) => String(item?.size || ""),
+    (value) => String(value || ""),
+    (items) => items,
+    (items) => [...items].reverse(),
+  );
+
+  const entries = getFilmstripItems();
+
+  assert.deepEqual(entries.map((entry) => entry.key), [
+    "job:job-1",
+    "job:job-2",
+    "job:job-3",
+    "job:job-4",
+    "job:job-5",
+    "job:job-6",
+    "file:latest.png",
+    "file:older.png",
+  ]);
+  assert.equal(entries.filter((entry) => entry.key.startsWith("job:")).length, 6);
+  assert.equal(entries.filter((entry) => entry.key.startsWith("file:")).length, 2);
 });
 
 test("filmstrip rendering reuses keyed thumbnail nodes instead of clearing the rail", async () => {
@@ -1386,15 +1485,32 @@ test("reference analysis generation mode survives task polling snapshots", async
 
 test("generation form data uses the current route tab instead of only saved browser config", async () => {
   const app = await readFile(appPath, "utf8");
+  const server = await readFile(serverPath, "utf8");
   const formDataBody = app.match(/function buildGenerationFormData\(job\) \{[\s\S]*?\n\}/)?.[0] || "";
 
   assert.match(app, /function getCurrentPrivateConfigRequestPayload\(\) \{[\s\S]*imageRoute:\s*getSelectedImageRoute\(\)/);
+  assert.match(app, /protocolBaseUrl:\s*refs\.protocolBaseUrlInput\.value\.trim\(\) \|\| browserPayload\.protocolBaseUrl/);
+  assert.match(app, /protocolApiKey:\s*refs\.protocolApiKeyInput\.value\.trim\(\) \|\| browserPayload\.protocolApiKey/);
+  assert.match(app, /protocolImageModel:\s*refs\.protocolImageModelInput\.value\.trim\(\) \|\| browserPayload\.protocolImageModel/);
   assert.match(
     app,
     /function appendCurrentConfigToFormData\(formData\) \{[\s\S]*appendBrowserConfigToFormData\(formData, undefined, getCurrentPrivateConfigRequestPayload\(\)\);/,
   );
   assert.match(formDataBody, /appendCurrentConfigToFormData\(formData\);/);
   assert.doesNotMatch(formDataBody, /appendBrowserConfigToFormData\(formData\);/);
+  assert.match(server, /requestModelProtocolImageGeneration/);
+  assert.match(server, /if \(options\.imageRoute === IMAGE_ROUTE_C\) \{[\s\S]*return requestModelProtocolImageGeneration\(options\);/);
+});
+
+test("generation size controls switch to protocol scale values in model protocol mode", async () => {
+  const app = await readFile(appPath, "utf8");
+
+  assert.match(app, /getModelProtocolImageSizeOptions,/);
+  assert.match(app, /normalizeModelProtocolImageSize/);
+  assert.match(app, /function isModelProtocolImageRoute\(\)/);
+  assert.match(app, /function renderSizeOptions\(sizeInput = refs\.sizeInput, ratioInput = refs\.ratioInput\) \{[\s\S]*getModelProtocolImageSizeOptions\(\)/);
+  assert.match(app, /function getSelectedGenerationSize\(\) \{[\s\S]*normalizeModelProtocolImageSize\(refs\.sizeInput\.value \|\| "auto"\)/);
+  assert.match(app, /refs\.imageRouteInputs\.forEach\(\(input\) => input\.addEventListener\("change", \(\) => \{[\s\S]*renderSizeOptions\(\);[\s\S]*\}\)\);/);
 });
 
 test("prompt field can start generation with Ctrl+Enter", async () => {
@@ -1505,9 +1621,9 @@ test("ratio picker renders every configured aspect ratio instead of a featured s
   assert.doesNotMatch(app, /button\.appendChild\(subtitle\)/);
   assert.match(html, /<summary class="field-heading adaptive-section-summary">[\s\S]*<span>参数设置<\/span>[\s\S]*<span class="ratio-orientation-summary" id="ratioOrientationSummary" aria-live="polite"><\/span>[\s\S]*<\/summary>/);
   assert.match(app, /ratioOrientationSummary:\s*document\.querySelector\("#ratioOrientationSummary"\)/);
-  assert.match(app, /function syncRatioOrientationSummary\(\) \{[\s\S]*const ratioOption = getRatioOption\(refs\.ratioInput\.value \|\| DEFAULT_UI_RATIO\);[\s\S]*refs\.ratioOrientationSummary\.textContent = getRatioOrientationLabel\(ratioOption\?\.orientation\);[\s\S]*refs\.ratioOrientationSummary\.dataset\.orientation = ratioOption\?\.orientation \|\| "square";[\s\S]*\}/);
+  assert.match(app, /function syncRatioOrientationSummary\(\) \{[\s\S]*const ratioOption = getRatioOption\(refs\.ratioInput\.value \|\| DEFAULT_UI_RATIO\);[\s\S]*refs\.ratioOrientationSummary\.textContent = ratioOption\?\.label \|\| getRatioOrientationLabel\(ratioOption\?\.orientation\);[\s\S]*refs\.ratioOrientationSummary\.dataset\.orientation = ratioOption\?\.orientation \|\| "square";[\s\S]*\}/);
   assert.match(app, /syncGenerationRatio\(value\) \{[\s\S]*renderRatioGrid\(\);[\s\S]*syncRatioOrientationSummary\(\);[\s\S]*renderReferenceAnalysisRatioGrid\(\);/);
-  assert.match(app, /const orientationLabel = getRatioOrientationLabel\(option\.orientation\);[\s\S]*button\.dataset\.orientation = option\.orientation \|\| "square";[\s\S]*button\.setAttribute\("aria-label", `\$\{option\.value\} \$\{orientationLabel\}`\);/);
+  assert.match(app, /const orientationLabel = getRatioOrientationLabel\(option\.orientation\);[\s\S]*button\.dataset\.orientation = option\.orientation \|\| "square";[\s\S]*button\.setAttribute\("aria-label", option\.label \|\| `\$\{option\.value\} \$\{orientationLabel\}`\);/);
   assert.doesNotMatch(app, /orientationBubble/);
   assert.doesNotMatch(styles, /\.ratio-chip span\s*\{/);
   assert.match(
@@ -2247,12 +2363,77 @@ test("studio stores API settings in the browser and sends them with cloud genera
   assert.match(browserConfig, /formData\.set\("responsesModel", config\.responsesModel\);/);
   assert.match(browserConfig, /formData\.set\("directEndpointPath", config\.directEndpointPath\);/);
   assert.match(browserConfig, /formData\.set\("directResponsesModel", config\.directResponsesModel\);/);
+  assert.match(browserConfig, /formData\.set\("protocolBaseUrl", config\.protocolBaseUrl\);/);
+  assert.match(browserConfig, /formData\.set\("protocolApiKey", config\.protocolApiKey\);/);
+  assert.match(browserConfig, /formData\.set\("protocolImageModel", config\.protocolImageModel\);/);
   assert.match(app, /directResponsesModelInput:\s*document\.querySelector\("#directResponsesModelInput"\),/);
   assert.match(app, /directResponsesModel:\s*refs\.directResponsesModelInput\.value\.trim\(\) \|\| browserPayload\.directResponsesModel/);
   assert.match(app, /refs\.directResponsesModelInput\.value = config\.directResponsesModel \|\| "gpt-5\.5";/);
+  assert.match(app, /protocolBaseUrlInput:\s*document\.querySelector\("#protocolBaseUrlInput"\),/);
+  assert.match(app, /protocolApiKeyInput:\s*document\.querySelector\("#protocolApiKeyInput"\),/);
+  assert.match(app, /protocolImageModelInput:\s*document\.querySelector\("#protocolImageModelInput"\),/);
+  assert.match(app, /protocolImageModel:\s*refs\.protocolImageModelInput\.value\.trim\(\) \|\| browserPayload\.protocolImageModel/);
+  assert.match(app, /refs\.protocolImageModelInput\.value = config\.protocolImageModel \|\| "gemini-3\.1-flash-image-preview";/);
   assert.match(app, /const payload = getCurrentPrivateConfigRequestPayload\(\);/);
   assert.match(app, /function buildPptFormData\(\) \{[\s\S]*appendCurrentConfigToFormData\(formData\);[\s\S]*return formData;/);
   assert.match(app, /function buildPptCompletionRequest\(slideNumbers\) \{[\s\S]*\.\.\.getCurrentPrivateConfigRequestPayload\(\),/);
+});
+
+test("config endpoint controls keep suffix before full URL and mark direct image edits as automatic", async () => {
+  const html = await readFile(indexPath, "utf8");
+  const app = await readFile(appPath, "utf8");
+  const styles = await readFile(stylesPath, "utf8");
+  const routeASelect = html.match(/<select class="endpoint-suffix-select" id="endpointPathSelect"[\s\S]*?<\/select>/)?.[0] || "";
+  const routeBSelect = html.match(/<select class="endpoint-suffix-select" id="directEndpointPathSelect"[\s\S]*?<\/select>/)?.[0] || "";
+
+  assert.match(
+    html,
+    /<select class="endpoint-suffix-select" id="endpointPathSelect"[\s\S]*?<\/select>\s*<button class="inline-button endpoint-full-toggle" id="baseUrlFullToggle"/,
+  );
+  assert.match(
+    html,
+    /<select class="endpoint-suffix-select" id="directEndpointPathSelect"[\s\S]*?<option value="images\/generations">images\/generations[\s\S]*?<option value="responses">responses<\/option>[\s\S]*?<option value="chat\/completions">chat\/completions<\/option>[\s\S]*?<\/select>\s*<button class="inline-button endpoint-full-toggle" id="directBaseUrlFullToggle"/,
+  );
+  assert.match(routeASelect, /<option value="responses">responses<\/option>/);
+  assert.doesNotMatch(routeASelect, /chat\/completions/);
+  assert.doesNotMatch(routeASelect, /images\/generations/);
+  assert.match(routeBSelect, /<option value="images\/generations">/);
+  assert.match(routeBSelect, /<option value="responses">/);
+  assert.match(routeBSelect, /chat\/completions/);
+  assert.doesNotMatch(routeBSelect, /edits/);
+  const directResponsesInputIndex = html.indexOf('id="directResponsesModelInput"');
+  const directResponsesFieldStart = html.lastIndexOf('<div class="field model-field"', directResponsesInputIndex);
+  const directResponsesFieldOpenTag = html.slice(
+    directResponsesFieldStart,
+    html.indexOf(">", directResponsesFieldStart) + 1,
+  );
+  assert.notEqual(directResponsesInputIndex, -1);
+  assert.notEqual(directResponsesFieldStart, -1);
+  assert.doesNotMatch(directResponsesFieldOpenTag, /\shidden(?:[=\s>]|$)/);
+  assert.match(html, /<input name="imageRoute" type="radio" value="c" \/>[\s\S]*<span>Gemini模型<\/span>/);
+  assert.match(html, /<div class="route-config-panel" data-route-panel="c"[\s\S]*id="protocolBaseUrlInput"[\s\S]*id="protocolApiKeyInput"[\s\S]*id="protocolImageModelInput"/);
+  assert.match(html, /id="protocolCompatibilityHint"[\s\S]*Gemini[\s\S]*images\/generations/);
+  assert.match(styles, /\.endpoint-toolbar\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*auto;/);
+  assert.match(styles, /\.config-form:has\(input\[name="imageRoute"\]\[value="c"\]:checked\) \[data-route-panel="a"\]/);
+  assert.match(styles, /\.config-form:has\(input\[name="imageRoute"\]\[value="c"\]:checked\) \[data-route-panel="b"\]/);
+  assert.match(app, /API_ENDPOINT_IMAGE_EDITS,/);
+  assert.match(app, /API_ENDPOINT_CHAT_COMPLETIONS,/);
+  assert.match(app, /splitModelProtocolUrl,/);
+  assert.match(app, /function normalizeEndpointSelectValue\(imageRoute = "a", endpointPath = "", fallbackEndpointPath = ""\)/);
+  assert.match(app, /normalizedEndpointPath === API_ENDPOINT_IMAGE_EDITS\s*\?\s*API_ENDPOINT_IMAGE_GENERATIONS/);
+  assert.match(app, /function getProtocolImageGenerationsUrlPreview\(/);
+  assert.match(app, /function getProtocolImageGenerationsUrlPreview\([\s\S]*splitModelProtocolUrl\([\s\S]*appendApiEndpointPath\([^,]+,\s*API_ENDPOINT_IMAGE_GENERATIONS\)/);
+});
+
+test("direct mode exposes the text and vision model field", async () => {
+  const html = await readFile(indexPath, "utf8");
+  const inputIndex = html.indexOf('id="directResponsesModelInput"');
+  const fieldStart = html.lastIndexOf('<div class="field model-field"', inputIndex);
+  const fieldOpenTag = html.slice(fieldStart, html.indexOf(">", fieldStart) + 1);
+
+  assert.notEqual(inputIndex, -1);
+  assert.notEqual(fieldStart, -1);
+  assert.doesNotMatch(fieldOpenTag, /\shidden(?:[=\s>]|$)/);
 });
 
 test("config drawer can test the connection and reveal fetched models in a picker", async () => {
@@ -2269,12 +2450,15 @@ test("config drawer can test the connection and reveal fetched models in a picke
   assert.match(app, /fetchModelsButton:\s*document\.querySelector\("#fetchModelsButton"\),/);
   assert.match(app, /directFetchModelsButton:\s*document\.querySelector\("#directFetchModelsButton"\),/);
   assert.match(app, /directResponsesFetchModelsButton:\s*document\.querySelector\("#directResponsesFetchModelsButton"\),/);
+  assert.match(app, /protocolFetchModelsButton:\s*document\.querySelector\("#protocolFetchModelsButton"\),/);
   assert.match(app, /modelPickerToggle:\s*document\.querySelector\("#modelPickerToggle"\),/);
   assert.match(app, /modelOptionsList:\s*document\.querySelector\("#modelOptionsList"\),/);
   assert.match(app, /directModelPickerToggle:\s*document\.querySelector\("#directModelPickerToggle"\),/);
   assert.match(app, /directModelOptionsList:\s*document\.querySelector\("#directModelOptionsList"\),/);
   assert.match(app, /directResponsesModelPickerToggle:\s*document\.querySelector\("#directResponsesModelPickerToggle"\),/);
   assert.match(app, /directResponsesModelOptionsList:\s*document\.querySelector\("#directResponsesModelOptionsList"\),/);
+  assert.match(app, /protocolModelPickerToggle:\s*document\.querySelector\("#protocolModelPickerToggle"\),/);
+  assert.match(app, /protocolModelOptionsList:\s*document\.querySelector\("#protocolModelOptionsList"\),/);
   assert.match(app, /from "\/lib\/config-model-picker\.mjs";/);
   assert.match(app, /const configModelPicker = createConfigModelPickerController\(/);
   assert.match(app, /configModelPicker\.bindEvents\(\);/);
@@ -2286,6 +2470,9 @@ test("config drawer can test the connection and reveal fetched models in a picke
   assert.match(configModelPicker, /formData\.set\("directApiKey", payload\.directApiKey\);/);
   assert.match(configModelPicker, /formData\.set\("directImageModel", payload\.directImageModel\);/);
   assert.match(configModelPicker, /formData\.set\("directResponsesModel", payload\.directResponsesModel\);/);
+  assert.match(configModelPicker, /formData\.set\("protocolBaseUrl", payload\.protocolBaseUrl\);/);
+  assert.match(configModelPicker, /formData\.set\("protocolApiKey", payload\.protocolApiKey\);/);
+  assert.match(configModelPicker, /formData\.set\("protocolImageModel", payload\.protocolImageModel\);/);
   assert.match(configModelPicker, /function render\(\)/);
   assert.match(configModelPicker, /function renderTarget\(target, activeTarget\)/);
   assert.match(configModelPicker, /function getVisibleModels\(target = getTargetForSelectedRoute\(\)\)/);
@@ -2293,8 +2480,10 @@ test("config drawer can test the connection and reveal fetched models in a picke
   assert.match(configModelPicker, /fetchConfigModels\(\{ openAfterFetch: true, mode: "models", target: MODEL_TARGET_RESPONSES \}\);/);
   assert.match(configModelPicker, /refs\.directFetchModelsButton\?\.addEventListener\("click"/);
   assert.match(configModelPicker, /refs\.directResponsesFetchModelsButton\?\.addEventListener\("click"/);
+  assert.match(configModelPicker, /refs\.protocolFetchModelsButton\?\.addEventListener\("click"/);
   assert.match(configModelPicker, /toggleModelPicker\(MODEL_TARGET_DIRECT\)/);
   assert.match(configModelPicker, /toggleModelPicker\(MODEL_TARGET_DIRECT_RESPONSES\)/);
+  assert.match(configModelPicker, /toggleModelPicker\(MODEL_TARGET_PROTOCOL\)/);
   assert.match(configModelPicker, /handleModelInput\(MODEL_TARGET_RESPONSES\)/);
   assert.match(styles, /\.config-actions-row\s*\{/);
   assert.match(styles, /\.model-picker-control\s*\{/);
@@ -2382,6 +2571,51 @@ test("direct mode fetch models uses direct API settings and direct model picker"
   assert.deepEqual(
     refs.directModelOptionsList.children.map((child) => child.textContent),
     ["vendor-image-pro", "gpt-image-2"],
+  );
+});
+
+test("model protocol mode fetch models uses protocol API settings and protocol picker", async () => {
+  const { createConfigModelPickerController } = await import(publicConfigModelPickerPath);
+  const { refs } = createModelPickerHarness();
+  refs.imageRouteInputs[0].checked = false;
+  refs.imageRouteInputs[2].checked = true;
+  const capturedBodies = [];
+  const state = { config: {}, configModels: { items: [], loading: false, loadingMode: "", open: false } };
+  const fetchImpl = async (_url, init) => {
+    capturedBodies.push(init.body);
+    return {
+      ok: true,
+      json: async () => ({ ok: true, models: ["gemini-3.1-flash-image-preview", "gemini-3.1-flash-image-preview-vip"] }),
+    };
+  };
+  const controller = createConfigModelPickerController({
+    refs,
+    state,
+    FormDataCtor: TestFormData,
+    fetchImpl,
+    getBrowserPrivateConfigRequestPayload: () => ({
+      imageRoute: "c",
+      protocolBaseUrl: "https://saved-protocol.example.test/v1",
+      protocolApiKey: "saved-protocol-key",
+      protocolImageModel: "saved-protocol-image",
+    }),
+  });
+
+  controller.bindEvents();
+  refs.protocolFetchModelsButton.dispatchEvent({ type: "click" });
+  await waitForAsyncHandlers();
+
+  assert.equal(capturedBodies.length, 1);
+  assert.equal(capturedBodies[0].get("imageRoute"), "c");
+  assert.equal(capturedBodies[0].get("protocolBaseUrl"), "https://protocol.example.test/v1");
+  assert.equal(capturedBodies[0].get("protocolApiKey"), "protocol-key");
+  assert.equal(capturedBodies[0].get("protocolImageModel"), "gemini-3.1-flash-image-preview");
+  assert.equal(refs.protocolModelOptionsList.hidden, false);
+  assert.equal(refs.directModelOptionsList.hidden, true);
+  assert.equal(refs.modelOptionsList.hidden, true);
+  assert.deepEqual(
+    refs.protocolModelOptionsList.children.map((child) => child.textContent),
+    ["gemini-3.1-flash-image-preview", "gemini-3.1-flash-image-preview-vip"],
   );
 });
 
@@ -2592,6 +2826,7 @@ test("studio accepts server-stored Cloudflare image URLs before browser caching 
 test("studio keeps queued Cloudflare jobs alive for task polling after the SSE response closes", async () => {
   const app = await readFile(appPath, "utf8");
 
+  assert.match(app, /formData\.set\("background", "1"\);/);
   assert.match(app, /let queuedForPolling = false;/);
   assert.match(app, /if \(eventName === GENERATION_STREAM_EVENTS\.QUEUED\) \{/);
   assert.match(app, /scheduleGenerationTaskPolling\(\);/);
@@ -2893,8 +3128,10 @@ test("creation mode has independent references count and scenario controls", asy
   assert.match(html, /id="creationDimensionSpecsInput"[\s\S]*rows="1"/);
   assert.match(html, /<div class="creation-control-row creation-option-grid">[\s\S]*id="creationImageCountInput"[\s\S]*id="creationScenarioInput"[\s\S]*id="creationVisualLanguageInput"[\s\S]*id="creationTargetLanguageInput"[\s\S]*id="creationOutputFormatInput"[\s\S]*id="creationRatioInput"[\s\S]*id="creationSizeInput"[\s\S]*id="creationSkuGenerationRuleInput"[\s\S]*id="creationListingAgentEnabledInput"[\s\S]*id="creationIndustryTemplateBrowser"/);
   assert.match(html, /id="creationVisualLanguageInput"[\s\S]*name="visualLanguage"[\s\S]*<option value="classic-commercial" selected>经典商业摄影<\/option>[\s\S]*<option value="premium-studio">高端棚拍<\/option>[\s\S]*<option value="warm-handcrafted">手作温度<\/option>/);
-  assert.match(html, /<select id="creationRatioInput" name="ratio">[\s\S]*<option value="1:1">1:1<\/option>[\s\S]*<\/select>/);
-  assert.match(html, /<select id="creationSizeInput" name="size">[\s\S]*<option value="auto">自动<\/option>[\s\S]*<\/select>/);
+  assert.match(html, /<select id="creationRatioInput" name="ratio">[\s\S]*<option value="1:1" selected>电商主图、头像、社交媒体 · 方形 1:1<\/option>[\s\S]*<option value="9:21">超长竖图 · 竖屏 9:21<\/option>[\s\S]*<option value="1:3">超长竖版广告 · 竖屏 1:3<\/option>[\s\S]*<\/select>/);
+  assert.match(html, /<select id="creationSizeInput" name="size">[\s\S]*<option value="1024x1024" selected>1K 1024 x 1024<\/option>[\s\S]*<option value="2880x2880">最大 2880 x 2880<\/option>[\s\S]*<\/select>/);
+  assert.match(html, /<select id="portraitRatioInput" name="ratio">[\s\S]*<option value="4:5" selected>Instagram帖子 · 竖屏 4:5<\/option>[\s\S]*<option value="3:1">超宽广告图 · 横屏 3:1<\/option>[\s\S]*<\/select>/);
+  assert.match(html, /<select id="portraitSizeInput" name="size">[\s\S]*<option value="1024x1280" selected>1K 1024 x 1280<\/option>[\s\S]*<option value="2560x3200">最大 2560 x 3200<\/option>[\s\S]*<\/select>/);
   assert.doesNotMatch(html, /id="creationScenarioHint"/);
   assert.match(html, /id="creationRolePicker"/);
   assert.match(html, /id="creationRoleGrid"/);

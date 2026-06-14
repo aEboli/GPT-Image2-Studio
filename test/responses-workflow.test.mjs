@@ -6,12 +6,14 @@ import {
   buildResponsesInput,
   consumeResponsesSse,
   createDirectImageRequestBody,
+  createGeminiImageGenerationRequestBody,
   createResponsesRequestBody,
   createChatCompletionsImageRequestBody,
   formatStatusHeartbeatMessage,
   normalizeBaseUrl,
   requestDirectImageGeneration,
   requestImageGeneration,
+  requestModelProtocolImageGeneration,
 } from "../lib/responses-workflow.mjs";
 
 test("buildResponsesInput returns structured content for prompt-only generation", () => {
@@ -275,6 +277,282 @@ test("direct image generation uploads a single reference image with the image fi
   assert.equal(requests[0].body.getAll("image[]").length, 0);
 });
 
+test("direct image generation keeps OpenAI Image API request body even for Gemini model names", async () => {
+  const requests = [];
+  await requestDirectImageGeneration({
+    baseUrl: "https://direct.example.test/v1",
+    endpointPath: "images/generations",
+    apiKey: "route-b-key",
+    prompt: "Create a tiny studio product photo.",
+    size: "1024x1024",
+    quality: "high",
+    format: "png",
+    imageModel: "gemini-3.1-flash-image-preview",
+    async fetchImpl(url, init) {
+      requests.push({ url, init, body: JSON.parse(init.body) });
+      return new Response(
+        JSON.stringify({
+          data: [{ b64_json: "ZGlyZWN0LWdlbWluaS1uYW1l" }],
+        }),
+        { status: 200 },
+      );
+    },
+  });
+
+  assert.equal(requests[0].url, "https://direct.example.test/v1/images/generations");
+  assert.equal(requests[0].body.model, "gemini-3.1-flash-image-preview");
+  assert.equal(requests[0].body.prompt, "Create a tiny studio product photo.");
+  assert.equal(requests[0].body.response_format, "b64_json");
+  assert.equal(requests[0].body.output_format, "png");
+  assert.equal(requests[0].body.quality, "high");
+  assert.equal(requests[0].body.n, 1);
+  assert.equal("contents" in requests[0].body, false);
+});
+
+test("model protocol image generation posts Gemini image models to image generations", async () => {
+  const requests = [];
+  const result = await requestModelProtocolImageGeneration({
+    baseUrl: "https://protocol.example.test/v1",
+    apiKey: "protocol-key",
+    prompt: "Use the product reference.",
+    referenceImageLabels: ["Reference image 1: product body."],
+    referenceImages: [
+      { filename: "product.png", mimeType: "image/png", base64: "cHJvZHVjdA==" },
+    ],
+    size: "2K",
+    aspectRatio: "3:4",
+    quality: "high",
+    format: "png",
+    imageModel: "gemini-3.1-flash-image-preview",
+    async fetchImpl(url, init) {
+      requests.push({ url, init, body: JSON.parse(init.body) });
+      return new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    inlineData: {
+                      mimeType: "image/png",
+                      data: "Z2VtaW5pLXJlZg==",
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      );
+    },
+  });
+
+  assert.equal(
+    requests[0].url,
+    "https://protocol.example.test/v1/images/generations",
+  );
+  assert.equal(requests[0].body.model, "gemini-3.1-flash-image-preview");
+  assert.deepEqual(requests[0].body.contents[0].parts, [
+    { text: "Use the product reference." },
+    { text: "Reference image 1: product body." },
+    {
+      inline_data: {
+        mime_type: "image/png",
+        data: "cHJvZHVjdA==",
+      },
+    },
+  ]);
+  assert.deepEqual(requests[0].body.generationConfig, {
+    responseModalities: ["TEXT", "IMAGE"],
+    imageConfig: {
+      aspectRatio: "3:4",
+      imageSize: "2K",
+    },
+  });
+  assert.equal("messages" in requests[0].body, false);
+  assert.equal("response_format" in requests[0].body, false);
+  assert.equal(result.finalImageBase64, "Z2VtaW5pLXJlZg==");
+  assert.equal(result.imageRoute, "c");
+  assert.equal(result.protocol, "model-image-generations");
+});
+
+test("model protocol image generation keeps chat completions fallback for non-Gemini models", async () => {
+  const requests = [];
+  const result = await requestModelProtocolImageGeneration({
+    baseUrl: "https://protocol.example.test/v1",
+    apiKey: "protocol-key",
+    prompt: "Return an image URL.",
+    size: "1K",
+    quality: "high",
+    format: "png",
+    imageModel: "vendor-chat-image",
+    async fetchImpl(url, init) {
+      requests.push({ url, method: init?.method || "GET", body: init?.body ? JSON.parse(init.body) : null });
+      if (url === "https://image.example.test/final.png") {
+        return new Response(new TextEncoder().encode("image-url"), {
+          status: 200,
+          headers: { "Content-Type": "image/png" },
+        });
+      }
+
+      return new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: "https://image.example.test/final.png",
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      );
+    },
+  });
+
+  assert.equal(requests[0].url, "https://protocol.example.test/v1/chat/completions");
+  assert.equal(requests[0].method, "POST");
+  assert.deepEqual(Object.keys(requests[0].body).sort(), ["messages", "model"]);
+  assert.equal(requests[0].body.model, "vendor-chat-image");
+  assert.equal(requests[1].url, "https://image.example.test/final.png");
+  assert.equal(requests[1].method, "GET");
+  assert.equal(result.finalImageBase64, "aW1hZ2UtdXJs");
+  assert.equal(result.imageRoute, "c");
+  assert.equal(result.protocol, "model-chat-completions");
+});
+
+test("model protocol image generation explains image generation endpoint mismatches", async () => {
+  await assert.rejects(
+    () =>
+      requestModelProtocolImageGeneration({
+        baseUrl: "https://api.agicto.cn/v1",
+        apiKey: "protocol-key",
+        prompt: "Create a tiny studio product photo.",
+        size: "4K",
+        aspectRatio: "1:1",
+        imageModel: "gemini-3.1-flash-image-preview",
+        async fetchImpl() {
+          return new Response("404 page not found", { status: 404 });
+        },
+      }),
+        /\/images\/generations/,
+  );
+});
+
+test("Gemini model protocol request body normalizes protocol image sizes", () => {
+  assert.deepEqual(
+    createGeminiImageGenerationRequestBody({
+      prompt: "Create a wide image.",
+      size: "4K",
+      aspectRatio: "16:9",
+      imageModel: "gemini-3.1-flash-image-preview",
+    }).generationConfig.imageConfig,
+    {
+      aspectRatio: "16:9",
+      imageSize: "4K",
+    },
+  );
+  assert.equal(
+    createGeminiImageGenerationRequestBody({
+      prompt: "Create a wide image.",
+      size: "4K",
+      aspectRatio: "16:9",
+      imageModel: "gemini-3.1-flash-image-preview",
+    }).model,
+    "gemini-3.1-flash-image-preview",
+  );
+});
+
+test("direct image generation no longer switches request shape per selected image model", async () => {
+  const requests = [];
+  const fetchImpl = async (url, init) => {
+    requests.push({ url, body: JSON.parse(init.body) });
+    return new Response(
+      JSON.stringify({
+        data: [{ b64_json: "c3dpdGNoLWZpbmFs" }],
+      }),
+      { status: 200 },
+    );
+  };
+
+  await requestDirectImageGeneration({
+    baseUrl: "https://direct.example.test/v1",
+    endpointPath: "images/generations",
+    apiKey: "route-b-key",
+    prompt: "Create with Gemini.",
+    size: "1024x1024",
+    quality: "high",
+    format: "png",
+    imageModel: "gemini-3.1-flash-image-preview",
+    fetchImpl,
+  });
+  await requestDirectImageGeneration({
+    baseUrl: "https://direct.example.test/v1",
+    endpointPath: "images/generations",
+    apiKey: "route-b-key",
+    prompt: "Create with Image 2.",
+    size: "1024x1024",
+    quality: "high",
+    format: "png",
+    imageModel: "gpt-image-2",
+    fetchImpl,
+  });
+  await requestDirectImageGeneration({
+    baseUrl: "https://direct.example.test/v1",
+    endpointPath: "images/generations",
+    apiKey: "route-b-key",
+    prompt: "Create with Gemini again.",
+    size: "1024x1024",
+    quality: "high",
+    format: "png",
+    imageModel: "gemini-3.1-flash-image-preview",
+    fetchImpl,
+  });
+
+  assert.deepEqual(requests.map((request) => request.url), [
+    "https://direct.example.test/v1/images/generations",
+    "https://direct.example.test/v1/images/generations",
+    "https://direct.example.test/v1/images/generations",
+  ]);
+  assert.equal(requests[0].body.model, "gemini-3.1-flash-image-preview");
+  assert.equal(requests[0].body.response_format, "b64_json");
+  assert.equal(requests[1].body.model, "gpt-image-2");
+  assert.equal(requests[1].body.response_format, "b64_json");
+  assert.equal(requests[1].body.output_format, "png");
+  assert.equal(requests[1].body.quality, "high");
+  assert.equal(requests[2].body.model, "gemini-3.1-flash-image-preview");
+  assert.equal(requests[2].body.response_format, "b64_json");
+});
+
+test("direct image generation surfaces JSON error payloads returned with HTTP 200", async () => {
+  await assert.rejects(
+    requestDirectImageGeneration({
+      baseUrl: "https://direct.example.test/v1",
+      endpointPath: "images/generations",
+      apiKey: "route-b-key",
+      prompt: "Create with unavailable Gemini.",
+      size: "1024x1024",
+      quality: "high",
+      format: "png",
+      imageModel: "gemini-3.1-flash-image-preview",
+      async fetchImpl() {
+        return new Response(
+          JSON.stringify({
+            error: {
+              code: "invalid_request_error",
+              message: "No available channel for model gemini-3.1-flash-image-preview.",
+              type: "invalid_request_error",
+            },
+          }),
+          { status: 200 },
+        );
+      },
+    }),
+    /No available channel for model gemini-3\.1-flash-image-preview/,
+  );
+});
+
 test("direct image generation submits reference image requests to image edits", async () => {
   const requests = [];
   const result = await requestDirectImageGeneration({
@@ -502,9 +780,9 @@ test("route A chat completions image generation forwards reference images", asyn
   assert.equal(result.finalImageBase64, "cm91dGUtYS1jaGF0");
 });
 
-test("normalizeBaseUrl appends v1 when the configured API URL omits it", () => {
+test("normalizeBaseUrl appends v1 only for bare API hosts", () => {
   assert.equal(normalizeBaseUrl("https://example.test"), "https://example.test/v1");
-  assert.equal(normalizeBaseUrl("https://example.test/openai/"), "https://example.test/openai/v1");
+  assert.equal(normalizeBaseUrl("https://example.test/openai/"), "https://example.test/openai");
   assert.equal(normalizeBaseUrl("https://example.test/openai/v1/"), "https://example.test/openai/v1");
 });
 

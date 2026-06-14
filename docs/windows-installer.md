@@ -1,12 +1,13 @@
 # Windows 安装包说明
 
-`GPT-Image2-Studio-Setup-v0.1.5.exe` 是 Windows 自解压安装包，用系统自带 `iexpress.exe` 生成。
+`GPT-Image2-Studio-Setup-v0.1.6.exe` 是 Windows 自解压安装包，用系统自带 `iexpress.exe` 生成。
 
 ## 本次更新
 
-- 安装包版本同步到 `0.1.5`，用于 GitHub Release 分发。
-- 调用通道配置继续细化，直接调用模式可单独保存图片模型和视觉文本模型，接口地址可选择请求后缀并自动拆分供应商完整 URL。
-- 队列任务会保存提交时的调用通道快照，并按模式和通道分别计算并发。
+- 当前安装包文件名为 `GPT-Image2-Studio-Setup-v0.1.6.exe`，用于 GitHub Release 分发。
+- 调用通道配置扩展为路由模式、直接调用模式和 Gemini 模型；三类通道可分别保存 Base URL、API Key 和模型配置。
+- 队列任务会保存提交时的调用通道快照，并按模式和通道分别计算并发；本地生成可后台提交，再通过任务轮询拿到最终结果。
+- 分辨率选项已重排，普通通道使用 15 种比例的像素尺寸，Gemini 模型使用 `auto`、`512`、`1K`、`2K`、`4K` 协议尺寸。
 - 套图卡片新增排队中、生成中的稳定 loading 外观，减少批量生成时的布局跳动。
 - 胶片栏增加加载、失败和空状态占位，历史缩略图加载过程更清晰。
 - 图片编辑、局部蒙版、参考图角色分析、SKU 多件装 Listing 生成和套图记录细节继续完善。
@@ -28,6 +29,14 @@
 
 安装完成后可以通过桌面或开始菜单里的 `GPT-Image2-Studio.cmd` 启动。启动脚本会自动选择可用端口，启动本地服务，并打开浏览器。
 
+## Node DNS fallback
+
+安装包内置的本地 Node 服务启动时会保留系统默认 `dns.lookup` 路径；只有当系统解析上游域名失败时，才会按顺序使用 `223.5.5.5`、`1.1.1.1` 和系统已有 DNS 服务器再尝试一次，用于降低部分网络环境下访问上游 API 时的解析失败概率。安装包会继承启动环境变量，因此发布后仍可用环境变量调整这项行为。
+
+- 设置 `IMAGE_STUDIO_DISABLE_DNS_FALLBACK=1` 会禁用该 fallback，并保持 Node 原始 DNS 服务器列表。
+- 设置 `IMAGE_STUDIO_DNS_FALLBACK_SERVERS` 可自定义服务器列表，多个地址用逗号、分号或空白分隔；自定义列表会替代默认的 `223.5.5.5`、`1.1.1.1`，但仍保留系统已有 DNS 服务器作为后续回退。
+- 如果 DNS 配置失败，命令行启动日志会输出 `DNS fallback 配置失败：...`，服务会继续启动；这通常表示自定义服务器格式不被当前 Node 运行时接受。桌面或开始菜单启动会隐藏服务子进程日志，排查时可在安装目录里用命令行运行 `GPT-Image2-Studio.cmd`。
+
 ## 本地数据
 
 API Key 和配置只保存在本机。服务端保存的配置位于安装目录下，浏览器私有配置会保存在当前浏览器的本地配置中：
@@ -47,7 +56,7 @@ API Key 和配置只保存在本机。服务端保存的配置位于安装目录
 | `images/generations` | 直接调用模式默认值，适合标准图片生成端点。 |
 | `images/edits` | 图片编辑专用端点。普通生图不要选它；图片编辑页会在上传源图或 mask 时自动调用 `/images/edits`。 |
 
-如果供应商复制给你的是完整地址，例如 `https://vendor.example/openai/v1/responses` 或 `https://vendor.example/openai/v1/images/generations`，可以直接粘贴到接口地址输入框。Studio 保存时会识别末尾的 `responses`、`chat/completions`、`images/generations`、`images/edits`，自动拆成 Base URL 和接口后缀，并保存到当前通道配置里；URL 里的查询参数和 hash 不会保存。遇到无法识别的末尾路径时，Studio 会把整段当作 Base URL，并在缺少 `/v1` 时自动补上 `/v1`。
+如果供应商复制给你的是完整地址，例如 `https://vendor.example/openai/v1/responses` 或 `https://vendor.example/openai/v1/images/generations`，可以直接粘贴到接口地址输入框。Studio 保存时会识别末尾的 `responses`、`chat/completions`、`images/generations`、`images/edits`，自动拆成 Base URL 和接口后缀，并保存到当前通道配置里；URL 里的查询参数和 hash 不会保存。遇到无法识别的末尾路径时，Studio 会把整段当作 Base URL，保留供应商给出的路径，不再额外补 `/v1`。
 
 生成图片保存到：
 

@@ -1,7 +1,7 @@
-import { normalizeApiBaseUrl } from "./api-base-url.mjs";
 import {
   DEFAULT_DIRECT_IMAGE_MODEL,
   DEFAULT_DIRECT_RESPONSES_MODEL,
+  DEFAULT_PROTOCOL_IMAGE_MODEL,
   normalizeImageRouteConfig,
 } from "./image-route-config.mjs";
 
@@ -37,23 +37,27 @@ export function maskBrowserApiKey(apiKey) {
   return `${apiKey.slice(0, 4)}***${apiKey.slice(-4)}`;
 }
 
-export function normalizeBrowserPrivateConfig(source = {}) {
+export function normalizeBrowserPrivateConfig(source = {}, { preserveRootBaseUrls = false } = {}) {
   const routeConfig = normalizeImageRouteConfig(source, {
     defaultBaseUrl: DEFAULT_BROWSER_BASE_URL,
     defaultResponsesModel: DEFAULT_BROWSER_RESPONSES_MODEL,
+    preserveRootBaseUrls,
   });
 
   return {
     imageRoute: routeConfig.imageRoute,
-    baseUrl: normalizeApiBaseUrl(routeConfig.baseUrl, { defaultBaseUrl: DEFAULT_BROWSER_BASE_URL }) || DEFAULT_BROWSER_BASE_URL,
+    baseUrl: routeConfig.baseUrl || DEFAULT_BROWSER_BASE_URL,
     apiKey: routeConfig.apiKey,
     endpointPath: routeConfig.endpointPath,
     responsesModel: routeConfig.responsesModel || DEFAULT_BROWSER_RESPONSES_MODEL,
-    directBaseUrl: normalizeApiBaseUrl(routeConfig.directBaseUrl, { defaultBaseUrl: DEFAULT_BROWSER_BASE_URL }) || DEFAULT_BROWSER_BASE_URL,
+    directBaseUrl: routeConfig.directBaseUrl || DEFAULT_BROWSER_BASE_URL,
     directApiKey: routeConfig.directApiKey,
     directEndpointPath: routeConfig.directEndpointPath,
     directImageModel: routeConfig.directImageModel || DEFAULT_DIRECT_IMAGE_MODEL,
     directResponsesModel: routeConfig.directResponsesModel || DEFAULT_DIRECT_RESPONSES_MODEL,
+    protocolBaseUrl: routeConfig.protocolBaseUrl || DEFAULT_BROWSER_BASE_URL,
+    protocolApiKey: routeConfig.protocolApiKey,
+    protocolImageModel: routeConfig.protocolImageModel || DEFAULT_PROTOCOL_IMAGE_MODEL,
   };
 }
 
@@ -64,14 +68,14 @@ export function readBrowserPrivateConfig(storage = getLocalStorage()) {
       return null;
     }
 
-    return normalizeBrowserPrivateConfig(JSON.parse(raw));
+    return normalizeBrowserPrivateConfig(JSON.parse(raw), { preserveRootBaseUrls: true });
   } catch (_error) {
     return null;
   }
 }
 
 export function toPublicBrowserConfig(privateConfig, baseConfig = {}) {
-  const normalized = normalizeBrowserPrivateConfig(privateConfig);
+  const normalized = normalizeBrowserPrivateConfig(privateConfig, { preserveRootBaseUrls: true });
   return {
     ...baseConfig,
     baseUrl: normalized.baseUrl,
@@ -86,24 +90,40 @@ export function toPublicBrowserConfig(privateConfig, baseConfig = {}) {
     directEndpointPath: normalized.directEndpointPath,
     directImageModel: normalized.directImageModel,
     directResponsesModel: normalized.directResponsesModel,
+    protocolBaseUrl: normalized.protocolBaseUrl,
+    protocolApiKeyConfigured: Boolean(normalized.protocolApiKey),
+    protocolApiKeyMask: maskBrowserApiKey(normalized.protocolApiKey),
+    protocolImageModel: normalized.protocolImageModel,
   };
 }
 
 export function saveBrowserPrivateConfig(payload, storage = getLocalStorage()) {
   const current = readBrowserPrivateConfig(storage) || normalizeBrowserPrivateConfig();
-  const next = normalizeBrowserPrivateConfig({
-    ...current,
-    baseUrl: payload.baseUrl,
-    apiKey: payload.apiKey ? payload.apiKey : current.apiKey,
-    endpointPath: payload.endpointPath || current.endpointPath,
-    responsesModel: payload.responsesModel,
-    imageRoute: payload.imageRoute || current.imageRoute,
-    directBaseUrl: payload.directBaseUrl || current.directBaseUrl,
-    directApiKey: payload.directApiKey ? payload.directApiKey : current.directApiKey,
-    directEndpointPath: payload.directEndpointPath || current.directEndpointPath,
-    directImageModel: payload.directImageModel || current.directImageModel,
-    directResponsesModel: payload.directResponsesModel || current.directResponsesModel,
-  });
+  const next = normalizeBrowserPrivateConfig(
+    {
+      ...current,
+      baseUrl: payload.baseUrl,
+      apiKey: payload.apiKey ? payload.apiKey : current.apiKey,
+      endpointPath: payload.endpointPath || current.endpointPath,
+      responsesModel: payload.responsesModel,
+      imageRoute: payload.imageRoute || current.imageRoute,
+      directBaseUrl: payload.directBaseUrl || current.directBaseUrl,
+      directApiKey: payload.directApiKey ? payload.directApiKey : current.directApiKey,
+      directEndpointPath: payload.directEndpointPath || current.directEndpointPath,
+      directImageModel: payload.directImageModel || current.directImageModel,
+      directResponsesModel: payload.directResponsesModel || current.directResponsesModel,
+      protocolBaseUrl: payload.protocolBaseUrl || current.protocolBaseUrl,
+      protocolApiKey: payload.protocolApiKey ? payload.protocolApiKey : current.protocolApiKey,
+      protocolImageModel: payload.protocolImageModel || current.protocolImageModel,
+    },
+    {
+      preserveRootBaseUrls: {
+        baseUrl: payload.baseUrl === undefined,
+        directBaseUrl: payload.directBaseUrl === undefined,
+        protocolBaseUrl: payload.protocolBaseUrl === undefined,
+      },
+    },
+  );
 
   storage?.setItem?.(BROWSER_CONFIG_STORAGE_KEY, JSON.stringify(next));
   return next;
@@ -117,10 +137,19 @@ export function appendBrowserConfigToFormData(formData, readConfig = readBrowser
     return formData;
   }
 
-  const config = normalizeBrowserPrivateConfig({
-    ...(browserConfig || {}),
-    ...overrideConfig,
-  });
+  const config = normalizeBrowserPrivateConfig(
+    {
+      ...(browserConfig || {}),
+      ...overrideConfig,
+    },
+    {
+      preserveRootBaseUrls: {
+        baseUrl: !("baseUrl" in overrideConfig),
+        directBaseUrl: !("directBaseUrl" in overrideConfig),
+        protocolBaseUrl: !("protocolBaseUrl" in overrideConfig),
+      },
+    },
+  );
 
   formData.set("baseUrl", config.baseUrl);
   formData.set("apiKey", config.apiKey);
@@ -132,6 +161,9 @@ export function appendBrowserConfigToFormData(formData, readConfig = readBrowser
   formData.set("directEndpointPath", config.directEndpointPath);
   formData.set("directImageModel", config.directImageModel);
   formData.set("directResponsesModel", config.directResponsesModel);
+  formData.set("protocolBaseUrl", config.protocolBaseUrl);
+  formData.set("protocolApiKey", config.protocolApiKey);
+  formData.set("protocolImageModel", config.protocolImageModel);
   return formData;
 }
 
@@ -149,6 +181,9 @@ export function getBrowserPrivateConfigRequestPayload(readConfig = readBrowserPr
         directEndpointPath: browserConfig.directEndpointPath,
         directImageModel: browserConfig.directImageModel,
         directResponsesModel: browserConfig.directResponsesModel,
+        protocolBaseUrl: browserConfig.protocolBaseUrl,
+        protocolApiKey: browserConfig.protocolApiKey,
+        protocolImageModel: browserConfig.protocolImageModel,
       }
     : {};
 }

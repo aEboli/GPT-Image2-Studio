@@ -23,29 +23,27 @@
 
 ## 项目定位
 
-GPT-Image2-Studio 是一个面向创作者、电商运营、内容团队和产品设计工作流的本地 Web 应用。它通过本地 Node 服务、Cloudflare Pages Worker 或 Vercel 部署连接图片生成接口，支持两类调用通道：
+GPT-Image2-Studio 是一个面向创作者、电商运营、内容团队和产品设计工作流的本地 Web 应用。它通过本地 Node 服务、Cloudflare Pages Worker 或 Vercel 部署连接图片生成接口，把提示词、生图、参考图分析、局部编辑、批量计划和历史记录放在同一个工作台里。
 
-| 通道 | 典型用途 | 配置 |
-| --- | --- | --- |
-| 路由模式 | 通过 `Responses API + image_generation` 调用图片工具 | 独立保存 Base URL、API Key、Responses 模型 |
-| 直接调用模式 | 连接兼容生图端点，直接调用图片模型 | 独立保存 Base URL、API Key、图片模型、视觉文本模型 |
+它不是单点脚本，而是一套完整工作流：
 
-它不是单点脚本，而是一套完整工作台：
-
-- 在浏览器里管理提示词、参考图、批量计划、生成队列和历史记录。
+- 在浏览器里管理提示词、参考图、批量任务、生成队列和历史记录。
 - 在本地保存 API 配置与输出结果，避免把私密配置提交到仓库。
 - 为电商套图、写真、文章插图、PPT 和画廊资产提供独立记录页。
 - 保留命令行单图生成、Cloudflare Pages、Vercel 和 Windows 安装包路径。
 
-## v0.1.5 更新
+## 近期更新重点
 
-- Windows 安装包版本同步到 `GPT-Image2-Studio-Setup-v0.1.5.exe`，用于 GitHub Release 分发。
-- 调用通道继续细化：直接调用模式新增独立视觉文本模型配置，接口地址支持 `images/generations`、`responses`、`chat/completions` 后缀选择和完整 URL 自动拆分；选择 `responses` 时会用直接调用模式的视觉/文本模型发起 `Responses API + image_generation` 请求。
-- 生成队列按模式和通道分别计算并发，配置状态栏会显示总运行数和总排队数。
-- 套图结果卡片加入排队中、生成中的稳定 loading 外观，减少补图和 SKU 生成时的布局跳动。
-- 胶片栏增加加载、失败和空状态占位，避免历史缩略图尚未加载时界面空白。
-- 图片编辑、局部蒙版、参考图角色分析、SKU 多件装 Listing 生成和套图记录细节继续完善。
-- README 与 Windows 安装包说明重排，便于新用户安装、开发者验证和发布者上传资产。
+- 增加 `Gemini模型` 调用通道，支持独立 Base URL、API Key、图像模型和模型列表拉取，默认模型为 `gemini-3.1-flash-image-preview`。
+- 配置面板扩展为路由模式、直接调用模式和 Gemini 模型三类通道；每次生成都会随请求提交当前面板配置，避免排队任务使用过期的浏览器配置。
+- 接口地址支持“基础 URL / 完整 URL”切换。已知后缀会自动拆分为 Base URL 和请求后缀，未知供应商路径会原样保留，不再额外补 `/v1`。
+- 直接调用模式支持 `images/generations`、`responses` 和 `chat/completions`；图片编辑页会自动使用 `images/edits`。
+- 分辨率体系已重排：普通通道覆盖 15 种比例和 1K、1.5K、2K、最大等档位，Gemini 模型通道切换为 `512`、`1K`、`2K`、`4K` 这类协议尺寸。
+- 套图、写真、图片编辑、快速溶图和参考图分析会跟随当前通道切换尺寸选项，并把比例信息传给服务端生成流程。
+- 本地生成支持后台提交，前端先收到排队事件，再通过任务轮询拿到最终结果，长任务不会占住浏览器连接。
+- 胶片栏和预览区使用稳定 loading 占位，生成中、排队中、失败和空状态更清晰，减少缩略图加载时的布局跳动。
+- 本地 Node 服务增加 DNS fallback。系统 DNS 解析上游失败时，会再尝试 `223.5.5.5`、`1.1.1.1` 和系统已有 DNS 服务器。
+- Windows 安装包说明、环境变量示例和安装包构建内容已同步包含 DNS fallback、当前配置面板和新的调用通道信息。
 
 ## 目录
 
@@ -57,7 +55,7 @@ GPT-Image2-Studio 是一个面向创作者、电商运营、内容团队和产�
 - [输出目录](#输出目录)
 - [参数与限制](#参数与限制)
 - [本地与云端能力边界](#本地与云端能力边界)
-- [构建与发布](#构建与发布)
+- [构建与验证](#构建与验证)
 - [常见问题](#常见问题)
 - [项目结构](#项目结构)
 
@@ -65,10 +63,10 @@ GPT-Image2-Studio 是一个面向创作者、电商运营、内容团队和产�
 
 ### 使用 Windows 安装包
 
-从 GitHub Release 下载：
+从 GitHub Release 下载当前安装包：
 
 ```text
-GPT-Image2-Studio-Setup-v0.1.5.exe
+GPT-Image2-Studio-Setup-v0.1.6.exe
 ```
 
 安装后从桌面或开始菜单启动：
@@ -117,6 +115,26 @@ launch-studio.cmd
 stop-studio-services.cmd
 ```
 
+### Node DNS fallback
+
+本地 Node 服务启动时会保留系统默认 `dns.lookup` 路径。只有当系统解析上游域名失败时，才会按顺序使用 `223.5.5.5`、`1.1.1.1` 和系统已有 DNS 服务器再尝试一次。Cloudflare Pages Worker 和 Vercel 部署不使用这段本地 Node DNS fallback。
+
+需要禁用时，在启动前设置：
+
+```powershell
+$env:IMAGE_STUDIO_DISABLE_DNS_FALLBACK="1"
+cmd /c npm start
+```
+
+需要自定义服务器列表时，使用 `IMAGE_STUDIO_DNS_FALLBACK_SERVERS`，多个地址可用逗号、分号或空白分隔：
+
+```powershell
+$env:IMAGE_STUDIO_DNS_FALLBACK_SERVERS="8.8.8.8,1.1.1.1"
+cmd /c npm start
+```
+
+如果 DNS 配置失败，启动日志会输出 `DNS fallback 配置失败：...`，服务会继续启动。
+
 ## 功能总览
 
 | 模块 | 路由 | 适合场景 | 亮点 |
@@ -139,7 +157,7 @@ stop-studio-services.cmd
 
 ### Studio 创作区
 
-Studio 是默认入口，用于快速生图、风格迁移、参考图编排和图片拆解。它适合从一个提示词开始，也适合上传多张参考图后让系统先分析关系，再进入正式生成。生成状态会记录比例、分辨率、调用模式和中转地址，便于复盘不同通道的输出。
+Studio 是默认入口，用于快速生图、风格迁移、参考图编排和图片拆解。它适合从一个提示词开始，也适合上传多张参考图后让系统先分析关系，再进入正式生成。生成状态会记录比例、分辨率、调用模式、模型和中转地址，便于复盘不同通道的输出。
 
 ### 图片编辑与局部蒙版
 
@@ -172,36 +190,43 @@ Studio 是默认入口，用于快速生图、风格迁移、参考图编排和�
 
 右下角配置面板会保存常用 API 参数，并按当前调用通道发送请求。
 
+| 通道 | 典型用途 | 主要配置 |
+| --- | --- | --- |
+| 路由模式 | 通过 `Responses API + image_generation` 调用图片工具 | Base URL、API Key、`responses` 后缀、Responses 模型 |
+| 直接调用模式 | 连接兼容生图端点，直接调用图片模型或兼容协议 | Base URL、API Key、`images/generations` / `responses` / `chat/completions` 后缀、图片模型、视觉文本模型 |
+| Gemini模型 | 连接兼容 Gemini 图像生成协议的端点 | 基础 URL、API Key、图像模型、模型列表 |
+
+常用默认值：
+
 | 配置项 | 默认值 | 说明 |
 | --- | --- | --- |
-| 生图调用通道 | 路由模式 | 路由模式通过 `Responses API` 调用 `image_generation`；直接调用模式使用独立生图端点 |
-| 路由模式接口地址 | `https://api.openai.com/v1` | 可替换为兼容 Responses API 的私有端点 |
-| 路由模式接口后缀 | `responses` | 常规路由模式使用 `responses`；如果供应商只兼容 Chat Completions 生图协议，可改为 `chat/completions` |
-| 路由模式 API Key | 空 | 本地保存，不提交到仓库 |
+| 路由模式 Base URL | `https://api.openai.com/v1` | 可替换为兼容 Responses API 的私有端点 |
+| 路由模式接口后缀 | `responses` | 用于 `Responses API + image_generation` |
 | 路由模式 Responses 模型 | 本地默认 `gpt-5.4`，Cloudflare 默认 `gpt-5.5` | 负责文本规划、结构化输出和调用图片工具 |
-| 直接调用模式接口地址 | `https://api.openai.com/v1` | 可替换为兼容生图接口的私有端点 |
-| 直接调用模式接口后缀 | `images/generations` | 常规直接生图使用 `images/generations`；如果供应商支持 Responses 或把生图结果放在 Chat Completions 响应里，可改为 `responses` 或 `chat/completions` |
-| 直接调用模式 API Key | 空 | 可与路由模式分开保存 |
+| 直接调用模式 Base URL | `https://api.openai.com/v1` | 可替换为兼容生图接口的私有端点 |
+| 直接调用模式接口后缀 | `images/generations` | 也可选 `responses` 或 `chat/completions` |
 | 直接调用模式生图模型 | `gpt-image-2` | 可通过模型列表选择或手动填写 |
-| 直接调用模式视觉文本模型 | `gpt-5.5` | 用于参考图分析、规划和文本视觉任务；当直接调用模式接口后缀为 `responses` 时，也作为 Responses 请求模型 |
+| 直接调用模式视觉文本模型 | `gpt-5.5` | 用于参考图分析、规划和文本视觉任务 |
+| Gemini模型基础 URL | `https://api.openai.com/v1` | UI 示例为兼容中转的 `/v1` 基础地址，实际请求会走 `/images/generations` |
+| Gemini模型图像模型 | `gemini-3.1-flash-image-preview` | 模型名包含 Gemini 图像特征时走 Gemini 图像生成请求体 |
 | 推理强度 | `xhigh` | 可选 `low` / `medium` / `high` / `xhigh` |
 
-### 接口后缀怎么选
+### 接口地址与后缀
 
-Studio 会把请求地址拆成 `Base URL + 接口后缀`。官方 OpenAI API 的完整地址分别是 `https://api.openai.com/v1/responses`、`https://api.openai.com/v1/chat/completions`、`https://api.openai.com/v1/images/generations` 和 `https://api.openai.com/v1/images/edits`；在 Studio 里，接口地址输入框通常只填写到 `/v1`，后缀由右侧下拉框选择。
+Studio 会把请求地址拆成 `Base URL + 接口后缀`。官方 OpenAI API 的完整地址分别是 `https://api.openai.com/v1/responses`、`https://api.openai.com/v1/chat/completions`、`https://api.openai.com/v1/images/generations` 和 `https://api.openai.com/v1/images/edits`。
 
 | 后缀 | 什么时候用 |
 | --- | --- |
-| `responses` | 路由模式默认值，也可用于直接调用模式连接兼容 Responses API 的中转或供应商。它会使用 `image_generation` 工具，由对应通道的视觉/文本模型负责理解提示词、参考图和多步流程。 |
-| `chat/completions` | 兼容供应商只提供 Chat Completions 风格的视觉/生图协议时使用。路由模式和直接调用模式都可以选择它；Studio 会按 Chat Completions 请求体发送，并从返回消息里提取图片。 |
-| `images/generations` | 直接调用模式默认值。适合供应商提供标准图片生成端点，Studio 会直接把提示词、尺寸、质量、格式和生图模型发给图片模型。 |
-| `images/edits` | 图片编辑专用端点。普通生图不要选它；进入 `/#image-edit` 后，Studio 会在上传源图或 mask 时自动调用 `/images/edits`。如果供应商只给了编辑端点完整 URL，可以粘贴它来提取同一个供应商的 Base URL。 |
+| `responses` | 路由模式默认值，也可用于直接调用模式连接兼容 Responses API 的中转或供应商 |
+| `chat/completions` | 供应商只提供 Chat Completions 风格的视觉/生图协议时使用 |
+| `images/generations` | 直接调用模式默认值，适合标准图片生成端点 |
+| `images/edits` | 图片编辑专用端点，普通生图不需要手动选择 |
 
-如果供应商给的是完整 URL，可以直接粘贴到接口地址输入框。保存时 Studio 会识别末尾的 `responses`、`chat/completions`、`images/generations` 或 `images/edits`，把前半段规范化保存为 Base URL，把末尾保存为对应通道的接口后缀，并丢弃 URL 里的查询参数和 hash。例如 `https://vendor.example/openai/v1/chat/completions?token=debug` 会保存为 Base URL `https://vendor.example/openai/v1`、后缀 `chat/completions`。如果末尾不是已知后缀，Studio 会把它当作 Base URL 处理，并在缺少 `/v1` 时自动补上 `/v1`，后缀继续使用当前下拉框选择。
+如果供应商给的是完整 URL，可以直接粘贴到接口地址输入框。保存时 Studio 会识别末尾的 `responses`、`chat/completions`、`images/generations` 或 `images/edits`，把前半段规范化保存为 Base URL，把末尾保存为对应通道的接口后缀，并丢弃 URL 里的查询参数和 hash。例如 `https://vendor.example/openai/v1/chat/completions?token=debug` 会保存为 Base URL `https://vendor.example/openai/v1`、后缀 `chat/completions`。如果末尾不是已知后缀，Studio 会把它当作 Base URL 处理，保留供应商给出的路径。
 
 隐私默认值：
 
-- 路由模式与直接调用模式的 API Key、私有 Base URL 默认只保存在本机 `.local/config.json` 或浏览器本地配置中。
+- 路由模式、直接调用模式和 Gemini 模型的 API Key 与私有 Base URL 默认只保存在本机 `.local/config.json` 或浏览器本地配置中。
 - `.local/`、`output/`、`artifacts/`、`dist/`、日志、构建产物和 `node_modules/` 不会提交到 GitHub。
 - 生成结果默认写入 Windows 图片目录，不混入源码目录。
 
@@ -277,31 +302,42 @@ output/generated-时间戳.<ext>
 | 套图基础数量 | 4 / 6 / 8 / 10 / 12 / 14 / 16 / 18 张，SKU 补图可追加 |
 | PPT 页数 | 1-20 页 |
 | 排队任务数 | 不设硬上限；本地队列按模式与通道并发上限逐批处理 |
-| 并发生成数 | 默认最多 15 个 |
+| 并发生成数 | 每个模式与调用通道分组默认最多 15 个 |
 | 输出格式 | PNG / JPG |
 
 常用比例和尺寸：
 
-| 比例 | `auto` 默认尺寸 | 可选尺寸 |
-| --- | --- | --- |
-| `1:1` | `1024x1024` | `1024x1024`、`1536x1536`、`2048x2048`、`2816x2816` |
-| `5:4` | `1280x1024` | `1280x1024`、`1920x1536`、`2560x2048`、`3120x2496` |
-| `9:16` | `720x1280` | `720x1280`、`1152x2048`、`2016x3584`、`2151x3824`、`2160x3840` |
-| `21:9` | `1680x720` | `1680x720`、`1916x821`、`2688x1152`、`3360x1440`、`3824x1639`、`3832x1642`、`3840x1646` |
-| `16:9` | `1280x720` | `1280x720`、`2048x1152`、`3584x2016`、`3824x2151`、`3840x2160` |
-| `4:3` | `1024x768` | `1024x768`、`1536x1152`、`2048x1536`、`3072x2304` |
-| `3:2` | `1536x1024` | `1536x1024`、`2304x1536`、`3072x2048`、`3456x2304` |
-| `4:5` | `1024x1280` | `1024x1280`、`1536x1920`、`2048x2560`、`2496x3120` |
-| `3:4` | `768x1024` | `768x1024`、`1536x2048`、`1920x2560`、`2304x3072`、`2448x3264` |
-| `2:3` | `1024x1536` | `1024x1536`、`1536x2304`、`2048x3072`、`2304x3456` |
+| 比例 | 适合场景 | `auto` 默认尺寸 | 可选尺寸 |
+| --- | --- | --- | --- |
+| `1:1` | 电商主图、头像、社交媒体 | `1024x1024` | `1024x1024`、`1536x1536`、`2048x2048`、`2560x2560`、`2880x2880` |
+| `4:3` | PPT、网页配图 | `1360x1024` | `1360x1024`、`2048x1536`、`2720x2048`、`3312x2480` |
+| `3:4` | 海报、人像 | `1024x1360` | `1024x1360`、`1536x2048`、`2048x2720`、`2480x3312` |
+| `3:2` | 摄影风格横图 | `1536x1024` | `1536x1024`、`2304x1536`、`3072x2048`、`3520x2352` |
+| `2:3` | 竖版摄影 | `1024x1536` | `1024x1536`、`1536x2304`、`2048x3072`、`2352x3520` |
+| `5:4` | 商品展示横图 | `1280x1024` | `1280x1024`、`1920x1536`、`2560x2048`、`3200x2560` |
+| `4:5` | Instagram 帖子、竖版商品图 | `1024x1280` | `1024x1280`、`1536x1920`、`2048x2560`、`2560x3200` |
+| `16:9` | 横版封面、YouTube | `1824x1024` | `1824x1024`、`2736x1536`、`3648x2048`、`3840x2160` |
+| `9:16` | 短视频封面、手机壁纸 | `1024x1824` | `1024x1824`、`1536x2736`、`2048x3648`、`2160x3840` |
+| `21:9` | 超宽横幅 | `2384x1024` | `2384x1024`、`1680x720`、`3584x1536`、`3840x1648` |
+| `9:21` | 超长竖图 | `1024x2384` | `1024x2384`、`720x1680`、`1536x3584`、`1648x3840` |
+| `2:1` | Banner 横幅 | `2048x1024` | `2048x1024`、`3072x1536`、`3840x1920` |
+| `1:2` | 长海报 | `1024x2048` | `1024x2048`、`1536x3072`、`1920x3840` |
+| `3:1` | 超宽广告图 | `3072x1024` | `3072x1024`、`3840x1280` |
+| `1:3` | 超长竖版广告 | `1024x3072` | `1024x3072`、`1280x3840` |
 
-高分辨率更容易触发上游超时、失败或没有最终图片结果。日常建议优先使用 1K 到 2K 尺寸，需要大图时再逐档尝试。
+Gemini 模型通道使用协议尺寸：
+
+| 模式 | 默认值 | 可选值 |
+| --- | --- | --- |
+| Gemini模型 | `1K` | `auto`、`512`、`1K`、`2K`、`4K` |
+
+Gemini 模型通道里，`auto` 最终会按 `1K` 发送。高分辨率更容易触发上游超时、失败或没有最终图片结果。日常建议优先使用 1K 到 2K 尺寸，需要大图时再逐档尝试。
 
 ## 本地与云端能力边界
 
 | 能力 | 本地 Node | Cloudflare Pages Worker / Vercel |
 | --- | --- | --- |
-| 普通图片生成 | 支持 | 支持 |
+| 普通图片生成 | 支持路由模式、直接调用模式和 Gemini 模型 | 支持核心生成，按部署配置保存调用通道 |
 | 风格迁移、融图分析、图片拆解 | 支持 | 支持核心生成 |
 | 图片编辑 | 支持整图编辑、局部蒙版、逐区精修、记录和路径回报 | 支持整图编辑和局部蒙版；本地文件夹操作不可用 |
 | 图片压缩 | 浏览器本地处理 | 浏览器本地处理 |
@@ -313,7 +349,7 @@ output/generated-时间戳.<ext>
 | 调用模式与元数据 | 本地索引、sidecar 和浏览器缓存保留 `imageRoute` | 生成、模型列表和服务端图片链接按部署配置保留调用模式信息 |
 | API Key 存储 | `.local/config.json` 或浏览器本地配置 | 浏览器本地配置或部署侧安全注入 |
 
-## 构建与发布
+## 构建与验证
 
 常用验证命令：
 
@@ -345,10 +381,10 @@ cmd /c npm run build:installer
 安装包产物写入：
 
 ```text
-artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.1.5.exe
+artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.1.6.exe
 ```
 
-发布前确认以下路径没有进入暂存区：
+提交前确认以下路径没有进入暂存区：
 
 ```text
 .local/
@@ -363,15 +399,15 @@ node_modules/
 *.log
 ```
 
-发行版号需要与 `package.json`、`package-lock.json`、README、`docs/windows-installer.md` 和安装包文件名一致。
-
 ## 常见问题
 
 | 现象 | 常见原因 | 处理方式 |
 | --- | --- | --- |
 | `npm start` 后中文日志显示乱码 | Windows 控制台没有按 UTF-8 显示输出 | 先打开 `http://localhost:3600` 验证服务；需要看中文日志时用 `cmd /c npm start` |
 | 端口 `3600` 被占用 | 本机已有旧服务或其他程序占用端口 | 用 `$env:PORT="3601"; cmd /c npm start`，或双击 `launch-studio.cmd` |
-| 页面能打开，但生成时报 API Key 或上游请求错误 | 当前调用通道没有保存 API Key，或 Base URL / 模型配置不正确 | 在右下角配置面板确认路由模式或直接调用模式，并保存对应配置 |
+| 页面能打开，但生成时报 API Key 或上游请求错误 | 当前调用通道没有保存 API Key，或 Base URL / 模型配置不正确 | 在右下角配置面板确认路由模式、直接调用模式或 Gemini 模型，并保存对应配置 |
+| 直接调用模式的编辑端点不在下拉框里 | 图片编辑会自动走 `images/edits` | 普通生图保持 `images/generations`、`responses` 或 `chat/completions` 即可 |
+| Gemini 模型通道没有返回图片 | 模型名、协议或供应商响应格式不匹配 | 确认基础 URL 会实际请求 `/images/generations`，并使用兼容图像生成的 Gemini 模型 |
 | 拉取后提示找不到依赖模块 | 没安装依赖，或旧 `node_modules` 与 lockfile 不一致 | 在仓库根目录执行 `cmd /c npm ci` |
 | 浏览器控制台提示 `/lib/*.mjs` 404 或公共模块不一致 | 开发时改了 `lib/` 但没有同步 `public/lib/` | 执行 `cmd /c npm run sync:public-lib -- --check`；失败时执行 `cmd /c npm run sync:public-lib` |
 | 自写 Node 脚本里 `spawn npm` 出现 `spawn EINVAL` | Windows npm shim 在部分执行环境里不能被 Node 子进程直接调用 | 使用 `cmd /c npm ...`，或 spawn `cmd.exe /c npm ...` |
@@ -380,7 +416,7 @@ node_modules/
 
 ```text
 GPT-Image2-Studio/
-|-- docs/                         # 教程、发布说明和执行计划记录
+|-- docs/                         # 教程、安装说明和执行计划记录
 |-- examples/                     # API 请求与 SSE 示例
 |-- lib/                          # 本地服务和前端共享逻辑
 |-- openspec/                     # 规格变更、设计和验收场景

@@ -4905,7 +4905,8 @@ textarea {
   align-items: center;
   justify-content: center;
   min-width: 34px;
-  height: 18px;
+  max-width: min(260px, 58vw);
+  min-height: 18px;
   padding: 0 9px;
   border-radius: 999px;
   border: 1px solid rgba(119, 255, 214, 0.42);
@@ -4915,6 +4916,9 @@ textarea {
   font-weight: 800;
   line-height: 1;
   letter-spacing: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   text-shadow: 0 0 12px rgba(119, 255, 214, 0.58);
   box-shadow:
     0 0 18px rgba(119, 255, 214, 0.16),
@@ -10373,7 +10377,7 @@ html[data-ui-layout="mobile"] .portrait-accessory-asset-panel {
 
 .route-selector {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
   padding: 4px;
   border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
@@ -10457,6 +10461,12 @@ html[data-ui-layout="mobile"] .portrait-accessory-asset-panel {
   background: color-mix(in srgb, var(--input-bg, rgba(255, 255, 255, 0.025)) 88%, transparent);
 }
 
+.field-hint {
+  color: var(--muted);
+  font-size: var(--type-caption-size);
+  overflow-wrap: anywhere;
+}
+
 .config-log-panel {
   background: color-mix(in srgb, var(--control-bg) 48%, transparent);
   box-shadow: none;
@@ -10468,7 +10478,11 @@ html[data-ui-layout="mobile"] .portrait-accessory-asset-panel {
 }
 
 .config-form:has(input[name="imageRoute"][value="a"]:checked) [data-route-panel="b"],
-.config-form:has(input[name="imageRoute"][value="b"]:checked) [data-route-panel="a"] {
+.config-form:has(input[name="imageRoute"][value="a"]:checked) [data-route-panel="c"],
+.config-form:has(input[name="imageRoute"][value="b"]:checked) [data-route-panel="a"],
+.config-form:has(input[name="imageRoute"][value="b"]:checked) [data-route-panel="c"],
+.config-form:has(input[name="imageRoute"][value="c"]:checked) [data-route-panel="a"],
+.config-form:has(input[name="imageRoute"][value="c"]:checked) [data-route-panel="b"] {
   display: none;
 }
 
@@ -10493,11 +10507,12 @@ html[data-ui-layout="mobile"] .portrait-accessory-asset-panel {
 
 .endpoint-toolbar {
   min-width: 0;
-  display: inline-flex;
+  display: inline-grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
-  flex-wrap: wrap;
+  width: min(380px, 100%);
 }
 
 .endpoint-address-control {
@@ -10512,7 +10527,8 @@ html[data-ui-layout="mobile"] .portrait-accessory-asset-panel {
 
 .endpoint-suffix-select {
   min-height: 32px;
-  max-width: min(220px, 100%);
+  min-width: 0;
+  width: 100%;
   padding: 0 32px 0 10px;
   border-radius: 999px;
   font-size: var(--type-subtitle-size);
