@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-label="cyberpunk neon style sample">
+  <defs>
+    <linearGradient id="night" x1="0" y1="0" x2="640" y2="480"><stop stop-color="#090a1f"/><stop offset=".5" stop-color="#151136"/><stop offset="1" stop-color="#060914"/></linearGradient>
+    <radialGradient id="pink" cx=".38" cy=".42" r=".46"><stop stop-color="#ff3be7" stop-opacity=".86"/><stop offset="1" stop-color="#ff3be7" stop-opacity="0"/></radialGradient>
+    <radialGradient id="cyan" cx=".68" cy=".2" r=".4"><stop stop-color="#29f4ff" stop-opacity=".82"/><stop offset="1" stop-color="#29f4ff" stop-opacity="0"/></radialGradient>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".7" numOctaves="3" seed="33"/><feComponentTransfer><feFuncA type="table" tableValues="0 .13"/></feComponentTransfer></filter>
+  </defs>
+  <rect width="640" height="480" fill="url(#night)"/>
+  <rect width="640" height="480" fill="url(#pink)"/>
+  <rect width="640" height="480" fill="url(#cyan)"/>
+  <path d="M0 248c78-54 158-80 240-79 88 0 157 43 237 42 57 0 111-19 163-55v324H0Z" fill="#182d47"/>
+  <path d="M0 292c88-44 168-58 240-42 83 19 154 20 230 3 58-13 115-35 170-66v293H0Z" fill="#081824"/>
+  <path d="M236 304h190v112H236Z" fill="#11142f" stroke="#29f4ff" stroke-width="6"/>
+  <path d="M218 304 329 216l114 88Z" fill="#25124a" stroke="#ff3be7" stroke-width="7"/>
+  <path d="M282 416v-69h58v69M363 338h34v34h-34M253 338h34v34h-34" fill="#29f4ff"/>
+  <path d="M246 429c23-75 52-126 88-154 30 31 52 83 65 154Z" fill="#2a185f" stroke="#ffcb45" stroke-width="4"/>
+  <path d="M116 367c-15-50 5-94 51-130 46 30 66 74 45 130Z" fill="#122d3a" stroke="#38ffb4" stroke-width="6"/>
+  <path d="M159 287v120" stroke="#2b1532" stroke-width="18" stroke-linecap="round"/>
+  <path d="M49 378h172M421 351h154M487 124h92M79 151h82" stroke="#ff3be7" stroke-width="8" stroke-linecap="round"/>
+  <path d="M67 404h240M397 374h198M452 153h88M108 181h70" stroke="#29f4ff" stroke-width="5" stroke-linecap="round"/>
+  <rect width="640" height="480" fill="#fff" filter="url(#grain)" opacity=".55"/>
+</svg>

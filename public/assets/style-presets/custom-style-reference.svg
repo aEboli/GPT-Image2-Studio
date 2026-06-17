@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-label="custom uploaded style reference sample">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="640" y2="480">
+      <stop stop-color="#20263a"/>
+      <stop offset=".52" stop-color="#30364d"/>
+      <stop offset="1" stop-color="#141923"/>
+    </linearGradient>
+    <linearGradient id="photo" x1="165" y1="116" x2="476" y2="360">
+      <stop stop-color="#f1c27b"/>
+      <stop offset=".48" stop-color="#9ad1c6"/>
+      <stop offset="1" stop-color="#d96d7b"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="16" stdDeviation="14" flood-color="#05070d" flood-opacity=".38"/>
+    </filter>
+    <filter id="grain">
+      <feTurbulence type="fractalNoise" baseFrequency=".55" numOctaves="3" seed="41"/>
+      <feComponentTransfer><feFuncA type="table" tableValues="0 .12"/></feComponentTransfer>
+    </filter>
+  </defs>
+  <rect width="640" height="480" fill="url(#bg)"/>
+  <path d="M70 354c92-63 176-83 252-62 83 23 166 5 248-54v242H70Z" fill="#111724" opacity=".58"/>
+  <rect x="142" y="92" width="356" height="286" rx="34" fill="#f3e9d8" filter="url(#shadow)"/>
+  <rect x="166" y="118" width="308" height="232" rx="24" fill="url(#photo)"/>
+  <circle cx="242" cy="194" r="44" fill="#f6e07d" opacity=".92"/>
+  <path d="M166 350 270 244l68 62 54-78 82 122Z" fill="#283d5e" opacity=".82"/>
+  <path d="M207 182c31-29 72-42 124-38M378 172c33 9 58 29 76 60M223 310c75 21 146 19 214-7" fill="none" stroke="#fff7df" stroke-width="10" stroke-linecap="round" opacity=".54"/>
+  <path d="M320 157v83M284 196h72" stroke="#172133" stroke-width="14" stroke-linecap="round"/>
+  <path d="M110 126h58M486 126h44M105 410h144M392 410h142" stroke="#94a3b8" stroke-width="8" stroke-linecap="round" opacity=".32"/>
+  <rect width="640" height="480" fill="#fff" filter="url(#grain)" opacity=".34"/>
+</svg>

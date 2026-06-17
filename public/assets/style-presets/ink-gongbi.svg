@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-label="gongbi chinese ink style sample">
+  <defs><filter id="paper"><feTurbulence type="fractalNoise" baseFrequency=".028" numOctaves="5" seed="22"/><feComponentTransfer><feFuncA type="table" tableValues=".08 .2"/></feComponentTransfer></filter></defs>
+  <rect width="640" height="480" fill="#f7f0e0"/>
+  <rect width="640" height="480" fill="#8c7d65" filter="url(#paper)" opacity=".26"/>
+  <path d="M0 247c78-54 158-81 240-80 88 0 157 43 237 42 57 0 111-19 163-55v326H0Z" fill="#b8c1ad" opacity=".26"/>
+  <path d="M0 287c88-44 168-58 240-42 83 19 154 20 230 3 58-13 115-35 170-66v298H0Z" fill="#80966c" opacity=".2"/>
+  <path d="M236 303h188v112H236M218 303 329 216l112 87M282 415v-68h58v68M363 338h34v33h-34M253 338h34v33h-34" fill="none" stroke="#20242b" stroke-width="4"/>
+  <path d="M246 428c23-74 52-125 87-153 29 30 50 82 64 153" fill="none" stroke="#9f8d51" stroke-width="4"/>
+  <path d="M116 366c-14-48 5-91 50-128 46 29 65 72 45 128Z" fill="#80966c" opacity=".34" stroke="#20242b" stroke-width="4"/>
+  <path d="M159 287v118" stroke="#20242b" stroke-width="9" stroke-linecap="round"/>
+  <path d="M91 385c58-29 105-65 140-108M383 194c58 13 94 50 109 111M424 235c40-5 73 8 99 39M393 176c33-33 72-42 118-25" fill="none" stroke="#20242b" stroke-width="5" stroke-linecap="round"/>
+  <path d="M476 153c-21 28-49 36-84 24 21-27 49-35 84-24ZM498 253c-31 12-57 4-78-25 31-10 57-2 78 25Z" fill="#b84b3a" opacity=".66" stroke="#20242b" stroke-width="2"/>
+  <path d="M72 68h214M420 399h118" stroke="#20242b" stroke-width="2" opacity=".18"/>
+</svg>

@@ -1,0 +1,133 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+
+const indexPath = new URL("../public/index.html", import.meta.url);
+const stylesPath = new URL("../public/styles.css", import.meta.url);
+const appPath = new URL("../public/app.js", import.meta.url);
+const serverPath = new URL("../server.mjs", import.meta.url);
+
+test("article illustration mode has independent create and assets entries", async () => {
+  const html = await readFile(indexPath, "utf8");
+  const styles = await readFile(stylesPath, "utf8");
+  const app = await readFile(appPath, "utf8");
+
+  assert.match(html, /href="#article-illustration"/);
+  assert.match(html, /data-view-panel="article-illustration"/);
+  assert.match(html, /id="articleIllustrationForm"/);
+  assert.match(html, /id="articleIllustrationStylePresetInput"/);
+  assert.match(html, /<option value="realist-magazine" selected>杂志写实<\/option>/);
+  assert.match(html, /<option value="documentary-realism">纪实摄影感<\/option>/);
+  assert.match(html, /<option value="historical-realism">历史写实<\/option>/);
+  assert.match(html, /<option value="gongbi-heritage">工笔国风<\/option>/);
+  assert.match(html, /<option value="graphic-novel">图像小说<\/option>/);
+  assert.match(html, /<option value="noir-comic">黑白漫画<\/option>/);
+  assert.match(html, /<option value="vintage-newsprint">旧报刊版画<\/option>/);
+  assert.match(html, /<option value="surreal-editorial">超现实社论<\/option>/);
+  assert.match(html, /<option value="anime-storyboard">动画分镜<\/option>/);
+  assert.match(html, /id="articleIllustrationSourceLength"/);
+  assert.match(html, /id="articleIllustrationStylePresetInput"[\s\S]*id="articleIllustrationStyleBibleInput"[\s\S]*id="articleIllustrationPlanButton"[\s\S]*<section class="studio-panel article-plan-panel">/);
+  assert.match(html, /class="article-board-sections"/);
+  assert.match(html, /id="articleReferenceSectionCount"/);
+  assert.match(html, /id="articleStoryboardSectionCount"/);
+  assert.match(html, /class="article-board-section article-reference-section"[\s\S]*id="articleIllustrationReferenceList"[\s\S]*class="article-board-section article-storyboard-section"[\s\S]*id="articleIllustrationStoryboardList"/);
+  assert.match(html, /id="articleIllustrationStoryboardList"/);
+  assert.doesNotMatch(html, /<section class="studio-panel article-plan-panel">[\s\S]*article-style-bible-field/);
+  assert.match(html, /href="#article-record"/);
+  assert.match(html, /data-view-panel="article-record"/);
+  assert.match(html, /id="articleRecordList"/);
+  assert.match(html, /data-article-record-column-preset="2"/);
+  assert.match(html, /data-article-record-column-preset="4"/);
+  assert.match(html, /data-article-record-column-preset="6"/);
+  assert.match(html, /data-article-record-column-preset="8"/);
+
+  assert.match(
+    styles,
+    /\.article-illustration-workspace\s*\{[\s\S]*grid-template-columns:\s*var\(--studio-grid-left,\s*392px\) minmax\(0, 1fr\);[\s\S]*gap:\s*var\(--studio-grid-gap,\s*14px\);/,
+  );
+  assert.match(styles, /\.article-plan-panel\s*\{[\s\S]*overflow: hidden;/);
+  assert.match(styles, /\.article-board-sections\s*\{[\s\S]*overflow: auto;/);
+  assert.match(styles, /\.article-board-section\s*\{[\s\S]*border-top: 1px solid var\(--border\);/);
+  assert.match(styles, /\.article-board-section-head\s*\{[\s\S]*justify-content: space-between;/);
+  assert.match(styles, /\.article-reference-list\s*\{[\s\S]*repeat\(auto-fit, minmax\(380px, 1fr\)\)/);
+  assert.match(styles, /\.article-storyboard-list\s*\{[\s\S]*repeat\(auto-fit, minmax\(380px, 1fr\)\)/);
+  assert.match(styles, /\.article-story-card\[data-item-kind="reference-card"\] \[data-article-item-caption\]/);
+  assert.match(styles, /\.article-card-image\s*\{[\s\S]*position: relative;/);
+  assert.match(styles, /\.article-card-image-button\s*\{[\s\S]*cursor: zoom-in;/);
+  assert.match(styles, /\.article-image-order-badge\s*\{[\s\S]*position: absolute;/);
+  assert.match(styles, /\.article-record-view\s*\{/);
+  assert.match(styles, /\.article-card-actions \.mini-action\s*\{[\s\S]*width: auto;[\s\S]*white-space: nowrap;/);
+  assert.match(styles, /\.article-record-card\s*\{[\s\S]*color: var\(--text\);/);
+  assert.match(styles, /\.article-record-sections\s*\{[\s\S]*overflow: auto;/);
+  assert.match(styles, /\.article-record-section-head\s*\{[\s\S]*justify-content: space-between;/);
+  assert.match(styles, /\.article-record-column-switch\s*\{[\s\S]*grid-template-columns: auto repeat\(4, minmax\(30px, 1fr\)\);/);
+  assert.match(styles, /\.article-record-image-grid\s*\{[\s\S]*repeat\(var\(--article-record-columns, 4\), minmax\(0, 1fr\)\)/);
+  assert.match(styles, /\.article-record-image-card\s*\{[\s\S]*overflow: hidden;/);
+  assert.match(styles, /\.article-record-card-meta\s*\{[\s\S]*display: flex;/);
+  assert.match(styles, /\.article-record-card-kind\.timeline\s*\{[\s\S]*rgba\(255, 201, 107, 0\.24\)/);
+  assert.match(styles, /\.article-record-detail\[data-record-columns="8"\] \.article-record-card-body/);
+  assert.match(styles, /\.article-record-detail\[data-record-columns="8"\] \.article-card-head span\s*\{[\s\S]*display: none;/);
+  assert.match(styles, /html\[data-ui-layout="tablet"\] \.article-record-image-grid\s*\{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+  assert.match(styles, /html\[data-ui-layout="mobile"\] \.article-record-detail\[data-record-columns="8"\] \.article-card-actions\s*\{[\s\S]*display: grid;/);
+  assert.match(styles, /html\[data-ui-layout="mobile"\] \.article-record-detail\[data-record-columns="8"\] \.article-card-head span\s*\{[\s\S]*display: inline;/);
+  assert.match(styles, /\.article-source-heading\s*\{[\s\S]*justify-content: space-between;/);
+  assert.match(styles, /\.article-field-count\s*\{[\s\S]*font-variant-numeric: tabular-nums;/);
+  assert.match(styles, /\.article-storyboard-list\s*\{[\s\S]*overflow: visible;/);
+  assert.match(styles, /\.article-board-sections::-webkit-scrollbar-thumb/);
+  assert.match(styles, /\.article-illustration-form::-webkit-scrollbar-thumb/);
+
+  assert.match(app, /CREATE_VIEW_IDS = new Set\(\[[^\]]*"article-illustration"/);
+  assert.match(app, /ASSET_VIEW_IDS = new Set\(\[[^\]]*"article-record"/);
+  assert.match(app, /function formatArticleDisplayText/);
+  assert.match(app, /function updateArticleSourceLength/);
+  assert.match(app, /articleIllustrationSourceTextInput\.addEventListener\("input", updateArticleSourceLength\)/);
+  assert.match(app, /function orderArticleItemsForView/);
+  assert.match(app, /articleReferenceSectionCount/);
+  assert.match(app, /articleStoryboardSectionCount/);
+  assert.match(app, /card\.dataset\.itemKind = item\.itemKind/);
+  assert.match(app, /function createArticleRecordCard/);
+  assert.match(app, /media\.dataset\.articleRecordPreviewItemId = item\.itemId/);
+  assert.match(app, /function buildArticleRecordLightboxItem/);
+  assert.match(app, /isArticleRecordItem: true/);
+  assert.match(app, /refs\.lightboxDelete\.hidden = Boolean\(isRecordItem\)/);
+  assert.match(app, /ARTICLE_RECORD_COLUMN_PRESETS = \[2, 4, 6, 8\]/);
+  assert.match(app, /recordColumnPreset: DEFAULT_ARTICLE_RECORD_COLUMN_PRESET/);
+  assert.match(app, /DEFAULT_ARTICLE_ILLUSTRATION_STYLE_PRESET = "realist-magazine"/);
+  assert.match(app, /articleRecordColumnButtons: \[\.\.\.document\.querySelectorAll\("\[data-article-record-column-preset\]"\)\]/);
+  assert.match(app, /function renderArticleRecordColumnPresetButtons/);
+  assert.match(app, /articleRecordDetail\.dataset\.recordColumns = String\(columnCount\)/);
+  assert.match(app, /--article-record-columns/);
+  assert.match(app, /function getArticleParagraphLabel/);
+  assert.match(app, /function getArticleTimelineLabel/);
+  assert.match(app, /paragraphIndex: item\.paragraphIndex \|\| storyboardOrdinal/);
+  assert.match(app, /title\.textContent = getArticleCardHeadingLabel\(item\)/);
+  assert.match(app, /media\.dataset\.articlePreviewItemId = item\.itemId/);
+  assert.match(app, /function openArticleIllustrationItemPreview\(itemId\)/);
+  assert.match(app, /data-article-preview-item-id/);
+  assert.match(app, /openArticleIllustrationItemPreview\(previewButton\.dataset\.articlePreviewItemId\)/);
+  assert.match(app, /refs\.articleIllustrationReferenceList\.addEventListener\("click", handleArticleIllustrationCardClick\)/);
+  assert.match(app, /refs\.articleIllustrationStoryboardList\.addEventListener\("click", handleArticleIllustrationCardClick\)/);
+  assert.match(app, /refs\.articleIllustrationReferenceList,\s*[\r\n]+\s*refs\.articleIllustrationStoryboardList/);
+  assert.match(app, /referenceItems\.forEach\(\(item\) => \{[\s\S]*createArticleStoryboardCard\(item\)/);
+  assert.match(app, /article-record-sections/);
+  assert.match(app, /appendRecordSection\(referenceItems/);
+  assert.match(app, /appendRecordSection\(storyboardItems/);
+  assert.match(app, /refs\.articleRecordDetail\.addEventListener\("click"[\s\S]*data-article-record-preview-item-id[\s\S]*openArticleRecordItemPreview/);
+  assert.match(app, /currentSet\?\.items\?\.filter\(\(item\) => item\.itemKind !== "reference-card"\)/);
+  assert.match(app, /createArticleImageOrderBadge\(item\)/);
+  assert.match(app, /对话用漫画对话框\/旁白框呈现，不要直接印在画面物体上/);
+  assert.match(app, /formatArticleDisplayText\(set\.title\)/);
+  assert.match(app, /fetch\("\/api\/article-illustration\/plan"/);
+  assert.match(app, /fetch\("\/api\/article-illustration\/generate"/);
+  assert.match(app, /fetch\("\/api\/article-illustration\/sets"/);
+});
+
+test("article illustration API routes are exposed separately from ecommerce creation routes", async () => {
+  const server = await readFile(serverPath, "utf8");
+
+  assert.match(server, /url\.pathname === "\/api\/article-illustration\/plan"/);
+  assert.match(server, /url\.pathname === "\/api\/article-illustration\/generate-references"/);
+  assert.match(server, /url\.pathname === "\/api\/article-illustration\/generate"/);
+  assert.match(server, /url\.pathname === "\/api\/article-illustration\/sets"/);
+  assert.doesNotMatch(server, /CREATION_IMAGE_COUNT_OPTIONS[\s\S]*article-illustration/);
+});

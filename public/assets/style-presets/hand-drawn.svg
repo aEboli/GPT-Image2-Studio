@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-label="hand drawn illustration style sample">
+  <defs><filter id="paper"><feTurbulence type="fractalNoise" baseFrequency=".035" numOctaves="4" seed="9"/><feComponentTransfer><feFuncA type="table" tableValues=".08 .22"/></feComponentTransfer></filter></defs>
+  <rect width="640" height="480" fill="#f7ead5"/>
+  <rect width="640" height="480" fill="#b5835e" filter="url(#paper)" opacity=".35"/>
+  <path d="M-7 252c91-58 178-80 259-66 91 15 136 49 213 43 67-6 126-28 184-71v322H-7Z" fill="#a8c7d5" opacity=".72"/>
+  <path d="M0 301c86-42 170-57 253-44 79 12 154 14 225 1 61-12 116-37 166-71v293H0Z" fill="#99be77" opacity=".82"/>
+  <path d="M244 428c20-78 52-129 91-153 31 33 54 84 68 153Z" fill="#e7c06d"/>
+  <path d="M236 306h190v111H236Z" fill="#f1d2aa"/>
+  <path d="M218 304 329 216l115 89Z" fill="#c85d4f"/>
+  <path d="M282 416v-69h58v69M363 338h34v34h-34M253 338h34v34h-34" fill="#66514f"/>
+  <path d="M113 366c-14-50 5-94 52-130 47 30 67 74 46 130Z" fill="#5f9b65"/>
+  <path d="M159 287v120" stroke="#6f4e33" stroke-width="17" stroke-linecap="round"/>
+  <path d="M0 252c91-58 178-80 259-66 83 14 133 49 206 43M0 301c86-42 170-57 253-44 79 12 154 14 225 1M236 306h190v111H236M218 304 329 216l115 89M113 366c-14-50 5-94 52-130" fill="none" stroke="#2f2a29" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M52 389c52 14 102 15 150 3M426 363c65 4 118-8 160-35" fill="none" stroke="#cc6b5d" stroke-width="4" stroke-linecap="round" opacity=".55"/>
+</svg>

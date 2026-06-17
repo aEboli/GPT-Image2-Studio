@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gpt-image2-studio-api",
+  "main": "cloudflare-pages-worker.mjs",
+  "compatibility_date": "2026-05-04",
+  "r2_buckets": [
+    {
+      "binding": "IMAGE_BUCKET",
+      "bucket_name": "gpt-image2-studio-images"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "GENERATION_QUEUE",
+        "queue": "gpt-image2-studio-generation"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "gpt-image2-studio-generation",
+        "max_batch_size": 1,
+        "max_batch_timeout": 1
+      }
+    ]
+  },
+  "routes": [
+    {
+      "pattern": "studio.827899031.xyz/api/*",
+      "zone_name": "827899031.xyz"
+    }
+  ]
+}

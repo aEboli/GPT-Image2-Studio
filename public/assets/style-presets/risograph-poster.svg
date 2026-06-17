@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-label="risograph poster style sample">
+  <defs><pattern id="dots" width="9" height="9" patternUnits="userSpaceOnUse"><circle cx="2.5" cy="2.5" r="1.8" fill="#24222a" opacity=".28"/></pattern><filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".55" numOctaves="3" seed="28"/><feComponentTransfer><feFuncA type="table" tableValues="0 .18"/></feComponentTransfer></filter></defs>
+  <rect width="640" height="480" fill="#f3e4b6"/>
+  <path d="M0 248c78-54 158-80 240-79 88 0 157 43 237 42 57 0 111-19 163-55v324H0Z" fill="#2f9ab7" opacity=".78"/>
+  <path d="M10 294c88-44 168-58 240-42 83 19 154 20 230 3 58-13 115-35 170-66v291H10Z" fill="#e84f49" opacity=".72"/>
+  <path d="M0 294c88-44 168-58 240-42 83 19 154 20 230 3 58-13 115-35 170-66v291H0Z" fill="url(#dots)" opacity=".75"/>
+  <path d="M254 430c23-75 52-126 88-154 30 31 52 83 65 154Z" fill="#f3cf4c"/>
+  <path d="M244 304h190v112H244Z" fill="#ef9d5d"/>
+  <path d="M226 304 337 216l114 88Z" fill="#e84f49"/>
+  <path d="M282 416v-69h58v69M363 338h34v34h-34M253 338h34v34h-34" fill="#24222a" opacity=".85"/>
+  <path d="M126 367c-15-50 5-94 51-130 46 30 66 74 45 130Z" fill="#2f9ab7"/>
+  <path d="M169 287v120" stroke="#24222a" stroke-width="16" stroke-linecap="round"/>
+  <path d="M50 95h192M50 123h126M448 86h132M431 412h148" stroke="#24222a" stroke-width="10" stroke-linecap="round" opacity=".75"/>
+  <rect width="640" height="480" fill="#fff" filter="url(#grain)" opacity=".65"/>
+</svg>

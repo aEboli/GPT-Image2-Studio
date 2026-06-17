@@ -1,0 +1,85 @@
+# Portrait Accessory Asset Notes
+
+These files are local white-background product-reference assets for the built-in portrait accessory library.
+
+- Composition standard: one product per image, front-facing or near-front product catalog view, centered on a clean white background.
+- Content standard: no people, no live model scenes, no room background, no brand marks, no watermarks, no labels, and no cluttered crop.
+- Source workflow: generated with the built-in image generation workflow as photorealistic retail product photography sheets, then cropped into individual app assets.
+- Classic style color variants: white-background photorealistic product thumbnails for upper, bottom, and shoe classics; each variant is a standalone PNG preview with no sourced product photo, brand mark, watermark, or catalog image.
+- Expanded clothing basics: white-background photorealistic product thumbnails for hoodies, camisoles, cropped cardigans, sweaters, skirts, shorts, JK skirt outfits, swimsuits, qipao dresses, and hanfu outfits; every expanded clothing asset has four color variants and no sourced product photo, brand mark, watermark, or catalog image.
+- COS category additions: local generated photorealistic costume-reference and cosplay character reference assets using generic anime-inspired and fantasy character archetypes; no official character, franchise, actor, celebrity, logo, catalog image, or sourced fan art is included.
+- Full library color completion: original single-color outerwear, dress, bag, accessory, hat, and COS assets now include four local PNG color variants generated with the built-in image generation workflow, then cropped from 2x2 white-background source sheets with consistent product-reference styling.
+- Independent style categories: commute, casual, sport, formal, heritage, and swim tabs add complete outfit/product-set references; every new asset has four built-in image generation variants cropped from 2x2 white-background source sheets.
+- Additional portrait outfit expansion: 12 more commute, casual, sport, formal, heritage, and swim references generated with the built-in image generation workflow, then cropped from 2x2 white-background source sheets with four color variants each.
+- Location portrait prop additions: tea set, paper umbrella, silk hand fan, and travel camera bag references generated with the built-in image generation workflow, then cropped from 2x2 white-background source sheets with four color variants each.
+
+The generated source sheets are retained under the local Codex generated-images folder for auditability:
+
+- `C:\Users\AEboli\.codex\generated_images\019e5143-6127-7a52-8875-428ac2983d8b\ig_071f3c4d362748b8016a11ab3caadc819199e56fc8c37c43e2.png`
+- `C:\Users\AEboli\.codex\generated_images\019e5143-6127-7a52-8875-428ac2983d8b\ig_071f3c4d362748b8016a11ac4c61a48191bfff53d8927a5063.png`
+- `C:\Users\AEboli\.codex\generated_images\019e5143-6127-7a52-8875-428ac2983d8b\ig_071f3c4d362748b8016a11aca2b9708191aefff3e3b50421f5.png`
+- `C:\Users\AEboli\.codex\generated_images\019e5f0e-dd3c-7cb1-8d85-251f63197557\ig_08725d4b1c334adf016a143ec712808191a101959485058105.png`
+- `C:\Users\AEboli\.codex\generated_images\019e5f0e-dd3c-7cb1-8d85-251f63197557\ig_08725d4b1c334adf016a143faac23c8191a1dd694a7c856976.png`
+- `C:\Users\AEboli\.codex\generated_images\019e5f0e-dd3c-7cb1-8d85-251f63197557\ig_08725d4b1c334adf016a143ffb588c8191bc72192d99463c05.png`
+- `C:\Users\AEboli\.codex\generated_images\019e5f0e-dd3c-7cb1-8d85-251f63197557\ig_08725d4b1c334adf016a145a6a7dfc81919b98c729113cd808.png`
+- `C:\Users\AEboli\.codex\generated_images\019e5f0e-dd3c-7cb1-8d85-251f63197557\ig_08725d4b1c334adf016a145ac44f708191821d53bfb19a1325.png`
+- `C:\Users\AEboli\.codex\generated_images\019e5f0e-dd3c-7cb1-8d85-251f63197557\ig_08725d4b1c334adf016a145b0963288191b9c62a28cd7b4e8e.png`
+- `C:\Users\AEboli\.codex\generated_images\019e5f0e-dd3c-7cb1-8d85-251f63197557\ig_08725d4b1c334adf016a145b5b654c8191bc78f054221e50d4.png`
+- `C:\Users\AEboli\.codex\generated_images\019e5f0e-dd3c-7cb1-8d85-251f63197557\ig_08725d4b1c334adf016a145b9370008191ab84c824a1bc11d3.png`
+- `C:\Users\AEboli\.codex\generated_images\019e5f0e-dd3c-7cb1-8d85-251f63197557\ig_08725d4b1c334adf016a145be3981c8191adb072f00338f32b.png`
+- `C:\Users\AEboli\.codex\generated_images\019e5f0e-dd3c-7cb1-8d85-251f63197557\ig_08725d4b1c334adf016a145e8c14388191b8f9a12bc5a4c9b1.png`
+- `C:\Users\AEboli\.codex\generated_images\019e5f0e-dd3c-7cb1-8d85-251f63197557\ig_08725d4b1c334adf016a145eef33bc81919182cf8fad3e3816.png`
+- `C:\Users\AEboli\.codex\generated_images\019e5f0e-dd3c-7cb1-8d85-251f63197557\ig_08725d4b1c334adf016a145f37d09c81918775775d7b1f443a.png`
+- `C:\Users\AEboli\.codex\generated_images\019e5f0e-dd3c-7cb1-8d85-251f63197557\ig_08725d4b1c334adf016a145ffe52b48191a9a8af0e80582c32.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_018ecea8a7c00a68016a16bb2861e48191a60d0485dbdd547a.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_018ecea8a7c00a68016a16bb76d080819182b35b06cce7fb71.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_018ecea8a7c00a68016a16bbccc53481919ddf69944e830fcb.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16d1fa6c98819180f3a6c941a7e470.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16d29276e0819182c2af36f638f0e7.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16d2e8bbc481918065d3199cefbb5c.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16d345182c8191bba622609461f425.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16d3bf70808191afbb8248bb993486.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16d427003c8191b4476d2622b7776b.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16d477f1f4819187fdea8afa5dca72.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16d4c7c3648191829cd7ade5d70d06.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16d51a531c81919f591fcab86b299c.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16d56e07c48191939a439cbc0285b7.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16d5c9429881919cbd62a91f9fe4e4.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16d6366eb48191ad21f55b4c575495.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16d6968c948191b1a5e93b7aa8cc14.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16d753eb548191a8f8164c2afef456.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16d7adc6708191b8ff338c7f658c0a.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16d7ffe1848191b40fabdf4659341a.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16d85919148191b5f9545c7ba483fa.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16d8b3aa188191807bfcb5e08a19b7.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16d8f973cc81919d906e2748268f53.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16d940e73c8191b3d7795a8220733f.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16d986ffd48191bf10e1f79d96b4e9.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16e1111f9481918f0b2691f2fccedf.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16e189c19c819181e65758007569c5.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16e1fe80c08191b49c57f8e2a2b5f4.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16e2662e408191b3af58dc1fcb4b35.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16e2d3e0348191bc24c0cc0daf6c8f.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16e3381a8c8191b9d49fd369874874.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16e385149c8191b8ba54ff32418988.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16e3e58b208191af735e301ca8cab8.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16e4c19a888191ab594de7c5778d37.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16e5349e2c8191874942e96820962f.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16e59194b88191973348682da28653.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_08e64bb4d78635ce016a16e5f1e42c8191bd30f4caac1cdf80.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_0291361628c9909e016a1701679c5481919050a284e32802fb.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_0291361628c9909e016a1701b4ae948191ab780964ee4e8e47.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_0291361628c9909e016a170216f7808191a7441b6cc6f56df6.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_0291361628c9909e016a170270ab448191876d93c82bdd5647.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_0291361628c9909e016a1702c891a88191aba8421523bf3f83.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_0291361628c9909e016a17033dab008191bb73604d91867046.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_0291361628c9909e016a1703b24b7c8191b8fe844a1b7057ea.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_0291361628c9909e016a170450e75c81919d12420ebf461a7f.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_0291361628c9909e016a17049787f481919404a2fdbf4a5153.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_0291361628c9909e016a17050395b081919c82e2a6a56a1d69.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_0291361628c9909e016a170562a2dc8191b8a4af405c40d5fb.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_0291361628c9909e016a1705e3ae988191b82a96319771e267.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_0be42134352e401b016a170cc54f9c8191a3f5caef4f048d2b.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_0be42134352e401b016a170d1ae1988191a43c6f54b7a77202.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_0be42134352e401b016a170d6822d08191b73c9448ce1bb03a.png`
+- `C:\Users\AEboli\.codex\generated_images\019e68c3-76c8-79b3-b261-e00415311870\ig_0be42134352e401b016a170dc20f788191b835d29077bd71a9.png`

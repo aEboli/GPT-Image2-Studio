@@ -1,0 +1,8 @@
+{
+  "functions": {
+    "server.mjs": {
+      "includeFiles": "node_modules/pptxgenjs/**",
+      "maxDuration": 300
+    }
+  }
+}

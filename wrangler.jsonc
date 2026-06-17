@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gpt-image2-studio",
+  "compatibility_date": "2026-05-04",
+  "pages_build_output_dir": "dist",
+  "r2_buckets": [
+    {
+      "binding": "IMAGE_BUCKET",
+      "bucket_name": "gpt-image2-studio-images"
+    }
+  ]
+}

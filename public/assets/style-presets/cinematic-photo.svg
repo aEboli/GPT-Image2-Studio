@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-label="cinematic photorealistic style sample">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="640" y2="480"><stop stop-color="#111927"/><stop offset=".55" stop-color="#183d44"/><stop offset="1" stop-color="#0b0f16"/></linearGradient>
+    <radialGradient id="lamp" cx=".62" cy=".34" r=".38"><stop stop-color="#ffd99a"/><stop offset=".38" stop-color="#d88a4a" stop-opacity=".55"/><stop offset="1" stop-color="#d88a4a" stop-opacity="0"/></radialGradient>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".74" numOctaves="3" seed="8"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 .18"/></feComponentTransfer></filter>
+  </defs>
+  <rect width="640" height="480" fill="url(#sky)"/>
+  <circle cx="404" cy="155" r="210" fill="url(#lamp)"/>
+  <path d="M0 260c80-56 162-82 246-78 79 4 142 42 220 38 59-3 117-25 174-63v323H0Z" fill="#20313a"/>
+  <path d="M0 316c112-45 218-57 318-36 94 19 200 8 322-36v236H0Z" fill="#13231f"/>
+  <path d="M247 430c23-77 52-129 88-158 31 33 53 85 66 158Z" fill="#b9a178"/>
+  <path d="M236 305h190v112H236Z" fill="#2b3638"/>
+  <path d="M218 304 329 217l114 87Z" fill="#8a4f3d"/>
+  <path d="M282 416v-69h58v69M363 337h34v34h-34M253 337h34v34h-34" fill="#ffd48d" opacity=".88"/>
+  <path d="M115 366c-15-50 5-94 51-130 46 30 66 74 45 130Z" fill="#426d62"/>
+  <path d="M159 287v120" stroke="#3d2b23" stroke-width="19" stroke-linecap="round"/>
+  <rect width="640" height="480" fill="#fff" filter="url(#grain)" opacity=".55"/>
+  <rect x="14" y="14" width="612" height="452" rx="28" fill="none" stroke="#ffd79e" stroke-width="8" opacity=".1"/>
+</svg>

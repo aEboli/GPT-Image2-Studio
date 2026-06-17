@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-label="retro pixel game style sample">
+  <rect width="640" height="480" fill="#6bb8ff"/>
+  <path d="M0 240h40v-16h48v-24h64v-16h88v24h80v16h72v-8h64v-24h72v-24h112v312H0Z" fill="#5d8fcf"/>
+  <path d="M0 288h56v-16h80v-24h104v16h96v16h96v-16h80v-24h128v240H0Z" fill="#5aaa58"/>
+  <path d="M240 304h24v-24h24v-24h24v-24h48v24h24v24h24v24h24v112H240Z" fill="#f4d05f"/>
+  <path d="M232 304h16v-16h16v-16h16v-16h16v-16h16v-16h32v16h16v16h16v16h16v16h16v16h16v16H232Z" fill="#d34848"/>
+  <path d="M240 304h184v112H240Z" fill="#efbd78"/>
+  <path d="M288 352h48v64h-48ZM360 336h40v40h-40ZM256 336h40v40h-40Z" fill="#4e3b4d"/>
+  <path d="M112 368h16v-64h16v-32h32v-32h24v32h24v32h16v64H112Z" fill="#268653"/>
+  <path d="M152 288h24v128h-24Z" fill="#735037"/>
+  <path d="M0 416h80v-16h112v16h96v-16h128v16h112v-16h112v80H0Z" fill="#2e6b3f"/>
+  <path d="M0 0h640v480H0Z" fill="none" stroke="#111827" stroke-width="16"/>
+</svg>

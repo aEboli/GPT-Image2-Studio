@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-label="handmade clay toy diorama style sample">
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="640" y2="480"><stop stop-color="#f6d7cc"/><stop offset=".62" stop-color="#eebfae"/><stop offset="1" stop-color="#c98578"/></linearGradient><filter id="clay"><feTurbulence type="fractalNoise" baseFrequency=".055" numOctaves="3" seed="12"/><feDisplacementMap in="SourceGraphic" scale="3"/></filter></defs>
+  <rect width="640" height="480" fill="url(#bg)"/>
+  <path d="M0 247c78-54 158-81 240-80 88 0 157 43 237 42 57 0 111-19 163-55v326H0Z" fill="#8fc8d8" filter="url(#clay)"/>
+  <path d="M0 287c88-44 168-58 240-42 83 19 154 20 230 3 58-13 115-35 170-66v298H0Z" fill="#8fd0bd" filter="url(#clay)"/>
+  <path d="M246 428c23-74 52-125 87-153 29 30 50 82 64 153Z" fill="#ffd36e" filter="url(#clay)"/>
+  <rect x="236" y="303" width="188" height="112" rx="22" fill="#f4c37f" filter="url(#clay)"/>
+  <path d="M218 303 329 216l112 87Z" fill="#db7f75" filter="url(#clay)"/>
+  <rect x="282" y="347" width="58" height="68" rx="16" fill="#915c62" filter="url(#clay)"/>
+  <rect x="363" y="338" width="34" height="33" rx="12" fill="#fff0c8" filter="url(#clay)"/>
+  <rect x="253" y="338" width="34" height="33" rx="12" fill="#fff0c8" filter="url(#clay)"/>
+  <path d="M116 366c-14-48 5-91 50-128 46 29 65 72 45 128Z" fill="#9ed9ca" filter="url(#clay)"/>
+  <path d="M159 287v118" stroke="#a66d54" stroke-width="20" stroke-linecap="round" filter="url(#clay)"/>
+  <path d="M44 382c92 23 183 24 274 4M402 362c77 7 137-6 180-41" stroke="#fff4df" stroke-width="9" stroke-linecap="round" opacity=".45"/>
+</svg>

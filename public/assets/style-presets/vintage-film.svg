@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-label="vintage analog film style sample">
+  <defs><radialGradient id="fade" cx=".45" cy=".34" r=".78"><stop stop-color="#f1c47f"/><stop offset=".55" stop-color="#8b5a33"/><stop offset="1" stop-color="#241510"/></radialGradient><filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".64" numOctaves="4" seed="31"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 .22"/></feComponentTransfer></filter></defs>
+  <rect width="640" height="480" fill="url(#fade)"/>
+  <path d="M0 247c78-54 158-81 240-80 88 0 157 43 237 42 57 0 111-19 163-55v326H0Z" fill="#6f573a" opacity=".62"/>
+  <path d="M0 287c88-44 168-58 240-42 83 19 154 20 230 3 58-13 115-35 170-66v298H0Z" fill="#3f2a1f" opacity=".72"/>
+  <path d="M246 428c23-74 52-125 87-153 29 30 50 82 64 153Z" fill="#d0a263"/>
+  <path d="M236 303h188v112H236Z" fill="#815a3e"/>
+  <path d="M218 303 329 216l112 87Z" fill="#5d3024"/>
+  <path d="M282 415v-68h58v68M363 338h34v33h-34M253 338h34v33h-34" fill="#f1c072" opacity=".7"/>
+  <path d="M116 366c-14-48 5-91 50-128 46 29 65 72 45 128Z" fill="#635337"/>
+  <path d="M159 287v118" stroke="#4a2c1d" stroke-width="18" stroke-linecap="round"/>
+  <rect width="640" height="480" fill="#fff" filter="url(#grain)" opacity=".65"/>
+  <rect x="18" y="18" width="604" height="444" rx="22" fill="none" stroke="#1f120e" stroke-width="34" opacity=".42"/>
+</svg>

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-label="low poly 3d style sample">
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="640" y2="480"><stop stop-color="#8ed0ef"/><stop offset="1" stop-color="#f2c695"/></linearGradient></defs>
+  <rect width="640" height="480" fill="url(#bg)"/>
+  <path d="M0 250 120 188 245 170 332 221 470 210 640 152v328H0Z" fill="#77a7b0"/>
+  <path d="M0 250 245 170 205 290 0 480Z" fill="#67929a"/>
+  <path d="M205 290 245 170 332 221 305 320Z" fill="#8eb9bd"/>
+  <path d="M305 320 332 221 470 210 448 332Z" fill="#5f8e94"/>
+  <path d="M0 310 250 246 472 259 640 190v290H0Z" fill="#82b96d"/>
+  <path d="M0 310 250 246 210 480H0Z" fill="#6fa85f"/>
+  <path d="M210 480 250 246 472 259 415 480Z" fill="#93c878"/>
+  <path d="M415 480 472 259 640 190v290Z" fill="#5e9a55"/>
+  <path d="M236 304 329 218 425 304v113H236Z" fill="#d9b36a"/>
+  <path d="M236 304 329 218 330 304Z" fill="#f0cc80"/>
+  <path d="M330 304 329 218 425 304Z" fill="#b94f45"/>
+  <path d="M236 304h94v113h-94Z" fill="#e4c282"/>
+  <path d="M330 304h95v113h-95Z" fill="#c7925d"/>
+  <path d="M287 348h54v69h-54Z" fill="#5d4b5a"/>
+  <path d="M115 365 167 238 212 365Z" fill="#4c9d6b"/>
+  <path d="M151 291h23v116h-23Z" fill="#81583d"/>
+  <path d="M39 410 205 379 365 398 577 352 640 380v100H0Z" fill="#487a45"/>
+</svg>

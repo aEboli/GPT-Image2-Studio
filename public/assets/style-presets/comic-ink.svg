@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-label="comic ink style sample">
+  <defs><pattern id="dots" width="12" height="12" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="2" fill="#1a1a1a" opacity=".32"/></pattern></defs>
+  <rect width="640" height="480" fill="#f8e26b"/>
+  <path d="M0 247c78-54 158-81 240-80 88 0 157 43 237 42 57 0 111-19 163-55v326H0Z" fill="#4ab1dd" stroke="#111" stroke-width="10"/>
+  <path d="M0 287c88-44 168-58 240-42 83 19 154 20 230 3 58-13 115-35 170-66v298H0Z" fill="#4bbf60" stroke="#111" stroke-width="10"/>
+  <path d="M0 287c88-44 168-58 240-42 83 19 154 20 230 3 58-13 115-35 170-66v298H0Z" fill="url(#dots)" opacity=".5"/>
+  <path d="M246 428c23-74 52-125 87-153 29 30 50 82 64 153Z" fill="#ffe35d" stroke="#111" stroke-width="9"/>
+  <path d="M236 303h188v112H236Z" fill="#f8c784" stroke="#111" stroke-width="9"/>
+  <path d="M218 303 329 216l112 87Z" fill="#e84545" stroke="#111" stroke-width="10" stroke-linejoin="round"/>
+  <path d="M282 415v-68h58v68M363 338h34v33h-34M253 338h34v33h-34" fill="#1a2338" stroke="#111" stroke-width="7"/>
+  <path d="M116 366c-14-48 5-91 50-128 46 29 65 72 45 128Z" fill="#2ea75f" stroke="#111" stroke-width="10"/>
+  <path d="M159 287v118" stroke="#111" stroke-width="22" stroke-linecap="round"/>
+  <path d="M47 385c106 21 212 21 318 0M415 132l52 79M497 119l-18 102" stroke="#111" stroke-width="8" stroke-linecap="round"/>
+</svg>

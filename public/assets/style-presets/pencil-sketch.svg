@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-label="pencil sketch style sample">
+  <defs><filter id="paper"><feTurbulence type="fractalNoise" baseFrequency=".055" numOctaves="4" seed="4"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues=".05 .24"/></feComponentTransfer></filter></defs>
+  <rect width="640" height="480" fill="#eee9df"/>
+  <rect width="640" height="480" fill="#767676" filter="url(#paper)" opacity=".45"/>
+  <path d="M0 250c78-57 160-83 246-79 79 4 143 42 220 38 59-3 117-25 174-63" fill="none" stroke="#6f6b64" stroke-width="18" opacity=".32"/>
+  <path d="M0 295c96-45 185-61 267-47 84 14 157 14 220 0 55-13 106-36 153-69" fill="none" stroke="#5c5a55" stroke-width="22" opacity=".38"/>
+  <path d="M247 430c23-77 52-129 88-158 31 33 53 85 66 158" fill="none" stroke="#4b4b49" stroke-width="6"/>
+  <path d="M236 305h190v112H236Z" fill="none" stroke="#333" stroke-width="7"/>
+  <path d="M218 304 329 217l114 87Z" fill="none" stroke="#2d2d2d" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M282 416v-69h58v69M363 337h34v34h-34M253 337h34v34h-34" fill="none" stroke="#333" stroke-width="6"/>
+  <path d="M115 366c-15-50 5-94 51-130 46 30 66 74 45 130Z" fill="none" stroke="#3a3a38" stroke-width="7"/>
+  <path d="M159 287v120" stroke="#383838" stroke-width="15" stroke-linecap="round"/>
+  <path d="M202 318l218 84M229 295l184 95M260 271l133 95M101 349l122-74M116 371l120-86M34 382l545-64M60 410l498-71" stroke="#565656" stroke-width="3" opacity=".38"/>
+</svg>

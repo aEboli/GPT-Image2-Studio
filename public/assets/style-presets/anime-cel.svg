@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-label="japanese cel animation style sample">
+  <defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="480"><stop stop-color="#8fd5ff"/><stop offset=".6" stop-color="#dcf6ff"/><stop offset="1" stop-color="#fff0bd"/></linearGradient></defs>
+  <rect width="640" height="480" fill="url(#sky)"/>
+  <circle cx="506" cy="83" r="48" fill="#ffe878" stroke="#203968" stroke-width="7"/>
+  <path d="M0 244c79-62 162-92 248-88 82 4 144 48 222 42 59-4 116-29 170-72v354H0Z" fill="#80c7ff" stroke="#203968" stroke-width="7"/>
+  <path d="M0 294c92-47 179-65 260-52 85 14 159 16 222 2 55-11 108-34 158-68v304H0Z" fill="#7ddf91" stroke="#203968" stroke-width="7"/>
+  <path d="M246 430c24-77 54-128 89-154 31 31 53 82 66 154Z" fill="#ffe99b" stroke="#203968" stroke-width="7"/>
+  <path d="M236 306h190v112H236Z" fill="#ffdba5" stroke="#203968" stroke-width="7"/>
+  <path d="M218 305 329 215l114 90Z" fill="#ff789a" stroke="#203968" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M282 418v-70h58v70M363 338h34v34h-34M253 338h34v34h-34" fill="#5b68d8" stroke="#203968" stroke-width="6"/>
+  <path d="M115 367c-15-50 5-94 51-130 46 30 66 74 45 130Z" fill="#59c783" stroke="#203968" stroke-width="7"/>
+  <path d="M159 287v120" stroke="#203968" stroke-width="19" stroke-linecap="round"/>
+  <path d="M44 372c76 20 154 23 234 10M405 357c62 4 122-5 181-28" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" opacity=".85"/>
+</svg>

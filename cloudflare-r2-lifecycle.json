@@ -1,0 +1,43 @@
+{
+  "rules": [
+    {
+      "id": "expire-generated-images-after-24h",
+      "conditions": {
+        "prefix": "images/"
+      },
+      "enabled": true,
+      "deleteObjectsTransition": {
+        "condition": {
+          "type": "Age",
+          "maxAge": 86400
+        }
+      }
+    },
+    {
+      "id": "expire-generation-task-state-after-24h",
+      "conditions": {
+        "prefix": "generation-tasks/"
+      },
+      "enabled": true,
+      "deleteObjectsTransition": {
+        "condition": {
+          "type": "Age",
+          "maxAge": 86400
+        }
+      }
+    },
+    {
+      "id": "expire-generation-request-payloads-after-24h",
+      "conditions": {
+        "prefix": "generation-requests/"
+      },
+      "enabled": true,
+      "deleteObjectsTransition": {
+        "condition": {
+          "type": "Age",
+          "maxAge": 86400
+        }
+      }
+    }
+  ]
+}

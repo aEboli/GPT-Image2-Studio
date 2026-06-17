@@ -1,0 +1,2872 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Image Studio</title>
+    <script>
+      (() => {
+        const themeKey = "image-studio-ui-theme-v1";
+        const languageKey = "image-studio-ui-language-v1";
+        try {
+          const savedTheme = window.localStorage.getItem(themeKey);
+          document.documentElement.dataset.theme = savedTheme === "light" ? "light" : "dark";
+        } catch {
+          document.documentElement.dataset.theme = "dark";
+        }
+        try {
+          const savedLanguage = window.localStorage.getItem(languageKey);
+          const language = savedLanguage === "en" ? "en" : "zh-CN";
+          document.documentElement.lang = language;
+          document.documentElement.dataset.uiLanguage = language;
+        } catch {
+          document.documentElement.dataset.uiLanguage = document.documentElement.lang || "zh-CN";
+        }
+
+        const innerWidth = window.innerWidth || 0;
+        const innerHeight = window.innerHeight || 0;
+        const outerWidth = window.outerWidth || innerWidth || 0;
+        const shorterSide = Math.min(innerWidth, innerHeight);
+        const longerSide = Math.max(innerWidth, innerHeight);
+        const deviceScale = window.devicePixelRatio || 1;
+        const coarsePointer = window.matchMedia?.("(pointer: coarse)")?.matches || false;
+        const isPhonePhysicalSize =
+          coarsePointer &&
+          shorterSide >= 720 &&
+          shorterSide <= 1600 &&
+          longerSide >= 1300 &&
+          longerSide <= 3600 &&
+          longerSide / shorterSide >= 1.65;
+        const isTabletPhysicalSize =
+          coarsePointer &&
+          shorterSide >= 1200 &&
+          shorterSide <= 2200 &&
+          longerSide >= 1600 &&
+          longerSide <= 3000 &&
+          longerSide / shorterSide >= 1.2 &&
+          longerSide / shorterSide < 1.65;
+        const inferredScale = deviceScale >= 1.5 ? deviceScale : isPhonePhysicalSize && shorterSide >= 1080 ? 3 : 2;
+        const physicalTouchWidth = isPhonePhysicalSize || isTabletPhysicalSize ? Math.round(innerWidth / inferredScale) : 0;
+        const viewportWidth = outerWidth > innerWidth ? outerWidth : innerWidth;
+        const width =
+          physicalTouchWidth >= 320 && physicalTouchWidth <= 1480
+            ? physicalTouchWidth
+            : viewportWidth;
+        if (width > 0 && width <= 640) {
+          document.documentElement.dataset.uiLayout = "mobile";
+        } else if (width > 0 && width <= 1024) {
+          document.documentElement.dataset.uiLayout = "tablet";
+        }
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Sora:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css?v=20260618-timeline-log-wrap-1" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-cluster">
+          <div class="brand-mark" aria-hidden="true">
+            <span class="brand-mark-core"></span>
+          </div>
+          <div class="brand-copy">
+            <div class="brand-title-row">
+              <h1>aEboli</h1>
+              <span class="brand-ai-badge">AI</span>
+            </div>
+            <p>AI 图像生成工作流</p>
+          </div>
+        </div>
+
+        <nav class="primary-nav global-nav" aria-label="全局导航">
+          <div class="view-tabs global-nav-list" aria-label="功能菜单导航">
+            <div class="nav-item" data-nav-section="create">
+              <button class="view-tab active" data-nav-menu="create" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="nav-menu-studio">
+                <span class="nav-tab-label">创作</span>
+                <span class="nav-tab-note">Studio</span>
+              </button>
+              <div class="nav-flyout mega-menu" id="nav-menu-studio" data-nav-subzone="studio" aria-hidden="true">
+                <div class="mega-menu-grid">
+                  <section class="mega-menu-column mega-menu-primary" aria-label="创作区">
+                    <span class="mega-menu-kicker">创作区</span>
+                    <a class="mega-menu-link large" href="#studio">提示词生图</a>
+                    <a class="mega-menu-link" href="#style-transfer">风格迁移</a>
+                    <a class="mega-menu-link" href="#reference-analysis">融图分析</a>
+                    <a class="mega-menu-link" href="#image-decomposition">图片拆解</a>
+                    <a class="mega-menu-link" href="#image-edit">图片编辑</a>
+                    <a class="mega-menu-link" href="#quick-blend">快速溶图</a>
+                    <a class="mega-menu-link" href="#creation">套图模式</a>
+                    <a class="mega-menu-link" href="#portrait">写真模式</a>
+                    <a class="mega-menu-link" href="#article-illustration">文章插图</a>
+                    <a class="mega-menu-link" href="#ppt">PPT生成</a>
+                  </section>
+                  <section class="mega-menu-column" aria-label="创作工具">
+                    <span class="mega-menu-title">工具</span>
+                    <button class="mega-menu-action large" type="button" data-nav-action="prompt-agent">图片转提示词</button>
+                    <a class="mega-menu-link" href="#image-compress">图片压缩</a>
+                  </section>
+                </div>
+              </div>
+            </div>
+            <div class="nav-item" data-nav-section="assets">
+              <button class="view-tab" data-nav-menu="assets" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="nav-menu-gallery">
+                <span class="nav-tab-label">资产</span>
+                <span class="nav-tab-note">Gallery</span>
+              </button>
+              <div class="nav-flyout mega-menu" id="nav-menu-gallery" data-nav-subzone="gallery" aria-hidden="true">
+                <div class="mega-menu-grid">
+                  <section class="mega-menu-column mega-menu-primary" aria-label="资产区">
+                    <span class="mega-menu-kicker">资产区</span>
+                    <a class="mega-menu-link large" href="#gallery">瀑布画廊</a>
+                    <a class="mega-menu-link" href="#article-record">文章插图记录</a>
+                    <a class="mega-menu-link" href="#creation-record">套图记录</a>
+                    <a class="mega-menu-link" href="#portrait-record">写真记录</a>
+                    <a class="mega-menu-link" href="#ppt-record">PPT记录</a>
+                  </section>
+                  <section class="mega-menu-column" aria-label="资产工具">
+                    <span class="mega-menu-title">工具</span>
+                    <button class="mega-menu-action large" type="button" data-nav-action="output">打开输出目录</button>
+                  </section>
+                </div>
+              </div>
+            </div>
+            <div class="nav-item" data-nav-section="settings">
+              <button class="view-tab" data-nav-menu="settings" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="nav-menu-settings">
+                <span class="nav-tab-label">配置</span>
+                <span class="nav-tab-note">Settings</span>
+              </button>
+              <div class="nav-flyout mega-menu" id="nav-menu-settings" data-nav-subzone="settings" aria-hidden="true">
+                <div class="mega-menu-grid">
+                  <section class="mega-menu-column mega-menu-primary" aria-label="配置区">
+                    <span class="mega-menu-kicker">配置区</span>
+                    <button class="mega-menu-action large" type="button" data-nav-action="config">配置 API</button>
+                    <button class="mega-menu-action" type="button" data-nav-action="activity-log">生成日志</button>
+                    <button class="mega-menu-action" id="themeNavAction" type="button" data-nav-action="theme">主题颜色</button>
+                  </section>
+                </div>
+              </div>
+            </div>
+          </div>
+        </nav>
+
+        <div id="generationModeStatus" class="header-pill generation-mode-status" aria-label="当前生图调用模式：路由模式" title="当前生图调用模式：路由模式">路由模式</div>
+
+        <div class="topbar-api-check" aria-label="API、LOG">
+          <button class="header-pill status-ready" id="connectionStatus" data-state="idle" type="button" aria-label="待填写API、LOG，打开 API、LOG">
+            <span class="status-dot"></span>
+            <span id="connectionLabel">待填写API、LOG</span>
+          </button>
+        </div>
+
+        <div class="topbar-ghost-actions">
+          <div class="header-pill" id="configStatus">配置未保存</div>
+          <button class="theme-toggle header-button" id="themeToggleButton" type="button" aria-pressed="false">
+            <span class="theme-toggle-icon" aria-hidden="true"></span>
+            <span id="themeToggleLabel">白色主题</span>
+          </button>
+          <button class="header-button" id="openOutputButton" type="button">打开输出目录</button>
+          <button class="header-button" id="openPromptAgentButton" type="button">图片转提示词</button>
+          <button class="header-button strong" id="openConfigButton" type="button">配置</button>
+        </div>
+      </header>
+
+      <main class="view-root">
+        <section class="view-panel studio-view" data-view-panel="studio">
+          <div class="studio-grid">
+            <section class="studio-panel settings-panel">
+              <form id="generateForm" class="settings-form">
+                <details
+                  class="field-group reference-field-group adaptive-section"
+                  id="referenceAdaptiveSection"
+                  data-adaptive-section="reference"
+                  data-compact-open="false"
+                >
+                  <summary class="field-heading adaptive-section-summary">
+                    <div>
+                      <span>参考图</span>
+                    </div>
+                    <small id="referenceCount">0 / 15</small>
+                  </summary>
+
+                  <label class="reference-dropzone" id="referenceDropzone">
+                    <input id="referenceInput" name="referenceImages" type="file" accept="image/*" multiple />
+                    <div class="reference-icon" aria-hidden="true"></div>
+                    <strong>拖入图片或点击上传</strong>
+                    <em>上传参考图</em>
+                  </label>
+
+                  <div class="reference-grid hidden" id="referenceGrid"></div>
+                </details>
+
+                <div class="field-group style-transfer-block hidden" id="styleTransferBlock" aria-live="polite">
+                  <div class="field-heading">
+                    <div>
+                      <span>图片风格迁移</span>
+                    </div>
+                  </div>
+                  <label class="compact-field style-transfer-preset-field">
+                    <span>风格选择（可替代风格图）</span>
+                    <select id="styleTransferPresetInput" name="styleTransferPreset"></select>
+                  </label>
+                  <div class="style-transfer-preset-preview" id="styleTransferPresetPreview" aria-live="polite">
+                    <div class="style-transfer-comparison" id="styleTransferPresetComparison"></div>
+                    <div class="style-transfer-preset-copy">
+                      <strong id="styleTransferPresetLabel"></strong>
+                      <span id="styleTransferPresetDescription"></span>
+                    </div>
+                  </div>
+                  <div class="style-transfer-upload-grid" id="styleTransferUploadGrid">
+                    <div class="style-transfer-slot style-transfer-source-slot">
+                      <label class="reference-dropzone style-transfer-dropzone" id="styleTransferSourceDropzone">
+                        <input id="styleTransferSourceInput" name="styleTransferSourceImage" type="file" accept="image/*" />
+                        <div class="reference-icon" aria-hidden="true"></div>
+                        <strong>上传原图</strong>
+                      </label>
+                      <div class="reference-grid style-transfer-grid hidden" id="styleTransferSourceGrid"></div>
+                    </div>
+
+                    <div class="style-transfer-slot style-transfer-style-slot">
+                      <label class="reference-dropzone style-transfer-dropzone" id="styleTransferStyleDropzone">
+                        <input id="styleTransferStyleInput" name="styleTransferReferenceImage" type="file" accept="image/*" />
+                        <div class="reference-icon" aria-hidden="true"></div>
+                        <strong>上传风格图</strong>
+                      </label>
+                      <div class="reference-grid style-transfer-grid hidden" id="styleTransferStyleGrid"></div>
+                    </div>
+                  </div>
+
+                  <label class="compact-field style-transfer-note">
+                    <span>补充说明（可选）</span>
+                    <textarea
+                      id="styleTransferInstructionInput"
+                      name="styleTransferInstruction"
+                      rows="3"
+                      maxlength="400"
+                      placeholder="例如：更接近日系动漫、保留人物衣服颜色、背景不要新增元素。"
+                    ></textarea>
+                  </label>
+                </div>
+
+                <div class="field-group" data-prompt-mode-block>
+                  <div class="field-heading with-action">
+                    <div>
+                      <span>提示词</span>
+                    </div>
+                    <button class="icon-button" id="surprisePromptButton" type="button" title="提示词模板" aria-expanded="false">
+                      ✦
+                    </button>
+                  </div>
+                  <label class="prompt-field">
+                    <textarea
+                      id="promptInput"
+                      name="prompt"
+                      rows="5"
+                      placeholder="写下你要生成的画面，也可以先上传参考图说明修改方向。"
+                    ></textarea>
+                    <span class="field-counter"><span id="promptCounter">0 字</span></span>
+                  </label>
+                </div>
+
+                <div class="prompt-enhance-panel" data-prompt-mode-block>
+                  <button
+                    class="prompt-enhance-toggle"
+                    id="promptEnhanceToggle"
+                    type="button"
+                    role="switch"
+                    aria-checked="false"
+                    aria-controls="promptEnhanceField"
+                    aria-label="开启或关闭提示词增强模式"
+                  >
+                    <span class="prompt-enhance-toggle-copy">
+                      <strong>增强模式</strong>
+                      <small id="promptEnhanceStatus">关闭</small>
+                    </span>
+                    <span class="prompt-enhance-switch-track" aria-hidden="true">
+                      <span class="prompt-enhance-switch-thumb"></span>
+                    </span>
+                  </button>
+                  <label class="prompt-enhance-field hidden" id="promptEnhanceField">
+                    <span>增强提示词</span>
+                    <textarea id="promptEnhanceInput" rows="3" maxlength="500">,sharp focus, macro details, rich textures, crisp edges, photorealistic texture, visible grain, detailed surface material, cinematic lighting</textarea>
+                  </label>
+                </div>
+
+                <button
+                  class="generate-button"
+                  id="generateButton"
+                  type="submit"
+                  title="开始生成（Ctrl+Enter）"
+                  aria-keyshortcuts="Control+Enter"
+                >
+                  开始生成
+                </button>
+
+                <details
+                  class="field-group parameter-settings adaptive-section"
+                  id="parameterAdaptiveSection"
+                  data-adaptive-section="parameters"
+                  data-compact-open="false"
+                >
+                  <summary class="field-heading adaptive-section-summary">
+                    <div>
+                      <span>参数设置</span>
+                    </div>
+                    <span class="ratio-orientation-summary" id="ratioOrientationSummary" aria-live="polite"></span>
+                  </summary>
+                  <div class="ratio-grid" id="ratioGrid"></div>
+                  <input id="ratioInput" name="ratio" type="hidden" value="1:1" />
+                  <div class="advanced-content">
+                    <div class="advanced-controls">
+                      <label class="compact-field">
+                        <span>思考等级</span>
+                        <select id="reasoningEffortInput" name="reasoningEffort"></select>
+                      </label>
+
+                      <label class="compact-field">
+                        <span>分辨率</span>
+                        <select id="sizeInput" name="size"></select>
+                      </label>
+
+                      <label class="compact-field">
+                        <span>输出格式</span>
+                        <select id="outputFormatInput" name="format"></select>
+                      </label>
+
+                      <div class="parameter-meta" aria-label="工具模型与质量">
+                        <span>工具模型</span>
+                        <strong>gpt-image-2</strong>
+                        <span>质量</span>
+                        <strong>High</strong>
+                      </div>
+                    </div>
+                  </div>
+                </details>
+              </form>
+
+            </section>
+
+            <section class="studio-panel preview-panel">
+              <div class="preview-stage">
+                <div class="preview-meta">
+                  <span class="model-badge" id="previewModel">GPT Image 2.0</span>
+                  <span id="previewTime">等待生成</span>
+                  <span id="previewId">ID: --</span>
+                  <span id="previewSize">--</span>
+                </div>
+
+                <div class="preview-canvas" id="previewCanvas">
+                  <div class="preview-placeholder" id="previewPlaceholder">
+                    <h3>生成结果会在这里实时更新。</h3>
+                    <span>生成日志可在配置中查看，底部胶片条可快速切换查看。</span>
+                  </div>
+                  <img id="previewImage" alt="当前预览" />
+                </div>
+
+                <div class="preview-toolbar">
+                  <div class="zoom-controls">
+                    <button class="toolbar-button" id="zoomOutButton" type="button">-</button>
+                    <span class="zoom-label" id="zoomLabel">100%</span>
+                    <button class="toolbar-button" id="zoomInButton" type="button">+</button>
+                    <button class="toolbar-button" id="zoomResetButton" type="button">适配</button>
+                  </div>
+
+                  <div class="preview-actions">
+                    <a class="toolbar-button" id="previewDownloadButton" href="#" download>下载</a>
+                    <button class="toolbar-button" id="previewLightboxButton" type="button">查看</button>
+                    <button class="toolbar-button danger" id="previewDeleteButton" type="button">删除</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="filmstrip-row">
+                <div class="filmstrip" id="filmstrip"></div>
+              </div>
+            </section>
+
+          </div>
+        </section>
+
+        <section class="view-panel reference-analysis-view hidden" data-view-panel="reference-analysis">
+          <div class="reference-analysis-workspace">
+            <section class="studio-panel reference-analysis-upload-panel">
+              <div class="panel-title between">
+                <div>
+                  <h2>融图分析</h2>
+                </div>
+                <span class="count-pill small" id="referenceAnalysisCount">0 / 15</span>
+              </div>
+
+              <label class="reference-dropzone reference-analysis-dropzone" id="referenceAnalysisDropzone">
+                <input id="referenceAnalysisInput" name="referenceAnalysisImages" type="file" accept="image/*" multiple />
+                <div class="reference-icon" aria-hidden="true"></div>
+                <strong>上传待分析图片</strong>
+                <span>最多 6 张 JPG / PNG</span>
+                <em>新建分析集</em>
+              </label>
+
+              <div class="reference-grid hidden" id="referenceAnalysisGrid"></div>
+
+              <div class="reference-analysis-actions">
+                <button class="inline-button reference-analysis-button" id="referenceAnalyzeButton" type="button">
+                  融图分析
+                </button>
+                <p class="prompt-agent-feedback" id="referenceAnalysisFeedback"></p>
+                <button
+                  id="referenceAnalysisToggleButton"
+                  class="reference-analysis-toggle hidden"
+                  type="button"
+                  aria-controls="referenceAnalysisHead referenceAnalysisList"
+                  aria-expanded="false"
+                >
+                  折叠提示词
+                </button>
+              </div>
+
+              <div class="reference-analysis-params">
+                <div class="field-heading">
+                  <div>
+                    <span>生成参数</span>
+                  </div>
+                </div>
+                <div class="ratio-grid" id="referenceAnalysisRatioGrid"></div>
+                <input id="referenceAnalysisRatioInput" type="hidden" value="1:1" />
+                <label class="compact-field reference-analysis-language-field">
+                  <span>输出语言</span>
+                  <select id="referenceAnalysisLanguageInput" name="targetLanguage">
+                    <option value="zh-CN" selected>简体中文</option>
+                    <option value="en">English</option>
+                    <option value="ja">日本語</option>
+                    <option value="ko">한국어</option>
+                  </select>
+                </label>
+                <label class="compact-field reference-analysis-size-field">
+                  <span>分辨率</span>
+                  <select id="referenceAnalysisSizeInput" name="referenceAnalysisSize"></select>
+                </label>
+                <button class="inline-button reference-analysis-generate-button" id="referenceAnalysisGenerateButton" type="button">
+                  开始生成
+                </button>
+                <button
+                  class="reference-analysis-auto-collapse is-active"
+                  id="referenceAnalysisAutoCollapseButton"
+                  type="button"
+                  role="switch"
+                  aria-checked="true"
+                >
+                  <span class="reference-analysis-switch-label">应用提示词后自动折叠</span>
+                  <span class="reference-analysis-switch-track" aria-hidden="true">
+                    <span class="reference-analysis-switch-thumb"></span>
+                  </span>
+                </button>
+              </div>
+            </section>
+
+            <div class="reference-analysis-preview-column">
+              <section class="studio-panel reference-analysis-preview-panel">
+                <div class="reference-analysis-generation" id="referenceAnalysisGenerationPanel">
+                  <div class="reference-analysis-generation-canvas" id="referenceAnalysisGenerationCanvas">
+                    <div class="reference-analysis-generation-placeholder" id="referenceAnalysisGenerationPlaceholder">
+                      生成图展示框
+                    </div>
+                    <img id="referenceAnalysisGenerationImage" alt="融图分析生成结果" />
+                  </div>
+                </div>
+              </section>
+
+              <section class="studio-panel reference-analysis-thumbnail-panel">
+                <div class="reference-analysis-thumbnail-head">
+                  <div class="reference-analysis-thumbnail-title">
+                    <span>生成缩略图</span>
+                    <small id="referenceAnalysisGenerationMeta">等待生成</small>
+                  </div>
+                  <a class="inline-button disabled" id="referenceAnalysisGenerationDownloadButton" href="#" download aria-disabled="true">
+                    下载
+                  </a>
+                </div>
+                <div
+                  class="reference-analysis-generation-strip hidden"
+                  id="referenceAnalysisGenerationStrip"
+                  aria-label="融图分析生成缩略图"
+                ></div>
+                <div class="reference-analysis-thumbnail-empty" id="referenceAnalysisThumbnailEmpty">等待生成结果</div>
+              </section>
+            </div>
+
+            <section class="studio-panel reference-analysis-result-panel">
+              <div class="panel-title between">
+                <div>
+                  <h2>编排提示词</h2>
+                </div>
+              </div>
+
+              <div class="reference-analysis-empty" id="referenceAnalysisEmpty">等待分析结果</div>
+              <div class="reference-analysis-panel hidden" id="referenceAnalysisPanel">
+                <div class="reference-analysis-head" id="referenceAnalysisHead">
+                  <div>
+                    <span>编排提示词</span>
+                    <strong id="referenceAnalysisSummary">--</strong>
+                  </div>
+                  <small id="referenceAnalysisMeta">--</small>
+                </div>
+                <div class="reference-analysis-list" id="referenceAnalysisList"></div>
+                <div class="reference-analysis-selected hidden" id="referenceAnalysisSelectedPromptPanel">
+                  <div class="reference-analysis-selected-head">
+                    <span>已选提示词</span>
+                    <div class="reference-analysis-selected-actions">
+                      <button class="inline-button" id="referenceAnalysisCopyPromptButton" type="button">复制</button>
+                    </div>
+                  </div>
+                  <textarea id="referenceAnalysisSelectedPrompt" rows="6" readonly></textarea>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view-panel image-decomposition-view hidden" data-view-panel="image-decomposition">
+          <div class="image-decomposition-workspace">
+            <section class="studio-panel image-decomposition-upload-panel">
+              <form id="imageDecompositionForm" class="settings-form image-decomposition-form">
+                <details
+                  class="field-group reference-field-group adaptive-section image-decomposition-source-field"
+                  id="imageDecompositionSourceAdaptiveSection"
+                  data-adaptive-section="image-decomposition-source"
+                  data-compact-open="true"
+                >
+                  <summary class="field-heading adaptive-section-summary">
+                    <div>
+                      <span>源图</span>
+                    </div>
+                    <small id="imageDecompositionCount">0 / 1</small>
+                  </summary>
+
+                  <label class="reference-dropzone image-decomposition-dropzone" id="imageDecompositionDropzone">
+                    <input id="imageDecompositionInput" name="imageDecompositionSourceImage" type="file" accept="image/*" />
+                    <div class="reference-icon" aria-hidden="true"></div>
+                    <strong>上传源图</strong>
+                    <span>仅支持 1 张 JPG / PNG / WebP</span>
+                    <em>选择要拆解的图片</em>
+                  </label>
+
+                  <div class="reference-grid image-decomposition-grid hidden" id="imageDecompositionGrid"></div>
+                </details>
+
+                <button class="generate-button image-decomposition-generate-button" id="imageDecompositionGenerateButton" type="button">
+                  开始拆解
+                </button>
+
+                <details
+                  class="field-group parameter-settings adaptive-section image-decomposition-parameter-settings"
+                  id="imageDecompositionParameterAdaptiveSection"
+                  data-adaptive-section="image-decomposition-parameters"
+                  data-compact-open="true"
+                >
+                  <summary class="field-heading adaptive-section-summary">
+                    <div>
+                      <span>参数设置</span>
+                    </div>
+                  </summary>
+                  <div class="ratio-grid" id="imageDecompositionRatioGrid"></div>
+                  <input id="imageDecompositionRatioInput" type="hidden" value="1:1" />
+                  <div class="advanced-content">
+                    <div class="advanced-controls">
+                      <label class="compact-field">
+                        <span>标注语言</span>
+                        <select id="imageDecompositionLanguageInput" name="targetLanguage">
+                          <option value="zh-CN">简体中文</option>
+                          <option value="en">English</option>
+                          <option value="ja">日本語</option>
+                          <option value="ko">한국어</option>
+                          <option value="fr">Français</option>
+                          <option value="de">Deutsch</option>
+                          <option value="es">Español</option>
+                          <option value="custom">自定义语言</option>
+                        </select>
+                      </label>
+
+                      <label class="compact-field image-decomposition-feature-cards-field">
+                        <span>两侧说明卡片</span>
+                        <select id="imageDecompositionFeatureCardsInput" name="featureCardsEnabled">
+                          <option value="off">不启用</option>
+                          <option value="on">启用</option>
+                        </select>
+                      </label>
+
+                      <label class="compact-field image-decomposition-size-field">
+                        <span>分辨率</span>
+                        <select id="imageDecompositionSizeInput" name="imageDecompositionSize"></select>
+                      </label>
+
+                      <label class="compact-field image-decomposition-custom-language hidden" id="imageDecompositionCustomLanguageField">
+                        <span>自定义语言</span>
+                        <input
+                          id="imageDecompositionCustomLanguageInput"
+                          name="customTargetLanguage"
+                          type="text"
+                          maxlength="40"
+                          placeholder="例如 Italiano"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                  <p class="prompt-agent-feedback image-decomposition-feedback" id="imageDecompositionFeedback"></p>
+                </details>
+              </form>
+            </section>
+
+            <section class="studio-panel preview-panel image-decomposition-preview-panel">
+              <div class="preview-stage image-decomposition-generation" id="imageDecompositionGenerationPanel">
+                <div class="preview-meta image-decomposition-preview-meta">
+                  <span class="model-badge">GPT Image 2.0</span>
+                  <span id="imageDecompositionGenerationMeta">等待生成</span>
+                </div>
+
+                <div class="preview-canvas image-decomposition-generation-canvas" id="imageDecompositionGenerationCanvas">
+                  <div class="image-decomposition-generation-placeholder preview-placeholder" id="imageDecompositionGenerationPlaceholder">
+                    <h3>拆解信息图会显示在这里</h3>
+                    <span>上传一张源图后开始生成，底部胶片条可快速切换结果。</span>
+                  </div>
+                  <img id="imageDecompositionGenerationImage" alt="图片拆解生成结果" />
+                </div>
+
+                <div class="preview-toolbar image-decomposition-preview-toolbar">
+                  <div class="zoom-controls image-decomposition-preview-status" aria-live="polite">
+                    <span class="zoom-label">100%</span>
+                    <span>适配</span>
+                  </div>
+
+                  <div class="preview-actions">
+                    <a class="toolbar-button disabled" id="imageDecompositionGenerationDownloadButton" href="#" download aria-disabled="true">
+                      下载
+                    </a>
+                    <button class="toolbar-button" id="imageDecompositionGenerationLightboxButton" type="button" disabled>查看</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="filmstrip-row image-decomposition-filmstrip-row">
+                <div
+                  class="filmstrip image-decomposition-generation-strip hidden"
+                  id="imageDecompositionGenerationStrip"
+                  aria-label="图片拆解生成缩略图"
+                ></div>
+                <div class="reference-analysis-thumbnail-empty image-decomposition-thumbnail-empty" id="imageDecompositionThumbnailEmpty">
+                  等待生成结果
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view-panel image-edit-view hidden" data-view-panel="image-edit">
+          <div class="image-edit-workspace">
+            <section class="studio-panel image-edit-upload-panel">
+              <form id="imageEditForm" class="settings-form image-edit-form">
+                <details
+                  class="field-group reference-field-group adaptive-section image-edit-source-field"
+                  id="imageEditSourceAdaptiveSection"
+                  data-adaptive-section="image-edit-source"
+                  data-compact-open="true"
+                  open
+                >
+                  <summary class="field-heading adaptive-section-summary">
+                    <div>
+                      <span>源图</span>
+                    </div>
+                    <small id="imageEditSourceCount">0 / 1</small>
+                  </summary>
+
+                  <label class="reference-dropzone image-edit-dropzone" id="imageEditDropzone">
+                    <input id="imageEditSourceInput" name="imageEditSourceImage" type="file" accept="image/*" />
+                    <div class="reference-icon" aria-hidden="true"></div>
+                    <strong>上传源图</strong>
+                    <span>JPG / PNG / WebP</span>
+                    <em>一次编辑一张图片</em>
+                  </label>
+
+                  <div class="reference-grid image-edit-source-grid hidden" id="imageEditSourceGrid"></div>
+                </details>
+
+                <section class="image-edit-local-mask-panel hidden" id="imageEditLocalMaskPanel" aria-label="局部编辑">
+                  <div class="image-edit-local-mask-stage" id="imageEditLocalMaskStage">
+                    <canvas id="imageEditSourceCanvas" class="image-edit-source-canvas" width="1" height="1"></canvas>
+                    <canvas id="imageEditMaskOverlayCanvas" class="image-edit-mask-overlay-canvas" width="1" height="1"></canvas>
+                  </div>
+                  <div class="image-edit-local-mask-toolbar" aria-label="局部编辑工具">
+                    <button class="toolbar-button" id="imageEditBrushToolButton" type="button" aria-pressed="true" title="画笔">画笔</button>
+                    <button class="toolbar-button" id="imageEditEraserToolButton" type="button" aria-pressed="false" title="橡皮">橡皮</button>
+                    <button class="toolbar-button" id="imageEditUndoMaskButton" type="button" title="撤销">撤销</button>
+                    <button class="toolbar-button" id="imageEditRedoMaskButton" type="button" title="重做">重做</button>
+                    <label class="compact-field image-edit-brush-size-field">
+                      <span>笔刷</span>
+                      <input id="imageEditBrushSizeInput" type="range" min="8" max="160" step="2" value="48" />
+                    </label>
+                    <button class="toolbar-button" id="imageEditAddRegionButton" type="button">新增区域</button>
+                  </div>
+                  <label class="compact-field image-edit-strategy-field">
+                    <span>执行策略</span>
+                    <select id="imageEditExecutionStrategyInput">
+                      <option value="merge">一次合并（快）</option>
+                      <option value="sequential">逐区精修（准）</option>
+                    </select>
+                  </label>
+                  <div class="image-edit-region-list" id="imageEditRegionList"></div>
+                  <p class="image-edit-local-mask-status" id="imageEditLocalMaskStatus" aria-live="polite"></p>
+                </section>
+
+                <label class="field-group image-edit-instruction-field">
+                  <span>编辑指令</span>
+                  <textarea
+                    id="imageEditPromptInput"
+                    name="imageEditPrompt"
+                    rows="6"
+                    maxlength="1200"
+                    placeholder="例如：把背景改成干净白色摄影棚，保留主体材质和比例。"
+                  ></textarea>
+                </label>
+
+                <button class="generate-button image-edit-generate-button" id="imageEditGenerateButton" type="button" disabled>
+                  开始编辑
+                </button>
+
+                <details
+                  class="field-group parameter-settings adaptive-section image-edit-parameter-settings"
+                  id="imageEditParameterAdaptiveSection"
+                  data-adaptive-section="image-edit-parameters"
+                  data-compact-open="true"
+                  open
+                >
+                  <summary class="field-heading adaptive-section-summary">
+                    <div>
+                      <span>参数设置</span>
+                    </div>
+                  </summary>
+                  <div class="ratio-grid" id="imageEditRatioGrid"></div>
+                  <input id="imageEditRatioInput" type="hidden" value="1:1" />
+                  <div class="advanced-content">
+                    <div class="advanced-controls">
+                      <label class="compact-field image-edit-size-field">
+                        <span>分辨率</span>
+                        <select id="imageEditSizeInput" name="imageEditSize"></select>
+                      </label>
+
+                      <label class="compact-field image-edit-format-field">
+                        <span>输出格式</span>
+                        <select id="imageEditOutputFormatInput" name="format"></select>
+                      </label>
+                    </div>
+                  </div>
+                  <p class="prompt-agent-feedback image-edit-feedback" id="imageEditFeedback"></p>
+                </details>
+              </form>
+            </section>
+
+            <section class="studio-panel preview-panel image-edit-preview-panel">
+              <div class="preview-stage image-edit-generation" id="imageEditGenerationPanel">
+                <div class="preview-meta image-edit-preview-meta">
+                  <span class="model-badge">Image Edit</span>
+                  <span id="imageEditGenerationMeta">等待生成</span>
+                </div>
+
+                <div class="preview-canvas image-edit-generation-canvas" id="imageEditGenerationCanvas">
+                  <div class="image-edit-generation-placeholder preview-placeholder" id="imageEditGenerationPlaceholder">
+                    <h3>编辑结果会显示在这里</h3>
+                    <span>上传源图并填写编辑指令后开始生成</span>
+                  </div>
+                  <img id="imageEditGenerationImage" alt="图片编辑生成结果" />
+                </div>
+
+                <div class="preview-toolbar image-edit-preview-toolbar">
+                  <div class="zoom-controls image-edit-preview-status" aria-live="polite">
+                    <span id="imageEditPreviewStatus">等待任务</span>
+                  </div>
+
+                  <div class="preview-actions">
+                    <a class="toolbar-button disabled" id="imageEditGenerationDownloadButton" href="#" download aria-disabled="true">
+                      下载
+                    </a>
+                    <button class="toolbar-button" id="imageEditGenerationLightboxButton" type="button" disabled>查看</button>
+                  </div>
+                </div>
+
+              </div>
+
+              <div class="filmstrip-row image-edit-filmstrip-row">
+                <div
+                  class="filmstrip image-edit-generation-strip hidden"
+                  id="imageEditGenerationStrip"
+                  aria-label="图片编辑生成缩略图"
+                ></div>
+                <div class="reference-analysis-thumbnail-empty image-edit-thumbnail-empty" id="imageEditThumbnailEmpty">
+                  等待生成结果
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view-panel quick-blend-view hidden" data-view-panel="quick-blend">
+          <div class="quick-blend-workspace">
+            <section class="studio-panel quick-blend-upload-panel">
+              <form id="quickBlendForm" class="settings-form quick-blend-form">
+                <div class="quick-blend-upload-grid">
+                  <div class="field-group quick-blend-upload-group">
+                    <div class="field-heading">
+                      <div>
+                        <span>产品图 / A 组</span>
+                      </div>
+                      <small id="quickBlendACount">0 张</small>
+                      <button class="quick-blend-clear-button" id="quickBlendAClearButton" type="button" data-quick-blend-clear-group="a" disabled>清空图片</button>
+                    </div>
+                    <label class="reference-dropzone quick-blend-dropzone" id="quickBlendADropzone">
+                      <input id="quickBlendAInput" name="quickBlendAImages" type="file" accept="image/*" multiple />
+                      <div class="reference-icon" aria-hidden="true"></div>
+                      <strong>上传产品图</strong>
+                      <span>每个任务使用 1 张产品图 + 1 张 B 组图</span>
+                      <em>支持多选或拖拽，数量不限</em>
+                    </label>
+                    <div class="reference-grid quick-blend-grid hidden" id="quickBlendAGrid"></div>
+                  </div>
+
+                  <div class="field-group quick-blend-upload-group">
+                    <div class="field-heading">
+                      <div>
+                        <span>B 组图片</span>
+                      </div>
+                      <small id="quickBlendBCount">0 张</small>
+                      <button class="quick-blend-clear-button" id="quickBlendBClearButton" type="button" data-quick-blend-clear-group="b" disabled>清空图片</button>
+                    </div>
+                    <label class="reference-dropzone quick-blend-dropzone" id="quickBlendBDropzone">
+                      <input id="quickBlendBInput" name="quickBlendBImages" type="file" accept="image/*" multiple />
+                      <div class="reference-icon" aria-hidden="true"></div>
+                      <strong>上传 B 组</strong>
+                      <span>数量必须与 A 组一致</span>
+                      <em>支持多选或拖拽，按顺序配对</em>
+                    </label>
+                    <div class="reference-grid quick-blend-grid hidden" id="quickBlendBGrid"></div>
+                  </div>
+                  <div class="field-group quick-blend-upload-group">
+                    <div class="field-heading">
+                      <div>
+                        <span>C 组图片</span>
+                      </div>
+                      <small id="quickBlendCCount">0 张</small>
+                      <button class="quick-blend-clear-button" id="quickBlendCClearButton" type="button" data-quick-blend-clear-group="c" disabled>清空图片</button>
+                    </div>
+                    <label class="reference-dropzone quick-blend-dropzone" id="quickBlendCDropzone">
+                      <input id="quickBlendCInput" name="quickBlendCImages" type="file" accept="image/*" multiple />
+                      <div class="reference-icon" aria-hidden="true"></div>
+                      <strong>上传 C 组</strong>
+                      <span>可选，数量需与 A/B 一致</span>
+                      <em>为空时不参与配对</em>
+                    </label>
+                    <div class="reference-grid quick-blend-grid hidden" id="quickBlendCGrid"></div>
+                  </div>
+                  <div class="field-group quick-blend-upload-group">
+                    <div class="field-heading">
+                      <div>
+                        <span>D 组图片</span>
+                      </div>
+                      <small id="quickBlendDCount">0 张</small>
+                      <button class="quick-blend-clear-button" id="quickBlendDClearButton" type="button" data-quick-blend-clear-group="d" disabled>清空图片</button>
+                    </div>
+                    <label class="reference-dropzone quick-blend-dropzone" id="quickBlendDDropzone">
+                      <input id="quickBlendDInput" name="quickBlendDImages" type="file" accept="image/*" multiple />
+                      <div class="reference-icon" aria-hidden="true"></div>
+                      <strong>上传 D 组</strong>
+                      <span>可选，数量需与 A/B 一致</span>
+                      <em>为空时不参与配对</em>
+                    </label>
+                    <div class="reference-grid quick-blend-grid hidden" id="quickBlendDGrid"></div>
+                  </div>
+                </div>
+
+                <section class="field-group quick-blend-pair-panel">
+                  <div class="field-heading">
+                    <div>
+                      <span>配对预览</span>
+                    </div>
+                    <small id="quickBlendPairCount">0 对</small>
+                  </div>
+                  <div class="quick-blend-pair-list" id="quickBlendPairList"></div>
+                </section>
+
+                <details
+                  class="field-group parameter-settings adaptive-section quick-blend-parameter-settings"
+                  id="quickBlendParameterAdaptiveSection"
+                  data-adaptive-section="quick-blend-parameters"
+                  data-compact-open="true"
+                  open
+                >
+                  <summary class="field-heading adaptive-section-summary">
+                    <div>
+                      <span>参数设置</span>
+                    </div>
+                  </summary>
+                  <div class="ratio-grid" id="quickBlendRatioGrid"></div>
+                  <input id="quickBlendRatioInput" type="hidden" value="1:1" />
+                  <div class="advanced-content">
+                    <div class="advanced-controls">
+                      <label class="compact-field quick-blend-size-field">
+                        <span>分辨率</span>
+                        <select id="quickBlendSizeInput" name="quickBlendSize"></select>
+                      </label>
+                      <label class="compact-field quick-blend-layout-field">
+                        <span>排列</span>
+                        <select id="quickBlendLayoutOrderInput" name="quickBlendLayoutOrder">
+                          <option value="vertical">上下</option>
+                          <option value="horizontal">左右</option>
+                        </select>
+                      </label>
+                      <label class="compact-field quick-blend-shape-field">
+                        <span>队形</span>
+                        <select id="quickBlendPlacementShapeInput" name="quickBlendPlacementShape">
+                          <option value="square">正方形排序</option>
+                          <option value="rectangle">矩形排序</option>
+                        </select>
+                      </label>
+                    </div>
+                  </div>
+                </details>
+
+                <button class="generate-button quick-blend-generate-button" id="quickBlendGenerateButton" type="button" disabled>
+                  开始快速溶图
+                </button>
+                <p class="prompt-agent-feedback quick-blend-feedback" id="quickBlendFeedback"></p>
+              </form>
+            </section>
+
+            <section class="studio-panel preview-panel quick-blend-preview-panel">
+              <div class="preview-stage quick-blend-generation" id="quickBlendGenerationPanel">
+                <div class="preview-meta quick-blend-preview-meta">
+                  <span class="model-badge">Quick Blend</span>
+                  <span id="quickBlendGenerationMeta">等待生成</span>
+                </div>
+
+                <div class="preview-canvas quick-blend-generation-canvas" id="quickBlendGenerationCanvas">
+                  <div class="quick-blend-generation-empty preview-placeholder" id="quickBlendGenerationEmpty">
+                    <h3>快速溶图结果会显示在这里</h3>
+                    <span>A/B 配对提交后，最新生成图会显示在画布中。</span>
+                  </div>
+                  <img id="quickBlendGenerationImage" alt="快速溶图生成结果" />
+                </div>
+
+                <div class="preview-toolbar quick-blend-preview-toolbar">
+                  <div class="zoom-controls quick-blend-preview-status" aria-live="polite">
+                    <span id="quickBlendPreviewStatus">等待任务</span>
+                  </div>
+
+                  <div class="preview-actions">
+                    <a class="toolbar-button disabled" id="quickBlendGenerationDownloadButton" href="#" download aria-disabled="true">
+                      下载
+                    </a>
+                    <button class="toolbar-button" id="quickBlendGenerationLightboxButton" type="button" disabled>查看</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="filmstrip-row quick-blend-filmstrip-row">
+                <div
+                  class="filmstrip quick-blend-generation-strip hidden"
+                  id="quickBlendGenerationStrip"
+                  aria-label="快速溶图生成缩略图"
+                ></div>
+                <div class="reference-analysis-thumbnail-empty quick-blend-thumbnail-empty" id="quickBlendThumbnailEmpty">
+                  等待生成结果
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view-panel image-compress-view hidden" data-view-panel="image-compress">
+          <div class="image-compress-workspace">
+            <section class="studio-panel image-compress-settings-panel">
+              <form class="settings-form image-compress-form" id="imageCompressForm">
+                <details
+                  class="field-group reference-field-group adaptive-section image-compress-source-field"
+                  id="imageCompressSourceAdaptiveSection"
+                  data-adaptive-section="image-compress-source"
+                  data-compact-open="true"
+                  open
+                >
+                  <summary class="field-heading adaptive-section-summary">
+                    <div>
+                      <span>压缩图片</span>
+                    </div>
+                    <small id="imageCompressCount">0 张</small>
+                  </summary>
+
+                  <label class="reference-dropzone image-compress-dropzone" id="imageCompressDropzone">
+                    <input id="imageCompressInput" name="imageCompressImages" type="file" accept="image/*" multiple />
+                    <div class="reference-icon" aria-hidden="true"></div>
+                    <strong>拖入图片或点击上传</strong>
+                    <span>JPG、PNG、WebP 均可处理，压缩在浏览器本地完成</span>
+                    <em>不会调用生成 API，也不会写入输出目录</em>
+                  </label>
+
+                  <div class="image-compress-file-list" id="imageCompressFileList"></div>
+                </details>
+
+                <details
+                  class="field-group parameter-settings adaptive-section image-compress-parameter-settings"
+                  id="imageCompressParameterAdaptiveSection"
+                  data-adaptive-section="image-compress-parameters"
+                  data-compact-open="true"
+                  open
+                >
+                  <summary class="field-heading adaptive-section-summary">
+                    <div>
+                      <span>压缩设置</span>
+                    </div>
+                  </summary>
+
+                  <div class="advanced-content image-compress-controls">
+                    <div class="advanced-controls">
+                      <label class="compact-field">
+                        <span>压缩方式</span>
+                        <select id="imageCompressModeInput" name="compressMode">
+                          <option value="quality" selected>按质量</option>
+                          <option value="target">按目标大小</option>
+                        </select>
+                      </label>
+
+                      <label class="compact-field image-compress-target-field hidden" id="imageCompressTargetField">
+                        <span>目标大小 MB</span>
+                        <input id="imageCompressTargetInput" name="targetSizeMb" type="number" min="0.05" max="200" step="0.05" value="1" />
+                      </label>
+
+                      <label class="compact-field">
+                        <span>输出格式</span>
+                        <select id="imageCompressFormatInput" name="outputFormat">
+                          <option value="original" selected>保持原格式</option>
+                          <option value="jpeg">JPEG</option>
+                          <option value="webp">WebP</option>
+                          <option value="png">PNG</option>
+                        </select>
+                      </label>
+
+                      <label class="compact-field image-compress-quality-field">
+                        <span>质量</span>
+                        <div class="image-compress-quality-row">
+                          <input id="imageCompressQualityInput" name="quality" type="range" min="1" max="100" value="85" />
+                          <output id="imageCompressQualityValue" for="imageCompressQualityInput">85%</output>
+                        </div>
+                      </label>
+
+                      <label class="compact-field image-compress-resize-toggle">
+                        <span>尺寸调整</span>
+                        <label class="reference-analysis-auto-collapse image-compress-switch" for="imageCompressResizeEnabledInput">
+                          <input id="imageCompressResizeEnabledInput" name="resizeEnabled" type="checkbox" />
+                          <span class="reference-analysis-switch-label">等比缩放并补边</span>
+                          <span class="reference-analysis-switch-track" aria-hidden="true">
+                            <span class="reference-analysis-switch-thumb"></span>
+                          </span>
+                        </label>
+                      </label>
+
+                      <label class="compact-field">
+                        <span>宽度</span>
+                        <input id="imageCompressResizeWidthInput" name="resizeWidth" type="number" min="1" max="12000" step="1" value="2000" />
+                      </label>
+
+                      <label class="compact-field">
+                        <span>高度</span>
+                        <input id="imageCompressResizeHeightInput" name="resizeHeight" type="number" min="1" max="12000" step="1" value="2000" />
+                      </label>
+                    </div>
+                  </div>
+                </details>
+
+                <div class="image-compress-actions">
+                  <button class="toolbar-button" id="imageCompressClearButton" type="button" disabled>清空</button>
+                  <button class="generate-button" id="imageCompressStartButton" type="button" disabled>开始压缩</button>
+                </div>
+                <p class="prompt-agent-feedback image-compress-feedback" id="imageCompressFeedback"></p>
+              </form>
+            </section>
+
+            <section class="studio-panel image-compress-results-panel">
+              <div class="panel-title between">
+                <div>
+                  <h2>压缩结果</h2>
+                  <p>每张图片完成后可单独下载，刷新页面会清空临时结果。</p>
+                </div>
+              </div>
+
+              <div class="image-compress-result-list" id="imageCompressResultList"></div>
+              <div class="reference-analysis-thumbnail-empty image-compress-result-empty" id="imageCompressResultEmpty">
+                等待压缩结果
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view-panel article-illustration-view hidden" data-view-panel="article-illustration">
+          <div class="article-illustration-workspace">
+            <section class="studio-panel article-input-panel">
+              <form class="article-illustration-form" id="articleIllustrationForm">
+                <div class="panel-title between">
+                  <div>
+                    <h2>文章插图</h2>
+                    <p>先解析整篇文章，再确认分镜与风格后批量生成。</p>
+                  </div>
+                  <span class="count-pill small" id="articleIllustrationCount">0 张</span>
+                </div>
+
+                <label class="compact-field">
+                  <span>文章标题</span>
+                  <input id="articleIllustrationTitleInput" name="title" type="text" maxlength="100" placeholder="可留空，模型会从正文中提炼" />
+                </label>
+
+                <label class="compact-field article-source-field">
+                  <div class="article-source-heading">
+                    <span>正文 / 多段材料</span>
+                    <output class="article-field-count" id="articleIllustrationSourceLength" for="articleIllustrationSourceTextInput">0 字</output>
+                  </div>
+                  <textarea
+                    id="articleIllustrationSourceTextInput"
+                    name="sourceText"
+                    rows="10"
+                    placeholder="粘贴完整文章、多个自然段或不同来源的材料。模型会先整体阅读，再按节奏建议插图数量。"
+                  ></textarea>
+                </label>
+
+                <div class="article-file-block">
+                  <div class="field-heading">
+                    <div>
+                      <span>文本文件</span>
+                    </div>
+                    <small id="articleIllustrationFileCount">0 个文件</small>
+                  </div>
+                  <label class="reference-dropzone article-file-dropzone" id="articleIllustrationDropzone">
+                    <input id="articleIllustrationSourceFilesInput" name="sourceFiles" type="file" accept=".txt,.md,.csv,.json" multiple />
+                    <div class="reference-icon" aria-hidden="true"></div>
+                    <strong>拖入文本文件或点击上传</strong>
+                    <em>TXT / MD / CSV / JSON</em>
+                  </label>
+                  <div class="article-file-list" id="articleIllustrationFileList"></div>
+                </div>
+
+                <label class="compact-field">
+                  <span>补充说明</span>
+                  <textarea
+                    id="articleIllustrationSupplementInput"
+                    name="supplementalPrompt"
+                    rows="3"
+                    maxlength="900"
+                    placeholder="可说明人物设定、不能改变的细节、情绪节奏、参考方向或禁用元素。"
+                  ></textarea>
+                </label>
+
+                <div class="article-control-grid">
+                  <label class="compact-field">
+                    <span>内容类型</span>
+                    <select id="articleIllustrationContentTypeInput" name="contentType">
+                      <option value="auto">自动判断</option>
+                      <option value="narrative">叙事故事</option>
+                      <option value="article">图文文章</option>
+                      <option value="mixed">混合通用</option>
+                    </select>
+                  </label>
+
+                  <label class="compact-field">
+                    <span>生成风格</span>
+                    <select id="articleIllustrationStylePresetInput" name="stylePreset">
+                      <option value="realist-magazine" selected>杂志写实</option>
+                      <option value="editorial-watercolor">编辑水彩</option>
+                      <option value="cinematic-editorial">电影感插画</option>
+                      <option value="picture-book">绘本质感</option>
+                      <option value="ink-wash">淡墨叙事</option>
+                      <option value="documentary-realism">纪实摄影感</option>
+                      <option value="historical-realism">历史写实</option>
+                      <option value="gongbi-heritage">工笔国风</option>
+                      <option value="graphic-novel">图像小说</option>
+                      <option value="noir-comic">黑白漫画</option>
+                      <option value="vintage-newsprint">旧报刊版画</option>
+                      <option value="surreal-editorial">超现实社论</option>
+                      <option value="anime-storyboard">动画分镜</option>
+                    </select>
+                  </label>
+                </div>
+
+                <label class="compact-field article-style-bible-field">
+                  <span>风格圣经</span>
+                  <textarea id="articleIllustrationStyleBibleInput" rows="4" placeholder="解析后可在这里微调全局风格、情绪、节奏和一致性约束。"></textarea>
+                </label>
+
+                <button class="toolbar-button" id="articleIllustrationPlanButton" type="button">解析文章</button>
+                <p class="ppt-feedback" id="articleIllustrationFeedback"></p>
+              </form>
+            </section>
+
+            <section class="studio-panel article-plan-panel">
+              <div class="panel-title between">
+                <div>
+                  <h2>分镜与设定</h2>
+                  <p id="articleIllustrationSetMeta">等待解析</p>
+                </div>
+                <div class="article-plan-actions">
+                  <button class="toolbar-button" id="articleIllustrationReferenceButton" type="button" disabled>生成参考图</button>
+                  <button class="generate-button" id="articleIllustrationGenerateButton" type="button" disabled>确认并生成插图</button>
+                </div>
+              </div>
+
+              <div class="article-board-sections">
+                <section class="article-board-section article-reference-section">
+                  <div class="article-board-section-head">
+                    <div>
+                      <h3>参考图</h3>
+                      <p>先放人物与高频场景，保证后续一致性。</p>
+                    </div>
+                    <span class="count-pill small" id="articleReferenceSectionCount">0 张</span>
+                  </div>
+                  <div class="article-reference-list" id="articleIllustrationReferenceList"></div>
+                </section>
+
+                <section class="article-board-section article-storyboard-section">
+                  <div class="article-board-section-head">
+                    <div>
+                      <h3>正文插图</h3>
+                      <p>按阅读顺序排列，参考图放在前面。</p>
+                    </div>
+                    <span class="count-pill small" id="articleStoryboardSectionCount">0 张</span>
+                  </div>
+                  <div class="article-storyboard-list" id="articleIllustrationStoryboardList"></div>
+                </section>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view-panel creation-view hidden" data-view-panel="creation">
+          <div class="creation-workspace">
+            <section class="studio-panel creation-settings-panel">
+              <form class="creation-form" id="creationForm">
+                <div class="panel-title between">
+                  <div>
+                    <h2>电商营销套图</h2>
+                  </div>
+                  <span class="count-pill small" id="creationProgressText">0 / 4</span>
+                </div>
+
+                <div class="creation-branch-tabs" role="radiogroup" aria-label="套图分支">
+                  <label class="creation-branch-option">
+                    <input name="creationBranch" type="radio" value="set" checked />
+                    <span>生成套图</span>
+                  </label>
+                  <label class="creation-branch-option">
+                    <input id="creationBranchLogoBatchInput" name="creationBranch" type="radio" value="logo-batch" />
+                    <span>上传图加 Logo</span>
+                  </label>
+                </div>
+
+                <div class="creation-logo-batch-source-block hidden" data-creation-logo-batch-only>
+                  <div class="field-head">
+                    <div>
+                      <span>待加 Logo 图片</span>
+                    </div>
+                    <small id="creationLogoBatchSourceCount">0 / 15</small>
+                  </div>
+                  <label class="reference-dropzone creation-logo-batch-source-dropzone" id="creationLogoBatchSourceDropzone">
+                    <input id="creationLogoBatchSourceInput" name="logoBatchSourceImages" type="file" accept="image/*" multiple />
+                    <div class="reference-icon" aria-hidden="true"></div>
+                    <span>上传需要加 Logo 的图片</span>
+                  </label>
+                  <div class="reference-grid creation-logo-batch-source-grid hidden" id="creationLogoBatchSourceGrid"></div>
+                </div>
+
+                <label class="compact-field" data-creation-set-only>
+                  <span>商品名称</span>
+                  <input id="creationProductNameInput" name="productName" type="text" maxlength="80" placeholder="例如：AeroPress Clear" />
+                </label>
+
+                <label class="compact-field" data-creation-set-only>
+                  <span>商品描述</span>
+                  <textarea
+                    id="creationProductDescriptionInput"
+                    name="productDescription"
+                    rows="2"
+                    maxlength="600"
+                    placeholder="例如：透明手冲咖啡壶，适合办公室和露营，轻盈清透。"
+                  ></textarea>
+                </label>
+
+                <label class="compact-field" data-creation-set-only>
+                  <span>核心卖点</span>
+                  <textarea
+                    id="creationSellingPointsInput"
+                    name="sellingPoints"
+                    rows="1"
+                    maxlength="360"
+                    placeholder="例如：轻便、易清洁、口感稳定"
+                  ></textarea>
+                </label>
+
+                <label class="compact-field" data-creation-set-only>
+                  <span>尺寸规格</span>
+                  <textarea
+                    id="creationDimensionSpecsInput"
+                    name="dimensionSpecs"
+                    rows="1"
+                    maxlength="360"
+                    placeholder="例如：长 13 cm，宽 2 cm，高 3 cm，重 42 g"
+                  ></textarea>
+                </label>
+
+                <label class="compact-field creation-dimension-unit-field" data-creation-set-only>
+                  <span>规格单位</span>
+                  <select id="creationDimensionUnitModeInput" name="dimensionUnitMode">
+                    <option value="metric">公制</option>
+                    <option value="imperial">英制</option>
+                    <option value="both" selected>公制和英制</option>
+                  </select>
+                </label>
+
+                <div class="creation-reference-block" data-creation-set-only>
+                  <div class="field-head">
+                    <div>
+                      <span>套图参考图</span>
+                    </div>
+                    <div class="creation-reference-head-actions">
+                      <button class="inline-button creation-reference-reset-button" id="creationReferenceResetButton" type="button">
+                        清空参考图
+                      </button>
+                      <small id="creationReferenceCount">0 / 15</small>
+                    </div>
+                  </div>
+                  <label class="reference-dropzone creation-reference-dropzone" id="creationReferenceDropzone">
+                    <input id="creationReferenceInput" name="creationReferenceImages" type="file" accept="image/*" multiple />
+                    <div class="reference-icon" aria-hidden="true"></div>
+                    <span>上传产品参考图</span>
+                  </label>
+                  <div class="reference-grid creation-reference-grid hidden" id="creationReferenceGrid"></div>
+                  <div
+                    class="creation-reference-restore-list hidden"
+                    id="creationReferenceRestoreList"
+                    aria-live="polite"
+                  ></div>
+                  <div class="reference-analysis-actions creation-reference-analysis-actions">
+                    <button class="inline-button reference-analysis-button" id="creationReferenceAnalyzeButton" type="button">
+                      智能识别
+                    </button>
+                    <button class="inline-button reference-analysis-button hidden" id="creationReferenceApplyAnalysisButton" type="button">
+                      应用建议
+                    </button>
+                    <p class="prompt-agent-feedback" id="creationReferenceAnalysisFeedback"></p>
+                  </div>
+                  <div class="reference-analysis-panel creation-reference-analysis-panel hidden" id="creationReferenceAnalysisPanel">
+                    <div class="reference-analysis-head">
+                      <div class="creation-reference-analysis-head-copy">
+                        <span>参考图建议</span>
+                      </div>
+                      <div class="creation-reference-analysis-head-actions">
+                        <button
+                          class="inline-button reference-analysis-toggle hidden"
+                          id="creationReferenceAnalysisToggleButton"
+                          type="button"
+                          aria-expanded="false"
+                          aria-controls="creationReferenceAnalysisList"
+                          disabled
+                        >
+                          折叠建议
+                        </button>
+                        <button
+                          class="inline-button reference-analysis-visual-button hidden"
+                          id="creationReferenceApplyVisualLanguageButton"
+                          type="button"
+                          disabled
+                        >
+                          应用视觉语言
+                        </button>
+                      </div>
+                      <strong id="creationReferenceAnalysisSummary">--</strong>
+                      <small class="creation-reference-analysis-meta" id="creationReferenceAnalysisMeta">--</small>
+                    </div>
+                    <div class="reference-analysis-list" id="creationReferenceAnalysisList"></div>
+                  </div>
+                </div>
+
+                <div class="creation-reference-block creation-style-reference-block" data-creation-set-only>
+                  <div class="field-head">
+                    <div>
+                      <span>参考风格图</span>
+                    </div>
+                    <small id="creationStyleReferenceCount">0 / 3</small>
+                  </div>
+                  <label class="reference-dropzone creation-reference-dropzone creation-style-reference-dropzone" id="creationStyleReferenceDropzone">
+                    <input id="creationStyleReferenceInput" name="creationStyleReferenceImages" type="file" accept="image/*" multiple />
+                    <div class="reference-icon" aria-hidden="true"></div>
+                    <span>上传风格参考图</span>
+                  </label>
+                  <div class="reference-grid creation-reference-grid creation-style-reference-grid hidden" id="creationStyleReferenceGrid"></div>
+                </div>
+
+                <div class="creation-logo-block">
+                  <div class="field-head">
+                    <div>
+                      <span>Logo（可选）</span>
+                    </div>
+                    <button class="icon-button creation-logo-library-button" id="creationLogoLibraryButton" type="button" aria-label="打开常用 Logo" title="常用 Logo" aria-expanded="false" aria-controls="creationLogoLibraryPanel">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 3.5l2.65 5.37 5.93.86-4.29 4.18 1.01 5.9L12 17.03l-5.3 2.78 1.01-5.9-4.29-4.18 5.93-.86L12 3.5z" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div class="creation-logo-library-panel hidden" id="creationLogoLibraryPanel" aria-live="polite">
+                    <div class="creation-logo-library-head">
+                      <div>
+                        <span>常用 Logo</span>
+                        <small id="creationLogoLibraryCount">0 个已保存</small>
+                      </div>
+                      <button class="reference-remove creation-logo-library-close" id="creationLogoLibraryCloseButton" type="button" aria-label="关闭常用 Logo">x</button>
+                    </div>
+                    <label class="creation-logo-library-upload">
+                      <input id="creationLogoLibraryInput" type="file" accept="image/*" multiple />
+                      <span>上传并长期保存 Logo</span>
+                    </label>
+                    <div class="creation-saved-logo-grid hidden" id="creationSavedLogoGrid"></div>
+                    <p class="creation-logo-library-empty" id="creationLogoLibraryEmpty">还没有常用 Logo，上传后会保存在当前浏览器。</p>
+                  </div>
+                  <label class="reference-dropzone creation-logo-dropzone" id="creationLogoDropzone">
+                    <input id="creationLogoInput" name="logoImage" type="file" accept="image/*" />
+                    <div class="reference-icon" aria-hidden="true"></div>
+                    <span>上传 Logo</span>
+                  </label>
+                  <div class="creation-logo-preview hidden" id="creationLogoPreview" aria-live="polite">
+                    <img id="creationLogoPreviewImage" alt="Logo 预览" />
+                    <button class="reference-remove creation-logo-remove" id="creationLogoRemoveButton" type="button" aria-label="移除 Logo">x</button>
+                  </div>
+                  <div class="creation-logo-controls">
+                    <label class="compact-field">
+                      <span>Logo 位置</span>
+                      <select id="creationLogoPlacementInput" name="logoPlacement">
+                        <option value="top-left" selected>左上</option>
+                        <option value="top-center">上中</option>
+                        <option value="top-right">右上</option>
+                        <option value="center-left">左中</option>
+                        <option value="center">居中</option>
+                        <option value="center-right">右中</option>
+                        <option value="bottom-left">左下</option>
+                        <option value="bottom-center">下中</option>
+                        <option value="bottom-right">右下</option>
+                      </select>
+                    </label>
+                    <label class="compact-field">
+                      <span>Logo 底色</span>
+                      <select id="creationLogoBackgroundInput" name="logoBackground">
+                        <option value="transparent">透明底，直接放置</option>
+                        <option value="remove-background">非透明底，先抠图</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="creation-control-row creation-option-grid">
+                  <label class="compact-field" data-creation-set-only>
+                    <span>套图数量</span>
+                    <select id="creationImageCountInput" name="imageCount">
+                      <option value="4">4 张</option>
+                      <option value="6">6 张</option>
+                      <option value="8">8 张</option>
+                      <option value="10">10 张</option>
+                      <option value="12">12 张</option>
+                      <option value="14">14 张</option>
+                      <option value="16">16 张</option>
+                      <option value="18" selected>18 张</option>
+                    </select>
+                  </label>
+
+                  <label class="compact-field creation-sku-bundle-field" data-creation-set-only>
+                    <span>SKU 组合件数</span>
+                    <input id="creationSkuBundleCountInput" name="skuBundleCount" type="text" inputmode="numeric" value="1" maxlength="6" />
+                  </label>
+
+                  <label class="compact-field" data-creation-set-only>
+                    <span>营销场景</span>
+                    <select id="creationScenarioInput" name="scenario">
+                      <option value="standard">标准电商</option>
+                      <option value="detail-page">详情页转化</option>
+                      <option value="social-seeding">社媒种草</option>
+                      <option value="launch">新品发布</option>
+                      <option value="promotion">活动促销</option>
+                      <option value="livestream">直播电商</option>
+                      <option value="gift-guide">礼品推荐</option>
+                      <option value="marketplace-search">平台搜索</option>
+                      <option value="brand-story">品牌故事</option>
+                    </select>
+                  </label>
+
+                  <label class="compact-field" data-creation-set-only>
+                    <span>视觉语言</span>
+                    <select id="creationVisualLanguageInput" name="visualLanguage">
+                      <option value="classic-commercial" selected>经典商业摄影</option>
+                      <option value="premium-studio">高端棚拍</option>
+                      <option value="reference-style">参考模式</option>
+                      <option value="clean-marketplace">平台清爽白底</option>
+                      <option value="lifestyle-editorial">生活方式杂志</option>
+                      <option value="social-ugc">社媒实拍</option>
+                      <option value="detail-infographic">详情页信息图</option>
+                      <option value="macro-material">微距材质</option>
+                      <option value="outdoor-context">户外场景</option>
+                      <option value="minimal-luxury">极简奢华</option>
+                      <option value="bold-campaign">活动海报</option>
+                      <option value="warm-handcrafted">手作温度</option>
+                    </select>
+                  </label>
+
+                  <label class="compact-field" data-creation-set-only>
+                    <span>目标语言</span>
+                    <select id="creationTargetLanguageInput" name="targetLanguage">
+                      <option value="zh-CN">简体中文</option>
+                      <option value="en" selected>English</option>
+                      <option value="ja">日本語</option>
+                      <option value="ko">한국어</option>
+                      <option value="fr">Français</option>
+                      <option value="de">Deutsch</option>
+                      <option value="es">Español</option>
+                    </select>
+                  </label>
+
+                  <label class="compact-field">
+                    <span>输出格式</span>
+                    <select id="creationOutputFormatInput" name="format">
+                      <option value="png">PNG</option>
+                      <option value="jpg">JPG</option>
+                    </select>
+                  </label>
+
+                  <label class="compact-field">
+                    <span>比例</span>
+                    <select id="creationRatioInput" name="ratio">
+                      <option value="1:1" selected>电商主图、头像、社交媒体 · 方形 1:1</option>
+                      <option value="4:3">PPT、网页配图 · 横屏 4:3</option>
+                      <option value="3:4">海报、人像 · 竖屏 3:4</option>
+                      <option value="3:2">摄影风格 · 横屏 3:2</option>
+                      <option value="2:3">竖版摄影 · 竖屏 2:3</option>
+                      <option value="5:4">商品展示 · 横屏 5:4</option>
+                      <option value="4:5">Instagram帖子 · 竖屏 4:5</option>
+                      <option value="16:9">横版封面、YouTube · 横屏 16:9</option>
+                      <option value="9:16">短视频封面、手机壁纸 · 竖屏 9:16</option>
+                      <option value="21:9">超宽横幅 · 横屏 21:9</option>
+                      <option value="9:21">超长竖图 · 竖屏 9:21</option>
+                      <option value="2:1">Banner横幅 · 横屏 2:1</option>
+                      <option value="1:2">长海报 · 竖屏 1:2</option>
+                      <option value="3:1">超宽广告图 · 横屏 3:1</option>
+                      <option value="1:3">超长竖版广告 · 竖屏 1:3</option>
+                    </select>
+                  </label>
+
+                  <label class="compact-field">
+                    <span>分辨率</span>
+                    <select id="creationSizeInput" name="size">
+                      <option value="auto">自动</option>
+                      <option value="1024x1024" selected>1K 1024 x 1024</option>
+                      <option value="1536x1536">1.5K 1536 x 1536</option>
+                      <option value="2048x2048">2K 2048 x 2048</option>
+                      <option value="2560x2560">2.5K 2560 x 2560</option>
+                      <option value="2880x2880">最大 2880 x 2880</option>
+                    </select>
+                  </label>
+
+                  <label class="compact-field creation-sku-generation-rule-field" data-creation-set-only>
+                    <span>SKU 生成规则</span>
+                    <select id="creationSkuGenerationRuleInput" name="skuGenerationRule">
+                      <option value="none" selected>无</option>
+                      <option value="package-list">添加包装清单</option>
+                      <option value="dimensions">添加尺寸</option>
+                      <option value="package-list-dimensions">添加包装清单和尺寸</option>
+                    </select>
+                  </label>
+
+                  <label class="creation-listing-toggle is-prominent" data-creation-set-only>
+                    <input id="creationListingAgentEnabledInput" type="checkbox" />
+                    <span>生成后自动撰写 Amazon Listing</span>
+                  </label>
+
+                  <section class="creation-industry-browser" id="creationIndustryTemplateBrowser" aria-label="行业模板" data-creation-set-only>
+                    <input id="creationIndustryTemplateInput" name="industryTemplate" type="hidden" value="general" />
+                    <div class="creation-industry-browser-head">
+                      <div class="creation-industry-picker-field">
+                        <span>行业模板</span>
+                        <button
+                          class="creation-industry-trigger"
+                          id="creationIndustryTemplateTrigger"
+                          type="button"
+                          aria-expanded="false"
+                          aria-controls="creationIndustryTemplatePopover"
+                        >
+                          <strong id="creationIndustryTemplateCurrent">未选择四级类目</strong>
+                        </button>
+                      </div>
+                      <label class="creation-template-search-field">
+                        <span>搜索类目</span>
+                        <input
+                          class="creation-template-search"
+                          id="creationIndustryTemplateSearchInput"
+                          type="search"
+                          autocomplete="off"
+                        />
+                      </label>
+                    </div>
+                    <div class="creation-industry-popover" id="creationIndustryTemplatePopover" hidden>
+                      <div class="creation-industry-popover-head">
+                        <strong id="creationIndustryTemplateStepLabel">一级类目</strong>
+                        <button
+                          class="creation-industry-back-button hidden"
+                          id="creationIndustryTemplateBackButton"
+                          type="button"
+                        >
+                          返回上一级
+                        </button>
+                      </div>
+                      <div class="creation-industry-levels" id="creationIndustryTemplateLevels"></div>
+                    </div>
+                  </section>
+                </div>
+                <section class="creation-role-picker" id="creationRolePicker" aria-label="套图图片类型" data-creation-set-only>
+                  <div class="field-head">
+                    <div>
+                      <span>图片类型</span>
+                    </div>
+                    <small id="creationRoleCount">10 / 18</small>
+                  </div>
+                  <div class="creation-role-grid" id="creationRoleGrid"></div>
+                </section>
+
+                <div class="creation-plan-actions" data-creation-set-only>
+                  <button class="toolbar-button" id="creationPlanButton" type="button">预览计划</button>
+                </div>
+                <button class="generate-button" id="creationGenerateButton" type="submit">生成营销套图</button>
+                <p class="ppt-feedback" id="creationFeedback"></p>
+              </form>
+            </section>
+
+            <section class="studio-panel creation-output-panel">
+              <div class="panel-title between">
+                <div>
+                  <h2>套图产物</h2>
+                  <p id="creationSetMeta">等待生成</p>
+                </div>
+                <div class="creation-output-actions">
+                  <button class="toolbar-button" id="creationRepairFailedButton" type="button" disabled>补齐未完成项</button>
+                </div>
+              </div>
+              <div class="creation-queue-strip hidden" id="creationQueueStrip" aria-label="套图生成队列"></div>
+              <div class="creation-record-detail" id="creationRecordDetail" aria-live="polite"></div>
+              <div class="creation-result-grid" id="creationResultGrid"></div>
+              <section class="creation-listing-panel hidden" aria-label="Amazon Listing 草稿">
+                <div class="panel-title between">
+                  <h3>Amazon Listing</h3>
+                  <span class="count-pill small" id="creationInlineListingStatus">未生成</span>
+                </div>
+                <div class="creation-listing-drafts" id="creationInlineListingDrafts"></div>
+              </section>
+              <div class="creation-prompt-editor-layer" id="creationPromptEditorLayer" aria-live="polite"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view-panel portrait-view hidden" data-view-panel="portrait">
+          <div class="portrait-workspace">
+            <section class="studio-panel portrait-settings-panel">
+              <form class="portrait-form" id="portraitForm">
+                <div class="panel-title between">
+                  <div>
+                    <h2>写真模式</h2>
+                  </div>
+                  <span class="count-pill small" id="portraitProgressText">0 / 12</span>
+                </div>
+
+                <div class="portrait-reference-block">
+                  <div class="field-head">
+                    <div>
+                      <span>人物参考图</span>
+                    </div>
+                    <small id="portraitReferenceCount">0 / 3</small>
+                  </div>
+                  <label class="reference-dropzone portrait-reference-dropzone" id="portraitReferenceDropzone">
+                    <input id="portraitReferenceInput" name="portraitReferenceImages" type="file" accept="image/*" multiple />
+                    <div class="reference-icon" aria-hidden="true"></div>
+                    <span>上传人物参考图</span>
+                  </label>
+                  <div class="portrait-reference-grid hidden" id="portraitReferenceGrid"></div>
+                </div>
+
+                <div class="portrait-reference-block">
+                  <div class="field-head portrait-accessory-head">
+                    <div class="portrait-accessory-title">
+                      <span>服装道具配饰参考图</span>
+                      <small id="portraitAccessoryReferenceCount">0 / 9</small>
+                    </div>
+                    <div class="portrait-accessory-head-actions">
+                      <button
+                        class="mini-action portrait-accessory-asset-button"
+                        id="portraitAccessoryAssetButton"
+                        type="button"
+                        aria-expanded="false"
+                        aria-haspopup="dialog"
+                        aria-controls="portraitAccessoryAssetPopover"
+                      >搭配库</button>
+                    </div>
+                  </div>
+                  <label class="reference-dropzone portrait-reference-dropzone" id="portraitAccessoryReferenceDropzone">
+                    <input id="portraitAccessoryReferenceInput" name="portraitAccessoryReferenceImages" type="file" accept="image/*" multiple />
+                    <div class="reference-icon" aria-hidden="true"></div>
+                    <span>上传服装、道具、配饰参考图</span>
+                  </label>
+                  <div class="portrait-reference-grid hidden" id="portraitAccessoryReferenceGrid"></div>
+                </div>
+
+                <div class="portrait-analysis-actions">
+                  <button class="toolbar-button" id="portraitReferenceAnalyzeButton" type="button">分析任务</button>
+                  <button class="toolbar-button" id="portraitApplyAnalysisButton" type="button" disabled>应用建议</button>
+                  <button
+                    class="toolbar-button portrait-analysis-toggle"
+                    id="portraitAnalysisToggleButton"
+                    type="button"
+                    aria-controls="portraitAnalysisPanel"
+                    aria-expanded="false"
+                    hidden
+                  >展开建议</button>
+                </div>
+                <div class="portrait-analysis-panel" id="portraitAnalysisPanel" hidden>
+                  <div class="creation-record-detail" id="portraitAnalysisSummary"></div>
+                </div>
+
+                <label class="compact-field">
+                  <span>人物名称</span>
+                  <input id="portraitSubjectNameInput" name="subjectName" type="text" maxlength="80" placeholder="例如：品牌主理人" />
+                </label>
+
+                <label class="compact-field">
+                  <span>人物摘要</span>
+                  <textarea id="portraitSubjectSummaryInput" name="subjectSummary" rows="4" maxlength="900" placeholder="可粘贴手写人物描述，也可分析参考图后应用为草稿。"></textarea>
+                </label>
+
+                <label class="compact-field">
+                  <span>数量</span>
+                  <input id="portraitImageCountInput" name="imageCount" type="number" min="1" max="100" value="12" />
+                </label>
+
+                <section class="portrait-location-section" aria-label="地点写真">
+                  <div class="field-head portrait-location-head">
+                    <label class="portrait-location-toggle">
+                      <input id="portraitLocationEnabledInput" name="portraitLocationEnabled" type="checkbox" />
+                      <span>地点写真</span>
+                    </label>
+                    <small id="portraitLocationSourceText">全国省市区镇</small>
+                  </div>
+                  <div class="portrait-location-grid">
+                    <label class="compact-field">
+                      <span>省份</span>
+                      <select id="portraitLocationProvinceInput" name="portraitLocationProvince"></select>
+                    </label>
+                    <label class="compact-field">
+                      <span>城市</span>
+                      <select id="portraitLocationCityInput" name="portraitLocationCity"></select>
+                    </label>
+                    <label class="compact-field">
+                      <span>区县</span>
+                      <select id="portraitLocationDistrictInput" name="portraitLocationDistrict"></select>
+                    </label>
+                    <label class="compact-field">
+                      <span>乡镇</span>
+                      <select id="portraitLocationTownInput" name="portraitLocationTown"></select>
+                    </label>
+                  </div>
+                  <p class="portrait-location-feature" id="portraitLocationFeatureText"></p>
+                </section>
+
+                <section class="portrait-style-section" aria-label="写真风格">
+                  <div class="field-head">
+                    <div>
+                      <span>摄影风格</span>
+                    </div>
+                  </div>
+                  <div class="portrait-style-grid">
+                    <label><input name="portraitStyles" type="checkbox" value="business-profile" checked />商务形象</label>
+                    <label><input name="portraitStyles" type="checkbox" value="fashion-magazine" />时尚杂志</label>
+                    <label><input name="portraitStyles" type="checkbox" value="cinematic-street" />电影街拍</label>
+                    <label><input name="portraitStyles" type="checkbox" value="studio-texture" />棚拍质感</label>
+                    <label><input name="portraitStyles" type="checkbox" value="natural-light-lifestyle" />自然光生活</label>
+                    <label><input name="portraitStyles" type="checkbox" value="retro-film" />复古胶片</label>
+                    <label><input name="portraitStyles" type="checkbox" value="black-white-portrait" />黑白肖像</label>
+                    <label><input name="portraitStyles" type="checkbox" value="outdoor-travel" />户外旅拍</label>
+                    <label><input name="portraitStyles" type="checkbox" value="social-avatar" />社媒头像</label>
+                  </div>
+                </section>
+
+                <section class="portrait-shot-section" aria-label="写真景别">
+                  <div class="field-head">
+                    <div>
+                      <span>景别</span>
+                    </div>
+                  </div>
+                  <div class="portrait-shot-grid">
+                    <label><input name="portraitShotTypes" type="checkbox" value="long-shot" checked />远景</label>
+                    <label><input name="portraitShotTypes" type="checkbox" value="full-body" checked />全身</label>
+                    <label><input name="portraitShotTypes" type="checkbox" value="medium-shot" checked />中景</label>
+                    <label><input name="portraitShotTypes" type="checkbox" value="close-up" checked />近景</label>
+                    <label><input name="portraitShotTypes" type="checkbox" value="extreme-close-up" checked />特写</label>
+                  </div>
+                </section>
+
+                <section class="portrait-action-section" aria-label="写真动作">
+                  <div class="field-head">
+                    <div>
+                      <span>动作</span>
+                    </div>
+                  </div>
+                  <div class="portrait-action-grid">
+                    <label class="portrait-action-card">
+                      <input name="portraitActions" type="checkbox" value="standing-relaxed" checked />
+                      <img src="./assets/portrait-actions/action-standing.png" alt="站立动作图示" loading="lazy" decoding="async" />
+                      <span>站立</span>
+                    </label>
+                    <label class="portrait-action-card">
+                      <input name="portraitActions" type="checkbox" value="walking-step" checked />
+                      <img src="./assets/portrait-actions/action-walking.png" alt="行走动作图示" loading="lazy" decoding="async" />
+                      <span>行走</span>
+                    </label>
+                    <label class="portrait-action-card">
+                      <input name="portraitActions" type="checkbox" value="seated-pose" checked />
+                      <img src="./assets/portrait-actions/action-seated.png" alt="坐姿动作图示" loading="lazy" decoding="async" />
+                      <span>坐姿</span>
+                    </label>
+                    <label class="portrait-action-card">
+                      <input name="portraitActions" type="checkbox" value="leaning-wall" checked />
+                      <img src="./assets/portrait-actions/action-leaning.png" alt="倚靠动作图示" loading="lazy" decoding="async" />
+                      <span>倚靠</span>
+                    </label>
+                    <label class="portrait-action-card">
+                      <input name="portraitActions" type="checkbox" value="looking-back" checked />
+                      <img src="./assets/portrait-actions/action-looking-back.png" alt="回眸动作图示" loading="lazy" decoding="async" />
+                      <span>回眸</span>
+                    </label>
+                    <label class="portrait-action-card">
+                      <input name="portraitActions" type="checkbox" value="adjusting-sleeve" checked />
+                      <img src="./assets/portrait-actions/action-adjusting-sleeve.png" alt="整理衣袖动作图示" loading="lazy" decoding="async" />
+                      <span>整理衣袖</span>
+                    </label>
+                    <label class="portrait-action-card">
+                      <input name="portraitActions" type="checkbox" value="holding-prop" checked />
+                      <img src="./assets/portrait-actions/action-holding-prop.png" alt="手持道具动作图示" loading="lazy" decoding="async" />
+                      <span>手持道具</span>
+                    </label>
+                    <label class="portrait-action-card">
+                      <input name="portraitActions" type="checkbox" value="turning-motion" checked />
+                      <img src="./assets/portrait-actions/action-turning.png" alt="转身动感动作图示" loading="lazy" decoding="async" />
+                      <span>转身动感</span>
+                    </label>
+                  </div>
+                  <div class="portrait-reference-block portrait-action-reference-block">
+                    <div class="field-head">
+                      <div>
+                        <span>动作参考图</span>
+                      </div>
+                      <small id="portraitActionReferenceCount">0 / 3</small>
+                    </div>
+                    <label class="reference-dropzone portrait-reference-dropzone portrait-action-reference-dropzone" id="portraitActionReferenceDropzone">
+                      <input id="portraitActionReferenceInput" name="portraitActionReferenceImages" type="file" accept="image/*" multiple />
+                      <div class="reference-icon" aria-hidden="true"></div>
+                      <span>上传动作或姿态参考图</span>
+                    </label>
+                    <div class="portrait-reference-grid hidden" id="portraitActionReferenceGrid"></div>
+                  </div>
+                </section>
+
+                <label class="compact-field">
+                  <span>自定义风格</span>
+                  <input id="portraitCustomStyleInput" name="customStyle" type="text" maxlength="220" placeholder="例如：暖色画廊自然光写真" />
+                </label>
+
+                <label class="compact-field">
+                  <span>摄影补充</span>
+                  <textarea id="portraitNotesInput" name="notes" rows="2" maxlength="500" placeholder="景别、光线、背景、表情或服装限制。"></textarea>
+                </label>
+
+                <div class="creation-options-grid">
+                  <label class="compact-field">
+                    <span>比例</span>
+                    <select id="portraitRatioInput" name="ratio">
+                      <option value="1:1">电商主图、头像、社交媒体 · 方形 1:1</option>
+                      <option value="4:3">PPT、网页配图 · 横屏 4:3</option>
+                      <option value="3:4">海报、人像 · 竖屏 3:4</option>
+                      <option value="3:2">摄影风格 · 横屏 3:2</option>
+                      <option value="2:3">竖版摄影 · 竖屏 2:3</option>
+                      <option value="5:4">商品展示 · 横屏 5:4</option>
+                      <option value="4:5" selected>Instagram帖子 · 竖屏 4:5</option>
+                      <option value="16:9">横版封面、YouTube · 横屏 16:9</option>
+                      <option value="9:16">短视频封面、手机壁纸 · 竖屏 9:16</option>
+                      <option value="21:9">超宽横幅 · 横屏 21:9</option>
+                      <option value="9:21">超长竖图 · 竖屏 9:21</option>
+                      <option value="2:1">Banner横幅 · 横屏 2:1</option>
+                      <option value="1:2">长海报 · 竖屏 1:2</option>
+                      <option value="3:1">超宽广告图 · 横屏 3:1</option>
+                      <option value="1:3">超长竖版广告 · 竖屏 1:3</option>
+                    </select>
+                  </label>
+                  <label class="compact-field">
+                    <span>分辨率</span>
+                    <select id="portraitSizeInput" name="size">
+                      <option value="auto">自动</option>
+                      <option value="1024x1280" selected>1K 1024 x 1280</option>
+                      <option value="1536x1920">1.5K 1536 x 1920</option>
+                      <option value="2048x2560">2K 2048 x 2560</option>
+                      <option value="2560x3200">最大 2560 x 3200</option>
+                    </select>
+                  </label>
+                  <label class="compact-field">
+                    <span>格式</span>
+                    <select id="portraitOutputFormatInput" name="format">
+                      <option value="png" selected>PNG</option>
+                      <option value="jpg">JPG</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div class="creation-plan-actions">
+                  <button class="toolbar-button" id="portraitPlanButton" type="button">预览计划</button>
+                </div>
+                <button class="generate-button" id="portraitGenerateButton" type="submit">生成写真</button>
+                <p class="ppt-feedback" id="portraitFeedback"></p>
+              </form>
+            </section>
+
+            <section class="studio-panel portrait-output-panel">
+              <div class="panel-title between portrait-output-title">
+                <div>
+                  <h2>写真产物</h2>
+                  <p id="portraitSetMeta">等待生成</p>
+                </div>
+                <button class="toolbar-button portrait-output-retry-button" id="portraitRepairFailedButton" type="button" hidden>重试失败项</button>
+              </div>
+              <div class="creation-record-detail" id="portraitDetail"></div>
+              <div class="creation-result-grid portrait-result-grid" id="portraitResultGrid"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view-panel ppt-view hidden" data-view-panel="ppt">
+          <div class="ppt-workspace">
+            <section class="studio-panel ppt-settings-panel">
+              <form class="ppt-form" id="pptForm">
+                <div class="panel-title between">
+                  <div>
+                    <h2>PPT 演示文稿制作</h2>
+                  </div>
+                </div>
+
+                <div class="field-group">
+                  <div class="field-heading">
+                    <div>
+                      <span>输入来源</span>
+                    </div>
+                  </div>
+                  <div class="ppt-source-options" role="radiogroup" aria-label="PPT 输入来源">
+                    <label class="ppt-source-option">
+                      <input id="pptSourceModeUpload" name="pptSourceMode" type="radio" value="upload" checked />
+                      <span>上传文档</span>
+                    </label>
+                    <label class="ppt-source-option">
+                      <input id="pptSourceModeText" name="pptSourceMode" type="radio" value="text" />
+                      <span>输入文本</span>
+                    </label>
+                    <label class="ppt-source-option">
+                      <input id="pptSourceModeTopic" name="pptSourceMode" type="radio" value="topic" />
+                      <span>输入主题</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="ppt-source-panel" data-ppt-source-panel="upload">
+                  <div class="field-heading">
+                    <div>
+                      <span>文档文件</span>
+                    </div>
+                    <small id="pptFileCount">0 个文件</small>
+                  </div>
+                  <label class="reference-dropzone ppt-dropzone" id="pptDropzone">
+                    <input
+                      id="pptSourceInput"
+                      name="sourceFiles"
+                      type="file"
+                      accept=".pdf,.docx,.pptx,.txt,.md,.csv"
+                      multiple
+                    />
+                    <div class="reference-icon" aria-hidden="true"></div>
+                    <strong>拖入文档或点击上传</strong>
+                    <em>上传文档</em>
+                  </label>
+                  <div class="ppt-file-list" id="pptFileList"></div>
+                </div>
+
+                <div class="ppt-source-panel hidden" data-ppt-source-panel="text">
+                  <label class="compact-field">
+                    <span>文本材料</span>
+                    <textarea
+                      id="pptSourceTextInput"
+                      name="sourceText"
+                      rows="8"
+                      placeholder="可以直接粘贴材料、需求、提纲或正文。"
+                    ></textarea>
+                  </label>
+                </div>
+
+                <div class="ppt-source-panel hidden" data-ppt-source-panel="topic">
+                  <label class="compact-field">
+                    <span>主题</span>
+                    <input
+                      id="pptTopicInput"
+                      name="topic"
+                      type="text"
+                      placeholder="例如：新品发布会、年度经营复盘、课程发布"
+                    />
+                  </label>
+                </div>
+
+                <div class="ppt-analysis-card">
+                  <div class="ppt-analysis-head">
+                    <div>
+                      <strong>分析文档</strong>
+                      <span id="pptAnalysisMeta"></span>
+                    </div>
+                    <button class="inline-button" id="pptAnalyzeButton" type="button">分析文档</button>
+                  </div>
+                  <div class="ppt-analysis-panel hidden" id="pptAnalysisPanel">
+                    <p id="pptAnalysisSummary"></p>
+                    <ul id="pptAnalysisSections"></ul>
+                  </div>
+                  <p class="ppt-feedback" id="pptAnalysisFeedback"></p>
+                </div>
+
+                <div class="ppt-control-grid">
+                  <label class="compact-field">
+                    <span>页数</span>
+                    <input id="pptPageCountInput" name="pageCount" type="number" min="1" max="20" value="8" />
+                  </label>
+                  <label class="compact-field">
+                    <span>视觉风格</span>
+                    <select id="pptStylePresetInput" name="stylePreset">
+                      <option value="business">商务汇报</option>
+                      <option value="education">教育培训</option>
+                      <option value="product">产品发布</option>
+                      <option value="marketing">营销提案</option>
+                      <option value="tech">科技发布</option>
+                      <option value="finance">金融数据</option>
+                      <option value="startup">创业路演</option>
+                      <option value="academic">学术研究</option>
+                      <option value="medical">医疗健康</option>
+                      <option value="minimal">极简留白</option>
+                      <option value="bold">大胆海报</option>
+                      <option value="chinese">东方雅致</option>
+                      <option value="luxury">高端品牌</option>
+                      <option value="sales">销售战报</option>
+                    </select>
+                  </label>
+                  <label class="compact-field">
+                    <span>PPTX 导出方式</span>
+                    <select id="pptExportModeInput" name="exportMode">
+                      <option value="flat-image">整页图片</option>
+                      <option value="editable-reconstruction">可编辑重建</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div class="ppt-motion-grid">
+                  <label class="compact-field">
+                    <span>渐进披露</span>
+                    <select id="pptDynamicPresetInput" name="dynamicPreset">
+                      <option value="smart">智能动态</option>
+                      <option value="spotlight">演讲聚焦</option>
+                      <option value="data-pulse">数据脉冲</option>
+                      <option value="storyline">路径叙事</option>
+                      <option value="product-demo">产品演示</option>
+                      <option value="cinematic">电影动势</option>
+                      <option value="none">静态专业</option>
+                    </select>
+                  </label>
+                  <label class="compact-field">
+                    <span>切换效果</span>
+                    <select id="pptTransitionPresetInput" name="transitionPreset">
+                      <option value="smooth">平滑</option>
+                      <option value="fade">淡入</option>
+                      <option value="push">推入</option>
+                      <option value="wipe">擦除</option>
+                      <option value="split">分割</option>
+                      <option value="random-bars">条带</option>
+                      <option value="morph-flow">流动切换</option>
+                      <option value="none">无切换</option>
+                    </select>
+                  </label>
+                  <label class="compact-field">
+                    <span>切换速度</span>
+                    <select id="pptTransitionSpeedInput" name="transitionSpeed">
+                      <option value="medium">中速</option>
+                      <option value="fast">快速</option>
+                      <option value="slow">慢速</option>
+                    </select>
+                  </label>
+                  <label class="compact-field">
+                    <span>自动换页</span>
+                    <input id="pptAutoAdvanceInput" name="autoAdvanceSeconds" type="number" min="0" max="60" step="0.5" value="0" />
+                  </label>
+                </div>
+                <button class="generate-button" id="pptGenerateButton" type="submit">生成 PPT 演示文稿</button>
+                <p class="ppt-feedback" id="pptFeedback"></p>
+              </form>
+            </section>
+
+            <section class="studio-panel ppt-result-panel">
+              <div class="panel-title between">
+                <div>
+                  <h2>PPT 结果</h2>
+                  <p id="pptStatusText">等待生成</p>
+                </div>
+                <div class="ppt-output-actions">
+                  <span class="ppt-completion-ratio" id="pptCompletionRatio">0 / 0 页成功</span>
+                  <button class="toolbar-button hidden" id="pptCompleteMissingButton" type="button">补齐缺页</button>
+                  <a class="toolbar-button disabled" id="pptDownloadLink" href="#" download aria-disabled="true">下载 PPTX</a>
+                  <a class="toolbar-button disabled ppt-editable-download-link" id="pptEditableDownloadLink" href="#" download aria-disabled="true">可编辑 PPTX</a>
+                </div>
+              </div>
+              <div class="ppt-progress">
+                <div class="ppt-progress-bar" id="pptProgressBar"></div>
+              </div>
+              <div class="ppt-outline-box" id="pptOutlineBox"></div>
+              <div class="ppt-slide-list" id="pptSlideList"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view-panel gallery-view hidden" data-view-panel="gallery" data-gallery-layout="desktop">
+          <section class="studio-panel gallery-panel">
+            <div class="gallery-toolbar">
+              <div class="gallery-toolbar-head">
+                <div class="gallery-top-actions">
+                  <span class="count-pill" id="galleryCount">0 张</span>
+                  <div class="gallery-column-switch" role="group" aria-label="画廊列数">
+                    <span class="gallery-column-label">列</span>
+                    <button
+                      class="gallery-column-button"
+                      type="button"
+                      data-gallery-column-preset="6"
+                      aria-label="显示 6 列"
+                      aria-pressed="false"
+                    >
+                      6
+                    </button>
+                    <button
+                      class="gallery-column-button"
+                      type="button"
+                      data-gallery-column-preset="9"
+                      aria-label="显示 9 列"
+                      aria-pressed="false"
+                    >
+                      9
+                    </button>
+                    <button
+                      class="gallery-column-button active"
+                      type="button"
+                      data-gallery-column-preset="12"
+                      aria-label="显示 12 列"
+                      aria-pressed="true"
+                    >
+                      12
+                    </button>
+                    <button
+                      class="gallery-column-button"
+                      type="button"
+                      data-gallery-column-preset="15"
+                      aria-label="显示 15 列"
+                      aria-pressed="false"
+                    >
+                      15
+                    </button>
+                    <button
+                      class="gallery-column-button"
+                      type="button"
+                      data-gallery-column-preset="18"
+                      aria-label="显示 18 列"
+                      aria-pressed="false"
+                    >
+                      18
+                    </button>
+                  </div>
+                  <button class="header-button" id="refreshGalleryButton" type="button">刷新画廊</button>
+                </div>
+                <div class="gallery-toolbar-meta">
+                  <div class="gallery-filters" id="galleryFilters"></div>
+                  <p class="gallery-helper-text" id="galleryHelperText">按日期分组显示，可按关键词、日期、尺寸和参考图快速筛选。</p>
+                  <div class="gallery-pagination hidden" id="galleryPagination" aria-label="画廊历史分页">
+                    <button class="gallery-page-button" id="galleryPreviousPageButton" type="button">上一页</button>
+                    <span class="gallery-page-status" id="galleryPageStatus">第 1 / 1 页</span>
+                    <button class="gallery-page-button" id="galleryNextPageButton" type="button">下一页</button>
+                  </div>
+                </div>
+                <button class="gallery-reset-button" id="galleryResetFiltersButton" type="button">清空筛选</button>
+              </div>
+
+              <div class="gallery-filter-row">
+                <label class="gallery-search-field">
+                  <span>关键词</span>
+                  <input
+                    class="gallery-search-input"
+                    id="gallerySearchInput"
+                    type="search"
+                    placeholder="搜索提示词、文件名、参考图名"
+                    autocomplete="off"
+                  />
+                </label>
+                <label class="gallery-inline-field">
+                  <span>日期</span>
+                  <input class="gallery-date-input" id="galleryDateInput" type="date" />
+                </label>
+                <label class="gallery-inline-field">
+                  <span>尺寸</span>
+                  <select class="gallery-filter-select" id="gallerySizeFilterInput"></select>
+                </label>
+                <label class="gallery-inline-field">
+                  <span>参考图</span>
+                  <select class="gallery-filter-select" id="galleryReferenceFilterInput"></select>
+                </label>
+              </div>
+
+            </div>
+
+            <div class="gallery-scroll-shell">
+              <div class="gallery-scroll-region" id="galleryScrollRegion">
+                <div class="gallery-empty" id="galleryEmpty">还没有本地输出，先回到 Studio 生成一张图。</div>
+                <div class="gallery-sections" id="gallerySections"></div>
+              </div>
+
+              <div class="gallery-scrollbar" id="galleryScrollbar" data-disabled="true" aria-label="瀑布画廊滚动控制">
+                <button class="gallery-scroll-arrow" id="galleryScrollUp" type="button" aria-label="向上滚动">↑</button>
+                <div class="gallery-scroll-track" id="galleryScrollTrack">
+                  <button
+                    class="gallery-scroll-thumb"
+                    id="galleryScrollThumb"
+                    type="button"
+                    aria-label="拖动查看瀑布画廊"
+                  ></button>
+                </div>
+                <button class="gallery-scroll-arrow" id="galleryScrollDown" type="button" aria-label="向下滚动">↓</button>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section class="view-panel article-record-view hidden" data-view-panel="article-record">
+          <section class="studio-panel article-record-panel">
+            <div class="panel-title between">
+              <div>
+                <h2>文章插图记录</h2>
+              </div>
+              <div class="article-record-actions">
+                <label class="creation-record-search">
+                  <span>搜索</span>
+                  <input id="articleRecordSearchInput" type="search" placeholder="标题、风格、正文摘要" autocomplete="off" />
+                </label>
+                <span class="count-pill" id="articleRecordCount">0 套</span>
+                <div class="gallery-column-switch article-record-column-switch" role="group" aria-label="文章插图记录列数">
+                  <span class="gallery-column-label">列</span>
+                  <button
+                    class="gallery-column-button"
+                    type="button"
+                    data-article-record-column-preset="2"
+                    aria-label="显示 2 列"
+                    aria-pressed="false"
+                  >
+                    2
+                  </button>
+                  <button
+                    class="gallery-column-button active"
+                    type="button"
+                    data-article-record-column-preset="4"
+                    aria-label="显示 4 列"
+                    aria-pressed="true"
+                  >
+                    4
+                  </button>
+                  <button
+                    class="gallery-column-button"
+                    type="button"
+                    data-article-record-column-preset="6"
+                    aria-label="显示 6 列"
+                    aria-pressed="false"
+                  >
+                    6
+                  </button>
+                  <button
+                    class="gallery-column-button"
+                    type="button"
+                    data-article-record-column-preset="8"
+                    aria-label="显示 8 列"
+                    aria-pressed="false"
+                  >
+                    8
+                  </button>
+                </div>
+                <button class="toolbar-button" id="articleRecordCopyPromptsButton" type="button" disabled>复制提示词</button>
+                <button class="toolbar-button" id="articleRecordCopyCaptionsButton" type="button" disabled>复制题注</button>
+                <button class="toolbar-button" id="articleRecordContinueButton" type="button" disabled>继续失败项</button>
+                <button class="toolbar-button" id="articleRecordRefreshButton" type="button">刷新记录</button>
+                <p class="prompt-agent-feedback creation-record-feedback" id="articleRecordFeedback" aria-live="polite"></p>
+              </div>
+            </div>
+            <div class="article-record-browser">
+              <div class="article-record-list" id="articleRecordList"></div>
+              <article class="article-record-detail" id="articleRecordDetail" aria-live="polite" tabindex="-1"></article>
+            </div>
+          </section>
+        </section>
+
+        <section class="view-panel creation-record-view hidden" data-view-panel="creation-record">
+          <section class="studio-panel creation-record-panel">
+            <div class="panel-title between">
+              <div>
+                <h2>套图记录</h2>
+              </div>
+              <div class="creation-record-actions">
+                <label class="creation-record-search">
+                  <span>搜索</span>
+                  <input id="creationRecordSearchInput" type="search" placeholder="商品、场景、语言" autocomplete="off" />
+                </label>
+                <span class="count-pill" id="creationRecordCount">0 套</span>
+                <button class="toolbar-button" id="creationRecordOpenFolderButton" type="button" disabled>打开套图文件夹</button>
+                <button class="toolbar-button" id="creationRecordCopyFullPathsButton" type="button" disabled>复制完整路径</button>
+                <div class="creation-record-export-actions">
+                  <button class="toolbar-button" id="creationRecordCopyPromptsButton" type="button" disabled>复制提示词</button>
+                  <button class="toolbar-button" id="creationRecordExportPromptsButton" type="button" disabled>导出提示词</button>
+                  <button class="toolbar-button" id="creationRecordExportManifestButton" type="button" disabled>导出清单</button>
+                  <button class="toolbar-button" id="creationRecordGenerateListingsButton" type="button" disabled>生成 Listing</button>
+                  <button class="toolbar-button" id="creationRecordCopyListingsButton" type="button" disabled>复制 Listing</button>
+                  <button class="toolbar-button" id="creationRecordExportListingsButton" type="button" disabled>导出 Listing</button>
+                </div>
+                <button class="toolbar-button" id="creationRecordReuseButton" type="button" disabled>复用到当前套图</button>
+                <button class="toolbar-button" id="creationRecordRepairIncompleteButton" type="button" disabled>补齐未生成图像</button>
+                <button class="toolbar-button" id="creationRecordRefreshButton" type="button">刷新记录</button>
+                <p class="prompt-agent-feedback creation-record-feedback" id="creationRecordActionFeedback" aria-live="polite"></p>
+              </div>
+            </div>
+            <div class="creation-record-browser">
+              <div class="creation-set-list creation-record-list" id="creationRecordSetList"></div>
+              <article class="creation-record-archive" aria-live="polite" tabindex="-1">
+                <div class="creation-record-detail" id="creationRecordArchiveDetail"></div>
+                <div class="creation-record-results">
+                  <div class="creation-result-grid creation-record-result-grid" id="creationRecordResultGrid"></div>
+                  <section class="creation-listing-panel hidden" aria-label="Amazon Listing 草稿">
+                    <div class="panel-title between">
+                      <h3>Amazon Listing</h3>
+                      <span class="count-pill small" id="creationRecordListingStatus">未生成</span>
+                    </div>
+                    <div class="creation-listing-drafts" id="creationRecordListingDrafts"></div>
+                  </section>
+                </div>
+              </article>
+            </div>
+          </section>
+        </section>
+
+        <section class="view-panel portrait-record-view hidden" data-view-panel="portrait-record">
+          <section class="studio-panel portrait-record-panel">
+            <div class="panel-title between">
+              <div>
+                <h2>写真记录</h2>
+              </div>
+              <div class="creation-record-actions">
+                <label class="creation-record-search">
+                  <span>搜索</span>
+                  <input id="portraitRecordSearchInput" type="search" placeholder="人物、风格、提示词" autocomplete="off" />
+                </label>
+                <span class="count-pill" id="portraitRecordCount">0 组</span>
+                <button class="toolbar-button" id="portraitRecordOpenFolderButton" type="button" disabled>打开文件夹</button>
+                <button class="toolbar-button" id="portraitRecordCopyPathsButton" type="button" disabled>复制路径</button>
+                <button class="toolbar-button" id="portraitRecordCopyPromptsButton" type="button" disabled>复制提示词</button>
+                <button class="toolbar-button" id="portraitRecordExportPromptsButton" type="button" disabled>导出提示词</button>
+                <button class="toolbar-button" id="portraitRecordExportManifestButton" type="button" disabled>导出清单</button>
+                <button class="toolbar-button" id="portraitRecordReuseButton" type="button" disabled>复用到当前写真</button>
+                <button class="toolbar-button" id="portraitRecordRefreshButton" type="button">刷新记录</button>
+                <p class="prompt-agent-feedback creation-record-feedback" id="portraitRecordActionFeedback" aria-live="polite"></p>
+              </div>
+            </div>
+            <div class="portrait-record-browser">
+              <div class="creation-set-list portrait-record-list" id="portraitRecordSetList"></div>
+              <article class="creation-record-archive portrait-record-archive" aria-live="polite" tabindex="-1">
+                <div class="creation-record-detail" id="portraitRecordArchiveDetail"></div>
+                <div class="creation-result-grid portrait-record-result-grid" id="portraitRecordResultGrid"></div>
+              </article>
+            </div>
+          </section>
+        </section>
+
+        <section class="view-panel ppt-record-view hidden" data-view-panel="ppt-record">
+          <section class="studio-panel ppt-record-panel">
+            <div class="panel-title between">
+              <div>
+                <h2>PPT记录</h2>
+              </div>
+              <div class="ppt-record-actions">
+                <span class="count-pill" id="pptRecordCount">0 个</span>
+                <button class="toolbar-button" id="pptRecordRefreshButton" type="button">刷新记录</button>
+              </div>
+            </div>
+            <div class="ppt-record-empty" id="pptRecordEmpty">还没有找到 PPT 文件。</div>
+            <div class="ppt-record-browser">
+              <div class="ppt-record-list" id="pptRecordList"></div>
+              <article class="ppt-record-detail" id="pptRecordDetail" aria-live="polite" tabindex="-1"></article>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <aside class="lightbox hidden" id="lightbox" aria-hidden="true">
+      <div class="lightbox-backdrop" id="lightboxBackdrop"></div>
+      <div class="lightbox-dialog" role="dialog" aria-modal="true" aria-label="图片详情">
+        <div class="lightbox-top">
+          <div class="lightbox-meta">
+            <span class="model-badge" id="lightboxModel">GPT Image 2.0</span>
+            <span id="lightboxTime"></span>
+            <span id="lightboxId"></span>
+          </div>
+
+          <div class="lightbox-actions">
+            <div class="lightbox-viewer-controls" role="group" aria-label="图片查看控制">
+              <button class="toolbar-button" id="lightboxZoomOutButton" type="button" aria-label="缩小图片">-</button>
+              <span class="lightbox-zoom-label" id="lightboxZoomLabel" aria-live="polite">适配</span>
+              <button class="toolbar-button" id="lightboxZoomInButton" type="button" aria-label="放大图片">+</button>
+              <button class="toolbar-button" id="lightboxFitButton" type="button">适配</button>
+              <button class="toolbar-button" id="lightboxActualSizeButton" type="button">100%</button>
+            </div>
+            <a class="toolbar-button" id="lightboxDownload" href="#" download>下载</a>
+            <button class="toolbar-button lightbox-record-action hidden" id="lightboxCopyPathButton" type="button">复制路径</button>
+            <button class="toolbar-button lightbox-record-action hidden" id="lightboxCopyFullPathButton" type="button">复制完整路径</button>
+            <button class="toolbar-button danger" id="lightboxDelete" type="button">删除</button>
+            <button class="toolbar-button" id="lightboxClose" type="button">关闭</button>
+          </div>
+        </div>
+
+        <div class="lightbox-media-stage">
+          <div class="lightbox-ambient" id="lightboxAmbient" aria-hidden="true"></div>
+          <div class="lightbox-image-shell">
+            <img id="lightboxImage" alt="放大预览" />
+          </div>
+
+          <div class="lightbox-fields">
+            <div class="detail-field">
+              <div class="detail-field-head">
+                <span id="lightboxPromptLabel">提示词</span>
+                <button class="inline-button detail-copy-button" id="copyPromptButton" type="button">复制</button>
+              </div>
+              <textarea id="lightboxPrompt" rows="4" readonly aria-labelledby="lightboxPromptLabel"></textarea>
+            </div>
+
+            <div class="detail-field">
+              <span id="lightboxParamsLabel">参数</span>
+              <textarea id="lightboxParams" rows="6" readonly aria-labelledby="lightboxParamsLabel"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <aside class="prompt-agent-modal hidden" id="promptAgentModal" aria-hidden="true">
+      <div class="prompt-agent-backdrop" id="promptAgentBackdrop"></div>
+      <div class="prompt-agent-dialog" role="dialog" aria-modal="true" aria-label="图片提示词分析">
+        <div class="prompt-agent-head">
+          <div>
+            <p class="drawer-eyebrow">Prompt Agent</p>
+            <h2>图片转 JSON 提示词</h2>
+          </div>
+          <button class="header-button" id="promptAgentCloseButton" type="button">关闭</button>
+        </div>
+
+        <div class="prompt-agent-body">
+          <section class="prompt-agent-upload">
+            <label class="prompt-agent-dropzone" id="promptAgentDropzone">
+              <input id="promptAgentImageInput" type="file" accept="image/*" />
+              <div class="reference-icon" aria-hidden="true"></div>
+              <strong>上传图片后分析</strong>
+              <span>返回可长期保留的 JSON 提示词</span>
+              <em>选择图片</em>
+            </label>
+
+            <div class="prompt-agent-preview hidden" id="promptAgentPreview">
+              <button
+                class="prompt-agent-preview-button"
+                id="promptAgentPreviewButton"
+                type="button"
+                aria-label="放大查看待分析图片"
+              >
+                <img id="promptAgentPreviewImage" alt="待分析图片预览" />
+                <span class="prompt-agent-zoom-badge">点击放大</span>
+                <span class="prompt-agent-scan-line" aria-hidden="true"></span>
+              </button>
+              <div>
+                <strong id="promptAgentFilename">--</strong>
+                <span id="promptAgentFileMeta">--</span>
+                <span class="prompt-agent-preview-hint">可放大查看细节</span>
+              </div>
+            </div>
+
+            <div class="prompt-agent-analysis-motion" id="promptAgentAnalysisMotion" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+
+            <button class="generate-button" id="promptAgentAnalyzeButton" type="button">分析图片</button>
+            <p class="prompt-agent-feedback" id="promptAgentFeedback"></p>
+          </section>
+
+          <section class="prompt-agent-output">
+            <div class="detail-field">
+              <div class="detail-field-head">
+                <span id="promptAgentResultLabel">JSON 结果</span>
+                <button class="inline-button detail-copy-button" id="copyPromptAgentJsonButton" type="button">复制 JSON</button>
+              </div>
+              <textarea id="promptAgentResult" rows="12" readonly aria-labelledby="promptAgentResultLabel"></textarea>
+            </div>
+
+            <div class="prompt-agent-history-head">
+              <div>
+                <h3>长期保留</h3>
+              </div>
+              <span class="count-pill small" id="promptAgentHistoryCount">0 条</span>
+            </div>
+            <div class="prompt-agent-history-empty" id="promptAgentHistoryEmpty">还没有分析记录。</div>
+            <div class="prompt-agent-history-list" id="promptAgentHistoryList"></div>
+          </section>
+        </div>
+      </div>
+    </aside>
+
+    <aside class="prompt-agent-image-viewer" id="promptAgentImageViewer" aria-hidden="true">
+      <button
+        class="prompt-agent-image-viewer-backdrop"
+        id="promptAgentImageViewerBackdrop"
+        type="button"
+        aria-label="关闭放大预览"
+      ></button>
+      <div class="prompt-agent-image-viewer-dialog" role="dialog" aria-modal="true" aria-label="待分析图片放大预览">
+        <div class="prompt-agent-image-viewer-head">
+          <span>待分析图片</span>
+          <button class="header-button" id="promptAgentImageViewerClose" type="button">关闭</button>
+        </div>
+        <img id="promptAgentImageViewerImage" alt="待分析图片放大预览" />
+      </div>
+    </aside>
+
+    <aside class="prompt-agent-image-viewer reference-preview-viewer" id="referencePreviewViewer" aria-hidden="true">
+      <button
+        class="prompt-agent-image-viewer-backdrop reference-preview-backdrop"
+        id="referencePreviewBackdrop"
+        type="button"
+        aria-label="关闭参考图放大预览"
+      ></button>
+      <div class="prompt-agent-image-viewer-dialog reference-preview-dialog" role="dialog" aria-modal="true" aria-label="参考图放大预览">
+        <div class="prompt-agent-image-viewer-head">
+          <span>参考图预览</span>
+          <button class="header-button" id="referencePreviewClose" type="button">关闭</button>
+        </div>
+        <img id="referencePreviewImage" alt="参考图放大预览" />
+      </div>
+    </aside>
+
+    <aside class="config-drawer" id="configDrawer" aria-hidden="true">
+      <div class="drawer-backdrop" id="closeConfigBackdrop"></div>
+      <div class="drawer-panel config-panel">
+        <div class="drawer-head">
+          <div>
+            <h2>连接配置</h2>
+          </div>
+          <div class="drawer-head-actions config-actions-row">
+            <details class="config-language-menu">
+              <summary class="header-button config-language-trigger" aria-label="切换界面语言">
+                <span aria-hidden="true">文</span>
+              </summary>
+              <div class="config-language-popover">
+                <label class="config-language-field">
+                  <span>界面语言</span>
+                  <select id="uiLanguageInput" name="uiLanguage">
+                    <option value="zh-CN" selected>简体中文</option>
+                    <option value="en">English</option>
+                  </select>
+                </label>
+              </div>
+            </details>
+            <button class="header-button" id="closeConfigButton" type="button">关闭</button>
+          </div>
+        </div>
+
+        <div class="config-drawer-body">
+          <form class="config-form" id="configForm">
+            <section class="config-card config-connection-card" aria-labelledby="configConnectionTitle">
+              <div class="config-card-head">
+                <h3 id="configConnectionTitle">调用通道</h3>
+              </div>
+
+              <fieldset class="route-selector" aria-label="生图调用模式">
+                <legend>生图调用模式</legend>
+                <label>
+                  <input name="imageRoute" type="radio" value="a" checked />
+                  <span>路由模式</span>
+                </label>
+                <label>
+                  <input name="imageRoute" type="radio" value="b" />
+                  <span>直接调用模式</span>
+                </label>
+                <label>
+                  <input name="imageRoute" type="radio" value="c" />
+                  <span>Gemini模型</span>
+                </label>
+              </fieldset>
+
+              <div class="config-route-fields">
+                <div class="route-config-panel" data-route-panel="a">
+                  <div class="field endpoint-field">
+                    <div class="field-heading inline endpoint-heading">
+                      <label for="baseUrlInput">接口地址</label>
+                      <div class="endpoint-toolbar">
+                        <select class="endpoint-suffix-select" id="endpointPathSelect" name="endpointPath" aria-label="路由模式请求协议后缀">
+                          <option value="responses">responses</option>
+                        </select>
+                        <button class="inline-button endpoint-full-toggle" id="baseUrlFullToggle" type="button" aria-pressed="false">完整 URL</button>
+                      </div>
+                    </div>
+                    <div class="endpoint-address-control">
+                      <input id="baseUrlInput" name="baseUrl" type="url" placeholder="https://api.openai.com/v1" required />
+                    </div>
+                  </div>
+
+                  <label class="field">
+                    <div class="field-heading inline">
+                      <span>API Key</span>
+                      <small id="savedKeyMask">未保存</small>
+                    </div>
+                    <input id="apiKeyInput" name="apiKey" type="password" placeholder="保持已保存 Key" />
+                  </label>
+
+                  <div class="field model-field">
+                    <div class="field-heading inline">
+                      <label for="responsesModelInput">Responses 模型</label>
+                      <button class="inline-button" id="fetchModelsButton" type="button">获取模型列表</button>
+                    </div>
+                    <div class="model-picker-control">
+                      <input id="responsesModelInput" name="responsesModel" type="text" placeholder="gpt-5.5" autocomplete="off" aria-controls="modelOptionsList" />
+                      <button class="model-picker-toggle" id="modelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="modelOptionsList" hidden></button>
+                      <div class="model-options-list" id="modelOptionsList" role="listbox" hidden></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="route-config-panel" data-route-panel="b">
+                  <div class="field endpoint-field">
+                    <div class="field-heading inline endpoint-heading">
+                      <label for="directBaseUrlInput">接口地址</label>
+                      <div class="endpoint-toolbar">
+                        <select class="endpoint-suffix-select" id="directEndpointPathSelect" name="directEndpointPath" aria-label="直接调用模式请求协议后缀">
+                          <option value="images/generations">images/generations</option>
+                          <option value="responses">responses</option>
+                          <option value="chat/completions">chat/completions</option>
+                        </select>
+                        <button class="inline-button endpoint-full-toggle" id="directBaseUrlFullToggle" type="button" aria-pressed="false">完整 URL</button>
+                      </div>
+                    </div>
+                    <div class="endpoint-address-control">
+                      <input id="directBaseUrlInput" name="directBaseUrl" type="url" placeholder="https://api.openai.com/v1" required />
+                    </div>
+                  </div>
+
+                  <label class="field">
+                    <div class="field-heading inline">
+                      <span>API Key</span>
+                      <small id="directSavedKeyMask">未保存</small>
+                    </div>
+                    <input id="directApiKeyInput" name="directApiKey" type="password" placeholder="保持已保存 Key" />
+                  </label>
+
+                  <div class="field model-field">
+                    <div class="field-heading inline">
+                      <label for="directImageModelInput">生图模型</label>
+                      <button class="inline-button" id="directFetchModelsButton" type="button">获取模型列表</button>
+                    </div>
+                    <div class="model-picker-control">
+                      <input id="directImageModelInput" name="directImageModel" type="text" placeholder="gpt-image-2" autocomplete="off" aria-controls="directModelOptionsList" />
+                      <button class="model-picker-toggle" id="directModelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="directModelOptionsList" hidden></button>
+                      <div class="model-options-list" id="directModelOptionsList" role="listbox" hidden></div>
+                    </div>
+                  </div>
+
+                  <div class="field model-field">
+                    <div class="field-heading inline">
+                      <label for="directResponsesModelInput">视觉/文本模型</label>
+                      <button class="inline-button" id="directResponsesFetchModelsButton" type="button">获取模型列表</button>
+                    </div>
+                    <div class="model-picker-control">
+                      <input id="directResponsesModelInput" name="directResponsesModel" type="text" placeholder="gpt-5.5" autocomplete="off" aria-controls="directResponsesModelOptionsList" />
+                      <button class="model-picker-toggle" id="directResponsesModelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="directResponsesModelOptionsList" hidden></button>
+                      <div class="model-options-list" id="directResponsesModelOptionsList" role="listbox" hidden></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="route-config-panel" data-route-panel="c">
+                  <label class="field">
+                    <div class="field-heading inline">
+                      <span>基础 URL</span>
+                    </div>
+                    <input id="protocolBaseUrlInput" name="protocolBaseUrl" type="url" placeholder="https://api.agicto.cn/v1" />
+                    <small class="field-hint" id="protocolEndpointPreview">/images/generations</small>
+                    <small class="field-hint" id="protocolCompatibilityHint">Gemini 图像模型按 AGICTO 图像生成协议调用；基础 URL 通常填写到 /v1，实际请求为 /images/generations。</small>
+                  </label>
+
+                  <label class="field">
+                    <div class="field-heading inline">
+                      <span>API Key</span>
+                      <small id="protocolSavedKeyMask">未保存</small>
+                    </div>
+                    <input id="protocolApiKeyInput" name="protocolApiKey" type="password" placeholder="保持已保存 Key" />
+                  </label>
+
+                  <div class="field model-field">
+                    <div class="field-heading inline">
+                      <label for="protocolImageModelInput">图像模型</label>
+                      <button class="inline-button" id="protocolFetchModelsButton" type="button">获取模型列表</button>
+                    </div>
+                    <div class="model-picker-control">
+                      <input id="protocolImageModelInput" name="protocolImageModel" type="text" placeholder="gemini-3.1-flash-image-preview" autocomplete="off" aria-controls="protocolModelOptionsList" />
+                      <button class="model-picker-toggle" id="protocolModelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="protocolModelOptionsList" hidden></button>
+                      <div class="model-options-list" id="protocolModelOptionsList" role="listbox" hidden></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <div class="config-action-bar">
+              <p class="config-note" id="configFeedback" aria-live="polite"></p>
+              <button class="header-button" id="testConnectionButton" type="button">测试连接</button>
+              <button class="generate-button" type="submit">保存</button>
+            </div>
+          </form>
+
+          <section class="config-log-panel live-panel config-card" id="configGenerationLogPanel" aria-label="生成日志">
+            <div class="panel-title between">
+              <div>
+                <h2>生成日志</h2>
+              </div>
+              <span class="count-pill small" id="liveCount">0 / 15</span>
+            </div>
+
+            <div class="error-banner hidden" id="errorBanner" role="alert" aria-live="assertive"></div>
+            <ol class="timeline-list" id="timelineList"></ol>
+            <button class="timeline-new-indicator hidden" id="timelineNewIndicator" type="button" aria-label="查看新动态">
+              <span aria-hidden="true">↑</span>
+              <strong id="timelineNewCount">0</strong>
+            </button>
+          </section>
+        </div>
+      </div>
+    </aside>
+
+    <aside class="portrait-accessory-asset-popover hidden" id="portraitAccessoryAssetPopover" aria-hidden="true">
+      <div class="portrait-accessory-asset-panel" role="dialog" aria-modal="false" aria-label="服装道具配饰资产库">
+        <div class="portrait-accessory-asset-head">
+          <div>
+            <p class="drawer-eyebrow">Wardrobe Library</p>
+            <h2>服装道具配饰资产库</h2>
+          </div>
+          <button class="icon-button" id="portraitAccessoryAssetCloseButton" type="button" aria-label="关闭服装道具配饰资产库">x</button>
+        </div>
+        <div class="portrait-accessory-asset-body">
+          <div class="portrait-accessory-asset-tabs" id="portraitAccessoryAssetTabs" role="tablist" aria-label="服饰分类"></div>
+          <div class="portrait-accessory-asset-list" id="portraitAccessoryAssetList"></div>
+          <p class="config-note" id="portraitAccessoryAssetFeedback"></p>
+        </div>
+      </div>
+    </aside>
+
+    <aside class="prompt-template-popover hidden" id="promptTemplatePopover" aria-hidden="true">
+      <div class="prompt-template-panel" role="dialog" aria-modal="false" aria-label="提示词模板">
+        <div class="prompt-template-head">
+          <div>
+            <p class="drawer-eyebrow">Prompt Kit</p>
+            <h2>提示词模板</h2>
+          </div>
+          <button class="toolbar-button" id="closePromptTemplateButton" type="button">关闭</button>
+        </div>
+
+        <div class="prompt-template-body">
+          <div class="prompt-template-list" id="promptTemplateList"></div>
+
+          <form class="prompt-template-form" id="promptTemplateForm">
+            <label class="compact-field">
+              <span>名称</span>
+              <input id="promptTemplateNameInput" type="text" maxlength="40" placeholder="模板名称" />
+            </label>
+
+            <label class="compact-field">
+              <span>内容</span>
+              <textarea id="promptTemplateTextInput" rows="8" maxlength="1000" placeholder="写入模板提示词"></textarea>
+            </label>
+
+            <div class="prompt-template-actions">
+              <button class="toolbar-button" id="newPromptTemplateButton" type="button">新建</button>
+              <button class="toolbar-button strong" type="submit">保存</button>
+              <button class="toolbar-button" id="applyPromptTemplateButton" type="button">插入</button>
+              <button class="toolbar-button danger" id="deletePromptTemplateButton" type="button">删除</button>
+            </div>
+
+            <p class="config-note" id="promptTemplateFeedback"></p>
+          </form>
+        </div>
+      </div>
+    </aside>
+
+    <aside class="ppt-edit-modal hidden" id="pptEditModal" aria-hidden="true">
+      <button class="ppt-edit-backdrop" id="pptEditBackdrop" type="button" aria-label="关闭 PPT 页面编辑器"></button>
+      <div class="ppt-edit-dialog" role="dialog" aria-modal="true" aria-label="编辑 PPT 页面">
+        <div class="ppt-edit-head">
+          <div>
+            <p class="drawer-eyebrow">Slide Editor</p>
+            <h2 id="pptEditTitle">编辑本页</h2>
+          </div>
+          <button class="header-button" id="pptEditCloseButton" type="button">关闭</button>
+        </div>
+        <div class="ppt-edit-body">
+          <div class="ppt-edit-canvas-wrap">
+            <img id="pptEditImage" alt="待编辑 PPT 页面" />
+            <canvas id="pptEditCanvas"></canvas>
+          </div>
+          <div class="ppt-edit-side">
+            <div class="ppt-edit-toolbar" role="toolbar" aria-label="标注工具">
+              <button class="toolbar-button active" id="pptEditDrawButton" type="button">画笔</button>
+              <button class="toolbar-button" id="pptEditEraseButton" type="button">橡皮</button>
+              <button class="toolbar-button" id="pptEditClearButton" type="button">清空</button>
+            </div>
+            <label class="compact-field">
+              <span>修改说明</span>
+              <textarea
+                id="pptEditInstructionInput"
+                rows="7"
+                placeholder="例如：删除红圈里的图标，把标题放大，右侧换成流程图。"
+              ></textarea>
+            </label>
+            <button class="generate-button" id="pptSubmitEditButton" type="button">重新生成本页</button>
+            <p class="ppt-feedback" id="pptEditFeedback"></p>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <script type="module" src="./app.js?v=20260618-timeline-links-new-tab-1"></script>
+  </body>
+</html>

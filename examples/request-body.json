@@ -1,0 +1,18 @@
+{
+  "model": "gpt-5.4",
+  "input": "生成一张美女抖音直播带货的写实风图片，主播坐在直播桌前展示商品，竖版构图，灯光专业，适合电商宣传。",
+  "stream": true,
+  "tool_choice": {
+    "type": "image_generation"
+  },
+  "tools": [
+    {
+      "type": "image_generation",
+      "model": "gpt-image-2",
+      "size": "1024x1536",
+      "quality": "high",
+      "output_format": "jpeg",
+      "background": "opaque"
+    }
+  ]
+}

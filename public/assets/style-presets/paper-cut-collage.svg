@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-label="paper cut collage style sample">
+  <defs><filter id="shadow"><feDropShadow dx="0" dy="7" stdDeviation="5" flood-color="#5b4636" flood-opacity=".28"/></filter><filter id="paper"><feTurbulence type="fractalNoise" baseFrequency=".04" numOctaves="3" seed="16"/><feComponentTransfer><feFuncA type="table" tableValues=".05 .18"/></feComponentTransfer></filter></defs>
+  <rect width="640" height="480" fill="#f2dfbf"/>
+  <rect width="640" height="480" fill="#795f4d" filter="url(#paper)" opacity=".2"/>
+  <path d="M0 248c78-54 158-80 240-79 88 0 157 43 237 42 57 0 111-19 163-55v324H0Z" fill="#8ab8c7" filter="url(#shadow)"/>
+  <path d="M0 294c88-44 168-58 240-42 83 19 154 20 230 3 58-13 115-35 170-66v291H0Z" fill="#96bc73" filter="url(#shadow)"/>
+  <path d="M246 429c23-75 52-126 88-154 30 31 52 83 65 154Z" fill="#f1ca65" filter="url(#shadow)"/>
+  <path d="M236 304h190v112H236Z" fill="#e9bd8b" filter="url(#shadow)"/>
+  <path d="M218 304 329 216l114 88Z" fill="#cd675e" filter="url(#shadow)"/>
+  <path d="M282 416v-69h58v69M363 338h34v34h-34M253 338h34v34h-34" fill="#55475c" filter="url(#shadow)"/>
+  <path d="M116 367c-15-50 5-94 51-130 46 30 66 74 45 130Z" fill="#6aae75" filter="url(#shadow)"/>
+  <path d="M159 287v120" stroke="#9b6a47" stroke-width="18" stroke-linecap="round" filter="url(#shadow)"/>
+  <path d="M50 408c92-30 191-36 298-19 83 14 161 5 236-28" fill="none" stroke="#fff4db" stroke-width="12" stroke-linecap="round" opacity=".55"/>
+</svg>

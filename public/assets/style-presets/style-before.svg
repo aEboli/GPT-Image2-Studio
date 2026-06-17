@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-label="neutral source image before style transfer">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="480"><stop stop-color="#b9d5eb"/><stop offset="1" stop-color="#f6ead8"/></linearGradient>
+    <linearGradient id="grass" x1="0" y1="260" x2="0" y2="480"><stop stop-color="#7fa36f"/><stop offset="1" stop-color="#46623f"/></linearGradient>
+    <filter id="photo"><feTurbulence type="fractalNoise" baseFrequency=".018" numOctaves="3" seed="2"/><feComponentTransfer><feFuncA type="table" tableValues="0 .1"/></feComponentTransfer></filter>
+  </defs>
+  <rect width="640" height="480" fill="url(#sky)"/>
+  <path d="M0 247c78-54 158-81 240-80 88 0 157 43 237 42 57 0 111-19 163-55v326H0Z" fill="#7892a0"/>
+  <path d="M0 287c88-44 168-58 240-42 83 19 154 20 230 3 58-13 115-35 170-66v298H0Z" fill="url(#grass)"/>
+  <path d="M246 428c23-74 52-125 87-153 29 30 50 82 64 153Z" fill="#d3c3a8"/>
+  <path d="M236 303h188v112H236Z" fill="#e7d8c4"/>
+  <path d="M218 303 329 216l112 87Z" fill="#9d5b45"/>
+  <path d="M282 415v-68h58v68M363 338h34v33h-34M253 338h34v33h-34" fill="#6d584e"/>
+  <path d="M116 366c-14-48 5-91 50-128 46 29 65 72 45 128Z" fill="#5e8d59"/>
+  <path d="M159 287v118" stroke="#6a4e36" stroke-width="18" stroke-linecap="round"/>
+  <path d="M0 480c112-52 225-78 340-77 111 0 211 26 300 77Z" fill="#2f4f34" opacity=".62"/>
+  <rect width="640" height="480" fill="#fff" filter="url(#photo)" opacity=".35"/>
+</svg>
