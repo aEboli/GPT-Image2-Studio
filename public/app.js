@@ -11200,6 +11200,7 @@ function normalizeCreationReferenceAnalysisPayload(payload = {}) {
 
   return {
     summary: String(analysis?.summary || "已识别套图参考图用途").trim(),
+    productName: String(analysis?.productName || analysis?.product_name || analysis?.subjectName || analysis?.subject_name || analysis?.productTitle || analysis?.product_title || "").trim(),
     categoryHint: String(analysis?.categoryHint || analysis?.category_hint || analysis?.category || "").trim(),
     categoryPath: String(analysis?.categoryPath || analysis?.category_path || "").trim(),
     visualLanguage,

@@ -385,8 +385,11 @@ test("prompt agent request can identify ecommerce creation reference roles", () 
   assert.equal(requestBody.text.format.name, "creation_reference_analysis_json");
   assert.ok(requestBody.text.format.schema.required.includes("reference_roles"));
   assert.ok(requestBody.text.format.schema.required.includes("sku_subjects"));
+  assert.ok(requestBody.text.format.schema.required.includes("product_name"));
+  assert.match(input[0].content[0].text, /product_name/i);
   assert.ok(requestBody.text.format.schema.required.includes("category_hint"));
   assert.ok(requestBody.text.format.schema.required.includes("visual_language"));
+  assert.match(requestBody.text.format.schema.properties.product_name.description, /product name/i);
   assert.deepEqual(requestBody.text.format.schema.properties.visual_language.enum, ["classic-commercial", "reference-style"]);
   assert.ok(requestBody.text.format.schema.properties.reference_roles.items.properties.role.enum.includes("dimensions"));
   assert.ok(requestBody.text.format.schema.properties.reference_roles.items.properties.role.enum.includes("usage"));

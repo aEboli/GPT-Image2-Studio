@@ -35,15 +35,12 @@ GPT-Image2-Studio 是一个面向创作者、电商运营、内容团队和产�
 
 ## 近期更新
 
-- 配置面板拆分为 `路由模式`、`直接调用模式` 和 `Gemini模型` 三类通道；每次生成都会提交当前通道快照，避免排队任务使用过期配置。
-- 接口地址支持基础 URL 与完整 URL 粘贴。已知后缀会自动拆成 Base URL 和接口后缀，未知供应商路径会原样保留。
-- 直接调用模式支持 `images/generations`、`responses`、`chat/completions`；图片编辑自动使用 `images/edits`。
-- Gemini 模型通道支持独立 Base URL、API Key、图像模型、模型列表拉取和 `auto` / `512` / `1K` / `2K` / `4K` 尺寸。
-- 普通通道覆盖 15 种常用比例，并按 1K、1.5K、2K、最大等档位生成像素尺寸。
-- 本地生成支持后台提交和任务轮询，长任务不会长期占住浏览器连接。
-- 胶片栏、预览区和套图卡片加入稳定 loading、排队中、失败和空状态，减少缩略图加载时的布局跳动。
-- 本地 Node 服务加入 DNS fallback。系统解析上游域名失败时，会继续尝试 `223.5.5.5`、`1.1.1.1` 和系统已有 DNS 服务器。
-- Windows 安装包文档同步更新到 `v0.1.6`，包含当前配置面板、DNS fallback、构建和发布校验说明。
+- `v0.1.7` 聚焦电商套图参考图流程：参考图分析、商品角色标签、SKU/组合装线索和提示词规划继续收紧。
+- 套图参考图卡片会保留分组商品标签，分析结果可更稳定地回填商品名、四级类目和参考用途。
+- 新增套图参考图专用灯箱入口，可从参考图卡片查看大图，并复用通用灯箱的缩放、拖拽、复制和打开路径能力。
+- 四级类目模板和套图规划继续补全，生成计划会更明确地区分主图、卖点图、场景图、SKU 补图和 Listing 证据。
+- 胶片栏、预览区和套图卡片继续优化 loading、排队中、失败和空状态，减少批量生成时的布局跳动。
+- Windows 安装包与发布文档同步更新到 `v0.1.7`。
 
 ## 目录
 
@@ -67,7 +64,7 @@ GPT-Image2-Studio 是一个面向创作者、电商运营、内容团队和产�
 从 GitHub Release 下载当前安装包：
 
 ```text
-GPT-Image2-Studio-Setup-v0.1.6.exe
+GPT-Image2-Studio-Setup-v0.1.7.exe
 ```
 
 安装后从桌面或开始菜单启动：
@@ -504,7 +501,7 @@ cmd /c npm run build:installer
 安装包产物写入：
 
 ```text
-artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.1.6.exe
+artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.1.7.exe
 ```
 
 更多说明见 [docs/windows-installer.md](./docs/windows-installer.md)。

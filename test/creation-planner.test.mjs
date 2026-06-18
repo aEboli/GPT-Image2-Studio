@@ -1977,6 +1977,7 @@ test("creation reference analysis normalizes role suggestions and prompt notes",
   const analysis = normalizeCreationReferenceAnalysis(
     {
       summary: "识别到产品正面、纹理细节和厨房使用场景。",
+      product_name: "Transparent coffee brewer",
       reference_roles: [
         { index: 1, filename: "front.png", role: "product", note: "正面主体，保留透明结构" },
         { index: 2, filename: "texture.png", role: "material", note: "磨砂纹理和边缘细节" },
@@ -1996,6 +1997,7 @@ test("creation reference analysis normalizes role suggestions and prompt notes",
   });
 
   assert.equal(analysis.summary, "识别到产品正面、纹理细节和厨房使用场景。");
+  assert.equal(analysis.productName, "Transparent coffee brewer");
   assert.equal(analysis.categoryHint, "");
   assert.equal(analysis.categoryPath, "");
   assert.deepEqual(

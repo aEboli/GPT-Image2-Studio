@@ -3650,6 +3650,7 @@ test("creation reference analysis apply fills product name from fourth-level cat
   const app = await readFile(appPath, "utf8");
 
   assert.match(app, /function applyCreationReferenceAnalysisProductNameSuggestion\(analysis = \{\}\) \{/);
+  assert.match(app, /productName: String\(analysis\?\.productName \|\| analysis\?\.product_name/);
   assert.match(app, /applyCreationReferenceAnalysisProductNameValue\(\{[\s\S]*previousAutoProductName: state\.creationReferenceAnalysis\.productNameSuggestion,[\s\S]*\}\)/);
   assert.match(app, /state\.creationReferenceAnalysis\.productNameSuggestion = result\.autoProductName;/);
   assert.match(app, /setCreationReferenceProductNameValue\(result\.productName\);/);
