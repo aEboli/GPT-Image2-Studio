@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  applyCreationReferenceAnalysisProductNameValue,
+  buildCreationReferenceAnalysisCategoryMatchText,
   buildCreationReferenceAnalysisAppliedFeedbackMessage,
   getCreationReferenceAnalysisDisplayRoleLabel,
   getCreationReferenceAnalysisRoleCorrectionReason,
@@ -9,6 +11,74 @@ import {
   shouldDowngradeReferenceProductAnalysisRole,
   summarizeCreationReferenceAnalysisRoleCorrections,
 } from "../lib/creation-reference-analysis-view.mjs";
+
+test("creation reference category matching ignores stale form product copy", () => {
+  const text = buildCreationReferenceAnalysisCategoryMatchText(
+    {
+      categoryHint: "apparel",
+      categoryPath: "Fashion > Women's Clothing > Sets",
+      summary: "Light blue pleated upper and lower garment set.",
+      recommendations: [
+        {
+          filename: "pleated-set.png",
+          roleLabel: "product subject group",
+          note: "Two complete clothing product units: sleeveless top and matching skirt.",
+        },
+      ],
+    },
+    {
+      productName: "jointed fishing lure",
+      productDescription: "bass bait with treble hooks",
+      sellingPoints: ["lifelike swimming action"],
+    },
+  );
+
+  assert.match(text, /apparel/);
+  assert.match(text, /pleated upper and lower garment set/);
+  assert.match(text, /matching skirt/);
+  assert.doesNotMatch(text, /fishing lure|bass bait|swimming action/);
+});
+
+test("creation reference product name suggestion replaces only analysis-managed names", () => {
+  assert.deepEqual(
+    applyCreationReferenceAnalysisProductNameValue({
+      analysis: { categoryTemplateLabel: "Women's Clothing Sets" },
+      currentProductName: "Fishing Lure",
+      previousAutoProductName: "Fishing Lure",
+    }),
+    {
+      applied: true,
+      autoProductName: "Women's Clothing Sets",
+      productName: "Women's Clothing Sets",
+    },
+  );
+
+  assert.deepEqual(
+    applyCreationReferenceAnalysisProductNameValue({
+      analysis: {},
+      currentProductName: "Fishing Lure",
+      previousAutoProductName: "Fishing Lure",
+    }),
+    {
+      applied: false,
+      autoProductName: "",
+      productName: "",
+    },
+  );
+
+  assert.deepEqual(
+    applyCreationReferenceAnalysisProductNameValue({
+      analysis: { categoryTemplateLabel: "Women's Clothing Sets" },
+      currentProductName: "Manual Catalog Name",
+      previousAutoProductName: "Fishing Lure",
+    }),
+    {
+      applied: false,
+      autoProductName: "Fishing Lure",
+      productName: "Manual Catalog Name",
+    },
+  );
+});
 
 test("creation reference analysis explains subject-unit downgrade from reference-product to product", () => {
   const reason = getCreationReferenceAnalysisRoleCorrectionReason(

@@ -9,7 +9,7 @@ test("creation SKU payload excludes applied analysis subjects backed only by dim
       skuSubjects: [
         {
           id: "lure-size-card",
-          title: "尺寸规格图",
+          title: "尺寸参数参考图",
           filenames: ["lure-size-card.png"],
           note: "长度 130mm、重量 35g。",
         },

@@ -23,6 +23,91 @@ export function getCreationReferenceAnalysisVisualLanguageReason(analysis = {}) 
   ).trim();
 }
 
+function cleanCreationReferenceAnalysisText(value) {
+  return String(value || "").trim();
+}
+
+export function buildCreationReferenceAnalysisCategoryMatchText(analysis = {}) {
+  const recommendationText = Array.isArray(analysis.recommendations)
+    ? analysis.recommendations.flatMap((entry = {}) => [entry.filename, entry.roleLabel, entry.note])
+    : [];
+
+  return [
+    analysis.categoryHint,
+    analysis.category_hint,
+    analysis.categoryPath,
+    analysis.category_path,
+    analysis.summary,
+    ...recommendationText,
+  ]
+    .map(cleanCreationReferenceAnalysisText)
+    .filter(Boolean)
+    .join(" ");
+}
+
+export function getCreationReferenceAnalysisProductNameSuggestion(analysis = {}) {
+  const directName = cleanCreationReferenceAnalysisText(
+    analysis.productName ||
+      analysis.product_name ||
+      analysis.subjectName ||
+      analysis.subject_name ||
+      analysis.productTitle ||
+      analysis.product_title,
+  );
+  if (directName) {
+    return directName;
+  }
+
+  const templateLabel = cleanCreationReferenceAnalysisText(analysis.categoryTemplateLabel);
+  if (templateLabel) {
+    return templateLabel;
+  }
+
+  const categoryPath = cleanCreationReferenceAnalysisText(analysis.categoryTemplatePath || analysis.categoryPath || analysis.category_path);
+  const pathLeaf = categoryPath
+    .split(">")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .at(-1);
+  if (pathLeaf) {
+    return pathLeaf;
+  }
+
+  return cleanCreationReferenceAnalysisText(analysis.categoryHint || analysis.category_hint || analysis.category);
+}
+
+export function applyCreationReferenceAnalysisProductNameValue({
+  analysis = {},
+  currentProductName = "",
+  previousAutoProductName = "",
+} = {}) {
+  const suggestion = getCreationReferenceAnalysisProductNameSuggestion(analysis);
+  const current = cleanCreationReferenceAnalysisText(currentProductName);
+  const previousAuto = cleanCreationReferenceAnalysisText(previousAutoProductName);
+
+  if (!suggestion) {
+    return {
+      applied: false,
+      autoProductName: "",
+      productName: previousAuto && current === previousAuto ? "" : current,
+    };
+  }
+
+  if (previousAuto && current && current !== previousAuto) {
+    return {
+      applied: false,
+      autoProductName: previousAuto,
+      productName: current,
+    };
+  }
+
+  return {
+    applied: current !== suggestion,
+    autoProductName: suggestion,
+    productName: suggestion,
+  };
+}
+
 const CREATION_REFERENCE_ANALYSIS_ENGLISH_UNIT_COUNTS = new Map([
   ["one", 1],
   ["two", 2],

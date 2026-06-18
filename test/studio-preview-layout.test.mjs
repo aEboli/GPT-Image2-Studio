@@ -343,7 +343,7 @@ test("lightbox detail image exposes PS-style zoom and pan viewer controls", asyn
 
   assert.match(
     html,
-    /<div class="lightbox-viewer-controls"[^>]*>[\s\S]*id="lightboxZoomOutButton"[\s\S]*id="lightboxZoomLabel"[\s\S]*id="lightboxZoomInButton"[\s\S]*id="lightboxFitButton"[\s\S]*id="lightboxActualSizeButton"[\s\S]*<\/div>/,
+    /<div class="lightbox-viewer-controls hidden"[^>]*>[\s\S]*id="lightboxZoomOutButton"[\s\S]*id="lightboxZoomLabel"[\s\S]*id="lightboxZoomInButton"[\s\S]*id="lightboxFitButton"[\s\S]*id="lightboxActualSizeButton"[\s\S]*<\/div>/,
   );
   assert.match(
     html,
@@ -353,18 +353,22 @@ test("lightbox detail image exposes PS-style zoom and pan viewer controls", asyn
   assert.match(styles, /\.lightbox-zoom-label\s*\{[\s\S]*min-width:\s*54px;[\s\S]*text-align:\s*center;/);
   assert.match(
     styles,
-    /\.lightbox-dialog\s*\{[\s\S]*width:\s*min\(1440px,\s*calc\(100vw - 32px\)\);[\s\S]*max-height:\s*calc\(100svh - 24px\);/,
+    /\.lightbox-dialog\s*\{[\s\S]*width:\s*min\(1180px,\s*calc\(100vw - 48px\)\);[\s\S]*max-height:\s*min\(92svh,\s*920px\);/,
   );
   assert.match(
     styles,
-    /\.lightbox-media-stage\s*\{[\s\S]*min-height:\s*min\(74svh,\s*calc\(100svh - 188px\)\);[\s\S]*grid-template-columns:\s*clamp\(280px,\s*18vw,\s*340px\)\s+minmax\(0,\s*1fr\)\s+clamp\(280px,\s*18vw,\s*340px\);/,
+    /\.lightbox-media-stage\s*\{[\s\S]*min-height:\s*min\(64svh,\s*680px\);[\s\S]*grid-template-columns:\s*clamp\(220px,\s*18vw,\s*280px\)\s+minmax\(0,\s*1fr\)\s+clamp\(220px,\s*18vw,\s*280px\);/,
   );
   assert.match(styles, /\.lightbox-media-stage\s*\{[\s\S]*gap:\s*clamp\(18px,\s*1\.7vw,\s*28px\);[\s\S]*padding:\s*0;/);
   assert.match(styles, /\.lightbox-media-stage\s*\{[^}]*overflow:\s*hidden;/);
   assert.match(styles, /\.lightbox-image-shell\s*\{[\s\S]*touch-action:\s*none;[\s\S]*user-select:\s*none;/);
   assert.match(styles, /\.lightbox-image-shell\.is-viewer-draggable\s*\{[\s\S]*cursor:\s*grab;/);
   assert.match(styles, /\.lightbox-media-stage\.is-viewer-dragging \.lightbox-image-shell\s*\{[\s\S]*cursor:\s*grabbing;/);
-  assert.match(styles, /#lightboxImage\s*\{[\s\S]*object-fit:\s*contain;[\s\S]*transform:\s*translate3d\(var\(--lightbox-pan-x,\s*0px\),\s*var\(--lightbox-pan-y,\s*0px\),\s*0\)\s*scale\(var\(--lightbox-scale,\s*1\)\);/);
+  assert.match(styles, /\.lightbox-media-stage\.is-viewer-inspecting\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);/);
+  assert.match(styles, /\.lightbox-media-stage\.is-viewer-inspecting \.lightbox-fields\s*\{[\s\S]*display:\s*none;/);
+  assert.match(styles, /\.lightbox-media-stage\.is-viewer-inspecting \.lightbox-image-shell,\s*\.lightbox\.is-image-only-preview \.lightbox-image-shell\s*\{[\s\S]*grid-column:\s*1\s*\/\s*-1;/);
+  assert.match(styles, /#lightboxImage\s*\{[\s\S]*position:\s*absolute;[\s\S]*left:\s*50%;[\s\S]*top:\s*50%;/);
+  assert.match(styles, /#lightboxImage\s*\{[\s\S]*object-fit:\s*contain;[\s\S]*transform:\s*translate\(-50%,\s*-50%\)\s*translate3d\(var\(--lightbox-pan-x,\s*0px\),\s*var\(--lightbox-pan-y,\s*0px\),\s*0\)\s*scale\(var\(--lightbox-scale,\s*1\)\);/);
   assert.doesNotMatch(lightboxImageRule, /transition:[\s\S]*transform/);
   assert.match(styles, /\.lightbox-fields\s*\{[\s\S]*display:\s*contents;/);
   assert.match(styles, /\.lightbox-image-shell\s*\{[\s\S]*grid-column:\s*2;[\s\S]*grid-row:\s*1;/);
@@ -383,6 +387,7 @@ test("lightbox detail image exposes PS-style zoom and pan viewer controls", asyn
   );
   assert.match(app, /import \{ createLightboxImageViewer, createLightboxViewerState \} from "\/lib\/lightbox-image-viewer\.mjs";/);
   assert.match(app, /lightboxViewer:\s*createLightboxViewerState\(\),/);
+  assert.match(app, /lightboxViewerControls:\s*document\.querySelector\("\.lightbox-viewer-controls"\),/);
   assert.match(app, /const lightboxViewerController = createLightboxImageViewer\(\{ refs, state \}\);/);
   assert.match(app, /function resetLightboxViewer\(options\) \{[\s\S]*lightboxViewerController\.reset\(options\);[\s\S]*\}/);
   assert.match(app, /function syncLightboxImageMetrics\(options\) \{[\s\S]*lightboxViewerController\.syncMetrics\(options\);[\s\S]*\}/);
@@ -391,14 +396,17 @@ test("lightbox detail image exposes PS-style zoom and pan viewer controls", asyn
   assert.doesNotMatch(app, /stepLightboxZoom|fitLightboxViewer|setLightboxActualSize|zoomLightboxAtPoint|startLightboxPan/);
   assert.match(lightboxViewer, /export const LIGHTBOX_VIEWER_MIN_SCALE = 0\.25;/);
   assert.match(lightboxViewer, /export const LIGHTBOX_VIEWER_MAX_SCALE = 8;/);
-  assert.match(lightboxViewer, /export function createLightboxViewerState\(\) \{[\s\S]*scale:\s*1,[\s\S]*fitScale:\s*1,[\s\S]*lastInspectionScale:\s*1,/);
+  assert.match(lightboxViewer, /export function createLightboxViewerState\(\) \{[\s\S]*scale:\s*1,[\s\S]*fitScale:\s*1,[\s\S]*mode:\s*"view",[\s\S]*lastInspectionScale:\s*1,/);
+  assert.match(lightboxViewer, /function isInspectionMode\(/);
   assert.match(lightboxViewer, /function calculateFitScale\(/);
   assert.match(lightboxViewer, /function zoomAtPoint\(/);
   assert.match(lightboxViewer, /function panBy\(/);
   assert.match(lightboxViewer, /function toggleInspectionZoom\(/);
   assert.match(lightboxViewer, /refs\.lightboxImage\.addEventListener\("load",\s*\(\) => syncMetrics\(\)\);/);
   assert.match(lightboxViewer, /refs\.lightboxImage\.addEventListener\("dragstart",\s*\(event\) => event\.preventDefault\(\)\);/);
-  assert.match(lightboxViewer, /refs\.lightboxImageShell\.addEventListener\("wheel",[\s\S]*event\.preventDefault\(\);[\s\S]*zoomAtPoint/);
+  assert.match(lightboxViewer, /refs\.lightboxViewerControls\.classList\.toggle\("hidden",\s*!isInspect\);/);
+  assert.match(lightboxViewer, /refs\.lightboxMediaStage\.classList\.toggle\("is-viewer-inspecting",\s*isInspectionMode\(current\)\);/);
+  assert.match(lightboxViewer, /refs\.lightboxImageShell\.addEventListener\("wheel",[\s\S]*!isInspectionMode\(viewer\(\)\)[\s\S]*event\.preventDefault\(\);[\s\S]*zoomAtPoint/);
   assert.match(lightboxViewer, /refs\.lightboxImageShell\.addEventListener\("pointerdown",\s*startPan\);/);
   assert.match(lightboxViewer, /refs\.lightboxImageShell\.addEventListener\("pointermove",\s*continuePan\);/);
   assert.match(lightboxViewer, /refs\.lightboxImageShell\.addEventListener\("dblclick",[\s\S]*toggleInspectionZoom/);
@@ -3132,7 +3140,7 @@ test("creation mode has independent references count and scenario controls", asy
   assert.match(html, /SKU 组合件数[\s\S]*id="creationSkuBundleCountInput"[\s\S]*name="skuBundleCount"/);
   assert.match(html, /id="creationImageCountInput"[\s\S]*<option value="8">8/);
   assert.match(html, /id="creationImageCountInput"[\s\S]*<option value="10">10 张<\/option>[\s\S]*<option value="12">12/);
-  assert.match(html, /id="creationImageCountInput"[\s\S]*<option value="14">14[\s\S]*<option value="16">16[\s\S]*<option value="18" selected>18/);
+  assert.match(html, /id="creationImageCountInput"[\s\S]*<option value="14">14[\s\S]*<option value="16" selected>16/);
   assert.match(html, /SKU 生成规则[\s\S]*id="creationSkuGenerationRuleInput"[\s\S]*name="skuGenerationRule"[\s\S]*<option value="none" selected>无<\/option>[\s\S]*<option value="package-list">添加包装清单<\/option>[\s\S]*<option value="dimensions">添加尺寸<\/option>[\s\S]*<option value="package-list-dimensions">添加包装清单和尺寸<\/option>/);
   assert.match(html, /id="creationScenarioInput"[\s\S]*value="social-seeding"/);
   assert.match(html, /id="creationScenarioInput"[\s\S]*value="livestream"/);
@@ -3174,7 +3182,7 @@ test("creation mode has independent references count and scenario controls", asy
   assert.match(html, /id="creationRolePicker"/);
   assert.match(html, /id="creationRoleGrid"/);
   assert.match(html, /id="creationRoleCount"/);
-  assert.match(html, /id="creationRoleCount">10 \/ 18/);
+  assert.match(html, /id="creationRoleCount">16 \/ 16/);
   assert.doesNotMatch(html, /id="creationRoleHint"/);
 
   assert.match(styles, /\.creation-reference-grid\s*\{/);
@@ -3284,19 +3292,32 @@ test("creation mode has independent references count and scenario controls", asy
   assert.match(app, /const visualLanguage = normalizeCreationVisualLanguage\(set\.visualLanguage\)/);
   assert.match(app, /visualLanguage,\s*[\r\n]+\s*visualLanguageLabel:\s*String\(set\.visualLanguageLabel \|\| formatCreationVisualLanguageLabel\(visualLanguage\)\)/);
   assert.match(app, /\["视觉语言", set\.visualLanguageLabel \|\| formatCreationVisualLanguageLabel\(set\.visualLanguage\)\]/);
-  assert.match(app, /material-closeup/);
-  assert.match(app, /usage-steps/);
-  assert.match(app, /review-qa/);
-  assert.match(app, /17-brand-story\|brand-story\|品牌故事图/);
-  assert.match(app, /18-image-decomposition\|image-decomposition\|图片拆解图/);
+  assert.doesNotMatch(app, /material-closeup/);
+  assert.doesNotMatch(app, /usage-steps/);
+  assert.doesNotMatch(app, /review-qa/);
+  assert.match(app, /4-multi-angle\|multi-angle\|多角度图/);
+  assert.match(app, /5-atmosphere\|atmosphere\|场景氛围图/);
+  assert.match(app, /6-product-detail\|product-detail\|商品细节图/);
+  assert.match(app, /7-brand-story\|brand-story\|品牌故事图/);
+  assert.match(app, /8-size-capacity-fit\|size-capacity-fit\|尺寸\/容量\/尺码图/);
+  assert.match(app, /9-effect-comparison\|effect-comparison\|效果对比图/);
+  assert.match(app, /10-spec-table\|spec-table\|详细规格\/参数表/);
+  assert.match(app, /11-craft-process\|craft-process\|工艺制作图/);
+  assert.match(app, /12-accessory-gift\|accessory-gift\|配件\/赠品图/);
+  assert.match(app, /13-series-showcase\|series-showcase\|系列展示图/);
+  assert.match(app, /14-ingredient-material\|ingredient-material\|商品成分图/);
+  assert.match(app, /15-after-sales\|after-sales\|售后保障图/);
+  assert.match(app, /16-usage-suggestion\|usage-suggestion\|使用建议图/);
+  assert.doesNotMatch(app, /17-brand-story\|brand-story\|品牌故事图/);
+  assert.doesNotMatch(app, /18-image-decomposition\|image-decomposition\|图片拆解图/);
   assert.doesNotMatch(app, /18-certification-proof\|certification-proof\|资质背书图/);
   assert.doesNotMatch(app, /brief\.className = "creation-card-brief";/);
   assert.doesNotMatch(app, /refs\.creationScenarioHint\.textContent =[\s\S]*CREATION_INDUSTRY_TEMPLATE_HINTS/);
   assert.match(app, /function getCreationScenarioRolePreset\(/);
   assert.match(app, /function getCreationSelectedRoles\(\) \{/);
-  assert.match(app, /\[4, 6, 8, 10, 12, 14, 16, 18\]\.includes\(value\) \? value : 18/);
-  assert.match(app, /\[4, 6, 8, 10, 12, 14, 16, 18\]\.includes\(normalizedCount\) \? String\(normalizedCount\) : "18"/);
-  assert.match(app, /\[4, 6, 8, 10, 12, 14, 16, 18\]\.includes\(selectedRoles\.length\)/);
+  assert.match(app, /\[4, 6, 8, 10, 12, 14, 16\]\.includes\(value\) \? value : 16/);
+  assert.match(app, /\[4, 6, 8, 10, 12, 14, 16\]\.includes\(normalizedCount\) \? String\(normalizedCount\) : "16"/);
+  assert.match(app, /\[4, 6, 8, 10, 12, 14, 16\]\.includes\(selectedRoles\.length\)/);
   assert.match(app, /function syncCreationSelectedRolesToCount\(\) \{/);
   assert.match(app, /function syncCreationSelectedRolesToScenario\(\) \{/);
   assert.match(app, /function renderCreationRatioOptions\(\) \{/);
@@ -3335,6 +3356,8 @@ test("creation mode has independent references count and scenario controls", asy
   assert.match(app, /function analyzeCreationReferenceImages\(\) \{/);
   assert.match(app, /async function applyCreationReferenceAnalysis\(analysis\) \{/);
   assert.match(app, /function applyCreationReferenceAnalysisCategoryMatch\(analysis\) \{/);
+  assert.match(app, /buildCreationReferenceAnalysisCategoryMatchText\(analysis\)/);
+  assert.doesNotMatch(app, /refs\.creationProductNameInput\?\.value,[\s\S]*refs\.creationProductDescriptionInput\?\.value,[\s\S]*refs\.creationSellingPointsInput\?\.value,/);
   assert.match(app, /analysis\?\.reference_roles/);
   assert.match(app, /findCreationIndustryTemplateMatch/);
   assert.match(app, /function applyCreationReferenceAnalysisRecommendations\(\) \{/);
@@ -3626,12 +3649,10 @@ test("creation mode exposes upload-image logo batch branch", async () => {
 test("creation reference analysis apply fills product name from fourth-level category", async () => {
   const app = await readFile(appPath, "utf8");
 
-  assert.match(app, /function getCreationReferenceAnalysisProductNameSuggestion\(analysis = \{\}\) \{/);
-  assert.match(app, /analysis\.categoryTemplateLabel/);
-  assert.match(app, /analysis\.categoryTemplatePath \|\| analysis\.categoryPath/);
-  assert.match(app, /\.split\(">"\)\s*\.map\(\(part\) => part\.trim\(\)\)\s*\.filter\(Boolean\)\s*\.at\(-1\)/);
   assert.match(app, /function applyCreationReferenceAnalysisProductNameSuggestion\(analysis = \{\}\) \{/);
-  assert.match(app, /refs\.creationProductNameInput\.value = suggestion;/);
+  assert.match(app, /applyCreationReferenceAnalysisProductNameValue\(\{[\s\S]*previousAutoProductName: state\.creationReferenceAnalysis\.productNameSuggestion,[\s\S]*\}\)/);
+  assert.match(app, /state\.creationReferenceAnalysis\.productNameSuggestion = result\.autoProductName;/);
+  assert.match(app, /setCreationReferenceProductNameValue\(result\.productName\);/);
   assert.match(
     app,
     /const productNameApplied = applyCreationReferenceAnalysisProductNameSuggestion\(analysis\);[\s\S]*state\.creationReferenceAnalysis\.applied = true;/,
@@ -3746,7 +3767,7 @@ test("creation mode exposes record detail and item repair actions", async () => 
   assert.match(loadingModule, /const firstSkuItem = items\.find\(\(item\) => item\.role === "sku"\);/);
   assert.match(app, /getItemOptions: \(item, _index, \{ firstSkuItem \}\) => \(\{ isSkuStart: item === firstSkuItem \}\)/);
   assert.match(app, /const firstRecordSkuItem = selectedSet\.items\.find\(\(item\) => item\.role === "sku"\);/);
-  assert.match(app, /createCreationCard\(item, index, \{ showActions: false, showRecordActions: true, isSkuStart: item === firstRecordSkuItem \}\)/);
+  assert.match(app, /createCreationCard\(item, index, \{ showActions: false, showRecordActions: true, creationSetId: selectedSet\.setId, isSkuStart: item === firstRecordSkuItem \}\)/);
   assert.match(app, /const shouldRenderPath = !imageUrl && !showRecordActions && !hideGenerationDetails;/);
   assert.match(app, /path\.textContent = item\.error \|\| "";/);
   assert.match(app, /refs\.creationResultGrid\.addEventListener\("click",[\s\S]*creationRetryItemId/);
@@ -3754,6 +3775,23 @@ test("creation mode exposes record detail and item repair actions", async () => 
   assert.match(app, /refs\.creationResultGrid\.addEventListener\("click",[\s\S]*creationClosePromptEditor/);
   assert.match(app, /refs\.creationResultGrid\.addEventListener\("click",[\s\S]*creationSavePromptItemId/);
   assert.match(app, /refs\.creationRepairFailedButton\.addEventListener\("click"/);
+});
+
+test("creation result card images open the lightbox from the thumbnail", async () => {
+  const app = await readFile(appPath, "utf8");
+  const styles = await readFile(stylesPath, "utf8");
+
+  assert.match(app, /const isResultPreviewMedia = Boolean\(imageUrl && !showRecordActions\);/);
+  assert.match(app, /document\.createElement\(\(showRecordActions \|\| isResultPreviewMedia\) && imageUrl \? "button" : "div"\)/);
+  assert.match(app, /media\.classList\.add\("creation-result-preview-media"\);/);
+  assert.match(app, /media\.dataset\.creationPreviewItemId = item\.itemId;/);
+  assert.match(app, /function buildCreationCurrentLightboxItem\(item = \{\}\) \{/);
+  assert.match(app, /isImageOnlyLightboxItem:\s*true,/);
+  assert.match(app, /function openCreationCurrentItemPreview\(itemId\) \{/);
+  assert.match(app, /openCreationCurrentItemPreview\(itemId\) \{[\s\S]*const lightboxItem = buildCreationCurrentLightboxItem\(item\);[\s\S]*openLightbox\(lightboxItem\);[\s\S]*\}/);
+  assert.match(app, /const shouldResolveLightboxItem = !state\.lightboxItem\.isCreationRecordItem && !state\.lightboxItem\.isImageOnlyLightboxItem;/);
+  assert.match(app, /refs\.creationResultGrid\.addEventListener\("click",[\s\S]*const previewButton = event\.target\.closest\("\[data-creation-preview-item-id\]"\);[\s\S]*openCreationCurrentItemPreview\(previewButton\.dataset\.creationPreviewItemId\)/);
+  assert.match(styles, /\.creation-result-preview-media\s*\{/);
 });
 
 test("creation generation cards replace plan details with loading animation", async () => {
@@ -4175,22 +4213,24 @@ test("creation record cards open gallery-style lightbox details", async () => {
   assert.doesNotMatch(app, /creation-card-prompt/);
   assert.match(app, /if \(shouldRenderPath\) \{[\s\S]*path\.className = "creation-card-path";[\s\S]*card\.appendChild\(path\);[\s\S]*\}/);
   assert.match(app, /media\.dataset\.creationRecordPreviewItemId = item\.itemId;/);
+  assert.match(app, /media\.dataset\.creationRecordPreviewSetId = options\.creationSetId \|\| "";/);
   assert.match(app, /function getCreationRecordItemById\(itemId, setId = ""\) \{/);
   assert.match(app, /function buildCreationRecordLightboxItem\(item, set\) \{/);
-  assert.match(app, /function openCreationRecordItemPreview\(itemId\) \{/);
+  assert.match(app, /function openCreationRecordItemPreview\(itemId, setId = ""\) \{/);
   assert.match(app, /async function copyCreationRecordItemPath\(itemId, setId = ""\) \{/);
   assert.match(app, /function syncLightboxCreationRecordActions\(fresh = \{\}\) \{/);
   assert.match(app, /async function copyLightboxCreationRecordPath\(\) \{/);
   assert.match(app, /async function copyLightboxCreationRecordFullPath\(\) \{/);
   assert.match(app, /actions\.className = "creation-card-actions creation-record-card-actions";/);
   assert.match(app, /previewButton\.dataset\.creationRecordPreviewItemId = item\.itemId;/);
+  assert.match(app, /previewButton\.dataset\.creationRecordPreviewSetId = options\.creationSetId \|\| "";/);
   assert.match(app, /const isArticleRecordItem = Boolean\(fresh\.isArticleRecordItem\);/);
   assert.match(app, /const isRecordItem = isCreationRecordItem \|\| isArticleRecordItem;/);
-  assert.match(app, /refs\.lightboxDelete\.hidden = Boolean\(isRecordItem\);/);
+  assert.match(app, /refs\.lightboxDelete\.hidden = Boolean\(isRecordItem \|\| isImageOnlyPreview\);/);
   assert.match(app, /refs\.lightboxCopyPathButton\.addEventListener\("click",/);
   assert.match(app, /refs\.lightboxCopyFullPathButton\.addEventListener\("click",/);
-  assert.match(app, /refs\.creationRecordResultGrid\.addEventListener\("click",[\s\S]*creationRecordPreviewItemId/);
-  assert.match(app, /createCreationCard\(item, index, \{ showActions: false, showRecordActions: true, isSkuStart: item === firstRecordSkuItem \}\)/);
+  assert.match(app, /refs\.creationRecordResultGrid\.addEventListener\("click",[\s\S]*openCreationRecordItemPreview\(\s*previewButton\.dataset\.creationRecordPreviewItemId,\s*previewButton\.dataset\.creationRecordPreviewSetId,\s*\)/);
+  assert.match(app, /createCreationCard\(item, index, \{ showActions: false, showRecordActions: true, creationSetId: selectedSet\.setId, isSkuStart: item === firstRecordSkuItem \}\)/);
   assert.doesNotMatch(app, /dataset\.creationRecordCopyPromptItemId/);
   assert.doesNotMatch(app, /dataset\.creationRecordCopyPathItemId/);
   assert.doesNotMatch(app, /dataset\.creationRecordCopyFullPathItemId/);

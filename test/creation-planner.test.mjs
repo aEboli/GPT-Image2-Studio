@@ -52,6 +52,45 @@ test("creation planner applies preview plan prompt overrides without changing se
   assert.equal(plan.items[0].prompt.includes("Custom hero prompt"), false);
 });
 
+test("creation planner exposes the refactored sixteen suite image types", () => {
+  assert.equal(CREATION_ITEM_ROLES.length, 16);
+  assert.deepEqual(
+    CREATION_ITEM_ROLES.map((role) => role.title),
+    [
+      "首屏主视觉",
+      "核心卖点图",
+      "使用场景图",
+      "多角度图",
+      "场景氛围图",
+      "商品细节图",
+      "品牌故事图",
+      "尺寸/容量/尺码图",
+      "效果对比图",
+      "详细规格/参数表",
+      "工艺制作图",
+      "配件/赠品图",
+      "系列展示图",
+      "商品成分图",
+      "售后保障图",
+      "使用建议图",
+    ],
+  );
+  assert.equal(normalizeCreationImageCount(18), 16);
+
+  const plan = buildCreationPlan({
+    productName: "AeroPress Clear",
+    productDescription: "Transparent portable coffee brewer",
+    sellingPoints: "lightweight, easy to clean, stable taste",
+    targetLanguage: "en",
+  });
+
+  assert.equal(plan.imageCount, 16);
+  assert.deepEqual(
+    plan.items.map((item) => item.title),
+    CREATION_ITEM_ROLES.map((role) => role.title),
+  );
+});
+
 test("creation planner builds the fixed four-image ecommerce set", () => {
   const plan = buildCreationPlan({
     productName: "AeroPress Clear",
@@ -65,18 +104,18 @@ test("creation planner builds the fixed four-image ecommerce set", () => {
   assert.equal(plan.targetLanguageLabel, "English");
   assert.deepEqual(
     plan.items.map((item) => item.role),
-    ["hero", "benefit", "scene", "detail-trust"],
+    ["hero", "benefit", "scene", "multi-angle"],
   );
   assert.deepEqual(
     plan.items.map((item) => item.title),
-    ["主图", "卖点图", "场景图", "详情信任图"],
+    ["首屏主视觉", "核心卖点图", "使用场景图", "多角度图"],
   );
   assert.ok(plan.items.every((item) => item.prompt.includes("Use concise English marketing copy")));
   assert.ok(plan.items.every((item) => item.prompt.includes("AeroPress Clear")));
-  assert.match(plan.items[0].prompt, /clean ecommerce hero image/i);
+  assert.match(plan.items[0].prompt, /hero visual/i);
   assert.match(plan.items[1].prompt, /benefit/i);
   assert.match(plan.items[2].prompt, /lifestyle/i);
-  assert.match(plan.items[3].prompt, /trust/i);
+  assert.match(plan.items[3].prompt, /3-4 angles/i);
 });
 
 test("creation planner defaults to classic commercial photography with a shared visual lock", () => {
@@ -211,7 +250,7 @@ test("creation planner treats detailed descriptions as selective set-wide source
     productDescription: "\u753b\u9762\u6587\u5b57\uff1a\u8d85\u5f3a\u5438\u529b\uff0c\u8f66\u5bb6\u4e24\u7528\uff1b\u5c55\u793a\u6ee4\u82af\u7ed3\u6784\u3001\u5438\u5634\u914d\u4ef6\u548c\u8f66\u5185\u4f7f\u7528\u573a\u666f",
     sellingPoints: "\u5f3a\u52b2\u5438\u529b\n\u4f4e\u566a\u97f3\n\u591a\u573a\u666f\u9002\u7528",
     targetLanguage: "en",
-    selectedRoles: ["hero", "benefit", "material-closeup"],
+    selectedRoles: ["hero", "benefit", "product-detail"],
   });
 
   assert.ok(
@@ -235,20 +274,20 @@ test("creation planner allocates source details by role without requiring agent 
       "\u753b\u9762\u6587\u5b57\uff1a\u8d85\u5f3a\u5438\u529b\uff1b\u6ee4\u82af\u7ed3\u6784\uff1b\u5438\u5634\u914d\u4ef6\uff1b\u8f66\u5185\u4f7f\u7528\u573a\u666f\uff1b\u5305\u88c5\u6536\u7eb3\u888b",
     sellingPoints: "\u5f3a\u52b2\u5438\u529b\n\u4f4e\u566a\u97f3\n\u591a\u573a\u666f\u9002\u7528",
     targetLanguage: "en",
-    selectedRoles: ["hero", "material-closeup", "scene", "package"],
+    selectedRoles: ["hero", "product-detail", "scene", "accessory-gift"],
   });
 
   const promptByRole = Object.fromEntries(plan.items.map((item) => [item.role, item.prompt]));
 
   assert.equal(plan.contentAllocation.strategy, "deterministic-rules");
   assert.equal(plan.contentAllocation.agentRequired, false);
-  assert.match(promptByRole["material-closeup"], /\u6ee4\u82af\u7ed3\u6784/);
-  assert.match(promptByRole["material-closeup"], /\u5438\u5634\u914d\u4ef6/);
-  assert.doesNotMatch(promptByRole["material-closeup"], /\u8f66\u5185\u4f7f\u7528\u573a\u666f/);
+  assert.match(promptByRole["product-detail"], /\u6ee4\u82af\u7ed3\u6784/);
+  assert.match(promptByRole["product-detail"], /\u5438\u5634\u914d\u4ef6/);
+  assert.doesNotMatch(promptByRole["product-detail"], /\u8f66\u5185\u4f7f\u7528\u573a\u666f/);
   assert.match(promptByRole.scene, /\u8f66\u5185\u4f7f\u7528\u573a\u666f/);
   assert.doesNotMatch(promptByRole.scene, /\u6ee4\u82af\u7ed3\u6784/);
   assert.doesNotMatch(promptByRole.scene, /\u753b\u9762\u6587\u5b57/);
-  assert.match(promptByRole.package, /\u5305\u88c5\u6536\u7eb3\u888b/);
+  assert.match(promptByRole["accessory-gift"], /\u5305\u88c5\u6536\u7eb3\u888b/);
 });
 
 test("creation planner does not repeat the full detailed description across unrelated roles", () => {
@@ -257,22 +296,165 @@ test("creation planner does not repeat the full detailed description across unre
     productDescription: "Electric lure, built-in LED light, internal steel rattle beads, ABS body, USB recharge cable",
     sellingPoints: "",
     targetLanguage: "en",
-    selectedRoles: ["hero", "package", "promotion", "material-closeup", "usage-steps", "dimensions", "review-qa"],
+    selectedRoles: ["hero", "accessory-gift", "after-sales", "product-detail", "usage-suggestion", "size-capacity-fit", "after-sales"],
   });
   const promptByRole = Object.fromEntries(plan.items.map((item) => [item.role, item.prompt]));
   const fullDescription =
     "Description: Electric lure, built-in LED light, internal steel rattle beads, ABS body, USB recharge cable.";
 
   assert.match(promptByRole.hero, /Electric lure/);
-  assert.match(promptByRole.promotion, /built-in LED light/);
-  assert.match(promptByRole["material-closeup"], /internal steel rattle beads/);
-  assert.match(promptByRole["material-closeup"], /ABS body/);
-  assert.doesNotMatch(promptByRole.package, /built-in LED light|internal steel rattle beads|ABS body/);
-  assert.doesNotMatch(promptByRole["material-closeup"], /built-in LED light/);
-  assert.doesNotMatch(promptByRole.package, new RegExp(fullDescription.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  assert.doesNotMatch(promptByRole["usage-steps"], new RegExp(fullDescription.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  assert.doesNotMatch(promptByRole.dimensions, new RegExp(fullDescription.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  assert.doesNotMatch(promptByRole["review-qa"], new RegExp(fullDescription.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(promptByRole["after-sales"], /internal steel rattle beads|USB recharge cable/);
+  assert.match(promptByRole["product-detail"], /internal steel rattle beads/);
+  assert.match(promptByRole["product-detail"], /ABS body/);
+  assert.doesNotMatch(promptByRole["accessory-gift"], /built-in LED light|internal steel rattle beads|ABS body/);
+  assert.doesNotMatch(promptByRole["accessory-gift"], new RegExp(fullDescription.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.doesNotMatch(promptByRole["usage-suggestion"], new RegExp(fullDescription.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.doesNotMatch(promptByRole["size-capacity-fit"], new RegExp(fullDescription.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.doesNotMatch(promptByRole["after-sales"], new RegExp(fullDescription.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+});
+
+test("creation planner limits hard size and weight facts to two dedicated information roles", () => {
+  const plan = buildCreationPlan({
+    productName: "Electric fishing lure",
+    productDescription:
+      "Rechargeable segmented fishing lure. Length 13cm. Weight 42g. ABS body. Internal steel rattle beads. USB recharge cable.",
+    sellingPoints: "",
+    targetLanguage: "en",
+    selectedRoles: [
+      "hero",
+      "benefit",
+      "scene",
+      "product-detail",
+      "size-capacity-fit",
+      "effect-comparison",
+      "spec-table",
+      "series-showcase",
+    ],
+  });
+
+  const rolesWithSpecs = plan.items
+    .filter((item) => /13cm|42g/.test(item.prompt))
+    .map((item) => item.role);
+
+  assert.deepEqual(rolesWithSpecs, ["size-capacity-fit", "spec-table"]);
+  assert.ok(rolesWithSpecs.length <= 2);
+});
+
+test("creation planner limits repeated material detail facts to two detail roles", () => {
+  const plan = buildCreationPlan({
+    productName: "Electric fishing lure",
+    productDescription:
+      "Rechargeable segmented fishing lure. ABS body. Internal steel rattle beads. Polished propeller. Reinforced hooks. USB recharge cable.",
+    sellingPoints: "",
+    targetLanguage: "en",
+    selectedRoles: [
+      "hero",
+      "benefit",
+      "scene",
+      "multi-angle",
+      "product-detail",
+      "brand-story",
+      "craft-process",
+      "ingredient-material",
+      "atmosphere",
+    ],
+  });
+
+  const rolesWithMaterialDetails = plan.items
+    .filter((item) => /ABS body|Internal steel rattle beads/i.test(item.prompt))
+    .map((item) => item.role);
+
+  assert.deepEqual(rolesWithMaterialDetails, ["product-detail", "ingredient-material"]);
+  assert.ok(rolesWithMaterialDetails.length <= 2);
+});
+
+test("creation planner turns rechargeable features into concrete scene and usage creative direction", () => {
+  const plan = buildCreationPlan({
+    productName: "Cordless desk lamp",
+    productDescription:
+      "Portable rechargeable desk lamp with USB-C charging cable, rechargeable battery, magnetic base, night reading, bedside charging, and power bank charging.",
+    sellingPoints: "cordless reading light\nfast USB-C recharge\nbedside and desktop use",
+    targetLanguage: "en",
+    selectedRoles: ["scene", "atmosphere", "usage-suggestion", "benefit"],
+  });
+
+  const promptByRole = Object.fromEntries(plan.items.map((item) => [item.role, item.prompt]));
+
+  assert.match(promptByRole.scene, /ecommerce art director/i);
+  assert.match(promptByRole.scene, /concrete charging or connection moment/i);
+  assert.match(promptByRole.scene, /USB-C|bedside charging|power bank charging/i);
+  assert.match(promptByRole["usage-suggestion"], /charging step sequence/i);
+  assert.match(promptByRole["usage-suggestion"], /USB-C|bedside charging|power bank charging/i);
+  assert.match(promptByRole.atmosphere, /purchase desire/i);
+});
+
+test("creation planner makes dual-unit dimension labels mandatory without raw metric-only conflicts", () => {
+  const plan = buildCreationPlan({
+    productName: "Hard bait fishing lure",
+    productDescription: "Rechargeable hard bait lure for shallow water.",
+    sellingPoints: "realistic swim action",
+    targetLanguage: "en",
+    selectedRoles: ["size-capacity-fit"],
+    dimensionUnitMode: "both",
+    referenceImageRoles: [
+      {
+        filename: "size-card.png",
+        role: "dimensions",
+        note: "Size specification card: length 10 cm, weight 15 g.",
+      },
+    ],
+  });
+
+  const dimensionsPrompt = plan.items[0].prompt;
+
+  assert.match(dimensionsPrompt, /Length 10 cm \(3\.94 in\)/);
+  assert.match(dimensionsPrompt, /Weight 15 g \(0\.53 oz\)/);
+  assert.match(dimensionsPrompt, /metric and imperial pair must appear in the same visible label/i);
+  assert.match(dimensionsPrompt, /Never show a metric-only length label such as 10 cm/i);
+  assert.doesNotMatch(dimensionsPrompt, /Description:.*(?:10 cm|15 g)/);
+  assert.doesNotMatch(dimensionsPrompt, /Selling points:.*(?:10 cm|15 g)/);
+});
+
+test("creation planner uses charging instructions from usage reference notes", () => {
+  const plan = buildCreationPlan({
+    productName: "Rechargeable hard bait lure",
+    productDescription: "Hard bait lure for shallow water.",
+    sellingPoints: "realistic action",
+    targetLanguage: "en",
+    selectedRoles: ["scene", "usage-suggestion"],
+    referenceImageRoles: [
+      {
+        filename: "charging-guide.png",
+        role: "usage",
+        note: "USB charging cable connects to red and black clips; show charging for 5 hours before use.",
+      },
+    ],
+  });
+
+  const promptByRole = Object.fromEntries(plan.items.map((item) => [item.role, item.prompt]));
+
+  assert.match(promptByRole.scene, /MUST include a visible charging or cable-connection moment/i);
+  assert.match(promptByRole.scene, /USB charging cable connects to red and black clips/);
+  assert.match(promptByRole["usage-suggestion"], /MUST include at least one dedicated charging\/connection panel/i);
+  assert.match(promptByRole["usage-suggestion"], /charging for 5 hours before use/i);
+});
+
+test("creation planner prevents conversion roles from becoming redundant white-background novelty cards", () => {
+  const plan = buildCreationPlan({
+    productName: "Rechargeable hard bait lure",
+    productDescription: "Rechargeable hard bait lure with USB charging cable, lifelike swim action, and shallow-water fishing use.",
+    sellingPoints: "realistic strike action\nready before every trip\nconfidence for night fishing",
+    targetLanguage: "en",
+    selectedRoles: ["brand-story", "after-sales", "atmosphere", "effect-comparison", "size-capacity-fit", "spec-table"],
+  });
+  const promptByRole = Object.fromEntries(plan.items.map((item) => [item.role, item.prompt]));
+
+  ["brand-story", "after-sales", "atmosphere", "effect-comparison"].forEach((role) => {
+    assert.match(promptByRole[role], /Do not create another plain white-background product-only card/i);
+    assert.match(promptByRole[role], /Do not rely on generic novelty, new-arrival, or feature-highlights poster language/i);
+  });
+  assert.doesNotMatch(promptByRole["size-capacity-fit"], /Do not create another plain white-background product-only card/i);
+  assert.doesNotMatch(promptByRole["spec-table"], /Do not create another plain white-background product-only card/i);
 });
 
 test("creation planner keeps overlong product descriptions bounded and role-useful", () => {
@@ -284,17 +466,17 @@ test("creation planner keeps overlong product descriptions bounded and role-usef
     productDescription: longDescription,
     sellingPoints: "",
     targetLanguage: "en",
-    selectedRoles: ["hero", "benefit", "material-closeup"],
+    selectedRoles: ["hero", "benefit", "product-detail"],
   });
 
   const promptByRole = Object.fromEntries(plan.items.map((item) => [item.role, item.prompt]));
 
   assert.ok(plan.items.every((item) => item.prompt.length < 8000));
   assert.doesNotMatch(promptByRole.hero, new RegExp(`Product: ${longDescription.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
-  assert.doesNotMatch(promptByRole["material-closeup"], new RegExp(longDescription.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.doesNotMatch(promptByRole["product-detail"], new RegExp(longDescription.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.notEqual(plan.items.find((item) => item.role === "benefit").sourceFocus.selling, "围绕商品核心价值提炼短卖点");
   assert.match(promptByRole.benefit, /pain point|low visibility|stable swim action/);
-  assert.match(promptByRole["material-closeup"], /ABS body|treble hooks|reflective scales/);
+  assert.match(promptByRole["product-detail"], /ABS body|treble hooks|reflective scales/);
 });
 
 test("creation planner keeps numbered kit descriptions from becoming orphan number fragments", () => {
@@ -312,15 +494,15 @@ test("creation planner keeps numbered kit descriptions from becoming orphan numb
     productDescription,
     sellingPoints: "",
     targetLanguage: "zh-CN",
-    selectedRoles: ["hero", "benefit", "package"],
+    selectedRoles: ["hero", "benefit", "accessory-gift"],
   });
 
   const promptByRole = Object.fromEntries(plan.items.map((item) => [item.role, item.prompt]));
 
   assert.doesNotMatch(promptByRole.hero, /Description: 1 \/ 创口贴\*20片 \/ 2/u);
-  assert.doesNotMatch(promptByRole.package, /Description: 配置清单：\./u);
+  assert.doesNotMatch(promptByRole["accessory-gift"], /Description: 配置清单：\./u);
   assert.match(promptByRole.benefit, /创口贴\*20片|PBT绷带|烧伤敷料|止血带/u);
-  assert.match(promptByRole.package, /创口贴\*20片|5\*450cmPBT绷带|7\.5\*450cmPBT绷带/u);
+  assert.match(promptByRole["accessory-gift"], /创口贴\*20片|5\*450cmPBT绷带|7\.5\*450cmPBT绷带/u);
 });
 
 test("creation planner keeps complete first aid inventory facts for package images", () => {
@@ -351,7 +533,7 @@ test("creation planner keeps complete first aid inventory facts for package imag
     productDescription,
     sellingPoints: "",
     targetLanguage: "en",
-    selectedRoles: ["hero", "package"],
+    selectedRoles: ["hero", "accessory-gift"],
     referenceImageRoles: [
       {
         filename: "kit-checklist.png",
@@ -361,7 +543,7 @@ test("creation planner keeps complete first aid inventory facts for package imag
     ],
   });
 
-  const packagePrompt = plan.items.find((item) => item.role === "package").prompt;
+  const packagePrompt = plan.items.find((item) => item.role === "accessory-gift").prompt;
 
   assert.match(packagePrompt, /Small Bandage\*80/);
   assert.match(packagePrompt, /PBT Bandage\*2 \(Medium\)/);
@@ -394,42 +576,32 @@ test("creation planner gives concrete ecommerce role intent to scene, seeding, m
     productDescription: "Segmented lifelike lure with scale texture, steel treble hooks, and flexible tail action",
     sellingPoints: "fish ignore basic lures\nsharp hooks\ndurable material",
     targetLanguage: "en",
-    selectedRoles: ["benefit", "scene", "social-proof", "usage-steps", "material-closeup"],
+    selectedRoles: ["benefit", "scene", "atmosphere", "usage-suggestion", "product-detail"],
   });
 
   const promptByRole = Object.fromEntries(plan.items.map((item) => [item.role, item.prompt]));
 
-  assert.match(promptByRole.benefit, /pain-point-driven benefit image/);
+  assert.match(promptByRole.benefit, /core selling-point image/);
   assert.match(promptByRole.benefit, /shopper pain points/);
   assert.match(promptByRole.benefit, /resolved benefit visually/);
-  assert.match(promptByRole.scene, /photorealistic product-in-use scene/);
+  assert.match(promptByRole.scene, /real-life usage scene image/);
   assert.match(promptByRole.scene, /being pursued or struck by a fish/);
-  assert.match(promptByRole["social-proof"], /social-feed product recommendation image/);
-  assert.match(promptByRole["social-proof"], /real adult person or angler/);
-  assert.match(promptByRole["social-proof"], /preserve the exact reference product as the unchanged sellable subject/);
-  assert.match(promptByRole["social-proof"], /same lure silhouette, segment count, head direction, tail shape, paint pattern, eye placement, fin shapes, hook hangers, split rings, tow eye, belly treble hooks, and tail hook hardware/);
-  assert.match(promptByRole["social-proof"], /People, fish, hands, rods, line, water, logos, and text may appear as supporting marketing context/);
-  assert.match(promptByRole["social-proof"], /Show a real hooked fish only when its mouth, lip, or jaw is visibly biting an existing belly or tail treble hook from the reference lure/);
-  assert.match(promptByRole["social-proof"], /Clearly show one visible point of that original treble hook embedded in the fish mouth, lip, or jaw/);
-  assert.match(promptByRole["social-proof"], /Do not replace the treble hook with a separate single hook/);
-  assert.match(promptByRole["social-proof"], /Keep the lure body outside or beside the fish mouth/);
-  assert.match(promptByRole["social-proof"], /Do not invent a new hook, top hook, back hook, mouth ring, extra split ring, or new attachment point/);
-  assert.match(promptByRole["social-proof"], /must not replace, redesign, duplicate, hide, cover, recolor, resize, or move any visible part of the reference lure/);
-  assert.match(promptByRole["social-proof"], /Do not turn the lure into a real fish or a different lure SKU/);
-  assert.match(promptByRole["social-proof"], /one short selling-point headline from the provided selling points/);
-  assert.doesNotMatch(promptByRole["social-proof"], /caught fish merely posed beside the lure/);
-  assert.match(promptByRole["usage-steps"], /Preserve the supplied reference product as the unchanged subject/);
-  assert.match(promptByRole["usage-steps"], /do not redesign the lure body, paint pattern, segments, tail, hooks, lip, blade, or hardware/);
-  assert.match(promptByRole["usage-steps"], /keep belly and tail treble hooks hanging from their original underside and tail hangers/);
-  assert.match(promptByRole["usage-steps"], /never relocate hooks or hangers onto the top, back, side, fish mouth, or hand/);
-  assert.match(promptByRole["usage-steps"], /attach the fishing line through the exact visible line-tie, tow eye, or split ring already present on the reference lure/);
-  assert.match(promptByRole["usage-steps"], /if the reference lure uses a front\/nose tow eye ahead of the diving lip, use that front\/nose tow eye/);
-  assert.match(promptByRole["usage-steps"], /do not assume or add a top\/back ring unless it is already visible in the reference/);
-  assert.match(promptByRole["usage-steps"], /do not tie the line to the body, eye, hook hanger, belly, tail, mouth, propeller, diving lip, blade, or an invented ring/);
-  assert.match(promptByRole["usage-steps"], /do not add a hook, loose connector, or extra ring at the lure mouth or back/);
-  assert.match(promptByRole["material-closeup"], /multi-window material detail image/);
-  assert.match(promptByRole["material-closeup"], /several small inset detail panes/);
-  assert.match(promptByRole["material-closeup"], /texture, finish, joints, edges/);
+  assert.match(promptByRole.atmosphere, /lifestyle atmosphere image/);
+  assert.match(promptByRole.atmosphere, /feel desirable in a lifestyle environment/);
+  assert.match(promptByRole.atmosphere, /recognizable and commercially inspectable/);
+  assert.match(promptByRole["usage-suggestion"], /usage recommendation image with numbered step diagrams/);
+  assert.match(promptByRole["usage-suggestion"], /Preserve the supplied reference product as the unchanged subject/);
+  assert.match(promptByRole["usage-suggestion"], /do not redesign the lure body, paint pattern, segments, tail, hooks, lip, blade, or hardware/);
+  assert.match(promptByRole["usage-suggestion"], /keep belly and tail treble hooks hanging from their original underside and tail hangers/);
+  assert.match(promptByRole["usage-suggestion"], /never relocate hooks or hangers onto the top, back, side, fish mouth, or hand/);
+  assert.match(promptByRole["usage-suggestion"], /attach the fishing line through the exact visible line-tie, tow eye, or split ring already present on the reference lure/);
+  assert.match(promptByRole["usage-suggestion"], /if the reference lure uses a front\/nose tow eye ahead of the diving lip, use that front\/nose tow eye/);
+  assert.match(promptByRole["usage-suggestion"], /do not assume or add a top\/back ring unless it is already visible in the reference/);
+  assert.match(promptByRole["usage-suggestion"], /do not tie the line to the body, eye, hook hanger, belly, tail, mouth, propeller, diving lip, blade, or an invented ring/);
+  assert.match(promptByRole["usage-suggestion"], /do not add a hook, loose connector, or extra ring at the lure mouth or back/);
+  assert.match(promptByRole["product-detail"], /product detail image/);
+  assert.match(promptByRole["product-detail"], /local close-up panes, macro crops, and callout labels/);
+  assert.match(promptByRole["product-detail"], /surfaces, edges, structure, controls, or finish quality/);
 });
 
 test("creation planner injects Simplified Chinese target-language guidance", () => {
@@ -482,7 +654,7 @@ test("creation planner defaults to English copy and metric-plus-imperial specs",
     productName: "Jointed fishing lure",
     productDescription: "Segmented swim bait",
     sellingPoints: "realistic finish",
-    selectedRoles: ["dimensions"],
+    selectedRoles: ["size-capacity-fit"],
     dimensionSpecs: "13cm/35g",
   });
 
@@ -555,7 +727,7 @@ test("creation planner expands ecommerce scenario sets to eight images", () => {
   assert.equal(plan.scenarioLabel, "详情页转化");
   assert.deepEqual(
     plan.items.map((item) => item.role),
-    ["hero", "benefit", "scene", "detail-trust", "comparison", "social-proof", "package", "promotion"],
+    ["hero", "benefit", "scene", "multi-angle", "atmosphere", "product-detail", "brand-story", "size-capacity-fit"],
   );
   assert.ok(plan.items.every((item) => item.prompt.includes("Detail-page conversion scenario")));
   assert.ok(plan.items.every((item) => item.prompt.includes("Use concise English marketing copy")));
@@ -580,21 +752,21 @@ test("creation planner expands ecommerce scenario sets to twelve images", () => 
       "hero",
       "benefit",
       "scene",
-      "detail-trust",
-      "comparison",
-      "social-proof",
-      "package",
-      "promotion",
-      "material-closeup",
-      "usage-steps",
-      "dimensions",
-      "review-qa",
+      "multi-angle",
+      "atmosphere",
+      "product-detail",
+      "brand-story",
+      "size-capacity-fit",
+      "effect-comparison",
+      "spec-table",
+      "craft-process",
+      "accessory-gift",
     ],
   );
   assert.ok(plan.items.every((item) => item.prompt.includes("Live commerce scenario")));
-  assert.ok(plan.items.some((item) => item.prompt.includes("multi-window material detail")));
-  assert.ok(plan.items.some((item) => item.prompt.includes("how to use")));
-  assert.ok(plan.items.some((item) => item.prompt.includes("dimensions")));
+  assert.ok(plan.items.some((item) => item.prompt.includes("local close-ups or macro views")));
+  assert.ok(plan.items.some((item) => item.prompt.includes("production-process image")));
+  assert.ok(plan.items.some((item) => item.prompt.includes("dimension, capacity")));
 });
 
 test("creation planner appends distinct SKU images after twelve carousel roles", () => {
@@ -631,15 +803,15 @@ test("creation planner appends distinct SKU images after twelve carousel roles",
     "hero",
     "benefit",
     "scene",
-    "detail-trust",
-    "comparison",
-    "social-proof",
-    "package",
-    "promotion",
-    "material-closeup",
-    "usage-steps",
-    "dimensions",
-    "review-qa",
+    "multi-angle",
+    "atmosphere",
+    "product-detail",
+    "brand-story",
+    "size-capacity-fit",
+    "effect-comparison",
+    "spec-table",
+    "craft-process",
+    "accessory-gift",
   ]);
   assert.deepEqual(skuItems.map((item) => item.role), ["sku", "sku", "sku"]);
   assert.deepEqual(skuItems.map((item) => item.slotIndex), [13, 14, 15]);
@@ -652,7 +824,7 @@ test("creation planner appends distinct SKU images after twelve carousel roles",
   assert.match(skuItems[2].prompt, /red-white-bg\.png/);
 });
 
-test("creation planner defaults suite generation to eighteen carousel images", () => {
+test("creation planner defaults suite generation to sixteen carousel images", () => {
   const plan = buildCreationPlan({
     productName: "Travel bottle",
     productDescription: "Leakproof travel bottle with carry loop and silicone seal.",
@@ -660,39 +832,61 @@ test("creation planner defaults suite generation to eighteen carousel images", (
     targetLanguage: "en",
   });
 
-  assert.equal(normalizeCreationImageCount("99"), 18);
-  assert.equal(plan.imageCount, 18);
+  assert.equal(normalizeCreationImageCount("99"), 16);
+  assert.equal(plan.imageCount, 16);
   assert.deepEqual(plan.items.map((item) => item.role), CREATION_ITEM_ROLES.map((role) => role.role));
 });
 
-test("creation planner supports additional ecommerce image types with dedicated rules", () => {
+test("creation planner treats sixteen-image suites as a selectable ten-image upload candidate pool", () => {
+  const plan = buildCreationPlan({
+    productName: "Golf cocktail graphic tee",
+    productDescription:
+      "Oversized heavyweight cotton T-shirt with vintage screen print, course-to-club lifestyle, wash texture, size chart, care guide, colorways, packaging stickers, and return guarantee.",
+    sellingPoints:
+      "100% natural cotton\nheavyweight washed denim blue\nvintage screen print\nrelaxed summer golf outfit\ncustom stickers and dust bag",
+    targetLanguage: "en",
+    imageCount: "16",
+  });
+  const promptByRole = Object.fromEntries(plan.items.map((item) => [item.role, item.prompt]));
+
+  assert.equal(plan.imageCount, 16);
+  assert.match(promptByRole.hero, /16-image suite is a candidate pool/i);
+  assert.match(promptByRole.hero, /choose the strongest 10/i);
+  assert.match(promptByRole.hero, /Core upload candidate/i);
+  assert.match(promptByRole["spec-table"], /Core upload candidate/i);
+  assert.match(promptByRole["craft-process"], /Backup candidate/i);
+  assert.match(promptByRole["usage-suggestion"], /alternative or replacement angle/i);
+  assert.doesNotMatch(promptByRole.hero, /Backup candidate/i);
+});
+
+test("creation planner supports the refactored ecommerce image types with dedicated rules", () => {
   const roleValues = CREATION_ITEM_ROLES.map((role) => role.role);
-  assert.ok(roleValues.includes("feature-callout"));
-  assert.ok(roleValues.includes("variant-matrix"));
-  assert.ok(roleValues.includes("compatibility"));
-  assert.ok(roleValues.includes("care-guide"));
+  assert.ok(roleValues.includes("multi-angle"));
+  assert.ok(roleValues.includes("craft-process"));
+  assert.ok(roleValues.includes("series-showcase"));
+  assert.ok(roleValues.includes("ingredient-material"));
   assert.ok(roleValues.includes("brand-story"));
-  assert.ok(roleValues.includes("image-decomposition"));
-  assert.ok(!roleValues.includes("certification-proof"));
-  assert.equal(CREATION_ITEM_ROLES.find((role) => role.role === "image-decomposition")?.title, "图片拆解图");
+  assert.ok(!roleValues.includes("image-decomposition"));
+  assert.ok(!roleValues.includes("feature-callout"));
+  assert.equal(CREATION_ITEM_ROLES.find((role) => role.role === "ingredient-material")?.title, "商品成分图");
 
   const plan = buildCreationPlan({
     productName: "Modular desk lamp",
     productDescription: "LED desk lamp with adjustable arm, USB-C power, replaceable diffuser, desk clamp compatibility, factory test card, and maker craft notes.",
     sellingPoints: "stable clamp, three brightness levels, replaceable diffuser, easy cleaning, tested wiring, workshop-built hinge",
     targetLanguage: "en",
-    selectedRoles: ["feature-callout", "variant-matrix", "compatibility", "care-guide", "brand-story", "image-decomposition"],
+    selectedRoles: ["craft-process", "series-showcase", "spec-table", "usage-suggestion", "brand-story", "ingredient-material"],
   });
 
-  assert.deepEqual(plan.selectedRoles, ["feature-callout", "variant-matrix", "compatibility", "care-guide", "brand-story", "image-decomposition"]);
-  assert.match(plan.items.find((item) => item.role === "feature-callout").prompt, /exploded feature callout/i);
-  assert.match(plan.items.find((item) => item.role === "variant-matrix").prompt, /variant matrix/i);
-  assert.match(plan.items.find((item) => item.role === "compatibility").prompt, /compatibility fit/i);
-  assert.match(plan.items.find((item) => item.role === "care-guide").prompt, /care and maintenance/i);
+  assert.deepEqual(plan.selectedRoles, ["craft-process", "series-showcase", "spec-table", "usage-suggestion", "brand-story", "ingredient-material"]);
+  assert.match(plan.items.find((item) => item.role === "craft-process").prompt, /production-process image/i);
+  assert.match(plan.items.find((item) => item.role === "series-showcase").prompt, /series display image/i);
+  assert.match(plan.items.find((item) => item.role === "spec-table").prompt, /legible parameter table/i);
+  assert.match(plan.items.find((item) => item.role === "usage-suggestion").prompt, /numbered step diagrams/i);
   assert.match(plan.items.find((item) => item.role === "brand-story").prompt, /brand story/i);
-  assert.match(plan.items.find((item) => item.role === "image-decomposition").prompt, /annotated component breakdown poster/i);
-  assert.doesNotMatch(plan.items.find((item) => item.role === "image-decomposition").prompt, /certification and trust proof/i);
-  assert.doesNotMatch(plan.items.find((item) => item.role === "image-decomposition").prompt, /certification marks|warranty promises|lab-style badges/i);
+  assert.match(plan.items.find((item) => item.role === "ingredient-material").prompt, /ingredient or material composition visualization/i);
+  assert.doesNotMatch(plan.items.find((item) => item.role === "ingredient-material").prompt, /certification and trust proof/i);
+  assert.match(plan.items.find((item) => item.role === "ingredient-material").prompt, /Do not invent formula percentages, lab claims, or certification marks/i);
 });
 
 test("creation planner applies SKU generation rules for package-list content and dimensions", () => {
@@ -1062,7 +1256,7 @@ test("creation planner does not create SKU images for accessory or package refer
 });
 
 test("creation planner uses selected ecommerce role set when provided", () => {
-  const selectedRoles = normalizeCreationSelectedRoles(["usage-steps", "hero", "unknown", "dimensions", "hero"]);
+  const selectedRoles = normalizeCreationSelectedRoles(["usage-suggestion", "hero", "unknown", "size-capacity-fit", "hero"]);
   const plan = buildCreationPlan({
     productName: "AeroPress Clear",
     productDescription: "Transparent portable coffee brewer",
@@ -1075,13 +1269,13 @@ test("creation planner uses selected ecommerce role set when provided", () => {
 
   assert.deepEqual(
     selectedRoles.map((role) => role.role),
-    ["usage-steps", "hero", "dimensions"],
+    ["usage-suggestion", "hero", "size-capacity-fit"],
   );
   assert.equal(plan.imageCount, 3);
-  assert.deepEqual(plan.selectedRoles, ["usage-steps", "hero", "dimensions"]);
+  assert.deepEqual(plan.selectedRoles, ["usage-suggestion", "hero", "size-capacity-fit"]);
   assert.deepEqual(
     plan.items.map((item) => item.role),
-    ["usage-steps", "hero", "dimensions"],
+    ["usage-suggestion", "hero", "size-capacity-fit"],
   );
   assert.deepEqual(
     plan.items.map((item) => item.slotIndex),
@@ -1096,14 +1290,14 @@ test("creation planner only injects selected size specifications into the dimens
     productDescription: "Transparent portable coffee brewer",
     sellingPoints: "lightweight, easy to clean",
     targetLanguage: "en",
-    selectedRoles: ["hero", "comparison", "dimensions"],
+    selectedRoles: ["hero", "effect-comparison", "size-capacity-fit"],
     dimensionSpecs: "Height 145mm\nDiameter 110mm\nCapacity 350ml",
     dimensionUnitMode: "metric",
   });
 
   const heroPrompt = plan.items.find((item) => item.role === "hero").prompt;
-  const comparisonPrompt = plan.items.find((item) => item.role === "comparison").prompt;
-  const dimensionsPrompt = plan.items.find((item) => item.role === "dimensions").prompt;
+  const comparisonPrompt = plan.items.find((item) => item.role === "effect-comparison").prompt;
+  const dimensionsPrompt = plan.items.find((item) => item.role === "size-capacity-fit").prompt;
 
   assert.equal(plan.dimensionSpecs, "Height 145mm");
   assert.match(dimensionsPrompt, /Dimension specifications for this size chart only: Height 145mm\./);
@@ -1120,7 +1314,7 @@ test("creation planner converts dimension specs to the selected unit mode", () =
     productDescription: "Transparent portable coffee brewer",
     sellingPoints: "lightweight, easy to clean",
     targetLanguage: "en",
-    selectedRoles: ["dimensions"],
+    selectedRoles: ["size-capacity-fit"],
     dimensionSpecs: "Height 5.7 in\nDiameter 4.3 in\nCapacity 12 fl oz",
     dimensionUnitMode: "metric",
   });
@@ -1129,7 +1323,7 @@ test("creation planner converts dimension specs to the selected unit mode", () =
     productDescription: "Transparent portable coffee brewer",
     sellingPoints: "lightweight, easy to clean",
     targetLanguage: "en",
-    selectedRoles: ["dimensions"],
+    selectedRoles: ["size-capacity-fit"],
     dimensionSpecs: "Height 14.5 cm\nCapacity 350 ml",
     dimensionUnitMode: "both",
   });
@@ -1149,7 +1343,7 @@ test("creation planner converts compact metric weight specs in selected unit mod
     productDescription: "Segmented swim bait",
     sellingPoints: "realistic finish",
     targetLanguage: "en",
-    selectedRoles: ["dimensions"],
+    selectedRoles: ["size-capacity-fit"],
     dimensionSpecs: "13cm/35g",
     dimensionUnitMode: "both",
   });
@@ -1163,7 +1357,7 @@ test("creation planner applies selected unit mode to dimensions recognized from 
     productDescription: "Segmented swim bait",
     sellingPoints: "realistic finish",
     targetLanguage: "en",
-    selectedRoles: ["hero", "dimensions"],
+    selectedRoles: ["hero", "size-capacity-fit"],
     dimensionUnitMode: "both",
     referenceImageRoles: [
       {
@@ -1175,7 +1369,7 @@ test("creation planner applies selected unit mode to dimensions recognized from 
   });
 
   const heroPrompt = plan.items.find((item) => item.role === "hero").prompt;
-  const dimensionsPrompt = plan.items.find((item) => item.role === "dimensions").prompt;
+  const dimensionsPrompt = plan.items.find((item) => item.role === "size-capacity-fit").prompt;
 
   assert.equal(plan.dimensionUnitMode, "both");
   assert.match(dimensionsPrompt, /Dimension specifications recognized from reference notes/);
@@ -1195,7 +1389,7 @@ test("creation planner locks decimal backpack weight and Chinese height width de
     productDescription: "Outdoor dual-shoulder backpack",
     sellingPoints: "large capacity, waterproof nylon, handheld shoulder backpack",
     targetLanguage: "en",
-    selectedRoles: ["hero", "dimensions"],
+    selectedRoles: ["hero", "size-capacity-fit"],
     dimensionUnitMode: "both",
     referenceImageRoles: [
       {
@@ -1207,7 +1401,7 @@ test("creation planner locks decimal backpack weight and Chinese height width de
   });
 
   const heroPrompt = plan.items.find((item) => item.role === "hero").prompt;
-  const dimensionsPrompt = plan.items.find((item) => item.role === "dimensions").prompt;
+  const dimensionsPrompt = plan.items.find((item) => item.role === "size-capacity-fit").prompt;
 
   assert.equal(
     plan.dimensionSpecs,
@@ -1228,7 +1422,7 @@ test("creation planner dedupes noisy reference-derived dimensions and stores sel
     productDescription: "Segmented electric lure with LED light and two treble hooks",
     sellingPoints: "realistic finish",
     targetLanguage: "en",
-    selectedRoles: ["package", "promotion", "dimensions", "review-qa"],
+    selectedRoles: ["accessory-gift", "after-sales", "size-capacity-fit", "after-sales"],
     dimensionUnitMode: "both",
     referenceImageRoles: [
       {
@@ -1249,9 +1443,9 @@ test("creation planner dedupes noisy reference-derived dimensions and stores sel
     ],
   });
 
-  const dimensionsPrompt = plan.items.find((item) => item.role === "dimensions").prompt;
+  const dimensionsPrompt = plan.items.find((item) => item.role === "size-capacity-fit").prompt;
   const nonDimensionPrompts = plan.items
-    .filter((item) => item.role !== "dimensions")
+    .filter((item) => item.role !== "size-capacity-fit")
     .map((item) => item.prompt);
 
   assert.equal(
@@ -1279,7 +1473,7 @@ test("creation planner prefers dimensions reference values over incidental image
     productDescription: "Segmented electric lure",
     sellingPoints: "realistic finish",
     targetLanguage: "en",
-    selectedRoles: ["hero", "dimensions"],
+    selectedRoles: ["hero", "size-capacity-fit"],
     dimensionUnitMode: "both",
     referenceImageRoles: [
       {
@@ -1300,7 +1494,7 @@ test("creation planner prefers dimensions reference values over incidental image
     ],
   });
 
-  const dimensionsPrompt = plan.items.find((item) => item.role === "dimensions").prompt;
+  const dimensionsPrompt = plan.items.find((item) => item.role === "size-capacity-fit").prompt;
 
   assert.equal(
     plan.dimensionSpecs,
@@ -1317,7 +1511,7 @@ test("creation planner reserves product analyst-note specifications for the dime
     productDescription: "Segmented swim bait",
     sellingPoints: "realistic finish",
     targetLanguage: "en",
-    selectedRoles: ["hero", "comparison", "scene", "dimensions"],
+    selectedRoles: ["hero", "effect-comparison", "scene", "size-capacity-fit"],
     dimensionUnitMode: "both",
     referenceImageRoles: [
       {
@@ -1329,9 +1523,9 @@ test("creation planner reserves product analyst-note specifications for the dime
   });
 
   const nonDimensionPrompts = plan.items
-    .filter((item) => item.role !== "dimensions")
+    .filter((item) => item.role !== "size-capacity-fit")
     .map((item) => item.prompt);
-  const dimensionsPrompt = plan.items.find((item) => item.role === "dimensions").prompt;
+  const dimensionsPrompt = plan.items.find((item) => item.role === "size-capacity-fit").prompt;
 
   assert.match(dimensionsPrompt, /Dimension specifications recognized from reference notes/);
   assert.match(dimensionsPrompt, /Length 130mm \(5\.12 in\) \/ Weight 35g \(1\.23 oz\)/);
@@ -1355,7 +1549,7 @@ test("creation planner carries exact lure specification table values into dimens
     productDescription: "Multi-section bionic swim bait with two treble hooks",
     sellingPoints: "realistic fish profile",
     targetLanguage: "zh-CN",
-    selectedRoles: ["hero", "dimensions"],
+    selectedRoles: ["hero", "size-capacity-fit"],
     dimensionUnitMode: "metric",
     referenceImageRoles: [
       {
@@ -1367,7 +1561,7 @@ test("creation planner carries exact lure specification table values into dimens
   });
 
   const heroPrompt = plan.items.find((item) => item.role === "hero").prompt;
-  const dimensionsPrompt = plan.items.find((item) => item.role === "dimensions").prompt;
+  const dimensionsPrompt = plan.items.find((item) => item.role === "size-capacity-fit").prompt;
 
   assert.match(dimensionsPrompt, /长度 13cm/);
   assert.match(dimensionsPrompt, /重量 42g/);
@@ -1382,7 +1576,7 @@ test("creation planner limits recognized lure specs to length height width depth
     productDescription: "Segmented bionic swim bait with hooks",
     sellingPoints: "realistic finish",
     targetLanguage: "en",
-    selectedRoles: ["hero", "dimensions"],
+    selectedRoles: ["hero", "size-capacity-fit"],
     dimensionUnitMode: "both",
     referenceImageRoles: [
       {
@@ -1394,7 +1588,7 @@ test("creation planner limits recognized lure specs to length height width depth
   });
 
   const heroPrompt = plan.items.find((item) => item.role === "hero").prompt;
-  const dimensionsPrompt = plan.items.find((item) => item.role === "dimensions").prompt;
+  const dimensionsPrompt = plan.items.find((item) => item.role === "size-capacity-fit").prompt;
 
   assert.equal(
     plan.dimensionSpecs,
@@ -1413,13 +1607,13 @@ test("creation planner removes model hook capacity and other non-size facts from
     productDescription: "Multi-section bionic swim bait",
     sellingPoints: "realistic finish",
     targetLanguage: "en",
-    selectedRoles: ["dimensions"],
+    selectedRoles: ["size-capacity-fit"],
     dimensionUnitMode: "both",
     dimensionSpecs:
       "Model F4J16, Length 13cm, Width 2cm, Height 3cm, Weight 42g, Hook Size 2#, Capacity 350 ml, Sinking Rate 0.5m/s",
   });
 
-  const dimensionsPrompt = plan.items.find((item) => item.role === "dimensions").prompt;
+  const dimensionsPrompt = plan.items.find((item) => item.role === "size-capacity-fit").prompt;
 
   assert.equal(
     plan.dimensionSpecs,
@@ -1439,22 +1633,22 @@ test("creation planner exposes scenario-specific role presets", () => {
       "hero",
       "benefit",
       "scene",
-      "usage-steps",
-      "detail-trust",
-      "comparison",
-      "promotion",
-      "social-proof",
-      "review-qa",
-      "dimensions",
+      "usage-suggestion",
+      "product-detail",
+      "effect-comparison",
+      "accessory-gift",
+      "after-sales",
+      "spec-table",
+      "size-capacity-fit",
     ],
   );
   assert.deepEqual(
     getCreationScenarioRolePreset("marketplace-search").map((role) => role.role),
-    ["hero", "benefit", "comparison", "dimensions", "material-closeup", "review-qa"],
+    ["hero", "benefit", "effect-comparison", "size-capacity-fit", "product-detail", "spec-table"],
   );
   assert.deepEqual(
     getCreationScenarioRolePreset("unknown").map((role) => role.role),
-    ["hero", "benefit", "scene", "detail-trust"],
+    ["hero", "benefit", "scene", "multi-angle"],
   );
 });
 
@@ -1473,7 +1667,7 @@ test("creation planner applies industry templates to default role sets and promp
   assert.equal(plan.industryTemplateLabel, "美妆个护");
   assert.deepEqual(
     plan.selectedRoles,
-    ["hero", "benefit", "material-closeup", "usage-steps", "detail-trust", "social-proof", "package", "review-qa"],
+    ["hero", "benefit", "product-detail", "usage-suggestion", "ingredient-material", "atmosphere", "accessory-gift", "after-sales"],
   );
   assert.ok(plan.items.every((item) => item.prompt.includes("Beauty and personal care industry template")));
   assert.ok(plan.items.every((item) => item.prompt.includes("texture, swatches, skincare use, packaging, and benefit hierarchy")));
@@ -1492,7 +1686,7 @@ test("creation planner applies fourth-level category templates to role presets a
   assert.equal(plan.industryTemplate, "category:C06-001-001-001");
   assert.equal(plan.industryTemplateLabel, "智能手机");
   assert.equal(plan.industryTemplatePath, "数码电子 > 手机通讯 > 手机 > 智能手机");
-  assert.deepEqual(plan.selectedRoles.slice(0, 4), ["hero", "benefit", "dimensions", "usage-steps"]);
+  assert.deepEqual(plan.selectedRoles.slice(0, 4), ["hero", "benefit", "size-capacity-fit", "usage-suggestion"]);
   assert.ok(
     plan.items.every((item) =>
       item.prompt.includes("Ecommerce category path: 数码电子 > 手机通讯 > 手机 > 智能手机"),
@@ -1502,7 +1696,7 @@ test("creation planner applies fourth-level category templates to role presets a
 });
 
 test("creation planner applies category role prompt instructions to matching set images", () => {
-  const selectedRoles = ["hero", "scene", "detail-trust", "dimensions", "usage-steps"];
+  const selectedRoles = ["hero", "scene", "product-detail", "size-capacity-fit", "usage-suggestion"];
   const plan = buildCreationPlan({
     productName: "Pocket X1",
     productDescription: "智能手机，OLED 屏幕，长续航",
@@ -1526,14 +1720,14 @@ test("creation planner applies category role prompt instructions to matching set
     selectedRoles.every((role) => categoryStrategy.every((strategy) => promptByRole[role].includes(strategy))),
   );
   assert.match(promptByRole.scene, /通勤手持|桌面办公/);
-  assert.match(promptByRole["detail-trust"], /摄像头模组/);
-  assert.match(promptByRole["detail-trust"], /屏幕边框/);
-  assert.match(promptByRole.dimensions, /机身厚度/);
-  assert.match(promptByRole.dimensions, /握持尺度/);
-  assert.match(promptByRole["usage-steps"], /拍摄/);
-  assert.match(promptByRole["usage-steps"], /游戏/);
-  assert.match(promptByRole["usage-steps"], /充电/);
-  assert.match(promptByRole["usage-steps"], /连接/);
+  assert.match(promptByRole["product-detail"], /摄像头模组/);
+  assert.match(promptByRole["product-detail"], /屏幕边框/);
+  assert.match(promptByRole["size-capacity-fit"], /机身厚度/);
+  assert.match(promptByRole["size-capacity-fit"], /握持尺度/);
+  assert.match(promptByRole["usage-suggestion"], /拍摄/);
+  assert.match(promptByRole["usage-suggestion"], /游戏/);
+  assert.match(promptByRole["usage-suggestion"], /充电/);
+  assert.match(promptByRole["usage-suggestion"], /连接/);
   assert.deepEqual(
     plan.items.filter((item) => /通勤手持|桌面办公/.test(item.prompt)).map((item) => item.role),
     ["scene"],
@@ -1549,7 +1743,7 @@ test("creation planner normalizes supported industry templates", () => {
   assert.equal(normalizeCreationIndustryTemplate("unknown").value, "general");
   assert.deepEqual(
     getCreationIndustryRolePreset("electronics").map((role) => role.role),
-    ["hero", "benefit", "dimensions", "usage-steps", "detail-trust", "comparison", "package", "review-qa"],
+    ["hero", "benefit", "spec-table", "usage-suggestion", "product-detail", "effect-comparison", "accessory-gift", "after-sales"],
   );
   assert.deepEqual(getCreationIndustryRolePreset("general"), []);
 });
@@ -1568,7 +1762,7 @@ test("creation planner fills larger industry template sets with remaining ecomme
   assert.equal(plan.industryTemplate, "electronics");
   assert.deepEqual(
     plan.selectedRoles.slice(0, 8),
-    ["hero", "benefit", "dimensions", "usage-steps", "detail-trust", "comparison", "package", "review-qa"],
+    ["hero", "benefit", "spec-table", "usage-suggestion", "product-detail", "effect-comparison", "accessory-gift", "after-sales"],
   );
   assert.equal(new Set(plan.selectedRoles).size, 12);
 });
@@ -1580,7 +1774,7 @@ test("creation planner adds role-specific guidance inside each marketing scenari
     sellingPoints: "lightweight, easy to clean, stable taste",
     targetLanguage: "en",
     scenario: "livestream",
-    selectedRoles: ["usage-steps", "promotion"],
+    selectedRoles: ["usage-suggestion", "after-sales"],
   });
   const marketplacePlan = buildCreationPlan({
     productName: "AeroPress Clear",
@@ -1588,7 +1782,7 @@ test("creation planner adds role-specific guidance inside each marketing scenari
     sellingPoints: "lightweight, easy to clean, stable taste",
     targetLanguage: "en",
     scenario: "marketplace-search",
-    selectedRoles: ["hero", "comparison"],
+    selectedRoles: ["hero", "effect-comparison"],
   });
   const socialSeedingPlan = buildCreationPlan({
     productName: "Jointed fishing lure",
@@ -1596,45 +1790,38 @@ test("creation planner adds role-specific guidance inside each marketing scenari
     sellingPoints: "lifelike finish, sharp hooks, durable material",
     targetLanguage: "en",
     scenario: "social-seeding",
-    selectedRoles: ["social-proof"],
+    selectedRoles: ["atmosphere"],
   });
 
   assert.match(
-    livestreamPlan.items.find((item) => item.role === "usage-steps").prompt,
+    livestreamPlan.items.find((item) => item.role === "usage-suggestion").prompt,
     /host-ready demonstration sequence/,
   );
   assert.match(
-    livestreamPlan.items.find((item) => item.role === "promotion").prompt,
-    /limited-time offer callout/,
+    livestreamPlan.items.find((item) => item.role === "after-sales").prompt,
+    /answer common live-room questions quickly/,
   );
   assert.match(
     marketplacePlan.items.find((item) => item.role === "hero").prompt,
     /thumbnail-first listing image/,
   );
   assert.match(
-    marketplacePlan.items.find((item) => item.role === "comparison").prompt,
+    marketplacePlan.items.find((item) => item.role === "effect-comparison").prompt,
     /crowded search result pages/,
   );
   assert.match(
-    socialSeedingPlan.items.find((item) => item.role === "social-proof").prompt,
-    /product-centered feed recommendation/,
+    socialSeedingPlan.items.find((item) => item.role === "atmosphere").prompt,
+    /mood, environment, and lifestyle aspiration/,
   );
   assert.match(
-    socialSeedingPlan.items.find((item) => item.role === "social-proof").prompt,
-    /real adult person or angler/,
+    socialSeedingPlan.items.find((item) => item.role === "atmosphere").prompt,
+    /without hiding it/,
   );
   assert.doesNotMatch(
-    socialSeedingPlan.items.find((item) => item.role === "social-proof").prompt,
+    socialSeedingPlan.items.find((item) => item.role === "atmosphere").prompt,
     /believable user recommendation/,
   );
-  assert.match(
-    socialSeedingPlan.items.find((item) => item.role === "social-proof").prompt,
-    /supporting marketing context/,
-  );
-  assert.match(
-    socialSeedingPlan.items.find((item) => item.role === "social-proof").prompt,
-    /real hooked fish/,
-  );
+  assert.doesNotMatch(socialSeedingPlan.items.find((item) => item.role === "atmosphere").prompt, /real hooked fish/);
   assert.match(getCreationScenarioRoleInstruction("unknown", "hero"), /selected ecommerce scenario/);
 });
 
@@ -1645,25 +1832,25 @@ test("creation planner normalizes supported scenario and image count options", (
   assert.equal(normalizeCreationImageCount("12"), 12);
   assert.equal(normalizeCreationImageCount("14"), 14);
   assert.equal(normalizeCreationImageCount("16"), 16);
-  assert.equal(normalizeCreationImageCount("18"), 18);
-  assert.equal(normalizeCreationImageCount("99"), 18);
+  assert.equal(normalizeCreationImageCount("18"), 16);
+  assert.equal(normalizeCreationImageCount("99"), 16);
   assert.equal(normalizeCreationScenario("social-seeding").value, "social-seeding");
   assert.equal(normalizeCreationScenario("livestream").value, "livestream");
   assert.equal(normalizeCreationScenario("gift-guide").value, "gift-guide");
   assert.equal(normalizeCreationScenario("unknown").value, "standard");
 });
 
-test("creation planner supports full eighteen-image suites", () => {
+test("creation planner supports full sixteen-image suites", () => {
   const plan = buildCreationPlan({
     productName: "Modular desk lamp",
     productDescription: "LED desk lamp with adjustable arm, USB-C power, replaceable diffuser, compatibility notes, care card, brand story, and visible component breakdown notes.",
     sellingPoints: "stable clamp, three brightness levels, replaceable diffuser, easy cleaning, tested wiring, workshop-built hinge",
     targetLanguage: "en",
-    imageCount: "18",
+    imageCount: "16",
   });
 
-  assert.equal(plan.imageCount, 18);
-  assert.equal(plan.items.length, 18);
+  assert.equal(plan.imageCount, 16);
+  assert.equal(plan.items.length, 16);
   assert.deepEqual(plan.items.map((item) => item.role), CREATION_ITEM_ROLES.map((role) => role.role));
 });
 
@@ -1727,7 +1914,7 @@ test("creation planner locks the selected reference subject as the set-wide prim
     productDescription: "Outdoor backpack image set with multiple color references",
     sellingPoints: "breathable back panel, waterproof fabric, large capacity",
     targetLanguage: "en",
-    selectedRoles: ["hero", "feature-callout", "brand-story", "image-decomposition"],
+    selectedRoles: ["hero", "craft-process", "brand-story", "ingredient-material"],
     referenceImageRoles: [
       { filename: "blue-backpack.png", role: "product", note: "Blue variant product subject." },
       { filename: "black-backpack.png", role: "product", note: "Black variant product subject." },
@@ -1860,7 +2047,7 @@ test("creation reference analysis classifies size-spec references as dimensions 
       sku_subjects: [
         {
           id: "lure-size-card",
-          title: "尺寸规格图",
+          title: "尺寸参数参考图",
           filenames: ["lure-size-card.png"],
           note: "长度 130mm、重量 35g。",
         },
@@ -1979,27 +2166,27 @@ test("creation reference analysis treats product-labeled feature selling-point c
       reference_roles: [
         {
           index: 1,
-          filename: "lure-feature-callout.png",
+          filename: "lure-structure-callout.png",
           role: "product",
           note: "用于锁定该鱼形分节路亚的功能卖点外观，包括自带钢珠、带充电电池、旋转螺旋桨和内置LED灯的结构表现。",
         },
       ],
       sku_subjects: [
         {
-          id: "lure-feature-callout",
-          title: "功能卖点图",
-          filenames: ["lure-feature-callout.png"],
+          id: "lure-structure-callout",
+          title: "结构细节参考图",
+          filenames: ["lure-structure-callout.png"],
           note: "功能卖点、钢珠、电池、螺旋桨和LED结构。",
         },
       ],
       risks: [],
     },
-    ["lure-feature-callout.png"],
+    ["lure-structure-callout.png"],
   );
 
   assert.deepEqual(
     analysis.recommendations.map((entry) => [entry.filename, entry.role, entry.roleLabel]),
-    [["lure-feature-callout.png", "material", "结构细节"]],
+    [["lure-structure-callout.png", "material", "结构细节"]],
   );
   assert.deepEqual(analysis.skuSubjects, []);
 });
@@ -2052,7 +2239,7 @@ test("creation reference analysis classifies other size-spec references as dimen
       sku_subjects: [
         {
           id: "lure-size-card",
-          title: "尺寸规格图",
+          title: "尺寸参数参考图",
           filenames: ["lure-size-card.png"],
           note: "长度 130mm、重量 35g。",
         },

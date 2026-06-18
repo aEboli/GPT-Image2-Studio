@@ -59,7 +59,7 @@
 ## 10. Expanded Creation Sets And Scenarios
 
 - [x] 10.1 Add failing tests for 10/12-image Creation Mode sets and expanded marketing scenarios.
-- [x] 10.2 Extend local creation planning to support material close-up, usage steps, dimensions, and review/Q&A image roles.
+- [x] 10.2 Extend local creation planning to support the refactored 16 Creation Mode image roles and 4-16 quick counts.
 - [x] 10.3 Add local Creation Mode UI options and compact guidance for expanded image counts and scenarios.
 
 ## 11. Creation Role Selection

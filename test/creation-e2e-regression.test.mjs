@@ -123,7 +123,7 @@ function makeCreationForm(overrides = {}) {
   formData.set("scenario", "detail-page");
   formData.set("visualLanguage", "lifestyle-editorial");
   formData.set("industryTemplate", "beauty");
-  formData.set("selectedRoles", JSON.stringify(["hero", "benefit", "package", "review-qa"]));
+  formData.set("selectedRoles", JSON.stringify(["hero", "benefit", "accessory-gift", "after-sales"]));
   formData.set(
     "referenceImageRoles",
     JSON.stringify([{ filename: "front.png", role: "product", note: "manual historical binding" }]),
@@ -356,11 +356,11 @@ test("creation workflow reuses history, reuploads references, tweaks prompts, re
   assert.match(generatedSet.items[1].prompt, /Shared visual language:/);
   assert.match(generatedSet.items[1].prompt, /lifestyle magazine editorial/);
   assert.ok(generatedSet.items[0].relativePath);
-  assert.match(generatedSet.items[0].filename, /^01-主图-\d{6}-主图-\d{6}-[a-z0-9]{4}\.png$/u);
-  assert.match(generatedSet.items[1].filename, /^02-卖点图-\d{6}-卖点图-\d{6}-[a-z0-9]{4}\.png$/u);
-  assert.match(generatedSet.items[2].filename, /^03-包装清单图-\d{6}-包装清单图-\d{6}-[a-z0-9]{4}\.png$/u);
-  assert.match(generatedSet.items[3].filename, /^04-口碑问答图-\d{6}-口碑问答图-\d{6}-[a-z0-9]{4}\.png$/u);
-  assert.doesNotMatch(generatedSet.items.map((item) => item.filename).join("\n"), /\b(?:hero|benefit|package|review|qa)\b/i);
+  assert.match(generatedSet.items[0].filename, /^01-首屏主视觉-\d{6}-[^-]+-\d{6}-[a-z0-9]{4}\.png$/u);
+  assert.match(generatedSet.items[1].filename, /^02-核心卖点图-\d{6}-[^-]+-\d{6}-[a-z0-9]{4}\.png$/u);
+  assert.match(generatedSet.items[2].filename, /^03-配件赠品图-\d{6}-[^-]+-\d{6}-[a-z0-9]{4}\.png$/u);
+  assert.match(generatedSet.items[3].filename, /^04-售后保障图-\d{6}-[^-]+-\d{6}-[a-z0-9]{4}\.png$/u);
+  assert.doesNotMatch(generatedSet.items.map((item) => item.filename).join("\n"), /\b(?:hero|benefit|accessory|gift|after|sales)\b/i);
 
   const listResponse = await fetch(`${baseUrl}/api/creation/sets`);
   assert.equal(listResponse.status, 200);

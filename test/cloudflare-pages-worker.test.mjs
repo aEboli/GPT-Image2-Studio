@@ -513,7 +513,7 @@ test("Cloudflare creation filenames use Chinese image type names", async () => {
   formData.set("imageCount", "4");
   formData.set("scenario", "standard");
   formData.set("industryTemplate", "general");
-  formData.set("selectedRoles", JSON.stringify(["hero", "review-qa"]));
+  formData.set("selectedRoles", JSON.stringify(["hero", "after-sales"]));
   formData.set("ratio", "1:1");
   formData.set("size", "1024x1024");
   formData.set("format", "png");
@@ -537,9 +537,9 @@ test("Cloudflare creation filenames use Chinese image type names", async () => {
   const filenames = complete.payload.set.items.map((item) => item.filename).join("\n");
 
   assert.equal(response.status, 200);
-  assert.match(complete.payload.set.items[0].filename, /^01-主图-cloudflare-/u);
-  assert.match(complete.payload.set.items[1].filename, /^02-口碑问答图-cloudflare-/u);
-  assert.doesNotMatch(filenames, /(?:^|-)hero(?:-|\.|$)|(?:^|-)review(?:-|\.|$)|(?:^|-)qa(?:-|\.|$)|ewqa/i);
+  assert.match(complete.payload.set.items[0].filename, /^01-首屏主视觉-cloudflare-/u);
+  assert.match(complete.payload.set.items[1].filename, /^02-售后保障图-cloudflare-/u);
+  assert.doesNotMatch(filenames, /(?:^|-)hero(?:-|\.|$)|(?:^|-)after(?:-|\.|$)|(?:^|-)sales(?:-|\.|$)/i);
   assert.equal(imageBucket.objects.size, 2);
 });
 

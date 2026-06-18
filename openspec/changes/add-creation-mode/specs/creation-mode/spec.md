@@ -12,26 +12,26 @@ The system SHALL expose Creation Mode as a separate tab under the creation works
 - **THEN** the prompt-mode activity feed and default gallery-visible history are not updated as if the images were prompt-mode single-image jobs
 
 ### Requirement: Creation Mode generates configurable ecommerce sets
-The system SHALL generate one set for one product with quick presets of 4, 6, 8, 10, 12, 14, 16, or 18 ecommerce marketing roles and SHALL allow the user to customize which of the 18 image roles are generated for the current set, including brand story and image decomposition roles. The system SHALL also allow the user to choose an industry template for general ecommerce, apparel, beauty, food, consumer electronics, home/living products, or a searchable fourth-level ecommerce category template. The system SHALL support a set-level visual-language selector that defaults to `classic-commercial` and keeps the generated set visually consistent across lighting, tone, material treatment, realism level, and brand atmosphere. When the user uses a preset without custom role changes and no non-general industry template is selected, the first four roles SHALL remain hero image, benefit image, lifestyle scene, and detail/trust image.
+The system SHALL generate one set for one product with quick presets of 4, 6, 8, 10, 12, 14, or 16 ecommerce marketing roles and SHALL allow the user to customize which of the 16 image roles are generated for the current set: hero, benefit, scene, multi-angle, atmosphere, product detail, brand story, size/capacity/fit, effect comparison, specification table, craft process, accessory/gift, series showcase, ingredient/material, after-sales, and usage suggestion. The system SHALL also allow the user to choose an industry template for general ecommerce, apparel, beauty, food, consumer electronics, home/living products, or a searchable fourth-level ecommerce category template. The system SHALL support a set-level visual-language selector that defaults to `classic-commercial` and keeps the generated set visually consistent across lighting, tone, material treatment, realism level, and brand atmosphere. When the user uses a preset without custom role changes and no non-general industry template is selected, the first four roles SHALL remain hero image, benefit image, usage scene, and multi-angle image.
 
 #### Scenario: User starts a creation set
 - **WHEN** the user submits product information and a target language in Creation Mode
 - **THEN** the system creates the selected number of planned image items
-- **AND** the first four items use hero, benefit, scene, and detail/trust roles
+- **AND** the first four items use hero, benefit, scene, and multi-angle roles
 - **AND** generation requests use only the references relevant to the current image role instead of attaching the full uploaded reference set to every image
 
 #### Scenario: User selects eight images
 - **WHEN** the user starts a Creation Mode set with 8 selected
-- **THEN** the planned set includes comparison, social proof, package, and promotion roles after the first four ecommerce roles
+- **THEN** the planned set includes atmosphere, product-detail, brand-story, and size/capacity/fit roles after the first four ecommerce roles
 
 #### Scenario: User selects twelve images
 - **WHEN** the user starts a Creation Mode set with 12 selected
-- **THEN** the planned set includes material close-up, usage steps, dimensions, and review/Q&A roles after the first eight ecommerce roles
+- **THEN** the planned set includes effect comparison, specification table, craft process, and accessory/gift roles after the first eight ecommerce roles
 
 #### Scenario: User adds SKU images from distinct product references
 - **WHEN** Creation reference analysis identifies distinct sellable product subjects from uploaded white-background product images
 - **THEN** the planned set appends one SKU image item for each distinct sellable product subject after the selected carousel roles
-- **AND** SKU image items do not count against the selected 4, 6, 8, 10, 12, 14, 16, or 18 carousel image count
+- **AND** SKU image items do not count against the selected 4, 6, 8, 10, 12, 14, or 16 carousel image count
 - **AND** accessory-only, package-only, material-only, scene, and style references do not create standalone SKU image items
 - **AND** each SKU prompt changes the background while preserving the subject shape, colors, markings, identifiers, and existing product logos
 - **AND** if the user uploaded a Logo reference, each SKU prompt also applies that supplied logo without covering existing product identifiers

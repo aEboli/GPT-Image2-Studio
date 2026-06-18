@@ -33,10 +33,10 @@ const demoSet = {
       relativePath: "",
     },
     {
-      itemId: "4-detail-trust",
+      itemId: "4-multi-angle",
       status: "completed",
-      filename: "04-trust.png",
-      relativePath: "2026-05/05-06/2026-05-06-creation/demo/04-trust.png",
+      filename: "04-multi-angle.png",
+      relativePath: "2026-05/05-06/2026-05-06-creation/demo/04-multi-angle.png",
     },
   ],
 };

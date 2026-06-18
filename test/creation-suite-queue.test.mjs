@@ -173,22 +173,20 @@ test("creation suite queue rebuilds items when draft roles differ from current s
     "hero",
     "benefit",
     "scene",
-    "detail-trust",
-    "comparison",
-    "social-proof",
-    "package",
-    "promotion",
-    "material-closeup",
-    "usage-steps",
-    "dimensions",
-    "review-qa",
-    "feature-callout",
-    "variant-matrix",
-    "compatibility",
-    "care-guide",
+    "multi-angle",
+    "atmosphere",
+    "product-detail",
     "brand-story",
+    "size-capacity-fit",
+    "effect-comparison",
+    "spec-table",
+    "craft-process",
+    "accessory-gift",
+    "series-showcase",
+    "ingredient-material",
+    "after-sales",
   ];
-  const selectedRoles = [...staleRoles, "image-decomposition"];
+  const selectedRoles = [...staleRoles, "usage-suggestion"];
   const staleDraft = {
     setId: "creation-draft-stale",
     items: staleRoles.map((role, index) => ({
@@ -212,10 +210,10 @@ test("creation suite queue rebuilds items when draft roles differ from current s
       selectedRoles.map((role, index) => ({
         itemId: `${index + 1}-${role}`,
         role,
-        title: role === "image-decomposition" ? "图片拆解图" : role,
+        title: role,
       })),
     getCreationSelectedDimensionUnitMode: () => "both",
-    getCreationSelectedImageCount: () => 18,
+    getCreationSelectedImageCount: () => 16,
     getCreationSelectedIndustryTemplate: () => ({ value: "general", label: "General", categoryPath: "" }),
     getCreationSelectedLanguage: () => ({ value: "en", label: "English" }),
     getCreationSelectedRoles: () => selectedRoles,
@@ -235,9 +233,9 @@ test("creation suite queue rebuilds items when draft roles differ from current s
     sellingPoints: [],
   });
 
-  assert.equal(set.imageCount, 18);
+  assert.equal(set.imageCount, 16);
   assert.deepEqual(set.items.map((item) => item.role), selectedRoles);
-  assert.equal(set.items.at(-1).title, "图片拆解图");
+  assert.equal(set.items.at(-1).title, "usage-suggestion");
 });
 
 test("creation suite queue falls back to normalized visual language labels", () => {

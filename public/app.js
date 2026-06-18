@@ -33,9 +33,10 @@ import {
 import { createPptAnalysisController } from "/lib/ppt-analysis-client.mjs?v=20260527-density-overlap-1";
 import { appendPptDeckDownloadLinks } from "/lib/ppt-record-links.mjs";
 import { buildCreationSkuSubjectsForPayload, normalizeCreationSkuBundleCountForPayload, normalizeCreationSkuSubjectForPayload } from "/lib/creation-sku-subjects.mjs";
+import { buildCreationReferenceLightboxItem } from "/lib/creation-reference-lightbox.mjs";
 import { bindCreationReferenceDrag, reorderCreationReferenceFiles } from "/lib/creation-reference-drag.mjs";
 import { isCreationSubjectReferenceRole } from "/lib/creation-reference-roles.mjs";
-import { appendCreationVisualLanguageSuggestionCard, buildCreationReferenceAnalysisAppliedFeedbackMessage, getCreationReferenceAnalysisDisplayRoleLabel, getCreationReferenceAnalysisGroupedSubjectUnitCount, getCreationReferenceAnalysisRoleCorrectionReason, getCreationReferenceAnalysisVisualLanguageReason, getCreationReferenceAnalysisVisualLanguageSource, normalizeCreationReferenceAnalysisUnitCountNote, shouldDowngradeReferenceProductAnalysisRole, syncCreationReferenceVisualLanguageButton } from "/lib/creation-reference-analysis-view.mjs";
+import { appendCreationVisualLanguageSuggestionCard, applyCreationReferenceAnalysisProductNameValue, buildCreationReferenceAnalysisAppliedFeedbackMessage, buildCreationReferenceAnalysisCategoryMatchText, getCreationReferenceAnalysisDisplayRoleLabel, getCreationReferenceAnalysisGroupedSubjectUnitCount, getCreationReferenceAnalysisRoleCorrectionReason, getCreationReferenceAnalysisVisualLanguageReason, getCreationReferenceAnalysisVisualLanguageSource, normalizeCreationReferenceAnalysisUnitCountNote, shouldDowngradeReferenceProductAnalysisRole, syncCreationReferenceVisualLanguageButton } from "/lib/creation-reference-analysis-view.mjs";
 import { createCreationListingController, getCreationRecordListingMetaLabel, getCreationListingSearchValues, normalizeCreationListingDraftForView, renderCreationListingDrafts } from "/lib/creation-listing-view.mjs";
 import { getCreationAutoRepairNotice, getCreationCompletionFeedback, getCreationIncompleteItems, shouldAutoRepairCreationSet } from "/lib/creation-auto-repair.mjs";
 import { canRepairCreationItem as canRepairCreationItemFromQueue, getCreationRepairButtonText as getCreationRepairButtonTextFromQueue, isCreationItemRepairActive as isCreationItemRepairActiveInQueue, queueCreationItemRepair as queueCreationItemRepairInState, removeQueuedCreationItemRepair, shiftNextQueuedCreationItemRepair } from "/lib/creation-item-repair-queue.mjs";
@@ -454,6 +455,7 @@ const state = {
     applied: false,
     collapsed: false,
     dirty: false,
+    productNameSuggestion: "",
     result: null,
     running: false,
   },
@@ -859,6 +861,7 @@ const refs = {
   lightboxTime: document.querySelector("#lightboxTime"),
   lightboxActualSizeButton: document.querySelector("#lightboxActualSizeButton"),
   lightboxFitButton: document.querySelector("#lightboxFitButton"),
+  lightboxViewerControls: document.querySelector(".lightbox-viewer-controls"),
   lightboxZoomInButton: document.querySelector("#lightboxZoomInButton"),
   lightboxZoomLabel: document.querySelector("#lightboxZoomLabel"),
   lightboxZoomOutButton: document.querySelector("#lightboxZoomOutButton"),
@@ -1980,6 +1983,9 @@ function setLightboxOpen(open) {
   refs.lightbox.classList.toggle("hidden", !open);
   refs.lightbox.classList.toggle("open", open);
   refs.lightbox.setAttribute("aria-hidden", String(!open));
+  if (!open) {
+    refs.lightbox.classList.remove("is-image-only-preview");
+  }
 }
 
 function resetPromptCopyFeedback() {
@@ -2022,6 +2028,7 @@ function syncLightboxCreationRecordActions(fresh = {}) {
   const isCreationRecordItem = Boolean(fresh.isCreationRecordItem);
   const isArticleRecordItem = Boolean(fresh.isArticleRecordItem);
   const isRecordItem = isCreationRecordItem || isArticleRecordItem;
+  const isImageOnlyPreview = Boolean(fresh.isImageOnlyLightboxItem);
   const hasRelativePath = Boolean(String(fresh.relativePath || "").trim());
 
   refs.lightboxCopyPathButton?.classList.toggle("hidden", !isCreationRecordItem);
@@ -2033,8 +2040,8 @@ function syncLightboxCreationRecordActions(fresh = {}) {
     refs.lightboxCopyFullPathButton.disabled = !isCreationRecordItem || !hasRelativePath;
   }
   if (refs.lightboxDelete) {
-    refs.lightboxDelete.hidden = Boolean(isRecordItem);
-    refs.lightboxDelete.disabled = isRecordItem || !fresh.filename;
+    refs.lightboxDelete.hidden = Boolean(isRecordItem || isImageOnlyPreview);
+    refs.lightboxDelete.disabled = isRecordItem || isImageOnlyPreview || !fresh.filename;
   }
 }
 
@@ -5341,13 +5348,14 @@ function closeLightbox() {
 function syncLightboxItem() {
   if (!state.lightboxItem) {
     refs.copyPromptButton.disabled = true;
+    refs.lightbox.classList.remove("is-image-only-preview");
     resetPromptCopyFeedback();
     syncLightboxCreationRecordActions();
     resetLightboxViewer();
     return;
   }
 
-  const shouldResolveLightboxItem = !state.lightboxItem.isCreationRecordItem;
+  const shouldResolveLightboxItem = !state.lightboxItem.isCreationRecordItem && !state.lightboxItem.isImageOnlyLightboxItem;
   const fresh =
     (shouldResolveLightboxItem && state.lightboxItem.filename && state.gallery.find((item) => item.filename === state.lightboxItem.filename)) ||
     (shouldResolveLightboxItem && state.lightboxItem.id && state.jobs.find((job) => job.id === state.lightboxItem.id)) ||
@@ -5355,6 +5363,7 @@ function syncLightboxItem() {
 
   const imageUrl = getImageUrl(fresh);
   state.lightboxItem = fresh;
+  refs.lightbox.classList.toggle("is-image-only-preview", Boolean(fresh.isImageOnlyLightboxItem));
   refs.lightboxModel.textContent = formatImageModelLabel(fresh.imageModel);
   refs.lightboxTime.textContent = formatTime(fresh.createdAt);
   refs.lightboxId.textContent = `ID: ${getDisplayId(fresh)}`;
@@ -7339,7 +7348,7 @@ const CREATION_ITEM_STATUS_LABELS = {
   planning: "待开始",
 };
 
-const CREATION_PREVIEW_SLOTS = "1-hero|hero|主图|商品清晰居中，适合作为首图;2-benefit|benefit|卖点图|突出 1-2 个核心卖点;3-scene|scene|场景图|展示真实使用环境、比例和使用方式;4-detail-trust|detail-trust|详情信任图|强调材质、结构、包装或品质证明;5-comparison|comparison|对比图|让商品优势一眼可比;6-social-proof|social-proof|种草图|适合社媒与口碑分享语境;7-package|package|包装清单图|说明包装、配件和到手内容;8-promotion|promotion|活动图|突出优惠、限时和购买理由;9-material-closeup|material-closeup|材质细节图|放大纹理、工艺和品质细节;10-usage-steps|usage-steps|使用步骤图|用步骤降低理解和使用门槛;11-dimensions|dimensions|尺寸规格图|呈现尺寸、容量和兼容信息;12-review-qa|review-qa|口碑问答图|回答购买前常见疑虑;13-feature-callout|feature-callout|功能拆解图|拆解关键功能、结构和购买理由;14-variant-matrix|variant-matrix|变体矩阵图|整理颜色、尺寸、套装或 SKU 选择;15-compatibility|compatibility|适配兼容图|说明适配对象、兼容范围和选择依据;16-care-guide|care-guide|保养维护图|展示清洁、收纳、替换或维护步骤;17-brand-story|brand-story|品牌故事图|呈现品牌理念、工艺来源和使用价值;18-image-decomposition|image-decomposition|图片拆解图|按图片拆解模式标注可见结构、部件、材质和外部功能".split(";").map((entry) => { const [itemId, role, title, brief] = entry.split("|"); return { itemId, role, title, brief }; });
+const CREATION_PREVIEW_SLOTS = "1-hero|hero|首屏主视觉|产品居中占画面主体，主标题+副标题传递核心价值主张;2-benefit|benefit|核心卖点图|产品居中，3 个核心优势用标签/徽章指向对应部位;3-scene|scene|使用场景图|产品融入真实生活场景，标题+副标题营造使用氛围;4-multi-angle|multi-angle|多角度图|3-4 个角度排列，干净背景，不含任何文字;5-atmosphere|atmosphere|场景氛围图|氛围感环境中的产品，lifestyle 风格，垂画感染力;6-product-detail|product-detail|商品细节图|产品局部特写/微距，标注指向具体细节部位;7-brand-story|brand-story|品牌故事图|品牌理念文案为主，主标题融合品牌名+定位;8-size-capacity-fit|size-capacity-fit|尺寸/容量/尺码图|产品+参照物对比，用标注线+数据标注具体尺寸;9-effect-comparison|effect-comparison|效果对比图|左右分屏或上下分屏对比，用不同颜色标签区分;10-spec-table|spec-table|详细规格/参数表|表格形式，表头用强调色背景，参数行黑色文字;11-craft-process|craft-process|工艺制作图|展示生产工艺/制作过程，标注关键工艺步骤;12-accessory-gift|accessory-gift|配件/赠品图|所有配件平铺展示，每个配件旁标注名称;13-series-showcase|series-showcase|系列展示图|多色/多 SKU 排列展示，标注各款式名称或色号;14-ingredient-material|ingredient-material|商品成分图|成分/材质可视化展示，用图标+文字说明;15-after-sales|after-sales|售后保障图|质保/退换政策图标化，用图标+简短文字;16-usage-suggestion|usage-suggestion|使用建议图|使用步骤图示，编号+简短说明".split(";").map((entry) => { const [itemId, role, title, brief] = entry.split("|"); return { itemId, role, title, brief }; });
 
 const CREATION_SCENARIO_LABELS = { standard: "标准电商", "detail-page": "详情页转化", "social-seeding": "社媒种草", launch: "新品发布", promotion: "活动促销", livestream: "直播电商", "gift-guide": "礼品推荐", "marketplace-search": "平台搜索", "brand-story": "品牌故事" };
 const CREATION_VISUAL_LANGUAGE_LABELS = { "classic-commercial": "经典商业摄影", "premium-studio": "高端棚拍", "reference-style": "参考模式", "clean-marketplace": "平台清爽白底", "lifestyle-editorial": "生活方式杂志", "social-ugc": "社媒实拍", "detail-infographic": "详情页信息图", "macro-material": "微距材质", "outdoor-context": "户外场景", "minimal-luxury": "极简奢华", "bold-campaign": "活动海报", "warm-handcrafted": "手作温度" };
@@ -7349,11 +7358,11 @@ const CREATION_SKU_GENERATION_RULE_LABELS = { none: "无", "package-list": "添�
 const CREATION_CATEGORY_TEMPLATE_MODULE_URL = "/lib/creation-category-templates.mjs?v=20260509-category-search-2";
 const CREATION_BASE_INDUSTRY_TEMPLATE_OPTIONS = [
   { value: "general", label: "通用电商", categoryPath: "", rolePreset: [] },
-  { value: "apparel", label: "服饰鞋包", categoryPath: "", rolePreset: ["hero", "scene", "material-closeup", "dimensions", "benefit", "social-proof", "review-qa", "promotion"] },
-  { value: "beauty", label: "美妆个护", categoryPath: "", rolePreset: ["hero", "benefit", "material-closeup", "usage-steps", "detail-trust", "social-proof", "package", "review-qa"] },
-  { value: "food", label: "食品饮料", categoryPath: "", rolePreset: ["hero", "benefit", "scene", "package", "material-closeup", "social-proof", "promotion", "review-qa"] },
-  { value: "electronics", label: "3C 数码", categoryPath: "", rolePreset: ["hero", "benefit", "dimensions", "usage-steps", "detail-trust", "comparison", "package", "review-qa"] },
-  { value: "home", label: "家居生活", categoryPath: "", rolePreset: ["hero", "scene", "dimensions", "material-closeup", "usage-steps", "benefit", "comparison", "review-qa"] },
+  { value: "apparel", label: "服饰鞋包", categoryPath: "", rolePreset: ["hero", "scene", "product-detail", "size-capacity-fit", "benefit", "multi-angle", "series-showcase", "after-sales"] },
+  { value: "beauty", label: "美妆个护", categoryPath: "", rolePreset: ["hero", "benefit", "product-detail", "usage-suggestion", "ingredient-material", "atmosphere", "accessory-gift", "after-sales"] },
+  { value: "food", label: "食品饮料", categoryPath: "", rolePreset: ["hero", "benefit", "scene", "accessory-gift", "ingredient-material", "atmosphere", "effect-comparison", "after-sales"] },
+  { value: "electronics", label: "3C 数码", categoryPath: "", rolePreset: ["hero", "benefit", "spec-table", "usage-suggestion", "product-detail", "effect-comparison", "accessory-gift", "after-sales"] },
+  { value: "home", label: "家居生活", categoryPath: "", rolePreset: ["hero", "scene", "size-capacity-fit", "product-detail", "usage-suggestion", "benefit", "effect-comparison", "after-sales"] },
 ];
 const CREATION_INDUSTRY_TEMPLATE_LABELS = Object.fromEntries(
   CREATION_BASE_INDUSTRY_TEMPLATE_OPTIONS.map((template) => [template.value, template.label]),
@@ -7362,55 +7371,55 @@ const CREATION_INDUSTRY_TEMPLATE_LEVEL_LABELS = ["一级类目", "二级类目",
 const CREATION_INDUSTRY_TEMPLATE_EMPTY_LABEL = "未选择四级类目";
 
 const CREATION_SCENARIO_ROLE_PRESETS = {
-  standard: ["hero", "benefit", "scene", "detail-trust"],
+  standard: ["hero", "benefit", "scene", "multi-angle"],
   "detail-page": [
     "hero",
     "benefit",
-    "detail-trust",
-    "material-closeup",
-    "dimensions",
-    "usage-steps",
-    "comparison",
-    "package",
+    "product-detail",
+    "size-capacity-fit",
+    "effect-comparison",
+    "spec-table",
+    "accessory-gift",
+    "usage-suggestion",
   ],
-  "social-seeding": ["hero", "scene", "social-proof", "benefit", "review-qa", "promotion"],
-  launch: ["hero", "benefit", "scene", "material-closeup", "package", "social-proof", "dimensions", "promotion"],
-  promotion: ["hero", "benefit", "comparison", "promotion", "package", "review-qa"],
+  "social-seeding": ["hero", "scene", "atmosphere", "benefit", "brand-story", "usage-suggestion"],
+  launch: ["hero", "benefit", "atmosphere", "multi-angle", "product-detail", "brand-story", "series-showcase", "accessory-gift"],
+  promotion: ["hero", "benefit", "effect-comparison", "after-sales", "accessory-gift", "usage-suggestion"],
   livestream: [
     "hero",
     "benefit",
     "scene",
-    "usage-steps",
-    "detail-trust",
-    "comparison",
-    "promotion",
-    "social-proof",
-    "review-qa",
-    "dimensions",
+    "usage-suggestion",
+    "product-detail",
+    "effect-comparison",
+    "accessory-gift",
+    "after-sales",
+    "spec-table",
+    "size-capacity-fit",
   ],
-  "gift-guide": ["hero", "package", "scene", "benefit", "social-proof", "review-qa"],
-  "marketplace-search": ["hero", "benefit", "comparison", "dimensions", "material-closeup", "review-qa"],
+  "gift-guide": ["hero", "accessory-gift", "scene", "benefit", "brand-story", "after-sales"],
+  "marketplace-search": ["hero", "benefit", "effect-comparison", "size-capacity-fit", "product-detail", "spec-table"],
   "brand-story": [
     "hero",
     "scene",
     "brand-story",
-    "material-closeup",
-    "package",
-    "detail-trust",
-    "image-decomposition",
-    "social-proof",
-    "usage-steps",
-    "review-qa",
+    "craft-process",
+    "ingredient-material",
+    "product-detail",
+    "atmosphere",
+    "series-showcase",
+    "usage-suggestion",
+    "after-sales",
   ],
 };
 
 const CREATION_INDUSTRY_ROLE_PRESETS = {
   general: [],
-  apparel: ["hero", "scene", "material-closeup", "dimensions", "benefit", "social-proof", "review-qa", "promotion"],
-  beauty: ["hero", "benefit", "material-closeup", "usage-steps", "detail-trust", "social-proof", "package", "review-qa"],
-  food: ["hero", "benefit", "scene", "package", "material-closeup", "social-proof", "promotion", "review-qa"],
-  electronics: ["hero", "benefit", "dimensions", "usage-steps", "detail-trust", "comparison", "package", "review-qa"],
-  home: ["hero", "scene", "dimensions", "material-closeup", "usage-steps", "benefit", "comparison", "review-qa"],
+  apparel: ["hero", "scene", "product-detail", "size-capacity-fit", "benefit", "multi-angle", "series-showcase", "after-sales"],
+  beauty: ["hero", "benefit", "product-detail", "usage-suggestion", "ingredient-material", "atmosphere", "accessory-gift", "after-sales"],
+  food: ["hero", "benefit", "scene", "accessory-gift", "ingredient-material", "atmosphere", "effect-comparison", "after-sales"],
+  electronics: ["hero", "benefit", "spec-table", "usage-suggestion", "product-detail", "effect-comparison", "accessory-gift", "after-sales"],
+  home: ["hero", "scene", "size-capacity-fit", "product-detail", "usage-suggestion", "benefit", "effect-comparison", "after-sales"],
 };
 
 const CREATION_REFERENCE_ROLE_OPTIONS = [
@@ -7430,8 +7439,8 @@ function getCreationReferenceRoleLabel(role) {
 }
 
 function getCreationSelectedImageCount() {
-  const value = Number.parseInt(refs.creationImageCountInput?.value || "18", 10);
-  return [4, 6, 8, 10, 12, 14, 16, 18].includes(value) ? value : 18;
+  const value = Number.parseInt(refs.creationImageCountInput?.value || "16", 10);
+  return [4, 6, 8, 10, 12, 14, 16].includes(value) ? value : 16;
 }
 
 function createEmptyCreationReferenceAnalysisState() {
@@ -7439,6 +7448,7 @@ function createEmptyCreationReferenceAnalysisState() {
     applied: false,
     collapsed: false,
     dirty: false,
+    productNameSuggestion: "",
     result: null,
     running: false,
   };
@@ -7889,8 +7899,8 @@ function setCreationImageCountValue(count) {
     return;
   }
 
-  const normalizedCount = Number(count) || 18;
-  refs.creationImageCountInput.value = [4, 6, 8, 10, 12, 14, 16, 18].includes(normalizedCount) ? String(normalizedCount) : "18";
+  const normalizedCount = Number(count) || 16;
+  refs.creationImageCountInput.value = [4, 6, 8, 10, 12, 14, 16].includes(normalizedCount) ? String(normalizedCount) : "16";
 }
 
 function getCreationSelectedScenario() {
@@ -7971,7 +7981,7 @@ function syncCreationSelectedRolesToCount() {
 function syncCreationSelectedRolesToScenario() {
   const selectedRoles = getCreationRecommendedRolePreset();
   state.creationSelectedRoles = selectedRoles;
-  if (refs.creationImageCountInput && [4, 6, 8, 10, 12, 14, 16, 18].includes(selectedRoles.length)) {
+  if (refs.creationImageCountInput && [4, 6, 8, 10, 12, 14, 16].includes(selectedRoles.length)) {
     refs.creationImageCountInput.value = String(selectedRoles.length);
   }
   resetCreationDraftPreview();
@@ -7980,7 +7990,7 @@ function syncCreationSelectedRolesToScenario() {
 function syncCreationSelectedRolesToIndustry() {
   const selectedRoles = getCreationRecommendedRolePreset();
   state.creationSelectedRoles = selectedRoles;
-  if (refs.creationImageCountInput && [4, 6, 8, 10, 12, 14, 16, 18].includes(selectedRoles.length)) {
+  if (refs.creationImageCountInput && [4, 6, 8, 10, 12, 14, 16].includes(selectedRoles.length)) {
     refs.creationImageCountInput.value = String(selectedRoles.length);
   }
   resetCreationDraftPreview();
@@ -9828,14 +9838,21 @@ function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
   card.appendChild(head);
 
   const imageUrl = getImageUrl(item);
-  const media = document.createElement(showRecordActions && imageUrl ? "button" : "div");
+  const isResultPreviewMedia = Boolean(imageUrl && !showRecordActions);
+  const media = document.createElement((showRecordActions || isResultPreviewMedia) && imageUrl ? "button" : "div");
   media.className = "creation-card-media";
   media.dataset.creationCardMedia = "true";
   if (showRecordActions && imageUrl) {
     media.type = "button";
     media.classList.add("creation-record-preview-media");
     media.dataset.creationRecordPreviewItemId = item.itemId;
+    media.dataset.creationRecordPreviewSetId = options.creationSetId || "";
     media.setAttribute("aria-label", `${item.title || "套图项"}查看大图`);
+  } else if (isResultPreviewMedia) {
+    media.type = "button";
+    media.classList.add("creation-result-preview-media");
+    media.dataset.creationPreviewItemId = item.itemId;
+    media.setAttribute("aria-label", `${item.title || "Creation item"} preview image`);
   }
 
   if (isLoadingCard) {
@@ -9947,6 +9964,7 @@ function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
     previewButton.className = "mini-action";
     previewButton.type = "button";
     previewButton.dataset.creationRecordPreviewItemId = item.itemId;
+    previewButton.dataset.creationRecordPreviewSetId = options.creationSetId || "";
     previewButton.textContent = "查看";
     previewButton.disabled = !imageUrl;
     previewButton.setAttribute("aria-label", `${itemTitle}查看大图`);
@@ -10186,8 +10204,24 @@ function buildCreationRecordLightboxItem(item, set) {
   };
 }
 
-function openCreationRecordItemPreview(itemId) {
-  const record = getCreationRecordItemById(itemId);
+function buildCreationCurrentLightboxItem(item = {}) {
+  const imageUrl = getImageUrl(item);
+  if (!imageUrl) return null;
+  const itemId = String(item.itemId || item.id || item.filename || "item").trim() || "item";
+  const relativeFilename = String(item.relativePath || "").split(/[\\/]/).filter(Boolean).pop() || "";
+  const filename = String(item.filename || relativeFilename || "creation-preview.png").trim() || "creation-preview.png";
+  return { ...item, id: `creation-current:${itemId}`, filename, imageUrl, thumbnailUrl: item.thumbnailUrl || imageUrl, prompt: "", isImageOnlyLightboxItem: true, };
+}
+
+function openCreationCurrentItemPreview(itemId) {
+  const item = getCreationCurrentSet()?.items?.find((entry) => entry.itemId === itemId);
+  const lightboxItem = buildCreationCurrentLightboxItem(item);
+  if (!lightboxItem) return;
+  openLightbox(lightboxItem);
+}
+
+function openCreationRecordItemPreview(itemId, setId = "") {
+  const record = getCreationRecordItemById(itemId, setId);
   if (!record?.item || !getImageUrl(record.item)) {
     setCreationRecordFeedback("当前单张还没有可查看的大图。", "error");
     return;
@@ -10443,19 +10477,18 @@ function renderCreationRecordView() {
   }
 
   const firstRecordSkuItem = selectedSet.items.find((item) => item.role === "sku");
-  selectedSet.items.forEach((item, index) => refs.creationRecordResultGrid.appendChild(createCreationCard(item, index, { showActions: false, showRecordActions: true, isSkuStart: item === firstRecordSkuItem })));
+  selectedSet.items.forEach((item, index) => refs.creationRecordResultGrid.appendChild(createCreationCard(item, index, { showActions: false, showRecordActions: true, creationSetId: selectedSet.setId, isSkuStart: item === firstRecordSkuItem })));
 }
 
 function openCreationReferencePreview(referenceId) {
   const item = state.creationReferenceFiles.find((entry) => entry.id === referenceId);
-  if (!item?.previewUrl) {
+  const lightboxItem = buildCreationReferenceLightboxItem(item);
+  if (!lightboxItem) {
     return;
   }
 
   state.creationReferencePreviewItem = item;
-  refs.referencePreviewImage.src = item.previewUrl;
-  refs.referencePreviewViewer.classList.add("open");
-  refs.referencePreviewViewer.setAttribute("aria-hidden", "false");
+  openLightbox(lightboxItem);
 }
 
 function openCreationStyleReferencePreview(referenceId) {
@@ -11102,8 +11135,32 @@ function setCreationReferenceAnalysisFeedback(message, kind = "") {
   syncCreationReferenceResetButton();
 }
 
+function setCreationReferenceProductNameValue(value) {
+  if (!refs.creationProductNameInput) {
+    return false;
+  }
+  const nextValue = String(value || "").trim();
+  if (refs.creationProductNameInput.value === nextValue) {
+    return false;
+  }
+  refs.creationProductNameInput.value = nextValue;
+  refs.creationProductNameInput.dispatchEvent(new Event("input", { bubbles: true }));
+  return true;
+}
+
+function clearCreationReferenceAnalysisProductNameSuggestion() {
+  const result = applyCreationReferenceAnalysisProductNameValue({
+    analysis: {},
+    currentProductName: refs.creationProductNameInput?.value || "",
+    previousAutoProductName: state.creationReferenceAnalysis.productNameSuggestion,
+  });
+  state.creationReferenceAnalysis.productNameSuggestion = result.autoProductName;
+  return setCreationReferenceProductNameValue(result.productName);
+}
+
 function markCreationReferenceAnalysisDirty() {
   invalidateCreationReferenceAnalysisRequest();
+  clearCreationReferenceAnalysisProductNameSuggestion();
   if (state.creationReferenceAnalysis.result) {
     state.creationReferenceAnalysis.applied = false;
     state.creationReferenceAnalysis.dirty = true;
@@ -11155,21 +11212,7 @@ function normalizeCreationReferenceAnalysisPayload(payload = {}) {
 }
 
 function getCreationReferenceAnalysisCategoryText(analysis = {}) {
-  const recommendationText = Array.isArray(analysis.recommendations)
-    ? analysis.recommendations.flatMap((entry) => [entry.filename, entry.roleLabel, entry.note])
-    : [];
-
-  return [
-    analysis.categoryHint,
-    analysis.categoryPath,
-    analysis.summary,
-    refs.creationProductNameInput?.value,
-    refs.creationProductDescriptionInput?.value,
-    refs.creationSellingPointsInput?.value,
-    ...recommendationText,
-  ]
-    .filter(Boolean)
-    .join(" ");
+  return buildCreationReferenceAnalysisCategoryMatchText(analysis);
 }
 
 async function applyCreationReferenceAnalysisCategoryMatch(analysis) {
@@ -11204,30 +11247,19 @@ async function applyCreationReferenceAnalysis(analysis) {
   return matchedTemplate;
 }
 
-function getCreationReferenceAnalysisProductNameSuggestion(analysis = {}) {
-  const templateLabel = String(analysis.categoryTemplateLabel || "").trim();
-  if (templateLabel) {
-    return templateLabel;
-  }
-
-  return (
-    String(analysis.categoryTemplatePath || analysis.categoryPath || "")
-      .split(">")
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .at(-1) || ""
-  );
-}
-
 function applyCreationReferenceAnalysisProductNameSuggestion(analysis = {}) {
-  const suggestion = getCreationReferenceAnalysisProductNameSuggestion(analysis);
-  if (!suggestion || !refs.creationProductNameInput) {
+  if (!refs.creationProductNameInput) {
     return false;
   }
 
-  refs.creationProductNameInput.value = suggestion;
-  refs.creationProductNameInput.dispatchEvent(new Event("input", { bubbles: true }));
-  return true;
+  const result = applyCreationReferenceAnalysisProductNameValue({
+    analysis,
+    currentProductName: refs.creationProductNameInput.value,
+    previousAutoProductName: state.creationReferenceAnalysis.productNameSuggestion,
+  });
+  state.creationReferenceAnalysis.productNameSuggestion = result.autoProductName;
+  setCreationReferenceProductNameValue(result.productName);
+  return result.applied;
 }
 
 function toggleCreationReferenceAnalysisPanel() {
@@ -15590,7 +15622,10 @@ function bindEvents() {
   refs.creationRecordResultGrid.addEventListener("click", (event) => {
     const previewButton = event.target.closest("[data-creation-record-preview-item-id]");
     if (previewButton) {
-      openCreationRecordItemPreview(previewButton.dataset.creationRecordPreviewItemId);
+      openCreationRecordItemPreview(
+        previewButton.dataset.creationRecordPreviewItemId,
+        previewButton.dataset.creationRecordPreviewSetId,
+      );
       return;
     }
   });
@@ -15788,6 +15823,12 @@ function bindEvents() {
     saveCreationItemDraft(itemId, textarea?.value || "");
   });
   refs.creationResultGrid.addEventListener("click", (event) => {
+    const previewButton = event.target.closest("[data-creation-preview-item-id]");
+    if (previewButton) {
+      openCreationCurrentItemPreview(previewButton.dataset.creationPreviewItemId);
+      return;
+    }
+
     const editButton = event.target.closest("[data-creation-edit-item-id]");
     if (editButton) {
       toggleCreationItemEditor(editButton.dataset.creationEditItemId);
