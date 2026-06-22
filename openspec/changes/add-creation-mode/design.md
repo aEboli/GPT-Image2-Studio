@@ -7,7 +7,7 @@ GPT-Image2-Studio currently has prompt-driven single image generation, PPT gener
 **Goals:**
 
 - Add a Creation Mode tab under the existing creation workspace.
-- Generate a fixed first-version set of four ecommerce marketing images for one product.
+- Generate configurable ecommerce carousel sets for one product using 4, 6, 8, 10, 12, 14, or 16 conversion-oriented image roles.
 - Support a target language selector that is injected into every generated marketing prompt.
 - Support a set-level visual-language selector so one generated set can vary image roles while sharing the same lighting, tonal treatment, material handling, and brand atmosphere.
 - Persist the creation set as a set-level manifest and persist generated images under `YYYY-MM-DD-creation/<set-folder>/`.
@@ -43,9 +43,9 @@ GPT-Image2-Studio currently has prompt-driven single image generation, PPT gener
    - Rationale: The user asked for data separation. Creation Mode records should be read through creation manifests, not mixed into the default gallery waterfall.
    - Alternative considered: show creation images in gallery with filters. This can be added later, but default mixing is out of scope.
 
-5. **Use fixed four-item planning for the first version.**
-   - Rationale: A fixed role set makes the workflow predictable and easier to verify: hero, benefit, scene, detail/trust.
-   - Alternative considered: user-configurable count and custom slots. This is deferred to avoid turning the first version into a full campaign designer.
+5. **Use stable role IDs with conversion-oriented labels and prompts.**
+   - Rationale: Creation Mode now supports 4/6/8/10/12/14/16 image sets, manual role selection, preview, repair, and record reuse. Keeping the existing 16 role IDs avoids manifest migration, while new Chinese labels and prompts make the set follow a normal ecommerce buying path: first-glance product understanding, information fusion, multi-scenario application, functional effect rendering, product proof, selection help, and final trust closing.
+   - Alternative considered: replace the role IDs or migrate old manifests to a new role model. This was rejected because existing records, preview edits, and repair flows already depend on the stable role IDs.
 
 6. **Treat saved record browsers as asset views.**
    - Rationale: Gallery output, waterfall browsing, PPT records, and Creation Mode set records are all saved assets, while the Creation Mode workspace should focus on the current in-progress set.
@@ -83,6 +83,14 @@ GPT-Image2-Studio currently has prompt-driven single image generation, PPT gener
    - Rationale: A Creation Mode set should look like one ecommerce asset family. The selected visual language anchors lighting, color grading, materials, realism level, and brand tone across every planned item, while item roles still control camera angle, composition, scene density, props, and information layout.
    - Alternative considered: reuse the existing strong style-transfer presets for each image. This was rejected because cyber, comic, watercolor, and similar art styles can break product fidelity and make the set feel like an inconsistent collage.
 
+15. **Add shopper-question and buyer-decision guidance as planner layers.**
+   - Rationale: Several expanded Creation Mode roles can otherwise read as fixed ecommerce templates: badge grids, angle sheets, icon rows, generic process timelines, or decorative lifestyle mood. The planner now injects a shopper question for every carousel role and adds buyer-decision guidance for conversion roles, so each image answers why a buyer would feel more ready to order while preserving the existing role, source-fact, visual-language, reference, SKU, and dimension constraints.
+   - Alternative considered: rely on role titles alone. This was rejected because titles improve selection, but prompts need explicit shopper-question guidance to keep generated images commercially useful.
+
+16. **Allow premium 3D/CGI where it improves promotional clarity, but reject rigid template output.**
+   - Rationale: Ecommerce sets often need high-end rendering for product mechanisms, effects, and polished campaign visuals. The scene role is now positioned as `适用多场景图` with 2-4 believable usage scenarios and advertising energy, while the effect comparison role is positioned as `功能效果渲染图` that can use premium 3D/CGI, cutaway-style overlays, motion trails, arrows, or effect paths when those visuals explain supplied product facts.
+   - Alternative considered: globally discourage 3D rendering. This was rejected because the issue is not rendering style itself; the issue is static, dead, template-like images without promotional force.
+
 ## Risks / Trade-offs
 
 - **Long-running generation can partially fail** -> Preserve saved items and mark the set `partial_failed`, with failed item errors visible.
@@ -94,3 +102,5 @@ GPT-Image2-Studio currently has prompt-driven single image generation, PPT gener
 - **Historical reference image binaries cannot be restored from manifests** -> Clear browser file inputs on record reuse and tell the user to re-upload originals when they want reference images in the next request.
 - **Saved reference role metadata can drift from current file inputs** -> Prefer current uploads for new requests, keep manifest role metadata visible, and mark missing historical files as requiring reupload before they participate in preview, generation, or repair.
 - **Visual variation can reduce set consistency** -> Keep the visual language on the set manifest and inject it as shared prompt guidance for every item, with the default `classic-commercial` preserving the previous behavior.
+- **Conversion guidance can over-soften factual roles** -> Keep buyer-decision prompts limited to roles that need art-direction or trust/desire framing, and leave hard information roles such as size/capacity/fit and specification tables governed by factual dimension and parameter constraints.
+- **Functional rendering can hallucinate mechanisms** -> Allow 3D/CGI and effect paths only as visualization of supplied facts, while preserving the existing ban on unsupported structures, numbers, certifications, and effects.

@@ -22,6 +22,7 @@ export const PUBLIC_LIB_SYNC_TARGETS = [
   "creation-reference-drag.mjs",
   "creation-reference-lightbox.mjs",
   "creation-reference-roles.mjs",
+  "creation-reference-coverage.mjs",
   "creation-reference-analysis-view.mjs",
   "creation-listing-view.mjs",
   "creation-suite-queue.mjs",

@@ -72,7 +72,7 @@ import {
 } from "./lib/gallery-store.mjs";
 import { normalizeBase64, requestDirectImageGeneration, requestImageEdit, requestImageGeneration, requestModelProtocolImageGeneration } from "./lib/responses-workflow.mjs";
 import { mergeRequestPrivateConfig } from "./lib/request-private-config.mjs";
-import { IMAGE_ROUTE_B, IMAGE_ROUTE_C, getSelectedImageGenerationConfig, getSelectedTextVisionConfig } from "./lib/image-route-config.mjs";
+import { IMAGE_ROUTE_B, IMAGE_ROUTE_C, getSelectedImageGenerationConfig, getSelectedPromptAgentAnalysisConfig, getSelectedTextVisionConfig } from "./lib/image-route-config.mjs";
 import { fetchAvailableModels } from "./lib/model-list-client.mjs";
 import { createGenerationTaskStore } from "./lib/generation-task-store.mjs";
 import { createSessionTaskSlotLimiter } from "./lib/generation-task-slots.mjs";
@@ -146,7 +146,6 @@ import {
   buildPortraitPlan,
 } from "./lib/portrait-planner.mjs";
 import {
-  buildPortraitItemFilename,
   buildPortraitRelativeDir,
   createPortraitSetStore,
 } from "./lib/portrait-store.mjs";
@@ -1512,7 +1511,7 @@ async function handlePromptAgentAnalyze(request, response) {
   }
 
   const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
-  const textVisionConfig = getSelectedTextVisionConfig(config);
+  const textVisionConfig = getSelectedPromptAgentAnalysisConfig(config);
   if (!textVisionConfig.apiKey) {
     return sendJson(response, 400, {
       message: "当前未保存 API Key，请先在配置中保存。",
@@ -1529,12 +1528,14 @@ async function handlePromptAgentAnalyze(request, response) {
     baseUrl: textVisionConfig.baseUrl,
     endpointPath: textVisionConfig.endpointPath,
     apiKey: textVisionConfig.apiKey,
+    imageRoute: textVisionConfig.imageRoute,
     image: images[0],
     images,
     mode,
     targetLanguage: targetLanguageInput,
     targetLanguageLabel: targetLanguageLabelInput,
     responsesModel: textVisionConfig.responsesModel,
+    imageModel: textVisionConfig.imageModel,
     reasoningEffort,
   });
   const filenames = images.map((image) => image.filename).filter(Boolean);
@@ -1733,13 +1734,13 @@ function buildCreationImageFilename({ item, createdAt, setId, format }) {
   const filenameTokenSource =
     item.role === "sku" ? item.filenameToken || item.title : item.title || item.filenameToken;
   const filenameToken = sanitizeCreationFilenameToken(filenameTokenSource || item.role || item.itemId, "creation");
-  const baseName = createTimestampedFilename({
+  return createTimestampedFilename({
     format,
     prompt: item.title || item.filenameToken || item.role || item.prompt,
+    filenameKeyword: filenameToken,
     createdAt,
     idSource: `${setId}-${item.slotIndex || item.itemId}`,
   });
-  return `${String(item.slotIndex).padStart(2, "0")}-${filenameToken}-${baseName}`;
 }
 
 function updatePortraitItems(items, itemId, patch = {}) {
@@ -1983,13 +1984,13 @@ function buildArticleImageFilename({ item, createdAt, setId, format }) {
     item.itemKind === "reference-card" ? `ref-${item.cardId || item.itemId}` : item.title || item.itemId,
     item.itemKind === "reference-card" ? "reference" : "illustration",
   );
-  const baseName = createTimestampedFilename({
+  return createTimestampedFilename({
     format,
     prompt: `${item.title} ${item.prompt}`,
+    filenameKeyword: filenameToken,
     createdAt,
     idSource: `${setId}-${item.itemId}`,
   });
-  return `${String(item.slotIndex).padStart(2, "0")}-${filenameToken}-${baseName}`;
 }
 
 async function getArticleReferenceImagesForItem(items = [], item = {}) {
@@ -2914,7 +2915,7 @@ async function handlePortraitReferenceAnalyze(request, response) {
   }
 
   const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
-  const textVisionConfig = getSelectedTextVisionConfig(config);
+  const textVisionConfig = getSelectedPromptAgentAnalysisConfig(config);
   if (!textVisionConfig.apiKey) {
     return sendJson(response, 400, {
       message: "当前未保存 API Key，请先在配置中保存。",
@@ -2928,11 +2929,13 @@ async function handlePortraitReferenceAnalyze(request, response) {
     baseUrl: textVisionConfig.baseUrl,
     endpointPath: textVisionConfig.endpointPath,
     apiKey: textVisionConfig.apiKey,
+    imageRoute: textVisionConfig.imageRoute,
     image: personReferenceImages[0],
     images: referenceImages,
     imageLabels: referenceImageLabels,
     mode: PORTRAIT_REFERENCE_ANALYSIS_MODE,
     responsesModel: textVisionConfig.responsesModel,
+    imageModel: textVisionConfig.imageModel,
     reasoningEffort,
   });
   const analysis = normalizePortraitReferenceAnalysis(
@@ -2989,7 +2992,7 @@ async function handleCreationReferenceAnalyze(request, response) {
   }
 
   const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
-  const textVisionConfig = getSelectedTextVisionConfig(config);
+  const textVisionConfig = getSelectedPromptAgentAnalysisConfig(config);
   if (!textVisionConfig.apiKey) {
     return sendJson(response, 400, {
       message: "当前未保存 API Key，请先在配置中保存。",
@@ -3003,10 +3006,12 @@ async function handleCreationReferenceAnalyze(request, response) {
     baseUrl: textVisionConfig.baseUrl,
     endpointPath: textVisionConfig.endpointPath,
     apiKey: textVisionConfig.apiKey,
+    imageRoute: textVisionConfig.imageRoute,
     image: referenceImages[0],
     images: referenceImages,
     mode: CREATION_REFERENCE_ANALYSIS_MODE,
     responsesModel: textVisionConfig.responsesModel,
+    imageModel: textVisionConfig.imageModel,
     reasoningEffort,
   });
   const analysis = normalizeCreationReferenceAnalysis(
@@ -3225,7 +3230,13 @@ async function handlePortraitGenerate(request, response) {
         const generationCompletedAt = new Date().toISOString();
         const generationDurationMs = Math.max(0, Date.now() - generationStartedAtMs);
         const savedSize = generationResult.effectiveSize || finalSize;
-        const filename = buildPortraitItemFilename(item, finalFormat);
+        const filename = createTimestampedFilename({
+          format: finalFormat,
+          prompt: item.title || item.prompt,
+          filenameKeyword: item.filenameToken || item.shotType || item.style || item.itemId,
+          createdAt,
+          idSource: `${setId}-${item.slotIndex || item.itemId}`,
+        });
         const saved = await saveGeneratedAsset({
           outputDir,
           relativeDir: portraitRelativeDir,
@@ -4172,7 +4183,13 @@ async function handlePortraitRepair(request, response) {
         const generationCompletedAt = new Date().toISOString();
         const generationDurationMs = Math.max(0, Date.now() - generationStartedAtMs);
         const savedSize = generationResult.effectiveSize || finalSize;
-        const filename = buildPortraitItemFilename(item, finalFormat);
+        const filename = createTimestampedFilename({
+          format: finalFormat,
+          prompt: item.title || item.prompt,
+          filenameKeyword: item.filenameToken || item.shotType || item.style || item.itemId,
+          createdAt: generationCompletedAt,
+          idSource: `${setId}-${item.slotIndex || item.itemId}`,
+        });
         const saved = await saveGeneratedAsset({
           outputDir,
           relativeDir: portraitRelativeDir,
@@ -4546,15 +4563,12 @@ async function handleCreationRepair(request, response) {
         const generationCompletedAt = new Date().toISOString();
         const generationDurationMs = Math.max(0, Date.now() - generationStartedAtMs);
         const savedSize = generationResult.effectiveSize || finalSize;
-        const filenameOptions = {
-          filename: item.filename || buildCreationImageFilename({
-            item,
-            createdAt: generationCompletedAt,
-            setId,
-            format: finalFormat,
-          }),
-        };
-        const filename = filenameOptions.filename;
+        const filename = buildCreationImageFilename({
+          item: repairItem,
+          createdAt: generationCompletedAt,
+          setId,
+          format: finalFormat,
+        });
         const saved = await saveGeneratedAsset({
           outputDir,
           relativeDir,

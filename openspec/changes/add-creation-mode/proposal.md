@@ -5,7 +5,7 @@ The current studio supports prompt-driven single image generation, but ecommerce
 ## What Changes
 
 - Add an independent Creation Mode tab under the creation workspace.
-- Generate a fixed first-version set of four ecommerce marketing images for one product: hero image, benefit image, lifestyle scene, and detail/trust image.
+- Generate a configurable ecommerce carousel set for one product with 4, 6, 8, 10, 12, 14, or 16 images, using stable role IDs and conversion-oriented Chinese role labels that cover first-glance understanding, information fusion, multi-scenario application, functional effect rendering, product proof, variant choice, and trust closing.
 - Allow users to choose the target language for marketing copy used inside the image prompts.
 - Store generated Creation Mode assets under a dated `creation` output folder that sits beside the existing `image` and `ppt` folders.
 - Keep Creation Mode state, records, and generated assets separate from prompt-mode state and the default gallery history.

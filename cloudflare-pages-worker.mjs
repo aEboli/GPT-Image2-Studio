@@ -81,6 +81,7 @@ import {
   IMAGE_ROUTE_B,
   IMAGE_ROUTE_C,
   getSelectedImageGenerationConfig,
+  getSelectedPromptAgentAnalysisConfig,
   getSelectedTextVisionConfig,
   normalizeImageRouteConfig,
 } from "./lib/image-route-config.mjs";
@@ -293,8 +294,11 @@ async function handlePromptAgentAnalyze(request, fetchImpl) {
     return jsonResponse({ message: `参考图最多支持 ${maxReferenceImages} 张。` }, 400);
   }
 
-  const config = normalizePrivateConfig(formData, { allowDirectTextVisionRoute: true });
-  const textVisionConfig = getSelectedTextVisionConfig(config);
+  const config = normalizePrivateConfig(formData, {
+    allowDirectImageRoute: true,
+    allowDirectTextVisionRoute: true,
+  });
+  const textVisionConfig = getSelectedPromptAgentAnalysisConfig(config);
   const reasoningFallback =
     mode === REFERENCE_ORCHESTRATION_MODE
       ? REFERENCE_ORCHESTRATION_REASONING_EFFORT
@@ -304,12 +308,14 @@ async function handlePromptAgentAnalyze(request, fetchImpl) {
     baseUrl: textVisionConfig.baseUrl,
     endpointPath: textVisionConfig.endpointPath,
     apiKey: textVisionConfig.apiKey,
+    imageRoute: textVisionConfig.imageRoute,
     image: images[0],
     images,
     mode,
     targetLanguage: targetLanguageInput,
     targetLanguageLabel: targetLanguageLabelInput,
     responsesModel: textVisionConfig.responsesModel,
+    imageModel: textVisionConfig.imageModel,
     reasoningEffort,
     fetchImpl,
   });
@@ -528,16 +534,57 @@ function arrayBufferToBase64(buffer) {
   return btoa(binary);
 }
 
-function buildCloudFilename({ taskId, createdAt, format, filenameToken = "" }) {
-  const safeDate = createdAt.replace(/[:.]/g, "-");
-  const suffix = String(taskId || "image").replace(/[^a-zA-Z0-9-]/g, "").slice(-12) || "image";
-  const safeToken = String(filenameToken || "")
-    .replace(/[^a-zA-Z0-9._-]/g, "-")
+function padClockPart(value) {
+  return String(value).padStart(2, "0");
+}
+
+function normalizeCloudFilenameDate(dateLike) {
+  const date = new Date(dateLike);
+  return Number.isNaN(date.getTime()) ? new Date() : date;
+}
+
+function formatCloudHourMinutePrefix(dateLike) {
+  const date = normalizeCloudFilenameDate(dateLike);
+  return `${padClockPart(date.getHours())}${padClockPart(date.getMinutes())}`;
+}
+
+function sanitizeCloudFilenameKeyword(value) {
+  return String(value || "")
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "")
+    .replace(/\s+/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-+|-+$/g, "")
-    .slice(0, 100);
-  const prefix = safeToken ? `${safeToken}-` : "";
-  return `${prefix}cloudflare-${safeDate}-${suffix}.${format}`;
+    .trim();
+}
+
+function extractCloudFilenameKeyword(value, fallback = "image") {
+  const sanitized = sanitizeCloudFilenameKeyword(value);
+  if (!sanitized) {
+    return fallback;
+  }
+
+  const chineseKeyword = sanitized.match(/\p{Script=Han}+/u)?.[0];
+  if (chineseKeyword) {
+    return chineseKeyword.slice(0, 5);
+  }
+
+  const latinKeyword = sanitized.match(/[a-zA-Z0-9][a-zA-Z0-9._-]*/)?.[0];
+  return (latinKeyword || sanitized).slice(0, 30) || fallback;
+}
+
+function extractCloudFilenameId(idSource) {
+  const normalized = String(idSource || crypto.randomUUID())
+    .replace(/\.[^.]+$/, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+  return normalized.length >= 4 ? normalized.slice(-4) : normalized.padStart(4, "0") || crypto.randomUUID().slice(-4);
+}
+
+function buildCloudFilename({ taskId, createdAt, format, filenameToken = "", prompt = "" }) {
+  const safeFormat = String(format || "png").trim().replace(/^\./, "").toLowerCase() || "png";
+  const keyword = extractCloudFilenameKeyword(filenameToken || prompt || taskId, "image");
+  const idTail = extractCloudFilenameId(taskId);
+  return `${formatCloudHourMinutePrefix(createdAt)}-${keyword}-${idTail}.${safeFormat}`;
 }
 
 function base64ToUint8Array(base64) {
@@ -847,7 +894,7 @@ function buildGalleryItem({
   generationDurationMs,
   filenameToken = "",
 }) {
-  const filename = buildCloudFilename({ taskId, createdAt, format, filenameToken });
+  const filename = buildCloudFilename({ taskId, createdAt, format, filenameToken, prompt });
   return {
     id: `${filename.replace(/\.[^.]+$/, "")}-${createdAt}`,
     filename,
@@ -1331,9 +1378,14 @@ async function toPptSourceDocuments(files) {
   );
 }
 
-function buildCloudPptSlideFilename(deckId, slideNumber) {
-  const safeDeckId = String(deckId || "deck").replace(/[^a-zA-Z0-9-]/g, "").slice(-12) || "deck";
-  return `cloudflare-${safeDeckId}-slide-${slideNumber}.${PPT_SLIDE_FORMAT}`;
+function buildCloudPptSlideFilename({ deckId, slidePrompt, outline, createdAt }) {
+  return buildCloudFilename({
+    taskId: `${deckId}-${slidePrompt.slideNumber}`,
+    createdAt,
+    format: PPT_SLIDE_FORMAT,
+    filenameToken: slidePrompt.title || outline.title || "slide",
+    prompt: slidePrompt.prompt,
+  });
 }
 
 function makeImageDataUrl(base64, format = PPT_SLIDE_FORMAT) {
@@ -1345,6 +1397,7 @@ async function generateCloudflarePptSlide({
   slidePrompt,
   outline,
   deckId,
+  createdAt,
   config,
   reasoningEffort,
   referenceImages = [],
@@ -1394,7 +1447,7 @@ async function generateCloudflarePptSlide({
     throw error;
   }
 
-  const filename = buildCloudPptSlideFilename(deckId, slidePrompt.slideNumber);
+  const filename = buildCloudPptSlideFilename({ deckId, slidePrompt, outline, createdAt });
   const imageUrl = makeImageDataUrl(finalBase64);
   return {
     slideNumber: slidePrompt.slideNumber,
@@ -1929,7 +1982,7 @@ async function runGenerate(request, writer, { fetchImpl, imageBucket } = {}) {
   const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
   const finalQuality = config.defaults.quality;
   const finalFormat = normalizeOutputFormat(requestedFormatInput || config.defaults.format);
-  const finalImageFilename = buildCloudFilename({ taskId, createdAt, format: finalFormat, filenameToken });
+  const finalImageFilename = buildCloudFilename({ taskId, createdAt, format: finalFormat, filenameToken, prompt });
   let finalBase64 = "";
   const generationStartedAt = new Date().toISOString();
   const generationStartedAtMs = Date.now();
@@ -2231,12 +2284,13 @@ function buildCloudCreationFilename({ setId, item, createdAt, format }) {
   const filenameTokenSource =
     item.role === "sku" ? item.filenameToken || item.title : item.title || item.filenameToken;
   const filenameToken = sanitizeCreationFilenameToken(filenameTokenSource || item.role || item.itemId, "creation");
-  const cloudFilename = buildCloudFilename({
+  return buildCloudFilename({
     taskId: `${setId}-${item.slotIndex || item.itemId}`,
     createdAt,
     format,
+    filenameToken,
+    prompt: item.prompt || item.title,
   });
-  return `${String(item.slotIndex).padStart(2, "0")}-${filenameToken}-${cloudFilename}`;
 }
 
 function parseJsonObject(value) {
@@ -2313,8 +2367,11 @@ async function handleCreationReferenceAnalyze(request, fetchImpl) {
     return jsonResponse({ message: "仅支持图片参考文件。" }, 400);
   }
 
-  const config = normalizePrivateConfig(formData, { allowDirectTextVisionRoute: true });
-  const textVisionConfig = getSelectedTextVisionConfig(config);
+  const config = normalizePrivateConfig(formData, {
+    allowDirectImageRoute: true,
+    allowDirectTextVisionRoute: true,
+  });
+  const textVisionConfig = getSelectedPromptAgentAnalysisConfig(config);
   const reasoningEffort = normalizeReasoningEffort(
     formData.get("reasoningEffort") || CREATION_REFERENCE_ANALYSIS_REASONING_EFFORT,
   );
@@ -2322,10 +2379,12 @@ async function handleCreationReferenceAnalyze(request, fetchImpl) {
     baseUrl: textVisionConfig.baseUrl,
     endpointPath: textVisionConfig.endpointPath,
     apiKey: textVisionConfig.apiKey,
+    imageRoute: textVisionConfig.imageRoute,
     image: referenceImages[0],
     images: referenceImages,
     mode: CREATION_REFERENCE_ANALYSIS_MODE,
     responsesModel: textVisionConfig.responsesModel,
+    imageModel: textVisionConfig.imageModel,
     reasoningEffort,
     fetchImpl,
   });
@@ -2383,8 +2442,11 @@ async function handlePortraitReferenceAnalyze(request, fetchImpl) {
     return jsonResponse({ message: "仅支持图片文件。" }, 400);
   }
 
-  const config = normalizePrivateConfig(formData, { allowDirectTextVisionRoute: true });
-  const textVisionConfig = getSelectedTextVisionConfig(config);
+  const config = normalizePrivateConfig(formData, {
+    allowDirectImageRoute: true,
+    allowDirectTextVisionRoute: true,
+  });
+  const textVisionConfig = getSelectedPromptAgentAnalysisConfig(config);
   const reasoningEffort = normalizeReasoningEffort(
     formData.get("reasoningEffort") || PORTRAIT_REFERENCE_ANALYSIS_REASONING_EFFORT,
   );
@@ -2392,11 +2454,13 @@ async function handlePortraitReferenceAnalyze(request, fetchImpl) {
     baseUrl: textVisionConfig.baseUrl,
     endpointPath: textVisionConfig.endpointPath,
     apiKey: textVisionConfig.apiKey,
+    imageRoute: textVisionConfig.imageRoute,
     image: personReferenceImages[0],
     images: referenceImages,
     imageLabels: referenceImageLabels,
     mode: PORTRAIT_REFERENCE_ANALYSIS_MODE,
     responsesModel: textVisionConfig.responsesModel,
+    imageModel: textVisionConfig.imageModel,
     reasoningEffort,
     fetchImpl,
   });
@@ -2444,12 +2508,13 @@ function buildCloudPortraitSet({ setId, plan, createdAt, updatedAt, status, item
 
 function buildCloudPortraitFilename({ setId, item, createdAt, format }) {
   const filenameToken = sanitizeCreationFilenameToken(item.shotType || item.style || item.itemId, "portrait");
-  const cloudFilename = buildCloudFilename({
+  return buildCloudFilename({
     taskId: `${setId}-${item.slotIndex || item.itemId}`,
     createdAt,
     format,
+    filenameToken,
+    prompt: item.prompt || item.title,
   });
-  return `${String(item.slotIndex).padStart(3, "0")}-${filenameToken}-${cloudFilename}`;
 }
 
 async function runCreationGenerate(request, writer, { fetchImpl, imageBucket } = {}) {
@@ -3560,6 +3625,7 @@ async function runPptGenerate(request, writer, fetchImpl) {
         slidePrompt,
         outline,
         deckId,
+        createdAt,
         config,
         reasoningEffort,
         fetchImpl,
@@ -3683,6 +3749,7 @@ async function runPptComplete(request, writer, fetchImpl) {
         slidePrompt,
         outline: completion.outline,
         deckId,
+        createdAt,
         config,
         reasoningEffort,
         fetchImpl,
@@ -3784,6 +3851,7 @@ async function runPptSlideEdit(request, writer, fetchImpl) {
     },
     outline: completion.outline,
     deckId,
+    createdAt,
     config,
     reasoningEffort,
     referenceImages,

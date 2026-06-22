@@ -537,8 +537,8 @@ test("Cloudflare creation filenames use Chinese image type names", async () => {
   const filenames = complete.payload.set.items.map((item) => item.filename).join("\n");
 
   assert.equal(response.status, 200);
-  assert.match(complete.payload.set.items[0].filename, /^01-首屏主视觉-cloudflare-/u);
-  assert.match(complete.payload.set.items[1].filename, /^02-售后保障图-cloudflare-/u);
+  assert.match(complete.payload.set.items[0].filename, /^\d{4}-首图成交主-[a-z0-9]{4}\.png$/u);
+  assert.match(complete.payload.set.items[1].filename, /^\d{4}-售后信任收-[a-z0-9]{4}\.png$/u);
   assert.doesNotMatch(filenames, /(?:^|-)hero(?:-|\.|$)|(?:^|-)after(?:-|\.|$)|(?:^|-)sales(?:-|\.|$)/i);
   assert.equal(imageBucket.objects.size, 2);
 });
@@ -752,7 +752,7 @@ test("Cloudflare creation reference analysis route rejects non-image reference f
   assert.equal(payload.message, "仅支持图片参考文件。");
 });
 
-test("Cloudflare portrait generation uses browser settings, split references and three digit filenames", async () => {
+test("Cloudflare portrait generation uses browser settings, split references and unified filenames", async () => {
   const seenRequests = [];
   const imageBucket = makeImageBucket();
   const formData = new FormData();
@@ -809,8 +809,8 @@ test("Cloudflare portrait generation uses browser settings, split references and
   assert.match(requestText, /pose, gesture, body movement, limb placement, and action rhythm/);
   assert.match(requestText, /Portrait clothing, prop, and accessory reference 1 of 1/);
   assert.match(requestText, /do not treat it as another person identity/);
-  assert.match(filenames[0], /^001-long-shot-cloudflare-/);
-  assert.match(filenames[1], /^002-full-body-cloudflare-/);
+  assert.match(filenames[0], /^\d{4}-long-shot-[a-z0-9]{4}\.png$/);
+  assert.match(filenames[1], /^\d{4}-full-body-[a-z0-9]{4}\.png$/);
   assert.equal(complete.payload.set.subjectSummary, "adult subject in a navy blazer");
   assert.deepEqual(complete.payload.set.referenceImageNames, ["person.png", "pose.png", "jacket.png"]);
   assert.equal(imageBucket.objects.size, 2);
@@ -1440,7 +1440,7 @@ test("Cloudflare quick blend uses exactly two references, generated prompt, labe
   assert.equal(savedEvent.payload.item.quickBlendPairIndex, "3");
   assert.equal(savedEvent.payload.item.quickBlendAImageName, "a-chair.png");
   assert.equal(savedEvent.payload.item.quickBlendBImageName, "b-table.png");
-  assert.match(savedEvent.payload.item.filename, /^a-chair-b-table-cloudflare-\d{4}-\d{2}-\d{2}T/);
+  assert.match(savedEvent.payload.item.filename, /^\d{4}-a-chair-b-table-[a-z0-9]{4}\.png$/);
   assert.deepEqual(savedEvent.payload.item.referenceImageNames, ["a-chair.png", "b-table.png"]);
   assert.match(savedEvent.payload.item.prompt, /A subject group above the B subject group/);
   assert.match(savedEvent.payload.item.prompt, /assigned layout slot using contain-style proportional scaling/);
@@ -1532,7 +1532,7 @@ test("Cloudflare quick blend accepts optional C and D groups with layout metadat
   assert.equal(savedEvent.payload.item.quickBlendDImageName, "d-rug.png");
   assert.equal(savedEvent.payload.item.quickBlendLayoutOrder, "horizontal");
   assert.equal(savedEvent.payload.item.quickBlendPlacementShape, "rectangle");
-  assert.match(savedEvent.payload.item.filename, /^a-chair-b-table-c-lamp-d-rug-cloudflare-\d{4}-\d{2}-\d{2}T/);
+  assert.match(savedEvent.payload.item.filename, /^\d{4}-a-chair-b-table-c-lamp-d-rug-[a-z0-9]{4}\.png$/);
   assert.deepEqual(savedEvent.payload.item.referenceImageNames, [
     "a-chair.png",
     "b-table.png",
@@ -1839,6 +1839,65 @@ test("Cloudflare prompt agent image analysis defaults to medium reasoning effort
   assert.equal(seenRequests[0].body.text.format.name, "image_prompt_json");
   assert.equal(seenRequests[0].body.reasoning?.effort, "medium");
   assert.equal(payload.item.reasoningEffort, "medium");
+});
+
+test("Cloudflare prompt agent Route C uses protocol settings for image analysis", async () => {
+  const seenRequests = [];
+  const formData = new FormData();
+  formData.set("imageRoute", "c");
+  formData.set("protocolBaseUrl", "https://protocol.example.test/v1");
+  formData.set("protocolApiKey", "protocol-browser-key");
+  formData.set("protocolImageModel", "gemini-3.1-flash-image-preview");
+  formData.append("image", new File(["castle"], "castle.png", { type: "image/png" }));
+
+  const response = await handleApiRequest(
+    new Request("https://studio.example/api/prompt-agent/analyze", {
+      method: "POST",
+      body: formData,
+    }),
+    {
+      async fetchImpl(url, init) {
+        seenRequests.push({
+          url,
+          auth: init.headers.Authorization,
+          body: JSON.parse(init.body),
+        });
+        return new Response(
+          JSON.stringify({
+            candidates: [
+              {
+                content: {
+                  parts: [
+                    {
+                      text: JSON.stringify({
+                        title: "Castle balcony",
+                        summary: "A fantasy balcony scene.",
+                        prompt: "Generate a detailed fantasy balcony scene.",
+                        style_tags: ["fantasy", "balcony"],
+                      }),
+                    },
+                  ],
+                },
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+      },
+    },
+  );
+
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(seenRequests.length, 1);
+  assert.equal(seenRequests[0].url, "https://protocol.example.test/v1/images/generations");
+  assert.equal(seenRequests[0].auth, "Bearer protocol-browser-key");
+  assert.equal(seenRequests[0].body.model, "gemini-3.1-flash-image-preview");
+  assert.deepEqual(seenRequests[0].body.generationConfig.responseModalities, ["TEXT"]);
+  assert.equal(payload.item.responsesModel, "gemini-3.1-flash-image-preview");
+  assert.equal(payload.item.json.prompt, "Generate a detailed fantasy balcony scene.");
+  assert.doesNotMatch(JSON.stringify(payload), /protocol-browser-key/);
 });
 
 test("Cloudflare generation reports the server image URL after best-effort R2 storage", async () => {

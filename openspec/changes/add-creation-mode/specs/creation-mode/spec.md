@@ -12,7 +12,7 @@ The system SHALL expose Creation Mode as a separate tab under the creation works
 - **THEN** the prompt-mode activity feed and default gallery-visible history are not updated as if the images were prompt-mode single-image jobs
 
 ### Requirement: Creation Mode generates configurable ecommerce sets
-The system SHALL generate one set for one product with quick presets of 4, 6, 8, 10, 12, 14, or 16 ecommerce marketing roles and SHALL allow the user to customize which of the 16 image roles are generated for the current set: hero, benefit, scene, multi-angle, atmosphere, product detail, brand story, size/capacity/fit, effect comparison, specification table, craft process, accessory/gift, series showcase, ingredient/material, after-sales, and usage suggestion. The system SHALL also allow the user to choose an industry template for general ecommerce, apparel, beauty, food, consumer electronics, home/living products, or a searchable fourth-level ecommerce category template. The system SHALL support a set-level visual-language selector that defaults to `classic-commercial` and keeps the generated set visually consistent across lighting, tone, material treatment, realism level, and brand atmosphere. When the user uses a preset without custom role changes and no non-general industry template is selected, the first four roles SHALL remain hero image, benefit image, usage scene, and multi-angle image.
+The system SHALL generate one set for one product with quick presets of 4, 6, 8, 10, 12, 14, or 16 ecommerce marketing roles and SHALL allow the user to customize which of the 16 image roles are generated for the current set: hero, benefit, scene, multi-angle, atmosphere, product detail, brand story, size/capacity/fit, effect comparison, specification table, craft process, accessory/gift, series showcase, ingredient/material, after-sales, and usage suggestion. The system SHALL keep those role IDs stable while presenting conversion-oriented Chinese role labels: 首图成交主视觉, 核心信息融合图, 适用多场景图, 多角度产品展示图, 冲动下单氛围图, 产品细节特写图, 品牌质感/礼品价值图, 尺寸容量适配图, 功能效果渲染图, 参数规格图, 品质工艺证明图, 到手清单/配件图, 多款式/SKU选择图, 材质成分解析图, 售后信任收口图, and 使用步骤/上手图. The system SHALL also allow the user to choose an industry template for general ecommerce, apparel, beauty, food, consumer electronics, home/living products, or a searchable fourth-level ecommerce category template. The system SHALL support a set-level visual-language selector that defaults to `classic-commercial` and keeps the generated set visually consistent across lighting, tone, material treatment, realism level, and brand atmosphere. When the user uses a preset without custom role changes and no non-general industry template is selected, the first four roles SHALL remain 首图成交主视觉, 核心信息融合图, 适用多场景图, and 多角度产品展示图.
 
 #### Scenario: User starts a creation set
 - **WHEN** the user submits product information and a target language in Creation Mode
@@ -63,6 +63,22 @@ The system SHALL generate one set for one product with quick presets of 4, 6, 8,
 - **AND** the generated set manifest stores both `visualLanguage` and `visualLanguageLabel`
 - **AND** missing or unknown visual-language values fall back to `classic-commercial`
 - **AND** the upload-image logo branch does not display or submit the visual-language selector
+
+#### Scenario: Planner makes templated roles buyer-decision oriented
+- **WHEN** the planned set includes roles such as benefit, multi-angle, atmosphere, brand story, effect comparison, craft process, accessory/gift, series showcase, ingredient/material, after-sales, or usage suggestion
+- **THEN** each corresponding prompt includes buyer-decision guidance that answers a concrete shopper question before purchase
+- **AND** hard information roles such as size/capacity/fit and specification table remain governed by factual dimension or parameter constraints instead of emotional lifestyle conversion copy
+
+#### Scenario: Planner gives every carousel role a shopper question
+- **WHEN** the system builds a Creation Mode plan
+- **THEN** every ecommerce carousel role prompt includes a `SHOPPER QUESTION` line that frames the image around one pre-purchase question such as what the product is, why it matters, where it is used, whether details are trustworthy, what arrives in the box, which SKU to choose, or which ordering risk is reduced
+- **AND** the prompt still forbids unsupported certifications, warranties, brand logos, parameters, effects, materials, and SKU options
+
+#### Scenario: Planner avoids rigid templates in promotional roles
+- **WHEN** the planned set includes the scene, atmosphere, or effect comparison role
+- **THEN** scene prompts treat the role as an `适用多场景图` that shows 2-4 believable usage scenarios with advertising campaign energy instead of a stiff grid
+- **AND** effect comparison prompts treat the role as a `功能效果渲染图` that may use premium 3D/CGI or cinematic product visualization to show a supplied function, mechanism, effect path, or outcome
+- **AND** those prompts still do not invent unsupported technical structures, parameters, certifications, performance numbers, or effects
 
 #### Scenario: User changes marketing scenario
 - **WHEN** the user selects a Creation Mode marketing scenario such as livestream, marketplace search, gift guide, or brand story
@@ -127,6 +143,12 @@ The system SHALL allow Creation Mode to upload its own reference images and choo
 - **WHEN** the user assigns a role such as product, package, material, scene, style, or other to a Creation Mode reference image
 - **THEN** the selected role is stored with the reference image metadata
 - **AND** the generated item prompts include role-aware reference guidance
+
+#### Scenario: Usage and scene references drive visual reconstruction
+- **WHEN** a Creation Mode plan assigns a `usage` or `scene` reference image to a generated item
+- **THEN** the item prompt treats the assigned reference image as a visual blueprint to faithfully reconstruct first and then recompose around the current product and selected visual language
+- **AND** the reference note is used only to identify the source content and must not be turned into new visible labels, rewritten steps, or a different scenario
+- **AND** usage references preserve the original step sequence, panels, arrows, hand/action setup, and operation flow when those elements are present
 
 #### Scenario: User reviews applied reference roles
 - **WHEN** reference image roles or notes have been applied to a Creation Mode set

@@ -2827,6 +2827,15 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .generation-m
   white-space: nowrap;
 }
 
+.creation-card-coverage {
+  margin: 0;
+  min-width: 0;
+  color: var(--muted);
+  font-size: var(--type-caption-size);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .creation-card-editor {
   position: fixed;
   left: auto;
@@ -8370,6 +8379,9 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
   grid-column: 2;
   grid-row: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   align-self: start;
   white-space: normal;
   overflow-wrap: anywhere;
@@ -8381,7 +8393,9 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
 }
 
 .timeline-relay {
-  margin-left: 0.45rem;
+  display: block;
+  margin-left: 0;
+  margin-top: 2px;
   color: rgba(237, 241, 255, 0.48);
   overflow-wrap: anywhere;
 }
@@ -8419,7 +8433,7 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
 .timeline-ratio-size,
 .timeline-item time {
   color: var(--muted);
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   line-height: 1.25;
 }
 
@@ -8436,11 +8450,11 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
 .timeline-mode,
 .timeline-ratio-size,
 .timeline-item time {
-  align-self: start;
+  align-self: center;
   justify-self: start;
   min-width: 0;
-  overflow-wrap: anywhere;
   white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .timeline-ratio-size,

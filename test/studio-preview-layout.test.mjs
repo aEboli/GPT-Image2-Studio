@@ -15,14 +15,15 @@ const configModelPickerPath = new URL("../lib/config-model-picker.mjs", import.m
 const creationListingViewPath = new URL("../lib/creation-listing-view.mjs", import.meta.url);
 const creationReferenceDragPath = new URL("../lib/creation-reference-drag.mjs", import.meta.url);
 const creationReferenceAnalysisViewPath = new URL("../lib/creation-reference-analysis-view.mjs", import.meta.url);
+const publicCreationReferenceCoveragePath = new URL("../public/lib/creation-reference-coverage.mjs", import.meta.url);
 const creationCardLoadingPath = new URL("../lib/creation-card-loading.mjs", import.meta.url);
 const creationSuiteQueuePath = new URL("../lib/creation-suite-queue.mjs", import.meta.url);
 const publicConfigModelPickerPath = new URL("../public/lib/config-model-picker.mjs", import.meta.url);
 const publicCreationListingViewPath = new URL("../public/lib/creation-listing-view.mjs", import.meta.url);
 const generationClientPath = new URL("../lib/generation-client.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20260618-timeline-log-wrap-1";
-const appAssetVersion = "20260618-timeline-links-new-tab-1";
+const stylesAssetVersion = "20260622-creation-coverage-1";
+const appAssetVersion = "20260622-creation-coverage-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
 const creationQueueModuleAssetVersion = "20260530-creation-queue-role-sync-1";
 const quickBlendModuleAssetVersion = "20260608-quick-blend-time-sort-1";
@@ -618,7 +619,7 @@ test("generation activity moves into settings while studio workspace reflows to 
   assert.match(readCssRule(styles, ".timeline-summary"), /white-space:\s*normal;/);
   assert.match(readCssRule(styles, ".timeline-summary"), /overflow-wrap:\s*anywhere;/);
   assert.doesNotMatch(readCssRule(styles, ".timeline-summary"), /white-space:\s*nowrap|text-overflow:\s*ellipsis|overflow:\s*hidden/);
-  assert.match(styles, /\.timeline-relay\s*\{[\s\S]*margin-left:\s*0\.45rem;[\s\S]*overflow-wrap:\s*anywhere;/);
+  assert.match(styles, /\.timeline-relay\s*\{[\s\S]*display:\s*block;[\s\S]*margin-left:\s*0;[\s\S]*margin-top:\s*2px;[\s\S]*overflow-wrap:\s*anywhere;/);
   assert.match(styles, /\.timeline-detail\s*\{[\s\S]*grid-column:\s*2 \/ -1;[\s\S]*grid-row:\s*2;/);
   assert.doesNotMatch(styles, /\.timeline-params\s*\{/);
   assert.match(styles, /\.timeline-url\s*\{[\s\S]*grid-column:\s*2 \/ -1;[\s\S]*grid-row:\s*2;/);
@@ -630,8 +631,8 @@ test("generation activity moves into settings while studio workspace reflows to 
   assert.match(styles, /\.timeline-ratio-size\s*\{[\s\S]*grid-column:\s*4;[\s\S]*grid-row:\s*1;/);
   assert.match(styles, /\.timeline-item time\s*\{[\s\S]*grid-column:\s*5;[\s\S]*grid-row:\s*1;/);
   assert.doesNotMatch(styles, /\.timeline-ratio\s*\{|\.timeline-resolution\s*\{/);
-  assert.match(styles, /\.timeline-main,\s*\.timeline-url,\s*\.timeline-mode,\s*\.timeline-ratio-size,\s*\.timeline-item time\s*\{[\s\S]*font-size:\s*0\.7rem;/);
-  assert.match(styles, /\.timeline-mode,\s*\.timeline-ratio-size,\s*\.timeline-item time\s*\{[\s\S]*white-space:\s*normal;[\s\S]*overflow-wrap:\s*anywhere;/);
+  assert.match(styles, /\.timeline-main,\s*\.timeline-url,\s*\.timeline-mode,\s*\.timeline-ratio-size,\s*\.timeline-item time\s*\{[\s\S]*font-size:\s*0\.78rem;/);
+  assert.match(styles, /\.timeline-mode,\s*\.timeline-ratio-size,\s*\.timeline-item time\s*\{[\s\S]*align-self:\s*center;[\s\S]*white-space:\s*normal;[\s\S]*overflow-wrap:\s*anywhere;/);
   assert.match(styles, /\.timeline-ratio-size,\s*\.timeline-item time\s*\{[\s\S]*font-variant-numeric:\s*tabular-nums;/);
   assert.match(app, /configGenerationLogPanel:\s*document\.querySelector\("#configGenerationLogPanel"\),/);
   assert.match(app, /function openConfigGenerationLog\(\) \{[\s\S]*setDrawerOpen\(true\);[\s\S]*refs\.configGenerationLogPanel\?\.scrollIntoView/);
@@ -2000,6 +2001,9 @@ test("prompt image analysis compresses large browser uploads before posting to V
     app,
     /async function buildPromptAgentFormData\(\) \{[\s\S]*formData\.set\("image", await preparePromptAnalysisImageFile\(state\.promptAgent\.file\)\);[\s\S]*formData\.set\(\s*"reasoningEffort",\s*PROMPT_AGENT_ANALYSIS_REASONING_EFFORT,?\s*\);/,
   );
+  const promptAgentFormDataBody = app.match(/async function buildPromptAgentFormData\(\) \{[\s\S]*?\n\}/)?.[0] || "";
+  assert.match(promptAgentFormDataBody, /appendCurrentConfigToFormData\(formData\);/);
+  assert.doesNotMatch(promptAgentFormDataBody, /appendJobConfigToFormData\(formData,\s*job\)/);
   assert.match(app, /body: await buildPromptAgentFormData\(\),/);
 });
 
@@ -2955,6 +2959,14 @@ test("prompt template storage respects an intentionally empty saved list", async
   assert.match(app, /return Array\.isArray\(parsed\) \? parsed\.map\(normalizePromptTemplate\)\.filter\(Boolean\) : \[\];/);
 });
 
+test("prompt template content accepts up to three thousand characters", async () => {
+  const html = await readFile(indexPath, "utf8");
+  const templateTextarea = html.match(/<textarea id="promptTemplateTextInput"[\s\S]*?<\/textarea>/)?.[0] || "";
+
+  assert.match(templateTextarea, /\bmaxlength="3000"/);
+  assert.doesNotMatch(templateTextarea, /\bmaxlength="1000"/);
+});
+
 test("default prompt templates cover ten daily life scenes", async () => {
   const app = await readFile(appPath, "utf8");
   const block = app.match(/const SURPRISE_PROMPTS = \[[\s\S]*?\];/)?.[0] || "";
@@ -3086,6 +3098,7 @@ test("creation mode has independent references count and scenario controls", asy
   const queueModule = await readFile(creationSuiteQueuePath, "utf8");
   const creationReferenceDrag = await readFile(creationReferenceDragPath, "utf8");
   const creationReferenceAnalysisView = await readFile(creationReferenceAnalysisViewPath, "utf8");
+  const creationReferenceCoverage = await readFile(publicCreationReferenceCoveragePath, "utf8");
 
   assert.match(html, /id="creationReferenceDropzone"/);
   assert.match(html, /id="creationReferenceCount">0 \/ 15/);
@@ -3295,19 +3308,22 @@ test("creation mode has independent references count and scenario controls", asy
   assert.doesNotMatch(app, /material-closeup/);
   assert.doesNotMatch(app, /usage-steps/);
   assert.doesNotMatch(app, /review-qa/);
-  assert.match(app, /4-multi-angle\|multi-angle\|多角度图/);
-  assert.match(app, /5-atmosphere\|atmosphere\|场景氛围图/);
-  assert.match(app, /6-product-detail\|product-detail\|商品细节图/);
-  assert.match(app, /7-brand-story\|brand-story\|品牌故事图/);
-  assert.match(app, /8-size-capacity-fit\|size-capacity-fit\|尺寸\/容量\/尺码图/);
-  assert.match(app, /9-effect-comparison\|effect-comparison\|效果对比图/);
-  assert.match(app, /10-spec-table\|spec-table\|详细规格\/参数表/);
-  assert.match(app, /11-craft-process\|craft-process\|工艺制作图/);
-  assert.match(app, /12-accessory-gift\|accessory-gift\|配件\/赠品图/);
-  assert.match(app, /13-series-showcase\|series-showcase\|系列展示图/);
-  assert.match(app, /14-ingredient-material\|ingredient-material\|商品成分图/);
-  assert.match(app, /15-after-sales\|after-sales\|售后保障图/);
-  assert.match(app, /16-usage-suggestion\|usage-suggestion\|使用建议图/);
+  assert.match(app, /1-hero\|hero\|首图成交主视觉/);
+  assert.match(app, /2-benefit\|benefit\|核心信息融合图/);
+  assert.match(app, /3-scene\|scene\|适用多场景图/);
+  assert.match(app, /4-multi-angle\|multi-angle\|多角度产品展示图/);
+  assert.match(app, /5-atmosphere\|atmosphere\|冲动下单氛围图/);
+  assert.match(app, /6-product-detail\|product-detail\|产品细节特写图/);
+  assert.match(app, /7-brand-story\|brand-story\|品牌质感\/礼品价值图/);
+  assert.match(app, /8-size-capacity-fit\|size-capacity-fit\|尺寸容量适配图/);
+  assert.match(app, /9-effect-comparison\|effect-comparison\|功能效果渲染图/);
+  assert.match(app, /10-spec-table\|spec-table\|参数规格图/);
+  assert.match(app, /11-craft-process\|craft-process\|品质工艺证明图/);
+  assert.match(app, /12-accessory-gift\|accessory-gift\|到手清单\/配件图/);
+  assert.match(app, /13-series-showcase\|series-showcase\|多款式\/SKU选择图/);
+  assert.match(app, /14-ingredient-material\|ingredient-material\|材质成分解析图/);
+  assert.match(app, /15-after-sales\|after-sales\|售后信任收口图/);
+  assert.match(app, /16-usage-suggestion\|usage-suggestion\|使用步骤\/上手图/);
   assert.doesNotMatch(app, /17-brand-story\|brand-story\|品牌故事图/);
   assert.doesNotMatch(app, /18-image-decomposition\|image-decomposition\|图片拆解图/);
   assert.doesNotMatch(app, /18-certification-proof\|certification-proof\|资质背书图/);
@@ -3483,6 +3499,20 @@ test("creation mode has independent references count and scenario controls", asy
   assert.match(app, /formData\.set\("skuBundleCount", refs\.creationSkuBundleCountInput\?\.value \|\| "1"\)/);
   assert.match(app, /formData\.set\("visualLanguage", refs\.creationVisualLanguageInput\?\.value \|\| "classic-commercial"\)/);
   assert.match(app, /formData\.set\("planOverrides", JSON\.stringify\(getCreationPlanOverrides\(\)\)\)/);
+  assert.match(app, /creationRoleSelectionManuallyEdited:\s*false/);
+  assert.match(app, /const CREATION_REFERENCE_COVERAGE_ROLE_TARGETS = \{/);
+  assert.match(app, /usage:\s*\["usage-suggestion"\]/);
+  assert.match(app, /scene:\s*\["scene",\s*"atmosphere"\]/);
+  assert.match(app, /material:\s*\["product-detail",\s*"ingredient-material"\]/);
+  assert.match(app, /dimensions:\s*\["size-capacity-fit",\s*"spec-table"\]/);
+  assert.match(app, /package:\s*\["accessory-gift"\]/);
+  assert.match(app, /from "\/lib\/creation-reference-coverage\.mjs\?v=20260622-creation-coverage-1"/);
+  assert.match(creationReferenceCoverage, /export function applyCreationReferenceCoverageRolePlan\(/);
+  assert.match(creationReferenceCoverage, /export function normalizeCreationCoverageFields\(/);
+  assert.match(creationReferenceCoverage, /export function appendCreationCoverageSummary\(/);
+  assert.match(creationReferenceCoverage, /export function toggleCreationSelectedRoles\(/);
+  assert.match(app, /function syncCreationSelectedRolesToReferenceCoverage\(analysis = state\.creationReferenceAnalysis\.result\) \{/);
+  assert.match(app, /if \(state\.creationRoleSelectionManuallyEdited\) \{/);
   assert.match(app, /fetch\("\/api\/creation\/reference\/analyze"/);
   assert.match(app, /fetch\("\/api\/creation\/plan"/);
   assert.match(app, /formData\.set\("selectedRoles", JSON\.stringify\(getCreationSelectedRoles\(\)\)\)/);
@@ -3520,11 +3550,21 @@ test("creation mode has independent references count and scenario controls", asy
   assert.match(app, /refs\.creationReferenceAnalysisToggleButton\.addEventListener\("click", toggleCreationReferenceAnalysisPanel\)/);
   const creationApplyAnalysisBody = app.match(/function applyCreationReferenceAnalysisRecommendations\(\) \{[\s\S]*?\r?\n\}\r?\n\r?\nfunction renderCreationReferenceAnalysis/)?.[0] || "";
   assert.match(creationApplyAnalysisBody, /const previousVisualLanguage = refs\.creationVisualLanguageInput\?\.value \|\| "classic-commercial";/);
+  assert.match(creationApplyAnalysisBody, /syncCreationSelectedRolesToReferenceCoverage\(analysis\);/);
   assert.match(creationApplyAnalysisBody, /state\.creationReferenceAnalysis\.applied = true;/);
   assert.match(creationApplyAnalysisBody, /state\.creationReferenceAnalysis\.collapsed = true;/);
   assert.match(creationApplyAnalysisBody, /setCreationSelectValue\(refs\.creationVisualLanguageInput,\s*previousVisualLanguage,\s*"classic-commercial"\);/);
   assert.match(creationApplyAnalysisBody, /renderCreationReferenceAnalysis\(\);/);
   assert.doesNotMatch(creationApplyAnalysisBody, /state\.creation\.generating/);
+  const toggleCreationRoleBody = app.match(/function toggleCreationSelectedRole\(role\) \{[\s\S]*?\r?\n\}\r?\n\r?\nfunction getCreationPreviewSlots/)?.[0] || "";
+  assert.match(toggleCreationRoleBody, /state\.creationRoleSelectionManuallyEdited = true;/);
+  const syncPresetBody = app.match(/function syncCreationSelectedRolesToPreset\(selectedRoles\) \{[\s\S]*?\r?\n\}\r?\nfunction syncCreationSelectedRolesToScenario/)?.[0] || "";
+  assert.match(syncPresetBody, /if \(state\.creationRoleSelectionManuallyEdited\) \{[\s\S]*resetCreationDraftPreview\(\);[\s\S]*return;/);
+  assert.match(app, /function syncCreationSelectedRolesToScenario\(\) \{ syncCreationSelectedRolesToPreset\(getCreationRecommendedRolePreset\(\)\); \}/);
+  assert.match(app, /function syncCreationSelectedRolesToIndustry\(\) \{ syncCreationSelectedRolesToPreset\(getCreationRecommendedRolePreset\(\)\); \}/);
+  assert.match(app, /appendCreationCoverageSummary\(card, item, \{ hideGenerationDetails \}\);/);
+  assert.match(creationReferenceCoverage, /export function buildCreationCoverageSummaryText\(item = \{\}\) \{/);
+  assert.match(creationReferenceCoverage, /coverageSummaryText/);
   assert.doesNotMatch(app, /state\.creationReferenceAnalysis = state\.referenceAnalysis/);
   assert.doesNotMatch(app, /state\.creation\.creationReferenceFiles/);
   assert.doesNotMatch(app, /state\.creationReferenceFiles = state\.referenceFiles/);
@@ -3658,6 +3698,18 @@ test("creation reference analysis apply fills product name from fourth-level cat
     app,
     /const productNameApplied = applyCreationReferenceAnalysisProductNameSuggestion\(analysis\);[\s\S]*state\.creationReferenceAnalysis\.applied = true;/,
   );
+});
+
+test("creation reference analysis auto-fills product name after recognition", async () => {
+  const app = await readFile(appPath, "utf8");
+  const applyBody = app.match(/async function applyCreationReferenceAnalysis\(analysis\) \{[\s\S]*?\n\}/)?.[0] || "";
+
+  assert.match(
+    applyBody,
+    /const productNameApplied = applyCreationReferenceAnalysisProductNameSuggestion\(normalized\);/,
+  );
+  assert.match(applyBody, /return \{ matchedTemplate, productNameApplied \};/);
+  assert.match(app, /const \{ matchedTemplate \} = await applyCreationReferenceAnalysis\(payload\);/);
 });
 
 test("creation reference analysis preserves grouped product labels on reference cards", async () => {

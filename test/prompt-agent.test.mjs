@@ -878,6 +878,129 @@ test("prompt agent posts to the configured endpoint path", async () => {
   assert.equal(result.prompt, "Clean product photo on white background.");
 });
 
+test("prompt agent uses chat completions request and response format for Route B text vision", async () => {
+  const calls = [];
+  const result = await requestPromptAgentAnalysis({
+    baseUrl: "https://direct.example.test/v1",
+    endpointPath: "chat/completions",
+    apiKey: "direct-key",
+    image: {
+      filename: "product.png",
+      mimeType: "image/png",
+      base64: "cHJvZHVjdA==",
+    },
+    responsesModel: "vendor-vision-text",
+    async fetchImpl(url, options) {
+      calls.push({
+        url,
+        body: JSON.parse(options.body),
+      });
+      return new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  title: "Chat product image",
+                  prompt: "Clean chat-completions product photo.",
+                  negative_prompt: "blur",
+                  style_tags: ["product"],
+                  subject: "Product",
+                  scene: "White studio",
+                  composition: "Centered",
+                  lighting: "Softbox",
+                  color_palette: "White and gray",
+                  camera: "Commercial macro",
+                  aspect_ratio: "1:1",
+                  notes: [],
+                }),
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      );
+    },
+  });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "https://direct.example.test/v1/chat/completions");
+  assert.equal(calls[0].body.model, "vendor-vision-text");
+  assert.equal("input" in calls[0].body, false);
+  assert.equal(calls[0].body.messages[0].role, "user");
+  assert.deepEqual(
+    calls[0].body.messages[0].content.map((item) => item.type),
+    ["text", "text", "image_url"],
+  );
+  assert.equal(calls[0].body.response_format.type, "json_schema");
+  assert.equal(calls[0].body.response_format.json_schema.name, "image_prompt_json");
+  assert.equal(result.prompt, "Clean chat-completions product photo.");
+});
+
+test("prompt agent uses model protocol settings for Route C Gemini analysis", async () => {
+  const calls = [];
+  const result = await requestPromptAgentAnalysis({
+    imageRoute: "c",
+    baseUrl: "https://protocol.example.test/v1",
+    apiKey: "protocol-key",
+    image: {
+      filename: "product.png",
+      mimeType: "image/png",
+      base64: "cHJvZHVjdA==",
+    },
+    responsesModel: "gemini-3.1-flash-image-preview",
+    imageModel: "gemini-3.1-flash-image-preview",
+    async fetchImpl(url, options) {
+      calls.push({
+        url,
+        body: JSON.parse(options.body),
+      });
+      return new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      title: "Gemini product image",
+                      prompt: "Clean Gemini protocol product photo.",
+                      negative_prompt: "blur",
+                      style_tags: ["product"],
+                      subject: "Product",
+                      scene: "White studio",
+                      composition: "Centered",
+                      lighting: "Softbox",
+                      color_palette: "White and gray",
+                      camera: "Commercial macro",
+                      aspect_ratio: "1:1",
+                      notes: [],
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      );
+    },
+  });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "https://protocol.example.test/v1/images/generations");
+  assert.equal(calls[0].body.model, "gemini-3.1-flash-image-preview");
+  assert.equal("input" in calls[0].body, false);
+  assert.equal("messages" in calls[0].body, false);
+  assert.deepEqual(calls[0].body.generationConfig.responseModalities, ["TEXT"]);
+  assert.equal(calls[0].body.generationConfig.responseMimeType, "application/json");
+  assert.deepEqual(
+    calls[0].body.contents[0].parts.map((item) => (item.text ? "text" : "inline_data")),
+    ["text", "text", "inline_data"],
+  );
+  assert.equal(result.prompt, "Clean Gemini protocol product photo.");
+});
+
 test("prompt agent retries creation reference analysis when the model returns prose instead of JSON", async () => {
   const calls = [];
   const validAnalysis = {

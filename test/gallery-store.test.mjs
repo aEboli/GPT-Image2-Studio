@@ -13,7 +13,7 @@ import {
   saveGeneratedAsset,
 } from "../lib/gallery-store.mjs";
 
-test("gallery store creates readable filenames from date prompt time and id tail", () => {
+test("gallery store creates readable filenames from time keyword and id tail", () => {
   const filename = createTimestampedFilename({
     format: "jpeg",
     prompt: "生成一张护肤礼盒直播带货主视觉，商业摄影风格",
@@ -21,7 +21,7 @@ test("gallery store creates readable filenames from date prompt time and id tail
     idSource: "task-demo-a1b2c3d4",
   });
 
-  assert.equal(filename, "260426-护肤礼盒-154233-c3d4.jpeg");
+  assert.equal(filename, "1542-护肤礼盒-c3d4.jpeg");
 });
 
 test("gallery store falls back to a compact generic keyword when prompt is not filename-friendly", () => {
@@ -32,10 +32,10 @@ test("gallery store falls back to a compact generic keyword when prompt is not f
     idSource: "job-xyz9",
   });
 
-  assert.equal(filename, "260426-未命名-090807-xyz9.png");
+  assert.equal(filename, "0908-未命名-xyz9.png");
 });
 
-test("gallery store can create hour-minute prefixed filenames with month-year before the id", () => {
+test("gallery store can create hour-minute prefixed filenames from explicit keywords", () => {
   const filename = createTimestampedFilename({
     format: "png",
     prompt: "Quick Blend pair 2",
@@ -45,7 +45,7 @@ test("gallery store can create hour-minute prefixed filenames with month-year be
     omitDatePrefix: true,
   });
 
-  assert.equal(filename, "1542-a-dress-b-shoe-0426-c3d4.png");
+  assert.equal(filename, "1542-a-dress-b-shoe-c3d4.png");
 });
 
 test("gallery store prefixes the prompt image folder with the image date", async () => {
@@ -447,24 +447,24 @@ test("gallery store batch renames historical images and sidecars together", asyn
     indexPath,
     publicBasePath: "/output",
   });
-  const renamedFilename = "260426-护肤礼盒-154233-cdef.png";
+  const renamedFilename = "1542-护肤礼盒-cdef.png";
   const dateDir = join(outputDir, "2026-04", "04-26", "2026-04-26-prompt");
   const jsonDir = join(outputDir, "json", "2026-04", "04-26", "2026-04-26-prompt");
   const indexPayload = JSON.parse(await readFile(indexPath, "utf8"));
 
   assert.equal(result.renamedCount, 1);
   await access(join(dateDir, renamedFilename));
-  await access(join(jsonDir, "260426-护肤礼盒-154233-cdef.json"));
+  await access(join(jsonDir, "1542-护肤礼盒-cdef.json"));
   await assert.rejects(access(join(dateDir, "asset_12345678-90ab-cdef-1234-567890abcdef.png")));
   assert.deepEqual(Object.keys(indexPayload), [renamedFilename]);
   assert.equal(items[0].filename, renamedFilename);
 });
 
-test("gallery store batch rename preserves hour-minute prefixed quick blend filenames", async () => {
+test("gallery store batch rename preserves unified hour-minute prefixed filenames", async () => {
   const rootDir = await mkdtemp(join(tmpdir(), "responses-gallery-quick-blend-name-"));
   const outputDir = join(rootDir, "output");
   const indexPath = join(rootDir, ".local", "gallery-index.json");
-  const filename = "1542-a-dress-b-shoe-0426-c3d4.png";
+  const filename = "1542-a-dress-b-shoe-c3d4.png";
 
   await saveGeneratedAsset({
     outputDir,

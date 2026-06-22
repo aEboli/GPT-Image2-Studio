@@ -197,6 +197,38 @@ test("creation material item reference images keep primary product plus material
   ]);
 });
 
+test("creation item reference images prefer explicit coverage sources plus the primary product", () => {
+  const item = {
+    role: "product-detail",
+    coverageSources: [
+      {
+        filename: "scale-detail.png",
+        role: "material",
+        note: "macro scale texture",
+      },
+    ],
+  };
+  const images = [
+    { filename: "blue-lure.png" },
+    { filename: "silver-lure.png" },
+    { filename: "scale-detail.png" },
+    { filename: "package.png" },
+    { filename: "lighting-style.png" },
+  ];
+  const roles = [
+    { filename: "blue-lure.png", role: "product" },
+    { filename: "silver-lure.png", role: "reference-product" },
+    { filename: "scale-detail.png", role: "material" },
+    { filename: "package.png", role: "package" },
+    { filename: "lighting-style.png", role: "style" },
+  ];
+
+  assert.deepEqual(
+    buildCreationItemReferenceImages(item, images, roles).map((image) => image.filename),
+    ["silver-lure.png", "scale-detail.png"],
+  );
+});
+
 test("creation usage-step item reference images keep usage instruction references", () => {
   const item = {
     role: "usage-suggestion",

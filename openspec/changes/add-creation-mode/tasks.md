@@ -203,3 +203,23 @@
 - [x] 32.1 Add planner and store regression tests for default visual-language fallback, selected visual-language prompt guidance, and legacy manifest normalization.
 - [x] 32.2 Pass set-level visual language through plan preview, local generation, Cloudflare generation, manifests, record details, reuse, and repair flows.
 - [x] 32.3 Add a Creation Mode-only visual-language selector while keeping the upload-image logo branch unchanged.
+
+## 33. Creation Buyer Decision Prompt Strategy
+
+- [x] 33.1 Add failing planner tests for buyer-decision guidance on formerly templated conversion roles.
+- [x] 33.2 Implement role-specific buyer-decision prompt guidance without changing role selection, source-fact allocation, SKU prompts, or hard information roles.
+- [x] 33.3 Update OpenSpec design/spec notes and rerun targeted Creation planner verification.
+
+## 34. Creation Role Conversion Taxonomy
+
+- [x] 34.1 Add failing tests for the new 16 conversion-oriented image type titles, default first-four order, shopper-question prompts, and filename expectations.
+- [x] 34.2 Update planner role titles, briefs, role intent, content allocation, shopper-question guidance, and buyer-decision prompt strategy while preserving role IDs and API request shape.
+- [x] 34.3 Sync the frontend role picker slot labels and brief copy with the planner role taxonomy.
+- [x] 34.4 Update OpenSpec spec/design notes and rerun targeted Creation Mode planner, frontend static, category-template, worker, and regression verification.
+
+## 35. Promotional Scene And Effect Rendering
+
+- [x] 35.1 Add failing tests for `适用多场景图`, `功能效果渲染图`, advertising campaign energy, non-rigid template guidance, and allowed premium 3D/CGI functional rendering.
+- [x] 35.2 Update planner titles, briefs, shopper questions, buyer-decision strategy, and role intent while preserving role IDs and API request shape.
+- [x] 35.3 Sync frontend role picker copy with the new promotional scene/effect taxonomy.
+- [x] 35.4 Update OpenSpec spec/design notes and rerun targeted planner and frontend static verification.

@@ -11,6 +11,7 @@ import {
   IMAGE_ROUTE_C,
   appendApiEndpointPath,
   getSelectedImageGenerationConfig,
+  getSelectedPromptAgentAnalysisConfig,
   getSelectedTextVisionConfig,
   splitApiEndpointUrl,
   splitModelProtocolUrl,
@@ -443,6 +444,28 @@ test("selected text and vision config preserves route A behavior", () => {
       endpointPath: "responses",
       apiKey: "route-a-key",
       responsesModel: "gpt-5.4",
+    },
+  );
+});
+
+test("selected prompt-agent analysis config uses model protocol settings in Route C", () => {
+  assert.deepEqual(
+    getSelectedPromptAgentAnalysisConfig({
+      imageRoute: "c",
+      baseUrl: "https://route-a.example.test/v1",
+      apiKey: "route-a-key",
+      responsesModel: "route-a-model",
+      protocolBaseUrl: "https://protocol.example.test/v1",
+      protocolApiKey: "protocol-key",
+      protocolImageModel: "gemini-3.1-flash-image-preview",
+    }),
+    {
+      imageRoute: "c",
+      baseUrl: "https://protocol.example.test/v1",
+      endpointPath: "images/generations",
+      apiKey: "protocol-key",
+      responsesModel: "gemini-3.1-flash-image-preview",
+      imageModel: "gemini-3.1-flash-image-preview",
     },
   );
 });

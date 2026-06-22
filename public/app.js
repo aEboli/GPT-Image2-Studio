@@ -36,6 +36,7 @@ import { buildCreationSkuSubjectsForPayload, normalizeCreationSkuBundleCountForP
 import { buildCreationReferenceLightboxItem } from "/lib/creation-reference-lightbox.mjs";
 import { bindCreationReferenceDrag, reorderCreationReferenceFiles } from "/lib/creation-reference-drag.mjs";
 import { isCreationSubjectReferenceRole } from "/lib/creation-reference-roles.mjs";
+import { appendCreationCoverageSummary, applyCreationReferenceCoverageRolePlan, normalizeCreationCoverageFields, toggleCreationSelectedRoles } from "/lib/creation-reference-coverage.mjs?v=20260622-creation-coverage-1";
 import { appendCreationVisualLanguageSuggestionCard, applyCreationReferenceAnalysisProductNameValue, buildCreationReferenceAnalysisAppliedFeedbackMessage, buildCreationReferenceAnalysisCategoryMatchText, getCreationReferenceAnalysisDisplayRoleLabel, getCreationReferenceAnalysisGroupedSubjectUnitCount, getCreationReferenceAnalysisRoleCorrectionReason, getCreationReferenceAnalysisVisualLanguageReason, getCreationReferenceAnalysisVisualLanguageSource, normalizeCreationReferenceAnalysisUnitCountNote, shouldDowngradeReferenceProductAnalysisRole, syncCreationReferenceVisualLanguageButton } from "/lib/creation-reference-analysis-view.mjs";
 import { createCreationListingController, getCreationRecordListingMetaLabel, getCreationListingSearchValues, normalizeCreationListingDraftForView, renderCreationListingDrafts } from "/lib/creation-listing-view.mjs";
 import { getCreationAutoRepairNotice, getCreationCompletionFeedback, getCreationIncompleteItems, shouldAutoRepairCreationSet } from "/lib/creation-auto-repair.mjs";
@@ -465,6 +466,7 @@ const state = {
     level3: "",
   },
   creationReferencePreviewItem: null,
+  creationRoleSelectionManuallyEdited: false,
   creationSelectedRoles: [],
   gallery: [],
   galleryLoading: true,
@@ -7348,7 +7350,7 @@ const CREATION_ITEM_STATUS_LABELS = {
   planning: "待开始",
 };
 
-const CREATION_PREVIEW_SLOTS = "1-hero|hero|首屏主视觉|产品居中占画面主体，主标题+副标题传递核心价值主张;2-benefit|benefit|核心卖点图|产品居中，3 个核心优势用标签/徽章指向对应部位;3-scene|scene|使用场景图|产品融入真实生活场景，标题+副标题营造使用氛围;4-multi-angle|multi-angle|多角度图|3-4 个角度排列，干净背景，不含任何文字;5-atmosphere|atmosphere|场景氛围图|氛围感环境中的产品，lifestyle 风格，垂画感染力;6-product-detail|product-detail|商品细节图|产品局部特写/微距，标注指向具体细节部位;7-brand-story|brand-story|品牌故事图|品牌理念文案为主，主标题融合品牌名+定位;8-size-capacity-fit|size-capacity-fit|尺寸/容量/尺码图|产品+参照物对比，用标注线+数据标注具体尺寸;9-effect-comparison|effect-comparison|效果对比图|左右分屏或上下分屏对比，用不同颜色标签区分;10-spec-table|spec-table|详细规格/参数表|表格形式，表头用强调色背景，参数行黑色文字;11-craft-process|craft-process|工艺制作图|展示生产工艺/制作过程，标注关键工艺步骤;12-accessory-gift|accessory-gift|配件/赠品图|所有配件平铺展示，每个配件旁标注名称;13-series-showcase|series-showcase|系列展示图|多色/多 SKU 排列展示，标注各款式名称或色号;14-ingredient-material|ingredient-material|商品成分图|成分/材质可视化展示，用图标+文字说明;15-after-sales|after-sales|售后保障图|质保/退换政策图标化，用图标+简短文字;16-usage-suggestion|usage-suggestion|使用建议图|使用步骤图示，编号+简短说明".split(";").map((entry) => { const [itemId, role, title, brief] = entry.split("|"); return { itemId, role, title, brief }; });
+const CREATION_PREVIEW_SLOTS = "1-hero|hero|首图成交主视觉|一眼看懂产品是什么、主承诺是什么，并用 2-3 个可信信息推动停留;2-benefit|benefit|核心信息融合图|融合产品、结果、痛点和可信证据，让买家明白为什么需要;3-scene|scene|适用多场景图|用 2-4 个真实适用场景展示产品价值，带宣传片式层次和购买代入感;4-multi-angle|multi-angle|多角度产品展示图|3-4 个清晰视角展示形态、结构、厚度和表面，不堆营销字;5-atmosphere|atmosphere|冲动下单氛围图|用真实拥有感和生活情绪触发想买冲动，同时保持产品清楚可看;6-product-detail|product-detail|产品细节特写图|用微距、局部和指向标注证明材质、结构、做工或关键部位;7-brand-story|brand-story|品牌质感/礼品价值图|把工艺、包装、仪式感或调性转成质感和送礼价值;8-size-capacity-fit|size-capacity-fit|尺寸容量适配图|用准确尺寸、容量、比例和适配参照降低买错风险;9-effect-comparison|effect-comparison|功能效果渲染图|用高级 3D/CGI 或广告级可视化表现功能路径、机制、效果和结果;10-spec-table|spec-table|参数规格图|用清晰参数表呈现型号、尺寸、单位和关键规格，便于快速核对;11-craft-process|craft-process|品质工艺证明图|把工艺、材料处理、装配或检测事实转成质量证据;12-accessory-gift|accessory-gift|到手清单/配件图|完整展示到手包含物、数量、包装和配件，减少到货不确定;13-series-showcase|series-showcase|多款式/SKU选择图|只展示已提供的颜色、款式、尺码、套装或 SKU，帮助快速选择;14-ingredient-material|ingredient-material|材质成分解析图|用材质、成分、结构或组件解释为什么值得信任或偏好;15-after-sales|after-sales|售后信任收口图|用已提供的服务、物流、质保或退换信息降低下单顾虑;16-usage-suggestion|usage-suggestion|使用步骤/上手图|用步骤、上手、保养或避坑信息降低使用焦虑".split(";").map((entry) => { const [itemId, role, title, brief] = entry.split("|"); return { itemId, role, title, brief }; });
 
 const CREATION_SCENARIO_LABELS = { standard: "标准电商", "detail-page": "详情页转化", "social-seeding": "社媒种草", launch: "新品发布", promotion: "活动促销", livestream: "直播电商", "gift-guide": "礼品推荐", "marketplace-search": "平台搜索", "brand-story": "品牌故事" };
 const CREATION_VISUAL_LANGUAGE_LABELS = { "classic-commercial": "经典商业摄影", "premium-studio": "高端棚拍", "reference-style": "参考模式", "clean-marketplace": "平台清爽白底", "lifestyle-editorial": "生活方式杂志", "social-ugc": "社媒实拍", "detail-infographic": "详情页信息图", "macro-material": "微距材质", "outdoor-context": "户外场景", "minimal-luxury": "极简奢华", "bold-campaign": "活动海报", "warm-handcrafted": "手作温度" };
@@ -7433,6 +7435,8 @@ const CREATION_REFERENCE_ROLE_OPTIONS = [
   { value: "style", label: "风格参考" },
   { value: "other", label: "其他" },
 ];
+
+const CREATION_REFERENCE_COVERAGE_ROLE_TARGETS = { usage: ["usage-suggestion"], scene: ["scene", "atmosphere"], material: ["product-detail", "ingredient-material"], dimensions: ["size-capacity-fit", "spec-table"], package: ["accessory-gift"] };
 
 function getCreationReferenceRoleLabel(role) {
   return CREATION_REFERENCE_ROLE_OPTIONS.find((option) => option.value === role)?.label || CREATION_REFERENCE_ROLE_OPTIONS[0].label;
@@ -7973,42 +7977,24 @@ function getCreationSelectedRoles() {
   return selectedRoles.length > 0 ? selectedRoles : getDefaultCreationRoleIds();
 }
 
-function syncCreationSelectedRolesToCount() {
-  state.creationSelectedRoles = getDefaultCreationRoleIds();
-  resetCreationDraftPreview();
-}
-
-function syncCreationSelectedRolesToScenario() {
-  const selectedRoles = getCreationRecommendedRolePreset();
+function syncCreationSelectedRolesToCount() { state.creationRoleSelectionManuallyEdited = false; state.creationSelectedRoles = getDefaultCreationRoleIds(); resetCreationDraftPreview(); }
+function syncCreationSelectedRolesToPreset(selectedRoles) {
+  if (state.creationRoleSelectionManuallyEdited) { resetCreationDraftPreview(); return; }
   state.creationSelectedRoles = selectedRoles;
   if (refs.creationImageCountInput && [4, 6, 8, 10, 12, 14, 16].includes(selectedRoles.length)) {
     refs.creationImageCountInput.value = String(selectedRoles.length);
   }
   resetCreationDraftPreview();
 }
-
-function syncCreationSelectedRolesToIndustry() {
-  const selectedRoles = getCreationRecommendedRolePreset();
-  state.creationSelectedRoles = selectedRoles;
-  if (refs.creationImageCountInput && [4, 6, 8, 10, 12, 14, 16].includes(selectedRoles.length)) {
-    refs.creationImageCountInput.value = String(selectedRoles.length);
-  }
-  resetCreationDraftPreview();
-}
+function syncCreationSelectedRolesToScenario() { syncCreationSelectedRolesToPreset(getCreationRecommendedRolePreset()); }
+function syncCreationSelectedRolesToIndustry() { syncCreationSelectedRolesToPreset(getCreationRecommendedRolePreset()); }
+function syncCreationSelectedRolesToReferenceCoverage(analysis = state.creationReferenceAnalysis.result) { if (state.creationRoleSelectionManuallyEdited) { resetCreationDraftPreview(); return; } const selectedRoles = applyCreationReferenceCoverageRolePlan({ roles: getCreationSelectedRoles(), analysis, supportedRoles: CREATION_PREVIEW_SLOTS.map((slot) => slot.role), roleTargets: CREATION_REFERENCE_COVERAGE_ROLE_TARGETS }); if (selectedRoles.length > 0) state.creationSelectedRoles = selectedRoles; resetCreationDraftPreview(); }
 
 function toggleCreationSelectedRole(role) {
-  const currentRoles = new Set(getCreationSelectedRoles());
-  if (currentRoles.has(role)) {
-    if (currentRoles.size <= 1) {
-      renderCreationRolePicker();
-      return;
-    }
-    currentRoles.delete(role);
-  } else {
-    currentRoles.add(role);
-  }
-
-  state.creationSelectedRoles = CREATION_PREVIEW_SLOTS.filter((slot) => currentRoles.has(slot.role)).map((slot) => slot.role);
+  state.creationRoleSelectionManuallyEdited = true;
+  const selectedRoles = toggleCreationSelectedRoles(role, getCreationSelectedRoles(), CREATION_PREVIEW_SLOTS.map((slot) => slot.role));
+  if (!selectedRoles) { renderCreationRolePicker(); return; }
+  state.creationSelectedRoles = selectedRoles;
   resetCreationDraftPreview();
 }
 
@@ -9154,6 +9140,7 @@ function normalizeCreationItemForView(item = {}, fallbackIndex = 0) {
     generationStartedAt: String(item.generationStartedAt || ""),
     generationCompletedAt: String(item.generationCompletedAt || ""),
     generationDurationMs: String(item.generationDurationMs || ""),
+    ...normalizeCreationCoverageFields(item),
     skuSubjectId,
     skuTitle,
     skuSubject: skuSubject ? { ...skuSubject } : null,
@@ -9512,6 +9499,7 @@ function applyCreationSetToForm(set) {
   const normalizedRoles = normalizeCreationRoleIds(
     normalized.selectedRoles.length > 0 ? normalized.selectedRoles : normalized.items.map((item) => item.role),
   );
+  state.creationRoleSelectionManuallyEdited = false;
   state.creationSelectedRoles = normalizedRoles.length > 0 ? normalizedRoles : getCreationRoleIdsForCount(normalized.imageCount);
   setCreationImageCountValue(state.creationSelectedRoles.length || normalized.imageCount);
   resetCreationReferenceFilesForRecordReuse(normalized);
@@ -9877,6 +9865,8 @@ function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
     media.appendChild(placeholder);
   }
   card.appendChild(media);
+
+  appendCreationCoverageSummary(card, item, { hideGenerationDetails });
 
   const shouldRenderPath = !imageUrl && !showRecordActions && !hideGenerationDetails;
   if (shouldRenderPath) {
@@ -11244,8 +11234,9 @@ async function applyCreationReferenceAnalysis(analysis) {
   state.creationReferenceAnalysis.collapsed = false;
   state.creationReferenceAnalysis.dirty = false;
   const matchedTemplate = await applyCreationReferenceAnalysisCategoryMatch(normalized);
+  const productNameApplied = applyCreationReferenceAnalysisProductNameSuggestion(normalized);
   renderCreationReferenceAnalysis();
-  return matchedTemplate;
+  return { matchedTemplate, productNameApplied };
 }
 
 function applyCreationReferenceAnalysisProductNameSuggestion(analysis = {}) {
@@ -11293,6 +11284,7 @@ function applyCreationReferenceAnalysisRecommendations() {
       : item;
   });
   const productNameApplied = applyCreationReferenceAnalysisProductNameSuggestion(analysis);
+  syncCreationSelectedRolesToReferenceCoverage(analysis);
   state.creationReferenceAnalysis.applied = true;
   state.creationReferenceAnalysis.collapsed = true;
   const appliedMessage = buildCreationReferenceAnalysisAppliedFeedbackMessage({
@@ -11450,7 +11442,7 @@ async function analyzeCreationReferenceImages() {
       throw new Error(payload.message || "套图参考图识别失败。");
     }
 
-    const matchedTemplate = await applyCreationReferenceAnalysis(payload);
+    const { matchedTemplate } = await applyCreationReferenceAnalysis(payload);
     if (requestToken !== creationReferenceAnalysisRequestToken || referenceSnapshot !== getCreationReferenceAnalysisSnapshot()) {
       return;
     }
@@ -14673,7 +14665,7 @@ async function buildPromptAgentFormData() {
   const formData = new FormData();
   formData.set("image", await preparePromptAnalysisImageFile(state.promptAgent.file));
   formData.set("reasoningEffort", PROMPT_AGENT_ANALYSIS_REASONING_EFFORT);
-  appendJobConfigToFormData(formData, job);
+  appendCurrentConfigToFormData(formData);
   return formData;
 }
 

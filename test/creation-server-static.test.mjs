@@ -424,7 +424,7 @@ test("creation repair route regenerates selected set items", async () => {
   assert.match(server, /dimensionSpecs:\s*existingSet\.dimensionSpecs/);
   assert.match(server, /industryTemplatePath:\s*existingSet\.industryTemplatePath/);
   assert.match(server, /applyCreationRepairOverrides/);
-  assert.match(server, /filename:\s*item\.filename \|\| buildCreationImageFilename/);
+  assert.match(server, /const filename = buildCreationImageFilename\(\{\s*item:\s*repairItem,/);
   assert.match(server, /prompt:\s*repairItem\.prompt/);
   assert.match(server, /buildCreationItemReferenceImages\(repairItem,\s*referenceImages,\s*referenceImageRoles\)/);
   assert.match(server, /buildCreationGenerationReferenceImageLabels\(\s*itemReferenceImages,\s*referenceImageRoles,/);

@@ -183,7 +183,7 @@ test("local generate accepts quick blend without a user prompt and saves pair me
   assert.equal(saved.payload.item.quickBlendPairIndex, "2");
   assert.equal(saved.payload.item.quickBlendAImageName, "a-dress.png");
   assert.equal(saved.payload.item.quickBlendBImageName, "b-shoe.png");
-  assert.match(saved.payload.item.filename, /^\d{4}-a-dress-b-shoe-\d{4}-[a-z0-9]{4}\.png$/);
+  assert.match(saved.payload.item.filename, /^\d{4}-a-dress-b-shoe-[a-z0-9]{4}\.png$/);
   assert.doesNotMatch(saved.payload.item.filename, /^\d{6}-/);
   assert.deepEqual(saved.payload.item.referenceImageNames, ["a-dress.png", "b-shoe.png"]);
   assert.match(saved.payload.item.prompt, /A subject group above the B subject group/i);
