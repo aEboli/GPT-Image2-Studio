@@ -35,12 +35,12 @@ GPT-Image2-Studio 是一个面向创作者、电商运营、内容团队和产�
 
 ## 近期更新
 
-- `v0.1.7` 聚焦电商套图参考图流程：参考图分析、商品角色标签、SKU/组合装线索和提示词规划继续收紧。
+- `v0.1.8` 聚焦电商套图参考图流程：参考图分析、商品角色标签、SKU/组合装线索和提示词规划继续收紧。
 - 套图参考图卡片会保留分组商品标签，分析结果可更稳定地回填商品名、四级类目和参考用途。
 - 新增套图参考图专用灯箱入口，可从参考图卡片查看大图，并复用通用灯箱的缩放、拖拽、复制和打开路径能力。
 - 四级类目模板和套图规划继续补全，生成计划会更明确地区分主图、卖点图、场景图、SKU 补图和 Listing 证据。
 - 胶片栏、预览区和套图卡片继续优化 loading、排队中、失败和空状态，减少批量生成时的布局跳动。
-- Windows 安装包与发布文档同步更新到 `v0.1.7`。
+- Windows 安装包与发布文档同步更新到 `v0.1.8`。
 
 ## 目录
 
@@ -64,7 +64,7 @@ GPT-Image2-Studio 是一个面向创作者、电商运营、内容团队和产�
 从 GitHub Release 下载当前安装包：
 
 ```text
-GPT-Image2-Studio-Setup-v0.1.7.exe
+GPT-Image2-Studio-Setup-v0.1.8.exe
 ```
 
 安装后从桌面或开始菜单启动：
@@ -501,7 +501,7 @@ cmd /c npm run build:installer
 安装包产物写入：
 
 ```text
-artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.1.7.exe
+artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.1.8.exe
 ```
 
 更多说明见 [docs/windows-installer.md](./docs/windows-installer.md)。

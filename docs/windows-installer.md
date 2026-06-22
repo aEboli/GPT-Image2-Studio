@@ -1,15 +1,15 @@
 # Windows 安装包说明
 
-`GPT-Image2-Studio-Setup-v0.1.7.exe` 是 Windows 自解压安装包，用系统自带 `iexpress.exe` 生成。
+`GPT-Image2-Studio-Setup-v0.1.8.exe` 是 Windows 自解压安装包，用系统自带 `iexpress.exe` 生成。
 
 ## 本次更新
 
-- 当前安装包文件名为 `GPT-Image2-Studio-Setup-v0.1.7.exe`，用于 GitHub Release 分发。
+- 当前安装包文件名为 `GPT-Image2-Studio-Setup-v0.1.8.exe`，用于 GitHub Release 分发。
 - 套图参考图分析继续完善，分析结果会保留商品分组标签，并可更稳定地回填商品名、四级类目和参考用途。
 - 新增套图参考图专用灯箱入口，参考图卡片可直接查看大图，并复用缩放、拖拽、复制和打开路径能力。
 - 四级类目模板和套图规划提示词继续补全，主图、卖点图、场景图、SKU 补图和 Listing 证据的职责更清晰。
 - 套图卡片、胶片栏和预览区继续优化 loading、排队中、失败和空状态，减少批量生成时的布局跳动。
-- README 与 Windows 安装包说明已同步到当前 `v0.1.7` 功能。
+- README 与 Windows 安装包说明已同步到当前 `v0.1.8` 功能。
 
 > 高分辨率更容易触发上游生成失败、超时或无最终图片结果。日常使用建议优先选择 1K 和 2K 分辨率，需要更大尺寸时再逐档尝试。
 
