@@ -1180,6 +1180,7 @@ test("Cloudflare creation SKU bundle generation only sends the selected SKU subj
   formData.set("scenario", "standard");
   formData.set("industryTemplate", "general");
   formData.set("selectedRoles", JSON.stringify(["hero"]));
+  formData.set("infographicRebuildEnabled", "false");
   formData.set(
     "referenceImageRoles",
     JSON.stringify([

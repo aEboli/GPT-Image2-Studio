@@ -82,6 +82,35 @@ test("creation SKU item reference images only include the matching subject files
   ]);
 });
 
+test("creation infographic rebuild item reference images keep subject references plus only its source infographic", () => {
+  const item = {
+    role: "infographic-rebuild",
+    sourceInfographic: {
+      filename: "size-card.png",
+      role: "dimensions",
+    },
+  };
+  const images = [
+    { filename: "blue-lure.png" },
+    { filename: "silver-anchor.png" },
+    { filename: "package-list.png" },
+    { filename: "size-card.png" },
+    { filename: "usage-guide.png" },
+  ];
+  const roles = [
+    { filename: "blue-lure.png", role: "product" },
+    { filename: "silver-anchor.png", role: "reference-product" },
+    { filename: "package-list.png", role: "package" },
+    { filename: "size-card.png", role: "dimensions" },
+    { filename: "usage-guide.png", role: "usage" },
+  ];
+
+  assert.deepEqual(
+    buildCreationItemReferenceImages(item, images, roles).map((image) => image.filename),
+    ["blue-lure.png", "silver-anchor.png", "size-card.png"],
+  );
+});
+
 test("creation SKU item reference images keep package-list content text-only and include dimension references", () => {
   const item = {
     role: "sku",

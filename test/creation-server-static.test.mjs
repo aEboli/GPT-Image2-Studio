@@ -205,7 +205,7 @@ test("creation generation labels uploaded reference image count and file order",
   assert.match(worker, /normalizeCreationReferenceRoles\(formData\.get\("referenceImageRoles"\)\)/);
   assert.match(server, /skuGenerationRule:\s*formData\.get\("skuGenerationRule"\)/);
   assert.match(worker, /skuGenerationRule:\s*formData\.get\("skuGenerationRule"\)/);
-  assert.match(worker, /referenceImageRoles,\s*\n\s*skuSubjects:\s*formData\.get\("skuSubjects"\),\s*\n\s*skuBundleCount:\s*formData\.get\("skuBundleCount"\),\s*\n\s*skuGenerationRule:\s*formData\.get\("skuGenerationRule"\),\s*\n\s*logoOptions:/);
+  assert.match(worker, /referenceImageRoles,\s*\n\s*infographicRebuildEnabled:\s*formData\.get\("infographicRebuildEnabled"\),\s*\n\s*skuSubjects:\s*formData\.get\("skuSubjects"\),\s*\n\s*skuBundleCount:\s*formData\.get\("skuBundleCount"\),\s*\n\s*skuGenerationRule:\s*formData\.get\("skuGenerationRule"\),\s*\n\s*logoOptions:/);
 });
 
 test("creation generation keeps style references separate from subject references", async () => {
@@ -246,11 +246,11 @@ test("creation generation passes SKU subjects through local and worker planning"
   assert.match(worker, /formData\.get\("skuBundleCount"\)/);
   assert.match(
     server,
-    /handleCreationGenerate[\s\S]*buildCreationPlan\(\{[\s\S]*visualLanguage:\s*formData\.get\("visualLanguage"\),[\s\S]*skuSubjects:\s*formData\.get\("skuSubjects"\),\s*\n\s*skuBundleCount:\s*formData\.get\("skuBundleCount"\)[\s\S]*logoOptions:/,
+    /handleCreationGenerate[\s\S]*buildCreationPlan\(\{[\s\S]*visualLanguage:\s*formData\.get\("visualLanguage"\),[\s\S]*referenceImageRoles,[\s\S]*infographicRebuildEnabled:\s*formData\.get\("infographicRebuildEnabled"\),[\s\S]*skuSubjects:\s*formData\.get\("skuSubjects"\),\s*\n\s*skuBundleCount:\s*formData\.get\("skuBundleCount"\)[\s\S]*logoOptions:/,
   );
   assert.match(
     worker,
-    /buildCreationPlan\(\{[\s\S]*skuSubjects:\s*formData\.get\("skuSubjects"\),\s*\n\s*skuBundleCount:\s*formData\.get\("skuBundleCount"\)[\s\S]*logoOptions:/,
+    /buildCreationPlan\(\{[\s\S]*referenceImageRoles,[\s\S]*infographicRebuildEnabled:\s*formData\.get\("infographicRebuildEnabled"\),[\s\S]*skuSubjects:\s*formData\.get\("skuSubjects"\),\s*\n\s*skuBundleCount:\s*formData\.get\("skuBundleCount"\)[\s\S]*logoOptions:/,
   );
   assert.match(server, /skuSubjects:\s*plan\.skuSubjects/);
   assert.match(worker, /skuSubjects:\s*plan\.skuSubjects/);
@@ -260,6 +260,31 @@ test("creation generation passes SKU subjects through local and worker planning"
   assert.match(worker, /visualLanguage:\s*plan\.visualLanguage/);
   assert.match(server, /visualLanguageLabel:\s*plan\.visualLanguageLabel/);
   assert.match(worker, /visualLanguageLabel:\s*plan\.visualLanguageLabel/);
+});
+
+test("creation infographic rebuild option is passed through planning generation repair and manifests", async () => {
+  const server = await readFile(serverPath, "utf8");
+  const worker = await readFile(cloudflareWorkerPath, "utf8");
+
+  assert.match(
+    server,
+    /handleCreationPlan[\s\S]*buildCreationPlan\(\{[\s\S]*infographicRebuildEnabled:\s*formData\.get\("infographicRebuildEnabled"\)/,
+  );
+  assert.match(
+    server,
+    /handleCreationGenerate[\s\S]*buildCreationPlan\(\{[\s\S]*infographicRebuildEnabled:\s*formData\.get\("infographicRebuildEnabled"\)/,
+  );
+  assert.match(
+    worker,
+    /buildCreationPlan\(\{[\s\S]*infographicRebuildEnabled:\s*formData\.get\("infographicRebuildEnabled"\)/,
+  );
+  assert.match(server, /infographicRebuildEnabled:\s*plan\.infographicRebuildEnabled/);
+  assert.match(worker, /infographicRebuildEnabled:\s*plan\.infographicRebuildEnabled/);
+  assert.match(
+    server,
+    /handleCreationRepair[\s\S]*repairPlanningOverrides = \{[\s\S]*infographicRebuildEnabled:\s*formData\.get\("infographicRebuildEnabled"\)/,
+  );
+  assert.match(server, /repairPlan = \{[\s\S]*infographicRebuildEnabled:\s*existingSet\.infographicRebuildEnabled/);
 });
 
 test("creation saved filenames prefer SKU filename tokens over display titles", async () => {

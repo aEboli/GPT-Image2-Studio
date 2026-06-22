@@ -110,6 +110,17 @@ function cleanQueueString(value) {
   return String(value || "").trim();
 }
 
+function normalizeDefaultEnabledBoolean(value) {
+  if (value === undefined || value === null || value === "") {
+    return true;
+  }
+  if (typeof value === "boolean") {
+    return value;
+  }
+  const normalized = cleanQueueString(value).toLowerCase();
+  return !["false", "0", "off", "no"].includes(normalized);
+}
+
 function isUnfinishedCreationQueueItem(item = {}) {
   const status = cleanQueueString(item.status).toLowerCase();
   return status !== "completed" && status !== "failed";
@@ -129,7 +140,15 @@ function getQueueRoleId(value) {
   return cleanQueueString(value?.role || value);
 }
 
-function draftItemsMatchSelectedRoles(draftItems, selectedRoles) {
+function isCreationInfographicRebuildQueueRole(role) {
+  return role === "infographic-rebuild";
+}
+
+function isCreationQueuedAppendRole(role) {
+  return role === "sku" || isCreationInfographicRebuildQueueRole(role);
+}
+
+function draftItemsMatchSelectedRoles(draftItems, selectedRoles, { infographicRebuildEnabled = true, infographicRebuildCount = 0 } = {}) {
   if (!Array.isArray(draftItems) || draftItems.length === 0 || !Array.isArray(selectedRoles)) {
     return false;
   }
@@ -137,12 +156,16 @@ function draftItemsMatchSelectedRoles(draftItems, selectedRoles) {
   const selectedRoleIds = selectedRoles.map(getQueueRoleId).filter(Boolean);
   const draftRoleIds = draftItems
     .map((item) => getQueueRoleId(item?.role))
-    .filter((role) => role && role !== "sku");
+    .filter((role) => role && !isCreationQueuedAppendRole(role));
+  const draftInfographicRebuildCount = draftItems.filter((item) =>
+    isCreationInfographicRebuildQueueRole(getQueueRoleId(item?.role)),
+  ).length;
 
   return (
     selectedRoleIds.length > 0 &&
     selectedRoleIds.length === draftRoleIds.length &&
-    selectedRoleIds.every((role, index) => role === draftRoleIds[index])
+    selectedRoleIds.every((role, index) => role === draftRoleIds[index]) &&
+    draftInfographicRebuildCount === (infographicRebuildEnabled ? infographicRebuildCount : 0)
   );
 }
 
@@ -167,6 +190,73 @@ function buildCreationQueuedSkuItems(skuSubjects = [], startIndex = 0) {
       referenceImageNames: Array.isArray(skuSubject.filenames) ? skuSubject.filenames.map(cleanQueueString).filter(Boolean) : [],
       skuSubject,
     }));
+}
+
+function isCreationSubjectReferenceRole(role) {
+  const normalized = cleanQueueString(role).toLowerCase();
+  return normalized === "product" || normalized === "reference-product";
+}
+
+function getCreationReferenceFilename(referenceRole = {}) {
+  return cleanQueueString(referenceRole.filename || referenceRole.name || referenceRole.fileName);
+}
+
+function buildCreationQueueSourceInfographic(referenceRole = {}, index = 0) {
+  const source = {
+    filename: getCreationReferenceFilename(referenceRole),
+    role: cleanQueueString(referenceRole.role),
+  };
+  const roleLabel = cleanQueueString(referenceRole.roleLabel || referenceRole.label);
+  const rolePromptLabel = cleanQueueString(referenceRole.rolePromptLabel || referenceRole.promptLabel);
+  const note = cleanQueueString(referenceRole.note);
+  if (roleLabel) {
+    source.roleLabel = roleLabel;
+  }
+  if (rolePromptLabel) {
+    source.rolePromptLabel = rolePromptLabel;
+  }
+  if (note) {
+    source.note = note;
+  }
+  source.index = index;
+  return source;
+}
+
+function getCreationInfographicRebuildSources(referenceRoles = []) {
+  return (Array.isArray(referenceRoles) ? referenceRoles : [])
+    .map((referenceRole, index) => ({ referenceRole, index }))
+    .filter(({ referenceRole }) => {
+      const filename = getCreationReferenceFilename(referenceRole);
+      const role = cleanQueueString(referenceRole?.role);
+      return filename && role && !isCreationSubjectReferenceRole(role);
+    })
+    .map(({ referenceRole, index }) => buildCreationQueueSourceInfographic(referenceRole, index));
+}
+
+function getCreationSubjectReferenceNames(referenceRoles = []) {
+  return (Array.isArray(referenceRoles) ? referenceRoles : [])
+    .filter((referenceRole) => isCreationSubjectReferenceRole(referenceRole?.role))
+    .map(getCreationReferenceFilename)
+    .filter(Boolean);
+}
+
+function buildCreationQueuedInfographicRebuildTitle(source = {}, index = 0) {
+  const label = cleanQueueString(source.roleLabel || source.role || source.filename);
+  const suffix = label ? ` - ${label}` : "";
+  return `信息图重构 ${index + 1}${suffix}`;
+}
+
+function buildCreationQueuedInfographicRebuildItems({ referenceRoles = [], sources = [], startIndex = 0 } = {}) {
+  const subjectReferenceNames = getCreationSubjectReferenceNames(referenceRoles);
+  return (Array.isArray(sources) ? sources : []).map((source, index) => ({
+    itemId: `queued-infographic-rebuild-${index + 1}`,
+    role: "infographic-rebuild",
+    title: buildCreationQueuedInfographicRebuildTitle(source, index),
+    slotIndex: startIndex + index + 1,
+    status: "queued",
+    referenceImageNames: [...subjectReferenceNames, source.filename].filter(Boolean),
+    sourceInfographic: source,
+  }));
 }
 
 function getCreationQueueStatusText(job, isActive) {
@@ -219,15 +309,33 @@ export function buildCreationQueuedSet({
       : { value: "none", label: "无" };
   const previewSlots = getCreationPreviewSlots();
   const selectedRoles = getCreationSelectedRoles();
-  const shouldUseDraftItems = draftItemsMatchSelectedRoles(draftItems, selectedRoles);
+  const referenceImageRoles = buildCreationReferenceRolePayload();
+  const infographicRebuildEnabled = normalizeDefaultEnabledBoolean(
+    refs.creationInfographicRebuildEnabledInput?.checked ?? draftSet?.infographicRebuildEnabled,
+  );
+  const infographicRebuildSources = infographicRebuildEnabled ? getCreationInfographicRebuildSources(referenceImageRoles) : [];
+  const shouldUseDraftItems = draftItemsMatchSelectedRoles(draftItems, selectedRoles, {
+    infographicRebuildEnabled,
+    infographicRebuildCount: infographicRebuildSources.length,
+  });
   const baseSlots = shouldUseDraftItems ? draftItems : previewSlots;
-  const baseRoleCount = baseSlots.filter((item) => getQueueRoleId(item?.role) !== "sku").length;
+  const baseRoleCount = baseSlots.filter((item) => !isCreationQueuedAppendRole(getQueueRoleId(item?.role))).length;
   const imageCount = selectedRoles.length || baseRoleCount || getCreationSelectedImageCount();
   const rawVisualLanguage = refs.creationVisualLanguageInput?.value;
   const normalizedVisualLanguage = normalizeVisualLanguageForQueue(rawVisualLanguage, normalizeCreationVisualLanguage);
   const skuSubjects = buildCreationSkuSubjectPayload();
   const baseItems = baseSlots.map((slot, index) => ({ ...slot, slotIndex: index + 1, status: "queued" }));
-  const items = shouldUseDraftItems ? baseItems : [...baseItems, ...buildCreationQueuedSkuItems(skuSubjects, baseItems.length)];
+  const items = shouldUseDraftItems
+    ? baseItems
+    : [
+        ...baseItems,
+        ...buildCreationQueuedSkuItems(skuSubjects, baseItems.length),
+        ...buildCreationQueuedInfographicRebuildItems({
+          referenceRoles: referenceImageRoles,
+          sources: infographicRebuildSources,
+          startIndex: baseItems.length + skuSubjects.length,
+        }),
+      ];
 
   return normalizeSet({
     setId: createQueueId("creation-local"),
@@ -249,7 +357,9 @@ export function buildCreationQueuedSet({
     industryTemplatePath: industryTemplate.categoryPath || "",
     selectedRoles,
     referenceImageNames: referenceFiles.map((item) => item.file?.name || "").filter(Boolean),
-    referenceImageRoles: buildCreationReferenceRolePayload(),
+    referenceImageRoles,
+    infographicRebuildEnabled,
+    infographicRebuildCount: infographicRebuildSources.length,
     skuSubjects,
     skuBundleCount: normalizeCreationSkuBundleCountForPayload(refs.creationSkuBundleCountInput?.value || "1"),
     skuGenerationRule: skuGenerationRule.value || "none",

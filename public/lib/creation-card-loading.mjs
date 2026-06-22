@@ -181,6 +181,7 @@ export function syncCreationLoadingCard(
   fallbackIndex = 0,
   {
     isSkuStart = false,
+    isInfographicRebuildStart = false,
     getFallbackTitle = () => "",
     getImageUrl = () => "",
     getStatusLabel = () => "",
@@ -195,6 +196,8 @@ export function syncCreationLoadingCard(
   card.classList.toggle("is-generating", true);
   card.classList.toggle("is-sku", item.role === "sku");
   card.classList.toggle("is-sku-start", isSkuStart);
+  card.classList.toggle("is-infographic-rebuild", item.role === "infographic-rebuild");
+  card.classList.toggle("is-infographic-rebuild-start", isInfographicRebuildStart);
 
   const title = card.querySelector("[data-creation-card-title]");
   if (title) {
@@ -240,11 +243,12 @@ export function syncCreationResultGrid({
     ]),
   );
   const firstSkuItem = items.find((item) => item.role === "sku");
+  const firstInfographicRebuildItem = items.find((item) => item.role === "infographic-rebuild");
   const renderedKeys = new Set();
 
   items.forEach((item, index) => {
     const key = getKey(item, index);
-    const options = getItemOptions(item, index, { firstSkuItem });
+    const options = getItemOptions(item, index, { firstSkuItem, firstInfographicRebuildItem });
     const existingCard = existingCards.get(key);
     const card = syncCard?.(existingCard, item, index, options) || createCard(item, index, options);
     renderedKeys.add(key);

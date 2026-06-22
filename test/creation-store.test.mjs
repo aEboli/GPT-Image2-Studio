@@ -163,6 +163,47 @@ test("creation store preserves item generation telemetry", () => {
   assert.equal(manifest.items[0].format, "jpg");
 });
 
+test("creation store preserves infographic rebuild setting and source metadata", () => {
+  const manifest = normalizeCreationSetManifest(
+    {
+      setId: "creation-set-infographic",
+      productName: "Infographic rebuild product",
+      infographicRebuildEnabled: true,
+      createdAt: "2026-05-05T09:00:00.000Z",
+      status: "partial_failed",
+      items: [
+        {
+          itemId: "17-infographic-rebuild-1",
+          slotIndex: 17,
+          role: "infographic-rebuild",
+          title: "Infographic rebuild 1",
+          prompt: "Keep the original source information unchanged.",
+          sourceInfographic: {
+            filename: "size-chart.jpg",
+            role: "dimensions",
+            roleLabel: "Dimensions",
+            rolePromptLabel: "dimension chart",
+            note: "Keep measurements",
+            index: 2,
+          },
+          status: "failed",
+        },
+      ],
+    },
+    { publicBasePath: "/output" },
+  );
+
+  assert.equal(manifest.infographicRebuildEnabled, true);
+  assert.deepEqual(manifest.items[0].sourceInfographic, {
+    filename: "size-chart.jpg",
+    role: "dimensions",
+    roleLabel: "Dimensions",
+    rolePromptLabel: "dimension chart",
+    note: "Keep measurements",
+    index: 2,
+  });
+});
+
 test("creation store preserves optional logo metadata for creation set detail display", async () => {
   const logo = {
     enabled: true,

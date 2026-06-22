@@ -52,8 +52,70 @@ test("creation planner applies preview plan prompt overrides without changing se
   assert.equal(plan.items[0].prompt.includes("Custom hero prompt"), false);
 });
 
-test("creation planner exposes the refactored sixteen suite image types", () => {
-  assert.equal(CREATION_ITEM_ROLES.length, 16);
+test("creation planner defaults infographic rebuild on and appends non-subject references after SKU items", () => {
+  const plan = buildCreationPlan({
+    productName: "Jointed fishing lure",
+    productDescription: "Segmented bait with treble hooks and lifelike swimming action",
+    sellingPoints: "realistic finish, durable body",
+    targetLanguage: "en",
+    selectedRoles: ["hero", "benefit"],
+    referenceImageRoles: [
+      { index: 1, filename: "blue-lure.png", role: "product", note: "Blue lure subject" },
+      { index: 2, filename: "silver-lure.png", role: "reference-product", note: "Primary silver lure subject" },
+      { index: 3, filename: "package-list.png", role: "package", note: "Includes USB cable and spare propeller" },
+      { index: 4, filename: "size-card.png", role: "dimensions", note: "Length 13 cm, weight 42 g" },
+      { index: 5, filename: "detail-card.png", role: "material", note: "Hook and body texture callouts" },
+    ],
+    skuSubjects: [
+      { id: "blue-lure", title: "Blue lure", filenames: ["blue-lure.png"], note: "Blue lure subject" },
+    ],
+  });
+
+  assert.equal(plan.infographicRebuildEnabled, true);
+  assert.deepEqual(
+    plan.items.map((item) => item.role),
+    ["hero", "benefit", "sku", "infographic-rebuild", "infographic-rebuild", "infographic-rebuild"],
+  );
+
+  const rebuildItems = plan.items.filter((item) => item.role === "infographic-rebuild");
+  assert.deepEqual(
+    rebuildItems.map((item) => item.sourceInfographic.filename),
+    ["package-list.png", "size-card.png", "detail-card.png"],
+  );
+  assert.deepEqual(
+    rebuildItems.map((item) => item.slotIndex),
+    [4, 5, 6],
+  );
+  assert.ok(rebuildItems.every((item) => item.prompt.includes("INFOGRAPHIC REBUILD")));
+  assert.ok(rebuildItems.every((item) => item.prompt.includes("keep the original source information unchanged")));
+  assert.ok(rebuildItems.every((item) => item.prompt.includes("Use the uploaded product subject references as the new product subject")));
+  assert.ok(rebuildItems.every((item) => item.prompt.includes("Do not add unsupported")));
+});
+
+test("creation planner disables infographic rebuild when requested", () => {
+  const plan = buildCreationPlan({
+    productName: "Jointed fishing lure",
+    productDescription: "Segmented bait with treble hooks and lifelike swimming action",
+    sellingPoints: "realistic finish, durable body",
+    targetLanguage: "en",
+    selectedRoles: ["hero", "benefit"],
+    infographicRebuildEnabled: "false",
+    referenceImageRoles: [
+      { index: 1, filename: "blue-lure.png", role: "product", note: "Blue lure subject" },
+      { index: 2, filename: "size-card.png", role: "dimensions", note: "Length 13 cm, weight 42 g" },
+      { index: 3, filename: "package-list.png", role: "package", note: "Includes USB cable" },
+    ],
+  });
+
+  assert.equal(plan.infographicRebuildEnabled, false);
+  assert.deepEqual(
+    plan.items.map((item) => item.role),
+    ["hero", "benefit"],
+  );
+});
+
+test("creation planner exposes the refactored eighteen suite image types", () => {
+  assert.equal(CREATION_ITEM_ROLES.length, 18);
   assert.deepEqual(
     CREATION_ITEM_ROLES.map((role) => role.title),
     [
@@ -73,9 +135,11 @@ test("creation planner exposes the refactored sixteen suite image types", () => 
       "材质成分解析图",
       "售后信任收口图",
       "使用步骤/上手图",
+      "真人手持展示图",
+      "真人穿戴场景图",
     ],
   );
-  assert.equal(normalizeCreationImageCount(18), 16);
+  assert.equal(normalizeCreationImageCount(18), 18);
 
   const plan = buildCreationPlan({
     productName: "AeroPress Clear",
@@ -84,7 +148,7 @@ test("creation planner exposes the refactored sixteen suite image types", () => 
     targetLanguage: "en",
   });
 
-  assert.equal(plan.imageCount, 16);
+  assert.equal(plan.imageCount, 18);
   assert.deepEqual(
     plan.items.map((item) => item.title),
     CREATION_ITEM_ROLES.map((role) => role.title),
@@ -519,6 +583,7 @@ test("creation planner keeps the requested role count while replacing weak roles
     sellingPoints: "USB-C recharge\nbedside reading\nmagnetic base",
     targetLanguage: "en",
     selectedRoles: ["hero", "benefit", "scene", "multi-angle"],
+    infographicRebuildEnabled: false,
     referenceImageRoles: [
       { filename: "lamp-main.png", role: "product", note: "white lamp main subject" },
       { filename: "charging-guide.png", role: "usage", note: "USB-C charging steps and cable direction" },
@@ -572,6 +637,8 @@ test("creation planner adds buyer-decision strategy to formerly templated conver
       "ingredient-material",
       "after-sales",
       "usage-suggestion",
+      "human-handheld",
+      "human-wearable",
     ],
   });
   const promptByRole = Object.fromEntries(plan.items.map((item) => [item.role, item.prompt]));
@@ -591,6 +658,8 @@ test("creation planner adds buyer-decision strategy to formerly templated conver
   assert.match(promptByRole["ingredient-material"], /what is it made of and why does that matter/i);
   assert.match(promptByRole["after-sales"], /what risk remains after I click buy/i);
   assert.match(promptByRole["usage-suggestion"], /will I know how to use it successfully/i);
+  assert.match(promptByRole["human-handheld"], /real handheld scale and use feel/i);
+  assert.match(promptByRole["human-wearable"], /fits, hangs, carries, or looks on a real person/i);
 });
 
 test("creation planner gives every ecommerce carousel role a shopper question", () => {
@@ -612,6 +681,25 @@ test("creation planner gives every ecommerce carousel role a shopper question", 
   assert.match(promptByRole["product-detail"], /are the visible details trustworthy enough to buy/i);
   assert.match(promptByRole["accessory-gift"], /what exactly will arrive in the box/i);
   assert.match(promptByRole["after-sales"], /what risk is reduced after ordering/i);
+  assert.match(promptByRole["human-handheld"], /real person's hands or in actual use/i);
+  assert.match(promptByRole["human-wearable"], /real body or when carried in a real scene/i);
+});
+
+test("creation planner gives hero images circular scenario insets and scenario cues", () => {
+  const plan = buildCreationPlan({
+    productName: "Adjustable wrench",
+    productDescription: "Adjustable wrench for indoor repairs, outdoor maintenance, and travel tool kits.",
+    sellingPoints: "indoor use\noutdoor maintenance\ntravel tool kit",
+    targetLanguage: "en",
+    selectedRoles: ["hero"],
+  });
+  const heroPrompt = plan.items[0].prompt;
+
+  assert.match(heroPrompt, /multiple small circular scene frames/i);
+  assert.match(heroPrompt, /3-5 small circular scene frames/i);
+  assert.match(heroPrompt, /home repair, workshop, outdoor, vehicle, or jobsite/i);
+  assert.match(heroPrompt, /commute, casual outing, travel, or daily styling/i);
+  assert.match(heroPrompt, /indoor|outdoor/i);
 });
 
 test("creation planner makes scene and effect roles feel like advertising instead of rigid templates", () => {
@@ -1025,7 +1113,7 @@ test("creation planner appends distinct SKU images after twelve carousel roles",
   assert.match(skuItems[2].prompt, /red-white-bg\.png/);
 });
 
-test("creation planner defaults suite generation to sixteen carousel images", () => {
+test("creation planner defaults suite generation to eighteen carousel images", () => {
   const plan = buildCreationPlan({
     productName: "Travel bottle",
     productDescription: "Leakproof travel bottle with carry loop and silicone seal.",
@@ -1033,8 +1121,8 @@ test("creation planner defaults suite generation to sixteen carousel images", ()
     targetLanguage: "en",
   });
 
-  assert.equal(normalizeCreationImageCount("99"), 16);
-  assert.equal(plan.imageCount, 16);
+  assert.equal(normalizeCreationImageCount("99"), 18);
+  assert.equal(plan.imageCount, 18);
   assert.deepEqual(plan.items.map((item) => item.role), CREATION_ITEM_ROLES.map((role) => role.role));
 });
 
@@ -1067,27 +1155,53 @@ test("creation planner supports the refactored ecommerce image types with dedica
   assert.ok(roleValues.includes("series-showcase"));
   assert.ok(roleValues.includes("ingredient-material"));
   assert.ok(roleValues.includes("brand-story"));
+  assert.ok(roleValues.includes("human-handheld"));
+  assert.ok(roleValues.includes("human-wearable"));
   assert.ok(!roleValues.includes("image-decomposition"));
   assert.ok(!roleValues.includes("feature-callout"));
   assert.equal(CREATION_ITEM_ROLES.find((role) => role.role === "ingredient-material")?.title, "材质成分解析图");
+  assert.equal(CREATION_ITEM_ROLES.find((role) => role.role === "human-handheld")?.title, "真人手持展示图");
+  assert.equal(CREATION_ITEM_ROLES.find((role) => role.role === "human-wearable")?.title, "真人穿戴场景图");
 
   const plan = buildCreationPlan({
     productName: "Modular desk lamp",
     productDescription: "LED desk lamp with adjustable arm, USB-C power, replaceable diffuser, desk clamp compatibility, factory test card, and maker craft notes.",
     sellingPoints: "stable clamp, three brightness levels, replaceable diffuser, easy cleaning, tested wiring, workshop-built hinge",
     targetLanguage: "en",
-    selectedRoles: ["craft-process", "series-showcase", "spec-table", "usage-suggestion", "brand-story", "ingredient-material"],
+    selectedRoles: [
+      "craft-process",
+      "series-showcase",
+      "spec-table",
+      "usage-suggestion",
+      "brand-story",
+      "ingredient-material",
+      "human-handheld",
+      "human-wearable",
+    ],
   });
 
-  assert.deepEqual(plan.selectedRoles, ["craft-process", "series-showcase", "spec-table", "usage-suggestion", "brand-story", "ingredient-material"]);
+  assert.deepEqual(plan.selectedRoles, [
+    "craft-process",
+    "series-showcase",
+    "spec-table",
+    "usage-suggestion",
+    "brand-story",
+    "ingredient-material",
+    "human-handheld",
+    "human-wearable",
+  ]);
   assert.match(plan.items.find((item) => item.role === "craft-process").prompt, /quality and craft proof image/i);
   assert.match(plan.items.find((item) => item.role === "series-showcase").prompt, /variant and SKU choice image/i);
   assert.match(plan.items.find((item) => item.role === "spec-table").prompt, /legible parameter table/i);
   assert.match(plan.items.find((item) => item.role === "usage-suggestion").prompt, /use-and-owning confidence image/i);
   assert.match(plan.items.find((item) => item.role === "brand-story").prompt, /brand texture and gift-value image/i);
   assert.match(plan.items.find((item) => item.role === "ingredient-material").prompt, /material or ingredient analysis image/i);
+  assert.match(plan.items.find((item) => item.role === "human-handheld").prompt, /real-person handheld demonstration image/i);
+  assert.match(plan.items.find((item) => item.role === "human-wearable").prompt, /real-person worn or carried demonstration image/i);
   assert.doesNotMatch(plan.items.find((item) => item.role === "ingredient-material").prompt, /certification and trust proof/i);
   assert.match(plan.items.find((item) => item.role === "ingredient-material").prompt, /Do not invent formula percentages, lab claims, or certification marks/i);
+  assert.match(plan.items.find((item) => item.role === "human-handheld").prompt, /live person must appear in the frame/i);
+  assert.match(plan.items.find((item) => item.role === "human-wearable").prompt, /live model must visibly wear, carry, shoulder, or use the product/i);
 });
 
 test("creation planner applies SKU generation rules for package-list content and dimensions", () => {
@@ -1441,6 +1555,7 @@ test("creation planner does not create SKU images for accessory or package refer
     sellingPoints: "durable finish",
     targetLanguage: "en",
     selectedRoles: ["hero", "benefit"],
+    infographicRebuildEnabled: false,
     referenceImageRoles: [
       { filename: "lure-a.png", role: "product", note: "Primary sellable lure" },
       { filename: "hooks.png", role: "package", note: "Accessory pack" },
@@ -1625,6 +1740,7 @@ test("creation planner dedupes noisy reference-derived dimensions and stores sel
     targetLanguage: "en",
     selectedRoles: ["accessory-gift", "after-sales", "size-capacity-fit", "after-sales"],
     dimensionUnitMode: "both",
+    infographicRebuildEnabled: false,
     referenceImageRoles: [
       {
         filename: "package-list.png",
@@ -2033,25 +2149,25 @@ test("creation planner normalizes supported scenario and image count options", (
   assert.equal(normalizeCreationImageCount("12"), 12);
   assert.equal(normalizeCreationImageCount("14"), 14);
   assert.equal(normalizeCreationImageCount("16"), 16);
-  assert.equal(normalizeCreationImageCount("18"), 16);
-  assert.equal(normalizeCreationImageCount("99"), 16);
+  assert.equal(normalizeCreationImageCount("18"), 18);
+  assert.equal(normalizeCreationImageCount("99"), 18);
   assert.equal(normalizeCreationScenario("social-seeding").value, "social-seeding");
   assert.equal(normalizeCreationScenario("livestream").value, "livestream");
   assert.equal(normalizeCreationScenario("gift-guide").value, "gift-guide");
   assert.equal(normalizeCreationScenario("unknown").value, "standard");
 });
 
-test("creation planner supports full sixteen-image suites", () => {
+test("creation planner supports full eighteen-image suites", () => {
   const plan = buildCreationPlan({
     productName: "Modular desk lamp",
     productDescription: "LED desk lamp with adjustable arm, USB-C power, replaceable diffuser, compatibility notes, care card, brand story, and visible component breakdown notes.",
     sellingPoints: "stable clamp, three brightness levels, replaceable diffuser, easy cleaning, tested wiring, workshop-built hinge",
     targetLanguage: "en",
-    imageCount: "16",
+    imageCount: "18",
   });
 
-  assert.equal(plan.imageCount, 16);
-  assert.equal(plan.items.length, 16);
+  assert.equal(plan.imageCount, 18);
+  assert.equal(plan.items.length, 18);
   assert.deepEqual(plan.items.map((item) => item.role), CREATION_ITEM_ROLES.map((role) => role.role));
 });
 

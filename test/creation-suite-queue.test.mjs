@@ -168,6 +168,163 @@ test("creation suite queue appends SKU preview cards to queued sets", () => {
   assert.equal(set.items[3].status, "queued");
 });
 
+test("creation suite queue defaults infographic rebuild on and appends queued rebuild cards", () => {
+  const referenceRoles = [
+    { filename: "subject-a.jpg", role: "product", roleLabel: "Subject" },
+    { filename: "subject-b.jpg", role: "reference-product", roleLabel: "Subject reference" },
+    { filename: "size-chart.jpg", role: "dimensions", roleLabel: "Dimensions", note: "Keep measurements" },
+    { filename: "steps.jpg", role: "usage", roleLabel: "Usage" },
+  ];
+
+  const set = buildCreationQueuedSet({
+    buildCreationReferenceRolePayload: () => referenceRoles,
+    buildCreationSkuSubjectPayload: () => [{ id: "sku-a", title: "SKU A", filenames: ["sku-a.jpg"] }],
+    createdAt: "2026-05-26T08:00:00.000Z",
+    creationState: { generating: true },
+    formatCreationDimensionUnitModeLabel: (value) => `Unit ${value}`,
+    formatCreationVisualLanguageLabel: (value) => `Visual ${value}`,
+    getCreationCurrentSet: () => null,
+    getCreationLogoPayload: () => null,
+    getCreationPreviewSlots: () => [
+      { itemId: "hero", role: "hero", title: "Hero" },
+      { itemId: "scene", role: "scene", title: "Scene" },
+    ],
+    getCreationSelectedDimensionUnitMode: () => "both",
+    getCreationSelectedImageCount: () => 2,
+    getCreationSelectedIndustryTemplate: () => ({ value: "general", label: "General", categoryPath: "" }),
+    getCreationSelectedLanguage: () => ({ value: "en", label: "English" }),
+    getCreationSelectedRoles: () => ["hero", "scene"],
+    getCreationSelectedScenario: () => ({ value: "standard", label: "Standard" }),
+    getCreationSelectedSkuGenerationRule: () => ({ value: "none", label: "None" }),
+    isCreationDraftSet: () => false,
+    normalizeCreationSkuBundleCountForPayload: (value) => Number(value),
+    normalizeCreationVisualLanguage: (value) => value || "classic-commercial",
+    normalizeSet,
+    productDescription: "Description",
+    productName: "Queued product",
+    refs: {
+      creationDimensionSpecsInput: { value: "" },
+      creationSkuBundleCountInput: { value: "1" },
+      creationVisualLanguageInput: { value: "classic-commercial" },
+    },
+    sellingPoints: [],
+  });
+
+  assert.equal(set.infographicRebuildEnabled, true);
+  assert.equal(set.imageCount, 2);
+  assert.deepEqual(set.items.map((item) => item.role), ["hero", "scene", "sku", "infographic-rebuild", "infographic-rebuild"]);
+  assert.equal(set.items[3].itemId, "queued-infographic-rebuild-1");
+  assert.equal(set.items[3].slotIndex, 4);
+  assert.deepEqual(set.items[3].sourceInfographic, {
+    filename: "size-chart.jpg",
+    role: "dimensions",
+    roleLabel: "Dimensions",
+    note: "Keep measurements",
+    index: 2,
+  });
+  assert.deepEqual(set.items[3].referenceImageNames, ["subject-a.jpg", "subject-b.jpg", "size-chart.jpg"]);
+  assert.deepEqual(set.items[4].referenceImageNames, ["subject-a.jpg", "subject-b.jpg", "steps.jpg"]);
+});
+
+test("creation suite queue omits queued infographic rebuild cards when disabled", () => {
+  const set = buildCreationQueuedSet({
+    buildCreationReferenceRolePayload: () => [
+      { filename: "subject.jpg", role: "product" },
+      { filename: "size-chart.jpg", role: "dimensions" },
+    ],
+    buildCreationSkuSubjectPayload: () => [],
+    createdAt: "2026-05-26T08:00:00.000Z",
+    creationState: { generating: true },
+    formatCreationDimensionUnitModeLabel: (value) => `Unit ${value}`,
+    formatCreationVisualLanguageLabel: (value) => `Visual ${value}`,
+    getCreationCurrentSet: () => null,
+    getCreationLogoPayload: () => null,
+    getCreationPreviewSlots: () => [{ itemId: "hero", role: "hero", title: "Hero" }],
+    getCreationSelectedDimensionUnitMode: () => "both",
+    getCreationSelectedImageCount: () => 1,
+    getCreationSelectedIndustryTemplate: () => ({ value: "general", label: "General", categoryPath: "" }),
+    getCreationSelectedLanguage: () => ({ value: "en", label: "English" }),
+    getCreationSelectedRoles: () => ["hero"],
+    getCreationSelectedScenario: () => ({ value: "standard", label: "Standard" }),
+    getCreationSelectedSkuGenerationRule: () => ({ value: "none", label: "None" }),
+    isCreationDraftSet: () => false,
+    normalizeCreationSkuBundleCountForPayload: (value) => Number(value),
+    normalizeCreationVisualLanguage: (value) => value || "classic-commercial",
+    normalizeSet,
+    productDescription: "Description",
+    productName: "Queued product",
+    refs: {
+      creationDimensionSpecsInput: { value: "" },
+      creationInfographicRebuildEnabledInput: { checked: false },
+      creationSkuBundleCountInput: { value: "1" },
+      creationVisualLanguageInput: { value: "classic-commercial" },
+    },
+    sellingPoints: [],
+  });
+
+  assert.equal(set.infographicRebuildEnabled, false);
+  assert.deepEqual(set.items.map((item) => item.role), ["hero"]);
+});
+
+test("creation suite queue keeps draft infographic rebuild items without changing base image count", () => {
+  const draftSet = {
+    setId: "creation-draft-with-rebuild",
+    items: [
+      { itemId: "hero", role: "hero", title: "Hero", status: "idle" },
+      { itemId: "scene", role: "scene", title: "Scene", status: "idle" },
+      { itemId: "queued-sku-1", role: "sku", title: "SKU image 1", status: "idle" },
+      {
+        itemId: "queued-infographic-rebuild-1",
+        role: "infographic-rebuild",
+        title: "Infographic rebuild 1",
+        status: "idle",
+        sourceInfographic: { filename: "size-chart.jpg", role: "dimensions", index: 1 },
+      },
+    ],
+  };
+
+  const set = buildCreationQueuedSet({
+    buildCreationReferenceRolePayload: () => [
+      { filename: "subject.jpg", role: "product" },
+      { filename: "size-chart.jpg", role: "dimensions" },
+    ],
+    buildCreationSkuSubjectPayload: () => [{ id: "sku-a", title: "SKU A", filenames: ["sku-a.jpg"] }],
+    createdAt: "2026-05-26T08:00:00.000Z",
+    creationState: { generating: false },
+    formatCreationDimensionUnitModeLabel: (value) => `Unit ${value}`,
+    formatCreationVisualLanguageLabel: (value) => `Visual ${value}`,
+    getCreationCurrentSet: () => draftSet,
+    getCreationLogoPayload: () => null,
+    getCreationPreviewSlots: () => [
+      { itemId: "hero", role: "hero", title: "Hero" },
+      { itemId: "scene", role: "scene", title: "Scene" },
+    ],
+    getCreationSelectedDimensionUnitMode: () => "both",
+    getCreationSelectedImageCount: () => 2,
+    getCreationSelectedIndustryTemplate: () => ({ value: "general", label: "General", categoryPath: "" }),
+    getCreationSelectedLanguage: () => ({ value: "en", label: "English" }),
+    getCreationSelectedRoles: () => ["hero", "scene"],
+    getCreationSelectedScenario: () => ({ value: "standard", label: "Standard" }),
+    getCreationSelectedSkuGenerationRule: () => ({ value: "none", label: "None" }),
+    isCreationDraftSet: () => true,
+    normalizeCreationSkuBundleCountForPayload: (value) => Number(value),
+    normalizeCreationVisualLanguage: (value) => value || "classic-commercial",
+    normalizeSet,
+    productDescription: "Description",
+    productName: "Queued product",
+    refs: {
+      creationDimensionSpecsInput: { value: "" },
+      creationSkuBundleCountInput: { value: "1" },
+      creationVisualLanguageInput: { value: "classic-commercial" },
+    },
+    sellingPoints: [],
+  });
+
+  assert.equal(set.imageCount, 2);
+  assert.deepEqual(set.items.map((item) => item.role), ["hero", "scene", "sku", "infographic-rebuild"]);
+  assert.equal(set.items[3].sourceInfographic.filename, "size-chart.jpg");
+});
+
 test("creation suite queue rebuilds items when draft roles differ from current selected roles", () => {
   const staleRoles = [
     "hero",

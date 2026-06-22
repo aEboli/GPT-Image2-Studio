@@ -45,18 +45,9 @@ import { buildCreationQueuedRepairFormData, buildCreationQueuedSet as buildCreat
 import { DEFAULT_PORTRAIT_ACCESSORY_ASSETS, PORTRAIT_ACCESSORY_ASSET_CATEGORIES, getPortraitAccessoryAssetFileDescriptor } from "/lib/portrait-accessory-assets.mjs?v=20260528-portrait-assets-sort-1";
 import { createDefaultPortraitLocationState, createPortraitLocationSelectorController } from "/lib/portrait-location-selector.mjs?v=20260527-portrait-location-1";
 const SURPRISE_PROMPTS = [
-  {
-    name: "清晨通勤",
-    prompt: "生成一张清晨城市通勤生活照，年轻上班族手拿咖啡走出地铁站，晨光穿过街边树影，画面自然真实，轻微运动模糊，适合生活方式摄影。",
-  },
-  {
-    name: "家庭早餐",
-    prompt: "生成一张温暖家庭早餐场景，木质餐桌上有吐司、煎蛋、牛奶和水果，家人围坐聊天，窗外柔和日光洒入，构图干净，有真实居家氛围。",
-  },
-  {
-    name: "居家阅读",
-    prompt: "生成一张安静居家阅读画面，人物坐在窗边单人椅上看书，旁边有茶杯和落地灯，浅色窗帘、柔和阴影，画面舒适松弛，细节清晰。",
-  },
+  { name: "清晨通勤", prompt: "生成一张清晨城市通勤生活照，年轻上班族手拿咖啡走出地铁站，晨光穿过街边树影，画面自然真实，轻微运动模糊，适合生活方式摄影。" },
+  { name: "家庭早餐", prompt: "生成一张温暖家庭早餐场景，木质餐桌上有吐司、煎蛋、牛奶和水果，家人围坐聊天，窗外柔和日光洒入，构图干净，有真实居家氛围。" },
+  { name: "居家阅读", prompt: "生成一张安静居家阅读画面，人物坐在窗边单人椅上看书，旁边有茶杯和落地灯，浅色窗帘、柔和阴影，画面舒适松弛，细节清晰。" },
   {
     name: "厨房做饭",
     prompt: "生成一张周末厨房做饭场景，人物在明亮厨房里切菜备餐，台面摆放新鲜蔬菜和锅具，暖白色顶光，生活化抓拍视角，干净有烟火气。",
@@ -93,22 +84,13 @@ const REASONING_LABELS = {
   high: "High",
   xhigh: "XHigh",
 };
-
 const REASONING_ESTIMATES = {
   low: "30s+",
   medium: "90s+",
   high: "150s+",
   xhigh: "210s+",
 };
-const DEFAULT_LIMITS = {
-  maxParallelTasksPerSession: 15,
-  maxReferenceImages: 15,
-  maxCreationReferenceImages: 15,
-  maxCreationStyleReferenceImages: 3,
-  maxPortraitPersonReferenceImages: 3,
-  maxPortraitActionReferenceImages: 3,
-  maxPortraitAccessoryReferenceImages: 9,
-};
+const DEFAULT_LIMITS = { maxParallelTasksPerSession: 15, maxReferenceImages: 15, maxCreationReferenceImages: 15, maxCreationStyleReferenceImages: 3, maxPortraitPersonReferenceImages: 3, maxPortraitActionReferenceImages: 3, maxPortraitAccessoryReferenceImages: 9 };
 const DEFAULT_PROMPT_ENHANCE_TEXT = ",sharp focus, macro details, rich textures, crisp edges, photorealistic texture, visible grain, detailed surface material, cinematic lighting"; function buildPromptModePrompt() { const prompt = refs.promptInput.value.trim(); if (!state.promptEnhanceEnabled) { return prompt; } const enhanceText = String(refs.promptEnhanceInput?.value || "").trim(); return enhanceText ? `${prompt}${enhanceText.startsWith(",") ? "" : "\n\n"}${enhanceText}` : prompt; } function syncPromptEnhanceMode() { refs.promptEnhanceToggle.classList.toggle("is-active", state.promptEnhanceEnabled); refs.promptEnhanceToggle.setAttribute("aria-checked", String(state.promptEnhanceEnabled)); refs.promptEnhanceToggle.querySelector("small").textContent = state.promptEnhanceEnabled ? "开启" : "关闭"; refs.promptEnhanceField.classList.toggle("hidden", !state.promptEnhanceEnabled); } function togglePromptEnhanceMode() { state.promptEnhanceEnabled = !state.promptEnhanceEnabled; syncPromptEnhanceMode(); if (state.promptEnhanceEnabled) { refs.promptEnhanceInput.focus(); } }
 const PROMPT_TEMPLATE_STORAGE_KEY = "image-studio-prompt-templates-v2";
 const DEFAULT_PROMPT_TEMPLATES = SURPRISE_PROMPTS.map((template, index) => ({
@@ -668,6 +650,7 @@ const refs = {
   creationFeedback: document.querySelector("#creationFeedback"),
   creationForm: document.querySelector("#creationForm"),
   creationGenerateButton: document.querySelector("#creationGenerateButton"),
+  creationInfographicRebuildEnabledInput: document.querySelector("#creationInfographicRebuildEnabledInput"),
   creationListingAgentEnabledInput: document.querySelector("#creationListingAgentEnabledInput"),
   creationDimensionSpecsInput: document.querySelector("#creationDimensionSpecsInput"),
   creationDimensionUnitModeInput: document.querySelector("#creationDimensionUnitModeInput"),
@@ -7350,7 +7333,7 @@ const CREATION_ITEM_STATUS_LABELS = {
   planning: "待开始",
 };
 
-const CREATION_PREVIEW_SLOTS = "1-hero|hero|首图成交主视觉|一眼看懂产品是什么、主承诺是什么，并用 2-3 个可信信息推动停留;2-benefit|benefit|核心信息融合图|融合产品、结果、痛点和可信证据，让买家明白为什么需要;3-scene|scene|适用多场景图|用 2-4 个真实适用场景展示产品价值，带宣传片式层次和购买代入感;4-multi-angle|multi-angle|多角度产品展示图|3-4 个清晰视角展示形态、结构、厚度和表面，不堆营销字;5-atmosphere|atmosphere|冲动下单氛围图|用真实拥有感和生活情绪触发想买冲动，同时保持产品清楚可看;6-product-detail|product-detail|产品细节特写图|用微距、局部和指向标注证明材质、结构、做工或关键部位;7-brand-story|brand-story|品牌质感/礼品价值图|把工艺、包装、仪式感或调性转成质感和送礼价值;8-size-capacity-fit|size-capacity-fit|尺寸容量适配图|用准确尺寸、容量、比例和适配参照降低买错风险;9-effect-comparison|effect-comparison|功能效果渲染图|用高级 3D/CGI 或广告级可视化表现功能路径、机制、效果和结果;10-spec-table|spec-table|参数规格图|用清晰参数表呈现型号、尺寸、单位和关键规格，便于快速核对;11-craft-process|craft-process|品质工艺证明图|把工艺、材料处理、装配或检测事实转成质量证据;12-accessory-gift|accessory-gift|到手清单/配件图|完整展示到手包含物、数量、包装和配件，减少到货不确定;13-series-showcase|series-showcase|多款式/SKU选择图|只展示已提供的颜色、款式、尺码、套装或 SKU，帮助快速选择;14-ingredient-material|ingredient-material|材质成分解析图|用材质、成分、结构或组件解释为什么值得信任或偏好;15-after-sales|after-sales|售后信任收口图|用已提供的服务、物流、质保或退换信息降低下单顾虑;16-usage-suggestion|usage-suggestion|使用步骤/上手图|用步骤、上手、保养或避坑信息降低使用焦虑".split(";").map((entry) => { const [itemId, role, title, brief] = entry.split("|"); return { itemId, role, title, brief }; });
+const CREATION_PREVIEW_SLOTS = "1-hero|hero|首图成交主视觉|主商品占主视觉，周围用多个小圆框展示工具、穿搭或使用场景;2-benefit|benefit|核心信息融合图|融合产品、结果、痛点和可信证据，让买家明白为什么需要;3-scene|scene|适用多场景图|用 2-4 个真实适用场景展示产品价值，带宣传片式层次和购买代入感;4-multi-angle|multi-angle|多角度产品展示图|3-4 个清晰视角展示形态、结构、厚度和表面，不堆营销字;5-atmosphere|atmosphere|冲动下单氛围图|用真实拥有感和生活情绪触发想买冲动，同时保持产品清楚可看;6-product-detail|product-detail|产品细节特写图|用微距、局部和指向标注证明材质、结构、做工或关键部位;7-brand-story|brand-story|品牌质感/礼品价值图|把工艺、包装、仪式感或调性转成质感和送礼价值;8-size-capacity-fit|size-capacity-fit|尺寸容量适配图|用准确尺寸、容量、比例和适配参照降低买错风险;9-effect-comparison|effect-comparison|功能效果渲染图|用高级 3D/CGI 或广告级可视化表现功能路径、机制、效果和结果;10-spec-table|spec-table|参数规格图|用清晰参数表呈现型号、尺寸、单位和关键规格，便于快速核对;11-craft-process|craft-process|品质工艺证明图|把工艺、材料处理、装配或检测事实转成质量证据;12-accessory-gift|accessory-gift|到手清单/配件图|完整展示到手包含物、数量、包装和配件，减少到货不确定;13-series-showcase|series-showcase|多款式/SKU选择图|只展示已提供的颜色、款式、尺码、套装或 SKU，帮助快速选择;14-ingredient-material|ingredient-material|材质成分解析图|用材质、成分、结构或组件解释为什么值得信任或偏好;15-after-sales|after-sales|售后信任收口图|用已提供的服务、物流、质保或退换信息降低下单顾虑;16-usage-suggestion|usage-suggestion|使用步骤/上手图|用步骤、上手、保养或避坑信息降低使用焦虑;17-human-handheld|human-handheld|真人手持展示图|真人出镜，手持、举到镜头前或用鱼线悬挂展示商品，让尺度、细节和真实使用感更直观;18-human-wearable|human-wearable|真人穿戴场景图|真人穿着、背着、提着或佩戴商品，在真实场景里展示版型、比例、背负关系和生活代入感".split(";").map((entry) => { const [itemId, role, title, brief] = entry.split("|"); return { itemId, role, title, brief }; });
 
 const CREATION_SCENARIO_LABELS = { standard: "标准电商", "detail-page": "详情页转化", "social-seeding": "社媒种草", launch: "新品发布", promotion: "活动促销", livestream: "直播电商", "gift-guide": "礼品推荐", "marketplace-search": "平台搜索", "brand-story": "品牌故事" };
 const CREATION_VISUAL_LANGUAGE_LABELS = { "classic-commercial": "经典商业摄影", "premium-studio": "高端棚拍", "reference-style": "参考模式", "clean-marketplace": "平台清爽白底", "lifestyle-editorial": "生活方式杂志", "social-ugc": "社媒实拍", "detail-infographic": "详情页信息图", "macro-material": "微距材质", "outdoor-context": "户外场景", "minimal-luxury": "极简奢华", "bold-campaign": "活动海报", "warm-handcrafted": "手作温度" };
@@ -7360,7 +7343,7 @@ const CREATION_SKU_GENERATION_RULE_LABELS = { none: "无", "package-list": "添�
 const CREATION_CATEGORY_TEMPLATE_MODULE_URL = "/lib/creation-category-templates.mjs?v=20260509-category-search-2";
 const CREATION_BASE_INDUSTRY_TEMPLATE_OPTIONS = [
   { value: "general", label: "通用电商", categoryPath: "", rolePreset: [] },
-  { value: "apparel", label: "服饰鞋包", categoryPath: "", rolePreset: ["hero", "scene", "product-detail", "size-capacity-fit", "benefit", "multi-angle", "series-showcase", "after-sales"] },
+  { value: "apparel", label: "服饰鞋包", categoryPath: "", rolePreset: ["hero", "human-wearable", "scene", "product-detail", "size-capacity-fit", "benefit", "series-showcase", "after-sales"] },
   { value: "beauty", label: "美妆个护", categoryPath: "", rolePreset: ["hero", "benefit", "product-detail", "usage-suggestion", "ingredient-material", "atmosphere", "accessory-gift", "after-sales"] },
   { value: "food", label: "食品饮料", categoryPath: "", rolePreset: ["hero", "benefit", "scene", "accessory-gift", "ingredient-material", "atmosphere", "effect-comparison", "after-sales"] },
   { value: "electronics", label: "3C 数码", categoryPath: "", rolePreset: ["hero", "benefit", "spec-table", "usage-suggestion", "product-detail", "effect-comparison", "accessory-gift", "after-sales"] },
@@ -7417,7 +7400,7 @@ const CREATION_SCENARIO_ROLE_PRESETS = {
 
 const CREATION_INDUSTRY_ROLE_PRESETS = {
   general: [],
-  apparel: ["hero", "scene", "product-detail", "size-capacity-fit", "benefit", "multi-angle", "series-showcase", "after-sales"],
+  apparel: ["hero", "human-wearable", "scene", "product-detail", "size-capacity-fit", "benefit", "series-showcase", "after-sales"],
   beauty: ["hero", "benefit", "product-detail", "usage-suggestion", "ingredient-material", "atmosphere", "accessory-gift", "after-sales"],
   food: ["hero", "benefit", "scene", "accessory-gift", "ingredient-material", "atmosphere", "effect-comparison", "after-sales"],
   electronics: ["hero", "benefit", "spec-table", "usage-suggestion", "product-detail", "effect-comparison", "accessory-gift", "after-sales"],
@@ -7443,8 +7426,8 @@ function getCreationReferenceRoleLabel(role) {
 }
 
 function getCreationSelectedImageCount() {
-  const value = Number.parseInt(refs.creationImageCountInput?.value || "16", 10);
-  return [4, 6, 8, 10, 12, 14, 16].includes(value) ? value : 16;
+  const value = Number.parseInt(refs.creationImageCountInput?.value || "18", 10);
+  return [4, 6, 8, 10, 12, 14, 16, 18].includes(value) ? value : 18;
 }
 
 function createEmptyCreationReferenceAnalysisState() {
@@ -7903,8 +7886,8 @@ function setCreationImageCountValue(count) {
     return;
   }
 
-  const normalizedCount = Number(count) || 16;
-  refs.creationImageCountInput.value = [4, 6, 8, 10, 12, 14, 16].includes(normalizedCount) ? String(normalizedCount) : "16";
+  const normalizedCount = Number(count) || 18;
+  refs.creationImageCountInput.value = [4, 6, 8, 10, 12, 14, 16, 18].includes(normalizedCount) ? String(normalizedCount) : "18";
 }
 
 function getCreationSelectedScenario() {
@@ -7981,7 +7964,7 @@ function syncCreationSelectedRolesToCount() { state.creationRoleSelectionManuall
 function syncCreationSelectedRolesToPreset(selectedRoles) {
   if (state.creationRoleSelectionManuallyEdited) { resetCreationDraftPreview(); return; }
   state.creationSelectedRoles = selectedRoles;
-  if (refs.creationImageCountInput && [4, 6, 8, 10, 12, 14, 16].includes(selectedRoles.length)) {
+  if (refs.creationImageCountInput && [4, 6, 8, 10, 12, 14, 16, 18].includes(selectedRoles.length)) {
     refs.creationImageCountInput.value = String(selectedRoles.length);
   }
   resetCreationDraftPreview();
@@ -9151,6 +9134,7 @@ function normalizeCreationSetForView(set = {}) {
   const items = (Array.isArray(set.items) ? set.items : [])
     .map((item, index) => normalizeCreationItemForView(item, index))
     .sort((left, right) => left.slotIndex - right.slotIndex);
+  const hasInfographicRebuildItems = items.some((item) => item.role === "infographic-rebuild");
   const status = String(set.status || "");
   const resolvedStatus =
     status || (items.every((item) => item.status === "completed") && items.length > 0
@@ -9182,6 +9166,10 @@ function normalizeCreationSetForView(set = {}) {
     industryTemplate: String(set.industryTemplate || industryTemplate.value || "general"),
     industryTemplateLabel: String(set.industryTemplateLabel || industryTemplate.label || ""),
     industryTemplatePath: String(set.industryTemplatePath || industryTemplate.categoryPath || ""),
+    infographicRebuildEnabled:
+      set.infographicRebuildEnabled === undefined && set.infographic_rebuild_enabled === undefined
+        ? hasInfographicRebuildItems
+        : set.infographicRebuildEnabled !== false && set.infographic_rebuild_enabled !== false,
     referenceImageNames: Array.isArray(set.referenceImageNames)
       ? set.referenceImageNames.map((item) => String(item)).filter(Boolean)
       : [],
@@ -9487,6 +9475,7 @@ function applyCreationSetToForm(set) {
   refs.creationSellingPointsInput.value = normalized.sellingPoints.join("\n");
   refs.creationDimensionSpecsInput.value = normalized.dimensionSpecs || "";
   if (refs.creationSkuBundleCountInput) refs.creationSkuBundleCountInput.value = String(normalized.skuBundleCount || 1);
+  if (refs.creationInfographicRebuildEnabledInput) refs.creationInfographicRebuildEnabledInput.checked = normalized.infographicRebuildEnabled !== false;
   setCreationSelectValue(refs.creationSkuGenerationRuleInput, normalized.skuGenerationRule, "none");
   setCreationSelectValue(refs.creationDimensionUnitModeInput, normalized.dimensionUnitMode, "both");
   setCreationSelectValue(refs.creationTargetLanguageInput, normalized.targetLanguage, "en");
@@ -9807,7 +9796,10 @@ function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
   card.dataset.creationCardKey = getCreationCardDomKey(item, fallbackIndex);
   card.classList.toggle("is-record-card", showRecordActions);
   card.classList.toggle("is-generating", isLoadingCard);
-  card.classList.toggle("is-sku", item.role === "sku"); card.classList.toggle("is-sku-start", options.isSkuStart === true);
+  card.classList.toggle("is-sku", item.role === "sku");
+  card.classList.toggle("is-sku-start", options.isSkuStart === true);
+  card.classList.toggle("is-infographic-rebuild", item.role === "infographic-rebuild");
+  card.classList.toggle("is-infographic-rebuild-start", options.isInfographicRebuildStart === true);
 
   const head = document.createElement("div");
   head.className = "creation-card-head";
@@ -9971,7 +9963,10 @@ function syncCreationResultGrid(items = []) {
     grid: refs.creationResultGrid,
     items,
     createCard: (item, index, options) => createCreationCard(item, index, options),
-    getItemOptions: (item, _index, { firstSkuItem }) => ({ isSkuStart: item === firstSkuItem }),
+    getItemOptions: (item, _index, { firstSkuItem, firstInfographicRebuildItem }) => ({
+      isSkuStart: item === firstSkuItem,
+      isInfographicRebuildStart: item === firstInfographicRebuildItem,
+    }),
     syncCard: (card, item, index, options) => syncCreationLoadingCard(card, item, index, {
       ...options,
       getFallbackTitle: (slotIndex) => CREATION_PREVIEW_SLOTS[slotIndex]?.title || "",
@@ -10467,7 +10462,18 @@ function renderCreationRecordView() {
   }
 
   const firstRecordSkuItem = selectedSet.items.find((item) => item.role === "sku");
-  selectedSet.items.forEach((item, index) => refs.creationRecordResultGrid.appendChild(createCreationCard(item, index, { showActions: false, showRecordActions: true, creationSetId: selectedSet.setId, isSkuStart: item === firstRecordSkuItem })));
+  const firstRecordInfographicRebuildItem = selectedSet.items.find((item) => item.role === "infographic-rebuild");
+  selectedSet.items.forEach((item, index) =>
+    refs.creationRecordResultGrid.appendChild(
+      createCreationCard(item, index, {
+        showActions: false,
+        showRecordActions: true,
+        creationSetId: selectedSet.setId,
+        isSkuStart: item === firstRecordSkuItem,
+        isInfographicRebuildStart: item === firstRecordInfographicRebuildItem,
+      }),
+    ),
+  );
 }
 
 function openCreationReferencePreview(referenceId) {
@@ -11621,6 +11627,7 @@ function buildCreationPlanPreviewFormData() {
   formData.set("dimensionUnitMode", refs.creationDimensionUnitModeInput.value || "both");
   formData.set("targetLanguage", targetLanguage.value);
   formData.set("imageCount", String(selectedRoles.length || getCreationSelectedImageCount()));
+  formData.set("infographicRebuildEnabled", String(refs.creationInfographicRebuildEnabledInput?.checked !== false));
   formData.set("scenario", refs.creationScenarioInput.value);
   formData.set("visualLanguage", refs.creationVisualLanguageInput?.value || "classic-commercial");
   formData.set("industryTemplate", refs.creationIndustryTemplateInput.value);
@@ -11691,7 +11698,7 @@ function buildCreationLogoBatchFormData() {
   return formData;
 }
 
-function applyCreationRepairTargetFormFields(formData, set = {}) { Object.entries({ productName: set.productName || "", productDescription: set.productDescription || "", sellingPoints: Array.isArray(set.sellingPoints) ? set.sellingPoints.join("\n") : String(set.sellingPoints || ""), dimensionSpecs: set.dimensionSpecs || "", dimensionUnitMode: set.dimensionUnitMode || "both", targetLanguage: set.targetLanguage || "en", scenario: set.scenario || "standard", visualLanguage: set.visualLanguage || "classic-commercial", industryTemplate: set.industryTemplate || "general", selectedRoles: JSON.stringify(Array.isArray(set.selectedRoles) ? set.selectedRoles : []), skuSubjects: JSON.stringify(Array.isArray(set.skuSubjects) ? set.skuSubjects : []), skuBundleCount: String(set.skuBundleCount || 1), skuGenerationRule: set.skuGenerationRule || "none", logoOptions: JSON.stringify(set.logo || null) }).forEach(([key, value]) => formData.set(key, value)); }
+function applyCreationRepairTargetFormFields(formData, set = {}) { Object.entries({ productName: set.productName || "", productDescription: set.productDescription || "", sellingPoints: Array.isArray(set.sellingPoints) ? set.sellingPoints.join("\n") : String(set.sellingPoints || ""), dimensionSpecs: set.dimensionSpecs || "", dimensionUnitMode: set.dimensionUnitMode || "both", targetLanguage: set.targetLanguage || "en", scenario: set.scenario || "standard", visualLanguage: set.visualLanguage || "classic-commercial", industryTemplate: set.industryTemplate || "general", selectedRoles: JSON.stringify(Array.isArray(set.selectedRoles) ? set.selectedRoles : []), infographicRebuildEnabled: String(set.infographicRebuildEnabled !== false), skuSubjects: JSON.stringify(Array.isArray(set.skuSubjects) ? set.skuSubjects : []), skuBundleCount: String(set.skuBundleCount || 1), skuGenerationRule: set.skuGenerationRule || "none", logoOptions: JSON.stringify(set.logo || null) }).forEach(([key, value]) => formData.set(key, value)); }
 
 function buildCreationRepairFormData({ itemId = "", scope = "incomplete", set = getCreationRepairTargetSet() } = {}) {
   const formData = new FormData(), currentSet = set ? normalizeCreationSetForView(set) : getCreationCurrentSet();
@@ -15856,6 +15863,7 @@ function bindEvents() {
   [refs.creationProductNameInput, refs.creationProductDescriptionInput, refs.creationSellingPointsInput, refs.creationDimensionSpecsInput].forEach((input) => input.addEventListener("input", resetCreationDraftPreview));
   [refs.creationDimensionUnitModeInput, refs.creationTargetLanguageInput, refs.creationVisualLanguageInput].forEach((input) => input.addEventListener("change", resetCreationDraftPreview));
   refs.creationImageCountInput.addEventListener("change", syncCreationSelectedRolesToCount);
+  refs.creationInfographicRebuildEnabledInput?.addEventListener("change", resetCreationDraftPreview);
   refs.creationSkuBundleCountInput?.addEventListener("input", resetCreationDraftPreview);
   refs.creationSkuGenerationRuleInput?.addEventListener("change", resetCreationDraftPreview);
   refs.creationScenarioInput.addEventListener("change", syncCreationSelectedRolesToScenario);

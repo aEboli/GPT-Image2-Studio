@@ -415,3 +415,34 @@ test("creation repair preserves existing SKU subjects when repair preview sends 
     assert.equal(emptySkuItem.skuSubject.id, "silver");
   }
 });
+
+test("creation repair preserves disabled infographic rebuild setting", () => {
+  const set = {
+    productName: "Jointed fishing lure",
+    productDescription: "Segmented electric lure",
+    sellingPoints: "realistic finish",
+    targetLanguage: "en",
+    imageCount: 1,
+    selectedRoles: ["hero"],
+    infographicRebuildEnabled: false,
+    referenceImageRoles: [
+      { filename: "subject.jpg", role: "product" },
+      { filename: "size-chart.jpg", role: "dimensions" },
+    ],
+    items: [
+      {
+        itemId: "1-hero",
+        slotIndex: 1,
+        role: "hero",
+        title: "Hero image",
+        prompt: "Old hero prompt.",
+        status: "failed",
+      },
+    ],
+  };
+
+  const plan = buildCreationRepairPlan(set, {});
+
+  assert.equal(plan.infographicRebuildEnabled, false);
+  assert.deepEqual(plan.items.map((item) => item.role), ["hero"]);
+});
