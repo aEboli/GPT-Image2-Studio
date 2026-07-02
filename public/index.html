@@ -65,7 +65,7 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Sora:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260622-creation-coverage-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260703-latest-restore-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -1728,30 +1728,9 @@
                   <div class="portrait-reference-grid hidden" id="portraitAccessoryReferenceGrid"></div>
                 </div>
 
-                <div class="portrait-analysis-actions">
-                  <button class="toolbar-button" id="portraitReferenceAnalyzeButton" type="button">分析任务</button>
-                  <button class="toolbar-button" id="portraitApplyAnalysisButton" type="button" disabled>应用建议</button>
-                  <button
-                    class="toolbar-button portrait-analysis-toggle"
-                    id="portraitAnalysisToggleButton"
-                    type="button"
-                    aria-controls="portraitAnalysisPanel"
-                    aria-expanded="false"
-                    hidden
-                  >展开建议</button>
-                </div>
-                <div class="portrait-analysis-panel" id="portraitAnalysisPanel" hidden>
-                  <div class="creation-record-detail" id="portraitAnalysisSummary"></div>
-                </div>
-
                 <label class="compact-field">
-                  <span>人物名称</span>
-                  <input id="portraitSubjectNameInput" name="subjectName" type="text" maxlength="80" placeholder="例如：品牌主理人" />
-                </label>
-
-                <label class="compact-field">
-                  <span>人物摘要</span>
-                  <textarea id="portraitSubjectSummaryInput" name="subjectSummary" rows="4" maxlength="900" placeholder="可粘贴手写人物描述，也可分析参考图后应用为草稿。"></textarea>
+                  <span>人物描述</span>
+                  <textarea id="portraitSubjectSummaryInput" name="subjectSummary" rows="4" maxlength="900" placeholder="手动填写人物外观、气质、服装、表情、发型或不能改变的细节。"></textarea>
                 </label>
 
                 <label class="compact-field">
@@ -2872,6 +2851,6 @@
       </div>
     </aside>
 
-    <script type="module" src="./app.js?v=20260622-creation-coverage-1"></script>
+    <script type="module" src="./app.js?v=20260703-latest-restore-1"></script>
   </body>
 </html>

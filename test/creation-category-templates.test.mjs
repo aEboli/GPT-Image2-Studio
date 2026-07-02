@@ -51,6 +51,7 @@ test("creation category templates derive targeted prompt strategy for every four
   assert.match(smartphone.rolePromptInstructions.scene, /桌面办公|通勤手持|夜景拍摄/);
   assert.match(smartphone.rolePromptInstructions["product-detail"], /屏幕边框|摄像头模组/);
   assert.match(smartphone.rolePromptInstructions["size-capacity-fit"], /机身厚度|握持尺度/);
+  assert.match(smartphone.rolePromptInstructions["usage-suggestion"], /selling-point evidence|卖点证据/);
 
   const representativeValues = [
     "category:C02-002-003-001",
@@ -70,6 +71,7 @@ test("creation category templates derive targeted prompt strategy for every four
   const bloodPressureMonitor = normalizeCreationIndustryTemplate("category:C15-001-001-001");
   assert.match(bloodPressureMonitor.promptInstruction, /家庭健康检测|袖带|不要诊断疾病/);
   assert.match(bloodPressureMonitor.rolePromptInstructions["usage-suggestion"], /佩戴袖带|读取数据/);
+  assert.match(bloodPressureMonitor.rolePromptInstructions["usage-suggestion"], /selling-point evidence|卖点证据/);
 
   assert.ok(
     CREATION_CATEGORY_TEMPLATE_OPTIONS.every(

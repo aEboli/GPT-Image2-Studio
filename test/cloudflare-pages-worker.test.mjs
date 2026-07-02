@@ -409,6 +409,70 @@ test("Cloudflare generation uses browser-provided API settings without echoing t
   assert.doesNotMatch(text, /test-browser-key/);
 });
 
+test("Cloudflare generation treats AGICTO trailing failed events after final image as success", async () => {
+  const seenRequests = [];
+  const imageBucket = makeImageBucket();
+  const formData = new FormData();
+  formData.set("jobId", "job-agicto-trailing-failed");
+  formData.set("prompt", "Create a stable product poster through AGICTO");
+  formData.set("ratio", "1:1");
+  formData.set("size", "1024x1024");
+  formData.set("format", "png");
+  formData.set("baseUrl", "https://api.agicto.cn/v1");
+  formData.set("apiKey", "agicto-browser-key");
+  formData.set("responsesModel", "gpt-5.4");
+
+  const response = await handleApiRequest(new Request("https://studio.example/api/generate", {
+    method: "POST",
+    body: formData,
+  }), {
+    imageBucket,
+    async fetchImpl(url, init) {
+      seenRequests.push({
+        url,
+        auth: init.headers.Authorization,
+        body: JSON.parse(init.body),
+      });
+      return new Response(
+        [
+          "event: response.completed",
+          'data: {"type":"response.completed","response":{"output":[{"type":"image_generation_call","result":"YWdpY3RvLWZpbmFs"}]}}',
+          "",
+          "event: response.failed",
+          'data: {"type":"response.failed","response":{"error":{"code":"rate_limit_exceeded","message":"late proxy failure"}}}',
+          "",
+          "data: [DONE]",
+          "",
+        ].join("\n"),
+        {
+          status: 200,
+          headers: { "content-type": "text/event-stream" },
+        },
+      );
+    },
+  });
+
+  const text = await response.text();
+  const events = parseSseEvents(text);
+  const chunkEvents = events.filter((event) => event.eventName === "final_image_chunk");
+
+  assert.equal(response.status, 200);
+  assert.equal(seenRequests.length, 1);
+  assert.equal(seenRequests[0].url, "https://api.agicto.cn/v1/responses");
+  assert.equal(seenRequests[0].auth, "Bearer agicto-browser-key");
+  assert.equal(seenRequests[0].body.stream, true);
+  assert.deepEqual(events.map((event) => event.eventName).filter((eventName) => eventName !== "status"), [
+    "final_image_chunk",
+    "saved",
+    "server_image",
+    "complete",
+  ]);
+  assert.equal(chunkEvents.map((event) => event.payload.chunk).join(""), "YWdpY3RvLWZpbmFs");
+  assert.doesNotMatch(text, /^event: error$/m);
+  assert.doesNotMatch(text, /^event: queued$/m);
+  assert.doesNotMatch(text, /agicto-browser-key/);
+});
+
 test("Cloudflare generation uses direct image model endpoint in direct mode", async () => {
   const seenRequests = [];
   const imageBucket = makeImageBucket();
@@ -538,7 +602,7 @@ test("Cloudflare creation filenames use Chinese image type names", async () => {
 
   assert.equal(response.status, 200);
   assert.match(complete.payload.set.items[0].filename, /^\d{4}-首图成交主-[a-z0-9]{4}\.png$/u);
-  assert.match(complete.payload.set.items[1].filename, /^\d{4}-售后信任收-[a-z0-9]{4}\.png$/u);
+  assert.match(complete.payload.set.items[1].filename, /^\d{4}-痛点图-[a-z0-9]{4}\.png$/u);
   assert.doesNotMatch(filenames, /(?:^|-)hero(?:-|\.|$)|(?:^|-)after(?:-|\.|$)|(?:^|-)sales(?:-|\.|$)/i);
   assert.equal(imageBucket.objects.size, 2);
 });
@@ -815,6 +879,46 @@ test("Cloudflare portrait generation uses browser settings, split references and
   assert.deepEqual(complete.payload.set.referenceImageNames, ["person.png", "pose.png", "jacket.png"]);
   assert.equal(imageBucket.objects.size, 2);
   assert.doesNotMatch(text, /test-browser-key/);
+});
+
+test("Cloudflare portrait generation accepts manual subject description without person references", async () => {
+  const seenRequests = [];
+  const imageBucket = makeImageBucket();
+  const formData = new FormData();
+  formData.set("subjectSummary", "adult subject in a linen shirt, neutral expression");
+  formData.set("imageCount", "1");
+  formData.set("baseUrl", "https://example.test/v1");
+  formData.set("apiKey", "test-browser-key");
+  formData.set("responsesModel", "gpt-5.5");
+
+  const response = await handleApiRequest(new Request("https://studio.example/api/portrait/generate", {
+    method: "POST",
+    body: formData,
+  }), {
+    imageBucket,
+    async fetchImpl(url, init) {
+      seenRequests.push({
+        url,
+        body: JSON.parse(init.body),
+      });
+      return makeSseResponse();
+    },
+  });
+
+  const text = await response.text();
+  const events = parseSseEvents(text);
+  const complete = events.find((event) => event.eventName === "complete");
+  const inputImages = seenRequests[0]?.body.input[0].content.filter((item) => item.type === "input_image") || [];
+  const requestText = JSON.stringify(seenRequests[0]?.body || {});
+
+  assert.equal(response.status, 200);
+  assert.equal(seenRequests.length, 1);
+  assert.equal(inputImages.length, 0);
+  assert.equal(complete.payload.set.subjectSummary, "adult subject in a linen shirt, neutral expression");
+  assert.deepEqual(complete.payload.set.referenceImageNames, []);
+  assert.match(requestText, /manual subject description/i);
+  assert.doesNotMatch(requestText, /Portrait person reference|Subject label/);
+  assert.equal(imageBucket.objects.size, 1);
 });
 
 test("Cloudflare portrait reference analysis uses complete portrait task references", async () => {

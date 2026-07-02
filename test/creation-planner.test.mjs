@@ -133,8 +133,8 @@ test("creation planner exposes the refactored eighteen suite image types", () =>
       "到手清单/配件图",
       "多款式/SKU选择图",
       "材质成分解析图",
-      "售后信任收口图",
-      "使用步骤/上手图",
+      "痛点图",
+      "卖点图",
       "真人手持展示图",
       "真人穿戴场景图",
     ],
@@ -447,7 +447,8 @@ test("creation planner turns rechargeable features into concrete scene and usage
   assert.match(promptByRole.scene, /ecommerce art director/i);
   assert.match(promptByRole.scene, /concrete charging or connection moment/i);
   assert.match(promptByRole.scene, /USB-C|bedside charging|power bank charging/i);
-  assert.match(promptByRole["usage-suggestion"], /charging step sequence/i);
+  assert.match(promptByRole["usage-suggestion"], /charging\/connection ease as selling-point evidence/i);
+  assert.doesNotMatch(promptByRole["usage-suggestion"], /charging step sequence|numbered steps/i);
   assert.match(promptByRole["usage-suggestion"], /USB-C|bedside charging|power bank charging/i);
   assert.match(promptByRole.atmosphere, /purchase desire/i);
 });
@@ -499,7 +500,8 @@ test("creation planner uses charging instructions from usage reference notes", (
 
   assert.match(promptByRole.scene, /MUST include a visible charging or cable-connection moment/i);
   assert.match(promptByRole.scene, /USB charging cable connects to red and black clips/);
-  assert.match(promptByRole["usage-suggestion"], /MUST include at least one dedicated charging\/connection panel/i);
+  assert.match(promptByRole["usage-suggestion"], /charging\/connection ease as selling-point evidence/i);
+  assert.doesNotMatch(promptByRole["usage-suggestion"], /MUST include at least one dedicated charging\/connection panel|numbered steps/i);
   assert.match(promptByRole["usage-suggestion"], /charging for 5 hours before use/i);
 });
 
@@ -545,13 +547,13 @@ test("creation planner maps reference analysis coverage onto the matching carous
   assert.match(byRole["usage-suggestion"].coverageSummary, /usage instructions/);
   assert.deepEqual(byRole["usage-suggestion"].coverageWarnings, []);
   assert.match(byRole["usage-suggestion"].prompt, /REFERENCE COVERAGE/);
-  assert.match(byRole["usage-suggestion"].prompt, /visual blueprint/i);
+  assert.match(byRole["usage-suggestion"].prompt, /selling-point evidence/i);
   assert.match(byRole["usage-suggestion"].prompt, /setup-guide\.png/);
   assert.match(byRole["usage-suggestion"].prompt, /three setup steps for first use/);
-  assert.match(byRole["usage-suggestion"].prompt, /faithfully reconstruct/i);
+  assert.doesNotMatch(byRole["usage-suggestion"].prompt, /faithfully reconstruct the original instruction card|preserve the original sequence/i);
 });
 
-test("creation planner treats usage and scene coverage as visual blueprints instead of rewritten info", () => {
+test("creation planner treats scene coverage as visual blueprints and usage coverage as selling-point evidence", () => {
   const plan = buildCreationPlan({
     productName: "Countertop purifier",
     productDescription: "Compact purifier with tap connector and filter cartridge.",
@@ -569,9 +571,11 @@ test("creation planner treats usage and scene coverage as visual blueprints inst
   assert.match(byRole.scene.prompt, /faithfully reconstruct/i);
   assert.match(byRole.scene.prompt, /then recompose/i);
   assert.match(byRole.scene.prompt, /do not turn the note into new labels/i);
-  assert.match(byRole["usage-suggestion"].prompt, /visual blueprint/i);
-  assert.match(byRole["usage-suggestion"].prompt, /preserve the original sequence/i);
-  assert.match(byRole["usage-suggestion"].prompt, /do not invent different steps/i);
+  assert.match(byRole["usage-suggestion"].prompt, /selling-point evidence/i);
+  assert.match(byRole["usage-suggestion"].prompt, /buyer payoff/i);
+  assert.match(byRole["usage-suggestion"].prompt, /three-panel original card shows attach connector, flush filter, then fill cup/);
+  assert.doesNotMatch(byRole["usage-suggestion"].prompt, /Usage source [^.]+ is a visual blueprint/i);
+  assert.doesNotMatch(byRole["usage-suggestion"].prompt, /preserve the original sequence|do not invent different steps/i);
   assert.doesNotMatch(byRole.scene.prompt, /role, and note must be visibly carried/i);
   assert.doesNotMatch(byRole["usage-suggestion"].prompt, /role, and note must be visibly carried/i);
 });
@@ -656,8 +660,8 @@ test("creation planner adds buyer-decision strategy to formerly templated conver
   assert.match(promptByRole["accessory-gift"], /what exactly arrives and does it feel complete/i);
   assert.match(promptByRole["series-showcase"], /which variant should I choose/i);
   assert.match(promptByRole["ingredient-material"], /what is it made of and why does that matter/i);
-  assert.match(promptByRole["after-sales"], /what risk remains after I click buy/i);
-  assert.match(promptByRole["usage-suggestion"], /will I know how to use it successfully/i);
+  assert.match(promptByRole["after-sales"], /这个产品具体帮我解决什么问题？/);
+  assert.match(promptByRole["usage-suggestion"], /我买它能获得哪些更明确的好处？/);
   assert.match(promptByRole["human-handheld"], /real handheld scale and use feel/i);
   assert.match(promptByRole["human-wearable"], /fits, hangs, carries, or looks on a real person/i);
 });
@@ -680,7 +684,8 @@ test("creation planner gives every ecommerce carousel role a shopper question", 
   assert.match(promptByRole.scene, /which real scenarios make this product feel useful and worth buying/i);
   assert.match(promptByRole["product-detail"], /are the visible details trustworthy enough to buy/i);
   assert.match(promptByRole["accessory-gift"], /what exactly will arrive in the box/i);
-  assert.match(promptByRole["after-sales"], /what risk is reduced after ordering/i);
+  assert.match(promptByRole["after-sales"], /这个产品具体帮我解决什么问题？/);
+  assert.match(promptByRole["usage-suggestion"], /我买它能获得哪些更明确的好处？/);
   assert.match(promptByRole["human-handheld"], /real person's hands or in actual use/i);
   assert.match(promptByRole["human-wearable"], /real body or when carried in a real scene/i);
 });
@@ -878,7 +883,9 @@ test("creation planner gives concrete ecommerce role intent to scene, seeding, m
   assert.match(promptByRole.atmosphere, /impulse-buy lifestyle atmosphere image/);
   assert.match(promptByRole.atmosphere, /feel desirable in a lifestyle environment/);
   assert.match(promptByRole.atmosphere, /recognizable and commercially inspectable/);
-  assert.match(promptByRole["usage-suggestion"], /use-and-owning confidence image/);
+  assert.match(promptByRole["usage-suggestion"], /selling-point image/i);
+  assert.match(promptByRole["usage-suggestion"], /3-5 core selling points/i);
+  assert.match(promptByRole["usage-suggestion"], /Treat easy setup, operation, care, wearing, charging, or connection cues as selling-point evidence/i);
   assert.match(promptByRole["usage-suggestion"], /Preserve the supplied reference product as the unchanged subject/);
   assert.match(promptByRole["usage-suggestion"], /do not redesign the lure body, paint pattern, segments, tail, hooks, lip, blade, or hardware/);
   assert.match(promptByRole["usage-suggestion"], /keep belly and tail treble hooks hanging from their original underside and tail hangers/);
@@ -1193,7 +1200,7 @@ test("creation planner supports the refactored ecommerce image types with dedica
   assert.match(plan.items.find((item) => item.role === "craft-process").prompt, /quality and craft proof image/i);
   assert.match(plan.items.find((item) => item.role === "series-showcase").prompt, /variant and SKU choice image/i);
   assert.match(plan.items.find((item) => item.role === "spec-table").prompt, /legible parameter table/i);
-  assert.match(plan.items.find((item) => item.role === "usage-suggestion").prompt, /use-and-owning confidence image/i);
+  assert.match(plan.items.find((item) => item.role === "usage-suggestion").prompt, /selling-point image/i);
   assert.match(plan.items.find((item) => item.role === "brand-story").prompt, /brand texture and gift-value image/i);
   assert.match(plan.items.find((item) => item.role === "ingredient-material").prompt, /material or ingredient analysis image/i);
   assert.match(plan.items.find((item) => item.role === "human-handheld").prompt, /real-person handheld demonstration image/i);
@@ -2112,11 +2119,11 @@ test("creation planner adds role-specific guidance inside each marketing scenari
 
   assert.match(
     livestreamPlan.items.find((item) => item.role === "usage-suggestion").prompt,
-    /host-ready demonstration sequence/,
+    /host-ready selling-point stack/,
   );
   assert.match(
     livestreamPlan.items.find((item) => item.role === "after-sales").prompt,
-    /answer common live-room questions quickly/,
+    /answer what problem the product solves/,
   );
   assert.match(
     marketplacePlan.items.find((item) => item.role === "hero").prompt,

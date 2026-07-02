@@ -879,6 +879,53 @@ test("consumeResponsesSse extracts image_generation.completed b64_json final ima
   assert.equal(result.finalImageBase64, "ZmluYWwtaW1hZ2U=");
 });
 
+test("consumeResponsesSse keeps a response.completed final image before a trailing failed event", async () => {
+  const chunks = [
+    [
+      "event: response.completed",
+      'data: {"type":"response.completed","response":{"output":[{"type":"image_generation_call","result":"Y29tcGxldGVkLWZpbmFs"}]}}',
+      "",
+      "event: response.failed",
+      'data: {"type":"response.failed","response":{"error":{"code":"rate_limit_exceeded","message":"late proxy failure"}}}',
+      "",
+      "data: [DONE]",
+      "",
+      "",
+    ].join("\n"),
+  ];
+  let index = 0;
+  const fakeStream = {
+    getReader() {
+      return {
+        async read() {
+          if (index >= chunks.length) {
+            return { done: true };
+          }
+
+          const chunk = chunks[index];
+          index += 1;
+          return {
+            done: false,
+            value: new TextEncoder().encode(chunk),
+          };
+        },
+      };
+    },
+  };
+
+  const seenEvents = [];
+  const result = await consumeResponsesSse(fakeStream, {
+    onEvent(event) {
+      seenEvents.push(event.type);
+    },
+  });
+
+  assert.deepEqual(seenEvents, ["final_image", "complete"]);
+  assert.deepEqual(result.events, ["response.completed", "response.failed"]);
+  assert.equal(result.finalImageBase64, "Y29tcGxldGVkLWZpbmFs");
+  assert.equal(result.responseCompleted, true);
+});
+
 test("consumeResponsesSse processes final image events left in the EOF buffer", async () => {
   const chunks = [
     [
@@ -1601,6 +1648,108 @@ test("requestImageGeneration retries upstream failed events with error codes", a
     events.filter((event) => event.type === "status" && event.stage === "retrying_upstream").length,
     2,
   );
+});
+
+test("requestImageGeneration keeps a final image that arrives before a terminal failed event", async () => {
+  const requests = [];
+  const events = [];
+
+  const result = await requestImageGeneration({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    prompt: "Create a stable final image.",
+    size: "1024x1024",
+    quality: "high",
+    responsesModel: "gpt-5.4",
+    transientHttpRetryDelayMs: 0,
+    async fetchImpl(_url, init) {
+      const body = JSON.parse(init.body);
+      requests.push({ stream: body.stream, size: body.tools[0].size });
+
+      return new Response(
+        [
+          "event: response.output_item.done",
+          'data: {"item":{"type":"image_generation_call","result":"Zmlyc3Q="}}',
+          "",
+          "event: response.failed",
+          'data: {"type":"response.failed","response":{"error":{"code":"rate_limit_exceeded","message":"retry me"}}}',
+          "",
+          "data: [DONE]",
+          "",
+        ].join("\n"),
+        {
+          status: 200,
+          headers: { "content-type": "text/event-stream" },
+        },
+      );
+    },
+    onEvent(event) {
+      events.push(event);
+    },
+  });
+
+  assert.deepEqual(requests, [{ stream: true, size: "1024x1024" }]);
+  assert.equal(result.finalImageBase64, "Zmlyc3Q=");
+  assert.deepEqual(
+    events.filter((event) => event.type === "final_image").map((event) => event.base64),
+    ["Zmlyc3Q="],
+  );
+  assert.equal(events.some((event) => event.type === "status" && event.stage === "retrying_upstream"), false);
+});
+
+test("requestImageGeneration accepts AGICTO-style completed final image before trailing failed event", async () => {
+  const requests = [];
+  const events = [];
+
+  const result = await requestImageGeneration({
+    baseUrl: "https://api.agicto.cn/v1",
+    apiKey: "test-key",
+    prompt: "Create a stable final image through a proxy.",
+    size: "1024x1024",
+    quality: "high",
+    responsesModel: "gpt-5.4",
+    transientHttpRetryDelayMs: 0,
+    async fetchImpl(url, init) {
+      const body = JSON.parse(init.body);
+      requests.push({ url, stream: body.stream, size: body.tools[0].size });
+
+      return new Response(
+        [
+          "event: response.completed",
+          'data: {"type":"response.completed","response":{"output":[{"type":"image_generation_call","result":"YWdpY3RvLWZpbmFs"}]}}',
+          "",
+          "event: response.failed",
+          'data: {"type":"response.failed","response":{"error":{"code":"rate_limit_exceeded","message":"late proxy failure"}}}',
+          "",
+          "data: [DONE]",
+          "",
+        ].join("\n"),
+        {
+          status: 200,
+          headers: { "content-type": "text/event-stream" },
+        },
+      );
+    },
+    onEvent(event) {
+      events.push(event);
+    },
+  });
+
+  assert.deepEqual(requests, [
+    {
+      url: "https://api.agicto.cn/v1/responses",
+      stream: true,
+      size: "1024x1024",
+    },
+  ]);
+  assert.equal(result.finalImageBase64, "YWdpY3RvLWZpbmFs");
+  assert.equal(result.responseCompleted, true);
+  assert.equal(result.fallbackUsed, undefined);
+  assert.deepEqual(
+    events.filter((event) => event.type === "final_image").map((event) => event.base64),
+    ["YWdpY3RvLWZpbmFs"],
+  );
+  assert.equal(events.some((event) => event.type === "status" && event.stage === "retrying_upstream"), false);
 });
 
 test("requestImageGeneration default retry delay is five seconds", () => {

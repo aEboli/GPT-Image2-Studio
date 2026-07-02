@@ -168,6 +168,41 @@ test("creation suite queue appends SKU preview cards to queued sets", () => {
   assert.equal(set.items[3].status, "queued");
 });
 
+test("creation suite queue defaults SKU rule to color-name labels when no getter is provided", () => {
+  const set = buildCreationQueuedSet({
+    buildCreationReferenceRolePayload: () => [{ filename: "red.jpg", role: "product" }],
+    buildCreationSkuSubjectPayload: () => [{ id: "red", title: "红色", filenames: ["red.jpg"] }],
+    createdAt: "2026-05-26T08:00:00.000Z",
+    creationState: { generating: false },
+    formatCreationDimensionUnitModeLabel: (value) => `Unit ${value}`,
+    formatCreationVisualLanguageLabel: (value) => `Visual ${value}`,
+    getCreationCurrentSet: () => null,
+    getCreationLogoPayload: () => null,
+    getCreationPreviewSlots: () => [{ itemId: "hero", role: "hero", title: "主图" }],
+    getCreationSelectedDimensionUnitMode: () => "both",
+    getCreationSelectedImageCount: () => 1,
+    getCreationSelectedIndustryTemplate: () => ({ value: "general", label: "General", categoryPath: "" }),
+    getCreationSelectedLanguage: () => ({ value: "en", label: "English" }),
+    getCreationSelectedRoles: () => ["hero"],
+    getCreationSelectedScenario: () => ({ value: "standard", label: "Standard" }),
+    isCreationDraftSet: () => false,
+    normalizeCreationSkuBundleCountForPayload: (value) => Number(value),
+    normalizeCreationVisualLanguage: (value) => value || "classic-commercial",
+    normalizeSet,
+    productDescription: "Description",
+    productName: "Queued product",
+    refs: {
+      creationDimensionSpecsInput: { value: "" },
+      creationSkuBundleCountInput: { value: "1" },
+      creationVisualLanguageInput: { value: "classic-commercial" },
+    },
+    sellingPoints: [],
+  });
+
+  assert.equal(set.skuGenerationRule, "color-name-under-subject");
+  assert.equal(set.skuGenerationRuleLabel, "主体下方显示颜色名");
+});
+
 test("creation suite queue defaults infographic rebuild on and appends queued rebuild cards", () => {
   const referenceRoles = [
     { filename: "subject-a.jpg", role: "product", roleLabel: "Subject" },
@@ -264,6 +299,55 @@ test("creation suite queue omits queued infographic rebuild cards when disabled"
 
   assert.equal(set.infographicRebuildEnabled, false);
   assert.deepEqual(set.items.map((item) => item.role), ["hero"]);
+});
+
+test("creation suite queue forces infographic rebuild when carousel count is zero", () => {
+  const set = buildCreationQueuedSet({
+    buildCreationReferenceRolePayload: () => [
+      { filename: "subject.jpg", role: "product" },
+      { filename: "feature-card.jpg", role: "material", roleLabel: "Feature card" },
+      { filename: "package-card.jpg", role: "package", roleLabel: "Package card" },
+    ],
+    buildCreationSkuSubjectPayload: () => [],
+    createdAt: "2026-05-26T08:00:00.000Z",
+    creationState: { generating: true },
+    formatCreationDimensionUnitModeLabel: (value) => `Unit ${value}`,
+    formatCreationVisualLanguageLabel: (value) => `Visual ${value}`,
+    getCreationCurrentSet: () => null,
+    getCreationLogoPayload: () => null,
+    getCreationPreviewSlots: () => [],
+    getCreationSelectedDimensionUnitMode: () => "both",
+    getCreationSelectedImageCount: () => 0,
+    getCreationSelectedIndustryTemplate: () => ({ value: "general", label: "General", categoryPath: "" }),
+    getCreationSelectedLanguage: () => ({ value: "en", label: "English" }),
+    getCreationSelectedRoles: () => [],
+    getCreationSelectedScenario: () => ({ value: "standard", label: "Standard" }),
+    getCreationSelectedSkuGenerationRule: () => ({ value: "none", label: "None" }),
+    isCreationDraftSet: () => false,
+    normalizeCreationSkuBundleCountForPayload: (value) => Number(value),
+    normalizeCreationVisualLanguage: (value) => value || "classic-commercial",
+    normalizeSet,
+    productDescription: "Description",
+    productName: "Queued product",
+    refs: {
+      creationDimensionSpecsInput: { value: "" },
+      creationInfographicRebuildEnabledInput: { checked: false },
+      creationSkuBundleCountInput: { value: "1" },
+      creationVisualLanguageInput: { value: "classic-commercial" },
+    },
+    sellingPoints: [],
+  });
+
+  assert.equal(set.imageCount, 0);
+  assert.equal(set.infographicRebuildEnabled, true);
+  assert.deepEqual(set.items.map((item) => item.role), ["infographic-rebuild", "infographic-rebuild"]);
+  assert.deepEqual(
+    set.items.map((item) => item.referenceImageNames),
+    [
+      ["subject.jpg", "feature-card.jpg"],
+      ["subject.jpg", "package-card.jpg"],
+    ],
+  );
 });
 
 test("creation suite queue keeps draft infographic rebuild items without changing base image count", () => {
@@ -495,6 +579,41 @@ test("creation suite queue syncs repaired sets back into matching completed queu
 
   assert.equal(creationState.queue[0].set.items[0].status, "generating");
   assert.equal(creationState.queue[0].set.items[0].error, "");
+});
+
+test("creation suite queue selection previews queued sets without replacing the active draft", () => {
+  const draftSet = {
+    setId: "creation-draft-active",
+    productName: "Draft product",
+    items: [{ itemId: "draft-hero", status: "idle" }],
+  };
+  const queuedSet = {
+    setId: "creation-local-queued",
+    productName: "Queued product",
+    items: [{ itemId: "queued-hero", status: "queued" }],
+  };
+  const creationState = {
+    activeQueueId: "",
+    currentSet: draftSet,
+    generating: false,
+    queue: [],
+    selectedQueueId: "",
+  };
+
+  const job = createCreationQueueJob({
+    creationState,
+    formData: "queued-body",
+    idFactory: () => "creation-queue-preview",
+    normalizeSet,
+    nowIso: () => "2026-05-26T08:00:00.000Z",
+    set: queuedSet,
+  });
+
+  assert.equal(job.id, "creation-queue-preview");
+  assert.equal(creationState.selectedQueueId, "creation-queue-preview");
+  assert.equal(creationState.queue[0].set.setId, "creation-local-queued");
+  assert.equal(creationState.currentSet.setId, "creation-draft-active");
+  assert.equal(creationState.currentSet.items[0].itemId, "draft-hero");
 });
 
 test("creation suite queue resolves repair target from selected queue instead of current active set", () => {

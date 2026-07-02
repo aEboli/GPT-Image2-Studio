@@ -116,6 +116,52 @@ test("creation store preserves scenario image count and reference image metadata
   );
 });
 
+test("creation store preserves zero carousel image count with appended rebuild items", () => {
+  const manifest = normalizeCreationSetManifest(
+    {
+      setId: "creation-set-zero-carousel",
+      productName: "Cooling towel 4-pack",
+      imageCount: 0,
+      selectedRoles: [],
+      infographicRebuildEnabled: true,
+      items: [
+        {
+          itemId: "queued-infographic-rebuild-1",
+          slotIndex: 1,
+          role: "infographic-rebuild",
+          title: "Infographic rebuild 1",
+          relativePath: "2026-05/05-05/2026-05-05-creation/demo/01-rebuild.png",
+        },
+      ],
+    },
+    { publicBasePath: "/output" },
+  );
+
+  assert.equal(manifest.imageCount, 0);
+  assert.deepEqual(manifest.selectedRoles, []);
+  assert.equal(manifest.infographicRebuildEnabled, true);
+  assert.equal(manifest.items.length, 1);
+});
+
+test("creation store does not treat blank image counts as zero carousel sets", () => {
+  for (const imageCount of ["", null]) {
+    const manifest = normalizeCreationSetManifest(
+      {
+        setId: `creation-set-blank-${String(imageCount)}`,
+        productName: "Legacy set",
+        imageCount,
+        items: [
+          { itemId: "hero", slotIndex: 1, role: "hero" },
+          { itemId: "scene", slotIndex: 2, role: "scene" },
+        ],
+      },
+      { publicBasePath: "/output" },
+    );
+
+    assert.equal(manifest.imageCount, 2);
+  }
+});
+
 test("creation store falls back legacy set manifests to classic commercial visual language", () => {
   const manifest = normalizeCreationSetManifest(
     {

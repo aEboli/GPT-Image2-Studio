@@ -223,6 +223,38 @@ test("browser config seeds direct image settings from saved route A credentials"
   assert.equal(formData.get("directApiKey"), "saved-route-a-key");
 });
 
+test("browser public config preserves server configured key state when browser has no private key", () => {
+  const browserConfig = normalizeBrowserPrivateConfig({
+    imageRoute: "b",
+    baseUrl: "https://browser-route.example.test/v1",
+    endpointPath: "responses",
+    responsesModel: "browser-route-model",
+    directBaseUrl: "https://browser-direct.example.test/v1/images/generations",
+    directEndpointPath: "images/generations",
+    directImageModel: "browser-direct-image",
+    directResponsesModel: "browser-direct-responses",
+  });
+
+  const publicConfig = toPublicBrowserConfig(browserConfig, {
+    apiKeyConfigured: true,
+    apiKeyMask: "env-***7890",
+    directApiKeyConfigured: true,
+    directApiKeyMask: "env-***7890",
+    protocolApiKeyConfigured: true,
+    protocolApiKeyMask: "envp***7890",
+  });
+
+  assert.equal(publicConfig.imageRoute, "b");
+  assert.equal(publicConfig.apiKeyConfigured, true);
+  assert.equal(publicConfig.apiKeyMask, "env-***7890");
+  assert.equal(publicConfig.directApiKeyConfigured, true);
+  assert.equal(publicConfig.directApiKeyMask, "env-***7890");
+  assert.equal(publicConfig.directBaseUrl, "https://browser-direct.example.test/v1");
+  assert.equal(publicConfig.directApiKey, undefined);
+  assert.equal(publicConfig.protocolApiKeyConfigured, true);
+  assert.equal(publicConfig.protocolApiKeyMask, "envp***7890");
+});
+
 test("public app shell delegates browser config and cache behavior to public modules", async () => {
   const app = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
   const lineCount = app.split(/\r?\n/).length;

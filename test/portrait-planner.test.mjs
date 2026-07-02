@@ -106,14 +106,18 @@ test("portrait planner builds a 12 image shot matrix with professional photograp
 
 test("portrait planner supports manual summary without image analysis", () => {
   const plan = buildPortraitPlan({
+    subjectName: "Unused display label",
     subjectSummary: "person in a linen shirt, neutral expression",
     imageCount: 1,
     selectedStyles: [],
   });
 
   assert.equal(plan.analysisRequired, false);
+  assert.equal(plan.subjectName, "");
   assert.equal(plan.items.length, 1);
   assert.match(plan.items[0].prompt, /person in a linen shirt/);
+  assert.doesNotMatch(plan.items[0].prompt, /Subject label|Unused display label/);
+  assert.match(plan.items[0].prompt, /manual subject description/i);
 });
 
 test("portrait planner rejects an empty confirmed subject summary", () => {
@@ -198,7 +202,7 @@ test("portrait prompts make supplied wardrobe references mandatory outfit locks"
   assert.match(plan.items[0].prompt, /must wear the supplied clothing, prop, and accessory reference/i);
   assert.match(plan.items[0].prompt, /style, shot type, scene, and photography instructions affect lighting, camera treatment, background, and composition only/i);
   assert.match(plan.items[0].prompt, /must not override the wardrobe lock/i);
-  assert.match(plan.items[0].prompt, /preserve the person reference identity separately/i);
+  assert.match(plan.items[0].prompt, /if person reference image\(s\) are supplied/i);
   assert.match(plan.items[0].prompt, /adult, conservative, non-sexual portrait/i);
 });
 

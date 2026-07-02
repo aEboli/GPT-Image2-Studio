@@ -70,6 +70,7 @@ test("portrait runtime keeps person references separate from styling accessory r
   assert.match(analyzeHandler, /(?:const\s+)?referenceImages = \[\.\.\.personReferenceImages, \.\.\.actionReferenceImages, \.\.\.accessoryReferenceImages\]/);
   assert.match(generateHandler, /formData\.getAll\("portraitActionReferenceImages"\)/);
   assert.match(generateHandler, /formData\.getAll\("portraitAccessoryReferenceImages"\)/);
+  assert.doesNotMatch(generateHandler, /if \(personReferenceImages\.length === 0\)/);
   assert.match(generateHandler, /actionReferenceImages\.length > MAX_PORTRAIT_ACTION_REFERENCE_IMAGES/);
   assert.match(generateHandler, /accessoryReferenceImages\.length > MAX_PORTRAIT_ACCESSORY_REFERENCE_IMAGES/);
   assert.match(generateHandler, /(?:const\s+)?referenceImages = \[\.\.\.personReferenceImages, \.\.\.actionReferenceImages, \.\.\.accessoryReferenceImages\]/);
@@ -87,6 +88,7 @@ test("portrait runtime keeps person references separate from styling accessory r
   assert.match(workerAnalyzeHandler, /(?:const\s+)?referenceImages = \[\.\.\.personReferenceImages, \.\.\.actionReferenceImages, \.\.\.accessoryReferenceImages\]/);
   assert.match(workerGenerateHandler, /formData\.getAll\("portraitActionReferenceImages"\)/);
   assert.match(workerGenerateHandler, /formData\.getAll\("portraitAccessoryReferenceImages"\)/);
+  assert.doesNotMatch(workerGenerateHandler, /if \(personReferenceImages\.length === 0\)/);
   assert.match(workerGenerateHandler, /actionReferenceImages\.length > MAX_PORTRAIT_ACTION_REFERENCE_IMAGES/);
   assert.match(workerGenerateHandler, /accessoryReferenceImages\.length > MAX_PORTRAIT_ACCESSORY_REFERENCE_IMAGES/);
   assert.match(workerGenerateHandler, /(?:const\s+)?referenceImages = \[\.\.\.personReferenceImages, \.\.\.actionReferenceImages, \.\.\.accessoryReferenceImages\]/);

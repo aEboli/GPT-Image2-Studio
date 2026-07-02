@@ -22,8 +22,8 @@ const publicConfigModelPickerPath = new URL("../public/lib/config-model-picker.m
 const publicCreationListingViewPath = new URL("../public/lib/creation-listing-view.mjs", import.meta.url);
 const generationClientPath = new URL("../lib/generation-client.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20260622-creation-coverage-1";
-const appAssetVersion = "20260622-creation-coverage-1";
+const stylesAssetVersion = "20260703-latest-restore-1";
+const appAssetVersion = "20260703-latest-restore-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
 const creationQueueModuleAssetVersion = "20260530-creation-queue-role-sync-1";
 const quickBlendModuleAssetVersion = "20260608-quick-blend-time-sort-1";
@@ -3328,8 +3328,14 @@ test("creation mode has independent references count and scenario controls", asy
   assert.match(app, /12-accessory-gift\|accessory-gift\|到手清单\/配件图/);
   assert.match(app, /13-series-showcase\|series-showcase\|多款式\/SKU选择图/);
   assert.match(app, /14-ingredient-material\|ingredient-material\|材质成分解析图/);
-  assert.match(app, /15-after-sales\|after-sales\|售后信任收口图/);
-  assert.match(app, /16-usage-suggestion\|usage-suggestion\|使用步骤\/上手图/);
+  assert.match(
+    app,
+    /15-after-sales\|after-sales\|痛点图\|用真实使用困扰、解决路径和结果变化，让买家知道它具体替我解决什么问题/,
+  );
+  assert.match(
+    app,
+    /16-usage-suggestion\|usage-suggestion\|卖点图\|用 3-5 个核心卖点连接功能证据和买后收益，让买家知道买它能获得什么好处/,
+  );
   assert.match(app, /17-human-handheld\|human-handheld\|真人手持展示图/);
   assert.match(app, /18-human-wearable\|human-wearable\|真人穿戴场景图/);
   assert.doesNotMatch(app, /17-brand-story\|brand-story\|品牌故事图/);
@@ -3514,7 +3520,7 @@ test("creation mode has independent references count and scenario controls", asy
   assert.match(app, /material:\s*\["product-detail",\s*"ingredient-material"\]/);
   assert.match(app, /dimensions:\s*\["size-capacity-fit",\s*"spec-table"\]/);
   assert.match(app, /package:\s*\["accessory-gift"\]/);
-  assert.match(app, /from "\/lib\/creation-reference-coverage\.mjs\?v=20260622-creation-coverage-1"/);
+  assert.match(app, /from "\/lib\/creation-reference-coverage\.mjs\?v=20260703-latest-restore-1"/);
   assert.match(creationReferenceCoverage, /export function applyCreationReferenceCoverageRolePlan\(/);
   assert.match(creationReferenceCoverage, /export function normalizeCreationCoverageFields\(/);
   assert.match(creationReferenceCoverage, /export function appendCreationCoverageSummary\(/);
@@ -3911,11 +3917,11 @@ test("creation result grid keeps running card loading DOM stable across rerender
   const loadingModule = await readFile(creationCardLoadingPath, "utf8");
 
   assert.match(app, /from "\/lib\/creation-card-loading\.mjs"/);
-  assert.match(app, /function syncCreationResultGrid\(items = \[\]\) \{/);
+  assert.match(app, /function syncCreationResultGrid\(items = \[\], \{ showActions = true \} = \{\}\) \{/);
   assert.match(app, /syncCreationResultGridShell\(\{/);
   assert.match(app, /syncCreationLoadingCard\(card,\s*item,\s*index/);
   assert.match(app, /createCreationCardLoadingShell\([^,]+,\s*null,\s*\{ sequenceIndex \}\)/);
-  assert.match(app, /syncCreationResultGrid\(items\);/);
+  assert.match(app, /syncCreationResultGrid\(items, \{ showActions: showCreationResultActions \}\);/);
   const renderCreationViewBody = extractFunctionBefore(app, "renderCreationView", "getCreationPlanOverrides");
   assert.doesNotMatch(renderCreationViewBody, /refs\.creationResultGrid\.innerHTML = "";/);
   assert.match(loadingModule, /export function getCreationCardDomKey\(item = \{\}, fallbackIndex = 0\) \{/);

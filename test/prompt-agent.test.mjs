@@ -499,6 +499,44 @@ test("prompt agent normalizes creation reference category hints", () => {
   assert.equal(result.category_path, "数码电子 > 手机通讯 > 手机 > 智能手机");
 });
 
+test("prompt agent preserves creation reference product name", () => {
+  const result = extractPromptAgentJson({
+    output: [
+      {
+        content: [
+          {
+            type: "output_text",
+            text: JSON.stringify({
+              summary: "Detected backpack product references.",
+              product_name: "双肩背包",
+              category_hint: "",
+              category_path: "",
+              visual_language: "classic-commercial",
+              visual_language_reason: "",
+              reference_roles: [
+                { index: 1, filename: "front.png", role: "product", note: "Backpack product subject." },
+              ],
+              sku_subjects: [
+                {
+                  id: "front.png",
+                  title: "红色双肩背包",
+                  reference_indexes: [1],
+                  filenames: ["front.png"],
+                  subject_unit_count: 2,
+                  note: "Two complete backpack views in one product-subject reference.",
+                },
+              ],
+              risks: [],
+            }),
+          },
+        ],
+      },
+    ],
+  });
+
+  assert.equal(result.product_name, "双肩背包");
+});
+
 test("prompt agent normalizes creation SKU subject groups", () => {
   const result = extractPromptAgentJson({
     output: [

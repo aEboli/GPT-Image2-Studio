@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -45,6 +45,197 @@ test("config store returns empty public config before any save", async () => {
   });
   assert.equal("maxConcurrentTasksPerSession" in config.limits, false);
   assert.deepEqual(config.reasoningEfforts, ["low", "medium", "high", "xhigh"]);
+});
+
+test("config store uses local environment variables as defaults before any save", async () => {
+  const rootDir = await mkdtemp(join(tmpdir(), "responses-config-"));
+  const store = createConfigStore({
+    rootDir,
+    env: {
+      OPENAI_API_KEY: "env-route-key-1234567890",
+      OPENAI_BASE_URL: "https://env-route.example.com/openai/v1/responses",
+      RESPONSES_MODEL: "gpt-env-responses",
+      ENDPOINT_PATH: "chat/completions",
+      IMAGE_ROUTE: "b",
+      DIRECT_API_KEY: "env-direct-key-1234567890",
+      DIRECT_BASE_URL: "https://env-direct.example.com/v1/images/generations",
+      DIRECT_ENDPOINT_PATH: "responses",
+      DIRECT_IMAGE_MODEL: "env-image-model",
+      DIRECT_RESPONSES_MODEL: "env-direct-responses",
+      PROTOCOL_API_KEY: "env-protocol-key-1234567890",
+      PROTOCOL_BASE_URL: "https://env-protocol.example.com/v1/images/generations",
+      PROTOCOL_IMAGE_MODEL: "env-protocol-image",
+      REASONING_EFFORT: "low",
+    },
+  });
+
+  const publicConfig = await store.readPublicConfig();
+  const privateConfig = await store.readPrivateConfig();
+
+  assert.equal(publicConfig.imageRoute, "b");
+  assert.equal(publicConfig.baseUrl, "https://env-route.example.com/openai/v1");
+  assert.equal(publicConfig.endpointPath, "responses");
+  assert.equal(publicConfig.apiKeyConfigured, true);
+  assert.match(publicConfig.apiKeyMask, /^env-.*7890$/);
+  assert.equal(publicConfig.responsesModel, "gpt-env-responses");
+  assert.equal(publicConfig.directBaseUrl, "https://env-direct.example.com/v1");
+  assert.equal(publicConfig.directEndpointPath, "images/generations");
+  assert.equal(publicConfig.directApiKeyConfigured, true);
+  assert.equal(publicConfig.directImageModel, "env-image-model");
+  assert.equal(publicConfig.directResponsesModel, "env-direct-responses");
+  assert.equal(publicConfig.protocolBaseUrl, "https://env-protocol.example.com/v1");
+  assert.equal(publicConfig.protocolApiKeyConfigured, true);
+  assert.equal(publicConfig.protocolImageModel, "env-protocol-image");
+  assert.equal(publicConfig.defaults.reasoningEffort, "low");
+  assert.equal(privateConfig.apiKey, "env-route-key-1234567890");
+  assert.equal(privateConfig.directApiKey, "env-direct-key-1234567890");
+  assert.equal(privateConfig.protocolApiKey, "env-protocol-key-1234567890");
+});
+
+test("config store lets temporary direct and OpenAI environment values override stale local config", async () => {
+  const rootDir = await mkdtemp(join(tmpdir(), "responses-config-"));
+  await mkdir(join(rootDir, ".local"), { recursive: true });
+  await writeFile(
+    join(rootDir, ".local", "config.json"),
+    `${JSON.stringify(
+      {
+        imageRoute: "a",
+        baseUrl: "https://stale-route.example.test/v1/responses",
+        endpointPath: "responses",
+        apiKey: "stale-route-key-1234567890",
+        responsesModel: "stale-route-model",
+        directBaseUrl: "https://stale-direct.example.test/v1/images/generations",
+        directEndpointPath: "images/generations",
+        directApiKey: "stale-direct-key-1234567890",
+        directImageModel: "stale-direct-image",
+        directResponsesModel: "stale-direct-responses",
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
+  const store = createConfigStore({
+    rootDir,
+    env: {
+      IMAGE_ROUTE: "b",
+      OPENAI_API_KEY: "env-route-key-1234567890",
+      OPENAI_BASE_URL: "https://env-route.example.test/openai/v1/chat/completions",
+      RESPONSES_MODEL: "env-route-responses",
+      DIRECT_API_KEY: "env-direct-key-1234567890",
+      DIRECT_BASE_URL: "https://env-direct.example.test/v1/images/generations",
+      DIRECT_IMAGE_MODEL: "env-direct-image",
+      DIRECT_RESPONSES_MODEL: "env-direct-responses",
+    },
+  });
+
+  const publicConfig = await store.readPublicConfig();
+  const privateConfig = await store.readPrivateConfig();
+
+  assert.equal(publicConfig.imageRoute, "b");
+  assert.equal(publicConfig.baseUrl, "https://env-route.example.test/openai/v1");
+  assert.equal(publicConfig.endpointPath, "chat/completions");
+  assert.equal(publicConfig.responsesModel, "env-route-responses");
+  assert.equal(publicConfig.apiKeyMask, "env-***7890");
+  assert.equal(publicConfig.directBaseUrl, "https://env-direct.example.test/v1");
+  assert.equal(publicConfig.directEndpointPath, "images/generations");
+  assert.equal(publicConfig.directImageModel, "env-direct-image");
+  assert.equal(publicConfig.directResponsesModel, "env-direct-responses");
+  assert.equal(publicConfig.directApiKeyMask, "env-***7890");
+  assert.equal(privateConfig.apiKey, "env-route-key-1234567890");
+  assert.equal(privateConfig.directApiKey, "env-direct-key-1234567890");
+});
+
+test("config store does not let stale direct config leak into a direct route seeded from OpenAI env", async () => {
+  const rootDir = await mkdtemp(join(tmpdir(), "responses-config-"));
+  await mkdir(join(rootDir, ".local"), { recursive: true });
+  await writeFile(
+    join(rootDir, ".local", "config.json"),
+    `${JSON.stringify(
+      {
+        imageRoute: "b",
+        directBaseUrl: "https://stale-direct.example.test/v1/images/generations",
+        directEndpointPath: "images/generations",
+        directApiKey: "stale-direct-key-1234567890",
+        directImageModel: "stale-direct-image",
+        directResponsesModel: "stale-direct-responses",
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
+  const store = createConfigStore({
+    rootDir,
+    env: {
+      IMAGE_ROUTE: "b",
+      OPENAI_API_KEY: "env-route-key-1234567890",
+      OPENAI_BASE_URL: "https://env-route.example.test/openai/v1/chat/completions",
+      RESPONSES_MODEL: "env-route-responses",
+    },
+  });
+
+  const publicConfig = await store.readPublicConfig();
+  const privateConfig = await store.readPrivateConfig();
+
+  assert.equal(publicConfig.directBaseUrl, "https://env-route.example.test/openai/v1");
+  assert.equal(publicConfig.directEndpointPath, "images/generations");
+  assert.equal(publicConfig.directApiKeyConfigured, true);
+  assert.equal(publicConfig.directApiKeyMask, "env-***7890");
+  assert.equal(publicConfig.directImageModel, "gpt-image-2");
+  assert.equal(publicConfig.directResponsesModel, "gpt-5.5");
+  assert.equal(privateConfig.directApiKey, "env-route-key-1234567890");
+  assert.equal(privateConfig.directBaseUrl, "https://env-route.example.test/openai/v1");
+  assert.equal(privateConfig.directEndpointPath, "images/generations");
+});
+
+test("config store saves displayed local environment credentials when key inputs stay blank", async () => {
+  const rootDir = await mkdtemp(join(tmpdir(), "responses-config-"));
+  const store = createConfigStore({
+    rootDir,
+    env: {
+      IMAGE_ROUTE: "b",
+      DIRECT_API_KEY: "env-direct-key-1234567890",
+      DIRECT_BASE_URL: "https://env-direct.example.test/v1/images/generations",
+      DIRECT_IMAGE_MODEL: "env-direct-image",
+      DIRECT_RESPONSES_MODEL: "env-direct-responses",
+    },
+  });
+
+  await store.saveConfig({
+    imageRoute: "b",
+    directBaseUrl: "https://saved-direct.example.test/v1/responses",
+    directEndpointPath: "responses",
+    directApiKey: "",
+    directImageModel: "saved-direct-image",
+    directResponsesModel: "saved-direct-responses",
+  });
+
+  const publicConfig = await store.readPublicConfig();
+  const privateConfig = await store.readPrivateConfig();
+  const raw = JSON.parse(await readFile(join(rootDir, ".local", "config.json"), "utf8"));
+
+  assert.equal(publicConfig.imageRoute, "b");
+  assert.equal(publicConfig.directBaseUrl, "https://env-direct.example.test/v1");
+  assert.equal(publicConfig.directEndpointPath, "images/generations");
+  assert.equal(publicConfig.directApiKeyConfigured, true);
+  assert.equal(publicConfig.directApiKeyMask, "env-***7890");
+  assert.equal(publicConfig.directImageModel, "env-direct-image");
+  assert.equal(publicConfig.directResponsesModel, "env-direct-responses");
+  assert.equal(privateConfig.directApiKey, "env-direct-key-1234567890");
+  assert.equal(raw.directBaseUrl, "https://saved-direct.example.test/v1");
+  assert.equal(raw.directEndpointPath, "responses");
+  assert.equal(raw.directApiKey, "env-direct-key-1234567890");
+  assert.equal(raw.directImageModel, "saved-direct-image");
+  assert.equal(raw.directResponsesModel, "saved-direct-responses");
+
+  const restartedStore = createConfigStore({ rootDir });
+  const restartedConfig = await restartedStore.readPrivateConfig();
+  assert.equal(restartedConfig.directBaseUrl, "https://saved-direct.example.test/v1");
+  assert.equal(restartedConfig.directEndpointPath, "responses");
+  assert.equal(restartedConfig.directApiKey, "env-direct-key-1234567890");
+  assert.equal(restartedConfig.directImageModel, "saved-direct-image");
+  assert.equal(restartedConfig.directResponsesModel, "saved-direct-responses");
 });
 
 test("config store persists private config and only exposes masked api key publicly", async () => {

@@ -170,7 +170,7 @@ const outputDir =
 const localDataRootDir =
   process.env.IMAGE_STUDIO_LOCAL_DATA_DIR ||
   (process.env.VERCEL ? join(tmpdir(), "gpt-image2-studio-local") : rootDir);
-const configStore = createConfigStore({ rootDir: localDataRootDir });
+const configStore = createConfigStore({ rootDir: localDataRootDir, env: process.env });
 const promptAgentStore = createPromptAgentStore({ rootDir: localDataRootDir });
 const generationTaskStore = createGenerationTaskStore();
 const pptDeckStore = createPptDeckStore({ outputDir, publicBasePath: "/output" });
@@ -3092,9 +3092,6 @@ async function handlePortraitGenerate(request, response) {
     const actionReferenceImages = await toReferenceImages([
       ...formData.getAll("portraitActionReferenceImages"),
     ]);
-    if (personReferenceImages.length === 0) {
-      throw new Error("请先上传人物参考图。");
-    }
     if (personReferenceImages.length > MAX_PORTRAIT_PERSON_REFERENCE_IMAGES) {
       throw new Error(`人物参考图最多支持 ${MAX_PORTRAIT_PERSON_REFERENCE_IMAGES} 张。`);
     }

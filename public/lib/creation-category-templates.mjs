@@ -126,7 +126,7 @@ const CATEGORY_PROFILE_BY_CODE_PREFIX = {
   C02: {
     rolePreset: ["hero", "benefit", "product-detail", "usage-suggestion", "product-detail", "atmosphere", "accessory-gift", "after-sales"],
     promptInstruction:
-      "Beauty and personal care focus: show texture, swatches, use steps, packaging, and benefit hierarchy without medical claims.",
+      "Beauty and personal care focus: show texture, swatches, use cues as selling-point evidence, packaging, and benefit hierarchy without medical claims.",
   },
   C03: {
     rolePreset: ["hero", "benefit", "scene", "accessory-gift", "usage-suggestion", "product-detail", "atmosphere", "after-sales"],
@@ -181,7 +181,7 @@ const CATEGORY_PROFILE_BY_CODE_PREFIX = {
   C13: {
     rolePreset: ["hero", "scene", "benefit", "accessory-gift", "usage-suggestion", "atmosphere", "after-sales", "after-sales"],
     promptInstruction:
-      "Toys and instruments focus: show play or practice context, age fit, contents, interaction steps, safety cues, and gift-ready packaging.",
+      "Toys and instruments focus: show play or practice context, age fit, contents, interaction cues as selling-point evidence, safety cues, and gift-ready packaging.",
   },
   C14: {
     rolePreset: ["hero", "scene", "benefit", "product-detail", "accessory-gift", "atmosphere", "after-sales", "after-sales"],
@@ -191,7 +191,7 @@ const CATEGORY_PROFILE_BY_CODE_PREFIX = {
   C15: {
     rolePreset: ["hero", "benefit", "accessory-gift", "product-detail", "usage-suggestion", "after-sales", "size-capacity-fit", "effect-comparison"],
     promptInstruction:
-      "Health category focus: show product structure, package information, safe use steps, specification clarity, and avoid diagnosis, cure, or unsupported medical claims.",
+      "Health category focus: show product structure, package information, safe-use cues as selling-point evidence, specification clarity, and avoid diagnosis, cure, or unsupported medical claims.",
   },
   C16: {
     rolePreset: ["hero", "benefit", "size-capacity-fit", "effect-comparison", "accessory-gift", "product-detail", "after-sales", "after-sales"],
@@ -227,7 +227,7 @@ const DEFAULT_CATEGORY_PROMPT_STRATEGY = {
     "product-detail": "Role category focus: use close proof of structure, material, packaging, and trustworthy product details.",
     "product-detail": "Role category focus: use macro detail for surface finish, texture, seams, contents, or key product structure.",
     "size-capacity-fit": "Role category focus: make scale, capacity, size, compatibility, or quantity easy to understand without inventing numbers.",
-    "usage-suggestion": "Role category focus: show practical setup, operation, wearing, serving, cleaning, or assembly steps that fit this category.",
+    "usage-suggestion": "Role category focus: turn practical setup, operation, wearing, serving, cleaning, or assembly cues into selling-point evidence and buyer payoff for this category.",
     "accessory-gift": "Role category focus: clarify packaging, included items, accessories, and what the shopper receives.",
     "effect-comparison": "Role category focus: compare category-relevant variants, materials, sizes, capacities, or use cases without fake metrics.",
   },
@@ -255,7 +255,7 @@ const CATEGORY_PROMPT_STRATEGY_BY_CODE_PREFIX = {
       hero: "Role category focus: show packaging, formula texture, applicator or product body clearly with premium clean beauty lighting.",
       scene: "Role category focus: place the product in a vanity, bathroom, skincare, makeup, fragrance, or grooming routine scene.",
       "product-detail": "Role category focus: show cream, foam, powder, lipstick, swatch, bristle, nozzle, or surface texture in macro detail.",
-      "usage-suggestion": "Role category focus: show safe skincare, makeup, fragrance, grooming, or beauty-tool steps without medical claims.",
+      "usage-suggestion": "Role category focus: turn safe skincare, makeup, fragrance, grooming, or beauty-tool use cues into selling-point evidence and buyer payoff without medical claims.",
       "accessory-gift": "Role category focus: make bottle, jar, tube, palette, box, shade, and included tools easy to inspect.",
     },
   },
@@ -268,7 +268,7 @@ const CATEGORY_PROMPT_STRATEGY_BY_CODE_PREFIX = {
       hero: "Role category focus: show a soft, safe, age-appropriate baby or maternity product presentation with clear package identity.",
       scene: "Role category focus: use a supervised feeding, care, sleep, travel, bathing, or parent-child scene with gentle lighting.",
       "product-detail": "Role category focus: emphasize safety structure, soft touch, rounded edges, scale, age range, package, or instruction proof.",
-      "usage-suggestion": "Role category focus: show simple supervised care, feeding, cleaning, wearing, or setup steps without health promises.",
+      "usage-suggestion": "Role category focus: turn simple supervised care, feeding, cleaning, wearing, or setup cues into selling-point evidence and buyer payoff without health promises.",
     },
   },
   C04: {
@@ -304,7 +304,7 @@ const CATEGORY_PROMPT_STRATEGY_BY_CODE_PREFIX = {
       scene: "Role category focus: show realistic desk work, commute, entertainment, game, shooting, listening, or smart-device use context.",
       "product-detail": "Role category focus: emphasize ports, buttons, bezels, camera or lens modules, hinges, vents, cables, and included accessories.",
       "size-capacity-fit": "Role category focus: clarify device size, screen ratio, body thickness, grip scale, connector placement, or accessory fit.",
-      "usage-suggestion": "Role category focus: show setup, charging, connection, shooting, gaming, audio playback, data transfer, or device pairing steps.",
+      "usage-suggestion": "Role category focus: turn setup, charging, connection, shooting, gaming, audio playback, data transfer, or device pairing cues into selling-point evidence and buyer payoff.",
       "effect-comparison": "Role category focus: compare colors, storage, size, accessory compatibility, or use scenarios without fake benchmarks.",
     },
   },
@@ -317,7 +317,7 @@ const CATEGORY_PROMPT_STRATEGY_BY_CODE_PREFIX = {
       scene: "Role category focus: show appliance use in a kitchen, living room, bathroom, laundry, grooming, or cleaning scenario.",
       "product-detail": "Role category focus: show control panel, cavity, nozzle, filter, blade, heating area, cable, accessory, or capacity proof.",
       "size-capacity-fit": "Role category focus: clarify capacity, footprint, installation clearance, countertop scale, or storage fit.",
-      "usage-suggestion": "Role category focus: show operation, cleaning, installation, accessory replacement, or maintenance steps safely.",
+      "usage-suggestion": "Role category focus: turn operation, cleaning, installation, accessory replacement, or maintenance cues into selling-point evidence and buyer payoff safely.",
     },
   },
   C08: {
@@ -385,7 +385,7 @@ const CATEGORY_PROMPT_STRATEGY_BY_CODE_PREFIX = {
     rolePromptInstructions: {
       scene: "Role category focus: show age-appropriate play, practice, building, collecting, music, tabletop, or gift context.",
       "product-detail": "Role category focus: show contents, safe edges, joints, controls, strings, pieces, material, or interaction structure.",
-      "usage-suggestion": "Role category focus: show simple play, assembly, practice, rule setup, or instrument operation steps.",
+      "usage-suggestion": "Role category focus: turn simple play, assembly, practice, rule setup, or instrument operation cues into selling-point evidence and buyer payoff.",
     },
   },
   C14: {
@@ -408,7 +408,7 @@ const CATEGORY_PROMPT_STRATEGY_BY_CODE_PREFIX = {
       hero: "Role category focus: show the healthcare product, packaging, use part, or device structure clearly in a trustworthy clean setup.",
       scene: "Role category focus: use a safe home check, care, hygiene, storage, or instruction-reading context without diagnosis claims.",
       "product-detail": "Role category focus: show display area, sleeve/cuff/contact surface, scale, consumable, instructions, package, or compliance-like information without fabricating certificates.",
-      "usage-suggestion": "Role category focus: show safe wearing, measurement, cleaning, replacement, reading data, or storage steps without treatment promises.",
+      "usage-suggestion": "Role category focus: turn safe wearing, measurement, cleaning, replacement, reading data, or storage cues into selling-point evidence and buyer payoff without treatment promises.",
       "accessory-gift": "Role category focus: show package, manual, accessories, consumables, and model or specification areas without fake approvals.",
     },
   },
@@ -445,7 +445,7 @@ const CATEGORY_PROMPT_STRATEGY_BY_CODE_PREFIX = {
     rolePromptInstructions: {
       scene: "Role category focus: use balcony, garden, planting, watering, pruning, harvesting, seedling, or farm-tool context.",
       "product-detail": "Role category focus: show plant leaf, soil, pot texture, blade, sprayer, fertilizer granule, or tool material detail.",
-      "usage-suggestion": "Role category focus: show planting, watering, pruning, transplanting, fertilizing, harvesting, or tool use steps safely.",
+      "usage-suggestion": "Role category focus: turn planting, watering, pruning, transplanting, fertilizing, harvesting, or tool-use cues into selling-point evidence and buyer payoff safely.",
     },
   },
 };
@@ -458,7 +458,7 @@ const CATEGORY_PROMPT_STRATEGY_BY_LEVEL2 = {
     rolePromptInstructions: {
       scene: "Role category focus: show phone communication products in desk work, commute, shooting, charging, call, or accessory connection contexts.",
       "product-detail": "Role category focus: show bezels, camera module, cutouts, buttons, connector, protective fit, and package accessories.",
-      "usage-suggestion": "Role category focus: show charging, pairing, holding, shooting, mounting, data transfer, or protective installation steps.",
+      "usage-suggestion": "Role category focus: turn charging, pairing, holding, shooting, mounting, data transfer, or protective installation cues into selling-point evidence and buyer payoff.",
     },
   },
   彩妆: {
@@ -475,7 +475,7 @@ const CATEGORY_PROMPT_STRATEGY_BY_LEVEL2 = {
     avoidHints: ["不要承诺治疗红屁屁"],
     rolePromptInstructions: {
       "product-detail": "Role category focus: show softness, breathability, waistband, absorbent layer, size, and packaging without medical promises.",
-      "usage-suggestion": "Role category focus: show supervised changing, storage, disposal, or wipe-use steps with safe baby care context.",
+      "usage-suggestion": "Role category focus: turn supervised changing, storage, disposal, or wipe-use cues into selling-point evidence and buyer payoff with safe baby care context.",
     },
   },
   家具: {
@@ -499,7 +499,7 @@ const CATEGORY_PROMPT_STRATEGY_BY_LEVEL2 = {
     detailHints: ["袖带", "显示屏读数区域", "按键", "说明书", "包装资质信息"],
     avoidHints: ["不要诊断疾病", "不要承诺治愈"],
     rolePromptInstructions: {
-      "usage-suggestion": "Role category focus: show safe wearing, sleeve/cuff placement, operation, reading data, cleaning, or storage steps.",
+      "usage-suggestion": "Role category focus: turn safe wearing, sleeve/cuff placement, operation, reading data, cleaning, or storage cues into selling-point evidence and buyer payoff.",
       "product-detail": "Role category focus: show device structure, sleeve/cuff, screen area, instructions, and compliance-oriented package information without fake approval marks.",
     },
   },
@@ -526,7 +526,7 @@ const CATEGORY_PROMPT_STRATEGY_BY_LEVEL3 = {
       scene: "Role category focus: show 桌面办公、通勤手持、夜景拍摄场景, gaming, or everyday phone usage with realistic hand scale.",
       "product-detail": "Role category focus: emphasize 屏幕边框、摄像头模组、接口与按键、机身边缘 and package accessories.",
       "size-capacity-fit": "Role category focus: emphasize 机身厚度、屏幕比例、摄像头凸起和握持尺度 without inventing numbers.",
-      "usage-suggestion": "Role category focus: show 拍摄、游戏、充电、连接、数据传输 or first setup steps with abstract non-branded UI.",
+      "usage-suggestion": "Role category focus: use 拍摄、游戏、充电、连接、数据传输 or first setup cues as 卖点证据 / selling-point evidence with abstract non-branded UI.",
       "effect-comparison": "Role category focus: compare colors, storage, screen size, or battery use cases without fake benchmarks.",
     },
   },
@@ -548,7 +548,7 @@ const CATEGORY_PROMPT_STRATEGY_BY_LEVEL3 = {
     avoidHints: ["不要诊断疾病", "不要承诺治愈", "不要生成医生背书"],
     usageContext: ["家庭自测", "老人健康管理"],
     rolePromptInstructions: {
-      "usage-suggestion": "Role category focus: show 佩戴袖带、读取数据、收纳和清洁的安全步骤，不做治疗承诺。",
+      "usage-suggestion": "Role category focus: use 佩戴袖带、读取数据、收纳和清洁 cues as 卖点证据 / selling-point evidence，不做治疗承诺。",
       "product-detail": "Role category focus: show 袖带、显示屏读数区域、按键、说明书和合规包装，不做疗效承诺。",
     },
   },
@@ -600,7 +600,7 @@ const CATEGORY_PROMPT_KEYWORD_RULES = [
         scene: "Role category focus: show 桌面办公、通勤手持、夜景拍摄场景 and everyday phone usage with realistic hand scale.",
         "product-detail": "Role category focus: emphasize 屏幕边框、摄像头模组、接口与按键、机身边缘 and package accessories.",
         "size-capacity-fit": "Role category focus: emphasize 机身厚度、屏幕比例、摄像头凸起和握持尺度 without inventing numbers.",
-        "usage-suggestion": "Role category focus: show 拍摄、游戏、充电、连接、数据传输 or first setup steps with abstract non-branded UI.",
+        "usage-suggestion": "Role category focus: use 拍摄、游戏、充电、连接、数据传输 or first setup cues as 卖点证据 / selling-point evidence with abstract non-branded UI.",
       },
     },
   },
@@ -612,7 +612,7 @@ const CATEGORY_PROMPT_KEYWORD_RULES = [
       avoidHints: ["不要诊断疾病", "不要承诺治愈", "不要生成医生背书"],
       usageContext: ["家庭自测", "老人健康管理"],
       rolePromptInstructions: {
-        "usage-suggestion": "Role category focus: show 佩戴袖带、读取数据、收纳和清洁的安全步骤，不做治疗承诺。",
+        "usage-suggestion": "Role category focus: use 佩戴袖带、读取数据、收纳和清洁 cues as 卖点证据 / selling-point evidence，不做治疗承诺。",
         "product-detail": "Role category focus: show 袖带、显示屏读数区域、按键、说明书和合规包装，不做疗效承诺。",
       },
     },

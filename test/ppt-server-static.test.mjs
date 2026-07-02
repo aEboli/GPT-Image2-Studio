@@ -72,7 +72,7 @@ test("server keeps local data stores writable on Vercel serverless runtime", asy
 
   assert.match(server, /process\.env\.IMAGE_STUDIO_LOCAL_DATA_DIR/);
   assert.match(server, /join\(tmpdir\(\),\s*"gpt-image2-studio-local"\)/);
-  assert.match(server, /createConfigStore\(\{ rootDir: localDataRootDir \}\)/);
+  assert.match(server, /createConfigStore\(\{ rootDir: localDataRootDir, env: process\.env \}\)/);
   assert.match(server, /createPromptAgentStore\(\{ rootDir: localDataRootDir \}\)/);
 });
 

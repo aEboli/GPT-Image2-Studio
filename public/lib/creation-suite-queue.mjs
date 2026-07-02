@@ -77,7 +77,7 @@ export function createCreationQueueJob({ creationState, formData, set, normalize
 
   creationState.queue.push(job);
   creationState.selectedQueueId = job.id;
-  if (!creationState.currentSet || !creationState.generating) {
+  if (!creationState.currentSet) {
     creationState.currentSet = job.set;
   }
   return job;
@@ -105,6 +105,10 @@ function formatVisualLanguageLabelForQueue(value, normalizedVisualLanguage, form
 }
 
 const QUEUE_NUMBER_LABELS = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
+const DEFAULT_CREATION_SKU_GENERATION_RULE = {
+  value: "color-name-under-subject",
+  label: "主体下方显示颜色名",
+};
 
 function cleanQueueString(value) {
   return String(value || "").trim();
@@ -306,11 +310,12 @@ export function buildCreationQueuedSet({
   const skuGenerationRule =
     typeof getCreationSelectedSkuGenerationRule === "function"
       ? getCreationSelectedSkuGenerationRule()
-      : { value: "none", label: "无" };
+      : DEFAULT_CREATION_SKU_GENERATION_RULE;
   const previewSlots = getCreationPreviewSlots();
+  const selectedImageCount = Number(getCreationSelectedImageCount());
   const selectedRoles = getCreationSelectedRoles();
   const referenceImageRoles = buildCreationReferenceRolePayload();
-  const infographicRebuildEnabled = normalizeDefaultEnabledBoolean(
+  const infographicRebuildEnabled = selectedImageCount === 0 || normalizeDefaultEnabledBoolean(
     refs.creationInfographicRebuildEnabledInput?.checked ?? draftSet?.infographicRebuildEnabled,
   );
   const infographicRebuildSources = infographicRebuildEnabled ? getCreationInfographicRebuildSources(referenceImageRoles) : [];
@@ -362,8 +367,8 @@ export function buildCreationQueuedSet({
     infographicRebuildCount: infographicRebuildSources.length,
     skuSubjects,
     skuBundleCount: normalizeCreationSkuBundleCountForPayload(refs.creationSkuBundleCountInput?.value || "1"),
-    skuGenerationRule: skuGenerationRule.value || "none",
-    skuGenerationRuleLabel: skuGenerationRule.label || "无",
+    skuGenerationRule: skuGenerationRule.value || DEFAULT_CREATION_SKU_GENERATION_RULE.value,
+    skuGenerationRuleLabel: skuGenerationRule.label || DEFAULT_CREATION_SKU_GENERATION_RULE.label,
     logo: getCreationLogoPayload(),
     createdAt,
     updatedAt: createdAt,

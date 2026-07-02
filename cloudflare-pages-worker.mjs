@@ -2776,9 +2776,6 @@ async function runPortraitGenerate(request, writer, { fetchImpl, imageBucket } =
   const actionReferenceImages = await toReferenceImages([
     ...formData.getAll("portraitActionReferenceImages"),
   ]);
-  if (personReferenceImages.length === 0) {
-    throw new Error("请先上传人物参考图。");
-  }
   if (personReferenceImages.length > MAX_PORTRAIT_PERSON_REFERENCE_IMAGES) {
     throw new Error(`人物参考图最多支持 ${MAX_PORTRAIT_PERSON_REFERENCE_IMAGES} 张。`);
   }
