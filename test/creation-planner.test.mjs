@@ -1133,6 +1133,27 @@ test("creation planner defaults suite generation to eighteen carousel images", (
   assert.deepEqual(plan.items.map((item) => item.role), CREATION_ITEM_ROLES.map((role) => role.role));
 });
 
+test("creation planner allows zero carousel images and forces infographic rebuild", () => {
+  const plan = buildCreationPlan({
+    productName: "Cooling towel 4-pack",
+    productDescription: "Cooling towels packed in portable cases.",
+    sellingPoints: "fast drying, clip-on case, mixed colors",
+    targetLanguage: "en",
+    imageCount: "0",
+    infographicRebuildEnabled: "false",
+    referenceImageRoles: [
+      { index: 1, filename: "towel-subjects.png", role: "product", note: "Four towel cases as the sellable subject group." },
+      { index: 2, filename: "feature-card.png", role: "material", note: "Cooling fabric callouts and airflow diagram." },
+      { index: 3, filename: "package-card.png", role: "package", note: "4 towels and 4 carrying cases." },
+    ],
+  });
+
+  assert.equal(plan.imageCount, 0);
+  assert.equal(plan.infographicRebuildEnabled, true);
+  assert.deepEqual(plan.selectedRoles, []);
+  assert.deepEqual(plan.items.map((item) => item.role), ["infographic-rebuild", "infographic-rebuild"]);
+});
+
 test("creation planner treats sixteen-image suites as a selectable ten-image upload candidate pool", () => {
   const plan = buildCreationPlan({
     productName: "Golf cocktail graphic tee",
@@ -1214,10 +1235,11 @@ test("creation planner supports the refactored ecommerce image types with dedica
 test("creation planner applies SKU generation rules for package-list content and dimensions", () => {
   assert.deepEqual(
     CREATION_SKU_GENERATION_RULE_OPTIONS.map((option) => option.value),
-    ["none", "package-list", "dimensions", "package-list-dimensions"],
+    ["color-name-under-subject", "none", "package-list", "dimensions", "package-list-dimensions"],
   );
+  assert.equal(normalizeCreationSkuGenerationRule("").value, "color-name-under-subject");
   assert.equal(normalizeCreationSkuGenerationRule("package-list-dimensions").value, "package-list-dimensions");
-  assert.equal(normalizeCreationSkuGenerationRule("bad-value").value, "none");
+  assert.equal(normalizeCreationSkuGenerationRule("bad-value").value, "color-name-under-subject");
 
   const plan = buildCreationPlan({
     productName: "Travel bottle bundle",
@@ -1253,6 +1275,100 @@ test("creation planner applies SKU generation rules for package-list content and
   assert.match(skuItem.prompt, /Spare silicone seal\*2/);
   assert.match(skuItem.prompt, /Height 24 cm, diameter 8 cm, capacity 750 ml/);
   assert.match(skuItem.prompt, /package-list content only, not packaging box appearance/i);
+});
+
+test("creation planner defaults SKU generation to show English color names under subjects", () => {
+  const plan = buildCreationPlan({
+    productName: "Silicone pet collar",
+    productDescription: "Soft waterproof pet collar with multiple colorways",
+    sellingPoints: "soft touch, waterproof, adjustable",
+    targetLanguage: "en",
+    selectedRoles: ["hero"],
+    skuSubjects: [
+      { id: "red-collar", title: "red collar", filenames: ["red-collar.png"], note: "recognized color is red" },
+    ],
+  });
+
+  const skuItem = plan.items.find((item) => item.role === "sku");
+
+  assert.equal(plan.skuGenerationRule, "color-name-under-subject");
+  assert.match(skuItem.prompt, /SKU generation rule: show the color name below the subject/i);
+  assert.match(skuItem.prompt, /Visible SKU color label under the subject: "red"/);
+});
+
+test("creation planner labels every visible unit color under grouped SKU subjects", () => {
+  const plan = buildCreationPlan({
+    productName: "Cooling towel 4-pack",
+    productDescription: "Clip-on cooling towel set with four visible color variants.",
+    sellingPoints: "portable, fast drying, mixed colors",
+    targetLanguage: "en",
+    selectedRoles: ["hero"],
+    skuSubjects: [
+      {
+        id: "cooling-towel-4-pack",
+        title: "Cooling towel 4-pack",
+        filenames: ["cooling-towel-4-pack.png"],
+        colorName: "blue, gray, black, silver",
+        subjectUnitCount: 4,
+        note: "Four complete visible product units: blue, gray, black, and silver cases.",
+      },
+    ],
+  });
+
+  const skuItem = plan.items.find((item) => item.role === "sku");
+
+  assert.match(skuItem.prompt, /label each complete visible product unit with its own color name directly below that corresponding unit/i);
+  assert.match(skuItem.prompt, /Visible SKU color labels for the grouped subject: "blue", "gray", "black", "silver"/);
+  assert.match(skuItem.prompt, /Do not render one shared color label for the whole grouped image/i);
+});
+
+test("creation planner keeps single multi-color SKU subjects as one color label", () => {
+  const plan = buildCreationPlan({
+    productName: "Blue silver fishing lure",
+    productDescription: "A single lure body with a blue and silver finish.",
+    sellingPoints: "reflective finish, sharp hooks",
+    targetLanguage: "en",
+    selectedRoles: ["hero"],
+    skuSubjects: [
+      {
+        id: "blue-silver-lure",
+        title: "Blue silver fishing lure",
+        filenames: ["blue-silver-lure.png"],
+        note: "One complete visible product unit with blue and silver finish.",
+      },
+    ],
+  });
+
+  const skuItem = plan.items.find((item) => item.role === "sku");
+
+  assert.match(skuItem.prompt, /Visible SKU color label under the subject: "blue"/);
+  assert.doesNotMatch(skuItem.prompt, /Visible SKU color labels for the grouped subject/i);
+  assert.doesNotMatch(skuItem.prompt, /each complete visible product unit needs its own label/i);
+});
+
+test("creation planner preserves explicit grouped SKU colors outside the color dictionary", () => {
+  const plan = buildCreationPlan({
+    productName: "Travel pouch two-pack",
+    productDescription: "Two visible pouch color variants packed as one SKU.",
+    sellingPoints: "water-resistant, compact",
+    targetLanguage: "es",
+    selectedRoles: ["hero"],
+    skuSubjects: [
+      {
+        id: "travel-pouch-2-pack",
+        title: "Travel pouch two-pack",
+        filenames: ["travel-pouch-2-pack.png"],
+        colorName: "azul marino, beige",
+        subjectUnitCount: 2,
+        note: "Two complete visible product units.",
+      },
+    ],
+  });
+
+  const skuItem = plan.items.find((item) => item.role === "sku");
+
+  assert.match(skuItem.prompt, /Visible SKU color labels for the grouped subject: "azul marino", "beige"/);
+  assert.match(skuItem.prompt, /place each exact label below the corresponding visible product unit/i);
 });
 
 test("creation planner SKU prompts treat source card text as non-subject noise", () => {

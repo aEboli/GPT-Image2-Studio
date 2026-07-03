@@ -35,6 +35,23 @@ test("static assets use the current cache-busting version", async () => {
   assert.match(html, new RegExp(`\\.\\/app\\.js\\?v=${appAssetVersion}`));
 });
 
+test("creation image count keeps role checkbox defaults synchronized", async () => {
+  const app = await readFile(appPath, "utf8");
+
+  assert.match(app, /const CREATION_IMAGE_COUNT_OPTIONS = \[0, 4, 6, 8, 10, 12, 14, 16, 18\];/);
+  assert.match(app, /function alignCreationRoleIdsToCount\(/);
+  assert.match(app, /function syncCreationSelectedRolesToCurrentCount\(\) \{/);
+  assert.match(app, /refs\.creationImageCountInput\.addEventListener\("click", syncCreationSelectedRolesToCurrentCount\)/);
+  assert.match(app, /function syncCreationSelectedRolesToPreset\(selectedRoles\) \{[\s\S]*isCreationZeroImageCountMode\(\)[\s\S]*state\.creationSelectedRoles = \[\]/);
+  assert.match(app, /set\.imageCount !== undefined && set\.imageCount !== null && String\(set\.imageCount\)\.trim\(\) !== "" && Number\.isFinite\(Number\(set\.imageCount\)\)/);
+
+  const applySetBody =
+    app.match(/function applyCreationSetToForm\(set\) \{[\s\S]*?\r?\n\}\r?\n\r?\nfunction getCreationCurrentSet/)?.[0] || "";
+  assert.match(applySetBody, /setCreationImageCountValue\(normalized\.imageCount\);/);
+  assert.match(applySetBody, /alignCreationRoleIdsToCount\(normalizedRoles, getCreationSelectedImageCount\(\)\)/);
+  assert.doesNotMatch(applySetBody, /setCreationImageCountValue\(state\.creationSelectedRoles\.length \|\| normalized\.imageCount\)/);
+});
+
 function readCssRule(styles, selector) {
   const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const match = styles.match(new RegExp(`${escapedSelector}\\s*\\{([\\s\\S]*?)\\n\\}`));
@@ -3151,10 +3168,10 @@ test("creation mode has independent references count and scenario controls", asy
   assert.doesNotMatch(creationReferenceClearBody, /state\.creationReferenceRestoreQueue\s*=|state\.creationReferenceAnalysis\s*=|setCreationReferenceAnalysisFeedback\("", ""\)|resetCreationDraftPreview|renderCreationView|creationResultGrid|state\.creation\.currentSet|state\.creation\.queue|state\.creation\.sets|state\.creationStyleReferenceFiles|state\.creationLogo/);
   assert.match(app, /refs\.creationReferenceResetButton\.addEventListener\("click", clearCreationReferenceFiles\)/);
   assert.match(html, /SKU 组合件数[\s\S]*id="creationSkuBundleCountInput"[\s\S]*name="skuBundleCount"/);
-  assert.match(html, /id="creationImageCountInput"[\s\S]*<option value="8">8/);
+  assert.match(html, /id="creationImageCountInput"[\s\S]*<option value="0">0 张<\/option>[\s\S]*<option value="8">8/);
   assert.match(html, /id="creationImageCountInput"[\s\S]*<option value="10">10 张<\/option>[\s\S]*<option value="12">12/);
   assert.match(html, /id="creationImageCountInput"[\s\S]*<option value="14">14[\s\S]*<option value="16">16 张<\/option>[\s\S]*<option value="18" selected>18/);
-  assert.match(html, /SKU 生成规则[\s\S]*id="creationSkuGenerationRuleInput"[\s\S]*name="skuGenerationRule"[\s\S]*<option value="none" selected>无<\/option>[\s\S]*<option value="package-list">添加包装清单<\/option>[\s\S]*<option value="dimensions">添加尺寸<\/option>[\s\S]*<option value="package-list-dimensions">添加包装清单和尺寸<\/option>/);
+  assert.match(html, /SKU 生成规则[\s\S]*id="creationSkuGenerationRuleInput"[\s\S]*name="skuGenerationRule"[\s\S]*<option value="color-name-under-subject" selected>主体下方显示颜色名<\/option>[\s\S]*<option value="none">无<\/option>[\s\S]*<option value="package-list">添加包装清单<\/option>[\s\S]*<option value="dimensions">添加尺寸<\/option>[\s\S]*<option value="package-list-dimensions">添加包装清单和尺寸<\/option>/);
   assert.match(html, /id="creationScenarioInput"[\s\S]*value="social-seeding"/);
   assert.match(html, /id="creationScenarioInput"[\s\S]*value="livestream"/);
   assert.match(html, /id="creationScenarioInput"[\s\S]*value="gift-guide"/);
@@ -3345,9 +3362,10 @@ test("creation mode has independent references count and scenario controls", asy
   assert.doesNotMatch(app, /refs\.creationScenarioHint\.textContent =[\s\S]*CREATION_INDUSTRY_TEMPLATE_HINTS/);
   assert.match(app, /function getCreationScenarioRolePreset\(/);
   assert.match(app, /function getCreationSelectedRoles\(\) \{/);
-  assert.match(app, /\[4, 6, 8, 10, 12, 14, 16, 18\]\.includes\(value\) \? value : 18/);
-  assert.match(app, /\[4, 6, 8, 10, 12, 14, 16, 18\]\.includes\(normalizedCount\) \? String\(normalizedCount\) : "18"/);
-  assert.match(app, /\[4, 6, 8, 10, 12, 14, 16, 18\]\.includes\(selectedRoles\.length\)/);
+  assert.match(app, /CREATION_IMAGE_COUNT_OPTIONS\.includes\(value\) \? value : 18/);
+  assert.match(app, /CREATION_IMAGE_COUNT_OPTIONS\.includes\(normalizedCount\) \? String\(normalizedCount\) : "18"/);
+  assert.match(app, /function isCreationZeroImageCountMode\(\) \{/);
+  assert.match(app, /CREATION_IMAGE_COUNT_OPTIONS\.includes\(selectedRoles\.length\)/);
   assert.match(app, /function syncCreationSelectedRolesToCount\(\) \{/);
   assert.match(app, /function syncCreationSelectedRolesToScenario\(\) \{/);
   assert.match(app, /function renderCreationRatioOptions\(\) \{/);
@@ -3533,16 +3551,19 @@ test("creation mode has independent references count and scenario controls", asy
   assert.match(app, /roleSelect\.dataset\.creationReferenceRoleId = item\.id;/);
   assert.match(app, /function updateCreationReferenceRole\(referenceId, role\) \{\s*state\.creationReferenceFiles = state\.creationReferenceFiles\.map\([\s\S]*?\);\s*markCreationReferenceAnalysisDirty\(\);\s*resetCreationDraftPreview\(\);\s*renderCreationReferenceGrid\(\);\s*\}/);
   assert.match(app, /refs\.creationStyleReferenceGrid\.appendChild\(\s*createReferenceAddCard\(\{[\s\S]*input:\s*refs\.creationStyleReferenceInput,[\s\S]*onFiles:\s*applyCreationStyleReferenceFiles/);
-  assert.match(app, /formData\.set\("imageCount", String\(selectedRoles\.length \|\| getCreationSelectedImageCount\(\)\)\)/);
+  assert.match(app, /formData\.set\("imageCount", String\(getCreationPlanPreviewImageCount\(selectedRoles\)\)\)/);
   assert.match(app, /formData\.set\("scenario", refs\.creationScenarioInput\.value\)/);
-  assert.match(app, /formData\.set\("infographicRebuildEnabled", String\(refs\.creationInfographicRebuildEnabledInput\?\.checked !== false\)\)/);
+  assert.match(app, /formData\.set\("infographicRebuildEnabled", String\(isCreationInfographicRebuildRequired\(\) \|\| refs\.creationInfographicRebuildEnabledInput\?\.checked !== false\)\)/);
   assert.match(app, /formData\.set\("skuGenerationRule", getCreationSelectedSkuGenerationRule\(\)\.value\)/);
   assert.match(app, /infographicRebuildEnabled: String\(set\.infographicRebuildEnabled !== false\)/);
   assert.match(app, /refs\.creationInfographicRebuildEnabledInput\.checked = normalized\.infographicRebuildEnabled !== false;/);
+  assert.match(app, /const DEFAULT_CREATION_SKU_GENERATION_RULE = "color-name-under-subject";/);
+  assert.match(app, /"color-name-under-subject": "主体下方显示颜色名"/);
   assert.match(app, /formData\.set\("industryTemplate", refs\.creationIndustryTemplateInput\.value\)/);
   assert.match(app, /\[refs\.creationProductNameInput, refs\.creationProductDescriptionInput, refs\.creationSellingPointsInput, refs\.creationDimensionSpecsInput\]\.forEach\(\(input\) => input\.addEventListener\("input", resetCreationDraftPreview\)\)/);
   assert.match(app, /\[refs\.creationDimensionUnitModeInput, refs\.creationTargetLanguageInput, refs\.creationVisualLanguageInput\]\.forEach\(\(input\) => input\.addEventListener\("change", resetCreationDraftPreview\)\)/);
   assert.match(app, /refs\.creationImageCountInput\.addEventListener\("change", syncCreationSelectedRolesToCount\)/);
+  assert.match(app, /refs\.creationImageCountInput\.addEventListener\("click", syncCreationSelectedRolesToCurrentCount\)/);
   assert.match(app, /refs\.creationInfographicRebuildEnabledInput\?\.addEventListener\("change", resetCreationDraftPreview\)/);
   assert.match(app, /refs\.creationSkuGenerationRuleInput\?\.addEventListener\("change", resetCreationDraftPreview\)/);
   assert.match(app, /refs\.creationRoleGrid\.addEventListener\("change"/);
@@ -4235,7 +4256,8 @@ test("asset record views include PPT records and Creation set records", async ()
   assert.match(app, /setCreationSelectValue\(refs\.creationTargetLanguageInput, normalized\.targetLanguage, "en"\);/);
   assert.match(app, /setCreationSelectValue\(refs\.creationScenarioInput, normalized\.scenario, "standard"\);/);
   assert.match(app, /setCreationIndustryTemplateValue\(normalized\.industryTemplate/);
-  assert.match(app, /state\.creationSelectedRoles = normalizedRoles\.length > 0 \? normalizedRoles : getCreationRoleIdsForCount\(normalized\.imageCount\);/);
+  assert.match(app, /setCreationImageCountValue\(normalized\.imageCount\);/);
+  assert.match(app, /state\.creationSelectedRoles = alignCreationRoleIdsToCount\(normalizedRoles, getCreationSelectedImageCount\(\)\);/);
   assert.match(app, /state\.creationReferenceFiles = \[\];/);
   assert.match(app, /state\.creationReferenceAnalysis = createEmptyCreationReferenceAnalysisState\(\);/);
   assert.doesNotMatch(app, /state\.creation\.currentSet = selectedSet \? normalizeCreationSetForView\(selectedSet\) : null;/);

@@ -1471,6 +1471,7 @@
                   <label class="compact-field" data-creation-set-only>
                     <span>套图数量</span>
                     <select id="creationImageCountInput" name="imageCount">
+                      <option value="0">0 张</option>
                       <option value="4">4 张</option>
                       <option value="6">6 张</option>
                       <option value="8">8 张</option>
@@ -1577,7 +1578,8 @@
                   <label class="compact-field creation-sku-generation-rule-field" data-creation-set-only>
                     <span>SKU 生成规则</span>
                     <select id="creationSkuGenerationRuleInput" name="skuGenerationRule">
-                      <option value="none" selected>无</option>
+                      <option value="color-name-under-subject" selected>主体下方显示颜色名</option>
+                      <option value="none">无</option>
                       <option value="package-list">添加包装清单</option>
                       <option value="dimensions">添加尺寸</option>
                       <option value="package-list-dimensions">添加包装清单和尺寸</option>
@@ -1591,7 +1593,7 @@
 
                   <label class="creation-listing-toggle is-prominent" data-creation-set-only>
                     <input id="creationListingAgentEnabledInput" type="checkbox" />
-                    <span>生成后自动撰写 Amazon Listing</span>
+                    <span>Listing</span>
                   </label>
 
                   <section class="creation-industry-browser" id="creationIndustryTemplateBrowser" aria-label="行业模板" data-creation-set-only>

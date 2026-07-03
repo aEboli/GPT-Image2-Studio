@@ -311,9 +311,9 @@ export function buildCreationQueuedSet({
     typeof getCreationSelectedSkuGenerationRule === "function"
       ? getCreationSelectedSkuGenerationRule()
       : DEFAULT_CREATION_SKU_GENERATION_RULE;
-  const previewSlots = getCreationPreviewSlots();
   const selectedImageCount = Number(getCreationSelectedImageCount());
-  const selectedRoles = getCreationSelectedRoles();
+  const previewSlots = selectedImageCount === 0 ? [] : getCreationPreviewSlots();
+  const selectedRoles = selectedImageCount === 0 ? [] : getCreationSelectedRoles();
   const referenceImageRoles = buildCreationReferenceRolePayload();
   const infographicRebuildEnabled = selectedImageCount === 0 || normalizeDefaultEnabledBoolean(
     refs.creationInfographicRebuildEnabledInput?.checked ?? draftSet?.infographicRebuildEnabled,
@@ -325,7 +325,7 @@ export function buildCreationQueuedSet({
   });
   const baseSlots = shouldUseDraftItems ? draftItems : previewSlots;
   const baseRoleCount = baseSlots.filter((item) => !isCreationQueuedAppendRole(getQueueRoleId(item?.role))).length;
-  const imageCount = selectedRoles.length || baseRoleCount || getCreationSelectedImageCount();
+  const imageCount = selectedImageCount === 0 ? 0 : selectedRoles.length || baseRoleCount || selectedImageCount;
   const rawVisualLanguage = refs.creationVisualLanguageInput?.value;
   const normalizedVisualLanguage = normalizeVisualLanguageForQueue(rawVisualLanguage, normalizeCreationVisualLanguage);
   const skuSubjects = buildCreationSkuSubjectPayload();

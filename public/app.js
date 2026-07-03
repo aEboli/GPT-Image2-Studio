@@ -91,6 +91,7 @@ const REASONING_ESTIMATES = {
   xhigh: "210s+",
 };
 const DEFAULT_LIMITS = { maxParallelTasksPerSession: 15, maxReferenceImages: 15, maxCreationReferenceImages: 15, maxCreationStyleReferenceImages: 3, maxPortraitPersonReferenceImages: 3, maxPortraitActionReferenceImages: 3, maxPortraitAccessoryReferenceImages: 9 };
+const CREATION_IMAGE_COUNT_OPTIONS = [0, 4, 6, 8, 10, 12, 14, 16, 18];
 const DEFAULT_PROMPT_ENHANCE_TEXT = ",sharp focus, macro details, rich textures, crisp edges, photorealistic texture, visible grain, detailed surface material, cinematic lighting"; function buildPromptModePrompt() { const prompt = refs.promptInput.value.trim(); if (!state.promptEnhanceEnabled) { return prompt; } const enhanceText = String(refs.promptEnhanceInput?.value || "").trim(); return enhanceText ? `${prompt}${enhanceText.startsWith(",") ? "" : "\n\n"}${enhanceText}` : prompt; } function syncPromptEnhanceMode() { refs.promptEnhanceToggle.classList.toggle("is-active", state.promptEnhanceEnabled); refs.promptEnhanceToggle.setAttribute("aria-checked", String(state.promptEnhanceEnabled)); refs.promptEnhanceToggle.querySelector("small").textContent = state.promptEnhanceEnabled ? "开启" : "关闭"; refs.promptEnhanceField.classList.toggle("hidden", !state.promptEnhanceEnabled); } function togglePromptEnhanceMode() { state.promptEnhanceEnabled = !state.promptEnhanceEnabled; syncPromptEnhanceMode(); if (state.promptEnhanceEnabled) { refs.promptEnhanceInput.focus(); } }
 const PROMPT_TEMPLATE_STORAGE_KEY = "image-studio-prompt-templates-v2";
 const DEFAULT_PROMPT_TEMPLATES = SURPRISE_PROMPTS.map((template, index) => ({
@@ -7329,7 +7330,8 @@ const CREATION_PREVIEW_SLOTS = "1-hero|hero|首图成交主视觉|主商品占�
 const CREATION_SCENARIO_LABELS = { standard: "标准电商", "detail-page": "详情页转化", "social-seeding": "社媒种草", launch: "新品发布", promotion: "活动促销", livestream: "直播电商", "gift-guide": "礼品推荐", "marketplace-search": "平台搜索", "brand-story": "品牌故事" };
 const CREATION_VISUAL_LANGUAGE_LABELS = { "classic-commercial": "经典商业摄影", "premium-studio": "高端棚拍", "reference-style": "参考模式", "clean-marketplace": "平台清爽白底", "lifestyle-editorial": "生活方式杂志", "social-ugc": "社媒实拍", "detail-infographic": "详情页信息图", "macro-material": "微距材质", "outdoor-context": "户外场景", "minimal-luxury": "极简奢华", "bold-campaign": "活动海报", "warm-handcrafted": "手作温度" };
 const CREATION_DIMENSION_UNIT_MODE_LABELS = { metric: "公制", imperial: "英制", both: "公制和英制" };
-const CREATION_SKU_GENERATION_RULE_LABELS = { none: "无", "package-list": "添加包装清单", dimensions: "添加尺寸", "package-list-dimensions": "添加包装清单和尺寸" };
+const DEFAULT_CREATION_SKU_GENERATION_RULE = "color-name-under-subject";
+const CREATION_SKU_GENERATION_RULE_LABELS = { "color-name-under-subject": "主体下方显示颜色名", none: "无", "package-list": "添加包装清单", dimensions: "添加尺寸", "package-list-dimensions": "添加包装清单和尺寸" };
 
 const CREATION_CATEGORY_TEMPLATE_MODULE_URL = "/lib/creation-category-templates.mjs?v=20260509-category-search-2";
 const CREATION_BASE_INDUSTRY_TEMPLATE_OPTIONS = [
@@ -7418,8 +7420,10 @@ function getCreationReferenceRoleLabel(role) {
 
 function getCreationSelectedImageCount() {
   const value = Number.parseInt(refs.creationImageCountInput?.value || "18", 10);
-  return [4, 6, 8, 10, 12, 14, 16, 18].includes(value) ? value : 18;
+  return CREATION_IMAGE_COUNT_OPTIONS.includes(value) ? value : 18;
 }
+
+function isCreationZeroImageCountMode() { return getCreationSelectedImageCount() === 0; } function isCreationInfographicRebuildRequired() { return isCreationZeroImageCountMode(); }
 
 function createEmptyCreationReferenceAnalysisState() {
   return {
@@ -7872,14 +7876,8 @@ function setCreationIndustryTemplateValue(value, { searchText = "" } = {}) {
   renderCreationIndustryTemplateBrowser();
 }
 
-function setCreationImageCountValue(count) {
-  if (!refs.creationImageCountInput) {
-    return;
-  }
-
-  const normalizedCount = Number(count) || 18;
-  refs.creationImageCountInput.value = [4, 6, 8, 10, 12, 14, 16, 18].includes(normalizedCount) ? String(normalizedCount) : "18";
-}
+function setCreationImageCountValue(count) { if (!refs.creationImageCountInput) return; const normalizedCount = Number(count); refs.creationImageCountInput.value = CREATION_IMAGE_COUNT_OPTIONS.includes(normalizedCount) ? String(normalizedCount) : "18"; }
+function getFiniteCreationImageCount(value) { return value !== undefined && value !== null && String(value).trim() !== "" && Number.isFinite(Number(value)) ? Number(value) : null; }
 
 function getCreationSelectedScenario() {
   const value = refs.creationScenarioInput?.value || "standard";
@@ -7946,23 +7944,26 @@ function getCreationRoleIdsForCount(
   return [...presetRoles, ...fallbackRoles].slice(0, count);
 }
 
-function getCreationSelectedRoles() {
-  const selectedRoles = normalizeCreationRoleIds(state.creationSelectedRoles);
-  return selectedRoles.length > 0 ? selectedRoles : getDefaultCreationRoleIds();
-}
+function alignCreationRoleIdsToCount(roles, count = getCreationSelectedImageCount()) { const normalizedCount = CREATION_IMAGE_COUNT_OPTIONS.includes(Number(count)) ? Number(count) : 18, roleIds = normalizeCreationRoleIds(roles), roleSet = new Set(roleIds); return [...roleIds, ...getCreationRoleIdsForCount(normalizedCount).filter((role) => !roleSet.has(role))].slice(0, normalizedCount); }
 
-function syncCreationSelectedRolesToCount() { state.creationRoleSelectionManuallyEdited = false; state.creationSelectedRoles = getDefaultCreationRoleIds(); resetCreationDraftPreview(); }
+function getCreationSelectedRoles() { if (isCreationZeroImageCountMode()) return []; const selectedRoles = normalizeCreationRoleIds(state.creationSelectedRoles); return selectedRoles.length > 0 ? selectedRoles : getDefaultCreationRoleIds(); }
+
+function syncCreationInfographicRebuildRequiredState() { if (!refs.creationInfographicRebuildEnabledInput) return; const required = isCreationInfographicRebuildRequired(); if (required) refs.creationInfographicRebuildEnabledInput.checked = true; refs.creationInfographicRebuildEnabledInput.disabled = required; }
+function syncCreationSelectedRolesToCount() { state.creationRoleSelectionManuallyEdited = false; state.creationSelectedRoles = alignCreationRoleIdsToCount([], getCreationSelectedImageCount()); syncCreationInfographicRebuildRequiredState(); resetCreationDraftPreview(); }
+function syncCreationSelectedRolesToCurrentCount() { if (getCreationSelectedRoles().length !== getCreationSelectedImageCount()) syncCreationSelectedRolesToCount(); }
 function syncCreationSelectedRolesToPreset(selectedRoles) {
   if (state.creationRoleSelectionManuallyEdited) { resetCreationDraftPreview(); return; }
-  state.creationSelectedRoles = selectedRoles;
-  if (refs.creationImageCountInput && [4, 6, 8, 10, 12, 14, 16, 18].includes(selectedRoles.length)) {
+  if (isCreationZeroImageCountMode()) { state.creationSelectedRoles = []; resetCreationDraftPreview(); return; }
+  const count = CREATION_IMAGE_COUNT_OPTIONS.includes(selectedRoles.length) ? selectedRoles.length : getCreationSelectedImageCount();
+  state.creationSelectedRoles = alignCreationRoleIdsToCount(selectedRoles, count);
+  if (refs.creationImageCountInput && CREATION_IMAGE_COUNT_OPTIONS.includes(selectedRoles.length)) {
     refs.creationImageCountInput.value = String(selectedRoles.length);
   }
   resetCreationDraftPreview();
 }
 function syncCreationSelectedRolesToScenario() { syncCreationSelectedRolesToPreset(getCreationRecommendedRolePreset()); }
 function syncCreationSelectedRolesToIndustry() { syncCreationSelectedRolesToPreset(getCreationRecommendedRolePreset()); }
-function syncCreationSelectedRolesToReferenceCoverage(analysis = state.creationReferenceAnalysis.result) { if (state.creationRoleSelectionManuallyEdited) { resetCreationDraftPreview(); return; } const selectedRoles = applyCreationReferenceCoverageRolePlan({ roles: getCreationSelectedRoles(), analysis, supportedRoles: CREATION_PREVIEW_SLOTS.map((slot) => slot.role), roleTargets: CREATION_REFERENCE_COVERAGE_ROLE_TARGETS }); if (selectedRoles.length > 0) state.creationSelectedRoles = selectedRoles; resetCreationDraftPreview(); }
+function syncCreationSelectedRolesToReferenceCoverage(analysis = state.creationReferenceAnalysis.result) { if (state.creationRoleSelectionManuallyEdited) { resetCreationDraftPreview(); return; } const selectedRoles = applyCreationReferenceCoverageRolePlan({ roles: getCreationSelectedRoles(), analysis, supportedRoles: CREATION_PREVIEW_SLOTS.map((slot) => slot.role), roleTargets: CREATION_REFERENCE_COVERAGE_ROLE_TARGETS }); if (selectedRoles.length > 0) state.creationSelectedRoles = alignCreationRoleIdsToCount(selectedRoles, getCreationSelectedImageCount()); resetCreationDraftPreview(); }
 
 function toggleCreationSelectedRole(role) {
   state.creationRoleSelectionManuallyEdited = true;
@@ -7972,11 +7973,7 @@ function toggleCreationSelectedRole(role) {
   resetCreationDraftPreview();
 }
 
-function getCreationPreviewSlots(count = getCreationSelectedImageCount()) {
-  const selectedRoles = normalizeCreationRoleIds(state.creationSelectedRoles);
-  const roleIds = selectedRoles.length > 0 ? selectedRoles : getDefaultCreationRoleIds(count);
-  return roleIds.map((role) => CREATION_PREVIEW_SLOTS.find((slot) => slot.role === role)).filter(Boolean);
-}
+function getCreationPreviewSlots(count = getCreationSelectedImageCount()) { if (Number(count) === 0) return []; const selectedRoles = normalizeCreationRoleIds(state.creationSelectedRoles); const roleIds = selectedRoles.length > 0 ? selectedRoles : getDefaultCreationRoleIds(count); return roleIds.map((role) => CREATION_PREVIEW_SLOTS.find((slot) => slot.role === role)).filter(Boolean); }
 
 function resetCreationDraftPreview() {
   if (!state.creation.generating && !state.creation.planning) {
@@ -8026,7 +8023,7 @@ function getCreationSelectedDimensionUnitMode() {
   return normalizeCreationDimensionUnitMode(refs.creationDimensionUnitModeInput?.value || "both");
 }
 
-function getCreationSelectedSkuGenerationRule() { const value = refs.creationSkuGenerationRuleInput?.value || "none"; return { value: CREATION_SKU_GENERATION_RULE_LABELS[value] ? value : "none", label: CREATION_SKU_GENERATION_RULE_LABELS[value] || CREATION_SKU_GENERATION_RULE_LABELS.none }; }
+function getCreationSelectedSkuGenerationRule() { const value = refs.creationSkuGenerationRuleInput?.value || DEFAULT_CREATION_SKU_GENERATION_RULE; const normalizedValue = CREATION_SKU_GENERATION_RULE_LABELS[value] ? value : DEFAULT_CREATION_SKU_GENERATION_RULE; return { value: normalizedValue, label: CREATION_SKU_GENERATION_RULE_LABELS[normalizedValue] || CREATION_SKU_GENERATION_RULE_LABELS[DEFAULT_CREATION_SKU_GENERATION_RULE] }; }
 
 function setCreationFeedback(message = "", kind = "") {
   if (!refs.creationFeedback) {
@@ -9148,7 +9145,7 @@ function normalizeCreationSetForView(set = {}) {
     dimensionUnitModeLabel: String(set.dimensionUnitModeLabel || formatCreationDimensionUnitModeLabel(set.dimensionUnitMode)),
     targetLanguage: String(set.targetLanguage || "en"),
     targetLanguageLabel: String(set.targetLanguageLabel || ""),
-    imageCount: Number(set.imageCount) || items.length || 10,
+    imageCount: set.imageCount !== undefined && set.imageCount !== null && String(set.imageCount).trim() !== "" && Number.isFinite(Number(set.imageCount)) ? Number(set.imageCount) : items.length || 10,
     selectedRoles: normalizeCreationRoleIds(set.selectedRoles || items.map((item) => item.role)),
     scenario: String(set.scenario || "standard"),
     scenarioLabel: String(set.scenarioLabel || CREATION_SCENARIO_LABELS[set.scenario] || ""),
@@ -9176,8 +9173,8 @@ function normalizeCreationSetForView(set = {}) {
       : [],
     skuSubjects: Array.isArray(set.skuSubjects) ? set.skuSubjects.map((item, index) => normalizeCreationSkuSubjectForPayload(item, index)).filter(Boolean) : [],
     skuBundleCount: normalizeCreationSkuBundleCountForPayload(set.skuBundleCount || set.sku_bundle_count || set.skuSubjects?.[0]?.bundleCount || "1"),
-    skuGenerationRule: CREATION_SKU_GENERATION_RULE_LABELS[set.skuGenerationRule || set.sku_generation_rule] ? String(set.skuGenerationRule || set.sku_generation_rule) : "none",
-    skuGenerationRuleLabel: String(set.skuGenerationRuleLabel || set.sku_generation_rule_label || CREATION_SKU_GENERATION_RULE_LABELS[set.skuGenerationRule || set.sku_generation_rule] || CREATION_SKU_GENERATION_RULE_LABELS.none),
+    skuGenerationRule: CREATION_SKU_GENERATION_RULE_LABELS[set.skuGenerationRule || set.sku_generation_rule] ? String(set.skuGenerationRule || set.sku_generation_rule) : DEFAULT_CREATION_SKU_GENERATION_RULE,
+    skuGenerationRuleLabel: String(set.skuGenerationRuleLabel || set.sku_generation_rule_label || CREATION_SKU_GENERATION_RULE_LABELS[set.skuGenerationRule || set.sku_generation_rule] || CREATION_SKU_GENERATION_RULE_LABELS[DEFAULT_CREATION_SKU_GENERATION_RULE]),
     logo: normalizeCreationLogoPayload(set.logo || set.creationLogo || null),
     listingDrafts: Array.isArray(set.listingDrafts)
       ? set.listingDrafts.map((draft, index) => normalizeCreationListingDraftForView(draft, index)).filter((draft) => draft.id)
@@ -9467,7 +9464,7 @@ function applyCreationSetToForm(set) {
   refs.creationDimensionSpecsInput.value = normalized.dimensionSpecs || "";
   if (refs.creationSkuBundleCountInput) refs.creationSkuBundleCountInput.value = String(normalized.skuBundleCount || 1);
   if (refs.creationInfographicRebuildEnabledInput) refs.creationInfographicRebuildEnabledInput.checked = normalized.infographicRebuildEnabled !== false;
-  setCreationSelectValue(refs.creationSkuGenerationRuleInput, normalized.skuGenerationRule, "none");
+  setCreationSelectValue(refs.creationSkuGenerationRuleInput, normalized.skuGenerationRule, DEFAULT_CREATION_SKU_GENERATION_RULE);
   setCreationSelectValue(refs.creationDimensionUnitModeInput, normalized.dimensionUnitMode, "both");
   setCreationSelectValue(refs.creationTargetLanguageInput, normalized.targetLanguage, "en");
   setCreationSelectValue(refs.creationScenarioInput, normalized.scenario, "standard");
@@ -9480,8 +9477,9 @@ function applyCreationSetToForm(set) {
     normalized.selectedRoles.length > 0 ? normalized.selectedRoles : normalized.items.map((item) => item.role),
   );
   state.creationRoleSelectionManuallyEdited = false;
-  state.creationSelectedRoles = normalizedRoles.length > 0 ? normalizedRoles : getCreationRoleIdsForCount(normalized.imageCount);
-  setCreationImageCountValue(state.creationSelectedRoles.length || normalized.imageCount);
+  setCreationImageCountValue(normalized.imageCount);
+  syncCreationInfographicRebuildRequiredState();
+  state.creationSelectedRoles = alignCreationRoleIdsToCount(normalizedRoles, getCreationSelectedImageCount());
   resetCreationReferenceFilesForRecordReuse(normalized);
   resetCreationStyleReferenceFiles();
   resetCreationLogoForRecordReuse(normalized);
@@ -9572,7 +9570,8 @@ function saveCreationItemDraft(itemId, promptOverride) {
 
 function getCreationProgressSummary(set = getCreationCurrentSet()) {
   const items = Array.isArray(set?.items) ? set.items : [];
-  const total = items.length || Number(set?.imageCount) || getCreationSelectedImageCount();
+  const imageCount = getFiniteCreationImageCount(set?.imageCount);
+  const total = (items.length || imageCount) ?? getCreationSelectedImageCount();
   const completed = items.filter((item) => item.status === "completed").length;
   const failed = items.filter((item) => item.status === "failed").length;
   return { total, completed, failed };
@@ -11528,9 +11527,10 @@ function renderCreationView() {
   const selectedQueueJob = logoBatchBranch ? null : getSelectedCreationQueueJob();
   const currentSet = getCreationDisplayedSet();
   const showCreationResultActions = !selectedQueueJob;
+  syncCreationInfographicRebuildRequiredState();
   const previewSlots = logoBatchBranch
     ? buildCreationLogoBatchPreviewItems(state.creation.generating ? "queued" : "idle")
-    : getCreationPreviewSlots(currentSet?.imageCount || getCreationSelectedImageCount());
+    : getCreationPreviewSlots(Number.isFinite(Number(currentSet?.imageCount)) ? Number(currentSet.imageCount) : getCreationSelectedImageCount());
   const items = currentSet?.items.length ? currentSet.items : previewSlots.map((slot, index) => ({
     ...slot,
     itemId: slot.itemId,
@@ -11611,6 +11611,8 @@ function getCreationPlanOverrides() {
     .filter(Boolean);
 }
 
+function getCreationPlanPreviewImageCount(selectedRoles = getCreationSelectedRoles()) { return isCreationZeroImageCountMode() ? 0 : selectedRoles.length || getCreationSelectedImageCount(); }
+
 function buildCreationPlanPreviewFormData() {
   const formData = new FormData();
   const targetLanguage = getCreationSelectedLanguage();
@@ -11622,8 +11624,8 @@ function buildCreationPlanPreviewFormData() {
   formData.set("dimensionSpecs", refs.creationDimensionSpecsInput.value.trim());
   formData.set("dimensionUnitMode", refs.creationDimensionUnitModeInput.value || "both");
   formData.set("targetLanguage", targetLanguage.value);
-  formData.set("imageCount", String(selectedRoles.length || getCreationSelectedImageCount()));
-  formData.set("infographicRebuildEnabled", String(refs.creationInfographicRebuildEnabledInput?.checked !== false));
+  formData.set("imageCount", String(getCreationPlanPreviewImageCount(selectedRoles)));
+  formData.set("infographicRebuildEnabled", String(isCreationInfographicRebuildRequired() || refs.creationInfographicRebuildEnabledInput?.checked !== false));
   formData.set("scenario", refs.creationScenarioInput.value);
   formData.set("visualLanguage", refs.creationVisualLanguageInput?.value || "classic-commercial");
   formData.set("industryTemplate", refs.creationIndustryTemplateInput.value);
@@ -11694,7 +11696,7 @@ function buildCreationLogoBatchFormData() {
   return formData;
 }
 
-function applyCreationRepairTargetFormFields(formData, set = {}) { Object.entries({ productName: set.productName || "", productDescription: set.productDescription || "", sellingPoints: Array.isArray(set.sellingPoints) ? set.sellingPoints.join("\n") : String(set.sellingPoints || ""), dimensionSpecs: set.dimensionSpecs || "", dimensionUnitMode: set.dimensionUnitMode || "both", targetLanguage: set.targetLanguage || "en", scenario: set.scenario || "standard", visualLanguage: set.visualLanguage || "classic-commercial", industryTemplate: set.industryTemplate || "general", selectedRoles: JSON.stringify(Array.isArray(set.selectedRoles) ? set.selectedRoles : []), infographicRebuildEnabled: String(set.infographicRebuildEnabled !== false), skuSubjects: JSON.stringify(Array.isArray(set.skuSubjects) ? set.skuSubjects : []), skuBundleCount: String(set.skuBundleCount || 1), skuGenerationRule: set.skuGenerationRule || "none", logoOptions: JSON.stringify(set.logo || null) }).forEach(([key, value]) => formData.set(key, value)); }
+function applyCreationRepairTargetFormFields(formData, set = {}) { Object.entries({ productName: set.productName || "", productDescription: set.productDescription || "", sellingPoints: Array.isArray(set.sellingPoints) ? set.sellingPoints.join("\n") : String(set.sellingPoints || ""), dimensionSpecs: set.dimensionSpecs || "", dimensionUnitMode: set.dimensionUnitMode || "both", targetLanguage: set.targetLanguage || "en", scenario: set.scenario || "standard", visualLanguage: set.visualLanguage || "classic-commercial", industryTemplate: set.industryTemplate || "general", selectedRoles: JSON.stringify(Array.isArray(set.selectedRoles) ? set.selectedRoles : []), infographicRebuildEnabled: String(set.infographicRebuildEnabled !== false), skuSubjects: JSON.stringify(Array.isArray(set.skuSubjects) ? set.skuSubjects : []), skuBundleCount: String(set.skuBundleCount || 1), skuGenerationRule: set.skuGenerationRule || DEFAULT_CREATION_SKU_GENERATION_RULE, logoOptions: JSON.stringify(set.logo || null) }).forEach(([key, value]) => formData.set(key, value)); }
 
 function buildCreationRepairFormData({ itemId = "", scope = "incomplete", set = getCreationRepairTargetSet() } = {}) {
   const formData = new FormData(), currentSet = set ? normalizeCreationSetForView(set) : getCreationCurrentSet();
@@ -11752,7 +11754,7 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
 
   if (eventName === "set_started") {
     upsertCreationSetForStream(payload.set, context);
-    setCreationFeedback(`套图任务已创建，正在生成 ${payload.set?.imageCount || getCreationSelectedImageCount()} 张营销图。`, "busy");
+    setCreationFeedback(`套图任务已创建，正在生成 ${getFiniteCreationImageCount(payload.set?.imageCount) ?? getCreationSelectedImageCount()} 张营销图。`, "busy");
     renderCreationView();
     return;
   }
@@ -12036,6 +12038,7 @@ async function previewCreationPlan() {
           status: "idle",
         }))
       : [];
+    const planImageCount = getFiniteCreationImageCount(plan.imageCount);
 
     state.creation.currentSet = normalizeCreationSetForView({
       setId: previousDraft?.setId || `creation-draft-${Date.now()}`,
@@ -12047,7 +12050,7 @@ async function previewCreationPlan() {
       dimensionUnitModeLabel: plan.dimensionUnitModeLabel || formatCreationDimensionUnitModeLabel(getCreationSelectedDimensionUnitMode()),
       targetLanguage: plan.targetLanguage || getCreationSelectedLanguage().value,
       targetLanguageLabel: plan.targetLanguageLabel || getCreationSelectedLanguage().label,
-      imageCount: plan.imageCount || items.length || getCreationSelectedRoles().length,
+      imageCount: planImageCount ?? (items.length || getCreationSelectedRoles().length),
       scenario: plan.scenario || getCreationSelectedScenario().value,
       scenarioLabel: plan.scenarioLabel || getCreationSelectedScenario().label,
       visualLanguage: plan.visualLanguage || normalizeCreationVisualLanguage(refs.creationVisualLanguageInput?.value),
@@ -15743,6 +15746,7 @@ function bindEvents() {
   [refs.creationProductNameInput, refs.creationProductDescriptionInput, refs.creationSellingPointsInput, refs.creationDimensionSpecsInput].forEach((input) => input.addEventListener("input", resetCreationDraftPreview));
   [refs.creationDimensionUnitModeInput, refs.creationTargetLanguageInput, refs.creationVisualLanguageInput].forEach((input) => input.addEventListener("change", resetCreationDraftPreview));
   refs.creationImageCountInput.addEventListener("change", syncCreationSelectedRolesToCount);
+  refs.creationImageCountInput.addEventListener("click", syncCreationSelectedRolesToCurrentCount);
   refs.creationInfographicRebuildEnabledInput?.addEventListener("change", resetCreationDraftPreview);
   refs.creationSkuBundleCountInput?.addEventListener("input", resetCreationDraftPreview);
   refs.creationSkuGenerationRuleInput?.addEventListener("change", resetCreationDraftPreview);

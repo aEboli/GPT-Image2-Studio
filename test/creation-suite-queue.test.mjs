@@ -350,6 +350,58 @@ test("creation suite queue forces infographic rebuild when carousel count is zer
   );
 });
 
+test("creation suite queue ignores stale carousel slots after zero count recognition suggestions", () => {
+  const set = buildCreationQueuedSet({
+    buildCreationReferenceRolePayload: () => [
+      { filename: "subject.jpg", role: "product" },
+      { filename: "feature-card.jpg", role: "material", roleLabel: "Feature card" },
+      { filename: "package-card.jpg", role: "package", roleLabel: "Package card" },
+    ],
+    buildCreationSkuSubjectPayload: () => [],
+    createdAt: "2026-05-26T08:00:00.000Z",
+    creationState: { generating: false },
+    formatCreationDimensionUnitModeLabel: (value) => `Unit ${value}`,
+    formatCreationVisualLanguageLabel: (value) => `Visual ${value}`,
+    getCreationCurrentSet: () => ({
+      setId: "creation-draft-stale-carousel",
+      items: [
+        { itemId: "hero", role: "hero", title: "Hero", status: "idle" },
+        { itemId: "scene", role: "scene", title: "Scene", status: "idle" },
+      ],
+    }),
+    getCreationLogoPayload: () => null,
+    getCreationPreviewSlots: () => [
+      { itemId: "hero", role: "hero", title: "Hero" },
+      { itemId: "scene", role: "scene", title: "Scene" },
+    ],
+    getCreationSelectedDimensionUnitMode: () => "both",
+    getCreationSelectedImageCount: () => 0,
+    getCreationSelectedIndustryTemplate: () => ({ value: "general", label: "General", categoryPath: "" }),
+    getCreationSelectedLanguage: () => ({ value: "en", label: "English" }),
+    getCreationSelectedRoles: () => [],
+    getCreationSelectedScenario: () => ({ value: "standard", label: "Standard" }),
+    getCreationSelectedSkuGenerationRule: () => ({ value: "none", label: "None" }),
+    isCreationDraftSet: () => true,
+    normalizeCreationSkuBundleCountForPayload: (value) => Number(value),
+    normalizeCreationVisualLanguage: (value) => value || "classic-commercial",
+    normalizeSet,
+    productDescription: "Description",
+    productName: "Queued product",
+    refs: {
+      creationDimensionSpecsInput: { value: "" },
+      creationInfographicRebuildEnabledInput: { checked: true },
+      creationSkuBundleCountInput: { value: "1" },
+      creationVisualLanguageInput: { value: "classic-commercial" },
+    },
+    sellingPoints: [],
+  });
+
+  assert.equal(set.imageCount, 0);
+  assert.equal(set.infographicRebuildEnabled, true);
+  assert.deepEqual(set.selectedRoles, []);
+  assert.deepEqual(set.items.map((item) => item.role), ["infographic-rebuild", "infographic-rebuild"]);
+});
+
 test("creation suite queue keeps draft infographic rebuild items without changing base image count", () => {
   const draftSet = {
     setId: "creation-draft-with-rebuild",
