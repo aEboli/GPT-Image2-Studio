@@ -1,11 +1,11 @@
 # Windows 安装包说明
 
-`GPT-Image2-Studio-Setup-v0.1.9.exe` 是 Windows 自解压安装包，用系统自带 `iexpress.exe` 生成。
+`GPT-Image2-Studio-Setup-v0.1.9.2.exe` 是 Windows 自解压安装包，用系统自带 `iexpress.exe` 生成。
 
 ## 发布同步
 
-- 当前安装包文件名为 `GPT-Image2-Studio-Setup-v0.1.9.exe`，用于 GitHub Release 分发。
-- README 与 Windows 安装包说明已同步到当前 `v0.1.9` 发行版。
+- 当前安装包文件名为 `GPT-Image2-Studio-Setup-v0.1.9.2.exe`，用于 GitHub Release 分发。
+- README 与 Windows 安装包说明已同步到当前 `v0.1.9.2` 发行版。
 
 > 高分辨率更容易触发上游生成失败、超时或无最终图片结果。日常使用建议优先选择 1K 和 2K 分辨率，需要更大尺寸时再逐档尝试。
 

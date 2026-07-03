@@ -35,7 +35,7 @@ GPT-Image2-Studio 是一个面向创作者、电商运营、内容团队和产�
 
 ## 发行版
 
-- 当前发行版：`v0.1.9`。
+- 当前发行版：`v0.1.9.2`。
 - README、Windows 安装包和 GitHub Release 已同步到当前版本。
 
 ## 目录
@@ -60,7 +60,7 @@ GPT-Image2-Studio 是一个面向创作者、电商运营、内容团队和产�
 从 GitHub Release 下载当前安装包：
 
 ```text
-GPT-Image2-Studio-Setup-v0.1.9.exe
+GPT-Image2-Studio-Setup-v0.1.9.2.exe
 ```
 
 安装后从桌面或开始菜单启动：
@@ -497,7 +497,7 @@ cmd /c npm run build:installer
 安装包产物写入：
 
 ```text
-artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.1.9.exe
+artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.1.9.2.exe
 ```
 
 更多说明见 [docs/windows-installer.md](./docs/windows-installer.md)。
