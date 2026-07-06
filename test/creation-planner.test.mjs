@@ -622,6 +622,24 @@ test("creation planner prevents conversion roles from becoming redundant white-b
   assert.doesNotMatch(promptByRole["spec-table"], /Do not create another plain white-background product-only card/i);
 });
 
+test("creation planner turns brand-story role into a many-scene use-and-style collage", () => {
+  const plan = buildCreationPlan({
+    productName: "Cooling towel",
+    productDescription: "Soft breathable cooling towel for workout, beach, hiking, running, swimming, and outdoor heat relief.",
+    sellingPoints: "cooling comfort\nmultiple wearing styles\nquick-dry fabric\nsport and travel ready",
+    targetLanguage: "en",
+    selectedRoles: ["brand-story"],
+  });
+  const prompt = plan.items.find((item) => item.role === "brand-story").prompt;
+
+  assert.match(prompt, /many-scene use-and-style collage/i);
+  assert.match(prompt, /9-12 rounded photo tiles/i);
+  assert.match(prompt, /varied real-use situations/i);
+  assert.match(prompt, /bottom row of use-method mini icons or simple line-art panels/i);
+  assert.match(prompt, /Multiple Uses & Style/i);
+  assert.match(prompt, /repeat the exact same product subject/i);
+});
+
 test("creation planner adds buyer-decision strategy to formerly templated conversion roles", () => {
   const plan = buildCreationPlan({
     productName: "Rechargeable hard bait lure",
@@ -654,7 +672,7 @@ test("creation planner adds buyer-decision strategy to formerly templated conver
   assert.match(promptByRole.benefit, /which pain point disappears/i);
   assert.match(promptByRole["multi-angle"], /can I trust what I am getting from every side/i);
   assert.match(promptByRole.atmosphere, /can I imagine owning this in my life/i);
-  assert.match(promptByRole["brand-story"], /fits my values, taste, or intended gift/i);
+  assert.match(promptByRole["brand-story"], /does this product fit many real occasions and usage styles/i);
   assert.match(promptByRole["effect-comparison"], /meaningful enough to choose this product/i);
   assert.match(promptByRole["craft-process"], /why should I trust the making quality/i);
   assert.match(promptByRole["accessory-gift"], /what exactly arrives and does it feel complete/i);
@@ -1222,7 +1240,7 @@ test("creation planner supports the refactored ecommerce image types with dedica
   assert.match(plan.items.find((item) => item.role === "series-showcase").prompt, /variant and SKU choice image/i);
   assert.match(plan.items.find((item) => item.role === "spec-table").prompt, /legible parameter table/i);
   assert.match(plan.items.find((item) => item.role === "usage-suggestion").prompt, /selling-point image/i);
-  assert.match(plan.items.find((item) => item.role === "brand-story").prompt, /brand texture and gift-value image/i);
+  assert.match(plan.items.find((item) => item.role === "brand-story").prompt, /many-scene use-and-style collage/i);
   assert.match(plan.items.find((item) => item.role === "ingredient-material").prompt, /material or ingredient analysis image/i);
   assert.match(plan.items.find((item) => item.role === "human-handheld").prompt, /real-person handheld demonstration image/i);
   assert.match(plan.items.find((item) => item.role === "human-wearable").prompt, /real-person worn or carried demonstration image/i);

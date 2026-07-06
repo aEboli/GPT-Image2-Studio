@@ -246,6 +246,39 @@ test("requestDirectImageGeneration posts once to image generations and emits the
   });
 });
 
+test("direct image generation keeps high-resolution direct requests on base64 responses", async () => {
+  const requests = [];
+
+  await requestDirectImageGeneration({
+    baseUrl: "https://api.mouubox.com/v1",
+    endpointPath: "images/generations",
+    apiKey: "route-b-key",
+    prompt: "Create a cinematic 4K landscape.",
+    size: "3840x2160",
+    aspectRatio: "16:9",
+    quality: "high",
+    format: "png",
+    imageModel: "gpt-image-2",
+    async fetchImpl(url, init) {
+      requests.push({ url, init, body: JSON.parse(init.body) });
+      return new Response(
+        JSON.stringify({
+          data: [{ b64_json: "Zm91ci1rLWJhc2U2NA==" }],
+        }),
+        { status: 200 },
+      );
+    },
+  });
+
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].url, "https://api.mouubox.com/v1/images/generations");
+  assert.equal(requests[0].body.model, "gpt-image-2");
+  assert.equal(requests[0].body.size, "3840x2160");
+  assert.equal(requests[0].body.quality, "high");
+  assert.equal(requests[0].body.response_format, "b64_json");
+  assert.equal("aspect_ratio" in requests[0].body, false);
+});
+
 test("direct image generation uploads a single reference image with the image field for edits compatibility", async () => {
   const requests = [];
   await requestDirectImageGeneration({

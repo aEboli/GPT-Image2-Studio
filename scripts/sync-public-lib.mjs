@@ -42,6 +42,7 @@ export const PUBLIC_LIB_SYNC_TARGETS = [
   "lightbox-image-viewer.mjs",
   "output-format-options.mjs",
   "preview-loading-shell.mjs",
+  "preview-keyboard-navigation.mjs",
   "preview-placeholder-state.mjs",
   "portrait-accessory-assets.mjs",
   "portrait-location-presets.mjs",
@@ -52,6 +53,7 @@ export const PUBLIC_LIB_SYNC_TARGETS = [
   "sse-writer.mjs",
   "studio-density.mjs",
   "studio-formatters.mjs",
+  "style-transfer-preset-lightbox.mjs",
   "view-mode-loader.mjs",
   "views",
 ];

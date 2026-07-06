@@ -122,6 +122,7 @@ test("creation suite queue builds a complete queued set from current form state"
   assert.equal(set.skuGenerationRule, "package-list");
   assert.equal(set.skuGenerationRuleLabel, "添加包装清单");
   assert.deepEqual(set.logo, { placement: "top-left" });
+  assert.equal(set.skuBundleCount, 2);
   assert.equal(set.items[0].status, "queued");
 });
 

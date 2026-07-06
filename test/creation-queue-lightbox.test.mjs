@@ -23,7 +23,7 @@ test("creation queue result thumbnails resolve images from the displayed queue s
   );
   assert.match(
     app,
-    /function openCreationCurrentItemPreview\(itemId\) \{[\s\S]*const item = getCreationDisplayedSet\(\)\?\.items\?\.find\(\(entry\) => entry\.itemId === itemId\);[\s\S]*const lightboxItem = buildCreationCurrentLightboxItem\(item\);[\s\S]*openLightbox\(lightboxItem\);[\s\S]*\}/,
+    /function openCreationCurrentItemPreview\(itemId\) \{[\s\S]*const currentSet = getCreationDisplayedSet\(\);[\s\S]*const item = currentSet\?\.items\?\.find\(\(entry\) => entry\.itemId === itemId\);[\s\S]*const lightboxItem = buildCreationCurrentLightboxItem\(item\);[\s\S]*openLightbox\(lightboxItem,\s*\{[\s\S]*items:\s*currentSet\?\.items \|\| \[\],[\s\S]*buildItem:\s*buildCreationCurrentLightboxItem,[\s\S]*\}\);[\s\S]*\}/,
   );
   assert.doesNotMatch(
     app,

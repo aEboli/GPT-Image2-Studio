@@ -6,7 +6,10 @@ const indexPath = new URL("../public/index.html", import.meta.url);
 const stylesPath = new URL("../public/styles.css", import.meta.url);
 const appPath = new URL("../public/app.js", import.meta.url);
 const publicLightboxViewerPath = new URL("../public/lib/lightbox-image-viewer.mjs", import.meta.url);
+const previewKeyboardNavigationPath = new URL("../lib/preview-keyboard-navigation.mjs", import.meta.url);
 const quickBlendViewPath = new URL("../lib/views/quick-blend-view.mjs", import.meta.url);
+const imageEditViewPath = new URL("../lib/views/image-edit-view.mjs", import.meta.url);
+const styleTransferPresetLightboxPath = new URL("../lib/style-transfer-preset-lightbox.mjs", import.meta.url);
 const serverPath = new URL("../server.mjs", import.meta.url);
 const workerPath = new URL("../cloudflare-pages-worker.mjs", import.meta.url);
 const browserConfigPath = new URL("../lib/browser-config.mjs", import.meta.url);
@@ -22,8 +25,8 @@ const publicConfigModelPickerPath = new URL("../public/lib/config-model-picker.m
 const publicCreationListingViewPath = new URL("../public/lib/creation-listing-view.mjs", import.meta.url);
 const generationClientPath = new URL("../lib/generation-client.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20260703-latest-restore-1";
-const appAssetVersion = "20260703-latest-restore-1";
+const stylesAssetVersion = "20260705-ui-scale-90-1";
+const appAssetVersion = "20260705-ui-scale-90-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
 const creationQueueModuleAssetVersion = "20260530-creation-queue-role-sync-1";
 const quickBlendModuleAssetVersion = "20260608-quick-blend-time-sort-1";
@@ -451,6 +454,39 @@ test("lightbox prompt field exposes a copy button beside the label", async () =>
   assert.match(app, /refs\.copyPromptButton\.addEventListener\("click",[\s\S]*copyLightboxPrompt\(\)\.catch/);
 });
 
+test("image previews support arrow-key navigation across preview contexts", async () => {
+  const app = await readFile(appPath, "utf8");
+  const previewKeyboardNavigation = await readFile(previewKeyboardNavigationPath, "utf8");
+  const quickBlendView = await readFile(quickBlendViewPath, "utf8");
+  const imageEditView = await readFile(imageEditViewPath, "utf8");
+
+  assert.match(app, /from "\/lib\/preview-keyboard-navigation\.mjs"/);
+  assert.match(app, /lightboxNavigation:\s*\{[\s\S]*items:\s*\[\],[\s\S]*index:\s*-1,/);
+  assert.match(app, /function openLightbox\(item,\s*navigation\s*=\s*null\) \{/);
+  assert.match(app, /const previewKeyboardNavigation = createPreviewKeyboardNavigationController\(\{/);
+  assert.match(app, /const handlePreviewArrowNavigation = previewKeyboardNavigation\.handlePreviewArrowNavigation;/);
+  assert.match(app, /previewKeyboardNavigation\.normalizeLightboxNavigation\(item,\s*navigation\);/);
+  assert.match(app, /document\.addEventListener\("keydown", handlePreviewArrowNavigation\);/);
+  assert.match(previewKeyboardNavigation, /function openLightboxNavigationItem\(direction\) \{/);
+  assert.match(previewKeyboardNavigation, /function handlePreviewArrowNavigation\(event\) \{/);
+  assert.match(previewKeyboardNavigation, /event\.key === "ArrowLeft" \|\| event\.key === "ArrowRight"/);
+  assert.match(previewKeyboardNavigation, /openLightboxNavigationItem\(direction\)/);
+  assert.match(previewKeyboardNavigation, /function openReferencePreviewByDirection\(direction\) \{/);
+  assert.match(previewKeyboardNavigation, /function openPromptAgentPreviewByDirection\(direction\) \{/);
+  assert.match(previewKeyboardNavigation, /function getReferencePreviewNavigationEntries\(\) \{/);
+  assert.match(previewKeyboardNavigation, /function getPromptAgentPreviewNavigationEntries\(\) \{/);
+  assert.match(previewKeyboardNavigation, /openReferencePreviewByDirection\(direction\)/);
+  assert.match(previewKeyboardNavigation, /openPromptAgentPreviewByDirection\(direction\)/);
+  assert.match(previewKeyboardNavigation, /isTextEditingTarget\(event\.target\)/);
+  assert.match(app, /openLightbox\(buildCreationRecordLightboxItem\(record\.item,\s*record\.set\),\s*\{[\s\S]*items:\s*record\.set\.items/);
+  assert.match(app, /openLightbox\(buildArticleRecordLightboxItem\(record\.item,\s*record\.set\),\s*\{[\s\S]*items:\s*record\.set\.items/);
+  assert.match(app, /openLightbox\(buildPortraitRecordLightboxItem\(record\.item,\s*record\.set\),\s*\{[\s\S]*items:\s*record\.set\.items/);
+
+  assert.match(quickBlendView, /function getQuickBlendReferencePreviewEntries\(\) \{/);
+  assert.match(quickBlendView, /setReferencePreviewNavigationContext\(\{[\s\S]*items:\s*getQuickBlendReferencePreviewEntries\(\),/);
+  assert.match(imageEditView, /setReferencePreviewNavigationContext\(\{[\s\S]*items:\s*\[item\],/);
+});
+
 test("filmstrip thumbnails stay square, fill the available rail, and keep labels compact", async () => {
   const styles = await readFile(stylesPath, "utf8");
   const app = await readFile(appPath, "utf8");
@@ -628,29 +664,53 @@ test("generation activity moves into settings while studio workspace reflows to 
     /<form class="config-form" id="configForm">[\s\S]*<\/form>\s*<section class="config-log-panel live-panel config-card" id="configGenerationLogPanel" aria-label="生成日志">[\s\S]*id="timelineList"/,
   );
   assert.match(styles, /\.studio-grid\s*\{[\s\S]*grid-template-columns:\s*var\(--studio-grid-left,\s*392px\)\s*minmax\(0,\s*1fr\);/);
-  assert.match(styles, /html\[data-ui-layout="narrow-desktop"\] \.studio-grid\s*\{[\s\S]*grid-template-columns:\s*360px\s*minmax\(0,\s*1fr\);/);
+  assert.match(styles, /html\[data-ui-layout="narrow-desktop"\] \.studio-grid\s*\{[\s\S]*grid-template-columns:\s*var\(--studio-grid-left,\s*324px\)\s*minmax\(0,\s*1fr\);/);
   assert.match(styles, /\.config-log-panel\.live-panel\s*\{[\s\S]*min-height:\s*180px;[\s\S]*height:\s*auto;/);
-  assert.match(styles, /\.timeline-item\s*\{[\s\S]*grid-template-columns:\s*24px\s+minmax\(0,\s*1fr\)\s+72px\s+118px\s+52px;/);
+  const timelineListRule = readCssRule(styles, ".timeline-list");
+  const timelineItemRule = readCssRule(styles, ".timeline-item");
+  assert.match(timelineListRule, /gap:\s*0;/);
+  assert.match(timelineListRule, /padding:\s*2px\s+0\s+4px;/);
+  assert.match(timelineItemRule, /grid-template-columns:\s*18px\s+minmax\(0,\s*1fr\);/);
+  assert.match(timelineItemRule, /gap:\s*4px\s+10px;/);
+  assert.match(timelineItemRule, /padding:\s*var\(--timeline-item-padding-y,\s*8px\)\s*0;/);
   assert.match(styles, /\.timeline-copy\s*\{[\s\S]*display:\s*contents;/);
   assert.match(styles, /\.timeline-main\s*\{[\s\S]*grid-column:\s*2;[\s\S]*grid-row:\s*1;[\s\S]*white-space:\s*normal;[\s\S]*overflow-wrap:\s*anywhere;/);
+  assert.match(readCssRule(styles, ".timeline-main"), /display:\s*block;/);
   assert.match(readCssRule(styles, ".timeline-summary"), /white-space:\s*normal;/);
   assert.match(readCssRule(styles, ".timeline-summary"), /overflow-wrap:\s*anywhere;/);
+  assert.match(readCssRule(styles, ".timeline-summary"), /color:\s*var\(--text\);/);
+  assert.match(readCssRule(styles, ".timeline-summary"), /font-weight:\s*700;/);
   assert.doesNotMatch(readCssRule(styles, ".timeline-summary"), /white-space:\s*nowrap|text-overflow:\s*ellipsis|overflow:\s*hidden/);
-  assert.match(styles, /\.timeline-relay\s*\{[\s\S]*display:\s*block;[\s\S]*margin-left:\s*0;[\s\S]*margin-top:\s*2px;[\s\S]*overflow-wrap:\s*anywhere;/);
+  assert.match(styles, /\.timeline-relay\s*\{[\s\S]*display:\s*inline;[\s\S]*margin-left:\s*8px;[\s\S]*overflow-wrap:\s*anywhere;/);
+  assert.match(readCssRule(styles, ".timeline-relay"), /color:\s*rgba\(132,\s*202,\s*255,\s*0\.82\);/);
+  assert.match(readCssRule(styles, ".timeline-relay"), /font-weight:\s*600;/);
+  assert.doesNotMatch(readCssRule(styles, ".timeline-relay"), /margin-top/);
   assert.match(styles, /\.timeline-detail\s*\{[\s\S]*grid-column:\s*2 \/ -1;[\s\S]*grid-row:\s*2;/);
   assert.doesNotMatch(styles, /\.timeline-params\s*\{/);
   assert.match(styles, /\.timeline-url\s*\{[\s\S]*grid-column:\s*2 \/ -1;[\s\S]*grid-row:\s*2;/);
   assert.match(readCssRule(styles, ".timeline-url"), /white-space:\s*normal;/);
   assert.match(readCssRule(styles, ".timeline-url"), /overflow-wrap:\s*anywhere;/);
+  assert.match(readCssRule(styles, ".timeline-url"), /color:\s*rgba\(171,\s*184,\s*218,\s*0\.76\);/);
   assert.doesNotMatch(readCssRule(styles, ".timeline-url"), /text-overflow:\s*ellipsis|white-space:\s*nowrap/);
   assert.match(styles, /\.timeline-item\.has-url \.timeline-detail\s*\{[\s\S]*grid-row:\s*3;/);
-  assert.match(styles, /\.timeline-mode\s*\{[\s\S]*grid-column:\s*3;[\s\S]*grid-row:\s*1;/);
-  assert.match(styles, /\.timeline-ratio-size\s*\{[\s\S]*grid-column:\s*4;[\s\S]*grid-row:\s*1;/);
-  assert.match(styles, /\.timeline-item time\s*\{[\s\S]*grid-column:\s*5;[\s\S]*grid-row:\s*1;/);
+  const timelineMetaRule = readCssRuleContaining(styles, ".timeline-meta", "display: flex");
+  assert.match(timelineMetaRule, /grid-column:\s*2\s*\/\s*-1;/);
+  assert.match(timelineMetaRule, /grid-row:\s*3;/);
+  assert.match(timelineMetaRule, /display:\s*flex;/);
+  assert.match(timelineMetaRule, /flex-wrap:\s*wrap;/);
+  assert.match(timelineMetaRule, /column-gap:\s*12px;/);
+  assert.doesNotMatch(timelineMetaRule, /justify-content:\s*space-between|margin-left/);
+  assert.match(styles, /\.timeline-item\.has-url\.has-detail \.timeline-meta\s*\{[\s\S]*grid-row:\s*4;/);
+  assert.doesNotMatch(readCssRule(styles, ".timeline-ratio-size"), /margin-left/);
+  assert.doesNotMatch(readCssRule(styles, ".timeline-item time"), /justify-self:\s*end/);
   assert.doesNotMatch(styles, /\.timeline-ratio\s*\{|\.timeline-resolution\s*\{/);
-  assert.match(styles, /\.timeline-main,\s*\.timeline-url,\s*\.timeline-mode,\s*\.timeline-ratio-size,\s*\.timeline-item time\s*\{[\s\S]*font-size:\s*0\.78rem;/);
-  assert.match(styles, /\.timeline-mode,\s*\.timeline-ratio-size,\s*\.timeline-item time\s*\{[\s\S]*align-self:\s*center;[\s\S]*white-space:\s*normal;[\s\S]*overflow-wrap:\s*anywhere;/);
+  assert.match(styles, /\.timeline-main,\s*\.timeline-url,\s*\.timeline-meta\s*\{[\s\S]*font-size:\s*0\.78rem;/);
+  assert.doesNotMatch(readCssRuleContaining(styles, ".timeline-main,\n.timeline-url,\n.timeline-meta", "font-size: 0.78rem"), /color:/);
+  assert.match(styles, /\.timeline-mode,\s*\.timeline-ratio-size,\s*\.timeline-item time\s*\{[\s\S]*color:\s*rgba\(171,\s*184,\s*218,\s*0\.64\);/);
+  assert.match(readCssRule(styles, ".timeline-mode"), /font-weight:\s*700;/);
+  assert.match(styles, /\.timeline-meta\s*\{[\s\S]*align-items:\s*center;[\s\S]*white-space:\s*nowrap;[\s\S]*overflow-wrap:\s*normal;/);
   assert.match(styles, /\.timeline-ratio-size,\s*\.timeline-item time\s*\{[\s\S]*font-variant-numeric:\s*tabular-nums;/);
+  assert.match(styles, /html\[data-ui-layout="mobile"\]\s+\.timeline-meta\s*\{[\s\S]*white-space:\s*normal;/);
   assert.match(app, /configGenerationLogPanel:\s*document\.querySelector\("#configGenerationLogPanel"\),/);
   assert.match(app, /function openConfigGenerationLog\(\) \{[\s\S]*setDrawerOpen\(true\);[\s\S]*refs\.configGenerationLogPanel\?\.scrollIntoView/);
   assert.match(app, /if \(action === "activity-log"\) \{[\s\S]*openConfigGenerationLog\(\);[\s\S]*return;/);
@@ -663,10 +723,12 @@ test("generation activity moves into settings while studio workspace reflows to 
   assert.match(app, /if \(displayText\.detail\) \{[\s\S]*className: "timeline-detail", textContent: displayText\.detail[\s\S]*\}/);
   assert.match(app, /if \(item\.paramsText\) \{[\s\S]*row\.classList\.add\("has-relay"\);[\s\S]*className: "timeline-relay", textContent: item\.paramsText[\s\S]*\}/);
   assert.doesNotMatch(app, /className: "timeline-params"|document\.createElement\("pre"\)/);
-  assert.match(app, /className: "timeline-mode", textContent: item\.modeLabel \|\| ""[\s\S]*const compactRatio = formatCompactRatioLabel\(item\.ratio\);[\s\S]*const compactSize = formatCompactSizeLabel\(item\.size\);[\s\S]*const ratioSize = document\.createElement\("span"\);[\s\S]*ratioSize\.className = "timeline-ratio-size";[\s\S]*ratioSize\.textContent = \[compactRatio, compactSize \? `\(\$\{compactSize\}\)` : ""\]\.filter\(Boolean\)\.join\(" "\);[\s\S]*row\.appendChild\(ratioSize\);[\s\S]*row\.appendChild\(time\);/);
+  assert.match(app, /const meta = document\.createElement\("span"\);[\s\S]*meta\.className = "timeline-meta";[\s\S]*className: "timeline-mode", textContent: item\.modeLabel[\s\S]*const compactRatio = formatCompactRatioLabel\(item\.ratio\);[\s\S]*const compactSize = formatCompactSizeLabel\(item\.size\);[\s\S]*const ratioSize = document\.createElement\("span"\);[\s\S]*ratioSize\.className = "timeline-ratio-size";[\s\S]*ratioSize\.textContent = \[compactRatio, compactSize \? `\(\$\{compactSize\}\)` : ""\]\.filter\(Boolean\)\.join\(" "\);[\s\S]*meta\.appendChild\(ratioSize\);[\s\S]*meta\.appendChild\(time\);[\s\S]*row\.appendChild\(meta\);/);
   assert.doesNotMatch(app, /className = "timeline-ratio"|className = "timeline-resolution"/);
-  assert.match(app, /function getGenerationActivityRelayText\(value\) \{[\s\S]*find\(\(line\) => \/\^中转\[：:\]\/\.test\(line\)\)/);
-  assert.match(app, /function buildGenerationActivityRelayText\(item = \{\}\) \{[\s\S]*return relayUrl \? `中转：\$\{relayUrl\}` : "";/);
+  assert.match(app, /function getGenerationActivityRelayText\(value\) \{[\s\S]*match\(\s*\/\^\(URL\|中转\)\[：:\]\(.*\)\$\//);
+  assert.match(app, /function getGenerationActivityRelayText\(value\) \{[\s\S]*return match \? `URL：\$\{match\[2\]\.trim\(\)\}` : "";/);
+  assert.match(app, /function buildGenerationActivityRelayText\(item = \{\}\) \{[\s\S]*return relayUrl \? `URL：\$\{relayUrl\}` : "";/);
+  assert.doesNotMatch(app, /return relayUrl \? `中转/);
   assert.match(app, /imageUrl: getImageUrl\(current\), modeLabel: formatGenerationActivityModeLabel\(current\.imageRoute \|\| current\.generationRoute\), paramsText: buildGenerationActivityRelayText\(current\),/);
   assert.match(app, /modeLabel: formatGenerationActivityModeLabel\(task\?\.imageRoute\),/);
   assert.match(app, /imageUrl: getImageUrl\(task\?\.item\),/);
@@ -744,7 +806,7 @@ test("creation workbench layouts inherit the prompt studio column split", async 
 
   assert.match(
     styles,
-    /html\[data-ui-layout="narrow-desktop"\] \.studio-grid,[\s\S]*html\[data-ui-layout="narrow-desktop"\] \.creation-workspace,[\s\S]*html\[data-ui-layout="narrow-desktop"\] \.article-illustration-workspace,[\s\S]*html\[data-ui-layout="narrow-desktop"\] \.portrait-workspace,[\s\S]*html\[data-ui-layout="narrow-desktop"\] \.ppt-workspace\s*\{[\s\S]*grid-template-columns:\s*360px\s*minmax\(0,\s*1fr\);/,
+    /html\[data-ui-layout="narrow-desktop"\] \.studio-grid,[\s\S]*html\[data-ui-layout="narrow-desktop"\] \.creation-workspace,[\s\S]*html\[data-ui-layout="narrow-desktop"\] \.article-illustration-workspace,[\s\S]*html\[data-ui-layout="narrow-desktop"\] \.portrait-workspace,[\s\S]*html\[data-ui-layout="narrow-desktop"\] \.ppt-workspace\s*\{[\s\S]*grid-template-columns:\s*var\(--studio-grid-left,\s*324px\)\s*minmax\(0,\s*1fr\);/,
   );
 });
 
@@ -771,17 +833,23 @@ test("config drawer uses a quieter structured settings layout", async () => {
   assert.match(styles, /\.config-panel\s*\{[\s\S]*display:\s*grid;[\s\S]*grid-template-rows:\s*auto minmax\(0,\s*1fr\);[\s\S]*overflow:\s*hidden;/);
   assert.match(styles, /\.config-actions-row\s*\{[\s\S]*flex-wrap:\s*nowrap;/);
   assert.match(styles, /html\[data-ui-layout="tablet"\]\s+\.config-panel \.drawer-head,[\s\S]*html\[data-ui-layout="mobile"\]\s+\.config-panel \.drawer-head\s*\{[\s\S]*align-items:\s*center;[\s\S]*flex-direction:\s*row;/);
-  assert.match(readCssRule(styles, ".config-drawer-body"), /overflow-y:\s*auto;[\s\S]*overflow-x:\s*hidden;[\s\S]*display:\s*grid;[\s\S]*gap:\s*12px;/);
+  assert.match(readCssRule(styles, ".config-drawer-body"), /overflow-y:\s*auto;[\s\S]*overflow-x:\s*hidden;[\s\S]*display:\s*grid;[\s\S]*gap:\s*8px;/);
   assert.match(styles, /\.config-language-menu\s*\{[\s\S]*position:\s*relative;/);
   assert.match(styles, /\.config-language-menu\[open\]\s+\.config-language-popover\s*\{[\s\S]*display:\s*grid;/);
   assert.match(styles, /\.config-language-trigger\s*\{[\s\S]*width:\s*42px;[\s\S]*padding:\s*0;/);
   assert.match(readCssRule(styles, 'html[data-ui-layout="mobile"] .config-language-popover'), /right:\s*0;[\s\S]*left:\s*auto;/);
-  assert.match(styles, /\.route-selector\s*\{[\s\S]*padding:\s*4px;[\s\S]*border-radius:\s*10px;/);
+  assert.match(styles, /\.route-selector\s*\{[\s\S]*padding:\s*3px;[\s\S]*border-radius:\s*8px;/);
+  assert.match(styles, /\.route-selector label\s*\{[\s\S]*min-height:\s*34px;[\s\S]*border-radius:\s*7px;/);
   assert.match(styles, /\.route-selector label:has\(input:checked\)\s*\{[\s\S]*box-shadow:/);
-  assert.match(styles, /\.config-route-fields\s*\{[\s\S]*padding:\s*12px;[\s\S]*border-radius:\s*8px;/);
+  assert.match(styles, /\.config-card\s*\{[\s\S]*padding:\s*10px;/);
+  assert.match(styles, /\.config-route-fields\s*\{[\s\S]*gap:\s*8px;[\s\S]*padding:\s*10px;[\s\S]*border-radius:\s*8px;/);
+  assert.match(styles, /\.config-route-fields input,[\s\S]*\.config-route-fields select,[\s\S]*\.config-language-field select\s*\{[\s\S]*min-height:\s*36px;/);
+  assert.match(styles, /\.endpoint-suffix-select\s*\{[\s\S]*min-height:\s*30px;/);
+  assert.match(styles, /\.inline-button\s*\{[\s\S]*min-height:\s*30px;/);
   assert.match(styles, /\.config-log-panel\.live-panel\s*\{[\s\S]*min-height:\s*180px;[\s\S]*height:\s*auto;/);
   assert.match(styles, /\.config-note:empty\s*\{[\s\S]*display:\s*none;/);
-  assert.match(styles, /\.config-action-bar\s*\{[\s\S]*position:\s*sticky;[\s\S]*bottom:\s*0;[\s\S]*grid-template-columns:\s*minmax\(124px,\s*0\.42fr\)\s*minmax\(0,\s*1fr\);/);
+  assert.match(styles, /\.config-action-bar\s*\{[\s\S]*position:\s*sticky;[\s\S]*bottom:\s*0;[\s\S]*grid-template-columns:\s*minmax\(112px,\s*0\.36fr\)\s*minmax\(0,\s*1fr\);/);
+  assert.match(styles, /\.config-action-bar \.header-button,[\s\S]*\.config-action-bar \.generate-button\s*\{[\s\S]*min-height:\s*38px;/);
   assert.match(styles, /html\[data-ui-layout="mobile"\]\s+\.config-action-bar\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);/);
   assert.match(
     readCssRule(styles, 'html[data-ui-layout="mobile"] .config-drawer .drawer-panel'),
@@ -993,20 +1061,20 @@ test("style transfer mode can use every style preset with before and after previ
   const app = await readFile(appPath, "utf8");
   const presetAssets = [
     "custom-style-reference.svg",
-    "cinematic-photo.svg",
-    "anime-cel.svg",
-    "hand-drawn.svg",
-    "pencil-sketch.svg",
-    "cyberpunk-neon.svg",
-    "pixel-game.svg",
-    "low-poly-3d.svg",
-    "editorial-watercolor.svg",
-    "paper-cut-collage.svg",
-    "risograph-poster.svg",
-    "vintage-film.svg",
-    "comic-ink.svg",
-    "clay-toy.svg",
-    "ink-gongbi.svg",
+    "cinematic-photo.png",
+    "anime-cel.png",
+    "hand-drawn.png",
+    "pencil-sketch.png",
+    "cyberpunk-neon.png",
+    "pixel-game.png",
+    "low-poly-3d.png",
+    "editorial-watercolor.png",
+    "paper-cut-collage.png",
+    "risograph-poster.png",
+    "vintage-film.png",
+    "comic-ink.png",
+    "clay-toy.png",
+    "ink-gongbi.png",
   ];
 
   assert.match(html, /id="styleTransferPresetInput"/);
@@ -1019,7 +1087,7 @@ test("style transfer mode can use every style preset with before and after previ
   );
   assert.match(app, /const STYLE_TRANSFER_CUSTOM_PRESET = "custom";/);
   assert.match(app, /const STYLE_TRANSFER_DEFAULT_PRESET = "clay-toy";/);
-  assert.match(app, /const STYLE_TRANSFER_PRESET_BEFORE_IMAGE = "\.\/assets\/style-presets\/style-before\.svg";/);
+  assert.match(app, /const STYLE_TRANSFER_PRESET_BEFORE_IMAGE = "\.\/assets\/style-presets\/style-before\.png";/);
   assert.match(app, /const STYLE_TRANSFER_PRESETS = \[/);
   assert.match(app, /beforeImage:\s*STYLE_TRANSFER_PRESET_BEFORE_IMAGE/);
   for (const asset of presetAssets) {
@@ -1031,6 +1099,34 @@ test("style transfer mode can use every style preset with before and after previ
   assert.match(app, /function ensureStyleTransferPresetReferenceFileReady\(\) \{/);
   assert.match(app, /await ensureStyleTransferPresetReferenceFileReady\(\);[\s\S]*const job = createStyleTransferJob\(\);/);
   assert.match(app, /styleTransferReferenceImageName:\s*stylePresetFile\?\.name \|\| styleItem\?\.file\?\.name \|\| ""/);
+});
+
+test("style transfer preset comparison opens clicked preset images directly", async () => {
+  const [app, styles, styleTransferPresetLightbox] = await Promise.all([
+    readFile(appPath, "utf8"),
+    readFile(stylesPath, "utf8"),
+    readFile(styleTransferPresetLightboxPath, "utf8"),
+  ]);
+
+  assert.match(app, /from "\/lib\/style-transfer-preset-lightbox\.mjs"/);
+  assert.match(app, /function openStyleTransferPresetPreview\(slot\) \{/);
+  assert.match(app, /buildStyleTransferPresetLightboxItem\(\{ preset, slot, nowIso \}\)/);
+  assert.match(
+    app,
+    /openLightbox\(lightboxItem,\s*\{\s*items:\s*\["before", "after"\]\.map\(\(previewSlot\) => buildStyleTransferPresetLightboxItem\(\{ preset, slot: previewSlot, nowIso \}\)\)\.filter\(Boolean\),\s*\}\);/,
+  );
+  assert.match(app, /refs\.styleTransferPresetComparison\.addEventListener\("click",\s*handleStyleTransferPresetComparisonClick\);/);
+  assert.match(app, /openStyleTransferPresetPreview\(trigger\.dataset\.styleTransferPresetPreview\)/);
+  assert.match(app, /button\.dataset\.styleTransferPresetPreview = previewSlot;/);
+  assert.match(app, /button\.title = `放大查看 \$\{preset\.label\}\$\{label\}`;/);
+  assert.match(styleTransferPresetLightbox, /export function buildStyleTransferPresetLightboxItem/);
+  assert.match(styleTransferPresetLightbox, /imageUrl,/);
+  assert.match(styleTransferPresetLightbox, /thumbnailUrl:\s*imageUrl,/);
+  assert.match(styleTransferPresetLightbox, /prompt:\s*`风格：\$\{preset\.label\}`/);
+  assert.match(styleTransferPresetLightbox, /paramsText:\s*`预设风格：\$\{preset\.label\}\\n预览内容：\$\{slotLabel\}原图`/);
+  assert.doesNotMatch(styleTransferPresetLightbox, /canvas|toDataURL|drawImage/);
+  assert.match(styles, /\.style-transfer-comparison-button\s*\{[\s\S]*cursor:\s*zoom-in;/);
+  assert.match(styles, /\.style-transfer-comparison-button:hover \.style-transfer-comparison-frame/);
 });
 
 test("quick blend mode exposes independent A and B upload groups", async () => {
@@ -1924,7 +2020,7 @@ test("compact select controls use theme-aware form surfaces", async () => {
   const rootRule = readCssRule(styles, ":root");
   const lightRule = readCssRule(styles, "html[data-theme=\"light\"]");
   const compactSelectRule = readCssRule(styles, ".compact-field select");
-  const compactArrowRule = readCssRule(styles, ".compact-field::after");
+  const compactArrowRule = readCssRule(styles, ".compact-field:has(select)::after");
   const compactOptionRule = readCssRule(styles, ".compact-field select option");
   const gallerySelectRule = readCssRule(styles, ".gallery-filter-select");
   const creationTemplateSearchRule = readCssRule(styles, ".creation-template-search");
@@ -2151,7 +2247,7 @@ test("reference orchestration analysis is a separate studio mode outside prompt 
   assert.match(app, /function renderReferenceAnalysisGenerationStrip\(\) \{/);
   assert.match(app, /refs\.referenceAnalysisThumbnailEmpty\.classList\.toggle\("hidden", entries\.length > 0\);/);
   assert.match(app, /function renderReferenceAnalysisGenerationPreview\(\) \{/);
-  assert.match(app, /function openReferenceAnalysisGeneratedPreview\(\) \{[\s\S]*const item = getReferenceAnalysisGenerationPreviewItem\(\);[\s\S]*openLightbox\(item\);/);
+  assert.match(app, /function openReferenceAnalysisGeneratedPreview\(\) \{[\s\S]*const item = getReferenceAnalysisGenerationPreviewItem\(\);[\s\S]*openLightbox\(item,\s*\{[\s\S]*items:\s*getReferenceAnalysisGenerationPreviewEntries\(\)\.map\(\(entry\) => entry\.item\),[\s\S]*\}\);/);
   assert.match(app, /refs\.referenceAnalysisGenerationCanvas\.setAttribute\("role", "button"\);/);
   assert.match(app, /refs\.referenceAnalysisGenerationCanvas\.setAttribute\("aria-label", "查看融图分析生成图"\);/);
   assert.match(app, /refs\.referenceAnalysisGenerationCanvas\.addEventListener\("click", openReferenceAnalysisGeneratedPreview\);/);
@@ -2376,7 +2472,7 @@ test("mobile and Pad studio layout uses dedicated compact workbench layouts", as
   assert.match(styles, /html\[data-ui-layout="mobile"\] \.zoom-controls\s*\{[\s\S]*grid-template-columns:\s*34px\s*minmax\(52px,\s*1fr\)\s*34px\s*minmax\(54px,\s*0\.9fr\);/);
   assert.match(styles, /html\[data-ui-layout="mobile"\] \.preview-actions\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/);
   assert.match(app, /const ADAPTIVE_COLLAPSIBLE_LAYOUTS = new Set\(\["tablet", "mobile"\]\);/);
-  assert.match(app, /studio-density\.mjs\?v=20260519-topbar-reveal-2/);
+  assert.match(app, /studio-density\.mjs\?v=20260705-ui-scale-90-1/);
   assert.match(app, /function getStudioViewportMetrics\(\) \{[\s\S]*coarsePointer:\s*window\.matchMedia\?\.\("\(pointer: coarse\)"\)\?\.matches \|\| false,/);
   assert.match(app, /function syncAdaptiveWorkbenchSections\(layoutMode = getCurrentStudioLayoutMode\(\)\) \{/);
   assert.match(app, /section\.open = section\.dataset\.compactOpen === "true";/);
@@ -3203,9 +3299,9 @@ test("creation mode has independent references count and scenario controls", asy
   assert.match(html, /id="creationSellingPointsInput"[\s\S]*rows="1"/);
   assert.match(html, /id="creationDimensionSpecsInput"[\s\S]*rows="1"/);
   assert.match(html, /id="creationInfographicRebuildEnabledInput"[\s\S]*type="checkbox"[\s\S]*checked/);
-  assert.match(html, /<div class="creation-control-row creation-option-grid">[\s\S]*id="creationImageCountInput"[\s\S]*id="creationScenarioInput"[\s\S]*id="creationVisualLanguageInput"[\s\S]*id="creationTargetLanguageInput"[\s\S]*id="creationOutputFormatInput"[\s\S]*id="creationRatioInput"[\s\S]*id="creationSizeInput"[\s\S]*id="creationSkuGenerationRuleInput"[\s\S]*id="creationInfographicRebuildEnabledInput"[\s\S]*id="creationListingAgentEnabledInput"[\s\S]*id="creationIndustryTemplateBrowser"/);
+  assert.match(html, /<div class="creation-control-row creation-option-grid">[\s\S]*id="creationImageCountInput"[\s\S]*id="creationSkuBundleCountInput"[\s\S]*id="creationScenarioInput"[\s\S]*id="creationVisualLanguageInput"[\s\S]*id="creationTargetLanguageInput"[\s\S]*id="creationOutputFormatInput"[\s\S]*id="creationRatioInput"[\s\S]*id="creationSizeInput"[\s\S]*id="creationSkuGenerationRuleInput"[\s\S]*id="creationInfographicRebuildEnabledInput"[\s\S]*id="creationListingAgentEnabledInput"[\s\S]*id="creationIndustryTemplateBrowser"/);
   assert.match(html, /id="creationVisualLanguageInput"[\s\S]*name="visualLanguage"[\s\S]*<option value="classic-commercial" selected>经典商业摄影<\/option>[\s\S]*<option value="premium-studio">高端棚拍<\/option>[\s\S]*<option value="warm-handcrafted">手作温度<\/option>/);
-  assert.match(html, /<select id="creationRatioInput" name="ratio">[\s\S]*<option value="1:1" selected>电商主图、头像、社交媒体 · 方形 1:1<\/option>[\s\S]*<option value="9:21">超长竖图 · 竖屏 9:21<\/option>[\s\S]*<option value="1:3">超长竖版广告 · 竖屏 1:3<\/option>[\s\S]*<\/select>/);
+  assert.match(html, /<select id="creationRatioInput" name="ratio">[\s\S]*<option value="1:1" data-full-label="电商主图、头像、社交媒体 · 方形 1:1" selected>1:1<\/option>[\s\S]*<option value="9:21" data-full-label="超长竖图 · 竖屏 9:21">9:21<\/option>[\s\S]*<option value="1:3" data-full-label="超长竖版广告 · 竖屏 1:3">1:3<\/option>[\s\S]*<\/select>/);
   assert.match(html, /<select id="creationSizeInput" name="size">[\s\S]*<option value="1024x1024" selected>1K 1024 x 1024<\/option>[\s\S]*<option value="2880x2880">最大 2880 x 2880<\/option>[\s\S]*<\/select>/);
   assert.match(html, /<select id="portraitRatioInput" name="ratio">[\s\S]*<option value="4:5" selected>Instagram帖子 · 竖屏 4:5<\/option>[\s\S]*<option value="3:1">超宽广告图 · 横屏 3:1<\/option>[\s\S]*<\/select>/);
   assert.match(html, /<select id="portraitSizeInput" name="size">[\s\S]*<option value="1024x1280" selected>1K 1024 x 1280<\/option>[\s\S]*<option value="2560x3200">最大 2560 x 3200<\/option>[\s\S]*<\/select>/);
@@ -3263,7 +3359,31 @@ test("creation mode has independent references count and scenario controls", asy
   assert.match(creationListingToggleRule, /border-color:\s*rgba\(249,\s*192,\s*106,\s*0\.58\);/);
   assert.match(creationListingToggleRule, /linear-gradient\(135deg,\s*rgba\(249,\s*192,\s*106,\s*0\.22\),\s*rgba\(112,\s*226,\s*162,\s*0\.11\)\)/);
   assert.doesNotMatch(readCssRule(styles, ".creation-listing-toggle.is-prominent"), /grid-column|min-height/);
+  const creationListingToggleTextRule = readCssRule(styles, ".creation-listing-toggle span");
+  assert.match(creationListingToggleTextRule, /font-size:\s*clamp\(0\.6rem,\s*8cqw,\s*var\(--type-subtitle-size\)\);/);
+  assert.match(creationListingToggleTextRule, /white-space:\s*nowrap;/);
+  assert.match(creationListingToggleTextRule, /text-overflow:\s*clip;/);
   assert.match(styles, /\.creation-sku-generation-rule-field\s*\{/);
+  const creationOptionGridControlRule = readCssRule(styles, ".creation-option-grid .compact-field select");
+  const creationSkuBundleRule = readCssRule(styles, ".creation-option-grid .creation-sku-bundle-field input");
+  assert.doesNotMatch(styles, /\.creation-option-grid\s+\.creation-sku-bundle-field::after/);
+  assert.match(creationOptionGridControlRule, /height:\s*40px;/);
+  assert.match(creationOptionGridControlRule, /min-width:\s*0;/);
+  assert.match(creationOptionGridControlRule, /box-sizing:\s*border-box;/);
+  assert.match(creationOptionGridControlRule, /padding:\s*0\s+28px\s+0\s+8px;/);
+  assert.match(creationOptionGridControlRule, /text-align:\s*center;/);
+  assert.match(creationOptionGridControlRule, /font-size:\s*clamp\(0\.52rem,\s*7cqw,\s*var\(--type-subtitle-size\)\);/);
+  assert.match(creationSkuBundleRule, /height:\s*40px;/);
+  assert.match(creationSkuBundleRule, /padding:\s*0\s+12px;/);
+  assert.match(creationSkuBundleRule, /text-align:\s*center;/);
+  assert.match(creationSkuBundleRule, /font-size:\s*clamp\(0\.52rem,\s*7cqw,\s*var\(--type-subtitle-size\)\);/);
+  assert.doesNotMatch(creationSkuBundleRule, /padding:\s*0\s+40px/);
+  assert.doesNotMatch(creationOptionGridControlRule, /vw/);
+  assert.match(creationOptionGridControlRule, /white-space:\s*nowrap;/);
+  assert.match(creationOptionGridControlRule, /text-overflow:\s*clip;/);
+  assert.match(readCssRule(styles, ".creation-option-grid .compact-field"), /container-type:\s*inline-size;/);
+  assert.match(readCssRule(styles, ".creation-option-grid .compact-field:has(select)::after"), /right:\s*11px;/);
+  assert.match(creationOptionGridControlRule, /text-align-last:\s*center;/);
   assert.match(styles, /html\[data-ui-layout="mobile"\] \.creation-option-grid\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\);/);
   assert.match(styles, /\.creation-role-picker\s*\{/);
   assert.match(styles, /\.creation-role-grid\s*\{/);
@@ -3338,6 +3458,7 @@ test("creation mode has independent references count and scenario controls", asy
   assert.match(app, /5-atmosphere\|atmosphere\|冲动下单氛围图/);
   assert.match(app, /6-product-detail\|product-detail\|产品细节特写图/);
   assert.match(app, /7-brand-story\|brand-story\|品牌质感\/礼品价值图/);
+  assert.match(app, /7-brand-story\|brand-story\|品牌质感\/礼品价值图\|做成多场景用途与风格拼贴/);
   assert.match(app, /8-size-capacity-fit\|size-capacity-fit\|尺寸容量适配图/);
   assert.match(app, /9-effect-comparison\|effect-comparison\|功能效果渲染图/);
   assert.match(app, /10-spec-table\|spec-table\|参数规格图/);
@@ -3577,7 +3698,12 @@ test("creation mode has independent references count and scenario controls", asy
   assert.match(app, /setCreationIndustryTemplateBrowserOpen\(true\)/);
   assert.match(app, /document\.addEventListener\("pointerdown"/);
   assert.match(app, /document\.addEventListener\("keydown"/);
-  assert.match(app, /refs\.creationRatioInput\.addEventListener\("change", renderCreationSizeOptions\)/);
+  assert.match(app, /function setCreationRatioOptionLabels\(\{ expanded = false \} = \{\}\) \{/);
+  assert.match(app, /element\.dataset\.fullLabel = option\.label;/);
+  assert.match(app, /element\.textContent = getCreationRatioCompactLabel\(option\);/);
+  assert.match(app, /refs\.creationRatioInput\.addEventListener\("pointerdown", \(\) => setCreationRatioOptionLabels\(\{ expanded: true \}\)\)/);
+  assert.match(app, /refs\.creationRatioInput\.addEventListener\("blur", \(\) => setCreationRatioOptionLabels\(\{ expanded: false \}\)\)/);
+  assert.match(app, /refs\.creationRatioInput\.addEventListener\("change", \(\) => \{[\s\S]*renderCreationSizeOptions\(\);[\s\S]*setCreationRatioOptionLabels\(\{ expanded: false \}\);[\s\S]*\}\)/);
   assert.match(app, /setCreationSelectValue\(refs\.creationDimensionUnitModeInput, normalized\.dimensionUnitMode, "both"\)/);
   assert.match(app, /setCreationSelectValue\(refs\.creationVisualLanguageInput, normalized\.visualLanguage, "classic-commercial"\)/);
   assert.match(app, /refs\.creationPlanButton\.addEventListener\("click"/);
@@ -3890,8 +4016,8 @@ test("creation result card images open the lightbox from the thumbnail", async (
   assert.match(app, /function buildCreationCurrentLightboxItem\(item = \{\}\) \{/);
   assert.match(app, /isImageOnlyLightboxItem:\s*true,/);
   assert.match(app, /function openCreationCurrentItemPreview\(itemId\) \{/);
-  assert.match(app, /openCreationCurrentItemPreview\(itemId\) \{[\s\S]*const lightboxItem = buildCreationCurrentLightboxItem\(item\);[\s\S]*openLightbox\(lightboxItem\);[\s\S]*\}/);
-  assert.match(app, /const shouldResolveLightboxItem = !state\.lightboxItem\.isCreationRecordItem && !state\.lightboxItem\.isImageOnlyLightboxItem;/);
+  assert.match(app, /openCreationCurrentItemPreview\(itemId\) \{[\s\S]*const lightboxItem = buildCreationCurrentLightboxItem\(item\);[\s\S]*openLightbox\(lightboxItem,\s*\{[\s\S]*items:\s*currentSet\?\.items \|\| \[\],[\s\S]*buildItem:\s*buildCreationCurrentLightboxItem,[\s\S]*\}\);[\s\S]*\}/);
+  assert.match(app, /const shouldResolveLightboxItem = !state\.lightboxItem\.isCreationRecordItem && !state\.lightboxItem\.isImageOnlyLightboxItem && !state\.lightboxItem\.isPreviewLightboxItem;/);
   assert.match(app, /refs\.creationResultGrid\.addEventListener\("click",[\s\S]*const previewButton = event\.target\.closest\("\[data-creation-preview-item-id\]"\);[\s\S]*openCreationCurrentItemPreview\(previewButton\.dataset\.creationPreviewItemId\)/);
   assert.match(styles, /\.creation-result-preview-media\s*\{/);
 });
@@ -4271,6 +4397,26 @@ test("creation record desktop grid keeps six cards per row", async () => {
   assert.doesNotMatch(creationRecordGridRule, /grid-template-columns:\s*repeat\(4,/);
 });
 
+test("creation record cards constrain SKU media inside narrow grid tracks", async () => {
+  const styles = await readFile(stylesPath, "utf8");
+  const recordCardRule = readCssRule(styles, ".creation-card.is-record-card");
+  const recordHeadRule = readCssRule(styles, ".creation-card.is-record-card .creation-card-head");
+  const recordMediaRule = readCssRule(styles, ".creation-card.is-record-card .creation-card-media");
+  const recordPreviewMediaRule = readCssRule(styles, ".creation-record-preview-media");
+  const recordImageRule = readCssRule(styles, ".creation-card.is-record-card .creation-card-media img");
+
+  assert.match(recordCardRule, /overflow:\s*hidden;/);
+  assert.match(recordHeadRule, /min-width:\s*0;/);
+  assert.match(recordMediaRule, /width:\s*100%;/);
+  assert.match(recordMediaRule, /max-width:\s*100%;/);
+  assert.match(recordMediaRule, /min-width:\s*0;/);
+  assert.match(recordMediaRule, /box-sizing:\s*border-box;/);
+  assert.match(recordPreviewMediaRule, /max-width:\s*100%;/);
+  assert.match(recordPreviewMediaRule, /min-width:\s*0;/);
+  assert.match(recordImageRule, /max-width:\s*100%;/);
+  assert.match(recordImageRule, /min-width:\s*0;/);
+});
+
 test("asset views define compact tablet and mobile layouts", async () => {
   const styles = await readFile(stylesPath, "utf8");
 
@@ -4329,7 +4475,7 @@ test("creation record cards open gallery-style lightbox details", async () => {
   assert.match(app, /previewButton\.dataset\.creationRecordPreviewSetId = options\.creationSetId \|\| "";/);
   assert.match(app, /const isArticleRecordItem = Boolean\(fresh\.isArticleRecordItem\);/);
   assert.match(app, /const isRecordItem = isCreationRecordItem \|\| isArticleRecordItem;/);
-  assert.match(app, /refs\.lightboxDelete\.hidden = Boolean\(isRecordItem \|\| isImageOnlyPreview\);/);
+  assert.match(app, /refs\.lightboxDelete\.hidden = Boolean\(isRecordItem \|\| isImageOnlyPreview \|\| isPreviewLightboxItem\);/);
   assert.match(app, /refs\.lightboxCopyPathButton\.addEventListener\("click",/);
   assert.match(app, /refs\.lightboxCopyFullPathButton\.addEventListener\("click",/);
   assert.match(app, /refs\.creationRecordResultGrid\.addEventListener\("click",[\s\S]*openCreationRecordItemPreview\(\s*previewButton\.dataset\.creationRecordPreviewItemId,\s*previewButton\.dataset\.creationRecordPreviewSetId,\s*\)/);

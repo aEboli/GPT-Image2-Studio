@@ -59,9 +59,19 @@ function makeFakeDocumentElement(tagName) {
     children: [],
     className: "",
     textContent: "",
+    dataset: {},
+    style: {},
+    addEventListener() {},
     appendChild(child) {
       this.children.push(child);
       return child;
+    },
+    replaceChildren(...children) {
+      this.children = children;
+      this.textContent = children.map((child) => child.textContent || "").join("");
+    },
+    setAttribute(name, value) {
+      this[name] = value;
     },
   };
 }
@@ -266,6 +276,7 @@ test("public app shell delegates browser config and cache behavior to public mod
   assert.match(app, /from "\/lib\/creation-listing-view\.mjs"/);
   assert.match(app, /from "\/lib\/creation-reference-drag\.mjs"/);
   assert.match(app, /from "\/lib\/lightbox-image-viewer\.mjs"/);
+  assert.match(app, /from "\/lib\/style-transfer-preset-lightbox\.mjs"/);
   assert.ok(
     lineCount < APP_SHELL_LINE_BUDGET,
     `public/app.js should stay below the shell budget, got ${lineCount}`,

@@ -11,7 +11,8 @@ import { isGenerationRequestRetryMessage, } from "/lib/generation-request-retry.
 import { cancelQueuedGenerationJob, getQueuedGenerationJobCount, getRunningGenerationJobCount, isQueuedGenerationJob, selectNextQueuedGenerationJobsByMode } from "/lib/generation-queue.mjs?v=20260611-mode-route-queue-1";
 import { buildCanceledGenerationActivityDetail, buildGenerationTaskActivityDetail, buildGenerationTaskStatusText, formatGenerationActivityModeLabel, getGenerationActivityDisplayText, sanitizeGenerationActivityDetail, sortGenerationActivityFeed, upsertGenerationActivityEntry } from "/lib/generation-activity-feed.mjs?v=20260504-vercel-static-lib-1";
 import { GENERATION_STREAM_EVENTS, recordFinalImageChunk } from "/lib/generation-stream-protocol.mjs";
-import { getStudioDensitySettings, getStudioLayoutMode, ALL_VARIABLE_NAMES } from "/lib/studio-density.mjs?v=20260519-topbar-reveal-2";
+import { getStudioDensitySettings, getStudioLayoutMode, ALL_VARIABLE_NAMES } from "/lib/studio-density.mjs?v=20260705-ui-scale-90-1";
+import { buildStyleTransferPresetLightboxItem } from "/lib/style-transfer-preset-lightbox.mjs";
 import { ensureLazyViewModule, getMountedLazyViewModule } from "/lib/view-mode-loader.mjs?v=20260608-quick-blend-time-sort-1";
 import { appendBrowserConfigToFormData, getBrowserPrivateConfigRequestPayload, getOrCreateClientSessionId, readBrowserPrivateConfig, saveBrowserPrivateConfig, toPublicBrowserConfig } from "/lib/browser-config.mjs";
 import { cacheBrowserGalleryItem, clearBrowserImageCache, dataUrlToBlob, deleteBrowserCachedGalleryItem, fetchServerImageAsDataUrl, getBrowserCachedImageData, getImageUrl, getServerImageUrl, getServerThumbnailUrl, isCacheableBrowserImageUrl, mergeServerAndBrowserGalleryItems, readBrowserCachedGalleryItems } from "/lib/browser-image-cache.mjs";
@@ -20,6 +21,7 @@ import { createCreationLogoLibraryController } from "/lib/creation-logo-library.
 import { consumeSse, requestGenerationStream } from "/lib/generation-client.mjs";
 import { createConfigModelPickerController } from "/lib/config-model-picker.mjs";
 import { createLightboxImageViewer, createLightboxViewerState } from "/lib/lightbox-image-viewer.mjs";
+import { createPreviewKeyboardNavigationController } from "/lib/preview-keyboard-navigation.mjs";
 import {
   API_ENDPOINT_CHAT_COMPLETIONS,
   API_ENDPOINT_IMAGE_EDITS,
@@ -183,7 +185,7 @@ const CREATION_LOGO_BACKGROUND_LABELS = {
 };
 const STYLE_TRANSFER_CUSTOM_PRESET = "custom";
 const STYLE_TRANSFER_DEFAULT_PRESET = "clay-toy";
-const STYLE_TRANSFER_PRESET_BEFORE_IMAGE = "./assets/style-presets/style-before.svg";
+const STYLE_TRANSFER_PRESET_BEFORE_IMAGE = "./assets/style-presets/style-before.png";
 const STYLE_TRANSFER_PRESET_REFERENCE_SIZE = 1024;
 const STYLE_TRANSFER_PRESETS = [
   {
@@ -199,7 +201,7 @@ const STYLE_TRANSFER_PRESETS = [
     label: "电影写实",
     description: "真实镜头、胶片色调、自然光影和电影级景深。",
     beforeImage: STYLE_TRANSFER_PRESET_BEFORE_IMAGE,
-    image: "./assets/style-presets/cinematic-photo.svg",
+    image: "./assets/style-presets/cinematic-photo.png",
     prompt: "Use a cinematic photoreal look with natural lens behavior, realistic lighting, filmic color grading, and believable texture.",
   },
   {
@@ -207,7 +209,7 @@ const STYLE_TRANSFER_PRESETS = [
     label: "日系赛璐璐",
     description: "干净线条、块面阴影、高饱和角色动画质感。",
     beforeImage: STYLE_TRANSFER_PRESET_BEFORE_IMAGE,
-    image: "./assets/style-presets/anime-cel.svg",
+    image: "./assets/style-presets/anime-cel.png",
     prompt: "Use Japanese cel animation styling with clean outlines, controlled flat shadows, vivid colors, and crisp character-focused rendering.",
   },
   {
@@ -215,7 +217,7 @@ const STYLE_TRANSFER_PRESETS = [
     label: "手绘插画",
     description: "松弛笔触、温和配色和纸面手作感。",
     beforeImage: STYLE_TRANSFER_PRESET_BEFORE_IMAGE,
-    image: "./assets/style-presets/hand-drawn.svg",
+    image: "./assets/style-presets/hand-drawn.png",
     prompt: "Use an expressive hand-drawn illustration look with visible sketch texture, warm imperfect strokes, and soft handmade color.",
   },
   {
@@ -223,7 +225,7 @@ const STYLE_TRANSFER_PRESETS = [
     label: "铅笔素描",
     description: "石墨线稿、排线明暗和纸张颗粒。",
     beforeImage: STYLE_TRANSFER_PRESET_BEFORE_IMAGE,
-    image: "./assets/style-presets/pencil-sketch.svg",
+    image: "./assets/style-presets/pencil-sketch.png",
     prompt: "Use a graphite pencil sketch style with visible hatching, tonal shading, paper grain, and monochrome drawing texture.",
   },
   {
@@ -231,7 +233,7 @@ const STYLE_TRANSFER_PRESETS = [
     label: "赛博霓虹",
     description: "高反差夜景、霓虹边光和湿润反射。",
     beforeImage: STYLE_TRANSFER_PRESET_BEFORE_IMAGE,
-    image: "./assets/style-presets/cyberpunk-neon.svg",
+    image: "./assets/style-presets/cyberpunk-neon.png",
     prompt: "Use a cyberpunk neon night style with high contrast, saturated colored rim lights, reflective surfaces, and dense urban mood.",
   },
   {
@@ -239,7 +241,7 @@ const STYLE_TRANSFER_PRESETS = [
     label: "像素游戏",
     description: "低分辨率像素块、限定调色和复古游戏画面。",
     beforeImage: STYLE_TRANSFER_PRESET_BEFORE_IMAGE,
-    image: "./assets/style-presets/pixel-game.svg",
+    image: "./assets/style-presets/pixel-game.png",
     prompt: "Use a retro pixel game style with blocky pixel forms, limited palette, crisp grid edges, and readable sprite-like shapes.",
   },
   {
@@ -247,7 +249,7 @@ const STYLE_TRANSFER_PRESETS = [
     label: "低多边形3D",
     description: "几何切面、硬边体块和轻量 3D 玩具感。",
     beforeImage: STYLE_TRANSFER_PRESET_BEFORE_IMAGE,
-    image: "./assets/style-presets/low-poly-3d.svg",
+    image: "./assets/style-presets/low-poly-3d.png",
     prompt: "Use a low-poly 3D style with faceted geometry, clean hard edges, simplified volumes, and soft studio lighting.",
   },
   {
@@ -255,7 +257,7 @@ const STYLE_TRANSFER_PRESETS = [
     label: "编辑水彩",
     description: "透明水色、留白边缘和杂志插画气质。",
     beforeImage: STYLE_TRANSFER_PRESET_BEFORE_IMAGE,
-    image: "./assets/style-presets/editorial-watercolor.svg",
+    image: "./assets/style-presets/editorial-watercolor.png",
     prompt: "Use an editorial watercolor style with translucent pigment washes, soft blooms, paper texture, and elegant magazine illustration restraint.",
   },
   {
@@ -263,7 +265,7 @@ const STYLE_TRANSFER_PRESETS = [
     label: "纸雕拼贴",
     description: "层叠纸片、投影厚度和剪贴画装饰感。",
     beforeImage: STYLE_TRANSFER_PRESET_BEFORE_IMAGE,
-    image: "./assets/style-presets/paper-cut-collage.svg",
+    image: "./assets/style-presets/paper-cut-collage.png",
     prompt: "Use a paper cut collage style with layered paper shapes, tactile edges, shallow shadows, and handcrafted poster composition.",
   },
   {
@@ -271,7 +273,7 @@ const STYLE_TRANSFER_PRESETS = [
     label: "Riso海报",
     description: "套色错位、网点颗粒和独立出版物质感。",
     beforeImage: STYLE_TRANSFER_PRESET_BEFORE_IMAGE,
-    image: "./assets/style-presets/risograph-poster.svg",
+    image: "./assets/style-presets/risograph-poster.png",
     prompt: "Use a risograph poster style with limited spot colors, offset registration, halftone grain, and bold printmaking texture.",
   },
   {
@@ -279,7 +281,7 @@ const STYLE_TRANSFER_PRESETS = [
     label: "复古胶片",
     description: "过期胶片、暖色偏移、暗角和颗粒噪点。",
     beforeImage: STYLE_TRANSFER_PRESET_BEFORE_IMAGE,
-    image: "./assets/style-presets/vintage-film.svg",
+    image: "./assets/style-presets/vintage-film.png",
     prompt: "Use a vintage film style with warm color shift, soft contrast, visible grain, subtle vignetting, and aged photographic mood.",
   },
   {
@@ -287,7 +289,7 @@ const STYLE_TRANSFER_PRESETS = [
     label: "漫画墨线",
     description: "粗黑轮廓、速度线、网点阴影和分镜张力。",
     beforeImage: STYLE_TRANSFER_PRESET_BEFORE_IMAGE,
-    image: "./assets/style-presets/comic-ink.svg",
+    image: "./assets/style-presets/comic-ink.png",
     prompt: "Use a bold comic ink style with heavy linework, graphic contrast, screentone shadows, and energetic panel-like clarity.",
   },
   {
@@ -295,7 +297,7 @@ const STYLE_TRANSFER_PRESETS = [
     label: "黏土手作",
     description: "柔软手工材质、圆润体块、玩具灯箱和微缩场景。",
     beforeImage: STYLE_TRANSFER_PRESET_BEFORE_IMAGE,
-    image: "./assets/style-presets/clay-toy.svg",
+    image: "./assets/style-presets/clay-toy.png",
     prompt: "Use a handmade clay toy diorama style with rounded forms, soft material texture, playful miniature lighting, and tactile surface detail.",
   },
   {
@@ -303,7 +305,7 @@ const STYLE_TRANSFER_PRESETS = [
     label: "国风工笔",
     description: "细线勾勒、淡彩晕染、宣纸纹理和东方留白。",
     beforeImage: STYLE_TRANSFER_PRESET_BEFORE_IMAGE,
-    image: "./assets/style-presets/ink-gongbi.svg",
+    image: "./assets/style-presets/ink-gongbi.png",
     prompt: "Use a Chinese gongbi painting style with precise fine lines, restrained ink-and-color washes, rice paper texture, and elegant negative space.",
   },
 ];
@@ -458,6 +460,11 @@ const state = {
   generationTasks: [],
   jobs: [],
   lightboxItem: null,
+  lightboxNavigation: {
+    items: [],
+    index: -1,
+    buildItem: null,
+  },
   lightboxViewer: createLightboxViewerState(),
   limits: { ...DEFAULT_LIMITS },
   promptAgent: {
@@ -552,6 +559,10 @@ const state = {
   imageEditPreviewItem: null,
   quickBlendPreviewItem: null,
   referenceAnalysisPreviewItem: null,
+  referencePreviewNavigation: {
+    items: [],
+    index: -1,
+  },
   referencePreviewItem: null,
   selectedPromptTemplateId: "",
   selectedPreviewKey: "",
@@ -1042,6 +1053,16 @@ const refs = {
 };
 
 const lightboxViewerController = createLightboxImageViewer({ refs, state });
+const previewKeyboardNavigation = createPreviewKeyboardNavigationController({
+  refs,
+  state,
+  getImageUrl,
+  resetLightboxViewer,
+  syncLightboxImageMetrics,
+  syncLightboxItem,
+});
+const handlePreviewArrowNavigation = previewKeyboardNavigation.handlePreviewArrowNavigation;
+const setReferencePreviewNavigationContext = previewKeyboardNavigation.setReferencePreviewNavigationContext;
 const portraitLocationController = createPortraitLocationSelectorController({ refs, state, renderPortraitView });
 const configModelPicker = createConfigModelPickerController({ refs, state, getBrowserPrivateConfigRequestPayload }); const creationLogoLibrary = createCreationLogoLibraryController({ applyLogoFile: applyCreationLogoFile, refs, setFeedback: setCreationFeedback, showError });
 const pptAnalysis = createPptAnalysisController({
@@ -1394,7 +1415,7 @@ function formatCompactRatioLabel(ratio) {
 
   return /^\d+:\d+$/.test(normalized) ? normalized : "";
 }
-function getGenerationActivityRelayText(value) { const relayLine = String(value || "").split(/\r?\n/).map((line) => line.trim()).find((line) => /^中转[：:]/.test(line)); return relayLine || ""; } function buildGenerationActivityRelayText(item = {}) { const route = String(item?.imageRoute || item?.generationRoute || "").toLowerCase(); const relayUrl = String(item?.baseUrl || (route === "c" ? item?.protocolBaseUrl || state.config?.protocolBaseUrl : route === "b" ? state.config?.directBaseUrl : state.config?.baseUrl) || state.config?.baseUrl || "").trim(); return relayUrl ? `中转：${relayUrl}` : ""; }
+function getGenerationActivityRelayText(value) { const match = String(value || "").split(/\r?\n/).map((line) => line.trim()).map((line) => line.match(/^(URL|中转)[：:](.*)$/)).find(Boolean); return match ? `URL：${match[2].trim()}` : ""; } function buildGenerationActivityRelayText(item = {}) { const route = String(item?.imageRoute || item?.generationRoute || "").toLowerCase(); const relayUrl = String(item?.baseUrl || (route === "c" ? item?.protocolBaseUrl || state.config?.protocolBaseUrl : route === "b" ? state.config?.directBaseUrl : state.config?.baseUrl) || state.config?.baseUrl || "").trim(); return relayUrl ? `URL：${relayUrl}` : ""; }
 function formatFilmstripSizeLabel(item) {
   return formatCompactSizeLabel(item?.size);
 }
@@ -1841,6 +1862,7 @@ async function ensureActiveViewModule(view) {
         showError,
         state,
         syncReferenceDropzoneCompact,
+        setReferencePreviewNavigationContext,
         updatePreviewLoadingShell,
       },
     });
@@ -2006,6 +2028,7 @@ function syncLightboxCreationRecordActions(fresh = {}) {
   const isArticleRecordItem = Boolean(fresh.isArticleRecordItem);
   const isRecordItem = isCreationRecordItem || isArticleRecordItem;
   const isImageOnlyPreview = Boolean(fresh.isImageOnlyLightboxItem);
+  const isPreviewLightboxItem = Boolean(fresh.isPreviewLightboxItem);
   const hasRelativePath = Boolean(String(fresh.relativePath || "").trim());
 
   refs.lightboxCopyPathButton?.classList.toggle("hidden", !isCreationRecordItem);
@@ -2017,8 +2040,8 @@ function syncLightboxCreationRecordActions(fresh = {}) {
     refs.lightboxCopyFullPathButton.disabled = !isCreationRecordItem || !hasRelativePath;
   }
   if (refs.lightboxDelete) {
-    refs.lightboxDelete.hidden = Boolean(isRecordItem || isImageOnlyPreview);
-    refs.lightboxDelete.disabled = isRecordItem || isImageOnlyPreview || !fresh.filename;
+    refs.lightboxDelete.hidden = Boolean(isRecordItem || isImageOnlyPreview || isPreviewLightboxItem);
+    refs.lightboxDelete.disabled = isRecordItem || isImageOnlyPreview || isPreviewLightboxItem || !fresh.filename;
   }
 }
 
@@ -2885,6 +2908,7 @@ function openReferencePreview(referenceId) {
   }
 
   state.referencePreviewItem = item;
+  setReferencePreviewNavigationContext({ items: state.referenceFiles, currentId: item.id });
   refs.referencePreviewImage.src = item.previewUrl;
   refs.referencePreviewViewer.classList.add("open");
   refs.referencePreviewViewer.setAttribute("aria-hidden", "false");
@@ -2895,7 +2919,9 @@ function closeReferencePreview() {
   state.creationReferencePreviewItem = null;
   state.referenceAnalysisPreviewItem = null;
   state.imageDecompositionPreviewItem = null;
+  state.imageEditPreviewItem = null;
   state.quickBlendPreviewItem = null;
+  state.referencePreviewNavigation = { items: [], index: -1 };
   state.styleTransferPreviewItem = null;
   refs.referencePreviewViewer.classList.remove("open");
   refs.referencePreviewViewer.setAttribute("aria-hidden", "true");
@@ -3348,7 +3374,9 @@ function renderImageDecompositionGenerationLoading(item) {
 function openImageDecompositionGeneratedPreview() {
   const item = getImageDecompositionGenerationPreviewItem();
   if (item && getImageUrl(item)) {
-    openLightbox(item);
+    openLightbox(item, {
+      items: getImageDecompositionGenerationPreviewEntries().map((entry) => entry.item),
+    });
   }
 }
 
@@ -3582,6 +3610,7 @@ function openImageDecompositionPreview(referenceId) {
   }
 
   state.imageDecompositionPreviewItem = item;
+  setReferencePreviewNavigationContext({ items: [item], currentId: item.id });
   refs.referencePreviewImage.src = item.previewUrl;
   refs.referencePreviewViewer.classList.add("open");
   refs.referencePreviewViewer.setAttribute("aria-hidden", "false");
@@ -3692,6 +3721,7 @@ function openReferenceAnalysisPreview(referenceId) {
   }
 
   state.referenceAnalysisPreviewItem = item;
+  setReferencePreviewNavigationContext({ items: state.referenceAnalysis.files, currentId: item.id });
   refs.referencePreviewImage.src = item.previewUrl;
   refs.referencePreviewViewer.classList.add("open");
   refs.referencePreviewViewer.setAttribute("aria-hidden", "false");
@@ -3817,24 +3847,42 @@ function getStyleTransferPresetReferenceFile() {
   return hasSelectedStyleTransferPreset() ? state.styleTransfer.presetReferenceFile : null;
 }
 
-function createStyleTransferComparisonCard({ label, src, alt }) {
+function openStyleTransferPresetPreview(slot) {
+  const preset = getStyleTransferPreset();
+  const lightboxItem = buildStyleTransferPresetLightboxItem({ preset, slot, nowIso });
+  if (lightboxItem) {
+    openLightbox(lightboxItem, {
+      items: ["before", "after"].map((previewSlot) => buildStyleTransferPresetLightboxItem({ preset, slot: previewSlot, nowIso })).filter(Boolean),
+    });
+  }
+}
+
+function handleStyleTransferPresetComparisonClick(event) {
+  const trigger = event.target?.closest?.("[data-style-transfer-preset-preview]");
+  if (trigger && refs.styleTransferPresetComparison?.contains(trigger)) openStyleTransferPresetPreview(trigger.dataset.styleTransferPresetPreview);
+}
+
+function createStyleTransferComparisonCard({ label, src, alt, previewSlot, preset = getStyleTransferPreset() }) {
   const card = document.createElement("div");
   card.className = "style-transfer-comparison-card";
 
   const caption = document.createElement("span");
-  caption.className = "style-transfer-comparison-label";
-  caption.textContent = label;
+  caption.className = "style-transfer-comparison-label"; caption.textContent = label;
   card.appendChild(caption);
 
-  const frame = document.createElement("div");
+  const button = document.createElement("button");
+  button.type = "button"; button.className = "style-transfer-comparison-button";
+  button.dataset.styleTransferPresetPreview = previewSlot;
+  button.title = `放大查看 ${preset.label}${label}`;
+  button.setAttribute("aria-label", button.title);
+
+  const frame = document.createElement("span");
   frame.className = "style-transfer-comparison-frame";
   const image = document.createElement("img");
-  image.loading = "lazy";
-  image.decoding = "async";
-  image.src = src;
-  image.alt = alt;
+  image.loading = "lazy"; image.decoding = "async"; image.src = src; image.alt = alt;
   frame.appendChild(image);
-  card.appendChild(frame);
+  button.appendChild(frame);
+  card.appendChild(button);
   return card;
 }
 
@@ -3877,11 +3925,13 @@ function renderStyleTransferPresetPreview() {
           label: "风格前",
           src: preset.beforeImage,
           alt: `${preset.label} 风格前示意图`,
+          previewSlot: "before",
         }),
         createStyleTransferComparisonCard({
           label: "风格后",
           src: preset.image,
           alt: `${preset.label} 风格后示意图`,
+          previewSlot: "after",
         }),
       );
     }
@@ -4006,6 +4056,10 @@ function openStyleTransferPreview(slot) {
 
   closeReferencePreview();
   state.styleTransferPreviewItem = item;
+  setReferencePreviewNavigationContext({
+    items: [state.styleTransfer.source, state.styleTransfer.style].filter(Boolean),
+    currentId: item.id,
+  });
   refs.referencePreviewImage.src = item.previewUrl;
   refs.referencePreviewViewer.classList.add("open");
   refs.referencePreviewViewer.setAttribute("aria-hidden", "false");
@@ -4423,7 +4477,9 @@ function renderReferenceAnalysisGenerationLoading(item) {
 function openReferenceAnalysisGeneratedPreview() {
   const item = getReferenceAnalysisGenerationPreviewItem();
   if (item && getImageUrl(item)) {
-    openLightbox(item);
+    openLightbox(item, {
+      items: getReferenceAnalysisGenerationPreviewEntries().map((entry) => entry.item),
+    });
   }
 }
 
@@ -4645,6 +4701,16 @@ function syncGenerationRatio(value) {
   syncGenerationSize(refs.sizeInput.value);
 }
 
+function getCreationRatioCompactLabel(option) {
+  return String(option?.value || DEFAULT_UI_RATIO);
+}
+
+function setCreationRatioOptionLabels({ expanded = false } = {}) {
+  refs.creationRatioInput?.querySelectorAll("option").forEach((option) => {
+    option.textContent = expanded ? option.dataset.fullLabel || option.value : option.value;
+  });
+}
+
 function renderCreationRatioOptions() {
   const currentValue = refs.creationRatioInput.value || DEFAULT_UI_RATIO;
   const options = getVisibleRatios();
@@ -4653,13 +4719,15 @@ function renderCreationRatioOptions() {
   options.forEach((option) => {
     const element = document.createElement("option");
     element.value = option.value;
-    element.textContent = option.label;
+    element.dataset.fullLabel = option.label;
+    element.textContent = getCreationRatioCompactLabel(option);
     refs.creationRatioInput.appendChild(element);
   });
 
   refs.creationRatioInput.value = options.some((option) => option.value === currentValue)
     ? currentValue
     : DEFAULT_UI_RATIO;
+  setCreationRatioOptionLabels({ expanded: false });
   renderCreationSizeOptions();
 }
 
@@ -5300,11 +5368,12 @@ function getCurrentPreviewItem() {
   return getSelectedJob() || getSelectedGalleryItem() || null;
 }
 
-function openLightbox(item) {
+function openLightbox(item, navigation = null) {
   if (!item || !getImageUrl(item)) {
     return;
   }
 
+  previewKeyboardNavigation.normalizeLightboxNavigation(item, navigation);
   state.lightboxItem = item;
   resetLightboxViewer();
   syncLightboxItem();
@@ -5316,6 +5385,7 @@ function openLightbox(item) {
 
 function closeLightbox() {
   state.lightboxItem = null;
+  previewKeyboardNavigation.clearLightboxNavigation();
   resetPromptCopyFeedback();
   resetLightboxViewer();
   setLightboxOpen(false);
@@ -5332,7 +5402,7 @@ function syncLightboxItem() {
     return;
   }
 
-  const shouldResolveLightboxItem = !state.lightboxItem.isCreationRecordItem && !state.lightboxItem.isImageOnlyLightboxItem;
+  const shouldResolveLightboxItem = !state.lightboxItem.isCreationRecordItem && !state.lightboxItem.isImageOnlyLightboxItem && !state.lightboxItem.isPreviewLightboxItem;
   const fresh =
     (shouldResolveLightboxItem && state.lightboxItem.filename && state.gallery.find((item) => item.filename === state.lightboxItem.filename)) ||
     (shouldResolveLightboxItem && state.lightboxItem.id && state.jobs.find((job) => job.id === state.lightboxItem.id)) ||
@@ -5345,7 +5415,7 @@ function syncLightboxItem() {
   refs.lightboxTime.textContent = formatTime(fresh.createdAt);
   refs.lightboxId.textContent = `ID: ${getDisplayId(fresh)}`;
   refs.lightboxPrompt.value = getDisplayPrompt(fresh);
-  refs.lightboxParams.value = buildParameterText(fresh, state.config || {});
+  refs.lightboxParams.value = String(fresh.paramsText || "").trim() || buildParameterText(fresh, state.config || {});
   refs.copyPromptButton.disabled = refs.lightboxPrompt.value.trim().length === 0;
   resetPromptCopyFeedback();
   resetLightboxViewer();
@@ -5613,18 +5683,25 @@ function renderTimeline() {
     if (item.imageUrl) { row.classList.add("has-url"); copy.appendChild(Object.assign(document.createElement("a"), { className: "timeline-url", href: item.imageUrl, target: "_blank", rel: "noopener noreferrer", textContent: item.imageUrl })); }
     if (displayText.detail) { row.classList.add("has-detail"); copy.appendChild(Object.assign(document.createElement("p"), { className: "timeline-detail", textContent: displayText.detail })); }
     row.appendChild(copy);
-    row.appendChild(Object.assign(document.createElement("span"), { className: "timeline-mode", textContent: item.modeLabel || "" }));
+    const meta = document.createElement("span");
+    meta.className = "timeline-meta";
+    if (item.modeLabel) {
+      meta.appendChild(Object.assign(document.createElement("span"), { className: "timeline-mode", textContent: item.modeLabel }));
+    }
 
     const compactRatio = formatCompactRatioLabel(item.ratio);
     const compactSize = formatCompactSizeLabel(item.size);
     const ratioSize = document.createElement("span");
     ratioSize.className = "timeline-ratio-size";
     ratioSize.textContent = [compactRatio, compactSize ? `(${compactSize})` : ""].filter(Boolean).join(" ");
-    row.appendChild(ratioSize);
+    if (ratioSize.textContent) {
+      meta.appendChild(ratioSize);
+    }
 
     const time = document.createElement("time");
     time.textContent = formatClock(item.at);
-    row.appendChild(time);
+    meta.appendChild(time);
+    row.appendChild(meta);
 
     refs.timelineList.appendChild(row);
   });
@@ -5861,6 +5938,10 @@ function getFilmstripItems() {
   }));
 
   return [...activeJobs, ...recentGallery].slice(0, 14);
+}
+
+function getCurrentPreviewNavigationItems() {
+  return getFilmstripItems().map((entry) => entry.item).filter((item) => item && getImageUrl(item));
 }
 
 function getFilmstripPlaceholderState() {
@@ -6105,7 +6186,7 @@ function createGalleryTile(item) {
   button.type = "button";
   button.className = "gallery-tile";
   button.addEventListener("click", () => {
-    openLightbox(item);
+    openLightbox(item, { items: state.gallery });
   });
 
   const image = document.createElement("img");
@@ -7325,7 +7406,7 @@ const CREATION_ITEM_STATUS_LABELS = {
   planning: "待开始",
 };
 
-const CREATION_PREVIEW_SLOTS = "1-hero|hero|首图成交主视觉|主商品占主视觉，周围用多个小圆框展示工具、穿搭或使用场景;2-benefit|benefit|核心信息融合图|融合产品、结果、痛点和可信证据，让买家明白为什么需要;3-scene|scene|适用多场景图|用 2-4 个真实适用场景展示产品价值，带宣传片式层次和购买代入感;4-multi-angle|multi-angle|多角度产品展示图|3-4 个清晰视角展示形态、结构、厚度和表面，不堆营销字;5-atmosphere|atmosphere|冲动下单氛围图|用真实拥有感和生活情绪触发想买冲动，同时保持产品清楚可看;6-product-detail|product-detail|产品细节特写图|用微距、局部和指向标注证明材质、结构、做工或关键部位;7-brand-story|brand-story|品牌质感/礼品价值图|把工艺、包装、仪式感或调性转成质感和送礼价值;8-size-capacity-fit|size-capacity-fit|尺寸容量适配图|用准确尺寸、容量、比例和适配参照降低买错风险;9-effect-comparison|effect-comparison|功能效果渲染图|用高级 3D/CGI 或广告级可视化表现功能路径、机制、效果和结果;10-spec-table|spec-table|参数规格图|用清晰参数表呈现型号、尺寸、单位和关键规格，便于快速核对;11-craft-process|craft-process|品质工艺证明图|把工艺、材料处理、装配或检测事实转成质量证据;12-accessory-gift|accessory-gift|到手清单/配件图|完整展示到手包含物、数量、包装和配件，减少到货不确定;13-series-showcase|series-showcase|多款式/SKU选择图|只展示已提供的颜色、款式、尺码、套装或 SKU，帮助快速选择;14-ingredient-material|ingredient-material|材质成分解析图|用材质、成分、结构或组件解释为什么值得信任或偏好;15-after-sales|after-sales|痛点图|用真实使用困扰、解决路径和结果变化，让买家知道它具体替我解决什么问题;16-usage-suggestion|usage-suggestion|卖点图|用 3-5 个核心卖点连接功能证据和买后收益，让买家知道买它能获得什么好处;17-human-handheld|human-handheld|真人手持展示图|真人出镜，手持、举到镜头前或用鱼线悬挂展示商品，让尺度、细节和真实使用感更直观;18-human-wearable|human-wearable|真人穿戴场景图|真人穿着、背着、提着或佩戴商品，在真实场景里展示版型、比例、背负关系和生活代入感".split(";").map((entry) => { const [itemId, role, title, brief] = entry.split("|"); return { itemId, role, title, brief }; });
+const CREATION_PREVIEW_SLOTS = "1-hero|hero|首图成交主视觉|主商品占主视觉，周围用多个小圆框展示工具、穿搭或使用场景;2-benefit|benefit|核心信息融合图|融合产品、结果、痛点和可信证据，让买家明白为什么需要;3-scene|scene|适用多场景图|用 2-4 个真实适用场景展示产品价值，带宣传片式层次和购买代入感;4-multi-angle|multi-angle|多角度产品展示图|3-4 个清晰视角展示形态、结构、厚度和表面，不堆营销字;5-atmosphere|atmosphere|冲动下单氛围图|用真实拥有感和生活情绪触发想买冲动，同时保持产品清楚可看;6-product-detail|product-detail|产品细节特写图|用微距、局部和指向标注证明材质、结构、做工或关键部位;7-brand-story|brand-story|品牌质感/礼品价值图|做成多场景用途与风格拼贴，展示多种真实使用场景和底部使用方式小图标;8-size-capacity-fit|size-capacity-fit|尺寸容量适配图|用准确尺寸、容量、比例和适配参照降低买错风险;9-effect-comparison|effect-comparison|功能效果渲染图|用高级 3D/CGI 或广告级可视化表现功能路径、机制、效果和结果;10-spec-table|spec-table|参数规格图|用清晰参数表呈现型号、尺寸、单位和关键规格，便于快速核对;11-craft-process|craft-process|品质工艺证明图|把工艺、材料处理、装配或检测事实转成质量证据;12-accessory-gift|accessory-gift|到手清单/配件图|完整展示到手包含物、数量、包装和配件，减少到货不确定;13-series-showcase|series-showcase|多款式/SKU选择图|只展示已提供的颜色、款式、尺码、套装或 SKU，帮助快速选择;14-ingredient-material|ingredient-material|材质成分解析图|用材质、成分、结构或组件解释为什么值得信任或偏好;15-after-sales|after-sales|痛点图|用真实使用困扰、解决路径和结果变化，让买家知道它具体替我解决什么问题;16-usage-suggestion|usage-suggestion|卖点图|用 3-5 个核心卖点连接功能证据和买后收益，让买家知道买它能获得什么好处;17-human-handheld|human-handheld|真人手持展示图|真人出镜，手持、举到镜头前或用鱼线悬挂展示商品，让尺度、细节和真实使用感更直观;18-human-wearable|human-wearable|真人穿戴场景图|真人穿着、背着、提着或佩戴商品，在真实场景里展示版型、比例、背负关系和生活代入感".split(";").map((entry) => { const [itemId, role, title, brief] = entry.split("|"); return { itemId, role, title, brief }; });
 
 const CREATION_SCENARIO_LABELS = { standard: "标准电商", "detail-page": "详情页转化", "social-seeding": "社媒种草", launch: "新品发布", promotion: "活动促销", livestream: "直播电商", "gift-guide": "礼品推荐", "marketplace-search": "平台搜索", "brand-story": "品牌故事" };
 const CREATION_VISUAL_LANGUAGE_LABELS = { "classic-commercial": "经典商业摄影", "premium-studio": "高端棚拍", "reference-style": "参考模式", "clean-marketplace": "平台清爽白底", "lifestyle-editorial": "生活方式杂志", "social-ugc": "社媒实拍", "detail-infographic": "详情页信息图", "macro-material": "微距材质", "outdoor-context": "户外场景", "minimal-luxury": "极简奢华", "bold-campaign": "活动海报", "warm-handcrafted": "手作温度" };
@@ -8935,7 +9016,10 @@ function openArticleRecordItemPreview(itemId, setId = "") {
     return;
   }
 
-  openLightbox(buildArticleRecordLightboxItem(record.item, record.set));
+  openLightbox(buildArticleRecordLightboxItem(record.item, record.set), {
+    items: record.set.items,
+    buildItem: (item) => buildArticleRecordLightboxItem(item, record.set),
+  });
 }
 
 function openArticleIllustrationItemPreview(itemId) {
@@ -8946,7 +9030,10 @@ function openArticleIllustrationItemPreview(itemId) {
     return;
   }
 
-  openLightbox(buildArticleRecordLightboxItem(item, currentSet));
+  openLightbox(buildArticleRecordLightboxItem(item, currentSet), {
+    items: currentSet.items,
+    buildItem: (entry) => buildArticleRecordLightboxItem(entry, currentSet),
+  });
 }
 
 function buildArticlePromptText(set = getArticleRecordSelectedSet()) {
@@ -10195,10 +10282,14 @@ function buildCreationCurrentLightboxItem(item = {}) {
 }
 
 function openCreationCurrentItemPreview(itemId) {
-  const item = getCreationDisplayedSet()?.items?.find((entry) => entry.itemId === itemId);
+  const currentSet = getCreationDisplayedSet();
+  const item = currentSet?.items?.find((entry) => entry.itemId === itemId);
   const lightboxItem = buildCreationCurrentLightboxItem(item);
   if (!lightboxItem) return;
-  openLightbox(lightboxItem);
+  openLightbox(lightboxItem, {
+    items: currentSet?.items || [],
+    buildItem: buildCreationCurrentLightboxItem,
+  });
 }
 
 function openCreationRecordItemPreview(itemId, setId = "") {
@@ -10208,7 +10299,10 @@ function openCreationRecordItemPreview(itemId, setId = "") {
     return;
   }
 
-  openLightbox(buildCreationRecordLightboxItem(record.item, record.set));
+  openLightbox(buildCreationRecordLightboxItem(record.item, record.set), {
+    items: record.set.items,
+    buildItem: (item) => buildCreationRecordLightboxItem(item, record.set),
+  });
 }
 
 async function copyCreationRecordItemPath(itemId, setId = "") {
@@ -10480,7 +10574,10 @@ function openCreationReferencePreview(referenceId) {
   }
 
   state.creationReferencePreviewItem = item;
-  openLightbox(lightboxItem);
+  openLightbox(lightboxItem, {
+    items: state.creationReferenceFiles,
+    buildItem: buildCreationReferenceLightboxItem,
+  });
 }
 
 function openCreationStyleReferencePreview(referenceId) {
@@ -10491,7 +10588,10 @@ function openCreationStyleReferencePreview(referenceId) {
   }
 
   state.creationReferencePreviewItem = item;
-  openLightbox(lightboxItem);
+  openLightbox(lightboxItem, {
+    items: state.creationStyleReferenceFiles,
+    buildItem: buildCreationReferenceLightboxItem,
+  });
 }
 
 function removeCreationReferenceFile(referenceId) {
@@ -10630,7 +10730,10 @@ function openCreationLogoBatchSourcePreview(sourceId) {
   }
 
   state.creationReferencePreviewItem = item;
-  openLightbox(lightboxItem);
+  openLightbox(lightboxItem, {
+    items: state.creationLogoBatchFiles,
+    buildItem: buildCreationReferenceLightboxItem,
+  });
 }
 
 function removeCreationLogoBatchSourceFile(sourceId) {
@@ -13551,7 +13654,10 @@ function openPortraitRecordItemPreview(itemId) {
     setPortraitRecordFeedback("当前单张还没有可查看的大图。", "error");
     return;
   }
-  openLightbox(buildPortraitRecordLightboxItem(record.item, record.set));
+  openLightbox(buildPortraitRecordLightboxItem(record.item, record.set), {
+    items: record.set.items,
+    buildItem: (item) => buildPortraitRecordLightboxItem(item, record.set),
+  });
 }
 
 async function loadPptDecks() {
@@ -15788,7 +15894,17 @@ function bindEvents() {
     ensureCreationCategoryTemplatesReady({ render: true });
     renderCreationIndustryTemplateBrowser();
   });
-  refs.creationRatioInput.addEventListener("change", renderCreationSizeOptions);
+  refs.creationRatioInput.addEventListener("pointerdown", () => setCreationRatioOptionLabels({ expanded: true }));
+  refs.creationRatioInput.addEventListener("keydown", (event) => {
+    if (["ArrowDown", "ArrowUp", "Enter", " "].includes(event.key)) {
+      setCreationRatioOptionLabels({ expanded: true });
+    }
+  });
+  refs.creationRatioInput.addEventListener("blur", () => setCreationRatioOptionLabels({ expanded: false }));
+  refs.creationRatioInput.addEventListener("change", () => {
+    renderCreationSizeOptions();
+    setCreationRatioOptionLabels({ expanded: false });
+  });
   refs.creationRoleGrid.addEventListener("change", (event) => {
     const target = event.target.closest("[data-creation-role]");
     if (!target) {
@@ -15996,6 +16112,7 @@ function bindEvents() {
   refs.promptInput.addEventListener("paste", handleStudioImagePaste); refs.promptEnhanceToggle.addEventListener("click", togglePromptEnhanceMode); refs.promptEnhanceInput.addEventListener("keydown", handlePromptGenerationShortcut);
   refs.styleTransferInstructionInput.addEventListener("keydown", handlePromptGenerationShortcut);
   refs.styleTransferInstructionInput.addEventListener("paste", handleStudioImagePaste);
+  refs.styleTransferPresetComparison.addEventListener("click", handleStyleTransferPresetComparisonClick);
   refs.styleTransferPresetInput.addEventListener("change", handleStyleTransferPresetChange);
   refs.sizeInput.addEventListener("change", (event) => {
     syncGenerationSize(event.target.value);
@@ -16239,7 +16356,7 @@ function bindEvents() {
   refs.previewLightboxButton.addEventListener("click", () => {
     const item = getCurrentPreviewItem();
     if (item && getImageUrl(item)) {
-      openLightbox(item);
+      openLightbox(item, { items: getCurrentPreviewNavigationItems() });
     }
   });
   refs.previewDownloadButton.addEventListener("click", (event) => {
@@ -16260,7 +16377,7 @@ function bindEvents() {
   refs.previewImage.addEventListener("click", () => {
     const item = getCurrentPreviewItem();
     if (item && getImageUrl(item)) {
-      openLightbox(item);
+      openLightbox(item, { items: getCurrentPreviewNavigationItems() });
     }
   });
   refs.referenceAnalysisGenerationCanvas.addEventListener("click", openReferenceAnalysisGeneratedPreview);
@@ -16343,6 +16460,7 @@ function bindEvents() {
       showError(error.message);
     });
   });
+  document.addEventListener("keydown", handlePreviewArrowNavigation);
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {

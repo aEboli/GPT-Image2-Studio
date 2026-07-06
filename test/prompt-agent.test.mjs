@@ -387,9 +387,11 @@ test("prompt agent request can identify ecommerce creation reference roles", () 
   assert.ok(requestBody.text.format.schema.required.includes("sku_subjects"));
   assert.ok(requestBody.text.format.schema.required.includes("product_name"));
   assert.match(input[0].content[0].text, /product_name/i);
+  assert.match(input[0].content[0].text, /main sellable product subject/i);
+  assert.match(input[0].content[0].text, /put that subject name in product_name/i);
   assert.ok(requestBody.text.format.schema.required.includes("category_hint"));
   assert.ok(requestBody.text.format.schema.required.includes("visual_language"));
-  assert.match(requestBody.text.format.schema.properties.product_name.description, /product name/i);
+  assert.match(requestBody.text.format.schema.properties.product_name.description, /main sellable product subject/i);
   assert.deepEqual(requestBody.text.format.schema.properties.visual_language.enum, ["classic-commercial", "reference-style"]);
   assert.ok(requestBody.text.format.schema.properties.reference_roles.items.properties.role.enum.includes("dimensions"));
   assert.ok(requestBody.text.format.schema.properties.reference_roles.items.properties.role.enum.includes("usage"));
@@ -535,6 +537,74 @@ test("prompt agent preserves creation reference product name", () => {
   });
 
   assert.equal(result.product_name, "双肩背包");
+});
+
+test("prompt agent fills missing creation product name from SKU subject title", () => {
+  const result = extractPromptAgentJson({
+    output: [
+      {
+        content: [
+          {
+            type: "output_text",
+            text: JSON.stringify({
+              summary: "Detected a sellable lunch bag SKU.",
+              product_name: "",
+              category_hint: "",
+              category_path: "",
+              visual_language: "classic-commercial",
+              visual_language_reason: "",
+              reference_roles: [
+                { index: 1, filename: "front.png", role: "product", note: "Lunch bag product subject." },
+              ],
+              sku_subjects: [
+                {
+                  id: "front.png",
+                  title: "insulated lunch bag",
+                  reference_indexes: [1],
+                  filenames: ["front.png"],
+                  subject_unit_count: 1,
+                  note: "One complete sellable product subject.",
+                },
+              ],
+              risks: [],
+            }),
+          },
+        ],
+      },
+    ],
+  });
+
+  assert.equal(result.product_name, "insulated lunch bag");
+});
+
+test("prompt agent fills missing creation product name from analyzed subject", () => {
+  const result = extractPromptAgentJson({
+    output: [
+      {
+        content: [
+          {
+            type: "output_text",
+            text: JSON.stringify({
+              summary: "Detected a product-subject reference.",
+              product_name: "",
+              product_subject: "foldable camping table",
+              category_hint: "Camping table",
+              category_path: "Sports > Camping > Camp Furniture > Camping Tables",
+              visual_language: "classic-commercial",
+              visual_language_reason: "",
+              reference_roles: [
+                { index: 1, filename: "table.png", role: "product", note: "Foldable camping table product subject." },
+              ],
+              sku_subjects: [],
+              risks: [],
+            }),
+          },
+        ],
+      },
+    ],
+  });
+
+  assert.equal(result.product_name, "foldable camping table");
 });
 
 test("prompt agent normalizes creation SKU subject groups", () => {

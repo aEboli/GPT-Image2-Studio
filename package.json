@@ -1,9 +1,9 @@
 {
   "name": "gpt-image2-studio",
-  "version": "0.1.9.2",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "使用 Responses API 和 gpt-image-2 的本地图片生成工作台",
+  "description": "本地优先的 AI 图像生成与视觉创作工作台",
   "scripts": {
     "start": "node server.mjs",
     "dev": "node server.mjs",

@@ -37,7 +37,7 @@ test("creation reference thumbnails open the image-only lightbox", async () => {
   ]);
 
   assert.match(app, /buildCreationReferenceLightboxItem/);
-  assert.match(app, /openLightbox\(lightboxItem\)/);
+  assert.match(app, /openLightbox\(lightboxItem,\s*\{[\s\S]*buildItem:\s*buildCreationReferenceLightboxItem,[\s\S]*\}\)/);
   assert.match(app, /isImageOnlyLightboxItem/);
   assert.match(styles, /\.lightbox\.is-image-only-preview\s+\.lightbox-fields/);
   assert.match(styles, /\.lightbox\.is-image-only-preview\s+\.lightbox-meta/);
@@ -48,7 +48,7 @@ test("creation style reference thumbnails open the image-only lightbox", async (
   const body = app.match(/function openCreationStyleReferencePreview\(referenceId\) \{(?<body>[\s\S]*?)\n\}/)?.groups?.body || "";
 
   assert.match(body, /buildCreationReferenceLightboxItem\(item\)/);
-  assert.match(body, /openLightbox\(lightboxItem\)/);
+  assert.match(body, /openLightbox\(lightboxItem,\s*\{[\s\S]*items:\s*state\.creationStyleReferenceFiles,[\s\S]*buildItem:\s*buildCreationReferenceLightboxItem,[\s\S]*\}\)/);
   assert.doesNotMatch(body, /referencePreviewViewer|referencePreviewImage/);
 });
 
@@ -57,6 +57,6 @@ test("creation logo batch source thumbnails open the image-only lightbox", async
   const body = app.match(/function openCreationLogoBatchSourcePreview\(sourceId\) \{(?<body>[\s\S]*?)\n\}/)?.groups?.body || "";
 
   assert.match(body, /buildCreationReferenceLightboxItem\(item\)/);
-  assert.match(body, /openLightbox\(lightboxItem\)/);
+  assert.match(body, /openLightbox\(lightboxItem,\s*\{[\s\S]*items:\s*state\.creationLogoBatchFiles,[\s\S]*buildItem:\s*buildCreationReferenceLightboxItem,[\s\S]*\}\)/);
   assert.doesNotMatch(body, /referencePreviewViewer|referencePreviewImage/);
 });

@@ -29,7 +29,7 @@ const ALL_VARIABLE_NAMES = [
   "--recent-thumb-size",
 ];
 
-const UI_GLOBAL_SCALE = 0.9776;
+const UI_GLOBAL_SCALE = 0.87984;
 
 const REGULAR_VARIABLES = {
   "--ui-root-font-size": "16px",

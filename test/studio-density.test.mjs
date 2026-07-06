@@ -10,9 +10,22 @@ test("studio density switches to compact mode on 2.5k 16:10 laptop viewports", (
   });
 
   assert.equal(settings.mode, "compact");
-  assert.equal(settings.variables["--ui-root-font-size"], "14.66px");
-  assert.equal(settings.variables["--studio-grid-left"], "351.94px");
-  assert.equal(settings.variables["--header-control-height"], "33.24px");
+  assert.equal(settings.variables["--ui-root-font-size"], "13.2px");
+  assert.equal(settings.variables["--studio-grid-left"], "316.74px");
+  assert.equal(settings.variables["--header-control-height"], "29.91px");
+});
+
+test("studio density scales regular desktop UI variables to ninety percent of the previous base density", () => {
+  const settings = getStudioDensitySettings({
+    width: 1720,
+    height: 1280,
+  });
+
+  assert.equal(settings.mode, "regular");
+  assert.equal(settings.variables["--ui-root-font-size"], "14.08px");
+  assert.equal(settings.variables["--app-shell-max-width"], "1478.13px");
+  assert.equal(settings.variables["--view-tab-height"], "35.19px");
+  assert.equal(settings.variables["--generate-button-height"], "36.95px");
 });
 
 test("studio density also keeps compact mode for scaled 16:10 desktop windows", () => {
@@ -31,12 +44,12 @@ test("studio density switches to wide mode on 2560x1348 desktops without changin
   });
 
   assert.equal(settings.mode, "wide");
-  assert.equal(settings.variables["--app-shell-max-width"], "2150.72px");
-  assert.equal(settings.variables["--studio-grid-left"], "383.22px");
-  assert.equal(settings.variables["--studio-grid-right"], "320.65px");
-  assert.equal(settings.variables["--view-root-offset"], "11.73px");
-  assert.equal(settings.variables["--textarea-min-height"], "97.76px");
-  assert.equal(settings.variables["--reference-dropzone-min-height"], "136.86px");
+  assert.equal(settings.variables["--app-shell-max-width"], "1935.65px");
+  assert.equal(settings.variables["--studio-grid-left"], "344.9px");
+  assert.equal(settings.variables["--studio-grid-right"], "288.59px");
+  assert.equal(settings.variables["--view-root-offset"], "10.56px");
+  assert.equal(settings.variables["--textarea-min-height"], "87.98px");
+  assert.equal(settings.variables["--reference-dropzone-min-height"], "123.18px");
 });
 
 test("studio density keeps wide mode on ultrawide desktops after browser zoom changes", () => {
@@ -47,7 +60,7 @@ test("studio density keeps wide mode on ultrawide desktops after browser zoom ch
   });
 
   assert.equal(settings.mode, "wide");
-  assert.equal(settings.variables["--app-shell-max-width"], "2150.72px");
+  assert.equal(settings.variables["--app-shell-max-width"], "1935.65px");
 });
 
 test("studio density restores regular mode from zoomed CSS pixels when the physical viewport is tall enough", () => {
@@ -58,7 +71,7 @@ test("studio density restores regular mode from zoomed CSS pixels when the physi
   });
 
   assert.equal(settings.mode, "regular");
-  assert.equal(settings.variables["--ui-root-font-size"], "15.64px");
+  assert.equal(settings.variables["--ui-root-font-size"], "14.08px");
 });
 
 test("studio density keeps regular mode on tall desktop viewports", () => {
@@ -68,8 +81,8 @@ test("studio density keeps regular mode on tall desktop viewports", () => {
   });
 
   assert.equal(settings.mode, "regular");
-  assert.equal(settings.variables["--ui-root-font-size"], "15.64px");
-  assert.equal(settings.variables["--studio-grid-left"], "383.22px");
+  assert.equal(settings.variables["--ui-root-font-size"], "14.08px");
+  assert.equal(settings.variables["--studio-grid-left"], "344.9px");
 });
 
 test("studio density does not force compact mode on narrow layouts", () => {
@@ -79,7 +92,7 @@ test("studio density does not force compact mode on narrow layouts", () => {
   });
 
   assert.equal(settings.mode, "regular");
-  assert.equal(settings.variables["--view-tab-height"], "39.1px");
+  assert.equal(settings.variables["--view-tab-height"], "35.19px");
 });
 
 test("studio layout mode keeps desktop structure when browser zoom only shrinks CSS pixels", () => {
@@ -243,8 +256,8 @@ test("studio density scales pixel-based workspace variables back up when browser
   });
 
   assert.equal(settings.mode, "regular");
-  assert.equal(settings.variables["--ui-root-font-size"], "31.28px");
-  assert.equal(settings.variables["--app-shell-max-width"], "3284.74px");
-  assert.equal(settings.variables["--studio-grid-left"], "766.44px");
-  assert.equal(settings.variables["--topbar-padding"], "11.73px 19.55px 27.37px");
+  assert.equal(settings.variables["--ui-root-font-size"], "28.15px");
+  assert.equal(settings.variables["--app-shell-max-width"], "2956.26px");
+  assert.equal(settings.variables["--studio-grid-left"], "689.79px");
+  assert.equal(settings.variables["--topbar-padding"], "10.56px 17.6px 24.64px");
 });

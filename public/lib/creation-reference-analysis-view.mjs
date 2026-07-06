@@ -27,6 +27,75 @@ function cleanCreationReferenceAnalysisText(value) {
   return String(value || "").trim();
 }
 
+function isLikelyCreationReferenceFilename(value) {
+  const text = cleanCreationReferenceAnalysisText(value);
+  return /[\\/]/.test(text) || /\.(?:avif|bmp|gif|heic|jpe?g|png|svg|tiff?|webp)$/i.test(text);
+}
+
+function isUsefulCreationReferenceProductName(value) {
+  const text = cleanCreationReferenceAnalysisText(value);
+  const normalized = text.toLowerCase();
+  return Boolean(text) && !isLikelyCreationReferenceFilename(text) && !["product", "goods", "item", "sku", "商品", "产品", "物品", "主体"].includes(normalized);
+}
+
+function getCreationReferenceAnalysisDirectProductName(analysis = {}) {
+  return cleanCreationReferenceAnalysisText(
+    analysis.productName ||
+      analysis.product_name ||
+      analysis.productSubject ||
+      analysis.product_subject ||
+      analysis.mainSubject ||
+      analysis.main_subject ||
+      analysis.subjectName ||
+      analysis.subject_name ||
+      analysis.subject ||
+      analysis.productTitle ||
+      analysis.product_title,
+  );
+}
+
+function getCreationReferenceAnalysisSkuSubjects(analysis = {}) {
+  return Array.isArray(analysis.skuSubjects)
+    ? analysis.skuSubjects
+    : Array.isArray(analysis.sku_subjects)
+      ? analysis.sku_subjects
+      : [];
+}
+
+function getCreationReferenceAnalysisSkuSubjectName(subject = {}) {
+  const directName = cleanCreationReferenceAnalysisText(
+    subject.productName ||
+      subject.product_name ||
+      subject.subjectName ||
+      subject.subject_name ||
+      subject.productTitle ||
+      subject.product_title ||
+      subject.title ||
+      subject.name ||
+      subject.label,
+  );
+  if (!isUsefulCreationReferenceProductName(directName)) {
+    return "";
+  }
+
+  const normalizedName = directName.toLowerCase();
+  const id = cleanCreationReferenceAnalysisText(subject.id || subject.subjectId || subject.subject_id).toLowerCase();
+  const filenames = Array.isArray(subject.filenames)
+    ? subject.filenames.map((item) => cleanCreationReferenceAnalysisText(item).toLowerCase()).filter(Boolean)
+    : [];
+  return normalizedName && normalizedName !== id && !filenames.includes(normalizedName) ? directName : "";
+}
+
+function getCreationReferenceAnalysisSkuSubjectProductName(analysis = {}) {
+  for (const subject of getCreationReferenceAnalysisSkuSubjects(analysis)) {
+    const subjectName = getCreationReferenceAnalysisSkuSubjectName(subject);
+    if (subjectName) {
+      return subjectName;
+    }
+  }
+  return "";
+}
+
 export function buildCreationReferenceAnalysisCategoryMatchText(analysis = {}) {
   const recommendationText = Array.isArray(analysis.recommendations)
     ? analysis.recommendations.flatMap((entry = {}) => [entry.filename, entry.roleLabel, entry.note])
@@ -46,16 +115,14 @@ export function buildCreationReferenceAnalysisCategoryMatchText(analysis = {}) {
 }
 
 export function getCreationReferenceAnalysisProductNameSuggestion(analysis = {}) {
-  const directName = cleanCreationReferenceAnalysisText(
-    analysis.productName ||
-      analysis.product_name ||
-      analysis.subjectName ||
-      analysis.subject_name ||
-      analysis.productTitle ||
-      analysis.product_title,
-  );
-  if (directName) {
+  const directName = getCreationReferenceAnalysisDirectProductName(analysis);
+  if (isUsefulCreationReferenceProductName(directName)) {
     return directName;
+  }
+
+  const skuSubjectName = getCreationReferenceAnalysisSkuSubjectProductName(analysis);
+  if (skuSubjectName) {
+    return skuSubjectName;
   }
 
   const templateLabel = cleanCreationReferenceAnalysisText(analysis.categoryTemplateLabel);

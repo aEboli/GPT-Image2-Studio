@@ -89,7 +89,7 @@ test("article illustration mode has independent create and assets entries", asyn
   assert.match(app, /media\.dataset\.articleRecordPreviewItemId = item\.itemId/);
   assert.match(app, /function buildArticleRecordLightboxItem/);
   assert.match(app, /isArticleRecordItem: true/);
-  assert.match(app, /refs\.lightboxDelete\.hidden = Boolean\(isRecordItem \|\| isImageOnlyPreview\)/);
+  assert.match(app, /refs\.lightboxDelete\.hidden = Boolean\(isRecordItem \|\| isImageOnlyPreview \|\| isPreviewLightboxItem\)/);
   assert.match(app, /ARTICLE_RECORD_COLUMN_PRESETS = \[2, 4, 6, 8\]/);
   assert.match(app, /recordColumnPreset: DEFAULT_ARTICLE_RECORD_COLUMN_PRESET/);
   assert.match(app, /DEFAULT_ARTICLE_ILLUSTRATION_STYLE_PRESET = "realist-magazine"/);

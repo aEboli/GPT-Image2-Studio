@@ -5,6 +5,7 @@ import {
   applyCreationReferenceAnalysisProductNameValue,
   buildCreationReferenceAnalysisCategoryMatchText,
   buildCreationReferenceAnalysisAppliedFeedbackMessage,
+  getCreationReferenceAnalysisProductNameSuggestion,
   getCreationReferenceAnalysisDisplayRoleLabel,
   getCreationReferenceAnalysisRoleCorrectionReason,
   normalizeCreationReferenceAnalysisUnitCountNote,
@@ -77,6 +78,56 @@ test("creation reference product name suggestion replaces only analysis-managed 
       autoProductName: "Fishing Lure",
       productName: "Manual Catalog Name",
     },
+  );
+});
+
+test("creation reference product name suggestion falls back to SKU subject title", () => {
+  assert.equal(
+    getCreationReferenceAnalysisProductNameSuggestion({
+      productName: "",
+      product_name: "",
+      categoryHint: "",
+      categoryPath: "",
+      skuSubjects: [
+        {
+          title: "insulated lunch bag",
+          filenames: ["front.png"],
+          note: "One complete sellable product subject.",
+        },
+      ],
+    }),
+    "insulated lunch bag",
+  );
+
+  assert.equal(
+    getCreationReferenceAnalysisProductNameSuggestion({
+      sku_subjects: [
+        {
+          name: "stainless steel water bottle",
+          reference_indexes: [1],
+        },
+      ],
+    }),
+    "stainless steel water bottle",
+  );
+});
+
+test("creation reference product name suggestion uses analyzed product subject", () => {
+  assert.equal(
+    getCreationReferenceAnalysisProductNameSuggestion({
+      productName: "",
+      productSubject: "foldable camping table",
+      categoryHint: "camping furniture",
+    }),
+    "foldable camping table",
+  );
+
+  assert.equal(
+    getCreationReferenceAnalysisProductNameSuggestion({
+      product_name: "",
+      main_subject: "ceramic coffee dripper",
+    }),
+    "ceramic coffee dripper",
   );
 });
 

@@ -108,6 +108,7 @@ export function createQuickBlendController(options = {}) {
     revokeReferencePreview = () => {},
     scheduleGenerationQueue = () => {},
     setActiveView = () => {},
+    setReferencePreviewNavigationContext = () => {},
     showError = () => {},
     syncReferenceDropzoneCompact = () => {},
     updatePreviewLoadingShell,
@@ -399,9 +400,17 @@ function openQuickBlendPreview(group, itemId) {
 
   closeReferencePreview();
   state.quickBlendPreviewItem = item;
+  setReferencePreviewNavigationContext({
+    items: getQuickBlendReferencePreviewEntries(),
+    currentId: item.id,
+  });
   refs.referencePreviewImage.src = item.previewUrl;
   refs.referencePreviewViewer.classList.add("open");
   refs.referencePreviewViewer.setAttribute("aria-hidden", "false");
+}
+
+function getQuickBlendReferencePreviewEntries() {
+  return QUICK_BLEND_GROUPS.flatMap((group) => getQuickBlendGroupFiles(group)).filter((item) => item?.previewUrl);
 }
 
 function getQuickBlendPairs() {
@@ -920,7 +929,9 @@ function renderQuickBlendGenerationLoading(item) {
 function openQuickBlendGeneratedPreview() {
   const item = getQuickBlendGenerationPreviewItem();
   if (item && getImageUrl(item)) {
-    openLightbox(item);
+    openLightbox(item, {
+      items: getQuickBlendGenerationEntries().map((entry) => entry.item),
+    });
   }
 }
 
