@@ -50,6 +50,7 @@ test("creation store normalizes set manifests with output URLs and item ordering
           slotIndex: 1,
           role: "hero",
           title: "主图",
+          conversionIntent: { conversionGoal: "建立首图识别" },
           relativePath: "2026-05/05-05/2026-05-05-creation/demo/01-hero.png",
         },
       ],
@@ -65,6 +66,7 @@ test("creation store normalizes set manifests with output URLs and item ordering
     manifest.items[0].imageUrl,
     "/output/2026-05/05-05/2026-05-05-creation/demo/01-hero.png",
   );
+  assert.deepEqual(manifest.items[0].conversionIntent, { conversionGoal: "建立首图识别" });
 });
 
 test("creation store preserves scenario image count and reference image metadata", () => {
@@ -74,6 +76,8 @@ test("creation store preserves scenario image count and reference image metadata
       productName: "AeroPress Clear",
       scenario: "social-seeding",
       scenarioLabel: "社媒种草",
+      platform: "amazon",
+      platformLabel: "Amazon",
       visualLanguage: "premium-studio",
       visualLanguageLabel: "高端棚拍",
       industryTemplate: "food",
@@ -97,6 +101,8 @@ test("creation store preserves scenario image count and reference image metadata
 
   assert.equal(manifest.scenario, "social-seeding");
   assert.equal(manifest.scenarioLabel, "社媒种草");
+  assert.equal(manifest.platform, "amazon");
+  assert.equal(manifest.platformLabel, "Amazon");
   assert.equal(manifest.visualLanguage, "premium-studio");
   assert.equal(manifest.visualLanguageLabel, "高端棚拍");
   assert.equal(manifest.industryTemplate, "food");

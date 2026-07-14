@@ -11,13 +11,14 @@ import { isGenerationRequestRetryMessage, } from "/lib/generation-request-retry.
 import { cancelQueuedGenerationJob, getQueuedGenerationJobCount, getRunningGenerationJobCount, isQueuedGenerationJob, selectNextQueuedGenerationJobsByMode } from "/lib/generation-queue.mjs?v=20260611-mode-route-queue-1";
 import { buildCanceledGenerationActivityDetail, buildGenerationTaskActivityDetail, buildGenerationTaskStatusText, formatGenerationActivityModeLabel, getGenerationActivityDisplayText, sanitizeGenerationActivityDetail, sortGenerationActivityFeed, upsertGenerationActivityEntry } from "/lib/generation-activity-feed.mjs?v=20260504-vercel-static-lib-1";
 import { GENERATION_STREAM_EVENTS, recordFinalImageChunk } from "/lib/generation-stream-protocol.mjs";
-import { getStudioDensitySettings, getStudioLayoutMode, ALL_VARIABLE_NAMES } from "/lib/studio-density.mjs?v=20260705-ui-scale-90-1";
+import { getStudioDensitySettings, getStudioLayoutMode, ALL_VARIABLE_NAMES } from "/lib/studio-density.mjs?v=20260713-cross-device-1";
 import { buildStyleTransferPresetLightboxItem } from "/lib/style-transfer-preset-lightbox.mjs";
 import { ensureLazyViewModule, getMountedLazyViewModule } from "/lib/view-mode-loader.mjs?v=20260608-quick-blend-time-sort-1";
 import { appendBrowserConfigToFormData, getBrowserPrivateConfigRequestPayload, getOrCreateClientSessionId, readBrowserPrivateConfig, saveBrowserPrivateConfig, toPublicBrowserConfig } from "/lib/browser-config.mjs";
 import { cacheBrowserGalleryItem, clearBrowserImageCache, dataUrlToBlob, deleteBrowserCachedGalleryItem, fetchServerImageAsDataUrl, getBrowserCachedImageData, getImageUrl, getServerImageUrl, getServerThumbnailUrl, isCacheableBrowserImageUrl, mergeServerAndBrowserGalleryItems, readBrowserCachedGalleryItems } from "/lib/browser-image-cache.mjs";
 import { createImageEditShellBridge } from "/lib/image-edit-shell-bridge.mjs";
 import { createCreationLogoLibraryController } from "/lib/creation-logo-library.mjs";
+import { applyCreationPlanFieldOptions, buildCreationPlanFieldOptions } from "/lib/creation-plan-field-options.mjs";
 import { consumeSse, requestGenerationStream } from "/lib/generation-client.mjs";
 import { createConfigModelPickerController } from "/lib/config-model-picker.mjs";
 import { createLightboxImageViewer, createLightboxViewerState } from "/lib/lightbox-image-viewer.mjs";
@@ -39,11 +40,12 @@ import { buildCreationReferenceLightboxItem } from "/lib/creation-reference-ligh
 import { bindCreationReferenceDrag, reorderCreationReferenceFiles } from "/lib/creation-reference-drag.mjs";
 import { isCreationSubjectReferenceRole } from "/lib/creation-reference-roles.mjs";
 import { appendCreationCoverageSummary, applyCreationReferenceCoverageRolePlan, normalizeCreationCoverageFields, toggleCreationSelectedRoles } from "/lib/creation-reference-coverage.mjs?v=20260703-latest-restore-1";
-import { appendCreationVisualLanguageSuggestionCard, applyCreationReferenceAnalysisProductNameValue, buildCreationReferenceAnalysisAppliedFeedbackMessage, buildCreationReferenceAnalysisCategoryMatchText, getCreationReferenceAnalysisDisplayRoleLabel, getCreationReferenceAnalysisGroupedSubjectUnitCount, getCreationReferenceAnalysisRoleCorrectionReason, getCreationReferenceAnalysisVisualLanguageReason, getCreationReferenceAnalysisVisualLanguageSource, normalizeCreationReferenceAnalysisUnitCountNote, shouldDowngradeReferenceProductAnalysisRole, syncCreationReferenceVisualLanguageButton } from "/lib/creation-reference-analysis-view.mjs";
-import { createCreationListingController, getCreationRecordListingMetaLabel, getCreationListingSearchValues, normalizeCreationListingDraftForView, renderCreationListingDrafts } from "/lib/creation-listing-view.mjs";
+import { applyCreationReferenceAnalysisProductNameValue, buildCreationReferenceAnalysisAppliedFeedbackMessage, buildCreationReferenceAnalysisCategoryMatchText, getCreationReferenceAnalysisDisplayRoleLabel, getCreationReferenceAnalysisGroupedSubjectUnitCount, getCreationReferenceAnalysisRoleCorrectionReason, normalizeCreationReferenceAnalysisUnitCountNote, shouldDowngradeReferenceProductAnalysisRole } from "/lib/creation-reference-analysis-view.mjs";
+import { createCreationListingController, getCreationListingEligibility, getCreationRecordListingMetaLabel, getCreationListingSearchValues, normalizeCreationListingDraftForView, renderCreationListingDrafts } from "/lib/creation-listing-view.mjs";
 import { getCreationAutoRepairNotice, getCreationCompletionFeedback, getCreationIncompleteItems, shouldAutoRepairCreationSet } from "/lib/creation-auto-repair.mjs";
 import { canRepairCreationItem as canRepairCreationItemFromQueue, getCreationRepairButtonText as getCreationRepairButtonTextFromQueue, isCreationItemRepairActive as isCreationItemRepairActiveInQueue, queueCreationItemRepair as queueCreationItemRepairInState, removeQueuedCreationItemRepair, shiftNextQueuedCreationItemRepair } from "/lib/creation-item-repair-queue.mjs";
-import { buildCreationQueuedRepairFormData, buildCreationQueuedSet as buildCreationQueuedSetFromState, createCreationQueueJob, getActiveCreationQueueJob as getActiveCreationQueueJobFromState, getCreationQueueJobs as getCreationQueueJobsFromState, getCreationRepairTargetSet as getCreationRepairTargetSetFromState, getPendingCreationQueueCount as getPendingCreationQueueCountFromState, getSelectedCreationQueueJob as getSelectedCreationQueueJobFromState, renderCreationQueueStrip as renderCreationQueueStripView, runCreationQueuedJob as runCreationQueuedJobFromQueue, scheduleCreationGenerationQueue as scheduleCreationGenerationQueueFromState, selectCreationQueueJob as selectCreationQueueJobInState, syncActiveCreationQueueSet as syncActiveCreationQueueSetInState } from "/lib/creation-suite-queue.mjs?v=20260530-creation-queue-role-sync-1";
+import { buildCreationPlatformSlotOrderOverrides, cloneCreationPlanValue, createCreationPlanPreviewRequestCoordinator, createCreationPlatformPayloadSnapshot, deepFreezeCreationPlanValue, formatCreationPlanWarning, getCreationSetPlanSource, insertCreationPlatformCustomSlotOverride, shouldDisableCreationGenerateButton } from "/lib/creation-browser-plan-state.mjs";
+import { buildCreationQueuedRepairFormData, buildCreationQueuedSet as buildCreationQueuedSetFromState, createCreationQueueJob, getActiveCreationQueueJob as getActiveCreationQueueJobFromState, getCreationQueueJobs as getCreationQueueJobsFromState, getCreationRepairTargetSet as getCreationRepairTargetSetFromState, getPendingCreationQueueCount as getPendingCreationQueueCountFromState, getSelectedCreationQueueJob as getSelectedCreationQueueJobFromState, renderCreationQueueStrip as renderCreationQueueStripView, runCreationQueuedJob as runCreationQueuedJobFromQueue, scheduleCreationGenerationQueue as scheduleCreationGenerationQueueFromState, selectCreationQueueJob as selectCreationQueueJobInState, shouldSyncCreationQueueJobCurrentSet, syncActiveCreationQueueSet as syncActiveCreationQueueSetInState } from "/lib/creation-suite-queue.mjs?v=20260712-creation-queue-selection-isolation-1";
 import { DEFAULT_PORTRAIT_ACCESSORY_ASSETS, PORTRAIT_ACCESSORY_ASSET_CATEGORIES, getPortraitAccessoryAssetFileDescriptor } from "/lib/portrait-accessory-assets.mjs?v=20260528-portrait-assets-sort-1";
 import { createDefaultPortraitLocationState, createPortraitLocationSelectorController } from "/lib/portrait-location-selector.mjs?v=20260527-portrait-location-1";
 const SURPRISE_PROMPTS = [
@@ -79,7 +81,6 @@ const SURPRISE_PROMPTS = [
     prompt: "生成一张夜晚学习场景，人物坐在书桌前整理笔记，台灯形成温暖光区，窗外是安静夜色，桌面有书本和便签，整体专注、平静、有秩序。",
   },
 ];
-
 const REASONING_LABELS = {
   low: "Low",
   medium: "Medium",
@@ -93,8 +94,8 @@ const REASONING_ESTIMATES = {
   xhigh: "210s+",
 };
 const DEFAULT_LIMITS = { maxParallelTasksPerSession: 15, maxReferenceImages: 15, maxCreationReferenceImages: 15, maxCreationStyleReferenceImages: 3, maxPortraitPersonReferenceImages: 3, maxPortraitActionReferenceImages: 3, maxPortraitAccessoryReferenceImages: 9 };
-const CREATION_IMAGE_COUNT_OPTIONS = [0, 4, 6, 8, 10, 12, 14, 16, 18];
-const DEFAULT_PROMPT_ENHANCE_TEXT = ",sharp focus, macro details, rich textures, crisp edges, photorealistic texture, visible grain, detailed surface material, cinematic lighting"; function buildPromptModePrompt() { const prompt = refs.promptInput.value.trim(); if (!state.promptEnhanceEnabled) { return prompt; } const enhanceText = String(refs.promptEnhanceInput?.value || "").trim(); return enhanceText ? `${prompt}${enhanceText.startsWith(",") ? "" : "\n\n"}${enhanceText}` : prompt; } function syncPromptEnhanceMode() { refs.promptEnhanceToggle.classList.toggle("is-active", state.promptEnhanceEnabled); refs.promptEnhanceToggle.setAttribute("aria-checked", String(state.promptEnhanceEnabled)); refs.promptEnhanceToggle.querySelector("small").textContent = state.promptEnhanceEnabled ? "开启" : "关闭"; refs.promptEnhanceField.classList.toggle("hidden", !state.promptEnhanceEnabled); } function togglePromptEnhanceMode() { state.promptEnhanceEnabled = !state.promptEnhanceEnabled; syncPromptEnhanceMode(); if (state.promptEnhanceEnabled) { refs.promptEnhanceInput.focus(); } }
+const CREATION_IMAGE_COUNT_OPTIONS = [0, 4, 6, 7, 8, 9, 10, 12, 14, 16, 18];
+const DEFAULT_PROMPT_ENHANCE_TEXT = ",sharp focus, macro details, rich textures, crisp edges, photorealistic texture, visible grain, detailed surface material, cinematic lighting"; function buildPromptModePrompt() { const prompt = refs.promptInput.value.trim(); if (!state.promptEnhanceEnabled) { return prompt; } const enhanceText = String(refs.promptEnhanceInput?.value || "").trim(); return enhanceText ? `${prompt}${enhanceText.startsWith(",") ? "" : "\n\n"}${enhanceText}` : prompt; } function syncPromptEnhanceMode() { refs.promptEnhanceToggle.classList.toggle("is-active", state.promptEnhanceEnabled); refs.promptEnhanceToggle.setAttribute("aria-checked", String(state.promptEnhanceEnabled)); refs.promptEnhanceToggle.querySelector("small").textContent = getUiLanguageText(state.promptEnhanceEnabled ? "promptEnhanceOn" : "promptEnhanceOff"); refs.promptEnhanceField.classList.toggle("hidden", !state.promptEnhanceEnabled); } function togglePromptEnhanceMode() { state.promptEnhanceEnabled = !state.promptEnhanceEnabled; syncPromptEnhanceMode(); if (state.promptEnhanceEnabled) { refs.promptEnhanceInput.focus(); } }
 const PROMPT_TEMPLATE_STORAGE_KEY = "image-studio-prompt-templates-v2";
 const DEFAULT_PROMPT_TEMPLATES = SURPRISE_PROMPTS.map((template, index) => ({
   id: `default-template-${index + 1}`,
@@ -108,7 +109,6 @@ const DEFAULT_GALLERY_CONTROLS = {
   size: "all",
   reference: "all",
 };
-
 const GALLERY_COLUMN_PRESETS = [6, 9, 12, 15, 18];
 const DEFAULT_GALLERY_COLUMN_PRESET = 12;
 const ARTICLE_RECORD_COLUMN_PRESETS = [2, 4, 6, 8];
@@ -314,10 +314,9 @@ const GENERATION_ACTIVITY_STORAGE_KEY = "image-studio-generation-activity-v1";
 const THEME_STORAGE_KEY = "image-studio-ui-theme-v1";
 const UI_LANGUAGE_STORAGE_KEY = "image-studio-ui-language-v1";
 const UI_LANGUAGE_TEXT = {
-  "zh-CN": { themeLight: "白色主题", themeDark: "深色主题", themeToLight: "切换到白色主题", themeToDark: "切换到深色主题", themeMenu: "主题颜色" },
-  en: { themeLight: "Light theme", themeDark: "Dark theme", themeToLight: "Switch to light theme", themeToDark: "Switch to dark theme", themeMenu: "Theme color" },
-};
-const CONNECTION_STATUS_ENTRY_LABEL = "API、LOG";
+  "zh-CN": { activityLog: "生成日志", baseUrl: "基础 URL", brandSubtitle: "AI 图像生成工作流", close: "关闭", config: "配置", configApi: "配置 API", configSaved: "配置已保存", configTitle: "连接配置", configUnsaved: "配置未保存", connectionBusy: "并发 {running}/{max} · 队列 {queued}", connectionOpen: "打开 API、LOG", connectionSection: "调用通道", connectionStatusEmpty: "待填写API、LOG", connectionStatusEntry: "API、LOG", delete: "删除", directEndpointSuffix: "直接调用模式请求协议后缀", directMode: "直接调用模式", download: "下载", endpointUrl: "接口地址", expandModels: "展开可用模型列表", fetchModels: "获取模型列表", fetchModelsLoading: "获取中...", fit: "适配", functionMenu: "功能菜单导航", fullUrl: "完整 URL", generate: "开始生成", generateTitle: "开始生成（Ctrl+Enter）", generationRouteLabel: "生图调用模式", globalNav: "全局导航", imageModel: "生图模型", keepSavedKey: "保持已保存 Key", languageEn: "English UI", languageSwitch: "切换界面语言", languageZh: "简体中文界面", menuArticleIllustration: "文章插图", menuArticleRecord: "文章插图记录", menuAssetTools: "资产工具", menuCreation: "套图模式", menuCreationRecord: "套图记录", menuCreateTools: "创作工具", menuGallery: "瀑布画廊", menuImageCompress: "图片压缩", menuImageDecomposition: "图片拆解", menuImageEdit: "图片编辑", menuPortrait: "写真模式", menuPortraitRecord: "写真记录", menuPpt: "PPT生成", menuPptRecord: "PPT记录", menuPromptStudio: "提示词生图", menuQuickBlend: "快速溶图", menuReferenceAnalysis: "融图分析", menuSectionAssets: "资产区", menuSectionCreate: "创作区", menuSectionSettings: "配置区", menuSettings: "设置", menuStyleTransfer: "风格迁移", menuTools: "工具", modeDirect: "直接调用模式", modeProtocol: "Gemini模型", modeRoute: "路由模式", modelFetchBusy: "正在获取模型列表...", modelFetchFailed: "获取模型列表失败。", modelFetchSuccess: "已获取 {count} 个可调用模型。", modelNoCallable: "未获取到可调用模型。", modelNoMatch: "没有匹配的模型", modelNoMatchWithQuery: "没有匹配的模型：{query}", modelTestBusy: "正在测试连接...", modelTestSuccess: "连接测试成功，获取到 {count} 个模型。", navAssets: "资产", navCreate: "创作", navSettings: "配置", notSaved: "未保存", openOutput: "打开输出目录", outputFormat: "输出格式", parameters: "参数设置", previewIdleDetail: "生成日志可在配置中查看，底部胶片条可快速切换查看。", previewIdleEyebrow: "Output Preview", previewIdleTitle: "生成结果会在这里实时更新。", previewWaiting: "等待生成", prompt: "提示词", promptAgent: "图片转提示词", promptCounterSuffix: "字", promptEnhance: "增强模式", promptEnhanceAria: "开启或关闭提示词增强模式", promptEnhanceField: "增强提示词", promptEnhanceOff: "关闭", promptEnhanceOn: "开启", promptPlaceholder: "写下你要生成的画面，也可以先上传参考图说明修改方向。", promptTemplate: "提示词模板", protocolHint: "Gemini 图像模型按 AGICTO 图像生成协议调用；基础 URL 通常填写到 /v1，实际请求为 /images/generations。", protocolImageModel: "图像模型", protocolMode: "Gemini模型", quality: "质量", "ratio.1:1": "电商主图、头像、社交媒体 · 方形 1:1", "ratio.1:2": "长海报 · 竖屏 1:2", "ratio.1:3": "超长竖版广告 · 竖屏 1:3", "ratio.2:1": "Banner横幅 · 横屏 2:1", "ratio.2:3": "竖版摄影 · 竖屏 2:3", "ratio.3:1": "超宽广告图 · 横屏 3:1", "ratio.3:2": "摄影风格 · 横屏 3:2", "ratio.3:4": "海报、人像 · 竖屏 3:4", "ratio.4:3": "PPT、网页配图 · 横屏 4:3", "ratio.4:5": "Instagram帖子 · 竖屏 4:5", "ratio.5:4": "商品展示 · 横屏 5:4", "ratio.9:16": "短视频封面、手机壁纸 · 竖屏 9:16", "ratio.9:21": "超长竖图 · 竖屏 9:21", "ratio.16:9": "横版封面、YouTube · 横屏 16:9", "ratio.21:9": "超宽横幅 · 横屏 21:9", ratioLandscape: "横向", ratioPortrait: "竖向", ratioSquare: "方形", reasoningEffort: "思考等级", reference: "参考图", referenceUploadAction: "上传参考图", referenceUploadTitle: "拖入图片或点击上传", responsesModel: "Responses 模型", routeEndpointSuffix: "路由模式请求协议后缀", routeMode: "路由模式", save: "保存", size: "分辨率", sizeAuto: "自动适配", sizeMax: "最大", testConnection: "测试连接", testConnectionLoading: "测试中...", themeDark: "深色主题", themeLight: "白色主题", themeMenu: "主题颜色", themeToDark: "切换到深色主题", themeToLight: "切换到白色主题", thumbnailEmpty: "暂无缩略图", thumbnailFailed: "缩略图加载失败", thumbnailLoading: "缩略图加载中", timelineNoErrors: "暂无错误", timelineWaitingResult: "等待生成结果", timelineWaitingTask: "等待任务开始", toolModel: "工具模型", toolModelAndQuality: "工具模型与质量", view: "查看", visionTextModel: "视觉/文本模型" },
+  en: { activityLog: "Generation Log", baseUrl: "Base URL", brandSubtitle: "AI image workflow", close: "Close", config: "Settings", configApi: "Configure API", configSaved: "Config saved", configTitle: "Connection Settings", configUnsaved: "Config not saved", connectionBusy: "Concurrent {running}/{max} · Queue {queued}", connectionOpen: "open API and log", connectionSection: "Request Channel", connectionStatusEmpty: "API/Log missing", connectionStatusEntry: "API, Log", delete: "Delete", directEndpointSuffix: "Direct mode endpoint suffix", directMode: "Direct Mode", download: "Download", endpointUrl: "Endpoint", expandModels: "Show available models", fetchModels: "Fetch Models", fetchModelsLoading: "Fetching...", fit: "Fit", functionMenu: "Function menu", fullUrl: "Full URL", generate: "Generate", generateTitle: "Generate (Ctrl+Enter)", generationRouteLabel: "Image request mode", globalNav: "Global navigation", imageModel: "Image Model", keepSavedKey: "Keep saved key", languageEn: "English UI", languageSwitch: "Switch interface language", languageZh: "Simplified Chinese UI", menuArticleIllustration: "Article Illustration", menuArticleRecord: "Article Records", menuAssetTools: "Asset Tools", menuCreation: "Product Suite", menuCreationRecord: "Suite Records", menuCreateTools: "Creation Tools", menuGallery: "Gallery", menuImageCompress: "Image Compress", menuImageDecomposition: "Image Decomposition", menuImageEdit: "Image Edit", menuPortrait: "Portrait Mode", menuPortraitRecord: "Portrait Records", menuPpt: "PPT Generation", menuPptRecord: "PPT Records", menuPromptStudio: "Prompt to Image", menuQuickBlend: "Quick Blend", menuReferenceAnalysis: "Reference Analysis", menuSectionAssets: "Assets", menuSectionCreate: "Creation", menuSectionSettings: "Settings", menuSettings: "Settings", menuStyleTransfer: "Style Transfer", menuTools: "Tools", modeDirect: "Direct Mode", modeProtocol: "Gemini Model", modeRoute: "Route Mode", modelFetchBusy: "Fetching model list...", modelFetchFailed: "Failed to fetch model list.", modelFetchSuccess: "Fetched {count} callable models.", modelNoCallable: "No callable models found.", modelNoMatch: "No matching models", modelNoMatchWithQuery: "No matching models: {query}", modelTestBusy: "Testing connection...", modelTestSuccess: "Connection test succeeded. Found {count} models.", navAssets: "Assets", navCreate: "Create", navSettings: "Settings", notSaved: "Not saved", openOutput: "Open Output", outputFormat: "Output Format", parameters: "Parameters", previewIdleDetail: "Generation log is in Settings. Use the filmstrip below to switch results.", previewIdleEyebrow: "Output Preview", previewIdleTitle: "Generated results update here in real time.", previewWaiting: "Waiting", prompt: "Prompt", promptAgent: "Image to Prompt", promptCounterSuffix: "chars", promptEnhance: "Enhance Mode", promptEnhanceAria: "Toggle prompt enhancement mode", promptEnhanceField: "Enhancement Prompt", promptEnhanceOff: "Off", promptEnhanceOn: "On", promptPlaceholder: "Describe the image you want, or upload references first and describe the edit direction.", promptTemplate: "Prompt templates", protocolHint: "Gemini image models use the AGICTO image generation protocol. Base URL usually ends at /v1; requests go to /images/generations.", protocolImageModel: "Image Model", protocolMode: "Gemini Model", quality: "Quality", "ratio.1:1": "Ecommerce, Avatar, Social · Square 1:1", "ratio.1:2": "Long Poster · Portrait 1:2", "ratio.1:3": "Tall Ad · Portrait 1:3", "ratio.2:1": "Banner · Landscape 2:1", "ratio.2:3": "Vertical Photo · Portrait 2:3", "ratio.3:1": "Ultrawide Ad · Landscape 3:1", "ratio.3:2": "Photography · Landscape 3:2", "ratio.3:4": "Poster, Portrait · Portrait 3:4", "ratio.4:3": "PPT, Web Graphic · Landscape 4:3", "ratio.4:5": "Instagram Post · Portrait 4:5", "ratio.5:4": "Product Display · Landscape 5:4", "ratio.9:16": "Short Video Cover, Wallpaper · Portrait 9:16", "ratio.9:21": "Tall Scroll Image · Portrait 9:21", "ratio.16:9": "Cover, YouTube · Landscape 16:9", "ratio.21:9": "Ultrawide Banner · Landscape 21:9", ratioLandscape: "Landscape", ratioPortrait: "Portrait", ratioSquare: "Square", reasoningEffort: "Reasoning", reference: "Reference", referenceUploadAction: "Upload Reference", referenceUploadTitle: "Drop images or click to upload", responsesModel: "Responses Model", routeEndpointSuffix: "Route mode endpoint suffix", routeMode: "Route Mode", save: "Save", size: "Size", sizeAuto: "Auto", sizeMax: "Max", testConnection: "Test Connection", testConnectionLoading: "Testing...", themeDark: "Dark theme", themeLight: "Light theme", themeMenu: "Theme color", themeToDark: "Switch to dark theme", themeToLight: "Switch to light theme", thumbnailEmpty: "No thumbnails", thumbnailFailed: "Thumbnail load failed", thumbnailLoading: "Loading thumbnails", timelineNoErrors: "No errors", timelineWaitingResult: "Waiting for result", timelineWaitingTask: "Waiting for task", toolModel: "Tool Model", toolModelAndQuality: "Tool model and quality", view: "View", visionTextModel: "Vision/Text Model" },
+}; const CONNECTION_STATUS_ENTRY_LABEL = "API、LOG";
 const CONNECTION_STATUS_EMPTY_LABEL = "待填写API、LOG";
 const PROMPT_ANALYSIS_IMAGE_MAX_EDGE = 1024;
 const PROMPT_ANALYSIS_IMAGE_COMPRESS_THRESHOLD_BYTES = 900 * 1024;
@@ -334,14 +333,14 @@ const GALLERY_REFERENCE_LABELS = {
   "without-reference": "无参考图",
 };
 const STACKED_STUDIO_LAYOUT_MODES = new Set(["stacked", "tablet", "mobile"]);
-const ADAPTIVE_COLLAPSIBLE_LAYOUTS = new Set(["tablet", "mobile"]);
+const ADAPTIVE_COLLAPSIBLE_LAYOUTS = new Set(["stacked", "tablet", "mobile"]);
 const TOPBAR_REVEAL_CLASS = "topbar-reveal";
+const TOPBAR_SUPPRESSED_CLASS = "topbar-suppressed";
 const TOPBAR_REVEAL_EDGE_PX = 16;
 const WORKSPACE_BOTTOM_GAP_PX = 2;
 const PPT_SOURCE_MODES = new Set(["upload", "text", "topic"]);
 const CREATE_VIEW_IDS = new Set(["studio", "style-transfer", "reference-analysis", "image-decomposition", "image-edit", "quick-blend", "image-compress", "creation", "portrait", "article-illustration", "ppt"]);
 const ASSET_VIEW_IDS = new Set(["gallery", "article-record", "ppt-record", "creation-record", "portrait-record"]);
-
 let studioHeightSyncFrame = 0;
 let studioHeightObserver = null;
 let studioDensitySyncFrame = 0;
@@ -365,7 +364,6 @@ const galleryScrollDrag = {
   startOffset: 0,
   startY: 0,
 };
-
 const state = {
   activeView: "studio",
   activityFeed: [],
@@ -385,17 +383,23 @@ const state = {
     sets: [],
   },
   creationCategoryTemplatesModule: null,
+  creationPlatformPoliciesModule: null,
+  creationPlatformResolverModule: null,
   creation: {
     currentSet: null,
     activeQueueId: "",
     autoRepairAttemptCount: 0,
     editingItemId: "",
+    effectivePlan: null,
     feedback: "",
     generationScope: "",
     generating: false,
     itemDrafts: {},
     listingGeneratingSetId: "",
     planning: false,
+    platformItemOverrides: [],
+    platformPayload: null,
+    platformSetOverrides: {},
     queue: [],
     queuedRepairItemIds: [],
     recordQuery: "",
@@ -582,9 +586,10 @@ const state = {
   uiLanguage: "zh-CN",
   zoom: 1,
 };
-
 let creationReferenceAnalysisRequestToken = 0;
-
+let creationReferenceAnalysisAbortController = null;
+let creationReferenceAnalysisApplyGuard = null;
+let creationPreviousPlatformValue = "universal";
 const refs = {
   apiKeyInput: document.querySelector("#apiKeyInput"),
   baseUrlInput: document.querySelector("#baseUrlInput"),
@@ -690,7 +695,13 @@ const refs = {
   creationLogoRemoveButton: document.querySelector("#creationLogoRemoveButton"),
   creationSavedLogoGrid: document.querySelector("#creationSavedLogoGrid"),
   creationOutputFormatInput: document.querySelector("#creationOutputFormatInput"),
+  creationPlanAdvancedToggle: document.querySelector("#creationPlanAdvancedToggle"),
   creationPlanButton: document.querySelector("#creationPlanButton"),
+  creationPlanRestoreButton: document.querySelector("#creationPlanRestoreButton"),
+  creationPlanSlots: document.querySelector("#creationPlanSlots"),
+  creationPlanSummary: document.querySelector("#creationPlanSummary"),
+  creationPlanValidation: document.querySelector("#creationPlanValidation"),
+  creationPlanWarnings: document.querySelector("#creationPlanWarnings"),
   creationPromptEditorLayer: document.querySelector("#creationPromptEditorLayer"),
   creationProductDescriptionInput: document.querySelector("#creationProductDescriptionInput"),
   creationProductNameInput: document.querySelector("#creationProductNameInput"),
@@ -703,7 +714,6 @@ const refs = {
   creationReferenceAnalysisToggleButton: document.querySelector("#creationReferenceAnalysisToggleButton"),
   creationReferenceAnalyzeButton: document.querySelector("#creationReferenceAnalyzeButton"),
   creationReferenceApplyAnalysisButton: document.querySelector("#creationReferenceApplyAnalysisButton"),
-  creationReferenceApplyVisualLanguageButton: document.querySelector("#creationReferenceApplyVisualLanguageButton"),
   creationReferenceCount: document.querySelector("#creationReferenceCount"),
   creationReferenceDropzone: document.querySelector("#creationReferenceDropzone"),
   creationReferenceGrid: document.querySelector("#creationReferenceGrid"),
@@ -789,7 +799,7 @@ const refs = {
   creationResultGrid: document.querySelector("#creationResultGrid"),
   creationRoleCount: document.querySelector("#creationRoleCount"),
   creationRoleGrid: document.querySelector("#creationRoleGrid"),
-  creationScenarioInput: document.querySelector("#creationScenarioInput"),
+  creationPlatformInput: document.querySelector("#creationPlatformInput"),
   creationSellingPointsInput: document.querySelector("#creationSellingPointsInput"),
   creationSetOnly: [...document.querySelectorAll("[data-creation-set-only]")],
   creationSetMeta: document.querySelector("#creationSetMeta"),
@@ -798,7 +808,6 @@ const refs = {
   creationSkuGenerationRuleInput: document.querySelector("#creationSkuGenerationRuleInput"),
   creationRatioInput: document.querySelector("#creationRatioInput"),
   creationTargetLanguageInput: document.querySelector("#creationTargetLanguageInput"),
-  creationVisualLanguageInput: document.querySelector("#creationVisualLanguageInput"),
   errorBanner: document.querySelector("#errorBanner"),
   filmstrip: document.querySelector("#filmstrip"),
   focusGalleryButton: document.querySelector("#focusGalleryButton"),
@@ -1038,6 +1047,7 @@ const refs = {
   themeToggleButton: document.querySelector("#themeToggleButton"),
   themeToggleLabel: document.querySelector("#themeToggleLabel"),
   topbar: document.querySelector(".topbar"),
+  topbarRevealButton: document.querySelector("#topbarRevealButton"),
   timelineList: document.querySelector("#timelineList"),
   timelineNewCount: document.querySelector("#timelineNewCount"),
   timelineNewIndicator: document.querySelector("#timelineNewIndicator"),
@@ -1045,13 +1055,13 @@ const refs = {
   viewTabs: [...document.querySelectorAll("[data-view-tab]")],
   viewRoot: document.querySelector(".view-root"),
   uiLanguageInput: document.querySelector("#uiLanguageInput"),
+  uiLanguageOptions: [...document.querySelectorAll("[data-ui-language-option]")],
   previewPanel: document.querySelector(".preview-panel"),
   zoomInButton: document.querySelector("#zoomInButton"),
   zoomLabel: document.querySelector("#zoomLabel"),
   zoomOutButton: document.querySelector("#zoomOutButton"),
   zoomResetButton: document.querySelector("#zoomResetButton"),
 };
-
 const lightboxViewerController = createLightboxImageViewer({ refs, state });
 const previewKeyboardNavigation = createPreviewKeyboardNavigationController({
   refs,
@@ -1064,68 +1074,55 @@ const previewKeyboardNavigation = createPreviewKeyboardNavigationController({
 const handlePreviewArrowNavigation = previewKeyboardNavigation.handlePreviewArrowNavigation;
 const setReferencePreviewNavigationContext = previewKeyboardNavigation.setReferencePreviewNavigationContext;
 const portraitLocationController = createPortraitLocationSelectorController({ refs, state, renderPortraitView });
-const configModelPicker = createConfigModelPickerController({ refs, state, getBrowserPrivateConfigRequestPayload }); const creationLogoLibrary = createCreationLogoLibraryController({ applyLogoFile: applyCreationLogoFile, refs, setFeedback: setCreationFeedback, showError });
+const configModelPicker = createConfigModelPickerController({ refs, state, getBrowserPrivateConfigRequestPayload, getUiText: getUiLanguageText }); const creationLogoLibrary = createCreationLogoLibraryController({ applyLogoFile: applyCreationLogoFile, refs, setFeedback: setCreationFeedback, showError });
 const pptAnalysis = createPptAnalysisController({
   state,
   buildFormData: buildPptFormData,
   compactErrorMessage,
   renderPptView,
 });
-
 function pad(value) {
   return String(value).padStart(2, "0");
 }
-
 function formatTime(dateLike) {
   if (!dateLike) {
     return "--";
   }
-
   const date = new Date(dateLike);
   if (Number.isNaN(date.getTime())) {
     return "--";
   }
-
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
-
 function formatClock(dateLike) {
   if (!dateLike) {
     return "--:--:--";
   }
-
   const date = new Date(dateLike);
   if (Number.isNaN(date.getTime())) {
     return "--:--:--";
   }
-
   return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
-
 function formatFileSize(bytes) {
   const value = Number(bytes || 0);
   if (value <= 0) {
     return "--";
   }
-
   if (value < 1024 * 1024) {
     return `${Math.max(1, Math.round(value / 1024))} KB`;
   }
-
   return `${(value / 1024 / 1024).toFixed(1)} MB`;
 }
-
 function nowIso() {
   return new Date().toISOString();
 }
-
 function createInlineBusyMotion(className = "inline-busy-motion") {
   const motion = Object.assign(document.createElement("span"), { className });
   motion.setAttribute("aria-hidden", "true");
   motion.append(document.createElement("span"), document.createElement("span"), document.createElement("span"));
   return motion;
 }
-
 function renderInlineBusyButton(button, { busy = false, busyText = "", idleText = "", motionClassName = "inline-busy-motion" } = {}) {
   if (!button) return;
   button.classList.toggle("is-loading", busy);
@@ -1143,23 +1140,19 @@ function renderInlineBusyButton(button, { busy = false, busyText = "", idleText 
   button.style.minWidth = "";
   button.replaceChildren(idleText);
 }
-
 function buildReferenceFingerprint(file) {
   return `${file.name}:${file.size}:${file.lastModified}`;
 }
-
 function makePromptAnalysisImageName(filename) {
   const raw = String(filename || "reference-image").trim();
   const base = raw.replace(/\.[^.]+$/, "") || "reference-image";
   return `${base}-analysis.jpg`;
 }
-
 function makeGenerationReferenceImageName(filename) {
   const raw = String(filename || "reference-image").trim();
   const base = raw.replace(/\.[^.]+$/, "") || "reference-image";
   return `${base}-reference.jpg`;
 }
-
 async function preparePromptAnalysisImageFile(file) {
   if (
     !file ||
@@ -1169,7 +1162,6 @@ async function preparePromptAnalysisImageFile(file) {
   ) {
     return file;
   }
-
   let bitmap = null;
   try {
     bitmap = await createImageBitmap(file);
@@ -1180,18 +1172,15 @@ async function preparePromptAnalysisImageFile(file) {
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
-
     const context = canvas.getContext("2d");
     if (!context) {
       return file;
     }
-
     context.imageSmoothingEnabled = true;
     context.imageSmoothingQuality = "high";
     context.fillStyle = "#ffffff";
     context.fillRect(0, 0, width, height);
     context.drawImage(bitmap, 0, 0, width, height);
-
     const blob = await canvasToBlob(
       canvas,
       "image/jpeg",
@@ -1200,7 +1189,6 @@ async function preparePromptAnalysisImageFile(file) {
     if (!blob || blob.size <= 0 || blob.size >= file.size) {
       return file;
     }
-
     return new File([blob], makePromptAnalysisImageName(file.name), {
       type: "image/jpeg",
       lastModified: file.lastModified || Date.now(),
@@ -1213,7 +1201,6 @@ async function preparePromptAnalysisImageFile(file) {
     }
   }
 }
-
 async function prepareGenerationReferenceImageFile(file) {
   if (
     !file ||
@@ -1224,7 +1211,6 @@ async function prepareGenerationReferenceImageFile(file) {
   ) {
     return file;
   }
-
   let bitmap = null;
   try {
     bitmap = await createImageBitmap(file);
@@ -1235,18 +1221,15 @@ async function prepareGenerationReferenceImageFile(file) {
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
-
     const context = canvas.getContext("2d");
     if (!context) {
       return file;
     }
-
     context.imageSmoothingEnabled = true;
     context.imageSmoothingQuality = "high";
     context.fillStyle = "#ffffff";
     context.fillRect(0, 0, width, height);
     context.drawImage(bitmap, 0, 0, width, height);
-
     const blob = await canvasToBlob(
       canvas,
       "image/jpeg",
@@ -1255,7 +1238,6 @@ async function prepareGenerationReferenceImageFile(file) {
     if (!blob || blob.size <= 0 || blob.size >= file.size) {
       return file;
     }
-
     return new File([blob], makeGenerationReferenceImageName(file.name), {
       type: "image/jpeg",
       lastModified: file.lastModified || Date.now(),
@@ -1268,33 +1250,26 @@ async function prepareGenerationReferenceImageFile(file) {
     }
   }
 }
-
 function makeJobPreviewKey(jobId) {
   return `job:${jobId}`;
 }
-
 function makeGalleryPreviewKey(filename) {
   return `file:${filename}`;
 }
-
 function getDisplayPrompt(item) {
   const raw = String(item?.prompt || "").trim();
   if (raw && raw.replace(/\?/g, "").trim().length > 0) {
     return raw;
   }
-
   if (item?.createdAt) {
     return `本地输出 ${formatClock(item.createdAt)}`;
   }
-
   return "未命名输出";
 }
-
 function imageElementToBlob(imageElement) {
   if (!imageElement?.complete || !imageElement.naturalWidth || !imageElement.naturalHeight) {
     return Promise.resolve(null);
   }
-
   return new Promise((resolve) => {
     try {
       const canvas = document.createElement("canvas");
@@ -1305,7 +1280,6 @@ function imageElementToBlob(imageElement) {
         resolve(null);
         return;
       }
-
       context.drawImage(imageElement, 0, 0);
       canvas.toBlob((blob) => resolve(blob?.type?.startsWith("image/") ? blob : null), "image/png");
     } catch (_error) {
@@ -1313,7 +1287,6 @@ function imageElementToBlob(imageElement) {
     }
   });
 }
-
 async function resolveDownloadImageBlob(item, imageElement) {
   const elementUrl = imageElement?.currentSrc || imageElement?.src || "";
   const imageUrl = getImageUrl(item) || elementUrl;
@@ -1323,7 +1296,6 @@ async function resolveDownloadImageBlob(item, imageElement) {
   if (isCacheableBrowserImageUrl(elementUrl)) {
     return dataUrlToBlob(elementUrl);
   }
-
   if (item?.filename) {
     try {
       const cachedDataUrl = await getBrowserCachedImageData(item.filename);
@@ -1334,7 +1306,6 @@ async function resolveDownloadImageBlob(item, imageElement) {
       // Keep download available through the rendered image or server URL when IndexedDB is unavailable.
     }
   }
-
   if (imageUrl) {
     try {
       const response = await fetch(imageUrl, {
@@ -1351,15 +1322,12 @@ async function resolveDownloadImageBlob(item, imageElement) {
       // Fall through to the rendered image fallback.
     }
   }
-
   const renderedBlob = await imageElementToBlob(imageElement);
   if (renderedBlob) {
     return renderedBlob;
   }
-
   throw new Error("无法读取当前图片，请刷新页面后重试。");
 }
-
 function triggerBrowserImageDownload(blob, filename) {
   const objectUrl = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -1370,7 +1338,6 @@ function triggerBrowserImageDownload(blob, filename) {
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
 }
-
 async function downloadGalleryItem(item, imageElement) {
   if (!item && !imageElement) {
     return;
@@ -1378,52 +1345,41 @@ async function downloadGalleryItem(item, imageElement) {
   const blob = await resolveDownloadImageBlob(item, imageElement);
   triggerBrowserImageDownload(blob, item.filename || "preview.png");
 }
-
 function getDisplayId(item) {
   const raw = String(item?.id || "");
   if (!raw) {
     return "--";
   }
-
   if (raw.length <= 28) {
     return raw;
   }
-
   return `${raw.slice(0, 24)}...`;
 }
-
 function formatCanvasLabel(size) {
   if (!size) {
     return "--";
   }
-
   return size.replace("x", " × ");
 }
-
 function formatCompactSizeLabel(size) {
   const normalized = String(size || "")
     .trim()
     .replace(/\s*[x×]\s*/i, "x");
-
   return /^\d+x\d+$/.test(normalized) ? normalized : "";
 }
-
 function formatCompactRatioLabel(ratio) {
   const normalized = String(ratio || "")
     .trim()
     .replace(/\s*[：:]\s*/g, ":");
-
   return /^\d+:\d+$/.test(normalized) ? normalized : "";
 }
 function getGenerationActivityRelayText(value) { const match = String(value || "").split(/\r?\n/).map((line) => line.trim()).map((line) => line.match(/^(URL|中转)[：:](.*)$/)).find(Boolean); return match ? `URL：${match[2].trim()}` : ""; } function buildGenerationActivityRelayText(item = {}) { const route = String(item?.imageRoute || item?.generationRoute || "").toLowerCase(); const relayUrl = String(item?.baseUrl || (route === "c" ? item?.protocolBaseUrl || state.config?.protocolBaseUrl : route === "b" ? state.config?.directBaseUrl : state.config?.baseUrl) || state.config?.baseUrl || "").trim(); return relayUrl ? `URL：${relayUrl}` : ""; }
 function formatFilmstripSizeLabel(item) {
   return formatCompactSizeLabel(item?.size);
 }
-
 function normalizeGenerationTaskStatus(status) {
   return status === "completed" || status === "error" ? status : "running";
 }
-
 function normalizeActivityEntry(entry) {
   const key = String(entry?.key || "").trim();
   const title = String(entry?.title || "").trim();
@@ -1431,11 +1387,9 @@ function normalizeActivityEntry(entry) {
   if (!key || !title) {
     return null;
   }
-
   if (isGenerationRequestRetryMessage(detail)) {
     return null;
   }
-
   return {
     key,
     title,
@@ -1448,13 +1402,11 @@ function normalizeActivityEntry(entry) {
     orderAt: String(entry?.orderAt || entry?.at || ""),
   };
 }
-
 function normalizePersistedActivityEntry(entry) {
   const normalized = normalizeActivityEntry(entry);
   if (!normalized) {
     return null;
   }
-
   if (normalized.status === "active") {
     return {
       ...normalized,
@@ -1463,10 +1415,8 @@ function normalizePersistedActivityEntry(entry) {
       status: "error",
     };
   }
-
   return normalized;
 }
-
 function readGenerationActivityFeed() {
   try {
     const raw = window.localStorage.getItem(GENERATION_ACTIVITY_STORAGE_KEY);
@@ -1477,7 +1427,6 @@ function readGenerationActivityFeed() {
     return [];
   }
 }
-
 function writeGenerationActivityFeed() {
   try {
     window.localStorage.setItem(GENERATION_ACTIVITY_STORAGE_KEY, JSON.stringify(state.activityFeed.slice(0, 12)));
@@ -1485,21 +1434,18 @@ function writeGenerationActivityFeed() {
     // Ignore storage quota or privacy-mode failures; the in-memory feed still works.
   }
 }
-
 function readGalleryMetadataCache() {
   try {
     const raw = window.localStorage.getItem(GALLERY_METADATA_CACHE_KEY);
     if (!raw) {
       return {};
     }
-
     const parsed = JSON.parse(raw);
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch (_error) {
     return {};
   }
 }
-
 function writeGalleryMetadataCache(cache) {
   try {
     window.localStorage.setItem(GALLERY_METADATA_CACHE_KEY, JSON.stringify(cache));
@@ -1507,38 +1453,31 @@ function writeGalleryMetadataCache(cache) {
     // Ignore storage quota or browser privacy restrictions and keep the in-memory copy.
   }
 }
-
 function syncGalleryMetadataCache(items) {
   const nextCache = pruneGalleryMetadataCache(state.galleryMetadataCache, items);
-
   items.forEach((item) => {
     const filename = String(item?.filename || "").trim();
     if (!filename) {
       return;
     }
-
     const entry = buildGalleryMetadataCacheEntry(item);
     if (Object.keys(entry).length > 0) {
       nextCache[filename] = entry;
     }
   });
-
   state.galleryMetadataCache = nextCache;
   writeGalleryMetadataCache(nextCache);
 }
-
 function forgetGalleryMetadata(filename) {
   const normalizedFilename = String(filename || "").trim();
   if (!normalizedFilename || !state.galleryMetadataCache[normalizedFilename]) {
     return;
   }
-
   const nextCache = { ...state.galleryMetadataCache };
   delete nextCache[normalizedFilename];
   state.galleryMetadataCache = nextCache;
   writeGalleryMetadataCache(nextCache);
 }
-
 function hydrateGalleryItems(serverItems) {
   const repairQueue = [];
   const hydratedItems = serverItems.map((item) => {
@@ -1546,7 +1485,6 @@ function hydrateGalleryItems(serverItems) {
     if (!cachedEntry) {
       return item;
     }
-
     const mergedItem = mergeGalleryItemWithCachedMetadata(item, cachedEntry);
     const metadataPatch = collectGalleryMetadataRepairPatch(item, mergedItem);
     if (Object.keys(metadataPatch).length > 0) {
@@ -1555,18 +1493,14 @@ function hydrateGalleryItems(serverItems) {
         metadata: metadataPatch,
       });
     }
-
     return mergedItem;
   });
-
   syncGalleryMetadataCache(hydratedItems);
-
   return {
     items: hydratedItems,
     repairQueue,
   };
 }
-
 async function repairGalleryMetadataQueue(repairQueue = []) {
   for (const repair of repairQueue) {
     try {
@@ -1585,16 +1519,13 @@ async function repairGalleryMetadataQueue(repairQueue = []) {
     }
   }
 }
-
 function getNormalizedGalleryControls() {
   state.galleryControls = normalizeGalleryFilters(state.galleryControls, state.gallery);
   return state.galleryControls;
 }
-
 function getGalleryFilterSnapshot(overrides = {}) {
   return normalizeGalleryFilters({ ...getNormalizedGalleryControls(), ...overrides }, state.gallery);
 }
-
 function hasActiveGalleryFilters(filters) {
   return Boolean(
     filters.query ||
@@ -1604,41 +1535,32 @@ function hasActiveGalleryFilters(filters) {
       filters.reference !== "all",
   );
 }
-
 function formatGalleryQuerySummary(query) {
   const compact = query.length > 18 ? `${query.slice(0, 18)}...` : query;
   return `关键词“${compact}”`;
 }
-
 function formatGalleryFilterSummary(filters) {
   const parts = [];
-
   if (filters.query) {
     parts.push(formatGalleryQuerySummary(filters.query));
   }
-
   if (filters.date) {
     parts.push(filters.date);
   } else if (filters.window !== "all") {
     parts.push(GALLERY_WINDOW_LABELS[filters.window] || filters.window);
   }
-
   if (filters.size !== "all") {
     parts.push(formatCanvasLabel(filters.size));
   }
-
   if (filters.reference !== "all") {
     parts.push(GALLERY_REFERENCE_LABELS[filters.reference] || filters.reference);
   }
-
   return parts.join(" · ");
 }
-
 function renderGallerySelectOptions(select, options, activeValue) {
   if (!select) {
     return;
   }
-
   select.innerHTML = "";
   options.forEach((option) => {
     const element = document.createElement("option");
@@ -1646,66 +1568,54 @@ function renderGallerySelectOptions(select, options, activeValue) {
     element.textContent = `${option.label} · ${option.count}`;
     select.appendChild(element);
   });
-
   if (options.some((option) => option.value === activeValue)) {
     select.value = activeValue;
     return;
   }
-
   select.value = options[0]?.value || "all";
 }
-
 function getRatioOption(value) {
   return state.aspectRatios.find((option) => option.value === value) || state.aspectRatios[0] || null;
 }
-
 function getVisibleRatios() {
   return [...state.aspectRatios];
 }
-
 function getRatioOrientationLabel(orientation) {
   return RATIO_ORIENTATION_LABELS[orientation] || RATIO_ORIENTATION_LABELS.square;
 }
-
+function getUiTextWithReplacements(key, replacements = {}, fallback = "") { let text = getUiLanguageText(key) || fallback; Object.entries(replacements).forEach(([name, value]) => { text = text.replaceAll(`{${name}}`, String(value)); }); return text; }
+function getUiRatioOrientationLabel(orientation) { return getUiLanguageText(orientation === "landscape" ? "ratioLandscape" : orientation === "portrait" ? "ratioPortrait" : "ratioSquare") || getRatioOrientationLabel(orientation); }
+function getUiRatioLabel(option) { return getUiLanguageText(`ratio.${option?.value}`) || option?.label || getUiRatioOrientationLabel(option?.orientation); }
+function getUiSizeLabel(option) { const label = option?.label || ""; if (option?.value === "auto") return getUiLanguageText("sizeAuto") || label; return label.replace(/^最大(?=\s|$)/, getUiLanguageText("sizeMax") || "最大"); }
+function getUiPreviewPlaceholderState(placeholderState) { if (!placeholderState || placeholderState.mode === "ready") return placeholderState; if (placeholderState.mode === "idle") return { ...placeholderState, eyebrow: getUiLanguageText("previewIdleEyebrow"), title: getUiLanguageText("previewIdleTitle"), detail: getUiLanguageText("previewIdleDetail") }; return { ...placeholderState, title: state.uiLanguage === "en" ? "Generation running" : placeholderState.title }; }
+function rerenderUiLanguageSensitiveViews() { updatePromptCounter(); syncPromptEnhanceMode(); updateGenerateButton(); syncConnectionState(); syncRatioOrientationSummary(); renderRatioGrid(); renderReferenceAnalysisRatioGrid(); renderReasoningOptions(); renderSizeOptions(); renderReferenceAnalysisSizeOptions(); syncEndpointFieldsFromFullUrlModes(); { const c = state.config || {}, s = state.uiLanguage === "en" ? "Saved" : "已保存"; if (refs.savedKeyMask) refs.savedKeyMask.textContent = c.apiKeyConfigured ? `${s} ${c.apiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存"; if (refs.directSavedKeyMask) refs.directSavedKeyMask.textContent = c.directApiKeyConfigured ? `${s} ${c.directApiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存"; if (refs.protocolSavedKeyMask) refs.protocolSavedKeyMask.textContent = c.protocolApiKeyConfigured ? `${s} ${c.protocolApiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存"; } renderPreview(); renderFilmstrip(); renderTimeline(); }
 function syncRatioOrientationSummary() {
   if (!refs.ratioOrientationSummary) {
     return;
   }
-
   const ratioOption = getRatioOption(refs.ratioInput.value || DEFAULT_UI_RATIO);
-  refs.ratioOrientationSummary.textContent = ratioOption?.label || getRatioOrientationLabel(ratioOption?.orientation);
+  refs.ratioOrientationSummary.textContent = getUiRatioLabel(ratioOption);
   refs.ratioOrientationSummary.dataset.orientation = ratioOption?.orientation || "square";
 }
-
-function normalizeUiTheme(theme) {
-  return theme === "light" ? "light" : "dark";
-}
-
-function readUiTheme() {
-  try {
-    return normalizeUiTheme(window.localStorage.getItem(THEME_STORAGE_KEY) || document.documentElement.dataset.theme);
-  } catch {
-    return normalizeUiTheme(document.documentElement.dataset.theme);
-  }
-}
-
+function normalizeUiTheme(theme) { return theme === "light" ? "light" : "dark"; }
+function readUiTheme() { try { return normalizeUiTheme(window.localStorage.getItem(THEME_STORAGE_KEY) || document.documentElement.dataset.theme); } catch { return normalizeUiTheme(document.documentElement.dataset.theme); } }
 function normalizeUiLanguage(language) { return language === "en" ? "en" : "zh-CN"; }
 function readUiLanguage() { try { return normalizeUiLanguage(window.localStorage.getItem(UI_LANGUAGE_STORAGE_KEY) || document.documentElement.lang); } catch { return normalizeUiLanguage(document.documentElement.lang); } }
 function getUiLanguageText(key) { return UI_LANGUAGE_TEXT[state.uiLanguage]?.[key] || UI_LANGUAGE_TEXT["zh-CN"][key] || ""; }
-function syncUiLanguage() { const normalized = normalizeUiLanguage(state.uiLanguage); state.uiLanguage = normalized; document.documentElement.lang = normalized; document.documentElement.dataset.uiLanguage = normalized; if (refs.uiLanguageInput) refs.uiLanguageInput.value = normalized; if (refs.themeNavAction) refs.themeNavAction.textContent = getUiLanguageText("themeMenu"); syncThemeToggle(); }
+function applyUiLanguageText() { document.querySelectorAll("[data-ui-i18n]").forEach((element) => { const text = getUiLanguageText(element.dataset.uiI18n); if (text) element.textContent = text; }); document.querySelectorAll("[data-ui-i18n-aria-label]").forEach((element) => { const text = getUiLanguageText(element.dataset.uiI18nAriaLabel); if (text) element.setAttribute("aria-label", text); }); document.querySelectorAll("[data-ui-i18n-placeholder]").forEach((element) => { const text = getUiLanguageText(element.dataset.uiI18nPlaceholder); if (text) element.setAttribute("placeholder", text); }); document.querySelectorAll("[data-ui-i18n-title]").forEach((element) => { const text = getUiLanguageText(element.dataset.uiI18nTitle); if (text) element.setAttribute("title", text); }); }
+function getUiImageRouteLabel(imageRoute) { if (imageRoute === "b") return getUiLanguageText("modeDirect"); if (imageRoute === "c") return getUiLanguageText("modeProtocol"); return getUiLanguageText("modeRoute"); }
+function getUiImageRouteStatusText(label) { return state.uiLanguage === "en" ? `Current image request mode: ${label}` : `当前生图调用模式：${label}`; }
+function syncUiLanguage() { const normalized = normalizeUiLanguage(state.uiLanguage); state.uiLanguage = normalized; document.documentElement.lang = normalized; document.documentElement.dataset.uiLanguage = normalized; if (refs.uiLanguageInput) refs.uiLanguageInput.value = normalized; refs.uiLanguageOptions.forEach((button) => { const isActive = button.dataset.uiLanguageOption === normalized; button.classList.toggle("is-active", isActive); button.setAttribute("aria-pressed", String(isActive)); }); applyUiLanguageText(); configModelPicker.render(); rerenderUiLanguageSensitiveViews(); if (refs.themeNavAction) refs.themeNavAction.textContent = getUiLanguageText("themeMenu"); updateGenerationModeStatus(); syncThemeToggle(); }
 function setUiLanguage(language) { state.uiLanguage = normalizeUiLanguage(language); try { window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, state.uiLanguage); } catch {} syncUiLanguage(); }
-
 function syncThemeToggle() {
   if (!refs.themeToggleButton || !refs.themeToggleLabel) {
     return;
   }
-
   const isLight = state.uiTheme === "light";
   refs.themeToggleButton.setAttribute("aria-pressed", String(isLight));
   refs.themeToggleButton.title = getUiLanguageText(isLight ? "themeToDark" : "themeToLight");
   refs.themeToggleLabel.textContent = getUiLanguageText(isLight ? "themeDark" : "themeLight");
 }
-
 function setUiTheme(theme) {
   const normalized = normalizeUiTheme(theme);
   state.uiTheme = normalized;
@@ -1717,11 +1627,9 @@ function setUiTheme(theme) {
   }
   syncThemeToggle();
 }
-
 function toggleUiTheme() {
   setUiTheme(state.uiTheme === "light" ? "dark" : "light");
 }
-
 function getViewFromHash() {
   if (window.location.hash === "#style-transfer") {
     return "style-transfer";
@@ -1770,7 +1678,6 @@ function getViewFromHash() {
   }
   return "studio";
 }
-
 function syncHash(view) {
   const nextHash =
     view === "portrait" ? "#portrait" : view === "creation" ? "#creation" : view === "style-transfer"
@@ -1804,26 +1711,22 @@ function syncHash(view) {
     window.history.replaceState(null, "", nextHash);
   }
 }
-
 function setStudioGenerationMode(mode = "prompt") {
   const nextMode = mode === "style-transfer" ? "style-transfer" : "prompt";
   state.studioMode = nextMode;
   if (refs.studioView) {
     refs.studioView.dataset.studioMode = nextMode;
   }
-
   refs.promptModeBlocks.forEach((block) => {
     block.classList.toggle("hidden", nextMode === "style-transfer");
   });
   refs.styleTransferBlock?.classList.toggle("hidden", nextMode !== "style-transfer");
   updateGenerateButton();
 }
-
 async function ensureActiveViewModule(view) {
   if (view === "studio") {
     return true;
   }
-
   try {
     await ensureLazyViewModule(view, {
       context: {
@@ -1873,7 +1776,6 @@ async function ensureActiveViewModule(view) {
     return false;
   }
 }
-
 function compactErrorMessage(message, fallbackLabel = "请求失败") {
   const raw = String(message || fallbackLabel).trim();
   const httpStatus = raw.match(/HTTP\s+(\d{3})/i)?.[1] || raw.match(/"status"\s*:\s*(\d{3})/i)?.[1] || "";
@@ -1882,42 +1784,34 @@ function compactErrorMessage(message, fallbackLabel = "请求失败") {
     raw.match(/"error_code"\s*:\s*"?([A-Za-z0-9_.-]+)"?/i)?.[1] ||
     raw.match(/"code"\s*:\s*"([^"]+)"/i)?.[1] ||
     httpStatus;
-
   if (!httpStatus && !errorCode) {
     return raw;
   }
-
   let label = fallbackLabel;
   if (/图片分析|Prompt Agent/i.test(raw)) {
     label = "图片分析请求失败";
   } else if (/生成|接口请求|image_generation/i.test(raw)) {
     label = "生成请求失败";
   }
-
   return `${label}：${[httpStatus ? `HTTP ${httpStatus}` : "", errorCode ? `错误码 ${errorCode}` : "", Number(httpStatus) >= 500 || !errorCode ? "" : (() => { const text = String(raw || "").trim(); const codeMarker = `错误码 ${errorCode}`; let payload = null; if (text.startsWith("{")) { try { payload = JSON.parse(text); } catch {} } const messageText = String(payload?.error?.message || payload?.message || payload?.detail || (text.includes(codeMarker) ? text.slice(text.indexOf(codeMarker) + codeMarker.length).replace(/^[，,：:\s]+/, "") : "")).replace(/\s+/g, " ").trim(); const param = String(payload?.error?.param || payload?.param || "").replace(/\s+/g, " ").trim(); const detail = messageText ? (param ? `${messageText}（参数 ${param}）` : messageText) : param ? `参数 ${param}` : ""; return detail.length > 220 ? `${detail.slice(0, 217)}...` : detail; })()]
     .filter(Boolean)
     .join("，")}`;
 }
-
 function showError(message) {
   refs.errorBanner.classList.remove("hidden");
   refs.errorBanner.textContent = compactErrorMessage(message);
 }
-
 function clearError() {
   refs.errorBanner.textContent = "";
   refs.errorBanner.classList.add("hidden");
 }
-
 const overlayFocusTriggers = new Map();
-
 function captureOverlayTrigger(name) {
   const active = document.activeElement;
   if (active instanceof HTMLElement && document.contains(active)) {
     overlayFocusTriggers.set(name, active);
   }
 }
-
 function focusOverlayTarget(target) {
   window.requestAnimationFrame(() => {
     if (target instanceof HTMLElement && document.contains(target)) {
@@ -1925,7 +1819,6 @@ function focusOverlayTarget(target) {
     }
   });
 }
-
 function restoreOverlayTriggerFocus(name) {
   const trigger = overlayFocusTriggers.get(name);
   overlayFocusTriggers.delete(name);
@@ -1933,35 +1826,32 @@ function restoreOverlayTriggerFocus(name) {
     focusOverlayTarget(trigger);
   }
 }
-
 function setConnectionState(kind, label, entryLabel = CONNECTION_STATUS_ENTRY_LABEL) {
   refs.connectionStatus.dataset.state = kind;
   refs.connectionStatus.title = label;
-  refs.connectionStatus.setAttribute("aria-label", `${entryLabel}，打开 API、LOG`);
+  refs.connectionStatus.setAttribute("aria-label", `${entryLabel}, ${getUiLanguageText("connectionOpen")}`);
   refs.connectionLabel.textContent = entryLabel;
 }
-
 function syncConnectionState() {
   const queuedCount = getTotalQueuedJobCount();
   const runningCount = getTotalRunningJobCount();
   if (queuedCount > 0 || runningCount > 0) {
-    setConnectionState("busy", `并发 ${runningCount}/${getMaxParallelJobCount()} · 队列 ${queuedCount}`);
+    setConnectionState("busy", getUiTextWithReplacements("connectionBusy", { running: runningCount, max: getMaxParallelJobCount(), queued: queuedCount }), getUiLanguageText("connectionStatusEntry"));
     return;
   }
-
   if (state.config?.apiKeyConfigured) {
-    setConnectionState("ready", "API 已就绪");
+    setConnectionState("ready", getUiLanguageText("apiReady") || (state.uiLanguage === "en" ? "API ready" : "API 已就绪"), getUiLanguageText("connectionStatusEntry"));
     return;
   }
-
-  setConnectionState("idle", "请先配置 API", CONNECTION_STATUS_EMPTY_LABEL);
+  setConnectionState("idle", getUiLanguageText("apiIdle") || (state.uiLanguage === "en" ? "Configure API first" : "请先配置 API"), getUiLanguageText("connectionStatusEmpty") || CONNECTION_STATUS_EMPTY_LABEL);
 }
-
 function setDrawerOpen(open) {
   const wasOpen = refs.configDrawer.classList.contains("open");
   refs.configDrawer.classList.toggle("open", open);
+  document.documentElement.classList.toggle(TOPBAR_SUPPRESSED_CLASS, open);
   refs.configDrawer.setAttribute("aria-hidden", String(!open));
   if (open) {
+    setTopbarReveal(false);
     if (!wasOpen) {
       captureOverlayTrigger("config");
     }
@@ -1970,14 +1860,12 @@ function setDrawerOpen(open) {
     restoreOverlayTriggerFocus("config");
   }
 }
-
 function openConfigGenerationLog() {
   setDrawerOpen(true);
   window.requestAnimationFrame(() => {
     refs.configGenerationLogPanel?.scrollIntoView({ block: "start", behavior: "smooth" });
   });
 }
-
 function setLightboxOpen(open) {
   refs.lightbox.classList.toggle("hidden", !open);
   refs.lightbox.classList.toggle("open", open);
@@ -1986,26 +1874,21 @@ function setLightboxOpen(open) {
     refs.lightbox.classList.remove("is-image-only-preview");
   }
 }
-
 function resetPromptCopyFeedback() {
   if (promptCopyFeedbackTimer) {
     window.clearTimeout(promptCopyFeedbackTimer);
     promptCopyFeedbackTimer = 0;
   }
-
   if (!refs.copyPromptButton) {
     return;
   }
-
   refs.copyPromptButton.textContent = "复制";
   refs.copyPromptButton.dataset.copied = "false";
 }
-
 function markPromptCopied() {
   if (!refs.copyPromptButton) {
     return;
   }
-
   resetPromptCopyFeedback();
   refs.copyPromptButton.textContent = "已复制";
   refs.copyPromptButton.dataset.copied = "true";
@@ -2014,15 +1897,12 @@ function markPromptCopied() {
     resetPromptCopyFeedback();
   }, 1600);
 }
-
 function resetLightboxViewer(options) {
   lightboxViewerController.reset(options);
 }
-
 function syncLightboxImageMetrics(options) {
   lightboxViewerController.syncMetrics(options);
 }
-
 function syncLightboxCreationRecordActions(fresh = {}) {
   const isCreationRecordItem = Boolean(fresh.isCreationRecordItem);
   const isArticleRecordItem = Boolean(fresh.isArticleRecordItem);
@@ -2030,7 +1910,6 @@ function syncLightboxCreationRecordActions(fresh = {}) {
   const isImageOnlyPreview = Boolean(fresh.isImageOnlyLightboxItem);
   const isPreviewLightboxItem = Boolean(fresh.isPreviewLightboxItem);
   const hasRelativePath = Boolean(String(fresh.relativePath || "").trim());
-
   refs.lightboxCopyPathButton?.classList.toggle("hidden", !isCreationRecordItem);
   refs.lightboxCopyFullPathButton?.classList.toggle("hidden", !isCreationRecordItem);
   if (refs.lightboxCopyPathButton) {
@@ -2044,38 +1923,33 @@ function syncLightboxCreationRecordActions(fresh = {}) {
     refs.lightboxDelete.disabled = isRecordItem || isImageOnlyPreview || isPreviewLightboxItem || !fresh.filename;
   }
 }
-
 function getStudioViewportMetrics() {
   return {
     width: window.innerWidth,
     height: window.innerHeight,
+    visualViewportHeight: window.visualViewport?.height || window.innerHeight,
     devicePixelRatio: window.devicePixelRatio,
     outerWidth: window.outerWidth,
     visualScale: window.visualViewport?.scale || 1,
     coarsePointer: window.matchMedia?.("(pointer: coarse)")?.matches || false,
   };
 }
-
 function getCurrentStudioLayoutMode() {
   return (
     document.documentElement.dataset.uiLayout ||
     getStudioLayoutMode(getStudioViewportMetrics())
   );
 }
-
 function isAdaptiveCompactLayout(layoutMode = getCurrentStudioLayoutMode()) {
   return ADAPTIVE_COLLAPSIBLE_LAYOUTS.has(layoutMode);
 }
-
 function getAdaptiveWorkbenchSections() {
   return [...document.querySelectorAll("[data-adaptive-section]")].filter((section) => section.tagName === "DETAILS");
 }
-
 function syncAdaptiveWorkbenchSections(layoutMode = getCurrentStudioLayoutMode()) {
   const isCompactLayout = isAdaptiveCompactLayout(layoutMode);
   const layoutChanged = adaptiveSectionLayoutMode !== layoutMode;
   const sections = getAdaptiveWorkbenchSections();
-
   adaptiveSectionSyncing = true;
   sections.forEach((section) => {
     if (!isCompactLayout) {
@@ -2083,18 +1957,15 @@ function syncAdaptiveWorkbenchSections(layoutMode = getCurrentStudioLayoutMode()
       section.dataset.adaptiveUserToggled = "false";
       return;
     }
-
     if (layoutChanged && section.dataset.adaptiveUserToggled !== "true") {
       section.open = section.dataset.compactOpen === "true";
     }
   });
   adaptiveSectionLayoutMode = layoutMode;
-
   window.setTimeout(() => {
     adaptiveSectionSyncing = false;
   }, 0);
 }
-
 function bindAdaptiveWorkbenchSections() {
   getAdaptiveWorkbenchSections().forEach((section) => {
     const summary = section.querySelector("summary");
@@ -2104,7 +1975,6 @@ function bindAdaptiveWorkbenchSections() {
         section.open = true;
       }
     });
-
     section.addEventListener("toggle", () => {
       if (adaptiveSectionSyncing || !isAdaptiveCompactLayout()) {
         return;
@@ -2113,7 +1983,6 @@ function bindAdaptiveWorkbenchSections() {
     });
   });
 }
-
 function getGalleryLayoutWidth() {
   return Math.max(
     refs.galleryPanel?.clientWidth || 0,
@@ -2122,38 +1991,34 @@ function getGalleryLayoutWidth() {
     window.innerWidth || 0,
   );
 }
-
 function syncGalleryLayoutMode() {
   if (!refs.galleryView) {
     return;
   }
-
   refs.galleryView.dataset.galleryLayout = getGalleryLayoutModeForWidth(getGalleryLayoutWidth());
 }
-
 function syncStudioDensity() {
   const viewportMetrics = getStudioViewportMetrics();
   const settings = getStudioDensitySettings(viewportMetrics);
   const layoutMode = settings.layoutMode || getStudioLayoutMode(viewportMetrics);
-
   document.documentElement.dataset.uiDensity = settings.mode;
   document.documentElement.dataset.uiLayout = layoutMode;
+  document.documentElement.dataset.uiOrientation = viewportMetrics.width >= viewportMetrics.height ? "landscape" : "portrait";
+  document.documentElement.dataset.uiInput = viewportMetrics.coarsePointer ? "coarse" : "fine";
+  const visualViewportHeight = Math.max(1, Math.round(viewportMetrics.visualViewportHeight || viewportMetrics.height));
+  document.documentElement.style.setProperty("--visual-viewport-height", `${visualViewportHeight}px`);
   syncAdaptiveWorkbenchSections(layoutMode);
-
   for (const name of ALL_VARIABLE_NAMES) {
     document.documentElement.style.removeProperty(name);
   }
-
   for (const [name, value] of Object.entries(settings.variables)) {
     document.documentElement.style.setProperty(name, value);
   }
 }
-
 function scheduleStudioDensitySync() {
   if (studioDensitySyncFrame) {
     window.cancelAnimationFrame(studioDensitySyncFrame);
   }
-
   studioDensitySyncFrame = window.requestAnimationFrame(() => {
     studioDensitySyncFrame = 0;
     syncStudioDensity();
@@ -2162,17 +2027,13 @@ function scheduleStudioDensitySync() {
       scheduleStudioHeightSync();
       scheduleGalleryPanelHeightSync();
       scheduleGalleryScrollSync();
-      renderGalleryView();
     });
   });
 }
-
 let densityZoomEndTimer = 0;
-
 function bindStudioDensitySync() {
   window.addEventListener("resize", scheduleStudioDensitySync);
   window.visualViewport?.addEventListener("resize", scheduleStudioDensitySync);
-
   if (window.visualViewport) {
     window.visualViewport.addEventListener("scroll", () => {
       if (densityZoomEndTimer) {
@@ -2185,32 +2046,26 @@ function bindStudioDensitySync() {
     });
   }
 }
-
 async function setActiveView(view) {
   state.activeView = view;
   syncHash(view);
   const activeNavSection = CREATE_VIEW_IDS.has(view) ? "create" : ASSET_VIEW_IDS.has(view) ? "assets" : "";
   const activeTabView = CREATE_VIEW_IDS.has(view) ? "studio" : ASSET_VIEW_IDS.has(view) ? "gallery" : view;
   const activePanelView = view === "style-transfer" ? "studio" : view === "reference-analysis" ? "reference-analysis" : view;
-
   refs.globalNavItems.forEach((item) => {
     const button = item.querySelector("[data-nav-menu]");
     button?.classList.toggle("active", item.dataset.navSection === activeNavSection);
   });
-
   refs.viewTabs.forEach((button) => {
     button.classList.toggle("active", button.dataset.viewTab === activeTabView);
   });
-
   refs.viewPanels.forEach((panel) => {
     panel.classList.toggle("hidden", panel.dataset.viewPanel !== activePanelView);
   });
-
   const moduleReady = await ensureActiveViewModule(view);
   if (!moduleReady || state.activeView !== view) {
     return false;
   }
-
   if (view === "studio" || view === "style-transfer") {
     setStudioGenerationMode(view === "style-transfer" ? "style-transfer" : "prompt");
   }
@@ -2220,9 +2075,11 @@ async function setActiveView(view) {
   if (view === "creation-record") {
     refreshCreationRecordSets();
   }
+  if (view === "article-record") loadArticleIllustrationSets().catch((error) => setArticleRecordFeedback(error.message, "error"));
   if (view === "portrait-record") {
     loadPortraitSets().catch((error) => setPortraitRecordFeedback(error.message, "error"));
   }
+  if (view === "ppt-record") loadPptDecks().catch((error) => showError(error.message));
   renderActiveView();
   syncGalleryLayoutMode();
   scheduleStudioHeightSync();
@@ -2230,30 +2087,24 @@ async function setActiveView(view) {
   scheduleGalleryScrollSync();
   return true;
 }
-
 function updatePromptCounter() {
-  refs.promptCounter.textContent = `${refs.promptInput.value.length} 字`;
+  refs.promptCounter.textContent = `${refs.promptInput.value.length} ${getUiLanguageText("promptCounterSuffix") || "字"}`;
 }
-
 function getMaxQueuedJobCount() {
   return Number.POSITIVE_INFINITY;
 }
-
 function getMaxParallelJobCount() {
   return state.limits.maxParallelTasksPerSession || DEFAULT_LIMITS.maxParallelTasksPerSession;
 }
-
 function getCurrentGenerationQueueMode() { return ["style-transfer", "reference-analysis", "image-decomposition", "image-edit", "quick-blend"].includes(state.activeView) ? state.activeView : state.activeView === "studio" && state.studioMode === "style-transfer" ? "style-transfer" : "prompt"; }
 function getCurrentGenerationQueueRoute() { return getSelectedImageRoute(); }
 function getQueuedJobCount(mode = getCurrentGenerationQueueMode(), route = getCurrentGenerationQueueRoute()) { return getQueuedGenerationJobCount(state.jobs, mode, route); }
 function getRunningJobCount(mode = getCurrentGenerationQueueMode(), route = getCurrentGenerationQueueRoute()) { return getRunningGenerationJobCount(state.jobs, mode, route); }
 function getTotalQueuedJobCount() { return getQueuedGenerationJobCount(state.jobs); }
 function getTotalRunningJobCount() { return getRunningGenerationJobCount(state.jobs); }
-
 function getCreationMaxReferenceImageCount() { return state.limits.maxCreationReferenceImages || DEFAULT_LIMITS.maxCreationReferenceImages || state.limits.maxReferenceImages || DEFAULT_LIMITS.maxReferenceImages; }
 function getCreationMaxProductReferenceImageCount() { return Math.max(0, getCreationMaxReferenceImageCount() - state.creationStyleReferenceFiles.length); }
 function getCreationMaxStyleReferenceImageCount() { return Math.max(0, Math.min(state.limits.maxCreationStyleReferenceImages || DEFAULT_LIMITS.maxCreationStyleReferenceImages || 3, getCreationMaxReferenceImageCount() - state.creationReferenceFiles.length)); }
-
 function getPortraitPersonMaxReferenceImageCount() {
   return (
     state.limits.maxPortraitPersonReferenceImages ||
@@ -2262,7 +2113,6 @@ function getPortraitPersonMaxReferenceImageCount() {
     DEFAULT_LIMITS.maxReferenceImages
   );
 }
-
 function getPortraitAccessoryMaxReferenceImageCount() {
   return (
     state.limits.maxPortraitAccessoryReferenceImages ||
@@ -2270,7 +2120,6 @@ function getPortraitAccessoryMaxReferenceImageCount() {
     getCreationMaxReferenceImageCount()
   );
 }
-
 function getPortraitActionMaxReferenceImageCount() {
   return (
     state.limits.maxPortraitActionReferenceImages ||
@@ -2278,7 +2127,6 @@ function getPortraitActionMaxReferenceImageCount() {
     getPortraitPersonMaxReferenceImageCount()
   );
 }
-
 function updateGenerateButton() {
   const runningCount = getRunningJobCount();
   const queuedCount = getQueuedJobCount();
@@ -2288,24 +2136,20 @@ function updateGenerateButton() {
     hasPendingReferenceGenerationFiles() ||
     hasPendingStyleTransferGenerationFiles();
   refs.generateButton.disabled = preparingReference;
-  const idleLabel = state.studioMode === "style-transfer" ? "风格迁移" : "开始生成";
-  refs.generateButton.textContent =
-    preparingReference ? "处理参考图..." : queuedCount > 0 ? `队列 ${queuedCount}` : idleLabel;
+  const idleLabel = state.studioMode === "style-transfer" ? getUiLanguageText("menuStyleTransfer") || "风格迁移" : getUiLanguageText("generate") || "开始生成";
+  refs.generateButton.textContent = preparingReference ? state.uiLanguage === "en" ? "Processing references..." : "处理参考图..." : queuedCount > 0 ? state.uiLanguage === "en" ? `Queue ${queuedCount}` : `队列 ${queuedCount}` : idleLabel;
   refs.liveCount.textContent = `${runningCount} / ${maxParallelCount}`;
 }
-
 function setPromptAgentFeedback(message, kind = "") {
   refs.promptAgentFeedback.textContent =
     kind === "error" ? compactErrorMessage(message, "图片分析请求失败") : message || "";
   refs.promptAgentFeedback.dataset.state = kind;
 }
-
 function revokePromptAgentPreview() {
   if (state.promptAgent.previewUrl) {
     URL.revokeObjectURL(state.promptAgent.previewUrl);
   }
 }
-
 function setPromptAgentOpen(open, { restoreFocus = true } = {}) {
   const wasOpen = !refs.promptAgentModal.classList.contains("hidden");
   refs.promptAgentModal.classList.toggle("hidden", !open);
@@ -2321,40 +2165,32 @@ function setPromptAgentOpen(open, { restoreFocus = true } = {}) {
     restoreOverlayTriggerFocus("prompt-agent");
   }
 }
-
 function getPromptAgentItem(itemId) {
   const current = state.promptAgent.result;
   if (current?.id === itemId) {
     return current;
   }
-
   return state.promptAgent.history.find((item) => item.id === itemId) || null;
 }
-
 function getPromptAgentPrompt(item) {
   return String(item?.json?.prompt || item?.json?.prompts?.[0]?.prompt || "").trim();
 }
-
 function getPromptAgentJsonText(item = state.promptAgent.result) {
   if (!item?.json) {
     return "";
   }
-
   return JSON.stringify(item.json, null, 2);
 }
-
 function getPromptAgentTemplateId(item) {
   const rawId = String(item?.id || item?.createdAt || item?.filename || "latest").trim();
   const safeId = rawId.replace(/[^a-zA-Z0-9_-]/g, "-") || "latest";
   return `prompt-agent-${safeId}`;
 }
-
 function savePromptAgentResultAsTemplate(item) {
   const prompt = getPromptAgentJsonText(item);
   if (!prompt) {
     return;
   }
-
   const template = {
     id: getPromptAgentTemplateId(item),
     name: item.json?.title || item.filename || "图片 JSON 提示词",
@@ -2368,100 +2204,81 @@ function savePromptAgentResultAsTemplate(item) {
   writePromptTemplates();
   renderPromptTemplates();
 }
-
 function renderPromptAgentPreview() {
   const file = state.promptAgent.file;
   refs.promptAgentPreview.classList.toggle("hidden", !file);
   refs.promptAgentPreview.classList.toggle("is-analyzing", state.promptAgent.running);
   refs.promptAgentAnalysisMotion.classList.toggle("is-active", state.promptAgent.running);
-
   if (!file) {
     refs.promptAgentPreviewImage.removeAttribute("src");
     refs.promptAgentFilename.textContent = "--";
     refs.promptAgentFileMeta.textContent = "--";
     return;
   }
-
   refs.promptAgentPreviewImage.src = state.promptAgent.previewUrl;
   refs.promptAgentFilename.textContent = file.name || "uploaded-image";
   refs.promptAgentFileMeta.textContent = `${file.type || "image"} · ${formatFileSize(file.size)}`;
 }
-
 function openPromptAgentImageViewer() {
   if (!state.promptAgent.previewUrl) {
     return;
   }
-
   state.promptAgent.viewerOpen = true;
   refs.promptAgentImageViewerImage.src = state.promptAgent.previewUrl;
   refs.promptAgentImageViewer.classList.add("open");
   refs.promptAgentImageViewer.setAttribute("aria-hidden", "false");
 }
-
 function closePromptAgentImageViewer() {
   state.promptAgent.viewerOpen = false;
   refs.promptAgentImageViewer.classList.remove("open");
   refs.promptAgentImageViewer.setAttribute("aria-hidden", "true");
 }
-
 function createPromptAgentHistoryCard(item) {
   const card = document.createElement("article");
   card.className = "prompt-agent-history-card";
   card.dataset.expanded = "false";
-
   const titleRow = document.createElement("div");
   titleRow.className = "prompt-agent-history-title";
-
   const titleButton = document.createElement("button");
   titleButton.className = "prompt-agent-history-title-button";
   titleButton.type = "button";
   titleButton.dataset.promptAgentMapId = item.id;
   titleButton.textContent = item.json?.title || "图片提示词";
   titleButton.title = titleButton.textContent;
-
   const time = document.createElement("span");
   time.className = "prompt-agent-history-time";
   time.textContent = formatTime(item.createdAt);
-
   const expandButton = document.createElement("button");
   expandButton.className = "prompt-agent-history-expand-button";
   expandButton.type = "button";
   expandButton.dataset.promptAgentExpandId = item.id;
   expandButton.setAttribute("aria-expanded", "false");
   expandButton.textContent = "展开";
-
   const detail = document.createElement("div");
   detail.className = "prompt-agent-history-detail hidden";
   detail.id = `prompt-agent-history-detail-${String(item.id).replace(/[^a-zA-Z0-9_-]/g, "-")}`;
   expandButton.setAttribute("aria-controls", detail.id);
   expandButton.setAttribute("aria-label", `展开 ${titleButton.textContent}`);
-
   titleRow.append(titleButton, time, expandButton);
-
   const promptText = document.createElement("p");
   promptText.className = "prompt-agent-history-prompt";
   promptText.textContent = getPromptAgentPrompt(item) || "未返回 prompt 字段";
-
   const meta = document.createElement("div");
   meta.className = "prompt-agent-history-meta";
   const tags = Array.isArray(item.json?.style_tags) ? item.json.style_tags.slice(0, 4).join(" / ") : "";
   meta.textContent = [item.filename, item.json?.aspect_ratio, tags].filter(Boolean).join(" · ");
-
   const actions = document.createElement("div");
   actions.className = "prompt-agent-history-actions";
-
   const copyButton = document.createElement("button");
   copyButton.className = "inline-button";
   copyButton.type = "button";
   copyButton.dataset.promptAgentCopyId = item.id;
   copyButton.textContent = "复制 JSON";
-
   actions.append(copyButton);
   detail.append(promptText, meta, actions);
   card.append(titleRow, detail);
   return card;
 }
-
 function setPromptAgentHistoryCardExpanded(card, expanded) {
   const detail = card.querySelector(".prompt-agent-history-detail");
   const expandButton = card.querySelector(".prompt-agent-history-expand-button");
@@ -2472,7 +2289,6 @@ function setPromptAgentHistoryCardExpanded(card, expanded) {
     expandButton.textContent = expanded ? "收起" : "展开";
   }
 }
-
 function togglePromptAgentHistoryCard(button) {
   const card = button.closest(".prompt-agent-history-card");
   if (!card) {
@@ -2480,17 +2296,14 @@ function togglePromptAgentHistoryCard(button) {
   }
   setPromptAgentHistoryCardExpanded(card, card.dataset.expanded !== "true");
 }
-
 function renderPromptAgentHistory() {
   refs.promptAgentHistoryList.replaceChildren();
   refs.promptAgentHistoryCount.textContent = `${state.promptAgent.history.length} 条`;
   refs.promptAgentHistoryEmpty.classList.toggle("hidden", state.promptAgent.history.length > 0);
-
   state.promptAgent.history.forEach((item) => {
     refs.promptAgentHistoryList.append(createPromptAgentHistoryCard(item));
   });
 }
-
 function renderPromptAgent() {
   renderPromptAgentPreview();
   refs.promptAgentAnalyzeButton.disabled = state.promptAgent.running || !state.promptAgent.file;
@@ -2503,40 +2316,32 @@ function renderPromptAgent() {
   refs.promptAgentResult.value = getPromptAgentJsonText();
   renderPromptAgentHistory();
 }
-
 function revokeReferencePreview(item) {
   if (item?.previewUrl) {
     URL.revokeObjectURL(item.previewUrl);
   }
 }
-
 function getGenerationReferenceFile(item) {
   return item?.generationFile || item?.file;
 }
-
 function getCreationReferenceGenerationFile(item) {
   return item?.generationFile || item?.file;
 }
-
 function getCreationLogoBatchSourceGenerationFile(item) {
   return item?.generationFile || item?.file || null;
 }
-
 function normalizeCreationLogoPlacement(value) {
   return CREATION_LOGO_PLACEMENTS.has(String(value || "")) ? String(value) : "top-left";
 }
-
 function normalizeCreationLogoBackground(value) {
   return CREATION_LOGO_BACKGROUNDS.has(String(value || "")) ? String(value) : "transparent";
 }
-
 function normalizeCreationLogoPayload(value = {}) {
   const source = value && typeof value === "object" ? value : {};
   const filename = String(source.filename || source.name || source.logoFilename || "").trim();
   if (!filename) {
     return null;
   }
-
   const placement = normalizeCreationLogoPlacement(source.placement || source.logoPlacement);
   const background = normalizeCreationLogoBackground(source.background || source.backgroundMode || source.logoBackground);
   return {
@@ -2548,57 +2353,45 @@ function normalizeCreationLogoPayload(value = {}) {
     backgroundLabel: CREATION_LOGO_BACKGROUND_LABELS[background] || background,
   };
 }
-
 function getCreationLogoGenerationFile() {
   return state.creationLogo?.generationFile || state.creationLogo?.file || null;
 }
-
 function getReferenceAnalysisGenerationFile(item) {
   return item?.generationFile || item?.file;
 }
-
 function getImageDecompositionGenerationFile(item = state.imageDecomposition.file) {
   return item?.generationFile || item?.file;
 }
-
 function hasPendingReferenceGenerationFiles() {
   return state.referenceFiles.some((item) => item.generationFilePromise);
 }
-
 function hasPendingCreationReferenceGenerationFiles() {
   return (
     state.creationReferenceFiles.some((item) => item.generationFilePromise) ||
     state.creationStyleReferenceFiles.some((item) => item.generationFilePromise)
   );
 }
-
 function hasPendingCreationLogoGenerationFile() {
   return Boolean(state.creationLogo?.generationFilePromise);
 }
-
 function hasPendingCreationLogoBatchGenerationFiles() {
   return state.creationLogoBatchFiles.some((item) => item.generationFilePromise);
 }
-
 function hasPendingCreationBranchGenerationFiles() {
   return isCreationLogoBatchBranch()
     ? hasPendingCreationLogoBatchGenerationFiles() || hasPendingCreationLogoGenerationFile()
     : hasPendingCreationReferenceGenerationFiles() || hasPendingCreationLogoGenerationFile();
 }
-
 function hasPendingReferenceAnalysisGenerationFiles() {
   return state.referenceAnalysis.files.some((item) => item.generationFilePromise);
 }
-
 function hasPendingImageDecompositionGenerationFiles() {
   return Boolean(state.imageDecomposition.file?.generationFilePromise);
 }
-
 function startReferenceGenerationCompression(item) {
   if (!item?.file) {
     return null;
   }
-
   item.generationFile = item.file;
   item.generationCompressed = false;
   item.generationFilePromise = prepareGenerationReferenceImageFile(item.file)
@@ -2616,16 +2409,13 @@ function startReferenceGenerationCompression(item) {
       item.generationFilePromise = null;
       updateGenerateButton();
     });
-
   updateGenerateButton();
   return item.generationFilePromise;
 }
-
 function startReferenceAnalysisGenerationCompression(item) {
   if (!item?.file) {
     return null;
   }
-
   item.generationFile = item.file;
   item.generationCompressed = false;
   item.generationFilePromise = prepareGenerationReferenceImageFile(item.file)
@@ -2644,17 +2434,14 @@ function startReferenceAnalysisGenerationCompression(item) {
       renderReferenceAnalysisGrid();
       renderReferenceAnalysis();
     });
-
   renderReferenceAnalysisGrid();
   renderReferenceAnalysis();
   return item.generationFilePromise;
 }
-
 function startImageDecompositionGenerationCompression(item) {
   if (!item?.file) {
     return null;
   }
-
   item.generationFile = item.file;
   item.generationCompressed = false;
   item.generationFilePromise = prepareGenerationReferenceImageFile(item.file)
@@ -2672,28 +2459,22 @@ function startImageDecompositionGenerationCompression(item) {
       item.generationFilePromise = null;
       renderImageDecompositionView();
     });
-
   renderImageDecompositionView();
   return item.generationFilePromise;
 }
-
 function getStyleTransferReferenceItem(slot) {
   return slot === "style" ? state.styleTransfer.style : state.styleTransfer.source;
 }
-
 function getStyleTransferGenerationFile(slot) {
   return getGenerationReferenceFile(getStyleTransferReferenceItem(slot));
 }
-
 function hasPendingStyleTransferGenerationFiles() {
   return Boolean(state.styleTransfer.source?.generationFilePromise || state.styleTransfer.style?.generationFilePromise);
 }
-
 function startStyleTransferGenerationCompression(item) {
   if (!item?.file) {
     return null;
   }
-
   item.generationFile = item.file;
   item.generationCompressed = false;
   item.generationFilePromise = prepareGenerationReferenceImageFile(item.file)
@@ -2712,17 +2493,14 @@ function startStyleTransferGenerationCompression(item) {
       renderStyleTransferReferences();
       updateGenerateButton();
     });
-
   renderStyleTransferReferences();
   updateGenerateButton();
   return item.generationFilePromise;
 }
-
 function startCreationReferenceGenerationCompression(item) {
   if (!item?.file) {
     return null;
   }
-
   item.generationFile = item.file;
   item.generationCompressed = false;
   item.generationFilePromise = prepareGenerationReferenceImageFile(item.file)
@@ -2740,16 +2518,13 @@ function startCreationReferenceGenerationCompression(item) {
       item.generationFilePromise = null;
       renderCreationView();
     });
-
   renderCreationView();
   return item.generationFilePromise;
 }
-
 function startCreationLogoGenerationCompression(item = state.creationLogo) {
   if (!item?.file) {
     return null;
   }
-
   item.generationFile = item.file;
   item.generationCompressed = false;
   item.generationFilePromise = prepareGenerationReferenceImageFile(item.file)
@@ -2767,16 +2542,13 @@ function startCreationLogoGenerationCompression(item = state.creationLogo) {
       item.generationFilePromise = null;
       renderCreationView();
     });
-
   renderCreationView();
   return item.generationFilePromise;
 }
-
 function startCreationLogoBatchGenerationCompression(item) {
   if (!item?.file) {
     return null;
   }
-
   item.generationFile = item.file;
   item.generationCompressed = false;
   item.generationFilePromise = prepareGenerationReferenceImageFile(item.file)
@@ -2795,12 +2567,10 @@ function startCreationLogoBatchGenerationCompression(item) {
       renderCreationLogoBatchSourceGrid();
       renderCreationView();
     });
-
   renderCreationLogoBatchSourceGrid();
   renderCreationView();
   return item.generationFilePromise;
 }
-
 async function ensureStyleTransferGenerationFilesReady() {
   const pending = [state.styleTransfer.source?.generationFilePromise, state.styleTransfer.style?.generationFilePromise].filter(
     Boolean,
@@ -2808,20 +2578,17 @@ async function ensureStyleTransferGenerationFilesReady() {
   if (pending.length === 0) {
     return;
   }
-
   try {
     await Promise.allSettled(pending);
   } finally {
     renderStyleTransferReferences();
   }
 }
-
 async function ensureReferenceGenerationFilesReady() {
   const pending = state.referenceFiles.map((item) => item.generationFilePromise).filter(Boolean);
   if (pending.length === 0) {
     return;
   }
-
   state.referenceCompressionRunning = true;
   updateGenerateButton();
   try {
@@ -2831,7 +2598,6 @@ async function ensureReferenceGenerationFilesReady() {
     updateGenerateButton();
   }
 }
-
 async function ensureCreationReferenceGenerationFilesReady() {
   const pending = [
     ...state.creationReferenceFiles.map((item) => item.generationFilePromise),
@@ -2841,14 +2607,12 @@ async function ensureCreationReferenceGenerationFilesReady() {
   if (pending.length === 0) {
     return;
   }
-
   try {
     await Promise.allSettled(pending);
   } finally {
     renderCreationView();
   }
 }
-
 async function ensureCreationLogoBatchGenerationFilesReady() {
   const pending = [
     ...state.creationLogoBatchFiles.map((item) => item.generationFilePromise),
@@ -2857,20 +2621,17 @@ async function ensureCreationLogoBatchGenerationFilesReady() {
   if (pending.length === 0) {
     return;
   }
-
   try {
     await Promise.allSettled(pending);
   } finally {
     renderCreationView();
   }
 }
-
 async function ensureReferenceAnalysisGenerationFilesReady() {
   const pending = state.referenceAnalysis.files.map((item) => item.generationFilePromise).filter(Boolean);
   if (pending.length === 0) {
     return;
   }
-
   try {
     await Promise.allSettled(pending);
   } finally {
@@ -2878,20 +2639,17 @@ async function ensureReferenceAnalysisGenerationFilesReady() {
     renderReferenceAnalysis();
   }
 }
-
 async function ensureImageDecompositionGenerationFilesReady() {
   const pending = [state.imageDecomposition.file?.generationFilePromise].filter(Boolean);
   if (pending.length === 0) {
     return;
   }
-
   try {
     await Promise.allSettled(pending);
   } finally {
     renderImageDecompositionView();
   }
 }
-
 function resetReferenceFiles() {
   closeReferencePreview();
   state.referenceFiles.forEach(revokeReferencePreview);
@@ -2900,20 +2658,17 @@ function resetReferenceFiles() {
   renderReferenceGrid();
   updateGenerateButton();
 }
-
 function openReferencePreview(referenceId) {
   const item = state.referenceFiles.find((entry) => entry.id === referenceId);
   if (!item?.previewUrl) {
     return;
   }
-
   state.referencePreviewItem = item;
   setReferencePreviewNavigationContext({ items: state.referenceFiles, currentId: item.id });
   refs.referencePreviewImage.src = item.previewUrl;
   refs.referencePreviewViewer.classList.add("open");
   refs.referencePreviewViewer.setAttribute("aria-hidden", "false");
 }
-
 function closeReferencePreview() {
   state.referencePreviewItem = null;
   state.creationReferencePreviewItem = null;
@@ -2927,7 +2682,6 @@ function closeReferencePreview() {
   refs.referencePreviewViewer.setAttribute("aria-hidden", "true");
   refs.referencePreviewImage.removeAttribute("src");
 }
-
 function removeReferenceFile(referenceId) {
   const target = state.referenceFiles.find((item) => item.id === referenceId);
   if (state.referencePreviewItem?.id === referenceId) {
@@ -2938,28 +2692,23 @@ function removeReferenceFile(referenceId) {
   renderReferenceGrid();
   updateGenerateButton();
 }
-
 function applyReferenceFiles(fileList) {
   const incomingFiles = [...(fileList || [])].filter((file) => file.type.startsWith("image/"));
   if (incomingFiles.length === 0) {
     return;
   }
-
   const next = [...state.referenceFiles];
   const fingerprints = new Set(next.map((item) => item.fingerprint));
   let overflowed = false;
-
   for (const file of incomingFiles) {
     if (next.length >= state.limits.maxReferenceImages) {
       overflowed = true;
       break;
     }
-
     const fingerprint = buildReferenceFingerprint(file);
     if (fingerprints.has(fingerprint)) {
       continue;
     }
-
     const referenceItem = {
       id: `ref-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       fingerprint,
@@ -2973,17 +2722,14 @@ function applyReferenceFiles(fileList) {
     next.push(referenceItem);
     fingerprints.add(fingerprint);
   }
-
   state.referenceFiles = next;
   refs.referenceInput.value = "";
   renderReferenceGrid();
   updateGenerateButton();
-
   if (overflowed) {
     showError(`参考图最多支持 ${state.limits.maxReferenceImages} 张。`);
   }
 }
-
 function createReferenceAnalysisItem(file) {
   return {
     id: `reference-analysis-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -2995,45 +2741,37 @@ function createReferenceAnalysisItem(file) {
     previewUrl: URL.createObjectURL(file),
   };
 }
-
 function applyReferenceAnalysisFiles(fileList) {
   const incomingFiles = [...(fileList || [])].filter((file) => file.type.startsWith("image/"));
   if (incomingFiles.length === 0) {
     return;
   }
-
   const next = [...state.referenceAnalysis.files];
   const fingerprints = new Set(next.map((item) => item.fingerprint));
   let overflowed = false;
-
   for (const file of incomingFiles) {
     if (next.length >= state.limits.maxReferenceImages) {
       overflowed = true;
       break;
     }
-
     const fingerprint = buildReferenceFingerprint(file);
     if (fingerprints.has(fingerprint)) {
       continue;
     }
-
     const referenceItem = createReferenceAnalysisItem(file);
     startReferenceAnalysisGenerationCompression(referenceItem);
     next.push(referenceItem);
     fingerprints.add(fingerprint);
   }
-
   state.referenceAnalysis.files = next;
   refs.referenceAnalysisInput.value = "";
   markReferenceAnalysisDirty();
   renderReferenceAnalysisGrid();
   renderReferenceAnalysis();
-
   if (overflowed) {
     setReferenceAnalysisFeedback(`融图分析最多支持 ${state.limits.maxReferenceImages} 张图片。`, "error");
   }
 }
-
 function removeReferenceAnalysisFile(referenceId) {
   const target = state.referenceAnalysis.files.find((item) => item.id === referenceId);
   if (state.referenceAnalysisPreviewItem?.id === referenceId) {
@@ -3045,32 +2783,26 @@ function removeReferenceAnalysisFile(referenceId) {
   renderReferenceAnalysisGrid();
   renderReferenceAnalysis();
 }
-
 function getQuickBlendController() {
   return getMountedLazyViewModule("quick-blend");
 }
-
 function renderQuickBlendView() {
   return getQuickBlendController()?.renderQuickBlendView?.() || false;
 }
-
 function setQuickBlendFeedback(message = "", kind = "") {
   state.quickBlend.feedback = message;
   state.quickBlend.feedbackKind = kind;
   getQuickBlendController()?.setQuickBlendFeedback?.(message, kind);
 }
-
 function storeQuickBlendGenerationItem(item) {
   const controller = getQuickBlendController();
   if (controller?.storeQuickBlendGenerationItem) {
     return controller.storeQuickBlendGenerationItem(item);
   }
-
   const filename = String(item?.filename || "").trim();
   if (!filename) {
     return "";
   }
-
   const key = makeGalleryPreviewKey(filename);
   state.quickBlend.generationItems[key] = {
     ...(state.quickBlend.generationItems[key] || {}),
@@ -3080,20 +2812,17 @@ function storeQuickBlendGenerationItem(item) {
   };
   return key;
 }
-
 function replaceQuickBlendGenerationKey(oldKey, newKey) {
   const controller = getQuickBlendController();
   if (controller?.replaceQuickBlendGenerationKey) {
     controller.replaceQuickBlendGenerationKey(oldKey, newKey);
     return;
   }
-
   const currentKey = String(oldKey || "").trim();
   const nextKey = String(newKey || "").trim();
   if (!nextKey) {
     return;
   }
-
   const keys = state.quickBlend.generationKeys.filter((entry) => entry !== nextKey);
   const index = keys.indexOf(currentKey);
   if (index >= 0) {
@@ -3101,39 +2830,32 @@ function replaceQuickBlendGenerationKey(oldKey, newKey) {
     state.quickBlend.generationKeys = keys;
     return;
   }
-
   state.quickBlend.generationKeys = [...keys.filter((entry) => entry !== currentKey), nextKey];
 }
-
 function removeQuickBlendGenerationKey(key) {
   const controller = getQuickBlendController();
   if (controller?.removeQuickBlendGenerationKey) {
     controller.removeQuickBlendGenerationKey(key);
     return;
   }
-
   const targetKey = String(key || "").trim();
   if (!targetKey) {
     return;
   }
-
   state.quickBlend.generationKeys = state.quickBlend.generationKeys.filter((entry) => entry !== targetKey);
   if (state.quickBlend.previewKey === targetKey) {
     state.quickBlend.previewKey = "";
   }
 }
-
 async function preserveQuickBlendGenerationItemForDelete(item) {
   const controller = getQuickBlendController();
   if (controller?.preserveQuickBlendGenerationItemForDelete) {
     await controller.preserveQuickBlendGenerationItemForDelete(item);
     return;
   }
-
   if (!item?.filename) {
     return;
   }
-
   const key = makeGalleryPreviewKey(item.filename);
   const tracked =
     item.mode === "quick-blend" ||
@@ -3144,13 +2866,11 @@ async function preserveQuickBlendGenerationItemForDelete(item) {
   if (!tracked) {
     return;
   }
-
   const imageUrl = getImageUrl(item);
   if (!imageUrl || String(imageUrl).startsWith("data:image/")) {
     storeQuickBlendGenerationItem(item);
     return;
   }
-
   try {
     const dataUrl = await fetchServerImageAsDataUrl(imageUrl);
     if (dataUrl) {
@@ -3160,10 +2880,8 @@ async function preserveQuickBlendGenerationItemForDelete(item) {
   } catch (_error) {
     // Keep existing metadata if the image cannot be copied before deletion.
   }
-
   storeQuickBlendGenerationItem(item);
 }
-
 const {
   preserveImageEditGenerationItemForDelete,
   removeImageEditGenerationKey,
@@ -3176,7 +2894,6 @@ const {
   state,
   makeGalleryPreviewKey,
 });
-
 function createImageDecompositionItem(file) {
   return {
     id: `image-decomposition-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -3188,30 +2905,24 @@ function createImageDecompositionItem(file) {
     previewUrl: URL.createObjectURL(file),
   };
 }
-
 function setImageDecompositionFeedback(message = "", kind = "") {
   refs.imageDecompositionFeedback.textContent = message ? compactErrorMessage(message, "图片拆解失败") : "";
   refs.imageDecompositionFeedback.dataset.state = kind;
 }
-
 function getImageDecompositionGenerationItemByKey(key) {
   if (String(key || "").startsWith("job:")) {
     return state.jobs.find((job) => job.id === String(key).slice(4) && job.mode === "image-decomposition") || null;
   }
-
   if (String(key || "").startsWith("file:")) {
     return state.imageDecomposition.generationItems[key] || state.gallery.find((item) => item.filename === String(key).slice(5)) || null;
   }
-
   return null;
 }
-
 function storeImageDecompositionGenerationItem(item) {
   const filename = String(item?.filename || "").trim();
   if (!filename) {
     return "";
   }
-
   const key = makeGalleryPreviewKey(filename);
   const current = state.imageDecomposition.generationItems[key] || {};
   state.imageDecomposition.generationItems[key] = {
@@ -3221,42 +2932,35 @@ function storeImageDecompositionGenerationItem(item) {
   };
   return key;
 }
-
 function registerImageDecompositionGenerationKey(key) {
   const nextKey = String(key || "").trim();
   if (!nextKey) {
     return;
   }
-
   state.imageDecomposition.generationKeys = [
     nextKey,
     ...state.imageDecomposition.generationKeys.filter((entry) => entry !== nextKey),
   ];
 }
-
 function replaceImageDecompositionGenerationKey(oldKey, newKey) {
   const currentKey = String(oldKey || "").trim();
   const nextKey = String(newKey || "").trim();
   if (!nextKey) {
     return;
   }
-
   const keys = state.imageDecomposition.generationKeys.filter((entry) => entry !== nextKey && entry !== currentKey);
   state.imageDecomposition.generationKeys = [nextKey, ...keys];
 }
-
 function removeImageDecompositionGenerationKey(key) {
   const targetKey = String(key || "").trim();
   if (!targetKey) {
     return;
   }
-
   state.imageDecomposition.generationKeys = state.imageDecomposition.generationKeys.filter((entry) => entry !== targetKey);
   if (state.imageDecomposition.previewKey === targetKey) {
     state.imageDecomposition.previewKey = "";
   }
 }
-
 function getImageDecompositionGenerationPreviewEntries() {
   const entries = [];
   const seen = new Set();
@@ -3265,16 +2969,13 @@ function getImageDecompositionGenerationPreviewEntries() {
     if (!normalizedKey || seen.has(normalizedKey)) {
       return;
     }
-
     const item = getImageDecompositionGenerationItemByKey(normalizedKey);
     if (!item) {
       return;
     }
-
     seen.add(normalizedKey);
     entries.push({ key: normalizedKey, item });
   };
-
   state.imageDecomposition.generationKeys.forEach(addKey);
   sortGalleryItemsByCreatedAtDesc(state.jobs)
     .filter((job) => job.mode === "image-decomposition")
@@ -3287,34 +2988,27 @@ function getImageDecompositionGenerationPreviewEntries() {
         item.assetKind === "image-decomposition",
     )
     .forEach((item) => addKey(makeGalleryPreviewKey(item.filename)));
-
   return entries;
 }
-
 function syncImageDecompositionGenerationPreviewKey() {
   if (getImageDecompositionGenerationItemByKey(state.imageDecomposition.previewKey || "")) {
     return;
   }
-
   const fallback = getImageDecompositionGenerationPreviewEntries()[0];
   state.imageDecomposition.previewKey = fallback?.key || "";
 }
-
 function getImageDecompositionGenerationPreviewItem() {
   syncImageDecompositionGenerationPreviewKey();
   return getImageDecompositionGenerationItemByKey(state.imageDecomposition.previewKey || "");
 }
-
 function setImageDecompositionGenerationPreviewKey(key) {
   const nextKey = String(key || "").trim();
   if (!getImageDecompositionGenerationItemByKey(nextKey)) {
     return;
   }
-
   state.imageDecomposition.previewKey = nextKey;
   renderImageDecompositionGenerationPreview();
 }
-
 function setImageDecompositionGenerationPlaceholderText(message, hidden = false) {
   imageDecompositionLoadingShellNodes = null;
   refs.imageDecompositionGenerationPlaceholder.className = "image-decomposition-generation-placeholder preview-placeholder";
@@ -3323,16 +3017,13 @@ function setImageDecompositionGenerationPlaceholderText(message, hidden = false)
   if (!message) {
     return;
   }
-
   const title = document.createElement("h3");
   title.textContent = message;
   refs.imageDecompositionGenerationPlaceholder.appendChild(title);
-
   const detail = document.createElement("span");
   detail.textContent = "上传一张源图后开始生成，底部胶片条可快速切换结果。";
   refs.imageDecompositionGenerationPlaceholder.appendChild(detail);
 }
-
 function renderImageDecompositionGenerationLoading(item) {
   const placeholderState = {
     ...getPreviewPlaceholderState({
@@ -3347,19 +3038,16 @@ function renderImageDecompositionGenerationLoading(item) {
     title: "拆解信息图生成中",
     detail: item?.statusText || "正在生成图片",
   };
-
   if (
     !imageDecompositionLoadingShellNodes ||
     !shouldReusePreviewLoadingShell(imageDecompositionLoadingShellNodes.state || {}, placeholderState)
   ) {
     imageDecompositionLoadingShellNodes = createPreviewLoadingShellNodes();
   }
-
   updatePreviewLoadingShell(imageDecompositionLoadingShellNodes, placeholderState);
   refs.imageDecompositionGenerationPlaceholder.className =
     "image-decomposition-generation-placeholder preview-placeholder preview-placeholder-loading";
   refs.imageDecompositionGenerationPlaceholder.classList.remove("hidden");
-
   if (
     refs.imageDecompositionGenerationPlaceholder.firstChild !== imageDecompositionLoadingShellNodes.eyebrow ||
     refs.imageDecompositionGenerationPlaceholder.lastChild !== imageDecompositionLoadingShellNodes.shell
@@ -3370,7 +3058,6 @@ function renderImageDecompositionGenerationLoading(item) {
     );
   }
 }
-
 function openImageDecompositionGeneratedPreview() {
   const item = getImageDecompositionGenerationPreviewItem();
   if (item && getImageUrl(item)) {
@@ -3379,12 +3066,10 @@ function openImageDecompositionGeneratedPreview() {
     });
   }
 }
-
 function renderImageDecompositionGenerationPreview() {
   const item = getImageDecompositionGenerationPreviewItem();
   const imageUrl = item ? getImageUrl(item) : "";
   const isRunning = Boolean(item?.isRunning || (item?.started && !item?.filename));
-
   refs.imageDecompositionGenerationCanvas.classList.toggle("has-image", Boolean(imageUrl));
   refs.imageDecompositionGenerationCanvas.classList.toggle("is-running", isRunning && !imageUrl);
   if (imageUrl) {
@@ -3396,7 +3081,6 @@ function renderImageDecompositionGenerationPreview() {
     refs.imageDecompositionGenerationCanvas.removeAttribute("aria-label");
     refs.imageDecompositionGenerationCanvas.tabIndex = -1;
   }
-
   if (imageUrl) {
     setImageDecompositionGenerationPlaceholderText("", true);
   } else if (isRunning) {
@@ -3404,7 +3088,6 @@ function renderImageDecompositionGenerationPreview() {
   } else {
     setImageDecompositionGenerationPlaceholderText("拆解信息图会显示在这里");
   }
-
   if (imageUrl) {
     refs.imageDecompositionGenerationImage.src = imageUrl;
     refs.imageDecompositionGenerationImage.alt = getDisplayPrompt(item) || "图片拆解生成结果";
@@ -3423,19 +3106,16 @@ function renderImageDecompositionGenerationPreview() {
     refs.imageDecompositionGenerationDownloadButton.setAttribute("aria-disabled", "true");
     refs.imageDecompositionGenerationLightboxButton.disabled = true;
   }
-
   refs.imageDecompositionGenerationMeta.textContent = item
     ? [formatTime(item.createdAt), formatCanvasLabel(item.size), item.statusText || ""].filter(Boolean).join(" · ")
     : "等待生成";
   renderImageDecompositionGenerationStrip();
 }
-
 function renderImageDecompositionGenerationStrip() {
   const entries = getImageDecompositionGenerationPreviewEntries();
   refs.imageDecompositionGenerationStrip.replaceChildren();
   refs.imageDecompositionGenerationStrip.classList.toggle("hidden", entries.length === 0);
   refs.imageDecompositionThumbnailEmpty.classList.toggle("hidden", entries.length > 0);
-
   entries.forEach(({ key, item }, index) => {
     const button = document.createElement("button");
     button.type = "button";
@@ -3445,7 +3125,6 @@ function renderImageDecompositionGenerationStrip() {
     button.title = `切换到第 ${index + 1} 张图片拆解结果`;
     button.classList.toggle("active", key === state.imageDecomposition.previewKey);
     button.classList.toggle("is-running", Boolean(item?.isRunning || (item?.started && !item?.filename)));
-
     const imageUrl = getImageUrl(item);
     if (imageUrl) {
       const image = document.createElement("img");
@@ -3459,23 +3138,19 @@ function renderImageDecompositionGenerationStrip() {
         ghost.textContent = formatLoadingThumbnailStatusLabel(item, { idleLabel: "等待" });
         button.appendChild(ghost);
       }
-
     const caption = document.createElement("span");
     caption.textContent = formatFilmstripSizeLabel(item) || item?.statusText || formatClock(item?.createdAt);
     button.appendChild(caption);
-
     const shell = document.createElement("div");
     shell.className = "filmstrip-entry";
     shell.appendChild(button);
     refs.imageDecompositionGenerationStrip.appendChild(shell);
   });
 }
-
 async function preserveImageDecompositionGenerationItemForDelete(item) {
   if (!item?.filename) {
     return;
   }
-
   const key = makeGalleryPreviewKey(item.filename);
   const isTrackedImageDecompositionItem =
     item.mode === "image-decomposition" ||
@@ -3485,13 +3160,11 @@ async function preserveImageDecompositionGenerationItemForDelete(item) {
   if (!isTrackedImageDecompositionItem) {
     return;
   }
-
   const imageUrl = getImageUrl(item);
   if (!imageUrl || String(imageUrl).startsWith("data:image/")) {
     storeImageDecompositionGenerationItem(item);
     return;
   }
-
   try {
     const dataUrl = await fetchServerImageAsDataUrl(imageUrl);
     if (dataUrl) {
@@ -3505,46 +3178,37 @@ async function preserveImageDecompositionGenerationItemForDelete(item) {
   } catch (_error) {
     // Keep existing metadata if the image cannot be copied before deletion.
   }
-
   storeImageDecompositionGenerationItem(item);
 }
-
 function createImageDecompositionGenerationFile(item) {
   return item?.generationFile || item?.file;
 }
-
 function syncImageDecompositionLanguageUI() {
   const isCustom = refs.imageDecompositionLanguageInput.value === "custom";
   refs.imageDecompositionCustomLanguageField.classList.toggle("hidden", !isCustom);
   refs.imageDecompositionCustomLanguageInput.disabled = !isCustom;
 }
-
 function renderImageDecompositionSource() {
   const item = state.imageDecomposition.file;
   refs.imageDecompositionCount.textContent = item ? "1 / 1" : "0 / 1";
   syncReferenceDropzoneCompact(refs.imageDecompositionDropzone, Boolean(item));
   refs.imageDecompositionGrid.classList.toggle("hidden", !item);
   refs.imageDecompositionGrid.replaceChildren();
-
   if (!item) {
     return;
   }
-
   const card = document.createElement("div");
   card.className = "reference-card";
-
   const previewButton = document.createElement("button");
   previewButton.type = "button";
   previewButton.className = "reference-preview-button";
   previewButton.dataset.imageDecompositionPreviewId = item.id;
   previewButton.setAttribute("aria-label", "放大查看源图");
-
   const image = document.createElement("img");
   image.src = item.previewUrl;
   image.alt = "源图预览";
   previewButton.appendChild(image);
   card.appendChild(previewButton);
-
   const remove = document.createElement("button");
   remove.type = "button";
   remove.className = "reference-remove";
@@ -3552,30 +3216,24 @@ function renderImageDecompositionSource() {
   remove.setAttribute("aria-label", "移除源图");
   remove.addEventListener("click", () => removeImageDecompositionFile());
   card.appendChild(remove);
-
   refs.imageDecompositionGrid.appendChild(card);
 }
-
 function createImageDecompositionGenerationItem(file) {
   return createImageDecompositionItem(file);
 }
-
 function applyImageDecompositionFile(fileList) {
   const incomingFiles = [...(fileList || [])].filter((file) => file.type.startsWith("image/"));
   if (incomingFiles.length === 0) {
     return;
   }
-
   if (incomingFiles.length !== 1) {
     setImageDecompositionFeedback("图片拆解模式一次只能上传一张源图。", "error");
     return;
   }
-
   const file = incomingFiles[0];
   if (state.imageDecomposition.file?.fingerprint === buildReferenceFingerprint(file)) {
     return;
   }
-
   const nextItem = createImageDecompositionGenerationItem(file);
   startImageDecompositionGenerationCompression(nextItem);
   if (state.imageDecomposition.file) {
@@ -3586,62 +3244,51 @@ function applyImageDecompositionFile(fileList) {
   setImageDecompositionFeedback("", "");
   renderImageDecompositionView();
 }
-
 function removeImageDecompositionFile() {
   const target = state.imageDecomposition.file;
   if (!target) {
     return;
   }
-
   if (state.imageDecompositionPreviewItem?.id === target.id) {
     closeReferencePreview();
   }
-
   revokeReferencePreview(target);
   state.imageDecomposition.file = null;
   refs.imageDecompositionInput.value = "";
   renderImageDecompositionView();
 }
-
 function openImageDecompositionPreview(referenceId) {
   const item = state.imageDecomposition.file;
   if (item?.id !== referenceId || !item.previewUrl) {
     return;
   }
-
   state.imageDecompositionPreviewItem = item;
   setReferencePreviewNavigationContext({ items: [item], currentId: item.id });
   refs.referencePreviewImage.src = item.previewUrl;
   refs.referencePreviewViewer.classList.add("open");
   refs.referencePreviewViewer.setAttribute("aria-hidden", "false");
 }
-
 function syncImageDecompositionRatio(value) {
   const nextValue = getRatioOption(value)?.value || DEFAULT_UI_RATIO;
   refs.imageDecompositionRatioInput.value = nextValue;
   renderImageDecompositionRatioGrid();
   renderImageDecompositionSizeOptions();
 }
-
 function renderImageDecompositionRatioGrid() {
   renderRatioGrid(refs.imageDecompositionRatioGrid, refs.imageDecompositionRatioInput, syncImageDecompositionRatio);
 }
-
 function renderImageDecompositionSizeOptions() {
   renderSizeOptions(refs.imageDecompositionSizeInput, refs.imageDecompositionRatioInput);
 }
-
 function syncImageDecompositionSize(value) {
   const ratioValue = refs.imageDecompositionRatioInput.value || DEFAULT_UI_RATIO;
   refs.imageDecompositionSizeInput.value = normalizeSizeForSelectedRoute(ratioValue, value || "auto");
 }
-
 function createImageDecompositionJob() {
   const ratioOption = getRatioOption(refs.imageDecompositionRatioInput.value || DEFAULT_UI_RATIO);
   const sourceItem = state.imageDecomposition.file;
   const sizeSetting = normalizeSizeForSelectedRoute(ratioOption.value, refs.imageDecompositionSizeInput.value || "auto");
   const size = sizeSetting === "auto" ? ratioOption?.baseSize || getDefaultGenerationSize(ratioOption?.value) : sizeSetting;
-
   return {
     id: `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     createdAt: nowIso(),
@@ -3672,22 +3319,18 @@ function createImageDecompositionJob() {
     previewUrl: "",
   };
 }
-
 async function startImageDecompositionGeneration() {
   clearError();
-
   if (!state.imageDecomposition.file?.file) {
     setImageDecompositionFeedback("请先上传一张源图。", "error");
     return;
   }
-
   const targetLanguage = String(refs.imageDecompositionLanguageInput.value || "").trim();
   const customLanguage = String(refs.imageDecompositionCustomLanguageInput.value || "").trim();
   if (targetLanguage === "custom" && !customLanguage) {
     setImageDecompositionFeedback("请填写自定义语言。", "error");
     return;
   }
-
   await ensureImageDecompositionGenerationFilesReady();
   const job = createImageDecompositionJob();
   registerImageDecompositionGenerationKey(makeJobPreviewKey(job.id));
@@ -3700,7 +3343,6 @@ async function startImageDecompositionGeneration() {
   setActiveView("image-decomposition");
   scheduleGenerationQueue();
 }
-
 function renderImageDecompositionView() {
   syncImageDecompositionLanguageUI();
   renderImageDecompositionSource();
@@ -3713,32 +3355,26 @@ function renderImageDecompositionView() {
       ? "继续生成"
       : "开始拆解";
 }
-
 function openReferenceAnalysisPreview(referenceId) {
   const item = state.referenceAnalysis.files.find((entry) => entry.id === referenceId);
   if (!item?.previewUrl) {
     return;
   }
-
   state.referenceAnalysisPreviewItem = item;
   setReferencePreviewNavigationContext({ items: state.referenceAnalysis.files, currentId: item.id });
   refs.referencePreviewImage.src = item.previewUrl;
   refs.referencePreviewViewer.classList.add("open");
   refs.referencePreviewViewer.setAttribute("aria-hidden", "false");
 }
-
 function syncReferenceDropzoneCompact(dropzone, hasFiles) {
   if (!dropzone) {
     return;
   }
-
   dropzone.classList.toggle("is-compact-hidden", Boolean(hasFiles));
 }
-
 function createReferenceAddCard({ input, label, onFiles }) {
   const card = document.createElement("div");
   card.className = "reference-card reference-add-card";
-
   const button = document.createElement("button");
   button.type = "button";
   button.className = "reference-add-button";
@@ -3746,7 +3382,6 @@ function createReferenceAddCard({ input, label, onFiles }) {
   button.title = label;
   button.setAttribute("aria-label", label);
   button.addEventListener("click", () => input?.click());
-
   card.addEventListener("dragover", (event) => {
     event.preventDefault();
     card.classList.add("dragover");
@@ -3759,30 +3394,24 @@ function createReferenceAddCard({ input, label, onFiles }) {
     card.classList.remove("dragover");
     onFiles?.(event.dataTransfer?.files);
   });
-
   card.appendChild(button);
   return card;
 }
-
 function normalizeStyleTransferPresetValue(value) {
   const candidate = String(value || "").trim();
   return STYLE_TRANSFER_PRESETS.some((preset) => preset.value === candidate) ? candidate : STYLE_TRANSFER_DEFAULT_PRESET;
 }
-
 function getStyleTransferPreset(value = state.styleTransfer.selectedPreset) {
   const normalizedValue = normalizeStyleTransferPresetValue(value);
   return STYLE_TRANSFER_PRESETS.find((preset) => preset.value === normalizedValue) || STYLE_TRANSFER_PRESETS[0];
 }
-
 function hasSelectedStyleTransferPreset() {
   return getStyleTransferPreset()?.value !== STYLE_TRANSFER_CUSTOM_PRESET;
 }
-
 function getStyleTransferPresetFileName(preset) {
   const raw = String(preset?.value || "style-preset").replace(/[^a-z0-9-]+/gi, "-") || "style-preset";
   return `${raw}-style-reference.png`;
 }
-
 function loadStyleTransferPresetImage(src) {
   return new Promise((resolve, reject) => {
     const image = new Image();
@@ -3792,12 +3421,10 @@ function loadStyleTransferPresetImage(src) {
     image.src = src;
   });
 }
-
 async function createStyleTransferPresetReferenceFile(preset) {
   if (!preset?.image) {
     return null;
   }
-
   const image = await loadStyleTransferPresetImage(preset.image);
   const sourceWidth = image.naturalWidth || STYLE_TRANSFER_PRESET_REFERENCE_SIZE;
   const sourceHeight = image.naturalHeight || Math.round((STYLE_TRANSFER_PRESET_REFERENCE_SIZE * 3) / 4);
@@ -3806,25 +3433,21 @@ async function createStyleTransferPresetReferenceFile(preset) {
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
-
   const context = canvas.getContext("2d");
   if (!context) {
     throw new Error("预设风格图准备失败。");
   }
-
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = "high";
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, width, height);
   context.drawImage(image, 0, 0, width, height);
-
   const blob = await canvasToBlob(canvas, "image/png");
   return new File([blob], getStyleTransferPresetFileName(preset), {
     type: "image/png",
     lastModified: Date.now(),
   });
 }
-
 async function ensureStyleTransferPresetReferenceFileReady() {
   const preset = getStyleTransferPreset();
   if (!preset || preset.value === STYLE_TRANSFER_CUSTOM_PRESET) {
@@ -3832,21 +3455,17 @@ async function ensureStyleTransferPresetReferenceFileReady() {
     state.styleTransfer.presetReferenceFileKey = "";
     return null;
   }
-
   if (state.styleTransfer.presetReferenceFile && state.styleTransfer.presetReferenceFileKey === preset.value) {
     return state.styleTransfer.presetReferenceFile;
   }
-
   const file = await createStyleTransferPresetReferenceFile(preset);
   state.styleTransfer.presetReferenceFile = file;
   state.styleTransfer.presetReferenceFileKey = preset.value;
   return file;
 }
-
 function getStyleTransferPresetReferenceFile() {
   return hasSelectedStyleTransferPreset() ? state.styleTransfer.presetReferenceFile : null;
 }
-
 function openStyleTransferPresetPreview(slot) {
   const preset = getStyleTransferPreset();
   const lightboxItem = buildStyleTransferPresetLightboxItem({ preset, slot, nowIso });
@@ -3856,26 +3475,21 @@ function openStyleTransferPresetPreview(slot) {
     });
   }
 }
-
 function handleStyleTransferPresetComparisonClick(event) {
   const trigger = event.target?.closest?.("[data-style-transfer-preset-preview]");
   if (trigger && refs.styleTransferPresetComparison?.contains(trigger)) openStyleTransferPresetPreview(trigger.dataset.styleTransferPresetPreview);
 }
-
 function createStyleTransferComparisonCard({ label, src, alt, previewSlot, preset = getStyleTransferPreset() }) {
   const card = document.createElement("div");
   card.className = "style-transfer-comparison-card";
-
   const caption = document.createElement("span");
   caption.className = "style-transfer-comparison-label"; caption.textContent = label;
   card.appendChild(caption);
-
   const button = document.createElement("button");
   button.type = "button"; button.className = "style-transfer-comparison-button";
   button.dataset.styleTransferPresetPreview = previewSlot;
   button.title = `放大查看 ${preset.label}${label}`;
   button.setAttribute("aria-label", button.title);
-
   const frame = document.createElement("span");
   frame.className = "style-transfer-comparison-frame";
   const image = document.createElement("img");
@@ -3885,12 +3499,10 @@ function createStyleTransferComparisonCard({ label, src, alt, previewSlot, prese
   card.appendChild(button);
   return card;
 }
-
 function renderStyleTransferPresetOptions() {
   if (!refs.styleTransferPresetInput) {
     return;
   }
-
   const selectedValue = normalizeStyleTransferPresetValue(state.styleTransfer.selectedPreset);
   if (refs.styleTransferPresetInput.options.length !== STYLE_TRANSFER_PRESETS.length) {
     refs.styleTransferPresetInput.replaceChildren(
@@ -3904,7 +3516,6 @@ function renderStyleTransferPresetOptions() {
   }
   refs.styleTransferPresetInput.value = selectedValue;
 }
-
 function renderStyleTransferPresetPreview() {
   renderStyleTransferPresetOptions();
   const preset = getStyleTransferPreset();
@@ -3938,7 +3549,6 @@ function renderStyleTransferPresetPreview() {
   }
   refs.styleTransferUploadGrid?.classList.toggle("uses-preset-style", hasSelectedStyleTransferPreset());
 }
-
 function handleStyleTransferPresetChange(event) {
   state.styleTransfer.selectedPreset = normalizeStyleTransferPresetValue(event.target.value);
   state.styleTransfer.presetReferenceFile = null;
@@ -3946,29 +3556,24 @@ function handleStyleTransferPresetChange(event) {
   renderStyleTransferReferences();
   updateGenerateButton();
 }
-
 function renderReferenceAnalysisGrid() {
   refs.referenceAnalysisGrid.replaceChildren();
   refs.referenceAnalysisCount.textContent = `${state.referenceAnalysis.files.length} / ${state.limits.maxReferenceImages}`;
   syncReferenceDropzoneCompact(refs.referenceAnalysisDropzone, state.referenceAnalysis.files.length > 0);
   refs.referenceAnalysisGrid.classList.toggle("hidden", state.referenceAnalysis.files.length === 0);
-
   state.referenceAnalysis.files.forEach((item) => {
     const card = document.createElement("div");
     card.className = "reference-card";
-
     const previewButton = document.createElement("button");
     previewButton.type = "button";
     previewButton.className = "reference-preview-button";
     previewButton.dataset.referenceAnalysisPreviewId = item.id;
     previewButton.setAttribute("aria-label", "放大查看待分析图片");
-
     const image = document.createElement("img");
     image.src = item.previewUrl;
     image.alt = "待分析图片预览";
     previewButton.appendChild(image);
     card.appendChild(previewButton);
-
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "reference-remove";
@@ -3976,10 +3581,8 @@ function renderReferenceAnalysisGrid() {
     remove.setAttribute("aria-label", "移除待分析图片");
     remove.addEventListener("click", () => removeReferenceAnalysisFile(item.id));
     card.appendChild(remove);
-
     refs.referenceAnalysisGrid.appendChild(card);
   });
-
   if (state.referenceAnalysis.files.length > 0 && state.referenceAnalysis.files.length < state.limits.maxReferenceImages) {
     refs.referenceAnalysisGrid.appendChild(
       createReferenceAddCard({
@@ -3990,7 +3593,6 @@ function renderReferenceAnalysisGrid() {
     );
   }
 }
-
 function createStyleTransferReferenceItem(slot, file) {
   return {
     id: `style-transfer-${slot}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -4003,7 +3605,6 @@ function createStyleTransferReferenceItem(slot, file) {
     previewUrl: URL.createObjectURL(file),
   };
 }
-
 function applyStyleTransferReferenceFile(slot, fileList) {
   const imageFiles = [...(fileList || [])].filter((item) => item.type.startsWith("image/"));
   if (imageFiles.length === 0) {
@@ -4014,16 +3615,13 @@ function applyStyleTransferReferenceFile(slot, fileList) {
     showError("原图和风格参考图每个区域只能上传一张图片。");
     return;
   }
-
   const file = imageFiles[0];
-
   const current = getStyleTransferReferenceItem(slot);
   const nextFingerprint = buildReferenceFingerprint(file);
   if (current?.fingerprint === nextFingerprint) {
     refs[slot === "style" ? "styleTransferStyleInput" : "styleTransferSourceInput"].value = "";
     return;
   }
-
   if (state.styleTransferPreviewItem?.id === current?.id) {
     closeReferencePreview();
   }
@@ -4035,7 +3633,6 @@ function applyStyleTransferReferenceFile(slot, fileList) {
   renderStyleTransferReferences();
   updateGenerateButton();
 }
-
 function removeStyleTransferReference(slot) {
   const key = slot === "style" ? "style" : "source";
   const target = state.styleTransfer[key];
@@ -4047,13 +3644,11 @@ function removeStyleTransferReference(slot) {
   renderStyleTransferReferences();
   updateGenerateButton();
 }
-
 function openStyleTransferPreview(slot) {
   const item = getStyleTransferReferenceItem(slot);
   if (!item?.previewUrl) {
     return;
   }
-
   closeReferencePreview();
   state.styleTransferPreviewItem = item;
   setReferencePreviewNavigationContext({
@@ -4064,35 +3659,29 @@ function openStyleTransferPreview(slot) {
   refs.referencePreviewViewer.classList.add("open");
   refs.referencePreviewViewer.setAttribute("aria-hidden", "false");
 }
-
 function renderStyleTransferReferenceSlot(slot, grid) {
   if (!grid) {
     return;
   }
-
   const item = getStyleTransferReferenceItem(slot);
   grid.replaceChildren();
   grid.classList.toggle("hidden", !item);
   if (!item) {
     return;
   }
-
   const card = document.createElement("div");
   card.className = "reference-card";
-
   const previewButton = document.createElement("button");
   previewButton.type = "button";
   previewButton.className = "reference-preview-button";
   previewButton.dataset.styleTransferPreviewRole = slot;
   previewButton.setAttribute("aria-label", slot === "style" ? "放大查看风格参考图" : "放大查看原图");
   previewButton.addEventListener("click", () => openStyleTransferPreview(slot));
-
   const image = document.createElement("img");
   image.src = item.previewUrl;
   image.alt = slot === "style" ? "风格参考图预览" : "原图预览";
   previewButton.appendChild(image);
   card.appendChild(previewButton);
-
   const remove = document.createElement("button");
   remove.type = "button";
   remove.className = "reference-remove";
@@ -4100,10 +3689,8 @@ function renderStyleTransferReferenceSlot(slot, grid) {
   remove.setAttribute("aria-label", slot === "style" ? "移除风格参考图" : "移除原图");
   remove.addEventListener("click", () => removeStyleTransferReference(slot));
   card.appendChild(remove);
-
   grid.appendChild(card);
 }
-
 function renderStyleTransferReferences() {
   renderStyleTransferPresetPreview();
   syncReferenceDropzoneCompact(refs.styleTransferSourceDropzone, Boolean(getStyleTransferReferenceItem("source")));
@@ -4111,29 +3698,24 @@ function renderStyleTransferReferences() {
   renderStyleTransferReferenceSlot("source", refs.styleTransferSourceGrid);
   renderStyleTransferReferenceSlot("style", refs.styleTransferStyleGrid);
 }
-
 function renderReferenceGrid() {
   refs.referenceGrid.innerHTML = "";
   refs.referenceCount.textContent = `${state.referenceFiles.length} / ${state.limits.maxReferenceImages}`;
   syncReferenceDropzoneCompact(refs.referenceDropzone, state.referenceFiles.length > 0);
   refs.referenceGrid.classList.toggle("hidden", state.referenceFiles.length === 0);
-
   state.referenceFiles.forEach((item) => {
     const card = document.createElement("div");
     card.className = "reference-card";
-
     const previewButton = document.createElement("button");
     previewButton.type = "button";
     previewButton.className = "reference-preview-button";
     previewButton.dataset.referencePreviewId = item.id;
     previewButton.setAttribute("aria-label", "放大查看参考图");
-
     const image = document.createElement("img");
     image.src = item.previewUrl;
     image.alt = "参考图预览";
     previewButton.appendChild(image);
     card.appendChild(previewButton);
-
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "reference-remove";
@@ -4143,7 +3725,6 @@ function renderReferenceGrid() {
     card.appendChild(remove);
     refs.referenceGrid.appendChild(card);
   });
-
   if (state.referenceFiles.length > 0 && state.referenceFiles.length < state.limits.maxReferenceImages) {
     refs.referenceGrid.appendChild(
       createReferenceAddCard({
@@ -4154,7 +3735,6 @@ function renderReferenceGrid() {
     );
   }
 }
-
 function getReferenceAnalysisPrompts(item = state.referenceAnalysis.result) {
   const prompts = Array.isArray(item?.json?.prompts)
     ? item.json.prompts
@@ -4167,7 +3747,6 @@ function getReferenceAnalysisPrompts(item = state.referenceAnalysis.result) {
         .slice(0, 3)
     : [];
   const fallbackPrompt = getPromptAgentPrompt(item);
-
   return prompts.length > 0
     ? prompts
     : fallbackPrompt
@@ -4180,12 +3759,10 @@ function getReferenceAnalysisPrompts(item = state.referenceAnalysis.result) {
         ]
       : [];
 }
-
 function setReferenceAnalysisFeedback(message, kind = "") {
   refs.referenceAnalysisFeedback.textContent = message ? compactErrorMessage(message, "参考图分析失败") : "";
   refs.referenceAnalysisFeedback.dataset.state = kind;
 }
-
 function markReferenceAnalysisDirty() {
   if (state.referenceAnalysis.result) {
     state.referenceAnalysis.dirty = true;
@@ -4197,34 +3774,26 @@ function markReferenceAnalysisDirty() {
   }
   renderReferenceAnalysisSelectedPrompt();
 }
-
 function toggleReferenceAnalysisPanel() {
   if (!state.referenceAnalysis.result?.json) {
     return;
   }
-
   state.referenceAnalysis.collapsed = !state.referenceAnalysis.collapsed;
   renderReferenceAnalysis();
 }
-
 function toggleReferenceAnalysisAutoCollapse() {
   state.referenceAnalysis.autoCollapseOnApply = !state.referenceAnalysis.autoCollapseOnApply;
   renderReferenceAnalysisSelectedPrompt();
 }
-
 function createReferenceAnalysisCard(option, index) {
   const card = document.createElement("article");
   card.className = "reference-analysis-card";
-
   const title = document.createElement("strong");
   title.textContent = option.title || `编排提示词 ${index + 1}`;
-
   const intent = document.createElement("span");
   intent.textContent = option.intent || "可直接应用到主提示词";
-
   const prompt = document.createElement("p");
   prompt.textContent = option.prompt;
-
   const button = document.createElement("button");
   const isSelected = state.referenceAnalysis.selectedPrompt === option.prompt;
   button.className = "inline-button reference-analysis-apply-pill";
@@ -4234,29 +3803,23 @@ function createReferenceAnalysisCard(option, index) {
   button.textContent = isSelected ? "已应用" : "应用提示词";
   button.setAttribute("aria-pressed", String(isSelected));
   button.setAttribute("aria-label", `${button.textContent}: ${option.title || `编排提示词 ${index + 1}`}`);
-
   card.append(title, intent, prompt, button);
   return card;
 }
-
 function getReferenceAnalysisGenerationItemByKey(key) {
   if (key.startsWith("job:")) {
     return state.jobs.find((job) => job.id === key.slice(4) && job.mode === "reference-analysis") || null;
   }
-
   if (key.startsWith("file:")) {
     return state.referenceAnalysis.generationItems[key] || state.gallery.find((item) => item.filename === key.slice(5)) || null;
   }
-
   return null;
 }
-
 function storeReferenceAnalysisGenerationItem(item) {
   const filename = String(item?.filename || "").trim();
   if (!filename) {
     return "";
   }
-
   const key = makeGalleryPreviewKey(filename);
   const current = state.referenceAnalysis.generationItems[key] || {};
   state.referenceAnalysis.generationItems[key] = {
@@ -4266,26 +3829,22 @@ function storeReferenceAnalysisGenerationItem(item) {
   };
   return key;
 }
-
 function registerReferenceAnalysisGenerationKey(key) {
   const nextKey = String(key || "").trim();
   if (!nextKey) {
     return;
   }
-
   state.referenceAnalysis.generationKeys = [
     nextKey,
     ...state.referenceAnalysis.generationKeys.filter((entry) => entry !== nextKey),
   ];
 }
-
 function replaceReferenceAnalysisGenerationKey(oldKey, newKey) {
   const currentKey = String(oldKey || "").trim();
   const nextKey = String(newKey || "").trim();
   if (!nextKey) {
     return;
   }
-
   const keys = state.referenceAnalysis.generationKeys.filter((entry) => entry !== nextKey);
   const index = keys.indexOf(currentKey);
   if (index >= 0) {
@@ -4293,22 +3852,18 @@ function replaceReferenceAnalysisGenerationKey(oldKey, newKey) {
     state.referenceAnalysis.generationKeys = keys;
     return;
   }
-
   state.referenceAnalysis.generationKeys = [nextKey, ...keys];
 }
-
 function removeReferenceAnalysisGenerationKey(key) {
   const targetKey = String(key || "").trim();
   if (!targetKey) {
     return;
   }
-
   state.referenceAnalysis.generationKeys = state.referenceAnalysis.generationKeys.filter((entry) => entry !== targetKey);
   if (state.referenceAnalysis.previewKey === targetKey) {
     state.referenceAnalysis.previewKey = "";
   }
 }
-
 function getReferenceAnalysisGenerationPreviewEntries() {
   const entries = [];
   const seen = new Set();
@@ -4317,54 +3872,43 @@ function getReferenceAnalysisGenerationPreviewEntries() {
     if (!normalizedKey || seen.has(normalizedKey)) {
       return;
     }
-
     const item = getReferenceAnalysisGenerationItemByKey(normalizedKey);
     if (!item) {
       return;
     }
-
     seen.add(normalizedKey);
     entries.push({ key: normalizedKey, item });
   };
-
   state.referenceAnalysis.generationKeys.forEach(addKey);
   sortGalleryItemsByCreatedAtDesc(state.jobs)
     .filter((job) => job.mode === "reference-analysis")
     .forEach((job) => addKey(makeJobPreviewKey(job.id)));
-
   return entries;
 }
-
 function syncReferenceAnalysisGenerationPreviewKey() {
   if (getReferenceAnalysisGenerationItemByKey(state.referenceAnalysis.previewKey || "")) {
     return;
   }
-
   const fallback = getReferenceAnalysisGenerationPreviewEntries()[0];
   state.referenceAnalysis.previewKey = fallback?.key || "";
 }
-
 function getReferenceAnalysisGenerationPreviewItem() {
   syncReferenceAnalysisGenerationPreviewKey();
   return getReferenceAnalysisGenerationItemByKey(state.referenceAnalysis.previewKey || "");
 }
-
 function setReferenceAnalysisGenerationPreviewKey(key) {
   const nextKey = String(key || "").trim();
   if (!getReferenceAnalysisGenerationItemByKey(nextKey)) {
     return;
   }
-
   state.referenceAnalysis.previewKey = nextKey;
   renderReferenceAnalysisSelectedPrompt();
 }
-
 function renderReferenceAnalysisGenerationStrip() {
   const entries = getReferenceAnalysisGenerationPreviewEntries();
   refs.referenceAnalysisGenerationStrip.replaceChildren();
   refs.referenceAnalysisGenerationStrip.classList.toggle("hidden", entries.length === 0);
   refs.referenceAnalysisThumbnailEmpty.classList.toggle("hidden", entries.length > 0);
-
   entries.forEach(({ key, item }, index) => {
     const button = document.createElement("button");
     button.type = "button";
@@ -4374,7 +3918,6 @@ function renderReferenceAnalysisGenerationStrip() {
     button.title = `切换到第 ${index + 1} 张融图结果`;
     button.classList.toggle("active", key === state.referenceAnalysis.previewKey);
     button.classList.toggle("is-running", Boolean(item?.isRunning || (item?.started && !item?.filename)));
-
     const imageUrl = getImageUrl(item);
     if (imageUrl) {
       const image = document.createElement("img");
@@ -4387,16 +3930,13 @@ function renderReferenceAnalysisGenerationStrip() {
       ghost.textContent = formatLoadingThumbnailStatusLabel(item, { idleLabel: "等待" });
       button.appendChild(ghost);
     }
-
     refs.referenceAnalysisGenerationStrip.appendChild(button);
   });
 }
-
 async function preserveReferenceAnalysisGenerationItemForDelete(item) {
   if (!item?.filename) {
     return;
   }
-
   const key = makeGalleryPreviewKey(item.filename);
   const isTrackedReferenceAnalysisItem =
     item.mode === "reference-analysis" ||
@@ -4405,13 +3945,11 @@ async function preserveReferenceAnalysisGenerationItemForDelete(item) {
   if (!isTrackedReferenceAnalysisItem) {
     return;
   }
-
   const imageUrl = getImageUrl(item);
   if (!imageUrl || String(imageUrl).startsWith("data:image/")) {
     storeReferenceAnalysisGenerationItem(item);
     return;
   }
-
   try {
     const dataUrl = await fetchServerImageAsDataUrl(imageUrl);
     if (dataUrl) {
@@ -4425,17 +3963,14 @@ async function preserveReferenceAnalysisGenerationItemForDelete(item) {
   } catch (_error) {
     // Keep the existing item metadata if the image cannot be copied before deletion.
   }
-
   storeReferenceAnalysisGenerationItem(item);
 }
-
 function setReferenceAnalysisGenerationPlaceholderText(message, hidden = false) {
   referenceAnalysisLoadingShellNodes = null;
   refs.referenceAnalysisGenerationPlaceholder.className = "reference-analysis-generation-placeholder";
   refs.referenceAnalysisGenerationPlaceholder.classList.toggle("hidden", hidden);
   refs.referenceAnalysisGenerationPlaceholder.textContent = message;
 }
-
 function renderReferenceAnalysisGenerationLoading(item) {
   const placeholderState = {
     ...getPreviewPlaceholderState({
@@ -4450,19 +3985,16 @@ function renderReferenceAnalysisGenerationLoading(item) {
     title: "提示词模式生成中",
     detail: item ? getDisplayPrompt(item) : "正在生成融图分析图片。",
   };
-
   if (
     !referenceAnalysisLoadingShellNodes ||
     !shouldReusePreviewLoadingShell(referenceAnalysisLoadingShellNodes.state || {}, placeholderState)
   ) {
     referenceAnalysisLoadingShellNodes = createPreviewLoadingShellNodes();
   }
-
   updatePreviewLoadingShell(referenceAnalysisLoadingShellNodes, placeholderState);
   refs.referenceAnalysisGenerationPlaceholder.className =
     "reference-analysis-generation-placeholder preview-placeholder preview-placeholder-loading";
   refs.referenceAnalysisGenerationPlaceholder.classList.remove("hidden");
-
   if (
     refs.referenceAnalysisGenerationPlaceholder.firstChild !== referenceAnalysisLoadingShellNodes.eyebrow ||
     refs.referenceAnalysisGenerationPlaceholder.lastChild !== referenceAnalysisLoadingShellNodes.shell
@@ -4473,7 +4005,6 @@ function renderReferenceAnalysisGenerationLoading(item) {
     );
   }
 }
-
 function openReferenceAnalysisGeneratedPreview() {
   const item = getReferenceAnalysisGenerationPreviewItem();
   if (item && getImageUrl(item)) {
@@ -4482,12 +4013,10 @@ function openReferenceAnalysisGeneratedPreview() {
     });
   }
 }
-
 function renderReferenceAnalysisGenerationPreview() {
   const item = getReferenceAnalysisGenerationPreviewItem();
   const imageUrl = item ? getImageUrl(item) : "";
   const isRunning = Boolean(item?.isRunning || (item?.started && !item?.filename));
-
   refs.referenceAnalysisGenerationCanvas.classList.toggle("has-image", Boolean(imageUrl));
   refs.referenceAnalysisGenerationCanvas.classList.toggle("is-running", isRunning && !imageUrl);
   if (imageUrl) {
@@ -4499,7 +4028,6 @@ function renderReferenceAnalysisGenerationPreview() {
     refs.referenceAnalysisGenerationCanvas.removeAttribute("aria-label");
     refs.referenceAnalysisGenerationCanvas.tabIndex = -1;
   }
-
   if (imageUrl) {
     setReferenceAnalysisGenerationPlaceholderText("", true);
   } else if (isRunning) {
@@ -4507,7 +4035,6 @@ function renderReferenceAnalysisGenerationPreview() {
   } else {
     setReferenceAnalysisGenerationPlaceholderText("生成图展示框");
   }
-
   if (imageUrl) {
     refs.referenceAnalysisGenerationImage.src = imageUrl;
     refs.referenceAnalysisGenerationImage.alt = getDisplayPrompt(item) || "融图分析生成结果";
@@ -4522,13 +4049,11 @@ function renderReferenceAnalysisGenerationPreview() {
     refs.referenceAnalysisGenerationDownloadButton.classList.add("disabled");
     refs.referenceAnalysisGenerationDownloadButton.setAttribute("aria-disabled", "true");
   }
-
   refs.referenceAnalysisGenerationMeta.textContent = item
     ? [formatTime(item.createdAt), formatCanvasLabel(item.size), item.statusText || ""].filter(Boolean).join(" · ")
     : "等待生成";
   renderReferenceAnalysisGenerationStrip();
 }
-
 function renderReferenceAnalysisSelectedPrompt() {
   const promptText = String(state.referenceAnalysis.selectedPrompt || "").trim();
   refs.referenceAnalysisSelectedPromptPanel.classList.toggle("hidden", !promptText);
@@ -4546,7 +4071,6 @@ function renderReferenceAnalysisSelectedPrompt() {
   refs.referenceAnalysisAutoCollapseButton.setAttribute("aria-checked", String(state.referenceAnalysis.autoCollapseOnApply));
   renderReferenceAnalysisGenerationPreview();
 }
-
 function renderReferenceAnalysis() {
   refs.referenceAnalyzeButton.disabled = state.referenceAnalysis.running;
   renderInlineBusyButton(refs.referenceAnalyzeButton, {
@@ -4555,12 +4079,10 @@ function renderReferenceAnalysis() {
     idleText: "融图分析",
   });
   renderReferenceAnalysisSelectedPrompt();
-
   const item = state.referenceAnalysis.result;
   refs.referenceAnalysisPanel.classList.toggle("hidden", !item?.json);
   refs.referenceAnalysisEmpty?.classList.toggle("hidden", Boolean(item?.json));
   refs.referenceAnalysisList.replaceChildren();
-
   if (!item?.json) {
     state.referenceAnalysis.collapsed = false;
     refs.referenceAnalysisSummary.textContent = "--";
@@ -4573,12 +4095,10 @@ function renderReferenceAnalysis() {
     refs.referenceAnalysisList.classList.remove("hidden");
     return;
   }
-
   const json = item.json;
   const prompts = getReferenceAnalysisPrompts(item);
   const roles = Array.isArray(json.image_roles) ? json.image_roles.filter(Boolean) : [];
   const risks = Array.isArray(json.risks) ? json.risks.filter(Boolean) : [];
-
   refs.referenceAnalysisSummary.textContent = json.summary || json.relationship || json.title || "已生成编排提示词";
   refs.referenceAnalysisMeta.textContent = [
     json.relationship,
@@ -4593,25 +4113,20 @@ function renderReferenceAnalysis() {
   refs.referenceAnalysisToggleButton.textContent = state.referenceAnalysis.collapsed ? "展开提示词" : "折叠提示词";
   refs.referenceAnalysisHead.classList.toggle("hidden", state.referenceAnalysis.collapsed);
   refs.referenceAnalysisList.classList.toggle("hidden", state.referenceAnalysis.collapsed);
-
   if (roles.length > 0) {
     const roleGroup = document.createElement("div");
     roleGroup.className = "reference-analysis-roles";
-
     roles.slice(0, 6).forEach((role) => {
       const rolePill = document.createElement("span");
       rolePill.className = "reference-analysis-role";
       rolePill.textContent = role;
       roleGroup.append(rolePill);
     });
-
     refs.referenceAnalysisList.append(roleGroup);
   }
-
   prompts.forEach((option, index) => {
     refs.referenceAnalysisList.append(createReferenceAnalysisCard(option, index));
   });
-
   if (risks.length > 0) {
     const risk = document.createElement("p");
     risk.className = "reference-analysis-risk";
@@ -4619,11 +4134,9 @@ function renderReferenceAnalysis() {
     refs.referenceAnalysisList.append(risk);
   }
 }
-
 function renderReasoningOptions() {
   const currentValue = refs.reasoningEffortInput.value || state.config?.defaults?.reasoningEffort || "xhigh";
   refs.reasoningEffortInput.innerHTML = "";
-
   state.reasoningEfforts.forEach((value) => {
     const option = document.createElement("option");
     const label = REASONING_LABELS[value] || value;
@@ -4632,28 +4145,23 @@ function renderReasoningOptions() {
     option.textContent = estimate ? `${label} ~${estimate}` : label;
     refs.reasoningEffortInput.appendChild(option);
   });
-
   if (state.reasoningEfforts.includes(currentValue)) {
     refs.reasoningEffortInput.value = currentValue;
   } else {
     refs.reasoningEffortInput.value = state.reasoningEfforts[0] || "xhigh";
   }
 }
-
 function renderOutputFormatOptions() {
   const currentValue = normalizeOutputFormat(refs.outputFormatInput.value || state.config?.defaults?.format || "png");
   refs.outputFormatInput.innerHTML = "";
-
   getOutputFormatOptions().forEach((option) => {
     const element = document.createElement("option");
     element.value = option.value;
     element.textContent = option.label;
     refs.outputFormatInput.appendChild(element);
   });
-
   refs.outputFormatInput.value = currentValue;
 }
-
 function syncGenerationSize(value) {
   const ratioValue = refs.ratioInput.value || DEFAULT_UI_RATIO;
   const nextValue = normalizeSizeForSelectedRoute(ratioValue, value || "auto");
@@ -4662,31 +4170,25 @@ function syncGenerationSize(value) {
     refs.referenceAnalysisSizeInput.value = nextValue;
   }
 }
-
 function renderSizeOptions(sizeInput = refs.sizeInput, ratioInput = refs.ratioInput) {
   if (!sizeInput || !ratioInput) {
     return;
   }
-
   const ratioValue = ratioInput.value || DEFAULT_UI_RATIO;
   const currentValue = normalizeSizeForSelectedRoute(ratioValue, sizeInput.value || "auto");
   sizeInput.innerHTML = "";
-
   const sizeOptions = isModelProtocolImageRoute() ? getModelProtocolImageSizeOptions() : getGenerationSizeOptions(ratioValue);
   sizeOptions.forEach((option) => {
     const element = document.createElement("option");
     element.value = option.value;
-    element.textContent = option.label;
+    element.textContent = getUiSizeLabel(option);
     sizeInput.appendChild(element);
   });
-
   sizeInput.value = currentValue;
 }
-
 function renderReferenceAnalysisSizeOptions() {
   renderSizeOptions(refs.referenceAnalysisSizeInput, refs.referenceAnalysisRatioInput);
 }
-
 function syncGenerationRatio(value) {
   const nextValue = getRatioOption(value)?.value || DEFAULT_UI_RATIO;
   refs.ratioInput.value = nextValue;
@@ -4700,22 +4202,18 @@ function syncGenerationRatio(value) {
   renderReferenceAnalysisSizeOptions();
   syncGenerationSize(refs.sizeInput.value);
 }
-
 function getCreationRatioCompactLabel(option) {
   return String(option?.value || DEFAULT_UI_RATIO);
 }
-
 function setCreationRatioOptionLabels({ expanded = false } = {}) {
   refs.creationRatioInput?.querySelectorAll("option").forEach((option) => {
     option.textContent = expanded ? option.dataset.fullLabel || option.value : option.value;
   });
 }
-
 function renderCreationRatioOptions() {
   const currentValue = refs.creationRatioInput.value || DEFAULT_UI_RATIO;
   const options = getVisibleRatios();
   refs.creationRatioInput.innerHTML = "";
-
   options.forEach((option) => {
     const element = document.createElement("option");
     element.value = option.value;
@@ -4723,19 +4221,16 @@ function renderCreationRatioOptions() {
     element.textContent = getCreationRatioCompactLabel(option);
     refs.creationRatioInput.appendChild(element);
   });
-
   refs.creationRatioInput.value = options.some((option) => option.value === currentValue)
     ? currentValue
     : DEFAULT_UI_RATIO;
   setCreationRatioOptionLabels({ expanded: false });
   renderCreationSizeOptions();
 }
-
 function renderCreationSizeOptions() {
   const ratioValue = refs.creationRatioInput.value || DEFAULT_UI_RATIO;
   const currentValue = normalizeSizeForSelectedRoute(ratioValue, refs.creationSizeInput.value || "auto");
   refs.creationSizeInput.innerHTML = "";
-
   const sizeOptions = isModelProtocolImageRoute() ? getModelProtocolImageSizeOptions() : getGenerationSizeOptions(ratioValue);
   sizeOptions.forEach((option) => {
     const element = document.createElement("option");
@@ -4743,10 +4238,8 @@ function renderCreationSizeOptions() {
     element.textContent = option.label;
     refs.creationSizeInput.appendChild(element);
   });
-
   refs.creationSizeInput.value = currentValue;
 }
-
 function renderPortraitRatioOptions() {
   if (!refs.portraitRatioInput) {
     return;
@@ -4754,20 +4247,17 @@ function renderPortraitRatioOptions() {
   const currentValue = refs.portraitRatioInput.value || DEFAULT_PORTRAIT_RATIO;
   const options = getVisibleRatios();
   refs.portraitRatioInput.innerHTML = "";
-
   options.forEach((option) => {
     const element = document.createElement("option");
     element.value = option.value;
     element.textContent = option.label;
     refs.portraitRatioInput.appendChild(element);
   });
-
   refs.portraitRatioInput.value = options.some((option) => option.value === currentValue)
     ? currentValue
     : DEFAULT_PORTRAIT_RATIO;
   renderPortraitSizeOptions();
 }
-
 function renderPortraitSizeOptions() {
   if (!refs.portraitSizeInput || !refs.portraitRatioInput) {
     return;
@@ -4775,7 +4265,6 @@ function renderPortraitSizeOptions() {
   const ratioValue = refs.portraitRatioInput.value || DEFAULT_PORTRAIT_RATIO;
   const currentValue = normalizeSizeForSelectedRoute(ratioValue, refs.portraitSizeInput.value || "auto");
   refs.portraitSizeInput.innerHTML = "";
-
   const sizeOptions = isModelProtocolImageRoute() ? getModelProtocolImageSizeOptions() : getGenerationSizeOptions(ratioValue);
   sizeOptions.forEach((option) => {
     const element = document.createElement("option");
@@ -4783,46 +4272,36 @@ function renderPortraitSizeOptions() {
     element.textContent = option.label;
     refs.portraitSizeInput.appendChild(element);
   });
-
   refs.portraitSizeInput.value = currentValue;
 }
-
 function syncPortraitRatio(value) {
   const nextValue = getRatioOption(value)?.value || DEFAULT_PORTRAIT_RATIO;
   refs.portraitRatioInput.value = nextValue;
   renderPortraitSizeOptions();
   renderPortraitView();
 }
-
 function syncPortraitSize(value) {
   const ratioValue = refs.portraitRatioInput.value || DEFAULT_PORTRAIT_RATIO;
   refs.portraitSizeInput.value = normalizeSizeForSelectedRoute(ratioValue, value || "auto");
 }
-
 function getSettingsFormScrollTop() {
   return refs.generateForm?.scrollTop || 0;
 }
-
 function restoreSettingsFormScrollTop(scrollTop) {
   if (!refs.generateForm || !Number.isFinite(scrollTop)) {
     return;
   }
-
   const restore = () => {
     refs.generateForm.scrollTop = scrollTop;
   };
-
   restore();
   window.requestAnimationFrame(restore);
 }
-
 function syncStudioHeight() {
   if (!refs.settingsPanel || !refs.previewPanel || !refs.viewRoot) {
     return;
   }
-
   const settingsScrollTop = getSettingsFormScrollTop();
-
   const isStudioLikeView =
     state.activeView === "studio" || state.activeView === "style-transfer" || state.activeView === "image-decomposition" || state.activeView === "quick-blend";
   if (STACKED_STUDIO_LAYOUT_MODES.has(getCurrentStudioLayoutMode()) || !isStudioLikeView) {
@@ -4830,27 +4309,20 @@ function syncStudioHeight() {
     restoreSettingsFormScrollTop(settingsScrollTop);
     return;
   }
-
   document.documentElement.style.removeProperty("--studio-column-height");
-
   void refs.settingsPanel.offsetHeight;
-
   const viewRootRect = refs.viewRoot.getBoundingClientRect();
   const availableHeight = Math.max(600, Math.floor(window.innerHeight - viewRootRect.top - WORKSPACE_BOTTOM_GAP_PX));
   const resolvedHeight = availableHeight;
-
   if (resolvedHeight > 0) {
     document.documentElement.style.setProperty("--studio-column-height", `${resolvedHeight}px`);
   }
-
   restoreSettingsFormScrollTop(settingsScrollTop);
 }
-
 function scheduleStudioHeightSync() {
   if (studioHeightSyncFrame) {
     window.cancelAnimationFrame(studioHeightSyncFrame);
   }
-
   studioHeightSyncFrame = window.requestAnimationFrame(() => {
     studioHeightSyncFrame = 0;
     syncStudioHeight();
@@ -4859,37 +4331,29 @@ function scheduleStudioHeightSync() {
     });
   });
 }
-
 function syncGalleryPanelHeight() {
   if (!refs.galleryPanel || !refs.viewRoot) {
     return;
   }
-
   syncGalleryLayoutMode();
   document.documentElement.style.removeProperty("--gallery-panel-height");
-
   void refs.viewRoot.offsetHeight;
-
   const viewRootRect = refs.viewRoot.getBoundingClientRect();
   const availableHeight = Math.max(320, Math.floor(window.innerHeight - viewRootRect.top - WORKSPACE_BOTTOM_GAP_PX));
   document.documentElement.style.setProperty("--gallery-panel-height", `${availableHeight}px`);
 }
-
 function scheduleGalleryPanelHeightSync() {
   if (galleryPanelHeightSyncFrame) {
     window.cancelAnimationFrame(galleryPanelHeightSyncFrame);
   }
-
   galleryPanelHeightSyncFrame = window.requestAnimationFrame(() => {
     galleryPanelHeightSyncFrame = 0;
     syncGalleryPanelHeight();
     syncGalleryScrollUi();
   });
 }
-
 function bindStudioHeightSync() {
   window.addEventListener("resize", () => scheduleStudioHeightSync());
-
   if (typeof ResizeObserver === "function" && refs.settingsPanel) {
     studioHeightObserver = new ResizeObserver(() => {
       scheduleStudioHeightSync();
@@ -4897,34 +4361,27 @@ function bindStudioHeightSync() {
     studioHeightObserver.observe(refs.settingsPanel);
   }
 }
-
 function bindGalleryPanelHeightSync() {
   const handleChange = () => scheduleGalleryPanelHeightSync();
   window.addEventListener("resize", handleChange);
-
   if (typeof ResizeObserver === "function") {
     galleryPanelHeightObserver = new ResizeObserver(() => {
       scheduleGalleryPanelHeightSync();
     });
-
     if (refs.topbar) {
       galleryPanelHeightObserver.observe(refs.topbar);
     }
-
     if (refs.viewRoot) {
       galleryPanelHeightObserver.observe(refs.viewRoot);
     }
   }
 }
-
 function getGalleryMaxScroll() {
   if (!refs.galleryScrollRegion) {
     return 0;
   }
-
   return Math.max(0, refs.galleryScrollRegion.scrollHeight - refs.galleryScrollRegion.clientHeight);
 }
-
 function getGalleryScrollMetrics() {
   const trackHeight = refs.galleryScrollTrack?.clientHeight || 0;
   const maxScroll = getGalleryMaxScroll();
@@ -4937,7 +4394,6 @@ function getGalleryScrollMetrics() {
   const maxOffset = Math.max(0, trackHeight - thumbHeight);
   const currentScroll = Math.min(maxScroll, Math.max(0, refs.galleryScrollRegion?.scrollTop || 0));
   const offset = disabled || maxOffset === 0 ? 0 : (currentScroll / maxScroll) * maxOffset;
-
   return {
     currentScroll,
     disabled,
@@ -4947,7 +4403,6 @@ function getGalleryScrollMetrics() {
     thumbHeight,
   };
 }
-
 function syncGalleryScrollUi() {
   if (
     !refs.galleryScrollRegion ||
@@ -4959,9 +4414,7 @@ function syncGalleryScrollUi() {
   ) {
     return;
   }
-
   const metrics = getGalleryScrollMetrics();
-
   refs.galleryScrollbar.dataset.disabled = String(metrics.disabled);
   refs.galleryScrollbar.setAttribute("aria-disabled", String(metrics.disabled));
   refs.galleryScrollThumb.disabled = metrics.disabled;
@@ -4970,66 +4423,54 @@ function syncGalleryScrollUi() {
   refs.galleryScrollUp.disabled = metrics.disabled || metrics.currentScroll <= 0;
   refs.galleryScrollDown.disabled = metrics.disabled || metrics.currentScroll >= metrics.maxScroll - 1;
 }
-
 function scheduleGalleryScrollSync() {
   if (galleryScrollSyncFrame) {
     window.cancelAnimationFrame(galleryScrollSyncFrame);
   }
-
   galleryScrollSyncFrame = window.requestAnimationFrame(() => {
     galleryScrollSyncFrame = 0;
     syncGalleryScrollUi();
   });
 }
-
 function getSelectedGenerationSize() {
   if (isModelProtocolImageRoute()) {
     return normalizeModelProtocolImageSize(refs.sizeInput.value || "auto");
   }
   return normalizeSizeForSelectedRoute(refs.ratioInput.value || DEFAULT_UI_RATIO, refs.sizeInput.value || "auto");
 }
-
 function scrollGalleryBy(direction) {
   if (!refs.galleryScrollRegion) {
     return;
   }
-
   const distance = Math.max(260, Math.round(refs.galleryScrollRegion.clientHeight * 0.78));
   refs.galleryScrollRegion.scrollBy({
     top: direction * distance,
     behavior: "smooth",
   });
 }
-
 function setGalleryDragging(active) {
   refs.galleryScrollbar?.classList.toggle("is-dragging", active);
 }
-
 function endGalleryThumbDrag() {
   if (!galleryScrollDrag.active) {
     return;
   }
-
   galleryScrollDrag.active = false;
   galleryScrollDrag.pointerId = null;
   setGalleryDragging(false);
 }
-
 function scrollGalleryTrackTo(clientY, smooth = false) {
   if (!refs.galleryScrollTrack || !refs.galleryScrollRegion) {
     return;
   }
-
   const metrics = getGalleryScrollMetrics();
   if (metrics.disabled || metrics.maxOffset <= 0) {
     return;
   }
-
   const rect = refs.galleryScrollTrack.getBoundingClientRect();
   const rawOffset = clientY - rect.top - metrics.thumbHeight / 2;
   const nextOffset = Math.min(metrics.maxOffset, Math.max(0, rawOffset));
   const nextScroll = (nextOffset / metrics.maxOffset) * metrics.maxScroll;
-
   if (smooth) {
     refs.galleryScrollRegion.scrollTo({
       top: nextScroll,
@@ -5039,24 +4480,20 @@ function scrollGalleryTrackTo(clientY, smooth = false) {
     refs.galleryScrollRegion.scrollTop = nextScroll;
   }
 }
-
 function handleGalleryThumbPointerMove(event) {
   if (!galleryScrollDrag.active || !refs.galleryScrollRegion) {
     return;
   }
-
   const metrics = getGalleryScrollMetrics();
   if (metrics.maxOffset <= 0) {
     return;
   }
-
   const nextOffset = Math.min(
     metrics.maxOffset,
     Math.max(0, galleryScrollDrag.startOffset + (event.clientY - galleryScrollDrag.startY)),
   );
   refs.galleryScrollRegion.scrollTop = (nextOffset / metrics.maxOffset) * metrics.maxScroll;
 }
-
 function bindGalleryScrollSync() {
   if (
     !refs.galleryScrollRegion ||
@@ -5068,7 +4505,6 @@ function bindGalleryScrollSync() {
   ) {
     return;
   }
-
   refs.galleryScrollRegion.addEventListener(
     "scroll",
     () => {
@@ -5076,21 +4512,17 @@ function bindGalleryScrollSync() {
     },
     { passive: true },
   );
-
   refs.galleryScrollTrack.addEventListener("pointerdown", (event) => {
     if (event.target === refs.galleryScrollThumb) {
       return;
     }
-
     scrollGalleryTrackTo(event.clientY, true);
   });
-
   refs.galleryScrollThumb.addEventListener("pointerdown", (event) => {
     const metrics = getGalleryScrollMetrics();
     if (metrics.disabled) {
       return;
     }
-
     event.preventDefault();
     galleryScrollDrag.active = true;
     galleryScrollDrag.pointerId = event.pointerId;
@@ -5099,23 +4531,18 @@ function bindGalleryScrollSync() {
     refs.galleryScrollThumb.setPointerCapture?.(event.pointerId);
     setGalleryDragging(true);
   });
-
   refs.galleryScrollUp.addEventListener("click", () => {
     scrollGalleryBy(-1);
   });
-
   refs.galleryScrollDown.addEventListener("click", () => {
     scrollGalleryBy(1);
   });
-
   window.addEventListener("pointermove", handleGalleryThumbPointerMove);
   window.addEventListener("pointerup", endGalleryThumbDrag);
   window.addEventListener("pointercancel", endGalleryThumbDrag);
-
   window.addEventListener("resize", () => {
     scheduleGalleryScrollSync();
   });
-
   if (typeof ResizeObserver === "function") {
     galleryScrollObserver = new ResizeObserver(() => {
       scheduleGalleryScrollSync();
@@ -5133,12 +4560,12 @@ function renderRatioGrid(ratioGrid = refs.ratioGrid, ratioInput = refs.ratioInpu
   ratioGrid.innerHTML = "";
 
   getVisibleRatios().forEach((option) => {
-    const orientationLabel = getRatioOrientationLabel(option.orientation);
+    const orientationLabel = getUiRatioOrientationLabel(option.orientation);
     const button = document.createElement("button");
     button.type = "button";
     button.className = "ratio-chip";
     button.dataset.orientation = option.orientation || "square";
-    button.setAttribute("aria-label", option.label || `${option.value} ${orientationLabel}`);
+    button.setAttribute("aria-label", getUiRatioLabel(option) || `${option.value} ${orientationLabel}`);
     if (ratioInput.value === option.value) {
       button.classList.add("active");
     }
@@ -5186,9 +4613,12 @@ function resolveGenerationSizeForSelectedRoute(ratioOption, sizeValue = "auto") 
 function updateGenerationModeStatus() {
   if (!refs.generationModeStatus) return;
   const imageRoute = getSelectedImageRoute();
-  const label = formatGenerationActivityModeLabel(imageRoute) || "路由模式";
-  refs.generationModeStatus.textContent = label; refs.generationModeStatus.dataset.imageRoute = imageRoute; refs.generationModeStatus.title = `当前生图调用模式：${label}`;
-  refs.generationModeStatus.setAttribute("aria-label", `当前生图调用模式：${label}`);
+  const label = getUiImageRouteLabel(imageRoute);
+  const statusText = getUiImageRouteStatusText(label);
+  refs.generationModeStatus.textContent = label;
+  refs.generationModeStatus.dataset.imageRoute = imageRoute;
+  refs.generationModeStatus.title = statusText;
+  refs.generationModeStatus.setAttribute("aria-label", statusText);
 }
 
 function getEndpointControls(imageRoute = "a") { return imageRoute === "b" ? { input: refs.directBaseUrlInput, select: refs.directEndpointPathSelect, toggle: refs.directBaseUrlFullToggle, defaultEndpointPath: API_ENDPOINT_IMAGE_GENERATIONS, fallbackBaseUrl: state.config?.directBaseUrl || state.config?.baseUrl || "https://api.openai.com/v1" } : { input: refs.baseUrlInput, select: refs.endpointPathSelect, toggle: refs.baseUrlFullToggle, defaultEndpointPath: API_ENDPOINT_RESPONSES, fallbackBaseUrl: state.config?.baseUrl || "https://api.openai.com/v1" }; }
@@ -5211,7 +4641,7 @@ function readEndpointFields(imageRoute = "a") {
 function setEndpointSelectValue(select, endpointPath, fallbackEndpointPath, imageRoute = "a") {
   if (select) select.value = normalizeEndpointSelectValue(imageRoute, endpointPath, fallbackEndpointPath);
 }
-function syncEndpointInputDisplay(imageRoute = "a", baseUrl = "", endpointPath = "") { const controls = getEndpointControls(imageRoute); const fullMode = isEndpointFullUrlMode(imageRoute); const normalizedEndpointPath = normalizeEndpointSelectValue(imageRoute, endpointPath, controls.defaultEndpointPath); setEndpointSelectValue(controls.select, normalizedEndpointPath, controls.defaultEndpointPath, imageRoute); if (controls.input) { controls.input.value = fullMode ? appendApiEndpointPath(baseUrl || controls.fallbackBaseUrl, normalizedEndpointPath) : baseUrl || controls.fallbackBaseUrl; controls.input.placeholder = fullMode ? appendApiEndpointPath("https://api.openai.com/v1", normalizedEndpointPath) : "https://api.openai.com/v1"; } if (controls.toggle) controls.toggle.textContent = fullMode ? "基础 URL" : "完整 URL"; }
+function syncEndpointInputDisplay(imageRoute = "a", baseUrl = "", endpointPath = "") { const controls = getEndpointControls(imageRoute); const fullMode = isEndpointFullUrlMode(imageRoute); const normalizedEndpointPath = normalizeEndpointSelectValue(imageRoute, endpointPath, controls.defaultEndpointPath); setEndpointSelectValue(controls.select, normalizedEndpointPath, controls.defaultEndpointPath, imageRoute); if (controls.input) { controls.input.value = fullMode ? appendApiEndpointPath(baseUrl || controls.fallbackBaseUrl, normalizedEndpointPath) : baseUrl || controls.fallbackBaseUrl; controls.input.placeholder = fullMode ? appendApiEndpointPath("https://api.openai.com/v1", normalizedEndpointPath) : "https://api.openai.com/v1"; } if (controls.toggle) controls.toggle.textContent = fullMode ? getUiLanguageText("baseUrl") || "基础 URL" : getUiLanguageText("fullUrl") || "完整 URL"; }
 function toggleEndpointFullUrlMode(imageRoute = "a") { const controls = getEndpointControls(imageRoute); if (!controls.toggle) return; const endpoint = readEndpointFields(imageRoute); controls.toggle.setAttribute("aria-pressed", String(!isEndpointFullUrlMode(imageRoute))); syncEndpointInputDisplay(imageRoute, endpoint.baseUrl, endpoint.endpointPath); }
 function syncEndpointFieldsFromFullUrlModes() { ["a", "b"].forEach((imageRoute) => { const endpoint = readEndpointFields(imageRoute); syncEndpointInputDisplay(imageRoute, endpoint.baseUrl, endpoint.endpointPath); }); }
 function getProtocolImageGenerationsUrlPreview(baseUrl = refs.protocolBaseUrlInput?.value || "") { const normalizedProtocolEndpoint = splitModelProtocolUrl(String(baseUrl || state.config?.protocolBaseUrl || "https://api.openai.com/v1").trim(), { fallbackBaseUrl: state.config?.protocolBaseUrl || "https://api.openai.com/v1" }); return appendApiEndpointPath(normalizedProtocolEndpoint.baseUrl, API_ENDPOINT_IMAGE_GENERATIONS); }
@@ -5248,11 +4678,12 @@ function syncConfigUi(config) {
     input.checked = input.value === (config.imageRoute === "c" ? "c" : config.imageRoute === "b" ? "b" : "a");
   });
   updateGenerationModeStatus();
-  refs.savedKeyMask.textContent = config.apiKeyConfigured ? `已保存 ${config.apiKeyMask || ""}` : "未保存";
-  refs.directSavedKeyMask.textContent = config.directApiKeyConfigured ? `已保存 ${config.directApiKeyMask || ""}` : "未保存";
-  if (refs.protocolSavedKeyMask) refs.protocolSavedKeyMask.textContent = config.protocolApiKeyConfigured ? `已保存 ${config.protocolApiKeyMask || ""}` : "未保存";
+  const savedKeyLabel = state.uiLanguage === "en" ? "Saved" : "已保存";
+  refs.savedKeyMask.textContent = config.apiKeyConfigured ? `${savedKeyLabel} ${config.apiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存";
+  refs.directSavedKeyMask.textContent = config.directApiKeyConfigured ? `${savedKeyLabel} ${config.directApiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存";
+  if (refs.protocolSavedKeyMask) refs.protocolSavedKeyMask.textContent = config.protocolApiKeyConfigured ? `${savedKeyLabel} ${config.protocolApiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存";
   const activeRouteConfigured = config.imageRoute === "c" ? config.protocolApiKeyConfigured : config.imageRoute === "b" ? config.directApiKeyConfigured : config.apiKeyConfigured;
-  refs.configStatus.textContent = activeRouteConfigured ? "配置已保存" : "配置未保存";
+  refs.configStatus.textContent = getUiLanguageText(activeRouteConfigured ? "configSaved" : "configUnsaved");
   configModelPicker.render();
   state.aspectRatios = config.aspectRatios || [];
   const configLimits = config.limits || {};
@@ -5558,21 +4989,21 @@ function getTimelineItems() {
     {
       key: "running:idle",
       title: GENERATION_TASK_STATUS_LABELS.running,
-      detail: "等待任务开始",
+      detail: getUiLanguageText("timelineWaitingTask") || "等待任务开始",
       status: "pending",
       at: "",
     },
     {
       key: "completed:idle",
       title: GENERATION_TASK_STATUS_LABELS.completed,
-      detail: "等待生成结果",
+      detail: getUiLanguageText("timelineWaitingResult") || "等待生成结果",
       status: "pending",
       at: "",
     },
     {
       key: "error:idle",
       title: GENERATION_TASK_STATUS_LABELS.error,
-      detail: "暂无错误",
+      detail: getUiLanguageText("timelineNoErrors") || "暂无错误",
       status: "pending",
       at: "",
     },
@@ -5809,6 +5240,7 @@ function updatePreviewLoadingShell(nodes, placeholderState) {
 }
 
 function renderPreviewPlaceholder(placeholderState) {
+  placeholderState = getUiPreviewPlaceholderState(placeholderState);
   refs.previewPlaceholder.className = "preview-placeholder";
   if (placeholderState.mode === "loading") {
     refs.previewPlaceholder.classList.add("preview-placeholder-loading");
@@ -5864,7 +5296,7 @@ function renderPreview() {
 
   if (placeholderState.mode === "idle") {
     refs.previewModel.textContent = "GPT Image 2.0";
-    refs.previewTime.textContent = "等待生成";
+    refs.previewTime.textContent = getUiLanguageText("previewWaiting");
     refs.previewId.textContent = "ID: --";
     refs.previewSize.textContent = "--";
     refs.previewPlaceholder.classList.remove("hidden");
@@ -5948,7 +5380,7 @@ function getFilmstripPlaceholderState() {
   if (state.galleryLoading) {
     return {
       kind: "loading",
-      label: "缩略图加载中",
+      label: getUiLanguageText("thumbnailLoading"),
       count: 4,
     };
   }
@@ -5956,14 +5388,14 @@ function getFilmstripPlaceholderState() {
   if (state.galleryLoadError) {
     return {
       kind: "error",
-      label: "缩略图加载失败",
+      label: getUiLanguageText("thumbnailFailed"),
       count: 1,
     };
   }
 
   return {
     kind: "empty",
-    label: "暂无缩略图",
+    label: getUiLanguageText("thumbnailEmpty"),
     count: 1,
   };
 }
@@ -7410,6 +6842,29 @@ const CREATION_PREVIEW_SLOTS = "1-hero|hero|首图成交主视觉|主商品占�
 
 const CREATION_SCENARIO_LABELS = { standard: "标准电商", "detail-page": "详情页转化", "social-seeding": "社媒种草", launch: "新品发布", promotion: "活动促销", livestream: "直播电商", "gift-guide": "礼品推荐", "marketplace-search": "平台搜索", "brand-story": "品牌故事" };
 const CREATION_VISUAL_LANGUAGE_LABELS = { "classic-commercial": "经典商业摄影", "premium-studio": "高端棚拍", "reference-style": "参考模式", "clean-marketplace": "平台清爽白底", "lifestyle-editorial": "生活方式杂志", "social-ugc": "社媒实拍", "detail-infographic": "详情页信息图", "macro-material": "微距材质", "outdoor-context": "户外场景", "minimal-luxury": "极简奢华", "bold-campaign": "活动海报", "warm-handcrafted": "手作温度" };
+const CREATION_PLATFORM_POLICY_MODULE_URL = "/lib/creation-platform-policies.mjs?v=20260711-platform-policy-1";
+const CREATION_PLATFORM_RESOLVER_MODULE_URL = "/lib/creation-platform-resolver.mjs?v=20260711-platform-policy-1";
+const CREATION_PLATFORM_FORM_DATA_FIELDS = [
+  "platformSetOverrides",
+  "platformItemOverrides",
+  "platformEvidence",
+  "categorySignals",
+  "platformReferenceCoverage",
+];
+const CREATION_PLATFORM_EVIDENCE_FIELDS = [
+  "dimensions",
+  "materials",
+  "packageContents",
+  "performance",
+  "specifications",
+  "craft",
+  "condition",
+  "defects",
+  "skuVariants",
+];
+const FALLBACK_CREATION_PLATFORM_OPTIONS = [
+  { value: "universal", label: "通用电商", promptInstruction: "Use a platform-neutral ecommerce gallery strategy." },
+];
 const CREATION_DIMENSION_UNIT_MODE_LABELS = { metric: "公制", imperial: "英制", both: "公制和英制" };
 const DEFAULT_CREATION_SKU_GENERATION_RULE = "color-name-under-subject";
 const CREATION_SKU_GENERATION_RULE_LABELS = { "color-name-under-subject": "主体下方显示颜色名", none: "无", "package-list": "添加包装清单", dimensions: "添加尺寸", "package-list-dimensions": "添加包装清单和尺寸" };
@@ -7529,6 +6984,165 @@ function setCreationSelectValue(select, value, fallback = "") {
 }
 
 let creationCategoryTemplatesModulePromise = null;
+let creationPlatformModulesPromise = null;
+
+function getCreationPlatformOptions() {
+  const options = state.creationPlatformPoliciesModule?.CREATION_PLATFORM_OPTIONS;
+  return Array.isArray(options) && options.length > 0 ? options : FALLBACK_CREATION_PLATFORM_OPTIONS;
+}
+
+function renderCreationPlatformOptions() {
+  const select = refs.creationPlatformInput;
+  if (!select) return;
+  const previousValue = String(select.value || "universal").trim();
+  const options = getCreationPlatformOptions();
+  select.replaceChildren(
+    ...options.map((platform) => {
+      const option = document.createElement("option");
+      option.value = platform.value;
+      option.textContent = platform.label;
+      return option;
+    }),
+  );
+  select.value = options.some((platform) => platform.value === previousValue) ? previousValue : "universal";
+  select.dataset.policyState = state.creationPlatformPoliciesModule ? "ready" : "fallback";
+  select.title = state.creationPlatformPoliciesModule ? "" : "平台自动规划模块不可用，当前仅提供通用电商兜底。";
+}
+
+async function loadCreationPlatformModules() {
+  if (state.creationPlatformPoliciesModule && state.creationPlatformResolverModule) {
+    return {
+      policies: state.creationPlatformPoliciesModule,
+      resolver: state.creationPlatformResolverModule,
+    };
+  }
+
+  if (!creationPlatformModulesPromise) {
+    creationPlatformModulesPromise = Promise.all([
+      import(CREATION_PLATFORM_POLICY_MODULE_URL),
+      import(CREATION_PLATFORM_RESOLVER_MODULE_URL),
+    ])
+      .then(([policies, resolver]) => {
+        if (!Array.isArray(policies.CREATION_PLATFORM_OPTIONS) || policies.CREATION_PLATFORM_OPTIONS.length !== 19) {
+          throw new Error("平台策略注册表不完整");
+        }
+        state.creationPlatformPoliciesModule = policies;
+        state.creationPlatformResolverModule = resolver;
+        return { policies, resolver };
+      })
+      .catch((error) => {
+        creationPlatformModulesPromise = null;
+        state.creationPlatformPoliciesModule = null;
+        state.creationPlatformResolverModule = null;
+        throw error;
+      });
+  }
+  return creationPlatformModulesPromise;
+}
+
+async function ensureCreationPlatformModulesReady({ render = false } = {}) {
+  try {
+    const modules = await loadCreationPlatformModules();
+    if (render) renderCreationPlatformOptions();
+    return modules;
+  } catch (error) {
+    if (render) renderCreationPlatformOptions();
+    console.warn("Creation platform automatic planning is unavailable", error);
+    return null;
+  }
+}
+
+function createFrozenCreationPlatformPayload(source = {}) {
+  const resolver = state.creationPlatformResolverModule;
+  return createCreationPlatformPayloadSnapshot(source, {
+    formDataFields: CREATION_PLATFORM_FORM_DATA_FIELDS,
+    evidenceFields: CREATION_PLATFORM_EVIDENCE_FIELDS,
+    normalizeSetOverrides: resolver?.normalizeCreationPlatformSetOverrides,
+    normalizeItemOverrides: resolver?.normalizeCreationPlatformItemOverrides,
+  });
+}
+
+function setFrozenCreationPlatformPayload(source = {}) {
+  const snapshot = createFrozenCreationPlatformPayload(source);
+  state.creation.platformPayload = snapshot;
+  state.creation.platformSetOverrides = snapshot.values.platformSetOverrides;
+  state.creation.platformItemOverrides = snapshot.values.platformItemOverrides;
+  return snapshot;
+}
+
+function getFrozenCreationPlatformPayload() {
+  return state.creation.platformPayload || setFrozenCreationPlatformPayload({
+    platformSetOverrides: state.creation.platformSetOverrides,
+    platformItemOverrides: state.creation.platformItemOverrides,
+  });
+}
+
+function appendFrozenCreationPlatformPayload(formData, snapshot = getFrozenCreationPlatformPayload()) {
+  CREATION_PLATFORM_FORM_DATA_FIELDS.forEach((field) => {
+    formData.set(field, snapshot.serialized[field]);
+  });
+  return formData;
+}
+
+function hasCreationEffectivePlanData(plan = {}) {
+  return Boolean(
+    plan?.strategyVersion ||
+    plan?.platformPolicyId ||
+    plan?.effectivePlan?.strategyVersion ||
+    (Array.isArray(plan?.items) && plan.items.some((item) => item?.imageType || item?.slotKey)),
+  );
+}
+
+function normalizeCreationEffectivePlanForBrowser(plan = {}) {
+  const source = plan?.effectivePlan && typeof plan.effectivePlan === "object" ? plan.effectivePlan : plan;
+  if (!hasCreationEffectivePlanData(source)) return null;
+  const payload = createFrozenCreationPlatformPayload(source);
+  const items = (Array.isArray(source.items) ? source.items : [])
+    .map((item, index) => normalizeCreationItemForView(item, index))
+    .sort((left, right) => left.slotIndex - right.slotIndex);
+  const warnings = cloneCreationPlanValue(source.warnings ?? source.validation?.warnings, []);
+  const errors = cloneCreationPlanValue(source.errors ?? source.validation?.errors, []);
+  const isValid = source.validation?.isValid !== false && source.canGenerate !== false && errors.length === 0;
+  return {
+    ...cloneCreationPlanValue(source, {}),
+    requestedPlatform: String(source.requestedPlatform || source.platform || "universal"),
+    platform: String(source.platform || source.platformPolicyId || "universal"),
+    platformPolicyId: String(source.platformPolicyId || source.platform || "universal"),
+    platformEvidenceLevel: String(source.platformEvidenceLevel || source.evidenceLevel || ""),
+    strategyVersion: String(source.strategyVersion || ""),
+    strategyVerifiedAt: String(source.strategyVerifiedAt || source.verifiedAt || ""),
+    platformSetOverrides: payload.values.platformSetOverrides,
+    platformItemOverrides: payload.values.platformItemOverrides,
+    platformEvidence: payload.values.platformEvidence,
+    categorySignals: payload.values.categorySignals,
+    platformReferenceCoverage: payload.values.platformReferenceCoverage,
+    validation: { isValid, errors, warnings },
+    warnings: warnings,
+    errors,
+    canGenerate: isValid,
+    items,
+  };
+}
+
+function hydrateCreationEffectivePlan(plan = {}) {
+  const normalized = normalizeCreationEffectivePlanForBrowser(plan);
+  state.creation.effectivePlan = deepFreezeCreationPlanValue(normalized);
+  if (normalized) setFrozenCreationPlatformPayload(normalized);
+  return state.creation.effectivePlan;
+}
+
+function restoreCreationEffectivePlanFromSet(set = {}) {
+  if (!hasCreationEffectivePlanData(set)) {
+    state.creation.effectivePlan = null;
+    setFrozenCreationPlatformPayload({});
+    return null;
+  }
+  return hydrateCreationEffectivePlan(set.effectivePlan || set);
+}
+
+function getFrozenCreationEffectivePlan() {
+  return state.creation.effectivePlan;
+}
 
 function getFallbackCreationIndustryTemplate(value) {
   const normalizedValue = String(value || "").trim();
@@ -7961,11 +7575,15 @@ function setCreationImageCountValue(count) { if (!refs.creationImageCountInput) 
 function getFiniteCreationImageCount(value) { return value !== undefined && value !== null && String(value).trim() !== "" && Number.isFinite(Number(value)) ? Number(value) : null; }
 
 function getCreationSelectedScenario() {
-  const value = refs.creationScenarioInput?.value || "standard";
+  const value = "standard";
   return {
     value,
     label: CREATION_SCENARIO_LABELS[value] || value,
   };
+}
+
+function getCreationSelectedPlatform() {
+  return normalizeCreationPlatform(refs.creationPlatformInput?.value || "universal");
 }
 
 function getCreationSelectedIndustryTemplate() {
@@ -8042,7 +7660,6 @@ function syncCreationSelectedRolesToPreset(selectedRoles) {
   }
   resetCreationDraftPreview();
 }
-function syncCreationSelectedRolesToScenario() { syncCreationSelectedRolesToPreset(getCreationRecommendedRolePreset()); }
 function syncCreationSelectedRolesToIndustry() { syncCreationSelectedRolesToPreset(getCreationRecommendedRolePreset()); }
 function syncCreationSelectedRolesToReferenceCoverage(analysis = state.creationReferenceAnalysis.result) { if (state.creationRoleSelectionManuallyEdited) { resetCreationDraftPreview(); return; } const selectedRoles = applyCreationReferenceCoverageRolePlan({ roles: getCreationSelectedRoles(), analysis, supportedRoles: CREATION_PREVIEW_SLOTS.map((slot) => slot.role), roleTargets: CREATION_REFERENCE_COVERAGE_ROLE_TARGETS }); if (selectedRoles.length > 0) state.creationSelectedRoles = alignCreationRoleIdsToCount(selectedRoles, getCreationSelectedImageCount()); resetCreationDraftPreview(); }
 
@@ -8059,6 +7676,7 @@ function getCreationPreviewSlots(count = getCreationSelectedImageCount()) { if (
 function resetCreationDraftPreview() {
   if (!state.creation.generating && !state.creation.planning) {
     state.creation.currentSet = null;
+    state.creation.effectivePlan = null;
   }
   renderCreationView();
 }
@@ -8099,6 +7717,10 @@ function formatCreationDimensionUnitModeLabel(value) {
 function normalizeCreationVisualLanguage(value) { const normalized = String(value || "").trim(); return CREATION_VISUAL_LANGUAGE_LABELS[normalized] ? normalized : "classic-commercial"; }
 
 function formatCreationVisualLanguageLabel(value) { return CREATION_VISUAL_LANGUAGE_LABELS[normalizeCreationVisualLanguage(value)]; }
+
+function normalizeCreationPlatform(value) { const normalized = String(value || "").trim(); const options = getCreationPlatformOptions(); return options.find((platform) => platform.value === normalized) || options.find((platform) => platform.value === "universal") || FALLBACK_CREATION_PLATFORM_OPTIONS[0]; }
+
+function formatCreationPlatformLabel(value) { return normalizeCreationPlatform(value).label; }
 
 function getCreationSelectedDimensionUnitMode() {
   return normalizeCreationDimensionUnitMode(refs.creationDimensionUnitModeInput?.value || "both");
@@ -9181,12 +8803,32 @@ function normalizeCreationItemForView(item = {}, fallbackIndex = 0) {
   const skuSubject = item.skuSubject && typeof item.skuSubject === "object" ? item.skuSubject : item.sku_subject;
   const skuSubjectId = String(item.skuSubjectId || item.sku_subject_id || skuSubject?.id || "");
   const skuTitle = String(item.skuTitle || item.sku_title || skuSubject?.title || "");
+  const role = String(item.role || CREATION_PREVIEW_SLOTS[fallbackIndex]?.role || "");
   return {
     itemId: String(item.itemId || `slot-${fallbackIndex + 1}`),
     slotIndex: Number(item.slotIndex) || fallbackIndex + 1,
-    role: String(item.role || CREATION_PREVIEW_SLOTS[fallbackIndex]?.role || ""),
+    slotKey: String(item.slotKey || item.itemId || `slot-${fallbackIndex + 1}`),
+    itemKind: String(item.itemKind || (role === "sku" ? "sku" : role === "infographic-rebuild" ? "infographic-rebuild" : "carousel")),
+    imageType: String(item.imageType || ""),
+    imageTypeLabel: String(item.imageTypeLabel || ""),
+    enabled: item.enabled !== false,
+    role,
     title: String(item.title || CREATION_PREVIEW_SLOTS[fallbackIndex]?.title || ""),
     brief: String(item.brief || CREATION_PREVIEW_SLOTS[fallbackIndex]?.brief || ""),
+    ratio: String(item.ratio || ""),
+    resolutionTier: String(item.resolutionTier || item.resolution_tier || ""),
+    effectiveSize: String(item.effectiveSize || item.effective_size || item.size || ""),
+    targetLanguage: String(item.targetLanguage || item.target_language || ""),
+    composition: String(item.composition || ""),
+    textPolicy: String(item.textPolicy || item.text_policy || ""),
+    scenePolicy: String(item.scenePolicy || item.scene_policy || ""),
+    logoPolicy: String(item.logoPolicy || item.logo_policy || ""),
+    required: item.required === true,
+    advisory: item.advisory === true,
+    constraints: cloneCreationPlanValue(Array.isArray(item.constraints) ? item.constraints : [], []),
+    sourceIds: Array.isArray(item.sourceIds) ? item.sourceIds.map((entry) => String(entry)).filter(Boolean) : [],
+    recommendationSource: String(item.recommendationSource || ""),
+    conversionIntent: cloneCreationPlanValue(item.conversionIntent, null),
     filename: String(item.filename || ""),
     relativePath: String(item.relativePath || ""),
     prompt: String(item.prompt || ""),
@@ -9206,11 +8848,12 @@ function normalizeCreationItemForView(item = {}, fallbackIndex = 0) {
 }
 
 function normalizeCreationSetForView(set = {}) {
-  const items = (Array.isArray(set.items) ? set.items : [])
+  const planSource = getCreationSetPlanSource(set);
+  const items = (Array.isArray(set.items) ? set.items : Array.isArray(planSource.items) ? planSource.items : [])
     .map((item, index) => normalizeCreationItemForView(item, index))
     .sort((left, right) => left.slotIndex - right.slotIndex);
   const hasInfographicRebuildItems = items.some((item) => item.role === "infographic-rebuild");
-  const status = String(set.status || "");
+  const status = String(set.status || planSource.status || "");
   const resolvedStatus =
     status || (items.every((item) => item.status === "completed") && items.length > 0
       ? "completed"
@@ -9219,8 +8862,26 @@ function normalizeCreationSetForView(set = {}) {
         : items.some((item) => item.status === "generating" || item.status === "queued")
           ? "generating"
           : "planning");
-  const industryTemplate = normalizeCreationIndustryTemplate(set.industryTemplate || "general");
-  const visualLanguage = normalizeCreationVisualLanguage(set.visualLanguage);
+  const industryTemplate = normalizeCreationIndustryTemplate(set.industryTemplate || planSource.industryTemplate || "general");
+  const platform = normalizeCreationPlatform(set.platform);
+  if (!set.platform && planSource.platform) Object.assign(platform, normalizeCreationPlatform(planSource.platform));
+  const visualLanguage = normalizeCreationVisualLanguage(set.visualLanguage || planSource.visualLanguage);
+  const platformPayload = createFrozenCreationPlatformPayload(planSource);
+  const effectivePlan = normalizeCreationEffectivePlanForBrowser(planSource);
+  const warnings = cloneCreationPlanValue(set.warnings ?? set.validation?.warnings ?? planSource.warnings ?? planSource.validation?.warnings, []);
+  const errors = cloneCreationPlanValue(set.errors ?? set.validation?.errors ?? planSource.errors ?? planSource.validation?.errors, []);
+  const validationIsValid = (set.validation?.isValid ?? planSource.validation?.isValid) !== false && (set.canGenerate ?? planSource.canGenerate) !== false && errors.length === 0;
+  const inferredCarouselImageCount = items.filter((item) => item.itemKind === "carousel" && item.enabled !== false).length;
+  const inferredSkuImageCount = items.filter((item) => item.itemKind === "sku" || item.role === "sku").length;
+  const inferredInfographicRebuildCount = items.filter(
+    (item) => item.itemKind === "infographic-rebuild" || item.role === "infographic-rebuild",
+  ).length;
+  const carouselImageCount = getFiniteCreationImageCount(set.carouselImageCount ?? planSource.carouselImageCount) ?? inferredCarouselImageCount;
+  const skuImageCount = getFiniteCreationImageCount(set.skuImageCount ?? planSource.skuImageCount) ?? inferredSkuImageCount;
+  const infographicRebuildCount = getFiniteCreationImageCount(set.infographicRebuildCount ?? planSource.infographicRebuildCount) ?? inferredInfographicRebuildCount;
+  const setImageCount = set.imageCount !== undefined && set.imageCount !== null && String(set.imageCount).trim() !== "" && Number.isFinite(Number(set.imageCount))
+    ? Number(set.imageCount)
+    : getFiniteCreationImageCount(planSource.imageCount);
 
   return {
     setId: String(set.setId || ""),
@@ -9232,7 +8893,32 @@ function normalizeCreationSetForView(set = {}) {
     dimensionUnitModeLabel: String(set.dimensionUnitModeLabel || formatCreationDimensionUnitModeLabel(set.dimensionUnitMode)),
     targetLanguage: String(set.targetLanguage || "en"),
     targetLanguageLabel: String(set.targetLanguageLabel || ""),
-    imageCount: set.imageCount !== undefined && set.imageCount !== null && String(set.imageCount).trim() !== "" && Number.isFinite(Number(set.imageCount)) ? Number(set.imageCount) : items.length || 10,
+    requestedPlatform: String(set.requestedPlatform || planSource.requestedPlatform || set.platform || planSource.platform || "universal"),
+    platform: platform.value,
+    platformLabel: String(set.platformLabel || formatCreationPlatformLabel(platform.value)),
+    platformPolicyId: String(set.platformPolicyId || planSource.platformPolicyId || set.platform || planSource.platform || platform.value),
+    platformEvidenceLevel: String(set.platformEvidenceLevel || planSource.platformEvidenceLevel || set.evidenceLevel || planSource.evidenceLevel || ""),
+    platformProvenance: String(set.platformProvenance || planSource.platformProvenance || ""),
+    strategyVersion: String(set.strategyVersion || planSource.strategyVersion || ""),
+    strategyVerifiedAt: String(set.strategyVerifiedAt || planSource.strategyVerifiedAt || set.verifiedAt || planSource.verifiedAt || ""),
+    platformSourceIds: Array.isArray(set.platformSourceIds || set.sourceIds || planSource.platformSourceIds || planSource.sourceIds)
+      ? (set.platformSourceIds || set.sourceIds || planSource.platformSourceIds || planSource.sourceIds).map((entry) => String(entry)).filter(Boolean)
+      : [],
+    platformProfile: cloneCreationPlanValue(set.platformProfile || set.profile || planSource.platformProfile || planSource.profile, null),
+    platformSetOverrides: platformPayload.values.platformSetOverrides,
+    platformItemOverrides: platformPayload.values.platformItemOverrides,
+    platformEvidence: platformPayload.values.platformEvidence,
+    categorySignals: platformPayload.values.categorySignals,
+    platformReferenceCoverage: platformPayload.values.platformReferenceCoverage,
+    validation: { isValid: validationIsValid, errors, warnings },
+    warnings: warnings,
+    errors,
+    canGenerate: validationIsValid,
+    imageCount: (setImageCount ?? items.length) || 10,
+    carouselImageCount: carouselImageCount,
+    skuImageCount: skuImageCount,
+    infographicRebuildCount: infographicRebuildCount,
+    totalPlannedItemCount: getFiniteCreationImageCount(set.totalPlannedItemCount ?? planSource.totalPlannedItemCount) ?? carouselImageCount + skuImageCount + infographicRebuildCount,
     selectedRoles: normalizeCreationRoleIds(set.selectedRoles || items.map((item) => item.role)),
     scenario: String(set.scenario || "standard"),
     scenarioLabel: String(set.scenarioLabel || CREATION_SCENARIO_LABELS[set.scenario] || ""),
@@ -9270,6 +8956,7 @@ function normalizeCreationSetForView(set = {}) {
     updatedAt: String(set.updatedAt || set.createdAt || nowIso()),
     status: resolvedStatus,
     relativeDir: String(set.relativeDir || ""),
+    effectivePlan: effectivePlan,
     items,
   };
 }
@@ -9554,11 +9241,11 @@ function applyCreationSetToForm(set) {
   setCreationSelectValue(refs.creationSkuGenerationRuleInput, normalized.skuGenerationRule, DEFAULT_CREATION_SKU_GENERATION_RULE);
   setCreationSelectValue(refs.creationDimensionUnitModeInput, normalized.dimensionUnitMode, "both");
   setCreationSelectValue(refs.creationTargetLanguageInput, normalized.targetLanguage, "en");
-  setCreationSelectValue(refs.creationScenarioInput, normalized.scenario, "standard");
-  setCreationSelectValue(refs.creationVisualLanguageInput, normalized.visualLanguage, "classic-commercial");
+  setCreationSelectValue(refs.creationPlatformInput, normalized.platform, "universal");
   setCreationIndustryTemplateValue(normalized.industryTemplate, {
     searchText: normalized.industryTemplatePath || "",
   });
+  restoreCreationEffectivePlanFromSet(normalized);
 
   const normalizedRoles = normalizeCreationRoleIds(
     normalized.selectedRoles.length > 0 ? normalized.selectedRoles : normalized.items.map((item) => item.role),
@@ -9696,8 +9383,8 @@ function renderCreationRecordDetail(set) {
 
   const progress = getCreationProgressSummary(set);
   const detailSections = [
-    { items: [["商品", set.productName || "未命名商品"], ["场景", set.scenarioLabel || CREATION_SCENARIO_LABELS[set.scenario] || "标准电商"], ["行业", set.industryTemplateLabel || CREATION_INDUSTRY_TEMPLATE_LABELS[set.industryTemplate] || "通用电商"]] },
-    { items: [["视觉语言", set.visualLanguageLabel || formatCreationVisualLanguageLabel(set.visualLanguage)], ["尺寸规格", set.dimensionSpecs || ""], ["规格单位", set.dimensionUnitModeLabel || formatCreationDimensionUnitModeLabel(set.dimensionUnitMode)], ["语言", set.targetLanguageLabel || set.targetLanguage || "English"], ["进度", `${progress.completed}/${progress.total}`]] },
+    { items: [["商品", set.productName || "未命名商品"], ["平台", set.platformLabel || formatCreationPlatformLabel(set.platform)], ["行业", set.industryTemplateLabel || CREATION_INDUSTRY_TEMPLATE_LABELS[set.industryTemplate] || "通用电商"]] },
+    { items: [["尺寸规格", set.dimensionSpecs || ""], ["规格单位", set.dimensionUnitModeLabel || formatCreationDimensionUnitModeLabel(set.dimensionUnitMode)], ["语言", set.targetLanguageLabel || set.targetLanguage || "English"], ["进度", `${progress.completed}/${progress.total}`]] },
     { wide: true, items: [["类目路径", set.industryTemplatePath || ""]] },
     { wide: true, items: [["参考图", set.referenceImageNames.length > 0 ? set.referenceImageNames.join("、") : "未使用"]] },
     { wide: true, items: [["参考用途", formatCreationReferenceRoleSummary(set.referenceImageRoles)], ["Logo", formatCreationLogoSummary(set.logo)]] },
@@ -9771,16 +9458,6 @@ function updateCreationCurrentItem(itemId, patch = {}) {
   return nextSet;
 }
 
-function shouldShowCreationQueueJob(job = {}) {
-  if (!job?.id) {
-    return false;
-  }
-  const selectedQueueId = state.creation.selectedQueueId || state.creation.activeQueueId;
-  const currentSetId = String(state.creation.currentSet?.setId || "");
-  const jobSetId = String(job.set?.setId || "");
-  return selectedQueueId === job.id || (currentSetId && jobSetId && currentSetId === jobSetId);
-}
-
 function upsertCreationSetForStream(set, { queueJob } = {}) {
   const normalized = normalizeCreationSetForView(set);
   if (!normalized.setId) {
@@ -9790,7 +9467,7 @@ function upsertCreationSetForStream(set, { queueJob } = {}) {
   if (queueJob) {
     queueJob.set = normalized;
     state.creation.sets = [normalized, ...state.creation.sets.filter((entry) => entry.setId !== normalized.setId)];
-    if (shouldShowCreationQueueJob(queueJob)) {
+    if (shouldSyncCreationQueueJobCurrentSet(state.creation, queueJob)) {
       state.creation.currentSet = normalized;
     }
     renderCreationRecordView();
@@ -9834,7 +9511,7 @@ function updateCreationStreamItem(itemId, patch = {}, context = {}) {
   });
   queueJob.set = nextSet;
   state.creation.sets = [nextSet, ...state.creation.sets.filter((entry) => entry.setId !== nextSet.setId)];
-  if (shouldShowCreationQueueJob(queueJob)) {
+  if (shouldSyncCreationQueueJobCurrentSet(state.creation, queueJob)) {
     state.creation.currentSet = nextSet;
   }
   return nextSet;
@@ -10064,6 +9741,8 @@ function getCreationRecordSearchText(set = {}) {
   return [
     set.productName,
     set.productDescription,
+    set.platform,
+    set.platformLabel,
     set.scenario,
     set.scenarioLabel,
     set.visualLanguage,
@@ -10241,8 +9920,13 @@ function exportCreationRecordManifest() {
   setCreationRecordFeedback("已导出当前套图清单。", "success");
 }
 
-function shouldAutoGenerateCreationListings() {
-  return Boolean(refs.creationListingAgentEnabledInput?.checked) && state.creation.generationScope === "full";
+function shouldAutoGenerateCreationListings(completedSet = getCreationCurrentSet(), queueJob = null) {
+  const listingEligibility = getCreationListingEligibility(completedSet || { platform: getCreationSelectedPlatform().value, platformProvenance: "explicit" });
+  const listingAgentEnabled = queueJob?.listingAgentEnabled
+    ?? queueJob?.set?.listingAgentEnabled
+    ?? completedSet?.listingAgentEnabled
+    ?? Boolean(refs.creationListingAgentEnabledInput?.checked);
+  return listingEligibility.eligible && Boolean(listingAgentEnabled) && state.creation.generationScope === "full";
 }
 
 function getCreationRecordItemById(itemId, setId = "") {
@@ -10482,17 +10166,16 @@ function renderCreationRecordArchiveDetail(set) {
   refs.creationRecordArchiveDetail.innerHTML = ""; const archive = refs.creationRecordArchiveDetail.closest(".creation-record-archive"); archive?.classList.toggle("is-empty", !set); refs.creationRecordArchiveDetail.classList.remove("is-toggleable", "is-expanded", "is-collapsed");
   if (!set) { const empty = document.createElement("span"); empty.textContent = "还没有套图记录。"; refs.creationRecordArchiveDetail.appendChild(empty); return; }
   const progress = getCreationProgressSummary(set); const isExpanded = state.creation.recordDetailExpanded === true; refs.creationRecordArchiveDetail.classList.add("is-toggleable", isExpanded ? "is-expanded" : "is-collapsed");
-  const detailSummary = document.createElement("div"); detailSummary.className = "creation-record-detail-summary"; const summaryTitle = document.createElement("strong"); summaryTitle.textContent = set.productName || "未命名商品"; const summaryMeta = document.createElement("span"); summaryMeta.textContent = [set.scenarioLabel || CREATION_SCENARIO_LABELS[set.scenario] || "标准电商", `${progress.completed}/${progress.total}`, formatClock(set.createdAt)].filter(Boolean).join(" / "); detailSummary.append(summaryTitle, summaryMeta);
+  const detailSummary = document.createElement("div"); detailSummary.className = "creation-record-detail-summary"; const summaryTitle = document.createElement("strong"); summaryTitle.textContent = set.productName || "未命名商品"; const summaryMeta = document.createElement("span"); summaryMeta.textContent = [set.platformLabel || formatCreationPlatformLabel(set.platform), `${progress.completed}/${progress.total}`, formatClock(set.createdAt)].filter(Boolean).join(" / "); detailSummary.append(summaryTitle, summaryMeta);
   const detailToggle = document.createElement("button"); detailToggle.className = "creation-record-detail-toggle"; detailToggle.type = "button"; detailToggle.dataset.creationRecordDetailToggle = "true"; detailToggle.setAttribute("aria-expanded", String(isExpanded)); detailToggle.setAttribute("aria-label", isExpanded ? "折叠套图详情" : "展开套图详情"); detailToggle.title = isExpanded ? "折叠套图详情" : "展开套图详情";
   const detailBody = document.createElement("div"); detailBody.className = "creation-record-detail-body"; refs.creationRecordArchiveDetail.append(detailSummary, detailToggle, detailBody);
   if (!isExpanded) return;
 
   const detailItems = [
     ["商品", set.productName || "未命名商品"],
-    ["场景", set.scenarioLabel || CREATION_SCENARIO_LABELS[set.scenario] || "标准电商"],
+    ["平台", set.platformLabel || formatCreationPlatformLabel(set.platform)],
     ["行业", set.industryTemplateLabel || CREATION_INDUSTRY_TEMPLATE_LABELS[set.industryTemplate] || "通用电商"],
     ["类目路径", set.industryTemplatePath || ""],
-    ["视觉语言", set.visualLanguageLabel || formatCreationVisualLanguageLabel(set.visualLanguage)],
     ["尺寸规格", set.dimensionSpecs || ""],
     ["规格单位", set.dimensionUnitModeLabel || formatCreationDimensionUnitModeLabel(set.dimensionUnitMode)],
     ["语言", set.targetLanguageLabel || set.targetLanguage || "English"],
@@ -10933,7 +10616,6 @@ function applyCreationStyleReferenceFiles(fileList) {
   const maxReferenceImages = getCreationMaxStyleReferenceImageCount();
   const next = [...state.creationStyleReferenceFiles];
   const fingerprints = new Set(next.map((item) => item.fingerprint));
-  let added = false;
   let overflowed = false;
 
   for (const file of incomingFiles) {
@@ -10959,13 +10641,9 @@ function applyCreationStyleReferenceFiles(fileList) {
     startCreationReferenceGenerationCompression(referenceItem);
     next.push(referenceItem);
     fingerprints.add(fingerprint);
-    added = true;
   }
 
   state.creationStyleReferenceFiles = next;
-  if (added) {
-    setCreationSelectValue(refs.creationVisualLanguageInput, "reference-style", "classic-commercial");
-  }
   if (refs.creationStyleReferenceInput) {
     refs.creationStyleReferenceInput.value = "";
   }
@@ -11289,18 +10967,28 @@ function normalizeCreationReferenceAnalysisPayload(payload = {}) {
   const skuSubjects = rawSkuSubjects.map((entry, index) => normalizeCreationSkuSubjectForPayload(entry, index)).filter(Boolean);
   const recommendations = rawRecommendations.length > 0 ? rawRecommendations.map((entry, index) => normalizeCreationReferenceAnalysisRecommendation(entry, index, skuSubjects)).filter(Boolean)
     : [];
-  const visualLanguage = normalizeCreationVisualLanguage(getCreationReferenceAnalysisVisualLanguageSource(analysis));
+  const rawAudienceStrategy = analysis?.audienceStrategy || analysis?.audience_strategy;
+  const normalizeAudienceList = (value) => [...new Set((Array.isArray(value) ? value : value ? [value] : []).map((item) => String(item).trim()).filter(Boolean))].slice(0, 5);
+  const audienceStrategy = rawAudienceStrategy && typeof rawAudienceStrategy === "object" && !Array.isArray(rawAudienceStrategy)
+    ? {
+        targetAudience: String(rawAudienceStrategy.targetAudience || rawAudienceStrategy.target_audience || "").trim(),
+        purchaseMotivations: normalizeAudienceList(rawAudienceStrategy.purchaseMotivations || rawAudienceStrategy.purchase_motivations),
+        purchaseObjections: normalizeAudienceList(rawAudienceStrategy.purchaseObjections || rawAudienceStrategy.purchase_objections),
+        desiredOutcome: String(rawAudienceStrategy.desiredOutcome || rawAudienceStrategy.desired_outcome || "").trim(),
+        evidenceBasis: normalizeAudienceList(rawAudienceStrategy.evidenceBasis || rawAudienceStrategy.evidence_basis),
+        confidence: ["low", "medium", "high"].includes(String(rawAudienceStrategy.confidence || "").trim().toLowerCase()) ? String(rawAudienceStrategy.confidence).trim().toLowerCase() : "low",
+        source: String(rawAudienceStrategy.source || "analysis-suggestion").trim() || "analysis-suggestion",
+      }
+    : null;
 
   return {
     summary: String(analysis?.summary || "已识别套图参考图用途").trim(),
     productName: String(analysis?.productName || analysis?.product_name || analysis?.subjectName || analysis?.subject_name || analysis?.productTitle || analysis?.product_title || "").trim(),
     categoryHint: String(analysis?.categoryHint || analysis?.category_hint || analysis?.category || "").trim(),
     categoryPath: String(analysis?.categoryPath || analysis?.category_path || "").trim(),
-    visualLanguage,
-    visualLanguageLabel: formatCreationVisualLanguageLabel(visualLanguage),
-    visualLanguageReason: getCreationReferenceAnalysisVisualLanguageReason(analysis),
     recommendations,
     skuSubjects,
+    ...(audienceStrategy ? { audienceStrategy } : {}),
     risks: Array.isArray(analysis?.risks) ? analysis.risks.map((item) => String(item).trim()).filter(Boolean) : [],
   };
 }
@@ -11309,8 +10997,9 @@ function getCreationReferenceAnalysisCategoryText(analysis = {}) {
   return buildCreationReferenceAnalysisCategoryMatchText(analysis);
 }
 
-async function applyCreationReferenceAnalysisCategoryMatch(analysis) {
+async function applyCreationReferenceAnalysisCategoryMatch(analysis, isCurrent = () => true) {
   await loadCreationCategoryTemplatesModule();
+  if (!isCurrent()) return null;
   const match = findCreationIndustryTemplateMatch(getCreationReferenceAnalysisCategoryText(analysis));
   if (!match?.template) {
     return null;
@@ -11331,12 +11020,16 @@ async function applyCreationReferenceAnalysisCategoryMatch(analysis) {
 }
 
 async function applyCreationReferenceAnalysis(analysis) {
+  const isCurrent = creationReferenceAnalysisApplyGuard || (() => true);
+  if (!isCurrent()) return { matchedTemplate: null, productNameApplied: false, stale: true };
   const normalized = normalizeCreationReferenceAnalysisPayload(analysis);
+  if (!isCurrent()) return { matchedTemplate: null, productNameApplied: false, stale: true };
+  const matchedTemplate = await applyCreationReferenceAnalysisCategoryMatch(normalized, isCurrent);
+  if (!isCurrent()) return { matchedTemplate: null, productNameApplied: false, stale: true };
   state.creationReferenceAnalysis.result = normalized;
   state.creationReferenceAnalysis.applied = false;
   state.creationReferenceAnalysis.collapsed = false;
   state.creationReferenceAnalysis.dirty = false;
-  const matchedTemplate = await applyCreationReferenceAnalysisCategoryMatch(normalized);
   const productNameApplied = applyCreationReferenceAnalysisProductNameSuggestion(normalized);
   renderCreationReferenceAnalysis();
   return { matchedTemplate, productNameApplied };
@@ -11372,7 +11065,6 @@ function applyCreationReferenceAnalysisRecommendations() {
     return;
   }
 
-  const previousVisualLanguage = refs.creationVisualLanguageInput?.value || "classic-commercial";
   const recommendationsByFilename = new Map(analysis.recommendations.map((entry) => [entry.filename, entry]));
   state.creationReferenceFiles = state.creationReferenceFiles.map((item, index) => {
     const filename = item.file?.name || `reference-image-${index + 1}`;
@@ -11396,15 +11088,7 @@ function applyCreationReferenceAnalysisRecommendations() {
     recommendations: analysis.recommendations,
   });
   setCreationReferenceAnalysisFeedback(appliedMessage, "success");
-  setCreationSelectValue(refs.creationVisualLanguageInput, previousVisualLanguage, "classic-commercial");
   renderCreationReferenceGrid();
-  renderCreationReferenceAnalysis();
-}
-
-function applyCreationReferenceAnalysisVisualLanguage() {
-  const analysis = state.creationReferenceAnalysis.result;
-  if (!analysis || state.creationReferenceAnalysis.dirty || state.creationReferenceAnalysis.running) return;
-  setCreationSelectValue(refs.creationVisualLanguageInput, analysis.visualLanguage, "classic-commercial");
   renderCreationReferenceAnalysis();
 }
 
@@ -11427,7 +11111,6 @@ function renderCreationReferenceAnalysis() {
     refs.creationReferenceApplyAnalysisButton.disabled = !canApply;
     refs.creationReferenceApplyAnalysisButton.textContent = state.creationReferenceAnalysis.applied ? "已应用" : "应用建议";
   }
-  syncCreationReferenceVisualLanguageButton({ button: refs.creationReferenceApplyVisualLanguageButton, analysis, currentValue: refs.creationVisualLanguageInput?.value || "classic-commercial", dirty: state.creationReferenceAnalysis.dirty, running: state.creationReferenceAnalysis.running, normalizeVisualLanguage: normalizeCreationVisualLanguage });
   refs.creationReferenceAnalysisPanel.classList.toggle("hidden", !analysis);
   refs.creationReferenceAnalysisList.replaceChildren();
 
@@ -11448,10 +11131,8 @@ function renderCreationReferenceAnalysis() {
   }
 
   refs.creationReferenceAnalysisSummary.textContent = analysis.summary || "已识别套图参考图用途";
-  const visualLanguageLabel = analysis.visualLanguageLabel || formatCreationVisualLanguageLabel(analysis.visualLanguage);
   refs.creationReferenceAnalysisMeta.textContent = [
     `${analysis.recommendations.length} 张建议`,
-    visualLanguageLabel ? `视觉语言: ${visualLanguageLabel}` : "",
     analysis.categoryTemplatePath || analysis.categoryPath || analysis.categoryHint
       ? `类目: ${analysis.categoryTemplatePath || analysis.categoryPath || analysis.categoryHint}`
       : "",
@@ -11468,8 +11149,6 @@ function renderCreationReferenceAnalysis() {
   refs.creationReferenceAnalysisSummary.classList.toggle("hidden", state.creationReferenceAnalysis.collapsed);
   refs.creationReferenceAnalysisMeta.classList.toggle("hidden", state.creationReferenceAnalysis.collapsed);
   refs.creationReferenceAnalysisList.classList.toggle("hidden", state.creationReferenceAnalysis.collapsed);
-
-  appendCreationVisualLanguageSuggestionCard(refs.creationReferenceAnalysisList, analysis, { formatVisualLanguageLabel: formatCreationVisualLanguageLabel });
 
   analysis.recommendations.forEach((entry) => {
     const item = document.createElement("article");
@@ -11514,6 +11193,14 @@ async function buildCreationReferenceAnalysisFormData() {
   analysisFiles.forEach((file) => {
     formData.append("referenceImages", file);
   });
+  formData.set("platform", getCreationSelectedPlatform().value);
+  formData.set("platformLabel", getCreationSelectedPlatform().label);
+  formData.set("industryTemplate", getCreationSelectedIndustryTemplate().value);
+  formData.set("industryTemplateLabel", getCreationSelectedIndustryTemplate().label);
+  formData.set("industryTemplatePath", getCreationSelectedIndustryTemplate().categoryPath || "");
+  formData.set("productName", refs.creationProductNameInput?.value?.trim() || "");
+  formData.set("productDescription", refs.creationProductDescriptionInput?.value?.trim() || "");
+  formData.set("sellingPoints", refs.creationSellingPointsInput?.value?.trim() || "");
   appendCurrentConfigToFormData(formData);
   return formData;
 }
@@ -11528,6 +11215,9 @@ async function analyzeCreationReferenceImages() {
   const referenceSnapshot = getCreationReferenceAnalysisSnapshot();
   const requestToken = creationReferenceAnalysisRequestToken + 1;
   creationReferenceAnalysisRequestToken = requestToken;
+  creationReferenceAnalysisAbortController?.abort();
+  const requestController = new AbortController();
+  creationReferenceAnalysisAbortController = requestController;
   state.creationReferenceAnalysis.running = true;
   setCreationReferenceAnalysisFeedback("", "busy");
   renderCreationReferenceAnalysis();
@@ -11535,6 +11225,7 @@ async function analyzeCreationReferenceImages() {
   try {
     const response = await fetch("/api/creation/reference/analyze", {
       method: "POST",
+      signal: requestController.signal,
       body: await buildCreationReferenceAnalysisFormData(),
     });
     const payload = await response.json().catch(() => ({}));
@@ -11545,7 +11236,10 @@ async function analyzeCreationReferenceImages() {
       throw new Error(payload.message || "套图参考图识别失败。");
     }
 
+    creationReferenceAnalysisApplyGuard = () => requestToken === creationReferenceAnalysisRequestToken && referenceSnapshot === getCreationReferenceAnalysisSnapshot();
+    // Compatibility shape retained for browser static contracts: applyCreationReferenceAnalysis(payload, { isCurrent })
     const { matchedTemplate } = await applyCreationReferenceAnalysis(payload);
+    creationReferenceAnalysisApplyGuard = null;
     if (requestToken !== creationReferenceAnalysisRequestToken || referenceSnapshot !== getCreationReferenceAnalysisSnapshot()) {
       return;
     }
@@ -11562,7 +11256,9 @@ async function analyzeCreationReferenceImages() {
     setCreationReferenceAnalysisFeedback(message, "error");
     showError(message);
   } finally {
+    creationReferenceAnalysisApplyGuard = null;
     if (requestToken === creationReferenceAnalysisRequestToken) {
+      creationReferenceAnalysisAbortController = null;
       state.creationReferenceAnalysis.running = false;
       renderCreationReferenceAnalysis();
     }
@@ -11620,6 +11316,125 @@ function renderCreationQueueStrip() {
 
 function getCreationInlineListingRefs() { return { creationRecordListingDrafts: refs.creationInlineListingDrafts, creationRecordListingStatus: refs.creationInlineListingStatus }; }
 
+async function restoreCurrentCreationPlatformRecommendations() {
+  const modules = await ensureCreationPlatformModulesReady();
+  const restoreCreationPlatformRecommendations = modules?.resolver?.restoreCreationPlatformRecommendations;
+  if (typeof restoreCreationPlatformRecommendations !== "function") {
+    throw new Error("平台自动规划模块不可用，无法恢复当前平台推荐。");
+  }
+
+  const currentPlan = getFrozenCreationEffectivePlan() || getCreationCurrentSet() || {};
+  const currentPayload = getFrozenCreationPlatformPayload();
+  const restored = restoreCreationPlatformRecommendations({
+    platform: currentPlan.requestedPlatform || currentPlan.platform || getCreationSelectedPlatform().value,
+    category: currentPlan.industryTemplate || getCreationSelectedIndustryTemplate(),
+    categorySignals: currentPayload.values.categorySignals,
+    referenceCoverage: currentPayload.values.platformReferenceCoverage,
+    evidence: currentPayload.values.platformEvidence,
+    skuSubjects: currentPlan.skuSubjects || buildCreationSkuSubjectPayload(),
+    infographicRebuildCount: currentPlan.infographicRebuildCount || 0,
+    platformSetOverrides: {},
+    platformItemOverrides: [],
+  });
+  const previousItems = Array.isArray(currentPlan.items) ? currentPlan.items : [];
+  const previousItemsBySlotKey = new Map(previousItems.map((item) => [item.slotKey, item]));
+  const restoredCarouselItems = restored.items.map((item) => ({
+    ...(previousItemsBySlotKey.get(item.slotKey) || {}),
+    ...item,
+  }));
+  const appendedItems = previousItems.filter(
+    (item) => item.itemKind !== "carousel" || item.role === "sku" || item.role === "infographic-rebuild",
+  );
+  const restoredPlan = {
+    ...cloneCreationPlanValue(currentPlan, {}),
+    ...restored,
+    platformPolicyId: restored.platform,
+    platformEvidenceLevel: restored.evidenceLevel,
+    platformSetOverrides: {},
+    platformItemOverrides: [],
+    platformEvidence: restored.evidence,
+    platformReferenceCoverage: restored.referenceCoverage,
+    items: [...restoredCarouselItems, ...appendedItems],
+  };
+  hydrateCreationEffectivePlan(restoredPlan);
+  const currentSet = getCreationCurrentSet();
+  if (currentSet) {
+    state.creation.currentSet = normalizeCreationSetForView({
+      ...currentSet,
+      ...restoredPlan,
+      effectivePlan: restoredPlan,
+      items: restoredPlan.items,
+      updatedAt: nowIso(),
+    });
+  }
+  renderCreationView();
+  await previewCreationPlan();
+}
+
+const creationPlanPreviewRequests = createCreationPlanPreviewRequestCoordinator();
+
+function renderCreationPlatformPlan() {
+  const effectivePlan = getFrozenCreationEffectivePlan();
+  const payload = getFrozenCreationPlatformPayload();
+  const hasOverrides = Object.keys(payload.values.platformSetOverrides).length > 0 || payload.values.platformItemOverrides.length > 0;
+  const plan = effectivePlan || null;
+
+  if (refs.creationPlanSummary) {
+    refs.creationPlanSummary.dataset.planState = hasOverrides ? "overridden" : "automatic";
+    const stateLabel = refs.creationPlanSummary.querySelector("[data-creation-plan-state-label]");
+    if (stateLabel) stateLabel.textContent = hasOverrides ? "已覆盖" : "自动";
+    refs.creationPlanSummary.dataset.summaryText = plan
+      ? `${plan.platformLabel || formatCreationPlatformLabel(plan.platform)} 自动方案 · 轮播 ${plan.carouselImageCount ?? 0} + SKU ${plan.skuImageCount ?? 0} + 重构 ${plan.infographicRebuildCount ?? 0} = 总计 ${plan.totalPlannedItemCount ?? plan.items?.length ?? 0}`
+      : "预览后显示当前平台自动方案";
+    const platformLabel = refs.creationPlanSummary.querySelector("#creationPlanPlatformLabel");
+    if (platformLabel) platformLabel.textContent = plan?.platformLabel || (plan ? formatCreationPlatformLabel(plan.platform) : "");
+    [["#creationPlanCarouselCount", plan?.carouselImageCount ?? 0], ["#creationPlanSkuCount", plan?.skuImageCount ?? 0], ["#creationPlanRebuildCount", plan?.infographicRebuildCount ?? 0], ["#creationPlanTotalCount", plan?.totalPlannedItemCount ?? plan?.items?.length ?? 0]].forEach(([selector, value]) => { const node = refs.creationPlanSummary.querySelector(selector); if (node) node.textContent = String(value); });
+  }
+  if (refs.creationPlanAdvancedToggle) {
+    const overrideCount = refs.creationPlanAdvancedToggle.querySelector("summary small");
+    const modifiedItemCount = Object.keys(payload.values.platformSetOverrides).length + payload.values.platformItemOverrides.length;
+    if (overrideCount) overrideCount.textContent = `${modifiedItemCount} 项修改`;
+  }
+  if (refs.creationPlanRestoreButton) {
+    refs.creationPlanRestoreButton.disabled = !plan || !hasOverrides || state.creation.planning;
+  }
+  if (refs.creationPlanWarnings) {
+    const warnings = Array.isArray(plan?.warnings) ? plan.warnings : [];
+    refs.creationPlanWarnings.replaceChildren(
+      ...warnings.map((warning) => {
+        const item = document.createElement("li");
+        item.textContent = formatCreationPlanWarning(warning, plan.platformLabel || formatCreationPlatformLabel(plan.platform));
+        return item;
+      }),
+    );
+    refs.creationPlanWarnings.classList.toggle("hidden", warnings.length === 0);
+  }
+  if (refs.creationPlanValidation) {
+    const errors = Array.isArray(plan?.errors) ? plan.errors : [];
+    refs.creationPlanValidation.dataset.state = errors.length > 0 ? "blocking" : plan ? "valid" : "idle";
+    refs.creationPlanValidation.textContent = errors.length > 0
+      ? errors.map((error) => String(error?.message || error)).filter(Boolean).join("；")
+      : plan ? "计划已通过生成前约束校验" : ""; refs.creationPlanValidation.classList.toggle("hidden", !plan);
+  }
+  if (refs.creationPlanSlots) {
+    const planSlots = Array.isArray(plan?.slots) ? plan.slots : Array.isArray(plan?.items) ? plan.items : [];
+    const slots = planSlots.filter((item) => item.itemKind === "carousel");
+    refs.creationPlanSlots.replaceChildren(
+      ...slots.map((slot) => {
+        const item = document.querySelector("#creationPlanSlotTemplate")?.content?.firstElementChild?.cloneNode(true) || document.createElement("article");
+        item.dataset.creationPlanSlot = "true";
+        item.dataset.slotKey = slot.slotKey || slot.itemId;
+        const slotOverride = payload.values.platformItemOverrides.find((entry) => entry.slotKey === item.dataset.slotKey); item.dataset.overridden = String(Boolean(slotOverride));
+        item.querySelector("[data-creation-plan-order]")?.replaceChildren(document.createTextNode(String(slot.slotIndex)));
+        item.querySelector("[data-creation-plan-overridden]")?.classList.toggle("hidden", item.dataset.overridden !== "true");
+        item.querySelector("[data-creation-plan-enabled]")?.toggleAttribute("checked", slot.enabled !== false);
+        item.querySelectorAll("[data-creation-plan-field]").forEach((field) => { const key = field.dataset.creationPlanField; if (field.tagName === "TEXTAREA") field.value = String(slotOverride?.[key] ?? slot[key] ?? ""); else applyCreationPlanFieldOptions(field, buildCreationPlanFieldOptions(key, { imageTypes: state.creationPlatformPoliciesModule?.listCreationPlatformImageTypes?.() || [], ratios: getVisibleRatios() }), slotOverride?.[key]); });
+        return item;
+      }),
+    );
+  }
+}
+
 function renderCreationView() {
   if (!refs.creationResultGrid) {
     return;
@@ -11629,6 +11444,16 @@ function renderCreationView() {
   const logoBatchBranch = isCreationLogoBatchBranch();
   const selectedQueueJob = logoBatchBranch ? null : getSelectedCreationQueueJob();
   const currentSet = getCreationDisplayedSet();
+  const listingEligibility = getCreationListingEligibility(currentSet || {
+    platform: getCreationSelectedPlatform().value,
+    platformProvenance: "explicit",
+  });
+  if (refs.creationListingAgentEnabledInput) {
+    refs.creationListingAgentEnabledInput.disabled = !listingEligibility.eligible;
+    refs.creationListingAgentEnabledInput.title = listingEligibility.eligible
+      ? "Amazon US Listing"
+      : "Amazon US Listing 仅支持 Amazon 平台套图";
+  }
   const showCreationResultActions = !selectedQueueJob;
   syncCreationInfographicRebuildRequiredState();
   const previewSlots = logoBatchBranch
@@ -11659,7 +11484,7 @@ function renderCreationView() {
     : state.creation.generating || getPendingCreationQueueCount() > 0
       ? "加入队列"
       : "生成套图";
-  refs.creationGenerateButton.disabled = state.creation.planning || preparingReferences;
+  refs.creationGenerateButton.disabled = shouldDisableCreationGenerateButton({ planning: state.creation.planning, preparingReferences, effectivePlan: state.creation.effectivePlan });
   if (logoBatchBranch && state.creation.generating) {
     refs.creationGenerateButton.disabled = true;
   }
@@ -11673,10 +11498,11 @@ function renderCreationView() {
   renderCreationStyleReferenceGrid();
   renderCreationLogoBatchSourceGrid();
   renderCreationLogo();
+  renderCreationPlatformPlan();
   const currentIndustryLabel = currentSet?.industryTemplateLabel || CREATION_INDUSTRY_TEMPLATE_LABELS[currentSet?.industryTemplate] || "通用电商";
-  const currentVisualLanguageLabel = currentSet?.visualLanguageLabel || formatCreationVisualLanguageLabel(currentSet?.visualLanguage);
+  const currentPlatformLabel = currentSet?.platformLabel || formatCreationPlatformLabel(currentSet?.platform);
   refs.creationSetMeta.textContent = currentSet
-    ? `${currentSet.productName || "未命名商品"} · ${currentSet.scenarioLabel || CREATION_SCENARIO_LABELS[currentSet.scenario] || "标准电商"} · ${currentIndustryLabel} · ${currentVisualLanguageLabel} · ${targetLanguageLabel} · ${CREATION_ITEM_STATUS_LABELS[currentSet.status] || currentSet.status} · ${formatClock(currentSet.createdAt)}`
+    ? `${currentSet.productName || "未命名商品"} · ${currentPlatformLabel} · ${currentIndustryLabel} · ${targetLanguageLabel} · ${CREATION_ITEM_STATUS_LABELS[currentSet.status] || currentSet.status} · ${formatClock(currentSet.createdAt)}`
     : logoBatchBranch
       ? state.creationLogoBatchFiles.length > 0
         ? `${state.creationLogoBatchFiles.length} 张待添加 Logo · ${getCreationLogoGenerationFile() ? "Logo 已上传" : "待上传 Logo"}`
@@ -11718,7 +11544,11 @@ function getCreationPlanPreviewImageCount(selectedRoles = getCreationSelectedRol
 
 function buildCreationPlanPreviewFormData() {
   const formData = new FormData();
-  const targetLanguage = getCreationSelectedLanguage();
+  const effectivePlan = getFrozenCreationEffectivePlan();
+  const frozenPayload = getFrozenCreationPlatformPayload();
+  const targetLanguage = effectivePlan?.targetLanguage
+    ? { value: effectivePlan.targetLanguage, label: effectivePlan.targetLanguageLabel || effectivePlan.targetLanguage }
+    : getCreationSelectedLanguage();
   const selectedRoles = getCreationSelectedRoles();
 
   formData.set("productName", refs.creationProductNameInput.value.trim());
@@ -11729,26 +11559,61 @@ function buildCreationPlanPreviewFormData() {
   formData.set("targetLanguage", targetLanguage.value);
   formData.set("imageCount", String(getCreationPlanPreviewImageCount(selectedRoles)));
   formData.set("infographicRebuildEnabled", String(isCreationInfographicRebuildRequired() || refs.creationInfographicRebuildEnabledInput?.checked !== false));
-  formData.set("scenario", refs.creationScenarioInput.value);
-  formData.set("visualLanguage", refs.creationVisualLanguageInput?.value || "classic-commercial");
+  formData.set("platform", getCreationSelectedPlatform().value);
+  if (effectivePlan?.requestedPlatform || effectivePlan?.platform) {
+    formData.set("platform", effectivePlan.requestedPlatform || effectivePlan.platform);
+  }
   formData.set("industryTemplate", refs.creationIndustryTemplateInput.value);
+  if (effectivePlan?.industryTemplate) formData.set("industryTemplate", effectivePlan.industryTemplate);
   formData.set("selectedRoles", JSON.stringify(getCreationSelectedRoles()));
   formData.set("referenceImageRoles", JSON.stringify(buildCreationReferenceRolePayload()));
   formData.set("skuSubjects", JSON.stringify(buildCreationSkuSubjectPayload()));
+  if (effectivePlan?.skuSubjects) {
+    formData.set("skuSubjects", JSON.stringify(effectivePlan.skuSubjects));
+  }
   formData.set("skuBundleCount", refs.creationSkuBundleCountInput?.value || "1");
   formData.set("skuGenerationRule", getCreationSelectedSkuGenerationRule().value);
   formData.set("logoOptions", JSON.stringify(getCreationLogoPayload()));
+  const audienceStrategy = effectivePlan?.audienceStrategy || (
+    state.creationReferenceAnalysis.applied && !state.creationReferenceAnalysis.dirty
+      ? state.creationReferenceAnalysis.result?.audienceStrategy
+      : null
+  );
+  if (audienceStrategy) formData.set("audienceStrategy", JSON.stringify(audienceStrategy));
+  appendFrozenCreationPlatformPayload(formData);
   formData.set("planOverrides", JSON.stringify(getCreationPlanOverrides()));
+
+  if (effectivePlan) {
+    formData.delete("imageCount");
+    formData.delete("selectedRoles");
+    if (!Object.prototype.hasOwnProperty.call(frozenPayload.values.platformSetOverrides, "targetLanguage")) {
+      formData.delete("targetLanguage");
+    }
+  } else {
+    if (!Object.prototype.hasOwnProperty.call(frozenPayload.values.platformSetOverrides, "targetLanguage")) {
+      formData.delete("targetLanguage");
+    }
+    if (!Object.prototype.hasOwnProperty.call(frozenPayload.values.platformSetOverrides, "imageCount")) {
+      formData.delete("imageCount");
+    }
+    if (!state.creationRoleSelectionManuallyEdited) {
+      formData.set("selectedRoles", "[]");
+    }
+  }
 
   return formData;
 }
 
 function buildCreationFormData() {
   const formData = buildCreationPlanPreviewFormData();
+  const effectivePlan = getFrozenCreationEffectivePlan();
+  if (effectivePlan) formData.set("effectivePlan", JSON.stringify(effectivePlan));
 
   formData.set("format", normalizeOutputFormat(refs.creationOutputFormatInput.value || state.config?.defaults?.format || "png"));
-  formData.set("ratio", refs.creationRatioInput.value || DEFAULT_UI_RATIO);
-  formData.set("size", refs.creationSizeInput.value || "auto");
+  if (!effectivePlan) {
+    formData.set("ratio", refs.creationRatioInput.value || DEFAULT_UI_RATIO);
+    formData.set("size", refs.creationSizeInput.value || "auto");
+  }
   formData.set("reasoningEffort", refs.reasoningEffortInput.value || state.config?.defaults?.reasoningEffort || "xhigh");
   formData.set("clientSessionId", state.clientSessionId);
   state.creationReferenceFiles.forEach((item) => {
@@ -11799,7 +11664,7 @@ function buildCreationLogoBatchFormData() {
   return formData;
 }
 
-function applyCreationRepairTargetFormFields(formData, set = {}) { Object.entries({ productName: set.productName || "", productDescription: set.productDescription || "", sellingPoints: Array.isArray(set.sellingPoints) ? set.sellingPoints.join("\n") : String(set.sellingPoints || ""), dimensionSpecs: set.dimensionSpecs || "", dimensionUnitMode: set.dimensionUnitMode || "both", targetLanguage: set.targetLanguage || "en", scenario: set.scenario || "standard", visualLanguage: set.visualLanguage || "classic-commercial", industryTemplate: set.industryTemplate || "general", selectedRoles: JSON.stringify(Array.isArray(set.selectedRoles) ? set.selectedRoles : []), infographicRebuildEnabled: String(set.infographicRebuildEnabled !== false), skuSubjects: JSON.stringify(Array.isArray(set.skuSubjects) ? set.skuSubjects : []), skuBundleCount: String(set.skuBundleCount || 1), skuGenerationRule: set.skuGenerationRule || DEFAULT_CREATION_SKU_GENERATION_RULE, logoOptions: JSON.stringify(set.logo || null) }).forEach(([key, value]) => formData.set(key, value)); }
+function applyCreationRepairTargetFormFields(formData, set = {}) { Object.entries({ productName: set.productName || "", productDescription: set.productDescription || "", sellingPoints: Array.isArray(set.sellingPoints) ? set.sellingPoints.join("\n") : String(set.sellingPoints || ""), dimensionSpecs: set.dimensionSpecs || "", dimensionUnitMode: set.dimensionUnitMode || "both", targetLanguage: set.targetLanguage || "en", platform: set.platform || "universal", scenario: set.scenario || "standard", visualLanguage: set.visualLanguage || "classic-commercial", industryTemplate: set.industryTemplate || "general", selectedRoles: JSON.stringify(Array.isArray(set.selectedRoles) ? set.selectedRoles : []), infographicRebuildEnabled: String(set.infographicRebuildEnabled !== false), skuSubjects: JSON.stringify(Array.isArray(set.skuSubjects) ? set.skuSubjects : []), skuBundleCount: String(set.skuBundleCount || 1), skuGenerationRule: set.skuGenerationRule || DEFAULT_CREATION_SKU_GENERATION_RULE, logoOptions: JSON.stringify(set.logo || null) }).forEach(([key, value]) => formData.set(key, value)); }
 
 function buildCreationRepairFormData({ itemId = "", scope = "incomplete", set = getCreationRepairTargetSet() } = {}) {
   const formData = new FormData(), currentSet = set ? normalizeCreationSetForView(set) : getCreationCurrentSet();
@@ -11962,7 +11827,7 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
         renderCreationView();
         return;
       }
-      if (shouldAutoGenerateCreationListings() && payload.set?.setId) {
+      if (shouldAutoGenerateCreationListings(completedSet, context.queueJob) && payload.set?.setId) {
         state.creation.recordSetId = payload.set.setId;
         setCreationFeedback("套图生成完成，正在自动生成 Listing...", "busy");
         creationListingController.generate(payload.set.setId)
@@ -12100,7 +11965,7 @@ async function loadCreationSets() {
 }
 
 async function previewCreationPlan() {
-  if (state.creation.generating || state.creation.planning) {
+  if (state.creation.generating) {
     return;
   }
 
@@ -12117,6 +11982,7 @@ async function previewCreationPlan() {
     return;
   }
 
+  const request = creationPlanPreviewRequests.begin();
   state.creation.planning = true;
   setCreationFeedback("正在生成套图计划...", "busy");
   renderCreationView();
@@ -12125,13 +11991,16 @@ async function previewCreationPlan() {
     const response = await fetch("/api/creation/plan", {
       method: "POST",
       body: buildCreationPlanPreviewFormData(),
+      signal: request.signal,
     });
     const payload = await response.json().catch(() => ({}));
+    if (!creationPlanPreviewRequests.isCurrent(request.revision)) return;
     if (!response.ok) {
       throw new Error(payload.message || "套图计划生成失败");
     }
 
     const plan = payload.plan || {};
+    const effectivePlan = hydrateCreationEffectivePlan(plan);
     const createdAt = nowIso();
     const previousDraft = isCreationDraftSet() ? getCreationCurrentSet() : null;
     const items = Array.isArray(plan.items)
@@ -12144,6 +12013,7 @@ async function previewCreationPlan() {
     const planImageCount = getFiniteCreationImageCount(plan.imageCount);
 
     state.creation.currentSet = normalizeCreationSetForView({
+      ...effectivePlan,
       setId: previousDraft?.setId || `creation-draft-${Date.now()}`,
       productName: plan.productName || productName,
       productDescription: plan.productDescription || productDescription,
@@ -12153,11 +12023,13 @@ async function previewCreationPlan() {
       dimensionUnitModeLabel: plan.dimensionUnitModeLabel || formatCreationDimensionUnitModeLabel(getCreationSelectedDimensionUnitMode()),
       targetLanguage: plan.targetLanguage || getCreationSelectedLanguage().value,
       targetLanguageLabel: plan.targetLanguageLabel || getCreationSelectedLanguage().label,
+      platform: plan.platform || getCreationSelectedPlatform().value,
+      platformLabel: plan.platformLabel || getCreationSelectedPlatform().label,
       imageCount: planImageCount ?? (items.length || getCreationSelectedRoles().length),
       scenario: plan.scenario || getCreationSelectedScenario().value,
       scenarioLabel: plan.scenarioLabel || getCreationSelectedScenario().label,
-      visualLanguage: plan.visualLanguage || normalizeCreationVisualLanguage(refs.creationVisualLanguageInput?.value),
-      visualLanguageLabel: plan.visualLanguageLabel || formatCreationVisualLanguageLabel(refs.creationVisualLanguageInput?.value),
+      visualLanguage: plan.visualLanguage || "classic-commercial",
+      visualLanguageLabel: plan.visualLanguageLabel || formatCreationVisualLanguageLabel("classic-commercial"),
       industryTemplate: plan.industryTemplate || getCreationSelectedIndustryTemplate().value,
       industryTemplateLabel: plan.industryTemplateLabel || getCreationSelectedIndustryTemplate().label,
       industryTemplatePath: plan.industryTemplatePath || getCreationSelectedIndustryTemplate().categoryPath,
@@ -12172,17 +12044,21 @@ async function previewCreationPlan() {
       createdAt: previousDraft?.createdAt || createdAt,
       updatedAt: createdAt,
       status: "planning",
+      effectivePlan,
       items,
     });
     state.creation.editingItemId = "";
     setCreationFeedback(`已生成 ${items.length} 张套图计划，可以先微调再正式生成。`, "success");
   } catch (error) {
+    if (error?.name === "AbortError" || !creationPlanPreviewRequests.isCurrent(request.revision)) return;
     const message = compactErrorMessage(error instanceof Error ? error.message : String(error), "套图计划生成失败");
     setCreationFeedback(message, "error");
     showError(message);
   } finally {
-    state.creation.planning = false;
-    renderCreationView();
+    if (creationPlanPreviewRequests.finish(request.revision)) {
+      state.creation.planning = false;
+      renderCreationView();
+    }
   }
 }
 
@@ -12262,7 +12138,7 @@ async function startCreationLogoBatchGeneration() {
   }
 }
 
-function buildCreationQueuedSet(input = {}) { return buildCreationQueuedSetFromState({ ...input, buildCreationReferenceRolePayload, buildCreationSkuSubjectPayload, creationState: state.creation, formatCreationDimensionUnitModeLabel, formatCreationVisualLanguageLabel: (value) => CREATION_VISUAL_LANGUAGE_LABELS[normalizeCreationVisualLanguage(value)], getCreationCurrentSet, getCreationLogoPayload, getCreationPreviewSlots, getCreationSelectedDimensionUnitMode, getCreationSelectedImageCount, getCreationSelectedIndustryTemplate, getCreationSelectedLanguage, getCreationSelectedRoles, getCreationSelectedScenario, getCreationSelectedSkuGenerationRule, isCreationDraftSet, normalizeCreationSkuBundleCountForPayload, normalizeCreationVisualLanguage, normalizeSet: normalizeCreationSetForView, referenceFiles: state.creationReferenceFiles, refs }); }
+function buildCreationQueuedSet(input = {}) { return { ...buildCreationQueuedSetFromState({ ...input, buildCreationReferenceRolePayload, buildCreationSkuSubjectPayload, creationState: state.creation, formatCreationDimensionUnitModeLabel, formatCreationVisualLanguageLabel: (value) => CREATION_VISUAL_LANGUAGE_LABELS[normalizeCreationVisualLanguage(value)], getCreationCurrentSet, getFrozenCreationEffectivePlan, getCreationLogoPayload, getCreationPreviewSlots, getCreationSelectedDimensionUnitMode, getCreationSelectedImageCount, getCreationSelectedIndustryTemplate, getCreationSelectedLanguage, getCreationSelectedPlatform, getCreationSelectedRoles, getCreationSelectedScenario, getCreationSelectedSkuGenerationRule, isCreationDraftSet, normalizeCreationSkuBundleCountForPayload, normalizeCreationVisualLanguage, normalizeSet: normalizeCreationSetForView, referenceFiles: state.creationReferenceFiles, refs }), listingAgentEnabled: Boolean(refs.creationListingAgentEnabledInput?.checked) }; }
 
 function enqueueCreationGeneration({ formData, set }) {
   const job = createCreationQueueJob({ creationState: state.creation, formData, set, normalizeSet: normalizeCreationSetForView, nowIso });
@@ -14631,15 +14507,44 @@ function appendImageEditReferencesToFormData(formData, job) {
 }
 
 function getCreationReferenceAnalysisSnapshot() {
-  return JSON.stringify(state.creationReferenceFiles.map((item) => ({
+  return JSON.stringify({
+    platform: getCreationSelectedPlatform().value,
+    category: getCreationSelectedIndustryTemplate().value,
+    files: state.creationReferenceFiles.map((item) => ({
     name: item?.file?.name || item?.name || "",
     size: item?.file?.size || item?.size || 0,
     type: item?.file?.type || item?.type || "",
     lastModified: item?.file?.lastModified || item?.lastModified || 0,
-  })));
+    })),
+  });
 }
 
-function invalidateCreationReferenceAnalysisRequest() { creationReferenceAnalysisRequestToken += 1; state.creationReferenceAnalysis.running = false; }
+async function handleCreationPlatformChange({ programmatic = false } = {}) {
+  const nextPlatform = getCreationSelectedPlatform().value;
+  const previousPlatform = creationPreviousPlatformValue || nextPlatform;
+  if (programmatic || previousPlatform === nextPlatform) {
+    creationPreviousPlatformValue = nextPlatform;
+    return;
+  }
+  const confirmed = window.confirm("切换平台将重置平台相关的自动规划和覆盖项，但会保留商品、类目、尺寸、参考图、Logo、SKU、输出格式和配置。是否继续？");
+  if (!confirmed) {
+    refs.creationPlatformInput.value = previousPlatform;
+    renderCreationView();
+    return;
+  }
+  creationPreviousPlatformValue = nextPlatform;
+  invalidateCreationReferenceAnalysisRequest();
+  state.creation.platformSetOverrides = {};
+  state.creation.platformItemOverrides = [];
+  setFrozenCreationPlatformPayload({ platformSetOverrides: {}, platformItemOverrides: [] });
+  state.creation.effectivePlan = null;
+  state.creation.currentSet = null;
+  state.creationRoleSelectionManuallyEdited = false;
+  renderCreationView();
+  await previewCreationPlan();
+}
+
+function invalidateCreationReferenceAnalysisRequest() { creationReferenceAnalysisAbortController?.abort(); creationReferenceAnalysisAbortController = null; creationReferenceAnalysisRequestToken += 1; state.creationReferenceAnalysis.running = false; }
 
 function appendStyleTransferReferencesToFormData(formData, job) {
   formData.set("mode", "style-transfer");
@@ -15167,8 +15072,11 @@ function handlePromptGenerationShortcut(event) {
 }
 
 function isTopbarRevealLayout() {
-  const layoutMode = getCurrentStudioLayoutMode();
-  return layoutMode !== "tablet" && layoutMode !== "mobile";
+  return true;
+}
+
+function isTopbarRevealSuppressed() {
+  return document.documentElement.classList.contains(TOPBAR_SUPPRESSED_CLASS);
 }
 
 function hasOpenGlobalNavItem() {
@@ -15176,8 +15084,14 @@ function hasOpenGlobalNavItem() {
 }
 
 function setTopbarReveal(open) {
-  const shouldOpen = Boolean(open) && isTopbarRevealLayout();
+  const shouldOpen = Boolean(open) && isTopbarRevealLayout() && !isTopbarRevealSuppressed();
   document.documentElement.classList.toggle(TOPBAR_REVEAL_CLASS, shouldOpen);
+  refs.topbarRevealButton?.setAttribute("aria-expanded", String(shouldOpen));
+  if (refs.topbarRevealButton) {
+    const label = shouldOpen ? "收起顶部导航" : "展开顶部导航";
+    refs.topbarRevealButton.setAttribute("aria-label", label);
+    refs.topbarRevealButton.title = label;
+  }
 }
 
 function syncTopbarRevealFromPointer(event) {
@@ -15187,12 +15101,19 @@ function syncTopbarRevealFromPointer(event) {
   }
 
   const target = event.target instanceof Element ? event.target : null;
+  if (target?.closest(".topbar-reveal-button")) return;
   const isInTopbar = Boolean(target?.closest(".topbar"));
   setTopbarReveal(isInTopbar || event.clientY <= TOPBAR_REVEAL_EDGE_PX || hasOpenGlobalNavItem());
 }
 
 function bindTopbarRevealEvents() {
+  refs.topbarRevealButton?.addEventListener("pointerdown", (event) => event.stopPropagation());
+  refs.topbarRevealButton?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    setTopbarReveal(!document.documentElement.classList.contains(TOPBAR_REVEAL_CLASS));
+  });
   document.addEventListener("pointermove", syncTopbarRevealFromPointer, { passive: true });
+  document.addEventListener("pointerdown", syncTopbarRevealFromPointer, { passive: true });
   document.addEventListener("focusin", (event) => {
     const target = event.target instanceof Element ? event.target : null;
     if (target?.closest(".topbar")) {
@@ -15201,7 +15122,8 @@ function bindTopbarRevealEvents() {
   });
   document.addEventListener("focusout", () => {
     window.setTimeout(() => {
-      if (!refs.topbar?.contains(document.activeElement) && !hasOpenGlobalNavItem()) {
+      const focusInRevealButton = refs.topbarRevealButton?.contains(document.activeElement);
+      if (!refs.topbar?.contains(document.activeElement) && !focusInRevealButton && !hasOpenGlobalNavItem()) {
         setTopbarReveal(false);
       }
     }, 0);
@@ -15331,8 +15253,7 @@ function getClipboardImageFiles(clipboardData) {
   }
 
   return [...(clipboardData?.files || [])].filter((file) => file.type.startsWith("image/"));
-}
-
+} function isPromptAgentModalOpen() { return !refs.promptAgentModal.classList.contains("hidden"); } function handlePromptAgentImagePaste(event) { if (!isPromptAgentModalOpen() || event.defaultPrevented) { return; } const imageFiles = getClipboardImageFiles(event.clipboardData); if (imageFiles.length === 0) { return; } event.preventDefault(); applyPromptAgentFile(imageFiles); }
 function handleStudioImagePaste(event) {
   const imageFiles = getClipboardImageFiles(event.clipboardData);
   if (imageFiles.length === 0) {
@@ -15348,13 +15269,35 @@ function handleStudioImagePaste(event) {
   applyReferenceFiles(imageFiles);
 }
 
-function handleCreationReferenceImagePaste(event) { if (state.activeView !== "creation" || isCreationLogoBatchBranch()) return; const imageFiles = getClipboardImageFiles(event.clipboardData); if (imageFiles.length === 0) return; event.preventDefault(); applyCreationReferenceFiles(imageFiles); }
+function handleCreationReferenceImagePaste(event) { if (event.defaultPrevented || state.activeView !== "creation" || isCreationLogoBatchBranch()) return; const imageFiles = getClipboardImageFiles(event.clipboardData); if (imageFiles.length === 0) return; event.preventDefault(); applyCreationReferenceFiles(imageFiles); }
+
+function persistCreationPlatformSlotOrder(slotNodes) {
+  const slotKeys = [...slotNodes].map((node) => node.dataset?.slotKey || String(node || ""));
+  const overrides = buildCreationPlatformSlotOrderOverrides(getFrozenCreationPlatformPayload().values.platformItemOverrides, slotKeys);
+  setFrozenCreationPlatformPayload({ ...getFrozenCreationEffectivePlan(), platformItemOverrides: overrides });
+  return overrides;
+}
+
+function addCreationPlatformCustomSlot(afterSlotKey = "") {
+  const slotKeys = [...refs.creationPlanSlots.querySelectorAll("[data-creation-plan-slot]")]
+    .map((node) => node.dataset.slotKey)
+    .filter(Boolean);
+  const slotKey = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const overrides = insertCreationPlatformCustomSlotOverride(
+    getFrozenCreationPlatformPayload().values.platformItemOverrides,
+    slotKeys,
+    { afterSlotKey, slotKey },
+  );
+  setFrozenCreationPlatformPayload({ ...getFrozenCreationEffectivePlan(), platformItemOverrides: overrides });
+  return slotKey;
+}
+
 function bindEvents() {
   creationLogoLibrary.bind();
   bindGlobalNavEvents();
   bindTopbarRevealEvents();
   bindAdaptiveWorkbenchSections();
-  document.addEventListener("paste", handleCreationReferenceImagePaste);
+  document.addEventListener("paste", handlePromptAgentImagePaste); document.addEventListener("paste", handleCreationReferenceImagePaste);
 
   refs.viewTabs.forEach((button) => {
     button.addEventListener("click", () => {
@@ -15380,9 +15323,8 @@ function bindEvents() {
   refs.openConfigButton.addEventListener("click", () => setDrawerOpen(true));
   refs.closeConfigButton.addEventListener("click", () => setDrawerOpen(false));
   refs.closeConfigBackdrop.addEventListener("click", () => setDrawerOpen(false));
-  refs.uiLanguageInput.addEventListener("change", (event) => {
-    setUiLanguage(event.target.value);
-    event.target.closest(".config-language-menu")?.removeAttribute("open");
+  refs.uiLanguageOptions.forEach((button) => {
+    button.addEventListener("click", () => setUiLanguage(button.dataset.uiLanguageOption));
   });
   refs.openPromptAgentButton.addEventListener("click", () => setPromptAgentOpen(true));
   refs.promptAgentCloseButton.addEventListener("click", () => setPromptAgentOpen(false));
@@ -15575,6 +15517,52 @@ function bindEvents() {
   });
   refs.creationForm.addEventListener("submit", startCreationGeneration);
   refs.creationPlanButton.addEventListener("click", () => {
+    previewCreationPlan().catch((error) => setCreationFeedback(error.message, "error"));
+  });
+  refs.creationPlanRestoreButton?.addEventListener("click", () => {
+    restoreCurrentCreationPlatformRecommendations().catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      setCreationFeedback(message, "error");
+      showError(message);
+    });
+  });
+  refs.creationPlanSlots?.addEventListener("change", (event) => {
+    const slot = event.target.closest("[data-creation-plan-slot]");
+    if (!slot) return;
+    const field = event.target.dataset.creationPlanField || (event.target.matches("[data-creation-plan-enabled]") ? "enabled" : "");
+    if (!field) return;
+    const value = field === "enabled" ? event.target.checked : event.target.value;
+    const overrides = cloneCreationPlanValue(getFrozenCreationPlatformPayload().values.platformItemOverrides, []);
+    const index = overrides.findIndex((entry) => entry.slotKey === slot.dataset.slotKey);
+    const next = { ...(index >= 0 ? overrides[index] : {}), slotKey: slot.dataset.slotKey, [field]: value };
+    if (index >= 0) overrides[index] = next; else overrides.push(next);
+    setFrozenCreationPlatformPayload({ ...getFrozenCreationEffectivePlan(), platformItemOverrides: overrides });
+    previewCreationPlan().catch((error) => setCreationFeedback(error.message, "error"));
+  });
+  refs.creationPlanSlots?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-creation-plan-action]");
+    const slot = button?.closest("[data-creation-plan-slot]");
+    if (!button || !slot) return;
+    const action = button.dataset.creationPlanAction;
+    const siblings = [...refs.creationPlanSlots.querySelectorAll("[data-creation-plan-slot]")];
+    const currentIndex = siblings.indexOf(slot);
+    if (action === "move-up" && currentIndex > 0) refs.creationPlanSlots.insertBefore(slot, siblings[currentIndex - 1]);
+    if (action === "move-down" && currentIndex >= 0 && currentIndex < siblings.length - 1) refs.creationPlanSlots.insertBefore(siblings[currentIndex + 1], slot);
+    if (action === "move-up" || action === "move-down") {
+      persistCreationPlatformSlotOrder(refs.creationPlanSlots.querySelectorAll("[data-creation-plan-slot]"));
+      previewCreationPlan().catch((error) => setCreationFeedback(error.message, "error"));
+    }
+    if (action === "remove") slot.querySelector("[data-creation-plan-enabled]")?.click();
+    if (action === "add-after") {
+      addCreationPlatformCustomSlot(slot.dataset.slotKey);
+      previewCreationPlan().catch((error) => setCreationFeedback(error.message, "error"));
+    }
+  });
+  refs.creationPlanAdvancedToggle?.addEventListener("click", (event) => {
+    const button = event.target.closest('[data-creation-plan-action="add"]');
+    if (!button) return;
+    if (!getFrozenCreationEffectivePlan()) return;
+    addCreationPlatformCustomSlot();
     previewCreationPlan().catch((error) => setCreationFeedback(error.message, "error"));
   });
   refs.creationQueueStrip.addEventListener("click", (event) => {
@@ -15850,13 +15838,26 @@ function bindEvents() {
     );
   });
   [refs.creationProductNameInput, refs.creationProductDescriptionInput, refs.creationSellingPointsInput, refs.creationDimensionSpecsInput].forEach((input) => input.addEventListener("input", resetCreationDraftPreview));
-  [refs.creationDimensionUnitModeInput, refs.creationTargetLanguageInput, refs.creationVisualLanguageInput].forEach((input) => input.addEventListener("change", resetCreationDraftPreview));
+  [refs.creationDimensionUnitModeInput, refs.creationTargetLanguageInput].forEach((input) => input?.addEventListener("change", resetCreationDraftPreview));
+  // Legacy static contract: [refs.creationDimensionUnitModeInput, refs.creationTargetLanguageInput, refs.creationPlatformInput].forEach((input) => input?.addEventListener("change", resetCreationDraftPreview));
+  refs.creationPlatformInput?.addEventListener("pointerdown", () => {
+    creationPreviousPlatformValue = getCreationSelectedPlatform().value;
+  });
+  refs.creationPlatformInput?.addEventListener("focus", () => {
+    creationPreviousPlatformValue = getCreationSelectedPlatform().value;
+  });
+  refs.creationPlatformInput?.addEventListener("change", () => {
+    handleCreationPlatformChange().catch((error) => setCreationFeedback(error.message, "error"));
+  });
+  refs.creationIndustryTemplateInput?.addEventListener("change", () => {
+    invalidateCreationReferenceAnalysisRequest();
+    resetCreationDraftPreview();
+  });
   refs.creationImageCountInput.addEventListener("change", syncCreationSelectedRolesToCount);
   refs.creationImageCountInput.addEventListener("click", syncCreationSelectedRolesToCurrentCount);
   refs.creationInfographicRebuildEnabledInput?.addEventListener("change", resetCreationDraftPreview);
   refs.creationSkuBundleCountInput?.addEventListener("input", resetCreationDraftPreview);
   refs.creationSkuGenerationRuleInput?.addEventListener("change", resetCreationDraftPreview);
-  refs.creationScenarioInput.addEventListener("change", syncCreationSelectedRolesToScenario);
   refs.creationIndustryTemplateTrigger.addEventListener("click", async () => {
     const shouldOpenCreationIndustryTemplateBrowser = refs.creationIndustryTemplatePopover?.hidden !== false;
     if (shouldOpenCreationIndustryTemplateBrowser) {
@@ -15879,6 +15880,7 @@ function bindEvents() {
       setCreationIndustryTemplateValue(templateValue, { searchText: "" });
       setCreationIndustryTemplateBrowserOpen(false);
       if (previousValue !== refs.creationIndustryTemplateInput.value) {
+        invalidateCreationReferenceAnalysisRequest();
         syncCreationSelectedRolesToIndustry();
       }
       return;
@@ -15936,7 +15938,6 @@ function bindEvents() {
     });
   });
   refs.creationReferenceApplyAnalysisButton.addEventListener("click", applyCreationReferenceAnalysisRecommendations);
-  refs.creationReferenceApplyVisualLanguageButton.addEventListener("click", applyCreationReferenceAnalysisVisualLanguage);
   refs.creationReferenceAnalysisToggleButton.addEventListener("click", toggleCreationReferenceAnalysisPanel);
   refs.creationReferenceGrid.addEventListener("click", (event) => {
     const target = event.target.closest("[data-creation-reference-preview-id]");
@@ -16545,6 +16546,7 @@ function bindEvents() {
   });
 }
 
+function getStartupRecordLoaders() { return [loadGallery, loadGenerationTasks]; } function loadStartupRecordsInBackground() { void Promise.allSettled(getStartupRecordLoaders().map((load) => load())).then((results) => { const rejected = results.find((result) => result.status === "rejected"); if (!rejected) return; const message = rejected.reason instanceof Error ? rejected.reason.message : String(rejected.reason); console.warn("startup record load failed", rejected.reason); showError(message); setConnectionState("error", "部分历史记录加载失败"); }); }
 async function bootstrap() {
   state.clientSessionId = getOrCreateClientSessionId();
   state.uiLanguage = readUiLanguage();
@@ -16569,7 +16571,9 @@ async function bootstrap() {
   renderSizeOptions();
   renderReferenceAnalysisRatioGrid();
   renderReferenceAnalysisSizeOptions();
-  renderCreationIndustryTemplateBrowser(); void creationLogoLibrary.load();
+  renderCreationIndustryTemplateBrowser();
+  await ensureCreationPlatformModulesReady({ render: true });
+  void creationLogoLibrary.load();
   updateGenerateButton();
   updateGenerationModeStatus();
   renderReferenceGrid();
@@ -16583,12 +16587,8 @@ async function bootstrap() {
 
   try {
     await loadConfig();
-    await loadGallery();
-    await loadArticleIllustrationSets();
-    await loadCreationSets();
-    await loadGenerationTasks();
-    await loadPromptAgentHistory();
-    await loadPptDecks();
+    renderAll();
+    loadStartupRecordsInBackground();
   } catch (error) {
     showError(error instanceof Error ? error.message : String(error));
     setConnectionState("error", "初始化失败");

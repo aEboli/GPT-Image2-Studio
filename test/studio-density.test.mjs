@@ -122,6 +122,36 @@ test("studio layout mode honors mobile and Pad emulation viewport widths", () =>
   );
 });
 
+test("studio layout mode covers representative phone tablet and desktop viewports", () => {
+  const cases = [
+    [{ width: 320, height: 568, coarsePointer: true }, "mobile"],
+    [{ width: 390, height: 844, coarsePointer: true }, "mobile"],
+    [{ width: 768, height: 1024, coarsePointer: true }, "tablet"],
+    [{ width: 1024, height: 768, coarsePointer: true }, "tablet"],
+    [{ width: 1366, height: 768, coarsePointer: false }, "narrow-desktop"],
+    [{ width: 1920, height: 1080, coarsePointer: false }, "desktop"],
+  ];
+
+  for (const [viewport, expectedMode] of cases) {
+    assert.equal(getStudioLayoutMode(viewport), expectedMode, `${viewport.width}x${viewport.height}`);
+  }
+});
+
+test("tablet landscape only keeps the two-panel layout when usable height is sufficient", () => {
+  assert.equal(
+    getStudioLayoutMode({ width: 1024, height: 768, coarsePointer: true }),
+    "tablet",
+  );
+  assert.equal(
+    getStudioLayoutMode({ width: 1024, height: 560, coarsePointer: true }),
+    "stacked",
+  );
+  assert.equal(
+    getStudioLayoutMode({ width: 1025, height: 768, coarsePointer: true }),
+    "stacked",
+  );
+});
+
 test("studio layout mode maps high-density phone physical pixels to mobile", () => {
   const physicalPhone = {
     width: 1200,

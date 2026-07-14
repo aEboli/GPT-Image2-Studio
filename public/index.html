@@ -2,7 +2,7 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Image Studio</title>
     <script>
       (() => {
@@ -52,6 +52,9 @@
           physicalTouchWidth >= 320 && physicalTouchWidth <= 1480
             ? physicalTouchWidth
             : viewportWidth;
+        document.documentElement.dataset.uiOrientation = innerWidth >= innerHeight ? "landscape" : "portrait";
+        document.documentElement.dataset.uiInput = coarsePointer ? "coarse" : "fine";
+        document.documentElement.style.setProperty("--visual-viewport-height", `${window.visualViewport?.height || innerHeight}px`);
         if (width > 0 && width <= 640) {
           document.documentElement.dataset.uiLayout = "mobile";
         } else if (width > 0 && width <= 1024) {
@@ -65,11 +68,22 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Sora:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260705-ui-scale-90-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260713-cross-device-1" />
   </head>
   <body>
     <div class="app-shell">
-      <header class="topbar">
+      <button
+        class="topbar-reveal-button"
+        id="topbarRevealButton"
+        type="button"
+        aria-expanded="false"
+        aria-controls="globalTopbar"
+        aria-label="展开顶部导航"
+        title="展开顶部导航"
+      >
+        <span class="topbar-reveal-icon" aria-hidden="true"></span>
+      </button>
+      <header class="topbar" id="globalTopbar">
         <div class="brand-cluster">
           <div class="brand-mark" aria-hidden="true">
             <span class="brand-mark-core"></span>
@@ -79,74 +93,74 @@
               <h1>aEboli</h1>
               <span class="brand-ai-badge">AI</span>
             </div>
-            <p>AI 图像生成工作流</p>
+            <p data-ui-i18n="brandSubtitle">AI 图像生成工作流</p>
           </div>
         </div>
 
-        <nav class="primary-nav global-nav" aria-label="全局导航">
-          <div class="view-tabs global-nav-list" aria-label="功能菜单导航">
+        <nav class="primary-nav global-nav" aria-label="全局导航" data-ui-i18n-aria-label="globalNav">
+          <div class="view-tabs global-nav-list" aria-label="功能菜单导航" data-ui-i18n-aria-label="functionMenu">
             <div class="nav-item" data-nav-section="create">
               <button class="view-tab active" data-nav-menu="create" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="nav-menu-studio">
-                <span class="nav-tab-label">创作</span>
+                <span class="nav-tab-label" data-ui-i18n="navCreate">创作</span>
                 <span class="nav-tab-note">Studio</span>
               </button>
               <div class="nav-flyout mega-menu" id="nav-menu-studio" data-nav-subzone="studio" aria-hidden="true">
                 <div class="mega-menu-grid">
-                  <section class="mega-menu-column mega-menu-primary" aria-label="创作区">
-                    <span class="mega-menu-kicker">创作区</span>
-                    <a class="mega-menu-link large" href="#studio">提示词生图</a>
-                    <a class="mega-menu-link" href="#style-transfer">风格迁移</a>
-                    <a class="mega-menu-link" href="#reference-analysis">融图分析</a>
-                    <a class="mega-menu-link" href="#image-decomposition">图片拆解</a>
-                    <a class="mega-menu-link" href="#image-edit">图片编辑</a>
-                    <a class="mega-menu-link" href="#quick-blend">快速溶图</a>
-                    <a class="mega-menu-link" href="#creation">套图模式</a>
-                    <a class="mega-menu-link" href="#portrait">写真模式</a>
-                    <a class="mega-menu-link" href="#article-illustration">文章插图</a>
-                    <a class="mega-menu-link" href="#ppt">PPT生成</a>
+                  <section class="mega-menu-column mega-menu-primary" aria-label="创作区" data-ui-i18n-aria-label="menuSectionCreate">
+                    <span class="mega-menu-kicker" data-ui-i18n="menuSectionCreate">创作区</span>
+                    <a class="mega-menu-link large" href="#studio" data-ui-i18n="menuPromptStudio">提示词生图</a>
+                    <a class="mega-menu-link" href="#style-transfer" data-ui-i18n="menuStyleTransfer">风格迁移</a>
+                    <a class="mega-menu-link" href="#reference-analysis" data-ui-i18n="menuReferenceAnalysis">融图分析</a>
+                    <a class="mega-menu-link" href="#image-decomposition" data-ui-i18n="menuImageDecomposition">图片拆解</a>
+                    <a class="mega-menu-link" href="#image-edit" data-ui-i18n="menuImageEdit">图片编辑</a>
+                    <a class="mega-menu-link" href="#quick-blend" data-ui-i18n="menuQuickBlend">快速溶图</a>
+                    <a class="mega-menu-link" href="#creation" data-ui-i18n="menuCreation">套图模式</a>
+                    <a class="mega-menu-link" href="#portrait" data-ui-i18n="menuPortrait">写真模式</a>
+                    <a class="mega-menu-link" href="#article-illustration" data-ui-i18n="menuArticleIllustration">文章插图</a>
+                    <a class="mega-menu-link" href="#ppt" data-ui-i18n="menuPpt">PPT生成</a>
                   </section>
-                  <section class="mega-menu-column" aria-label="创作工具">
-                    <span class="mega-menu-title">工具</span>
-                    <button class="mega-menu-action large" type="button" data-nav-action="prompt-agent">图片转提示词</button>
-                    <a class="mega-menu-link" href="#image-compress">图片压缩</a>
+                  <section class="mega-menu-column" aria-label="创作工具" data-ui-i18n-aria-label="menuCreateTools">
+                    <span class="mega-menu-title" data-ui-i18n="menuTools">工具</span>
+                    <button class="mega-menu-action large" type="button" data-nav-action="prompt-agent" data-ui-i18n="promptAgent">图片转提示词</button>
+                    <a class="mega-menu-link" href="#image-compress" data-ui-i18n="menuImageCompress">图片压缩</a>
                   </section>
                 </div>
               </div>
             </div>
             <div class="nav-item" data-nav-section="assets">
               <button class="view-tab" data-nav-menu="assets" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="nav-menu-gallery">
-                <span class="nav-tab-label">资产</span>
+                <span class="nav-tab-label" data-ui-i18n="navAssets">资产</span>
                 <span class="nav-tab-note">Gallery</span>
               </button>
               <div class="nav-flyout mega-menu" id="nav-menu-gallery" data-nav-subzone="gallery" aria-hidden="true">
                 <div class="mega-menu-grid">
-                  <section class="mega-menu-column mega-menu-primary" aria-label="资产区">
-                    <span class="mega-menu-kicker">资产区</span>
-                    <a class="mega-menu-link large" href="#gallery">瀑布画廊</a>
-                    <a class="mega-menu-link" href="#article-record">文章插图记录</a>
-                    <a class="mega-menu-link" href="#creation-record">套图记录</a>
-                    <a class="mega-menu-link" href="#portrait-record">写真记录</a>
-                    <a class="mega-menu-link" href="#ppt-record">PPT记录</a>
+                  <section class="mega-menu-column mega-menu-primary" aria-label="资产区" data-ui-i18n-aria-label="menuSectionAssets">
+                    <span class="mega-menu-kicker" data-ui-i18n="menuSectionAssets">资产区</span>
+                    <a class="mega-menu-link large" href="#gallery" data-ui-i18n="menuGallery">瀑布画廊</a>
+                    <a class="mega-menu-link" href="#article-record" data-ui-i18n="menuArticleRecord">文章插图记录</a>
+                    <a class="mega-menu-link" href="#creation-record" data-ui-i18n="menuCreationRecord">套图记录</a>
+                    <a class="mega-menu-link" href="#portrait-record" data-ui-i18n="menuPortraitRecord">写真记录</a>
+                    <a class="mega-menu-link" href="#ppt-record" data-ui-i18n="menuPptRecord">PPT记录</a>
                   </section>
-                  <section class="mega-menu-column" aria-label="资产工具">
-                    <span class="mega-menu-title">工具</span>
-                    <button class="mega-menu-action large" type="button" data-nav-action="output">打开输出目录</button>
+                  <section class="mega-menu-column" aria-label="资产工具" data-ui-i18n-aria-label="menuAssetTools">
+                    <span class="mega-menu-title" data-ui-i18n="menuTools">工具</span>
+                    <button class="mega-menu-action large" type="button" data-nav-action="output" data-ui-i18n="openOutput">打开输出目录</button>
                   </section>
                 </div>
               </div>
             </div>
             <div class="nav-item" data-nav-section="settings">
               <button class="view-tab" data-nav-menu="settings" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="nav-menu-settings">
-                <span class="nav-tab-label">配置</span>
+                <span class="nav-tab-label" data-ui-i18n="navSettings">配置</span>
                 <span class="nav-tab-note">Settings</span>
               </button>
               <div class="nav-flyout mega-menu" id="nav-menu-settings" data-nav-subzone="settings" aria-hidden="true">
                 <div class="mega-menu-grid">
-                  <section class="mega-menu-column mega-menu-primary" aria-label="配置区">
-                    <span class="mega-menu-kicker">配置区</span>
-                    <button class="mega-menu-action large" type="button" data-nav-action="config">配置 API</button>
-                    <button class="mega-menu-action" type="button" data-nav-action="activity-log">生成日志</button>
-                    <button class="mega-menu-action" id="themeNavAction" type="button" data-nav-action="theme">主题颜色</button>
+                  <section class="mega-menu-column mega-menu-primary" aria-label="配置区" data-ui-i18n-aria-label="menuSectionSettings">
+                    <span class="mega-menu-kicker" data-ui-i18n="menuSectionSettings">配置区</span>
+                    <button class="mega-menu-action large" type="button" data-nav-action="config" data-ui-i18n="configApi">配置 API</button>
+                    <button class="mega-menu-action" type="button" data-nav-action="activity-log" data-ui-i18n="activityLog">生成日志</button>
+                    <button class="mega-menu-action" id="themeNavAction" type="button" data-nav-action="theme" data-ui-i18n="themeMenu">主题颜色</button>
                   </section>
                 </div>
               </div>
@@ -164,14 +178,14 @@
         </div>
 
         <div class="topbar-ghost-actions">
-          <div class="header-pill" id="configStatus">配置未保存</div>
+          <div class="header-pill" id="configStatus" data-ui-i18n="configUnsaved">配置未保存</div>
           <button class="theme-toggle header-button" id="themeToggleButton" type="button" aria-pressed="false">
             <span class="theme-toggle-icon" aria-hidden="true"></span>
             <span id="themeToggleLabel">白色主题</span>
           </button>
-          <button class="header-button" id="openOutputButton" type="button">打开输出目录</button>
-          <button class="header-button" id="openPromptAgentButton" type="button">图片转提示词</button>
-          <button class="header-button strong" id="openConfigButton" type="button">配置</button>
+          <button class="header-button" id="openOutputButton" type="button" data-ui-i18n="openOutput">打开输出目录</button>
+          <button class="header-button" id="openPromptAgentButton" type="button" data-ui-i18n="promptAgent">图片转提示词</button>
+          <button class="header-button strong" id="openConfigButton" type="button" data-ui-i18n="config">配置</button>
         </div>
       </header>
 
@@ -188,7 +202,7 @@
                 >
                   <summary class="field-heading adaptive-section-summary">
                     <div>
-                      <span>参考图</span>
+                      <span data-ui-i18n="reference">参考图</span>
                     </div>
                     <small id="referenceCount">0 / 15</small>
                   </summary>
@@ -196,8 +210,8 @@
                   <label class="reference-dropzone" id="referenceDropzone">
                     <input id="referenceInput" name="referenceImages" type="file" accept="image/*" multiple />
                     <div class="reference-icon" aria-hidden="true"></div>
-                    <strong>拖入图片或点击上传</strong>
-                    <em>上传参考图</em>
+                    <strong data-ui-i18n="referenceUploadTitle">拖入图片或点击上传</strong>
+                    <em data-ui-i18n="referenceUploadAction">上传参考图</em>
                   </label>
 
                   <div class="reference-grid hidden" id="referenceGrid"></div>
@@ -255,9 +269,9 @@
                 <div class="field-group" data-prompt-mode-block>
                   <div class="field-heading with-action">
                     <div>
-                      <span>提示词</span>
+                      <span data-ui-i18n="prompt">提示词</span>
                     </div>
-                    <button class="icon-button" id="surprisePromptButton" type="button" title="提示词模板" aria-expanded="false">
+                    <button class="icon-button" id="surprisePromptButton" type="button" title="提示词模板" aria-expanded="false" data-ui-i18n-title="promptTemplate">
                       ✦
                     </button>
                   </div>
@@ -267,6 +281,7 @@
                       name="prompt"
                       rows="5"
                       placeholder="写下你要生成的画面，也可以先上传参考图说明修改方向。"
+                      data-ui-i18n-placeholder="promptPlaceholder"
                     ></textarea>
                     <span class="field-counter"><span id="promptCounter">0 字</span></span>
                   </label>
@@ -281,9 +296,10 @@
                     aria-checked="false"
                     aria-controls="promptEnhanceField"
                     aria-label="开启或关闭提示词增强模式"
+                    data-ui-i18n-aria-label="promptEnhanceAria"
                   >
                     <span class="prompt-enhance-toggle-copy">
-                      <strong>增强模式</strong>
+                      <strong data-ui-i18n="promptEnhance">增强模式</strong>
                       <small id="promptEnhanceStatus">关闭</small>
                     </span>
                     <span class="prompt-enhance-switch-track" aria-hidden="true">
@@ -291,7 +307,7 @@
                     </span>
                   </button>
                   <label class="prompt-enhance-field hidden" id="promptEnhanceField">
-                    <span>增强提示词</span>
+                    <span data-ui-i18n="promptEnhanceField">增强提示词</span>
                     <textarea id="promptEnhanceInput" rows="3" maxlength="500">,sharp focus, macro details, rich textures, crisp edges, photorealistic texture, visible grain, detailed surface material, cinematic lighting</textarea>
                   </label>
                 </div>
@@ -301,6 +317,8 @@
                   id="generateButton"
                   type="submit"
                   title="开始生成（Ctrl+Enter）"
+                  data-ui-i18n-title="generateTitle"
+                  data-ui-i18n="generate"
                   aria-keyshortcuts="Control+Enter"
                 >
                   开始生成
@@ -314,7 +332,7 @@
                 >
                   <summary class="field-heading adaptive-section-summary">
                     <div>
-                      <span>参数设置</span>
+                      <span data-ui-i18n="parameters">参数设置</span>
                     </div>
                     <span class="ratio-orientation-summary" id="ratioOrientationSummary" aria-live="polite"></span>
                   </summary>
@@ -323,24 +341,24 @@
                   <div class="advanced-content">
                     <div class="advanced-controls">
                       <label class="compact-field">
-                        <span>思考等级</span>
+                        <span data-ui-i18n="reasoningEffort">思考等级</span>
                         <select id="reasoningEffortInput" name="reasoningEffort"></select>
                       </label>
 
                       <label class="compact-field">
-                        <span>分辨率</span>
+                        <span data-ui-i18n="size">分辨率</span>
                         <select id="sizeInput" name="size"></select>
                       </label>
 
                       <label class="compact-field">
-                        <span>输出格式</span>
+                        <span data-ui-i18n="outputFormat">输出格式</span>
                         <select id="outputFormatInput" name="format"></select>
                       </label>
 
-                      <div class="parameter-meta" aria-label="工具模型与质量">
-                        <span>工具模型</span>
+                      <div class="parameter-meta" aria-label="工具模型与质量" data-ui-i18n-aria-label="toolModelAndQuality">
+                        <span data-ui-i18n="toolModel">工具模型</span>
                         <strong>gpt-image-2</strong>
-                        <span>质量</span>
+                        <span data-ui-i18n="quality">质量</span>
                         <strong>High</strong>
                       </div>
                     </div>
@@ -361,8 +379,8 @@
 
                 <div class="preview-canvas" id="previewCanvas">
                   <div class="preview-placeholder" id="previewPlaceholder">
-                    <h3>生成结果会在这里实时更新。</h3>
-                    <span>生成日志可在配置中查看，底部胶片条可快速切换查看。</span>
+                    <h3 data-ui-i18n="previewIdleTitle">生成结果会在这里实时更新。</h3>
+                    <span data-ui-i18n="previewIdleDetail">生成日志可在配置中查看，底部胶片条可快速切换查看。</span>
                   </div>
                   <img id="previewImage" alt="当前预览" />
                 </div>
@@ -372,13 +390,13 @@
                     <button class="toolbar-button" id="zoomOutButton" type="button">-</button>
                     <span class="zoom-label" id="zoomLabel">100%</span>
                     <button class="toolbar-button" id="zoomInButton" type="button">+</button>
-                    <button class="toolbar-button" id="zoomResetButton" type="button">适配</button>
+                    <button class="toolbar-button" id="zoomResetButton" type="button" data-ui-i18n="fit">适配</button>
                   </div>
 
                   <div class="preview-actions">
-                    <a class="toolbar-button" id="previewDownloadButton" href="#" download>下载</a>
-                    <button class="toolbar-button" id="previewLightboxButton" type="button">查看</button>
-                    <button class="toolbar-button danger" id="previewDeleteButton" type="button">删除</button>
+                    <a class="toolbar-button" id="previewDownloadButton" href="#" download data-ui-i18n="download">下载</a>
+                    <button class="toolbar-button" id="previewLightboxButton" type="button" data-ui-i18n="view">查看</button>
+                    <button class="toolbar-button danger" id="previewDeleteButton" type="button" data-ui-i18n="delete">删除</button>
                   </div>
                 </div>
               </div>
@@ -1376,14 +1394,6 @@
                         >
                           折叠建议
                         </button>
-                        <button
-                          class="inline-button reference-analysis-visual-button hidden"
-                          id="creationReferenceApplyVisualLanguageButton"
-                          type="button"
-                          disabled
-                        >
-                          应用视觉语言
-                        </button>
                       </div>
                       <strong id="creationReferenceAnalysisSummary">--</strong>
                       <small class="creation-reference-analysis-meta" id="creationReferenceAnalysisMeta">--</small>
@@ -1474,7 +1484,9 @@
                       <option value="0">0 张</option>
                       <option value="4">4 张</option>
                       <option value="6">6 张</option>
+                      <option value="7">7 张</option>
                       <option value="8">8 张</option>
+                      <option value="9">9 张</option>
                       <option value="10">10 张</option>
                       <option value="12">12 张</option>
                       <option value="14">14 张</option>
@@ -1489,35 +1501,9 @@
                   </label>
 
                   <label class="compact-field" data-creation-set-only>
-                    <span>营销场景</span>
-                    <select id="creationScenarioInput" name="scenario">
-                      <option value="standard">标准电商</option>
-                      <option value="detail-page">详情页转化</option>
-                      <option value="social-seeding">社媒种草</option>
-                      <option value="launch">新品发布</option>
-                      <option value="promotion">活动促销</option>
-                      <option value="livestream">直播电商</option>
-                      <option value="gift-guide">礼品推荐</option>
-                      <option value="marketplace-search">平台搜索</option>
-                      <option value="brand-story">品牌故事</option>
-                    </select>
-                  </label>
-
-                  <label class="compact-field" data-creation-set-only>
-                    <span>视觉语言</span>
-                    <select id="creationVisualLanguageInput" name="visualLanguage">
-                      <option value="classic-commercial" selected>经典商业摄影</option>
-                      <option value="premium-studio">高端棚拍</option>
-                      <option value="reference-style">参考模式</option>
-                      <option value="clean-marketplace">平台清爽白底</option>
-                      <option value="lifestyle-editorial">生活方式杂志</option>
-                      <option value="social-ugc">社媒实拍</option>
-                      <option value="detail-infographic">详情页信息图</option>
-                      <option value="macro-material">微距材质</option>
-                      <option value="outdoor-context">户外场景</option>
-                      <option value="minimal-luxury">极简奢华</option>
-                      <option value="bold-campaign">活动海报</option>
-                      <option value="warm-handcrafted">手作温度</option>
+                    <span>平台选择</span>
+                    <select id="creationPlatformInput" name="platform">
+                      <option value="universal" selected>通用电商</option>
                     </select>
                   </label>
 
@@ -1636,14 +1622,154 @@
                     </div>
                   </section>
                 </div>
-                <section class="creation-role-picker" id="creationRolePicker" aria-label="套图图片类型" data-creation-set-only>
-                  <div class="field-head">
-                    <div>
-                      <span>图片类型</span>
+                <section class="creation-plan-surface" aria-labelledby="creationPlanTitle" data-creation-set-only>
+                  <div class="creation-plan-summary" id="creationPlanSummary" data-plan-state="automatic">
+                    <div class="creation-plan-summary-head">
+                      <div class="creation-plan-summary-title">
+                        <span id="creationPlanTitle">平台生图计划</span>
+                        <strong id="creationPlanPlatformLabel">通用电商</strong>
+                      </div>
+                      <div class="creation-plan-summary-actions">
+                        <span class="creation-plan-state-label" data-creation-plan-state-label>自动</span>
+                        <button class="inline-button" id="creationPlanRestoreButton" type="button" disabled>
+                          恢复平台推荐
+                        </button>
+                      </div>
                     </div>
-                      <small id="creationRoleCount">18 / 18</small>
+
+                    <dl class="creation-plan-counts" aria-label="计划图片数量">
+                      <div>
+                        <dt>轮播图</dt>
+                        <dd id="creationPlanCarouselCount">0</dd>
+                      </div>
+                      <div>
+                        <dt>SKU 图</dt>
+                        <dd id="creationPlanSkuCount">0</dd>
+                      </div>
+                      <div>
+                        <dt>重构图</dt>
+                        <dd id="creationPlanRebuildCount">0</dd>
+                      </div>
+                      <div>
+                        <dt>总计</dt>
+                        <dd id="creationPlanTotalCount">0</dd>
+                      </div>
+                    </dl>
+
+                    <ul class="creation-plan-message warning hidden" id="creationPlanWarnings" aria-live="polite"></ul>
+                    <div class="creation-plan-message validation hidden" id="creationPlanValidation" aria-live="polite"></div>
                   </div>
-                  <div class="creation-role-grid" id="creationRoleGrid"></div>
+
+                  <details class="creation-plan-advanced" id="creationPlanAdvancedToggle">
+                    <summary>
+                      <span>逐图高级编辑</span>
+                      <small>0 项修改</small>
+                    </summary>
+                    <div class="creation-plan-advanced-body">
+                      <div class="creation-plan-slot-toolbar">
+                        <span>图片顺序</span>
+                        <button class="inline-button" type="button" data-creation-plan-action="add">添加图片</button>
+                      </div>
+                      <div class="creation-plan-slots" id="creationPlanSlots" role="list">
+                        <p class="creation-plan-empty" data-creation-plan-empty>暂无计划项</p>
+                      </div>
+
+                      <template id="creationPlanSlotTemplate">
+                        <article class="creation-plan-slot" data-creation-plan-slot data-slot-key="" data-overridden="false" role="listitem">
+                          <div class="creation-plan-slot-head">
+                            <span class="creation-plan-slot-order" data-creation-plan-order>1</span>
+                            <label class="creation-plan-slot-enabled">
+                              <input type="checkbox" data-creation-plan-enabled checked />
+                              <span>启用</span>
+                            </label>
+                            <span class="creation-plan-overridden hidden" data-creation-plan-overridden>已修改</span>
+                          </div>
+
+                          <div class="creation-plan-slot-actions" aria-label="调整图片顺序">
+                            <button class="inline-button" type="button" data-creation-plan-action="move-up" aria-label="上移" title="上移">上移</button>
+                            <button class="inline-button" type="button" data-creation-plan-action="move-down" aria-label="下移" title="下移">下移</button>
+                            <button class="inline-button" type="button" data-creation-plan-action="add-after">在后面添加</button>
+                            <button class="inline-button danger" type="button" data-creation-plan-action="remove">删除</button>
+                          </div>
+
+                          <div class="creation-plan-slot-fields">
+                            <label class="creation-plan-field" data-creation-plan-field-state="automatic">
+                              <span>图片类型</span>
+                              <select data-creation-plan-field="imageType">
+                                <option value="">跟随平台</option>
+                              </select>
+                            </label>
+                            <label class="creation-plan-field" data-creation-plan-field-state="automatic">
+                              <span>比例</span>
+                              <select data-creation-plan-field="ratio">
+                                <option value="">跟随平台</option>
+                              </select>
+                            </label>
+                            <label class="creation-plan-field" data-creation-plan-field-state="automatic">
+                              <span>分辨率</span>
+                              <select data-creation-plan-field="resolutionTier">
+                                <option value="">跟随平台</option>
+                                <option value="1.5K">1.5K</option>
+                                <option value="2K">2K</option>
+                                <option value="max">最大</option>
+                              </select>
+                            </label>
+                            <label class="creation-plan-field" data-creation-plan-field-state="automatic">
+                              <span>目标语言</span>
+                              <select data-creation-plan-field="targetLanguage">
+                                <option value="">跟随平台</option>
+                                <option value="zh-CN">简体中文</option>
+                                <option value="en">English</option>
+                                <option value="ja">日本語</option>
+                                <option value="ko">한국어</option>
+                                <option value="fr">Français</option>
+                                <option value="de">Deutsch</option>
+                                <option value="es">Español</option>
+                              </select>
+                            </label>
+                            <label class="creation-plan-field" data-creation-plan-field-state="automatic">
+                              <span>构图</span>
+                              <select data-creation-plan-field="composition">
+                                <option value="">跟随平台</option>
+                              </select>
+                            </label>
+                            <label class="creation-plan-field" data-creation-plan-field-state="automatic">
+                              <span>文字密度</span>
+                              <select data-creation-plan-field="textPolicy">
+                                <option value="">跟随平台</option>
+                              </select>
+                            </label>
+                            <label class="creation-plan-field" data-creation-plan-field-state="automatic">
+                              <span>场景策略</span>
+                              <select data-creation-plan-field="scenePolicy">
+                                <option value="">跟随平台</option>
+                              </select>
+                            </label>
+                            <label class="creation-plan-field" data-creation-plan-field-state="automatic">
+                              <span>Logo 策略</span>
+                              <select data-creation-plan-field="logoPolicy">
+                                <option value="">跟随平台</option>
+                              </select>
+                            </label>
+                            <label class="creation-plan-field creation-plan-prompt-field" data-creation-plan-field-state="automatic">
+                              <span>提示词</span>
+                              <textarea rows="3" data-creation-plan-field="prompt"></textarea>
+                            </label>
+                          </div>
+                        </article>
+                      </template>
+
+                      <section class="creation-role-picker" id="creationRolePicker" aria-label="兼容套图图片类型" data-creation-set-only>
+                        <div class="field-head">
+                          <div>
+                            <span>兼容图片类型</span>
+                          </div>
+                          <small id="creationRoleCount">18 / 18</small>
+                        </div>
+                        <div class="creation-role-grid" id="creationRoleGrid"></div>
+                      </section>
+                    </div>
+                  </details>
                 </section>
 
                 <div class="creation-plan-actions" data-creation-set-only>
@@ -2571,24 +2697,15 @@
       <div class="drawer-panel config-panel">
         <div class="drawer-head">
           <div>
-            <h2>连接配置</h2>
+            <h2 data-ui-i18n="configTitle">连接配置</h2>
           </div>
           <div class="drawer-head-actions config-actions-row">
-            <details class="config-language-menu">
-              <summary class="header-button config-language-trigger" aria-label="切换界面语言">
-                <span aria-hidden="true">文</span>
-              </summary>
-              <div class="config-language-popover">
-                <label class="config-language-field">
-                  <span>界面语言</span>
-                  <select id="uiLanguageInput" name="uiLanguage">
-                    <option value="zh-CN" selected>简体中文</option>
-                    <option value="en">English</option>
-                  </select>
-                </label>
-              </div>
-            </details>
-            <button class="header-button" id="closeConfigButton" type="button">关闭</button>
+            <div class="config-language-switch" role="group" aria-label="切换界面语言" data-ui-i18n-aria-label="languageSwitch">
+              <input id="uiLanguageInput" name="uiLanguage" type="hidden" value="zh-CN" />
+              <button class="config-language-option is-active" type="button" data-ui-language-option="zh-CN" aria-pressed="true" aria-label="简体中文界面" data-ui-i18n-aria-label="languageZh">CN</button>
+              <button class="config-language-option" type="button" data-ui-language-option="en" aria-pressed="false" aria-label="English UI" data-ui-i18n-aria-label="languageEn">EN</button>
+            </div>
+            <button class="header-button" id="closeConfigButton" type="button" data-ui-i18n="close">关闭</button>
           </div>
         </div>
 
@@ -2596,22 +2713,22 @@
           <form class="config-form" id="configForm">
             <section class="config-card config-connection-card" aria-labelledby="configConnectionTitle">
               <div class="config-card-head">
-                <h3 id="configConnectionTitle">调用通道</h3>
+                <h3 id="configConnectionTitle" data-ui-i18n="connectionSection">调用通道</h3>
               </div>
 
-              <fieldset class="route-selector" aria-label="生图调用模式">
-                <legend>生图调用模式</legend>
+              <fieldset class="route-selector" aria-label="生图调用模式" data-ui-i18n-aria-label="generationRouteLabel">
+                <legend data-ui-i18n="generationRouteLabel">生图调用模式</legend>
                 <label>
                   <input name="imageRoute" type="radio" value="a" checked />
-                  <span>路由模式</span>
+                  <span data-ui-i18n="routeMode">路由模式</span>
                 </label>
                 <label>
                   <input name="imageRoute" type="radio" value="b" />
-                  <span>直接调用模式</span>
+                  <span data-ui-i18n="directMode">直接调用模式</span>
                 </label>
                 <label>
                   <input name="imageRoute" type="radio" value="c" />
-                  <span>Gemini模型</span>
+                  <span data-ui-i18n="protocolMode">Gemini模型</span>
                 </label>
               </fieldset>
 
@@ -2619,12 +2736,12 @@
                 <div class="route-config-panel" data-route-panel="a">
                   <div class="field endpoint-field">
                     <div class="field-heading inline endpoint-heading">
-                      <label for="baseUrlInput">接口地址</label>
+                      <label for="baseUrlInput" data-ui-i18n="endpointUrl">接口地址</label>
                       <div class="endpoint-toolbar">
-                        <select class="endpoint-suffix-select" id="endpointPathSelect" name="endpointPath" aria-label="路由模式请求协议后缀">
+                        <select class="endpoint-suffix-select" id="endpointPathSelect" name="endpointPath" aria-label="路由模式请求协议后缀" data-ui-i18n-aria-label="routeEndpointSuffix">
                           <option value="responses">responses</option>
                         </select>
-                        <button class="inline-button endpoint-full-toggle" id="baseUrlFullToggle" type="button" aria-pressed="false">完整 URL</button>
+                        <button class="inline-button endpoint-full-toggle" id="baseUrlFullToggle" type="button" aria-pressed="false" data-ui-i18n="fullUrl">完整 URL</button>
                       </div>
                     </div>
                     <div class="endpoint-address-control">
@@ -2635,19 +2752,19 @@
                   <label class="field">
                     <div class="field-heading inline">
                       <span>API Key</span>
-                      <small id="savedKeyMask">未保存</small>
+                      <small id="savedKeyMask" data-ui-i18n="notSaved">未保存</small>
                     </div>
-                    <input id="apiKeyInput" name="apiKey" type="password" placeholder="保持已保存 Key" />
+                    <input id="apiKeyInput" name="apiKey" type="password" placeholder="保持已保存 Key" data-ui-i18n-placeholder="keepSavedKey" />
                   </label>
 
                   <div class="field model-field">
                     <div class="field-heading inline">
-                      <label for="responsesModelInput">Responses 模型</label>
-                      <button class="inline-button" id="fetchModelsButton" type="button">获取模型列表</button>
+                      <label for="responsesModelInput" data-ui-i18n="responsesModel">Responses 模型</label>
+                      <button class="inline-button" id="fetchModelsButton" type="button" data-ui-i18n="fetchModels">获取模型列表</button>
                     </div>
                     <div class="model-picker-control">
                       <input id="responsesModelInput" name="responsesModel" type="text" placeholder="gpt-5.5" autocomplete="off" aria-controls="modelOptionsList" />
-                      <button class="model-picker-toggle" id="modelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="modelOptionsList" hidden></button>
+                      <button class="model-picker-toggle" id="modelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="modelOptionsList" data-ui-i18n-aria-label="expandModels" hidden></button>
                       <div class="model-options-list" id="modelOptionsList" role="listbox" hidden></div>
                     </div>
                   </div>
@@ -2656,14 +2773,14 @@
                 <div class="route-config-panel" data-route-panel="b">
                   <div class="field endpoint-field">
                     <div class="field-heading inline endpoint-heading">
-                      <label for="directBaseUrlInput">接口地址</label>
+                      <label for="directBaseUrlInput" data-ui-i18n="endpointUrl">接口地址</label>
                       <div class="endpoint-toolbar">
-                        <select class="endpoint-suffix-select" id="directEndpointPathSelect" name="directEndpointPath" aria-label="直接调用模式请求协议后缀">
+                        <select class="endpoint-suffix-select" id="directEndpointPathSelect" name="directEndpointPath" aria-label="直接调用模式请求协议后缀" data-ui-i18n-aria-label="directEndpointSuffix">
                           <option value="images/generations">images/generations</option>
                           <option value="responses">responses</option>
                           <option value="chat/completions">chat/completions</option>
                         </select>
-                        <button class="inline-button endpoint-full-toggle" id="directBaseUrlFullToggle" type="button" aria-pressed="false">完整 URL</button>
+                        <button class="inline-button endpoint-full-toggle" id="directBaseUrlFullToggle" type="button" aria-pressed="false" data-ui-i18n="fullUrl">完整 URL</button>
                       </div>
                     </div>
                     <div class="endpoint-address-control">
@@ -2674,31 +2791,31 @@
                   <label class="field">
                     <div class="field-heading inline">
                       <span>API Key</span>
-                      <small id="directSavedKeyMask">未保存</small>
+                      <small id="directSavedKeyMask" data-ui-i18n="notSaved">未保存</small>
                     </div>
-                    <input id="directApiKeyInput" name="directApiKey" type="password" placeholder="保持已保存 Key" />
+                    <input id="directApiKeyInput" name="directApiKey" type="password" placeholder="保持已保存 Key" data-ui-i18n-placeholder="keepSavedKey" />
                   </label>
 
                   <div class="field model-field">
                     <div class="field-heading inline">
-                      <label for="directImageModelInput">生图模型</label>
-                      <button class="inline-button" id="directFetchModelsButton" type="button">获取模型列表</button>
+                      <label for="directImageModelInput" data-ui-i18n="imageModel">生图模型</label>
+                      <button class="inline-button" id="directFetchModelsButton" type="button" data-ui-i18n="fetchModels">获取模型列表</button>
                     </div>
                     <div class="model-picker-control">
                       <input id="directImageModelInput" name="directImageModel" type="text" placeholder="gpt-image-2" autocomplete="off" aria-controls="directModelOptionsList" />
-                      <button class="model-picker-toggle" id="directModelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="directModelOptionsList" hidden></button>
+                      <button class="model-picker-toggle" id="directModelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="directModelOptionsList" data-ui-i18n-aria-label="expandModels" hidden></button>
                       <div class="model-options-list" id="directModelOptionsList" role="listbox" hidden></div>
                     </div>
                   </div>
 
                   <div class="field model-field">
                     <div class="field-heading inline">
-                      <label for="directResponsesModelInput">视觉/文本模型</label>
-                      <button class="inline-button" id="directResponsesFetchModelsButton" type="button">获取模型列表</button>
+                      <label for="directResponsesModelInput" data-ui-i18n="visionTextModel">视觉/文本模型</label>
+                      <button class="inline-button" id="directResponsesFetchModelsButton" type="button" data-ui-i18n="fetchModels">获取模型列表</button>
                     </div>
                     <div class="model-picker-control">
                       <input id="directResponsesModelInput" name="directResponsesModel" type="text" placeholder="gpt-5.5" autocomplete="off" aria-controls="directResponsesModelOptionsList" />
-                      <button class="model-picker-toggle" id="directResponsesModelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="directResponsesModelOptionsList" hidden></button>
+                      <button class="model-picker-toggle" id="directResponsesModelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="directResponsesModelOptionsList" data-ui-i18n-aria-label="expandModels" hidden></button>
                       <div class="model-options-list" id="directResponsesModelOptionsList" role="listbox" hidden></div>
                     </div>
                   </div>
@@ -2707,29 +2824,29 @@
                 <div class="route-config-panel" data-route-panel="c">
                   <label class="field">
                     <div class="field-heading inline">
-                      <span>基础 URL</span>
+                      <span data-ui-i18n="baseUrl">基础 URL</span>
                     </div>
                     <input id="protocolBaseUrlInput" name="protocolBaseUrl" type="url" placeholder="https://api.agicto.cn/v1" />
                     <small class="field-hint" id="protocolEndpointPreview">/images/generations</small>
-                    <small class="field-hint" id="protocolCompatibilityHint">Gemini 图像模型按 AGICTO 图像生成协议调用；基础 URL 通常填写到 /v1，实际请求为 /images/generations。</small>
+                    <small class="field-hint" id="protocolCompatibilityHint" data-ui-i18n="protocolHint">Gemini 图像模型按 AGICTO 图像生成协议调用；基础 URL 通常填写到 /v1，实际请求为 /images/generations。</small>
                   </label>
 
                   <label class="field">
                     <div class="field-heading inline">
                       <span>API Key</span>
-                      <small id="protocolSavedKeyMask">未保存</small>
+                      <small id="protocolSavedKeyMask" data-ui-i18n="notSaved">未保存</small>
                     </div>
-                    <input id="protocolApiKeyInput" name="protocolApiKey" type="password" placeholder="保持已保存 Key" />
+                    <input id="protocolApiKeyInput" name="protocolApiKey" type="password" placeholder="保持已保存 Key" data-ui-i18n-placeholder="keepSavedKey" />
                   </label>
 
                   <div class="field model-field">
                     <div class="field-heading inline">
-                      <label for="protocolImageModelInput">图像模型</label>
-                      <button class="inline-button" id="protocolFetchModelsButton" type="button">获取模型列表</button>
+                      <label for="protocolImageModelInput" data-ui-i18n="protocolImageModel">图像模型</label>
+                      <button class="inline-button" id="protocolFetchModelsButton" type="button" data-ui-i18n="fetchModels">获取模型列表</button>
                     </div>
                     <div class="model-picker-control">
                       <input id="protocolImageModelInput" name="protocolImageModel" type="text" placeholder="gemini-3.1-flash-image-preview" autocomplete="off" aria-controls="protocolModelOptionsList" />
-                      <button class="model-picker-toggle" id="protocolModelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="protocolModelOptionsList" hidden></button>
+                      <button class="model-picker-toggle" id="protocolModelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="protocolModelOptionsList" data-ui-i18n-aria-label="expandModels" hidden></button>
                       <div class="model-options-list" id="protocolModelOptionsList" role="listbox" hidden></div>
                     </div>
                   </div>
@@ -2739,15 +2856,15 @@
 
             <div class="config-action-bar">
               <p class="config-note" id="configFeedback" aria-live="polite"></p>
-              <button class="header-button" id="testConnectionButton" type="button">测试连接</button>
-              <button class="generate-button" type="submit">保存</button>
+              <button class="header-button" id="testConnectionButton" type="button" data-ui-i18n="testConnection">测试连接</button>
+              <button class="generate-button" type="submit" data-ui-i18n="save">保存</button>
             </div>
           </form>
 
-          <section class="config-log-panel live-panel config-card" id="configGenerationLogPanel" aria-label="生成日志">
+          <section class="config-log-panel live-panel config-card" id="configGenerationLogPanel" aria-label="生成日志" data-ui-i18n-aria-label="activityLog">
             <div class="panel-title between">
               <div>
-                <h2>生成日志</h2>
+                <h2 data-ui-i18n="activityLog">生成日志</h2>
               </div>
               <span class="count-pill small" id="liveCount">0 / 15</span>
             </div>
@@ -2853,6 +2970,6 @@
       </div>
     </aside>
 
-    <script type="module" src="./app.js?v=20260705-ui-scale-90-1"></script>
+    <script type="module" src="./app.js?v=20260713-cross-device-1"></script>
   </body>
 </html>

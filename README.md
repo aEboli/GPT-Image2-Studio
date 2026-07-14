@@ -84,11 +84,16 @@ OPENAI_API_KEY=<your-api-key>
 OPENAI_BASE_URL=https://api.openai.com/v1
 RESPONSES_MODEL=gpt-5.4
 
+HOST=
+IMAGE_STUDIO_REQUEST_TOKEN=
+
 IMAGE_STUDIO_DISABLE_DNS_FALLBACK=0
 IMAGE_STUDIO_DNS_FALLBACK_SERVERS=
 ```
 
 真实 `.env` 不要提交到 Git。云端部署请使用平台的 Secret 或环境变量配置。
+
+本地服务默认只监听 `127.0.0.1`。只有明确需要局域网访问时才设置 `HOST`；显式开放到非回环地址后，同源浏览器请求仍可使用，非回环且不带 `Origin` 的命令行写请求需要在 `X-Image-Studio-Token` 请求头中携带启动令牌。可通过 `IMAGE_STUDIO_REQUEST_TOKEN` 固定该令牌，留空时服务会在启动时随机生成。
 
 ### Node DNS fallback
 

@@ -2,6 +2,7 @@ export function createConfigModelPickerController({
   refs,
   state,
   getBrowserPrivateConfigRequestPayload,
+  getUiText,
   fetchImpl = fetch,
   FormDataCtor = FormData,
 } = {}) {
@@ -115,6 +116,14 @@ export function createConfigModelPickerController({
     refs.configFeedback.dataset.state = kind;
   }
 
+  function uiText(key, fallback, replacements = {}) {
+    let text = typeof getUiText === "function" ? getUiText(key) || fallback : fallback;
+    Object.entries(replacements).forEach(([name, value]) => {
+      text = text.replaceAll(`{${name}}`, String(value));
+    });
+    return text;
+  }
+
   function getInputValue(input) {
     return String(input?.value || "").trim();
   }
@@ -190,7 +199,9 @@ export function createConfigModelPickerController({
     if (refs.testConnectionButton) {
       refs.testConnectionButton.disabled = loading;
       refs.testConnectionButton.textContent =
-        loading && state.configModels.loadingMode === "test" ? "测试中..." : "测试连接";
+        loading && state.configModels.loadingMode === "test"
+          ? uiText("testConnectionLoading", "测试中...")
+          : uiText("testConnection", "测试连接");
     }
     MODEL_TARGETS.forEach((target) => {
       const targetRefs = getTargetRefs(target);
@@ -200,8 +211,8 @@ export function createConfigModelPickerController({
       targetRefs.fetchButton.disabled = loading;
       targetRefs.fetchButton.textContent =
         loading && state.configModels.loadingMode === "models" && loadingTarget === target
-          ? "获取中..."
-          : "获取模型列表";
+          ? uiText("fetchModelsLoading", "获取中...")
+          : uiText("fetchModels", "获取模型列表");
     });
   }
 
@@ -222,7 +233,9 @@ export function createConfigModelPickerController({
     const empty = documentRef.createElement("div");
     empty.className = "model-options-empty";
     empty.setAttribute("role", "status");
-    empty.textContent = query ? `没有匹配的模型：${query}` : "没有匹配的模型";
+    empty.textContent = query
+      ? uiText("modelNoMatchWithQuery", "没有匹配的模型：{query}", { query })
+      : uiText("modelNoMatch", "没有匹配的模型");
     list.appendChild(empty);
   }
 
@@ -313,7 +326,7 @@ export function createConfigModelPickerController({
     state.configModels.loadingTarget = requestTarget;
     syncLegacyModelState(requestTarget);
     render();
-    setFeedback(mode === "test" ? "正在测试连接..." : "正在获取模型列表...", "busy");
+    setFeedback(mode === "test" ? uiText("modelTestBusy", "正在测试连接...") : uiText("modelFetchBusy", "正在获取模型列表..."), "busy");
 
     try {
       const response = await fetchImpl("/api/models", {
@@ -322,14 +335,14 @@ export function createConfigModelPickerController({
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || payload.ok === false) {
-        throw new Error(payload.message || "获取模型列表失败。");
+        throw new Error(payload.message || uiText("modelFetchFailed", "获取模型列表失败。"));
       }
 
       const models = Array.isArray(payload.models)
         ? payload.models.map((item) => String(item || "").trim()).filter(Boolean)
         : [];
       if (models.length === 0) {
-        throw new Error("未获取到可调用模型。");
+        throw new Error(uiText("modelNoCallable", "未获取到可调用模型。"));
       }
 
       const modelState = getModelState(requestTarget);
@@ -338,7 +351,9 @@ export function createConfigModelPickerController({
       modelState.open = Boolean(openAfterFetch);
       syncLegacyModelState(requestTarget);
       setFeedback(
-        mode === "test" ? `连接测试成功，获取到 ${models.length} 个模型。` : `已获取 ${models.length} 个可调用模型。`,
+        mode === "test"
+          ? uiText("modelTestSuccess", "连接测试成功，获取到 {count} 个模型。", { count: models.length })
+          : uiText("modelFetchSuccess", "已获取 {count} 个可调用模型。", { count: models.length }),
         "success",
       );
     } catch (error) {

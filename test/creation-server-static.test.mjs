@@ -1,11 +1,89 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { createServer as createTcpServer } from "node:net";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
+import { fileURLToPath } from "node:url";
 
 const serverPath = new URL("../server.mjs", import.meta.url);
 const galleryStorePath = new URL("../lib/gallery-store.mjs", import.meta.url);
 const creationStorePath = new URL("../lib/creation-store.mjs", import.meta.url);
 const cloudflareWorkerPath = new URL("../cloudflare-pages-worker.mjs", import.meta.url);
+const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+async function getFreePort() {
+  const server = createTcpServer();
+  await new Promise((resolveListen, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolveListen);
+  });
+  const address = server.address();
+  await new Promise((resolveClose, reject) => {
+    server.close((error) => (error ? reject(error) : resolveClose()));
+  });
+  return address.port;
+}
+
+async function stopServer(server) {
+  if (!server || server.exitCode !== null || server.signalCode) {
+    return;
+  }
+
+  server.kill("SIGTERM");
+  await Promise.race([
+    once(server, "exit"),
+    delay(1500).then(() => {
+      if (server.exitCode === null && !server.signalCode) {
+        server.kill("SIGKILL");
+      }
+    }),
+  ]);
+}
+
+function collectDiagnostics(server) {
+  const diagnostics = {
+    stdout: "",
+    stderr: "",
+  };
+  server.stdout?.setEncoding("utf8");
+  server.stderr?.setEncoding("utf8");
+  server.stdout?.on("data", (chunk) => {
+    diagnostics.stdout += chunk;
+  });
+  server.stderr?.on("data", (chunk) => {
+    diagnostics.stderr += chunk;
+  });
+  return diagnostics;
+}
+
+async function waitForServer(baseUrl, server, diagnostics) {
+  const deadline = Date.now() + 7000;
+  let lastError = null;
+
+  while (Date.now() < deadline) {
+    if (server.exitCode !== null) {
+      throw new Error(`server exited early (${server.exitCode})\n${diagnostics.stderr}\n${diagnostics.stdout}`);
+    }
+
+    try {
+      const response = await fetch(`${baseUrl}/api/config`);
+      if (response.status < 500) {
+        await response.arrayBuffer();
+        return;
+      }
+    } catch (error) {
+      lastError = error;
+    }
+
+    await delay(100);
+  }
+
+  throw new Error(`server did not start: ${lastError?.message || "timeout"}\n${diagnostics.stderr}`);
+}
 
 test("server exposes independent creation generation and record endpoints", async () => {
   const server = await readFile(serverPath, "utf8");
@@ -26,6 +104,65 @@ test("creation record list responses are not cacheable", async () => {
   assert.match(server, /async function handleCreationSetsGet\(response\) \{/);
   assert.match(server, /function sendJson\(response, statusCode, payload, headers = \{\}\) \{/);
   assert.match(server, /sendJson\(response, 200, await creationSetStore\.listManifests\(\), \{\s*"Cache-Control": "no-store"/);
+});
+
+test("local static assets revalidate instead of being downloaded from scratch", async () => {
+  const server = await readFile(serverPath, "utf8");
+
+  assert.match(server, /function buildStaticEtag\(fileStat\) \{/);
+  assert.match(server, /function isFreshStaticRequest\(request, etag, lastModified\) \{/);
+  assert.match(server, /return isPublicAsset \|\| isLibraryAsset \? "no-cache" : null;/);
+  assert.match(server, /"ETag": etag,/);
+  assert.match(server, /"Last-Modified": lastModified,/);
+  assert.match(server, /response\.writeHead\(304, headers\);/);
+  assert.doesNotMatch(server, /isPublicAsset \|\| isLibraryAsset \? "no-store" : null;/);
+});
+
+test("static revalidation treats a stale etag as modified even when last-modified matches", async (t) => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "static-etag-precedence-"));
+  const outputDir = join(tempRoot, "output");
+  const localDataRootDir = join(tempRoot, "local-data");
+  const port = await getFreePort();
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const appUrl = `${baseUrl}/app.js?etag-precedence`;
+  const server = spawn(process.execPath, ["server.mjs"], {
+    cwd: rootDir,
+    env: {
+      ...process.env,
+      PORT: String(port),
+      VERCEL: "1",
+      TMP: tempRoot,
+      TEMP: tempRoot,
+      IMAGE_STUDIO_OUTPUT_DIR: outputDir,
+      IMAGE_STUDIO_LOCAL_DATA_DIR: localDataRootDir,
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const diagnostics = collectDiagnostics(server);
+
+  t.after(async () => {
+    await stopServer(server);
+    await rm(tempRoot, { recursive: true, force: true });
+  });
+
+  await waitForServer(baseUrl, server, diagnostics);
+
+  const initialResponse = await fetch(appUrl);
+  assert.equal(initialResponse.status, 200);
+  await initialResponse.arrayBuffer();
+  const etag = initialResponse.headers.get("etag");
+  const lastModified = initialResponse.headers.get("last-modified");
+  assert.ok(etag, "static response should include an ETag");
+  assert.ok(lastModified, "static response should include Last-Modified");
+
+  const staleEtagResponse = await fetch(appUrl, {
+    headers: {
+      "If-None-Match": `W/"stale-${etag}"`,
+      "If-Modified-Since": lastModified,
+    },
+  });
+  assert.equal(staleEtagResponse.status, 200);
+  await staleEtagResponse.arrayBuffer();
 });
 
 test("local model list route returns structured errors for malformed request bodies", async () => {
@@ -205,7 +342,10 @@ test("creation generation labels uploaded reference image count and file order",
   assert.match(worker, /normalizeCreationReferenceRoles\(formData\.get\("referenceImageRoles"\)\)/);
   assert.match(server, /skuGenerationRule:\s*formData\.get\("skuGenerationRule"\)/);
   assert.match(worker, /skuGenerationRule:\s*formData\.get\("skuGenerationRule"\)/);
-  assert.match(worker, /referenceImageRoles,\s*\n\s*infographicRebuildEnabled:\s*formData\.get\("infographicRebuildEnabled"\),\s*\n\s*skuSubjects:\s*formData\.get\("skuSubjects"\),\s*\n\s*skuBundleCount:\s*formData\.get\("skuBundleCount"\),\s*\n\s*skuGenerationRule:\s*formData\.get\("skuGenerationRule"\),\s*\n\s*logoOptions:/);
+  assert.match(
+    worker,
+    /referenceImageRoles,[\s\S]*platformReferenceCoverage:\s*formData\.get\("platformReferenceCoverage"\),[\s\S]*platformItemOverrides:\s*formData\.get\("platformItemOverrides"\),[\s\S]*audienceStrategy:\s*formData\.get\("audienceStrategy"\),[\s\S]*effectivePlan:\s*formData\.get\("effectivePlan"\),[\s\S]*planOverrides:\s*formData\.get\("planOverrides"\),[\s\S]*infographicRebuildEnabled:\s*formData\.get\("infographicRebuildEnabled"\),[\s\S]*skuGenerationRule:\s*formData\.get\("skuGenerationRule"\),[\s\S]*logoOptions:/,
+  );
 });
 
 test("creation generation keeps style references separate from subject references", async () => {
@@ -246,11 +386,11 @@ test("creation generation passes SKU subjects through local and worker planning"
   assert.match(worker, /formData\.get\("skuBundleCount"\)/);
   assert.match(
     server,
-    /handleCreationGenerate[\s\S]*buildCreationPlan\(\{[\s\S]*visualLanguage:\s*formData\.get\("visualLanguage"\),[\s\S]*referenceImageRoles,[\s\S]*infographicRebuildEnabled:\s*formData\.get\("infographicRebuildEnabled"\),[\s\S]*skuSubjects:\s*formData\.get\("skuSubjects"\),\s*\n\s*skuBundleCount:\s*formData\.get\("skuBundleCount"\)[\s\S]*logoOptions:/,
+    /handleCreationGenerate[\s\S]*buildCreationSubmittedPlan\(\{[\s\S]*visualLanguage:\s*formData\.get\("visualLanguage"\),[\s\S]*referenceImageRoles,[\s\S]*effectivePlan:\s*formData\.get\("effectivePlan"\),[\s\S]*planOverrides:\s*formData\.get\("planOverrides"\),[\s\S]*infographicRebuildEnabled:\s*formData\.get\("infographicRebuildEnabled"\),[\s\S]*skuSubjects:\s*formData\.get\("skuSubjects"\),\s*\n\s*skuBundleCount:\s*formData\.get\("skuBundleCount"\)[\s\S]*logoOptions:/,
   );
   assert.match(
     worker,
-    /buildCreationPlan\(\{[\s\S]*referenceImageRoles,[\s\S]*infographicRebuildEnabled:\s*formData\.get\("infographicRebuildEnabled"\),[\s\S]*skuSubjects:\s*formData\.get\("skuSubjects"\),\s*\n\s*skuBundleCount:\s*formData\.get\("skuBundleCount"\)[\s\S]*logoOptions:/,
+    /runCreationGenerate[\s\S]*buildCreationSubmittedPlan\(\{[\s\S]*referenceImageRoles,[\s\S]*effectivePlan:\s*formData\.get\("effectivePlan"\),[\s\S]*planOverrides:\s*formData\.get\("planOverrides"\),[\s\S]*infographicRebuildEnabled:\s*formData\.get\("infographicRebuildEnabled"\),[\s\S]*skuSubjects:\s*formData\.get\("skuSubjects"\),\s*\n\s*skuBundleCount:\s*formData\.get\("skuBundleCount"\)[\s\S]*logoOptions:/,
   );
   assert.match(server, /skuSubjects:\s*plan\.skuSubjects/);
   assert.match(worker, /skuSubjects:\s*plan\.skuSubjects/);
@@ -272,11 +412,11 @@ test("creation infographic rebuild option is passed through planning generation 
   );
   assert.match(
     server,
-    /handleCreationGenerate[\s\S]*buildCreationPlan\(\{[\s\S]*infographicRebuildEnabled:\s*formData\.get\("infographicRebuildEnabled"\)/,
+    /handleCreationGenerate[\s\S]*buildCreationSubmittedPlan\(\{[\s\S]*infographicRebuildEnabled:\s*formData\.get\("infographicRebuildEnabled"\)/,
   );
   assert.match(
     worker,
-    /buildCreationPlan\(\{[\s\S]*infographicRebuildEnabled:\s*formData\.get\("infographicRebuildEnabled"\)/,
+    /runCreationGenerate[\s\S]*buildCreationSubmittedPlan\(\{[\s\S]*infographicRebuildEnabled:\s*formData\.get\("infographicRebuildEnabled"\)/,
   );
   assert.match(server, /infographicRebuildEnabled:\s*plan\.infographicRebuildEnabled/);
   assert.match(worker, /infographicRebuildEnabled:\s*plan\.infographicRebuildEnabled/);
@@ -362,13 +502,22 @@ test("local creation generation accepts reference role metadata", async () => {
 
 test("local creation reference analysis has an independent route and does not write prompt history", async () => {
   const server = await readFile(serverPath, "utf8");
+  const worker = await readFile(cloudflareWorkerPath, "utf8");
   const handler =
     server.match(/async function handleCreationReferenceAnalyze[\s\S]*?\r?\n}\r?\n\r?\nasync function handleCreationGenerate/)?.[0] || "";
+  const workerHandler =
+    worker.match(/async function handleCreationReferenceAnalyze[\s\S]*?\r?\n}\r?\n\r?\nasync function handleCreationPlan/)?.[0] || "";
 
   assert.match(server, /CREATION_REFERENCE_ANALYSIS_MODE/);
   assert.match(server, /async function handleCreationReferenceAnalyze/);
   assert.match(server, /url\.pathname === "\/api\/creation\/reference\/analyze"/);
   assert.match(handler, /requestPromptAgentAnalysis/);
+  assert.match(handler, /formData\.get\("platformLabel"\)/);
+  assert.match(handler, /normalizeCreationPlatform/);
+  assert.match(handler, /contextPrompt:/);
+  assert.match(workerHandler, /formData\.get\("platformLabel"\)/);
+  assert.match(workerHandler, /normalizeCreationPlatform/);
+  assert.match(workerHandler, /contextPrompt:/);
   assert.match(handler, /normalizeCreationReferenceAnalysis/);
   assert.doesNotMatch(handler, /promptAgentStore\.append/);
 });
@@ -429,7 +578,7 @@ test("local creation plan preview exposes an independent route and shared overri
   assert.match(generateHandler, /dimensionSpecs:\s*formData\.get\("dimensionSpecs"\)/);
   assert.match(generateHandler, /dimensionUnitMode:\s*formData\.get\("dimensionUnitMode"\)/);
   assert.match(generateHandler, /formData\.get\("planOverrides"\)/);
-  assert.match(generateHandler, /applyCreationPlanOverrides\(plan,/);
+  assert.match(generateHandler, /buildCreationSubmittedPlan/);
 });
 
 test("creation repair route regenerates selected set items", async () => {
@@ -453,7 +602,8 @@ test("creation repair route regenerates selected set items", async () => {
   assert.match(server, /prompt:\s*repairItem\.prompt/);
   assert.match(server, /buildCreationItemReferenceImages\(repairItem,\s*referenceImages,\s*referenceImageRoles\)/);
   assert.match(server, /buildCreationGenerationReferenceImageLabels\(\s*itemReferenceImages,\s*referenceImageRoles,/);
-  assert.match(app, /function buildCreationPlanPreviewFormData[\s\S]*formData\.set\("visualLanguage"/);
+  assert.match(app, /function buildCreationPlanPreviewFormData\(\) \{(?:(?!function buildCreationRepairFormData)[\s\S])*formData\.set\("platform", getCreationSelectedPlatform\(\)\.value\)/);
+  assert.doesNotMatch(app, /function buildCreationPlanPreviewFormData\(\) \{(?:(?!function buildCreationRepairFormData)[\s\S])*formData\.set\("visualLanguage"/);
   assert.match(app, /function buildCreationRepairFormData[\s\S]*buildCreationPlanPreviewFormData\(\)\.entries\(\)/);
   assert.match(server, /handleCreationRepair[\s\S]*visualLanguage:\s*formData\.get\("visualLanguage"\)/);
   assert.match(server, /refreshCreationRepairItemsFromPlan/);

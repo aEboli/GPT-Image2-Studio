@@ -8,10 +8,12 @@ import {
   getCreationRepairTargetSet,
   getPendingCreationQueueCount,
   renderCreationQueueStrip,
+  runCreationQueuedJob,
   scheduleCreationGenerationQueue,
   selectCreationQueueJob,
   syncActiveCreationQueueSet,
 } from "../lib/creation-suite-queue.mjs";
+import * as creationSuiteQueue from "../lib/creation-suite-queue.mjs";
 
 function normalizeSet(set = {}) {
   return {
@@ -83,6 +85,23 @@ test("creation suite queue builds a complete queued set from current form state"
     formatCreationDimensionUnitModeLabel: (value) => `Unit ${value}`,
     formatCreationVisualLanguageLabel: (value) => `Visual ${value}`,
     getCreationCurrentSet: () => null,
+    getFrozenCreationEffectivePlan: () => ({
+      productName: "Queued product",
+      productDescription: "Description",
+      sellingPoints: ["Point A"],
+      platform: "amazon",
+      platformLabel: "Amazon",
+      targetLanguage: "en",
+      targetLanguageLabel: "English",
+      effectiveAudienceStrategy: { targetAudience: "comparison-focused buyers" },
+      items: [{
+        itemId: "hero",
+        role: "hero",
+        itemKind: "carousel",
+        prompt: "Frozen prompt",
+        conversionIntent: { conversionGoal: "recognition" },
+      }],
+    }),
     getCreationLogoPayload: () => ({ placement: "top-left" }),
     getCreationPreviewSlots: () => [{ itemId: "hero", role: "main" }],
     getCreationSelectedDimensionUnitMode: () => "both",
@@ -93,6 +112,7 @@ test("creation suite queue builds a complete queued set from current form state"
       categoryPath: "General > Test",
     }),
     getCreationSelectedLanguage: () => ({ value: "en", label: "English" }),
+    getCreationSelectedPlatform: () => ({ value: "amazon", label: "Amazon" }),
     getCreationSelectedRoles: () => [{ itemId: "hero", role: "main" }],
     getCreationSelectedScenario: () => ({ value: "standard", label: "Standard" }),
     getCreationSelectedSkuGenerationRule: () => ({ value: "package-list", label: "添加包装清单" }),
@@ -114,6 +134,8 @@ test("creation suite queue builds a complete queued set from current form state"
   assert.match(set.setId, /^creation-local-/);
   assert.equal(set.productName, "Queued product");
   assert.equal(set.dimensionUnitModeLabel, "Unit both");
+  assert.equal(set.platform, "amazon");
+  assert.equal(set.platformLabel, "Amazon");
   assert.equal(set.visualLanguage, "reference-style");
   assert.equal(set.visualLanguageLabel, "Visual reference-style");
   assert.deepEqual(set.referenceImageNames, ["reference-a.png"]);
@@ -124,6 +146,9 @@ test("creation suite queue builds a complete queued set from current form state"
   assert.deepEqual(set.logo, { placement: "top-left" });
   assert.equal(set.skuBundleCount, 2);
   assert.equal(set.items[0].status, "queued");
+  assert.equal(set.items[0].prompt, "Frozen prompt");
+  assert.equal(set.items[0].conversionIntent.conversionGoal, "recognition");
+  assert.equal(set.effectivePlan.effectiveAudienceStrategy.targetAudience, "comparison-focused buyers");
 });
 
 test("creation suite queue appends SKU preview cards to queued sets", () => {
@@ -667,6 +692,107 @@ test("creation suite queue selection previews queued sets without replacing the 
   assert.equal(creationState.queue[0].set.setId, "creation-local-queued");
   assert.equal(creationState.currentSet.setId, "creation-draft-active");
   assert.equal(creationState.currentSet.items[0].itemId, "draft-hero");
+});
+
+test("creation suite queue only synchronizes the explicitly selected job", () => {
+  assert.equal(typeof creationSuiteQueue.shouldSyncCreationQueueJobCurrentSet, "function");
+  const creationState = {
+    activeQueueId: "queue-a",
+    currentSet: { setId: "set-a" },
+    queue: [
+      { id: "queue-a", status: "running", set: { setId: "set-a" } },
+      { id: "queue-b", status: "running", set: { setId: "set-b" } },
+    ],
+    selectedQueueId: "queue-b",
+  };
+
+  assert.equal(creationSuiteQueue.shouldSyncCreationQueueJobCurrentSet(creationState, creationState.queue[0]), false);
+  assert.equal(creationSuiteQueue.shouldSyncCreationQueueJobCurrentSet(creationState, creationState.queue[1]), true);
+});
+
+test("creation suite queue synchronizes the active job when no job is selected", () => {
+  const creationState = {
+    activeQueueId: "queue-a",
+    currentSet: null,
+    queue: [
+      { id: "queue-a", status: "running", set: { setId: "set-a" } },
+      { id: "queue-b", status: "running", set: { setId: "set-b" } },
+    ],
+    selectedQueueId: "",
+  };
+
+  assert.equal(creationSuiteQueue.shouldSyncCreationQueueJobCurrentSet(creationState, creationState.queue[0]), true);
+  assert.equal(creationSuiteQueue.shouldSyncCreationQueueJobCurrentSet(creationState, creationState.queue[1]), false);
+});
+
+test("creation suite queue selection switches a queue-backed current set", () => {
+  const creationState = {
+    activeQueueId: "queue-a",
+    currentSet: { setId: "set-a", productName: "A" },
+    queue: [
+      { id: "queue-a", status: "running", set: { setId: "set-a", productName: "A" } },
+      { id: "queue-b", status: "running", set: { setId: "set-b", productName: "B" } },
+    ],
+    selectedQueueId: "queue-a",
+  };
+
+  assert.equal(selectCreationQueueJob(creationState, "queue-b"), true);
+  assert.equal(creationState.selectedQueueId, "queue-b");
+  assert.equal(creationState.currentSet.setId, "set-b");
+  assert.equal(creationState.currentSet.productName, "B");
+});
+
+test("creation suite queue keeps the selected panel during another job lifecycle", async () => {
+  async function runCase({ fetchImpl, runCreationStream = async () => {} } = {}) {
+    const selectedSet = { setId: "set-b", productName: "B", items: [] };
+    const activeJob = {
+      id: "queue-a",
+      status: "queued",
+      formData: "active-body",
+      set: { setId: "set-a", productName: "A", items: [{ itemId: "a-item", status: "queued" }] },
+    };
+    const creationState = {
+      activeQueueId: "queue-a",
+      currentSet: selectedSet,
+      generating: true,
+      generationScope: "full",
+      queue: [activeJob, { id: "queue-b", status: "running", set: selectedSet }],
+      selectedQueueId: "queue-b",
+    };
+
+    await runCreationQueuedJob(activeJob, {
+      creationState,
+      compactErrorMessage: (message) => message,
+      fetchImpl,
+      loadCreationSets: async () => {},
+      normalizeSet,
+      nowIso: () => "2026-07-12T08:00:00.000Z",
+      render: () => {},
+      runCreationStream,
+      setFeedback: () => {},
+      showError: () => {},
+    });
+    return { activeJob, creationState };
+  }
+
+  const started = await runCase({
+    fetchImpl: async () => ({ ok: true, body: {} }),
+  });
+  assert.equal(started.creationState.currentSet.setId, "set-b");
+
+  const completed = await runCase({
+    fetchImpl: async () => ({ ok: true, body: {} }),
+  });
+  assert.equal(completed.activeJob.status, "completed");
+  assert.equal(completed.creationState.currentSet.setId, "set-b");
+
+  const failed = await runCase({
+    fetchImpl: async () => {
+      throw new Error("active failed");
+    },
+  });
+  assert.equal(failed.activeJob.status, "failed");
+  assert.equal(failed.creationState.currentSet.setId, "set-b");
 });
 
 test("creation suite queue resolves repair target from selected queue instead of current active set", () => {

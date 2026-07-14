@@ -25,10 +25,10 @@ const publicConfigModelPickerPath = new URL("../public/lib/config-model-picker.m
 const publicCreationListingViewPath = new URL("../public/lib/creation-listing-view.mjs", import.meta.url);
 const generationClientPath = new URL("../lib/generation-client.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20260705-ui-scale-90-1";
-const appAssetVersion = "20260705-ui-scale-90-1";
+const stylesAssetVersion = "20260713-cross-device-1";
+const appAssetVersion = "20260713-cross-device-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
-const creationQueueModuleAssetVersion = "20260530-creation-queue-role-sync-1";
+const creationQueueModuleAssetVersion = "20260712-creation-queue-selection-isolation-1";
 const quickBlendModuleAssetVersion = "20260608-quick-blend-time-sort-1";
 
 test("static assets use the current cache-busting version", async () => {
@@ -41,7 +41,7 @@ test("static assets use the current cache-busting version", async () => {
 test("creation image count keeps role checkbox defaults synchronized", async () => {
   const app = await readFile(appPath, "utf8");
 
-  assert.match(app, /const CREATION_IMAGE_COUNT_OPTIONS = \[0, 4, 6, 8, 10, 12, 14, 16, 18\];/);
+  assert.match(app, /const CREATION_IMAGE_COUNT_OPTIONS = \[0, 4, 6, 7, 8, 9, 10, 12, 14, 16, 18\];/);
   assert.match(app, /function alignCreationRoleIdsToCount\(/);
   assert.match(app, /function syncCreationSelectedRolesToCurrentCount\(\) \{/);
   assert.match(app, /refs\.creationImageCountInput\.addEventListener\("click", syncCreationSelectedRolesToCurrentCount\)/);
@@ -661,7 +661,7 @@ test("generation activity moves into settings while studio workspace reflows to 
   assert.match(html, /data-nav-action="activity-log"[\s\S]*生成日志/);
   assert.match(
     html,
-    /<form class="config-form" id="configForm">[\s\S]*<\/form>\s*<section class="config-log-panel live-panel config-card" id="configGenerationLogPanel" aria-label="生成日志">[\s\S]*id="timelineList"/,
+    /<form class="config-form" id="configForm">[\s\S]*<\/form>\s*<section class="config-log-panel live-panel config-card" id="configGenerationLogPanel" aria-label="生成日志" data-ui-i18n-aria-label="activityLog">[\s\S]*<h2 data-ui-i18n="activityLog">生成日志<\/h2>[\s\S]*id="timelineList"/,
   );
   assert.match(styles, /\.studio-grid\s*\{[\s\S]*grid-template-columns:\s*var\(--studio-grid-left,\s*392px\)\s*minmax\(0,\s*1fr\);/);
   assert.match(styles, /html\[data-ui-layout="narrow-desktop"\] \.studio-grid\s*\{[\s\S]*grid-template-columns:\s*var\(--studio-grid-left,\s*324px\)\s*minmax\(0,\s*1fr\);/);
@@ -816,7 +816,7 @@ test("config drawer uses a quieter structured settings layout", async () => {
 
   assert.match(html, /<div class="drawer-panel config-panel">/);
   assert.match(html, /<div class="config-drawer-body">[\s\S]*<section class="config-card config-connection-card" aria-labelledby="configConnectionTitle">/);
-  assert.match(html, /<h3 id="configConnectionTitle">调用通道<\/h3>/);
+  assert.match(html, /<h3 id="configConnectionTitle" data-ui-i18n="connectionSection">调用通道<\/h3>/);
   assert.doesNotMatch(html, /config-drawer-summary/);
   assert.doesNotMatch(html, /选择当前生成请求的调用路径/);
   assert.doesNotMatch(html, /API Key 只保存在当前浏览器/);
@@ -825,25 +825,33 @@ test("config drawer uses a quieter structured settings layout", async () => {
   assert.doesNotMatch(html, /config-preferences-card|configPreferencesTitle|<h3 id="configPreferencesTitle">偏好<\/h3>/);
   assert.match(
     html,
-    /<div class="drawer-head-actions config-actions-row">[\s\S]*<details class="config-language-menu">[\s\S]*<summary class="header-button config-language-trigger" aria-label="切换界面语言">[\s\S]*<span aria-hidden="true">文<\/span>[\s\S]*<select id="uiLanguageInput"[\s\S]*<\/select>[\s\S]*<\/details>[\s\S]*<button class="header-button" id="closeConfigButton" type="button">关闭<\/button>/,
+    /<div class="drawer-head-actions config-actions-row">[\s\S]*<div class="config-language-switch" role="group" aria-label="切换界面语言" data-ui-i18n-aria-label="languageSwitch">[\s\S]*<input id="uiLanguageInput" name="uiLanguage" type="hidden" value="zh-CN" \/>[\s\S]*data-ui-language-option="zh-CN"[\s\S]*data-ui-language-option="en"[\s\S]*<\/div>[\s\S]*<button class="header-button" id="closeConfigButton" type="button" data-ui-i18n="close">关闭<\/button>/,
   );
-  assert.match(html, /<div class="config-action-bar">[\s\S]*id="configFeedback"[^>]*aria-live="polite"[^>]*><\/p>[\s\S]*id="testConnectionButton"[\s\S]*type="submit">保存<\/button>[\s\S]*<\/div>/);
-  assert.match(html, /<\/form>\s*<section class="config-log-panel live-panel config-card" id="configGenerationLogPanel" aria-label="生成日志">/);
+  assert.match(html, /<div class="config-action-bar">[\s\S]*id="configFeedback"[^>]*aria-live="polite"[^>]*><\/p>[\s\S]*id="testConnectionButton"[\s\S]*data-ui-i18n="testConnection">测试连接<\/button>[\s\S]*type="submit" data-ui-i18n="save">保存<\/button>[\s\S]*<\/div>/);
+  assert.match(html, /<\/form>\s*<section class="config-log-panel live-panel config-card" id="configGenerationLogPanel" aria-label="生成日志" data-ui-i18n-aria-label="activityLog">/);
   assert.match(styles, /\.config-drawer \.drawer-panel\s*\{[\s\S]*width:\s*min\(560px,\s*calc\(100vw - 24px\)\);/);
   assert.match(styles, /\.config-panel\s*\{[\s\S]*display:\s*grid;[\s\S]*grid-template-rows:\s*auto minmax\(0,\s*1fr\);[\s\S]*overflow:\s*hidden;/);
   assert.match(styles, /\.config-actions-row\s*\{[\s\S]*flex-wrap:\s*nowrap;/);
   assert.match(styles, /html\[data-ui-layout="tablet"\]\s+\.config-panel \.drawer-head,[\s\S]*html\[data-ui-layout="mobile"\]\s+\.config-panel \.drawer-head\s*\{[\s\S]*align-items:\s*center;[\s\S]*flex-direction:\s*row;/);
   assert.match(readCssRule(styles, ".config-drawer-body"), /overflow-y:\s*auto;[\s\S]*overflow-x:\s*hidden;[\s\S]*display:\s*grid;[\s\S]*gap:\s*8px;/);
-  assert.match(styles, /\.config-language-menu\s*\{[\s\S]*position:\s*relative;/);
-  assert.match(styles, /\.config-language-menu\[open\]\s+\.config-language-popover\s*\{[\s\S]*display:\s*grid;/);
-  assert.match(styles, /\.config-language-trigger\s*\{[\s\S]*width:\s*42px;[\s\S]*padding:\s*0;/);
-  assert.match(readCssRule(styles, 'html[data-ui-layout="mobile"] .config-language-popover'), /right:\s*0;[\s\S]*left:\s*auto;/);
+  assert.match(readCssRule(styles, ".config-language-switch"), /width:\s*104px;[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
+  assert.match(readCssRule(styles, ".config-language-option"), /min-width:\s*0;[\s\S]*white-space:\s*nowrap;/);
+  assert.match(readCssRule(styles, ".config-actions-row > .header-button"), /min-width:\s*78px;/);
+  assert.match(readCssRule(styles, 'html[data-ui-layout="mobile"] .config-language-switch'), /width:\s*104px;[\s\S]*flex:\s*0 0 104px;/);
+  assert.match(
+    readCssRule(styles, 'html:is([data-ui-layout="mobile"], [data-ui-layout="tablet"], [data-ui-layout="stacked"]) .config-language-option'),
+    /min-height:\s*44px;/,
+  );
+  assert.match(
+    readCssRule(styles, 'html:is([data-ui-layout="mobile"], [data-ui-layout="tablet"], [data-ui-layout="stacked"]) .route-selector label'),
+    /min-height:\s*46px;/,
+  );
   assert.match(styles, /\.route-selector\s*\{[\s\S]*padding:\s*3px;[\s\S]*border-radius:\s*8px;/);
   assert.match(styles, /\.route-selector label\s*\{[\s\S]*min-height:\s*34px;[\s\S]*border-radius:\s*7px;/);
   assert.match(styles, /\.route-selector label:has\(input:checked\)\s*\{[\s\S]*box-shadow:/);
   assert.match(styles, /\.config-card\s*\{[\s\S]*padding:\s*10px;/);
   assert.match(styles, /\.config-route-fields\s*\{[\s\S]*gap:\s*8px;[\s\S]*padding:\s*10px;[\s\S]*border-radius:\s*8px;/);
-  assert.match(styles, /\.config-route-fields input,[\s\S]*\.config-route-fields select,[\s\S]*\.config-language-field select\s*\{[\s\S]*min-height:\s*36px;/);
+  assert.match(styles, /\.config-route-fields input,[\s\S]*\.config-route-fields select\s*\{[\s\S]*min-height:\s*36px;/);
   assert.match(styles, /\.endpoint-suffix-select\s*\{[\s\S]*min-height:\s*30px;/);
   assert.match(styles, /\.inline-button\s*\{[\s\S]*min-height:\s*30px;/);
   assert.match(styles, /\.config-log-panel\.live-panel\s*\{[\s\S]*min-height:\s*180px;[\s\S]*height:\s*auto;/);
@@ -876,7 +884,7 @@ test("studio prompt counter displays character count without a hard limit", asyn
 
   assert.match(html, /<span class="field-counter"><span id="promptCounter">0 字<\/span><\/span>/);
   assert.doesNotMatch(html, /id="promptCounter">0<\/span>\s*\/\s*1000/);
-  assert.match(app, /refs\.promptCounter\.textContent = `\$\{refs\.promptInput\.value\.length\} 字`;/);
+  assert.match(app, /refs\.promptCounter\.textContent = `\$\{refs\.promptInput\.value\.length\} \$\{getUiLanguageText\("promptCounterSuffix"\) \|\| "字"\}`;/);
   assert.doesNotMatch(app, /refs\.promptCounter\.textContent = String\(refs\.promptInput\.value\.length\);/);
 });
 
@@ -1002,6 +1010,24 @@ test("pasted clipboard images on creation view upload to creation references", a
     /function handleCreationReferenceImagePaste\(event\) \{[\s\S]*state\.activeView !== "creation"[\s\S]*isCreationLogoBatchBranch\(\)[\s\S]*const imageFiles = getClipboardImageFiles\(event\.clipboardData\);[\s\S]*imageFiles\.length === 0[\s\S]*return;[\s\S]*event\.preventDefault\(\);[\s\S]*applyCreationReferenceFiles\(imageFiles\);/,
   );
   assert.match(app, /document\.addEventListener\("paste", handleCreationReferenceImagePaste\);/);
+});
+
+test("pasted clipboard images in prompt agent modal upload to prompt agent preview", async () => {
+  const app = await readFile(appPath, "utf8");
+
+  assert.match(
+    app,
+    /function isPromptAgentModalOpen\(\) \{[\s\S]*return !refs\.promptAgentModal\.classList\.contains\("hidden"\);[\s\S]*\}/,
+  );
+  assert.match(
+    app,
+    /function handlePromptAgentImagePaste\(event\) \{[\s\S]*if \(!isPromptAgentModalOpen\(\) \|\| event\.defaultPrevented\) \{[\s\S]*return;[\s\S]*const imageFiles = getClipboardImageFiles\(event\.clipboardData\);[\s\S]*if \(imageFiles\.length === 0\) \{[\s\S]*return;[\s\S]*event\.preventDefault\(\);[\s\S]*applyPromptAgentFile\(imageFiles\);/,
+  );
+  assert.match(
+    app,
+    /function handleCreationReferenceImagePaste\(event\) \{[\s\S]*event\.defaultPrevented[\s\S]*state\.activeView !== "creation"/,
+  );
+  assert.match(app, /document\.addEventListener\("paste", handlePromptAgentImagePaste\);/);
 });
 
 test("reference thumbnails render three per row and open a local preview viewer", async () => {
@@ -1747,11 +1773,11 @@ test("studio panels start without redundant title blocks and merge parameters un
   assert.match(html, /<details[\s\S]*class="field-group parameter-settings adaptive-section"[\s\S]*id="parameterAdaptiveSection"[\s\S]*<div class="ratio-grid" id="ratioGrid"><\/div>[\s\S]*<div class="advanced-content">/);
   assert.match(styles, /\.parameter-settings > \.ratio-grid\s*\{[\s\S]*margin-bottom:\s*calc\(var\(--field-gap,\s*6px\) \+ 2px\);/);
   assert.doesNotMatch(promptParameterSettings, /<small>Parameters<\/small>/);
-  assert.match(html, /<details[\s\S]*class="field-group parameter-settings adaptive-section"[\s\S]*<label class="compact-field">[\s\S]*<span>思考等级<\/span>[\s\S]*id="reasoningEffortInput"[\s\S]*<label class="compact-field">[\s\S]*id="sizeInput"[\s\S]*<label class="compact-field">[\s\S]*id="outputFormatInput"/);
+  assert.match(html, /<details[\s\S]*class="field-group parameter-settings adaptive-section"[\s\S]*<label class="compact-field">[\s\S]*<span data-ui-i18n="reasoningEffort">思考等级<\/span>[\s\S]*id="reasoningEffortInput"[\s\S]*<label class="compact-field">[\s\S]*id="sizeInput"[\s\S]*<label class="compact-field">[\s\S]*id="outputFormatInput"/);
   assert.match(app, /const REASONING_LABELS = \{[\s\S]*low: "Low",[\s\S]*medium: "Medium",[\s\S]*high: "High",[\s\S]*xhigh: "XHigh",[\s\S]*\};/);
   assert.match(app, /const REASONING_ESTIMATES = \{[\s\S]*low: "30s\+",[\s\S]*medium: "90s\+",[\s\S]*high: "150s\+",[\s\S]*xhigh: "210s\+",[\s\S]*\};/);
   assert.match(app, /option\.textContent = estimate \? `\$\{label\} ~\$\{estimate\}` : label;/);
-  assert.match(html, /<div class="advanced-controls">[\s\S]*<label class="compact-field">[\s\S]*<span>输出格式<\/span>[\s\S]*<\/label>[\s\S]*<div class="parameter-meta" aria-label="工具模型与质量">[\s\S]*<span>工具模型<\/span>[\s\S]*<strong>gpt-image-2<\/strong>[\s\S]*<span>质量<\/span>[\s\S]*<strong>High<\/strong>[\s\S]*<\/div>[\s\S]*<\/div>/);
+  assert.match(html, /<div class="advanced-controls">[\s\S]*<label class="compact-field">[\s\S]*<span data-ui-i18n="outputFormat">输出格式<\/span>[\s\S]*<\/label>[\s\S]*<div class="parameter-meta" aria-label="工具模型与质量" data-ui-i18n-aria-label="toolModelAndQuality">[\s\S]*<span data-ui-i18n="toolModel">工具模型<\/span>[\s\S]*<strong>gpt-image-2<\/strong>[\s\S]*<span data-ui-i18n="quality">质量<\/span>[\s\S]*<strong>High<\/strong>[\s\S]*<\/div>[\s\S]*<\/div>/);
   assert.doesNotMatch(html, /<p>工具模型：/);
   assert.doesNotMatch(html, /<p>质量：/);
   assert.doesNotMatch(html, /<details class="advanced-box"/);
@@ -1779,11 +1805,11 @@ test("ratio picker renders every configured aspect ratio instead of a featured s
   assert.doesNotMatch(app, /state\.aspectRatios\.slice\(0,\s*5\)/);
   assert.doesNotMatch(app, /subtitle\.textContent = option\.label/);
   assert.doesNotMatch(app, /button\.appendChild\(subtitle\)/);
-  assert.match(html, /<summary class="field-heading adaptive-section-summary">[\s\S]*<span>参数设置<\/span>[\s\S]*<span class="ratio-orientation-summary" id="ratioOrientationSummary" aria-live="polite"><\/span>[\s\S]*<\/summary>/);
+  assert.match(html, /<summary class="field-heading adaptive-section-summary">[\s\S]*<span data-ui-i18n="parameters">参数设置<\/span>[\s\S]*<span class="ratio-orientation-summary" id="ratioOrientationSummary" aria-live="polite"><\/span>[\s\S]*<\/summary>/);
   assert.match(app, /ratioOrientationSummary:\s*document\.querySelector\("#ratioOrientationSummary"\)/);
-  assert.match(app, /function syncRatioOrientationSummary\(\) \{[\s\S]*const ratioOption = getRatioOption\(refs\.ratioInput\.value \|\| DEFAULT_UI_RATIO\);[\s\S]*refs\.ratioOrientationSummary\.textContent = ratioOption\?\.label \|\| getRatioOrientationLabel\(ratioOption\?\.orientation\);[\s\S]*refs\.ratioOrientationSummary\.dataset\.orientation = ratioOption\?\.orientation \|\| "square";[\s\S]*\}/);
+  assert.match(app, /function syncRatioOrientationSummary\(\) \{[\s\S]*const ratioOption = getRatioOption\(refs\.ratioInput\.value \|\| DEFAULT_UI_RATIO\);[\s\S]*refs\.ratioOrientationSummary\.textContent = getUiRatioLabel\(ratioOption\);[\s\S]*refs\.ratioOrientationSummary\.dataset\.orientation = ratioOption\?\.orientation \|\| "square";[\s\S]*\}/);
   assert.match(app, /syncGenerationRatio\(value\) \{[\s\S]*renderRatioGrid\(\);[\s\S]*syncRatioOrientationSummary\(\);[\s\S]*renderReferenceAnalysisRatioGrid\(\);/);
-  assert.match(app, /const orientationLabel = getRatioOrientationLabel\(option\.orientation\);[\s\S]*button\.dataset\.orientation = option\.orientation \|\| "square";[\s\S]*button\.setAttribute\("aria-label", option\.label \|\| `\$\{option\.value\} \$\{orientationLabel\}`\);/);
+  assert.match(app, /const orientationLabel = getUiRatioOrientationLabel\(option\.orientation\);[\s\S]*button\.dataset\.orientation = option\.orientation \|\| "square";[\s\S]*button\.setAttribute\("aria-label", getUiRatioLabel\(option\) \|\| `\$\{option\.value\} \$\{orientationLabel\}`\);/);
   assert.doesNotMatch(app, /orientationBubble/);
   assert.doesNotMatch(styles, /\.ratio-chip span\s*\{/);
   assert.match(
@@ -1800,7 +1826,7 @@ test("studio output format can be selected as png or jpg", async () => {
   const html = await readFile(indexPath, "utf8");
   const app = await readFile(appPath, "utf8");
 
-  assert.match(html, /<span>输出格式<\/span>[\s\S]*<select id="outputFormatInput" name="format"><\/select>/);
+  assert.match(html, /<span data-ui-i18n="outputFormat">输出格式<\/span>[\s\S]*<select id="outputFormatInput" name="format"><\/select>/);
   assert.match(app, /getOutputFormatOptions,[\s\S]*normalizeOutputFormat,/);
   assert.match(app, /outputFormatInput: document\.querySelector\("#outputFormatInput"\)/);
   assert.match(app, /function renderOutputFormatOptions\(\) \{[\s\S]*getOutputFormatOptions\(\)\.forEach/);
@@ -1834,17 +1860,17 @@ test("top navigation groups functions into an Apple-style global mega menu", asy
   const assetsMenu = html.match(/data-nav-section="assets"[\s\S]*?(?=<div class="nav-item" data-nav-section="settings")/)?.[0] || "";
   const settingsMenu = html.match(/data-nav-section="settings"[\s\S]*?(?=<\/div>\s*<\/nav>)/)?.[0] || "";
 
-  assert.match(html, /<nav class="primary-nav global-nav" aria-label="全局导航">/);
+  assert.match(html, /<nav class="primary-nav global-nav" aria-label="全局导航" data-ui-i18n-aria-label="globalNav">/);
   assert.doesNotMatch(html, /nav-region-label/);
   assert.doesNotMatch(html, />主区</);
-  assert.match(html, /<div class="view-tabs global-nav-list" aria-label="功能菜单导航">/);
-  assert.match(html, /data-nav-section="create"[\s\S]*data-nav-menu="create"[\s\S]*aria-haspopup="true"[\s\S]*aria-expanded="false"[\s\S]*<span class="nav-tab-label">创作<\/span>[\s\S]*<span class="nav-tab-note">Studio<\/span>/);
+  assert.match(html, /<div class="view-tabs global-nav-list" aria-label="功能菜单导航" data-ui-i18n-aria-label="functionMenu">/);
+  assert.match(html, /data-nav-section="create"[\s\S]*data-nav-menu="create"[\s\S]*aria-haspopup="true"[\s\S]*aria-expanded="false"[\s\S]*<span class="nav-tab-label" data-ui-i18n="navCreate">创作<\/span>[\s\S]*<span class="nav-tab-note">Studio<\/span>/);
   assert.doesNotMatch(html, /data-nav-section="present"/);
   assert.doesNotMatch(html, /data-view-tab="ppt"/);
-  assert.match(html, /data-nav-section="assets"[\s\S]*data-nav-menu="assets"[\s\S]*aria-haspopup="true"[\s\S]*aria-expanded="false"[\s\S]*<span class="nav-tab-label">资产<\/span>[\s\S]*<span class="nav-tab-note">Gallery<\/span>/);
+  assert.match(html, /data-nav-section="assets"[\s\S]*data-nav-menu="assets"[\s\S]*aria-haspopup="true"[\s\S]*aria-expanded="false"[\s\S]*<span class="nav-tab-label" data-ui-i18n="navAssets">资产<\/span>[\s\S]*<span class="nav-tab-note">Gallery<\/span>/);
   assert.doesNotMatch(html, /data-nav-section="records"/);
   assert.doesNotMatch(html, /data-view-tab="ppt-record"/);
-  assert.match(html, /data-nav-section="settings"[\s\S]*data-nav-menu="settings"[\s\S]*aria-haspopup="true"[\s\S]*aria-expanded="false"[\s\S]*<span class="nav-tab-label">配置<\/span>[\s\S]*<span class="nav-tab-note">Settings<\/span>/);
+  assert.match(html, /data-nav-section="settings"[\s\S]*data-nav-menu="settings"[\s\S]*aria-haspopup="true"[\s\S]*aria-expanded="false"[\s\S]*<span class="nav-tab-label" data-ui-i18n="navSettings">配置<\/span>[\s\S]*<span class="nav-tab-note">Settings<\/span>/);
   assert.doesNotMatch(html, /<button class="view-tab[^>]*(data-view-tab|data-nav-action)=/);
   assert.match(createMenu, /href="#studio"[\s\S]*提示词生图/);
   assert.match(createMenu, /href="#creation"[\s\S]*套图模式/);
@@ -1898,9 +1924,9 @@ test("top navigation groups functions into an Apple-style global mega menu", asy
   assert.match(app, /refs\.connectionStatus\.addEventListener\("click",\s*\(\) => setDrawerOpen\(true\)\);/);
   assert.match(app, /const CONNECTION_STATUS_ENTRY_LABEL = "API、LOG";/);
   assert.match(app, /const CONNECTION_STATUS_EMPTY_LABEL = "待填写API、LOG";/);
-  assert.match(app, /refs\.connectionStatus\.setAttribute\("aria-label", `\$\{entryLabel\}，打开 API、LOG`\);/);
+  assert.match(app, /refs\.connectionStatus\.setAttribute\("aria-label", `\$\{entryLabel\}, \$\{getUiLanguageText\("connectionOpen"\)\}`\);/);
   assert.match(app, /refs\.connectionLabel\.textContent = entryLabel;/);
-  assert.match(app, /setConnectionState\("idle", "请先配置 API", CONNECTION_STATUS_EMPTY_LABEL\);/);
+  assert.match(app, /setConnectionState\("idle", getUiLanguageText\("apiIdle"\) \|\| \(state\.uiLanguage === "en" \? "Configure API first" : "请先配置 API"\), getUiLanguageText\("connectionStatusEmpty"\) \|\| CONNECTION_STATUS_EMPTY_LABEL\);/);
   assert.match(app, /globalNavItems:\s*\[\.\.\.document\.querySelectorAll\("\[data-nav-section\]"\)\]/);
   assert.match(app, /function setActiveGlobalNavItem\(item\) \{[\s\S]*refs\.globalNavItems\.forEach\(\(navItem\) => \{[\s\S]*const isOpen = navItem === item;[\s\S]*navItem\.classList\.toggle\("is-nav-open",\s*isOpen\);/);
   assert.match(app, /button\.addEventListener\("pointerenter",\s*\(\) => setActiveGlobalNavItem\(item\)\);/);
@@ -1968,25 +1994,66 @@ test("theme toggle persists dark and white themes", async () => {
 
 test("theme language switch supports English from the config drawer", async () => {
   const html = await readFile(indexPath, "utf8");
+  const styles = await readFile(stylesPath, "utf8");
   const app = await readFile(appPath, "utf8");
 
   assert.match(html, /const languageKey = "image-studio-ui-language-v1";/);
   assert.match(
     html,
-    /<details class="config-language-menu">[\s\S]*<summary class="header-button config-language-trigger" aria-label="切换界面语言">[\s\S]*<span aria-hidden="true">文<\/span>[\s\S]*<label class="config-language-field">[\s\S]*<span>界面语言<\/span>[\s\S]*<select id="uiLanguageInput" name="uiLanguage">[\s\S]*<option value="zh-CN" selected>简体中文<\/option>[\s\S]*<option value="en">English<\/option>/,
+    /<div class="config-language-switch" role="group" aria-label="切换界面语言" data-ui-i18n-aria-label="languageSwitch">[\s\S]*<input id="uiLanguageInput" name="uiLanguage" type="hidden" value="zh-CN" \/>[\s\S]*<button class="config-language-option is-active" type="button" data-ui-language-option="zh-CN" aria-pressed="true" aria-label="简体中文界面" data-ui-i18n-aria-label="languageZh">CN<\/button>[\s\S]*<button class="config-language-option" type="button" data-ui-language-option="en" aria-pressed="false" aria-label="English UI" data-ui-i18n-aria-label="languageEn">EN<\/button>/,
   );
   assert.doesNotMatch(html, /<label class="field ui-language-field">/);
-  assert.match(html, /<button class="mega-menu-action" id="themeNavAction" type="button" data-nav-action="theme">主题颜色<\/button>/);
+  assert.doesNotMatch(html, /<details class="config-language-menu">/);
+  assert.match(html, /<h2 data-ui-i18n="configTitle">连接配置<\/h2>/);
+  assert.match(html, /<button class="header-button" id="closeConfigButton" type="button" data-ui-i18n="close">关闭<\/button>/);
+  assert.match(html, /<span data-ui-i18n="routeMode">路由模式<\/span>/);
+  assert.match(html, /<button class="mega-menu-action" id="themeNavAction" type="button" data-nav-action="theme" data-ui-i18n="themeMenu">主题颜色<\/button>/);
+  assert.match(readCssRule(styles, ".config-language-switch"), /width:\s*104px;[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
+  assert.match(readCssRule(styles, ".config-language-option"), /min-width:\s*0;[\s\S]*white-space:\s*nowrap;/);
+  assert.match(readCssRule(styles, ".config-actions-row > .header-button"), /min-width:\s*78px;/);
   assert.match(app, /const UI_LANGUAGE_STORAGE_KEY = "image-studio-ui-language-v1";/);
   assert.match(app, /function normalizeUiLanguage\(language\) \{[\s\S]*return language === "en" \? "en" : "zh-CN";/);
   assert.match(app, /document\.documentElement\.lang = normalized;/);
+  assert.match(app, /function applyUiLanguageText\(\) \{[\s\S]*document\.querySelectorAll\("\[data-ui-i18n\]"\)[\s\S]*document\.querySelectorAll\("\[data-ui-i18n-aria-label\]"\)[\s\S]*document\.querySelectorAll\("\[data-ui-i18n-placeholder\]"\)/);
+  assert.match(app, /function getUiImageRouteLabel\(imageRoute\) \{[\s\S]*modeDirect[\s\S]*modeProtocol[\s\S]*modeRoute/);
+  assert.match(app, /refs\.uiLanguageOptions\.forEach\(\(button\) => \{[\s\S]*button\.classList\.toggle\("is-active", isActive\);[\s\S]*button\.setAttribute\("aria-pressed", String\(isActive\)\);/);
   assert.match(app, /refs\.themeNavAction\.textContent = getUiLanguageText\("themeMenu"\);/);
   assert.match(
     app,
     /refs\.themeToggleLabel\.textContent = getUiLanguageText\(isLight \? "themeDark" : "themeLight"\);/,
   );
-  assert.match(app, /refs\.uiLanguageInput\.addEventListener\("change",\s*\(event\) => \{/);
-  assert.match(app, /event\.target\.closest\("\.config-language-menu"\)\?\.removeAttribute\("open"\);/);
+  assert.match(app, /refs\.uiLanguageOptions\.forEach\(\(button\) => \{[\s\S]*button\.addEventListener\("click", \(\) => setUiLanguage\(button\.dataset\.uiLanguageOption\)\);/);
+  assert.doesNotMatch(app, /uiLanguageInput\.addEventListener\("change"/);
+});
+
+test("main studio shell follows the selected UI language", async () => {
+  const html = await readFile(indexPath, "utf8");
+  const app = await readFile(appPath, "utf8");
+
+  assert.match(html, /<nav class="primary-nav global-nav" aria-label="全局导航" data-ui-i18n-aria-label="globalNav">/);
+  assert.match(html, /<span class="nav-tab-label" data-ui-i18n="navCreate">创作<\/span>/);
+  assert.match(html, /<span class="nav-tab-label" data-ui-i18n="navAssets">资产<\/span>/);
+  assert.match(html, /<span class="nav-tab-label" data-ui-i18n="navSettings">配置<\/span>/);
+  assert.match(html, /href="#studio" data-ui-i18n="menuPromptStudio">提示词生图<\/a>/);
+  assert.match(html, /href="#creation" data-ui-i18n="menuCreation">套图模式<\/a>/);
+  assert.match(html, /href="#ppt" data-ui-i18n="menuPpt">PPT生成<\/a>/);
+  assert.match(html, /data-nav-action="prompt-agent" data-ui-i18n="promptAgent">图片转提示词<\/button>/);
+  assert.match(html, /<strong data-ui-i18n="referenceUploadTitle">拖入图片或点击上传<\/strong>/);
+  assert.match(html, /id="promptInput"[\s\S]*data-ui-i18n-placeholder="promptPlaceholder"/);
+  assert.match(html, /id="promptEnhanceToggle"[\s\S]*data-ui-i18n-aria-label="promptEnhanceAria"[\s\S]*<strong data-ui-i18n="promptEnhance">增强模式<\/strong>/);
+  assert.match(html, /id="generateButton"[\s\S]*data-ui-i18n-title="generateTitle"[\s\S]*data-ui-i18n="generate"[\s\S]*>/);
+  assert.match(html, /id="parameterAdaptiveSection"[\s\S]*<span data-ui-i18n="parameters">参数设置<\/span>/);
+  assert.match(html, /<span data-ui-i18n="reasoningEffort">思考等级<\/span>[\s\S]*id="reasoningEffortInput"/);
+  assert.match(html, /<span data-ui-i18n="size">分辨率<\/span>[\s\S]*id="sizeInput"/);
+  assert.match(html, /<span data-ui-i18n="outputFormat">输出格式<\/span>[\s\S]*id="outputFormatInput"/);
+  assert.match(html, /id="previewDownloadButton"[\s\S]*data-ui-i18n="download">下载<\/a>/);
+  assert.match(html, /id="previewLightboxButton"[\s\S]*data-ui-i18n="view">查看<\/button>/);
+  assert.match(html, /id="previewDeleteButton"[\s\S]*data-ui-i18n="delete">删除<\/button>/);
+  assert.match(app, /function getUiRatioLabel\(option\)/);
+  assert.match(app, /function getUiSizeLabel\(option\)/);
+  assert.match(app, /function getUiPreviewPlaceholderState\(placeholderState\)/);
+  assert.match(app, /function rerenderUiLanguageSensitiveViews\(\)/);
+  assert.match(app, /rerenderUiLanguageSensitiveViews\(\);/);
 });
 
 test("floating dialogs and popovers use theme-aware overlay surface tokens", async () => {
@@ -2431,7 +2498,10 @@ test("mobile and Pad studio layout uses dedicated compact workbench layouts", as
   const app = await readFile(appPath, "utf8");
   const referenceAdaptiveSection = html.match(/<details[\s\S]*id="referenceAdaptiveSection"[\s\S]*?<\/details>/)?.[0] || "";
   const parameterAdaptiveSection = html.match(/<details[\s\S]*id="parameterAdaptiveSection"[\s\S]*?<\/details>/)?.[0] || "";
+  const tabletAppShellRule = readCssRule(styles, 'html[data-ui-layout="tablet"] .app-shell');
+  const tabletViewRootRule = readCssRule(styles, 'html[data-ui-layout="tablet"] .view-root');
 
+  assert.match(html, /<meta name="viewport" content="width=device-width, initial-scale=1\.0, viewport-fit=cover" \/>/);
   assert.match(html, /id="referenceAdaptiveSection"[\s\S]*data-adaptive-section="reference"[\s\S]*data-compact-open="false"[\s\S]*<summary class="field-heading adaptive-section-summary">/);
   assert.match(html, /id="parameterAdaptiveSection"[\s\S]*data-adaptive-section="parameters"[\s\S]*data-compact-open="false"[\s\S]*<summary class="field-heading adaptive-section-summary">/);
   assert.match(html, /dataset\.uiLayout = "mobile";[\s\S]*dataset\.uiLayout = "tablet";/);
@@ -2440,28 +2510,28 @@ test("mobile and Pad studio layout uses dedicated compact workbench layouts", as
   assert.doesNotMatch(referenceAdaptiveSection, /\sopen(?:\s|>)/);
   assert.doesNotMatch(parameterAdaptiveSection, /\sopen(?:\s|>)/);
   assert.match(styles, /html,\s*[\r\n]+body\s*\{[\s\S]*overflow-x:\s*clip;/);
-  assert.match(
-    styles,
-    /html\[data-ui-layout="tablet"\] \.app-shell\s*\{[\s\S]*height:\s*100dvh;[\s\S]*grid-template-rows:\s*auto minmax\(0,\s*1fr\);[\s\S]*overflow:\s*hidden;/,
-  );
+  assert.match(tabletAppShellRule, /height:\s*100dvh;/);
+  assert.match(tabletAppShellRule, /grid-template-rows:\s*minmax\(0,\s*1fr\);/);
+  assert.match(tabletAppShellRule, /overflow:\s*hidden;/);
+  assert.match(tabletViewRootRule, /height:\s*100%;/);
+  assert.match(tabletViewRootRule, /min-height:\s*0;/);
+  assert.match(tabletViewRootRule, /overflow:\s*hidden;/);
   assert.match(
     styles,
     /html\[data-ui-layout="mobile"\] \.app-shell\s*\{[\s\S]*height:\s*auto;[\s\S]*min-height:\s*100dvh;[\s\S]*display:\s*block;[\s\S]*overflow:\s*visible;/,
   );
+  assert.match(styles, /html\[data-ui-layout="tablet"\]\[data-ui-orientation="portrait"\] \.studio-grid,[\s\S]*html\[data-ui-layout="stacked"\]\[data-ui-orientation="portrait"\] \.studio-grid\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);[\s\S]*grid-template-areas:\s*"settings"[\s\S]*"preview";/);
+  assert.match(styles, /@media \(min-width:\s*900px\) and \(min-height:\s*600px\)[\s\S]*html\[data-ui-orientation="landscape"\]\[data-ui-layout="tablet"\] \.studio-grid,[\s\S]*html\[data-ui-orientation="landscape"\]\[data-ui-layout="stacked"\] \.studio-grid\s*\{[\s\S]*grid-template-columns:\s*minmax\(320px,\s*380px\)\s*minmax\(0,\s*1fr\);[\s\S]*grid-template-areas:\s*"settings preview";/);
   assert.match(
     styles,
-    /html\[data-ui-layout="tablet"\] \.studio-grid\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*minmax\(320px,\s*380px\);[\s\S]*grid-template-areas:\s*"preview settings";[\s\S]*height:\s*100%;[\s\S]*overflow:\s*hidden;/,
-  );
-  assert.match(
-    styles,
-    /html\[data-ui-layout="mobile"\] \.studio-grid\s*\{[\s\S]*grid-template-rows:\s*none;[\s\S]*"preview"[\s\S]*"settings";[\s\S]*height:\s*auto;[\s\S]*overflow:\s*visible;/,
+    /html\[data-ui-layout="mobile"\] \.studio-grid\s*\{[\s\S]*grid-template-rows:\s*none;[\s\S]*"settings"[\s\S]*"preview";[\s\S]*height:\s*auto;[\s\S]*overflow:\s*visible;/,
   );
   assert.match(styles, /html\[data-ui-layout="tablet"\] \.preview-panel\s*\{[\s\S]*grid-area:\s*preview;[\s\S]*height:\s*100%;/);
   assert.match(styles, /html\[data-ui-layout="mobile"\] \.preview-panel\s*\{[\s\S]*grid-area:\s*preview;[\s\S]*height:\s*auto;[\s\S]*overflow:\s*visible;/);
   assert.match(styles, /html\[data-ui-layout="tablet"\] \.settings-form\s*\{[\s\S]*height:\s*100%;[\s\S]*overflow:\s*auto;/);
   assert.match(styles, /html\[data-ui-layout="mobile"\] \.settings-form\s*\{[\s\S]*height:\s*auto;[\s\S]*overflow:\s*visible;/);
   assert.match(styles, /html\[data-ui-layout="mobile"\] \.preview-canvas\s*\{[\s\S]*min-height:\s*clamp\(180px,\s*36svh,\s*280px\);/);
-  assert.match(styles, /html\[data-ui-layout="mobile"\] \.ratio-grid\s*\{[\s\S]*display:\s*flex;[\s\S]*overflow-x:\s*auto;/);
+  assert.match(styles, /html\[data-ui-layout="mobile"\] \.ratio-grid\s*\{[\s\S]*display:\s*flex;[\s\S]*overflow-x:\s*auto;[\s\S]*scrollbar-width:\s*thin;/);
   assert.match(styles, /html\[data-ui-layout="mobile"\] \.reference-dropzone\s*\{[\s\S]*min-height:\s*48px;[\s\S]*grid-template-columns:\s*30px\s*minmax\(0,\s*1fr\);/);
   assert.match(styles, /html\[data-ui-layout="mobile"\] \.filmstrip-item span\s*\{[\s\S]*display:\s*none;/);
   assert.match(styles, /html\[data-ui-layout="tablet"\] \.adaptive-section,[\s\S]*html\[data-ui-layout="mobile"\] \.adaptive-section\s*\{[\s\S]*border-radius:\s*14px;/);
@@ -2469,14 +2539,312 @@ test("mobile and Pad studio layout uses dedicated compact workbench layouts", as
   assert.match(styles, /html\[data-ui-layout="tablet"\] \.adaptive-section\[open\] > \.adaptive-section-summary::after,[\s\S]*html\[data-ui-layout="mobile"\] \.adaptive-section\[open\] > \.adaptive-section-summary::after\s*\{/);
   assert.match(styles, /html\[data-ui-layout="mobile"\] \.advanced-controls\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);/);
   assert.match(styles, /html\[data-ui-layout="mobile"\] \.preview-toolbar\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);/);
-  assert.match(styles, /html\[data-ui-layout="mobile"\] \.zoom-controls\s*\{[\s\S]*grid-template-columns:\s*34px\s*minmax\(52px,\s*1fr\)\s*34px\s*minmax\(54px,\s*0\.9fr\);/);
+  assert.match(styles, /html\[data-ui-layout="mobile"\] \.zoom-controls\s*\{[\s\S]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);/);
   assert.match(styles, /html\[data-ui-layout="mobile"\] \.preview-actions\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/);
-  assert.match(app, /const ADAPTIVE_COLLAPSIBLE_LAYOUTS = new Set\(\["tablet", "mobile"\]\);/);
-  assert.match(app, /studio-density\.mjs\?v=20260705-ui-scale-90-1/);
+  assert.match(app, /const ADAPTIVE_COLLAPSIBLE_LAYOUTS = new Set\(\["stacked", "tablet", "mobile"\]\);/);
+  assert.match(app, /studio-density\.mjs\?v=20260713-cross-device-1/);
   assert.match(app, /function getStudioViewportMetrics\(\) \{[\s\S]*coarsePointer:\s*window\.matchMedia\?\.\("\(pointer: coarse\)"\)\?\.matches \|\| false,/);
   assert.match(app, /function syncAdaptiveWorkbenchSections\(layoutMode = getCurrentStudioLayoutMode\(\)\) \{/);
   assert.match(app, /section\.open = section\.dataset\.compactOpen === "true";/);
   assert.match(app, /function bindAdaptiveWorkbenchSections\(\) \{/);
+});
+
+test("compact preview toolbar keeps controls evenly distributed and centered", async () => {
+  const html = await readFile(indexPath, "utf8");
+  const styles = await readFile(stylesPath, "utf8");
+  const previewActions = html.match(
+    /<div class="preview-actions">[\s\S]*?id="previewDownloadButton"[\s\S]*?id="previewLightboxButton"[\s\S]*?id="previewDeleteButton"[\s\S]*?<\/div>/,
+  )?.[0] || "";
+  const previewActionButtonRule = readCssRule(styles, ".preview-actions .toolbar-button");
+  const zoomLabelRule = readCssRule(styles, ".zoom-label");
+
+  assert.match(previewActions, /<a class="toolbar-button" id="previewDownloadButton"[^>]*>下载<\/a>/);
+  assert.match(
+    previewActions,
+    /id="previewDownloadButton"[\s\S]*id="previewLightboxButton"[\s\S]*id="previewDeleteButton"/,
+  );
+  assert.match(previewActionButtonRule, /display:\s*inline-flex;/);
+  assert.match(previewActionButtonRule, /align-items:\s*center;/);
+  assert.match(previewActionButtonRule, /justify-content:\s*center;/);
+  assert.match(previewActionButtonRule, /text-align:\s*center;/);
+  assert.match(
+    styles,
+    /html\[data-ui-layout="tablet"\] \.zoom-controls,\s*html\[data-ui-layout="mobile"\] \.zoom-controls\s*\{[\s\S]*?grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);/,
+  );
+  assert.match(
+    styles,
+    /html\[data-ui-layout="tablet"\] \.preview-actions,\s*html\[data-ui-layout="mobile"\] \.preview-actions\s*\{[\s\S]*?grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/,
+  );
+  assert.match(zoomLabelRule, /display:\s*grid;/);
+  assert.match(zoomLabelRule, /place-items:\s*center;/);
+});
+
+test("compact image decomposition keeps operation panels before results without implicit grid tracks", async () => {
+  const html = await readFile(indexPath, "utf8");
+  const styles = await readFile(stylesPath, "utf8");
+  const workspace = html.match(/<div class="image-decomposition-workspace">[\s\S]*?<\/section>\s*<\/div>/)?.[0] || "";
+
+  assert.ok(
+    workspace.indexOf("image-decomposition-upload-panel") < workspace.indexOf("image-decomposition-preview-panel"),
+    "image decomposition operations should precede the result panel in DOM order",
+  );
+  assert.match(
+    styles,
+    /html:is\(\[data-ui-layout="mobile"\],\s*\[data-ui-layout="tablet"\],\s*\[data-ui-layout="stacked"\]\) \.image-decomposition-workspace\s*\{[\s\S]*grid-template-areas:\s*none;[\s\S]*grid-auto-flow:\s*row;/,
+  );
+  assert.match(
+    styles,
+    /html:is\(\[data-ui-layout="mobile"\],\s*\[data-ui-layout="tablet"\],\s*\[data-ui-layout="stacked"\]\) \.image-decomposition-preview-panel\s*\{[\s\S]*grid-area:\s*auto;/,
+  );
+  assert.match(
+    styles,
+    /html\[data-ui-layout="tablet"\]\[data-ui-orientation="portrait"\] :is\(\.image-decomposition-upload-panel,\s*\.image-decomposition-form\),[\s\S]*html\[data-ui-layout="mobile"\] :is\(\.image-decomposition-upload-panel,\s*\.image-decomposition-form\)\s*\{[\s\S]*height:\s*auto;[\s\S]*overflow:\s*visible;/,
+  );
+});
+
+test("compact creation menu entries keep touch-sized targets", async () => {
+  const html = await readFile(indexPath, "utf8");
+  const styles = await readFile(stylesPath, "utf8");
+  const creationMenu = html.match(/id="nav-menu-studio"[\s\S]*?<\/div>\s*<\/div>/)?.[0] || "";
+
+  assert.match(creationMenu, /class="mega-menu-link[^"\n]*" href="#image-decomposition"/);
+  assert.match(
+    styles,
+    /html\[data-ui-layout="mobile"\] :is\(\.mega-menu-link,\s*\.mega-menu-action\),[\s\S]*html\[data-ui-input="coarse"\]\[data-ui-layout="tablet"\] :is\(\.mega-menu-link,\s*\.mega-menu-action\),[\s\S]*html\[data-ui-input="coarse"\]\[data-ui-layout="stacked"\] :is\(\.mega-menu-link,\s*\.mega-menu-action\)\s*\{[\s\S]*min-block-size:\s*44px;[\s\S]*align-items:\s*center;/,
+  );
+});
+
+test("compact config menu actions keep touch-sized targets", async () => {
+  const html = await readFile(indexPath, "utf8");
+  const styles = await readFile(stylesPath, "utf8");
+  const configMenu = html.match(/id="nav-menu-settings"[\s\S]*?<\/div>\s*<\/div>/)?.[0] || "";
+
+  assert.match(configMenu, /class="mega-menu-action large"[^>]*data-nav-action="config"/);
+  assert.match(
+    styles,
+    /html\[data-ui-layout="mobile"\] :is\(\.mega-menu-link,\s*\.mega-menu-action\),[\s\S]*html\[data-ui-input="coarse"\]\[data-ui-layout="tablet"\] :is\(\.mega-menu-link,\s*\.mega-menu-action\),[\s\S]*html\[data-ui-input="coarse"\]\[data-ui-layout="stacked"\] :is\(\.mega-menu-link,\s*\.mega-menu-action\)\s*\{[\s\S]*min-block-size:\s*44px;/,
+  );
+});
+
+test("compact gallery tiles keep a 44px hit area without distorting images", async () => {
+  const styles = await readFile(stylesPath, "utf8");
+
+  assert.match(styles, /\.gallery-tile img\s*\{[\s\S]*width:\s*100%;[\s\S]*height:\s*auto;/);
+  assert.match(
+    styles,
+    /html\[data-ui-layout="mobile"\] \.gallery-masonry,[\s\S]*html\[data-ui-input="coarse"\]:is\(\[data-ui-layout="tablet"\],\s*\[data-ui-layout="stacked"\]\) \.gallery-masonry\s*\{[\s\S]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(44px,\s*1fr\)\);/,
+  );
+  assert.match(
+    styles,
+    /html\[data-ui-layout="mobile"\] \.gallery-tile,[\s\S]*html\[data-ui-input="coarse"\]:is\(\[data-ui-layout="tablet"\],\s*\[data-ui-layout="stacked"\]\) \.gallery-tile\s*\{[\s\S]*min-inline-size:\s*44px;[\s\S]*min-block-size:\s*44px;/,
+  );
+});
+
+test("compact creation logo and card actions keep touch-sized targets", async () => {
+  const styles = await readFile(stylesPath, "utf8");
+
+  assert.match(
+    styles,
+    /html\[data-ui-layout="mobile"\] :is\(\.creation-logo-library-button,\s*\.creation-card-actions \.mini-action\),[\s\S]*html\[data-ui-input="coarse"\]:is\(\[data-ui-layout="tablet"\],\s*\[data-ui-layout="stacked"\]\) :is\(\.creation-logo-library-button,\s*\.creation-card-actions \.mini-action\)\s*\{[\s\S]*min-inline-size:\s*44px;[\s\S]*min-block-size:\s*44px;/,
+  );
+});
+
+test("compact quick blend clear controls keep touch-sized targets", async () => {
+  const html = await readFile(indexPath, "utf8");
+  const styles = await readFile(stylesPath, "utf8");
+
+  assert.equal((html.match(/class="quick-blend-clear-button"/g) || []).length, 4);
+  assert.match(
+    styles,
+    /html\[data-ui-layout="mobile"\] \.quick-blend-clear-button,[\s\S]*html\[data-ui-input="coarse"\]:is\(\[data-ui-layout="tablet"\],\s*\[data-ui-layout="stacked"\]\) \.quick-blend-clear-button\s*\{[\s\S]*min-block-size:\s*44px;/,
+  );
+});
+
+test("compact PPT source labels keep touch-sized targets", async () => {
+  const html = await readFile(indexPath, "utf8");
+  const styles = await readFile(stylesPath, "utf8");
+
+  assert.equal((html.match(/class="ppt-source-option"/g) || []).length, 3);
+  assert.match(
+    styles,
+    /html\[data-ui-layout="mobile"\] \.ppt-source-option,[\s\S]*html\[data-ui-input="coarse"\]:is\(\[data-ui-layout="tablet"\],\s*\[data-ui-layout="stacked"\]\) \.ppt-source-option\s*\{[\s\S]*min-block-size:\s*44px;/,
+  );
+});
+
+test("compact portrait library location style and shot controls keep touch-sized targets", async () => {
+  const html = await readFile(indexPath, "utf8");
+  const styles = await readFile(stylesPath, "utf8");
+
+  assert.match(html, /class="mini-action portrait-accessory-asset-button"[\s\S]*>搭配库<\/button>/);
+  assert.match(html, /class="portrait-location-toggle"[\s\S]*<span>地点写真<\/span>/);
+  assert.equal((html.match(/name="portraitStyles"/g) || []).length, 9);
+  assert.equal((html.match(/name="portraitShotTypes"/g) || []).length, 5);
+  assert.match(
+    styles,
+    /html\[data-ui-layout="mobile"\] :is\(\.portrait-accessory-asset-button,\s*\.portrait-location-toggle,\s*\.portrait-style-grid label,\s*\.portrait-shot-grid label\),[\s\S]*html\[data-ui-input="coarse"\]:is\(\[data-ui-layout="tablet"\],\s*\[data-ui-layout="stacked"\]\) :is\(\.portrait-accessory-asset-button,\s*\.portrait-location-toggle,\s*\.portrait-style-grid label,\s*\.portrait-shot-grid label\)\s*\{[\s\S]*min-block-size:\s*44px;/,
+  );
+});
+
+test("coarse compact image decomposition actions and selects keep touch-sized targets", async () => {
+  const styles = await readFile(stylesPath, "utf8");
+
+  assert.match(
+    styles,
+    /html\[data-ui-input="coarse"\]:is\(\[data-ui-layout="tablet"\],\s*\[data-ui-layout="stacked"\]\) :is\(\.image-decomposition-generate-button,\s*\.image-decomposition-parameter-settings select\)\s*\{[\s\S]*min-block-size:\s*44px;/,
+  );
+});
+
+test("coarse compact Gallery scrollbar arrows and thumb expose 44px hit areas", async () => {
+  const html = await readFile(indexPath, "utf8");
+  const styles = await readFile(stylesPath, "utf8");
+
+  assert.equal((html.match(/class="gallery-scroll-arrow"/g) || []).length, 2);
+  assert.match(html, /class="gallery-scroll-thumb"[\s\S]*id="galleryScrollThumb"/);
+  assert.match(
+    styles,
+    /html\[data-ui-input="coarse"\]:is\(\[data-ui-layout="tablet"\],\s*\[data-ui-layout="stacked"\]\) \.gallery-scroll-shell\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*44px;/,
+  );
+  assert.match(
+    styles,
+    /html\[data-ui-input="coarse"\]:is\(\[data-ui-layout="tablet"\],\s*\[data-ui-layout="stacked"\]\) \.gallery-scrollbar\s*\{[\s\S]*--gallery-scroll-arrow-size:\s*44px;[\s\S]*min-inline-size:\s*44px;/,
+  );
+  assert.match(
+    styles,
+    /html\[data-ui-input="coarse"\]:is\(\[data-ui-layout="tablet"\],\s*\[data-ui-layout="stacked"\]\) :is\(\.gallery-scroll-track,\s*\.gallery-scroll-thumb\)\s*\{[\s\S]*min-inline-size:\s*44px;[\s\S]*width:\s*44px;/,
+  );
+});
+
+test("low-height coarse stacked Studio keeps reveal and core controls touch-sized", async () => {
+  const html = await readFile(indexPath, "utf8");
+  const styles = await readFile(stylesPath, "utf8");
+  const app = await readFile(appPath, "utf8");
+
+  assert.match(html, /id="topbarRevealButton"[\s\S]*aria-expanded="false"[\s\S]*aria-controls="globalTopbar"/);
+  assert.match(html, /class="toolbar-button" id="creationPlanButton"/);
+  assert.match(html, /class="generate-button" id="creationGenerateButton"/);
+  assert.match(html, /id="creationLogoBackgroundInput"[\s\S]*name="logoBackground"/);
+  assert.match(html, /class="header-button" id="closeConfigButton"/);
+  assert.match(html, /class="inline-button endpoint-full-toggle" id="baseUrlFullToggle"/);
+  assert.match(html, /class="inline-button" id="fetchModelsButton"/);
+  assert.match(html, /class="header-button" id="testConnectionButton"/);
+  assert.match(html, /class="generate-button" type="submit" data-ui-i18n="save"/);
+  assert.match(app, /function isTopbarRevealLayout\(\) \{[\s\S]*return true;/);
+  assert.match(app, /refs\.topbarRevealButton\?\.addEventListener\("click",[\s\S]*setTopbarReveal\(/);
+  assert.match(
+    styles,
+    /html\[data-ui-input="coarse"\]\[data-ui-layout="stacked"\] \.topbar-reveal-button\s*\{[\s\S]*position:\s*fixed;[\s\S]*display:\s*inline-grid;[\s\S]*width:\s*44px;[\s\S]*height:\s*44px;/,
+  );
+  assert.match(
+    styles,
+    /html\[data-ui-input="coarse"\]\[data-ui-layout="stacked"\]\.topbar-reveal \.topbar\s*\{[\s\S]*transform:\s*translate\(-50%,\s*0\);/,
+  );
+  assert.match(
+    styles,
+    /html\[data-ui-input="coarse"\]\[data-ui-layout="stacked"\] :is\([\s\S]*\.view-tab,[\s\S]*\.header-button,[\s\S]*\.inline-button,[\s\S]*\.toolbar-button,[\s\S]*\.icon-button,[\s\S]*\.generate-button,[\s\S]*\.ratio-chip,[\s\S]*input:not\(\[type="hidden"\]\)[\s\S]*select,[\s\S]*#lightboxClose[\s\S]*\)\s*\{[\s\S]*min-width:\s*44px;[\s\S]*min-height:\s*44px;/,
+  );
+});
+
+test("cross-device workbench keeps touch targets overflow and overlays reachable", async () => {
+  const styles = await readFile(stylesPath, "utf8");
+  const app = await readFile(appPath, "utf8");
+
+  assert.match(styles, /html,\s*[\r\n]+body\s*\{[\s\S]*max-width:\s*100%;[\s\S]*overflow-x:\s*clip;/);
+  assert.match(styles, /html:is\(\[data-ui-layout="mobile"\],\s*\[data-ui-layout="tablet"\],\s*\[data-ui-layout="stacked"\]\) :is\(\s*\.studio-grid,[\s\S]*\.ppt-record-view\s*\)\s*\{[\s\S]*min-width:\s*0;[\s\S]*max-width:\s*100%;/);
+  assert.match(styles, /html:is\(\[data-ui-layout="mobile"\],\s*\[data-ui-layout="tablet"\],\s*\[data-ui-layout="stacked"\]\) :is\(\.panel-title,\s*\.field-heading,[\s\S]*\.prompt-agent-feedback\)\s*\{[\s\S]*overflow-wrap:\s*anywhere;/);
+  assert.match(styles, /html\[data-ui-layout="mobile"\] :is\([\s\S]*\.generate-button[\s\S]*#lightboxClose[\s\S]*\)\s*\{[\s\S]*min-width:\s*44px;[\s\S]*min-height:\s*44px;/);
+  assert.match(styles, /html\[data-ui-input="coarse"\]\[data-ui-layout="tablet"\] :is\([\s\S]*\.generate-button[\s\S]*#lightboxClose[\s\S]*\)\s*\{[\s\S]*min-width:\s*44px;[\s\S]*min-height:\s*44px;/);
+  assert.match(styles, /html:is\(\[data-ui-layout="mobile"\],\s*\[data-ui-layout="tablet"\],\s*\[data-ui-layout="stacked"\]\) #surprisePromptButton\s*\{[\s\S]*min-inline-size:\s*44px;[\s\S]*min-block-size:\s*44px;/);
+  assert.match(styles, /html:is\(\[data-ui-layout="mobile"\],\s*\[data-ui-layout="tablet"\],\s*\[data-ui-layout="stacked"\]\) :is\(\.ratio-grid,\s*\.filmstrip,\s*\.gallery-top-actions,\s*\.article-record-actions,\s*\.creation-record-actions,\s*\.ppt-record-actions\)\s*\{[\s\S]*overflow-x:\s*auto;[\s\S]*scrollbar-width:\s*thin;/);
+  assert.match(styles, /html:is\(\[data-ui-layout="mobile"\],\s*\[data-ui-layout="tablet"\],\s*\[data-ui-layout="stacked"\]\) :is\(\.drawer-panel,\s*\.prompt-agent-dialog,\s*\.prompt-agent-image-viewer-dialog,\s*\.prompt-template-panel,\s*\.portrait-accessory-asset-panel,\s*\.ppt-edit-dialog,\s*\.lightbox-dialog\)\s*\{[\s\S]*max-height:\s*calc\(var\(--visual-viewport-height,\s*100dvh\)[\s\S]*env\(safe-area-inset-top\)[\s\S]*env\(safe-area-inset-bottom\)[\s\S]*overflow:\s*auto;/);
+  assert.match(styles, /html:is\(\[data-ui-layout="mobile"\],\s*\[data-ui-layout="tablet"\],\s*\[data-ui-layout="stacked"\]\) \.lightbox-dialog\s*\{[\s\S]*grid-template-rows:\s*auto\s*minmax\(0,\s*1fr\);/);
+  assert.match(styles, /html\[data-ui-layout="mobile"\] \.lightbox-top\s*\{[\s\S]*position:\s*sticky;[\s\S]*top:\s*0;/);
+  assert.match(app, /document\.documentElement\.dataset\.uiOrientation = viewportMetrics\.width >= viewportMetrics\.height \? "landscape" : "portrait";/);
+  assert.match(app, /document\.documentElement\.dataset\.uiInput = viewportMetrics\.coarsePointer \? "coarse" : "fine";/);
+  assert.match(app, /document\.documentElement\.style\.setProperty\("--visual-viewport-height", `\$\{visualViewportHeight\}px`\);/);
+});
+
+test("responsive viewport sync updates root layout metadata without rebuilding workflow nodes", async () => {
+  const app = await readFile(appPath, "utf8");
+  const syncBody = app.match(/function syncStudioDensity\(\) \{[\s\S]*?\r?\n\}\r?\nfunction scheduleStudioDensitySync/)?.[0] || "";
+  const scheduleBody = app.match(/function scheduleStudioDensitySync\(\) \{[\s\S]*?\r?\n\}\r?\nlet densityZoomEndTimer/)?.[0] || "";
+
+  assert.match(syncBody, /dataset\.uiLayout = layoutMode/);
+  assert.match(syncBody, /dataset\.uiOrientation/);
+  assert.match(syncBody, /dataset\.uiInput/);
+  assert.match(syncBody, /--visual-viewport-height/);
+  assert.doesNotMatch(syncBody, /appendChild|replaceChildren|innerHTML|outerHTML|createElement|cloneNode/);
+  assert.match(scheduleBody, /syncStudioDensity\(\)/);
+  assert.match(scheduleBody, /syncGalleryLayoutMode\(\)/);
+  assert.doesNotMatch(scheduleBody, /renderGalleryView|appendChild|replaceChildren|innerHTML|outerHTML|createElement|cloneNode/);
+  assert.match(app, /window\.addEventListener\("resize", scheduleStudioDensitySync\);/);
+  assert.match(app, /window\.visualViewport\?\.addEventListener\("resize", scheduleStudioDensitySync\);/);
+});
+
+test("tablet and mobile topbars auto-hide while keeping mode status visible", async () => {
+  const styles = await readFile(stylesPath, "utf8");
+  const app = await readFile(appPath, "utf8");
+
+  assert.match(
+    styles,
+    /html\[data-ui-layout="tablet"\] \.topbar,\s*[\r\n]+\s*html\[data-ui-layout="mobile"\] \.topbar\s*\{[\s\S]*position:\s*fixed;[\s\S]*display:\s*flex;[\s\S]*justify-content:\s*center;[\s\S]*transform:\s*translate\(-50%,\s*calc\(-100% \+ var\(--topbar-trigger-height,\s*10px\)\)\);/,
+  );
+  assert.match(
+    styles,
+    /html\[data-ui-layout="tablet"\] \.topbar:hover,\s*[\r\n]+\s*html\[data-ui-layout="mobile"\] \.topbar:hover,\s*[\s\S]*html\[data-ui-layout="tablet"\]\.topbar-reveal \.topbar,\s*[\r\n]+\s*html\[data-ui-layout="mobile"\]\.topbar-reveal \.topbar,[\s\S]*\{[\s\S]*transform:\s*translate\(-50%,\s*0\);/,
+  );
+  assert.match(
+    styles,
+    /html\[data-ui-layout="tablet"\] \.brand-cluster,\s*[\r\n]+\s*html\[data-ui-layout="mobile"\] \.brand-cluster,\s*[\r\n]+\s*html\[data-ui-layout="tablet"\] \.topbar-api-check,\s*[\r\n]+\s*html\[data-ui-layout="mobile"\] \.topbar-api-check,\s*[\r\n]+\s*html\[data-ui-layout="tablet"\] \.nav-tab-note,\s*[\r\n]+\s*html\[data-ui-layout="mobile"\] \.nav-tab-note\s*\{[\s\S]*display:\s*none;/,
+  );
+  assert.match(
+    styles,
+    /html\[data-ui-layout="tablet"\] \.generation-mode-status,\s*[\r\n]+\s*html\[data-ui-layout="mobile"\] \.generation-mode-status\s*\{[\s\S]*display:\s*inline-flex;[\s\S]*white-space:\s*nowrap;/,
+  );
+  assert.match(
+    styles,
+    /html\[data-ui-layout="tablet"\] \.global-nav-list,\s*[\r\n]+\s*html\[data-ui-layout="mobile"\] \.global-nav-list\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*max-content\);[\s\S]*overflow:\s*visible;/,
+  );
+  assert.match(app, /function isTopbarRevealLayout\(\) \{[\s\S]*return true;/);
+});
+
+test("tablet and mobile topbars provide an explicit keyboard-accessible reveal control", async () => {
+  const html = await readFile(indexPath, "utf8");
+  const styles = await readFile(stylesPath, "utf8");
+  const app = await readFile(appPath, "utf8");
+
+  assert.match(html, /<button[^>]*id="topbarRevealButton"[^>]*type="button"[^>]*aria-expanded="false"[^>]*aria-controls="globalTopbar"/);
+  assert.match(html, /<header class="topbar" id="globalTopbar">/);
+  assert.match(styles, /\.topbar-reveal-button\s*\{[\s\S]*display:\s*none;/);
+  assert.match(styles, /html\[data-ui-layout="tablet"\] \.topbar-reveal-button,[\s\S]*html\[data-ui-layout="mobile"\] \.topbar-reveal-button\s*\{[\s\S]*display:\s*inline-grid;[\s\S]*width:\s*44px;[\s\S]*height:\s*44px;/);
+  assert.match(styles, /html\[data-ui-layout="tablet"\]\.topbar-reveal \.topbar-reveal-button,[\s\S]*html\[data-ui-layout="mobile"\]\.topbar-reveal \.topbar-reveal-button\s*\{[\s\S]*top:\s*calc\(max\(2px, env\(safe-area-inset-top\)\) \+ 48px\);/);
+  assert.match(app, /topbarRevealButton:\s*document\.querySelector\("#topbarRevealButton"\)/);
+  assert.match(app, /refs\.topbarRevealButton\?\.addEventListener\("click", \(event\) => \{[\s\S]*event\.stopPropagation\(\);/);
+  assert.match(app, /setAttribute\("aria-expanded", String\(shouldOpen\)\)/);
+  assert.match(app, /target\?\.closest\("\.topbar-reveal-button"\)\) return;/);
+  assert.match(app, /focusInRevealButton = refs\.topbarRevealButton\?\.contains\(document\.activeElement\)/);
+});
+
+test("config drawer suppresses auto-hidden topbar reveal on tablet and mobile", async () => {
+  const styles = await readFile(stylesPath, "utf8");
+  const app = await readFile(appPath, "utf8");
+
+  assert.match(app, /const TOPBAR_SUPPRESSED_CLASS = "topbar-suppressed";/);
+  assert.match(
+    app,
+    /function isTopbarRevealSuppressed\(\) \{[\s\S]*return document\.documentElement\.classList\.contains\(TOPBAR_SUPPRESSED_CLASS\);[\s\S]*\}/,
+  );
+  assert.match(
+    app,
+    /const shouldOpen = Boolean\(open\) && isTopbarRevealLayout\(\) && !isTopbarRevealSuppressed\(\);/,
+  );
+  assert.match(
+    app,
+    /refs\.configDrawer\.classList\.toggle\("open", open\);[\s\S]*document\.documentElement\.classList\.toggle\(TOPBAR_SUPPRESSED_CLASS, open\);[\s\S]*if \(open\) \{[\s\S]*setTopbarReveal\(false\);/,
+  );
+  assert.match(
+    styles,
+    /html\.topbar-suppressed\[data-ui-layout="tablet"\] \.topbar,\s*[\r\n]+\s*html\.topbar-suppressed\[data-ui-layout="mobile"\] \.topbar\s*\{[\s\S]*pointer-events:\s*none;[\s\S]*transform:\s*translate\(-50%,\s*calc\(-100% \+ var\(--topbar-trigger-height,\s*10px\)\)\);/,
+  );
 });
 
 test("studio columns use synchronized desktop height so wide screens do not leave a dead zone under the workspace", async () => {
@@ -2573,7 +2941,7 @@ test("config endpoint controls keep suffix before full URL and mark direct image
   assert.notEqual(directResponsesInputIndex, -1);
   assert.notEqual(directResponsesFieldStart, -1);
   assert.doesNotMatch(directResponsesFieldOpenTag, /\shidden(?:[=\s>]|$)/);
-  assert.match(html, /<input name="imageRoute" type="radio" value="c" \/>[\s\S]*<span>Gemini模型<\/span>/);
+  assert.match(html, /<input name="imageRoute" type="radio" value="c" \/>[\s\S]*<span data-ui-i18n="protocolMode">Gemini模型<\/span>/);
   assert.match(html, /<div class="route-config-panel" data-route-panel="c"[\s\S]*id="protocolBaseUrlInput"[\s\S]*id="protocolApiKeyInput"[\s\S]*id="protocolImageModelInput"/);
   assert.match(html, /id="protocolCompatibilityHint"[\s\S]*Gemini[\s\S]*images\/generations/);
   assert.match(styles, /\.endpoint-toolbar\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*auto;/);
@@ -2685,6 +3053,40 @@ test("fetch models button opens fetched model options while silent fetches stay 
 
   assert.equal(state.configModels.open, false);
   assert.equal(refs.modelOptionsList.hidden, true);
+});
+
+test("config model picker action labels follow injected UI language", async () => {
+  const { createConfigModelPickerController } = await import(publicConfigModelPickerPath);
+  const { refs } = createModelPickerHarness();
+  const state = { config: {}, configModels: { items: [], loading: false, loadingMode: "", open: false } };
+  const labels = {
+    fetchModels: "Fetch Models",
+    fetchModelsLoading: "Fetching...",
+    testConnection: "Test Connection",
+    testConnectionLoading: "Testing...",
+  };
+  const controller = createConfigModelPickerController({
+    refs,
+    state,
+    FormDataCtor: TestFormData,
+    fetchImpl: async () => ({ ok: true, json: async () => ({ ok: true, models: [] }) }),
+    getBrowserPrivateConfigRequestPayload: () => ({}),
+    getUiText: (key) => labels[key] || "",
+  });
+
+  controller.render();
+  assert.equal(refs.testConnectionButton.textContent, "Test Connection");
+  assert.equal(refs.fetchModelsButton.textContent, "Fetch Models");
+
+  state.configModels.loading = true;
+  state.configModels.loadingMode = "models";
+  state.configModels.loadingTarget = "responses";
+  controller.render();
+  assert.equal(refs.fetchModelsButton.textContent, "Fetching...");
+
+  state.configModels.loadingMode = "test";
+  controller.render();
+  assert.equal(refs.testConnectionButton.textContent, "Testing...");
 });
 
 test("direct mode fetch models uses direct API settings and direct model picker", async () => {
@@ -3202,7 +3604,7 @@ test("creation mode is a separate studio view with isolated state and routes", a
   assert.doesNotMatch(app, /creation[\s\S]{0,400}PROMPT_TEMPLATE_STORAGE_KEY/);
 });
 
-test("creation mode has independent references count and scenario controls", async () => {
+test("creation mode has independent references count and platform controls", async () => {
   const html = await readFile(indexPath, "utf8");
   const styles = await readFile(stylesPath, "utf8");
   const app = await readFile(appPath, "utf8");
@@ -3231,7 +3633,8 @@ test("creation mode has independent references count and scenario controls", asy
   assert.doesNotMatch(creationReferenceAnalysisHeadCopy, /creationReferenceAnalysisSummary/);
   assert.match(html, /<\/div>\s*<strong id="creationReferenceAnalysisSummary">--<\/strong>\s*<small class="creation-reference-analysis-meta" id="creationReferenceAnalysisMeta">--<\/small>/);
   assert.match(html, /id="creationReferenceAnalysisToggleButton"[\s\S]*aria-controls="creationReferenceAnalysisList"/);
-  assert.match(html, /id="creationReferenceApplyVisualLanguageButton"[\s\S]*应用视觉语言/);
+  assert.doesNotMatch(html, /id="creationReferenceApplyVisualLanguageButton"/);
+  assert.doesNotMatch(html, /应用视觉语言/);
   const creationReferenceAnalysisHeadActions = html.match(/<div class="creation-reference-analysis-head-actions">[\s\S]*?<\/div>/)?.[0] || "";
   assert.doesNotMatch(creationReferenceAnalysisHeadActions, /creationReferenceAnalysisMeta/);
   assert.match(html, /class="creation-reference-analysis-meta" id="creationReferenceAnalysisMeta"/);
@@ -3265,12 +3668,20 @@ test("creation mode has independent references count and scenario controls", asy
   assert.match(app, /refs\.creationReferenceResetButton\.addEventListener\("click", clearCreationReferenceFiles\)/);
   assert.match(html, /SKU 组合件数[\s\S]*id="creationSkuBundleCountInput"[\s\S]*name="skuBundleCount"/);
   assert.match(html, /id="creationImageCountInput"[\s\S]*<option value="0">0 张<\/option>[\s\S]*<option value="8">8/);
+  assert.match(html, /id="creationImageCountInput"[\s\S]*<option value="6">6 张<\/option>[\s\S]*<option value="7">7 张<\/option>[\s\S]*<option value="8">8 张<\/option>[\s\S]*<option value="9">9 张<\/option>/);
   assert.match(html, /id="creationImageCountInput"[\s\S]*<option value="10">10 张<\/option>[\s\S]*<option value="12">12/);
   assert.match(html, /id="creationImageCountInput"[\s\S]*<option value="14">14[\s\S]*<option value="16">16 张<\/option>[\s\S]*<option value="18" selected>18/);
   assert.match(html, /SKU 生成规则[\s\S]*id="creationSkuGenerationRuleInput"[\s\S]*name="skuGenerationRule"[\s\S]*<option value="color-name-under-subject" selected>主体下方显示颜色名<\/option>[\s\S]*<option value="none">无<\/option>[\s\S]*<option value="package-list">添加包装清单<\/option>[\s\S]*<option value="dimensions">添加尺寸<\/option>[\s\S]*<option value="package-list-dimensions">添加包装清单和尺寸<\/option>/);
-  assert.match(html, /id="creationScenarioInput"[\s\S]*value="social-seeding"/);
-  assert.match(html, /id="creationScenarioInput"[\s\S]*value="livestream"/);
-  assert.match(html, /id="creationScenarioInput"[\s\S]*value="gift-guide"/);
+  assert.doesNotMatch(html, /id="creationScenarioInput"/);
+  assert.doesNotMatch(html, /id="creationVisualLanguageInput"/);
+  assert.match(html, /平台选择[\s\S]*id="creationPlatformInput"[\s\S]*name="platform"[\s\S]*<option value="universal" selected>通用电商<\/option>/);
+  assert.doesNotMatch(html, /id="creationPlatformInput"[\s\S]*<option value="amazon">Amazon<\/option>/);
+  assert.match(app, /const CREATION_PLATFORM_POLICY_MODULE_URL = "\/lib\/creation-platform-policies\.mjs[^\"]*";/);
+  assert.match(app, /const CREATION_PLATFORM_RESOLVER_MODULE_URL = "\/lib\/creation-platform-resolver\.mjs[^\"]*";/);
+  assert.match(app, /Promise\.all\(\[[\s\S]*import\(CREATION_PLATFORM_POLICY_MODULE_URL\)[\s\S]*import\(CREATION_PLATFORM_RESOLVER_MODULE_URL\)/);
+  assert.match(app, /const FALLBACK_CREATION_PLATFORM_OPTIONS = \[[\s\S]*value: "universal"[\s\S]*label: "通用电商"[\s\S]*\];/);
+  assert.match(app, /function renderCreationPlatformOptions\(\)/);
+  assert.doesNotMatch(app, /const CREATION_PLATFORM_LABELS = \{[\s\S]*amazon:/);
   assert.match(html, /id="creationIndustryTemplateInput"[\s\S]*type="hidden"[\s\S]*value="general"/);
   assert.doesNotMatch(html, /value="apparel"/);
   assert.doesNotMatch(html, /value="beauty"/);
@@ -3299,8 +3710,7 @@ test("creation mode has independent references count and scenario controls", asy
   assert.match(html, /id="creationSellingPointsInput"[\s\S]*rows="1"/);
   assert.match(html, /id="creationDimensionSpecsInput"[\s\S]*rows="1"/);
   assert.match(html, /id="creationInfographicRebuildEnabledInput"[\s\S]*type="checkbox"[\s\S]*checked/);
-  assert.match(html, /<div class="creation-control-row creation-option-grid">[\s\S]*id="creationImageCountInput"[\s\S]*id="creationSkuBundleCountInput"[\s\S]*id="creationScenarioInput"[\s\S]*id="creationVisualLanguageInput"[\s\S]*id="creationTargetLanguageInput"[\s\S]*id="creationOutputFormatInput"[\s\S]*id="creationRatioInput"[\s\S]*id="creationSizeInput"[\s\S]*id="creationSkuGenerationRuleInput"[\s\S]*id="creationInfographicRebuildEnabledInput"[\s\S]*id="creationListingAgentEnabledInput"[\s\S]*id="creationIndustryTemplateBrowser"/);
-  assert.match(html, /id="creationVisualLanguageInput"[\s\S]*name="visualLanguage"[\s\S]*<option value="classic-commercial" selected>经典商业摄影<\/option>[\s\S]*<option value="premium-studio">高端棚拍<\/option>[\s\S]*<option value="warm-handcrafted">手作温度<\/option>/);
+  assert.match(html, /<div class="creation-control-row creation-option-grid">[\s\S]*id="creationImageCountInput"[\s\S]*id="creationSkuBundleCountInput"[\s\S]*id="creationPlatformInput"[\s\S]*id="creationTargetLanguageInput"[\s\S]*id="creationOutputFormatInput"[\s\S]*id="creationRatioInput"[\s\S]*id="creationSizeInput"[\s\S]*id="creationSkuGenerationRuleInput"[\s\S]*id="creationInfographicRebuildEnabledInput"[\s\S]*id="creationListingAgentEnabledInput"[\s\S]*id="creationIndustryTemplateBrowser"/);
   assert.match(html, /<select id="creationRatioInput" name="ratio">[\s\S]*<option value="1:1" data-full-label="电商主图、头像、社交媒体 · 方形 1:1" selected>1:1<\/option>[\s\S]*<option value="9:21" data-full-label="超长竖图 · 竖屏 9:21">9:21<\/option>[\s\S]*<option value="1:3" data-full-label="超长竖版广告 · 竖屏 1:3">1:3<\/option>[\s\S]*<\/select>/);
   assert.match(html, /<select id="creationSizeInput" name="size">[\s\S]*<option value="1024x1024" selected>1K 1024 x 1024<\/option>[\s\S]*<option value="2880x2880">最大 2880 x 2880<\/option>[\s\S]*<\/select>/);
   assert.match(html, /<select id="portraitRatioInput" name="ratio">[\s\S]*<option value="4:5" selected>Instagram帖子 · 竖屏 4:5<\/option>[\s\S]*<option value="3:1">超宽广告图 · 横屏 3:1<\/option>[\s\S]*<\/select>/);
@@ -3352,7 +3762,7 @@ test("creation mode has independent references count and scenario controls", asy
   assert.doesNotMatch(creationIndustryOptionTextRule, /overflow:\s*hidden|text-overflow:\s*ellipsis|white-space:\s*nowrap/);
   assert.match(styles, /\.creation-industry-option strong\s*\{[\s\S]*font-size:\s*var\(--type-subtitle-size\);/);
   assert.match(styles, /\.creation-industry-option small\s*\{[\s\S]*font-size:\s*var\(--type-caption-size,\s*0\.7rem\);[\s\S]*line-height:\s*1\.35;/);
-  assert.doesNotMatch(styles, /\.creation-industry-levels\s*\{[\s\S]*grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\);/);
+  assert.doesNotMatch(styles, /\.creation-industry-levels\s*\{[^}]*grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\);/);
   assert.match(styles, /\.creation-option-grid\s*\{\s*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\);/);
   const creationListingToggleRule = readCssRule(styles, ".creation-listing-toggle");
   assert.match(creationListingToggleRule, /min-height:\s*40px;/);
@@ -3360,23 +3770,37 @@ test("creation mode has independent references count and scenario controls", asy
   assert.match(creationListingToggleRule, /linear-gradient\(135deg,\s*rgba\(249,\s*192,\s*106,\s*0\.22\),\s*rgba\(112,\s*226,\s*162,\s*0\.11\)\)/);
   assert.doesNotMatch(readCssRule(styles, ".creation-listing-toggle.is-prominent"), /grid-column|min-height/);
   const creationListingToggleTextRule = readCssRule(styles, ".creation-listing-toggle span");
-  assert.match(creationListingToggleTextRule, /font-size:\s*clamp\(0\.6rem,\s*8cqw,\s*var\(--type-subtitle-size\)\);/);
+  assert.match(creationListingToggleTextRule, /font-size:\s*clamp\(0\.72rem,\s*8\.5cqw,\s*var\(--type-body-size\)\);/);
   assert.match(creationListingToggleTextRule, /white-space:\s*nowrap;/);
   assert.match(creationListingToggleTextRule, /text-overflow:\s*clip;/);
   assert.match(styles, /\.creation-sku-generation-rule-field\s*\{/);
   const creationOptionGridControlRule = readCssRule(styles, ".creation-option-grid .compact-field select");
+  const creationOptionGridOptionRule = readCssRule(styles, ".creation-option-grid .compact-field select option");
+  const creationFormCompactLabelRule = readCssRule(styles, ".creation-form .compact-field > span");
+  const creationPlatformSelectRule = readCssRule(styles, "#creationPlatformInput");
+  const creationPlatformOptionRule = readCssRule(styles, "#creationPlatformInput option");
   const creationSkuBundleRule = readCssRule(styles, ".creation-option-grid .creation-sku-bundle-field input");
+  const creationTemplateSearchLabelRule = readCssRule(styles, ".creation-template-search-field span");
+  const creationTemplateSearchRule = readCssRule(styles, ".creation-template-search");
+  const creationIndustryHeadLabelRule = readCssRule(styles, ".creation-industry-browser-head span");
   assert.doesNotMatch(styles, /\.creation-option-grid\s+\.creation-sku-bundle-field::after/);
   assert.match(creationOptionGridControlRule, /height:\s*40px;/);
   assert.match(creationOptionGridControlRule, /min-width:\s*0;/);
   assert.match(creationOptionGridControlRule, /box-sizing:\s*border-box;/);
   assert.match(creationOptionGridControlRule, /padding:\s*0\s+28px\s+0\s+8px;/);
   assert.match(creationOptionGridControlRule, /text-align:\s*center;/);
-  assert.match(creationOptionGridControlRule, /font-size:\s*clamp\(0\.52rem,\s*7cqw,\s*var\(--type-subtitle-size\)\);/);
+  assert.match(creationOptionGridControlRule, /font-size:\s*clamp\(0\.72rem,\s*8\.5cqw,\s*var\(--type-body-size\)\);/);
+  assert.match(creationOptionGridOptionRule, /font-size:\s*14px;/);
+  assert.match(creationFormCompactLabelRule, /font-size:\s*var\(--type-body-size\);/);
+  assert.match(creationPlatformSelectRule, /font-size:\s*clamp\(0\.72rem,\s*8\.5cqw,\s*var\(--type-body-size\)\);/);
+  assert.match(creationPlatformOptionRule, /font-size:\s*14px;/);
   assert.match(creationSkuBundleRule, /height:\s*40px;/);
   assert.match(creationSkuBundleRule, /padding:\s*0\s+12px;/);
   assert.match(creationSkuBundleRule, /text-align:\s*center;/);
-  assert.match(creationSkuBundleRule, /font-size:\s*clamp\(0\.52rem,\s*7cqw,\s*var\(--type-subtitle-size\)\);/);
+  assert.match(creationSkuBundleRule, /font-size:\s*clamp\(0\.72rem,\s*8\.5cqw,\s*var\(--type-body-size\)\);/);
+  assert.match(creationTemplateSearchLabelRule, /font-size:\s*var\(--type-body-size\);/);
+  assert.match(creationTemplateSearchRule, /font-size:\s*var\(--type-body-size\);/);
+  assert.match(creationIndustryHeadLabelRule, /font-size:\s*var\(--type-body-size\);/);
   assert.doesNotMatch(creationSkuBundleRule, /padding:\s*0\s+40px/);
   assert.doesNotMatch(creationOptionGridControlRule, /vw/);
   assert.match(creationOptionGridControlRule, /white-space:\s*nowrap;/);
@@ -3408,9 +3832,11 @@ test("creation mode has independent references count and scenario controls", asy
   assert.match(app, /creationReferenceAnalysisList: document\.querySelector\("#creationReferenceAnalysisList"\)/);
   assert.match(app, /creationReferenceAnalysisPanel: document\.querySelector\("#creationReferenceAnalysisPanel"\)/);
   assert.match(app, /creationReferenceAnalysisToggleButton: document\.querySelector\("#creationReferenceAnalysisToggleButton"\)/);
-  assert.match(app, /creationReferenceApplyVisualLanguageButton: document\.querySelector\("#creationReferenceApplyVisualLanguageButton"\)/);
+  assert.doesNotMatch(app, /creationReferenceApplyVisualLanguageButton: document\.querySelector\("#creationReferenceApplyVisualLanguageButton"\)/);
   assert.match(app, /creationSkuBundleCountInput: document\.querySelector\("#creationSkuBundleCountInput"\)/);
-  assert.match(app, /creationVisualLanguageInput: document\.querySelector\("#creationVisualLanguageInput"\)/);
+  assert.match(app, /creationPlatformInput: document\.querySelector\("#creationPlatformInput"\)/);
+  assert.doesNotMatch(app, /creationScenarioInput: document\.querySelector\("#creationScenarioInput"\)/);
+  assert.doesNotMatch(app, /creationVisualLanguageInput: document\.querySelector\("#creationVisualLanguageInput"\)/);
   assert.match(app, /creationDimensionSpecsInput: document\.querySelector\("#creationDimensionSpecsInput"\)/);
   assert.match(app, /creationDimensionUnitModeInput: document\.querySelector\("#creationDimensionUnitModeInput"\)/);
   assert.match(app, /creationIndustryTemplateBrowser: document\.querySelector\("#creationIndustryTemplateBrowser"\)/);
@@ -3444,9 +3870,10 @@ test("creation mode has independent references count and scenario controls", asy
   assert.match(app, /const CREATION_SCENARIO_ROLE_PRESETS = \{/);
   assert.match(app, /const CREATION_VISUAL_LANGUAGE_LABELS = \{/);
   assert.match(app, /"reference-style": "参考模式"/);
-  assert.match(app, /const visualLanguage = normalizeCreationVisualLanguage\(set\.visualLanguage\)/);
-  assert.match(app, /visualLanguage,\s*[\r\n]+\s*visualLanguageLabel:\s*String\(set\.visualLanguageLabel \|\| formatCreationVisualLanguageLabel\(visualLanguage\)\)/);
-  assert.match(app, /\["视觉语言", set\.visualLanguageLabel \|\| formatCreationVisualLanguageLabel\(set\.visualLanguage\)\]/);
+  assert.match(app, /const platform = normalizeCreationPlatform\(set\.platform\)/);
+  assert.match(app, /platform:\s*platform\.value,\s*[\r\n]+\s*platformLabel:\s*String\(set\.platformLabel \|\| formatCreationPlatformLabel\(platform\.value\)\)/);
+  assert.match(app, /\["平台", set\.platformLabel \|\| formatCreationPlatformLabel\(set\.platform\)\]/);
+  assert.doesNotMatch(app, /\["视觉语言", set\.visualLanguageLabel \|\| formatCreationVisualLanguageLabel\(set\.visualLanguage\)\]/);
   assert.doesNotMatch(app, /material-closeup/);
   assert.doesNotMatch(app, /usage-steps/);
   assert.doesNotMatch(app, /review-qa/);
@@ -3481,14 +3908,14 @@ test("creation mode has independent references count and scenario controls", asy
   assert.doesNotMatch(app, /18-certification-proof\|certification-proof\|资质背书图/);
   assert.doesNotMatch(app, /brief\.className = "creation-card-brief";/);
   assert.doesNotMatch(app, /refs\.creationScenarioHint\.textContent =[\s\S]*CREATION_INDUSTRY_TEMPLATE_HINTS/);
-  assert.match(app, /function getCreationScenarioRolePreset\(/);
+  assert.match(app, /function getCreationSelectedPlatform\(/);
   assert.match(app, /function getCreationSelectedRoles\(\) \{/);
   assert.match(app, /CREATION_IMAGE_COUNT_OPTIONS\.includes\(value\) \? value : 18/);
   assert.match(app, /CREATION_IMAGE_COUNT_OPTIONS\.includes\(normalizedCount\) \? String\(normalizedCount\) : "18"/);
   assert.match(app, /function isCreationZeroImageCountMode\(\) \{/);
   assert.match(app, /CREATION_IMAGE_COUNT_OPTIONS\.includes\(selectedRoles\.length\)/);
   assert.match(app, /function syncCreationSelectedRolesToCount\(\) \{/);
-  assert.match(app, /function syncCreationSelectedRolesToScenario\(\) \{/);
+  assert.doesNotMatch(app, /function syncCreationSelectedRolesToScenario\(\) \{/);
   assert.match(app, /function renderCreationRatioOptions\(\) \{/);
   assert.match(app, /function renderCreationSizeOptions\(\) \{/);
   assert.match(app, /function renderCreationRolePicker\(\) \{/);
@@ -3506,7 +3933,7 @@ test("creation mode has independent references count and scenario controls", asy
     creationReferenceUploadHandler,
     /setCreationSelectValue\(refs\.creationVisualLanguageInput,\s*"reference-style",\s*"classic-commercial"\)/,
   );
-  assert.match(
+  assert.doesNotMatch(
     creationStyleReferenceUploadHandler,
     /setCreationSelectValue\(refs\.creationVisualLanguageInput,\s*"reference-style",\s*"classic-commercial"\)/,
   );
@@ -3522,26 +3949,26 @@ test("creation mode has independent references count and scenario controls", asy
     creationReferenceAnalysisFormBody,
     /refs\.reasoningEffortInput|state\.config\?\.defaults\?\.reasoningEffort|"xhigh"/,
   );
+  assert.match(creationReferenceAnalysisFormBody, /formData\.set\("platform", getCreationSelectedPlatform\(\)\.value\)/);
+  assert.match(creationReferenceAnalysisFormBody, /formData\.set\("platformLabel", getCreationSelectedPlatform\(\)\.label\)/);
   assert.match(app, /function analyzeCreationReferenceImages\(\) \{/);
   assert.match(app, /async function applyCreationReferenceAnalysis\(analysis\) \{/);
-  assert.match(app, /function applyCreationReferenceAnalysisCategoryMatch\(analysis\) \{/);
+  assert.match(app, /async function applyCreationReferenceAnalysisCategoryMatch\(analysis, isCurrent = \(\) => true\) \{/);
+  assert.match(app, /await applyCreationReferenceAnalysisCategoryMatch\(normalized, isCurrent\)/);
   assert.match(app, /buildCreationReferenceAnalysisCategoryMatchText\(analysis\)/);
   assert.doesNotMatch(app, /refs\.creationProductNameInput\?\.value,[\s\S]*refs\.creationProductDescriptionInput\?\.value,[\s\S]*refs\.creationSellingPointsInput\?\.value,/);
   assert.match(app, /analysis\?\.reference_roles/);
   assert.match(app, /findCreationIndustryTemplateMatch/);
   assert.match(app, /function applyCreationReferenceAnalysisRecommendations\(\) \{/);
-  assert.match(app, /function applyCreationReferenceAnalysisVisualLanguage\(\) \{/);
-  assert.match(
-    app,
-    /function applyCreationReferenceAnalysisVisualLanguage\(\) \{\s*const analysis = state\.creationReferenceAnalysis\.result;\s*if \(!analysis \|\| state\.creationReferenceAnalysis\.dirty \|\| state\.creationReferenceAnalysis\.running\) return;/,
-  );
+  assert.doesNotMatch(app, /function applyCreationReferenceAnalysisVisualLanguage\(\) \{/);
   assert.match(app, /from "\/lib\/creation-reference-analysis-view\.mjs"/);
+  assert.match(queueModule, /const platform =\s*[\r\n]+\s*typeof getCreationSelectedPlatform === "function"\s*[\r\n]+\s*\? getCreationSelectedPlatform\(\)\s*[\r\n]+\s*: DEFAULT_CREATION_PLATFORM;/);
+  assert.match(queueModule, /platform:\s*platform\.value/);
+  assert.match(queueModule, /platformLabel:\s*platform\.label/);
   assert.match(queueModule, /const normalizedVisualLanguage = normalizeVisualLanguageForQueue\(rawVisualLanguage, normalizeCreationVisualLanguage\);/);
   assert.match(queueModule, /visualLanguage:\s*normalizedVisualLanguage\.value/);
-  assert.match(queueModule, /visualLanguageLabel:\s*formatVisualLanguageLabelForQueue\(rawVisualLanguage, normalizedVisualLanguage, formatCreationVisualLanguageLabel\)/);
-  assert.match(app, /formatCreationVisualLanguageLabel:\s*\(value\)\s*=>\s*CREATION_VISUAL_LANGUAGE_LABELS\[normalizeCreationVisualLanguage\(value\)\]/);
   assert.doesNotMatch(app, /formatCreationVisualLanguageLabel,\s*getCreationCurrentSet/);
-  assert.match(app, /visualLanguageReason:/);
+  assert.doesNotMatch(app, /visualLanguageReason:/);
   assert.match(app, /hasCreationReferenceUsageInstructionSignal/);
   assert.match(app, /hasCreationReferenceDetailSignal/);
   assert.match(app, /hasCreationReferenceProductSubjectSignal/);
@@ -3560,20 +3987,11 @@ test("creation mode has independent references count and scenario controls", asy
   assert.match(app, /normalizeCreationReferenceAnalysisRecommendation\(entry = \{\}, index = 0, skuSubjects = \[\]\)/);
   assert.match(app, /roleCorrectionReason:\s*roleCorrectionReason/);
   assert.match(app, /const appliedMessage = buildCreationReferenceAnalysisAppliedFeedbackMessage\(\{/);
-  assert.match(app, /setCreationSelectValue\(refs\.creationVisualLanguageInput,\s*analysis\.visualLanguage,\s*"classic-commercial"\)/);
-  assert.match(creationReferenceAnalysisView, /export function syncCreationReferenceVisualLanguageButton/);
-  assert.match(
-    creationReferenceAnalysisView,
-    /button\.disabled = !analysis \|\| alreadyUsingSuggestion \|\| dirty \|\| running;/,
-  );
-  assert.doesNotMatch(creationReferenceAnalysisView, /generating/);
-  assert.match(creationReferenceAnalysisView, /button\.textContent = alreadyUsingSuggestion \? "已是建议视觉语言" : "应用视觉语言"/);
-  assert.match(creationReferenceAnalysisView, /视觉语言建议/);
-  assert.match(app, /analysis\.visualLanguageLabel \|\| formatCreationVisualLanguageLabel\(analysis\.visualLanguage\)/);
-  assert.match(
-    app,
-    /appendCreationVisualLanguageSuggestionCard\(\s*refs\.creationReferenceAnalysisList,\s*analysis,\s*\{\s*formatVisualLanguageLabel:\s*formatCreationVisualLanguageLabel,?\s*\}\s*\)/,
-  );
+  assert.doesNotMatch(app, /setCreationSelectValue\(refs\.creationVisualLanguageInput,\s*analysis\.visualLanguage,\s*"classic-commercial"\)/);
+  assert.doesNotMatch(creationReferenceAnalysisView, /export function syncCreationReferenceVisualLanguageButton/);
+  assert.doesNotMatch(creationReferenceAnalysisView, /已是建议视觉语言|应用视觉语言|视觉语言建议/);
+  assert.doesNotMatch(app, /analysis\.visualLanguageLabel \|\| formatCreationVisualLanguageLabel\(analysis\.visualLanguage\)/);
+  assert.doesNotMatch(app, /appendCreationVisualLanguageSuggestionCard/);
   assert.match(app, /state\.creationReferenceAnalysis\.applied = false;/);
   assert.match(app, /state\.creationReferenceAnalysis\.applied = true;/);
   assert.match(app, /correction\.className = "creation-reference-analysis-role-correction";/);
@@ -3650,7 +4068,8 @@ test("creation mode has independent references count and scenario controls", asy
   assert.match(app, /formData\.set\("referenceImageRoles", JSON\.stringify\(buildCreationReferenceRolePayload\(\)\)\)/);
   assert.match(app, /formData\.set\("skuSubjects", JSON\.stringify\(buildCreationSkuSubjectPayload\(\)\)\)/);
   assert.match(app, /formData\.set\("skuBundleCount", refs\.creationSkuBundleCountInput\?\.value \|\| "1"\)/);
-  assert.match(app, /formData\.set\("visualLanguage", refs\.creationVisualLanguageInput\?\.value \|\| "classic-commercial"\)/);
+  assert.match(app, /formData\.set\("platform", getCreationSelectedPlatform\(\)\.value\)/);
+  assert.doesNotMatch(app, /formData\.set\("visualLanguage", refs\.creationVisualLanguageInput\?\.value \|\| "classic-commercial"\)/);
   assert.match(app, /formData\.set\("planOverrides", JSON\.stringify\(getCreationPlanOverrides\(\)\)\)/);
   assert.match(app, /creationRoleSelectionManuallyEdited:\s*false/);
   assert.match(app, /const CREATION_REFERENCE_COVERAGE_ROLE_TARGETS = \{/);
@@ -3673,7 +4092,7 @@ test("creation mode has independent references count and scenario controls", asy
   assert.match(app, /function updateCreationReferenceRole\(referenceId, role\) \{\s*state\.creationReferenceFiles = state\.creationReferenceFiles\.map\([\s\S]*?\);\s*markCreationReferenceAnalysisDirty\(\);\s*resetCreationDraftPreview\(\);\s*renderCreationReferenceGrid\(\);\s*\}/);
   assert.match(app, /refs\.creationStyleReferenceGrid\.appendChild\(\s*createReferenceAddCard\(\{[\s\S]*input:\s*refs\.creationStyleReferenceInput,[\s\S]*onFiles:\s*applyCreationStyleReferenceFiles/);
   assert.match(app, /formData\.set\("imageCount", String\(getCreationPlanPreviewImageCount\(selectedRoles\)\)\)/);
-  assert.match(app, /formData\.set\("scenario", refs\.creationScenarioInput\.value\)/);
+  assert.doesNotMatch(app, /formData\.set\("scenario", refs\.creationScenarioInput\.value\)/);
   assert.match(app, /formData\.set\("infographicRebuildEnabled", String\(isCreationInfographicRebuildRequired\(\) \|\| refs\.creationInfographicRebuildEnabledInput\?\.checked !== false\)\)/);
   assert.match(app, /formData\.set\("skuGenerationRule", getCreationSelectedSkuGenerationRule\(\)\.value\)/);
   assert.match(app, /infographicRebuildEnabled: String\(set\.infographicRebuildEnabled !== false\)/);
@@ -3682,13 +4101,13 @@ test("creation mode has independent references count and scenario controls", asy
   assert.match(app, /"color-name-under-subject": "主体下方显示颜色名"/);
   assert.match(app, /formData\.set\("industryTemplate", refs\.creationIndustryTemplateInput\.value\)/);
   assert.match(app, /\[refs\.creationProductNameInput, refs\.creationProductDescriptionInput, refs\.creationSellingPointsInput, refs\.creationDimensionSpecsInput\]\.forEach\(\(input\) => input\.addEventListener\("input", resetCreationDraftPreview\)\)/);
-  assert.match(app, /\[refs\.creationDimensionUnitModeInput, refs\.creationTargetLanguageInput, refs\.creationVisualLanguageInput\]\.forEach\(\(input\) => input\.addEventListener\("change", resetCreationDraftPreview\)\)/);
+  assert.match(app, /\[refs\.creationDimensionUnitModeInput, refs\.creationTargetLanguageInput, refs\.creationPlatformInput\]\.forEach\(\(input\) => input\?\.addEventListener\("change", resetCreationDraftPreview\)\)/);
   assert.match(app, /refs\.creationImageCountInput\.addEventListener\("change", syncCreationSelectedRolesToCount\)/);
   assert.match(app, /refs\.creationImageCountInput\.addEventListener\("click", syncCreationSelectedRolesToCurrentCount\)/);
   assert.match(app, /refs\.creationInfographicRebuildEnabledInput\?\.addEventListener\("change", resetCreationDraftPreview\)/);
   assert.match(app, /refs\.creationSkuGenerationRuleInput\?\.addEventListener\("change", resetCreationDraftPreview\)/);
   assert.match(app, /refs\.creationRoleGrid\.addEventListener\("change"/);
-  assert.match(app, /refs\.creationScenarioInput\.addEventListener\("change", syncCreationSelectedRolesToScenario\)/);
+  assert.doesNotMatch(app, /refs\.creationScenarioInput\.addEventListener\("change", syncCreationSelectedRolesToScenario\)/);
   assert.doesNotMatch(app, /refs\.creationIndustryTemplateInput\.addEventListener\("change", syncCreationSelectedRolesToIndustry\)/);
   assert.match(app, /const shouldOpenCreationIndustryTemplateBrowser = refs\.creationIndustryTemplatePopover\?\.hidden !== false;/);
   assert.match(app, /if \(shouldOpenCreationIndustryTemplateBrowser\) \{[\s\S]*focusCreationIndustryTemplateBrowserOnSelectedTemplate\(\);[\s\S]*\}[\s\S]*renderCreationIndustryTemplateBrowser\(\);[\s\S]*setCreationIndustryTemplateBrowserOpen\(shouldOpenCreationIndustryTemplateBrowser\);/);
@@ -3705,27 +4124,28 @@ test("creation mode has independent references count and scenario controls", asy
   assert.match(app, /refs\.creationRatioInput\.addEventListener\("blur", \(\) => setCreationRatioOptionLabels\(\{ expanded: false \}\)\)/);
   assert.match(app, /refs\.creationRatioInput\.addEventListener\("change", \(\) => \{[\s\S]*renderCreationSizeOptions\(\);[\s\S]*setCreationRatioOptionLabels\(\{ expanded: false \}\);[\s\S]*\}\)/);
   assert.match(app, /setCreationSelectValue\(refs\.creationDimensionUnitModeInput, normalized\.dimensionUnitMode, "both"\)/);
-  assert.match(app, /setCreationSelectValue\(refs\.creationVisualLanguageInput, normalized\.visualLanguage, "classic-commercial"\)/);
+  assert.match(app, /setCreationSelectValue\(refs\.creationPlatformInput, normalized\.platform, "universal"\)/);
+  assert.doesNotMatch(app, /setCreationSelectValue\(refs\.creationVisualLanguageInput, normalized\.visualLanguage, "classic-commercial"\)/);
   assert.match(app, /refs\.creationPlanButton\.addEventListener\("click"/);
   assert.match(app, /refs\.creationReferenceGrid\.addEventListener\("change",[\s\S]*creationReferenceRoleId/);
   assert.match(app, /refs\.creationStyleReferenceInput\.addEventListener\("change",[\s\S]*applyCreationStyleReferenceFiles/);
   assert.match(app, /refs\.creationReferenceAnalyzeButton\.addEventListener\("click"/);
   assert.match(app, /refs\.creationReferenceApplyAnalysisButton\.addEventListener\("click", applyCreationReferenceAnalysisRecommendations\)/);
-  assert.match(app, /refs\.creationReferenceApplyVisualLanguageButton\.addEventListener\("click", applyCreationReferenceAnalysisVisualLanguage\)/);
+  assert.doesNotMatch(app, /refs\.creationReferenceApplyVisualLanguageButton\.addEventListener\("click", applyCreationReferenceAnalysisVisualLanguage\)/);
   assert.match(app, /refs\.creationReferenceAnalysisToggleButton\.addEventListener\("click", toggleCreationReferenceAnalysisPanel\)/);
   const creationApplyAnalysisBody = app.match(/function applyCreationReferenceAnalysisRecommendations\(\) \{[\s\S]*?\r?\n\}\r?\n\r?\nfunction renderCreationReferenceAnalysis/)?.[0] || "";
-  assert.match(creationApplyAnalysisBody, /const previousVisualLanguage = refs\.creationVisualLanguageInput\?\.value \|\| "classic-commercial";/);
+  assert.doesNotMatch(creationApplyAnalysisBody, /previousVisualLanguage/);
   assert.match(creationApplyAnalysisBody, /syncCreationSelectedRolesToReferenceCoverage\(analysis\);/);
   assert.match(creationApplyAnalysisBody, /state\.creationReferenceAnalysis\.applied = true;/);
   assert.match(creationApplyAnalysisBody, /state\.creationReferenceAnalysis\.collapsed = true;/);
-  assert.match(creationApplyAnalysisBody, /setCreationSelectValue\(refs\.creationVisualLanguageInput,\s*previousVisualLanguage,\s*"classic-commercial"\);/);
+  assert.doesNotMatch(creationApplyAnalysisBody, /setCreationSelectValue\(refs\.creationVisualLanguageInput/);
   assert.match(creationApplyAnalysisBody, /renderCreationReferenceAnalysis\(\);/);
   assert.doesNotMatch(creationApplyAnalysisBody, /state\.creation\.generating/);
   const toggleCreationRoleBody = app.match(/function toggleCreationSelectedRole\(role\) \{[\s\S]*?\r?\n\}\r?\n\r?\nfunction getCreationPreviewSlots/)?.[0] || "";
   assert.match(toggleCreationRoleBody, /state\.creationRoleSelectionManuallyEdited = true;/);
-  const syncPresetBody = app.match(/function syncCreationSelectedRolesToPreset\(selectedRoles\) \{[\s\S]*?\r?\n\}\r?\nfunction syncCreationSelectedRolesToScenario/)?.[0] || "";
+  const syncPresetBody = app.match(/function syncCreationSelectedRolesToPreset\(selectedRoles\) \{[\s\S]*?\r?\n\}\r?\nfunction syncCreationSelectedRolesToIndustry/)?.[0] || "";
   assert.match(syncPresetBody, /if \(state\.creationRoleSelectionManuallyEdited\) \{[\s\S]*resetCreationDraftPreview\(\);[\s\S]*return;/);
-  assert.match(app, /function syncCreationSelectedRolesToScenario\(\) \{ syncCreationSelectedRolesToPreset\(getCreationRecommendedRolePreset\(\)\); \}/);
+  assert.doesNotMatch(app, /function syncCreationSelectedRolesToScenario\(\) \{ syncCreationSelectedRolesToPreset\(getCreationRecommendedRolePreset\(\)\); \}/);
   assert.match(app, /function syncCreationSelectedRolesToIndustry\(\) \{ syncCreationSelectedRolesToPreset\(getCreationRecommendedRolePreset\(\)\); \}/);
   assert.match(app, /appendCreationCoverageSummary\(card, item, \{ hideGenerationDetails \}\);/);
   assert.match(creationReferenceCoverage, /export function buildCreationCoverageSummaryText\(item = \{\}\) \{/);
@@ -4168,7 +4588,7 @@ test("creation generation can enqueue another suite while one is running", async
   assert.match(app, /body: buildCreationQueuedRepairFormData\(queueJob, \{ scope: "incomplete", set: currentSet \}\)/);
   assert.match(app, /setCreationFeedback\(`已加入队列 · 第 \$\{getPendingCreationQueueCount\(\)\} 位`, "busy"\);/);
   assert.match(app, /refs\.creationGenerateButton\.textContent = [\s\S]*\? "加入队列"[\s\S]*: "生成套图";/);
-  assert.match(app, /refs\.creationGenerateButton\.disabled = state\.creation\.planning \|\| preparingReferences;/);
+  assert.match(app, /refs\.creationGenerateButton\.disabled = shouldDisableCreationGenerateButton\(\{ planning: state\.creation\.planning, preparingReferences, effectivePlan: state\.creation\.effectivePlan \}\);/);
   assert.doesNotMatch(app, /refs\.creationGenerateButton\.disabled =[\s\S]*getPendingCreationQueueCount\(\) >= getMaxQueuedJobCount\(\);/);
   assert.doesNotMatch(app, /refs\.creationGenerateButton\.disabled = state\.creation\.generating \|\| state\.creation\.planning \|\| preparingReferences;/);
 });
@@ -4380,7 +4800,7 @@ test("asset record views include PPT records and Creation set records", async ()
   assert.match(app, /refs\.creationSellingPointsInput\.value = normalized\.sellingPoints\.join\("\\n"\);/);
   assert.match(app, /refs\.creationDimensionSpecsInput\.value = normalized\.dimensionSpecs \|\| "";/);
   assert.match(app, /setCreationSelectValue\(refs\.creationTargetLanguageInput, normalized\.targetLanguage, "en"\);/);
-  assert.match(app, /setCreationSelectValue\(refs\.creationScenarioInput, normalized\.scenario, "standard"\);/);
+  assert.match(app, /setCreationSelectValue\(refs\.creationPlatformInput, normalized\.platform, "universal"\);/);
   assert.match(app, /setCreationIndustryTemplateValue\(normalized\.industryTemplate/);
   assert.match(app, /setCreationImageCountValue\(normalized\.imageCount\);/);
   assert.match(app, /state\.creationSelectedRoles = alignCreationRoleIdsToCount\(normalizedRoles, getCreationSelectedImageCount\(\)\);/);
@@ -4696,12 +5116,15 @@ test("creation listing drafts scroll in the right output panel without collapsin
 test("creation listing agent can run automatically after full creation generation completes", async () => {
   const app = await readFile(appPath, "utf8");
 
-  assert.match(app, /function shouldAutoGenerateCreationListings\(\) \{/);
+  assert.match(
+    app,
+    /function shouldAutoGenerateCreationListings\(completedSet = getCreationCurrentSet\(\), queueJob = null\) \{/,
+  );
   assert.match(app, /refs\.creationListingAgentEnabledInput\?\.checked/);
   assert.match(app, /state\.creation\.generationScope === "full"/);
   assert.match(
     app,
-    /if \(eventName === "complete"\) \{[\s\S]*upsertCreationSetForStream\(payload\.set, context\);[\s\S]*shouldAutoGenerateCreationListings\(\)[\s\S]*setCreationFeedback\("套图生成完成，正在自动生成 Listing\.\.\.", "busy"\);[\s\S]*creationListingController\.generate\(payload\.set\.setId\)[\s\S]*setCreationFeedback\("套图与 Listing 已生成。", "success"\)/,
+    /if \(eventName === "complete"\) \{[\s\S]*upsertCreationSetForStream\(payload\.set, context\);[\s\S]*shouldAutoGenerateCreationListings\(completedSet, context\.queueJob\)[\s\S]*setCreationFeedback\("套图生成完成，正在自动生成 Listing\.\.\.", "busy"\);[\s\S]*creationListingController\.generate\(payload\.set\.setId\)[\s\S]*setCreationFeedback\("套图与 Listing 已生成。", "success"\)/,
   );
 });
 

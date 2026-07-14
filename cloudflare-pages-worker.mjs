@@ -49,8 +49,11 @@ import {
 } from "./lib/generation-stream-protocol.mjs";
 import {
   applyCreationPlanOverrides,
+  assertCreationPlanCanGenerate,
   buildCreationPlan,
+  buildCreationSubmittedPlan,
   normalizeCreationLogoOptions,
+  normalizeCreationPlatform,
   normalizeCreationReferenceRoles,
 } from "./lib/creation-planner.mjs";
 import {
@@ -62,6 +65,7 @@ import {
   buildCreationLogoBatchPlan,
 } from "./lib/creation-logo-batch.mjs";
 import { generateCreationListingDrafts } from "./lib/creation-listing-agent.mjs";
+import { getCreationListingEligibility } from "./lib/creation-listing-view.mjs";
 import { generatePptDeckOutline } from "./lib/ppt-deck-workflow.mjs";
 import { analyzePptDocument } from "./lib/ppt-document-analysis.mjs";
 import { buildSlideEditPrompt, buildSlideImagePrompts } from "./lib/ppt-slide-prompts.mjs";
@@ -88,6 +92,10 @@ import {
 import { fetchAvailableModels } from "./lib/model-list-client.mjs";
 import { runWithConcurrency } from "./lib/limited-concurrency.mjs";
 import {
+  buildCreationItemGenerationPrompt,
+  resolveCreationItemGenerationParameters,
+} from "./lib/creation-generation-parameters.mjs";
+import {
   CREATION_REFERENCE_ANALYSIS_MODE,
   PORTRAIT_REFERENCE_ANALYSIS_MODE,
   REFERENCE_ORCHESTRATION_MODE,
@@ -95,6 +103,7 @@ import {
 } from "./lib/prompt-agent.mjs";
 import { writeWorkerSseEvent } from "./lib/sse-writer.mjs";
 import {
+  appendCreationItemLogoReference,
   appendCreationStyleReferences,
   buildCreationGenerationReferenceImageLabels,
   buildCreationItemReferenceImages,
@@ -124,6 +133,9 @@ const SERVER_IMAGE_STORAGE_PREFIX = "images/";
 const GENERATION_TASK_STORAGE_PREFIX = "generation-tasks/";
 const GENERATION_REQUEST_STORAGE_PREFIX = "generation-requests/";
 const SERVER_IMAGE_RETENTION_MS = 24 * 60 * 60 * 1000;
+const SERVER_IMAGE_CUSTOM_METADATA_LIMIT_BYTES = 8192;
+const SERVER_IMAGE_CUSTOM_METADATA_SHORT_VALUE_LIMIT_BYTES = 256;
+const SERVER_IMAGE_CUSTOM_METADATA_LONG_VALUE_LIMIT_BYTES = 1024;
 const QUICK_BLEND_REFERENCE_COUNT_MESSAGE =
   "Quick Blend mode requires 2 to 4 reference images: A and B are required; C and D are optional.";
 const IMAGE_EDIT_MODE = "image-edit";
@@ -304,6 +316,8 @@ async function handlePromptAgentAnalyze(request, fetchImpl) {
       ? REFERENCE_ORCHESTRATION_REASONING_EFFORT
       : PROMPT_AGENT_ANALYSIS_REASONING_EFFORT;
   const reasoningEffort = normalizeReasoningEffort(formData.get("reasoningEffort") || reasoningFallback);
+  const platform = normalizeCreationPlatform(formData.get("platform"));
+  const platformLabel = String(formData.get("platformLabel") || platform.label).trim() || platform.label;
   const json = await requestPromptAgentAnalysis({
     baseUrl: textVisionConfig.baseUrl,
     endpointPath: textVisionConfig.endpointPath,
@@ -317,6 +331,15 @@ async function handlePromptAgentAnalyze(request, fetchImpl) {
     responsesModel: textVisionConfig.responsesModel,
     imageModel: textVisionConfig.imageModel,
     reasoningEffort,
+    contextPrompt: [
+      "套图分析上下文：",
+      `平台选择：${platformLabel}`,
+      `商品类目：${String(formData.get("industryTemplateLabel") || formData.get("industryTemplate") || "通用电商").trim() || "通用电商"}`,
+      String(formData.get("industryTemplatePath") || "").trim() ? `类目路径：${String(formData.get("industryTemplatePath")).trim()}` : "",
+      "请根据该平台和商品类型判断每张参考图最适合支持主图、详情页信息、SKU 对比、规格核对、移动端缩略图或直播/内容场景中的哪类套图生成用途。",
+    ]
+      .filter(Boolean)
+      .join("\n"),
     fetchImpl,
   });
 
@@ -580,11 +603,14 @@ function extractCloudFilenameId(idSource) {
   return normalized.length >= 4 ? normalized.slice(-4) : normalized.padStart(4, "0") || crypto.randomUUID().slice(-4);
 }
 
-function buildCloudFilename({ taskId, createdAt, format, filenameToken = "", prompt = "" }) {
+function buildCloudFilename({ taskId, createdAt, format, filenameToken = "", filenamePrefix = "", prompt = "" }) {
   const safeFormat = String(format || "png").trim().replace(/^\./, "").toLowerCase() || "png";
   const keyword = extractCloudFilenameKeyword(filenameToken || prompt || taskId, "image");
+  const prefix = String(filenamePrefix || "")
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]/g, "");
   const idTail = extractCloudFilenameId(taskId);
-  return `${formatCloudHourMinutePrefix(createdAt)}-${keyword}-${idTail}.${safeFormat}`;
+  return `${formatCloudHourMinutePrefix(createdAt)}-${prefix ? `${prefix}-` : ""}${keyword}-${idTail}.${safeFormat}`;
 }
 
 function base64ToUint8Array(base64) {
@@ -623,6 +649,21 @@ function sanitizeCreationFilenameToken(value, fallback = "creation") {
     .replace(/\s+/g, "")
     .trim();
   return token || fallback;
+}
+
+function getCreationFilenameSequence(item = {}) {
+  const slotIndex = Number.parseInt(String(item?.slotIndex || ""), 10);
+  if (Number.isFinite(slotIndex) && slotIndex > 0) {
+    return String(slotIndex);
+  }
+
+  const itemId = String(item?.itemId || "").trim();
+  const leadingSequence = itemId.match(/^\d+/)?.[0];
+  if (leadingSequence) {
+    return leadingSequence;
+  }
+
+  return itemId.match(/-(\d+)$/)?.[1] || "1";
 }
 
 function getClientSessionIdFromRequest(request, formData = null) {
@@ -774,12 +815,70 @@ function isExpiredIso(value) {
   return Number.isFinite(expiresAt) && expiresAt <= Date.now();
 }
 
+function getStoredImageMetadataByteLength(metadata) {
+  return new TextEncoder().encode(JSON.stringify(metadata)).byteLength;
+}
+
+function truncateStoredImageMetadataValue(value, maxBytes) {
+  const encoder = new TextEncoder();
+  let byteLength = 0;
+  let result = "";
+  for (const character of String(value ?? "")) {
+    const characterByteLength = encoder.encode(character).byteLength;
+    if (byteLength + characterByteLength > maxBytes) {
+      break;
+    }
+    result += character;
+    byteLength += characterByteLength;
+  }
+  return result;
+}
+
+function addStoredImageMetadataField(metadata, field, value, maxValueBytes) {
+  if (value === undefined || value === null || String(value) === "") {
+    return;
+  }
+
+  const limitedValue = truncateStoredImageMetadataValue(value, maxValueBytes);
+  const characters = Array.from(limitedValue);
+  let low = 0;
+  let high = characters.length;
+  let acceptedValue = "";
+
+  while (low <= high) {
+    const middle = Math.floor((low + high) / 2);
+    const candidateValue = characters.slice(0, middle).join("");
+    const candidate = { ...metadata, [field]: candidateValue };
+    if (getStoredImageMetadataByteLength(candidate) <= SERVER_IMAGE_CUSTOM_METADATA_LIMIT_BYTES) {
+      acceptedValue = candidateValue;
+      low = middle + 1;
+    } else {
+      high = middle - 1;
+    }
+  }
+
+  if (acceptedValue) {
+    metadata[field] = acceptedValue;
+  }
+}
+
+function addStoredImageMetadataJsonField(metadata, field, value) {
+  const serializedValue = JSON.stringify(value);
+  if (
+    new TextEncoder().encode(serializedValue).byteLength > SERVER_IMAGE_CUSTOM_METADATA_LONG_VALUE_LIMIT_BYTES ||
+    getStoredImageMetadataByteLength({ ...metadata, [field]: serializedValue }) >
+      SERVER_IMAGE_CUSTOM_METADATA_LIMIT_BYTES
+  ) {
+    return;
+  }
+  metadata[field] = serializedValue;
+}
+
 function buildStoredImageMetadata({ filename, createdAt, expiresAt, item = {} }) {
-  const metadata = {
-    filename: String(filename || ""),
-    createdAt: String(createdAt || ""),
-    expiresAt: String(expiresAt || ""),
-  };
+  const metadata = {};
+  addStoredImageMetadataField(metadata, "filename", filename, SERVER_IMAGE_CUSTOM_METADATA_SHORT_VALUE_LIMIT_BYTES);
+  addStoredImageMetadataField(metadata, "createdAt", createdAt, SERVER_IMAGE_CUSTOM_METADATA_SHORT_VALUE_LIMIT_BYTES);
+  addStoredImageMetadataField(metadata, "expiresAt", expiresAt, SERVER_IMAGE_CUSTOM_METADATA_SHORT_VALUE_LIMIT_BYTES);
   const optionalFields = [
     "generationMode",
     "assetKind",
@@ -792,11 +891,14 @@ function buildStoredImageMetadata({ filename, createdAt, expiresAt, item = {} })
     "quickBlendPlacementShape",
     "referenceImageName",
     "sourceImageName",
-    "editInstruction",
     "editMode",
     "executionStrategy",
     "ratio",
     "ratioLabel",
+    "resolutionTier",
+    "requestedSize",
+    "effectiveSize",
+    "targetLanguage",
     "size",
     "quality",
     "format",
@@ -806,20 +908,41 @@ function buildStoredImageMetadata({ filename, createdAt, expiresAt, item = {} })
   ];
 
   for (const field of optionalFields) {
-    const value = item[field];
-    if (value !== undefined && value !== null && String(value) !== "") {
-      metadata[field] = String(value);
-    }
+    addStoredImageMetadataField(
+      metadata,
+      field,
+      item[field],
+      SERVER_IMAGE_CUSTOM_METADATA_SHORT_VALUE_LIMIT_BYTES,
+    );
   }
 
   if (Array.isArray(item.referenceImageNames) && item.referenceImageNames.length > 0) {
-    metadata.referenceImageNames = JSON.stringify(item.referenceImageNames.map((value) => String(value)));
+    addStoredImageMetadataJsonField(
+      metadata,
+      "referenceImageNames",
+      item.referenceImageNames.map((value) => String(value)),
+    );
   }
   if (Number(item.regionCount || 0) > 0) {
-    metadata.regionCount = String(Number(item.regionCount));
+    addStoredImageMetadataField(
+      metadata,
+      "regionCount",
+      Number(item.regionCount),
+      SERVER_IMAGE_CUSTOM_METADATA_SHORT_VALUE_LIMIT_BYTES,
+    );
+  }
+
+  const longFields = ["prompt", "editInstruction", "generationPrompt"];
+  for (const field of longFields) {
+    addStoredImageMetadataField(
+      metadata,
+      field,
+      item[field],
+      SERVER_IMAGE_CUSTOM_METADATA_LONG_VALUE_LIMIT_BYTES,
+    );
   }
   if (Array.isArray(item.regionInstructions) && item.regionInstructions.length > 0) {
-    metadata.regionInstructions = JSON.stringify(item.regionInstructions);
+    addStoredImageMetadataJsonField(metadata, "regionInstructions", item.regionInstructions);
   }
 
   return metadata;
@@ -2256,7 +2379,20 @@ function buildCloudCreationSet({ setId, plan, createdAt, updatedAt, status, item
     dimensionUnitModeLabel: plan.dimensionUnitModeLabel,
     targetLanguage: plan.targetLanguage,
     targetLanguageLabel: plan.targetLanguageLabel,
+    platform: plan.platform,
+    platformLabel: plan.platformLabel,
+    strategyVersion: plan.strategyVersion || "",
+    platformPolicyId: plan.platformPolicyId || plan.platform || "",
+    platformEvidenceLevel: plan.platformEvidenceLevel || "",
+    platformProvenance: plan.platformProvenance || "explicit",
+    platformSetOverrides: plan.platformSetOverrides || plan.setOverrides || {},
+    platformItemOverrides: plan.platformItemOverrides || {},
     imageCount: plan.imageCount,
+    carouselImageCount: plan.carouselImageCount ?? plan.imageCount,
+    skuImageCount: plan.skuImageCount ?? items.filter((item) => item.role === "sku").length,
+    infographicRebuildCount:
+      plan.infographicRebuildCount ?? items.filter((item) => item.role === "infographic-rebuild").length,
+    totalPlannedItemCount: plan.totalPlannedItemCount ?? items.length,
     scenario: plan.scenario,
     scenarioLabel: plan.scenarioLabel,
     visualLanguage: plan.visualLanguage,
@@ -2273,6 +2409,7 @@ function buildCloudCreationSet({ setId, plan, createdAt, updatedAt, status, item
     skuGenerationRule: plan.skuGenerationRule || "none",
     skuGenerationRuleLabel: plan.skuGenerationRuleLabel || "无",
     logo: plan.logo || null,
+    effectivePlan: plan.effectivePlan || plan,
     createdAt,
     updatedAt: updatedAt || createdAt,
     status,
@@ -2290,6 +2427,7 @@ function buildCloudCreationFilename({ setId, item, createdAt, format }) {
     createdAt,
     format,
     filenameToken,
+    filenamePrefix: getCreationFilenameSequence(item),
     prompt: item.prompt || item.title,
   });
 }
@@ -2336,12 +2474,19 @@ function buildCreationPlanFromFormData(formData) {
     dimensionSpecs: formData.get("dimensionSpecs"),
     dimensionUnitMode: formData.get("dimensionUnitMode"),
     targetLanguage: formData.get("targetLanguage"),
+    platform: formData.get("platform"),
     imageCount: formData.get("imageCount"),
     scenario: formData.get("scenario"),
     visualLanguage: formData.get("visualLanguage"),
     industryTemplate: formData.get("industryTemplate"),
+    categorySignals: formData.get("categorySignals"),
     selectedRoles: formData.get("selectedRoles"),
     referenceImageRoles,
+    platformReferenceCoverage: formData.get("platformReferenceCoverage"),
+    platformEvidence: formData.get("platformEvidence"),
+    platformSetOverrides: formData.get("platformSetOverrides"),
+    platformItemOverrides: formData.get("platformItemOverrides"),
+    audienceStrategy: formData.get("audienceStrategy"),
     infographicRebuildEnabled: formData.get("infographicRebuildEnabled"),
     skuSubjects: formData.get("skuSubjects"),
     skuBundleCount: formData.get("skuBundleCount"),
@@ -2377,6 +2522,11 @@ async function handleCreationReferenceAnalyze(request, fetchImpl) {
   const reasoningEffort = normalizeReasoningEffort(
     formData.get("reasoningEffort") || CREATION_REFERENCE_ANALYSIS_REASONING_EFFORT,
   );
+  const platform = normalizeCreationPlatform(formData.get("platform"));
+  const platformLabel = String(formData.get("platformLabel") || platform.label).trim() || platform.label;
+  const industryTemplateLabel =
+    String(formData.get("industryTemplateLabel") || formData.get("industryTemplate") || "通用电商").trim() || "通用电商";
+  const industryTemplatePath = String(formData.get("industryTemplatePath") || "").trim();
   const analysis = await requestPromptAgentAnalysis({
     baseUrl: textVisionConfig.baseUrl,
     endpointPath: textVisionConfig.endpointPath,
@@ -2388,6 +2538,18 @@ async function handleCreationReferenceAnalyze(request, fetchImpl) {
     responsesModel: textVisionConfig.responsesModel,
     imageModel: textVisionConfig.imageModel,
     reasoningEffort,
+    contextPrompt: [
+      "套图分析上下文：",
+      `平台选择：${platformLabel}`,
+      `商品类目：${industryTemplateLabel}`,
+      industryTemplatePath ? `类目路径：${industryTemplatePath}` : "",
+      String(formData.get("productName") || "").trim() ? `商品名称：${String(formData.get("productName")).trim()}` : "",
+      String(formData.get("productDescription") || "").trim() ? `商品描述：${String(formData.get("productDescription")).trim()}` : "",
+      String(formData.get("sellingPoints") || "").trim() ? `核心卖点：${String(formData.get("sellingPoints")).trim()}` : "",
+      "请根据该平台和商品类型判断每张参考图最适合支持主图、详情页信息、SKU 对比、规格核对、移动端缩略图或直播/内容场景中的哪类套图生成用途。",
+    ]
+      .filter(Boolean)
+      .join("\n"),
     fetchImpl,
   });
 
@@ -2520,11 +2682,6 @@ function buildCloudPortraitFilename({ setId, item, createdAt, format }) {
 }
 
 async function runCreationGenerate(request, writer, { fetchImpl, imageBucket } = {}) {
-  if (!imageBucket) {
-    await writeSseEvent(writer, "error", { message: SERVER_IMAGE_BUCKET_MISSING_MESSAGE });
-    return;
-  }
-
   const formData = await request.formData();
   const setId = `creation-set-${crypto.randomUUID()}`;
   const createdAt = new Date().toISOString();
@@ -2554,45 +2711,73 @@ async function runCreationGenerate(request, writer, { fetchImpl, imageBucket } =
   }
   const referenceImageNames = referenceImages.map((image) => image.filename).filter(Boolean);
   const referenceImageRoles = normalizeCreationReferenceRoles(formData.get("referenceImageRoles"));
-  let plan = buildCreationPlan({
+  let plan = buildCreationSubmittedPlan({
     productName: formData.get("productName"),
     productDescription: formData.get("productDescription"),
     sellingPoints: formData.get("sellingPoints"),
     dimensionSpecs: formData.get("dimensionSpecs"),
     dimensionUnitMode: formData.get("dimensionUnitMode"),
     targetLanguage: formData.get("targetLanguage"),
+    platform: formData.get("platform"),
     imageCount: formData.get("imageCount"),
     scenario: formData.get("scenario"),
     visualLanguage: formData.get("visualLanguage"),
     industryTemplate: formData.get("industryTemplate"),
+    categorySignals: formData.get("categorySignals"),
     selectedRoles: formData.get("selectedRoles"),
     referenceImageRoles,
+    platformReferenceCoverage: formData.get("platformReferenceCoverage"),
+    platformEvidence: formData.get("platformEvidence"),
+    platformSetOverrides: formData.get("platformSetOverrides"),
+    platformItemOverrides: formData.get("platformItemOverrides"),
+    audienceStrategy: formData.get("audienceStrategy"),
+    effectivePlan: formData.get("effectivePlan"),
+    planOverrides: formData.get("planOverrides"),
     infographicRebuildEnabled: formData.get("infographicRebuildEnabled"),
     skuSubjects: formData.get("skuSubjects"),
     skuBundleCount: formData.get("skuBundleCount"),
     skuGenerationRule: formData.get("skuGenerationRule"),
     logoOptions: buildCreationLogoOptionsFromFormData(formData, logoImage),
   });
-  plan = applyCreationPlanOverrides(plan, formData.get("planOverrides"));
+  assertCreationPlanCanGenerate(plan);
+
+  if (!imageBucket) {
+    await writeSseEvent(writer, "error", { message: SERVER_IMAGE_BUCKET_MISSING_MESSAGE });
+    return;
+  }
+
   const config = normalizePrivateConfig(formData, { allowDirectImageRoute: true });
   const generationConfig = getSelectedImageGenerationConfig(config);
-  const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || "1:1"));
-  const requestedSizeInput = String(formData.get("size") || "auto").trim().toLowerCase();
-  const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
+  const fallbackRatio = String(formData.get("ratio") || "1:1");
+  const fallbackSize = String(formData.get("size") || "auto").trim();
   const finalQuality = config.defaults.quality;
   const finalFormat = normalizeOutputFormat(formData.get("format") || config.defaults.format);
   const reasoningEffort = normalizeReasoningEffort(
     formData.get("reasoningEffort") || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
   );
-  let items = plan.items.map((item) => ({
-    ...item,
-    status: "queued",
-    filename: "",
-    relativePath: "",
-    imageUrl: "",
-    thumbnailUrl: "",
-    error: "",
-  }));
+  let items = plan.items.map((item) => {
+    const parameters = resolveCreationItemGenerationParameters(item, {
+      imageRoute: generationConfig.imageRoute,
+      fallbackRatio,
+      fallbackSize,
+      fallbackTargetLanguage: plan.targetLanguage,
+    });
+    return {
+      ...item,
+      ratio: parameters.ratioOption.value,
+      ratioLabel: parameters.ratioOption.label,
+      resolutionTier: parameters.resolutionTier,
+      requestedSize: parameters.requestedSize,
+      effectiveSize: parameters.finalSize,
+      targetLanguage: parameters.targetLanguage,
+      status: "queued",
+      filename: "",
+      relativePath: "",
+      imageUrl: "",
+      thumbnailUrl: "",
+      error: "",
+    };
+  });
   let set = buildCloudCreationSet({
     setId,
     plan,
@@ -2608,29 +2793,49 @@ async function runCreationGenerate(request, writer, { fetchImpl, imageBucket } =
   await runWithConcurrency(plan.items, MAX_PARALLEL_TASKS_PER_SESSION, async (item) => {
     const generationStartedAt = new Date().toISOString();
     const generationStartedAtMs = Date.now();
+    const itemGenerationParameters = resolveCreationItemGenerationParameters(item, {
+      imageRoute: generationConfig.imageRoute,
+      fallbackRatio,
+      fallbackSize,
+      fallbackTargetLanguage: plan.targetLanguage,
+    });
+    let finalPrompt = "";
     let finalBase64 = "";
 
     try {
+      finalPrompt = buildCreationItemGenerationPrompt(item.prompt, itemGenerationParameters);
       items = items.map((entry) =>
         entry.itemId === item.itemId ? { ...entry, status: "generating", generationStartedAt } : entry,
       );
-      await writeSseEvent(writer, "item_started", { setId, itemId: item.itemId, role: item.role });
+      await writeSseEvent(writer, "item_started", {
+        setId,
+        itemId: item.itemId,
+        role: item.role,
+        ratio: itemGenerationParameters.ratioOption.value,
+        requestedSize: itemGenerationParameters.requestedSize,
+        effectiveSize: itemGenerationParameters.finalSize,
+        targetLanguage: itemGenerationParameters.targetLanguage,
+      });
 
       const itemReferenceImages = buildCreationItemReferenceImages(item, referenceImages, plan.referenceImageRoles);
       const itemGenerationReferenceImages = appendCreationStyleReferences(itemReferenceImages, styleReferenceImages);
-      const itemGenerationReferenceImagesWithLogo = appendCreationLogoReference(itemGenerationReferenceImages, logoImage);
+      const itemGenerationReferenceImagesWithLogo = appendCreationItemLogoReference(
+        item,
+        itemGenerationReferenceImages,
+        logoImage,
+      );
       const generationResult = await requestCloudImageGeneration({
         baseUrl: generationConfig.baseUrl,
         apiKey: generationConfig.apiKey,
-        prompt: appendRatioHintToPrompt(item.prompt, ratioOption),
+        prompt: finalPrompt,
         referenceImages: itemGenerationReferenceImagesWithLogo,
         referenceImageLabels: buildCreationGenerationReferenceImageLabels(
           itemReferenceImages,
           plan.referenceImageRoles,
           styleReferenceImages,
         ),
-        size: finalSize,
-        aspectRatio: ratioOption.value,
+        size: itemGenerationParameters.finalSize,
+        aspectRatio: itemGenerationParameters.ratioOption.value,
         quality: finalQuality,
         format: toApiOutputFormat(finalFormat),
         responsesModel: generationConfig.responsesModel,
@@ -2647,6 +2852,9 @@ async function runCreationGenerate(request, writer, { fetchImpl, imageBucket } =
               itemId: item.itemId,
               stage: event.stage,
               message: event.message,
+              ratio: itemGenerationParameters.ratioOption.value,
+              effectiveSize: itemGenerationParameters.finalSize,
+              targetLanguage: itemGenerationParameters.targetLanguage,
             });
             return;
           }
@@ -2666,6 +2874,9 @@ async function runCreationGenerate(request, writer, { fetchImpl, imageBucket } =
               setId,
               itemId: item.itemId,
               dataUrl: makeImageDataUrl(event.base64, finalFormat),
+              ratio: itemGenerationParameters.ratioOption.value,
+              effectiveSize: itemGenerationParameters.finalSize,
+              targetLanguage: itemGenerationParameters.targetLanguage,
             });
           }
         },
@@ -2678,7 +2889,7 @@ async function runCreationGenerate(request, writer, { fetchImpl, imageBucket } =
 
       const generationCompletedAt = new Date().toISOString();
       const generationDurationMs = Math.max(0, Date.now() - generationStartedAtMs);
-      const savedSize = generationResult.effectiveSize || finalSize;
+      const savedSize = generationResult.effectiveSize || itemGenerationParameters.finalSize;
       const filename = buildCloudCreationFilename({ setId, item, createdAt, format: finalFormat });
       const storedImage = await storeFinalImage({
         imageBucket,
@@ -2686,6 +2897,7 @@ async function runCreationGenerate(request, writer, { fetchImpl, imageBucket } =
         createdAt,
         format: finalFormat,
         base64: finalBase64,
+        item: { ...item, generationPrompt: finalPrompt, ...itemGenerationParameters, ratio: itemGenerationParameters.ratioOption.value, effectiveSize: savedSize, targetLanguage: itemGenerationParameters.targetLanguage },
       });
 
       items = items.map((entry) =>
@@ -2701,8 +2913,15 @@ async function runCreationGenerate(request, writer, { fetchImpl, imageBucket } =
               generationStartedAt,
               generationCompletedAt,
               generationDurationMs,
+              generationPrompt: finalPrompt,
+              ratio: itemGenerationParameters.ratioOption.value,
+              ratioLabel: itemGenerationParameters.ratioOption.label,
+              resolutionTier: itemGenerationParameters.resolutionTier,
+              requestedSize: itemGenerationParameters.requestedSize,
+              effectiveSize: savedSize,
               size: savedSize,
               format: finalFormat,
+              targetLanguage: itemGenerationParameters.targetLanguage,
             }
           : entry,
       );
@@ -2723,7 +2942,9 @@ async function runCreationGenerate(request, writer, { fetchImpl, imageBucket } =
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       items = items.map((entry) =>
-        entry.itemId === item.itemId ? { ...entry, status: "failed", error: message } : entry,
+        entry.itemId === item.itemId
+          ? { ...entry, status: "failed", error: message, generationPrompt: finalPrompt }
+          : entry,
       );
       set = buildCloudCreationSet({
         setId,
@@ -3921,6 +4142,13 @@ async function handleCloudCreationListings(request, { env = {}, fetchImpl = fetc
   const setId = String(set?.setId || "").trim();
   if (!setId) {
     return jsonResponse({ ok: false, message: "Missing Creation set metadata." }, 400);
+  }
+
+  if (!getCreationListingEligibility(set).eligible) {
+    return jsonResponse({
+      ok: false,
+      message: "Amazon US Listing is only available for Amazon Creation sets or eligible legacy records.",
+    }, 400);
   }
 
   const mock = env.IMAGE_STUDIO_MOCK_LISTING_AGENT === "1" || payload.mock === true;

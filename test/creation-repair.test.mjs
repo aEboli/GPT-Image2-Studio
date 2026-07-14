@@ -171,6 +171,21 @@ test("creation repair keeps existing prompt when overrides are blank", () => {
   assert.equal(item.marketingCopy, "Original copy");
 });
 
+test("creation repair preserves frozen per-item conversion intent", () => {
+  const [item] = refreshCreationRepairItemsFromPlan(
+    [{ itemId: "benefit", role: "benefit", prompt: "Frozen prompt" }],
+    {
+      __frozenEffectivePlan: true,
+      items: [{
+        itemId: "benefit",
+        role: "benefit",
+        conversionIntent: { conversionGoal: "用证据降低顾虑", objectionFocus: "担心尺寸" },
+      }],
+    },
+  );
+  assert.deepEqual(item.conversionIntent, { conversionGoal: "用证据降低顾虑", objectionFocus: "担心尺寸" });
+});
+
 test("creation repair rebuilds targeted prompts when current visual language differs from stored set", () => {
   const set = {
     productName: "Jointed fishing lure",
@@ -206,6 +221,43 @@ test("creation repair rebuilds targeted prompts when current visual language dif
   assert.match(item.prompt, /warm tactile handcrafted setting/);
   assert.doesNotMatch(item.prompt, /Old scene prompt/);
   assert.doesNotMatch(item.prompt, /polished commercial lighting/);
+});
+
+test("creation repair rebuilds targeted prompts when current platform differs from stored set", () => {
+  const set = {
+    productName: "Jointed fishing lure",
+    productDescription: "Segmented lifelike lure for bass fishing",
+    sellingPoints: ["realistic swim action"],
+    targetLanguage: "en",
+    imageCount: 2,
+    platform: "universal",
+    scenario: "standard",
+    visualLanguage: "classic-commercial",
+    industryTemplate: "general",
+    selectedRoles: ["hero", "scene"],
+    items: [
+      {
+        itemId: "1-hero",
+        slotIndex: 1,
+        role: "hero",
+        title: "Hero image",
+        prompt: "Old universal platform prompt.",
+        status: "failed",
+      },
+    ],
+  };
+
+  assert.equal(hasCreationRepairPlanningOverride(set, { platform: "amazon" }), true);
+  assert.equal(hasCreationRepairPlanningOverride(set, { platform: "universal" }), false);
+
+  const plan = buildCreationRepairPlan(set, { platform: "amazon" });
+  const [item] = refreshCreationRepairItemsFromPlan(set.items, plan);
+
+  assert.equal(plan.platform, "amazon");
+  assert.equal(plan.platformLabel, "Amazon");
+  assert.match(item.prompt, /PLATFORM FIT ANALYSIS: Platform: Amazon/);
+  assert.match(item.prompt, /Amazon-style marketplace priorities/);
+  assert.doesNotMatch(item.prompt, /Old universal platform prompt/);
 });
 
 test("creation repair treats current selling point input as a planning override", () => {

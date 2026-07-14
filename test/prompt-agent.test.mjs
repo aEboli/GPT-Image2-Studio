@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import {
+  CREATION_REFERENCE_ANALYSIS_JSON_SCHEMA,
   CREATION_REFERENCE_ANALYSIS_MODE,
   PORTRAIT_REFERENCE_ANALYSIS_JSON_SCHEMA,
   PORTRAIT_REFERENCE_ANALYSIS_MODE,
@@ -358,6 +359,7 @@ test("prompt agent request can identify ecommerce creation reference roles", () 
     mode: "creation-reference-analysis",
     responsesModel: "gpt-5.4",
     reasoningEffort: "high",
+    contextPrompt: "平台：Amazon。商品类型：数码电子 > 手机通讯 > 手机。",
   });
 
   assert.match(input[0].content[0].text, /套图参考图识别/);
@@ -386,13 +388,24 @@ test("prompt agent request can identify ecommerce creation reference roles", () 
   assert.ok(requestBody.text.format.schema.required.includes("reference_roles"));
   assert.ok(requestBody.text.format.schema.required.includes("sku_subjects"));
   assert.ok(requestBody.text.format.schema.required.includes("product_name"));
+  assert.ok(requestBody.text.format.schema.required.includes("audience_strategy"));
+  assert.deepEqual(
+    requestBody.text.format.schema.properties.audience_strategy.required,
+    ["target_audience", "purchase_motivations", "purchase_objections", "desired_outcome", "evidence_basis", "confidence", "source"],
+  );
+  assert.match(input[0].content[0].text, /敏感属性|sensitive/i);
+  assert.match(input[0].content[0].text, /购买动机|purchase motivations/i);
+  assert.match(requestBody.input[0].content[1].text, /平台：Amazon/);
+  assert.match(requestBody.input[0].content[1].text, /商品类型：数码电子/);
   assert.match(input[0].content[0].text, /product_name/i);
   assert.match(input[0].content[0].text, /main sellable product subject/i);
   assert.match(input[0].content[0].text, /put that subject name in product_name/i);
   assert.ok(requestBody.text.format.schema.required.includes("category_hint"));
-  assert.ok(requestBody.text.format.schema.required.includes("visual_language"));
+  assert.ok(!requestBody.text.format.schema.required.includes("visual_language"));
+  assert.equal(requestBody.text.format.schema.properties.visual_language, undefined);
+  assert.equal(requestBody.text.format.schema.properties.visual_language_reason, undefined);
+  assert.match(input[0].content[0].text, /不要输出视觉语言建议/);
   assert.match(requestBody.text.format.schema.properties.product_name.description, /main sellable product subject/i);
-  assert.deepEqual(requestBody.text.format.schema.properties.visual_language.enum, ["classic-commercial", "reference-style"]);
   assert.ok(requestBody.text.format.schema.properties.reference_roles.items.properties.role.enum.includes("dimensions"));
   assert.ok(requestBody.text.format.schema.properties.reference_roles.items.properties.role.enum.includes("usage"));
   assert.ok(requestBody.text.format.schema.properties.reference_roles.items.properties.role.enum.includes("reference-product"));
@@ -434,6 +447,38 @@ test("prompt agent request can identify ecommerce creation reference roles", () 
   );
   assert.match(requestBody.text.format.schema.properties.sku_subjects.items.properties.filenames.description, /same grouped sellable product subject/i);
   assert.match(input[0].content[0].text, /SKU/);
+});
+
+test("creation reference analysis normalizes an evidence-bounded audience strategy", () => {
+  const result = extractPromptAgentJson(JSON.stringify({
+    summary: "适合通勤场景的便携商品",
+    product_name: "便携咖啡杯",
+    category_hint: "咖啡杯",
+    category_path: "家居生活 > 饮具 > 咖啡杯",
+    reference_roles: [{ index: 1, filename: "cup.png", role: "product", note: "可见密封杯盖" }],
+    sku_subjects: [],
+    audience_strategy: {
+      target_audience: "需要通勤携带饮品的使用者",
+      purchase_motivations: ["便于携带", "减少洒漏"],
+      purchase_objections: ["担心杯盖密封性"],
+      desired_outcome: "通勤途中更从容地携带饮品",
+      evidence_basis: ["参考图可见密封杯盖"],
+      confidence: "medium",
+      source: "analysis-suggestion",
+    },
+    risks: [],
+  }));
+
+  assert.deepEqual(result.audience_strategy, {
+    target_audience: "需要通勤携带饮品的使用者",
+    purchase_motivations: ["便于携带", "减少洒漏"],
+    purchase_objections: ["担心杯盖密封性"],
+    desired_outcome: "通勤途中更从容地携带饮品",
+    evidence_basis: ["参考图可见密封杯盖"],
+    confidence: "medium",
+    source: "analysis-suggestion",
+  });
+  assert.equal(CREATION_REFERENCE_ANALYSIS_JSON_SCHEMA.properties.audience_strategy.additionalProperties, false);
 });
 
 test("prompt agent creation reference analysis supports fifteen ordered references", () => {
@@ -513,8 +558,6 @@ test("prompt agent preserves creation reference product name", () => {
               product_name: "双肩背包",
               category_hint: "",
               category_path: "",
-              visual_language: "classic-commercial",
-              visual_language_reason: "",
               reference_roles: [
                 { index: 1, filename: "front.png", role: "product", note: "Backpack product subject." },
               ],
@@ -551,8 +594,6 @@ test("prompt agent fills missing creation product name from SKU subject title", 
               product_name: "",
               category_hint: "",
               category_path: "",
-              visual_language: "classic-commercial",
-              visual_language_reason: "",
               reference_roles: [
                 { index: 1, filename: "front.png", role: "product", note: "Lunch bag product subject." },
               ],
@@ -590,8 +631,6 @@ test("prompt agent fills missing creation product name from analyzed subject", (
               product_subject: "foldable camping table",
               category_hint: "Camping table",
               category_path: "Sports > Camping > Camp Furniture > Camping Tables",
-              visual_language: "classic-commercial",
-              visual_language_reason: "",
               reference_roles: [
                 { index: 1, filename: "table.png", role: "product", note: "Foldable camping table product subject." },
               ],
@@ -687,7 +726,7 @@ test("prompt agent lifts grouped SKU subject unit count from note evidence", () 
   assert.equal(result.sku_subjects[0].subject_unit_count, 2);
 });
 
-test("prompt agent normalizes creation reference visual language recommendation", () => {
+test("prompt agent ignores legacy creation reference visual language recommendation", () => {
   const result = extractPromptAgentJson({
     output: [
       {
@@ -713,8 +752,8 @@ test("prompt agent normalizes creation reference visual language recommendation"
     ],
   });
 
-  assert.equal(result.visual_language, "reference-style");
-  assert.equal(result.visual_language_reason, "参考图主要提供光线、背景和构图风格。");
+  assert.equal(result.visual_language, undefined);
+  assert.equal(result.visual_language_reason, undefined);
 });
 
 test("prompt agent keeps original filenames for unnamed creation SKU subjects", () => {
@@ -1115,8 +1154,6 @@ test("prompt agent retries creation reference analysis when the model returns pr
     summary: "Fishing lure reference set.",
     category_hint: "Fishing Lures",
     category_path: "Sports > Fishing > Fishing Lures",
-    visual_language: "classic-commercial",
-    visual_language_reason: "Product references use clean ecommerce photography.",
     reference_roles: [
       {
         index: 1,

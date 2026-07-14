@@ -284,12 +284,17 @@ function scalePixelVariables(variables, factor) {
 
 export function getStudioLayoutMode(viewport = {}) {
   const layoutWidth = resolveLayoutViewportWidth(viewport);
+  const layoutHeight = normalizePositiveNumber(viewport.height);
 
   if (layoutWidth <= 640) {
     return "mobile";
   }
 
   if (layoutWidth <= 1024) {
+    const isLandscape = layoutHeight > 0 && layoutWidth >= layoutHeight;
+    if (layoutWidth >= 900 && isLandscape && layoutHeight < 600) {
+      return "stacked";
+    }
     return "tablet";
   }
 

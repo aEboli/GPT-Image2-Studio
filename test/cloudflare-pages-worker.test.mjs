@@ -35,15 +35,20 @@ function parseSseEvents(text) {
     .filter(Boolean);
 }
 
-function makeImageBucket() {
+function makeImageBucket({ customMetadataByteLimit = Number.POSITIVE_INFINITY } = {}) {
   const objects = new Map();
   return {
     objects,
     async put(key, value, options = {}) {
+      const customMetadata = options.customMetadata || {};
+      const customMetadataBytes = new TextEncoder().encode(JSON.stringify(customMetadata)).byteLength;
+      if (customMetadataBytes > customMetadataByteLimit) {
+        throw new Error(`R2 custom metadata exceeds ${customMetadataByteLimit} bytes`);
+      }
       objects.set(key, {
         body: value,
         httpMetadata: options.httpMetadata || {},
-        customMetadata: options.customMetadata || {},
+        customMetadata,
       });
     },
     async get(key) {
@@ -405,6 +410,7 @@ test("Cloudflare generation uses browser-provided API settings without echoing t
   assert.match(savedEvent.payload.item.generationStartedAt, /^\d{4}-\d{2}-\d{2}T/);
   assert.match(savedEvent.payload.item.generationCompletedAt, /^\d{4}-\d{2}-\d{2}T/);
   assert.equal(imageBucket.objects.size, 1);
+  assert.equal([...imageBucket.objects.values()][0].customMetadata.prompt, "Create a simple product poster");
   assert.doesNotMatch(text, /data:image\/png;base64,ZmluYWw=/);
   assert.doesNotMatch(text, /test-browser-key/);
 });
@@ -601,10 +607,71 @@ test("Cloudflare creation filenames use Chinese image type names", async () => {
   const filenames = complete.payload.set.items.map((item) => item.filename).join("\n");
 
   assert.equal(response.status, 200);
-  assert.match(complete.payload.set.items[0].filename, /^\d{4}-首图成交主-[a-z0-9]{4}\.png$/u);
-  assert.match(complete.payload.set.items[1].filename, /^\d{4}-痛点图-[a-z0-9]{4}\.png$/u);
+  assert.match(complete.payload.set.items[0].filename, /^\d{4}-1-首图成交主-[a-z0-9]{4}\.png$/u);
+  assert.match(complete.payload.set.items[1].filename, /^\d{4}-2-痛点图-[a-z0-9]{4}\.png$/u);
   assert.doesNotMatch(filenames, /(?:^|-)hero(?:-|\.|$)|(?:^|-)after(?:-|\.|$)|(?:^|-)sales(?:-|\.|$)/i);
+  assert.equal(complete.payload.set.platformProvenance, "legacy-missing");
   assert.equal(imageBucket.objects.size, 2);
+});
+
+test("Cloudflare Amazon creation stays below the R2 custom metadata limit and freezes the full plan", async () => {
+  const imageBucket = makeImageBucket({ customMetadataByteLimit: 8192 });
+  const formData = new FormData();
+  formData.set("productName", "Amazon Travel Bottle");
+  formData.set("productDescription", "Stainless steel 12 oz travel bottle with a leakproof lid");
+  formData.set("sellingPoints", "durable steel\nleakproof lid\nincludes one bottle and lid");
+  formData.set("dimensionSpecs", "12 oz; 8 x 3 in");
+  formData.set("platform", "amazon");
+  formData.set("platformSetOverrides", JSON.stringify({ imageCount: 4, targetLanguage: "en" }));
+  formData.set(
+    "platformItemOverrides",
+    JSON.stringify([{ slotKey: "amazon:benefit-proof", composition: "comparison-layout" }]),
+  );
+  formData.set("industryTemplate", "general");
+  formData.set("ratio", "1:1");
+  formData.set("size", "1024x1024");
+  formData.set("format", "png");
+  formData.set("baseUrl", "https://example.test/v1");
+  formData.set("apiKey", "test-browser-key");
+  formData.set("responsesModel", "gpt-5.5");
+
+  const response = await handleApiRequest(
+    new Request("https://studio.example/api/creation/generate", { method: "POST", body: formData }),
+    {
+      imageBucket,
+      async fetchImpl() {
+        return makeSseResponse();
+      },
+    },
+  );
+  const complete = parseSseEvents(await response.text()).find((event) => event.eventName === "complete");
+  const set = complete?.payload?.set;
+
+  assert.equal(response.status, 200);
+  assert.equal(set?.status, "completed");
+  assert.equal(imageBucket.objects.size, set.items.length);
+  for (const object of imageBucket.objects.values()) {
+    assert.ok(new TextEncoder().encode(JSON.stringify(object.customMetadata)).byteLength <= 8192);
+    assert.ok(new TextEncoder().encode(object.customMetadata.prompt || "").byteLength <= 1024);
+    assert.ok(new TextEncoder().encode(object.customMetadata.generationPrompt || "").byteLength <= 1024);
+  }
+  assert.ok([...imageBucket.objects.values()].some((object) => object.customMetadata.prompt));
+  assert.ok([...imageBucket.objects.values()].some((object) => object.customMetadata.generationPrompt));
+
+  assert.match(set.strategyVersion, /^\d{4}-\d{2}-\d{2}\.\d+$/u);
+  assert.equal(set.platformPolicyId, "amazon");
+  assert.equal(set.platformEvidenceLevel, "A");
+  assert.equal(set.platformProvenance, "explicit");
+  assert.deepEqual(set.platformSetOverrides, { imageCount: 4, targetLanguage: "en" });
+  assert.deepEqual(set.platformItemOverrides, [
+    { slotKey: "amazon:benefit-proof", composition: "comparison-layout" },
+  ]);
+  assert.equal(set.imageCount, set.carouselImageCount);
+  assert.equal(set.totalPlannedItemCount, set.carouselImageCount + set.skuImageCount + set.infographicRebuildCount);
+  assert.equal(set.effectivePlan.strategyVersion, set.strategyVersion);
+  assert.deepEqual(set.effectivePlan.platformSetOverrides, set.platformSetOverrides);
+  assert.ok(set.items.every((item) => item.prompt && item.generationPrompt));
+  assert.ok(set.effectivePlan.items.every((item) => item.prompt));
 });
 
 test("Cloudflare creation plan route returns the shared preview plan", async () => {
@@ -639,6 +706,10 @@ test("Cloudflare creation reference analysis route uses browser API settings", a
   formData.set("apiKey", "test-browser-key");
   formData.set("responsesModel", "gpt-5.5");
   formData.set("reasoningEffort", "high");
+  formData.set("platform", "amazon");
+  formData.set("platformLabel", "Amazon");
+  formData.set("industryTemplateLabel", "数码电子");
+  formData.set("industryTemplatePath", "数码电子 > 手机通讯 > 手机 > 智能手机");
   formData.append("referenceImages", new File(["lure"], "lure.png", { type: "image/png" }));
 
   const response = await handleApiRequest(
@@ -688,6 +759,10 @@ test("Cloudflare creation reference analysis route uses browser API settings", a
     },
   );
   const payload = await response.json();
+  const inputText = seenRequests[0]?.body.input[0].content
+    .filter((item) => item.type === "input_text")
+    .map((item) => item.text)
+    .join("\n");
   const inputImages = seenRequests[0]?.body.input[0].content.filter((item) => item.type === "input_image") || [];
 
   assert.equal(response.status, 200);
@@ -695,6 +770,9 @@ test("Cloudflare creation reference analysis route uses browser API settings", a
   assert.equal(seenRequests[0].url, "https://example.test/v1/responses");
   assert.equal(seenRequests[0].auth, "Bearer test-browser-key");
   assert.equal(seenRequests[0].body.text.format.name, "creation_reference_analysis_json");
+  assert.match(inputText, /平台选择：Amazon/);
+  assert.match(inputText, /商品类目：数码电子/);
+  assert.match(inputText, /类目路径：数码电子 > 手机通讯 > 手机 > 智能手机/);
   assert.equal(inputImages.length, 1);
   assert.equal(payload.ok, true);
   assert.equal(payload.analysis.reference_roles[0].role, "product");
@@ -2342,6 +2420,11 @@ test("Cloudflare generation modes keep interactive streaming when a queue bindin
     assert.equal(events.some((event) => event.eventName === "queued"), false, `${testCase.name}: should not emit queued`);
     assert.ok(savedEvent, `${testCase.name}: expected saved event`);
     assert.equal(savedEvent.payload.item.generationMode, testCase.expectedGenerationMode);
+    if (testCase.name === "image-edit") {
+      const storedMetadata = [...imageBucket.objects.values()][0]?.customMetadata;
+      assert.equal(storedMetadata?.prompt, "Replace the background with a clean studio wall");
+      assert.equal(storedMetadata?.editInstruction, "Replace the background with a clean studio wall");
+    }
     assert.ok(events.some((event) => event.eventName === "complete"), `${testCase.name}: expected complete event`);
     assert.doesNotMatch(text, /test-browser-key/, `${testCase.name}: should not echo API key`);
   }

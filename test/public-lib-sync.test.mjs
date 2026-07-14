@@ -40,3 +40,14 @@ test("public app top-level browser imports are covered by the sync target list",
     );
   }
 });
+
+test("platform policy and resolver modules are exact browser mirrors", async () => {
+  for (const filename of ["creation-platform-policies.mjs", "creation-platform-resolver.mjs"]) {
+    assert.ok(PUBLIC_LIB_SYNC_TARGETS.includes(filename), `${filename} must be a public-lib sync target`);
+    assert.equal(
+      await sha256(`../public/lib/${filename}`),
+      await sha256(`../lib/${filename}`),
+      `${filename} must be byte-equivalent in public/lib`,
+    );
+  }
+});

@@ -327,6 +327,35 @@ export function getCreationListingDrafts(set) {
   return Array.isArray(set?.listingDrafts) ? set.listingDrafts : [];
 }
 
+export function getCreationListingEligibility(set = {}) {
+  const source = set && typeof set === "object" ? set : {};
+  const plan = source.effectivePlan && typeof source.effectivePlan === "object" ? source.effectivePlan : {};
+  const provenance = cleanCreationListingText(source.platformProvenance || plan.platformProvenance).toLowerCase();
+  const platform = cleanCreationListingText(
+    source.requestedPlatform
+      || plan.requestedPlatform
+      || source.platform
+      || plan.platform
+      || source.platformPolicyId
+      || plan.platformPolicyId,
+  ).toLowerCase();
+  const hasPlatformMetadata = Boolean(
+    provenance
+      || platform
+      || source.strategyVersion
+      || plan.strategyVersion
+      || source.effectivePlan,
+  );
+
+  if (platform === "amazon") {
+    return { eligible: true, reason: "amazon" };
+  }
+  if (provenance === "legacy-missing" || !hasPlatformMetadata) {
+    return { eligible: true, reason: "legacy-missing" };
+  }
+  return { eligible: false, reason: "non-amazon" };
+}
+
 export function getCreationRecordListingMetaLabel(set) {
   return getCreationListingDrafts(set).length > 0 ? "Listing" : "";
 }
@@ -721,6 +750,12 @@ export function createCreationListingController(context = {}) {
       return null;
     }
 
+    if (!getCreationListingEligibility(selectedSet).eligible) {
+      const message = "Amazon US Listing 仅支持 Amazon 平台套图；当前记录仍可查看、复制和导出已保存草稿。";
+      context.setFeedback?.(message, "error");
+      throw new Error(message);
+    }
+
     if (isCreationListingGenerating(context.state, selectedSet.setId)) {
       context.setFeedback?.("当前套图 Listing 正在生成。", "busy");
       return selectedSet;
@@ -803,11 +838,15 @@ export function createCreationListingController(context = {}) {
   function syncRecordControls(selectedSet) {
     const drafts = getCreationListingDrafts(selectedSet);
     const isGenerating = isCreationListingGenerating(context.state, selectedSet?.setId);
+    const listingEligibility = getCreationListingEligibility(selectedSet);
     if (context.refs.creationRecordGenerateListingsButton) {
       renderCreationListingGenerateButton(context.refs.creationRecordGenerateListingsButton, {
-        disabled: !selectedSet || isGenerating,
+        disabled: !selectedSet || isGenerating || !listingEligibility.eligible,
         isGenerating,
       });
+      context.refs.creationRecordGenerateListingsButton.title = selectedSet && !listingEligibility.eligible
+        ? "Amazon US Listing 仅支持 Amazon 平台套图"
+        : "";
     }
     if (context.refs.creationRecordCopyListingsButton) {
       context.refs.creationRecordCopyListingsButton.disabled = drafts.length === 0 || isGenerating;

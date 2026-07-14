@@ -4,7 +4,9 @@ import assert from "node:assert/strict";
 import {
   applyCreationPlanOverrides,
   buildCreationPlan,
+  CREATION_IMAGE_COUNT_OPTIONS,
   CREATION_ITEM_ROLES,
+  CREATION_PLATFORM_OPTIONS,
   CREATION_SKU_GENERATION_RULE_OPTIONS,
   CREATION_VISUAL_LANGUAGE_OPTIONS,
   getCreationIndustryRolePreset,
@@ -17,6 +19,7 @@ import {
   normalizeCreationReferenceAnalysis,
   normalizeCreationImageCount,
   normalizeCreationIndustryTemplate,
+  normalizeCreationPlatform,
   normalizeCreationReferenceRoles,
   normalizeCreationScenario,
   normalizeCreationSelectedRoles,
@@ -180,6 +183,48 @@ test("creation planner builds the fixed four-image ecommerce set", () => {
   assert.match(plan.items[1].prompt, /information-fusion selling image/i);
   assert.match(plan.items[2].prompt, /multi-scenario application image/i);
   assert.match(plan.items[3].prompt, /3-4 clean views/i);
+});
+
+test("creation planner defaults to platform-aware ecommerce analysis without changing image type defaults", () => {
+  const plan = buildCreationPlan({
+    productName: "AeroPress Clear",
+    productDescription: "Transparent portable coffee brewer",
+    sellingPoints: "lightweight, easy to clean, stable taste",
+    targetLanguage: "en",
+  });
+
+  assert.ok(CREATION_PLATFORM_OPTIONS.length >= 12);
+  assert.equal(normalizeCreationPlatform("unknown").value, "universal");
+  assert.equal(plan.platform, "universal");
+  assert.equal(plan.platformLabel, "通用电商");
+  assert.equal(plan.imageCount, 18);
+  assert.deepEqual(
+    plan.items.map((item) => item.title),
+    CREATION_ITEM_ROLES.map((role) => role.title),
+  );
+  assert.equal(plan.skuGenerationRule, "color-name-under-subject");
+  assert.ok(plan.items.every((item) => item.prompt.includes("PLATFORM FIT ANALYSIS")));
+  assert.ok(plan.items.every((item) => item.prompt.includes("Platform: 通用电商")));
+});
+
+test("creation planner adapts prompts to selected platform and product category", () => {
+  const plan = buildCreationPlan({
+    productName: "Portable solar power bank",
+    productDescription: "10000mAh outdoor charger for camping and emergency backup",
+    sellingPoints: "USB-C fast charging, waterproof shell, flashlight",
+    targetLanguage: "en",
+    platform: "amazon",
+    industryTemplate: "electronics",
+    selectedRoles: ["hero", "spec-table", "usage-suggestion"],
+  });
+
+  assert.equal(plan.platform, "amazon");
+  assert.equal(plan.platformLabel, "Amazon");
+  assert.ok(plan.items.every((item) => item.prompt.includes("Platform: Amazon")));
+  assert.ok(plan.items.every((item) => item.prompt.includes("Product category/type: 3C 数码")));
+  assert.match(plan.items.find((item) => item.role === "hero").prompt, /thumbnail-legible/i);
+  assert.match(plan.items.find((item) => item.role === "spec-table").prompt, /comparison-ready/i);
+  assert.match(plan.items.find((item) => item.role === "usage-suggestion").prompt, /buyer intent/i);
 });
 
 test("creation planner defaults to classic commercial photography with a shared visual lock", () => {
@@ -2284,8 +2329,11 @@ test("creation planner adds role-specific guidance inside each marketing scenari
 });
 
 test("creation planner normalizes supported scenario and image count options", () => {
+  assert.deepEqual(CREATION_IMAGE_COUNT_OPTIONS, [0, 4, 6, 7, 8, 9, 10, 12, 14, 16, 18]);
   assert.equal(normalizeCreationImageCount("6"), 6);
+  assert.equal(normalizeCreationImageCount("7"), 7);
   assert.equal(normalizeCreationImageCount("8"), 8);
+  assert.equal(normalizeCreationImageCount("9"), 9);
   assert.equal(normalizeCreationImageCount("10"), 10);
   assert.equal(normalizeCreationImageCount("12"), 12);
   assert.equal(normalizeCreationImageCount("14"), 14);

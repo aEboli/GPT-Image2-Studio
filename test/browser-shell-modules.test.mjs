@@ -283,14 +283,30 @@ test("public app shell delegates browser config and cache behavior to public mod
   );
 });
 
+test("browser bootstrap does not block first paint on record history requests", async () => {
+  const app = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
+  const bootstrapBody = app.match(/async function bootstrap\(\) \{[\s\S]*?\r?\n}\r?\n\r?\nbootstrap\(\);/)?.[0] || "";
+
+  assert.match(app, /function loadStartupRecordsInBackground\(\) \{/);
+  assert.match(app, /function getStartupRecordLoaders\(\) \{ return \[loadGallery, loadGenerationTasks\]; \}/);
+  assert.match(app, /Promise\.allSettled\(\s*getStartupRecordLoaders\(\)\.map/);
+  assert.match(app, /if \(view === "article-record"\)\s*loadArticleIllustrationSets\(\)\.catch/);
+  assert.match(app, /if \(view === "ppt-record"\)\s*loadPptDecks\(\)\.catch/);
+  assert.match(bootstrapBody, /await loadConfig\(\);[\s\S]*renderAll\(\);[\s\S]*loadStartupRecordsInBackground\(\);/);
+  assert.doesNotMatch(
+    bootstrapBody,
+    /await loadGallery\(\);[\s\S]*await loadArticleIllustrationSets\(\);[\s\S]*await loadCreationSets\(\);/,
+  );
+});
+
 test("config drawer shows image route settings as exclusive mode tabs", async () => {
   const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
   const app = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
   const styles = await readFile(new URL("../public/styles.css", import.meta.url), "utf8");
 
-  assert.match(html, /<fieldset class="route-selector" aria-label="生图调用模式">/);
-  assert.match(html, /<span>路由模式<\/span>/);
-  assert.match(html, /<span>直接调用模式<\/span>/);
+  assert.match(html, /<fieldset class="route-selector" aria-label="生图调用模式" data-ui-i18n-aria-label="generationRouteLabel">/);
+  assert.match(html, /<span data-ui-i18n="routeMode">路由模式<\/span>/);
+  assert.match(html, /<span data-ui-i18n="directMode">直接调用模式<\/span>/);
   assert.match(html, /id="generationModeStatus"[\s\S]*路由模式/);
   assert.match(
     html,
@@ -325,7 +341,7 @@ test("config drawer shows image route settings as exclusive mode tabs", async ()
   assert.match(app, /function syncEndpointFieldsFromFullUrlModes\(/);
   assert.match(app, /function updateGenerationModeStatus\(\) \{/);
   assert.match(app, /const imageRoute = getSelectedImageRoute\(\);/);
-  assert.match(app, /formatGenerationActivityModeLabel\(imageRoute\)/);
+  assert.match(app, /getUiImageRouteLabel\(imageRoute\)/);
 });
 
 test("creation reference drag helper reorders product items as whole records only", () => {

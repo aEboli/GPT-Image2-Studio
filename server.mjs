@@ -78,6 +78,10 @@ import { createGenerationTaskStore } from "./lib/generation-task-store.mjs";
 import { createSessionTaskSlotLimiter } from "./lib/generation-task-slots.mjs";
 import { runWithConcurrency } from "./lib/limited-concurrency.mjs";
 import {
+  buildCreationItemGenerationPrompt,
+  resolveCreationItemGenerationParameters,
+} from "./lib/creation-generation-parameters.mjs";
+import {
   DEFAULT_REASONING_EFFORT,
   MAX_CREATION_REFERENCE_IMAGES,
   MAX_CREATION_STYLE_REFERENCE_IMAGES,
@@ -117,14 +121,18 @@ import {
 import { normalizePptMotionOptions } from "./lib/ppt-motion-presets.mjs";
 import { migrateOutputDirectoryMonths } from "./lib/output-directory-migration.mjs";
 import {
+  appendCreationItemLogoReference,
   appendCreationStyleReferences,
   buildCreationGenerationReferenceImageLabels,
   buildCreationItemReferenceImages,
 } from "./lib/creation-reference-labels.mjs";
 import {
   applyCreationPlanOverrides,
+  assertCreationPlanCanGenerate,
   buildCreationPlan,
+  buildCreationSubmittedPlan,
   normalizeCreationLogoOptions,
+  normalizeCreationPlatform,
   normalizeCreationReferenceAnalysis,
   normalizeCreationReferenceRoles,
 } from "./lib/creation-planner.mjs";
@@ -141,6 +149,7 @@ import {
 } from "./lib/creation-repair.mjs";
 import { buildCreationRelativeDir, createCreationSetStore } from "./lib/creation-store.mjs";
 import { generateCreationListingDrafts } from "./lib/creation-listing-agent.mjs";
+import { getCreationListingEligibility } from "./lib/creation-listing-view.mjs";
 import {
   applyPortraitPlanOverrides,
   buildPortraitPlan,
@@ -178,6 +187,9 @@ const creationSetStore = createCreationSetStore({ outputDir, publicBasePath: "/o
 const portraitSetStore = createPortraitSetStore({ outputDir, publicBasePath: "/output" });
 const articleIllustrationSetStore = createArticleIllustrationSetStore({ outputDir, publicBasePath: "/output" });
 const port = Number(process.env.PORT || 3600);
+const explicitHost = String(process.env.HOST || "").trim();
+const serverHost = explicitHost || "127.0.0.1";
+const requestToken = String(process.env.IMAGE_STUDIO_REQUEST_TOKEN || randomUUID()).trim();
 const DEFAULT_CREATION_LISTING_REASONING_EFFORT = "medium";
 const CREATION_REFERENCE_ANALYSIS_REASONING_EFFORT = "low";
 const PORTRAIT_REFERENCE_ANALYSIS_REASONING_EFFORT = "low";
@@ -253,7 +265,25 @@ function getStaticCacheControl(filePath) {
   const isPublicAsset = relativePublicPath && !relativePublicPath.startsWith("..") && !isAbsolute(relativePublicPath);
   const isLibraryAsset = relativeLibPath && !relativeLibPath.startsWith("..") && !isAbsolute(relativeLibPath);
 
-  return isPublicAsset || isLibraryAsset ? "no-store" : null;
+  return isPublicAsset || isLibraryAsset ? "no-cache" : null;
+}
+
+function buildStaticEtag(fileStat) {
+  return `W/"${Number(fileStat.size || 0).toString(16)}-${Math.trunc(Number(fileStat.mtimeMs || 0)).toString(16)}"`;
+}
+
+function isFreshStaticRequest(request, etag, lastModified) {
+  const ifNoneMatch = String(request.headers["if-none-match"] || "").trim();
+  if (ifNoneMatch) {
+    return ifNoneMatch
+      .split(",")
+      .map((value) => value.trim())
+      .some((value) => value === "*" || value === etag);
+  }
+
+  const ifModifiedSince = Date.parse(String(request.headers["if-modified-since"] || ""));
+  const lastModifiedTime = Date.parse(lastModified);
+  return Number.isFinite(ifModifiedSince) && Number.isFinite(lastModifiedTime) && ifModifiedSince >= lastModifiedTime;
 }
 
 function getStyleTransferReferenceImageLabels(generationMode, styleTransferStylePreset, referenceImages = [], options = {}) {
@@ -288,6 +318,78 @@ function sendText(response, statusCode, message) {
     "Content-Type": "text/plain; charset=utf-8",
   });
   response.end(message);
+}
+
+function compactErrorMessage(message, fallbackLabel = "请求失败") {
+  const raw = String(message || fallbackLabel).replace(/\s+/g, " ").trim() || fallbackLabel;
+  return raw.length > 500 ? `${raw.slice(0, 497)}...` : raw;
+}
+
+function normalizeNetworkHostname(value) {
+  const hostname = String(value || "").trim().toLowerCase();
+  return hostname.startsWith("[") && hostname.endsWith("]") ? hostname.slice(1, -1) : hostname;
+}
+
+function parseHostHeader(value) {
+  try {
+    const parsed = new URL(`http://${String(value || "").trim()}`);
+    return {
+      host: parsed.host.toLowerCase(),
+      hostname: normalizeNetworkHostname(parsed.hostname),
+    };
+  } catch {
+    return { host: "", hostname: "" };
+  }
+}
+
+function isLoopbackHostname(value) {
+  const hostname = normalizeNetworkHostname(value);
+  return hostname === "localhost" || hostname === "::1" || /^127(?:\.\d{1,3}){3}$/.test(hostname);
+}
+
+function isLoopbackRemoteAddress(value) {
+  const address = normalizeNetworkHostname(value).replace(/^::ffff:/, "");
+  return address === "::1" || /^127(?:\.\d{1,3}){3}$/.test(address);
+}
+
+function hasValidRequestToken(request) {
+  const suppliedToken = String(request.headers["x-image-studio-token"] || "").trim();
+  return Boolean(requestToken) && suppliedToken === requestToken;
+}
+
+function isSameOriginRequest(request, requestHost) {
+  const origin = String(request.headers.origin || "").trim();
+  if (!origin) {
+    return false;
+  }
+  try {
+    const parsedOrigin = new URL(origin);
+    return ["http:", "https:"].includes(parsedOrigin.protocol) && parsedOrigin.host.toLowerCase() === requestHost;
+  } catch {
+    return false;
+  }
+}
+
+function isAuthorizedSensitiveRequest(request, pathname) {
+  if (request.method === "GET" || !pathname.startsWith("/api/")) {
+    return true;
+  }
+  if (hasValidRequestToken(request)) {
+    return true;
+  }
+
+  const requestHost = parseHostHeader(request.headers.host);
+  if (!requestHost.host || (!explicitHost && !isLoopbackHostname(requestHost.hostname))) {
+    return false;
+  }
+  if (String(request.headers["sec-fetch-site"] || "").trim().toLowerCase() === "cross-site") {
+    return false;
+  }
+  if (request.headers.origin) {
+    return isSameOriginRequest(request, requestHost.host);
+  }
+
+  return isLoopbackHostname(requestHost.hostname) && isLoopbackRemoteAddress(request.socket?.remoteAddress);
 }
 
 async function requestStudioImageGeneration(options) {
@@ -361,15 +463,27 @@ async function readFormDataBody(request) {
   return wrapped.formData();
 }
 
-async function serveFile(response, filePath) {
-  await stat(filePath);
+async function serveFile(request, response, filePath) {
+  const fileStat = await stat(filePath);
   const cacheControl = getStaticCacheControl(filePath);
+  const etag = buildStaticEtag(fileStat);
+  const lastModified = fileStat.mtime.toUTCString();
   const headers = {
     "Content-Type": getMimeType(filePath),
+    "Content-Length": fileStat.size,
+    "ETag": etag,
+    "Last-Modified": lastModified,
   };
 
   if (cacheControl) {
     headers["Cache-Control"] = cacheControl;
+  }
+
+  if (isFreshStaticRequest(request, etag, lastModified)) {
+    delete headers["Content-Length"];
+    response.writeHead(304, headers);
+    response.end();
+    return;
   }
 
   response.writeHead(200, headers);
@@ -1525,6 +1639,8 @@ async function handlePromptAgentAnalyze(request, response) {
       : PROMPT_AGENT_ANALYSIS_REASONING_EFFORT;
   const reasoningEffort = normalizeReasoningEffort(formData.get("reasoningEffort") || reasoningFallback);
   const createdAt = new Date().toISOString();
+  const platform = normalizeCreationPlatform(formData.get("platform"));
+  const platformLabel = String(formData.get("platformLabel") || platform.label).trim() || platform.label;
   const json = await requestPromptAgentAnalysis({
     baseUrl: textVisionConfig.baseUrl,
     endpointPath: textVisionConfig.endpointPath,
@@ -1538,6 +1654,15 @@ async function handlePromptAgentAnalyze(request, response) {
     responsesModel: textVisionConfig.responsesModel,
     imageModel: textVisionConfig.imageModel,
     reasoningEffort,
+    contextPrompt: [
+      "套图分析上下文：",
+      `平台选择：${platformLabel}`,
+      `商品类目：${String(formData.get("industryTemplateLabel") || formData.get("industryTemplate") || "通用电商").trim() || "通用电商"}`,
+      String(formData.get("industryTemplatePath") || "").trim() ? `类目路径：${String(formData.get("industryTemplatePath")).trim()}` : "",
+      "请根据该平台和商品类型判断每张参考图最适合支持主图、详情页信息、SKU 对比、规格核对、移动端缩略图或直播/内容场景中的哪类套图生成用途。",
+    ]
+      .filter(Boolean)
+      .join("\n"),
   });
   const filenames = images.map((image) => image.filename).filter(Boolean);
   const item = await promptAgentStore.append({
@@ -1699,7 +1824,19 @@ function buildCreationSetManifest({
     dimensionUnitModeLabel: plan.dimensionUnitModeLabel,
     targetLanguage: plan.targetLanguage,
     targetLanguageLabel: plan.targetLanguageLabel,
+    platform: plan.platform,
+    platformLabel: plan.platformLabel,
+    strategyVersion: plan.strategyVersion || "",
+    platformPolicyId: plan.platformPolicyId || plan.platform || "",
+    platformEvidenceLevel: plan.platformEvidenceLevel || "",
+    platformProvenance: plan.platformProvenance || "explicit",
+    platformSetOverrides: plan.platformSetOverrides || plan.setOverrides || {},
+    platformItemOverrides: plan.platformItemOverrides || {},
     imageCount: plan.imageCount,
+    carouselImageCount: plan.carouselImageCount ?? plan.imageCount,
+    skuImageCount: plan.skuImageCount ?? items.filter((item) => item.role === "sku").length,
+    infographicRebuildCount: plan.infographicRebuildCount ?? items.filter((item) => item.role === "infographic-rebuild").length,
+    totalPlannedItemCount: plan.totalPlannedItemCount ?? items.length,
     scenario: plan.scenario,
     scenarioLabel: plan.scenarioLabel,
     visualLanguage: plan.visualLanguage,
@@ -1716,6 +1853,7 @@ function buildCreationSetManifest({
     skuGenerationRule: plan.skuGenerationRule || "none",
     skuGenerationRuleLabel: plan.skuGenerationRuleLabel || "无",
     logo: plan.logo || null,
+    effectivePlan: plan.effectivePlan || plan,
     createdAt,
     updatedAt: updatedAt || createdAt,
     status,
@@ -1732,14 +1870,30 @@ function sanitizeCreationFilenameToken(value, fallback = "creation") {
   return token || fallback;
 }
 
+function getCreationFilenameSequence(item = {}) {
+  const slotIndex = Number.parseInt(String(item?.slotIndex || ""), 10);
+  if (Number.isFinite(slotIndex) && slotIndex > 0) {
+    return String(slotIndex);
+  }
+
+  const itemId = String(item?.itemId || "").trim();
+  const leadingSequence = itemId.match(/^\d+/)?.[0];
+  if (leadingSequence) {
+    return leadingSequence;
+  }
+
+  return itemId.match(/-(\d+)$/)?.[1] || "1";
+}
+
 function buildCreationImageFilename({ item, createdAt, setId, format }) {
   const filenameTokenSource =
     item.role === "sku" ? item.filenameToken || item.title : item.title || item.filenameToken;
   const filenameToken = sanitizeCreationFilenameToken(filenameTokenSource || item.role || item.itemId, "creation");
+  const filenameSequence = getCreationFilenameSequence(item);
   return createTimestampedFilename({
     format,
     prompt: item.title || item.filenameToken || item.role || item.prompt,
-    filenameKeyword: filenameToken,
+    filenameKeyword: `${filenameSequence}-${filenameToken}`,
     createdAt,
     idSource: `${setId}-${item.slotIndex || item.itemId}`,
   });
@@ -2721,6 +2875,12 @@ async function handleCreationListingsGenerate(request, response) {
     throw error;
   }
 
+  if (!getCreationListingEligibility(set).eligible) {
+    return sendJson(response, 400, {
+      message: "Amazon US Listing is only available for Amazon Creation sets or eligible legacy records.",
+    });
+  }
+
   const mock = process.env.IMAGE_STUDIO_MOCK_LISTING_AGENT === "1";
   const config = mergeRequestPrivateConfig(payload, await configStore.readPrivateConfig());
   const textVisionConfig = getSelectedTextVisionConfig(config);
@@ -3004,6 +3164,11 @@ async function handleCreationReferenceAnalyze(request, response) {
   const reasoningEffort = normalizeReasoningEffort(
     formData.get("reasoningEffort") || CREATION_REFERENCE_ANALYSIS_REASONING_EFFORT,
   );
+  const platform = normalizeCreationPlatform(formData.get("platform"));
+  const platformLabel = String(formData.get("platformLabel") || platform.label).trim() || platform.label;
+  const industryTemplateLabel =
+    String(formData.get("industryTemplateLabel") || formData.get("industryTemplate") || "通用电商").trim() || "通用电商";
+  const industryTemplatePath = String(formData.get("industryTemplatePath") || "").trim();
   const json = await requestPromptAgentAnalysis({
     baseUrl: textVisionConfig.baseUrl,
     endpointPath: textVisionConfig.endpointPath,
@@ -3015,6 +3180,18 @@ async function handleCreationReferenceAnalyze(request, response) {
     responsesModel: textVisionConfig.responsesModel,
     imageModel: textVisionConfig.imageModel,
     reasoningEffort,
+    contextPrompt: [
+      "套图分析上下文：",
+      `平台选择：${platformLabel}`,
+      `商品类目：${industryTemplateLabel}`,
+      industryTemplatePath ? `类目路径：${industryTemplatePath}` : "",
+      String(formData.get("productName") || "").trim() ? `商品名称：${String(formData.get("productName")).trim()}` : "",
+      String(formData.get("productDescription") || "").trim() ? `商品描述：${String(formData.get("productDescription")).trim()}` : "",
+      String(formData.get("sellingPoints") || "").trim() ? `核心卖点：${String(formData.get("sellingPoints")).trim()}` : "",
+      "请根据该平台和商品类型判断每张参考图最适合支持主图、详情页信息、SKU 对比、规格核对、移动端缩略图或直播/内容场景中的哪类套图生成用途。",
+    ]
+      .filter(Boolean)
+      .join("\n"),
   });
   const analysis = normalizeCreationReferenceAnalysis(
     json,
@@ -3038,12 +3215,19 @@ async function handleCreationPlan(request, response) {
       dimensionSpecs: formData.get("dimensionSpecs"),
       dimensionUnitMode: formData.get("dimensionUnitMode"),
       targetLanguage: formData.get("targetLanguage"),
+      platform: formData.get("platform"),
       imageCount: formData.get("imageCount"),
       scenario: formData.get("scenario"),
       visualLanguage: formData.get("visualLanguage"),
       industryTemplate: formData.get("industryTemplate"),
+      categorySignals: formData.get("categorySignals"),
       selectedRoles: formData.get("selectedRoles"),
       referenceImageRoles,
+      platformReferenceCoverage: formData.get("platformReferenceCoverage"),
+      platformEvidence: formData.get("platformEvidence"),
+      platformSetOverrides: formData.get("platformSetOverrides"),
+      platformItemOverrides: formData.get("platformItemOverrides"),
+      audienceStrategy: formData.get("audienceStrategy"),
       infographicRebuildEnabled: formData.get("infographicRebuildEnabled"),
       skuSubjects: formData.get("skuSubjects"),
       skuBundleCount: formData.get("skuBundleCount"),
@@ -3426,26 +3610,35 @@ async function handleCreationGenerate(request, response) {
     generationReferenceImages = appendCreationLogoReference(referenceImages, logoImage);
     referenceImageNames = referenceImages.map((image) => image.filename).filter(Boolean);
     referenceImageRoles = normalizeCreationReferenceRoles(formData.get("referenceImageRoles"));
-    plan = buildCreationPlan({
+    plan = buildCreationSubmittedPlan({
       productName: formData.get("productName"),
       productDescription: formData.get("productDescription"),
       sellingPoints: formData.get("sellingPoints"),
       dimensionSpecs: formData.get("dimensionSpecs"),
       dimensionUnitMode: formData.get("dimensionUnitMode"),
       targetLanguage: formData.get("targetLanguage"),
+      platform: formData.get("platform"),
       imageCount: formData.get("imageCount"),
       scenario: formData.get("scenario"),
       visualLanguage: formData.get("visualLanguage"),
       industryTemplate: formData.get("industryTemplate"),
+      categorySignals: formData.get("categorySignals"),
       selectedRoles: formData.get("selectedRoles"),
       referenceImageRoles,
+      platformReferenceCoverage: formData.get("platformReferenceCoverage"),
+      platformEvidence: formData.get("platformEvidence"),
+      platformSetOverrides: formData.get("platformSetOverrides"),
+      platformItemOverrides: formData.get("platformItemOverrides"),
+      audienceStrategy: formData.get("audienceStrategy"),
+      effectivePlan: formData.get("effectivePlan"),
+      planOverrides: formData.get("planOverrides"),
       infographicRebuildEnabled: formData.get("infographicRebuildEnabled"),
       skuSubjects: formData.get("skuSubjects"),
       skuBundleCount: formData.get("skuBundleCount"),
       skuGenerationRule: formData.get("skuGenerationRule"),
       logoOptions: buildCreationLogoOptionsFromFormData(formData, logoImage),
     });
-    plan = applyCreationPlanOverrides(plan, formData.get("planOverrides"));
+    assertCreationPlanCanGenerate(plan);
 
     const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
     const generationConfig = getSelectedImageGenerationConfig(config);
@@ -3461,6 +3654,8 @@ async function handleCreationGenerate(request, response) {
     const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || "1:1"));
     const requestedSizeInput = String(formData.get("size") || "auto").trim().toLowerCase();
     const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
+    const fallbackRatio = ratioOption.value;
+    const fallbackSize = requestedSizeInput;
     const finalQuality = config.defaults?.quality || "high";
     const finalFormat = normalizeOutputFormat(String(formData.get("format") || config.defaults?.format || "png"));
     const reasoningEffort = normalizeReasoningEffort(
@@ -3472,15 +3667,29 @@ async function handleCreationGenerate(request, response) {
       productName: plan.productName || plan.productDescription,
       setId,
     });
-    items = plan.items.map((item) => ({
+    items = plan.items.map((item) => {
+      const parameters = resolveCreationItemGenerationParameters(item, {
+        imageRoute: generationConfig.imageRoute,
+        fallbackRatio,
+        fallbackSize,
+        fallbackTargetLanguage: plan.targetLanguage,
+      });
+      return {
       ...item,
+      ratio: parameters.ratioOption.value,
+      ratioLabel: parameters.ratioOption.label,
+      resolutionTier: parameters.resolutionTier,
+      requestedSize: parameters.requestedSize,
+      effectiveSize: parameters.finalSize,
+      targetLanguage: parameters.targetLanguage,
       status: "queued",
       filename: "",
       relativePath: "",
       imageUrl: "",
       thumbnailUrl: "",
       error: "",
-    }));
+      };
+    });
 
     let setManifest = await creationSetStore.saveManifest(
       buildCreationSetManifest({
@@ -3501,6 +3710,12 @@ async function handleCreationGenerate(request, response) {
       const taskId = `${setId}-${item.itemId}`;
       const generationStartedAt = new Date().toISOString();
       const generationStartedAtMs = Date.now();
+      const itemGenerationParameters = resolveCreationItemGenerationParameters(item, {
+        imageRoute: generationConfig.imageRoute,
+        fallbackRatio,
+        fallbackSize,
+        fallbackTargetLanguage: plan.targetLanguage,
+      });
       let finalBase64 = "";
       let slotClaimed = false;
 
@@ -3511,12 +3726,24 @@ async function handleCreationGenerate(request, response) {
           status: "generating",
           generationStartedAt,
         });
-        writeSseEvent(response, "item_started", { setId, itemId: item.itemId, role: item.role });
+        writeSseEvent(response, "item_started", {
+          setId,
+          itemId: item.itemId,
+          role: item.role,
+          ratio: itemGenerationParameters.ratioOption.value,
+          requestedSize: itemGenerationParameters.requestedSize,
+          effectiveSize: itemGenerationParameters.finalSize,
+          targetLanguage: itemGenerationParameters.targetLanguage,
+        });
 
-        const finalPrompt = appendRatioHintToPrompt(item.prompt, ratioOption);
+        const finalPrompt = buildCreationItemGenerationPrompt(item.prompt, itemGenerationParameters);
         const itemReferenceImages = buildCreationItemReferenceImages(item, referenceImages, referenceImageRoles);
         const itemGenerationReferenceImages = appendCreationStyleReferences(itemReferenceImages, styleReferenceImages);
-        const itemGenerationReferenceImagesWithLogo = appendCreationLogoReference(itemGenerationReferenceImages, logoImage);
+        const itemGenerationReferenceImagesWithLogo = appendCreationItemLogoReference(
+          item,
+          itemGenerationReferenceImages,
+          logoImage,
+        );
         const generationResult = await requestStudioImageGeneration({
           baseUrl: generationConfig.baseUrl,
           apiKey: generationConfig.apiKey,
@@ -3527,8 +3754,8 @@ async function handleCreationGenerate(request, response) {
             referenceImageRoles,
             styleReferenceImages,
           ),
-          size: finalSize,
-          aspectRatio: ratioOption.value,
+          size: itemGenerationParameters.finalSize,
+          aspectRatio: itemGenerationParameters.ratioOption.value,
           quality: finalQuality,
           format: toApiOutputFormat(finalFormat),
           responsesModel: generationConfig.responsesModel,
@@ -3543,6 +3770,9 @@ async function handleCreationGenerate(request, response) {
                 itemId: item.itemId,
                 stage: event.stage,
                 message: event.message,
+                ratio: itemGenerationParameters.ratioOption.value,
+                effectiveSize: itemGenerationParameters.finalSize,
+                targetLanguage: itemGenerationParameters.targetLanguage,
               });
             }
 
@@ -3560,6 +3790,9 @@ async function handleCreationGenerate(request, response) {
                 setId,
                 itemId: item.itemId,
                 dataUrl: `data:${toOutputFormatMimeType(finalFormat)};base64,${normalizeBase64(event.base64)}`,
+                ratio: itemGenerationParameters.ratioOption.value,
+                effectiveSize: itemGenerationParameters.finalSize,
+                targetLanguage: itemGenerationParameters.targetLanguage,
               });
             }
           },
@@ -3572,7 +3805,7 @@ async function handleCreationGenerate(request, response) {
 
         const generationCompletedAt = new Date().toISOString();
         const generationDurationMs = Math.max(0, Date.now() - generationStartedAtMs);
-        const savedSize = generationResult.effectiveSize || finalSize;
+        const savedSize = generationResult.effectiveSize || itemGenerationParameters.finalSize;
         const filename = buildCreationImageFilename({
           item,
           createdAt,
@@ -3585,15 +3818,18 @@ async function handleCreationGenerate(request, response) {
           filename,
           imageBuffer: Buffer.from(normalizeBase64(finalBase64), "base64"),
           metadata: {
-            prompt: item.prompt,
+            prompt: finalPrompt,
             createdAt,
             baseUrl: generationConfig.baseUrl,
             responsesModel: generationConfig.responsesModel,
             imageRoute: generationConfig.imageRoute,
             imageModel: generationConfig.imageModel,
             endpointPath: generationConfig.endpointPath,
-            ratio: ratioOption.value,
-            ratioLabel: ratioOption.label,
+            ratio: itemGenerationParameters.ratioOption.value,
+            ratioLabel: itemGenerationParameters.ratioOption.label,
+            resolutionTier: itemGenerationParameters.resolutionTier,
+            requestedSize: itemGenerationParameters.requestedSize,
+            effectiveSize: savedSize,
             size: savedSize,
             quality: finalQuality,
             format: finalFormat,
@@ -3605,7 +3841,7 @@ async function handleCreationGenerate(request, response) {
             creationSetId: setId,
             creationItemId: item.itemId,
             creationRole: item.role,
-            targetLanguage: plan.targetLanguage,
+            targetLanguage: itemGenerationParameters.targetLanguage,
             creationScenario: plan.scenario,
             creationIndustryTemplate: plan.industryTemplate,
             creationImageCount: plan.imageCount,
@@ -3631,6 +3867,13 @@ async function handleCreationGenerate(request, response) {
           generationStartedAt,
           generationCompletedAt,
           generationDurationMs,
+          ratio: itemGenerationParameters.ratioOption.value,
+          ratioLabel: itemGenerationParameters.ratioOption.label,
+          resolutionTier: itemGenerationParameters.resolutionTier,
+          requestedSize: itemGenerationParameters.requestedSize,
+          effectiveSize: savedSize,
+          size: savedSize,
+          targetLanguage: itemGenerationParameters.targetLanguage,
         });
         setManifest = await creationSetStore.saveManifest(
           buildCreationSetManifest({
@@ -4379,6 +4622,7 @@ async function handleCreationRepair(request, response) {
       dimensionSpecs: formData.get("dimensionSpecs"),
       dimensionUnitMode: formData.get("dimensionUnitMode"),
       targetLanguage: formData.get("targetLanguage"),
+      platform: formData.get("platform"),
       scenario: formData.get("scenario"),
       visualLanguage: formData.get("visualLanguage"),
       industryTemplate: formData.get("industryTemplate"),
@@ -4413,6 +4657,8 @@ async function handleCreationRepair(request, response) {
       dimensionUnitModeLabel: existingSet.dimensionUnitModeLabel,
       targetLanguage: existingSet.targetLanguage,
       targetLanguageLabel: existingSet.targetLanguageLabel,
+      platform: existingSet.platform || "universal",
+      platformLabel: existingSet.platformLabel || "",
       imageCount: existingSet.imageCount,
       scenario: existingSet.scenario,
       scenarioLabel: existingSet.scenarioLabel,
@@ -4442,9 +4688,8 @@ async function handleCreationRepair(request, response) {
 
     const clientSessionId = getClientSessionId(request, formData);
     const generationRequestScope = "creation";
-    const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || "1:1"));
-    const requestedSizeInput = String(formData.get("size") || "auto").trim().toLowerCase();
-    const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
+    const fallbackRatio = String(formData.get("ratio") || "1:1");
+    const fallbackSize = String(formData.get("size") || "auto").trim();
     const finalQuality = config.defaults?.quality || "high";
     const finalFormat = normalizeOutputFormat(String(formData.get("format") || config.defaults?.format || "png"));
     const reasoningEffort = normalizeReasoningEffort(
@@ -4491,6 +4736,12 @@ async function handleCreationRepair(request, response) {
       const taskId = `${setId}-repair-${item.itemId}`;
       const generationStartedAt = new Date().toISOString();
       const generationStartedAtMs = Date.now();
+      const itemGenerationParameters = resolveCreationItemGenerationParameters(repairItem, {
+        imageRoute: generationConfig.imageRoute,
+        fallbackRatio,
+        fallbackSize,
+        fallbackTargetLanguage: existingSet.targetLanguage,
+      });
       let finalBase64 = "";
       let slotClaimed = false;
 
@@ -4504,12 +4755,16 @@ async function handleCreationRepair(request, response) {
           generationStartedAt,
           error: "",
         });
-        writeSseEvent(response, "item_started", { setId, itemId: item.itemId, role: repairItem.role });
+        writeSseEvent(response, "item_started", { setId, itemId: item.itemId, role: repairItem.role, ratio: itemGenerationParameters.ratioOption.value, effectiveSize: itemGenerationParameters.finalSize, targetLanguage: itemGenerationParameters.targetLanguage });
 
-        const finalPrompt = appendRatioHintToPrompt(repairItem.prompt, ratioOption);
+        const finalPrompt = buildCreationItemGenerationPrompt(repairItem.prompt, itemGenerationParameters);
         const itemReferenceImages = buildCreationItemReferenceImages(repairItem, referenceImages, referenceImageRoles);
         const itemGenerationReferenceImages = appendCreationStyleReferences(itemReferenceImages, styleReferenceImages);
-        const itemGenerationReferenceImagesWithLogo = appendCreationLogoReference(itemGenerationReferenceImages, logoImage);
+        const itemGenerationReferenceImagesWithLogo = appendCreationItemLogoReference(
+          repairItem,
+          itemGenerationReferenceImages,
+          logoImage,
+        );
         const generationResult = await requestStudioImageGeneration({
           baseUrl: generationConfig.baseUrl,
           apiKey: generationConfig.apiKey,
@@ -4520,8 +4775,8 @@ async function handleCreationRepair(request, response) {
             referenceImageRoles,
             styleReferenceImages,
           ),
-          size: finalSize,
-          aspectRatio: ratioOption.value,
+          size: itemGenerationParameters.finalSize,
+          aspectRatio: itemGenerationParameters.ratioOption.value,
           quality: finalQuality,
           format: toApiOutputFormat(finalFormat),
           responsesModel: generationConfig.responsesModel,
@@ -4565,7 +4820,7 @@ async function handleCreationRepair(request, response) {
 
         const generationCompletedAt = new Date().toISOString();
         const generationDurationMs = Math.max(0, Date.now() - generationStartedAtMs);
-        const savedSize = generationResult.effectiveSize || finalSize;
+        const savedSize = generationResult.effectiveSize || itemGenerationParameters.finalSize;
         const filename = buildCreationImageFilename({
           item: repairItem,
           createdAt: generationCompletedAt,
@@ -4578,15 +4833,18 @@ async function handleCreationRepair(request, response) {
           filename,
           imageBuffer: Buffer.from(normalizeBase64(finalBase64), "base64"),
           metadata: {
-            prompt: repairItem.prompt,
+            prompt: finalPrompt,
             createdAt: generationCompletedAt,
             baseUrl: generationConfig.baseUrl,
             responsesModel: generationConfig.responsesModel,
             imageRoute: generationConfig.imageRoute,
             imageModel: generationConfig.imageModel,
             endpointPath: generationConfig.endpointPath,
-            ratio: ratioOption.value,
-            ratioLabel: ratioOption.label,
+            ratio: itemGenerationParameters.ratioOption.value,
+            ratioLabel: itemGenerationParameters.ratioOption.label,
+            resolutionTier: itemGenerationParameters.resolutionTier,
+            requestedSize: itemGenerationParameters.requestedSize,
+            effectiveSize: savedSize,
             size: savedSize,
             quality: finalQuality,
             format: finalFormat,
@@ -4599,7 +4857,7 @@ async function handleCreationRepair(request, response) {
             creationItemId: item.itemId,
             creationRole: repairItem.role,
             creationRepairOf: item.itemId,
-            targetLanguage: existingSet.targetLanguage,
+            targetLanguage: itemGenerationParameters.targetLanguage,
             creationScenario: existingSet.scenario,
             creationIndustryTemplate: existingSet.industryTemplate || "general",
             creationImageCount: existingSet.imageCount,
@@ -4627,6 +4885,12 @@ async function handleCreationRepair(request, response) {
           generationStartedAt,
           generationCompletedAt,
           generationDurationMs,
+          ratio: itemGenerationParameters.ratioOption.value,
+          ratioLabel: itemGenerationParameters.ratioOption.label,
+          resolutionTier: itemGenerationParameters.resolutionTier,
+          requestedSize: itemGenerationParameters.requestedSize,
+          effectiveSize: savedSize,
+          targetLanguage: itemGenerationParameters.targetLanguage,
           error: "",
         });
         setManifest = await creationSetStore.saveManifest(
@@ -5415,6 +5679,12 @@ async function handleGenerate(request, response) {
 async function routeRequest(request, response) {
   const url = new URL(request.url || "/", "http://localhost");
 
+  if (!isAuthorizedSensitiveRequest(request, url.pathname)) {
+    return sendJson(response, 403, {
+      message: "请求来源未通过本地服务安全校验。",
+    });
+  }
+
   if (request.method === "GET" && url.pathname === "/api/config") {
     return handleConfigGet(response);
   }
@@ -5566,7 +5836,7 @@ async function routeRequest(request, response) {
     }
 
     try {
-      return await serveFile(response, target);
+      return await serveFile(request, response, target);
     } catch (error) {
       if (error && typeof error === "object" && error.code === "ENOENT") {
         return sendText(response, 404, "Not found");
@@ -5577,7 +5847,7 @@ async function routeRequest(request, response) {
   }
 
   if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
-    return serveFile(response, join(publicDir, "index.html"));
+    return serveFile(request, response, join(publicDir, "index.html"));
   }
 
   if (request.method === "GET") {
@@ -5587,7 +5857,7 @@ async function routeRequest(request, response) {
     }
 
     try {
-      return await serveFile(response, target);
+      return await serveFile(request, response, target);
     } catch (error) {
       if (!(error && typeof error === "object" && error.code === "ENOENT")) {
         throw error;
@@ -5602,7 +5872,7 @@ async function routeRequest(request, response) {
     }
 
     try {
-      return await serveFile(response, target);
+      return await serveFile(request, response, target);
     } catch (error) {
       if (error && typeof error === "object" && error.code === "ENOENT") {
         return sendText(response, 404, "Not found");
@@ -5633,9 +5903,12 @@ const server = createServer(async (request, response) => {
   }
 });
 
-server.listen(port, () => {
+server.listen(port, serverHost, () => {
   const now = new Date();
-  console.log(`Responses Image Studio 正在运行: http://localhost:${port}`);
+  console.log(`Responses Image Studio 正在运行: http://${serverHost}:${port}`);
+  if (explicitHost && !isLoopbackHostname(serverHost)) {
+    console.log(`远程写接口令牌: ${requestToken}`);
+  }
   console.log(`输出根目录: ${outputDir}`);
   console.log(`当前输出目录: ${join(outputDir, formatMonthFolder(now), formatDayFolder(now))}`);
   console.log(`配置文件: ${configStore.configPath}`);

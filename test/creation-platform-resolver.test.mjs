@@ -1,0 +1,584 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+
+const RESOLVER_MODULE_URL = new URL("../lib/creation-platform-resolver.mjs", import.meta.url);
+
+let resolver;
+let resolverImportError;
+try {
+  resolver = await import(RESOLVER_MODULE_URL.href);
+} catch (error) {
+  resolverImportError = error;
+}
+
+test("canonical Creation platform resolver module is available", () => {
+  assert.ifError(resolverImportError);
+});
+
+const resolverTest = (name, fn) => test(name, { skip: !resolver }, fn);
+
+function fullAmazonEvidence() {
+  return {
+    dimensions: true,
+    materials: true,
+    packageContents: true,
+    performance: true,
+    specifications: true,
+    craft: true,
+    condition: true,
+    defects: true,
+  };
+}
+
+resolverTest("resolver exposes normalization, resolution, validation, and restore helpers", () => {
+  for (const exportName of [
+    "getCreationPlatformCategorySignals",
+    "normalizeCreationPlatformItemOverrides",
+    "normalizeCreationPlatformSetOverrides",
+    "normalizeCreationAudienceStrategy",
+    "resolveCreationPlatformPlan",
+    "restoreCreationPlatformRecommendations",
+    "validateCreationPlatformPlan",
+  ]) {
+    assert.equal(typeof resolver[exportName], "function", `missing resolver export ${exportName}`);
+  }
+});
+
+resolverTest("resolver merges supplied audience context with deterministic item intents", () => {
+  const plan = resolver.resolveCreationPlatformPlan({
+    platform: "xiaohongshu",
+    category: "home",
+    audienceStrategy: {
+      targetAudience: "重视居家整洁的租房使用者",
+      purchaseMotivations: ["节省空间", "保持整洁", "节省空间"],
+      purchaseObjections: ["担心尺寸不合适"],
+      desiredOutcome: "让小空间更易整理",
+      evidenceBasis: ["商品描述提供折叠尺寸"],
+      confidence: "high",
+      source: "user",
+    },
+    itemOverrides: [{
+      slotKey: "xiaohongshu:detail-macro",
+      conversionIntent: { conversionGoal: "用细节降低做工顾虑" },
+    }],
+  });
+
+  assert.equal(plan.effectiveAudienceStrategy.targetAudience, "重视居家整洁的租房使用者");
+  assert.deepEqual(plan.effectiveAudienceStrategy.purchaseMotivations.slice(0, 2), ["节省空间", "保持整洁"]);
+  assert.equal(new Set(plan.effectiveAudienceStrategy.purchaseMotivations).size, plan.effectiveAudienceStrategy.purchaseMotivations.length);
+  assert.equal(plan.effectiveAudienceStrategy.provenance.targetAudience, "user");
+  assert.ok(plan.items.every((item) => item.conversionIntent?.conversionGoal));
+  assert.equal(
+    plan.items.find((item) => item.slotKey === "xiaohongshu:detail-macro").conversionIntent.conversionGoal,
+    "用细节降低做工顾虑",
+  );
+  assert.notEqual(plan.items[0].conversionIntent.conversionGoal, plan.items[1].conversionIntent.conversionGoal);
+});
+
+resolverTest("resolver applies platform, category, reference, set, then item precedence", () => {
+  const plan = resolver.resolveCreationPlatformPlan({
+    platform: "amazon",
+    category: "electronics",
+    referenceCoverage: [{ role: "material", filename: "material-card.png", note: "Aluminum shell" }],
+    evidence: fullAmazonEvidence(),
+    skuSubjects: [{ id: "black" }, { id: "silver" }],
+    setOverrides: {
+      targetLanguage: "ja",
+      ratio: "4:3",
+      resolutionTier: "1.5K",
+      composition: "set-information-layout",
+      textPolicy: "moderate",
+      scenePolicy: "neutral",
+      logoPolicy: "preserve-existing-only",
+    },
+    itemOverrides: [
+      {
+        slotKey: "amazon:amazon-main",
+        targetLanguage: "ko",
+        ratio: "1:1",
+        resolutionTier: "2K",
+        composition: "centered-white-85-percent",
+        textPolicy: "none",
+        scenePolicy: "studio-white",
+        logoPolicy: "forbid-overlay",
+      },
+    ],
+  });
+
+  assert.equal(plan.platform, "amazon");
+  assert.deepEqual(
+    plan.items.map((item) => item.imageType),
+    ["amazon-main", "benefit-proof", "spec-table", "material-proof", "detail-macro", "dimension-fit", "in-box"],
+  );
+
+  const main = plan.items[0];
+  assert.deepEqual(
+    {
+      targetLanguage: main.targetLanguage,
+      ratio: main.ratio,
+      resolutionTier: main.resolutionTier,
+      composition: main.composition,
+      textPolicy: main.textPolicy,
+      scenePolicy: main.scenePolicy,
+      logoPolicy: main.logoPolicy,
+    },
+    {
+      targetLanguage: "ko",
+      ratio: "1:1",
+      resolutionTier: "2K",
+      composition: "centered-white-85-percent",
+      textPolicy: "none",
+      scenePolicy: "studio-white",
+      logoPolicy: "forbid-overlay",
+    },
+  );
+
+  const secondary = plan.items[1];
+  assert.deepEqual(
+    {
+      targetLanguage: secondary.targetLanguage,
+      ratio: secondary.ratio,
+      resolutionTier: secondary.resolutionTier,
+      composition: secondary.composition,
+      textPolicy: secondary.textPolicy,
+      scenePolicy: secondary.scenePolicy,
+      logoPolicy: secondary.logoPolicy,
+    },
+    {
+      targetLanguage: "ja",
+      ratio: "4:3",
+      resolutionTier: "1.5K",
+      composition: "set-information-layout",
+      textPolicy: "moderate",
+      scenePolicy: "neutral",
+      logoPolicy: "preserve-existing-only",
+    },
+  );
+  assert.deepEqual(plan.categorySignals, ["electronics-specifications"]);
+  assert.ok(plan.referenceCoverage.some((entry) => entry.role === "material"));
+  assert.equal(plan.validation.isValid, true);
+});
+
+resolverTest("category substitutions are deterministic and do not duplicate image types", () => {
+  const cases = [
+    {
+      category: "apparel",
+      evidence: { dimensions: true, packageContents: true },
+      expected: ["generic-hero", "benefit-proof", "lifestyle-first", "scale-proof", "detail-macro", "dimension-fit", "in-box", "clean-product-proof"],
+    },
+    {
+      category: "electronics",
+      evidence: { dimensions: true, specifications: true, packageContents: true },
+      expected: ["generic-hero", "benefit-proof", "spec-table", "multi-angle", "detail-macro", "dimension-fit", "in-box", "clean-product-proof"],
+    },
+    {
+      category: "food",
+      evidence: { dimensions: true, materials: true, packageContents: true },
+      expected: ["generic-hero", "benefit-proof", "lifestyle-first", "material-proof", "detail-macro", "dimension-fit", "in-box", "clean-product-proof"],
+    },
+    {
+      categorySignals: ["condition"],
+      evidence: { dimensions: true, condition: true, packageContents: true },
+      expected: ["generic-hero", "benefit-proof", "condition-proof", "multi-angle", "detail-macro", "dimension-fit", "in-box", "clean-product-proof"],
+    },
+  ];
+
+  for (const input of cases) {
+    const plan = resolver.resolveCreationPlatformPlan({ platform: "universal", ...input });
+    assert.deepEqual(plan.items.map((item) => item.imageType), input.expected);
+    assert.equal(new Set(plan.items.map((item) => item.imageType)).size, plan.items.length);
+  }
+});
+
+resolverTest("reference coverage replaces a lower-priority slot after category overlay", () => {
+  const plan = resolver.resolveCreationPlatformPlan({
+    platform: "amazon",
+    category: "electronics",
+    evidence: { dimensions: true, specifications: true, materials: true, packageContents: true },
+    referenceCoverage: [
+      { role: "material", filename: "material.png" },
+      { role: "usage", filename: "usage.png" },
+    ],
+  });
+
+  assert.deepEqual(
+    plan.items.map((item) => item.imageType),
+    ["amazon-main", "usage-demo", "spec-table", "material-proof", "detail-macro", "dimension-fit", "in-box"],
+  );
+  assert.equal(new Set(plan.items.map((item) => item.imageType)).size, plan.items.length);
+});
+
+resolverTest("evidence-dependent fallback is stable, safe, and non-duplicating", () => {
+  const withoutMaterial = resolver.resolveCreationPlatformPlan({
+    platform: "etsy",
+    evidence: { dimensions: true, craft: true, packageContents: true },
+    skuSubjects: [{ id: "only-sku" }],
+  });
+  assert.deepEqual(
+    withoutMaterial.items.map((item) => item.imageType),
+    ["lifestyle-first", "clean-product-proof", "craft-proof", "detail-macro", "scale-proof", "gift-packaging", "usage-demo"],
+  );
+  assert.equal(withoutMaterial.carouselImageCount, 7);
+  assert.ok(withoutMaterial.warnings.some((warning) => warning.code === "missing-evidence-slot-omitted"));
+
+  const withMaterial = resolver.resolveCreationPlatformPlan({
+    platform: "etsy",
+    evidence: { dimensions: true, materials: true, craft: true, packageContents: true },
+    skuSubjects: [{ id: "only-sku" }],
+  });
+  assert.deepEqual(
+    withMaterial.items.map((item) => item.imageType),
+    ["lifestyle-first", "clean-product-proof", "craft-proof", "detail-macro", "scale-proof", "material-proof", "gift-packaging", "usage-demo"],
+  );
+  assert.equal(new Set(withMaterial.items.map((item) => item.imageType)).size, withMaterial.items.length);
+  assert.ok(withMaterial.warnings.some((warning) => warning.code === "missing-evidence-slot-replaced"));
+});
+
+resolverTest("variant carousel slot stays distinct from deduplicated appended SKU counts", () => {
+  const plan = resolver.resolveCreationPlatformPlan({
+    platform: "universal",
+    evidence: { dimensions: true, packageContents: true },
+    skuSubjects: [{ id: "red" }, { id: "red" }, { id: "blue" }],
+    infographicRebuildCount: 1,
+  });
+
+  assert.ok(plan.items.some((item) => item.imageType === "variant-comparison" && item.itemKind === "carousel"));
+  assert.deepEqual(plan.skuSubjectIds, ["red", "blue"]);
+  assert.equal(plan.carouselImageCount, 8);
+  assert.equal(plan.imageCount, 8);
+  assert.equal(plan.skuImageCount, 2);
+  assert.equal(plan.infographicRebuildCount, 1);
+  assert.equal(plan.totalPlannedItemCount, 11);
+});
+
+resolverTest("set and item enablement or ordering overrides derive final carousel counts", () => {
+  const plan = resolver.resolveCreationPlatformPlan({
+    platform: "universal",
+    evidence: { dimensions: true, packageContents: true },
+    skuSubjects: [{ id: "one" }, { id: "two" }],
+    infographicRebuildCount: 2,
+    setOverrides: { imageCount: 4 },
+    itemOverrides: [
+      { slotKey: "universal:benefit-proof", order: 0, textPolicy: "factual-short" },
+      { slotKey: "universal:generic-hero", order: 1 },
+      { slotKey: "universal:lifestyle-first", enabled: false },
+    ],
+  });
+
+  assert.deepEqual(plan.slots.map((item) => item.imageType), ["benefit-proof", "generic-hero", "lifestyle-first", "multi-angle"]);
+  assert.equal(plan.slots.find((item) => item.imageType === "lifestyle-first").enabled, false);
+  assert.equal(plan.items.length, 3);
+  assert.equal(plan.items[0].textPolicy, "factual-short");
+  assert.equal(plan.carouselImageCount, 3);
+  assert.equal(plan.skuImageCount, 2);
+  assert.equal(plan.infographicRebuildCount, 2);
+  assert.equal(plan.totalPlannedItemCount, 7);
+});
+
+resolverTest("custom item overrides materialize stable slots at the requested positions", () => {
+  const plan = resolver.resolveCreationPlatformPlan({
+    platform: "amazon",
+    evidence: fullAmazonEvidence(),
+    itemOverrides: [
+      { slotKey: "custom-before-main", imageType: "custom", enabled: true, order: 0, prompt: "自定义首图" },
+      { slotKey: "amazon:amazon-main", order: 1 },
+      { slotKey: "custom-after-main", imageType: "custom", enabled: true, order: 2, prompt: "自定义第二张" },
+      { slotKey: "amazon:benefit-proof", order: 3 },
+      { slotKey: "amazon:lifestyle-first", order: 4 },
+      { slotKey: "amazon:multi-angle", order: 5 },
+      { slotKey: "amazon:detail-macro", order: 6 },
+      { slotKey: "amazon:dimension-fit", order: 7 },
+      { slotKey: "amazon:in-box", order: 8 },
+    ],
+  });
+
+  assert.deepEqual(plan.slots.slice(0, 4).map((slot) => slot.slotKey), [
+    "custom-before-main",
+    "amazon:amazon-main",
+    "custom-after-main",
+    "amazon:benefit-proof",
+  ]);
+  assert.equal(plan.slots[0].imageType, "custom");
+  assert.equal(plan.slots[0].prompt, "自定义首图");
+  assert.equal(plan.slots[2].imageType, "custom");
+  assert.equal(plan.slots[2].prompt, "自定义第二张");
+  assert.equal(plan.carouselImageCount, 9);
+});
+
+resolverTest("disabled slots remain addressable and can be enabled again", () => {
+  const disabled = resolver.resolveCreationPlatformPlan({
+    platform: "amazon",
+    evidence: fullAmazonEvidence(),
+    itemOverrides: [{ slotKey: "amazon:benefit-proof", enabled: false }],
+  });
+  assert.equal(disabled.slots.length, 7);
+  assert.equal(disabled.items.length, 6);
+  assert.equal(disabled.slots.find((slot) => slot.slotKey === "amazon:benefit-proof")?.enabled, false);
+
+  const enabledAgain = resolver.resolveCreationPlatformPlan({
+    platform: "amazon",
+    evidence: fullAmazonEvidence(),
+    itemOverrides: [{ slotKey: "amazon:benefit-proof", enabled: true }],
+  });
+  assert.equal(enabledAgain.slots.length, 7);
+  assert.equal(enabledAgain.items.length, 7);
+  assert.equal(enabledAgain.slots.find((slot) => slot.slotKey === "amazon:benefit-proof")?.enabled, true);
+});
+
+resolverTest("set image-count override can extend a shorter platform plan to existing large presets", () => {
+  const plan = resolver.resolveCreationPlatformPlan({
+    platform: "amazon",
+    evidence: fullAmazonEvidence(),
+    skuSubjects: [{ id: "one" }, { id: "two" }],
+    setOverrides: { imageCount: 18 },
+  });
+
+  assert.equal(plan.slots.length, 18);
+  assert.equal(plan.carouselImageCount, 18);
+  assert.equal(plan.imageCount, 18);
+  assert.equal(plan.items[0].imageType, "amazon-main");
+  assert.equal(new Set(plan.items.map((item) => item.imageType)).size, 18);
+  assert.ok(plan.items.slice(7).every((item) => item.slotKey.startsWith("amazon:extra:")));
+});
+
+resolverTest("sourced hard-rule conflicts block generation after overrides", () => {
+  const plan = resolver.resolveCreationPlatformPlan({
+    platform: "amazon",
+    evidence: fullAmazonEvidence(),
+    itemOverrides: [
+      {
+        slotKey: "amazon:amazon-main",
+        composition: "collage-grid",
+        textPolicy: "moderate",
+        logoPolicy: "allow-supplied",
+      },
+    ],
+  });
+
+  assert.equal(plan.validation.isValid, false);
+  assert.equal(plan.canGenerate, false);
+  assert.deepEqual(
+    plan.errors.map((error) => error.constraintId).sort(),
+    ["amazon-main-no-collage", "amazon-main-no-external-logo", "amazon-main-no-marketing-text"],
+  );
+  assert.ok(plan.errors.every((error) => error.level === "blocking"));
+  assert.ok(plan.errors.every((error) => error.sourceIds.includes("amazon-g1881")));
+});
+
+resolverTest("prompt hard rules distinguish prohibited requests from negative safety instructions", () => {
+  const unsafe = resolver.resolveCreationPlatformPlan({
+    platform: "amazon",
+    evidence: fullAmazonEvidence(),
+    itemOverrides: [
+      {
+        slotKey: "amazon:amazon-main",
+        prompt: "Add a SALE badge, watermark, collage, and external Logo overlay.",
+      },
+    ],
+  });
+  assert.equal(unsafe.canGenerate, false);
+  assert.deepEqual(
+    unsafe.errors.map((error) => error.constraintId).sort(),
+    [
+      "amazon-main-no-badges",
+      "amazon-main-no-collage",
+      "amazon-main-no-external-logo",
+      "amazon-main-no-marketing-text",
+      "amazon-main-no-watermark",
+    ],
+  );
+
+  const safe = resolver.resolveCreationPlatformPlan({
+    platform: "amazon",
+    evidence: fullAmazonEvidence(),
+    itemOverrides: [
+      {
+        slotKey: "amazon:amazon-main",
+        prompt:
+          "Do not add a watermark, badge, marketing copy, collage, or external Logo. Preserve only identifiers printed on the product.",
+      },
+    ],
+  });
+  assert.equal(safe.canGenerate, true);
+  assert.equal(safe.validation.isValid, true);
+  assert.deepEqual(safe.errors, []);
+
+  const neutralDescription = resolver.resolveCreationPlatformPlan({
+    platform: "amazon",
+    evidence: fullAmazonEvidence(),
+    itemOverrides: [
+      {
+        slotKey: "amazon:amazon-main",
+        prompt:
+          "Product name: Badge Holder. Product model: Watermark Remover. Preserve only identifiers printed on the supplied product.",
+      },
+    ],
+  });
+  assert.equal(neutralDescription.canGenerate, true);
+  assert.deepEqual(neutralDescription.errors, []);
+
+  for (const prompt of [
+    "Avoid watermark and add a SALE badge.",
+    "Do not add a watermark, add a badge.",
+  ]) {
+    const mixedInstruction = resolver.resolveCreationPlatformPlan({
+      platform: "amazon",
+      evidence: fullAmazonEvidence(),
+      itemOverrides: [{ slotKey: "amazon:amazon-main", prompt }],
+    });
+    assert.equal(mixedInstruction.canGenerate, false, prompt);
+    assert.ok(
+      mixedInstruction.errors.some((error) => error.constraintId === "amazon-main-no-badges"),
+      prompt,
+    );
+  }
+
+  for (const prompt of [
+    "Adding a SALE badge to the product.",
+    "Creating a SALE badge.",
+    "Including a badge in the image.",
+    "Placing a badge on the product.",
+    "Making a badge overlay.",
+    "Made a badge overlay.",
+  ]) {
+    const inflectedPositive = resolver.resolveCreationPlatformPlan({
+      platform: "amazon",
+      evidence: fullAmazonEvidence(),
+      itemOverrides: [{ slotKey: "amazon:amazon-main", prompt }],
+    });
+    assert.equal(inflectedPositive.canGenerate, false, prompt);
+    assert.ok(
+      inflectedPositive.errors.some((error) => error.constraintId === "amazon-main-no-badges"),
+      prompt,
+    );
+  }
+
+  for (const prompt of ["Make sure not to add a badge.", "Please create a watermark-free image."]) {
+    const negativeVariant = resolver.resolveCreationPlatformPlan({
+      platform: "amazon",
+      evidence: fullAmazonEvidence(),
+      itemOverrides: [{ slotKey: "amazon:amazon-main", prompt }],
+    });
+    assert.equal(negativeVariant.canGenerate, true, prompt);
+    assert.deepEqual(negativeVariant.errors, [], prompt);
+  }
+
+  for (const prompt of [
+    "Generate a sale badge.",
+    "Design a collage.",
+    "Use a watermark.",
+    "Feature an external logo overlay.",
+    "Produce a badge.",
+    "Draw a collage.",
+  ]) {
+    const affirmativeVariant = resolver.resolveCreationPlatformPlan({
+      platform: "amazon",
+      evidence: fullAmazonEvidence(),
+      itemOverrides: [{ slotKey: "amazon:amazon-main", prompt }],
+    });
+    assert.equal(affirmativeVariant.canGenerate, false, prompt);
+    assert.ok(affirmativeVariant.errors.length > 0, prompt);
+  }
+
+  for (const prompt of [
+    "Create an image of Badge Holder.",
+    "Show the Watermark Remover product.",
+    "Render the Collage Maker device.",
+    "Create the external logo kit as a product.",
+  ]) {
+    const productIdentity = resolver.resolveCreationPlatformPlan({
+      platform: "amazon",
+      evidence: fullAmazonEvidence(),
+      itemOverrides: [{ slotKey: "amazon:amazon-main", prompt }],
+    });
+    assert.equal(productIdentity.canGenerate, true, prompt);
+    assert.deepEqual(productIdentity.errors, [], prompt);
+  }
+});
+
+resolverTest("changing a strict slot to custom removes platform blocking rules with a warning", () => {
+  const plan = resolver.resolveCreationPlatformPlan({
+    platform: "amazon",
+    evidence: fullAmazonEvidence(),
+    itemOverrides: [
+      {
+        slotKey: "amazon:amazon-main",
+        imageType: "custom",
+        composition: "collage-grid",
+        textPolicy: "moderate",
+        logoPolicy: "allow-supplied",
+      },
+    ],
+  });
+
+  assert.equal(plan.items[0].imageType, "custom");
+  assert.equal(plan.items[0].constraints.length, 0);
+  assert.equal(plan.validation.isValid, true);
+  assert.ok(plan.warnings.some((warning) => warning.code === "custom-image-type"));
+});
+
+resolverTest("unknown platforms fall back visibly and C-level profiles stay advisory", () => {
+  const unknown = resolver.resolveCreationPlatformPlan({
+    platform: "future-market",
+    evidence: { dimensions: true, packageContents: true },
+    skuSubjects: [{ id: "one" }, { id: "two" }],
+  });
+  assert.equal(unknown.requestedPlatform, "future-market");
+  assert.equal(unknown.platform, "universal");
+  assert.ok(unknown.warnings.some((warning) => warning.code === "unknown-platform"));
+
+  const cLevel = resolver.resolveCreationPlatformPlan({
+    platform: "pdd",
+    evidence: fullAmazonEvidence(),
+    skuSubjects: [{ id: "one" }, { id: "two" }],
+  });
+  assert.equal(cLevel.evidenceLevel, "C");
+  assert.equal(cLevel.validation.isValid, true);
+  assert.ok(cLevel.warnings.some((warning) => warning.code === "advisory-platform-profile"));
+  assert.ok(cLevel.items.every((item) => item.constraints.every((constraint) => constraint.level !== "blocking")));
+});
+
+resolverTest("restore current platform recommendation clears overrides but preserves planning evidence", () => {
+  const input = {
+    platform: "amazon",
+    category: "electronics",
+    evidence: { dimensions: true, specifications: true, packageContents: true },
+    referenceCoverage: [{ role: "usage", filename: "usage.png" }],
+    skuSubjects: [{ id: "one" }, { id: "two" }],
+    setOverrides: { ratio: "4:3", targetLanguage: "ja", imageCount: 4 },
+    itemOverrides: [{ slotKey: "amazon:amazon-main", imageType: "custom", ratio: "3:4" }],
+  };
+
+  const modified = resolver.resolveCreationPlatformPlan(input);
+  assert.equal(modified.items[0].imageType, "custom");
+  assert.equal(modified.carouselImageCount, 4);
+
+  const restored = resolver.restoreCreationPlatformRecommendations(input);
+  assert.equal(restored.platform, "amazon");
+  assert.equal(restored.items[0].imageType, "amazon-main");
+  assert.equal(restored.items[0].ratio, "1:1");
+  assert.equal(restored.items[0].targetLanguage, "en");
+  assert.equal(restored.carouselImageCount, 7);
+  assert.deepEqual(restored.setOverrides, {});
+  assert.deepEqual(restored.itemOverrides, []);
+  assert.deepEqual(restored.categorySignals, ["electronics-specifications"]);
+  assert.ok(restored.referenceCoverage.some((entry) => entry.role === "usage"));
+  assert.deepEqual(restored.skuSubjectIds, ["one", "two"]);
+});
+
+resolverTest("override normalizers accept JSON and discard entries without supported changes", () => {
+  assert.deepEqual(
+    resolver.normalizeCreationPlatformSetOverrides(JSON.stringify({ ratio: "3:4", unknown: "ignored" })),
+    { ratio: "3:4" },
+  );
+  assert.deepEqual(
+    resolver.normalizeCreationPlatformItemOverrides(
+      JSON.stringify([
+        { slotKey: "amazon:amazon-main", textPolicy: "none" },
+        { slotKey: "", textPolicy: "moderate" },
+        { slotKey: "amazon:benefit-proof", unknown: "ignored" },
+      ]),
+    ),
+    [{ slotKey: "amazon:amazon-main", textPolicy: "none" }],
+  );
+});
