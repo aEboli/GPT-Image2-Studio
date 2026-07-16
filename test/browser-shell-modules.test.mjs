@@ -557,8 +557,9 @@ test("creation record listing meta label only appears when listing drafts exist"
   assert.equal(getCreationRecordListingMetaLabel({}), "");
 });
 
-test("creation listing view removes Chinese from English draft headers", () => {
+test("creation listing view removes Chinese from English V2 draft headers", () => {
   const header = formatCreationListingDraftHeader({
+    schemaVersion: "2",
     title: "1 Pack 13cm 璺簹纭サ Product Listing Draft",
     skuTitle: "璺簹纭サ",
     marketplace: "amazon-us",

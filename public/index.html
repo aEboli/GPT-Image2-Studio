@@ -1337,15 +1337,6 @@
                   ></textarea>
                 </label>
 
-                <label class="compact-field creation-dimension-unit-field" data-creation-set-only>
-                  <span>规格单位</span>
-                  <select id="creationDimensionUnitModeInput" name="dimensionUnitMode">
-                    <option value="metric">公制</option>
-                    <option value="imperial">英制</option>
-                    <option value="both" selected>公制和英制</option>
-                  </select>
-                </label>
-
                 <div class="creation-reference-block" data-creation-set-only>
                   <div class="field-head">
                     <div>
@@ -1400,21 +1391,6 @@
                     </div>
                     <div class="reference-analysis-list" id="creationReferenceAnalysisList"></div>
                   </div>
-                </div>
-
-                <div class="creation-reference-block creation-style-reference-block" data-creation-set-only>
-                  <div class="field-head">
-                    <div>
-                      <span>参考风格图</span>
-                    </div>
-                    <small id="creationStyleReferenceCount">0 / 3</small>
-                  </div>
-                  <label class="reference-dropzone creation-reference-dropzone creation-style-reference-dropzone" id="creationStyleReferenceDropzone">
-                    <input id="creationStyleReferenceInput" name="creationStyleReferenceImages" type="file" accept="image/*" multiple />
-                    <div class="reference-icon" aria-hidden="true"></div>
-                    <span>上传风格参考图</span>
-                  </label>
-                  <div class="reference-grid creation-reference-grid creation-style-reference-grid hidden" id="creationStyleReferenceGrid"></div>
                 </div>
 
                 <div class="creation-logo-block">
@@ -1572,15 +1548,26 @@
                     </select>
                   </label>
 
-                  <label class="creation-listing-toggle" data-creation-set-only>
-                    <input id="creationInfographicRebuildEnabledInput" name="infographicRebuildEnabled" type="checkbox" checked />
-                    <span>信息图重构</span>
+                  <label class="compact-field creation-dimension-unit-field" data-creation-set-only>
+                    <span>规格单位</span>
+                    <select id="creationDimensionUnitModeInput" name="dimensionUnitMode">
+                      <option value="metric">公制</option>
+                      <option value="imperial">英制</option>
+                      <option value="both" selected>公制和英制</option>
+                    </select>
                   </label>
 
-                  <label class="creation-listing-toggle is-prominent" data-creation-set-only>
-                    <input id="creationListingAgentEnabledInput" type="checkbox" />
-                    <span>Listing</span>
-                  </label>
+                  <div class="creation-toggle-row" data-creation-set-only>
+                    <label class="creation-listing-toggle">
+                      <input id="creationInfographicRebuildEnabledInput" name="infographicRebuildEnabled" type="checkbox" checked />
+                      <span>信息图重构</span>
+                    </label>
+
+                    <label class="creation-listing-toggle is-prominent">
+                      <input id="creationListingAgentEnabledInput" type="checkbox" />
+                      <span>Listing</span>
+                    </label>
+                  </div>
 
                   <section class="creation-industry-browser" id="creationIndustryTemplateBrowser" aria-label="行业模板" data-creation-set-only>
                     <input id="creationIndustryTemplateInput" name="industryTemplate" type="hidden" value="general" />
@@ -1793,9 +1780,9 @@
               <div class="creation-queue-strip hidden" id="creationQueueStrip" aria-label="套图生成队列"></div>
               <div class="creation-record-detail" id="creationRecordDetail" aria-live="polite"></div>
               <div class="creation-result-grid" id="creationResultGrid"></div>
-              <section class="creation-listing-panel hidden" aria-label="Amazon Listing 草稿">
+              <section class="creation-listing-panel hidden" aria-label="Listing 草稿">
                 <div class="panel-title between">
-                  <h3>Amazon Listing</h3>
+                  <h3>Listing 草稿</h3>
                   <span class="count-pill small" id="creationInlineListingStatus">未生成</span>
                 </div>
                 <div class="creation-listing-drafts" id="creationInlineListingDrafts"></div>
@@ -2473,9 +2460,9 @@
                 <div class="creation-record-detail" id="creationRecordArchiveDetail"></div>
                 <div class="creation-record-results">
                   <div class="creation-result-grid creation-record-result-grid" id="creationRecordResultGrid"></div>
-                  <section class="creation-listing-panel hidden" aria-label="Amazon Listing 草稿">
+                  <section class="creation-listing-panel hidden" aria-label="Listing 草稿">
                     <div class="panel-title between">
-                      <h3>Amazon Listing</h3>
+                      <h3>Listing 草稿</h3>
                       <span class="count-pill small" id="creationRecordListingStatus">未生成</span>
                     </div>
                     <div class="creation-listing-drafts" id="creationRecordListingDrafts"></div>

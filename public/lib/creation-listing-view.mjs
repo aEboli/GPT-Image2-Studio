@@ -1,3 +1,5 @@
+import { getCreationListingPolicy } from "./creation-listing-policies.mjs";
+
 const CREATION_LISTING_BUCKET_LABELS = {
   exact: "精准关键词",
   longTail: "长尾关键词",
@@ -203,6 +205,9 @@ function cleanEnglishVisibleListingText(value, fallback = "") {
 }
 
 function formatCreationListingVisibleText(draft = {}, value, fallback = "") {
+  if (cleanCreationListingText(draft.schemaVersion || draft.schema_version) !== "2") {
+    return cleanCreationListingText(value) || fallback;
+  }
   return isEnglishCreationListingDraft(draft)
     ? cleanEnglishVisibleListingText(value, fallback)
     : cleanCreationListingText(value) || fallback;
@@ -285,6 +290,9 @@ function normalizeCreationListingDisplayForView(value = {}) {
   return {
     title: cleanCreationListingText(value.title),
     sellingPoints: cleanCreationListingArray(value.sellingPoints || value.selling_points),
+    buyerObjections: cleanCreationListingArray(value.buyerObjections || value.buyer_objections || value.painPoints || value.pain_points),
+    highlights: cleanCreationListingArray(value.highlights || value.fiveBullets || value.five_bullets),
+    searchTerms: cleanCreationListingArray(value.searchTerms || value.search_terms || value.backendSearchTerms || value.backend_search_terms, { split: true }),
     painPoints: cleanCreationListingArray(value.painPoints || value.pain_points),
     fiveBullets: cleanCreationListingArray(value.fiveBullets || value.five_bullets),
     description: cleanCreationListingText(value.description),
@@ -296,64 +304,97 @@ function normalizeCreationListingDisplayForView(value = {}) {
 }
 
 export function normalizeCreationListingDraftForView(draft = {}, fallbackIndex = 0) {
-  const language = cleanCreationListingText(draft.language) || "en-US";
-  const keywordBuckets = normalizeCreationListingPublicKeywordBuckets(draft.keywordBuckets || draft.keyword_buckets, language);
+  const schemaVersion = cleanCreationListingText(draft.schemaVersion || draft.schema_version);
+  const isV2 = schemaVersion === "2";
+  const requestedPolicyId = cleanCreationListingText(draft.platformId || draft.platform_id || draft.marketplace) || "universal";
+  const policy = getCreationListingPolicy(requestedPolicyId);
+  const language = cleanCreationListingText(draft.language) || policy.defaultLocale || "en-US";
+  const normalizePublicText = isV2
+    ? (value, fallback = "") => formatCreationListingPublicText(value, language, fallback)
+    : (value, fallback = "") => cleanCreationListingText(value) || fallback;
+  const normalizePublicArray = isV2
+    ? (value, options = {}) => cleanCreationListingPublicArray(value, { ...options, language })
+    : (value, options = {}) => cleanCreationListingArray(value, options);
+  const keywordBuckets = isV2
+    ? normalizeCreationListingPublicKeywordBuckets(draft.keywordBuckets || draft.keyword_buckets, language)
+    : normalizeCreationListingKeywordBuckets(draft.keywordBuckets || draft.keyword_buckets);
   const zhDisplay = normalizeCreationListingDisplayForView(draft.zhDisplay || draft.zh_display);
+  const highlights = normalizePublicArray(draft.highlights || draft.fiveBullets || draft.five_bullets);
+  const buyerObjections = normalizePublicArray(
+    draft.buyerObjections || draft.buyer_objections || draft.painPoints || draft.pain_points,
+  );
+  const searchTerms = normalizePublicArray(
+    draft.searchTerms || draft.search_terms || draft.backendSearchTerms || draft.backend_search_terms,
+    { split: true },
+  );
+  const savedFieldLabels = draft.fieldLabels && typeof draft.fieldLabels === "object" ? draft.fieldLabels : {};
+  const savedFieldPurposes = draft.fieldPurposes && typeof draft.fieldPurposes === "object" ? draft.fieldPurposes : {};
+  const policyFieldLabels = {
+    title: policy.titleRules.label || "标题",
+    highlights: policy.highlightRules.label || "亮点",
+    description: policy.descriptionRules.label || "描述",
+    searchTerms: policy.searchRules.label || "搜索词",
+    sellingPoints: "卖点策略",
+    buyerObjections: "购买疑虑",
+    keywordBuckets: "关键词规划",
+  };
+  const policyFieldPurposes = {
+    title: policy.titleRules.purpose || "",
+    highlights: policy.highlightRules.purpose || "",
+    description: policy.descriptionRules.purpose || "",
+    searchTerms: policy.searchRules.purpose || "",
+  };
   return {
+    ...(draft && typeof draft === "object" ? structuredClone(draft) : {}),
     id: cleanCreationListingText(draft.id) || `listing-${fallbackIndex + 1}`,
-    marketplace: cleanCreationListingText(draft.marketplace) || "amazon-us",
+    ...(schemaVersion ? { schemaVersion } : {}),
+    platformId: cleanCreationListingText(draft.platformId || draft.platform_id) || (isV2 ? policy.id : requestedPolicyId === "amazon-us" ? "amazon" : policy.id),
+    platformLabel: cleanCreationListingText(draft.platformLabel || draft.platform_label) || policy.label,
+    listingPolicyVersion: cleanCreationListingText(draft.listingPolicyVersion || draft.listing_policy_version) || (isV2 ? policy.policyVersion : ""),
+    marketplace: cleanCreationListingText(draft.marketplace) || (isV2 ? policy.marketplaceId : "amazon-us"),
     language,
     skuSubjectId: cleanCreationListingText(draft.skuSubjectId || draft.sku_subject_id),
     skuTitle: cleanCreationListingText(draft.skuTitle || draft.sku_title),
     evidenceMode: cleanCreationListingText(draft.evidenceMode || draft.evidence_mode) || "input-only",
     status: cleanCreationListingText(draft.status) || "completed",
-    title: formatCreationListingPublicText(draft.title, language, `Listing ${fallbackIndex + 1}`),
-    sellingPoints: cleanCreationListingPublicArray(draft.sellingPoints || draft.selling_points, { language }),
-    painPoints: cleanCreationListingPublicArray(draft.painPoints || draft.pain_points, { language }),
-    fiveBullets: cleanCreationListingPublicArray(draft.fiveBullets || draft.five_bullets, { language }),
-    description: formatCreationListingPublicText(draft.description, language),
-    backendSearchTerms: formatCreationListingPublicText(draft.backendSearchTerms || draft.backend_search_terms, language),
+    title: normalizePublicText(draft.title, `Listing ${fallbackIndex + 1}`),
+    sellingPoints: normalizePublicArray(draft.sellingPoints || draft.selling_points),
+    buyerObjections,
+    highlights,
+    searchTerms,
+    painPoints: normalizePublicArray(draft.painPoints || draft.pain_points),
+    fiveBullets: normalizePublicArray(draft.fiveBullets || draft.five_bullets),
+    description: normalizePublicText(draft.description),
+    backendSearchTerms: normalizePublicText(draft.backendSearchTerms || draft.backend_search_terms),
     keywordBuckets,
     evidence: cleanCreationListingArray(draft.evidence),
     missingInfo: cleanCreationListingArray(draft.missingInfo || draft.missing_info),
     warnings: cleanCreationListingArray(draft.warnings),
     createdAt: cleanCreationListingText(draft.createdAt || draft.created_at),
     updatedAt: cleanCreationListingText(draft.updatedAt || draft.updated_at),
+    publishFields: isV2
+      ? Array.isArray(draft.publishFields) ? cleanCreationListingArray(draft.publishFields) : [...policy.publishFields]
+      : [
+      "title", "sellingPoints", "painPoints", "fiveBullets", "description", "backendSearchTerms", "keywordBuckets",
+    ],
+    internalFields: isV2
+      ? Array.isArray(draft.internalFields) ? cleanCreationListingArray(draft.internalFields) : [...policy.internalFields]
+      : ["evidence", "missingInfo", "warnings"],
+    fieldLabels: Object.fromEntries(Object.entries(policyFieldLabels).map(([field, fallback]) => [
+      field,
+      isV2 ? cleanCreationListingText(savedFieldLabels[field]) || fallback : fallback,
+    ])),
+    fieldPurposes: Object.fromEntries(Object.entries(policyFieldPurposes).map(([field, fallback]) => [
+      field,
+      isV2 ? cleanCreationListingText(savedFieldPurposes[field]) || fallback : fallback,
+    ])),
+    isLegacy: !isV2,
     ...(zhDisplay ? { zhDisplay } : {}),
   };
 }
 
 export function getCreationListingDrafts(set) {
   return Array.isArray(set?.listingDrafts) ? set.listingDrafts : [];
-}
-
-export function getCreationListingEligibility(set = {}) {
-  const source = set && typeof set === "object" ? set : {};
-  const plan = source.effectivePlan && typeof source.effectivePlan === "object" ? source.effectivePlan : {};
-  const provenance = cleanCreationListingText(source.platformProvenance || plan.platformProvenance).toLowerCase();
-  const platform = cleanCreationListingText(
-    source.requestedPlatform
-      || plan.requestedPlatform
-      || source.platform
-      || plan.platform
-      || source.platformPolicyId
-      || plan.platformPolicyId,
-  ).toLowerCase();
-  const hasPlatformMetadata = Boolean(
-    provenance
-      || platform
-      || source.strategyVersion
-      || plan.strategyVersion
-      || source.effectivePlan,
-  );
-
-  if (platform === "amazon") {
-    return { eligible: true, reason: "amazon" };
-  }
-  if (provenance === "legacy-missing" || !hasPlatformMetadata) {
-    return { eligible: true, reason: "legacy-missing" };
-  }
-  return { eligible: false, reason: "non-amazon" };
 }
 
 export function getCreationRecordListingMetaLabel(set) {
@@ -365,8 +406,9 @@ export function formatCreationListingDraftHeader(draft = {}, index = 0) {
   const skuMeta = formatCreationListingVisibleText(draft, draft.skuTitle || draft.skuSubjectId, "");
   const meta = [
     skuMeta,
-    draft.marketplace,
+    draft.platformLabel || draft.marketplace,
     draft.language,
+    draft.listingPolicyVersion,
     draft.evidenceMode,
     draft.status,
   ]
@@ -386,6 +428,9 @@ export function getCreationListingSearchValues(set = {}) {
     ...(Array.isArray(draft.sellingPoints) ? draft.sellingPoints : []),
     ...(Array.isArray(draft.painPoints) ? draft.painPoints : []),
     ...(Array.isArray(draft.fiveBullets) ? draft.fiveBullets : []),
+    ...(Array.isArray(draft.highlights) ? draft.highlights : []),
+    ...(Array.isArray(draft.searchTerms) ? draft.searchTerms : []),
+    ...(Array.isArray(draft.buyerObjections) ? draft.buyerObjections : []),
     ...Object.values(draft.keywordBuckets || {}).flat(),
   ]);
 }
@@ -488,7 +533,7 @@ function createCreationListingCharacterCountsNode(counts) {
   return stats;
 }
 
-function createCreationListingField(label, value, { list = false, localizedValue, copyValue, countValue, localizedCountValue } = {}) {
+function createCreationListingField(label, value, { list = false, localizedValue, copyValue, countValue, localizedCountValue, purpose } = {}) {
   const field = document.createElement("div");
   field.className = "creation-listing-field";
   const copySource = copyValue ?? value;
@@ -511,6 +556,13 @@ function createCreationListingField(label, value, { list = false, localizedValue
     ),
   );
   field.appendChild(fieldHead);
+  const purposeText = cleanCreationListingText(purpose);
+  if (purposeText) {
+    const purposeNode = document.createElement("small");
+    purposeNode.className = "creation-listing-field-purpose";
+    purposeNode.textContent = purposeText;
+    field.appendChild(purposeNode);
+  }
 
   if (list) {
     const listNode = document.createElement("ul");
@@ -558,6 +610,48 @@ async function copyCreationListingFieldButton(copyButton, context = {}) {
 }
 
 export function buildCreationListingDraftText(draft, index = 0) {
+  if (cleanCreationListingText(draft?.schemaVersion) === "2") {
+    const status = cleanCreationListingText(draft.status).toLowerCase() || "needs-review";
+    const baseLines = [
+      `Listing ${index + 1}`,
+      `平台: ${draft.platformLabel || draft.platformId || draft.marketplace || "通用电商"}`,
+      `语言: ${draft.language || "无"}`,
+      `策略版本: ${draft.listingPolicyVersion || "无"}`,
+      `状态: ${status}`,
+    ];
+    if (["needs-review", "failed"].includes(status)) {
+      return [
+        ...baseLines,
+        status === "failed" ? "无可发布草稿。" : "待人工复核，不可直接发布。",
+        `警告: ${formatCreationListingList(draft.warnings).join("；")}`,
+        `缺失信息: ${formatCreationListingList(draft.missingInfo).join("；")}`,
+      ].join("\n");
+    }
+
+    const values = {
+      title: draft.title,
+      highlights: draft.highlights,
+      description: draft.description,
+      searchTerms: draft.searchTerms,
+      sellingPoints: draft.sellingPoints,
+      buyerObjections: draft.buyerObjections,
+      keywordBuckets: Object.values(draft.keywordBuckets || {}).flat(),
+    };
+    const labels = draft.fieldLabels || {};
+    const publishLines = (draft.publishFields || ["title", "highlights", "description"])
+      .flatMap((field) => {
+        const value = values[field];
+        const label = labels[field] || field;
+        if (Array.isArray(value)) {
+          const items = cleanCreationListingArray(value);
+          return items.length > 0 ? [`${label}:`, ...items.map((item, itemIndex) => `${itemIndex + 1}. ${item}`)] : [];
+        }
+        const text = cleanCreationListingText(value);
+        return text ? [`${label}: ${text}`] : [];
+      });
+    return [...baseLines, ...publishLines].join("\n");
+  }
+
   const {
     title,
     sellingPoints,
@@ -642,86 +736,151 @@ export function renderCreationListingDrafts({ refs, state, set } = {}) {
 
   drafts.forEach((draft, index) => {
     const card = document.createElement("article");
-    const isFailedDraft = cleanCreationListingText(draft.status).toLowerCase() === "failed";
-    card.className = isFailedDraft ? "creation-listing-card is-failed" : "creation-listing-card";
+    const draftStatus = cleanCreationListingText(draft.status).toLowerCase();
+    const isFailedDraft = draftStatus === "failed";
+    const needsReview = draftStatus === "needs-review";
+    const isNonPublishableDraft = isFailedDraft || needsReview;
+    card.className = [
+      "creation-listing-card",
+      isFailedDraft ? "is-failed" : "",
+      needsReview ? "is-needs-review" : "",
+    ].filter(Boolean).join(" ");
 
     const header = document.createElement("div");
     header.className = "creation-listing-card-head";
     const headerContent = formatCreationListingDraftHeader(draft, index);
     const title = document.createElement("h4");
-    const titleCopy = document.createElement("button");
-    titleCopy.className = "creation-listing-title-copy";
-    titleCopy.type = "button";
-    titleCopy.textContent = headerContent.title;
-    titleCopy.title = "点击复制标题";
-    titleCopy.setAttribute("aria-label", "复制标题");
-    applyCreationListingCopyData(titleCopy, "标题", headerContent.title);
-    title.appendChild(titleCopy);
+    if (isNonPublishableDraft) {
+      title.textContent = headerContent.title;
+    } else {
+      const titleCopy = document.createElement("button");
+      titleCopy.className = "creation-listing-title-copy";
+      titleCopy.type = "button";
+      titleCopy.textContent = headerContent.title;
+      titleCopy.title = "点击复制标题";
+      titleCopy.setAttribute("aria-label", "复制标题");
+      applyCreationListingCopyData(titleCopy, draft.fieldLabels?.title || "标题", headerContent.title);
+      title.appendChild(titleCopy);
+    }
     const meta = document.createElement("p");
     meta.textContent = headerContent.meta;
     header.append(title, meta);
     card.appendChild(header);
 
-    if (isFailedDraft) {
-      const failedNote = document.createElement("p");
-      failedNote.className = "creation-listing-failed-note";
-      failedNote.textContent = "Listing 生成失败：下方是保守占位草稿，请重写或重新生成后再发布。";
-      card.appendChild(failedNote);
+    if (isNonPublishableDraft || draft.schemaVersion === "2") {
+      const reviewNote = document.createElement("p");
+      reviewNote.className = isFailedDraft ? "creation-listing-failed-note" : "creation-listing-review-note";
+      reviewNote.textContent = isFailedDraft
+        ? "Listing 生成失败：当前没有可发布草稿，请修正信息后重写或重新生成。"
+        : needsReview
+          ? "此草稿待人工复核，不可直接发布。"
+          : "机器校验通过，发布前仍需人工复核；不代表平台审核、法律合规或转化保证。";
+      card.appendChild(reviewNote);
     }
 
     const contentFrame = document.createElement("div");
     contentFrame.className = "creation-listing-content-frame";
-    contentFrame.appendChild(createCreationListingField("标题", draft.title, {
-      localizedValue: draft.zhDisplay?.title,
-    }));
-    contentFrame.appendChild(createCreationListingField("卖点", draft.sellingPoints, {
-      list: true,
-      localizedValue: draft.zhDisplay?.sellingPoints,
-    }));
-    contentFrame.appendChild(createCreationListingField("痛点", draft.painPoints, {
-      list: true,
-      localizedValue: draft.zhDisplay?.painPoints,
-    }));
-    contentFrame.appendChild(createCreationListingField("五点描述", draft.fiveBullets, {
-      list: true,
-      localizedValue: draft.zhDisplay?.fiveBullets,
-    }));
-    contentFrame.appendChild(createCreationListingField("描述", draft.description, {
-      localizedValue: draft.zhDisplay?.description,
-    }));
-    contentFrame.appendChild(createCreationListingField("后台搜索词", draft.backendSearchTerms, {
-      localizedValue: draft.zhDisplay?.backendSearchTerms,
-    }));
+    if (!isNonPublishableDraft) {
+      if (draft.schemaVersion === "2") {
+      const publishHeading = document.createElement("p");
+      publishHeading.className = "creation-listing-section-label";
+      publishHeading.textContent = "发布字段";
+      contentFrame.appendChild(publishHeading);
+      for (const [field, value, localizedValue, list] of [
+        ["title", draft.title, draft.zhDisplay?.title, false],
+        ["highlights", draft.highlights, draft.zhDisplay?.highlights, true],
+        ["description", draft.description, draft.zhDisplay?.description, false],
+        ["searchTerms", draft.searchTerms, draft.zhDisplay?.searchTerms, true],
+      ]) {
+        if (!draft.publishFields.includes(field)) continue;
+        const node = createCreationListingField(draft.fieldLabels[field] || field, value, { list, localizedValue });
+        node.classList.add("is-publishable");
+        contentFrame.appendChild(node);
+      }
 
-    const bucketLines = getCreationListingBucketEntries(draft.keywordBuckets).map(
-      (entry) => `${entry.label}: ${formatCreationListingList(entry.values).join("、")}`,
-    );
-    const localizedBucketLines = buildCreationListingLocalizedBucketLines(draft.zhDisplay?.keywordBuckets);
-    const localizedBucketValues = Object.values(draft.zhDisplay?.keywordBuckets || {}).flat();
-    const buckets = createCreationListingField("关键词分组", bucketLines, {
-      list: true,
-      localizedValue: localizedBucketLines,
-      copyValue: buildCreationListingBucketCopyLines(draft.keywordBuckets),
-      countValue: Object.values(draft.keywordBuckets || {}).flat(),
-      localizedCountValue: localizedBucketValues,
-    });
-    buckets.classList.add("creation-listing-buckets");
-    contentFrame.appendChild(buckets);
+      const internalHeading = document.createElement("p");
+      internalHeading.className = "creation-listing-section-label is-internal";
+      internalHeading.textContent = "内部策划与复核";
+      contentFrame.appendChild(internalHeading);
+      const sellingPointsField = createCreationListingField(draft.fieldLabels.sellingPoints, draft.sellingPoints, {
+        list: true,
+        localizedValue: draft.zhDisplay?.sellingPoints,
+      });
+      sellingPointsField.classList.add("is-internal");
+      contentFrame.appendChild(sellingPointsField);
+      const objectionsField = createCreationListingField(draft.fieldLabels.buyerObjections, draft.buyerObjections, {
+        list: true,
+        localizedValue: draft.zhDisplay?.buyerObjections,
+      });
+      objectionsField.classList.add("is-internal");
+      contentFrame.appendChild(objectionsField);
+      if (draft.internalFields.includes("searchTerms") && !draft.publishFields.includes("searchTerms")) {
+        const searchTermsField = createCreationListingField(draft.fieldLabels.searchTerms, draft.searchTerms, {
+          list: true,
+          localizedValue: draft.zhDisplay?.searchTerms,
+          purpose: draft.fieldPurposes.searchTerms,
+        });
+        searchTermsField.classList.add("is-internal");
+        contentFrame.appendChild(searchTermsField);
+      }
+      } else {
+        contentFrame.appendChild(createCreationListingField("标题", draft.title, {
+          localizedValue: draft.zhDisplay?.title,
+        }));
+        contentFrame.appendChild(createCreationListingField("卖点", draft.sellingPoints, {
+          list: true,
+          localizedValue: draft.zhDisplay?.sellingPoints,
+        }));
+        contentFrame.appendChild(createCreationListingField("痛点", draft.painPoints, {
+          list: true,
+          localizedValue: draft.zhDisplay?.painPoints,
+        }));
+        contentFrame.appendChild(createCreationListingField("五点描述", draft.fiveBullets, {
+          list: true,
+          localizedValue: draft.zhDisplay?.fiveBullets,
+        }));
+        contentFrame.appendChild(createCreationListingField("描述", draft.description, {
+          localizedValue: draft.zhDisplay?.description,
+        }));
+        contentFrame.appendChild(createCreationListingField("后台搜索词", draft.backendSearchTerms, {
+          localizedValue: draft.zhDisplay?.backendSearchTerms,
+        }));
+      }
+
+      const bucketLines = getCreationListingBucketEntries(draft.keywordBuckets).map(
+        (entry) => `${entry.label}: ${formatCreationListingList(entry.values).join("、")}`,
+      );
+      const localizedBucketLines = buildCreationListingLocalizedBucketLines(draft.zhDisplay?.keywordBuckets);
+      const localizedBucketValues = Object.values(draft.zhDisplay?.keywordBuckets || {}).flat();
+      const buckets = createCreationListingField(draft.schemaVersion === "2" ? draft.fieldLabels.keywordBuckets : "关键词分组", bucketLines, {
+        list: true,
+        localizedValue: localizedBucketLines,
+        copyValue: buildCreationListingBucketCopyLines(draft.keywordBuckets),
+        countValue: Object.values(draft.keywordBuckets || {}).flat(),
+        localizedCountValue: localizedBucketValues,
+      });
+      buckets.classList.add("creation-listing-buckets", ...(draft.schemaVersion === "2" ? ["is-internal"] : []));
+      contentFrame.appendChild(buckets);
+    }
 
     const warningCopy = cleanCreationListingPublicArray(draft.warnings, { language: draft.language });
     const missingInfoCopy = cleanCreationListingPublicArray(draft.missingInfo, { language: draft.language });
     const warningReference = resolveCreationListingReviewReferenceRows(draft.warnings, draft.zhDisplay?.warnings, "warnings");
     const missingInfoReference = resolveCreationListingReviewReferenceRows(draft.missingInfo, draft.zhDisplay?.missingInfo, "missingInfo");
-    contentFrame.appendChild(createCreationListingField("警告", draft.warnings, {
+    const warningsField = createCreationListingField("警告", draft.warnings, {
       list: true,
       localizedValue: warningReference,
       copyValue: warningCopy.length > 0 ? warningCopy : ["None"],
-    }));
-    contentFrame.appendChild(createCreationListingField("缺失信息", draft.missingInfo, {
+    });
+    warningsField.classList.add("is-internal");
+    contentFrame.appendChild(warningsField);
+    const missingField = createCreationListingField("缺失信息", draft.missingInfo, {
       list: true,
       localizedValue: missingInfoReference,
       copyValue: missingInfoCopy.length > 0 ? missingInfoCopy : ["None"],
-    }));
+    });
+    missingField.classList.add("is-internal");
+    contentFrame.appendChild(missingField);
     card.appendChild(contentFrame);
 
     refs.creationRecordListingDrafts.appendChild(card);
@@ -748,12 +907,6 @@ export function createCreationListingController(context = {}) {
     if (!selectedSet?.setId) {
       context.setFeedback?.("请先选择一套记录。", "error");
       return null;
-    }
-
-    if (!getCreationListingEligibility(selectedSet).eligible) {
-      const message = "Amazon US Listing 仅支持 Amazon 平台套图；当前记录仍可查看、复制和导出已保存草稿。";
-      context.setFeedback?.(message, "error");
-      throw new Error(message);
     }
 
     if (isCreationListingGenerating(context.state, selectedSet.setId)) {
@@ -838,15 +991,12 @@ export function createCreationListingController(context = {}) {
   function syncRecordControls(selectedSet) {
     const drafts = getCreationListingDrafts(selectedSet);
     const isGenerating = isCreationListingGenerating(context.state, selectedSet?.setId);
-    const listingEligibility = getCreationListingEligibility(selectedSet);
     if (context.refs.creationRecordGenerateListingsButton) {
       renderCreationListingGenerateButton(context.refs.creationRecordGenerateListingsButton, {
-        disabled: !selectedSet || isGenerating || !listingEligibility.eligible,
+        disabled: !selectedSet || isGenerating,
         isGenerating,
       });
-      context.refs.creationRecordGenerateListingsButton.title = selectedSet && !listingEligibility.eligible
-        ? "Amazon US Listing 仅支持 Amazon 平台套图"
-        : "";
+      context.refs.creationRecordGenerateListingsButton.title = "";
     }
     if (context.refs.creationRecordCopyListingsButton) {
       context.refs.creationRecordCopyListingsButton.disabled = drafts.length === 0 || isGenerating;

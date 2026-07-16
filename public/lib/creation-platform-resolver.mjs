@@ -61,6 +61,49 @@ const IMAGE_TYPE_EVIDENCE_KEYS = {
   "defect-disclosure": "defects",
   "gift-packaging": "packageContents",
 };
+const CUSTOM_ROLE_LIFESTYLE_ROLES = new Set([
+  "scene",
+  "atmosphere",
+  "usage-suggestion",
+  "human-handheld",
+  "human-wearable",
+]);
+const CUSTOM_ROLE_STORY_ROLES = new Set([
+  "hero",
+  "benefit",
+  "brand-story",
+  "after-sales",
+]);
+const GENERIC_AUDIENCE_TARGET = "buyers evaluating this product category";
+const GENERIC_AUDIENCE_OUTCOME = "make a confident product choice";
+const SENSITIVE_AUDIENCE_PATTERNS = [
+  /\b(?:age(?:d)?|teen(?:ager)?s?|children?|kids?|bab(?:y|ies)|elderly|seniors?|young adults?|middle[- ]aged)\b/iu,
+  /\b(?:age[sd]?\s*)?\d{1,2}(?:\s*[-–]\s*\d{1,2})?\s*(?:years? old|year[- ]olds?)\b/iu,
+  /\b(?:male|female|men|women|gender|transgender|nonbinary|pregnan(?:t|cy)|maternity)\b/iu,
+  /\b(?:race|racial|ethnic(?:ity)?|nationality|asian|african|caucasian|latino|hispanic)\b/iu,
+  /\b(?:black|white|african american)\s+(?:buyers?|consumers?|people|persons?|men|women|families|users?)\b/iu,
+  /\b(?:american|chinese|japanese|korean|indian|british|french|german|mexican|canadian)s?\s+(?:buyers?|consumers?|people|persons?|men|women|families|users?)\b/iu,
+  /\b(?:religion|religious|christian|muslim|islamic|jewish|hindu|buddhist)\b/iu,
+  /\b(?:disabled|disability|patient|diabetic|cancer|disease|medical condition|mental health|depression|anxiety)\b/iu,
+  /\b(?:sexual orientation|gay|lesbian|bisexual)\b/iu,
+  /\b(?:income|salary|wealthy|low[- ]income|high[- ]income|poor|rich)\b/iu,
+  /(?:美国|中国|日本|韩国|印度|英国|法国|德国|墨西哥|加拿大)(?:买家|消费者|用户|人群|家庭|男性|女性|男士|女士)/u,
+  /(?:年龄|\d{1,2}\s*岁|老年人?|中年人?|青少年|儿童|婴儿|宝宝|年轻人|男性|女性|男士|女士|性别|跨性别|孕妇|怀孕|种族|民族|国籍|黑人|白人|美国人|中国人|日本人|韩国人|印度人|宗教|基督徒|穆斯林|犹太|印度教|佛教|残疾|残障|患者|病人|糖尿病|癌症|抑郁|焦虑|性取向|同性恋|双性恋|收入|薪资|高收入|低收入|富人|穷人)/u,
+];
+const UNSUPPORTED_AUDIENCE_CLAIM_PATTERNS = [
+  /\b(?:fda|ce|ul|iso)\s*(?:certified|approved|compliant|certification)?\b/iu,
+  /\b(?:certif(?:ied|ication)|officially approved|clinically proven|doctor recommended)\b/iu,
+  /\b(?:best[- ]seller|number one|#\s*1|sales? (?:leader|champion))\b/iu,
+  /\b(?:over|more than)?\s*\d+(?:[.,]\d+)*(?:\s*(?:k|m|million|thousand))?\s+(?:units?\s+)?sold\b/iu,
+  /\b(?:guarantee(?:d)?|warrant(?:y|ied)|money[- ]back)\b/iu,
+  /\b(?:five[- ]star|5[- ]star|ratings?|reviews?|testimonials?)\b/iu,
+  /\b[0-5](?:\.\d+)?\s*(?:\/\s*5|stars?)\b/iu,
+  /(?:[$¥€£]\s*\d|\b\d+(?:\.\d+)?\s*(?:usd|cny|rmb|eur|gbp)\b|\b(?:lowest|best|special|exclusive)\s+price\b|\b\d+(?:\.\d+)?%\s*off\b)/iu,
+  /\b\d+(?:\.\d+)?\s*(?:x|times)\s+(?:faster|stronger|better|longer|more|performance)\b/iu,
+  /\b100%\s+(?:leakproof|effective|guaranteed|safe|waterproof)\b/iu,
+  /\b(?:cure[sd]?|treats?|prevents?|heals?|therapeutic|health (?:benefit|outcome|effect|improvement))\b/iu,
+  /(?:认证|官方批准|权威背书|临床验证|医生推荐|销量(?:第一|冠军)|全网第一|爆款|已售\s*\d+(?:\.\d+)?\s*(?:万|千|件|单)?|最低价|全网最低|特价|到手价|优惠价|售价\s*[¥￥]?\s*\d+|\d+(?:\.\d+)?\s*折|\d+(?:\.\d+)?\s*倍(?:更快|更强|提升|性能|效果)|\d(?:\.\d+)?\s*(?:分|星)|百分百(?:有效|防水|安全|保证)|保证|担保|保修|质保|退款|好评|五星|治愈|治疗|预防|疗效|健康功效|保健功效)/u,
+];
 
 const CATEGORY_OVERLAYS = {
   "apparel-fit": {
@@ -132,26 +175,58 @@ function uniqueStrings(values = []) {
   return [...new Set(values.map(cleanString).filter(Boolean))];
 }
 
-function normalizeAudienceList(value, maxItems = 5) {
-  const values = Array.isArray(value) ? value : cleanString(value) ? [value] : [];
-  return uniqueStrings(values).slice(0, maxItems);
+function hasCreationAudienceTextRisk(value) {
+  const text = cleanString(value);
+  return Boolean(text) && (
+    SENSITIVE_AUDIENCE_PATTERNS.some((pattern) => pattern.test(text)) ||
+    UNSUPPORTED_AUDIENCE_CLAIM_PATTERNS.some((pattern) => pattern.test(text))
+  );
 }
 
-export function normalizeCreationAudienceStrategy(value = {}) {
+function sanitizeCreationAudienceText(value) {
+  const text = cleanString(value);
+  return text && !hasCreationAudienceTextRisk(text) ? text : "";
+}
+
+function normalizeAudienceList(value, maxItems = 5) {
+  const values = Array.isArray(value) ? value : cleanString(value) ? [value] : [];
+  return uniqueStrings(values).map(sanitizeCreationAudienceText).filter(Boolean).slice(0, maxItems);
+}
+
+function hasAudienceStrategyContent(value = {}) {
+  return Boolean(cleanString(value.targetAudience || value.target_audience) || normalizeAudienceList(value.purchaseMotivations || value.purchase_motivations).length || normalizeAudienceList(value.purchaseObjections || value.purchase_objections).length || cleanString(value.desiredOutcome || value.desired_outcome) || normalizeAudienceList(value.evidenceBasis || value.evidence_basis).length);
+}
+
+export function normalizeCreationAudienceStrategy(value = {}, options = {}) {
   const source = parseJson(value, {});
   if (!source || typeof source !== "object" || Array.isArray(source)) return {};
+  const rawMotivations = Array.isArray(source.purchaseMotivations || source.purchase_motivations) ? source.purchaseMotivations || source.purchase_motivations : cleanString(source.purchaseMotivations || source.purchase_motivations) ? [source.purchaseMotivations || source.purchase_motivations] : [];
+  const rawObjections = Array.isArray(source.purchaseObjections || source.purchase_objections) ? source.purchaseObjections || source.purchase_objections : cleanString(source.purchaseObjections || source.purchase_objections) ? [source.purchaseObjections || source.purchase_objections] : [];
+  const rawEvidence = Array.isArray(source.evidenceBasis || source.evidence_basis) ? source.evidenceBasis || source.evidence_basis : cleanString(source.evidenceBasis || source.evidence_basis) ? [source.evidenceBasis || source.evidence_basis] : [];
+  const rawTargetAudience = cleanString(source.targetAudience || source.target_audience);
+  const rawDesiredOutcome = cleanString(source.desiredOutcome || source.desired_outcome);
+  if (!rawTargetAudience && rawMotivations.length === 0 && rawObjections.length === 0 && !rawDesiredOutcome && rawEvidence.length === 0) return {};
   const confidenceValue = cleanString(source.confidence).toLowerCase();
-  const confidence = ["low", "medium", "high"].includes(confidenceValue) ? confidenceValue : "low";
+  let confidence = ["low", "medium", "high"].includes(confidenceValue) ? confidenceValue : "low";
   const sourceValue = cleanString(source.source || source.audienceSource || source.audience_source).toLowerCase();
   const normalizedSource = ["user", "analysis-suggestion", "platform-default", "category-default"].includes(sourceValue)
     ? sourceValue
-    : "analysis-suggestion";
+    : cleanString(options.defaultSource) || "analysis-suggestion";
+  let targetAudience = sanitizeCreationAudienceText(rawTargetAudience);
+  let purchaseMotivations = normalizeAudienceList(rawMotivations);
+  let purchaseObjections = normalizeAudienceList(rawObjections);
+  let desiredOutcome = sanitizeCreationAudienceText(rawDesiredOutcome);
+  const evidenceBasis = normalizeAudienceList(rawEvidence);
+  const removedUnsafeContent = (rawTargetAudience && !targetAudience) || (rawDesiredOutcome && !desiredOutcome) || purchaseMotivations.length < uniqueStrings(rawMotivations).length || purchaseObjections.length < uniqueStrings(rawObjections).length || evidenceBasis.length < uniqueStrings(rawEvidence).length;
+  if (normalizedSource === "analysis-suggestion" && evidenceBasis.length === 0) {
+    targetAudience = GENERIC_AUDIENCE_TARGET;
+    purchaseMotivations = [];
+    purchaseObjections = [];
+    desiredOutcome = GENERIC_AUDIENCE_OUTCOME;
+    confidence = "low";
+  } else if (normalizedSource === "analysis-suggestion" && removedUnsafeContent) confidence = "low";
   const normalized = {
-    targetAudience: cleanString(source.targetAudience || source.target_audience),
-    purchaseMotivations: normalizeAudienceList(source.purchaseMotivations || source.purchase_motivations),
-    purchaseObjections: normalizeAudienceList(source.purchaseObjections || source.purchase_objections),
-    desiredOutcome: cleanString(source.desiredOutcome || source.desired_outcome),
-    evidenceBasis: normalizeAudienceList(source.evidenceBasis || source.evidence_basis),
+    targetAudience, purchaseMotivations, purchaseObjections, desiredOutcome, evidenceBasis,
     confidence,
     source: normalizedSource,
   };
@@ -159,14 +234,14 @@ export function normalizeCreationAudienceStrategy(value = {}) {
     normalized.desiredOutcome || normalized.evidenceBasis.length ? normalized : {};
 }
 
-function normalizeConversionIntent(value = {}) {
+export function normalizeCreationConversionIntent(value = {}) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const normalized = {
-    audienceFocus: cleanString(value.audienceFocus || value.audience_focus),
-    motivationFocus: cleanString(value.motivationFocus || value.motivation_focus),
-    objectionFocus: cleanString(value.objectionFocus || value.objection_focus),
-    conversionGoal: cleanString(value.conversionGoal || value.conversion_goal),
-    evidenceFocus: cleanString(value.evidenceFocus || value.evidence_focus),
+    audienceFocus: sanitizeCreationAudienceText(value.audienceFocus || value.audience_focus),
+    motivationFocus: sanitizeCreationAudienceText(value.motivationFocus || value.motivation_focus),
+    objectionFocus: sanitizeCreationAudienceText(value.objectionFocus || value.objection_focus),
+    conversionGoal: sanitizeCreationAudienceText(value.conversionGoal || value.conversion_goal),
+    evidenceFocus: sanitizeCreationAudienceText(value.evidenceFocus || value.evidence_focus),
   };
   return Object.values(normalized).some(Boolean) ? normalized : null;
 }
@@ -192,6 +267,14 @@ function normalizeNonNegativeInteger(value) {
   if (value === undefined || value === null || cleanString(value) === "") return null;
   const parsed = Number.parseInt(cleanString(value), 10);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function normalizeSelectedRoles(value = []) {
+  const entries = parseJson(value, []);
+  if (!Array.isArray(entries)) return [];
+  return entries
+    .map((entry) => cleanString(typeof entry === "string" ? entry : entry?.role))
+    .filter(Boolean);
 }
 
 export function normalizeCreationPlatformSetOverrides(value = {}) {
@@ -222,7 +305,7 @@ function normalizeItemOverride(entry = {}) {
   if (enabled !== null) normalized.enabled = enabled;
   const order = normalizeNonNegativeInteger(entry.order);
   if (order !== null) normalized.order = order;
-  const conversionIntent = normalizeConversionIntent(entry.conversionIntent || entry.conversion_intent);
+  const conversionIntent = normalizeCreationConversionIntent(entry.conversionIntent || entry.conversion_intent);
   if (conversionIntent) normalized.conversionIntent = conversionIntent;
 
   return Object.keys(normalized).length > 1 ? normalized : null;
@@ -340,6 +423,14 @@ function normalizeEvidence(value = {}, referenceCoverage = []) {
   return evidence;
 }
 
+export function buildCreationReferencePlanningSignals(referenceRoles = [], baseEvidence = {}) {
+  const referenceCoverage = normalizeReferenceCoverage({ referenceCoverage: referenceRoles });
+  return {
+    referenceCoverage,
+    evidence: normalizeEvidence(baseEvidence, referenceCoverage),
+  };
+}
+
 function getStableSkuSubjectId(subject, index) {
   if (typeof subject === "string") return cleanString(subject);
   if (!subject || typeof subject !== "object") return "";
@@ -370,6 +461,53 @@ function createImageTypeSlot(imageTypeValue, template, source = "platform") {
     constraints: cloneValue(definition.constraints),
     sourceIds: uniqueStrings([...(template.sourceIds || []), ...definition.sourceIds]),
     recommendationSource: source,
+  };
+}
+
+function getRoleLedCustomDefaults(roleValue) {
+  const role = cleanString(roleValue) || "product-detail";
+  if (CUSTOM_ROLE_LIFESTYLE_ROLES.has(role)) {
+    return {
+      composition: "role-led-lifestyle",
+      textPolicy: "concise",
+      scenePolicy: "authentic-use",
+      logoPolicy: "allow-supplied",
+    };
+  }
+  if (CUSTOM_ROLE_STORY_ROLES.has(role)) {
+    return {
+      composition: "role-led-story",
+      textPolicy: "concise",
+      scenePolicy: "optional-context",
+      logoPolicy: "allow-supplied",
+    };
+  }
+  return {
+    composition: "role-led-evidence",
+    textPolicy: "factual-only",
+    scenePolicy: "neutral",
+    logoPolicy: "allow-supplied",
+  };
+}
+
+function createRoleLedCustomSlot(slot = {}, {
+  role = slot.role,
+  imageTypeLabel = "自定义图片",
+  recommendationSource = "item-override",
+} = {}) {
+  const normalizedRole = cleanString(role) || "product-detail";
+  return {
+    ...slot,
+    ...getRoleLedCustomDefaults(normalizedRole),
+    imageType: "custom",
+    imageTypeLabel,
+    role: normalizedRole,
+    prompt: "",
+    required: false,
+    advisory: true,
+    constraints: [],
+    sourceIds: [],
+    recommendationSource,
   };
 }
 
@@ -443,7 +581,7 @@ function applyEvidenceFallbacks(slots, evidence, warnings) {
   return resolved;
 }
 
-function applySetOverrides(slots, setOverrides, { profile, evidence, warnings }) {
+function applySetOverrides(slots, setOverrides, { profile, evidence, selectedRoles, warnings }) {
   let resized = [...slots];
   if (Number.isFinite(setOverrides.imageCount)) {
     const requestedCount = Math.max(0, setOverrides.imageCount);
@@ -454,14 +592,33 @@ function applySetOverrides(slots, setOverrides, { profile, evidence, warnings })
         (candidate) => !usedImageTypes.has(candidate) && hasEvidenceForImageType(candidate, evidence),
       );
       if (!nextImageType) {
+        const slotNumber = resized.length + 1;
+        const slotKey = `${profile.id}:extra:custom:${slotNumber}`;
+        const template = {
+          ...cloneValue(profile.slots[0]),
+          slotKey,
+          itemId: slotKey,
+          itemKind: "carousel",
+          enabled: true,
+          ratio: profile.defaultRatio,
+          resolutionTier: profile.resolutionTier,
+          targetLanguage: profile.targetLanguage,
+          recommendationSource: "set-count-extension-custom",
+        };
+        resized.push(createRoleLedCustomSlot(template, {
+          role: selectedRoles[resized.length] || "product-detail",
+          imageTypeLabel: `自定义图片 ${slotNumber}`,
+          recommendationSource: "set-count-extension-custom",
+        }));
         warnings.push({
-          code: "image-count-extension-limited",
+          code: "image-count-extension-custom",
           level: "warning",
           requestedCount,
           effectiveCount: resized.length,
-          message: "The requested image count exceeds the distinct evidence-supported image types available for this plan.",
+          slotKey,
+          message: "Added an advisory custom image slot to honor the requested image count without inventing unsupported product facts.",
         });
-        break;
+        continue;
       }
 
       const slotKey = `${profile.id}:extra:${nextImageType}`;
@@ -490,17 +647,9 @@ function applySetOverrides(slots, setOverrides, { profile, evidence, warnings })
   });
 }
 
-function applyKnownImageTypeOverride(slot, imageTypeValue) {
+function applyKnownImageTypeOverride(slot, imageTypeValue, role = slot.role) {
   if (imageTypeValue === "custom") {
-    return {
-      ...slot,
-      imageType: "custom",
-      imageTypeLabel: "自定义图片",
-      required: false,
-      advisory: true,
-      constraints: [],
-      recommendationSource: "item-override",
-    };
+    return createRoleLedCustomSlot(slot, { role });
   }
   return createImageTypeSlot(imageTypeValue, slot, "item-override") || slot;
 }
@@ -511,8 +660,13 @@ function applyItemOverrides(slots, itemOverrides, warnings) {
     const base = { ...slot, enabled: slot.enabled !== false, _baseOrder: index };
     if (!override) return base;
 
-    let next = override.imageType ? applyKnownImageTypeOverride(base, override.imageType) : base;
-    if (override.imageType === "custom") {
+    const hasBlockingConstraint = (base.constraints || []).some((constraint) => constraint.level === "blocking");
+    const blockedImageTypeOverride = hasBlockingConstraint && override.imageType && override.imageType !== base.imageType;
+    let next = override.imageType && !blockedImageTypeOverride
+      ? applyKnownImageTypeOverride(base, override.imageType, override.role || base.role)
+      : base;
+    if (blockedImageTypeOverride) warnings.push({ code: "strict-slot-image-type-preserved", level: "warning", slotKey: slot.slotKey, message: "The platform image type was preserved because this slot has sourced blocking constraints." });
+    else if (override.imageType === "custom") {
       warnings.push({
         code: "custom-image-type",
         level: "warning",
@@ -539,14 +693,14 @@ function applyItemOverrides(slots, itemOverrides, warnings) {
       slotKey: override.slotKey,
       itemId: override.slotKey,
       itemKind: "carousel",
-      role: "product-detail",
+      role: override.role || "product-detail",
       enabled: true,
       required: false,
       advisory: true,
       sourceIds: [],
       constraints: [],
       _baseOrder: slots.length + index,
-    }, "custom");
+    }, "custom", override.role || "product-detail");
     for (const field of ITEM_OVERRIDE_FIELDS) {
       if (field === "imageType") continue;
       if (override[field] !== undefined) customSlot[field] = override[field];
@@ -588,19 +742,39 @@ function getCategoryAudienceContext(categorySignals = []) {
   return { motivation: "understand whether the product fits the intended use", objection: "unclear product fit" };
 }
 
-function buildEffectiveAudienceStrategy(profile, categorySignals, inputStrategy) {
-  const supplied = normalizeCreationAudienceStrategy(inputStrategy);
+function getReferenceAnalysisAudienceStrategy(value = {}) {
+  const source = parseJson(value, {});
+  if (!source || typeof source !== "object" || Array.isArray(source)) return {};
+  return normalizeCreationAudienceStrategy(source.audienceStrategy || source.audience_strategy, { defaultSource: "analysis-suggestion" });
+}
+
+function getAudienceFieldSource(primary, secondary, field, fallback) {
+  if (["purchaseMotivations", "purchaseObjections", "evidenceBasis"].includes(field)) {
+    if (primary[field]?.length) return primary.source;
+    if (secondary[field]?.length) return secondary.source;
+    return fallback;
+  }
+  if (cleanString(primary[field])) return primary.source;
+  if (cleanString(secondary[field])) return secondary.source;
+  return fallback;
+}
+
+function buildEffectiveAudienceStrategy(profile, categorySignals, referenceStrategy, inputStrategy) {
+  const analyzed = normalizeCreationAudienceStrategy(referenceStrategy, { defaultSource: "analysis-suggestion" });
+  const supplied = normalizeCreationAudienceStrategy(inputStrategy, { defaultSource: "user" });
   const marketingContext = cloneValue(profile.marketingContext || {});
   const categoryContext = getCategoryAudienceContext(categorySignals);
-  const source = supplied.source || "platform-default";
-  const targetAudience = supplied.targetAudience || "buyers evaluating this product category";
+  const source = hasAudienceStrategyContent(supplied) ? supplied.source : hasAudienceStrategyContent(analyzed) ? analyzed.source : "platform-default";
+  const targetAudience = supplied.targetAudience || analyzed.targetAudience || GENERIC_AUDIENCE_TARGET;
   const purchaseMotivations = uniqueStrings([
     ...(supplied.purchaseMotivations || []),
+    ...(analyzed.purchaseMotivations || []),
     categoryContext.motivation,
     ...(marketingContext.defaultMotivations || []),
   ]).slice(0, 5);
   const purchaseObjections = uniqueStrings([
     ...(supplied.purchaseObjections || []),
+    ...(analyzed.purchaseObjections || []),
     categoryContext.objection,
     ...(marketingContext.defaultObjections || []),
   ]).slice(0, 5);
@@ -608,16 +782,17 @@ function buildEffectiveAudienceStrategy(profile, categorySignals, inputStrategy)
     targetAudience,
     purchaseMotivations,
     purchaseObjections,
-    desiredOutcome: supplied.desiredOutcome || "make a confident product choice",
-    evidenceBasis: supplied.evidenceBasis || [],
-    confidence: supplied.confidence || "low",
+    desiredOutcome: supplied.desiredOutcome || analyzed.desiredOutcome || GENERIC_AUDIENCE_OUTCOME,
+    evidenceBasis: uniqueStrings([...(supplied.evidenceBasis || []), ...(analyzed.evidenceBasis || [])]).slice(0, 5),
+    confidence: hasAudienceStrategyContent(supplied) ? supplied.confidence || "low" : analyzed.confidence || "low",
     source,
     marketingContext,
     provenance: {
-      targetAudience: supplied.targetAudience ? source : "platform-default",
-      purchaseMotivations: supplied.purchaseMotivations?.length ? source : "platform-category",
-      purchaseObjections: supplied.purchaseObjections?.length ? source : "platform-category",
-      desiredOutcome: supplied.desiredOutcome ? source : "platform-default",
+      targetAudience: getAudienceFieldSource(supplied, analyzed, "targetAudience", "platform-default"),
+      purchaseMotivations: getAudienceFieldSource(supplied, analyzed, "purchaseMotivations", "platform-category"),
+      purchaseObjections: getAudienceFieldSource(supplied, analyzed, "purchaseObjections", "platform-category"),
+      desiredOutcome: getAudienceFieldSource(supplied, analyzed, "desiredOutcome", "platform-default"),
+      evidenceBasis: getAudienceFieldSource(supplied, analyzed, "evidenceBasis", "none"),
     },
   };
 }
@@ -749,6 +924,7 @@ function getConstraintPromptForbiddenValues(constraint = {}) {
   if (constraint.field === "composition") {
     return ["collage", "montage", "multi-panel", "scene inset"];
   }
+  if (constraint.field === "scenePolicy" && constraint.value === "studio-white") return ["lifestyle scene", "lifestyle background", "scene prop", "decorative prop", "environmental context"];
   if (constraint.field === "logoPolicy" && constraint.value === "forbid-overlay") {
     return ["external logo", "uploaded logo", "logo overlay"];
   }
@@ -849,10 +1025,13 @@ export function resolveCreationPlatformPlan(input = {}) {
 
   const setOverrides = normalizeCreationPlatformSetOverrides(input.setOverrides || input.platformSetOverrides);
   const itemOverrides = normalizeCreationPlatformItemOverrides(input.itemOverrides || input.platformItemOverrides);
-  slots = applySetOverrides(slots, setOverrides, { profile, evidence, warnings });
+  const selectedRoles = normalizeSelectedRoles(input.selectedRoles);
+  slots = applySetOverrides(slots, setOverrides, { profile, evidence, selectedRoles, warnings });
+  slots = slots.map((slot, index) => selectedRoles[index] ? { ...slot, role: selectedRoles[index] } : slot);
   slots = applyItemOverrides(slots, itemOverrides, warnings);
-  const audienceStrategy = normalizeCreationAudienceStrategy(input.audienceStrategy || input.audience_strategy);
-  const effectiveAudienceStrategy = buildEffectiveAudienceStrategy(profile, uniqueStrings(categorySignals), audienceStrategy);
+  const referenceAudienceStrategy = getReferenceAnalysisAudienceStrategy(input.referenceAnalysis);
+  const audienceStrategy = normalizeCreationAudienceStrategy(input.audienceStrategy || input.audience_strategy, { defaultSource: "user" });
+  const effectiveAudienceStrategy = buildEffectiveAudienceStrategy(profile, uniqueStrings(categorySignals), referenceAudienceStrategy, audienceStrategy);
   slots = assignConversionIntents(slots, effectiveAudienceStrategy);
 
   const enabledItems = slots.filter((slot) => slot.enabled !== false);

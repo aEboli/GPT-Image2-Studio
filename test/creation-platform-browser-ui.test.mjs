@@ -114,7 +114,7 @@ test("Creation fills every policy-backed item override select while preserving a
   assert.equal(fieldState.dataset.creationPlanFieldState, "overridden");
   assert.match(app, /const slotOverride = payload\.values\.platformItemOverrides\.find/);
   assert.match(app, /slotOverride\?\.\[key\]\);/);
-  assert.match(app, /refs\.creationPlanSlots\?\.addEventListener\("change",[\s\S]*\[field\]: value[\s\S]*previewCreationPlan\(\)/);
+  assert.match(app, /refs\.creationPlanSlots\?\.addEventListener\("change",[\s\S]*setCreationPlatformItemOverride\(slot\.dataset\.slotKey, field, value\)[\s\S]*previewCreationPlan\(\)/);
 });
 
 test("Creation plan styling stays compact and prevents field text overflow on mobile", async () => {

@@ -472,6 +472,10 @@ textarea::-webkit-scrollbar-corner {
   overflow: hidden;
 }
 
+html[data-ui-density="wide"] .app-shell {
+  width: calc(100vw - 20px);
+}
+
 .topbar {
   position: relative;
   z-index: 30;
@@ -1245,6 +1249,20 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .generation-m
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.creation-toggle-row {
+  grid-column: 1 / -1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 10px;
+}
+
+.creation-toggle-row .creation-listing-toggle {
+  height: 100%;
+  box-sizing: border-box;
+}
+
 .creation-sku-generation-rule-field {
   min-width: 0;
 }
@@ -1312,13 +1330,6 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .generation-m
 .creation-reference-block {
   display: grid;
   gap: 8px;
-}
-
-.creation-style-reference-block {
-  padding: 9px 10px;
-  border: 1px solid rgba(112, 226, 162, 0.18);
-  border-radius: 8px;
-  background: rgba(112, 226, 162, 0.04);
 }
 
 .creation-reference-block .field-head {
@@ -2861,6 +2872,7 @@ ul.creation-plan-message {
 }
 
 .creation-card-head {
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3682,6 +3694,10 @@ ul.creation-plan-message {
     rgba(255, 255, 255, 0.025);
 }
 
+.creation-listing-card.is-needs-review {
+  border-color: rgba(251, 191, 36, 0.34);
+}
+
 .creation-listing-card-head {
   display: grid;
   gap: 6px;
@@ -3745,6 +3761,18 @@ ul.creation-plan-message {
   line-height: 1.45;
 }
 
+.creation-listing-review-note {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(125, 211, 252, 0.2);
+  border-radius: 8px;
+  background: rgba(125, 211, 252, 0.06);
+  color: #d7f3ff;
+  font-size: var(--type-caption-size);
+  font-weight: 700;
+  line-height: 1.45;
+}
+
 .creation-listing-content-frame {
   min-width: 0;
   display: grid;
@@ -3753,6 +3781,19 @@ ul.creation-plan-message {
   border: 1px solid rgba(125, 211, 252, 0.18);
   border-radius: 8px;
   background: rgba(8, 12, 28, 0.28);
+}
+
+.creation-listing-section-label {
+  color: var(--text);
+  font-size: var(--type-caption-size);
+  font-weight: 800;
+}
+
+.creation-listing-section-label.is-internal {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  color: var(--muted);
 }
 
 .creation-listing-card-head p,
@@ -3771,6 +3812,11 @@ ul.creation-plan-message {
   border: 1px solid rgba(255, 255, 255, 0.075);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.025);
+}
+
+.creation-listing-field.is-internal {
+  border-style: dashed;
+  background: rgba(255, 255, 255, 0.015);
 }
 
 .creation-listing-field:first-child {
@@ -8960,8 +9006,7 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
 }
 
 .timeline-mode,
-.timeline-ratio-size,
-.timeline-item time {
+.timeline-ratio-size {
   color: rgba(171, 184, 218, 0.64);
 }
 
@@ -8971,7 +9016,7 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
 }
 
 .timeline-ratio-size,
-.timeline-item time {
+.timeline-start-time time {
   font-variant-numeric: tabular-nums;
 }
 
@@ -8979,8 +9024,14 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
   color: #8b5cf6;
 }
 
-.timeline-item time {
+.timeline-start-time,
+.creation-record-time {
   color: #ffad33;
+  font-weight: 700;
+}
+
+.timeline-start-time time {
+  color: inherit;
 }
 
 .ghost-link {
@@ -11610,6 +11661,10 @@ html[data-ui-layout="mobile"] .creation-option-grid {
   grid-template-columns: minmax(0, 1fr);
 }
 
+html[data-ui-layout="mobile"] .creation-toggle-row {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 html[data-ui-layout="mobile"] .creation-logo-controls {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -12497,13 +12552,11 @@ html[data-ui-layout="mobile"] .reference-grid {
 }
 
 html[data-ui-layout="mobile"] .creation-reference-grid,
-html[data-ui-layout="mobile"] .creation-style-reference-grid,
 html[data-ui-layout="mobile"] .creation-logo-batch-source-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 html[data-ui-layout="mobile"] .creation-reference-grid .reference-card,
-html[data-ui-layout="mobile"] .creation-style-reference-grid .reference-card,
 html[data-ui-layout="mobile"] .creation-logo-batch-source-grid .reference-card {
   min-width: 0;
 }

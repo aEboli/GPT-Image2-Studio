@@ -3,10 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 import { handleApiRequest, handleGenerationQueue } from "../cloudflare-pages-worker.mjs";
-import {
-  MAX_CREATION_REFERENCE_IMAGES,
-  MAX_CREATION_STYLE_REFERENCE_IMAGES,
-} from "../lib/studio-constants.mjs";
+import { MAX_CREATION_REFERENCE_IMAGES } from "../lib/studio-constants.mjs";
 
 function makeSseResponse(base64 = "ZmluYWw=") {
   return new Response(
@@ -169,7 +166,7 @@ test("Cloudflare creation listing route accepts explicit set metadata and return
   assert.equal(body.listingDrafts[0].evidenceMode, "input-only");
 });
 
-test("Cloudflare creation listing route preserves mixed grouped SKU pack wording", async () => {
+test("Cloudflare creation listing mock keeps mixed grouped SKU records as reviewable V2 input", async () => {
   const request = new Request("https://studio.example/api/creation/listings", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -209,8 +206,13 @@ test("Cloudflare creation listing route preserves mixed grouped SKU pack wording
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
   assert.equal(body.listingDrafts.length, 1);
-  assert.match(body.listingDrafts[0].title, /^2 Pack \/ 3 Pack Electronic Fishing Lure\b/);
-  assert.match(body.set.listingDrafts[0].title, /^2 Pack \/ 3 Pack Electronic Fishing Lure\b/);
+  assert.equal(body.listingDrafts[0].schemaVersion, "2");
+  assert.equal(body.listingDrafts[0].platformId, "universal");
+  assert.equal(body.listingDrafts[0].status, "needs-review");
+  assert.equal(body.listingDrafts[0].evidenceMode, "input-only");
+  assert.equal(body.listingDrafts[0].title, "Electronic Fishing Lure");
+  assert.doesNotMatch(body.listingDrafts[0].title, /^2 Pack \/ 3 Pack\b/);
+  assert.deepEqual(body.set.listingDrafts, body.listingDrafts);
 });
 
 test("Cloudflare creation listing route requires explicit set metadata with setId", async () => {
@@ -671,6 +673,14 @@ test("Cloudflare Amazon creation stays below the R2 custom metadata limit and fr
   assert.equal(set.effectivePlan.strategyVersion, set.strategyVersion);
   assert.deepEqual(set.effectivePlan.platformSetOverrides, set.platformSetOverrides);
   assert.ok(set.items.every((item) => item.prompt && item.generationPrompt));
+  assert.ok(set.items.every((item) => item.baseUrl === "https://example.test/v1"));
+  assert.ok(set.items.every((item) => item.imageRoute === "a"));
+  assert.ok(set.items.every((item) => item.responsesModel === "gpt-5.5"));
+  assert.ok(set.items.every((item) => item.imageModel === "gpt-image-2"));
+  assert.ok(set.items.every((item) => item.requestedSize));
+  assert.ok(set.items.every((item) => /^\d+x\d+$/u.test(item.effectiveSize)));
+  assert.ok(set.items.every((item) => item.format === "png" && item.quality === "high"));
+  assert.ok(set.items.every((item) => item.reasoningEffort));
   assert.ok(set.effectivePlan.items.every((item) => item.prompt));
 });
 
@@ -1122,26 +1132,6 @@ test("Cloudflare creation generation accepts fifteen set reference images", asyn
   assert.doesNotMatch(text, /参考图最多支持/);
 });
 
-test("Cloudflare creation generation rejects reference and style images above the combined limit", async () => {
-  const formData = new FormData();
-  for (let index = 1; index <= MAX_CREATION_REFERENCE_IMAGES - 1; index += 1) {
-    formData.append("referenceImages", new File([`ref-${index}`], `ref-${index}.png`, { type: "image/png" }));
-  }
-  for (let index = 1; index <= MAX_CREATION_STYLE_REFERENCE_IMAGES - 1; index += 1) {
-    formData.append("styleReferenceImages", new File([`style-${index}`], `style-${index}.png`, { type: "image/png" }));
-  }
-
-  const response = await handleApiRequest(new Request("https://studio.example/api/creation/generate", {
-    method: "POST",
-    body: formData,
-  }), { imageBucket: makeImageBucket() });
-  const events = parseSseEvents(await response.text());
-  const error = events.find((event) => event.eventName === "error");
-
-  assert.equal(response.status, 200);
-  assert.equal(error?.payload.message, `套图参考图和参考风格图合计最多支持 ${MAX_CREATION_REFERENCE_IMAGES} 张。`);
-});
-
 test("Cloudflare creation generation labels reference count order roles and excludes logo from the reference list", async () => {
   const seenRequests = [];
   const imageBucket = makeImageBucket();
@@ -1159,14 +1149,14 @@ test("Cloudflare creation generation labels reference count order roles and excl
     "referenceImageRoles",
     JSON.stringify([
       {
-        filename: "yellow-red.png",
-        role: "product",
-        note: "yellow red SKU",
-      },
-      {
         filename: "silver-black.png",
         role: "style",
         note: "silver black finish",
+      },
+      {
+        filename: "yellow-red.png",
+        role: "product",
+        note: "yellow red SKU",
       },
     ]),
   );
@@ -1182,8 +1172,8 @@ test("Cloudflare creation generation labels reference count order roles and excl
   formData.set("baseUrl", "https://example.test/v1");
   formData.set("apiKey", "test-browser-key");
   formData.set("responsesModel", "gpt-5.5");
-  formData.append("referenceImages", new File(["ref-1"], "yellow-red.png", { type: "image/png" }));
-  formData.append("referenceImages", new File(["ref-2"], "silver-black.png", { type: "image/png" }));
+  formData.append("referenceImages", new File(["ref-1"], "silver-black.png", { type: "image/png" }));
+  formData.append("referenceImages", new File(["ref-2"], "yellow-red.png", { type: "image/png" }));
   formData.append("logoImage", new File(["logo"], "brand-mark.png", { type: "image/png" }));
 
   const response = await handleApiRequest(new Request("https://studio.example/api/creation/generate", {
@@ -1213,17 +1203,15 @@ test("Cloudflare creation generation labels reference count order roles and excl
   assert.equal(response.status, 200);
   assert.equal(complete?.payload?.set?.visualLanguage, "lifestyle-editorial");
   assert.equal(complete?.payload?.set?.visualLanguageLabel, "生活方式杂志");
-  assert.equal(inputImages.length, 3);
+  assert.equal(inputImages.length, 2);
   assert.match(inputText, /Shared visual language: 生活方式杂志/);
   assert.match(inputText, /lifestyle magazine editorial/);
-  assert.match(inputText, /Creation reference image 1 of 2: yellow-red\.png\./);
-  assert.match(inputText, /Creation reference image 2 of 2: silver-black\.png\./);
-  assert.match(inputText, /Uploaded reference count: 2\./);
-  assert.match(inputText, /Uploaded reference files: 1\. yellow-red\.png; 2\. silver-black\.png\./);
+  assert.match(inputText, /Creation reference image 1 of 1: yellow-red\.png\./);
+  assert.match(inputText, /Uploaded reference count: 1\./);
+  assert.match(inputText, /Uploaded reference files: 1\. yellow-red\.png\./);
   assert.match(inputText, /Role: product subject\./);
   assert.match(inputText, /Note: yellow red SKU\./);
-  assert.match(inputText, /Role: visual style reference\./);
-  assert.match(inputText, /Note: silver black finish\./);
+  assert.doesNotMatch(inputText, /silver-black\.png|visual style reference|silver black finish/);
   assert.doesNotMatch(inputText, /Uploaded reference files:[^\n]*brand-mark\.png/);
 });
 
@@ -1279,7 +1267,7 @@ test("Cloudflare creation generation applies edited preview plan overrides", asy
   assert.equal(complete?.payload?.set?.items?.[0]?.marketingCopy, "Edited preview copy");
 });
 
-test("Cloudflare creation style references are style-only generation inputs", async () => {
+test("Cloudflare creation generation ignores removed legacy style reference fields", async () => {
   const seenRequests = [];
   const imageBucket = makeImageBucket();
   const formData = new FormData();
@@ -1338,15 +1326,12 @@ test("Cloudflare creation style references are style-only generation inputs", as
 
   assert.equal(response.status, 200);
   assert.equal(seenRequests.length, 1);
-  assert.equal(complete?.payload?.set?.visualLanguage, "reference-style");
-  assert.equal(complete?.payload?.set?.visualLanguageLabel, "参考模式");
+  assert.equal(complete?.payload?.set?.visualLanguage, "classic-commercial");
+  assert.equal(complete?.payload?.set?.visualLanguageLabel, "经典商业摄影");
   assert.deepEqual(complete?.payload?.set?.referenceImageNames, ["product.png"]);
-  assert.equal(inputImages.length, 3);
+  assert.equal(inputImages.length, 1);
   assert.match(inputText, /Creation reference image 1 of 1: product\.png\./);
-  assert.match(inputText, /Creation style reference image 1 of 2: warm-lighting\.png\./);
-  assert.match(inputText, /Creation style reference image 2 of 2: paper-texture\.png\./);
-  assert.match(inputText, /Use this image only for style, lighting, color grading/);
-  assert.match(inputText, /Do not copy the style reference subject/);
+  assert.doesNotMatch(inputText, /Creation style reference image/);
   assert.doesNotMatch(inputText, /Uploaded reference files:[^\n]*warm-lighting\.png/);
 });
 

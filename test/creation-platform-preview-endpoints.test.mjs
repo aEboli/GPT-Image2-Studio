@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 import { handleApiRequest } from "../cloudflare-pages-worker.mjs";
+import { resolveCreationSelectedRolesSubmission } from "../lib/creation-browser-plan-state.mjs";
 import * as creationPlanner from "../lib/creation-planner.mjs";
 
 const serverPath = fileURLToPath(new URL("../server.mjs", import.meta.url));
@@ -16,6 +17,12 @@ const FULL_EVIDENCE = {
   performance: true,
   specifications: true,
 };
+const EXPLICIT_EIGHTEEN_ROLES = [
+  "hero", "benefit", "scene", "multi-angle", "product-detail", "size-capacity-fit",
+  "accessory-gift", "series-showcase", "usage-suggestion", "ingredient-material",
+  "craft-process", "effect-comparison", "spec-table", "atmosphere", "human-handheld",
+  "human-wearable", "brand-story", "after-sales",
+];
 
 function buildPlatformPreviewFormData() {
   const formData = new FormData();
@@ -142,21 +149,52 @@ test("Cloudflare preview returns strategy metadata, normalized overrides, valida
   );
 });
 
+test("explicit 18-image selection survives shared local planning and repeated Worker previews", async () => {
+  const buildFormData = () => {
+    const formData = new FormData();
+    formData.set("productName", "Travel Bottle");
+    formData.set("productDescription", "Product shown in the supplied image");
+    formData.set("platform", "amazon");
+    formData.set("imageCount", "18");
+    formData.set("selectedRoles", JSON.stringify(EXPLICIT_EIGHTEEN_ROLES));
+    formData.set("infographicRebuildEnabled", "false");
+    formData.set("platformSetOverrides", JSON.stringify({ imageCount: 18 }));
+    formData.set("platformItemOverrides", "[]");
+    formData.set("platformEvidence", "{}");
+    formData.set("categorySignals", "[]");
+    formData.set("platformReferenceCoverage", "[]");
+    return formData;
+  };
+  const localPlan = creationPlanner.buildCreationPlan(Object.fromEntries(buildFormData().entries()));
+  const initialResponse = await handleApiRequest(
+    new Request("https://studio.example/api/creation/plan", { method: "POST", body: buildFormData() }),
+  );
+  const initialPlan = (await initialResponse.json()).plan;
+  const repeatedFormData = buildFormData();
+  repeatedFormData.set("platformSetOverrides", JSON.stringify(initialPlan.platformSetOverrides));
+  repeatedFormData.set("platformItemOverrides", JSON.stringify(initialPlan.platformItemOverrides));
+  const repeatedResponse = await handleApiRequest(
+    new Request("https://studio.example/api/creation/plan", { method: "POST", body: repeatedFormData }),
+  );
+  const repeatedPlan = (await repeatedResponse.json()).plan;
+
+  for (const plan of [localPlan, initialPlan, repeatedPlan]) {
+    const carouselItems = plan.items.filter((item) => item.itemKind === "carousel");
+    assert.equal(plan.carouselImageCount, 18);
+    assert.equal(carouselItems.length, 18);
+    assert.equal(new Set(carouselItems.map((item) => item.slotKey)).size, 18);
+    assert.deepEqual(carouselItems.map((item) => item.role), EXPLICIT_EIGHTEEN_ROLES);
+  }
+  assert.equal(initialResponse.status, 200);
+  assert.equal(repeatedResponse.status, 200);
+});
+
 test("re-previewing one frozen browser plan preserves platform semantics without promoting automatic language", async () => {
   const app = await readFile(appPath, "utf8");
   const previewBuilder = app.match(
     /function buildCreationPlanPreviewFormData\(\)[\s\S]*?(?=\r?\nfunction buildCreationFormData)/,
   )?.[0] || "";
-  const serializesFrozenImageCount = previewBuilder.includes(
-    'if (effectivePlan?.carouselImageCount !== undefined) formData.set("imageCount", String(effectivePlan.carouselImageCount))',
-  );
-  const serializesFrozenSelectedRoles = /if \(effectivePlan\?\.items\) \{\r?\n\s*formData\.set\("selectedRoles", JSON\.stringify\(selectedRoles\)\)/.test(
-    previewBuilder,
-  );
-  const frozenPlanBranch = previewBuilder.match(/if \(effectivePlan\) \{([\s\S]*?)\r?\n\s*\} else \{/)?.[1] || "";
-  const preservesOnlyExplicitFrozenTargetLanguage = /if \(!Object\.prototype\.hasOwnProperty\.call\(frozenPayload\.values\.platformSetOverrides, "targetLanguage"\)\) \{\r?\n\s*formData\.delete\("targetLanguage"\)/.test(
-    frozenPlanBranch,
-  );
+  const preservesOnlyExplicitFrozenTargetLanguage = /if \(!Object\.prototype\.hasOwnProperty\.call\(frozenPayload\.values\.platformSetOverrides, "targetLanguage"\)\) \{\r?\n\s*formData\.delete\("targetLanguage"\)/.test(previewBuilder);
   const buildInitialFormData = () => {
     const formData = new FormData();
     formData.set("productName", "普通商品");
@@ -178,17 +216,18 @@ test("re-previewing one frozen browser plan preserves platform semantics without
   const initialPayload = await initialResponse.json();
   const frozenPlan = initialPayload.plan;
   const repeatedFormData = buildInitialFormData();
-  if (serializesFrozenImageCount) {
-    repeatedFormData.set("imageCount", String(frozenPlan.carouselImageCount));
-  }
-  if (serializesFrozenSelectedRoles) {
-    repeatedFormData.set(
-      "selectedRoles",
-      JSON.stringify(
-        frozenPlan.items.filter((item) => item.enabled !== false && item.itemKind === "carousel").map((item) => item.role),
-      ),
-    );
-  }
+  const roleSubmission = resolveCreationSelectedRolesSubmission({
+    effectivePlan: frozenPlan,
+    platformSetOverrides: frozenPlan.platformSetOverrides,
+    selectedRoles: frozenPlan.items
+      .filter((item) => item.enabled !== false && item.itemKind === "carousel")
+      .map((item) => item.role),
+    roleSelectionManuallyEdited: false,
+  });
+  if (roleSubmission.imageCount !== null) repeatedFormData.set("imageCount", String(roleSubmission.imageCount));
+  else repeatedFormData.delete("imageCount");
+  if (roleSubmission.selectedRoles !== null) repeatedFormData.set("selectedRoles", JSON.stringify(roleSubmission.selectedRoles));
+  else repeatedFormData.delete("selectedRoles");
   if (!preservesOnlyExplicitFrozenTargetLanguage) {
     repeatedFormData.set("targetLanguage", frozenPlan.targetLanguage);
   }

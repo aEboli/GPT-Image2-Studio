@@ -706,10 +706,10 @@ test("generation activity moves into settings while studio workspace reflows to 
   assert.doesNotMatch(styles, /\.timeline-ratio\s*\{|\.timeline-resolution\s*\{/);
   assert.match(styles, /\.timeline-main,\s*\.timeline-url,\s*\.timeline-meta\s*\{[\s\S]*font-size:\s*0\.78rem;/);
   assert.doesNotMatch(readCssRuleContaining(styles, ".timeline-main,\n.timeline-url,\n.timeline-meta", "font-size: 0.78rem"), /color:/);
-  assert.match(styles, /\.timeline-mode,\s*\.timeline-ratio-size,\s*\.timeline-item time\s*\{[\s\S]*color:\s*rgba\(171,\s*184,\s*218,\s*0\.64\);/);
+  assert.match(styles, /\.timeline-mode,\s*\.timeline-ratio-size\s*\{[\s\S]*color:\s*rgba\(171,\s*184,\s*218,\s*0\.64\);/);
   assert.match(readCssRule(styles, ".timeline-mode"), /font-weight:\s*700;/);
   assert.match(styles, /\.timeline-meta\s*\{[\s\S]*align-items:\s*center;[\s\S]*white-space:\s*nowrap;[\s\S]*overflow-wrap:\s*normal;/);
-  assert.match(styles, /\.timeline-ratio-size,\s*\.timeline-item time\s*\{[\s\S]*font-variant-numeric:\s*tabular-nums;/);
+  assert.match(styles, /\.timeline-ratio-size,\s*\.timeline-start-time time\s*\{[\s\S]*font-variant-numeric:\s*tabular-nums;/);
   assert.match(styles, /html\[data-ui-layout="mobile"\]\s+\.timeline-meta\s*\{[\s\S]*white-space:\s*normal;/);
   assert.match(app, /configGenerationLogPanel:\s*document\.querySelector\("#configGenerationLogPanel"\),/);
   assert.match(app, /function openConfigGenerationLog\(\) \{[\s\S]*setDrawerOpen\(true\);[\s\S]*refs\.configGenerationLogPanel\?\.scrollIntoView/);
@@ -723,7 +723,7 @@ test("generation activity moves into settings while studio workspace reflows to 
   assert.match(app, /if \(displayText\.detail\) \{[\s\S]*className: "timeline-detail", textContent: displayText\.detail[\s\S]*\}/);
   assert.match(app, /if \(item\.paramsText\) \{[\s\S]*row\.classList\.add\("has-relay"\);[\s\S]*className: "timeline-relay", textContent: item\.paramsText[\s\S]*\}/);
   assert.doesNotMatch(app, /className: "timeline-params"|document\.createElement\("pre"\)/);
-  assert.match(app, /const meta = document\.createElement\("span"\);[\s\S]*meta\.className = "timeline-meta";[\s\S]*className: "timeline-mode", textContent: item\.modeLabel[\s\S]*const compactRatio = formatCompactRatioLabel\(item\.ratio\);[\s\S]*const compactSize = formatCompactSizeLabel\(item\.size\);[\s\S]*const ratioSize = document\.createElement\("span"\);[\s\S]*ratioSize\.className = "timeline-ratio-size";[\s\S]*ratioSize\.textContent = \[compactRatio, compactSize \? `\(\$\{compactSize\}\)` : ""\]\.filter\(Boolean\)\.join\(" "\);[\s\S]*meta\.appendChild\(ratioSize\);[\s\S]*meta\.appendChild\(time\);[\s\S]*row\.appendChild\(meta\);/);
+  assert.match(app, /const meta = document\.createElement\("span"\);[\s\S]*meta\.className = "timeline-meta";[\s\S]*className: "timeline-mode", textContent: item\.modeLabel[\s\S]*const compactRatio = formatCompactRatioLabel\(item\.ratio\);[\s\S]*const compactSize = formatCompactSizeLabel\(item\.size\);[\s\S]*const ratioSize = document\.createElement\("span"\);[\s\S]*ratioSize\.className = "timeline-ratio-size";[\s\S]*ratioSize\.textContent = \[compactRatio, compactSize \? `\(\$\{compactSize\}\)` : ""\]\.filter\(Boolean\)\.join\(" "\);[\s\S]*meta\.appendChild\(ratioSize\);[\s\S]*const timelineTimes = item\.generationStartedAt \|\| item\.generationCompletedAt[\s\S]*\[item\.generationStartedAt, item\.generationCompletedAt\][\s\S]*\[item\.at\][\s\S]*timelineTimes\.forEach\(\(timelineAt\)[\s\S]*timelineTime\.className = "timeline-start-time";[\s\S]*time\.textContent = formatClock\(timelineAt\);[\s\S]*meta\.appendChild\(timelineTime\);[\s\S]*row\.appendChild\(meta\);/);
   assert.doesNotMatch(app, /className = "timeline-ratio"|className = "timeline-resolution"/);
   assert.match(app, /function getGenerationActivityRelayText\(value\) \{[\s\S]*match\(\s*\/\^\(URL\|中转\)\[：:\]\(.*\)\$\//);
   assert.match(app, /function getGenerationActivityRelayText\(value\) \{[\s\S]*return match \? `URL：\$\{match\[2\]\.trim\(\)\}` : "";/);
@@ -2455,6 +2455,18 @@ test("studio layout consumes density variables for wide-screen adaptation withou
   assert.match(styles, /html\[data-ui-layout="narrow-desktop"\] \.studio-grid\s*\{/);
 });
 
+test("wide density keeps the desktop app shell flush without a viewport breakpoint jump", async () => {
+  const styles = await readFile(stylesPath, "utf8");
+  const app = await readFile(appPath, "utf8");
+
+  assert.match(
+    styles,
+    /html\[data-ui-density="wide"\] \.app-shell\s*\{[\s\S]*width:\s*calc\(100vw - 20px\);/,
+  );
+  assert.match(app, /document\.documentElement\.dataset\.uiDensity = settings\.mode;/);
+  assert.doesNotMatch(styles, /@media \(min-width:\s*2200px\)[\s\S]*?\.app-shell/);
+});
+
 test("image upload zones collapse into compact thumbnail grids after files are present", async () => {
   const styles = await readFile(stylesPath, "utf8");
   const app = await readFile(appPath, "utf8");
@@ -3604,7 +3616,7 @@ test("creation mode is a separate studio view with isolated state and routes", a
   assert.doesNotMatch(app, /creation[\s\S]{0,400}PROMPT_TEMPLATE_STORAGE_KEY/);
 });
 
-test("creation mode has independent references count and platform controls", async () => {
+test("creation mode has product references without a separate style-reference module", async () => {
   const html = await readFile(indexPath, "utf8");
   const styles = await readFile(stylesPath, "utf8");
   const app = await readFile(appPath, "utf8");
@@ -3620,10 +3632,7 @@ test("creation mode has independent references count and platform controls", asy
   assert.match(html, /class="creation-reference-head-actions"[\s\S]*id="creationReferenceResetButton"[\s\S]*type="button"[\s\S]*清空参考图[\s\S]*id="creationReferenceCount"/);
   assert.match(html, /id="creationReferenceInput"[\s\S]*name="creationReferenceImages"/);
   assert.match(html, /id="creationReferenceGrid"/);
-  assert.match(html, /id="creationStyleReferenceDropzone"/);
-  assert.match(html, /id="creationStyleReferenceCount">0 \/ 3/);
-  assert.match(html, /id="creationStyleReferenceInput"[\s\S]*name="creationStyleReferenceImages"/);
-  assert.match(html, /id="creationStyleReferenceGrid"/);
+  assert.doesNotMatch(html, /creationStyleReference|creation-style-reference/);
   assert.match(html, /id="creationReferenceAnalyzeButton"[\s\S]*智能识别/);
   assert.match(html, /id="creationReferenceApplyAnalysisButton"[\s\S]*应用建议/);
   assert.match(html, /id="creationReferenceAnalysisFeedback"/);
@@ -3664,7 +3673,7 @@ test("creation mode has independent references count and platform controls", asy
   assert.match(creationReferenceClearBody, /state\.creationReferenceFiles = \[\];/);
   assert.match(creationReferenceClearBody, /refs\.creationReferenceInput\.value = "";/);
   assert.match(creationReferenceClearBody, /renderCreationReferenceGrid\(\);/);
-  assert.doesNotMatch(creationReferenceClearBody, /state\.creationReferenceRestoreQueue\s*=|state\.creationReferenceAnalysis\s*=|setCreationReferenceAnalysisFeedback\("", ""\)|resetCreationDraftPreview|renderCreationView|creationResultGrid|state\.creation\.currentSet|state\.creation\.queue|state\.creation\.sets|state\.creationStyleReferenceFiles|state\.creationLogo/);
+  assert.doesNotMatch(creationReferenceClearBody, /state\.creationReferenceRestoreQueue\s*=|state\.creationReferenceAnalysis\s*=|setCreationReferenceAnalysisFeedback\("", ""\)|resetCreationDraftPreview|renderCreationView|creationResultGrid|state\.creation\.currentSet|state\.creation\.queue|state\.creation\.sets|state\.creationLogo/);
   assert.match(app, /refs\.creationReferenceResetButton\.addEventListener\("click", clearCreationReferenceFiles\)/);
   assert.match(html, /SKU 组合件数[\s\S]*id="creationSkuBundleCountInput"[\s\S]*name="skuBundleCount"/);
   assert.match(html, /id="creationImageCountInput"[\s\S]*<option value="0">0 张<\/option>[\s\S]*<option value="8">8/);
@@ -3710,7 +3719,7 @@ test("creation mode has independent references count and platform controls", asy
   assert.match(html, /id="creationSellingPointsInput"[\s\S]*rows="1"/);
   assert.match(html, /id="creationDimensionSpecsInput"[\s\S]*rows="1"/);
   assert.match(html, /id="creationInfographicRebuildEnabledInput"[\s\S]*type="checkbox"[\s\S]*checked/);
-  assert.match(html, /<div class="creation-control-row creation-option-grid">[\s\S]*id="creationImageCountInput"[\s\S]*id="creationSkuBundleCountInput"[\s\S]*id="creationPlatformInput"[\s\S]*id="creationTargetLanguageInput"[\s\S]*id="creationOutputFormatInput"[\s\S]*id="creationRatioInput"[\s\S]*id="creationSizeInput"[\s\S]*id="creationSkuGenerationRuleInput"[\s\S]*id="creationInfographicRebuildEnabledInput"[\s\S]*id="creationListingAgentEnabledInput"[\s\S]*id="creationIndustryTemplateBrowser"/);
+  assert.match(html, /<div class="creation-control-row creation-option-grid">[\s\S]*id="creationImageCountInput"[\s\S]*id="creationSkuBundleCountInput"[\s\S]*id="creationPlatformInput"[\s\S]*id="creationTargetLanguageInput"[\s\S]*id="creationOutputFormatInput"[\s\S]*id="creationRatioInput"[\s\S]*id="creationSizeInput"[\s\S]*id="creationSkuGenerationRuleInput"[\s\S]*id="creationDimensionUnitModeInput"[\s\S]*id="creationInfographicRebuildEnabledInput"[\s\S]*id="creationListingAgentEnabledInput"[\s\S]*id="creationIndustryTemplateBrowser"/);
   assert.match(html, /<select id="creationRatioInput" name="ratio">[\s\S]*<option value="1:1" data-full-label="电商主图、头像、社交媒体 · 方形 1:1" selected>1:1<\/option>[\s\S]*<option value="9:21" data-full-label="超长竖图 · 竖屏 9:21">9:21<\/option>[\s\S]*<option value="1:3" data-full-label="超长竖版广告 · 竖屏 1:3">1:3<\/option>[\s\S]*<\/select>/);
   assert.match(html, /<select id="creationSizeInput" name="size">[\s\S]*<option value="1024x1024" selected>1K 1024 x 1024<\/option>[\s\S]*<option value="2880x2880">最大 2880 x 2880<\/option>[\s\S]*<\/select>/);
   assert.match(html, /<select id="portraitRatioInput" name="ratio">[\s\S]*<option value="4:5" selected>Instagram帖子 · 竖屏 4:5<\/option>[\s\S]*<option value="3:1">超宽广告图 · 横屏 3:1<\/option>[\s\S]*<\/select>/);
@@ -3764,6 +3773,18 @@ test("creation mode has independent references count and platform controls", asy
   assert.match(styles, /\.creation-industry-option small\s*\{[\s\S]*font-size:\s*var\(--type-caption-size,\s*0\.7rem\);[\s\S]*line-height:\s*1\.35;/);
   assert.doesNotMatch(styles, /\.creation-industry-levels\s*\{[^}]*grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\);/);
   assert.match(styles, /\.creation-option-grid\s*\{\s*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\);/);
+  assert.match(
+    html,
+    /<div class="creation-toggle-row" data-creation-set-only>[\s\S]*id="creationInfographicRebuildEnabledInput"[\s\S]*id="creationListingAgentEnabledInput"[\s\S]*<\/div>/,
+  );
+  const creationToggleRowRule = readCssRule(styles, ".creation-toggle-row");
+  assert.match(creationToggleRowRule, /grid-column:\s*1 \/ -1;/);
+  assert.match(creationToggleRowRule, /display:\s*grid;/);
+  assert.match(creationToggleRowRule, /grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\);/);
+  assert.match(creationToggleRowRule, /align-items:\s*stretch;/);
+  const creationToggleControlRule = readCssRule(styles, ".creation-toggle-row .creation-listing-toggle");
+  assert.match(creationToggleControlRule, /height:\s*100%;/);
+  assert.match(creationToggleControlRule, /box-sizing:\s*border-box;/);
   const creationListingToggleRule = readCssRule(styles, ".creation-listing-toggle");
   assert.match(creationListingToggleRule, /min-height:\s*40px;/);
   assert.match(creationListingToggleRule, /border-color:\s*rgba\(249,\s*192,\s*106,\s*0\.58\);/);
@@ -3809,6 +3830,10 @@ test("creation mode has independent references count and platform controls", asy
   assert.match(readCssRule(styles, ".creation-option-grid .compact-field:has(select)::after"), /right:\s*11px;/);
   assert.match(creationOptionGridControlRule, /text-align-last:\s*center;/);
   assert.match(styles, /html\[data-ui-layout="mobile"\] \.creation-option-grid\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\);/);
+  assert.match(
+    readCssRule(styles, 'html[data-ui-layout="mobile"] .creation-toggle-row'),
+    /grid-template-columns:\s*minmax\(0, 1fr\);/,
+  );
   assert.match(styles, /\.creation-role-picker\s*\{/);
   assert.match(styles, /\.creation-role-grid\s*\{/);
   assert.match(styles, /\.creation-role-option\s*\{/);
@@ -3816,15 +3841,12 @@ test("creation mode has independent references count and platform controls", asy
   assert.doesNotMatch(styles, /\.creation-card-brief\s*\{/);
 
   assert.match(app, /creationReferenceFiles:\s*\[\]/);
-  assert.match(app, /creationStyleReferenceFiles:\s*\[\]/);
   assert.match(app, /function getCreationMaxReferenceImageCount\(\) \{/);
-  assert.match(app, /function getCreationMaxProductReferenceImageCount\(\) \{ return Math\.max\(0, getCreationMaxReferenceImageCount\(\) - state\.creationStyleReferenceFiles\.length\); \}/);
-  assert.match(app, /function getCreationMaxStyleReferenceImageCount\(\) \{/);
-  assert.match(app, /getCreationMaxReferenceImageCount\(\) - state\.creationReferenceFiles\.length/);
+  assert.match(app, /function getCreationMaxProductReferenceImageCount\(\) \{ return getCreationMaxReferenceImageCount\(\); \}/);
   assert.match(app, /const maxReferenceImages = getCreationMaxProductReferenceImageCount\(\);/);
-  assert.match(app, /const maxReferenceImages = getCreationMaxStyleReferenceImageCount\(\);/);
-  assert.match(server, /referenceImages\.length \+ styleReferenceImages\.length > MAX_CREATION_REFERENCE_IMAGES/);
-  assert.match(worker, /referenceImages\.length \+ styleReferenceImages\.length > MAX_CREATION_REFERENCE_IMAGES/);
+  assert.doesNotMatch(app, /creationStyleReference|styleReferenceImages/);
+  assert.doesNotMatch(server, /styleReferenceImages|MAX_CREATION_STYLE_REFERENCE_IMAGES/);
+  assert.doesNotMatch(worker, /styleReferenceImages|MAX_CREATION_STYLE_REFERENCE_IMAGES/);
   assert.match(app, /creationIndustryTemplateBrowser:\s*\{/);
   assert.match(app, /creationReferenceAnalysis:\s*\{/);
   assert.match(app, /creationReferenceAnalyzeButton: document\.querySelector\("#creationReferenceAnalyzeButton"\)/);
@@ -3854,10 +3876,6 @@ test("creation mode has independent references count and platform controls", asy
   assert.match(app, /import\(CREATION_CATEGORY_TEMPLATE_MODULE_URL\)/);
   assert.doesNotMatch(app, /from "\/lib\/creation-category-templates\.mjs\?v=20260509-category-search-2"/);
   assert.match(app, /creationReferenceInput: document\.querySelector\("#creationReferenceInput"\)/);
-  assert.match(app, /creationStyleReferenceInput: document\.querySelector\("#creationStyleReferenceInput"\)/);
-  assert.match(app, /creationStyleReferenceGrid: document\.querySelector\("#creationStyleReferenceGrid"\)/);
-  assert.match(app, /creationStyleReferenceDropzone: document\.querySelector\("#creationStyleReferenceDropzone"\)/);
-  assert.match(app, /creationStyleReferenceCount: document\.querySelector\("#creationStyleReferenceCount"\)/);
   assert.match(app, /creationRoleGrid: document\.querySelector\("#creationRoleGrid"\)/);
   assert.match(app, /creationRoleCount: document\.querySelector\("#creationRoleCount"\)/);
   assert.doesNotMatch(app, /creationScenarioHint: document\.querySelector\("#creationScenarioHint"\)/);
@@ -3869,7 +3887,7 @@ test("creation mode has independent references count and platform controls", asy
   assert.match(app, /\{ value: "usage", label: "使用说明" \}/);
   assert.match(app, /const CREATION_SCENARIO_ROLE_PRESETS = \{/);
   assert.match(app, /const CREATION_VISUAL_LANGUAGE_LABELS = \{/);
-  assert.match(app, /"reference-style": "参考模式"/);
+  assert.doesNotMatch(app, /"reference-style": "参考模式"/);
   assert.match(app, /const platform = normalizeCreationPlatform\(set\.platform\)/);
   assert.match(app, /platform:\s*platform\.value,\s*[\r\n]+\s*platformLabel:\s*String\(set\.platformLabel \|\| formatCreationPlatformLabel\(platform\.value\)\)/);
   assert.match(app, /\["平台", set\.platformLabel \|\| formatCreationPlatformLabel\(set\.platform\)\]/);
@@ -3924,17 +3942,10 @@ test("creation mode has independent references count and platform controls", asy
   assert.match(creationRolePickerBody, /input\.type = "checkbox";/);
   assert.doesNotMatch(creationRolePickerBody, /input\.disabled = state\.creation\.generating;/);
   assert.match(app, /function applyCreationReferenceFiles\(fileList\) \{/);
-  assert.match(app, /function applyCreationStyleReferenceFiles\(fileList\) \{/);
   const creationReferenceUploadHandler =
-    app.match(/function applyCreationReferenceFiles\(fileList\) \{[\s\S]*?\r?\n}\r?\n\r?\nfunction applyCreationStyleReferenceFiles/)?.[0] || "";
-  const creationStyleReferenceUploadHandler =
-    app.match(/function applyCreationStyleReferenceFiles\(fileList\) \{[\s\S]*?\r?\n}\r?\n\r?\nfunction renderCreationLogo/)?.[0] || "";
+    app.match(/function applyCreationReferenceFiles\(fileList\) \{[\s\S]*?\r?\n}\r?\n\r?\nfunction renderCreationLogo/)?.[0] || "";
   assert.doesNotMatch(
     creationReferenceUploadHandler,
-    /setCreationSelectValue\(refs\.creationVisualLanguageInput,\s*"reference-style",\s*"classic-commercial"\)/,
-  );
-  assert.doesNotMatch(
-    creationStyleReferenceUploadHandler,
     /setCreationSelectValue\(refs\.creationVisualLanguageInput,\s*"reference-style",\s*"classic-commercial"\)/,
   );
   assert.match(app, /function buildCreationReferenceAnalysisFormData\(\) \{/);
@@ -4023,8 +4034,9 @@ test("creation mode has independent references count and platform controls", asy
   assert.match(creationReferenceDrag, /grid\.addEventListener\("drop"[\s\S]*reorderReferenceFile\(referenceId, getCreationReferenceDropBeforeId\(event, dragState\)\)/);
   assert.match(
     app,
-    /function buildCreationReferenceRolePayload\(\) \{\s*return state\.creationReferenceFiles\.map\(\(item, index\) => \(\{[\s\S]*note: item\.note \|\| "",[\s\S]*\}\)\);\s*\}/,
+    /function buildCreationReferenceRolePayload\(\) \{[\s\S]*return state\.creationReferenceFiles[\s\S]*note: item\.note \|\| "",[\s\S]*\.filter\(\(item\) => item\.role !== "style"\);\s*\}/,
   );
+  assert.doesNotMatch(app, /\{ value: "style", label: "风格参考" \}/);
   assert.match(app, /function inferCreationReferenceAnalysisRole\(entry = \{\}\) \{/);
   assert.match(app, /shouldUseDetailRole/);
   assert.match(app, /explicitRole === "other"/);
@@ -4090,7 +4102,7 @@ test("creation mode has independent references count and platform controls", asy
   assert.match(app, /formData\.set\("selectedRoles", JSON\.stringify\(getCreationSelectedRoles\(\)\)\)/);
   assert.match(app, /roleSelect\.dataset\.creationReferenceRoleId = item\.id;/);
   assert.match(app, /function updateCreationReferenceRole\(referenceId, role\) \{\s*state\.creationReferenceFiles = state\.creationReferenceFiles\.map\([\s\S]*?\);\s*markCreationReferenceAnalysisDirty\(\);\s*resetCreationDraftPreview\(\);\s*renderCreationReferenceGrid\(\);\s*\}/);
-  assert.match(app, /refs\.creationStyleReferenceGrid\.appendChild\(\s*createReferenceAddCard\(\{[\s\S]*input:\s*refs\.creationStyleReferenceInput,[\s\S]*onFiles:\s*applyCreationStyleReferenceFiles/);
+  assert.doesNotMatch(app, /creationStyleReference|applyCreationStyleReferenceFiles/);
   assert.match(app, /formData\.set\("imageCount", String\(getCreationPlanPreviewImageCount\(selectedRoles\)\)\)/);
   assert.doesNotMatch(app, /formData\.set\("scenario", refs\.creationScenarioInput\.value\)/);
   assert.match(app, /formData\.set\("infographicRebuildEnabled", String\(isCreationInfographicRebuildRequired\(\) \|\| refs\.creationInfographicRebuildEnabledInput\?\.checked !== false\)\)/);
@@ -4128,7 +4140,7 @@ test("creation mode has independent references count and platform controls", asy
   assert.doesNotMatch(app, /setCreationSelectValue\(refs\.creationVisualLanguageInput, normalized\.visualLanguage, "classic-commercial"\)/);
   assert.match(app, /refs\.creationPlanButton\.addEventListener\("click"/);
   assert.match(app, /refs\.creationReferenceGrid\.addEventListener\("change",[\s\S]*creationReferenceRoleId/);
-  assert.match(app, /refs\.creationStyleReferenceInput\.addEventListener\("change",[\s\S]*applyCreationStyleReferenceFiles/);
+  assert.doesNotMatch(app, /styleReferenceImages|creationStyleReference/);
   assert.match(app, /refs\.creationReferenceAnalyzeButton\.addEventListener\("click"/);
   assert.match(app, /refs\.creationReferenceApplyAnalysisButton\.addEventListener\("click", applyCreationReferenceAnalysisRecommendations\)/);
   assert.doesNotMatch(app, /refs\.creationReferenceApplyVisualLanguageButton\.addEventListener\("click", applyCreationReferenceAnalysisVisualLanguage\)/);
@@ -4136,7 +4148,6 @@ test("creation mode has independent references count and platform controls", asy
   const creationApplyAnalysisBody = app.match(/function applyCreationReferenceAnalysisRecommendations\(\) \{[\s\S]*?\r?\n\}\r?\n\r?\nfunction renderCreationReferenceAnalysis/)?.[0] || "";
   assert.doesNotMatch(creationApplyAnalysisBody, /previousVisualLanguage/);
   assert.match(creationApplyAnalysisBody, /syncCreationSelectedRolesToReferenceCoverage\(analysis\);/);
-  assert.match(creationApplyAnalysisBody, /state\.creationReferenceAnalysis\.applied = true;/);
   assert.match(creationApplyAnalysisBody, /state\.creationReferenceAnalysis\.collapsed = true;/);
   assert.doesNotMatch(creationApplyAnalysisBody, /setCreationSelectValue\(refs\.creationVisualLanguageInput/);
   assert.match(creationApplyAnalysisBody, /renderCreationReferenceAnalysis\(\);/);
@@ -4355,6 +4366,7 @@ test("creation mode exposes record detail and item repair actions", async () => 
   assert.match(styles, /\.creation-card-actions\s*\{/);
   assert.match(styles, /\.creation-card-path\s*\{/);
   assert.match(styles, /\.creation-card\s*\{[\s\S]*position:\s*relative;[\s\S]*isolation:\s*isolate;[\s\S]*gap:\s*8px;[\s\S]*min-height:\s*max-content;[\s\S]*padding:\s*8px;/);
+  assert.match(styles, /\.creation-card-head\s*\{[\s\S]*min-width:\s*0;/);
   assert.match(styles, /\.creation-card-head strong\s*\{[\s\S]*font-size:\s*0\.82rem;[\s\S]*white-space:\s*nowrap;/);
   assert.match(styles, /\.creation-result-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(6,\s*minmax\(0,\s*1fr\)\);[\s\S]*grid-auto-rows:\s*max-content;[\s\S]*gap:\s*10px;/);
   assert.match(styles, /\.creation-card\.is-sku\s*\{[\s\S]*order:\s*2;/);
@@ -4689,10 +4701,7 @@ test("creation mode uploads prepared reference images for generation and repair"
     app,
     /state\.creationReferenceFiles\.forEach\(\(item\) => \{\s*const file = getCreationReferenceGenerationFile\(item\);\s*if \(file\) \{\s*formData\.append\("referenceImages", file\);\s*\}\s*\}\);/,
   );
-  assert.match(
-    app,
-    /state\.creationStyleReferenceFiles\.forEach\(\(item\) => \{\s*const file = getCreationReferenceGenerationFile\(item\);\s*if \(file\) \{\s*formData\.append\("styleReferenceImages", file\);\s*\}\s*\}\);/,
-  );
+  assert.doesNotMatch(app, /styleReferenceImages|creationStyleReferenceFiles/);
   assert.doesNotMatch(app, /formData\.append\("referenceImages", item\.file\)/);
 });
 
@@ -4884,7 +4893,7 @@ test("creation record cards open gallery-style lightbox details", async () => {
   assert.match(app, /media\.dataset\.creationRecordPreviewItemId = item\.itemId;/);
   assert.match(app, /media\.dataset\.creationRecordPreviewSetId = options\.creationSetId \|\| "";/);
   assert.match(app, /function getCreationRecordItemById\(itemId, setId = ""\) \{/);
-  assert.match(app, /function buildCreationRecordLightboxItem\(item, set\) \{/);
+  assert.match(app, /import \{ buildCreationRecordLightboxItem, normalizeCreationGenerationSnapshotForView \} from "\/lib\/creation-record-lightbox\.mjs";/);
   assert.match(app, /function openCreationRecordItemPreview\(itemId, setId = ""\) \{/);
   assert.match(app, /async function copyCreationRecordItemPath\(itemId, setId = ""\) \{/);
   assert.match(app, /function syncLightboxCreationRecordActions\(fresh = \{\}\) \{/);
@@ -4971,6 +4980,8 @@ test("creation mode exposes listing agent controls and record listing drafts", a
   assert.match(html, /id="creationRecordListingStatus"/);
   assert.match(html, /id="creationRecordListingDrafts"/);
   assert.match(html, /id="creationRecordResultGrid"[\s\S]*id="creationRecordListingDrafts"/);
+  assert.match(html, /aria-label="Listing 草稿"[\s\S]*<h3>Listing 草稿<\/h3>/u);
+  assert.doesNotMatch(html, /Amazon Listing 草稿|<h3>Amazon Listing<\/h3>/u);
 
   assert.match(app, /creationListingAgentEnabledInput: document\.querySelector\("#creationListingAgentEnabledInput"\)/);
   assert.match(app, /creationInlineListingDrafts: document\.querySelector\("#creationInlineListingDrafts"\)/);
@@ -5015,7 +5026,11 @@ test("creation mode exposes listing agent controls and record listing drafts", a
   assert.match(listingView, /function applyCreationListingCopyData\(target, label, value, \{ list = false \} = \{\}\) \{/);
   assert.match(listingView, /applyCreationListingCopyData\(copyButton, label, copySource, \{ list: copyList \}\);/);
   assert.match(listingView, /titleCopy\.className = "creation-listing-title-copy";/);
-  assert.match(listingView, /applyCreationListingCopyData\(titleCopy, "标题", headerContent\.title\);/);
+  assert.match(listingView, /applyCreationListingCopyData\(titleCopy, draft\.fieldLabels\?\.title \|\| "标题", headerContent\.title\);/);
+  assert.match(listingView, /getCreationListingPolicy\(requestedPolicyId\)/);
+  assert.match(listingView, /draft\.publishFields\.includes\(field\)/);
+  assert.match(listingView, /is-needs-review/);
+  assert.match(listingView, /待人工复核，不可直接发布/u);
   assert.match(listingView, /const CREATION_LISTING_BUCKET_COPY_LABELS = \{/);
   assert.match(listingView, /const localizedBucketLines = buildCreationListingLocalizedBucketLines\(draft\.zhDisplay\?\.keywordBuckets\);/);
   assert.match(listingView, /localizedCountValue: localizedBucketValues,/);
@@ -5028,6 +5043,8 @@ test("creation mode exposes listing agent controls and record listing drafts", a
   assert.match(styles, /\.creation-listing-drafts\s*\{/);
   assert.match(styles, /\.creation-listing-card\s*\{/);
   assert.match(styles, /\.creation-listing-card\.is-failed\s*\{/);
+  assert.match(styles, /\.creation-listing-card\.is-needs-review\s*\{/);
+  assert.match(styles, /\.creation-listing-field\.is-internal\s*\{/);
   assert.match(styles, /\.creation-listing-card[\s\S]*overflow-wrap:\s*anywhere;/);
   assert.match(styles, /\.creation-record-meta-row\s*\{[\s\S]*justify-content:\s*space-between;/);
   assert.match(styles, /\.creation-record-listing-badge\s*\{[\s\S]*background:\s*rgba\(54,\s*211,\s*153,\s*0\.14\);/);

@@ -1,6 +1,6 @@
 {
   "name": "gpt-image2-studio",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "description": "本地优先的 AI 图像生成与视觉创作工作台",

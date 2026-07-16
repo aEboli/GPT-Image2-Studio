@@ -638,7 +638,7 @@ test("listing agent rejects after two invalid listing responses", async () => {
     (error) => {
       assert.match(error.message, /Listing generation failed validation after 2 attempts/);
       assert.match(error.message, /title must start with quantity/);
-      assert.match(error.message, /sellingPoints\[0\] contains unsupported claim "FDA Certified"/);
+      assert.match(error.message, /sellingPoints\[0\] contains unsupported claim "certification claim"/);
       return true;
     },
   );
@@ -781,7 +781,7 @@ test("listing agent retries when title includes size and specification values", 
   assert.doesNotMatch(draft.title, /130\s*mm|35\s*g|hook size|4#/i);
 });
 
-test("generateCreationListingDrafts creates one parent draft for all SKU variants", async () => {
+test("generateCreationListingDrafts creates one reviewable V2 parent draft for all SKU variants", async () => {
   const drafts = await generateCreationListingDrafts({
     set: {
       setId: "set-1",
@@ -800,13 +800,13 @@ test("generateCreationListingDrafts creates one parent draft for all SKU variant
   });
 
   assert.equal(drafts.length, 1);
-  assert.equal(drafts[0].status, "completed");
-  assert.match(drafts[0].title, /^2 Pack Fishing Lure\b/);
+  assert.equal(drafts[0].schemaVersion, "2");
+  assert.equal(drafts[0].platformId, "universal");
+  assert.equal(drafts[0].status, "needs-review");
+  assert.equal(drafts[0].title, "Fishing Lure");
   assert.doesNotMatch(drafts[0].title, /8\.89 cm|3\.5 in/i);
   assert.equal(drafts[0].skuSubjectId, "");
-  assert.match(drafts[0].fiveBullets.join("\n"), /2 selectable variant options/);
-  assert.match(visibleChineseDisplayText(drafts[0]), /可选变体/u);
-  assert.equal(validateListingAgentDraft(drafts[0], "2 Pack").ok, true);
+  assert.match(drafts[0].warnings.join("\n"), /not ready to publish/i);
 });
 
 test("generateCreationListingDrafts keeps metric and imperial specs out of mock titles", async () => {
@@ -826,9 +826,10 @@ test("generateCreationListingDrafts keeps metric and imperial specs out of mock 
     mock: true,
   });
 
-  assert.match(drafts[0].title, /^1 Pack Electric Fishing Lure\b/);
+  assert.equal(drafts[0].schemaVersion, "2");
+  assert.equal(drafts[0].status, "needs-review");
+  assert.equal(drafts[0].title, "Electric Fishing Lure");
   assert.doesNotMatch(drafts[0].title, /13cm|5\.12 in|42g|1\.48 oz/i);
-  assert.equal(validateListingAgentDraft(drafts[0], "1 Pack").ok, true);
 });
 
 test("generateCreationListingDrafts uses grouped SKU subject unit count and search terms in titles", async () => {
@@ -859,25 +860,12 @@ test("generateCreationListingDrafts uses grouped SKU subject unit count and sear
   });
 
   assert.equal(drafts.length, 1);
-  assert.match(drafts[0].title, /^3 Pack Electronic Fishing Lure\b/);
-  assert.match(drafts[0].title, /\b(?:swimbait|bass|freshwater|bait|propeller|slow sinking)\b/i);
+  assert.equal(drafts[0].schemaVersion, "2");
+  assert.equal(drafts[0].status, "needs-review");
+  assert.equal(drafts[0].title, "Electronic Fishing Lure");
   assert.doesNotMatch(drafts[0].title, /130\s*mm|35\s*g|hook size|4#/i);
   assert.match(drafts[0].backendSearchTerms, /\belectronic fishing lure\b/i);
-  assert.match(drafts[0].backendSearchTerms, /\bpropeller swimbait\b/i);
-  assert.match(drafts[0].backendSearchTerms, /\bslow sinking bass trout\b/i);
-  assert.match(drafts[0].backendSearchTerms, /\bfreshwater saltwater hard bait\b/i);
-  assert.deepEqual(drafts[0].keywordBuckets.longTail, [
-    "Electronic Fishing Lure propeller swimbait",
-    "slow sinking bass trout lure",
-    "freshwater saltwater hard bait",
-  ]);
-  assert.deepEqual(drafts[0].keywordBuckets.traffic, [
-    "bass fishing lure",
-    "trout fishing bait",
-    "freshwater swimbait",
-    "saltwater hard bait",
-  ]);
-  assert.equal(validateListingAgentDraft(drafts[0], "3 Pack").ok, true);
+  assert.deepEqual(drafts[0].keywordBuckets.exact, ["Electronic Fishing Lure"]);
 });
 
 test("generateCreationListingDrafts honors set-level same-SKU pack counts for grouped subjects", async () => {
@@ -905,8 +893,9 @@ test("generateCreationListingDrafts honors set-level same-SKU pack counts for gr
   });
 
   assert.equal(drafts.length, 1);
-  assert.match(drafts[0].title, /^6 Pack Electronic Fishing Lure\b/);
-  assert.equal(validateListingAgentDraft(drafts[0], "6 Pack").ok, true);
+  assert.equal(drafts[0].schemaVersion, "2");
+  assert.equal(drafts[0].status, "needs-review");
+  assert.equal(drafts[0].title, "Electronic Fishing Lure");
 });
 
 test("generateCreationListingDrafts uses visible subject unit count for swimbait titles", async () => {
@@ -935,14 +924,10 @@ test("generateCreationListingDrafts uses visible subject unit count for swimbait
     mock: true,
   });
 
-  assert.match(drafts[0].title, /^4 Pack Swimbait Lure\b/);
-  assert.match(drafts[0].title, /\b(?:bass|freshwater|bait|slow sinking|propeller)\b/i);
-  assert.match(drafts[0].title, /\bjointed\b/i);
-  assert.match(drafts[0].title, /\blifelike\b/i);
-  assert.match(drafts[0].title, /\bsaltwater\b/i);
-  assert.match(drafts[0].title, /\bhard bait\b/i);
+  assert.equal(drafts[0].schemaVersion, "2");
+  assert.equal(drafts[0].status, "needs-review");
+  assert.equal(drafts[0].title, "Swimbait Lure");
   assert.doesNotMatch(drafts[0].title, /160\s*mm|50\.4\s*g|hook size|#2|6\.3 in|1\.78 oz/i);
-  assert.equal(validateListingAgentDraft(drafts[0], "4 Pack").ok, true);
 });
 
 test("generateCreationListingDrafts writes mixed grouped SKU quantities as slash pack titles", async () => {
@@ -978,8 +963,9 @@ test("generateCreationListingDrafts writes mixed grouped SKU quantities as slash
   });
 
   assert.equal(drafts.length, 1);
-  assert.match(drafts[0].title, /^2 Pack \/ 3 Pack Electronic Fishing Lure\b/);
-  assert.equal(validateListingAgentDraft(drafts[0], "2 Pack / 3 Pack").ok, true);
+  assert.equal(drafts[0].schemaVersion, "2");
+  assert.equal(drafts[0].status, "needs-review");
+  assert.equal(drafts[0].title, "Electronic Fishing Lure");
 });
 
 test("mock listing drafts describe grouped two-unit subjects", () => {

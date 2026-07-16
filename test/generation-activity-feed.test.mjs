@@ -48,6 +48,39 @@ test("generation activity updates text without changing the original order", () 
   assert.equal(updatedFeed[1].orderAt, "2026-05-04T10:00:00.000Z");
 });
 
+test("generation activity preserves generation start and completion times after later updates", () => {
+  const startedFeed = upsertGenerationActivityEntry([], {
+    key: "job-1:task",
+    title: "Running",
+    detail: "正在生成图片",
+    status: "active",
+    at: "2026-05-04T10:00:01.000Z",
+    generationStartedAt: "2026-05-04T10:00:00.000Z",
+  });
+
+  const completedFeed = upsertGenerationActivityEntry(startedFeed, {
+    key: "job-1:task",
+    title: "Completed",
+    detail: "图像已成功生成",
+    status: "done",
+    at: "2026-05-04T10:05:00.000Z",
+    generationStartedAt: "2026-05-04T10:04:59.000Z",
+    generationCompletedAt: "2026-05-04T10:05:00.000Z",
+  });
+
+  const refreshedFeed = upsertGenerationActivityEntry(completedFeed, {
+    key: "job-1:task",
+    status: "done",
+    at: "2026-05-04T10:06:00.000Z",
+    generationStartedAt: "2026-05-04T10:05:59.000Z",
+    generationCompletedAt: "2026-05-04T10:06:00.000Z",
+  });
+
+  assert.equal(refreshedFeed[0].at, "2026-05-04T10:06:00.000Z");
+  assert.equal(refreshedFeed[0].generationStartedAt, "2026-05-04T10:00:00.000Z");
+  assert.equal(refreshedFeed[0].generationCompletedAt, "2026-05-04T10:05:00.000Z");
+});
+
 test("generation activity task details omit prompt text while preserving status details", () => {
   assert.equal(
     buildGenerationTaskActivityDetail({

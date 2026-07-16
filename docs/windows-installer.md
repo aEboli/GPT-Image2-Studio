@@ -1,6 +1,6 @@
 # Windows 安装包说明
 
-`GPT-Image2-Studio-Setup-v0.2.0.exe` 是 Windows 自解压安装包，由系统自带 `iexpress.exe` 生成，用于 GitHub Release 分发。
+`GPT-Image2-Studio-Setup-v0.2.1.exe` 是 Windows 自解压安装包，由系统自带 `iexpress.exe` 生成，用于 GitHub Release 分发。
 
 ## 安装内容
 

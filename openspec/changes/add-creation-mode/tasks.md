@@ -223,3 +223,9 @@
 - [x] 35.2 Update planner titles, briefs, shopper questions, buyer-decision strategy, and role intent while preserving role IDs and API request shape.
 - [x] 35.3 Sync frontend role picker copy with the new promotional scene/effect taxonomy.
 - [x] 35.4 Update OpenSpec spec/design notes and rerun targeted planner and frontend static verification.
+
+## 36. Per-item Generation Request Snapshots
+
+- [x] 36.1 Add regression coverage for legacy sidecar recovery, per-item lightbox mapping, and local/Cloudflare request snapshot persistence.
+- [x] 36.2 Persist the actual generation prompt and request parameters for Creation generation and repair, and recover legacy records from image sidecars.
+- [x] 36.3 Render Creation record lightboxes from the saved item snapshot without current-config fallbacks, then run targeted tests and strict OpenSpec validation.

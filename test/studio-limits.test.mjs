@@ -4,7 +4,6 @@ import { readFile } from "node:fs/promises";
 
 import {
   MAX_CREATION_REFERENCE_IMAGES,
-  MAX_CREATION_STYLE_REFERENCE_IMAGES,
   MAX_PARALLEL_TASKS_PER_SESSION,
   MAX_PORTRAIT_ACCESSORY_REFERENCE_IMAGES,
   MAX_PORTRAIT_PERSON_REFERENCE_IMAGES,
@@ -32,7 +31,6 @@ test("studio task limits keep the local queue unbounded and cap generation at fi
 test("studio reference limits keep standard references and creation references at fifteen", async () => {
   assert.equal(MAX_REFERENCE_IMAGES, 15);
   assert.equal(MAX_CREATION_REFERENCE_IMAGES, 15);
-  assert.equal(MAX_CREATION_STYLE_REFERENCE_IMAGES, 3);
   assert.equal(MAX_PORTRAIT_PERSON_REFERENCE_IMAGES, 3);
   assert.equal(MAX_PORTRAIT_ACCESSORY_REFERENCE_IMAGES, 9);
 
@@ -41,7 +39,6 @@ test("studio reference limits keep standard references and creation references a
 
   assert.match(app, /maxReferenceImages:\s*15/);
   assert.match(app, /maxCreationReferenceImages:\s*15/);
-  assert.match(app, /maxCreationStyleReferenceImages:\s*3/);
   assert.match(app, /maxPortraitPersonReferenceImages:\s*3/);
   assert.match(app, /maxPortraitAccessoryReferenceImages:\s*9/);
   assert.match(index, /id="referenceCount">0 \/ 15<\/small>/);

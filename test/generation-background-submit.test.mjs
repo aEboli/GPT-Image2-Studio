@@ -186,4 +186,6 @@ test("local background generate releases request connections and completes throu
   assert.equal(completed.length, 7);
   assert.equal(completed.find((task) => task.id === "background-submit-7")?.imageRoute, "b");
   assert.equal(completed.every((task) => task.item?.filename), true);
+  assert.equal(completed.every((task) => /^\d{4}-\d{2}-\d{2}T/.test(task.generationStartedAt)), true);
+  assert.equal(completed.every((task) => task.generationStartedAt === task.item?.generationStartedAt), true);
 });

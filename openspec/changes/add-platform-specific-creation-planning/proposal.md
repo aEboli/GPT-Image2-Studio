@@ -1,6 +1,6 @@
 ## Why
 
-当前套图模式虽然已经提供 19 个平台选项，但平台差异只体现在附加提示词上，图片类型、顺序、张数、比例、分辨率、语言和生成管线参数仍沿用同一套默认逻辑。这会让 Amazon 白底主图等严格要求与现有通用首图模板直接冲突，也无法生成淘宝长图、小红书 3:4 封面等平台原生资产。
+当前套图模式虽然已经提供 19 个平台选项，但平台差异只体现在附加提示词上，图片类型、顺序、张数、比例、分辨率、语言和生成管线参数仍沿用同一套默认逻辑。这会让 Amazon 白底主图等严格要求与现有通用首图模板直接冲突，也无法生成淘宝长图、小红书 3:4 封面等平台原生资产。Listing 入口虽已对所有平台开放，生成器仍固定使用 Amazon US English、数量前置标题、恰好五条要点和后台搜索词契约，非 Amazon 平台实际得到的仍是 Amazon 文案。
 
 ## What Changes
 
@@ -15,7 +15,9 @@
 - 对参考图分析增加平台/类目请求版本校验，防止旧平台异步结果回写到新平台状态。
 - 在队列快照和 Creation manifest 中持久化策略版本、平台 provenance、有效覆盖、轮播/SKU/重构计数及逐图参数；旧记录保持原计划，不因策略升级漂移，只有显式重新规划才使用新策略。
 - 对官方规则不足的平台使用可见的保守建议和较低证据等级，不把推断标记为官方硬约束，也不在运行时抓取平台网站。
-- 非 Amazon 平台禁用 Amazon US Listing Agent，并说明当前 Listing 能力的市场范围。
+- 所有 19 个 canonical 平台及旧记录均可进入 Listing Agent；新增独立、版本化的 Listing policy registry，以 5 个跨类目 archetype 复用基础策略，并为 19 个平台分别声明 locale、标题、高亮、描述、搜索面、转化顺序、来源和证据等级覆盖。
+- 将 Listing 输出演进为可兼容旧字段别名的 V2 superset draft，冻结生成时的平台、locale 和 Listing 策略版本；旧草稿不自动迁移，只有用户显式重写或重新生成时才采用当前策略。
+- 以统一事实门控、平台字段校验和保守 claim 规则约束全部文案。本能力生成的是待人工复核草稿，不自动发布，也不保证平台审核通过、法律合规或转化效果。
 - 成套采用/淘汰审核、可持久化的暂停/取消/重排队列、商品版本管理、多平台差量派生和生成后视觉/OCR 质检留作后续独立 change，不扩入本次平台规划变更。
 
 ## Capabilities
@@ -27,7 +29,7 @@
 ### Modified Capabilities
 
 - `creation-mode`: 从统一角色切片和整套共用参数，调整为版本化平台策略驱动的图片类型规划、逐图生成参数、手动覆盖、平台切换、持久化与兼容行为。
-- `creation-listing-agent`: 将 Amazon US Listing Agent 的启用条件明确限制为 Amazon 平台套图，避免其他平台误生成 Amazon Listing。
+- `creation-listing-agent`: 在全平台可用的入口上增加版本化平台文案策略、跨类目 playbook、V2 草稿、旧草稿兼容、事实门控、平台校验和本地/Worker 一致性。
 
 ## Impact
 
@@ -35,6 +37,6 @@
 - 浏览器交互：`public/app.js`、`public/index.html`、`public/styles.css`，包括平台摘要、覆盖状态、可排序图片槽位和切换确认；浏览器使用的平台模块通过 `scripts/sync-public-lib.mjs` 从 `lib` 精确镜像到 `public/lib`。
 - 生成路径：`server.mjs`、`cloudflare-pages-worker.mjs`，改为按计划项解析并提交比例、分辨率与语言。
 - 队列、修复与存储：`lib/creation-suite-queue.mjs`、`lib/creation-repair.mjs`、`lib/creation-store.mjs`。
-- Listing：现有 Listing 控件的可用状态与校验逻辑；不扩展非 Amazon Listing 内容生成。
+- Listing：新增共享 Listing policy registry，并更新草稿 source、严格 JSON schema、提示词、校验、保守回退、manifest 归一化、记录页动态字段标签、复制和导出；本地服务与 Worker 继续调用同一实现。
 - 测试：平台策略、解析优先级、规划器、浏览器交互、队列、存储、修复、本地/Worker 一致性和端到端回归测试。
 - 现有未提交平台功能属于本变更的实施基线，实施时必须保留并最小化修改用户当前脏工作树中的其他改动。

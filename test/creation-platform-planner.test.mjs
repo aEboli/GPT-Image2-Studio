@@ -165,6 +165,59 @@ test("Creation planner emits approved platform-native carousel plans and effecti
   }
 });
 
+test("planner preserves all 18 explicitly selected roles without evidence", () => {
+  const selectedRoles = [
+    "hero", "benefit", "scene", "multi-angle", "product-detail", "size-capacity-fit",
+    "accessory-gift", "series-showcase", "usage-suggestion", "ingredient-material",
+    "craft-process", "effect-comparison", "spec-table", "atmosphere", "human-handheld",
+    "human-wearable", "brand-story", "after-sales",
+  ];
+  const plan = buildCreationPlan({
+    productName: "Travel Bottle",
+    productDescription: "Product shown in the supplied image",
+    platform: "amazon",
+    imageCount: 18,
+    selectedRoles,
+    infographicRebuildEnabled: false,
+  });
+  const carouselItems = plan.items.filter((item) => item.itemKind === "carousel");
+
+  assert.equal(plan.carouselImageCount, 18);
+  assert.equal(plan.imageCount, 18);
+  assert.equal(carouselItems.length, 18);
+  assert.equal(new Set(carouselItems.map((item) => item.slotKey)).size, 18);
+  assert.deepEqual(carouselItems.map((item) => item.role), selectedRoles);
+  assert.ok(carouselItems.every((item) => /Do not invent dimensions, materials, package contents, condition, defects, prices, certifications, sales, rankings, guarantees, reviews, or performance claims/i.test(item.prompt)));
+});
+
+test("Temu 16 and universal 18 custom items expose selected role purpose in title and prompt", () => {
+  const selectedRoles = [
+    "hero", "benefit", "scene", "multi-angle", "product-detail", "size-capacity-fit",
+    "accessory-gift", "series-showcase", "usage-suggestion", "ingredient-material",
+    "craft-process", "effect-comparison", "spec-table", "atmosphere", "human-handheld",
+    "human-wearable", "brand-story", "after-sales",
+  ];
+
+  for (const [platform, imageCount] of [["temu", 16], ["universal", 18]]) {
+    const plan = buildCreationPlan({
+      productName: "Fishing Lure",
+      productDescription: "Product shown in the supplied image",
+      platform,
+      imageCount,
+      selectedRoles: selectedRoles.slice(0, imageCount),
+      infographicRebuildEnabled: false,
+    });
+    const customItems = plan.items.filter((item) => item.itemKind === "carousel" && item.imageType === "custom");
+
+    assert.ok(customItems.length >= 4, platform);
+    assert.ok(customItems.every((item) => item.title.endsWith("（自定义）")), platform);
+    assert.ok(customItems.every((item) => !/^自定义图片\s*\d*$/u.test(item.title)), platform);
+    assert.ok(customItems.every((item) => item.prompt.includes(item.title.replace("（自定义）", "")) || item.prompt.includes("Create ")), platform);
+    assert.ok(new Set(customItems.map((item) => item.prompt)).size === customItems.length, platform);
+    assert.ok(customItems.every((item) => /Do not invent dimensions, materials, package contents/i.test(item.prompt)), platform);
+  }
+});
+
 test("strict marketplace main images remove generic hero conflicts and external Logo attachment", () => {
   const plan = buildPlatformPlan("amazon", {
     logoOptions: { enabled: true, filename: "brand-mark.png", placement: "top-left", background: "transparent" },
@@ -196,7 +249,7 @@ test("local and Worker generation assemble external Logo references per planned 
 
   for (const source of [server, worker]) {
     assert.match(source, /appendCreationItemLogoReference/);
-    assert.match(source, /appendCreationItemLogoReference\(\s*item,\s*itemGenerationReferenceImages,\s*logoImage\s*,?\s*\)/);
+    assert.match(source, /appendCreationItemLogoReference\(\s*item,\s*itemReferenceImages,\s*logoImage\s*,?\s*\)/);
   }
 });
 

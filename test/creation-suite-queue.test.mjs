@@ -126,7 +126,7 @@ test("creation suite queue builds a complete queued set from current form state"
     refs: {
       creationDimensionSpecsInput: { value: "13 cm" },
       creationSkuBundleCountInput: { value: "2" },
-      creationVisualLanguageInput: { value: "reference-style" },
+      creationVisualLanguageInput: { value: "premium-studio" },
     },
     sellingPoints: ["point"],
   });
@@ -136,8 +136,8 @@ test("creation suite queue builds a complete queued set from current form state"
   assert.equal(set.dimensionUnitModeLabel, "Unit both");
   assert.equal(set.platform, "amazon");
   assert.equal(set.platformLabel, "Amazon");
-  assert.equal(set.visualLanguage, "reference-style");
-  assert.equal(set.visualLanguageLabel, "Visual reference-style");
+  assert.equal(set.visualLanguage, "premium-studio");
+  assert.equal(set.visualLanguageLabel, "Visual premium-studio");
   assert.deepEqual(set.referenceImageNames, ["reference-a.png"]);
   assert.deepEqual(set.referenceImageRoles, [{ id: "ref-1", role: "product" }]);
   assert.deepEqual(set.skuSubjects, [{ id: "sku-a", title: "SKU A", filenames: ["sku-a.jpg"] }]);
@@ -575,20 +575,20 @@ test("creation suite queue falls back to normalized visual language labels", () 
     getCreationSelectedScenario: () => ({ value: "standard", label: "Standard" }),
     isCreationDraftSet: () => false,
     normalizeCreationSkuBundleCountForPayload: (value) => Number(value),
-    normalizeCreationVisualLanguage: (value) => ({ value, label: "Reference style" }),
+    normalizeCreationVisualLanguage: (value) => ({ value, label: "Premium studio" }),
     normalizeSet,
     productDescription: "Description",
     productName: "Queued product",
     refs: {
       creationDimensionSpecsInput: { value: "" },
       creationSkuBundleCountInput: { value: "1" },
-      creationVisualLanguageInput: { value: "reference-style" },
+      creationVisualLanguageInput: { value: "premium-studio" },
     },
     sellingPoints: [],
   });
 
-  assert.equal(set.visualLanguage, "reference-style");
-  assert.equal(set.visualLanguageLabel, "Reference style");
+  assert.equal(set.visualLanguage, "premium-studio");
+  assert.equal(set.visualLanguageLabel, "Premium studio");
 });
 
 test("creation suite queue renders selectable active and queued suites", () => {
@@ -1009,7 +1009,6 @@ test("creation suite queued repair form data keeps the queued suite reference fi
   source.set("productName", "Queued product");
   source.set("referenceImageRoles", JSON.stringify([{ filename: "queue-a.png", role: "product" }]));
   source.append("referenceImages", new Blob(["queue-a"], { type: "image/png" }), "queue-a.png");
-  source.append("styleReferenceImages", new Blob(["style-a"], { type: "image/png" }), "style-a.png");
 
   const repairData = buildCreationQueuedRepairFormData(
     {
@@ -1026,5 +1025,4 @@ test("creation suite queued repair form data keeps the queued suite reference fi
   assert.equal(repairData.get("scope"), "incomplete");
   assert.equal(repairData.get("productName"), "Queued product");
   assert.deepEqual(repairData.getAll("referenceImages").map((file) => file.name), ["queue-a.png"]);
-  assert.deepEqual(repairData.getAll("styleReferenceImages").map((file) => file.name), ["style-a.png"]);
 });

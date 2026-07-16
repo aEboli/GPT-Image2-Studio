@@ -31,4 +31,4 @@
 
 - [x] 6.1 运行 prompt、policy、resolver、planner、browser、preview/generation、queue、store、repair、Worker 与端到端定向测试，修复全部回归且不弱化断言。
 - [x] 6.2 运行完整 `npm test`、`npm run sync:public-lib -- --check`、`npm run build:pages`、OpenSpec strict validation 和新增中文乱码扫描，并记录环境限制。
-- [ ] 6.3 请求独立只读验收 agent 复核受众安全、事实边界、严格主图、冻结快照安全、Local/Worker 一致性、队列/修复漂移和脏工作树保留；处理所有确认问题后完成本 change。
+- [x] 6.3 请求独立只读验收 agent 复核受众安全、事实边界、严格主图、冻结快照安全、Local/Worker 一致性、队列/修复漂移和脏工作树保留；处理所有确认问题后完成本 change。

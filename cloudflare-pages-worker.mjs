@@ -65,7 +65,6 @@ import {
   buildCreationLogoBatchPlan,
 } from "./lib/creation-logo-batch.mjs";
 import { generateCreationListingDrafts } from "./lib/creation-listing-agent.mjs";
-import { getCreationListingEligibility } from "./lib/creation-listing-view.mjs";
 import { generatePptDeckOutline } from "./lib/ppt-deck-workflow.mjs";
 import { analyzePptDocument } from "./lib/ppt-document-analysis.mjs";
 import { buildSlideEditPrompt, buildSlideImagePrompts } from "./lib/ppt-slide-prompts.mjs";
@@ -95,6 +94,7 @@ import {
   buildCreationItemGenerationPrompt,
   resolveCreationItemGenerationParameters,
 } from "./lib/creation-generation-parameters.mjs";
+import { buildCreationGenerationSnapshot } from "./lib/creation-generation-snapshot.mjs";
 import {
   CREATION_REFERENCE_ANALYSIS_MODE,
   PORTRAIT_REFERENCE_ANALYSIS_MODE,
@@ -104,7 +104,6 @@ import {
 import { writeWorkerSseEvent } from "./lib/sse-writer.mjs";
 import {
   appendCreationItemLogoReference,
-  appendCreationStyleReferences,
   buildCreationGenerationReferenceImageLabels,
   buildCreationItemReferenceImages,
 } from "./lib/creation-reference-labels.mjs";
@@ -112,7 +111,6 @@ import {
   DEFAULT_BASE_URL,
   DEFAULT_REASONING_EFFORT,
   MAX_CREATION_REFERENCE_IMAGES,
-  MAX_CREATION_STYLE_REFERENCE_IMAGES,
   MAX_PARALLEL_TASKS_PER_SESSION,
   MAX_PORTRAIT_ACTION_REFERENCE_IMAGES,
   MAX_PORTRAIT_ACCESSORY_REFERENCE_IMAGES,
@@ -248,7 +246,6 @@ function buildPublicConfig() {
       maxParallelTasksPerSession: MAX_PARALLEL_TASKS_PER_SESSION,
       maxReferenceImages: MAX_REFERENCE_IMAGES,
       maxCreationReferenceImages: MAX_CREATION_REFERENCE_IMAGES,
-      maxCreationStyleReferenceImages: MAX_CREATION_STYLE_REFERENCE_IMAGES,
       maxPortraitPersonReferenceImages: MAX_PORTRAIT_PERSON_REFERENCE_IMAGES,
       maxPortraitActionReferenceImages: MAX_PORTRAIT_ACTION_REFERENCE_IMAGES,
       maxPortraitAccessoryReferenceImages: MAX_PORTRAIT_ACCESSORY_REFERENCE_IMAGES,
@@ -691,6 +688,7 @@ function toPublicGenerationTask(task = {}) {
     errorMessage: String(task.errorMessage || ""),
     createdAt: String(task.createdAt || new Date().toISOString()),
     updatedAt: String(task.updatedAt || task.createdAt || new Date().toISOString()),
+    generationStartedAt: String(task.generationStartedAt || task.item?.generationStartedAt || ""),
     prompt: String(task.prompt || ""),
     ratio: String(task.ratio || ""),
     ratioLabel: String(task.ratioLabel || ""),
@@ -902,9 +900,12 @@ function buildStoredImageMetadata({ filename, createdAt, expiresAt, item = {} })
     "size",
     "quality",
     "format",
+    "baseUrl",
     "imageRoute",
     "responsesModel",
     "imageModel",
+    "endpointPath",
+    "reasoningEffort",
   ];
 
   for (const field of optionalFields) {
@@ -2409,7 +2410,7 @@ function buildCloudCreationSet({ setId, plan, createdAt, updatedAt, status, item
     skuGenerationRule: plan.skuGenerationRule || "none",
     skuGenerationRuleLabel: plan.skuGenerationRuleLabel || "无",
     logo: plan.logo || null,
-    effectivePlan: plan.effectivePlan || plan,
+    effectivePlan: plan,
     createdAt,
     updatedAt: updatedAt || createdAt,
     status,
@@ -2689,25 +2690,12 @@ async function runCreationGenerate(request, writer, { fetchImpl, imageBucket } =
     ...formData.getAll("referenceImages"),
     ...formData.getAll("referenceImage"),
   ]);
-  const styleReferenceImages = await toReferenceImages([
-    ...formData.getAll("styleReferenceImages"),
-    ...formData.getAll("styleReferenceImage"),
-  ]);
   const logoImage = await readCreationLogoImage(formData);
   if (referenceImages.length > MAX_CREATION_REFERENCE_IMAGES) {
     throw new Error(`参考图最多支持 ${MAX_CREATION_REFERENCE_IMAGES} 张。`);
   }
   if (referenceImages.some((image) => !String(image.mimeType || "").startsWith("image/"))) {
     throw new Error("仅支持图片参考文件。");
-  }
-  if (styleReferenceImages.length > MAX_CREATION_STYLE_REFERENCE_IMAGES) {
-    throw new Error(`参考风格图最多支持 ${MAX_CREATION_STYLE_REFERENCE_IMAGES} 张。`);
-  }
-  if (referenceImages.length + styleReferenceImages.length > MAX_CREATION_REFERENCE_IMAGES) {
-    throw new Error(`套图参考图和参考风格图合计最多支持 ${MAX_CREATION_REFERENCE_IMAGES} 张。`);
-  }
-  if (styleReferenceImages.some((image) => !String(image.mimeType || "").startsWith("image/"))) {
-    throw new Error("仅支持图片参考风格文件。");
   }
   const referenceImageNames = referenceImages.map((image) => image.filename).filter(Boolean);
   const referenceImageRoles = normalizeCreationReferenceRoles(formData.get("referenceImageRoles"));
@@ -2800,12 +2788,28 @@ async function runCreationGenerate(request, writer, { fetchImpl, imageBucket } =
       fallbackTargetLanguage: plan.targetLanguage,
     });
     let finalPrompt = "";
+    let generationSnapshot = {};
     let finalBase64 = "";
 
     try {
       finalPrompt = buildCreationItemGenerationPrompt(item.prompt, itemGenerationParameters);
+      const itemReferenceImages = buildCreationItemReferenceImages(item, referenceImages, plan.referenceImageRoles);
+      const itemGenerationReferenceImagesWithLogo = appendCreationItemLogoReference(
+        item,
+        itemReferenceImages,
+        logoImage,
+      );
+      generationSnapshot = buildCreationGenerationSnapshot({
+        generationPrompt: finalPrompt,
+        generationConfig,
+        parameters: itemGenerationParameters,
+        format: finalFormat,
+        quality: finalQuality,
+        reasoningEffort,
+        referenceImages: itemGenerationReferenceImagesWithLogo,
+      });
       items = items.map((entry) =>
-        entry.itemId === item.itemId ? { ...entry, status: "generating", generationStartedAt } : entry,
+        entry.itemId === item.itemId ? { ...entry, ...generationSnapshot, status: "generating", generationStartedAt } : entry,
       );
       await writeSseEvent(writer, "item_started", {
         setId,
@@ -2816,14 +2820,6 @@ async function runCreationGenerate(request, writer, { fetchImpl, imageBucket } =
         effectiveSize: itemGenerationParameters.finalSize,
         targetLanguage: itemGenerationParameters.targetLanguage,
       });
-
-      const itemReferenceImages = buildCreationItemReferenceImages(item, referenceImages, plan.referenceImageRoles);
-      const itemGenerationReferenceImages = appendCreationStyleReferences(itemReferenceImages, styleReferenceImages);
-      const itemGenerationReferenceImagesWithLogo = appendCreationItemLogoReference(
-        item,
-        itemGenerationReferenceImages,
-        logoImage,
-      );
       const generationResult = await requestCloudImageGeneration({
         baseUrl: generationConfig.baseUrl,
         apiKey: generationConfig.apiKey,
@@ -2832,7 +2828,6 @@ async function runCreationGenerate(request, writer, { fetchImpl, imageBucket } =
         referenceImageLabels: buildCreationGenerationReferenceImageLabels(
           itemReferenceImages,
           plan.referenceImageRoles,
-          styleReferenceImages,
         ),
         size: itemGenerationParameters.finalSize,
         aspectRatio: itemGenerationParameters.ratioOption.value,
@@ -2897,13 +2892,14 @@ async function runCreationGenerate(request, writer, { fetchImpl, imageBucket } =
         createdAt,
         format: finalFormat,
         base64: finalBase64,
-        item: { ...item, generationPrompt: finalPrompt, ...itemGenerationParameters, ratio: itemGenerationParameters.ratioOption.value, effectiveSize: savedSize, targetLanguage: itemGenerationParameters.targetLanguage },
+        item: { ...item, ...generationSnapshot, effectiveSize: savedSize, size: savedSize },
       });
 
       items = items.map((entry) =>
         entry.itemId === item.itemId
           ? {
               ...entry,
+              ...generationSnapshot,
               status: "completed",
               filename,
               imageUrl: storedImage.imageUrl,
@@ -2913,7 +2909,6 @@ async function runCreationGenerate(request, writer, { fetchImpl, imageBucket } =
               generationStartedAt,
               generationCompletedAt,
               generationDurationMs,
-              generationPrompt: finalPrompt,
               ratio: itemGenerationParameters.ratioOption.value,
               ratioLabel: itemGenerationParameters.ratioOption.label,
               resolutionTier: itemGenerationParameters.resolutionTier,
@@ -2943,7 +2938,7 @@ async function runCreationGenerate(request, writer, { fetchImpl, imageBucket } =
       const message = error instanceof Error ? error.message : String(error);
       items = items.map((entry) =>
         entry.itemId === item.itemId
-          ? { ...entry, status: "failed", error: message, generationPrompt: finalPrompt }
+          ? { ...entry, ...generationSnapshot, status: "failed", error: message }
           : entry,
       );
       set = buildCloudCreationSet({
@@ -4142,13 +4137,6 @@ async function handleCloudCreationListings(request, { env = {}, fetchImpl = fetc
   const setId = String(set?.setId || "").trim();
   if (!setId) {
     return jsonResponse({ ok: false, message: "Missing Creation set metadata." }, 400);
-  }
-
-  if (!getCreationListingEligibility(set).eligible) {
-    return jsonResponse({
-      ok: false,
-      message: "Amazon US Listing is only available for Amazon Creation sets or eligible legacy records.",
-    }, 400);
   }
 
   const mock = env.IMAGE_STUDIO_MOCK_LISTING_AGENT === "1" || payload.mock === true;

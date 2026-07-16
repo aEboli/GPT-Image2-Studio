@@ -481,6 +481,15 @@ test("creation reference analysis normalizes an evidence-bounded audience strate
   assert.equal(CREATION_REFERENCE_ANALYSIS_JSON_SCHEMA.properties.audience_strategy.additionalProperties, false);
 });
 
+test("creation reference analysis removes sensitive personas and unsupported claims", () => {
+  const result = extractPromptAgentJson(JSON.stringify({
+    summary: "不可信的受众分析", product_name: "普通商品", category_hint: "普通类目", category_path: "普通类目",
+    reference_roles: [{ index: 1, filename: "product.png", role: "product", note: "可见普通商品" }], sku_subjects: [],
+    audience_strategy: { target_audience: "Black buyers age 25-34", purchase_motivations: ["FDA certified health effects", "$19.99 lowest price", "3x faster", "4.9/5 stars", "over 1 million sold", "销量第一"], purchase_objections: ["patients with diabetes", "Chinese consumers"], desired_outcome: "clinically proven treatment", evidence_basis: [], confidence: "high", source: "analysis-suggestion" }, risks: [],
+  }));
+  assert.deepEqual(result.audience_strategy, { target_audience: "buyers evaluating this product category", purchase_motivations: [], purchase_objections: [], desired_outcome: "make a confident product choice", evidence_basis: [], confidence: "low", source: "analysis-suggestion" });
+});
+
 test("prompt agent creation reference analysis supports fifteen ordered references", () => {
   const images = Array.from({ length: MAX_CREATION_REFERENCE_IMAGES }, (_, index) => ({
     filename: `creation-ref-${index + 1}.png`,

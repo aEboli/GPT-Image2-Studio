@@ -43,15 +43,6 @@ test("creation reference thumbnails open the image-only lightbox", async () => {
   assert.match(styles, /\.lightbox\.is-image-only-preview\s+\.lightbox-meta/);
 });
 
-test("creation style reference thumbnails open the image-only lightbox", async () => {
-  const app = await readFile(appPath, "utf8");
-  const body = app.match(/function openCreationStyleReferencePreview\(referenceId\) \{(?<body>[\s\S]*?)\n\}/)?.groups?.body || "";
-
-  assert.match(body, /buildCreationReferenceLightboxItem\(item\)/);
-  assert.match(body, /openLightbox\(lightboxItem,\s*\{[\s\S]*items:\s*state\.creationStyleReferenceFiles,[\s\S]*buildItem:\s*buildCreationReferenceLightboxItem,[\s\S]*\}\)/);
-  assert.doesNotMatch(body, /referencePreviewViewer|referencePreviewImage/);
-});
-
 test("creation logo batch source thumbnails open the image-only lightbox", async () => {
   const app = await readFile(appPath, "utf8");
   const body = app.match(/function openCreationLogoBatchSourcePreview\(sourceId\) \{(?<body>[\s\S]*?)\n\}/)?.groups?.body || "";

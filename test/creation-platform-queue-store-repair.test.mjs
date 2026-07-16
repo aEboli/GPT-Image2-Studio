@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -86,6 +86,49 @@ test("legacy manifest records missing provenance without applying current strate
   assert.equal(manifest.items[0].prompt, "old prompt");
 });
 
+test("legacy creation records recover the actual generation snapshot from image sidecars", async (t) => {
+  const outputDir = await mkdtemp(join(tmpdir(), "creation-sidecar-recovery-"));
+  const store = createCreationSetStore({ outputDir });
+  const relativePath = "2026-07/07-15/2026-07-15-creation/record/item.png";
+  const sidecarPath = join(outputDir, "json", "2026-07", "07-15", "2026-07-15-creation", "record", "item.json");
+  t.after(() => rm(outputDir, { recursive: true, force: true }));
+
+  await store.saveManifest({
+    setId: "legacy-sidecar",
+    items: [{ itemId: "item-1", slotIndex: 1, role: "hero", prompt: "planning prompt", relativePath }],
+  });
+  await mkdir(join(outputDir, "2026-07", "07-15", "2026-07-15-creation", "record"), { recursive: true });
+  await writeFile(join(outputDir, ...relativePath.split("/")), "image", "utf8");
+  await mkdir(join(outputDir, "json", "2026-07", "07-15", "2026-07-15-creation", "record"), { recursive: true });
+  await writeFile(sidecarPath, `${JSON.stringify({
+    prompt: "actual upstream prompt",
+    baseUrl: "https://gateway.example/v1",
+    imageRoute: "a",
+    responsesModel: "gpt-5.4-mini",
+    imageModel: "gpt-image-2",
+    endpointPath: "/responses",
+    referenceImageNames: ["front.png", "detail.png"],
+    hasReferenceImage: true,
+    ratio: "1:1",
+    ratioLabel: "1:1 方形",
+    size: "2048x2048",
+    actualSize: "1254x1254",
+    quality: "high",
+    format: "png",
+    reasoningEffort: "medium",
+  }, null, 2)}\n`, "utf8");
+
+  const manifest = await store.readManifest("legacy-sidecar");
+  const item = manifest.items[0];
+  assert.equal(item.prompt, "planning prompt");
+  assert.equal(item.generationPrompt, "actual upstream prompt");
+  assert.equal(item.requestedSize, "2048x2048");
+  assert.equal(item.effectiveSize, "2048x2048");
+  assert.equal(item.actualSize, "1254x1254");
+  assert.equal(item.responsesModel, "gpt-5.4-mini");
+  assert.deepEqual(item.referenceImageNames, ["front.png", "detail.png"]);
+});
+
 test("saving a legacy manifest does not rewrite platform strategy fields", async () => {
   const outputDir = await mkdtemp(join(tmpdir(), "creation-legacy-"));
   const store = createCreationSetStore({ outputDir });
@@ -104,6 +147,7 @@ test("repair preserves saved effective item parameters and prompt", () => {
       platform: "amazon",
       strategyVersion: "2026-07-11.1",
       items: [{ itemId: "item-1", role: "hero", imageType: "amazon-main", prompt: "saved prompt", ratio: "1:1", effectiveSize: "2K", targetLanguage: "en", constraints: ["white background"] }],
+      effectivePlan: { platform: "etsy", items: [{ itemId: "item-1", prompt: "unvalidated nested prompt" }] },
     },
     items: [{ itemId: "item-1", slotIndex: 1, role: "hero", imageType: "amazon-main", prompt: "saved prompt", ratio: "1:1", effectiveSize: "2K", targetLanguage: "en", constraints: ["white background"] }],
   };
@@ -112,6 +156,7 @@ test("repair preserves saved effective item parameters and prompt", () => {
   const refreshed = refreshCreationRepairItemsFromPlan(creationSet.items, plan);
 
   assert.equal(plan.platform, "amazon");
+  assert.equal(Object.hasOwn(plan, "effectivePlan"), false);
   assert.equal(refreshed[0].prompt, "saved prompt");
   assert.equal(refreshed[0].imageType, "amazon-main");
   assert.equal(refreshed[0].effectiveSize, "2K");

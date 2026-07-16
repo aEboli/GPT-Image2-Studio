@@ -38,7 +38,6 @@ test("config store returns empty public config before any save", async () => {
     maxParallelTasksPerSession: 15,
     maxReferenceImages: 15,
     maxCreationReferenceImages: 15,
-    maxCreationStyleReferenceImages: 3,
     maxPortraitPersonReferenceImages: 3,
     maxPortraitActionReferenceImages: 3,
     maxPortraitAccessoryReferenceImages: 9,
