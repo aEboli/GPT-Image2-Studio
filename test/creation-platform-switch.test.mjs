@@ -18,7 +18,6 @@ const previous = {
   category: "home",
   dimensions: "10cm",
   referenceFiles: ["hero.jpg"],
-  styleReferenceFiles: ["style.jpg"],
   logo: { filename: "brand.png" },
   skuSubjects: [{ id: "red" }],
   outputFormat: "png",
@@ -38,7 +37,7 @@ test("confirming a platform switch clears only platform planning fields", () => 
   assert.equal(next.strategyVersion, "etsy-v1");
   assert.deepEqual(next.platformSetOverrides, {});
   assert.deepEqual(next.platformItemOverrides, []);
-  for (const key of ["productName", "category", "dimensions", "referenceFiles", "styleReferenceFiles", "logo", "skuSubjects", "outputFormat", "config"]) {
+  for (const key of ["productName", "category", "dimensions", "referenceFiles", "logo", "skuSubjects", "outputFormat", "config"]) {
     assert.deepEqual(next[key], previous[key], key);
   }
 });
@@ -47,13 +46,44 @@ test("programmatic hydration does not create a switch transaction", () => {
   assert.equal(beginCreationPlatformSwitch(previous, previous.platform, { programmatic: true }), null);
 });
 
-test("browser platform change confirms before reset and immediately previews on confirmation", async () => {
+test("browser platform change directly resets and previews without confirmation", async () => {
   const app = await readFile(appPath, "utf8");
-  assert.match(app, /async function handleCreationPlatformChange/);
-  assert.match(app, /window\.confirm\(/);
-  assert.match(app, /refs\.creationPlatformInput\.value = previousPlatform/);
-  assert.match(app, /platformSetOverrides:\s*\{\}/);
-  assert.match(app, /platformItemOverrides:\s*\[\]/);
-  assert.match(app, /await previewCreationPlan\(\)/);
+  const handler = app.match(
+    /async function handleCreationPlatformChange\(\{ programmatic = false \} = \{\}\) \{[\s\S]*?\r?\n\}\r?\n\r?\nfunction invalidateCreationReferenceAnalysisRequest/,
+  )?.[0] || "";
+  assert.doesNotMatch(handler, /window\.confirm|confirmed|refs\.creationPlatformInput\.value = previousPlatform/);
+  assert.match(
+    handler,
+    /if \(programmatic \|\| previousPlatform === nextPlatform\) \{[\s\S]*creationPreviousPlatformValue = nextPlatform;[\s\S]*return;/,
+  );
+  assert.match(
+    handler,
+    /creationPreviousPlatformValue = nextPlatform;[\s\S]*invalidateCreationReferenceAnalysisRequest\(\);[\s\S]*state\.creation\.platformSetOverrides = \{\};[\s\S]*state\.creation\.platformItemOverrides = \[\];[\s\S]*setFrozenCreationPlatformPayload\(\{ platformSetOverrides: \{\}, platformItemOverrides: \[\] \}\);[\s\S]*state\.creation\.effectivePlan = null;[\s\S]*state\.creation\.currentSet = null;[\s\S]*state\.creationRoleSelectionManuallyEdited = false;[\s\S]*renderCreationView\(\);[\s\S]*await previewCreationPlan\(\);/,
+  );
+  for (const protectedField of [
+    "creationProductNameInput",
+    "creationProductDescriptionInput",
+    "creationSellingPointsInput",
+    "creationIndustryTemplateInput",
+    "creationDimensionSpecsInput",
+    "creationLogoInput",
+    "creationSkuBundleCountInput",
+    "creationSkuGenerationRuleInput",
+    "creationOutputFormatInput",
+  ]) {
+    assert.doesNotMatch(handler, new RegExp(`refs\\.${protectedField}\\.(?:value|checked)\\s*=`), protectedField);
+  }
+  assert.doesNotMatch(handler, /state\.creationReferenceFiles\s*=|state\.creationLogo\s*=/);
   assert.doesNotMatch(app, /setCreationSelectValue\([\s\S]{0,120}dispatchEvent/);
+});
+
+test("platform confirmation removal stays isolated from reference analysis", async () => {
+  const app = await readFile(appPath, "utf8");
+  const handler = app.match(
+    /async function handleCreationPlatformChange\(\{ programmatic = false \} = \{\}\) \{[\s\S]*?\r?\n\}\r?\n\r?\nfunction invalidateCreationReferenceAnalysisRequest/,
+  )?.[0] || "";
+  assert.doesNotMatch(handler, /window\.confirm/);
+  assert.match(handler, /invalidateCreationReferenceAnalysisRequest\(\)/);
+  assert.match(app, /creationReferenceApplyAnalysisButton: document\.querySelector\("#creationReferenceApplyAnalysisButton"\)/);
+  assert.match(app, /refs\.creationReferenceApplyAnalysisButton\.addEventListener\("click", applyCreationReferenceAnalysisRecommendations\)/);
 });

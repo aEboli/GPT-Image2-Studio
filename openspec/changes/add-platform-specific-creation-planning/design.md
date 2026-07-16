@@ -4,7 +4,9 @@
 
 当前工作树包含用户尚未提交的平台选择、参考图分析上下文、manifest 字段和相关测试改动。本设计必须在这些改动上增量实施，不覆盖、清理或重写无关内容。
 
-平台规则来自 2026-07-11 前核验的官方规则和真实页面观察。Amazon、TikTok Shop、Walmart、Etsy、eBay、Shopify、Shopee、淘宝等平台有较强官方依据；京东、小红书和 Temu 有部分官方或真实页面证据；拼多多、抖音、Lazada、AliExpress、Rakuten、Coupang、Mercado Libre 的公开细则不完整，因此只能提供保守默认值，不能伪装成官方硬规则。
+平台图片规则来自 2026-07-11 前核验的官方规则和真实页面观察。Amazon、TikTok Shop、Walmart、Etsy、eBay、Shopify、Shopee、淘宝等平台有较强官方依据；京东、小红书和 Temu 有部分官方或真实页面证据；拼多多、抖音、Lazada、AliExpress、Rakuten、Coupang、Mercado Libre 的公开细则不完整，因此只能提供保守默认值，不能伪装成官方硬规则。
+
+Listing 入口现已对所有平台开放，但 `marketplace=amazon-us`、`language=en-US`、数量前置标题、恰好五条要点、后台搜索词和 Amazon/Rufus 指导仍散落在草稿、提示词、校验和视图中。2026-07-15 的官方文档核验表明，各平台的字段、长度、语言和搜索面并不相同；继续只替换提示词会产生伪平台化输出，也会让旧记录、浏览器、本地服务和 Worker 对同一草稿产生不同解释。
 
 ## Goals / Non-Goals
 
@@ -16,14 +18,17 @@
 - 让本地服务和 Cloudflare Worker 共享同一策略解析结果，并让每张图使用自己的生成参数。
 - 让队列、保存、复用、补图和修复冻结当时的有效计划，不因未来策略更新发生漂移。
 - 以来源、核验日期和证据等级管理平台规则；只有有明确官方来源的规则才能成为阻断性约束。
+- 让 19 个 canonical 平台使用版本化 Listing policy、平台字段语义和跨类目转化 playbook，同时保持同一生成、校验、持久化和回退管线。
+- 让 Listing 草稿冻结平台、locale 与策略版本，兼容旧 Amazon 字段，并让本地服务与 Worker 对相同输入生成相同请求和校验结果。
+- 用统一事实门控和 claim 风险控制减少误导、无依据承诺和跨类目违规风险，同时明确输出仍需用户复核。
 
 **Non-Goals:**
 
 - 运行时抓取、登录或自动更新第三方平台规则。
 - 自动发布图片或 Listing 到第三方平台。
-- 扩展非 Amazon Listing 文案生成。
 - 使用视觉模型对最终生成图片做自动合规认证；平台约束仍需用户最终审核。
 - 建立平台乘以所有四级类目的完整静态笛卡尔矩阵。
+- 保证平台审核通过、法律合规、搜索排名、销量或转化率；系统只提供基于当前来源和输入事实的可复核草稿。
 
 ## Decisions
 
@@ -203,13 +208,58 @@ Temu 的 B 级结论来自用户登录态卖家后台的只读观察，没有稳
 
 ### 9. 持久化冻结有效计划并兼容旧记录
 
-新 manifest 保存 `strategyVersion`、`platformPolicyId`、`platformEvidenceLevel`、`platformProvenance`、四类计数字段、套图覆盖和每个 item 的图片类型、逐图参数、Logo 策略、约束与警告。新提交的 manifest 使用 `platformProvenance=explicit`。reader 必须在填充 `universal` fallback 前检查原始 manifest 是否真正拥有 platform 字段；缺失时保存内存态 `platformProvenance=legacy-missing`，从而区分“用户明确选择通用电商”和“旧记录没有平台概念”。不得仅依赖已归一化后的 `platform=universal` 判断 Listing 资格。队列在提交时冻结完整 plan，而不是等任务开始时重新读取表单。
+新 manifest 保存 `strategyVersion`、`platformPolicyId`、`platformEvidenceLevel`、`platformProvenance`、四类计数字段、套图覆盖和每个 item 的图片类型、逐图参数、Logo 策略、约束与警告。新提交的 manifest 使用 `platformProvenance=explicit`。reader 必须在填充 `universal` fallback 前检查原始 manifest 是否真正拥有 platform 字段；缺失时保存内存态 `platformProvenance=legacy-missing`，从而区分“用户明确选择通用电商”和“旧记录没有平台概念”。这些来源字段继续服务计划和历史兼容，但不参与 Listing 入口资格判断。队列在提交时冻结完整 plan，而不是等任务开始时重新读取表单。
 
 旧 manifest 缺少新字段时继续按已保存的 `role`、prompt 和图片记录显示与修复，不自动应用当前 profile。用户只有点击“按当前平台重新规划”才会基于最新 `strategyVersion` 生成新计划。历史复用仍清除无法恢复的浏览器 `File` 对象，并保持现有参考图重新绑定流程。
 
-### 10. Listing 能力保持 Amazon US 边界
+### 10. Listing 使用独立版本化策略注册表
 
-当所选平台不是 Amazon 时，创建页和记录页的 Listing Agent 操作均禁用并显示“当前仅支持 Amazon US”。已有 Amazon Listing 草稿仍可查看和导出；切换到非 Amazon 平台不会删除历史草稿，也不会自动把它改写成其他平台文案。
+新增 `lib/creation-listing-policies.mjs` 作为 Listing 文案规则的唯一人工编辑源，不把图片策略的来源或证据等级自动升级为文案规则。注册表以 5 个跨类目 archetype 保存共享基线，并要求 19 个 canonical ID 都有显式 override：
+
+- `universal`：通用事实型基线。
+- `search`：Amazon、京东、eBay、Walmart、Rakuten、Coupang、Mercado Libre。
+- `value`：淘宝/天猫、拼多多、Temu、Shopee、Lazada、AliExpress。
+- `content`：抖音电商、小红书电商、TikTok Shop。
+- `brand`：Etsy、Shopify/DTC。
+
+archetype 只复用跨类目写作顺序，不代表平台规则相同。每个平台 override 至少声明 `id`、`label`、`marketplaceId`、`defaultLocale`、`policyVersion`、`verifiedAt`、`evidenceLevel`、`sourceIds`、标题规则、高亮规则、描述规则、搜索面规则、转化顺序、变体策略、claim 风险组、发布字段与内部字段、fallback。标题和搜索限制同时支持字符与 UTF-8 字节语义；未被官方资料明确覆盖的长度、条数、语气和关键词建议必须标记为可配置的保守建议。
+
+Listing 规则采用与图片规则相同的来源纪律：只有当前可核验的官方文档才能形成阻断性硬规则，官方文档未说明的内容、登录态观察、经验型转化建议和 C 级 profile 只能产生提示或警告。第一版 Listing source register 保存核验日期 2026-07-15，并至少包含：
+
+- 跨平台真实、合法和不得误导底线：《中华人民共和国广告法》：<https://www.samr.gov.cn/zw/zfxxgk/fdzdgknr/fgs/art/2023/art_5474cf75173c45d6a0379730fb4e8d97.html>。
+- Amazon 标题与要点：<https://sellercentral.amazon.com/help/hub/reference/external/GYTR6SYGFA5E3EQC>、75 字符限制于 2026-07-27 生效的官方公告 <https://sellercentral.amazon.com/seller-forums/discussions/t/145b6d0f-999c-4555-896c-c694bda2e470>，以及 <https://sellercentral.amazon.com/help/hub/reference/external/GX5L8BF8GLMML6CX>。
+- TikTok Shop 商品标题与商品信息：<https://seller-us.tiktok.com/university/essay?knowledge_id=7073362639816491> 与 <https://seller-us.tiktok.com/university/essay?knowledge_id=3196690250417921>。
+- Etsy 标题、标签与描述：<https://www.etsy.com/seller-handbook/article/382774281517>、<https://www.etsy.com/seller-handbook/article/1399426136697> 与 <https://www.etsy.com/seller-handbook/article/1347574487014>。
+- eBay listing best practices：<https://www.ebay.com/sellercenter/listings/create-listings/best-practices>。
+- Walmart Product Detail Page 与 Keyword optimization：<https://marketplacelearn.walmart.com/guides/Item%20setup/Item%20content,%20imagery,%20and%20media/Product-Detail-Page:-overview> 与 <https://marketplacelearn.walmart.com/guides/Item%20setup/Item%20content,%20imagery,%20and%20media/Keyword-optimization>。
+- Shopify 商品描述与 SEO 关键词：<https://help.shopify.com/en/manual/products/details/product-descriptions/write> 与 <https://help.shopify.com/en/manual/promoting-marketing/seo/adding-keywords>。
+- 淘宝、京东、拼多多、抖音、小红书、Shopee、Lazada、Rakuten 与 Coupang 官方开放平台或卖家教育文档：<https://open.taobao.com/doc.htm?docId=119447&docType=1>、<https://jos.jd.com/apilist?apiGroupId=48&apiId=13420&apiName=jingdong.ware.write.add>、<https://open.pinduoduo.com/application/document/api?id=pdd.goods.add>、<https://op.jinritemai.com/docs/api-docs/14/249>、<https://op.jinritemai.com/docs/api-docs/14/1373>、<https://open.xiaohongshu.com/document/api?apiNavigationId=65&id=12&gatewayId=103&gatewayVersionId=1661&apiId=6487&apiParentNavigationId=14>、<https://seller.shopee.com.my/edu/article/2222>、<https://seller.shopee.sg/edu/article/87/product-descriptions-best-practices>、<https://open.lazada.com/apps/doc/doc?nodeId=30715&docId=120946>、<https://navi-manual.faq.rakuten.net/> 与 <https://developers.coupangcorp.com/hc/en-us/articles/360033877853-Product-Creation>。
+
+研究快照中的精确限制，例如 Amazon 标题 75 字符限制自 2026-07-27 起生效、Amazon 要点至少 3 条且每条 10-255 字符、TikTok Shop 标题 25-200 字符、eBay 标题 80 字符、Coupang 商品名不超过 100 字符且搜索标签最多 20 个并各不超过 20 字符，只能在对应 source 仍为当前策略依据时作为版本化规则。Amazon 75 字符限制在 2026-07-27 前只产生 recommendation warning，生效日及之后才成为 blocking error；validator 使用显式 validation date 或当前日期判断，无法解析的显式日期按保守阻断处理。Temu、AliExpress、Mercado Libre 以及其他没有稳定公开 Listing 细则的平台继续使用保守可配置值，不得标成官方硬限制。运行时不访问上述 URL。
+
+### 11. 冻结平台和 locale，并演进为 V2 superset draft
+
+Listing policy 解析顺序为：`effectivePlan.platformPolicyId` 或 `effectivePlan.platform` > manifest `platformPolicyId` > manifest `platform` > `universal`。目标 locale 解析顺序为冻结 `effectivePlan.targetLanguage` > manifest `targetLanguage` > policy `defaultLocale`。未知平台、无法支持的 locale 或 `platformProvenance=legacy-missing` 回退到可说明的基线，并在草稿中记录 warning；不得把 reader 为兼容填充的 `platform=universal` 误当成旧记录曾经显式选择过平台。
+
+新草稿使用 V2 superset：保存 `schemaVersion`、`platformId`、`marketplace`、`platformLabel`、`listingPolicyVersion`、`language`、`title`、`sellingPoints`、`buyerObjections`、`highlights`、`description`、`searchTerms`、`keywordBuckets`、证据、缺失信息、警告、状态、时间戳和中文复核视图。`highlights` 的平台显示标签、条数和引导格式由 policy 决定；`searchTerms` 可表示 Amazon 后台词、Etsy 标签、平台搜索词或仅供参考的关键词建议，UI 必须按 policy 显示用途，不能把所有平台都标为“后台搜索词”。`sellingPoints` 和 `buyerObjections` 是写作与复核依据，只有 profile 明确列入 `publishFields` 时才进入整段发布复制。
+
+reader 与视图继续接受 V1 `fiveBullets`、`backendSearchTerms`、`painPoints`、`marketplace=amazon-us` 和 `zhDisplay` 别名；旧草稿按原字段、原 marketplace 和原内容显示、复制与导出，不批量重写，也不在读取时套用新 profile。用户显式重写或重新生成时才创建 V2 草稿并冻结当前 Listing policy 版本。
+
+### 12. 提示词、schema、校验和回退共用事实门控
+
+请求提示词按“跨平台事实与安全底线 > 平台 policy > locale 与单位 > 跨类目 playbook > Source JSON > 重试错误”分层组装。Amazon US、Rufus、数量前置、英文、固定五点和大写引导词不再是全局指令，只在对应 policy 有依据时启用。strict JSON schema 使用稳定 V2 superset 并由 policy 约束条数；字符数、UTF-8 字节数、语言、字段用途和 claim 校验留在共享 validator，避免不同兼容网关对 JSON Schema 长度关键字支持不一致。
+
+跨类目 playbook 固定为商品身份与搜索意图、事实支持的结果型卖点、真实使用场景、购买疑虑回答、尺寸/适配/变体/包装清晰度和证据不足披露。平台 override 可以重排、删减或改变字段表现，但不得创建平台乘以类目的静态矩阵，也不得加入用户没有提供的类目事实。
+
+统一事实门控只接受用户商品资料、SKU/包装/尺寸输入、参考图角色说明、保存的有效计划与可追溯 manifest 元数据作为公开 claim 的基础。生成图只能支持可直接观察的外观、数量和场景，不足以单独证明材质、认证、医疗/保健效果、安全、兼容性、耐久、性能、销量、排名、评价、价格、折扣、保修或退款承诺。无法证明的事实进入 `missingInfo` 或被删除；高风险绝对化、比较级、社会证明和促销 claim 进入 warning 或阻断。
+
+模型输出先归一化再按 resolved policy 校验，失败时携带结构化错误重试一次。仍失败时只能返回 `needs-review` 或 `failed` 的 input-only 保守占位，不得把 mock 文案或通用模板标成可发布成品。任何成功状态也只表示通过当前机器校验，不表示平台审核、法律合规或高转化得到保证。
+
+### 13. 浏览器、本地服务和 Worker 共享同一 Listing 语义
+
+浏览器从同步的 Listing policy 读取平台标签、字段标签、发布字段和内部字段；记录页按平台显示“要点/亮点/标签/搜索词”等真实用途，整段复制默认只包含 `publishFields`，同时保留证据、警告、缺失信息和结构化 JSON 导出。历史 V1 草稿继续使用兼容标签，不因当前表单平台变化而改写。
+
+本地服务从保存的 manifest 读取 set，Cloudflare Worker 从显式 payload 读取 set，但两者都必须调用相同的 source builder、policy resolver、schema builder、prompt builder、normalizer 和 validator。相同规范化 set 与配置必须产生相同的上游请求体、草稿元数据、校验和回退状态；端点不得复制 19 套策略，也不得在运行时抓取规则来源。
 
 ## Risks / Trade-offs
 
@@ -220,6 +270,10 @@ Temu 的 B 级结论来自用户登录态卖家后台的只读观察，没有稳
 - [平台与类目组合数量很大] → 使用确定性类目补位而不是维护 19 乘以全部四级类目的静态矩阵。
 - [脏工作树发生冲突] → 实施前记录当前 diff，只修改本变更需要的函数和测试，不格式化或清理无关文件。
 - [本地与 Worker 产生漂移] → 策略和 resolver 使用同一模块，并增加相同 payload 的计划深度相等测试。
+- [Listing 官方字段与限制会随站点、类目和后台版本变化] → Listing policy 单独版本化并保存来源与核验日期；只有当前官方依据形成硬规则，其余保持可配置建议。
+- [跨类目生成可能虚构或误导] → 所有平台共用事实门控，高风险 claim 不以生成图单独证明，证据不足进入缺失信息或阻断。
+- [高转化目标被误解为结果承诺] → UI 和导出明确标识草稿与复核状态，不宣称保证排名、销量、审核、合规或转化。
+- [V2 字段破坏历史草稿] → reader 接受 V1 aliases，旧草稿不自动迁移，重写才使用当前 policy。
 
 ## Migration Plan
 
@@ -228,9 +282,11 @@ Temu 的 B 级结论来自用户登录态卖家后台的只读观察，没有稳
 3. 让 planner 输出新字段，但暂时保持旧 `role`、API 字段和旧记录读取兼容。
 4. 更新浏览器自动应用与覆盖交互，再更新本地和 Worker 单图生成参数解析。
 5. 扩展队列、manifest、复用和 repair；运行迁移与旧 fixture 回归测试。
-6. 最后启用非 Amazon Listing 限制并进行真实浏览器验收。
+6. 最后移除 Listing 平台资格限制，并对 19 个 canonical 平台、旧记录及真实浏览器控件进行验收。
+7. 用官方研究和失败测试固定 Listing source register、5 个 archetype、19 个 override、解析顺序、V2 aliases、事实门控和平台 validator。
+8. 更新 Listing source、schema、prompt、校验、回退、记录页、复制、导出与同步模块，并验证本地/Worker 请求和结果一致。
 
-回滚时可恢复旧 UI 和全局参数提交，同时保留新 manifest 的未知可选字段；旧 reader 会忽略这些字段。不得删除或批量重写已有 Creation manifest。
+回滚时可恢复旧 UI、全局参数提交和 V1 Listing 生成，同时保留新 manifest 的未知可选字段；V2 reader 必须继续读取已有 V1/V2 草稿。不得删除或批量重写已有 Creation manifest 或 Listing 草稿。
 
 ## Open Questions
 

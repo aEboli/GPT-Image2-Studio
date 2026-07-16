@@ -353,6 +353,19 @@ test("creation workflow reuses history, reuploads references, tweaks prompts, re
   assert.equal(generatedSet.items.length, 4);
   assert.equal(generatedSet.items.filter((item) => item.status === "completed").length, 4);
   assert.equal(generatedSet.items[0].prompt, "Custom hero prompt from regression.");
+  assert.match(generatedSet.items[0].generationPrompt, /Custom hero prompt from regression\./);
+  assert.notEqual(generatedSet.items[0].generationPrompt, generatedSet.items[0].prompt);
+  assert.notEqual(generatedSet.items[0].generationPrompt, generatedSet.items[1].generationPrompt);
+  assert.equal(generatedSet.items[0].baseUrl, "http://127.0.0.1:9/v1");
+  assert.equal(generatedSet.items[0].imageRoute, "a");
+  assert.equal(generatedSet.items[0].responsesModel, "gpt-5.4");
+  assert.equal(generatedSet.items[0].imageModel, "gpt-image-2");
+  assert.equal(generatedSet.items[0].requestedSize, "1.5K");
+  assert.match(generatedSet.items[0].effectiveSize, /^\d+x\d+$/);
+  assert.equal(generatedSet.items[0].format, "png");
+  assert.equal(generatedSet.items[0].quality, "high");
+  assert.equal(generatedSet.items[0].reasoningEffort, "low");
+  assert.deepEqual(generatedSet.items[0].referenceImageNames, ["front.png"]);
   assert.match(generatedSet.items[1].prompt, /Shared visual language:/);
   assert.match(generatedSet.items[1].prompt, /lifestyle magazine editorial/);
   assert.ok(generatedSet.items[0].relativePath);
@@ -372,7 +385,9 @@ test("creation workflow reuses history, reuploads references, tweaks prompts, re
   assert.equal(listingResponse.body.ok, true);
   assert.equal(listingResponse.body.set.setId, generatedSet.setId);
   assert.equal(listingResponse.body.set.listingDrafts.length, 1);
-  assert.equal(listingResponse.body.set.listingDrafts[0].evidenceMode, "image-backed");
+  assert.equal(listingResponse.body.set.listingDrafts[0].schemaVersion, "2");
+  assert.equal(listingResponse.body.set.listingDrafts[0].status, "needs-review");
+  assert.equal(listingResponse.body.set.listingDrafts[0].evidenceMode, "input-only");
 
   const listedAfterListingsResponse = await fetch(`${baseUrl}/api/creation/sets`);
   assert.equal(listedAfterListingsResponse.status, 200);
@@ -383,7 +398,9 @@ test("creation workflow reuses history, reuploads references, tweaks prompts, re
   const manifestPath = await findCreationManifestPath(outputDir, generatedSet.setId);
   const persistedListingManifest = JSON.parse(await readFile(manifestPath, "utf8"));
   assert.equal(persistedListingManifest.listingDrafts.length, 1);
-  assert.equal(persistedListingManifest.listingDrafts[0].evidenceMode, "image-backed");
+  assert.equal(persistedListingManifest.listingDrafts[0].schemaVersion, "2");
+  assert.equal(persistedListingManifest.listingDrafts[0].status, "needs-review");
+  assert.equal(persistedListingManifest.listingDrafts[0].evidenceMode, "input-only");
 
   const initialPathReport = await postJson(baseUrl, "/api/creation/sets/paths", { setId: generatedSet.setId });
   assert.equal(initialPathReport.response.status, 200);
@@ -457,6 +474,9 @@ test("creation workflow reuses history, reuploads references, tweaks prompts, re
   const regeneratedSet = getCompleteSet(regenerateResult.events);
   assert.equal(regeneratedSet.status, "completed");
   assert.equal(regeneratedSet.items[0].prompt, "Regenerated hero prompt from regression.");
+  assert.match(regeneratedSet.items[0].generationPrompt, /Regenerated hero prompt from regression\./);
+  assert.equal(regeneratedSet.items[0].requestedSize, "1536x1536");
+  assert.deepEqual(regeneratedSet.items[0].referenceImageNames, ["front.png"]);
 
   const pathReport = await postJson(baseUrl, "/api/creation/sets/paths", { setId: generatedSet.setId });
   assert.equal(pathReport.response.status, 200);
@@ -590,7 +610,7 @@ test("creation listing endpoint preserves grouped mixed pack wording through val
     );
   };
 
-  const assertListingPackText = async ({ setId, expectedPackText }) => {
+  const assertReviewableV2Listing = async ({ setId, expectedPackText }) => {
     const listingResponse = await postJson(baseUrl, "/api/creation/listings", { setId });
     assert.equal(listingResponse.response.status, 200);
     assert.equal(listingResponse.body.ok, true);
@@ -599,28 +619,29 @@ test("creation listing endpoint preserves grouped mixed pack wording through val
 
     const responseDraft = listingResponse.body.listingDrafts[0];
     const setDraft = listingResponse.body.set.listingDrafts[0];
-    const validationOptions = {
-      expectedQuantity: expectedPackText,
-      forbidTitleSpecs: true,
-    };
-    assert.match(responseDraft.title, new RegExp(`^${escapeRegExp(expectedPackText)} Electronic Fishing Lure\\b`));
+    assert.equal(responseDraft.schemaVersion, "2");
+    assert.equal(responseDraft.platformId, "universal");
+    assert.equal(responseDraft.status, "needs-review");
+    assert.equal(responseDraft.evidenceMode, "input-only");
+    assert.equal(responseDraft.title, "Electronic Fishing Lure");
+    assert.doesNotMatch(responseDraft.title, new RegExp(`^${escapeRegExp(expectedPackText)}\\b`));
     assert.equal(setDraft.title, responseDraft.title);
-    assert.deepEqual(validateCreationListingDraft(responseDraft, validationOptions).errors, []);
+    assert.deepEqual(validateCreationListingDraft(responseDraft).errors, []);
 
     const persistedManifest = JSON.parse(await readFile(join(manifestsDir, `${setId}.json`), "utf8"));
     assert.equal(persistedManifest.listingDrafts.length, 1);
-    assert.equal(persistedManifest.listingDrafts[0].title, responseDraft.title);
-    assert.deepEqual(validateCreationListingDraft(persistedManifest.listingDrafts[0], validationOptions).errors, []);
+    assert.deepEqual(persistedManifest.listingDrafts[0], responseDraft);
+    assert.deepEqual(validateCreationListingDraft(persistedManifest.listingDrafts[0]).errors, []);
   };
 
   await writeGroupedManifest({ setId: "creation-set-mixed-pack-plain", skuBundleCount: 1 });
-  await assertListingPackText({
+  await assertReviewableV2Listing({
     setId: "creation-set-mixed-pack-plain",
     expectedPackText: "2 Pack / 3 Pack",
   });
 
   await writeGroupedManifest({ setId: "creation-set-mixed-pack-bundled", skuBundleCount: 2 });
-  await assertListingPackText({
+  await assertReviewableV2Listing({
     setId: "creation-set-mixed-pack-bundled",
     expectedPackText: "4 Pack / 6 Pack",
   });

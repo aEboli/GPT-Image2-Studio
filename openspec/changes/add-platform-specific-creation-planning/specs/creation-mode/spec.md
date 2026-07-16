@@ -94,6 +94,35 @@ The system SHALL allow users to override platform-derived target language, defau
 - **AND** the user can independently change that item's image type, ratio, resolution, language, composition, text density, scene policy, Logo policy, and prompt
 - **AND** the planned carousel count equals the number of enabled carousel slots
 
+#### Scenario: 用户显式选择 18 张时生成计划严格对齐 18 张
+- **WHEN** 平台自动推荐少于 18 张，且用户在数量控件或兼容图片类型区域主动选择 18 张
+- **THEN** 浏览器将 `imageCount=18` 和对应的 `selectedRoles` 保存为显式用户覆盖
+- **AND** 预览、重复预览、冻结 `effectivePlan`、队列快照和实际生成均包含 18 个启用的轮播项
+- **AND** 补充槽位使用唯一 `slotKey` 和用户选择的内容角色，仅作为保守的自定义图片建议，不创建缺失的尺寸、材质、包装、性能或其他商品事实
+
+#### Scenario: 显式补足槽位保留用户选择的图片用途
+- **WHEN** Temu 显式选择 16 张或通用电商显式选择 18 张，且安全的平台图片类型不足以补足数量
+- **THEN** 补充槽位保持 `imageType=custom`、advisory 且没有平台硬约束
+- **AND** 每个补充槽位使用对应 `selectedRoles` 的用途、构图、文字和场景语义，不继承 `clean-product-proof` 的无文字棚拍策略
+- **AND** 计划标题显示为“角色用途（自定义）”，提示词按角色用途分化，同时继续禁止虚构缺失商品事实
+
+#### Scenario: 首次显式数量预览保留已对齐角色
+- **WHEN** 用户把数量改为 18，浏览器已保存显式 `imageCount=18` 和 18 个已对齐角色，但新的 `effectivePlan` 尚未返回
+- **THEN** 首次预览仍提交显式数量及全部 18 个 `selectedRoles`
+- **AND** 未手动编辑角色不会被解释为清空角色
+- **AND** 只有不存在显式数量且不存在手动角色编辑时，浏览器才提交空角色选择以请求纯自动计划
+
+#### Scenario: 平台自动推荐数量保持可见且不冒充用户覆盖
+- **WHEN** 用户尚未主动修改数量，且 Amazon 自动计划解析为 7 个有效轮播项
+- **THEN** 数量控件和兼容图片类型区域显示当前有效轮播数量 7
+- **AND** 浏览器不把该自动值保存为显式 `imageCount` 覆盖
+
+#### Scenario: 兼容图片类型区域使用当前有效轮播计划口径
+- **WHEN** 当前平台计划已解析，或用户启用、禁用、增删、排序槽位后预览更新
+- **THEN** 兼容图片类型区域仅列出当前 `effectivePlan` 的轮播槽位，并按每个槽位的 `enabled` 状态显示选择结果
+- **AND** 计数显示“已启用轮播槽位数 / 当前轮播槽位总数”
+- **AND** 追加 SKU 项和信息图重构项不进入该区域的列表或计数
+
 #### Scenario: User intentionally leaves a platform image type
 - **WHEN** an override conflicts with a sourced hard rule
 - **AND** the user changes that slot's image type to `custom`
@@ -104,7 +133,7 @@ The system SHALL allow users to override platform-derived target language, defau
 - **WHEN** the user selects Restore current platform recommendation
 - **THEN** the system clears only platform-related set and item overrides
 - **AND** it recomputes the profile, category, and reference-derived plan
-- **AND** it preserves product information, category, dimensions, references, style references, Logo, SKU, output format, and model/API configuration
+- **AND** it preserves product information, category, dimensions, references, Logo, SKU, output format, and model/API configuration
 
 ### Requirement: Platform switching is confirmed and race-safe
 The system SHALL treat a platform change as a confirmable state transaction. Confirming SHALL clear platform-related overrides and apply the new profile while preserving product evidence; cancelling SHALL restore the previous platform and all previous field values. Reference analysis results SHALL only apply to the platform and category snapshot that initiated them.
@@ -112,7 +141,7 @@ The system SHALL treat a platform change as a confirmable state transaction. Con
 #### Scenario: User confirms a platform switch
 - **WHEN** the user changes from one platform to another and confirms the warning
 - **THEN** the system resets image types, order, enabled carousel count, automatic language, automatic ratios, automatic resolutions, composition strategy, and platform-related overrides
-- **AND** it preserves product name, description, selling points, category, dimensions, reference files and metadata, style references, Logo, SKU, output format, and model/API configuration
+- **AND** it preserves product name, description, selling points, category, dimensions, reference files and metadata, Logo, SKU, output format, and model/API configuration
 - **AND** it immediately exposes the newly resolved platform plan for preview
 
 #### Scenario: User cancels a platform switch
@@ -124,6 +153,13 @@ The system SHALL treat a platform change as a confirmable state transaction. Con
 - **WHEN** a reference analysis request was started for an earlier platform or category
 - **AND** its response arrives after the current platform or category has changed
 - **THEN** the response is ignored and cannot alter product suggestions, reference roles, notes, category, selected slots, or plan preview
+
+#### Scenario: 用户应用参考图分析后刷新冻结规划证据
+- **WHEN** 用户点击应用当前参考图分析建议，且建议被写入参考图角色与说明
+- **THEN** 浏览器从已应用的参考图角色重建 `platformReferenceCoverage` 和派生 `platformEvidence`
+- **AND** 已冻结的套图级覆盖、逐图覆盖和类目信号保持不变，旧的 coverage/evidence 不会覆盖新应用结果
+- **AND** 材质、包装和尺寸参考角色可恢复相应的 `material-proof`、`in-box` 和 `dimension-fit` 类型
+- **AND** 未经用户应用的原始识别结果不直接成为商品事实证据
 
 ### Requirement: Creation generation uses per-item effective parameters consistently
 The system SHALL include effective ratio, resolution tier, resolved size, and target language on each planned item. Local generation and Cloudflare Worker generation SHALL resolve and submit those values per item, and the same planning payload SHALL produce equivalent plans in both environments.

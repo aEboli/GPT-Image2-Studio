@@ -313,7 +313,7 @@ test("creation store preserves listing drafts on manifest updates", async () => 
   });
 
   assert.equal(saved.listingDrafts.length, 1);
-  assert.equal(saved.listingDrafts[0].marketplace, "amazon-us");
+  assert.equal(Object.prototype.hasOwnProperty.call(saved.listingDrafts[0], "marketplace"), false);
 
   const read = await store.readManifest("creation-set-listing");
   assert.equal(read.listingDrafts[0].title, "2 Pack 3.5 in Blue Fishing Lures for Bass");
@@ -351,6 +351,45 @@ test("creation store preserves listing drafts on manifest updates", async () => 
 
   const cleared = await store.readManifest("creation-set-listing");
   assert.equal(cleared.listingDrafts.length, 0);
+
+  await rm(rootDir, { recursive: true, force: true });
+});
+
+test("creation store preserves historical V1 Listing fields without read-time migration", async () => {
+  const rootDir = await mkdtemp(join(tmpdir(), "creation-listing-v1-store-"));
+  const store = createCreationSetStore({ outputDir: rootDir });
+  const legacyDraft = {
+    id: "legacy-amazon-draft",
+    marketplace: "amazon-us",
+    language: "en-US",
+    title: "Original legacy title",
+    painPoints: ["Original buyer concern"],
+    fiveBullets: ["Original bullet one", "Original bullet two"],
+    backendSearchTerms: "original backend phrase",
+    zhDisplay: {
+      title: "原始旧标题",
+      painPoints: ["原始购买疑虑"],
+      fiveBullets: ["原始要点一", "原始要点二"],
+      backendSearchTerms: "原始后台词",
+    },
+    legacyOnlyField: { keep: true },
+  };
+
+  await store.saveManifest({
+    setId: "creation-set-listing-v1",
+    productName: "Legacy Product",
+    listingDrafts: [legacyDraft],
+  });
+  await store.saveManifest({
+    setId: "creation-set-listing-v1",
+    productName: "Updated without listing changes",
+    status: "completed",
+  });
+
+  const raw = JSON.parse(await readFile(store.manifestPath("creation-set-listing-v1"), "utf8"));
+  assert.deepEqual(raw.listingDrafts, [legacyDraft]);
+  const read = await store.readManifest("creation-set-listing-v1");
+  assert.deepEqual(read.listingDrafts, [legacyDraft]);
 
   await rm(rootDir, { recursive: true, force: true });
 });

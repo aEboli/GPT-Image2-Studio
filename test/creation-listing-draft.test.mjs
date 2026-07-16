@@ -268,7 +268,7 @@ test("listing sources compact generated items before prompt assembly", () => {
   });
 
   assert.equal(sources[0].imageItems[0].title, "Hero image");
-  assert.equal(sources[0].imageItems[0].marketingCopy, "Shows the lure profile clearly.");
+  assert.equal(Object.hasOwn(sources[0].imageItems[0], "marketingCopy"), false);
   assert.equal(sources[0].imageItems[0].relativePath, "sets/blue.png");
   assert.equal(sources[0].imageItems[0].prompt, undefined);
   assert.equal(sources[0].imageItems[0].imageUrl, undefined);
@@ -772,11 +772,11 @@ test("listing draft validation rejects unsupported claims in customer-facing cop
 
   const validation = validateCreationListingDraft(draft, { expectedQuantity: "2 Pack" });
   assert.equal(validation.ok, false);
-  assert.match(validation.errors.join("\n"), /title contains unsupported claim "FDA Certified"/);
-  assert.match(validation.errors.join("\n"), /title contains unsupported claim "medical grade"/);
-  assert.match(validation.errors.join("\n"), /sellingPoints\[0\] contains unsupported claim "guaranteed"/);
-  assert.match(validation.errors.join("\n"), /painPoints\[0\] contains unsupported claim "warranty"/);
-  assert.match(validation.errors.join("\n"), /fiveBullets\[0\] contains unsupported claim "best"/);
+  assert.match(validation.errors.join("\n"), /title contains unsupported claim "certification claim"/);
+  assert.match(validation.errors.join("\n"), /title contains unsupported claim "medical or safety claim"/);
+  assert.match(validation.errors.join("\n"), /sellingPoints\[0\] contains unsupported claim "guarantee, price, discount, or refund claim"/);
+  assert.match(validation.errors.join("\n"), /painPoints\[0\] contains unsupported claim "guarantee, price, discount, or refund claim"/);
+  assert.match(validation.errors.join("\n"), /fiveBullets\[0\] contains unsupported claim "absolute or ranking claim"/);
 });
 
 test("keyword helper deduplicates case-insensitively and removes competitor brands", () => {

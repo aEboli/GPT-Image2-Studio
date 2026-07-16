@@ -48,10 +48,10 @@
 - [x] 7.3 Add failing repair tests proving that retry and completion reuse each saved item's image type, role, ratio, effective size, language, constraints, and prompt instead of current form or current-profile defaults.
 - [x] 7.4 Extend `creation-suite-queue`, server/Worker set builders, `creation-store`, record hydration, export, and `creation-repair` to persist and restore the frozen effective plan without rewriting legacy manifests.
 
-## 8. Amazon Listing Boundary
+## 8. Listing Integration Boundary
 
-- [x] 8.1 Add failing Listing UI and endpoint tests for Amazon eligibility, non-Amazon disabled controls and validation, preserved historical drafts, and legacy manifests without platform metadata.
-- [x] 8.2 Restrict new Listing generation and rewrite actions to Amazon or eligible legacy sets while leaving review, copy, and export of saved Amazon drafts available on non-Amazon records.
+- [x] 8.1 Add Listing UI and endpoint tests for platform-aware records, preserved historical drafts, and legacy manifests without platform metadata.
+- [x] 8.2 Keep Listing generation, rewrite, review, copy, and export integrated with saved Creation records without making platform metadata a destructive migration boundary.
 
 ## 9. Verification And Independent Acceptance
 
@@ -74,3 +74,40 @@
 - [x] 10.7 为移动端顶栏增加明确且可触达的展开入口，并修正计划警告列表语义和中文可见状态，不改变现有桌面布局。
 - [x] 10.8 运行定向测试、完整 `npm test`、public/lib 同步检查、Cloudflare Pages 构建、OpenSpec strict validation、依赖审计和中文乱码扫描。
 - [x] 10.9 请求独立只读验收 agent 复核安全边界、写真 SSE、R2 上限、Worker manifest、计划编辑器真实交互和脏工作树保留；处理所有确认问题后再完成本节。
+
+## 11. 兼容图片类型计数对齐
+
+- [x] 11.1 增加定向浏览器状态测试，证明兼容图片类型区域从冻结 `effectivePlan` 读取当前轮播槽位、启用状态和计数，并排除追加 SKU 与信息图重构项。
+- [x] 11.2 将兼容图片类型区域的列表、勾选状态和计数对齐当前有效轮播计划，复用逐槽启停覆盖与预览更新路径，并运行相关回归与 OpenSpec strict validation。
+- [x] 11.3 将兼容图片类型和平台计划摘要对齐当前显示队列任务的冻结 `effectivePlan` 与只读覆盖快照；旧任务无可用计划时回退当前表单计划，并完成定向回归、public/lib 同步检查和 OpenSpec strict validation。
+
+## 12. 显式生成数量端到端对齐
+
+- [x] 12.1 增加失败测试，覆盖无证据 Amazon 显式 18 张、18 个所选角色、浏览器自动 7 与用户改 18 的序列化，以及本地与 Worker 代表性端点。
+- [x] 12.2 让浏览器将用户数量选择保存为显式覆盖，让 planner 把所选角色传入共享 resolver，并以不虚构商品事实的自定义建议槽位严格补足请求数量。
+- [x] 12.3 运行定向测试、端点一致性检查、public/lib 同步检查和 OpenSpec strict validation，并复核中文编码与最小 diff。
+
+## 13. 全平台 Listing 回归
+
+- [x] 13.1 移除全部平台资格限制，遍历 19 个 canonical 平台并直接覆盖 Temu、Etsy、legacy，保留空选择和生成中禁用，并完成浏览器控件、本地/Worker 端点、全量测试与构建验证。
+
+## 14. 全平台专属 Listing 文案策略
+
+- [x] 14.1 将 2026-07-15 核验的广告真实性底线和 Amazon、TikTok Shop、Etsy、eBay、Walmart、Shopify、淘宝、京东、拼多多、抖音、小红书、Shopee、Lazada、Rakuten、Coupang 官方 Listing 来源固化为版本化 source register；明确 Temu、AliExpress、Mercado Libre 等低证据平台只使用可配置保守建议，不产生伪官方硬规则。
+- [x] 14.2 先增加失败测试，固定 5 个跨类目 archetype、19 个 canonical override、完整 Listing policy 字段、来源与证据等级、冻结 platform/locale 解析顺序、unknown 与 `legacy-missing` 回退，以及运行时不访问规则 URL。
+- [x] 14.3 先增加失败测试，覆盖 V2 strict superset schema、V1 `fiveBullets`/`backendSearchTerms`/`painPoints`/`amazon-us` aliases、平台标题/高亮/描述/搜索面/语言/字符与 UTF-8 字节限制、统一事实门控、claim 风险和两次无效后的 reviewable fallback。
+- [x] 14.4 实现共享 Listing policy registry、resolver、source enrichment、分层 prompt、动态 strict schema、normalizer、validator 和保守回退；移除全局 Amazon US English、Rufus、数量前置、固定五点、后台词和非 ASCII 假设，同时保留 Amazon policy 的有依据规则。
+- [x] 14.5 更新记录页归一化、动态字段标签、发布字段/内部字段区分、复制、导出和失败状态；旧 V1 草稿保持原内容且不自动迁移，用户显式重写时才生成并冻结 V2 policy metadata。
+- [x] 14.6 增加本地服务与 Cloudflare Worker parity 测试，证明相同规范化 set 产生等价的 policy、locale、上游请求体、草稿、校验和回退状态，并确认两个端点不复制平台策略。
+- [x] 14.7 运行 Listing 定向测试、全量 `npm test`、`npm run sync:public-lib -- --check`、Cloudflare Pages 构建、OpenSpec strict validation、中文 UTF-8/乱码扫描和限定文件最小 diff 复核；不得把机器校验表述为平台审核、法律合规或高转化保证。
+- [x] 14.8 请求独立只读验收 agent 复核官方来源等级、19 平台覆盖、旧草稿兼容、事实门控、失败状态、UI 发布复制、本地/Worker parity 和脏工作树保留；处理所有确认问题后才勾选本节任务。
+
+## 15. 参考证据刷新与自定义槽位语义
+
+- [x] 15.1 增加规格和失败测试，覆盖应用建议后刷新参考 coverage/evidence、Temu 显式 16 张、通用电商显式 18 张，以及 custom 槽的角色默认值、提示词和用途标题分化。
+- [x] 15.2 从用户已应用的参考图角色重建冻结 `platformReferenceCoverage` 和 `platformEvidence`，保留现有套图/逐图覆盖与类目信号，不把未应用的识别结果直接当作事实。
+- [x] 15.3 让显式补足的 custom 槽使用安全的 role-led 默认值，并让 planner 显示“角色用途（自定义）”及对应角色提示词，同时保持 advisory、无平台硬约束和事实门控。
+- [x] 15.4 运行 resolver、planner、browser state 定向测试、public/lib 同步检查、OpenSpec strict validation 和中文 UTF-8/乱码扫描，复核限定文件的最小 diff。
+- [x] 15.5 增加失败测试，直接模拟 `effectivePlan=null`、显式 `imageCount=18`、角色未手动编辑和 18 个已对齐角色，证明浏览器提交决策保留数量与角色并让端点计划得到指定 custom 用途。
+- [x] 15.6 将首次预览的数量与角色提交规则收敛为可测试的纯决策，并接入 `buildCreationPlanPreviewFormData`；仅在无显式数量且无手动角色编辑时请求空角色自动计划。
+- [x] 15.7 运行 browser state、preview endpoint 定向测试、public/lib 同步检查和 OpenSpec strict validation。

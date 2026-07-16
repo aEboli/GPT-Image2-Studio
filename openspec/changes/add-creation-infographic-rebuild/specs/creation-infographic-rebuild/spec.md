@@ -25,7 +25,7 @@ Each `infographic-rebuild` item SHALL instruct generation to use its source info
 - **AND** the prompt forbids unsupported new parameters, claims, certifications, sizes, steps, accessories, materials, or guarantees
 
 ### Requirement: Infographic rebuild uses scoped reference images
-Generation requests for an `infographic-rebuild` item SHALL attach only the selected subject reference images, that item's source infographic reference image, style reference images, and optional Logo reference. Other non-subject infographic references MUST NOT be attached to that item.
+Generation requests for an `infographic-rebuild` item SHALL attach only the selected subject reference images, that item's source infographic reference image, and optional Logo reference. Other non-subject infographic references MUST NOT be attached to that item. Removed standalone style-reference inputs MUST NOT be attached.
 
 #### Scenario: Rebuild generation sends only relevant references
 - **WHEN** a Creation set has 3 subject references and 5 non-subject references

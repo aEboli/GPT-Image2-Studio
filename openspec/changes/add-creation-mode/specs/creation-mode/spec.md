@@ -32,7 +32,7 @@ The system SHALL generate one set for one product with quick presets of 4, 6, 8,
 - **WHEN** Creation reference analysis identifies distinct sellable product subjects from uploaded white-background product images
 - **THEN** the planned set appends one SKU image item for each distinct sellable product subject after the selected carousel roles
 - **AND** SKU image items do not count against the selected 4, 6, 8, 10, 12, 14, or 16 carousel image count
-- **AND** accessory-only, package-only, material-only, scene, and style references do not create standalone SKU image items
+- **AND** accessory-only, package-only, material-only, and scene references do not create standalone SKU image items
 - **AND** each SKU prompt changes the background while preserving the subject shape, colors, markings, identifiers, and existing product logos
 - **AND** if the user uploaded a Logo reference, each SKU prompt also applies that supplied logo without covering existing product identifiers
 
@@ -40,7 +40,7 @@ The system SHALL generate one set for one product with quick presets of 4, 6, 8,
 - **WHEN** the user sets the SKU combination count to 2, 5, or an equivalent Chinese numeral before planning or generating a Creation Mode set
 - **THEN** every appended SKU image prompt requires exactly that many identical copies of the same SKU subject
 - **AND** the prompt treats the count change as copy-and-arrange duplication of the main subject, not as a request to redraw, redesign, recolor, relabel, or introduce a second SKU
-- **AND** each SKU generation request attaches only the matched SKU subject reference images, plus the optional Logo reference, so unrelated uploaded product, package, scene, material, or style references cannot become the SKU subject
+- **AND** each SKU generation request attaches only the matched SKU subject reference images, plus the optional Logo reference, so unrelated uploaded product, package, scene, or material references cannot become the SKU subject
 - **AND** a count of 1 keeps the previous single-subject SKU image behavior
 
 #### Scenario: User customizes selected image roles
@@ -207,7 +207,12 @@ The system SHALL provide Creation Mode set record details that show the set-leve
 #### Scenario: User previews one saved item image
 - **WHEN** the user clicks a saved Creation Mode item thumbnail or its View action
 - **THEN** the shared image lightbox opens with the saved image enlarged
-- **AND** the item prompt, generation parameters, saved relative path, download action, and path-copy actions are available inside the lightbox
+- **AND** the lightbox shows the actual per-item prompt sent to the upstream image request rather than the set planning prompt
+- **AND** the lightbox shows the saved per-item request snapshot, including route, models, endpoint, ratio, requested and effective sizes, output format, quality, reasoning effort, and the reference image names used by that request
+- **AND** a legacy manifest item recovers its actual generation prompt and request snapshot from the saved image sidecar when those fields are absent from the manifest
+- **AND** the saved planning prompt remains available for editing and repair without replacing the recovered generation prompt
+- **AND** missing historical request fields remain unrecorded instead of being filled from the current global configuration
+- **AND** the saved relative path, download action, and path-copy actions are available inside the lightbox
 - **AND** the record card itself does not render the full prompt or saved path inline below the image
 
 #### Scenario: User regenerates one saved item

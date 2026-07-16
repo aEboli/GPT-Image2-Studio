@@ -327,11 +327,20 @@ export function getStudioDensitySettings(viewport) {
       : mode === "wide"
         ? WIDE_VARIABLES
         : REGULAR_VARIABLES;
+  const scaledVariables = scalePixelVariables(variables, zoomOutCompensation * UI_GLOBAL_SCALE);
+  const viewportWidth = normalizePositiveNumber(viewport?.width);
+
+  if (zoomOutCompensation > 1 && viewportWidth > 0) {
+    const shellMaxWidth = Number.parseFloat(scaledVariables["--app-shell-max-width"]);
+    if (Number.isFinite(shellMaxWidth) && shellMaxWidth < viewportWidth) {
+      scaledVariables["--app-shell-max-width"] = `${formatScaledPixelValue(viewportWidth)}px`;
+    }
+  }
 
   return {
     layoutMode: getStudioLayoutMode(viewport),
     mode,
-    variables: scalePixelVariables(variables, zoomOutCompensation * UI_GLOBAL_SCALE),
+    variables: scaledVariables,
     zoomOutCompensation,
   };
 }

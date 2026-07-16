@@ -152,7 +152,7 @@ test("listing draft view preserves Chinese warning and missing info display fiel
   assert.deepEqual(draft.zhDisplay.missingInfo, ["未提供实际包袋尺寸。"]);
 });
 
-test("English listing view strips legacy Chinese from public copy fields", () => {
+test("English listing view preserves historical V1 Unicode public copy verbatim", () => {
   const draft = normalizeCreationListingDraftForView({
     language: "en-US",
     title: "1 Pack 13cm 路亚硬饵 Product Listing Draft",
@@ -194,13 +194,13 @@ test("English listing view strips legacy Chinese from public copy fields", () =>
     ...Object.values(draft.keywordBuckets).flat(),
   ].join("\n");
 
-  assert.doesNotMatch(publicText, /[\u3400-\u9fff]/u);
-  assert.doesNotMatch(draft.fiveBullets.join("\n"), /:\s*[,，]/u);
-  assert.doesNotMatch(publicText, /Listing Draft|listing draft/i);
-  assert.doesNotMatch(publicText, /Provided product attributes|Sellers often struggle|this draft|Keyword structure|Five-bullet layout|searchable copy/i);
-  assert.equal(buildCreationListingFieldCopyText(draft.title), "1 Pack 13cm Product");
+  assert.match(publicText, /路亚硬饵/u);
+  assert.equal(draft.title, "1 Pack 13cm 路亚硬饵 Product Listing Draft");
+  assert.equal(draft.sellingPoints[0], "路亚硬饵 listing draft for US marketplace review.");
+  assert.equal(draft.fiveBullets[1], "Includes 3 selectable SKU variants: 银蓝鳞纹橙红尾电动仿生鱼饵, 黄绿黑斑电动仿生鱼饵.");
+  assert.equal(buildCreationListingFieldCopyText(draft.title), "1 Pack 13cm 路亚硬饵 Product Listing Draft");
   assert.equal(draft.zhDisplay.title, "路亚硬饵");
-  assert.doesNotMatch(buildCreationRecordListingText({ listingDrafts: [draft] }), /路亚|银蓝|黄绿|硬饵/u);
+  assert.match(buildCreationRecordListingText({ listingDrafts: [draft] }), /路亚|银蓝|黄绿|硬饵/u);
 });
 
 test("rendered listing header title is a direct copy target", () => {
@@ -387,6 +387,8 @@ test("rendered failed listing drafts show a clear rewrite notice", () => {
           ],
           description: "First Aid Kit option for home and travel.",
           backendSearchTerms: "first aid kit home travel compact",
+          warnings: ["Generation did not produce a publishable draft."],
+          missingInfo: ["Verified product facts are required before rewriting."],
         }],
       },
     });
@@ -394,8 +396,19 @@ test("rendered failed listing drafts show a clear rewrite notice", () => {
     globalThis.document = previousDocument;
   }
 
-  assert.match(getFakeTextContent(root), /Listing 生成失败：下方是保守占位草稿，请重写或重新生成后再发布。/u);
+  assert.match(getFakeTextContent(root), /Listing 生成失败：当前没有可发布草稿，请修正信息后重写或重新生成。/u);
   assert.ok(String(root.children[0]?.className || "").includes("is-failed"));
+  assert.equal(collectFakeElements(root, (node) => (
+    String(node.className || "").split(/\s+/).includes("creation-listing-title-copy")
+  )).length, 0);
+  const copyLabels = root.querySelectorAll("[data-creation-listing-copy-text]")
+    .map((button) => button.dataset.creationListingCopyLabel);
+  for (const label of ["标题", "卖点", "痛点", "五点描述", "描述", "后台搜索词", "关键词分组"]) {
+    assert.equal(copyLabels.includes(label), false, `${label} must not be copyable for a failed draft`);
+  }
+  assert.doesNotMatch(getFakeTextContent(root), /Compact first aid kit|Loose supplies|first aid kit home travel compact/u);
+  assert.match(getFakeTextContent(root), /Generation did not produce a publishable draft/u);
+  assert.match(getFakeTextContent(root), /Verified product facts are required before rewriting/u);
 });
 
 test("rendered listing warning and missing info fields show Chinese references", () => {
@@ -534,7 +547,7 @@ test("rendered listing warning and missing info fallbacks summarize each English
   assert.equal(repeatedGenericCount, 0);
 });
 
-test("rendered listing field copy data excludes zhDisplay and Chinese labels", () => {
+test("rendered V1 listing field copy preserves historical Unicode and excludes zhDisplay-only values", () => {
   const previousDocument = globalThis.document;
   const root = makeFakeElement("div");
   globalThis.document = {
@@ -587,11 +600,149 @@ test("rendered listing field copy data excludes zhDisplay and Chinese labels", (
     button.dataset.creationListingCopyText,
   ]));
 
-  assert.equal(copyByLabel["标题"], "1 Pack 13cm Product");
+  assert.equal(copyByLabel["标题"], "1 Pack 13cm 路亚硬饵 Product Listing Draft");
   assert.equal(
     copyByLabel["关键词分组"],
     "Long-tail keywords: fishing lure\nTraffic keywords: product listing\nDescriptive keywords: sku specific",
   );
-  assert.doesNotMatch(Object.values(copyByLabel).join("\n"), /[\u3400-\u9fff]|精准|长尾|流量|描述|无/u);
-  assert.doesNotMatch(Object.values(copyByLabel).join("\n"), /中文卖点对照|中文精准词|路亚|银蓝|黄绿|硬饵/u);
+  assert.match(Object.values(copyByLabel).join("\n"), /路亚|银蓝|黄绿|硬饵/u);
+  assert.doesNotMatch(Object.values(copyByLabel).join("\n"), /中文卖点对照|中文精准词/u);
+});
+
+test("V2 listing view keeps policy metadata and copies only publishable platform fields", () => {
+  const draft = normalizeCreationListingDraftForView({
+    id: "etsy-v2",
+    schemaVersion: "2",
+    platformId: "etsy",
+    platformLabel: "Etsy",
+    marketplace: "etsy",
+    listingPolicyVersion: "listing-policy-2026-07-15.v1",
+    language: "en-US",
+    title: "Handmade Blue Storage Box",
+    sellingPoints: ["Supplied 2 L capacity"],
+    buyerObjections: ["Confirm the supplied dimensions before purchase"],
+    highlights: ["Blue finish", "Stackable shape", "Supplied 2 L capacity"],
+    description: "A blue storage box described from the supplied product facts.",
+    searchTerms: ["blue storage box", "stackable organizer"],
+    keywordBuckets: { exact: ["internal exact plan"] },
+    evidence: ["product-input"],
+    missingInfo: [],
+    warnings: [],
+    status: "completed",
+  });
+
+  assert.equal(draft.schemaVersion, "2");
+  assert.equal(draft.platformId, "etsy");
+  assert.equal(draft.platformLabel, "Etsy");
+  assert.equal(draft.listingPolicyVersion, "listing-policy-2026-07-15.v1");
+  assert.deepEqual(draft.highlights, ["Blue finish", "Stackable shape", "Supplied 2 L capacity"]);
+  assert.deepEqual(draft.searchTerms, ["blue storage box", "stackable organizer"]);
+  assert.deepEqual(draft.buyerObjections, ["Confirm the supplied dimensions before purchase"]);
+  assert.equal(draft.fieldLabels.highlights, "Highlights");
+  assert.equal(draft.fieldLabels.searchTerms, "Tags");
+
+  const copyText = buildCreationRecordListingText({
+    setId: "set-etsy-v2",
+    productName: "Blue Storage Box",
+    listingDrafts: [draft],
+  });
+  assert.match(copyText, /Handmade Blue Storage Box/);
+  assert.match(copyText, /Blue finish/);
+  assert.match(copyText, /blue storage box/);
+  assert.doesNotMatch(copyText, /Confirm the supplied dimensions/);
+  assert.doesNotMatch(copyText, /internal exact plan/);
+});
+
+test("completed V2 drafts show internal search suggestions without adding them to full-copy", () => {
+  const previousDocument = globalThis.document;
+  const root = makeFakeElement("div");
+  const internalSearchToken = "INTERNAL_TEMU_SEARCH_TOKEN";
+  const set = {
+    setId: "set-temu-internal-search",
+    listingDrafts: [{
+      schemaVersion: "2",
+      platformId: "temu",
+      marketplace: "temu",
+      listingPolicyVersion: "listing-policy-2026-07-15.v2",
+      language: "en-US",
+      title: "Blue Storage Box",
+      highlights: ["Blue finish"],
+      description: "A blue storage box described from supplied facts.",
+      searchTerms: [internalSearchToken],
+      warnings: [],
+      missingInfo: [],
+      status: "completed",
+    }],
+  };
+  globalThis.document = { createElement: makeFakeElement };
+
+  try {
+    renderCreationListingDrafts({
+      refs: { creationRecordListingDrafts: root },
+      state: {},
+      set,
+    });
+  } finally {
+    globalThis.document = previousDocument;
+  }
+
+  assert.match(getFakeTextContent(root), new RegExp(internalSearchToken));
+  assert.match(getFakeTextContent(root), /Provide relevant search phrases for review\./u);
+  const copyByLabel = Object.fromEntries(
+    root.querySelectorAll("[data-creation-listing-copy-text]").map((button) => [
+      button.dataset.creationListingCopyLabel,
+      button.dataset.creationListingCopyText,
+    ]),
+  );
+  assert.equal(copyByLabel["Keyword suggestions"], internalSearchToken);
+  assert.doesNotMatch(buildCreationRecordListingText(set), new RegExp(internalSearchToken));
+});
+
+test("V2 review states and platform field labels are explicit in the rendered draft", () => {
+  const previousDocument = globalThis.document;
+  const root = makeFakeElement("div");
+  globalThis.document = { createElement: makeFakeElement };
+
+  try {
+    renderCreationListingDrafts({
+      refs: { creationRecordListingDrafts: root },
+      state: {},
+      set: {
+        setId: "set-etsy-review",
+        listingDrafts: [{
+          schemaVersion: "2",
+          platformId: "etsy",
+          platformLabel: "Etsy",
+          marketplace: "etsy",
+          listingPolicyVersion: "listing-policy-2026-07-15.v1",
+          language: "en-US",
+          title: "Blue Storage Box",
+          highlights: ["Blue finish"],
+          description: "Input-only draft for review.",
+          searchTerms: ["blue storage box"],
+          buyerObjections: ["Confirm dimensions"],
+          warnings: ["Source evidence is incomplete"],
+          missingInfo: ["Verified dimensions are missing"],
+          status: "needs-review",
+        }],
+      },
+    });
+  } finally {
+    globalThis.document = previousDocument;
+  }
+
+  assert.ok(String(root.children[0]?.className || "").includes("is-needs-review"));
+  assert.match(getFakeTextContent(root), /待人工复核/u);
+  assert.match(getFakeTextContent(root), /不可直接发布/u);
+  assert.doesNotMatch(getFakeTextContent(root), /发布字段|内部策划与复核|Blue finish|blue storage box|Confirm dimensions/u);
+  assert.match(getFakeTextContent(root), /Source evidence is incomplete/u);
+  assert.match(getFakeTextContent(root), /Verified dimensions are missing/u);
+  assert.equal(collectFakeElements(root, (node) => (
+    String(node.className || "").split(/\s+/).includes("creation-listing-title-copy")
+  )).length, 0);
+  const labels = root.querySelectorAll("[data-creation-listing-copy-text]")
+    .map((button) => button.dataset.creationListingCopyLabel);
+  assert.equal(labels.includes("Title"), false);
+  assert.equal(labels.includes("Highlights"), false);
+  assert.equal(labels.includes("Tags"), false);
 });

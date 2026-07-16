@@ -36,6 +36,7 @@ resolverTest("resolver exposes normalization, resolution, validation, and restor
     "normalizeCreationPlatformItemOverrides",
     "normalizeCreationPlatformSetOverrides",
     "normalizeCreationAudienceStrategy",
+    "normalizeCreationConversionIntent",
     "resolveCreationPlatformPlan",
     "restoreCreationPlatformRecommendations",
     "validateCreationPlatformPlan",
@@ -73,6 +74,28 @@ resolverTest("resolver merges supplied audience context with deterministic item 
     "用细节降低做工顾虑",
   );
   assert.notEqual(plan.items[0].conversionIntent.conversionGoal, plan.items[1].conversionIntent.conversionGoal);
+});
+
+resolverTest("resolver merges reference-analysis guidance below explicit set input with field provenance", () => {
+  const plan = resolver.resolveCreationPlatformPlan({
+    platform: "amazon",
+    referenceAnalysis: { audienceStrategy: { targetAudience: "gift buyers comparing practical options", purchaseMotivations: ["choose a useful gift"], evidenceBasis: ["reference image shows gift-ready packaging"], confidence: "medium", source: "analysis-suggestion" } },
+    audienceStrategy: { purchaseObjections: ["uncertain package completeness"], desiredOutcome: "choose the complete supplied set", evidenceBasis: ["user description lists included items"], confidence: "high", source: "user" },
+  });
+  assert.equal(plan.effectiveAudienceStrategy.targetAudience, "gift buyers comparing practical options");
+  assert.equal(plan.effectiveAudienceStrategy.provenance.targetAudience, "analysis-suggestion");
+  assert.equal(plan.effectiveAudienceStrategy.provenance.purchaseObjections, "user");
+  assert.deepEqual(plan.effectiveAudienceStrategy.evidenceBasis, ["user description lists included items", "reference image shows gift-ready packaging"]);
+});
+
+resolverTest("audience normalizers remove sensitive personas and unsupported claims with conservative fallback", () => {
+  const strategy = resolver.normalizeCreationAudienceStrategy({ targetAudience: "Black buyers age 25-34", purchaseMotivations: ["FDA certified health effects", "$19.99 lowest price", "3x faster", "4.9/5 stars", "over 1 million sold", "销量第一"], purchaseObjections: ["patients with diabetes", "Chinese consumers"], desiredOutcome: "clinically proven treatment", evidenceBasis: [], confidence: "high", source: "analysis-suggestion" });
+  const intent = resolver.normalizeCreationConversionIntent({ audienceFocus: "25岁黑人用户", motivationFocus: "售价￥99，性能提升3倍", objectionFocus: "美国消费者", conversionGoal: "explain supplied product details", evidenceFocus: "10 year guarantee, 4.9 stars, and 已售10万件" });
+  assert.equal(strategy.targetAudience, "buyers evaluating this product category");
+  assert.deepEqual(strategy.purchaseMotivations, []);
+  assert.equal(strategy.desiredOutcome, "make a confident product choice");
+  assert.equal(strategy.confidence, "low");
+  assert.deepEqual(intent, { audienceFocus: "", motivationFocus: "", objectionFocus: "", conversionGoal: "explain supplied product details", evidenceFocus: "" });
 });
 
 resolverTest("resolver applies platform, category, reference, set, then item precedence", () => {
@@ -341,6 +364,113 @@ resolverTest("set image-count override can extend a shorter platform plan to exi
   assert.ok(plan.items.slice(7).every((item) => item.slotKey.startsWith("amazon:extra:")));
 });
 
+resolverTest("explicit Amazon image-count 18 is honored without product evidence", () => {
+  const selectedRoles = [
+    "hero", "benefit", "scene", "multi-angle", "product-detail", "size-capacity-fit",
+    "accessory-gift", "series-showcase", "usage-suggestion", "ingredient-material",
+    "craft-process", "effect-comparison", "spec-table", "atmosphere", "human-handheld",
+    "human-wearable", "brand-story", "after-sales",
+  ];
+  const plan = resolver.resolveCreationPlatformPlan({
+    platform: "amazon",
+    selectedRoles,
+    setOverrides: { imageCount: 18 },
+  });
+
+  assert.equal(plan.carouselImageCount, 18);
+  assert.equal(plan.imageCount, 18);
+  assert.equal(plan.items.length, 18);
+  assert.equal(new Set(plan.items.map((item) => item.slotKey)).size, 18);
+  assert.deepEqual(plan.items.map((item) => item.role), selectedRoles);
+  assert.ok(plan.items.slice(13).every((item) => (
+    item.imageType === "custom" &&
+    item.enabled === true &&
+    item.advisory === true &&
+    item.constraints.length === 0
+  )));
+  assert.ok(!plan.warnings.some((warning) => warning.code === "image-count-extension-limited"));
+});
+
+resolverTest("applied reference roles rebuild coverage and evidence for material package and dimensions", () => {
+  const signals = resolver.buildCreationReferencePlanningSignals([
+    { filename: "material.jpg", role: "material", note: "结构细节" },
+    { filename: "package.jpg", role: "package", note: "包装清单" },
+    { filename: "dimensions.jpg", role: "dimensions", note: "尺寸规格" },
+  ], {
+    performance: true,
+    materials: false,
+    packageContents: false,
+    dimensions: false,
+  });
+
+  assert.deepEqual(signals.referenceCoverage.map((entry) => entry.role), ["material", "package", "dimensions"]);
+  assert.equal(signals.evidence.performance, true);
+  assert.equal(signals.evidence.materials, true);
+  assert.equal(signals.evidence.packageContents, true);
+  assert.equal(signals.evidence.dimensions, true);
+  assert.equal(signals.evidence.specifications, true);
+
+  for (const platform of ["temu", "universal"]) {
+    const plan = resolver.resolveCreationPlatformPlan({
+      platform,
+      referenceCoverage: signals.referenceCoverage,
+      evidence: signals.evidence,
+    });
+    assert.ok(plan.items.some((item) => item.imageType === "material-proof"), platform);
+    assert.ok(plan.items.some((item) => item.imageType === "in-box"), platform);
+    assert.ok(plan.items.some((item) => item.imageType === "dimension-fit"), platform);
+  }
+});
+
+resolverTest("Temu 16 and universal 18 custom extensions use role-led advisory defaults", () => {
+  const selectedRoles = [
+    "hero", "benefit", "scene", "multi-angle", "product-detail", "size-capacity-fit",
+    "accessory-gift", "series-showcase", "usage-suggestion", "ingredient-material",
+    "craft-process", "effect-comparison", "spec-table", "atmosphere", "human-handheld",
+    "human-wearable", "brand-story", "after-sales",
+  ];
+
+  for (const [platform, imageCount] of [["temu", 16], ["universal", 18]]) {
+    const plan = resolver.resolveCreationPlatformPlan({
+      platform,
+      selectedRoles: selectedRoles.slice(0, imageCount),
+      setOverrides: { imageCount },
+    });
+    const customItems = plan.items.filter((item) => item.imageType === "custom");
+
+    assert.ok(customItems.length >= 4, platform);
+    assert.ok(customItems.every((item) => item.advisory === true), platform);
+    assert.ok(customItems.every((item) => item.constraints.length === 0), platform);
+    assert.ok(customItems.every((item) => item.composition !== "single-product-or-alt-angle"), platform);
+    assert.ok(customItems.every((item) => item.textPolicy !== "none"), platform);
+    assert.ok(new Set(customItems.map((item) => `${item.composition}|${item.textPolicy}|${item.scenePolicy}`)).size > 1, platform);
+  }
+});
+
+resolverTest("manual custom conversion clears inherited platform policy before applying role defaults", () => {
+  const plan = resolver.resolveCreationPlatformPlan({
+    platform: "amazon",
+    evidence: fullAmazonEvidence(),
+    itemOverrides: [{
+      slotKey: "amazon:benefit-proof",
+      imageType: "custom",
+      role: "human-handheld",
+    }],
+  });
+  const custom = plan.slots.find((item) => item.slotKey === "amazon:benefit-proof");
+
+  assert.equal(custom.imageType, "custom");
+  assert.equal(custom.role, "human-handheld");
+  assert.equal(custom.composition, "role-led-lifestyle");
+  assert.equal(custom.textPolicy, "concise");
+  assert.equal(custom.scenePolicy, "authentic-use");
+  assert.equal(custom.logoPolicy, "allow-supplied");
+  assert.equal(custom.prompt, "");
+  assert.deepEqual(custom.constraints, []);
+  assert.deepEqual(custom.sourceIds, []);
+  assert.equal(custom.advisory, true);
+});
+
 resolverTest("sourced hard-rule conflicts block generation after overrides", () => {
   const plan = resolver.resolveCreationPlatformPlan({
     platform: "amazon",
@@ -496,7 +626,7 @@ resolverTest("prompt hard rules distinguish prohibited requests from negative sa
   }
 });
 
-resolverTest("changing a strict slot to custom removes platform blocking rules with a warning", () => {
+resolverTest("changing a strict slot cannot remove platform blocking rules", () => {
   const plan = resolver.resolveCreationPlatformPlan({
     platform: "amazon",
     evidence: fullAmazonEvidence(),
@@ -506,15 +636,18 @@ resolverTest("changing a strict slot to custom removes platform blocking rules w
         imageType: "custom",
         composition: "collage-grid",
         textPolicy: "moderate",
+        scenePolicy: "lifestyle",
         logoPolicy: "allow-supplied",
       },
     ],
   });
 
-  assert.equal(plan.items[0].imageType, "custom");
-  assert.equal(plan.items[0].constraints.length, 0);
-  assert.equal(plan.validation.isValid, true);
-  assert.ok(plan.warnings.some((warning) => warning.code === "custom-image-type"));
+  assert.equal(plan.items[0].imageType, "amazon-main");
+  assert.ok(plan.items[0].constraints.some((constraint) => constraint.id === "amazon-main-studio-white"));
+  assert.equal(plan.validation.isValid, false);
+  assert.ok(plan.errors.some((error) => error.constraintId === "amazon-main-no-collage"));
+  assert.ok(plan.errors.some((error) => error.constraintId === "amazon-main-studio-white"));
+  assert.ok(plan.warnings.some((warning) => warning.code === "strict-slot-image-type-preserved"));
 });
 
 resolverTest("unknown platforms fall back visibly and C-level profiles stay advisory", () => {
@@ -546,11 +679,11 @@ resolverTest("restore current platform recommendation clears overrides but prese
     referenceCoverage: [{ role: "usage", filename: "usage.png" }],
     skuSubjects: [{ id: "one" }, { id: "two" }],
     setOverrides: { ratio: "4:3", targetLanguage: "ja", imageCount: 4 },
-    itemOverrides: [{ slotKey: "amazon:amazon-main", imageType: "custom", ratio: "3:4" }],
+    itemOverrides: [{ slotKey: "amazon:benefit-proof", imageType: "custom", ratio: "3:4" }],
   };
 
   const modified = resolver.resolveCreationPlatformPlan(input);
-  assert.equal(modified.items[0].imageType, "custom");
+  assert.equal(modified.items[1].imageType, "custom");
   assert.equal(modified.carouselImageCount, 4);
 
   const restored = resolver.restoreCreationPlatformRecommendations(input);

@@ -287,7 +287,19 @@ test("studio density scales pixel-based workspace variables back up when browser
 
   assert.equal(settings.mode, "regular");
   assert.equal(settings.variables["--ui-root-font-size"], "28.15px");
-  assert.equal(settings.variables["--app-shell-max-width"], "2956.26px");
+  assert.equal(settings.variables["--app-shell-max-width"], "3400px");
   assert.equal(settings.variables["--studio-grid-left"], "689.79px");
   assert.equal(settings.variables["--topbar-padding"], "10.56px 17.6px 24.64px");
+});
+
+test("studio density lets viewport width limit the app shell after zooming out", () => {
+  const settings = getStudioDensitySettings({
+    width: 2560,
+    height: 1440,
+    outerWidth: 1920,
+    devicePixelRatio: 0.75,
+  });
+
+  assert.equal(settings.zoomOutCompensation, 1.33);
+  assert.equal(settings.variables["--app-shell-max-width"], "2560px");
 });

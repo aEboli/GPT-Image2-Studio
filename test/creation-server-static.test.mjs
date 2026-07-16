@@ -348,7 +348,7 @@ test("creation generation labels uploaded reference image count and file order",
   );
 });
 
-test("creation generation keeps style references separate from subject references", async () => {
+test("creation generation has no removed style-reference request path", async () => {
   const server = await readFile(serverPath, "utf8");
   const worker = await readFile(cloudflareWorkerPath, "utf8");
   const generateHandler =
@@ -358,17 +358,11 @@ test("creation generation keeps style references separate from subject reference
   const workerGenerateHandler =
     worker.match(/async function runCreationGenerate[\s\S]*?\r?\n}\r?\n\r?\nfunction streamCreationGenerate/)?.[0] || "";
 
-  assert.match(server, /MAX_CREATION_STYLE_REFERENCE_IMAGES/);
-  assert.match(worker, /MAX_CREATION_STYLE_REFERENCE_IMAGES/);
-  assert.match(generateHandler, /formData\.getAll\("styleReferenceImages"\)/);
-  assert.match(repairHandler, /formData\.getAll\("styleReferenceImages"\)/);
-  assert.match(workerGenerateHandler, /formData\.getAll\("styleReferenceImages"\)/);
-  assert.match(generateHandler, /styleReferenceImages\.length > MAX_CREATION_STYLE_REFERENCE_IMAGES/);
-  assert.match(repairHandler, /styleReferenceImages\.length > MAX_CREATION_STYLE_REFERENCE_IMAGES/);
-  assert.match(workerGenerateHandler, /styleReferenceImages\.length > MAX_CREATION_STYLE_REFERENCE_IMAGES/);
-  assert.match(generateHandler, /const itemGenerationReferenceImages = appendCreationStyleReferences\(/);
-  assert.match(repairHandler, /const itemGenerationReferenceImages = appendCreationStyleReferences\(/);
-  assert.match(workerGenerateHandler, /const itemGenerationReferenceImages = appendCreationStyleReferences\(/);
+  assert.doesNotMatch(server, /MAX_CREATION_STYLE_REFERENCE_IMAGES|styleReferenceImages|appendCreationStyleReferences/);
+  assert.doesNotMatch(worker, /MAX_CREATION_STYLE_REFERENCE_IMAGES|styleReferenceImages|appendCreationStyleReferences/);
+  assert.match(generateHandler, /appendCreationItemLogoReference\(\s*item,\s*itemReferenceImages,\s*logoImage/);
+  assert.match(repairHandler, /appendCreationItemLogoReference\(\s*repairItem,\s*itemReferenceImages,\s*logoImage/);
+  assert.match(workerGenerateHandler, /appendCreationItemLogoReference\(\s*item,\s*itemReferenceImages,\s*logoImage/);
   assert.match(generateHandler, /referenceImageLabels:\s*buildCreationGenerationReferenceImageLabels\(/);
   assert.match(repairHandler, /referenceImageLabels:\s*buildCreationGenerationReferenceImageLabels\(/);
   assert.match(workerGenerateHandler, /referenceImageLabels:\s*buildCreationGenerationReferenceImageLabels\(/);

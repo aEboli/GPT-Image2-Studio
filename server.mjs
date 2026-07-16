@@ -81,10 +81,10 @@ import {
   buildCreationItemGenerationPrompt,
   resolveCreationItemGenerationParameters,
 } from "./lib/creation-generation-parameters.mjs";
+import { buildCreationGenerationSnapshot } from "./lib/creation-generation-snapshot.mjs";
 import {
   DEFAULT_REASONING_EFFORT,
   MAX_CREATION_REFERENCE_IMAGES,
-  MAX_CREATION_STYLE_REFERENCE_IMAGES,
   MAX_PARALLEL_TASKS_PER_SESSION,
   MAX_PORTRAIT_ACTION_REFERENCE_IMAGES,
   MAX_PORTRAIT_ACCESSORY_REFERENCE_IMAGES,
@@ -122,7 +122,6 @@ import { normalizePptMotionOptions } from "./lib/ppt-motion-presets.mjs";
 import { migrateOutputDirectoryMonths } from "./lib/output-directory-migration.mjs";
 import {
   appendCreationItemLogoReference,
-  appendCreationStyleReferences,
   buildCreationGenerationReferenceImageLabels,
   buildCreationItemReferenceImages,
 } from "./lib/creation-reference-labels.mjs";
@@ -149,7 +148,6 @@ import {
 } from "./lib/creation-repair.mjs";
 import { buildCreationRelativeDir, createCreationSetStore } from "./lib/creation-store.mjs";
 import { generateCreationListingDrafts } from "./lib/creation-listing-agent.mjs";
-import { getCreationListingEligibility } from "./lib/creation-listing-view.mjs";
 import {
   applyPortraitPlanOverrides,
   buildPortraitPlan,
@@ -1853,7 +1851,7 @@ function buildCreationSetManifest({
     skuGenerationRule: plan.skuGenerationRule || "none",
     skuGenerationRuleLabel: plan.skuGenerationRuleLabel || "无",
     logo: plan.logo || null,
-    effectivePlan: plan.effectivePlan || plan,
+    effectivePlan: plan,
     createdAt,
     updatedAt: updatedAt || createdAt,
     status,
@@ -2875,12 +2873,6 @@ async function handleCreationListingsGenerate(request, response) {
     throw error;
   }
 
-  if (!getCreationListingEligibility(set).eligible) {
-    return sendJson(response, 400, {
-      message: "Amazon US Listing is only available for Amazon Creation sets or eligible legacy records.",
-    });
-  }
-
   const mock = process.env.IMAGE_STUDIO_MOCK_LISTING_AGENT === "1";
   const config = mergeRequestPrivateConfig(payload, await configStore.readPrivateConfig());
   const textVisionConfig = getSelectedTextVisionConfig(config);
@@ -3573,8 +3565,6 @@ async function handleCreationGenerate(request, response) {
   let creationRelativeDir = "";
   let createdAt = new Date().toISOString();
   let referenceImages = [];
-  let styleReferenceImages = [];
-  let generationReferenceImages = [];
   let logoImage = null;
   let referenceImageNames = [];
   let referenceImageRoles = [];
@@ -3587,10 +3577,6 @@ async function handleCreationGenerate(request, response) {
       ...formData.getAll("referenceImages"),
       ...formData.getAll("referenceImage"),
     ]);
-    styleReferenceImages = await toReferenceImages([
-      ...formData.getAll("styleReferenceImages"),
-      ...formData.getAll("styleReferenceImage"),
-    ]);
     logoImage = await readCreationLogoImage(formData);
     if (referenceImages.length > MAX_CREATION_REFERENCE_IMAGES) {
       throw new Error(`参考图最多支持 ${MAX_CREATION_REFERENCE_IMAGES} 张。`);
@@ -3598,16 +3584,6 @@ async function handleCreationGenerate(request, response) {
     if (referenceImages.some((image) => !String(image.mimeType || "").startsWith("image/"))) {
       throw new Error("仅支持图片参考文件。");
     }
-    if (styleReferenceImages.length > MAX_CREATION_STYLE_REFERENCE_IMAGES) {
-      throw new Error(`参考风格图最多支持 ${MAX_CREATION_STYLE_REFERENCE_IMAGES} 张。`);
-    }
-    if (referenceImages.length + styleReferenceImages.length > MAX_CREATION_REFERENCE_IMAGES) {
-      throw new Error(`套图参考图和参考风格图合计最多支持 ${MAX_CREATION_REFERENCE_IMAGES} 张。`);
-    }
-    if (styleReferenceImages.some((image) => !String(image.mimeType || "").startsWith("image/"))) {
-      throw new Error("仅支持图片参考风格文件。");
-    }
-    generationReferenceImages = appendCreationLogoReference(referenceImages, logoImage);
     referenceImageNames = referenceImages.map((image) => image.filename).filter(Boolean);
     referenceImageRoles = normalizeCreationReferenceRoles(formData.get("referenceImageRoles"));
     plan = buildCreationSubmittedPlan({
@@ -3722,7 +3698,24 @@ async function handleCreationGenerate(request, response) {
       try {
         await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response);
         slotClaimed = true;
+        const finalPrompt = buildCreationItemGenerationPrompt(item.prompt, itemGenerationParameters);
+        const itemReferenceImages = buildCreationItemReferenceImages(item, referenceImages, referenceImageRoles);
+        const itemGenerationReferenceImagesWithLogo = appendCreationItemLogoReference(
+          item,
+          itemReferenceImages,
+          logoImage,
+        );
+        const generationSnapshot = buildCreationGenerationSnapshot({
+          generationPrompt: finalPrompt,
+          generationConfig,
+          parameters: itemGenerationParameters,
+          format: finalFormat,
+          quality: finalQuality,
+          reasoningEffort,
+          referenceImages: itemGenerationReferenceImagesWithLogo,
+        });
         items = updateCreationItems(items, item.itemId, {
+          ...generationSnapshot,
           status: "generating",
           generationStartedAt,
         });
@@ -3736,14 +3729,6 @@ async function handleCreationGenerate(request, response) {
           targetLanguage: itemGenerationParameters.targetLanguage,
         });
 
-        const finalPrompt = buildCreationItemGenerationPrompt(item.prompt, itemGenerationParameters);
-        const itemReferenceImages = buildCreationItemReferenceImages(item, referenceImages, referenceImageRoles);
-        const itemGenerationReferenceImages = appendCreationStyleReferences(itemReferenceImages, styleReferenceImages);
-        const itemGenerationReferenceImagesWithLogo = appendCreationItemLogoReference(
-          item,
-          itemGenerationReferenceImages,
-          logoImage,
-        );
         const generationResult = await requestStudioImageGeneration({
           baseUrl: generationConfig.baseUrl,
           apiKey: generationConfig.apiKey,
@@ -3752,7 +3737,6 @@ async function handleCreationGenerate(request, response) {
           referenceImageLabels: buildCreationGenerationReferenceImageLabels(
             itemReferenceImages,
             referenceImageRoles,
-            styleReferenceImages,
           ),
           size: itemGenerationParameters.finalSize,
           aspectRatio: itemGenerationParameters.ratioOption.value,
@@ -3819,6 +3803,7 @@ async function handleCreationGenerate(request, response) {
           imageBuffer: Buffer.from(normalizeBase64(finalBase64), "base64"),
           metadata: {
             prompt: finalPrompt,
+            ...generationSnapshot,
             createdAt,
             baseUrl: generationConfig.baseUrl,
             responsesModel: generationConfig.responsesModel,
@@ -3845,9 +3830,9 @@ async function handleCreationGenerate(request, response) {
             creationScenario: plan.scenario,
             creationIndustryTemplate: plan.industryTemplate,
             creationImageCount: plan.imageCount,
-            hasReferenceImage: generationReferenceImages.length > 0,
-            referenceImageNames,
-            referenceImageName: referenceImageNames[0] || "",
+            hasReferenceImage: generationSnapshot.hasReferenceImage,
+            referenceImageNames: generationSnapshot.referenceImageNames,
+            referenceImageName: generationSnapshot.referenceImageName,
             referenceImageRoles,
             hasCreationLogo: Boolean(plan.logo),
             creationLogo: plan.logo,
@@ -3858,6 +3843,7 @@ async function handleCreationGenerate(request, response) {
         const imageUrl = buildPublicAssetUrl("/output", saved.relativePath, saved.createdAt);
 
         items = updateCreationItems(items, item.itemId, {
+          ...generationSnapshot,
           status: "completed",
           missingAsset: false,
           filename,
@@ -3873,6 +3859,7 @@ async function handleCreationGenerate(request, response) {
           requestedSize: itemGenerationParameters.requestedSize,
           effectiveSize: savedSize,
           size: savedSize,
+          actualSize: saved.metadata?.actualSize || savedSize,
           targetLanguage: itemGenerationParameters.targetLanguage,
         });
         setManifest = await creationSetStore.saveManifest(
@@ -4568,25 +4555,12 @@ async function handleCreationRepair(request, response) {
       ...formData.getAll("referenceImages"),
       ...formData.getAll("referenceImage"),
     ]);
-    const styleReferenceImages = await toReferenceImages([
-      ...formData.getAll("styleReferenceImages"),
-      ...formData.getAll("styleReferenceImage"),
-    ]);
     const logoImage = await readCreationLogoImage(formData);
     if (referenceImages.length > MAX_CREATION_REFERENCE_IMAGES) {
       throw new Error(`参考图最多支持 ${MAX_CREATION_REFERENCE_IMAGES} 张。`);
     }
     if (referenceImages.some((image) => !String(image.mimeType || "").startsWith("image/"))) {
       throw new Error("仅支持图片参考文件。");
-    }
-    if (styleReferenceImages.length > MAX_CREATION_STYLE_REFERENCE_IMAGES) {
-      throw new Error(`参考风格图最多支持 ${MAX_CREATION_STYLE_REFERENCE_IMAGES} 张。`);
-    }
-    if (referenceImages.length + styleReferenceImages.length > MAX_CREATION_REFERENCE_IMAGES) {
-      throw new Error(`套图参考图和参考风格图合计最多支持 ${MAX_CREATION_REFERENCE_IMAGES} 张。`);
-    }
-    if (styleReferenceImages.some((image) => !String(image.mimeType || "").startsWith("image/"))) {
-      throw new Error("仅支持图片参考风格文件。");
     }
     referenceImageNames =
       referenceImages.length > 0
@@ -4601,7 +4575,6 @@ async function handleCreationRepair(request, response) {
       ? buildCreationLogoOptionsFromFormData(formData, logoImage)
       : existingSet.logo || buildCreationLogoOptionsFromFormData(formData);
     const normalizedLogoOptions = normalizeCreationLogoOptions(logoOptions);
-    const generationReferenceImages = appendCreationLogoReference(referenceImages, logoImage);
 
     const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
     const generationConfig = getSelectedImageGenerationConfig(config);
@@ -4748,7 +4721,24 @@ async function handleCreationRepair(request, response) {
       try {
         await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response);
         slotClaimed = true;
+        const finalPrompt = buildCreationItemGenerationPrompt(repairItem.prompt, itemGenerationParameters);
+        const itemReferenceImages = buildCreationItemReferenceImages(repairItem, referenceImages, referenceImageRoles);
+        const itemGenerationReferenceImagesWithLogo = appendCreationItemLogoReference(
+          repairItem,
+          itemReferenceImages,
+          logoImage,
+        );
+        const generationSnapshot = buildCreationGenerationSnapshot({
+          generationPrompt: finalPrompt,
+          generationConfig,
+          parameters: itemGenerationParameters,
+          format: finalFormat,
+          quality: finalQuality,
+          reasoningEffort,
+          referenceImages: itemGenerationReferenceImagesWithLogo,
+        });
         items = updateCreationItems(items, item.itemId, {
+          ...generationSnapshot,
           prompt: repairItem.prompt,
           marketingCopy: repairItem.marketingCopy,
           status: "generating",
@@ -4757,14 +4747,6 @@ async function handleCreationRepair(request, response) {
         });
         writeSseEvent(response, "item_started", { setId, itemId: item.itemId, role: repairItem.role, ratio: itemGenerationParameters.ratioOption.value, effectiveSize: itemGenerationParameters.finalSize, targetLanguage: itemGenerationParameters.targetLanguage });
 
-        const finalPrompt = buildCreationItemGenerationPrompt(repairItem.prompt, itemGenerationParameters);
-        const itemReferenceImages = buildCreationItemReferenceImages(repairItem, referenceImages, referenceImageRoles);
-        const itemGenerationReferenceImages = appendCreationStyleReferences(itemReferenceImages, styleReferenceImages);
-        const itemGenerationReferenceImagesWithLogo = appendCreationItemLogoReference(
-          repairItem,
-          itemGenerationReferenceImages,
-          logoImage,
-        );
         const generationResult = await requestStudioImageGeneration({
           baseUrl: generationConfig.baseUrl,
           apiKey: generationConfig.apiKey,
@@ -4773,7 +4755,6 @@ async function handleCreationRepair(request, response) {
           referenceImageLabels: buildCreationGenerationReferenceImageLabels(
             itemReferenceImages,
             referenceImageRoles,
-            styleReferenceImages,
           ),
           size: itemGenerationParameters.finalSize,
           aspectRatio: itemGenerationParameters.ratioOption.value,
@@ -4834,6 +4815,7 @@ async function handleCreationRepair(request, response) {
           imageBuffer: Buffer.from(normalizeBase64(finalBase64), "base64"),
           metadata: {
             prompt: finalPrompt,
+            ...generationSnapshot,
             createdAt: generationCompletedAt,
             baseUrl: generationConfig.baseUrl,
             responsesModel: generationConfig.responsesModel,
@@ -4861,9 +4843,9 @@ async function handleCreationRepair(request, response) {
             creationScenario: existingSet.scenario,
             creationIndustryTemplate: existingSet.industryTemplate || "general",
             creationImageCount: existingSet.imageCount,
-            hasReferenceImage: generationReferenceImages.length > 0,
-            referenceImageNames,
-            referenceImageName: referenceImageNames[0] || "",
+            hasReferenceImage: generationSnapshot.hasReferenceImage,
+            referenceImageNames: generationSnapshot.referenceImageNames,
+            referenceImageName: generationSnapshot.referenceImageName,
             referenceImageRoles,
             hasCreationLogo: Boolean(repairPlan.logo),
             creationLogo: repairPlan.logo,
@@ -4874,6 +4856,7 @@ async function handleCreationRepair(request, response) {
         const imageUrl = buildPublicAssetUrl("/output", saved.relativePath, saved.createdAt);
 
         items = updateCreationItems(items, item.itemId, {
+          ...generationSnapshot,
           prompt: repairItem.prompt,
           marketingCopy: repairItem.marketingCopy,
           status: "completed",
@@ -4890,6 +4873,8 @@ async function handleCreationRepair(request, response) {
           resolutionTier: itemGenerationParameters.resolutionTier,
           requestedSize: itemGenerationParameters.requestedSize,
           effectiveSize: savedSize,
+          size: savedSize,
+          actualSize: saved.metadata?.actualSize || savedSize,
           targetLanguage: itemGenerationParameters.targetLanguage,
           error: "",
         });
@@ -5320,6 +5305,7 @@ async function handleGenerate(request, response) {
     const generationStartedAtMs = Date.now();
 
     generationTaskStore.updateTask(clientSessionId, taskId, {
+      generationStartedAt,
       ratio: ratioOption.value,
       ratioLabel: ratioOption.label,
       size: finalSize,

@@ -3,11 +3,9 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 import { handleApiRequest } from "../cloudflare-pages-worker.mjs";
+import { CREATION_PLATFORM_OPTIONS } from "../lib/creation-platform-policies.mjs";
 import { createCreationQueueJob } from "../lib/creation-suite-queue.mjs";
-import {
-  createCreationListingController,
-  getCreationListingEligibility,
-} from "../lib/creation-listing-view.mjs";
+import { createCreationListingController } from "../lib/creation-listing-view.mjs";
 
 function makeButton() {
   return {
@@ -24,27 +22,58 @@ function makeState(set) {
   return { creation: { listingGeneratingSetId: "", listingGeneratingSetIds: [], sets: [set] } };
 }
 
-test("Listing eligibility accepts explicit Amazon and legacy-missing but rejects explicit universal", () => {
-  assert.deepEqual(getCreationListingEligibility({ platform: "amazon", platformProvenance: "explicit" }), {
-    eligible: true,
-    reason: "amazon",
-  });
-  assert.deepEqual(getCreationListingEligibility({ platform: "universal", platformProvenance: "legacy-missing" }), {
-    eligible: true,
-    reason: "legacy-missing",
-  });
-  assert.deepEqual(getCreationListingEligibility({ productName: "Legacy product" }), {
-    eligible: true,
-    reason: "legacy-missing",
-  });
-  assert.deepEqual(getCreationListingEligibility({ platform: "universal", platformProvenance: "explicit" }), {
-    eligible: false,
-    reason: "non-amazon",
-  });
-  assert.equal(getCreationListingEligibility({ platform: "etsy" }).eligible, false);
+test("all selected Creation platforms enable manual Listing while missing and active records stay disabled", () => {
+  assert.equal(CREATION_PLATFORM_OPTIONS.length, 19);
+  for (const platform of [...CREATION_PLATFORM_OPTIONS.map((option) => option.value), ""]) {
+    const set = { setId: platform || "legacy", platform, productName: `${platform || "legacy"} product` };
+    const refs = { creationRecordGenerateListingsButton: makeButton() };
+    const controller = createCreationListingController({ refs, state: makeState(set) });
+
+    controller.syncRecordControls(set);
+
+    assert.equal(refs.creationRecordGenerateListingsButton.disabled, false, platform || "legacy");
+    assert.equal(refs.creationRecordGenerateListingsButton.title, "", platform || "legacy");
+  }
+
+  const emptyRefs = { creationRecordGenerateListingsButton: makeButton() };
+  createCreationListingController({ refs: emptyRefs, state: makeState(null) }).syncRecordControls(null);
+  assert.equal(emptyRefs.creationRecordGenerateListingsButton.disabled, true);
+
+  const busySet = { setId: "busy-temu", platform: "temu", productName: "Busy Temu product" };
+  const busyRefs = { creationRecordGenerateListingsButton: makeButton() };
+  const busyState = makeState(busySet);
+  busyState.creation.listingGeneratingSetId = busySet.setId;
+  createCreationListingController({ refs: busyRefs, state: busyState }).syncRecordControls(busySet);
+  assert.equal(busyRefs.creationRecordGenerateListingsButton.disabled, true);
 });
 
-test("non-Amazon records disable generation while preserving historical draft copy and export", async () => {
+test("completed universal records keep manual Listing generation enabled", () => {
+  const set = {
+    setId: "universal-completed",
+    platform: "universal",
+    platformProvenance: "explicit",
+    productName: "Universal product",
+    status: "completed",
+    items: Array.from({ length: 15 }, (_, index) => ({
+      itemId: `item-${index + 1}`,
+      status: "completed",
+    })),
+  };
+  const refs = {
+    creationRecordGenerateListingsButton: makeButton(),
+    creationRecordCopyListingsButton: makeButton(),
+    creationRecordExportListingsButton: makeButton(),
+  };
+  const controller = createCreationListingController({ refs, state: makeState(set) });
+
+  controller.syncRecordControls(set);
+
+  assert.equal(refs.creationRecordGenerateListingsButton.disabled, false);
+  assert.equal(refs.creationRecordGenerateListingsButton.textContent, "生成 Listing");
+  assert.equal(refs.creationRecordGenerateListingsButton.title, "");
+});
+
+test("specific platform records use the existing Listing generation, copy, and export flow", async () => {
   const set = {
     setId: "etsy-history",
     platform: "etsy",
@@ -60,33 +89,50 @@ test("non-Amazon records disable generation while preserving historical draft co
   let fetchCount = 0;
   let copied = "";
   let exported = "";
+  let selectedSet = set;
   const controller = createCreationListingController({
     refs,
     state: makeState(set),
-    getSelectedSet: () => set,
-    fetchImpl: async () => { fetchCount += 1; throw new Error("must not fetch"); },
+    getSelectedSet: () => selectedSet,
+    fetchImpl: async () => {
+      fetchCount += 1;
+      return new Response(JSON.stringify({
+        ok: true,
+        set: {
+          ...set,
+          listingDrafts: [{ id: "etsy-regenerated", title: "1 Pack Regenerated Etsy Draft", marketplace: "amazon-us" }],
+        },
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    },
     writeTextToClipboard: async (value) => { copied = value; },
     downloadTextFile: (value) => { exported = value; },
     setFeedback() {},
+    upsertSet: (nextSet) => {
+      selectedSet = nextSet;
+      return nextSet;
+    },
   });
 
   controller.syncRecordControls(set);
-  assert.equal(refs.creationRecordGenerateListingsButton.disabled, true);
-  assert.match(refs.creationRecordGenerateListingsButton.title, /Amazon US/i);
+  assert.equal(refs.creationRecordGenerateListingsButton.disabled, false);
+  assert.equal(refs.creationRecordGenerateListingsButton.title, "");
   assert.equal(refs.creationRecordCopyListingsButton.disabled, false);
   assert.equal(refs.creationRecordExportListingsButton.disabled, false);
-  await assert.rejects(controller.generate(), /Amazon US/i);
-  assert.equal(fetchCount, 0);
+  const nextSet = await controller.generate();
+  assert.equal(fetchCount, 1);
+  assert.equal(nextSet.listingDrafts[0].title, "1 Pack Regenerated Etsy Draft");
   await controller.copy();
   controller.exportListings();
-  assert.match(copied, /Saved Amazon US Draft/);
-  assert.match(exported, /Saved Amazon US Draft/);
-  assert.equal(set.listingDrafts.length, 1);
+  assert.match(copied, /Regenerated Etsy Draft/);
+  assert.match(exported, /Regenerated Etsy Draft/);
 });
 
-test("Cloudflare Listing endpoint allows Amazon and legacy records but rejects non-Amazon before upstream", async () => {
+test("Cloudflare Listing endpoint allows every Creation platform", async () => {
   for (const set of [
     { setId: "amazon-explicit", platform: "amazon", platformProvenance: "explicit", productName: "Bottle", items: [] },
+    { setId: "universal-explicit", platform: "universal", platformProvenance: "explicit", productName: "Bottle", items: [] },
+    { setId: "temu-explicit", platform: "temu", platformProvenance: "explicit", productName: "Bottle", items: [] },
+    { setId: "etsy-explicit", platform: "etsy", platformProvenance: "explicit", productName: "Bottle", items: [] },
     { setId: "legacy", productName: "Bottle", items: [] },
   ]) {
     const response = await handleApiRequest(new Request("https://studio.example/api/creation/listings", {
@@ -96,38 +142,20 @@ test("Cloudflare Listing endpoint allows Amazon and legacy records but rejects n
     }), { env: { IMAGE_STUDIO_MOCK_LISTING_AGENT: "1" } });
     assert.equal(response.status, 200, `${set.setId} should be eligible`);
   }
-
-  for (const set of [
-    { setId: "etsy-explicit", platform: "etsy", platformProvenance: "explicit", listingDrafts: [{ title: "keep" }] },
-    { setId: "universal-explicit", platform: "universal", platformProvenance: "explicit" },
-  ]) {
-    let fetchCount = 0;
-    const response = await handleApiRequest(new Request("https://studio.example/api/creation/listings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ apiKey: "unused", set }),
-    }), { async fetchImpl() { fetchCount += 1; throw new Error("must not fetch"); } });
-    const body = await response.json();
-    assert.equal(response.status, 400);
-    assert.match(body.message, /Amazon US/i);
-    assert.equal(fetchCount, 0);
-    assert.deepEqual(set.listingDrafts, set.listingDrafts);
-  }
 });
 
-test("local Listing endpoint checks shared eligibility before API configuration", async () => {
+test("local Listing endpoint has no platform eligibility gate", async () => {
   const server = await readFile(new URL("../server.mjs", import.meta.url), "utf8");
   const handler = server.match(/async function handleCreationListingsGenerate[\s\S]*?\n}\n\nasync function handlePortraitSetsGet/)?.[0] || "";
-  assert.match(handler, /getCreationListingEligibility\(set\)/);
-  assert.ok(handler.indexOf("getCreationListingEligibility(set)") < handler.indexOf("mergeRequestPrivateConfig"));
-  assert.match(handler, /Amazon US/);
+  assert.doesNotMatch(handler, /CreationListingEligibility|marketplace eligibility gate/i);
+  assert.match(handler, /mergeRequestPrivateConfig/);
 });
 
-test("current-platform automatic Listing control is restricted to Amazon US scope", async () => {
+test("current-platform automatic Listing controls have no platform eligibility gate", async () => {
   const app = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
-  assert.match(app, /getCreationListingEligibility/);
-  assert.match(app, /creationListingAgentEnabledInput\.disabled\s*=\s*!listingEligibility\.eligible/);
-  assert.match(app, /function shouldAutoGenerateCreationListings\([^)]*\)[\s\S]*getCreationListingEligibility/);
+  assert.doesNotMatch(app, /CreationListingEligibility/);
+  assert.match(app, /creationListingAgentEnabledInput\.disabled\s*=\s*false/);
+  assert.match(app, /function shouldAutoGenerateCreationListings\([^)]*\)[\s\S]*return Boolean\(listingAgentEnabled\)/);
 });
 
 test("queued automatic Listing uses the completed set and frozen queue switch", async () => {

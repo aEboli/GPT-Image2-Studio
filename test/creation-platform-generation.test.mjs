@@ -107,6 +107,14 @@ test("local planner and Worker endpoint produce deeply equivalent plans for one 
   assert.ok(payload.plan.items.every((item) => item.conversionIntent?.conversionGoal));
 });
 
+test("creation planning keeps unsafe analysis personas and unsupported claims out of prompts", () => {
+  const plan = buildCreationPlan({ productName: "Plain Bottle", platform: "amazon", audienceStrategy: { targetAudience: "Black buyers age 25-34", purchaseMotivations: ["FDA certified health effects", "$19.99 lowest price", "3x faster", "4.9/5 stars", "over 1 million sold", "销量第一"], purchaseObjections: ["patients with diabetes", "Chinese consumers"], desiredOutcome: "clinically proven treatment", evidenceBasis: [], confidence: "high", source: "analysis-suggestion" } });
+  const promptText = plan.items.map((item) => item.prompt).join("\n");
+  assert.equal(plan.effectiveAudienceStrategy.targetAudience, "buyers evaluating this product category");
+  assert.equal(plan.effectiveAudienceStrategy.confidence, "low");
+  assert.doesNotMatch(promptText, /Black buyers|25-34|Chinese consumers|FDA certified|\$19\.99|3x faster|4\.9\/5|million sold|销量第一|diabetes|clinically proven treatment/i);
+});
+
 test("submitted effective plans are bounded, normalized, recounted, and hard-rule revalidated", () => {
   const input = normalizedPlatformInput();
   const preview = buildCreationPlan(input);
@@ -134,6 +142,16 @@ test("submitted effective plans are bounded, normalized, recounted, and hard-rul
   });
   assert.throws(() => assertCreationPlanCanGenerate(tampered), /Amazon 主图不得包含营销文字/);
 
+  const imageTypeTampered = buildCreationSubmittedPlan({ effectivePlan: JSON.stringify({ ...amazon, items: amazon.items.map((item, index) => index === 0 ? { ...item, imageType: "generic-hero", constraints: [], scenePolicy: "lifestyle", prompt: `${item.prompt} Create a lifestyle scene with decorative props.` } : item), canGenerate: true, validation: { isValid: true } }) });
+  assert.equal(imageTypeTampered.items[0].imageType, "amazon-main");
+  assert.throws(() => assertCreationPlanCanGenerate(imageTypeTampered), /纯白棚拍背景|不得使用生活场景/);
+  const disabledTampered = buildCreationSubmittedPlan({ effectivePlan: JSON.stringify({ ...amazon, items: amazon.items.map((item, index) => index === 0 ? { ...item, enabled: false, textPolicy: "moderate", prompt: `${item.prompt} Add visible marketing text.` } : item), canGenerate: true, validation: { isValid: true } }) });
+  assert.equal(disabledTampered.items[0].enabled, true);
+  assert.throws(() => assertCreationPlanCanGenerate(disabledTampered), /Amazon 主图不得包含营销文字/);
+  const nestedPlan = buildCreationSubmittedPlan({ effectivePlan: JSON.stringify({ ...amazon, effectivePlan: { ...amazon, items: amazon.items.map((item) => ({ ...item, prompt: "unvalidated nested prompt" })) } }) });
+  assert.equal(Object.hasOwn(nestedPlan, "effectivePlan"), false);
+  assert.deepEqual(nestedPlan.items.map((item) => item.prompt), amazon.items.map((item) => item.prompt));
+
   assert.throws(
     () => buildCreationSubmittedPlan({ effectivePlan: "x".repeat(MAX_CREATION_EFFECTIVE_PLAN_BYTES + 1) }),
     /冻结计划.*过大/,
@@ -142,6 +160,14 @@ test("submitted effective plans are bounded, normalized, recounted, and hard-rul
     () => buildCreationSubmittedPlan({ effectivePlan: JSON.stringify({ items: [{ itemId: "broken" }] }) }),
     /缺少.*prompt|冻结计划项/,
   );
+});
+
+test("Local and Worker persist the outer server-validated Creation plan", async () => {
+  const [server, worker] = await Promise.all([readFile(serverPath, "utf8"), readFile(workerPath, "utf8")]);
+  for (const source of [server, worker]) {
+    assert.match(source, /effectivePlan:\s*plan,/);
+    assert.doesNotMatch(source, /effectivePlan:\s*plan\.effectivePlan\s*\|\|\s*plan/);
+  }
 });
 
 test("local and Worker Creation loops resolve and expose parameters inside each item callback", async () => {

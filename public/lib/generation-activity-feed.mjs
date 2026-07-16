@@ -216,6 +216,8 @@ export function upsertGenerationActivityEntry(feed, entry, limit = DEFAULT_GENER
     ...entry,
     key,
     detail: sanitizeGenerationActivityDetail(entry?.detail ?? existing?.detail),
+    generationStartedAt: String(existing?.generationStartedAt || entry?.generationStartedAt || ""),
+    generationCompletedAt: String(existing?.generationCompletedAt || entry?.generationCompletedAt || ""),
     orderAt: String(existing?.orderAt || existing?.at || entry?.orderAt || entry?.at || ""),
   };
   const nextFeed = existing
