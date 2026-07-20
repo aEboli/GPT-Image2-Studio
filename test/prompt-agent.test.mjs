@@ -400,12 +400,14 @@ test("prompt agent request can identify ecommerce creation reference roles", () 
   assert.match(input[0].content[0].text, /product_name/i);
   assert.match(input[0].content[0].text, /main sellable product subject/i);
   assert.match(input[0].content[0].text, /put that subject name in product_name/i);
+  assert.match(input[0].content[0].text, /Do not include brand names in product_name/i);
   assert.ok(requestBody.text.format.schema.required.includes("category_hint"));
   assert.ok(!requestBody.text.format.schema.required.includes("visual_language"));
   assert.equal(requestBody.text.format.schema.properties.visual_language, undefined);
   assert.equal(requestBody.text.format.schema.properties.visual_language_reason, undefined);
   assert.match(input[0].content[0].text, /不要输出视觉语言建议/);
   assert.match(requestBody.text.format.schema.properties.product_name.description, /main sellable product subject/i);
+  assert.match(requestBody.text.format.schema.properties.product_name.description, /Do not include brand names/i);
   assert.ok(requestBody.text.format.schema.properties.reference_roles.items.properties.role.enum.includes("dimensions"));
   assert.ok(requestBody.text.format.schema.properties.reference_roles.items.properties.role.enum.includes("usage"));
   assert.ok(requestBody.text.format.schema.properties.reference_roles.items.properties.role.enum.includes("reference-product"));
@@ -419,8 +421,16 @@ test("prompt agent request can identify ecommerce creation reference roles", () 
     MAX_CREATION_REFERENCE_IMAGES,
   );
   assert.ok(requestBody.text.format.schema.properties.sku_subjects.items.required.includes("subject_unit_count"));
+  assert.ok(requestBody.text.format.schema.properties.sku_subjects.items.required.includes("color_names"));
   assert.equal(requestBody.text.format.schema.properties.sku_subjects.items.properties.subject_unit_count.type, "integer");
   assert.equal(requestBody.text.format.schema.properties.sku_subjects.items.properties.subject_unit_count.minimum, 1);
+  assert.match(input[0].content[0].text, /navy blue versus cyan or sky blue/i);
+  assert.match(input[0].content[0].text, /orange versus red/i);
+  assert.match(input[0].content[0].text, /not the white\/transparent background/i);
+  assert.match(
+    requestBody.text.format.schema.properties.sku_subjects.items.properties.color_names.description,
+    /not the background, overlay text, lighting, or shared neutral trim/i,
+  );
   assert.match(input[0].content[0].text, /dimensions/);
   assert.match(input[0].content[0].text, /role=dimensions/);
   assert.match(input[0].content[0].text, /role=usage/);
@@ -673,9 +683,9 @@ test("prompt agent normalizes creation SKU subject groups", () => {
                 { index: 4, filename: "hooks.png", role: "package", note: "Accessory pack." },
               ],
               sku_subjects: [
-                { id: "blue", title: "Blue lure", reference_indexes: [1], filenames: ["blue.png"], subject_unit_count: 1, note: "Blue sellable subject." },
-                { id: "green", title: "Green lure", reference_indexes: [2], filenames: ["green.png"], subject_unit_count: 1, note: "Green sellable subject." },
-                { id: "red", title: "Red lure", reference_indexes: [3], filenames: ["red.png"], subject_unit_count: 1, note: "Red sellable subject." },
+                { id: "blue", title: "Blue lure", reference_indexes: [1], filenames: ["blue.png"], subject_unit_count: 1, color_names: ["navy blue"], note: "Blue sellable subject." },
+                { id: "green", title: "Green lure", reference_indexes: [2], filenames: ["green.png"], subject_unit_count: 1, color_names: ["green"], note: "Green sellable subject." },
+                { id: "red", title: "Red lure", reference_indexes: [3], filenames: ["red.png"], subject_unit_count: 1, color_names: ["red"], note: "Red sellable subject." },
               ],
               risks: ["Accessory image is not a distinct SKU subject."],
             }),
@@ -686,11 +696,11 @@ test("prompt agent normalizes creation SKU subject groups", () => {
   });
 
   assert.deepEqual(
-    result.sku_subjects.map((subject) => [subject.id, subject.filenames, subject.reference_indexes, subject.subject_unit_count]),
+    result.sku_subjects.map((subject) => [subject.id, subject.filenames, subject.reference_indexes, subject.subject_unit_count, subject.color_names]),
     [
-      ["blue", ["blue.png"], [1], 1],
-      ["green", ["green.png"], [2], 1],
-      ["red", ["red.png"], [3], 1],
+      ["blue", ["blue.png"], [1], 1, ["navy blue"]],
+      ["green", ["green.png"], [2], 1, ["green"]],
+      ["red", ["red.png"], [3], 1, ["red"]],
     ],
   );
 });

@@ -471,3 +471,26 @@ test("creation SKU payload enriches applied subjects from matching reference-pro
   assert.equal(subjects[0].subjectUnitCount, 2);
   assert.deepEqual(subjects[0].referenceIndexes, [1]);
 });
+
+test("creation SKU payload preserves analyzed colors for each distinct subject", () => {
+  const subjects = buildCreationSkuSubjectsForPayload({
+    analysis: {
+      skuSubjects: [
+        { id: "navy", title: "Backpack 1", filenames: ["sku-1.png"], color_names: ["navy blue"] },
+        { id: "cyan", title: "Backpack 2", filenames: ["sku-2.png"], colorNames: ["cyan"] },
+        { id: "orange", title: "Backpack 3", filenames: ["sku-3.png"], color_name: "orange" },
+        { id: "red", title: "Backpack 4", filenames: ["sku-4.png"], colorName: "red" },
+      ],
+    },
+    applied: true,
+    dirty: false,
+    referenceRoles: [
+      { filename: "sku-1.png", role: "product", note: "深蓝色背包主体。" },
+      { filename: "sku-2.png", role: "product", note: "亮蓝色背包主体。" },
+      { filename: "sku-3.png", role: "product", note: "橙色背包主体。" },
+      { filename: "sku-4.png", role: "product", note: "红色背包主体。" },
+    ],
+  });
+
+  assert.deepEqual(subjects.map((subject) => subject.colorName), ["navy blue", "cyan", "orange", "red"]);
+});

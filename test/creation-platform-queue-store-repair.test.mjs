@@ -58,7 +58,9 @@ test("creation manifest preserves strategy metadata, effective counts, and prove
     totalPlannedItemCount: 4,
     items: [
       { itemId: "a", slotIndex: 1, role: "hero", imageType: "amazon-main", prompt: "p", ratio: "1:1", effectiveSize: "2K", targetLanguage: "en" },
-      { itemId: "b", slotIndex: 2, role: "sku", imageType: "sku-item", prompt: "s", ratio: "1:1", effectiveSize: "1.5K", targetLanguage: "en" },
+      { itemId: "b", slotIndex: 2, role: "detail", imageType: "amazon-detail", prompt: "d", ratio: "1:1", effectiveSize: "2K", targetLanguage: "en" },
+      { itemId: "c", slotIndex: 3, role: "sku", imageType: "sku-item", prompt: "s", ratio: "1:1", effectiveSize: "1.5K", targetLanguage: "en" },
+      { itemId: "d", slotIndex: 4, role: "infographic-rebuild", imageType: "infographic-rebuild", prompt: "r", ratio: "1:1", effectiveSize: "2K", targetLanguage: "en" },
     ],
   });
 

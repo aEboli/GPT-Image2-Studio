@@ -12,14 +12,14 @@ import {
 function makeValidDraft(overrides = {}) {
   return {
     title: "2 Pack Blue Fishing Lures Bass Trout Freshwater Swimbait",
-    sellingPoints: ["Bright blue profile helps organize color variants."],
-    painPoints: ["Flat lure movement can be ignored in stained water; the bright profile helps the bait stay noticeable."],
+    sellingPoints: ["Bright blue profile with a stated two-pack quantity."],
+    painPoints: ["Review the stated color variant and pack quantity before purchase."],
     fiveBullets: [
-      "CORE VALUE: 2 Pack 3.5 in size fits common freshwater tackle storage.",
-      "BUILT TO LAST: Blue lure profile supports clear SKU identification.",
-      "REAL-LIFE USE: Compact design works for bass fishing presentations.",
-      "SIZE & FIT: Clear product details keep color, size, and pack information easy to compare.",
-      "PACKAGE SNAPSHOT: Concise wording keeps searchable product terms natural.",
+      "PRODUCT TYPE: Blue fishing lure.",
+      "PACK DETAILS: Two supplied product units.",
+      "VISIBLE DETAILS: Blue profile and stated variant name.",
+      "SPECIFICATIONS: Review the stated size and pack information.",
+      "PACKAGE CONTENTS: Two fishing lure product units.",
     ],
     description: "Blue fishing lure option for US marketplace shoppers.",
     backendSearchTerms: "blue fishing lure bass bait compact lure",
@@ -132,13 +132,12 @@ test("listing agent prompt uses dedicated SEO five-point constraints", async () 
   assert.match(prompt, /search terms/i);
   assert.doesNotMatch(prompt, /place it immediately after quantity/);
   assert.doesNotMatch(prompt, /include every expected size unit/i);
-  assert.match(prompt, /feature \+ buyer outcome/);
-  assert.match(prompt, /fear \+ scene resonance/);
-  assert.match(prompt, /not shopping uncertainty/i);
+  assert.match(prompt, /Attribute-only rule/i);
+  assert.match(prompt, /no public field or zhDisplay field may contain functional/i);
+  assert.match(prompt, /Do not say or imply that the product helps/i);
   assert.match(prompt, /exactly five bullets/);
   assert.match(prompt, /uppercase lead label/i);
-  assert.match(prompt, /BP1.*biggest pain/i);
-  assert.match(prompt, /BP5.*package/i);
+  assert.match(prompt, /PRODUCT TYPE.*PACK DETAILS.*PACKAGE CONTENTS/i);
   assert.match(prompt, /Do not write gift/i);
 });
 
@@ -287,7 +286,7 @@ test("listing agent repairs grouped subject description quantity after retry bud
     return new Response(JSON.stringify({
       output_text: JSON.stringify(makeValidDraft({
         title: "2 Pack Fishing Lure Jointed Swimbait Bass Trout Freshwater Bait",
-        description: "This fishing lure option helps shoppers compare freshwater bait details.",
+        description: "This fishing lure option includes the stated freshwater bait details.",
       })),
     }), { status: 200 });
   };
@@ -329,7 +328,7 @@ test("listing agent repairs grouped subject quantity from Chinese source notes i
     return new Response(JSON.stringify({
       output_text: JSON.stringify(makeValidDraft({
         title: "2 Pack Electric Fishing Lure Jointed Swimbait Bass Trout Freshwater Bait",
-        description: "This electric fishing lure option helps shoppers compare freshwater bait details.",
+        description: "This electric fishing lure option includes the stated freshwater bait details.",
       })),
     }), { status: 200 });
   };
@@ -391,7 +390,7 @@ test("listing agent sends a strict JSON schema request with prompt guardrails", 
   assert.match(calls[0].body.input, /warnings and missingInfo/);
   assert.ok(calls[0].body.text.format.schema.properties.zhDisplay);
   assert.match(calls[0].body.input, /Do not use the phrase "Listing Draft"/);
-  assert.match(calls[0].body.input, /Rufus-friendly/);
+  assert.match(calls[0].body.input, /search-friendly structure/);
   assert.match(calls[0].body.input, /Do not invent material, warranty, certification, compatibility, medical, safety, or performance claims/);
 });
 
@@ -457,12 +456,12 @@ test("listing agent accepts UI-only Chinese display text alongside English publi
     output_text: JSON.stringify(makeValidDraft({
       zhDisplay: {
         title: "2 件 3.5 英寸蓝色路亚鱼饵",
-        sellingPoints: ["亮蓝色外观便于区分颜色变体。"],
-        painPoints: ["减少挑选紧凑型鱼饵颜色时的判断成本。"],
+        sellingPoints: ["亮蓝色外观与已注明的颜色变体。"],
+        painPoints: ["购买前核对颜色变体和包装数量。"],
         fiveBullets: [
-          "2 件 3.5 英寸规格适合常见淡水钓具收纳。",
-          "蓝色鱼饵外观便于识别 SKU。",
-          "紧凑设计适用于鲈鱼钓法展示。",
+          "商品类型：蓝色路亚鱼饵。",
+          "包装信息：2 件商品。",
+          "外观信息：蓝色外观和已注明的 SKU。",
           "商品细节基于已提供信息和 SKU 元数据。",
           "关键词导向文案保持简洁。",
         ],
@@ -578,7 +577,7 @@ test("listing agent retries when public listing fields contain Chinese", async (
   assert.doesNotMatch(visibleDraftText(draft), /[\u3400-\u9fff]/u);
 });
 
-test("listing agent retries when pain points are shopping uncertainty instead of usage problems", async () => {
+test("listing agent retries when any field contains functional wording", async () => {
   const prompts = [];
   let callCount = 0;
   const fetchImpl = async (_url, init) => {
@@ -586,15 +585,13 @@ test("listing agent retries when pain points are shopping uncertainty instead of
     prompts.push(JSON.parse(init.body).input);
     const draft = callCount === 1
       ? makeValidDraft({
-        title: "2 Pack 3.5 in Blue Fishing Lures for Bass",
         painPoints: [
-          "Not sure which color to choose? The parent listing clearly groups blue/silver, yellow/green, and silver/gold options.",
-          "Need size details before buying? The listing states 3.5 in size up front.",
+          "The bright profile helps the bait stay noticeable.",
         ],
       })
       : makeValidDraft({
         painPoints: [
-          "Dead-looking bait can get ignored during slow retrieves; lifelike motion helps create a more natural presentation.",
+          "Review the stated color variant and pack quantity before purchase.",
         ],
       });
     return new Response(JSON.stringify({ output_text: JSON.stringify(draft) }), { status: 200 });
@@ -610,8 +607,8 @@ test("listing agent retries when pain points are shopping uncertainty instead of
   });
 
   assert.equal(callCount, 2);
-  assert.match(prompts[1], /usage-scene problem/);
-  assert.match(draft.painPoints.join("\n"), /Dead-looking bait/);
+  assert.match(prompts[1], /functional or effect wording/i);
+  assert.doesNotMatch(draft.painPoints.join("\n"), /helps|supports|improves/i);
 });
 
 test("listing agent rejects after two invalid listing responses", async () => {
@@ -654,11 +651,11 @@ test("listing agent keeps compound dimensions out of search-focused titles", asy
       output_text: JSON.stringify(makeValidDraft({
         title: "2 Pack Desk Organizer Tray Office Storage Desktop Organizer",
         fiveBullets: [
-          "CORE VALUE: 2 Pack 3.5 x 2 in size keeps quantity and dimensions visible.",
-          "BUILT TO LAST: Compact tray profile supports office storage and desk organization.",
-          "REAL-LIFE USE: Desk-friendly shape fits workstations, shelves, and home office setups.",
-          "SIZE & FIT: Clear dimensions help shoppers check the tray against available space.",
-          "PACKAGE SNAPSHOT: Concise product details keep each bullet focused on the offer.",
+          "PRODUCT TYPE: Desk organizer tray.",
+          "PACK DETAILS: Two supplied product units.",
+          "VISIBLE DETAILS: Compact tray profile and stated color.",
+          "SPECIFICATIONS: Stated dimensions are 3.5 x 2 in.",
+          "PACKAGE CONTENTS: Two desk organizer trays.",
         ],
       })),
     }), { status: 200 });
@@ -781,7 +778,7 @@ test("listing agent retries when title includes size and specification values", 
   assert.doesNotMatch(draft.title, /130\s*mm|35\s*g|hook size|4#/i);
 });
 
-test("generateCreationListingDrafts creates one reviewable V2 parent draft for all SKU variants", async () => {
+test("generateCreationListingDrafts creates one completed V1 parent draft for all SKU variants", async () => {
   const drafts = await generateCreationListingDrafts({
     set: {
       setId: "set-1",
@@ -800,13 +797,113 @@ test("generateCreationListingDrafts creates one reviewable V2 parent draft for a
   });
 
   assert.equal(drafts.length, 1);
-  assert.equal(drafts[0].schemaVersion, "2");
+  assert.equal(drafts[0].schemaVersion, undefined);
   assert.equal(drafts[0].platformId, "universal");
-  assert.equal(drafts[0].status, "needs-review");
-  assert.equal(drafts[0].title, "Fishing Lure");
+  assert.equal(drafts[0].status, "completed");
+  assert.match(drafts[0].title, /^2 Pack Fishing Lure\b/);
   assert.doesNotMatch(drafts[0].title, /8\.89 cm|3\.5 in/i);
   assert.equal(drafts[0].skuSubjectId, "");
-  assert.match(drafts[0].warnings.join("\n"), /not ready to publish/i);
+  assert.ok(drafts[0].fiveBullets.length > 0);
+  assert.ok(drafts[0].description);
+});
+
+test("application Listing generation uses one platform-aware V1 request and removes brand terms", async () => {
+  const calls = [];
+  const draftPayload = {
+    title: "Acme Travel Bottle",
+    sellingPoints: ["Acme portable design"],
+    painPoints: ["Acme bottles can be awkward to carry."],
+    fiveBullets: ["PORTABLE: Acme bottle fits daily travel."],
+    description: "Acme travel bottle for daily hydration.",
+    backendSearchTerms: "Acme travel bottle",
+    keywordBuckets: {
+      exact: ["Acme travel bottle"],
+      longTail: [],
+      traffic: [],
+      descriptive: [],
+    },
+    zhDisplay: {
+      title: "Acme 旅行水瓶",
+      sellingPoints: ["Acme 便携设计"],
+      painPoints: ["Acme 水瓶不便携带。"],
+      fiveBullets: ["便携：Acme 水瓶适合日常旅行。"],
+      description: "Acme 日常补水旅行水瓶。",
+      backendSearchTerms: "Acme 旅行水瓶",
+      keywordBuckets: {
+        exact: ["Acme 旅行水瓶"],
+        longTail: [],
+        traffic: [],
+        descriptive: [],
+      },
+    },
+  };
+
+  const drafts = await generateCreationListingDrafts({
+    set: {
+      setId: "set-platform-v1",
+      platformPolicyId: "etsy",
+      productName: "Acme Travel Bottle",
+      brand: "Acme",
+      productDescription: "Compact travel bottle for daily hydration.",
+    },
+    config: { baseUrl: "https://example.test/v1", apiKey: "test-key", responsesModel: "gpt-5.4" },
+    fetchImpl: async (_url, init) => {
+      calls.push(JSON.parse(init.body));
+      return new Response(JSON.stringify({ output_text: JSON.stringify(draftPayload) }), { status: 200 });
+    },
+  });
+
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].input, /"platformId": "etsy"/);
+  assert.deepEqual(calls[0].text.format.schema.required.sort(), Object.keys(draftPayload).sort());
+  assert.equal(drafts[0].schemaVersion, undefined);
+  assert.equal(drafts[0].status, "completed");
+  assert.doesNotMatch(visibleDraftText(drafts[0]), /Acme/i);
+  assert.doesNotMatch(visibleChineseDisplayText(drafts[0]), /Acme/i);
+  assert.match(drafts[0].fiveBullets[0], /^PRODUCT TYPE:/);
+  assert.doesNotMatch(visibleDraftText(drafts[0]), /portable|fits|hydration/i);
+});
+
+test("application Listing generation falls back after one incomplete response without review", async () => {
+  let requestCount = 0;
+  const drafts = await generateCreationListingDrafts({
+    set: {
+      setId: "set-incomplete-direct",
+      platformPolicyId: "etsy",
+      productName: "Travel Bottle",
+      productDescription: "Compact bottle for daily travel.",
+    },
+    config: { baseUrl: "https://example.test/v1", apiKey: "test-key" },
+    fetchImpl: async () => {
+      requestCount += 1;
+      return new Response(JSON.stringify({
+        output_text: JSON.stringify({
+          title: "Travel Bottle",
+          sellingPoints: [],
+          painPoints: [],
+          fiveBullets: [],
+          description: "",
+          backendSearchTerms: "",
+          keywordBuckets: { exact: [], longTail: [], traffic: [], descriptive: [] },
+          zhDisplay: {
+            title: "旅行水瓶",
+            sellingPoints: [],
+            painPoints: [],
+            fiveBullets: [],
+            description: "",
+            backendSearchTerms: "",
+            keywordBuckets: { exact: [], longTail: [], traffic: [], descriptive: [] },
+          },
+        }),
+      }), { status: 200 });
+    },
+  });
+
+  assert.equal(requestCount, 1);
+  assert.equal(drafts[0].status, "completed");
+  assert.ok(drafts[0].fiveBullets.length > 0);
+  assert.ok(drafts[0].zhDisplay?.fiveBullets.length > 0);
+  assert.ok(drafts[0].backendSearchTerms);
 });
 
 test("generateCreationListingDrafts keeps metric and imperial specs out of mock titles", async () => {
@@ -826,9 +923,9 @@ test("generateCreationListingDrafts keeps metric and imperial specs out of mock 
     mock: true,
   });
 
-  assert.equal(drafts[0].schemaVersion, "2");
-  assert.equal(drafts[0].status, "needs-review");
-  assert.equal(drafts[0].title, "Electric Fishing Lure");
+  assert.equal(drafts[0].schemaVersion, undefined);
+  assert.equal(drafts[0].status, "completed");
+  assert.match(drafts[0].title, /^1 Pack Electric Fishing Lure\b/);
   assert.doesNotMatch(drafts[0].title, /13cm|5\.12 in|42g|1\.48 oz/i);
 });
 
@@ -860,9 +957,9 @@ test("generateCreationListingDrafts uses grouped SKU subject unit count and sear
   });
 
   assert.equal(drafts.length, 1);
-  assert.equal(drafts[0].schemaVersion, "2");
-  assert.equal(drafts[0].status, "needs-review");
-  assert.equal(drafts[0].title, "Electronic Fishing Lure");
+  assert.equal(drafts[0].schemaVersion, undefined);
+  assert.equal(drafts[0].status, "completed");
+  assert.match(drafts[0].title, /^3 Pack Electronic Fishing Lure\b/);
   assert.doesNotMatch(drafts[0].title, /130\s*mm|35\s*g|hook size|4#/i);
   assert.match(drafts[0].backendSearchTerms, /\belectronic fishing lure\b/i);
   assert.deepEqual(drafts[0].keywordBuckets.exact, ["Electronic Fishing Lure"]);
@@ -893,9 +990,9 @@ test("generateCreationListingDrafts honors set-level same-SKU pack counts for gr
   });
 
   assert.equal(drafts.length, 1);
-  assert.equal(drafts[0].schemaVersion, "2");
-  assert.equal(drafts[0].status, "needs-review");
-  assert.equal(drafts[0].title, "Electronic Fishing Lure");
+  assert.equal(drafts[0].schemaVersion, undefined);
+  assert.equal(drafts[0].status, "completed");
+  assert.match(drafts[0].title, /^6 Pack Electronic Fishing Lure\b/);
 });
 
 test("generateCreationListingDrafts uses visible subject unit count for swimbait titles", async () => {
@@ -924,9 +1021,9 @@ test("generateCreationListingDrafts uses visible subject unit count for swimbait
     mock: true,
   });
 
-  assert.equal(drafts[0].schemaVersion, "2");
-  assert.equal(drafts[0].status, "needs-review");
-  assert.equal(drafts[0].title, "Swimbait Lure");
+  assert.equal(drafts[0].schemaVersion, undefined);
+  assert.equal(drafts[0].status, "completed");
+  assert.match(drafts[0].title, /^4 Pack Swimbait Lure\b/);
   assert.doesNotMatch(drafts[0].title, /160\s*mm|50\.4\s*g|hook size|#2|6\.3 in|1\.78 oz/i);
 });
 
@@ -963,9 +1060,9 @@ test("generateCreationListingDrafts writes mixed grouped SKU quantities as slash
   });
 
   assert.equal(drafts.length, 1);
-  assert.equal(drafts[0].schemaVersion, "2");
-  assert.equal(drafts[0].status, "needs-review");
-  assert.equal(drafts[0].title, "Electronic Fishing Lure");
+  assert.equal(drafts[0].schemaVersion, undefined);
+  assert.equal(drafts[0].status, "completed");
+  assert.match(drafts[0].title, /^2 Pack \/ 3 Pack Electronic Fishing Lure\b/);
 });
 
 test("mock listing drafts describe grouped two-unit subjects", () => {
@@ -1083,7 +1180,7 @@ test("mock listing draft uses product-facing copy instead of internal template c
   assert.match(draft.title, /^1 Pack First Aid Kit\b/);
   assert.doesNotMatch(draft.title, /8cm|3\.15 in/i);
   assert.match(publicText, /\bFirst Aid Kit\b/);
-  assert.match(publicText, /\b(?:home|travel|emergency|compact|portable|quick access)\b/i);
+  assert.match(publicText, /\b(?:pack|size|option|dimensions|variant|package)\b/i);
   assert.doesNotMatch(
     publicText,
     /\b(?:Provided product attributes|searchable copy|shopper-ready language|Sellers often struggle|Product details are based on provided inputs|Keyword structure combines|product listing searchable variant comparison|sku specific)\b/i,

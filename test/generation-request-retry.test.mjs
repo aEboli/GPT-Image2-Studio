@@ -70,6 +70,20 @@ test("generation stream waits five seconds before retrying request failures", as
   assert.equal(job.requestRetryCount, 1);
 });
 
+test("generation stream preserves a JSON API error instead of replacing it with a generic message", async () => {
+  await assert.rejects(
+    requestGenerationStream("/api/portrait/generate", {
+      body: new FormData(),
+      fetchImpl: async () =>
+        new Response(JSON.stringify({ message: "请先上传人物参考图。" }), {
+          status: 400,
+          headers: { "content-type": "application/json" },
+        }),
+    }),
+    /请先上传人物参考图/,
+  );
+});
+
 test("generation request retry stops after two retries without surfacing a user-facing error", () => {
   const plan = getGenerationRequestRetryPlan({
     error: new TypeError("Failed to fetch"),

@@ -69,6 +69,43 @@ test("creation store normalizes set manifests with output URLs and item ordering
   assert.deepEqual(manifest.items[0].conversionIntent, { conversionGoal: "建立首图识别" });
 });
 
+test("creation store reconciles saved counts with actual plan items", () => {
+  const manifest = normalizeCreationSetManifest({
+    setId: "creation-set-stale-counts",
+    imageCount: 10,
+    carouselImageCount: 10,
+    skuImageCount: 7,
+    infographicRebuildCount: 6,
+    totalPlannedItemCount: 23,
+    effectivePlan: {
+      imageCount: 10,
+      carouselImageCount: 10,
+      skuImageCount: 7,
+      infographicRebuildCount: 6,
+      totalPlannedItemCount: 23,
+      items: [
+        { itemId: "rebuild", slotIndex: 1, role: "infographic-rebuild", itemKind: "infographic-rebuild" },
+        { itemId: "sku", slotIndex: 2, role: "sku", itemKind: "sku" },
+      ],
+    },
+    items: [
+      { itemId: "rebuild", slotIndex: 1, role: "infographic-rebuild", itemKind: "infographic-rebuild" },
+      { itemId: "sku", slotIndex: 2, role: "sku", itemKind: "sku" },
+    ],
+  });
+
+  assert.equal(manifest.imageCount, 0);
+  assert.equal(manifest.carouselImageCount, 0);
+  assert.equal(manifest.skuImageCount, 1);
+  assert.equal(manifest.infographicRebuildCount, 1);
+  assert.equal(manifest.totalPlannedItemCount, 2);
+  assert.equal(manifest.effectivePlan.imageCount, 0);
+  assert.equal(manifest.effectivePlan.carouselImageCount, 0);
+  assert.equal(manifest.effectivePlan.skuImageCount, 1);
+  assert.equal(manifest.effectivePlan.infographicRebuildCount, 1);
+  assert.equal(manifest.effectivePlan.totalPlannedItemCount, 2);
+});
+
 test("creation store preserves scenario image count and reference image metadata", () => {
   const manifest = normalizeCreationSetManifest(
     {
@@ -111,6 +148,7 @@ test("creation store preserves scenario image count and reference image metadata
   assert.equal(manifest.dimensionSpecs, "高 14.5 cm\n容量 350 ml");
   assert.equal(manifest.dimensionUnitMode, "both");
   assert.equal(manifest.imageCount, 6);
+  assert.equal(manifest.skuGenerationEnabled, true);
   assert.deepEqual(manifest.selectedRoles, ["hero", "benefit", "comparison"]);
   assert.deepEqual(manifest.referenceImageNames, ["product-front.png", "package.png"]);
   assert.deepEqual(
@@ -220,6 +258,7 @@ test("creation store preserves infographic rebuild setting and source metadata",
     {
       setId: "creation-set-infographic",
       productName: "Infographic rebuild product",
+      skuGenerationEnabled: false,
       infographicRebuildEnabled: true,
       createdAt: "2026-05-05T09:00:00.000Z",
       status: "partial_failed",
@@ -245,6 +284,7 @@ test("creation store preserves infographic rebuild setting and source metadata",
     { publicBasePath: "/output" },
   );
 
+  assert.equal(manifest.skuGenerationEnabled, false);
   assert.equal(manifest.infographicRebuildEnabled, true);
   assert.deepEqual(manifest.items[0].sourceInfographic, {
     filename: "size-chart.jpg",

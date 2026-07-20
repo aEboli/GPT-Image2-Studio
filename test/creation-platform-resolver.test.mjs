@@ -17,6 +17,12 @@ test("canonical Creation platform resolver module is available", () => {
 
 const resolverTest = (name, fn) => test(name, { skip: !resolver }, fn);
 
+const CANONICAL_PLATFORM_IDS = [
+  "universal", "amazon", "tmall-taobao", "jd", "pdd", "douyin", "xiaohongshu", "temu",
+  "tiktok-shop", "shopee", "lazada", "etsy", "ebay", "walmart", "shopify", "aliexpress",
+  "rakuten", "coupang", "mercado-libre",
+];
+
 function fullAmazonEvidence() {
   return {
     dimensions: true,
@@ -187,29 +193,54 @@ resolverTest("category substitutions are deterministic and do not duplicate imag
     {
       category: "apparel",
       evidence: { dimensions: true, packageContents: true },
-      expected: ["generic-hero", "benefit-proof", "lifestyle-first", "scale-proof", "detail-macro", "dimension-fit", "in-box", "clean-product-proof"],
+      expectedImageType: "scale-proof",
+      replacedImageType: "multi-angle",
     },
     {
       category: "electronics",
       evidence: { dimensions: true, specifications: true, packageContents: true },
-      expected: ["generic-hero", "benefit-proof", "spec-table", "multi-angle", "detail-macro", "dimension-fit", "in-box", "clean-product-proof"],
+      expectedImageType: "spec-table",
     },
     {
       category: "food",
       evidence: { dimensions: true, materials: true, packageContents: true },
-      expected: ["generic-hero", "benefit-proof", "lifestyle-first", "material-proof", "detail-macro", "dimension-fit", "in-box", "clean-product-proof"],
+      expectedImageType: "material-proof",
     },
     {
       categorySignals: ["condition"],
       evidence: { dimensions: true, condition: true, packageContents: true },
-      expected: ["generic-hero", "benefit-proof", "condition-proof", "multi-angle", "detail-macro", "dimension-fit", "in-box", "clean-product-proof"],
+      expectedImageType: "condition-proof",
+      replacedImageType: "multi-angle",
     },
   ];
 
   for (const input of cases) {
     const plan = resolver.resolveCreationPlatformPlan({ platform: "universal", ...input });
-    assert.deepEqual(plan.items.map((item) => item.imageType), input.expected);
-    assert.equal(new Set(plan.items.map((item) => item.imageType)).size, plan.items.length);
+    const repeated = resolver.resolveCreationPlatformPlan({ platform: "universal", ...input });
+    const imageTypes = plan.items.map((item) => item.imageType);
+    assert.equal(plan.carouselImageCount, 18);
+    assert.deepEqual(imageTypes, repeated.items.map((item) => item.imageType));
+    assert.ok(imageTypes.includes(input.expectedImageType));
+    if (input.replacedImageType) assert.equal(imageTypes.includes(input.replacedImageType), false);
+    assert.equal(new Set(imageTypes).size, plan.items.length);
+  }
+});
+
+resolverTest("every canonical platform keeps one size-related slot without dimension evidence", () => {
+  for (const platform of CANONICAL_PLATFORM_IDS) {
+    const plan = resolver.resolveCreationPlatformPlan({ platform });
+    const sizeItems = plan.items.filter((item) => (
+      item.role === "size-capacity-fit" && ["dimension-fit", "scale-proof"].includes(item.imageType)
+    ));
+
+    assert.equal(sizeItems.length, 1, platform);
+    assert.ok(
+      !plan.warnings.some((warning) => (
+        warning.slotKey === sizeItems[0].slotKey &&
+        ["missing-evidence-slot-omitted", "missing-evidence-slot-replaced"].includes(warning.code)
+      )),
+      `${platform} must not evidence-fallback its size slot`,
+    );
   }
 });
 
@@ -267,11 +298,11 @@ resolverTest("variant carousel slot stays distinct from deduplicated appended SK
 
   assert.ok(plan.items.some((item) => item.imageType === "variant-comparison" && item.itemKind === "carousel"));
   assert.deepEqual(plan.skuSubjectIds, ["red", "blue"]);
-  assert.equal(plan.carouselImageCount, 8);
-  assert.equal(plan.imageCount, 8);
+  assert.equal(plan.carouselImageCount, 18);
+  assert.equal(plan.imageCount, 18);
   assert.equal(plan.skuImageCount, 2);
   assert.equal(plan.infographicRebuildCount, 1);
-  assert.equal(plan.totalPlannedItemCount, 11);
+  assert.equal(plan.totalPlannedItemCount, 21);
 });
 
 resolverTest("set and item enablement or ordering overrides derive final carousel counts", () => {
@@ -284,12 +315,12 @@ resolverTest("set and item enablement or ordering overrides derive final carouse
     itemOverrides: [
       { slotKey: "universal:benefit-proof", order: 0, textPolicy: "factual-short" },
       { slotKey: "universal:generic-hero", order: 1 },
-      { slotKey: "universal:lifestyle-first", enabled: false },
+      { slotKey: "universal:scene-application", enabled: false },
     ],
   });
 
-  assert.deepEqual(plan.slots.map((item) => item.imageType), ["benefit-proof", "generic-hero", "lifestyle-first", "multi-angle"]);
-  assert.equal(plan.slots.find((item) => item.imageType === "lifestyle-first").enabled, false);
+  assert.deepEqual(plan.slots.map((item) => item.imageType), ["benefit-proof", "generic-hero", "scene-application", "multi-angle"]);
+  assert.equal(plan.slots.find((item) => item.imageType === "scene-application").enabled, false);
   assert.equal(plan.items.length, 3);
   assert.equal(plan.items[0].textPolicy, "factual-short");
   assert.equal(plan.carouselImageCount, 3);
@@ -348,7 +379,7 @@ resolverTest("disabled slots remain addressable and can be enabled again", () =>
   assert.equal(enabledAgain.slots.find((slot) => slot.slotKey === "amazon:benefit-proof")?.enabled, true);
 });
 
-resolverTest("set image-count override can extend a shorter platform plan to existing large presets", () => {
+resolverTest("set image-count override is capped at the canonical platform slot count", () => {
   const plan = resolver.resolveCreationPlatformPlan({
     platform: "amazon",
     evidence: fullAmazonEvidence(),
@@ -356,15 +387,20 @@ resolverTest("set image-count override can extend a shorter platform plan to exi
     setOverrides: { imageCount: 18 },
   });
 
-  assert.equal(plan.slots.length, 18);
-  assert.equal(plan.carouselImageCount, 18);
-  assert.equal(plan.imageCount, 18);
+  assert.equal(plan.slots.length, 7);
+  assert.equal(plan.carouselImageCount, 7);
+  assert.equal(plan.imageCount, 7);
   assert.equal(plan.items[0].imageType, "amazon-main");
-  assert.equal(new Set(plan.items.map((item) => item.imageType)).size, 18);
-  assert.ok(plan.items.slice(7).every((item) => item.slotKey.startsWith("amazon:extra:")));
+  assert.equal(plan.items.some((item) => item.imageType === "custom"), false);
+  assert.equal(plan.setOverrides.imageCount, 7);
+  assert.ok(plan.warnings.some((warning) => (
+    warning.code === "image-count-extension-limited" &&
+    warning.requestedCount === 18 &&
+    warning.effectiveCount === 7
+  )));
 });
 
-resolverTest("explicit Amazon image-count 18 is honored without product evidence", () => {
+resolverTest("explicit Amazon image-count 18 is capped without custom slots", () => {
   const selectedRoles = [
     "hero", "benefit", "scene", "multi-angle", "product-detail", "size-capacity-fit",
     "accessory-gift", "series-showcase", "usage-suggestion", "ingredient-material",
@@ -377,18 +413,13 @@ resolverTest("explicit Amazon image-count 18 is honored without product evidence
     setOverrides: { imageCount: 18 },
   });
 
-  assert.equal(plan.carouselImageCount, 18);
-  assert.equal(plan.imageCount, 18);
-  assert.equal(plan.items.length, 18);
-  assert.equal(new Set(plan.items.map((item) => item.slotKey)).size, 18);
-  assert.deepEqual(plan.items.map((item) => item.role), selectedRoles);
-  assert.ok(plan.items.slice(13).every((item) => (
-    item.imageType === "custom" &&
-    item.enabled === true &&
-    item.advisory === true &&
-    item.constraints.length === 0
-  )));
-  assert.ok(!plan.warnings.some((warning) => warning.code === "image-count-extension-limited"));
+  assert.equal(plan.carouselImageCount, 7);
+  assert.equal(plan.imageCount, 7);
+  assert.equal(plan.items.length, 7);
+  assert.equal(new Set(plan.items.map((item) => item.slotKey)).size, 7);
+  assert.deepEqual(plan.items.map((item) => item.role), selectedRoles.slice(0, 7));
+  assert.equal(plan.items.some((item) => item.imageType === "custom"), false);
+  assert.ok(plan.warnings.some((warning) => warning.code === "image-count-extension-limited"));
 });
 
 resolverTest("applied reference roles rebuild coverage and evidence for material package and dimensions", () => {
@@ -422,7 +453,7 @@ resolverTest("applied reference roles rebuild coverage and evidence for material
   }
 });
 
-resolverTest("Temu 16 and universal 18 custom extensions use role-led advisory defaults", () => {
+resolverTest("Temu is capped while universal keeps 18 canonical slots without custom extensions", () => {
   const selectedRoles = [
     "hero", "benefit", "scene", "multi-angle", "product-detail", "size-capacity-fit",
     "accessory-gift", "series-showcase", "usage-suggestion", "ingredient-material",
@@ -430,21 +461,24 @@ resolverTest("Temu 16 and universal 18 custom extensions use role-led advisory d
     "human-wearable", "brand-story", "after-sales",
   ];
 
-  for (const [platform, imageCount] of [["temu", 16], ["universal", 18]]) {
-    const plan = resolver.resolveCreationPlatformPlan({
-      platform,
-      selectedRoles: selectedRoles.slice(0, imageCount),
-      setOverrides: { imageCount },
-    });
-    const customItems = plan.items.filter((item) => item.imageType === "custom");
+  const temu = resolver.resolveCreationPlatformPlan({
+    platform: "temu",
+    selectedRoles: selectedRoles.slice(0, 16),
+    setOverrides: { imageCount: 16 },
+  });
+  assert.ok(temu.carouselImageCount <= 8);
+  assert.equal(temu.items.some((item) => item.imageType === "custom"), false);
+  assert.ok(temu.warnings.some((warning) => warning.code === "image-count-extension-limited"));
 
-    assert.ok(customItems.length >= 4, platform);
-    assert.ok(customItems.every((item) => item.advisory === true), platform);
-    assert.ok(customItems.every((item) => item.constraints.length === 0), platform);
-    assert.ok(customItems.every((item) => item.composition !== "single-product-or-alt-angle"), platform);
-    assert.ok(customItems.every((item) => item.textPolicy !== "none"), platform);
-    assert.ok(new Set(customItems.map((item) => `${item.composition}|${item.textPolicy}|${item.scenePolicy}`)).size > 1, platform);
-  }
+  const universal = resolver.resolveCreationPlatformPlan({
+    platform: "universal",
+    selectedRoles,
+    setOverrides: { imageCount: 18 },
+  });
+  assert.equal(universal.carouselImageCount, 18);
+  assert.deepEqual(universal.items.map((item) => item.role), selectedRoles);
+  assert.equal(universal.items.some((item) => item.imageType === "custom"), false);
+  assert.equal(universal.warnings.some((warning) => warning.code === "image-count-extension-limited"), false);
 });
 
 resolverTest("manual custom conversion clears inherited platform policy before applying role defaults", () => {

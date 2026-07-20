@@ -99,6 +99,9 @@ test("creation suite queue builds a complete queued set from current form state"
         role: "hero",
         itemKind: "carousel",
         prompt: "Frozen prompt",
+        ratio: "4:3",
+        resolutionTier: "2048x1536",
+        targetLanguage: "en",
         conversionIntent: { conversionGoal: "recognition" },
       }],
     }),
@@ -147,8 +150,54 @@ test("creation suite queue builds a complete queued set from current form state"
   assert.equal(set.skuBundleCount, 2);
   assert.equal(set.items[0].status, "queued");
   assert.equal(set.items[0].prompt, "Frozen prompt");
+  assert.equal(set.items[0].ratio, "4:3");
+  assert.equal(set.items[0].resolutionTier, "2048x1536");
+  assert.equal(set.items[0].targetLanguage, "en");
   assert.equal(set.items[0].conversionIntent.conversionGoal, "recognition");
   assert.equal(set.effectivePlan.effectiveAudienceStrategy.targetAudience, "comparison-focused buyers");
+});
+
+test("creation suite queue reads the editable draft while another set is generating", () => {
+  const draftSet = {
+    setId: "creation-draft-next",
+    infographicRebuildEnabled: false,
+    items: [{ itemId: "draft-hero", role: "hero", prompt: "Next draft prompt" }],
+  };
+  const set = buildCreationQueuedSet({
+    buildCreationReferenceRolePayload: () => [],
+    buildCreationSkuSubjectPayload: () => [],
+    createdAt: "2026-07-17T08:00:00.000Z",
+    creationState: { generating: true },
+    formatCreationDimensionUnitModeLabel: (value) => value,
+    getCreationCurrentSet: () => ({ setId: "active-18", items: Array.from({ length: 18 }) }),
+    getCreationDraftSet: () => draftSet,
+    getCreationLogoPayload: () => null,
+    getCreationPreviewSlots: () => [{ itemId: "fallback", role: "hero" }],
+    getCreationSelectedDimensionUnitMode: () => "both",
+    getCreationSelectedImageCount: () => 1,
+    getCreationSelectedIndustryTemplate: () => ({ value: "general", label: "General" }),
+    getCreationSelectedLanguage: () => ({ value: "en", label: "English" }),
+    getCreationSelectedPlatform: () => ({ value: "universal", label: "通用电商" }),
+    getCreationSelectedRoles: () => ["hero"],
+    getCreationSelectedScenario: () => ({ value: "standard", label: "Standard" }),
+    isCreationDraftSet: (set) => set?.setId?.startsWith("creation-draft-"),
+    normalizeCreationSkuBundleCountForPayload: Number,
+    normalizeCreationVisualLanguage: (value) => value || "classic-commercial",
+    normalizeSet,
+    productDescription: "Next description",
+    productName: "Next product",
+    refs: {
+      creationDimensionSpecsInput: { value: "" },
+      creationInfographicRebuildEnabledInput: { checked: false },
+      creationSkuBundleCountInput: { value: "1" },
+      creationVisualLanguageInput: { value: "classic-commercial" },
+    },
+    sellingPoints: [],
+  });
+
+  assert.equal(set.items.length, 1);
+  assert.equal(set.items[0].prompt, "Next draft prompt");
+  assert.notEqual(set.setId, "active-18");
 });
 
 test("creation suite queue appends SKU preview cards to queued sets", () => {
@@ -229,7 +278,7 @@ test("creation suite queue defaults SKU rule to color-name labels when no getter
   assert.equal(set.skuGenerationRuleLabel, "主体下方显示颜色名");
 });
 
-test("creation suite queue defaults infographic rebuild on and appends queued rebuild cards", () => {
+test("creation suite queue appends queued rebuild cards when enabled", () => {
   const referenceRoles = [
     { filename: "subject-a.jpg", role: "product", roleLabel: "Subject" },
     { filename: "subject-b.jpg", role: "reference-product", roleLabel: "Subject reference" },
@@ -265,6 +314,7 @@ test("creation suite queue defaults infographic rebuild on and appends queued re
     productName: "Queued product",
     refs: {
       creationDimensionSpecsInput: { value: "" },
+      creationInfographicRebuildEnabledInput: { checked: true },
       creationSkuBundleCountInput: { value: "1" },
       creationVisualLanguageInput: { value: "classic-commercial" },
     },
@@ -287,7 +337,7 @@ test("creation suite queue defaults infographic rebuild on and appends queued re
   assert.deepEqual(set.items[4].referenceImageNames, ["subject-a.jpg", "subject-b.jpg", "steps.jpg"]);
 });
 
-test("creation suite queue omits queued infographic rebuild cards when disabled", () => {
+test("creation suite queue defaults infographic rebuild off", () => {
   const set = buildCreationQueuedSet({
     buildCreationReferenceRolePayload: () => [
       { filename: "subject.jpg", role: "product" },
@@ -316,7 +366,6 @@ test("creation suite queue omits queued infographic rebuild cards when disabled"
     productName: "Queued product",
     refs: {
       creationDimensionSpecsInput: { value: "" },
-      creationInfographicRebuildEnabledInput: { checked: false },
       creationSkuBundleCountInput: { value: "1" },
       creationVisualLanguageInput: { value: "classic-commercial" },
     },
@@ -324,6 +373,44 @@ test("creation suite queue omits queued infographic rebuild cards when disabled"
   });
 
   assert.equal(set.infographicRebuildEnabled, false);
+  assert.deepEqual(set.items.map((item) => item.role), ["hero"]);
+});
+
+test("creation suite queue omits appended SKU cards when disabled", () => {
+  const set = buildCreationQueuedSet({
+    buildCreationReferenceRolePayload: () => [{ filename: "sku-a.jpg", role: "product" }],
+    buildCreationSkuSubjectPayload: () => [{ id: "sku-a", title: "SKU A", filenames: ["sku-a.jpg"] }],
+    createdAt: "2026-05-26T08:00:00.000Z",
+    creationState: { generating: true },
+    formatCreationDimensionUnitModeLabel: (value) => `Unit ${value}`,
+    formatCreationVisualLanguageLabel: (value) => `Visual ${value}`,
+    getCreationCurrentSet: () => null,
+    getCreationLogoPayload: () => null,
+    getCreationPreviewSlots: () => [{ itemId: "hero", role: "hero", title: "Hero" }],
+    getCreationSelectedDimensionUnitMode: () => "both",
+    getCreationSelectedImageCount: () => 1,
+    getCreationSelectedIndustryTemplate: () => ({ value: "general", label: "General", categoryPath: "" }),
+    getCreationSelectedLanguage: () => ({ value: "en", label: "English" }),
+    getCreationSelectedRoles: () => ["hero"],
+    getCreationSelectedScenario: () => ({ value: "standard", label: "Standard" }),
+    getCreationSelectedSkuGenerationRule: () => ({ value: "none", label: "None" }),
+    isCreationDraftSet: () => false,
+    normalizeCreationSkuBundleCountForPayload: (value) => Number(value),
+    normalizeCreationVisualLanguage: (value) => value || "classic-commercial",
+    normalizeSet,
+    productDescription: "Description",
+    productName: "Queued product",
+    refs: {
+      creationDimensionSpecsInput: { value: "" },
+      creationSkuGenerationEnabledInput: { checked: false },
+      creationSkuBundleCountInput: { value: "1" },
+      creationVisualLanguageInput: { value: "classic-commercial" },
+    },
+    sellingPoints: [],
+  });
+
+  assert.equal(set.skuGenerationEnabled, false);
+  assert.equal(set.skuSubjects.length, 1);
   assert.deepEqual(set.items.map((item) => item.role), ["hero"]);
 });
 
@@ -476,6 +563,7 @@ test("creation suite queue keeps draft infographic rebuild items without changin
     productName: "Queued product",
     refs: {
       creationDimensionSpecsInput: { value: "" },
+      creationInfographicRebuildEnabledInput: { checked: true },
       creationSkuBundleCountInput: { value: "1" },
       creationVisualLanguageInput: { value: "classic-commercial" },
     },
@@ -659,6 +747,28 @@ test("creation suite queue syncs repaired sets back into matching completed queu
   assert.equal(creationState.queue[0].set.items[0].error, "");
 });
 
+test("creation suite queue syncs a stable set id without overwriting another active job", () => {
+  const creationState = {
+    activeQueueId: "job-1",
+    queue: [
+      { id: "job-1", status: "running", set: { setId: "set-18", items: Array.from({ length: 18 }, (_, index) => ({ itemId: `item-18-${index}` })) } },
+      { id: "job-2", status: "running", set: { setId: "set-4", items: Array.from({ length: 4 }, (_, index) => ({ itemId: `item-4-${index}` })) } },
+    ],
+  };
+
+  syncActiveCreationQueueSet(
+    creationState,
+    { setId: "set-4", items: Array.from({ length: 4 }, (_, index) => ({ itemId: `updated-4-${index}` })) },
+    normalizeSet,
+  );
+
+  assert.equal(creationState.queue[0].set.setId, "set-18");
+  assert.equal(creationState.queue[0].set.items.length, 18);
+  assert.equal(creationState.queue[1].set.setId, "set-4");
+  assert.equal(creationState.queue[1].set.items.length, 4);
+  assert.equal(creationState.queue[1].set.items[0].itemId, "updated-4-0");
+});
+
 test("creation suite queue selection previews queued sets without replacing the active draft", () => {
   const draftSet = {
     setId: "creation-draft-active",
@@ -743,7 +853,7 @@ test("creation suite queue selection switches a queue-backed current set", () =>
 });
 
 test("creation suite queue keeps the selected panel during another job lifecycle", async () => {
-  async function runCase({ fetchImpl, runCreationStream = async () => {} } = {}) {
+  async function runCase({ fetchImpl, runCreationStream } = {}) {
     const selectedSet = { setId: "set-b", productName: "B", items: [] };
     const activeJob = {
       id: "queue-a",
@@ -760,6 +870,14 @@ test("creation suite queue keeps the selected panel during another job lifecycle
       selectedQueueId: "queue-b",
     };
 
+    const streamRunner = runCreationStream || (async (_response, context) => {
+      activeJob.set = normalizeSet({
+        ...activeJob.set,
+        status: "completed",
+        items: activeJob.set.items.map((item) => ({ ...item, status: "completed" })),
+      });
+      await context.onEventHandled("complete", { set: activeJob.set });
+    });
     await runCreationQueuedJob(activeJob, {
       creationState,
       compactErrorMessage: (message) => message,
@@ -768,7 +886,7 @@ test("creation suite queue keeps the selected panel during another job lifecycle
       normalizeSet,
       nowIso: () => "2026-07-12T08:00:00.000Z",
       render: () => {},
-      runCreationStream,
+      runCreationStream: streamRunner,
       setFeedback: () => {},
       showError: () => {},
     });
@@ -793,6 +911,81 @@ test("creation suite queue keeps the selected panel during another job lifecycle
   });
   assert.equal(failed.activeJob.status, "failed");
   assert.equal(failed.creationState.currentSet.setId, "set-b");
+});
+
+test("creation suite queue does not convert an SSE error into completion", async () => {
+  const job = {
+    id: "queue-error",
+    status: "queued",
+    formData: "body",
+    set: { setId: "set-error", items: [{ itemId: "hero", status: "queued" }] },
+  };
+  const creationState = {
+    activeQueueId: "",
+    currentSet: job.set,
+    generating: false,
+    generationScope: "",
+    queue: [job],
+    selectedQueueId: job.id,
+  };
+
+  await runCreationQueuedJob(job, {
+    creationState,
+    compactErrorMessage: (message) => message,
+    fetchImpl: async () => ({ ok: true, body: {} }),
+    loadCreationSets: async () => {},
+    normalizeSet,
+    nowIso: () => "2026-07-18T08:00:00.000Z",
+    render: () => {},
+    runAutoRepairIfNeeded: async () => false,
+    runCreationStream: async (_response, context) => {
+      job.set = normalizeSet({
+        ...job.set,
+        status: "failed",
+        items: job.set.items.map((item) => ({ ...item, status: "failed", error: "upstream failed" })),
+      });
+      await context.onEventHandled("error", { message: "upstream failed" });
+    },
+    setFeedback: () => {},
+    showError: () => {},
+  });
+
+  assert.equal(job.status, "failed");
+  assert.equal(job.set.status, "failed");
+  assert.equal(job.set.items[0].status, "failed");
+});
+
+test("creation suite queue treats an SSE stream without a terminal event as interrupted", async () => {
+  const job = {
+    id: "queue-interrupted",
+    status: "queued",
+    formData: "body",
+    set: { setId: "set-interrupted", items: [{ itemId: "hero", status: "queued" }] },
+  };
+  const creationState = {
+    activeQueueId: "",
+    currentSet: job.set,
+    generating: false,
+    generationScope: "",
+    queue: [job],
+    selectedQueueId: job.id,
+  };
+
+  await runCreationQueuedJob(job, {
+    creationState,
+    compactErrorMessage: (message) => message,
+    fetchImpl: async () => ({ ok: true, body: {} }),
+    loadCreationSets: async () => {},
+    normalizeSet,
+    nowIso: () => "2026-07-18T08:00:00.000Z",
+    render: () => {},
+    runCreationStream: async () => {},
+    setFeedback: () => {},
+    showError: () => {},
+  });
+
+  assert.equal(job.status, "failed");
+  assert.equal(job.set.status, "failed");
 });
 
 test("creation suite queue resolves repair target from selected queue instead of current active set", () => {
@@ -833,7 +1026,6 @@ test("creation suite queue schedules queued sets serially", async () => {
     activeQueueId: "",
     autoRepairAttemptCount: 2,
     currentSet: null,
-    editingItemId: "hero",
     generating: false,
     generationScope: "",
     queue: [],
@@ -885,13 +1077,20 @@ test("creation suite queue schedules queued sets serially", async () => {
     render: () => {
       renderCount += 1;
     },
-    runCreationStream: async (response) => {
+    runCreationStream: async (response, options) => {
       streamBodies.push(response.body);
       if (response.body === "first-body") {
         await firstStreamDone;
       } else if (response.body === "second-body") {
         await secondStreamDone;
       }
+      const job = options.queueJob;
+      job.set = normalizeSet({
+        ...job.set,
+        status: "completed",
+        items: job.set.items.map((item) => ({ ...item, status: "completed" })),
+      });
+      await options.onEventHandled("complete", { set: job.set });
     },
     setFeedback: () => {},
     showError: () => {},
@@ -944,7 +1143,6 @@ test("creation suite queue starts the next suite when a running suite frees item
     activeQueueId: "queue-a",
     autoRepairAttemptCount: 0,
     currentSet: null,
-    editingItemId: "",
     generating: true,
     generationScope: "full",
     queue: [
@@ -991,6 +1189,12 @@ test("creation suite queue starts the next suite when a running suite frees item
     render: () => {},
     runCreationStream: async (_response, options) => {
       streamOptions.push(options);
+      options.queueJob.set = normalizeSet({
+        ...options.queueJob.set,
+        status: "completed",
+        items: options.queueJob.set.items.map((item) => ({ ...item, status: "completed" })),
+      });
+      await options.onEventHandled("complete", { set: options.queueJob.set });
     },
     setFeedback: () => {},
     showError: () => {},

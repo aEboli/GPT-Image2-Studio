@@ -95,6 +95,7 @@ import {
   resolveCreationItemGenerationParameters,
 } from "./lib/creation-generation-parameters.mjs";
 import { buildCreationGenerationSnapshot } from "./lib/creation-generation-snapshot.mjs";
+import { resolveCreationPlanCounts } from "./lib/creation-plan-counts.mjs";
 import {
   CREATION_REFERENCE_ANALYSIS_MODE,
   PORTRAIT_REFERENCE_ANALYSIS_MODE,
@@ -159,8 +160,8 @@ function buildPortraitReferenceImageLabels(personReferenceImages = [], actionRef
   ];
 }
 const GENERATION_MODES = new Set(["style-transfer", "reference-analysis", IMAGE_DECOMPOSITION_MODE, QUICK_BLEND_MODE, IMAGE_EDIT_MODE, "portrait"]);
-const SERVER_IMAGE_BUCKET_MISSING_MESSAGE = "鏈嶅姟鍣ㄥ浘鐗囧瓨鍌ㄦ湭閰嶇疆 IMAGE_BUCKET";
-const GENERATION_QUEUE_MISSING_MESSAGE = "鏈嶅姟鍣ㄥ紓姝ョ敓鎴愰槦鍒楁湭閰嶇疆 GENERATION_QUEUE";
+const SERVER_IMAGE_BUCKET_MISSING_MESSAGE = "服务端图片存储未配置 IMAGE_BUCKET";
+const GENERATION_QUEUE_MISSING_MESSAGE = "服务端异步生成队列未配置 GENERATION_QUEUE";
 const DEFAULT_CREATION_LISTING_REASONING_EFFORT = "medium";
 const CREATION_REFERENCE_ANALYSIS_REASONING_EFFORT = "low";
 const PORTRAIT_REFERENCE_ANALYSIS_REASONING_EFFORT = "low";
@@ -361,7 +362,7 @@ function normalizeReasoningEffort(value, fallback = DEFAULT_REASONING_EFFORT) {
     return fallback;
   }
   if (!REASONING_EFFORT_OPTIONS.includes(normalized)) {
-    throw new Error(`涓嶆敮鎸佺殑鎺ㄧ悊寮哄害: ${normalized}`);
+    throw new Error(`不支持的推理强度: ${normalized}`);
   }
   return normalized;
 }
@@ -415,7 +416,7 @@ function normalizePrivateConfig(
     (!allowDirectImageRoute || !generationConfig.apiKey) &&
     (!allowDirectTextVisionRoute || !textVisionConfig.apiKey)
   ) {
-    throw new Error("褰撳墠娴忚鍣ㄦ湭淇濆瓨 API Key锛岃鍏堝湪閰嶇疆涓繚瀛樸€?");
+    throw new Error("当前浏览器未保存 API Key，请先在配置中保存。");
   }
 
   return {
@@ -2370,6 +2371,7 @@ function getCloudCreationSetStatus(items) {
 }
 
 function buildCloudCreationSet({ setId, plan, createdAt, updatedAt, status, items, referenceImageNames = [] }) {
+  const planCounts = resolveCreationPlanCounts({ ...plan, items });
   return {
     setId,
     productName: plan.productName,
@@ -2388,12 +2390,7 @@ function buildCloudCreationSet({ setId, plan, createdAt, updatedAt, status, item
     platformProvenance: plan.platformProvenance || "explicit",
     platformSetOverrides: plan.platformSetOverrides || plan.setOverrides || {},
     platformItemOverrides: plan.platformItemOverrides || {},
-    imageCount: plan.imageCount,
-    carouselImageCount: plan.carouselImageCount ?? plan.imageCount,
-    skuImageCount: plan.skuImageCount ?? items.filter((item) => item.role === "sku").length,
-    infographicRebuildCount:
-      plan.infographicRebuildCount ?? items.filter((item) => item.role === "infographic-rebuild").length,
-    totalPlannedItemCount: plan.totalPlannedItemCount ?? items.length,
+    ...planCounts,
     scenario: plan.scenario,
     scenarioLabel: plan.scenarioLabel,
     visualLanguage: plan.visualLanguage,
@@ -2401,6 +2398,7 @@ function buildCloudCreationSet({ setId, plan, createdAt, updatedAt, status, item
     industryTemplate: plan.industryTemplate,
     industryTemplateLabel: plan.industryTemplateLabel,
     industryTemplatePath: plan.industryTemplatePath,
+    skuGenerationEnabled: plan.skuGenerationEnabled,
     infographicRebuildEnabled: plan.infographicRebuildEnabled,
     selectedRoles: plan.selectedRoles,
     referenceImageNames,
@@ -2475,6 +2473,8 @@ function buildCreationPlanFromFormData(formData) {
     dimensionSpecs: formData.get("dimensionSpecs"),
     dimensionUnitMode: formData.get("dimensionUnitMode"),
     targetLanguage: formData.get("targetLanguage"),
+    ratio: formData.get("ratio"),
+    resolutionTier: formData.get("resolutionTier"),
     platform: formData.get("platform"),
     imageCount: formData.get("imageCount"),
     scenario: formData.get("scenario"),
@@ -2488,6 +2488,7 @@ function buildCreationPlanFromFormData(formData) {
     platformSetOverrides: formData.get("platformSetOverrides"),
     platformItemOverrides: formData.get("platformItemOverrides"),
     audienceStrategy: formData.get("audienceStrategy"),
+    skuGenerationEnabled: formData.get("skuGenerationEnabled"),
     infographicRebuildEnabled: formData.get("infographicRebuildEnabled"),
     skuSubjects: formData.get("skuSubjects"),
     skuBundleCount: formData.get("skuBundleCount"),
@@ -2706,6 +2707,8 @@ async function runCreationGenerate(request, writer, { fetchImpl, imageBucket } =
     dimensionSpecs: formData.get("dimensionSpecs"),
     dimensionUnitMode: formData.get("dimensionUnitMode"),
     targetLanguage: formData.get("targetLanguage"),
+    ratio: formData.get("ratio"),
+    resolutionTier: formData.get("resolutionTier"),
     platform: formData.get("platform"),
     imageCount: formData.get("imageCount"),
     scenario: formData.get("scenario"),
@@ -2721,6 +2724,7 @@ async function runCreationGenerate(request, writer, { fetchImpl, imageBucket } =
     audienceStrategy: formData.get("audienceStrategy"),
     effectivePlan: formData.get("effectivePlan"),
     planOverrides: formData.get("planOverrides"),
+    skuGenerationEnabled: formData.get("skuGenerationEnabled"),
     infographicRebuildEnabled: formData.get("infographicRebuildEnabled"),
     skuSubjects: formData.get("skuSubjects"),
     skuBundleCount: formData.get("skuBundleCount"),
@@ -4305,6 +4309,18 @@ export async function handleApiRequest(request, options = {}) {
     );
   }
 
+  if (
+    ["GET", "POST"].includes(request.method) &&
+    [
+      "/api/article-illustration/sets",
+      "/api/article-illustration/plan",
+      "/api/article-illustration/generate-references",
+      "/api/article-illustration/generate",
+    ].includes(url.pathname)
+  ) {
+    return unsupportedFeature(request);
+  }
+
   if (request.method === "GET" && url.pathname.startsWith(SERVER_IMAGE_ROUTE_PREFIX)) {
     return handleServerImageRequest(request, imageBucket);
   }
@@ -4318,7 +4334,7 @@ export async function handleApiRequest(request, options = {}) {
   }
 
   if (request.method === "POST" && url.pathname === "/api/output/open") {
-    return unsupportedFeature(request, "Cloudflare 閮ㄧ讲鐗堜笉鏀寔鎵撳紑鏈満杈撳嚭鐩綍锛岃浣跨敤棰勮鍖虹殑涓嬭浇鎸夐挳淇濆瓨鍥剧墖銆?");
+    return unsupportedFeature(request, "Cloudflare 部署版不支持打开本机输出目录，请使用预览区的下载按钮保存图片。");
   }
 
   if (request.method === "POST" && url.pathname === "/api/ppt/analyze") {

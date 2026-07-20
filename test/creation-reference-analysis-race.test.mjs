@@ -38,3 +38,45 @@ test("analysis apply checks freshness after async category loading before mutati
   assert.match(app, /const matchedTemplate = await applyCreationReferenceAnalysisCategoryMatch\(normalized, isCurrent\);[\s\S]*state\.creationReferenceAnalysis\.result = normalized;/);
   assert.match(app, /if \(previousValue !== refs\.creationIndustryTemplateInput\.value\) \{\s*invalidateCreationReferenceAnalysisRequest\(\);/);
 });
+
+test("reference mutations invalidate analysis without clearing product form fields", async () => {
+  const app = await readFile(appPath, "utf8");
+  const dirtyBody = app.match(/function markCreationReferenceAnalysisDirty\(\) \{[\s\S]*?\n\}/)?.[0] || "";
+
+  assert.match(dirtyBody, /invalidateCreationReferenceAnalysisRequest\(\);/);
+  assert.doesNotMatch(dirtyBody, /creationProductNameInput|setCreationReferenceProductNameValue|clearCreationReferenceAnalysisProductNameSuggestion/);
+});
+
+test("reference analysis applies automatically and keeps the detected role editable", async () => {
+  const app = await readFile(appPath, "utf8");
+
+  const applyBody = app.match(/async function applyCreationReferenceAnalysis\(analysis\) \{[\s\S]*?\n\}/)?.[0] || "";
+  const recommendationsBody = app.match(/function applyCreationReferenceAnalysisRecommendations\(\) \{[\s\S]*?(?=\r?\nfunction renderCreationReferenceAnalysis)/)?.[0] || "";
+  const renderGridBody = app.match(/function renderCreationReferenceGrid\(\) \{[\s\S]*?(?=\r?\nfunction buildCreationReferenceRolePayload)/)?.[0] || "";
+
+  assert.match(applyBody, /const appliedResult = applyCreationReferenceAnalysisRecommendations\(\);/);
+  assert.match(recommendationsBody, /state\.creationReferenceAnalysis\.applied = true;/);
+  assert.doesNotMatch(recommendationsBody, /roleLocked\s*:/);
+  assert.match(renderGridBody, /roleSelect\.dataset\.creationReferenceRoleId = item\.id;/);
+  assert.doesNotMatch(renderGridBody, /creation-reference-role-readonly/);
+  assert.match(app, /const \{ appliedMessage, matchedTemplate \} = await applyCreationReferenceAnalysis\(payload\);/);
+  assert.doesNotMatch(app, /creationReferenceApplyAnalysisButton|应用建议/);
+
+  const appliedIndex = recommendationsBody.indexOf("state.creationReferenceAnalysis.applied = true;");
+  const productNameIndex = recommendationsBody.indexOf("applyCreationReferenceAnalysisProductNameSuggestion");
+  assert.ok(appliedIndex >= 0 && productNameIndex >= 0 && appliedIndex < productNameIndex);
+});
+
+test("reference notes enter edit mode on double click and invalidate the frozen plan on commit", async () => {
+  const app = await readFile(appPath, "utf8");
+
+  const updateBody = app.match(/function updateCreationReferenceNote\(referenceId, noteText\) \{[\s\S]*?(?=\r?\nfunction beginCreationReferenceNoteEditing)/)?.[0] || "";
+  const beginBody = app.match(/function beginCreationReferenceNoteEditing\(event\) \{[\s\S]*?(?=\r?\nfunction commitCreationReferenceNoteEditing)/)?.[0] || "";
+  const commitBody = app.match(/function commitCreationReferenceNoteEditing\(note\) \{[\s\S]*?(?=\r?\nfunction updateCreationReferenceRole)/)?.[0] || "";
+
+  assert.match(beginBody, /setAttribute\("contenteditable", "true"\)/);
+  assert.match(commitBody, /updateCreationReferenceNote\(referenceId, nextNote\)/);
+  assert.match(updateBody, /resetCreationDraftPreview\(\)/);
+  assert.match(app, /refs\.creationReferenceGrid\.addEventListener\("dblclick", beginCreationReferenceNoteEditing\)/);
+  assert.match(app, /refs\.creationReferenceGrid\.addEventListener\("focusout"[\s\S]*commitCreationReferenceNoteEditing/);
+});

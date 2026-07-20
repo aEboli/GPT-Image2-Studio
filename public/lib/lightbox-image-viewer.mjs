@@ -87,12 +87,12 @@ export function createLightboxImageViewer({ refs, state }) {
     const ready = hasMetrics(current);
     const isInspect = isInspectionMode(current);
     const minimumScale = getMinimumScale(current);
-    refs.lightboxViewerControls.classList.toggle("hidden", !isInspect);
+    refs.lightboxViewerControls.classList.toggle("hidden", !ready);
     refs.lightboxZoomLabel.textContent = ready ? `${Math.round(current.scale * 100)}%` : "适配";
-    refs.lightboxZoomOutButton.disabled = !ready || !isInspect || current.scale <= minimumScale + LIGHTBOX_VIEWER_SCALE_EPSILON;
-    refs.lightboxZoomInButton.disabled = !ready || !isInspect || current.scale >= LIGHTBOX_VIEWER_MAX_SCALE - LIGHTBOX_VIEWER_SCALE_EPSILON;
+    refs.lightboxZoomOutButton.disabled = !ready || current.scale <= minimumScale + LIGHTBOX_VIEWER_SCALE_EPSILON;
+    refs.lightboxZoomInButton.disabled = !ready || current.scale >= LIGHTBOX_VIEWER_MAX_SCALE - LIGHTBOX_VIEWER_SCALE_EPSILON;
     refs.lightboxFitButton.disabled = !ready || !isInspect;
-    refs.lightboxActualSizeButton.disabled = !ready || !isInspect;
+    refs.lightboxActualSizeButton.disabled = !ready || (isInspect && Math.abs(current.scale - 1) <= LIGHTBOX_VIEWER_SCALE_EPSILON);
   }
 
   function apply() {
@@ -215,9 +215,7 @@ export function createLightboxImageViewer({ refs, state }) {
     if (!hasMetrics(viewer())) {
       return;
     }
-    if (!isInspectionMode(viewer())) {
-      return;
-    }
+    if (!isInspectionMode(viewer())) viewer().mode = "inspect";
     const factor = direction > 0 ? LIGHTBOX_VIEWER_BUTTON_FACTOR : 1 / LIGHTBOX_VIEWER_BUTTON_FACTOR;
     zoomAtPoint(viewer().scale * factor, anchorPoint);
   }
@@ -292,6 +290,37 @@ export function createLightboxImageViewer({ refs, state }) {
     }
   }
 
+  function setOpen(open) {
+    refs.lightbox.classList.toggle("hidden", !open);
+    refs.lightbox.classList.toggle("open", open);
+    refs.lightbox.setAttribute("aria-hidden", String(!open));
+    document.documentElement.classList.toggle("lightbox-open", open);
+    if (!open) refs.lightbox.classList.remove("is-image-only-preview");
+  }
+
+  function trapFocus(event) {
+    if (event.key !== "Tab" || refs.lightbox.classList.contains("hidden")) return;
+    const focusable = [...refs.lightbox.querySelectorAll(
+      'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    )].filter((element) => !element.disabled && element.getAttribute?.("aria-hidden") !== "true");
+    if (focusable.length === 0) {
+      event.preventDefault();
+      return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    } else if (!focusable.includes(document.activeElement)) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
   function bindEvents() {
     refs.lightboxZoomOutButton.addEventListener("click", () => stepZoom(-1));
     refs.lightboxZoomInButton.addEventListener("click", () => stepZoom(1));
@@ -316,6 +345,9 @@ export function createLightboxImageViewer({ refs, state }) {
       event.preventDefault();
       toggleInspectionZoom({ clientX: event.clientX, clientY: event.clientY });
     });
+    if (typeof document !== "undefined") {
+      document.addEventListener("keydown", trapFocus);
+    }
     window.addEventListener("resize", () => {
       if (!refs.lightbox.classList.contains("hidden")) {
         syncMetrics({ preserveMode: true });
@@ -333,5 +365,6 @@ export function createLightboxImageViewer({ refs, state }) {
     zoomAtPoint,
     panBy,
     toggleInspectionZoom,
+    setOpen,
   };
 }

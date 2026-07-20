@@ -26,7 +26,21 @@ The system SHALL provide versioned automatic planning profiles for `universal`, 
 #### Scenario: Universal fallback remains available
 - **WHEN** the platform value is absent, unknown, or explicitly `universal`
 - **THEN** the planner uses the universal ecommerce profile
+- **AND** the universal profile exposes the original 18 role-aligned native carousel slots and recommends 18 images without `custom` extension
+- **AND** missing platform-specific evidence does not reduce the universal carousel below those 18 generic role-led slots
 - **AND** an unknown explicit value produces a visible planning warning instead of being presented as a verified named-platform plan
+
+#### Scenario: Every platform keeps one size-related image type
+- **WHEN** any canonical platform automatic plan is resolved with or without exact dimension evidence
+- **THEN** its enabled carousel contains at least one `dimension-fit` or `scale-proof` item mapped to `size-capacity-fit`
+- **AND** missing dimension evidence does not replace or omit that size-related item
+- **AND** without supplied dimension values the prompt forbids invented measurements and permits only non-numeric, evidence-grounded scale or fit presentation
+
+#### Scenario: Platform strategy changes every item prompt
+- **WHEN** the same product facts are planned for two different canonical platforms
+- **THEN** every carousel item prompt includes the selected profile's platform-specific gallery instruction
+- **AND** the current slot's image type, composition, text and scene policies remain explicit
+- **AND** a generic legacy role brief does not replace the platform gallery strategy
 
 #### Scenario: Product category adjusts platform slots
 - **WHEN** a selected fourth-level category or applied reference evidence indicates apparel fit, electronic specifications, food ingredients, multiple SKUs, package contents, or product condition
@@ -80,35 +94,41 @@ The system SHALL store an `imageType` and effective `logoPolicy` for every platf
 - **THEN** the platform policy and browser-used resolver files in `public/lib` are byte-equivalent to their canonical `lib` files
 - **AND** an out-of-sync or missing mirror fails the repository sync check
 
-### Requirement: Users can override every automatic planning value
-The system SHALL allow users to override platform-derived target language, default ratio, default resolution, visual language, default composition, default text density, default scene policy, default Logo policy, enabled image count, item enablement, item order, item image type, item ratio, item resolution, item language, item composition, item text density, item scene policy, item Logo policy, and item prompt. Existing SKU bundle count and SKU generation rule inputs SHALL remain editable and SHALL NOT be locked by the platform profile. Per-item overrides SHALL take precedence over set-level overrides, and all user overrides SHALL take precedence over profile, category, and reference-derived recommendations before final constraint validation.
+### Requirement: Users can adjust plans without editing prompts or advanced per-item parameters
+The system SHALL allow users to override platform-derived target language, default ratio, default resolution, visual language, enabled image count, and compatible image-type enablement. Existing SKU bundle count and SKU generation rule inputs SHALL remain editable and SHALL NOT be locked by the platform profile. The Creation UI SHALL NOT expose item order, item image type, item ratio, item resolution, item language, item composition, item text density, item scene policy, item Logo policy, or item prompt editing, and SHALL NOT submit user-authored prompt overrides.
 
 #### Scenario: User applies a set-level override
-- **WHEN** the user changes the automatic target language, default ratio, default resolution, visual language, default composition, default text density, default scene policy, default Logo policy, or enabled image count
+- **WHEN** the user changes the automatic target language, default ratio, default resolution, visual language, or enabled image count
 - **THEN** the effective plan uses that value for items without a more specific item override
 - **AND** the UI marks the field as user-overridden
 
-#### Scenario: User edits and reorders individual items
-- **WHEN** the user enables, disables, adds, removes, moves, or edits an image slot
-- **THEN** plan preview reflects the effective ordered slot list
-- **AND** the user can independently change that item's image type, ratio, resolution, language, composition, text density, scene policy, Logo policy, and prompt
+#### Scenario: User enables or disables compatible image types
+- **WHEN** the user enables or disables a current carousel slot in the compatible image-type area
+- **THEN** plan preview reflects the enabled slot list
 - **AND** the planned carousel count equals the number of enabled carousel slots
+- **AND** no advanced per-item editor or prompt input is shown
 
-#### Scenario: 用户显式选择 18 张时生成计划严格对齐 18 张
-- **WHEN** 平台自动推荐少于 18 张，且用户在数量控件或兼容图片类型区域主动选择 18 张
-- **THEN** 浏览器将 `imageCount=18` 和对应的 `selectedRoles` 保存为显式用户覆盖
-- **AND** 预览、重复预览、冻结 `effectivePlan`、队列快照和实际生成均包含 18 个启用的轮播项
-- **AND** 补充槽位使用唯一 `slotKey` 和用户选择的内容角色，仅作为保守的自定义图片建议，不创建缺失的尺寸、材质、包装、性能或其他商品事实
+#### Scenario: 平台决定套图数量上限
+- **WHEN** 当前平台 profile 只内置 6 个规范化轮播槽位
+- **THEN** 套图数量控件只提供不超过 6 的受支持选项
+- **AND** 浏览器、resolver、本地端点和 Worker 均不得把请求扩展为第 7 至 18 个通用或 `custom` 轮播项
+- **AND** SKU 图和信息图重构仍作为独立追加项，不占用该平台轮播上限
 
-#### Scenario: 显式补足槽位保留用户选择的图片用途
-- **WHEN** Temu 显式选择 16 张或通用电商显式选择 18 张，且安全的平台图片类型不足以补足数量
-- **THEN** 补充槽位保持 `imageType=custom`、advisory 且没有平台硬约束
-- **AND** 每个补充槽位使用对应 `selectedRoles` 的用途、构图、文字和场景语义，不继承 `clean-product-proof` 的无文字棚拍策略
-- **AND** 计划标题显示为“角色用途（自定义）”，提示词按角色用途分化，同时继续禁止虚构缺失商品事实
+#### Scenario: 通用电商保留 18 张原生套图
+- **WHEN** 用户选择通用电商且未主动减少套图数量
+- **THEN** 数量控件默认选择 18，并提供 0 至 18 的受支持选项
+- **AND** resolver、本地端点和 Worker 返回 18 个通用电商原生轮播项
+- **AND** 这些轮播项对应原有 18 个角色且不使用 `custom` 图片类型补足
 
-#### Scenario: 首次显式数量预览保留已对齐角色
-- **WHEN** 用户把数量改为 18，浏览器已保存显式 `imageCount=18` 和 18 个已对齐角色，但新的 `effectivePlan` 尚未返回
-- **THEN** 首次预览仍提交显式数量及全部 18 个 `selectedRoles`
+#### Scenario: 平台切换立即收紧数量
+- **WHEN** 用户从内置 9 个轮播槽位的平台切换到内置 6 个轮播槽位的平台
+- **THEN** 数量控件立即移除 7 至 18 的选项
+- **AND** 若旧选择超过 6，当前值收紧为新平台推荐值并立即请求新计划
+- **AND** 冻结 `effectivePlan`、摘要、队列快照和实际生成均使用收紧后的轮播数量
+
+#### Scenario: 首次显式数量预览保留平台范围内的已对齐角色
+- **WHEN** 用户在当前平台上限内修改数量，浏览器已保存显式 `imageCount` 和相同数量的已对齐角色，但新的 `effectivePlan` 尚未返回
+- **THEN** 首次预览仍提交显式数量及全部已对齐 `selectedRoles`
 - **AND** 未手动编辑角色不会被解释为清空角色
 - **AND** 只有不存在显式数量且不存在手动角色编辑时，浏览器才提交空角色选择以请求纯自动计划
 
@@ -123,11 +143,24 @@ The system SHALL allow users to override platform-derived target language, defau
 - **AND** 计数显示“已启用轮播槽位数 / 当前轮播槽位总数”
 - **AND** 追加 SKU 项和信息图重构项不进入该区域的列表或计数
 
-#### Scenario: User intentionally leaves a platform image type
-- **WHEN** an override conflicts with a sourced hard rule
-- **AND** the user changes that slot's image type to `custom`
-- **THEN** the conflicting platform hard rule no longer blocks generation
-- **AND** the UI and plan warn that the custom image is not guaranteed to comply with the selected platform
+#### Scenario: 显式套图参数覆盖平台默认值
+- **WHEN** 用户选择小红书平台，并显式选择 English、统一比例和分辨率
+- **THEN** 浏览器把 `targetLanguage`、`ratio` 和 `resolutionTier` 保存为套图级覆盖
+- **AND** 预览返回的每个轮播 item、冻结 `effectivePlan`、队列和实际逐图请求均使用这些显式值
+- **AND** 小红书的简体中文、3:4 和 1.5K 平台默认值不得重新覆盖用户选择
+
+#### Scenario: Image count change is frozen before first generation
+- **WHEN** reference analysis or an earlier preview produced one count and the user selects a different image count
+- **THEN** the browser immediately requests a refreshed plan using the new explicit count and aligned roles
+- **AND** a generation submit waits for the latest preview to finish
+- **AND** the first queued generation uses the refreshed count without requiring a second click
+
+#### Scenario: SKU generation toggle preserves the platform carousel plan
+- **WHEN** a named-platform plan is visible and the user disables or enables SKU image generation
+- **THEN** the browser immediately refreshes the plan for the same selected platform
+- **AND** only appended SKU items, `skuImageCount`, and `totalPlannedItemCount` change
+- **AND** `carouselImageCount`, ordered carousel slot keys, image types, and compatible image-type state remain unchanged
+- **AND** the refresh does not show or submit the universal legacy role list
 
 #### Scenario: User restores the current platform recommendation
 - **WHEN** the user selects Restore current platform recommendation
@@ -193,8 +226,20 @@ The system SHALL snapshot the complete effective platform plan when a Creation s
 - **AND** disabling or replacing a variant-comparison carousel slot does not remove appended one-item-per-SKU outputs
 - **AND** duplicate SKU references for the same stable SKU subject create only one appended SKU item
 
+#### Scenario: 当前表单数量与轮播计划一一对应
+- **WHEN** 用户把当前可编辑表单的“套图数量”改为 4
+- **THEN** 当前表单计划的 `imageCount` 和 `carouselImageCount` 均为 4
+- **AND** 当前计划摘要显示轮播图 4，SKU 图和重构图仍按各自实际追加项计数
+- **AND** `totalPlannedItemCount` 等于轮播图、SKU 图和重构图之和，不要求等于“套图数量”
+
+#### Scenario: 后台队列快照不覆盖当前表单计划
+- **WHEN** 一个轮播图数量为 18 的冻结队列任务正在后台生成，且用户把下一套当前表单的“套图数量”改为 4
+- **THEN** 当前表单的计划摘要和高级槽位不得显示该队列任务的 18 张轮播计划
+- **AND** 队列任务继续使用提交时冻结的 18 张计划，不受当前表单编辑影响
+- **AND** 若当前表单计划尚未重新计算，界面显示待刷新状态而不是把队列快照标记为当前自动方案
+
 #### Scenario: Form changes after enqueue do not affect the queued set
-- **WHEN** the user submits a platform-planned set and then edits platform, category, overrides, ratio, size, language, slots, or prompts while it is waiting
+- **WHEN** the user submits a platform-planned set and then edits platform, category, supported overrides, ratio, size, language, or compatible slot enablement while it is waiting
 - **THEN** the queued set starts with the frozen plan that existed at submission time
 
 #### Scenario: New record is reopened or repaired
@@ -228,3 +273,17 @@ The system SHALL omit or replace image types that require unavailable factual ev
 - **THEN** the UI preserves all entered product and asset state
 - **AND** it reports that platform automatic planning is unavailable
 - **AND** it does not silently display or submit a named-platform plan built from stale duplicated defaults
+
+### Requirement: Creation records display and expose Listing drafts in the old-style format
+The Creation record UI SHALL display every current Listing draft using the fixed section order 标题、卖点、痛点、五点描述、商品描述、后台搜索词、关键词分组. Each English value SHALL be followed by its corresponding Simplified Chinese reference, and copy/export actions SHALL be immediately available without validation or review gating.
+
+#### Scenario: User opens a newly generated Listing draft
+- **WHEN** a completed Listing is rendered in a Creation record
+- **THEN** all seven old-style sections are shown in the fixed order
+- **AND** each English scalar or list entry is followed by its matching `中文参考` value
+- **AND** the UI does not show validation, retry-review or `needs-review` controls
+
+#### Scenario: User copies or exports a Listing draft
+- **WHEN** the user invokes single-field copy, full copy or export
+- **THEN** the action uses the old-style bilingual field mapping
+- **AND** it is not blocked by validation, review, warnings or access state

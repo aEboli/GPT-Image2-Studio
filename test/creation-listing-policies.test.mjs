@@ -38,21 +38,22 @@ const COMPLETE_POLICY_FIELDS = [
 ];
 
 test("listing policy registry has five archetypes and exact canonical platform coverage", () => {
-  assert.equal(CREATION_LISTING_POLICY_VERSION, "listing-policy-2026-07-15.v2");
+  assert.equal(CREATION_LISTING_POLICY_VERSION, "listing-policy-2026-07-18.v3");
   assert.deepEqual(Object.keys(CREATION_LISTING_ARCHETYPES).sort(), [
-    "brand",
     "content",
+    "editorial",
     "search",
     "universal",
     "value",
   ]);
+  assert.equal(CANONICAL_IDS.length, 19);
   assert.deepEqual(CREATION_LISTING_PLATFORM_POLICIES.map(({ id }) => id), CANONICAL_IDS);
   assert.deepEqual(listCreationListingPolicies().map(({ id }) => id), CANONICAL_IDS);
 
   for (const policy of CREATION_LISTING_PLATFORM_POLICIES) {
     COMPLETE_POLICY_FIELDS.forEach((field) => assert.ok(field in policy, `${policy.id}.${field}`));
     assert.equal(policy.policyVersion, CREATION_LISTING_POLICY_VERSION);
-    assert.equal(policy.verifiedAt, "2026-07-15");
+    assert.equal(policy.verifiedAt, "2026-07-18");
     assert.ok(CREATION_LISTING_ARCHETYPES[policy.archetypeId]);
     assert.ok(["A", "B", "C"].includes(policy.evidenceLevel));
     assert.ok(policy.publishFields.includes("title"));
@@ -67,7 +68,7 @@ test("listing policy registry has five archetypes and exact canonical platform c
 test("listing source register is independent, versioned, official where claimed, and internally referenced", () => {
   assert.notEqual(CREATION_LISTING_SOURCE_REGISTER, undefined);
   assert.ok(CREATION_LISTING_SOURCE_REGISTER["advertising-law-truthfulness"]);
-  assert.equal(CREATION_LISTING_SOURCE_REGISTER["advertising-law-truthfulness"].verifiedAt, "2026-07-15");
+  assert.equal(CREATION_LISTING_SOURCE_REGISTER["advertising-law-truthfulness"].verifiedAt, "2026-07-18");
   assert.match(CREATION_LISTING_SOURCE_REGISTER["advertising-law-truthfulness"].url, /^https:\/\/www\.samr\.gov\.cn\//);
   const amazonTitleAnnouncement = CREATION_LISTING_SOURCE_REGISTER["amazon-title-75-effective-2026-07-27"];
   const amazonPolicy = getCreationListingPolicy("amazon");
@@ -86,9 +87,39 @@ test("listing source register is independent, versioned, official where claimed,
       const source = CREATION_LISTING_SOURCE_REGISTER[sourceId];
       assert.ok(source, `${policy.id} hard source ${sourceId}`);
       assert.equal(source.authority, "official", `${policy.id} hard source authority`);
-      assert.equal(source.verifiedAt, "2026-07-15");
+      assert.equal(source.verifiedAt, "2026-07-18");
     }
   }
+});
+
+test("listing archetypes and platform overrides contain no brand semantics", () => {
+  const archetypeText = JSON.stringify(CREATION_LISTING_ARCHETYPES);
+  assert.doesNotMatch(archetypeText, /brand/i);
+  assert.equal(getCreationListingPolicy("etsy").archetypeId, "editorial");
+  assert.equal(getCreationListingPolicy("shopify").archetypeId, "editorial");
+  assert.doesNotMatch(JSON.stringify(CREATION_LISTING_PLATFORM_POLICIES), /brand-if-supplied|craft-or-brand-context/i);
+});
+
+test("sourced Etsy, Amazon, and Coupang limits preserve their exact units and effective dates", () => {
+  const etsy = getCreationListingPolicy("etsy");
+  assert.equal(etsy.titleRules.hardMaxChars, 140);
+  assert.deepEqual(etsy.titleRules.hardConstraintSourceIds, ["etsy-title-tags"]);
+  assert.equal(etsy.searchRules.hardMaxItems, 13);
+  assert.equal(etsy.searchRules.hardMaxCharsPerItem, 20);
+  assert.deepEqual(etsy.searchRules.hardConstraintSourceIds, ["etsy-title-tags", "etsy-tag-guidance"]);
+
+  const amazon = getCreationListingPolicy("amazon");
+  assert.equal(amazon.titleRules.hardMaxChars, 75);
+  assert.equal(amazon.titleRules.effectiveFrom, "2026-07-27");
+  assert.deepEqual(amazon.titleRules.hardConstraintSourceIds, ["amazon-title-75-effective-2026-07-27"]);
+  assert.equal(amazon.searchRules.hardMaxUtf8BytesPerItem, null);
+  assert.deepEqual(amazon.searchRules.hardConstraintSourceIds, []);
+
+  const coupang = getCreationListingPolicy("coupang");
+  assert.equal(coupang.searchRules.hardMaxItems, 20);
+  assert.equal(coupang.searchRules.hardMaxCharsPerItem, null);
+  assert.equal(coupang.searchRules.hardMaxUtf8BytesPerItem, 20);
+  assert.deepEqual(coupang.searchRules.hardConstraintSourceIds, ["coupang-product-creation"]);
 });
 
 test("saved drafts keep their frozen listing policy version when read by the view", () => {
@@ -114,6 +145,7 @@ test("low-evidence Listing platforms expose conservative recommendations without
     assert.equal(policy.titleRules.hardMaxChars, null);
     assert.equal(policy.highlightRules.hardMaxItems, null);
     assert.equal(policy.searchRules.hardMaxItems, null);
+    assert.equal(policy.searchRules.hardMaxUtf8BytesPerItem, null);
     assert.deepEqual(policy.titleRules.hardConstraintSourceIds, []);
     assert.deepEqual(policy.highlightRules.hardConstraintSourceIds, []);
     assert.deepEqual(policy.searchRules.hardConstraintSourceIds, []);

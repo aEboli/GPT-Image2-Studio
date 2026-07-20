@@ -127,6 +127,7 @@ test("preview loading shell renders only motion nodes without visible copy", asy
   assert.equal(nodes.shell.children[0].className, "preview-loading-orb-field");
   assert.equal(nodes.shell.children[0].children.length, 1);
   assert.match(nodes.shell.children[0].children[0].className, /preview-loading-motion/);
+  assert.equal(nodes.field.classList.contains("is-orbiting"), false);
 });
 
 test("preview loading shell shows one centered orb per active job up to six", async () => {
@@ -172,6 +173,7 @@ test("preview loading shell shows one centered orb per active job up to six", as
   });
 
   assert.equal(nodes.field.children.length, 6);
+  assert.ok(nodes.field.classList.contains("is-orbiting"));
   assert.deepEqual(
     nodes.field.children.map((child) => child.dataset.previewLoadingOrbId),
     ["job-1", "job-2", "job-3", "job-4", "job-5", "job-6"],
@@ -221,6 +223,7 @@ test("preview loading shell preserves existing orb nodes when a new job appears"
   runtime.updatePreviewLoadingShell(nodes, baseState);
   const firstOrb = nodes.field.children[0];
   const secondOrb = nodes.field.children[1];
+  assert.ok(nodes.field.classList.contains("is-orbiting"));
 
   runtime.updatePreviewLoadingShell(nodes, {
     ...baseState,
@@ -237,6 +240,7 @@ test("preview loading shell preserves existing orb nodes when a new job appears"
   assert.equal(nodes.field.children[1], secondOrb);
   assert.equal(nodes.field.children[2].dataset.previewLoadingOrbId, "job-c");
   assert.ok(nodes.field.children[2].classList.contains("is-entering"));
+  assert.ok(nodes.field.classList.contains("is-orbiting"));
 });
 
 test("preview loading shell spaces six visible orbs with collision-safe gaps", () => {

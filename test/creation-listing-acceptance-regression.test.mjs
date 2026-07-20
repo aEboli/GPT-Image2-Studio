@@ -26,23 +26,27 @@ const EMPTY_KEYWORD_BUCKETS = {
   descriptive: [],
 };
 
+function buildTraceableChineseRows(values, label) {
+  return values.map((item) => `${label}：${item}`);
+}
+
 function makeV2Draft(policy, overrides = {}) {
-  return {
+  const draft = {
     schemaVersion: "2",
     platformId: policy.platformId || policy.id,
     platformLabel: policy.platformLabel || policy.label,
     marketplace: policy.marketplaceId,
     listingPolicyVersion: policy.listingPolicyVersion || policy.policyVersion,
     language: policy.locale || policy.language || policy.defaultLocale,
-    title: "Blue Storage Box for Everyday Home Organization",
+    title: "Blue Stackable Storage Box",
     sellingPoints: ["Blue finish and stackable shape are supplied product facts."],
     buyerObjections: ["Check the supplied dimensions before purchase."],
     highlights: [
-      "Blue finish makes this option easy to identify.",
-      "Stackable shape supports orderly everyday storage.",
-      "Supplied dimensions help shoppers check available space.",
+      "Blue finish is a supplied product attribute.",
+      "Stackable shape is stated in the product data.",
+      "Supplied dimensions are listed in the product data.",
     ],
-    description: "Blue storage box with a stackable shape for everyday home organization.",
+    description: "Blue storage box with a stackable shape and supplied dimensions.",
     searchTerms: ["blue storage box", "stackable organizer"],
     keywordBuckets: {
       exact: ["blue storage box"],
@@ -56,6 +60,23 @@ function makeV2Draft(policy, overrides = {}) {
     status: "completed",
     ...overrides,
   };
+  if (!Object.prototype.hasOwnProperty.call(overrides, "zhDisplay")) {
+    draft.zhDisplay = {
+      title: `中文标题：${draft.title}`,
+      sellingPoints: buildTraceableChineseRows(draft.sellingPoints, "中文卖点"),
+      buyerObjections: buildTraceableChineseRows(draft.buyerObjections, "中文购买疑虑"),
+      highlights: buildTraceableChineseRows(draft.highlights, "中文亮点"),
+      description: `中文描述：${draft.description}`,
+      searchTerms: buildTraceableChineseRows(draft.searchTerms, "中文搜索词"),
+      keywordBuckets: Object.fromEntries(Object.entries(draft.keywordBuckets).map(([key, values]) => [
+        key,
+        buildTraceableChineseRows(values, "中文关键词"),
+      ])),
+      warnings: buildTraceableChineseRows(draft.warnings, "中文警告"),
+      missingInfo: buildTraceableChineseRows(draft.missingInfo, "中文缺失信息"),
+    };
+  }
+  return draft;
 }
 
 function allIssues(validation) {
@@ -68,6 +89,17 @@ function hasDeepKey(value, targetKey) {
   if (!value || typeof value !== "object") return false;
   if (Object.prototype.hasOwnProperty.call(value, targetKey)) return true;
   return Object.values(value).some((nested) => hasDeepKey(nested, targetKey));
+}
+
+function collectStringLeaves(value, leaves = []) {
+  if (typeof value === "string") {
+    leaves.push(value);
+  } else if (Array.isArray(value)) {
+    value.forEach((item) => collectStringLeaves(item, leaves));
+  } else if (value && typeof value === "object") {
+    Object.values(value).forEach((item) => collectStringLeaves(item, leaves));
+  }
+  return leaves;
 }
 
 test("compact Listing Source JSON and upstream request omit internal marketingCopy", async () => {
@@ -99,7 +131,7 @@ test("compact Listing Source JSON and upstream request omit internal marketingCo
   const fetchImpl = async (_url, init) => {
     requests.push(JSON.parse(init.body));
     return new Response(JSON.stringify({
-      output_text: JSON.stringify(makeV2Draft(policy)),
+      output_text: JSON.stringify(makeV2Draft(policy, { warnings: source.warnings || [] })),
     }), { status: 200 });
   };
 
@@ -187,16 +219,16 @@ test("unsupported high-risk claims are rejected in Chinese, English, Japanese, K
   assert.equal(validatedCaseCount, 20);
 });
 
-test("material, certification, compatibility, and performance claims require exact whitelisted input evidence", () => {
+test("functional and performance wording stays blocked even with exact evidence", () => {
   const policy = resolveCreationListingPolicy({ platform: "universal" });
   const cases = [
-    ["304 Stainless Steel body", "Stainless steel body", "304 Stainless Steel body"],
-    ["FDA Certified product", "CE Certified product", "FDA Certified product"],
-    ["Compatible with iPhone 15 Pro", "Compatible with iPhone 15", "Compatible with iPhone 15 Pro"],
-    ["12-hour battery runtime", "Long battery runtime", "12-hour battery runtime"],
+    ["304 Stainless Steel body", "Stainless steel body", "304 Stainless Steel body", true],
+    ["FDA Certified product", "CE Certified product", "FDA Certified product", true],
+    ["Compatible with iPhone 15 Pro", "Compatible with iPhone 15", "Compatible with iPhone 15 Pro", false],
+    ["12-hour battery runtime", "Long battery runtime", "12-hour battery runtime", false],
   ];
 
-  for (const [claim, similarEvidence, exactEvidence] of cases) {
+  for (const [claim, similarEvidence, exactEvidence, allowedWithEvidence] of cases) {
     const unsupported = validateCreationListingDraft(makeV2Draft(policy, {
       description: claim,
     }), {
@@ -209,38 +241,185 @@ test("material, certification, compatibility, and performance claims require exa
     assert.equal(unsupported.ok, false, `${claim} must not use same-category keyword matching`);
     assert.match(allIssues(unsupported), /description|claim|evidence/i, claim);
 
-    const supported = validateCreationListingDraft(makeV2Draft(policy, {
+    const supportedDraft = makeV2Draft(policy, {
       description: claim,
-    }), {
+    });
+    supportedDraft.zhDisplay.description = `中文描述：${claim}`;
+    const supported = validateCreationListingDraft(supportedDraft, {
       policy,
       sourceFacts: {
         productName: "Test Product",
         productDescription: exactEvidence,
       },
     });
-    assert.equal(supported.ok, true, `${claim} should pass with exact user evidence`);
+    assert.equal(supported.ok, allowedWithEvidence, `${claim} exact-evidence result`);
+    if (!allowedWithEvidence) {
+      assert.match(allIssues(supported), /functional|performance|unsupported/i, claim);
+    }
   }
 });
 
-test("non-publishable search terms stay out of Temu and universal full-copy output", () => {
+test("historical V2 full copy maps old-style bilingual fields and excludes review-only metadata", () => {
   for (const platform of ["universal", "temu"]) {
     const policy = resolveCreationListingPolicy({ platform });
-    assert.equal(policy.searchRules.publishable, false);
-    assert.equal(policy.publishFields.includes("searchTerms"), false);
+    const fixtureId = platform === "universal" ? "A" : "B";
     const draft = normalizeCreationListingDraft(makeV2Draft(policy, {
-      searchTerms: [`INTERNAL_${platform.toUpperCase()}_SEARCH_TOKEN`],
+      title: `EN_TITLE_${fixtureId}`,
+      sellingPoints: [`EN_SELLING_${fixtureId}`],
+      buyerObjections: [`EN_OBJECTION_${fixtureId}`],
+      highlights: [`EN_HIGHLIGHT_${fixtureId}`],
+      description: `EN_DESCRIPTION_${fixtureId}`,
+      searchTerms: [`EN_SEARCH_${fixtureId}`],
+      keywordBuckets: {
+        exact: [`EN_EXACT_${fixtureId}`],
+        longTail: [`EN_LONG_TAIL_${fixtureId}`],
+        traffic: [`EN_TRAFFIC_${fixtureId}`],
+        descriptive: [`EN_DESCRIPTIVE_${fixtureId}`],
+      },
+      warnings: [`EN_WARNING_${fixtureId}`],
+      missingInfo: [`EN_MISSING_${fixtureId}`],
+      zhDisplay: {
+        title: `中文标题_${fixtureId} EN_TITLE_${fixtureId}`,
+        sellingPoints: [`中文卖点_${fixtureId} EN_SELLING_${fixtureId}`],
+        buyerObjections: [`中文疑虑_${fixtureId} EN_OBJECTION_${fixtureId}`],
+        highlights: [`中文亮点_${fixtureId} EN_HIGHLIGHT_${fixtureId}`],
+        description: `中文描述_${fixtureId} EN_DESCRIPTION_${fixtureId}`,
+        searchTerms: [`中文搜索_${fixtureId} EN_SEARCH_${fixtureId}`],
+        keywordBuckets: {
+          exact: [`中文精准_${fixtureId} EN_EXACT_${fixtureId}`],
+          longTail: [`中文长尾_${fixtureId} EN_LONG_TAIL_${fixtureId}`],
+          traffic: [`中文流量_${fixtureId} EN_TRAFFIC_${fixtureId}`],
+          descriptive: [`中文描述词_${fixtureId} EN_DESCRIPTIVE_${fixtureId}`],
+        },
+        warnings: [`中文警告_${fixtureId} EN_WARNING_${fixtureId}`],
+        missingInfo: [`中文缺失_${fixtureId} EN_MISSING_${fixtureId}`],
+      },
     }), {
       forceV2: true,
       schemaVersion: "2",
       listingPolicy: policy,
     });
+    const setId = `SET_METADATA_${platform}`;
+    const productName = `FORBIDDEN_BRAND_PRODUCT_NAME_${platform}`;
     const copy = buildCreationRecordListingText({
-      setId: `set-${platform}`,
-      productName: "Blue Storage Box",
+      setId,
+      productName,
       listingDrafts: [draft],
     });
-    assert.doesNotMatch(copy, new RegExp(`INTERNAL_${platform.toUpperCase()}_SEARCH_TOKEN`));
+    for (const token of [
+      `EN_TITLE_${fixtureId}`, `EN_SELLING_${fixtureId}`, `EN_OBJECTION_${fixtureId}`,
+      `EN_HIGHLIGHT_${fixtureId}`, `EN_DESCRIPTION_${fixtureId}`, `EN_SEARCH_${fixtureId}`,
+      `EN_EXACT_${fixtureId}`,
+      `中文标题_${fixtureId}`, `中文卖点_${fixtureId}`, `中文疑虑_${fixtureId}`,
+      `中文亮点_${fixtureId}`, `中文描述_${fixtureId}`, `中文搜索_${fixtureId}`,
+      `中文精准_${fixtureId}`,
+    ]) {
+      assert.match(copy, new RegExp(token));
+    }
+    assert.doesNotMatch(copy, new RegExp(`EN_WARNING_${fixtureId}|EN_MISSING_${fixtureId}|中文警告_${fixtureId}|中文缺失_${fixtureId}`));
+    for (const metadata of [
+      setId,
+      productName,
+      draft.platformId,
+      draft.platformLabel,
+      draft.marketplace,
+      draft.listingPolicyVersion,
+    ]) {
+      if (metadata) assert.equal(copy.includes(metadata), false, metadata);
+    }
   }
+});
+
+test("new V2 model, retry, mock, and fallback drafts remove identities from visible metadata and ids", async () => {
+  const [source] = buildCreationListingSources({
+    setId: "set-visible-metadata",
+    platform: "universal",
+    productName: "Acme Blue Storage Box",
+    productDescription: "Blue storage box with a stackable shape. Sold by Northwind Store. Trademark: RocketMark.",
+    sellingPoints: ["Blue finish", "Stackable shape"],
+  });
+  const policy = source.listingPolicy;
+  const validOutput = JSON.stringify(makeV2Draft(policy, { warnings: source.warnings }));
+  const response = (outputText) => new Response(JSON.stringify({ output_text: outputText }), { status: 200 });
+  const scenarios = [
+    {
+      name: "model",
+      mock: false,
+      fetchImpl: async () => response(validOutput),
+      expectedRequests: 1,
+    },
+    {
+      name: "retry",
+      mock: false,
+      fetchImpl: async (_url, _init, state = {}) => response(state.unused),
+      expectedRequests: 2,
+    },
+    {
+      name: "fallback",
+      mock: false,
+      fetchImpl: async () => response("{}"),
+      expectedRequests: 2,
+    },
+    {
+      name: "mock",
+      mock: true,
+      fetchImpl: async () => {
+        throw new Error("mock mode must not call upstream");
+      },
+      expectedRequests: 0,
+    },
+  ];
+
+  for (const scenario of scenarios) {
+    let requestCount = 0;
+    const fetchImpl = scenario.name === "retry"
+      ? async () => {
+        requestCount += 1;
+        return response(requestCount === 1 ? "{}" : validOutput);
+      }
+      : async (...args) => {
+        requestCount += 1;
+        return scenario.fetchImpl(...args);
+      };
+    const draft = await requestCreationListingDraft({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      responsesModel: "test-model",
+      source,
+      fetchImpl,
+      mock: scenario.mock,
+    });
+
+    assert.equal(requestCount, scenario.expectedRequests, scenario.name);
+    assert.equal(draft.status, "completed", scenario.name);
+    assert.equal(draft.skuTitle, "Blue Storage Box", scenario.name);
+    assert.equal(draft.id, "listing-blue-storage-box", scenario.name);
+    const serializedLeaves = collectStringLeaves(draft).join("\n");
+    for (const forbidden of ["Acme", "Northwind Store", "RocketMark"]) {
+      assert.doesNotMatch(serializedLeaves, new RegExp(forbidden, "iu"), `${scenario.name}: ${forbidden}`);
+    }
+  }
+
+  const normalizedExplicitId = normalizeCreationListingDraft({
+    ...makeV2Draft(policy, { warnings: source.warnings }),
+    id: "listing-acme-blue-storage-box",
+  }, source);
+  assert.equal(normalizedExplicitId.id, "listing-blue-storage-box");
+
+  const [redSource] = buildCreationListingSources({
+    setId: "set-red-storage-box",
+    platform: "universal",
+    productName: "Red Storage Box",
+    productDescription: "Red storage box with a stackable shape.",
+    sellingPoints: ["Red finish", "Stackable shape"],
+  });
+  const redDraft = await requestCreationListingDraft({
+    source: redSource,
+    mock: true,
+  });
+  assert.equal(redDraft.skuTitle, "Red Storage Box");
+  assert.equal(redDraft.id, "listing-red-storage-box");
+  assert.match(redDraft.title, /^Red Storage Box\b/u);
 });
 
 test("V1 display, field copy, and full copy preserve historical Unicode verbatim", () => {
@@ -364,5 +543,7 @@ test("V2 view prefers frozen publish metadata over the current bundled policy", 
   for (const [field, purpose] of Object.entries(frozen.fieldPurposes)) {
     assert.equal(viewDraft.fieldPurposes[field], purpose);
   }
-  assert.doesNotMatch(buildCreationListingDraftText(viewDraft), /INTERNAL_FROZEN_SEARCH_TOKEN/);
+  const copy = buildCreationListingDraftText(viewDraft);
+  assert.match(copy, /INTERNAL_FROZEN_SEARCH_TOKEN/);
+  assert.match(copy, /中文搜索词：INTERNAL_FROZEN_SEARCH_TOKEN/u);
 });

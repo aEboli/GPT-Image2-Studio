@@ -53,6 +53,29 @@ test("Cloudflare unsupported API routes use the shared capability contract", asy
   assert.equal(payload.code, "unsupported_runtime_capability");
   assert.equal(payload.runtime, "cloudflare");
   assert.equal(payload.path, "/api/output/open");
+  assert.equal(payload.message, "Cloudflare 部署版不支持打开本机输出目录，请使用预览区的下载按钮保存图片。");
+});
+
+test("article illustration routes expose an explicit Cloudflare capability contract", async () => {
+  const worker = await import("../cloudflare-pages-worker.mjs");
+  const routes = [
+    ["GET", "/api/article-illustration/sets"],
+    ["POST", "/api/article-illustration/plan"],
+    ["POST", "/api/article-illustration/generate-references"],
+    ["POST", "/api/article-illustration/generate"],
+  ];
+
+  for (const [method, path] of routes) {
+    assert.equal(isApiRouteSupported("local", method, path), true);
+    assert.equal(isApiRouteSupported("cloudflare", method, path), false);
+    const response = await worker.handleApiRequest(
+      new Request(`https://studio.example${path}`, { method }),
+    );
+    const payload = await response.json();
+    assert.equal(response.status, 400);
+    assert.equal(payload.code, "unsupported_runtime_capability");
+    assert.equal(payload.path, path);
+  }
 });
 
 test("portrait APIs document Cloudflare local-filesystem gaps", async () => {

@@ -115,7 +115,7 @@ test("lightbox fitted mode can scale below the interactive minimum on narrow vie
   assert.equal(refs.lightboxZoomOutButton.disabled, true);
 });
 
-test("lightbox viewer starts in plain view mode until the user double-clicks the image", () => {
+test("lightbox viewer starts fitted with visible controls until the user inspects the image", () => {
   const { controller, imageStyle, refs, state } = createViewerHarness();
   const previousWindow = globalThis.window;
   globalThis.window = { addEventListener() {} };
@@ -149,9 +149,9 @@ test("lightbox viewer starts in plain view mode until the user double-clicks the
 
   assert.equal(state.lightboxViewer.mode, "view");
   assert.equal(imageStyle.getPropertyValue("--lightbox-scale"), "0.3333");
-  assert.equal(refs.lightboxViewerControls.classList.contains("hidden"), true);
+  assert.equal(refs.lightboxViewerControls.classList.contains("hidden"), false);
   assert.equal(refs.lightboxMediaStage.classList.contains("is-viewer-inspecting"), false);
-  assert.equal(refs.lightboxZoomInButton.disabled, true);
+  assert.equal(refs.lightboxZoomInButton.disabled, false);
   assert.equal(wheelPrevented, false);
   assert.equal(state.lightboxViewer.dragging, false);
 
@@ -191,6 +191,40 @@ test("lightbox viewer starts in plain view mode until the user double-clicks the
   });
 
   assert.equal(state.lightboxViewer.mode, "view");
-  assert.equal(refs.lightboxViewerControls.classList.contains("hidden"), true);
+  assert.equal(refs.lightboxViewerControls.classList.contains("hidden"), false);
   assert.equal(refs.lightboxMediaStage.classList.contains("is-viewer-inspecting"), false);
+});
+
+test("lightbox traps tab focus and restores page scrolling when closed", () => {
+  const { controller, refs } = createViewerHarness();
+  const first = { disabled: false, focus() { document.activeElement = first; } };
+  const last = { disabled: false, focus() { document.activeElement = last; } };
+  const documentListeners = {};
+  const previousDocument = globalThis.document;
+  const previousWindow = globalThis.window;
+  refs.lightbox.querySelectorAll = () => [first, last];
+  refs.lightbox.setAttribute = () => {};
+  globalThis.document = {
+    activeElement: last,
+    documentElement: { classList: createClassList() },
+    addEventListener(type, handler) { documentListeners[type] = handler; },
+  };
+  globalThis.window = { addEventListener() {} };
+
+  try {
+    controller.bindEvents();
+    controller.setOpen(true);
+    assert.equal(document.documentElement.classList.contains("lightbox-open"), true);
+
+    let prevented = false;
+    documentListeners.keydown({ key: "Tab", shiftKey: false, preventDefault() { prevented = true; } });
+    assert.equal(prevented, true);
+    assert.equal(document.activeElement, first);
+
+    controller.setOpen(false);
+    assert.equal(document.documentElement.classList.contains("lightbox-open"), false);
+  } finally {
+    globalThis.document = previousDocument;
+    globalThis.window = previousWindow;
+  }
 });

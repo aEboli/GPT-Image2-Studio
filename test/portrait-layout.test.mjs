@@ -7,6 +7,7 @@ const stylesPath = new URL("../public/styles.css", import.meta.url);
 const appPath = new URL("../public/app.js", import.meta.url);
 const accessoryAssetsPath = new URL("../lib/portrait-accessory-assets.mjs", import.meta.url);
 const locationSelectorPath = new URL("../lib/portrait-location-selector.mjs", import.meta.url);
+const referenceAnalysisPath = new URL("../lib/portrait-reference-analysis-client.mjs", import.meta.url);
 
 test("portrait mode has independent navigation, routes and DOM refs", async () => {
   const html = await readFile(indexPath, "utf8");
@@ -24,10 +25,14 @@ test("portrait mode has independent navigation, routes and DOM refs", async () =
   assert.match(app, /if \(window\.location\.hash === "#portrait-record"\)/);
   assert.match(app, /view === "portrait" \? "#portrait"/);
   assert.match(app, /view === "portrait-record"[\s\S]*\? "#portrait-record"/);
-  assert.doesNotMatch(portraitForm, /id="portraitReferenceAnalyzeButton"|id="portraitApplyAnalysisButton"|id="portraitAnalysisToggleButton"|id="portraitAnalysisPanel"/);
+  assert.match(portraitForm, /id="portraitReferenceAnalyzeButton"/);
+  assert.match(portraitForm, /id="portraitReferenceApplyAnalysisButton"/);
+  assert.match(portraitForm, /id="portraitReferenceAnalysisPanel"/);
   assert.doesNotMatch(portraitForm, /id="portraitSubjectNameInput"|name="subjectName"|人物名称|分析任务|应用建议/);
   assert.match(portraitForm, /人物描述[\s\S]*id="portraitSubjectSummaryInput" name="subjectSummary"/);
-  assert.doesNotMatch(app, /portraitReferenceAnalyzeButton|portraitApplyAnalysisButton|portraitAnalysisToggleButton|portraitAnalysisPanel|portraitSubjectNameInput/);
+  assert.match(app, /portraitReferenceAnalyzeButton/);
+  assert.match(app, /portraitReferenceApplyAnalysisButton/);
+  assert.match(app, /portraitReferenceAnalysisPanel/);
   assert.match(app, /portraitSubjectSummaryInput: document\.querySelector\("#portraitSubjectSummaryInput"\)/);
   assert.match(app, /portraitStyleInputs: \[\.\.\.document\.querySelectorAll\("\[name=\\\"portraitStyles\\\"\]"\)\]/);
   assert.match(app, /portraitShotTypeInputs: \[\.\.\.document\.querySelectorAll\("\[name=\\\"portraitShotTypes\\\"\]"\)\]/);
@@ -140,13 +145,19 @@ test("portrait action selector uses local PNG preview assets", async () => {
   assert.match(attribution, /locally generated/);
 });
 
-test("portrait generation uses only manual subject description as required identity input", async () => {
+test("portrait reference analysis is optional and requires explicit apply", async () => {
   const html = await readFile(indexPath, "utf8");
   const app = await readFile(appPath, "utf8");
+  const referenceAnalysis = await readFile(referenceAnalysisPath, "utf8");
 
   assert.match(html, /<span>人物描述<\/span>[\s\S]*id="portraitSubjectSummaryInput"/);
-  assert.doesNotMatch(html, /人物摘要|分析参考图后应用/);
-  assert.doesNotMatch(app, /请先上传人物参考图|点击分析任务|正在分析写真任务参考图/);
+  assert.match(html, /分析人物参考图/);
+  assert.match(html, /应用分析草稿/);
+  assert.match(app, /createPortraitReferenceAnalysisController/);
+  assert.match(referenceAnalysis, /fetchImpl\("\/api\/portrait\/reference\/analyze"/);
+  assert.match(referenceAnalysis, /state\.portrait\.referenceAnalysis\.applied = true/);
+  assert.match(app, /const appliedAnalysis = state\.portrait\.referenceAnalysis\.applied/);
+  assert.match(app, /formData\.set\("analysis", JSON\.stringify\(appliedAnalysis\)\)/);
   assert.match(app, /if \(!refs\.portraitSubjectSummaryInput\.value\.trim\(\)\) \{[\s\S]*请先填写人物描述/);
   assert.match(app, /body: buildPortraitFormData\(\{ includeFiles: true \}\)/);
 });
@@ -301,11 +312,33 @@ test("portrait workbench exposes failed item retry controls without prompt tunin
 
 test("portrait lazy view modules delegate to portrait renderers", async () => {
   const app = await readFile(appPath, "utf8");
+  const referenceAnalysis = await readFile(referenceAnalysisPath, "utf8");
 
   assert.match(app, /portrait: renderPortraitView/);
   assert.match(app, /portraitRecord: renderPortraitRecordView/);
   assert.match(app, /if \(view === "portrait-record"\) \{[\s\S]*loadPortraitSets\(\)/);
   assert.match(app, /requestGenerationStream\("\/api\/portrait\/generate"/);
   assert.match(app, /fetch\("\/api\/portrait\/plan"/);
-  assert.doesNotMatch(app, /fetch\("\/api\/portrait\/reference\/analyze"/);
+  assert.match(referenceAnalysis, /fetchImpl\("\/api\/portrait\/reference\/analyze"/);
+});
+
+test("portrait reference analysis browser module is synced from lib", async () => {
+  const [source, publicSource] = await Promise.all([
+    readFile(referenceAnalysisPath, "utf8"),
+    readFile(new URL("../public/lib/portrait-reference-analysis-client.mjs", import.meta.url), "utf8"),
+  ]);
+  assert.equal(publicSource, source);
+});
+
+test("portrait generation requires a terminal SSE event", async () => {
+  const app = await readFile(appPath, "utf8");
+  assert.match(app, /consumeSseUntilTerminal\([\s\S]*写真生成连接已中断，未收到完成事件/);
+});
+
+test("portrait repair reuses saved output parameters instead of the current form", async () => {
+  const app = await readFile(appPath, "utf8");
+  const body = app.match(/function buildPortraitRepairFormData\([^]*?\n\}/)?.[0] || "";
+  assert.match(body, /formData\.set\("ratio", currentSet\.ratio\)/);
+  assert.match(body, /formData\.set\("size", currentSet\.size\)/);
+  assert.match(body, /formData\.set\("format", currentSet\.format\)/);
 });

@@ -2,6 +2,7 @@ node_modules/
 output/
 artifacts/
 dist/
+test-results/
 
 .env
 .env.*

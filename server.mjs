@@ -144,9 +144,11 @@ import {
   buildCreationRepairPlan,
   hydrateCreationRepairSkuSubjects,
   refreshCreationRepairItemsFromPlan,
+  resolveCreationRepairGenerationConfig,
   selectCreationRepairItems,
 } from "./lib/creation-repair.mjs";
 import { buildCreationRelativeDir, createCreationSetStore } from "./lib/creation-store.mjs";
+import { resolveCreationPlanCounts } from "./lib/creation-plan-counts.mjs";
 import { generateCreationListingDrafts } from "./lib/creation-listing-agent.mjs";
 import {
   applyPortraitPlanOverrides,
@@ -1812,6 +1814,7 @@ function buildCreationSetManifest({
   referenceImageNames = [],
   referenceImageRoles = [],
 }) {
+  const planCounts = resolveCreationPlanCounts({ ...plan, items });
   return {
     setId,
     productName: plan.productName,
@@ -1830,11 +1833,7 @@ function buildCreationSetManifest({
     platformProvenance: plan.platformProvenance || "explicit",
     platformSetOverrides: plan.platformSetOverrides || plan.setOverrides || {},
     platformItemOverrides: plan.platformItemOverrides || {},
-    imageCount: plan.imageCount,
-    carouselImageCount: plan.carouselImageCount ?? plan.imageCount,
-    skuImageCount: plan.skuImageCount ?? items.filter((item) => item.role === "sku").length,
-    infographicRebuildCount: plan.infographicRebuildCount ?? items.filter((item) => item.role === "infographic-rebuild").length,
-    totalPlannedItemCount: plan.totalPlannedItemCount ?? items.length,
+    ...planCounts,
     scenario: plan.scenario,
     scenarioLabel: plan.scenarioLabel,
     visualLanguage: plan.visualLanguage,
@@ -1842,6 +1841,7 @@ function buildCreationSetManifest({
     industryTemplate: plan.industryTemplate,
     industryTemplateLabel: plan.industryTemplateLabel,
     industryTemplatePath: plan.industryTemplatePath,
+    skuGenerationEnabled: plan.skuGenerationEnabled,
     infographicRebuildEnabled: plan.infographicRebuildEnabled,
     selectedRoles: plan.selectedRoles || items.map((item) => item.role).filter(Boolean),
     referenceImageNames,
@@ -3207,6 +3207,8 @@ async function handleCreationPlan(request, response) {
       dimensionSpecs: formData.get("dimensionSpecs"),
       dimensionUnitMode: formData.get("dimensionUnitMode"),
       targetLanguage: formData.get("targetLanguage"),
+      ratio: formData.get("ratio"),
+      resolutionTier: formData.get("resolutionTier"),
       platform: formData.get("platform"),
       imageCount: formData.get("imageCount"),
       scenario: formData.get("scenario"),
@@ -3220,6 +3222,7 @@ async function handleCreationPlan(request, response) {
       platformSetOverrides: formData.get("platformSetOverrides"),
       platformItemOverrides: formData.get("platformItemOverrides"),
       audienceStrategy: formData.get("audienceStrategy"),
+      skuGenerationEnabled: formData.get("skuGenerationEnabled"),
       infographicRebuildEnabled: formData.get("infographicRebuildEnabled"),
       skuSubjects: formData.get("skuSubjects"),
       skuBundleCount: formData.get("skuBundleCount"),
@@ -3593,6 +3596,8 @@ async function handleCreationGenerate(request, response) {
       dimensionSpecs: formData.get("dimensionSpecs"),
       dimensionUnitMode: formData.get("dimensionUnitMode"),
       targetLanguage: formData.get("targetLanguage"),
+      ratio: formData.get("ratio"),
+      resolutionTier: formData.get("resolutionTier"),
       platform: formData.get("platform"),
       imageCount: formData.get("imageCount"),
       scenario: formData.get("scenario"),
@@ -3608,6 +3613,7 @@ async function handleCreationGenerate(request, response) {
       audienceStrategy: formData.get("audienceStrategy"),
       effectivePlan: formData.get("effectivePlan"),
       planOverrides: formData.get("planOverrides"),
+      skuGenerationEnabled: formData.get("skuGenerationEnabled"),
       infographicRebuildEnabled: formData.get("infographicRebuildEnabled"),
       skuSubjects: formData.get("skuSubjects"),
       skuBundleCount: formData.get("skuBundleCount"),
@@ -4571,11 +4577,6 @@ async function handleCreationRepair(request, response) {
       referenceImageRoles =
         submittedReferenceImageRoles.length > 0 ? submittedReferenceImageRoles : existingSet.referenceImageRoles || [];
     }
-    const logoOptions = logoImage
-      ? buildCreationLogoOptionsFromFormData(formData, logoImage)
-      : existingSet.logo || buildCreationLogoOptionsFromFormData(formData);
-    const normalizedLogoOptions = normalizeCreationLogoOptions(logoOptions);
-
     const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
     const generationConfig = getSelectedImageGenerationConfig(config);
     if (!generationConfig.apiKey) {
@@ -4588,25 +4589,6 @@ async function handleCreationRepair(request, response) {
     const repairItemId = formData.get("itemId");
     const promptOverride = formData.get("promptOverride");
     const marketingCopyOverride = formData.get("marketingCopyOverride");
-    const repairPlanningOverrides = {
-      productName: formData.get("productName"),
-      productDescription: formData.get("productDescription"),
-      sellingPoints: formData.get("sellingPoints"),
-      dimensionSpecs: formData.get("dimensionSpecs"),
-      dimensionUnitMode: formData.get("dimensionUnitMode"),
-      targetLanguage: formData.get("targetLanguage"),
-      platform: formData.get("platform"),
-      scenario: formData.get("scenario"),
-      visualLanguage: formData.get("visualLanguage"),
-      industryTemplate: formData.get("industryTemplate"),
-      selectedRoles: formData.get("selectedRoles"),
-      referenceImageRoles,
-      infographicRebuildEnabled: formData.get("infographicRebuildEnabled"),
-      skuSubjects: formData.get("skuSubjects"),
-      skuBundleCount: formData.get("skuBundleCount"),
-      skuGenerationRule: formData.get("skuGenerationRule"),
-      logoOptions: normalizedLogoOptions.enabled ? normalizedLogoOptions : existingSet.logo || null,
-    };
     let repairItems = hydrateCreationRepairSkuSubjects(
       selectCreationRepairItems(existingSet, {
         itemId: repairItemId,
@@ -4621,34 +4603,7 @@ async function handleCreationRepair(request, response) {
       return;
     }
 
-    repairPlan = {
-      productName: existingSet.productName,
-      productDescription: existingSet.productDescription,
-      sellingPoints: existingSet.sellingPoints,
-      dimensionSpecs: existingSet.dimensionSpecs,
-      dimensionUnitMode: existingSet.dimensionUnitMode,
-      dimensionUnitModeLabel: existingSet.dimensionUnitModeLabel,
-      targetLanguage: existingSet.targetLanguage,
-      targetLanguageLabel: existingSet.targetLanguageLabel,
-      platform: existingSet.platform || "universal",
-      platformLabel: existingSet.platformLabel || "",
-      imageCount: existingSet.imageCount,
-      scenario: existingSet.scenario,
-      scenarioLabel: existingSet.scenarioLabel,
-      visualLanguage: existingSet.visualLanguage || "classic-commercial",
-      visualLanguageLabel: existingSet.visualLanguageLabel || "",
-      industryTemplate: existingSet.industryTemplate || "general",
-      industryTemplateLabel: existingSet.industryTemplateLabel || "",
-      industryTemplatePath: existingSet.industryTemplatePath || "",
-      referenceImageRoles,
-      infographicRebuildEnabled: existingSet.infographicRebuildEnabled,
-      skuSubjects: existingSet.skuSubjects || [],
-      skuBundleCount: existingSet.skuBundleCount || 1,
-      skuGenerationRule: existingSet.skuGenerationRule || "none",
-      skuGenerationRuleLabel: existingSet.skuGenerationRuleLabel || "无",
-      logo: normalizedLogoOptions.enabled ? normalizedLogoOptions : existingSet.logo || null,
-    };
-    repairPlan = buildCreationRepairPlan(existingSet, repairPlanningOverrides);
+    repairPlan = buildCreationRepairPlan(existingSet);
     repairItems = refreshCreationRepairItemsFromPlan(repairItems, repairPlan);
     if (repairItemId) {
       repairItems = repairItems.map((item) =>
@@ -4706,11 +4661,15 @@ async function handleCreationRepair(request, response) {
 
     await runWithConcurrency(repairItems, MAX_PARALLEL_TASKS_PER_SESSION, async (item) => {
       const repairItem = item;
+      const itemGenerationConfig = resolveCreationRepairGenerationConfig(repairItem, generationConfig);
+      const itemFormat = normalizeOutputFormat(repairItem.format || finalFormat);
+      const itemQuality = String(repairItem.quality || finalQuality);
+      const itemReasoningEffort = normalizeReasoningEffort(repairItem.reasoningEffort || reasoningEffort);
       const taskId = `${setId}-repair-${item.itemId}`;
       const generationStartedAt = new Date().toISOString();
       const generationStartedAtMs = Date.now();
       const itemGenerationParameters = resolveCreationItemGenerationParameters(repairItem, {
-        imageRoute: generationConfig.imageRoute,
+        imageRoute: itemGenerationConfig.imageRoute,
         fallbackRatio,
         fallbackSize,
         fallbackTargetLanguage: existingSet.targetLanguage,
@@ -4730,11 +4689,11 @@ async function handleCreationRepair(request, response) {
         );
         const generationSnapshot = buildCreationGenerationSnapshot({
           generationPrompt: finalPrompt,
-          generationConfig,
+          generationConfig: itemGenerationConfig,
           parameters: itemGenerationParameters,
-          format: finalFormat,
-          quality: finalQuality,
-          reasoningEffort,
+          format: itemFormat,
+          quality: itemQuality,
+          reasoningEffort: itemReasoningEffort,
           referenceImages: itemGenerationReferenceImagesWithLogo,
         });
         items = updateCreationItems(items, item.itemId, {
@@ -4748,8 +4707,8 @@ async function handleCreationRepair(request, response) {
         writeSseEvent(response, "item_started", { setId, itemId: item.itemId, role: repairItem.role, ratio: itemGenerationParameters.ratioOption.value, effectiveSize: itemGenerationParameters.finalSize, targetLanguage: itemGenerationParameters.targetLanguage });
 
         const generationResult = await requestStudioImageGeneration({
-          baseUrl: generationConfig.baseUrl,
-          apiKey: generationConfig.apiKey,
+          baseUrl: itemGenerationConfig.baseUrl,
+          apiKey: itemGenerationConfig.apiKey,
           prompt: finalPrompt,
           referenceImages: itemGenerationReferenceImagesWithLogo,
           referenceImageLabels: buildCreationGenerationReferenceImageLabels(
@@ -4758,13 +4717,13 @@ async function handleCreationRepair(request, response) {
           ),
           size: itemGenerationParameters.finalSize,
           aspectRatio: itemGenerationParameters.ratioOption.value,
-          quality: finalQuality,
-          format: toApiOutputFormat(finalFormat),
-          responsesModel: generationConfig.responsesModel,
-          imageRoute: generationConfig.imageRoute,
-          imageModel: generationConfig.imageModel,
-          endpointPath: generationConfig.endpointPath,
-          reasoningEffort,
+          quality: itemQuality,
+          format: toApiOutputFormat(itemFormat),
+          responsesModel: itemGenerationConfig.responsesModel,
+          imageRoute: itemGenerationConfig.imageRoute,
+          imageModel: itemGenerationConfig.imageModel,
+          endpointPath: itemGenerationConfig.endpointPath,
+          reasoningEffort: itemReasoningEffort,
           async onEvent(event) {
             if (event.type === "status") {
               writeSseEvent(response, "item_status", {
@@ -4788,7 +4747,7 @@ async function handleCreationRepair(request, response) {
               writeSseEvent(response, "item_final_image", {
                 setId,
                 itemId: item.itemId,
-                dataUrl: `data:${toOutputFormatMimeType(finalFormat)};base64,${normalizeBase64(event.base64)}`,
+                dataUrl: `data:${toOutputFormatMimeType(itemFormat)};base64,${normalizeBase64(event.base64)}`,
               });
             }
           },
@@ -4806,7 +4765,7 @@ async function handleCreationRepair(request, response) {
           item: repairItem,
           createdAt: generationCompletedAt,
           setId,
-          format: finalFormat,
+          format: itemFormat,
         });
         const saved = await saveGeneratedAsset({
           outputDir,
@@ -4817,20 +4776,20 @@ async function handleCreationRepair(request, response) {
             prompt: finalPrompt,
             ...generationSnapshot,
             createdAt: generationCompletedAt,
-            baseUrl: generationConfig.baseUrl,
-            responsesModel: generationConfig.responsesModel,
-            imageRoute: generationConfig.imageRoute,
-            imageModel: generationConfig.imageModel,
-            endpointPath: generationConfig.endpointPath,
+            baseUrl: itemGenerationConfig.baseUrl,
+            responsesModel: itemGenerationConfig.responsesModel,
+            imageRoute: itemGenerationConfig.imageRoute,
+            imageModel: itemGenerationConfig.imageModel,
+            endpointPath: itemGenerationConfig.endpointPath,
             ratio: itemGenerationParameters.ratioOption.value,
             ratioLabel: itemGenerationParameters.ratioOption.label,
             resolutionTier: itemGenerationParameters.resolutionTier,
             requestedSize: itemGenerationParameters.requestedSize,
             effectiveSize: savedSize,
             size: savedSize,
-            quality: finalQuality,
-            format: finalFormat,
-            reasoningEffort,
+            quality: itemQuality,
+            format: itemFormat,
+            reasoningEffort: itemReasoningEffort,
             generationStartedAt,
             generationCompletedAt,
             generationDurationMs,

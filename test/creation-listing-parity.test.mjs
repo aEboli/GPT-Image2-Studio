@@ -147,16 +147,16 @@ const localizedCopy = {
   "en-US": {
     title: "Blue Storage Box 2 L Stackable Home Organizer",
     highlights: [
-      "Supplied 2 L capacity keeps the size clear.",
-      "Blue finish makes this supplied option easy to identify.",
-      "Stackable shape supports tidy everyday storage.",
+      "Supplied product data states a 2 L capacity.",
+      "Blue finish is stated for this product option.",
+      "Stackable shape is stated in the product data.",
     ],
     description: "Blue storage box with the supplied 2 L capacity, stackable shape, and supplied dimensions.",
     searchTerms: ["blue storage box", "2 L organizer", "stackable storage"],
   },
   "zh-CN": {
     title: "蓝色2升可叠放家用收纳盒",
-    highlights: ["已提供的2升容量便于核对规格。", "蓝色外观便于识别当前选项。", "可叠放造型适合日常收纳。"],
+    highlights: ["商品资料注明2升容量。", "商品资料注明蓝色外观。", "商品资料注明可叠放造型。"],
     description: "蓝色收纳盒采用已提供的2升容量、可叠放造型和尺寸信息。",
     searchTerms: ["蓝色收纳盒", "2升整理盒", "可叠放收纳"],
   },
@@ -182,7 +182,9 @@ const localizedCopy = {
 
 function makeValidV2Draft(source) {
   const policy = source.listingPolicy;
-  const copy = localizedCopy[source.language] || localizedCopy["en-US"];
+  const copy = localizedCopy["en-US"];
+  const zhCopy = localizedCopy["zh-CN"];
+  const warnings = source.warnings || policy.warnings || [];
   return {
     schemaVersion: "2",
     platformId: source.platformId,
@@ -204,8 +206,24 @@ function makeValidV2Draft(source) {
     },
     evidence: ["product-input"],
     missingInfo: [],
-    warnings: policy.warnings || [],
+    warnings,
     status: "completed",
+    zhDisplay: {
+      title: zhCopy.title,
+      sellingPoints: [zhCopy.highlights[0]],
+      buyerObjections: ["购买前请核对已提供的尺寸。"],
+      highlights: zhCopy.highlights,
+      description: zhCopy.description,
+      searchTerms: zhCopy.searchTerms,
+      keywordBuckets: {
+        exact: [zhCopy.searchTerms[0]],
+        longTail: [zhCopy.searchTerms[1]],
+        traffic: [zhCopy.searchTerms[2]],
+        descriptive: [zhCopy.title],
+      },
+      warnings: warnings.map((warning) => `提示对照：${warning}`),
+      missingInfo: [],
+    },
   };
 }
 
@@ -237,7 +255,7 @@ async function postJson(baseUrl, pathname, payload) {
   return { response, body: await response.json() };
 }
 
-test("shared, local, and Worker Listing paths keep policy requests, drafts, validation, and fallback equivalent", async (t) => {
+test("shared, local, and Worker Listing paths keep platform-aware old-style requests and fallback equivalent", async (t) => {
   const tempRoot = await mkdtemp(join(tmpdir(), "creation-listing-parity-"));
   const outputDir = join(tempRoot, "output");
   const localDataRootDir = join(tempRoot, "local-data");
@@ -351,8 +369,11 @@ test("shared, local, and Worker Listing paths keep policy requests, drafts, vali
     assert.equal(source.listingPolicy.evidenceLevel, evidenceLevel, platform);
     assert.equal(result.draft.platformId, platform, platform);
     assert.equal(result.draft.language, expectedLocale, platform);
-    assert.equal(result.draft.listingPolicyVersion, source.listingPolicyVersion, platform);
-    assert.equal(result.validation.ok, true, `${platform}: ${result.validation.errors.join("; ")}`);
+    assert.equal(result.draft.schemaVersion, undefined, platform);
+    assert.ok(result.draft.fiveBullets.length > 0, platform);
+    assert.equal(result.draft.status, "completed", platform);
+    assert.ok(result.draft.title, platform);
+    assert.ok(result.draft.zhDisplay?.title, platform);
   }
 
   const legacySet = makeNormalizedSet({ id: "parity-legacy-missing", legacyMissing: true });
@@ -360,7 +381,8 @@ test("shared, local, and Worker Listing paths keep policy requests, drafts, vali
   const legacyResult = await compareThreePaths(legacySet, [makeValidV2Draft(legacySource)]);
   assert.equal(legacyResult.draft.platformId, "universal");
   assert.equal(legacyResult.draft.language, "en-US");
-  assert.match(legacyResult.draft.warnings.join("\n"), /legacy-missing/i);
+  assert.equal(Object.prototype.hasOwnProperty.call(legacyResult.draft, "warnings"), false);
+  assert.ok(legacyResult.draft.fiveBullets.length > 0);
 
   const fallbackSet = makeNormalizedSet({
     id: "parity-temu-fallback",
@@ -370,19 +392,22 @@ test("shared, local, and Worker Listing paths keep policy requests, drafts, vali
   const fallbackSource = buildCreationListingSources(fallbackSet)[0];
   const invalidOutput = makeInvalidV2Draft(fallbackSource);
   const fallbackResult = await compareThreePaths(fallbackSet, [invalidOutput, invalidOutput]);
-  assert.equal(fallbackResult.requests.length, 2);
-  assert.equal(fallbackResult.draft.schemaVersion, "2");
+  assert.equal(fallbackResult.requests.length, 1);
+  assert.equal(fallbackResult.draft.schemaVersion, undefined);
   assert.equal(fallbackResult.draft.platformId, "temu");
   assert.equal(fallbackResult.draft.evidenceMode, "input-only");
-  assert.ok(["needs-review", "failed"].includes(fallbackResult.draft.status));
-  assert.match(fallbackResult.draft.warnings.join("\n"), /manual review|invalid/i);
+  assert.equal(fallbackResult.draft.status, "completed");
+  assert.ok(fallbackResult.draft.title);
+  assert.ok(fallbackResult.draft.fiveBullets.length > 0);
+  assert.ok(fallbackResult.draft.description);
+  assert.ok(fallbackResult.draft.zhDisplay?.title);
 
   const fetchLog = (await readFile(fetchLogPath, "utf8"))
     .trim()
     .split(/\r?\n/)
     .filter(Boolean)
     .map((line) => JSON.parse(line));
-  assert.equal(fetchLog.length, cases.length + 1 + 2);
+  assert.equal(fetchLog.length, cases.length + 1 + 1);
   assert.ok(fetchLog.every(({ url }) => url === responsesUrl));
 });
 

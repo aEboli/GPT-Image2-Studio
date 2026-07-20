@@ -149,7 +149,7 @@ test("Cloudflare preview returns strategy metadata, normalized overrides, valida
   );
 });
 
-test("explicit 18-image selection survives shared local planning and repeated Worker previews", async () => {
+test("out-of-range Amazon count is capped consistently in local and repeated Worker previews", async () => {
   const buildFormData = () => {
     const formData = new FormData();
     formData.set("productName", "Travel Bottle");
@@ -160,7 +160,7 @@ test("explicit 18-image selection survives shared local planning and repeated Wo
     formData.set("infographicRebuildEnabled", "false");
     formData.set("platformSetOverrides", JSON.stringify({ imageCount: 18 }));
     formData.set("platformItemOverrides", "[]");
-    formData.set("platformEvidence", "{}");
+    formData.set("platformEvidence", JSON.stringify({ dimensions: true, packageContents: true }));
     formData.set("categorySignals", "[]");
     formData.set("platformReferenceCoverage", "[]");
     return formData;
@@ -180,10 +180,12 @@ test("explicit 18-image selection survives shared local planning and repeated Wo
 
   for (const plan of [localPlan, initialPlan, repeatedPlan]) {
     const carouselItems = plan.items.filter((item) => item.itemKind === "carousel");
-    assert.equal(plan.carouselImageCount, 18);
-    assert.equal(carouselItems.length, 18);
-    assert.equal(new Set(carouselItems.map((item) => item.slotKey)).size, 18);
-    assert.deepEqual(carouselItems.map((item) => item.role), EXPLICIT_EIGHTEEN_ROLES);
+    assert.equal(plan.carouselImageCount, 7);
+    assert.equal(plan.platformSetOverrides.imageCount, 7);
+    assert.equal(carouselItems.length, 7);
+    assert.equal(new Set(carouselItems.map((item) => item.slotKey)).size, 7);
+    assert.deepEqual(carouselItems.map((item) => item.role), EXPLICIT_EIGHTEEN_ROLES.slice(0, 7));
+    assert.equal(carouselItems.some((item) => item.imageType === "custom"), false);
   }
   assert.equal(initialResponse.status, 200);
   assert.equal(repeatedResponse.status, 200);

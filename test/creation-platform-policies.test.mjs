@@ -43,12 +43,22 @@ const PROFILE_CONTRACT = {
     slots: [
       "generic-hero@1:1",
       "benefit-proof@1:1",
-      "lifestyle-first@1:1",
+      "scene-application@1:1",
       "multi-angle@1:1",
+      "ownership-atmosphere@1:1",
       "detail-macro@1:1",
+      "use-style-story@1:1",
       "dimension-fit@1:1",
+      "comparison-proof@1:1",
+      "spec-table@1:1",
+      "craft-proof@1:1",
       "in-box@1:1",
       "variant-comparison@1:1",
+      "material-proof@1:1",
+      "pain-solution@1:1",
+      "selling-point-stack@1:1",
+      "creator-demo@1:1",
+      "wearable-demo@1:1",
     ],
   },
   amazon: {
@@ -130,7 +140,7 @@ const PROFILE_CONTRACT = {
       "creator-demo@3:4",
       "lifestyle-first@3:4",
       "detail-macro@1:1",
-      "variant-comparison@1:1",
+      "dimension-fit@1:1",
     ],
   },
   xiaohongshu: {
@@ -177,7 +187,7 @@ const PROFILE_CONTRACT = {
       "lifestyle-first@1:1",
       "benefit-proof@1:1",
       "detail-macro@1:1",
-      "variant-comparison@1:1",
+      "dimension-fit@1:1",
     ],
   },
   shopee: {
@@ -277,7 +287,7 @@ const PROFILE_CONTRACT = {
       "benefit-proof@1:1",
       "detail-macro@1:1",
       "usage-demo@1:1",
-      "variant-comparison@1:1",
+      "dimension-fit@1:1",
       "brand-trust@1:1",
     ],
   },
@@ -311,7 +321,7 @@ const PROFILE_CONTRACT = {
       "spec-table@1:1",
       "usage-demo@1:1",
       "gift-packaging@1:1",
-      "variant-comparison@1:1",
+      "dimension-fit@1:1",
       "in-box@1:1",
     ],
   },
@@ -363,6 +373,9 @@ const IMAGE_TYPE_CONTRACT = {
   "content-cover": ["hero", "dynamic-vertical-cover", "concise", "demo-context", "allow-supplied"],
   "xhs-feed-cover": ["hero", "editorial-3x4-cover", "concise", "authentic-lifestyle", "allow-supplied"],
   "lifestyle-first": ["atmosphere", "environmental-first", "none-or-short", "authentic-lifestyle", "allow-supplied"],
+  "scene-application": ["scene", "multi-scenario-application", "concise", "authentic-use", "allow-supplied"],
+  "ownership-atmosphere": ["atmosphere", "ownership-atmosphere", "concise", "authentic-lifestyle", "allow-supplied"],
+  "use-style-story": ["brand-story", "multi-scene-use-style-story", "moderate", "multi-context", "allow-supplied"],
   "benefit-proof": ["benefit", "product-with-evidence", "concise", "optional-context", "allow-supplied"],
   "info-benefit": ["benefit", "modular-information-hierarchy", "moderate", "neutral", "allow-supplied"],
   "value-bundle": ["accessory-gift", "bundle-quantity-groups", "factual-short", "studio-clean", "allow-supplied"],
@@ -375,11 +388,14 @@ const IMAGE_TYPE_CONTRACT = {
   "spec-table": ["spec-table", "specification-table", "factual-only", "neutral", "allow-supplied"],
   "usage-demo": ["usage-suggestion", "usage-or-step-demo", "concise", "authentic-use", "allow-supplied"],
   "creator-demo": ["human-handheld", "person-handheld-or-demo", "concise", "authentic-use", "allow-supplied"],
+  "wearable-demo": ["human-wearable", "person-wearing-or-carrying", "concise", "authentic-use", "allow-supplied"],
   "in-box": ["accessory-gift", "flat-lay-in-box", "factual-only", "studio-clean", "allow-supplied"],
   "variant-comparison": ["series-showcase", "supplied-variant-comparison", "factual-only", "studio-clean", "allow-supplied"],
   "material-proof": ["ingredient-material", "material-ingredient-or-color-swatches", "factual-short", "neutral", "allow-supplied"],
   "craft-proof": ["craft-process", "craft-or-quality-evidence", "factual-short", "process", "allow-supplied"],
   "comparison-proof": ["effect-comparison", "side-by-side-functional-evidence", "factual-only", "controlled-context", "allow-supplied"],
+  "pain-solution": ["after-sales", "pain-solution-payoff", "concise", "authentic-use", "allow-supplied"],
+  "selling-point-stack": ["usage-suggestion", "selling-points-with-evidence", "concise", "optional-context", "allow-supplied"],
   "condition-proof": ["product-detail", "condition-inspection", "factual-only", "studio-clean", "preserve-existing-only"],
   "defect-disclosure": ["product-detail", "defect-macro", "factual-only", "studio-clean", "preserve-existing-only"],
   "gift-packaging": ["accessory-gift", "gift-or-unboxing", "concise", "gift-context", "allow-supplied"],
@@ -431,7 +447,7 @@ test("canonical Creation platform policy module is available", () => {
 const policyTest = (name, fn) => test(name, { skip: !policies }, fn);
 
 policyTest("policy registry exposes the versioned browser-safe contract", () => {
-  assert.equal(policies.CREATION_PLATFORM_POLICY_VERSION, "2026-07-14.1");
+  assert.equal(policies.CREATION_PLATFORM_POLICY_VERSION, "2026-07-18.2");
   assert.equal(policies.CREATION_PLATFORM_POLICY_VERIFIED_AT, "2026-07-11");
   assert.deepEqual(policies.CREATION_PLATFORM_EVIDENCE_LEVELS, ["baseline", "A", "B", "C"]);
   assert.deepEqual(policies.CREATION_PLATFORM_RESOLUTION_TIERS, ["1.5K", "2K", "max"]);
@@ -503,6 +519,10 @@ policyTest("all 19 profiles expose exact metadata, counts, sources, and ordered 
       profile.slots.map((slot) => `${slot.imageType}@${slot.ratio}`),
       expected.slots,
     );
+    assert.ok(
+      profile.slots.some((slot) => ["dimension-fit", "scale-proof"].includes(slot.imageType)),
+      `${platformId} requires a dimension or scale slot`,
+    );
 
     for (const sourceId of profile.sourceIds) {
       assert.ok(policies.CREATION_PLATFORM_SOURCE_REGISTRY[sourceId], `${platformId} references missing source ${sourceId}`);
@@ -511,6 +531,7 @@ policyTest("all 19 profiles expose exact metadata, counts, sources, and ordered 
 
   assert.equal(policies.CREATION_PLATFORM_PROFILE_REGISTRY.amazon.recommendedImageCount, 7);
   assert.equal(policies.CREATION_PLATFORM_PROFILE_REGISTRY.shopee.recommendedImageCount, 9);
+  assert.equal(policies.CREATION_PLATFORM_PROFILE_REGISTRY.universal.recommendedImageCount, 18);
 });
 
 policyTest("all 19 profiles expose structured advisory marketing context", () => {

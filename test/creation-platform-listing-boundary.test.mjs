@@ -129,11 +129,11 @@ test("specific platform records use the existing Listing generation, copy, and e
 
 test("Cloudflare Listing endpoint allows every Creation platform", async () => {
   for (const set of [
-    { setId: "amazon-explicit", platform: "amazon", platformProvenance: "explicit", productName: "Bottle", items: [] },
-    { setId: "universal-explicit", platform: "universal", platformProvenance: "explicit", productName: "Bottle", items: [] },
-    { setId: "temu-explicit", platform: "temu", platformProvenance: "explicit", productName: "Bottle", items: [] },
-    { setId: "etsy-explicit", platform: "etsy", platformProvenance: "explicit", productName: "Bottle", items: [] },
-    { setId: "legacy", productName: "Bottle", items: [] },
+    { setId: "amazon-explicit", platform: "amazon", platformProvenance: "explicit", productName: "Travel Bottle", items: [] },
+    { setId: "universal-explicit", platform: "universal", platformProvenance: "explicit", productName: "Travel Bottle", items: [] },
+    { setId: "temu-explicit", platform: "temu", platformProvenance: "explicit", productName: "Travel Bottle", items: [] },
+    { setId: "etsy-explicit", platform: "etsy", platformProvenance: "explicit", productName: "Travel Bottle", items: [] },
+    { setId: "legacy", productName: "Travel Bottle", items: [] },
   ]) {
     const response = await handleApiRequest(new Request("https://studio.example/api/creation/listings", {
       method: "POST",
@@ -146,7 +146,7 @@ test("Cloudflare Listing endpoint allows every Creation platform", async () => {
 
 test("local Listing endpoint has no platform eligibility gate", async () => {
   const server = await readFile(new URL("../server.mjs", import.meta.url), "utf8");
-  const handler = server.match(/async function handleCreationListingsGenerate[\s\S]*?\n}\n\nasync function handlePortraitSetsGet/)?.[0] || "";
+  const handler = server.match(/async function handleCreationListingsGenerate[\s\S]*?\r?\n}\r?\n\r?\nasync function handlePortraitSetsGet/)?.[0] || "";
   assert.doesNotMatch(handler, /CreationListingEligibility|marketplace eligibility gate/i);
   assert.match(handler, /mergeRequestPrivateConfig/);
 });

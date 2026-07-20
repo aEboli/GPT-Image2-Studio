@@ -40,7 +40,7 @@ test("creation reference category matching ignores stale form product copy", () 
   assert.doesNotMatch(text, /fishing lure|bass bait|swimming action/);
 });
 
-test("creation reference product name suggestion replaces only analysis-managed names", () => {
+test("creation reference product name suggestion preserves form text and replaces only analysis-managed names", () => {
   assert.deepEqual(
     applyCreationReferenceAnalysisProductNameValue({
       analysis: { categoryTemplateLabel: "Women's Clothing Sets" },
@@ -62,8 +62,8 @@ test("creation reference product name suggestion replaces only analysis-managed 
     }),
     {
       applied: false,
-      autoProductName: "",
-      productName: "",
+      autoProductName: "Fishing Lure",
+      productName: "Fishing Lure",
     },
   );
 
@@ -75,7 +75,20 @@ test("creation reference product name suggestion replaces only analysis-managed 
     }),
     {
       applied: false,
-      autoProductName: "Fishing Lure",
+      autoProductName: "",
+      productName: "Manual Catalog Name",
+    },
+  );
+
+  assert.deepEqual(
+    applyCreationReferenceAnalysisProductNameValue({
+      analysis: { categoryTemplateLabel: "Women's Clothing Sets" },
+      currentProductName: "Manual Catalog Name",
+      previousAutoProductName: "",
+    }),
+    {
+      applied: false,
+      autoProductName: "",
       productName: "Manual Catalog Name",
     },
   );

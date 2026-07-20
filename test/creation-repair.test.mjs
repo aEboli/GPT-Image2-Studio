@@ -186,7 +186,87 @@ test("creation repair preserves frozen per-item conversion intent", () => {
   assert.deepEqual(item.conversionIntent, { conversionGoal: "用证据降低顾虑", objectionFocus: "担心尺寸" });
 });
 
-test("creation repair rebuilds targeted prompts when current visual language differs from stored set", () => {
+test("legacy creation repair ignores current form planning values and preserves saved items", () => {
+  const set = {
+    productName: "Saved product",
+    productDescription: "Saved description",
+    sellingPoints: ["saved selling point"],
+    imageCount: 1,
+    carouselImageCount: 1,
+    platform: "universal",
+    targetLanguage: "en",
+    visualLanguage: "classic-commercial",
+    items: [{
+      itemId: "saved-hero",
+      slotIndex: 1,
+      itemKind: "carousel",
+      role: "hero",
+      prompt: "Saved frozen prompt.",
+      ratio: "1:1",
+      effectiveSize: "1536x1536",
+      targetLanguage: "en",
+      status: "failed",
+    }],
+  };
+
+  const plan = buildCreationRepairPlan(set, {
+    productName: "Current draft product",
+    platform: "amazon",
+    targetLanguage: "zh-CN",
+    visualLanguage: "warm-handcrafted",
+  });
+  const [item] = refreshCreationRepairItemsFromPlan(set.items, plan);
+
+  assert.equal(plan.__frozenEffectivePlan, true);
+  assert.equal(plan.productName, "Saved product");
+  assert.equal(plan.platform, "universal");
+  assert.equal(plan.targetLanguage, "en");
+  assert.equal(plan.visualLanguage, "classic-commercial");
+  assert.equal(item.prompt, "Saved frozen prompt.");
+  assert.equal(item.ratio, "1:1");
+  assert.equal(item.effectiveSize, "1536x1536");
+});
+
+test("creation repair freeze marker is not serialized with the effective plan", () => {
+  const plan = buildCreationRepairPlan({
+    productName: "Saved product",
+    imageCount: 1,
+    items: [{ itemId: "saved-hero", slotIndex: 1, role: "hero", prompt: "Saved prompt" }],
+  });
+
+  assert.equal(plan.__frozenEffectivePlan, true);
+  assert.equal(Object.keys(plan).includes("__frozenEffectivePlan"), false);
+  assert.equal(JSON.stringify(plan).includes("__frozenEffectivePlan"), false);
+});
+
+test("creation repair generation keeps the saved route and model snapshot", async () => {
+  const { resolveCreationRepairGenerationConfig } = await import("../lib/creation-repair.mjs");
+  const resolved = resolveCreationRepairGenerationConfig({
+    baseUrl: "https://saved.example/v1",
+    imageRoute: "route-b",
+    responsesModel: "saved-responses",
+    imageModel: "saved-image",
+    endpointPath: "images/generations",
+  }, {
+    apiKey: "current-secret",
+    baseUrl: "https://current.example/v1",
+    imageRoute: "route-c",
+    responsesModel: "current-responses",
+    imageModel: "current-image",
+    endpointPath: "chat/completions",
+  });
+
+  assert.deepEqual(resolved, {
+    apiKey: "current-secret",
+    baseUrl: "https://saved.example/v1",
+    imageRoute: "route-b",
+    responsesModel: "saved-responses",
+    imageModel: "saved-image",
+    endpointPath: "images/generations",
+  });
+});
+
+test("creation repair ignores the current visual language and keeps the saved prompt", () => {
   const set = {
     productName: "Jointed fishing lure",
     productDescription: "Segmented lifelike lure for bass fishing",
@@ -215,15 +295,11 @@ test("creation repair rebuilds targeted prompts when current visual language dif
   const plan = buildCreationRepairPlan(set, { visualLanguage: "warm-handcrafted" });
   const [item] = refreshCreationRepairItemsFromPlan(set.items, plan);
 
-  assert.equal(plan.visualLanguage, "warm-handcrafted");
-  assert.equal(plan.visualLanguageLabel, "手作温度");
-  assert.match(item.prompt, /VISUAL LANGUAGE LOCK/);
-  assert.match(item.prompt, /warm tactile handcrafted setting/);
-  assert.doesNotMatch(item.prompt, /Old scene prompt/);
-  assert.doesNotMatch(item.prompt, /polished commercial lighting/);
+  assert.equal(plan.visualLanguage, "classic-commercial");
+  assert.equal(item.prompt, "Old scene prompt with polished commercial lighting.");
 });
 
-test("creation repair rebuilds targeted prompts when current platform differs from stored set", () => {
+test("creation repair ignores the current platform and keeps the saved prompt", () => {
   const set = {
     productName: "Jointed fishing lure",
     productDescription: "Segmented lifelike lure for bass fishing",
@@ -253,14 +329,11 @@ test("creation repair rebuilds targeted prompts when current platform differs fr
   const plan = buildCreationRepairPlan(set, { platform: "amazon" });
   const [item] = refreshCreationRepairItemsFromPlan(set.items, plan);
 
-  assert.equal(plan.platform, "amazon");
-  assert.equal(plan.platformLabel, "Amazon");
-  assert.match(item.prompt, /PLATFORM FIT ANALYSIS: Platform: Amazon/);
-  assert.match(item.prompt, /Amazon-style marketplace priorities/);
-  assert.doesNotMatch(item.prompt, /Old universal platform prompt/);
+  assert.equal(plan.platform, "universal");
+  assert.equal(item.prompt, "Old universal platform prompt.");
 });
 
-test("creation repair treats current selling point input as a planning override", () => {
+test("creation repair ignores current selling points and keeps the saved prompt", () => {
   const set = {
     productName: "Jointed fishing lure",
     productDescription: "Segmented lifelike lure for bass fishing",
@@ -288,8 +361,8 @@ test("creation repair treats current selling point input as a planning override"
   const plan = buildCreationRepairPlan(set, { sellingPoints: "new silent rattle chamber" });
   const [item] = refreshCreationRepairItemsFromPlan(set.items, plan);
 
-  assert.match(item.prompt, /new silent rattle chamber/);
-  assert.doesNotMatch(item.prompt, /Old hero prompt/);
+  assert.deepEqual(plan.sellingPoints, ["old swim action"]);
+  assert.equal(item.prompt, "Old hero prompt with the old swim action.");
 });
 
 test("creation repair rehydrates SKU subject metadata from legacy set manifests", () => {
@@ -343,7 +416,7 @@ test("creation repair rehydrates SKU subject metadata from legacy set manifests"
   );
 });
 
-test("creation repair rebuilds retried SKU prompts with the shared SKU series lock", () => {
+test("creation repair does not rewrite saved SKU prompts to add a newer series lock", () => {
   const set = {
     productName: "Jointed fishing lure",
     productDescription: "Three sellable lure colorways",
@@ -393,9 +466,7 @@ test("creation repair rebuilds retried SKU prompts with the shared SKU series lo
   const plan = buildCreationRepairPlan(set, { visualLanguage: "clean-marketplace" });
   const refreshed = refreshCreationRepairItemsFromPlan(set.items, plan);
 
-  assert.ok(refreshed.every((item) => item.prompt.includes("SKU SERIES CONSISTENCY LOCK")));
-  assert.ok(refreshed.every((item) => item.prompt.includes("same visual template across first generation and retries")));
-  assert.ok(refreshed.every((item) => item.prompt.includes("Series subjects: Silver lure; Gold lure")));
+  assert.deepEqual(refreshed.map((item) => item.prompt), ["Old silver SKU prompt.", "Old gold SKU prompt."]);
 });
 
 test("creation repair refreshes legacy SKU prompts that predate the series lock", () => {
@@ -454,14 +525,14 @@ test("creation repair preserves existing SKU subjects when repair preview sends 
   };
 
   const plan = buildCreationRepairPlan(set, { skuSubjects: "[]" });
-  const skuItem = plan.items.find((item) => item.role === "sku");
+  const [skuItem] = hydrateCreationRepairSkuSubjects(plan.items, plan);
 
   assert.deepEqual(plan.skuSubjects.map((subject) => subject.id), ["silver"]);
   assert.equal(skuItem.skuSubject.id, "silver");
 
   for (const emptyPayload of ["", "   "]) {
     const emptyPlan = buildCreationRepairPlan(set, { skuSubjects: emptyPayload });
-    const emptySkuItem = emptyPlan.items.find((item) => item.role === "sku");
+    const [emptySkuItem] = hydrateCreationRepairSkuSubjects(emptyPlan.items, emptyPlan);
 
     assert.deepEqual(emptyPlan.skuSubjects.map((subject) => subject.id), ["silver"]);
     assert.equal(emptySkuItem.skuSubject.id, "silver");
@@ -496,5 +567,24 @@ test("creation repair preserves disabled infographic rebuild setting", () => {
   const plan = buildCreationRepairPlan(set, {});
 
   assert.equal(plan.infographicRebuildEnabled, false);
+  assert.deepEqual(plan.items.map((item) => item.role), ["hero"]);
+});
+
+test("creation repair preserves disabled SKU generation setting", () => {
+  const set = {
+    productName: "Jointed fishing lure",
+    productDescription: "Segmented electric lure",
+    imageCount: 1,
+    selectedRoles: ["hero"],
+    skuGenerationEnabled: false,
+    skuSubjects: [{ id: "blue", title: "Blue lure", filenames: ["blue.jpg"] }],
+    items: [{ itemId: "1-hero", slotIndex: 1, role: "hero", title: "Hero image", status: "failed" }],
+  };
+
+  const plan = buildCreationRepairPlan(set, {});
+
+  assert.equal(plan.skuGenerationEnabled, false);
+  assert.equal(plan.skuImageCount, 0);
+  assert.deepEqual(plan.skuSubjects.map((subject) => subject.id), ["blue"]);
   assert.deepEqual(plan.items.map((item) => item.role), ["hero"]);
 });

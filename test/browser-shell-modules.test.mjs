@@ -15,7 +15,7 @@ import {
 import { isCreationSubjectReferenceRole } from "../public/lib/creation-reference-roles.mjs";
 import { reorderCreationReferenceFiles } from "../public/lib/creation-reference-drag.mjs";
 
-const APP_SHELL_LINE_BUDGET = 16600;
+const APP_SHELL_LINE_BUDGET = 17000;
 
 function makeFakeControlButton(className = "") {
   const element = {

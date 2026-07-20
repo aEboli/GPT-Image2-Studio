@@ -81,6 +81,23 @@ function normalizeStringArray(value) {
   return Array.isArray(value) ? value.map(cleanString).filter(Boolean) : [];
 }
 
+function normalizeColorNames(value) {
+  const values = Array.isArray(value) ? value : value ? [value] : [];
+  const seen = new Set();
+  return values
+    .flatMap((item) => cleanString(item).split(/[,，、;；|/]+/))
+    .map(cleanString)
+    .filter(Boolean)
+    .filter((item) => {
+      const key = item.toLowerCase();
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+}
+
 function normalizeIndexArray(value) {
   return Array.isArray(value)
     ? value.map((item) => Number.parseInt(cleanString(item), 10)).filter((item) => Number.isFinite(item) && item > 0)
@@ -170,12 +187,16 @@ function buildProductReferenceSkuSubjects(referenceRoles = []) {
       const note = entry.note || "";
       const subjectUnitCount = normalizeSubjectUnitCount(entry.subjectUnitCount ?? entry.subject_unit_count) ||
         inferSubjectUnitCount([entry.filename, note].join(" "));
+      const colorNames = normalizeColorNames(
+        entry.colorNames ?? entry.color_names ?? entry.colorName ?? entry.color_name ?? entry.colors ?? entry.colours,
+      );
       return {
         id: entry.filename || `sku-${index + 1}`,
         title: entry.filename || `SKU ${index + 1}`,
         referenceIndexes: [entry.referenceIndex],
         filenames: [entry.filename].filter(Boolean),
         note,
+        ...(colorNames.length > 0 ? { colorName: colorNames.join(", ") } : {}),
         ...(subjectUnitCount ? { subjectUnitCount } : {}),
       };
     });
@@ -236,11 +257,16 @@ function enrichSkuSubjectFromProductReferences(subject = {}, productReferenceSub
     ...matchedSubjects.map((entry) => normalizeSubjectUnitCount(entry.subjectUnitCount)),
     inferSubjectUnitCount([subject.title, inferenceNote].join(" ")),
   );
+  const colorNames = normalizeColorNames([
+    subject.colorName,
+    ...matchedSubjects.flatMap((entry) => normalizeColorNames(entry.colorName)),
+  ]);
 
   return {
     ...subject,
     ...(referenceIndexes.length > 0 ? { referenceIndexes } : {}),
     ...(note ? { note } : {}),
+    ...(colorNames.length > 0 ? { colorName: colorNames.join(", ") } : {}),
     ...(subjectUnitCount ? { subjectUnitCount } : {}),
   };
 }
@@ -371,6 +397,9 @@ export function normalizeCreationSkuSubjectForPayload(entry = {}, index = 0) {
   const id = cleanString(entry.id || entry.subjectId || entry.subject_id || filenames[0] || `sku-${index + 1}`);
   const title = cleanString(entry.title || entry.name || filenames[0] || id);
   const note = cleanString(entry.note || entry.description);
+  const colorNames = normalizeColorNames(
+    entry.colorNames ?? entry.color_names ?? entry.colorName ?? entry.color_name ?? entry.colors ?? entry.colours,
+  );
   const rawBundleCount = entry.bundleCount ?? entry.bundle_count ?? entry.quantity ?? entry.count ?? entry.skuBundleCount;
   const bundleCount = rawBundleCount === undefined || rawBundleCount === null || cleanString(rawBundleCount) === ""
     ? 0
@@ -391,6 +420,7 @@ export function normalizeCreationSkuSubjectForPayload(entry = {}, index = 0) {
         referenceIndexes,
         filenames,
         note,
+        ...(colorNames.length > 0 ? { colorName: colorNames.join(", ") } : {}),
         ...(bundleCount ? { bundleCount } : {}),
         ...(subjectUnitCount ? { subjectUnitCount } : {}),
       }
@@ -447,6 +477,7 @@ function mergeSameReferenceSubjects(subjects = [], roleMap = new Map()) {
       referenceIndexes: uniqueNumbers(group.flatMap((item) => item.referenceIndexes || [])),
       filenames: [filename],
       note: group.map((item) => cleanString(item.note)).filter(Boolean).join(" | "),
+      colorName: normalizeColorNames(group.flatMap((item) => normalizeColorNames(item.colorName))).join(", "),
       subjectUnitCount: Math.max(group.length, ...group.map((item) => Number(item.subjectUnitCount) || 0)),
     }];
   });

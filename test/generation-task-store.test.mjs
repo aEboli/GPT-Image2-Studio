@@ -94,6 +94,27 @@ test("generation task store records errors with a compact public status", () => 
   assert.equal(snapshot.errorMessage, "上游请求失败");
 });
 
+test("generation task store preserves explicit empty fields when a task is updated", () => {
+  const store = createGenerationTaskStore();
+  store.upsertTask("session-a", {
+    id: "job-clear",
+    prompt: "旧提示词",
+    errorMessage: "旧错误",
+    status: "running",
+  });
+
+  store.updateTask("session-a", "job-clear", {
+    prompt: "",
+    errorMessage: "",
+    statusText: "",
+  });
+
+  const [snapshot] = store.listTasks("session-a");
+  assert.equal(snapshot.prompt, "");
+  assert.equal(snapshot.errorMessage, "");
+  assert.equal(snapshot.statusText, "");
+});
+
 test("generation task store keeps at most 20 recent tasks by default", () => {
   const store = createGenerationTaskStore();
 

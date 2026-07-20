@@ -31,7 +31,7 @@ export function createPptAnalysisController({
     summary: document.querySelector("#pptAnalysisSummary"),
     topicInput: document.querySelector("#pptTopicInput"),
   };
-  const model = { analysis: null, analyzing: false };
+  const model = { analysis: null, analyzing: false, requestToken: 0, abortController: null };
 
   function setFeedback(message = "", kind = "") {
     refs.feedback.textContent = message ? compactErrorMessage(message, "PPT 文档分析失败") : "";
@@ -39,6 +39,10 @@ export function createPptAnalysisController({
   }
 
   function clear() {
+    model.requestToken += 1;
+    model.abortController?.abort();
+    model.abortController = null;
+    model.analyzing = false;
     model.analysis = null;
     setFeedback("");
   }
@@ -76,8 +80,8 @@ export function createPptAnalysisController({
     }
   }
 
-  async function requestAnalysis() {
-    const response = await fetch("/api/ppt/analyze", { method: "POST", body: buildFormData() });
+  async function requestAnalysis(signal) {
+    const response = await fetch("/api/ppt/analyze", { method: "POST", body: buildFormData(), signal });
     const payload = await readAnalysisResponsePayload(response);
     if (!response.ok || payload.ok === false) {
       if (response.status === 404 || response.status === 405) {
@@ -95,21 +99,47 @@ export function createPptAnalysisController({
       return;
     }
 
+    const requestToken = model.requestToken + 1;
+    model.requestToken = requestToken;
+    model.abortController?.abort();
+    const requestController = new AbortController();
+    model.abortController = requestController;
+    const sourceSnapshot = JSON.stringify({
+      files: state.ppt.files.map((file) => `${file.name || ""}:${file.size || 0}:${file.lastModified || 0}`),
+      sourceText: refs.sourceTextInput.value,
+      topic: refs.topicInput.value,
+      sourceMode: refs.sourceModeInputs.find((input) => input.checked)?.value || "",
+    });
     model.analyzing = true;
     model.analysis = null;
     setFeedback("正在分析文档...", "busy");
     renderPptView();
 
     try {
-      const analysis = await requestAnalysis();
+      const analysis = await requestAnalysis(requestController.signal);
+      const currentSnapshot = JSON.stringify({
+        files: state.ppt.files.map((file) => `${file.name || ""}:${file.size || 0}:${file.lastModified || 0}`),
+        sourceText: refs.sourceTextInput.value,
+        topic: refs.topicInput.value,
+        sourceMode: refs.sourceModeInputs.find((input) => input.checked)?.value || "",
+      });
+      if (requestToken !== model.requestToken || sourceSnapshot !== currentSnapshot) {
+        return;
+      }
       model.analysis = analysis;
       applyResult(analysis);
       setFeedback("已根据文档内容更新页数和视觉风格。", "success");
     } catch (error) {
+      if (requestToken !== model.requestToken || error?.name === "AbortError") {
+        return;
+      }
       setFeedback(error instanceof Error ? error.message : String(error), "error");
     } finally {
-      model.analyzing = false;
-      renderPptView();
+      if (requestToken === model.requestToken) {
+        model.abortController = null;
+        model.analyzing = false;
+        renderPptView();
+      }
     }
   }
 

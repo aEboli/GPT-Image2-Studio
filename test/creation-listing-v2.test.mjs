@@ -5,6 +5,7 @@ import * as listingAgent from "../lib/creation-listing-agent.mjs";
 import * as listingDraft from "../lib/creation-listing-draft.mjs";
 import {
   getCreationListingPolicy,
+  listCreationListingPolicies,
   resolveCreationListingPolicy,
 } from "../lib/creation-listing-policies.mjs";
 
@@ -35,6 +36,18 @@ const SOURCE_FACTS = {
   dimensions: "20 x 12 x 10 cm",
 };
 
+const BILINGUAL_CONTENT_FIELDS = [
+  "title",
+  "sellingPoints",
+  "buyerObjections",
+  "highlights",
+  "description",
+  "searchTerms",
+  "keywordBuckets",
+  "warnings",
+  "missingInfo",
+];
+
 function requireFunction(module, name) {
   assert.equal(typeof module[name], "function", `${name} must be exported`);
   return module[name];
@@ -42,7 +55,7 @@ function requireFunction(module, name) {
 
 function makeV2Draft(policy, overrides = {}) {
   const locale = policy.locale || policy.defaultLocale;
-  return {
+  const draft = {
     schemaVersion: "2",
     platformId: policy.platformId || policy.id,
     platformLabel: policy.platformLabel || policy.label,
@@ -50,12 +63,12 @@ function makeV2Draft(policy, overrides = {}) {
     listingPolicyVersion: policy.listingPolicyVersion || policy.policyVersion,
     language: locale,
     title: "Blue Storage Box 2 L Stackable Home Organizer",
-    sellingPoints: ["The supplied 2 L capacity keeps the size clear."],
+    sellingPoints: ["The supplied product details state a 2 L capacity."],
     buyerObjections: ["Check the supplied dimensions before purchase."],
     highlights: [
       "2 L capacity is stated in the supplied product details.",
-      "Blue finish makes this option easy to identify.",
-      "Stackable shape supports tidy everyday storage.",
+      "Blue finish is stated in the supplied product details.",
+      "Stackable shape is stated in the supplied product details.",
     ],
     description: "Blue storage box with the supplied 2 L capacity, stackable shape, and 20 x 12 x 10 cm dimensions.",
     searchTerms: ["blue storage box", "2 L organizer", "stackable storage"],
@@ -69,8 +82,45 @@ function makeV2Draft(policy, overrides = {}) {
     missingInfo: [],
     warnings: [],
     status: "completed",
-    ...overrides,
+    zhDisplay: {
+      title: "蓝色 2 升可叠放家用收纳盒",
+      sellingPoints: ["已提供的商品资料注明 2 升容量。"],
+      buyerObjections: ["购买前请核对已提供的尺寸。"],
+      highlights: [
+        "商品资料已注明 2 升容量。",
+        "商品资料注明蓝色外观。",
+        "商品资料注明可叠放造型。",
+      ],
+      description: "蓝色收纳盒，已提供 2 升容量、可叠放造型和 20 x 12 x 10 厘米尺寸。",
+      searchTerms: ["蓝色收纳盒", "2 升整理盒", "可叠放收纳"],
+      keywordBuckets: {
+        exact: ["蓝色收纳盒"],
+        longTail: ["2 升可叠放收纳盒"],
+        traffic: ["家用整理盒"],
+        descriptive: ["蓝色可叠放盒"],
+      },
+      warnings: [],
+      missingInfo: [],
+    },
   };
+  const merged = { ...draft, ...overrides };
+  if (!Object.prototype.hasOwnProperty.call(overrides, "zhDisplay")) {
+    merged.zhDisplay = {
+      title: `中文事实对照：${merged.title}`,
+      sellingPoints: merged.sellingPoints.map((item) => `中文事实对照：${item}`),
+      buyerObjections: merged.buyerObjections.map((item) => `中文事实对照：${item}`),
+      highlights: merged.highlights.map((item) => `中文事实对照：${item}`),
+      description: `中文事实对照：${merged.description}`,
+      searchTerms: merged.searchTerms.map((item) => `中文事实对照：${item}`),
+      keywordBuckets: Object.fromEntries(Object.entries(merged.keywordBuckets).map(([key, values]) => [
+        key,
+        values.map((item) => `中文事实对照：${item}`),
+      ])),
+      warnings: merged.warnings.map((item) => `中文事实对照：${item}`),
+      missingInfo: merged.missingInfo.map((item) => `中文事实对照：${item}`),
+    };
+  }
+  return merged;
 }
 
 function issueText(validation, field = "all") {
@@ -82,6 +132,24 @@ function issueText(validation, field = "all") {
   return (values || [])
     .map((value) => typeof value === "string" ? value : JSON.stringify(value))
     .join("\n");
+}
+
+function assertCompleteBilingualNoBrandDraft(draft, forbiddenPattern) {
+  for (const field of BILINGUAL_CONTENT_FIELDS) {
+    assert.ok(Object.prototype.hasOwnProperty.call(draft, field), field);
+    assert.ok(Object.prototype.hasOwnProperty.call(draft.zhDisplay || {}, field), `zhDisplay.${field}`);
+    if (Array.isArray(draft[field])) {
+      assert.equal(draft.zhDisplay[field].length, draft[field].length, field);
+    }
+  }
+  for (const bucket of ["exact", "longTail", "traffic", "descriptive"]) {
+    assert.equal(draft.zhDisplay.keywordBuckets[bucket].length, draft.keywordBuckets[bucket].length, bucket);
+  }
+  const content = {
+    ...Object.fromEntries(BILINGUAL_CONTENT_FIELDS.map((field) => [field, draft[field]])),
+    zhDisplay: Object.fromEntries(BILINGUAL_CONTENT_FIELDS.map((field) => [field, draft.zhDisplay[field]])),
+  };
+  assert.doesNotMatch(JSON.stringify(content), forbiddenPattern);
 }
 
 function validateFor(platformId, overrides = {}, options = {}) {
@@ -111,7 +179,234 @@ test("V2 strict schema is a stable superset with policy-driven item constraints"
   assert.equal(amazonSchema.properties.highlights.type, "array");
   assert.equal(amazonSchema.properties.highlights.minItems, 3);
   assert.equal(amazonSchema.properties.searchTerms.type, "array");
+  assert.equal(amazonSchema.properties.zhDisplay.type, "object");
+  assert.deepEqual(amazonSchema.properties.zhDisplay.required, BILINGUAL_CONTENT_FIELDS);
+  assert.deepEqual(Object.keys(amazonSchema.properties.zhDisplay.properties), BILINGUAL_CONTENT_FIELDS);
+  for (const field of BILINGUAL_CONTENT_FIELDS) {
+    assert.equal(
+      amazonSchema.properties.zhDisplay.properties[field].type,
+      amazonSchema.properties[field].type,
+      `zhDisplay.${field} must use the same JSON type as ${field}`,
+    );
+  }
   assert.notEqual(etsySchema.properties.highlights.minItems, 3, "Amazon bullet minimum must not leak into Etsy");
+});
+
+test("V2 validator requires complete structurally aligned English and Chinese content", () => {
+  const policy = resolveCreationListingPolicy({ platform: "etsy" });
+  const missingChinese = listingDraft.validateCreationListingDraft(
+    makeV2Draft(policy, { zhDisplay: { title: "蓝色收纳盒" } }),
+    { policy, sourceFacts: SOURCE_FACTS, source: SOURCE_FACTS },
+  );
+  assert.equal(missingChinese.ok, false);
+  assert.match(issueText(missingChinese, "errors"), /zhDisplay\.sellingPoints|bilingual/i);
+
+  const misaligned = listingDraft.validateCreationListingDraft(
+    makeV2Draft(policy, {
+      zhDisplay: {
+        ...makeV2Draft(policy).zhDisplay,
+        highlights: ["只有一项"],
+        keywordBuckets: {
+          ...makeV2Draft(policy).zhDisplay.keywordBuckets,
+          exact: [],
+        },
+      },
+    }),
+    { policy, sourceFacts: SOURCE_FACTS, source: SOURCE_FACTS },
+  );
+  assert.equal(misaligned.ok, false);
+  assert.match(issueText(misaligned, "errors"), /zhDisplay\.highlights.*same number|zhDisplay\.keywordBuckets\.exact.*same number/i);
+});
+
+test("V2 normalizer mirrors source-only warnings and deduplicates punctuation variants", () => {
+  const policy = resolveCreationListingPolicy({ platform: "universal" });
+  const warning = "Generated images were unavailable; copy is based on supplied product inputs";
+  const normalized = listingDraft.normalizeCreationListingDraft(
+    makeV2Draft(policy, {
+      warnings: [warning],
+      zhDisplay: {
+        ...makeV2Draft(policy).zhDisplay,
+        warnings: ["\u751f\u6210\u56fe\u50cf\u8bc1\u636e\u4e0d\u53ef\u7528\uff0c\u6587\u6848\u57fa\u4e8e\u5df2\u63d0\u4f9b\u7684\u5546\u54c1\u8d44\u6599\u3002"],
+      },
+    }),
+    {
+      forceV2: true,
+      listingPolicy: policy,
+      platformId: "universal",
+      warnings: [`${warning}.`, "Platform provenance is legacy-missing; universal is a compatibility fallback."],
+    },
+  );
+
+  assert.equal(normalized.warnings.filter((value) => value.startsWith(warning)).length, 1);
+  assert.equal(normalized.zhDisplay.warnings.length, normalized.warnings.length);
+  assert.doesNotMatch(JSON.stringify(normalized.warnings), /\buniversal\b/i);
+  const validation = listingDraft.validateCreationListingDraft(normalized, {
+    policy,
+    source: SOURCE_FACTS,
+    sourceFacts: SOURCE_FACTS,
+  });
+  assert.doesNotMatch(issueText(validation, "errors"), /zhDisplay\.warnings.*same number/i);
+});
+
+test("no-brand helpers extract structured brand and platform aliases and sanitize recursively", () => {
+  const extractForbiddenTerms = requireFunction(listingDraft, "extractCreationListingForbiddenTerms");
+  const sanitizeNoBrand = requireFunction(listingDraft, "sanitizeCreationListingNoBrandContent");
+  const source = {
+    brand: "Acme",
+    brandName: "Acme Labs",
+    trademark: "RocketMark",
+    storeName: "Northwind Store",
+    sellerName: "Blue Seller",
+    manufacturer: "Contoso Works",
+    platformId: "tmall-taobao",
+    platformLabel: "淘宝/天猫",
+    marketplace: "amazon-us",
+    skuSubjects: [{ brandNames: ["Nested Brand"] }],
+  };
+  const terms = extractForbiddenTerms(source);
+  for (const term of ["Acme", "Acme Labs", "RocketMark", "Northwind Store", "Blue Seller", "Contoso Works", "Nested Brand", "Amazon", "amazon-us", "淘宝", "天猫"]) {
+    assert.ok(terms.some((value) => value.toLowerCase() === term.toLowerCase()), term);
+  }
+
+  const sanitized = sanitizeNoBrand({
+    title: "Acme box for Amazon",
+    nested: ["来自淘宝 Northwind Store", { text: "RocketMark by Contoso Works" }, "Acme户外登山双肩包"],
+  }, terms);
+  assert.doesNotMatch(JSON.stringify(sanitized), /Acme|Amazon|淘宝|Northwind|RocketMark|Contoso/i);
+  assert.equal(sanitized.nested[2], "户外登山双肩包");
+});
+
+test("no-brand extraction records text-declaration provenance and keeps descriptive product prefixes", () => {
+  const extractCandidates = requireFunction(listingDraft, "extractCreationListingForbiddenTermCandidates");
+  const extractForbiddenTerms = requireFunction(listingDraft, "extractCreationListingForbiddenTerms");
+  const source = {
+    productName: "Acme Blue Storage Box",
+    productDescription: "Sold by Northwind Store. Trademark: RocketMark.",
+    sellingPoints: ["品牌：Acme", "店铺：Northwind Store"],
+    skuSubjects: [{ id: "blue", note: "卖家：Northwind Store" }],
+    referenceImageRoles: [{ role: "hero", note: "商标：RocketMark" }],
+  };
+
+  const candidates = extractCandidates(source);
+  for (const [term, provenancePattern] of [
+    ["Acme", /productName.*prefix|sellingPoints.*brand/i],
+    ["Northwind Store", /productDescription.*sold-by|sellingPoints.*store|skuSubjects.*seller/i],
+    ["RocketMark", /productDescription.*trademark|referenceImageRoles.*trademark/i],
+  ]) {
+    const candidate = candidates.find((entry) => entry.term === term);
+    assert.ok(candidate, term);
+    assert.match(candidate.provenance.join("\n"), provenancePattern, term);
+  }
+  const forbiddenTerms = extractForbiddenTerms(source);
+  for (const term of ["Acme", "Northwind Store", "RocketMark"]) {
+    assert.ok(forbiddenTerms.includes(term), term);
+  }
+
+  for (const descriptor of ["Red", "Electronic", "Blue", "Travel", "Long", "Product"]) {
+    const terms = extractForbiddenTerms({ productName: `${descriptor} Storage Box` });
+    assert.equal(terms.some((term) => term.toLowerCase() === descriptor.toLowerCase()), false, descriptor);
+  }
+
+  const persistedCandidates = extractCandidates({
+    productName: "Travel Bottle",
+    sku_title: "Northwind Travel Bottle",
+    title: "Acme Travel Bottle for Daily Hydration",
+    zhDisplay: { title: "Acme 日常补水便携水瓶" },
+  });
+  assert.match(
+    persistedCandidates.find((entry) => entry.term === "Acme")?.provenance.join("\n") || "",
+    /source\.title:prefix|source\.zhDisplay\.title:prefix/u,
+  );
+  assert.match(
+    persistedCandidates.find((entry) => entry.term === "Northwind")?.provenance.join("\n") || "",
+    /source\.sku_title:prefix/u,
+  );
+
+  for (const [field, title] of [
+    ["title", "Handmade Blue Storage Box"],
+    ["title", "2 Pack Travel Bottle"],
+    ["title", "Serum Product Information"],
+    ["skuTitle", "Two Pack Travel Bottle"],
+  ]) {
+    const terms = extractForbiddenTerms({ [field]: title });
+    assert.equal(terms.some((term) => /^(?:handmade|2|serum|two)$/iu.test(term)), false, title);
+  }
+});
+
+test("RED is not a global platform alias and red product facts survive no-brand sanitization", () => {
+  const extractForbiddenTerms = requireFunction(listingDraft, "extractCreationListingForbiddenTerms");
+  const sanitizeNoBrand = requireFunction(listingDraft, "sanitizeCreationListingNoBrandContent");
+  const terms = extractForbiddenTerms({ productName: "Red Storage Box", title: "Red Storage Box" });
+  assert.equal(terms.some((term) => term.toLowerCase() === "red"), false);
+  assert.equal(sanitizeNoBrand("Red Storage Box", terms), "Red Storage Box");
+});
+
+test("V2 validator recursively rejects forbidden terms in English and Chinese content leaves", () => {
+  const policy = resolveCreationListingPolicy({ platform: "amazon" });
+  const source = {
+    ...SOURCE_FACTS,
+    brandName: "Acme Labs",
+    storeName: "北风商店",
+    platformId: "amazon",
+    platformLabel: "Amazon",
+  };
+  const draft = makeV2Draft(policy, {
+    title: "Acme Labs Blue Storage Box",
+    zhDisplay: {
+      ...makeV2Draft(policy).zhDisplay,
+      description: "蓝色收纳盒，由北风商店提供。",
+    },
+  });
+  const validation = listingDraft.validateCreationListingDraft(draft, { policy, sourceFacts: source, source });
+  assert.equal(validation.ok, false);
+  assert.match(issueText(validation, "errors"), /title.*Acme Labs/i);
+  assert.match(issueText(validation, "errors"), /zhDisplay\.description.*北风商店/i);
+});
+
+test("V2 model retry sanitizes brands and platform aliases and returns complete bilingual content", async () => {
+  const policy = resolveCreationListingPolicy({ platform: "etsy" });
+  const attempts = [];
+  const first = makeV2Draft(policy);
+  delete first.zhDisplay;
+  const second = makeV2Draft(policy, {
+    title: "Acme Labs Storage Box for Etsy",
+    sellingPoints: ["Available from Northwind Store."],
+    zhDisplay: {
+      ...makeV2Draft(policy).zhDisplay,
+      title: "Acme Labs 收纳盒",
+      sellingPoints: ["由北风商店提供。"],
+    },
+  });
+  const fetchImpl = async (_url, init) => {
+    attempts.push(JSON.parse(init.body));
+    const output = attempts.length === 1 ? first : second;
+    return new Response(JSON.stringify({ output_text: JSON.stringify(output) }), { status: 200 });
+  };
+  const draft = await listingAgent.requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "test-model",
+    source: {
+      ...SOURCE_FACTS,
+      forceV2: true,
+      platformId: "etsy",
+      marketplace: "etsy",
+      listingPolicyVersion: policy.listingPolicyVersion,
+      language: "en-US",
+      listingPolicy: policy,
+      brandName: "Acme Labs",
+      storeName: "Northwind Store",
+      shopName: "北风商店",
+    },
+    fetchImpl,
+  });
+
+  assert.equal(attempts.length, 2);
+  assert.match(attempts[0].input, /own hard rule, not an official marketplace rule/i);
+  assert.match(attempts[0].input, /Acme Labs/);
+  assert.ok(attempts[0].text.format.schema.required.includes("zhDisplay"));
+  assert.equal(draft.status, "completed");
+  assertCompleteBilingualNoBrandDraft(draft, /Acme|Northwind|北风商店|Etsy/i);
 });
 
 test("V1 aliases remain readable without mutating or discarding historical content", () => {
@@ -240,24 +535,108 @@ test("Etsy and low-evidence platforms keep recommendations advisory while bounde
   assert.match(issueText(searchByteValidation, "errors"), /search.*(?:utf-?8|byte)/i);
 });
 
-test("V2 locale validation does not reapply global Amazon English rules", () => {
-  const cases = [
-    ["tmall-taobao", "zh-CN", "蓝色收纳盒 2升 可叠放家用整理盒", "蓝色外观便于识别。", "适合日常家居整理。", "蓝色 收纳盒"],
-    ["rakuten", "ja-JP", "青い収納ボックス 2リットル 積み重ね対応", "青色で種類を確認しやすい商品です。", "日常の収納に使えるボックスです。", "青 収納 ボックス"],
-    ["coupang", "ko-KR", "파란색 수납 상자 2리터 적층형 정리함", "파란색 옵션을 쉽게 구분할 수 있습니다.", "일상 정리에 사용하는 수납 상자입니다.", "파란색 수납 상자"],
-    ["mercado-libre", "es-419", "Caja azul apilable de 2 litros para organizar", "El color azul permite identificar la opción.", "Caja apilable para organizar objetos de uso diario.", "caja azul apilable"],
-  ];
-
-  for (const [platform, language, title, highlight, description, searchTerm] of cases) {
-    const validation = validateFor(platform, {
-      language,
-      title,
-      highlights: [highlight],
-      description,
-      searchTerms: [searchTerm],
+test("V2 keeps English top-level copy and Simplified Chinese counterparts for every platform locale", () => {
+  for (const [platform, language] of [
+    ["tmall-taobao", "zh-CN"],
+    ["rakuten", "ja-JP"],
+    ["coupang", "ko-KR"],
+    ["mercado-libre", "es-419"],
+  ]) {
+    const policy = resolveCreationListingPolicy({ platform });
+    const valid = listingDraft.validateCreationListingDraft(makeV2Draft(policy, { language }), {
+      policy,
+      sourceFacts: SOURCE_FACTS,
+      source: SOURCE_FACTS,
     });
-    assert.doesNotMatch(issueText(validation, "errors"), /English only|Amazon US|language mismatch/i, platform);
+    assert.doesNotMatch(issueText(valid, "errors"), /English|Simplified Chinese|language mismatch/i, platform);
+
+    const invalid = listingDraft.validateCreationListingDraft(makeV2Draft(policy, {
+      language,
+      title: "蓝色收纳盒",
+    }), { policy, sourceFacts: SOURCE_FACTS, source: SOURCE_FACTS });
+    assert.equal(invalid.ok, false, platform);
+    assert.match(issueText(invalid, "errors"), /top-level V2 content fields must be English/i, platform);
   }
+});
+
+test("V2 completed drafts require every frozen publish field to be non-empty", () => {
+  const policy = resolveCreationListingPolicy({ platform: "etsy" });
+  for (const [field, value] of [
+    ["title", ""],
+    ["highlights", []],
+    ["searchTerms", []],
+    ["keywordBuckets", { exact: [], longTail: [], traffic: [], descriptive: [] }],
+  ]) {
+    const draft = makeV2Draft(policy, {
+      publishFields: ["title", "highlights", "description", "searchTerms", "keywordBuckets"],
+      [field]: value,
+      zhDisplay: {
+        ...makeV2Draft(policy).zhDisplay,
+        [field]: field === "keywordBuckets"
+          ? { exact: [], longTail: [], traffic: [], descriptive: [] }
+          : value,
+      },
+    });
+    const validation = listingDraft.validateCreationListingDraft(draft, {
+      policy,
+      source: SOURCE_FACTS,
+      sourceFacts: SOURCE_FACTS,
+    });
+    assert.equal(validation.ok, false, field);
+    assert.match(issueText(validation, "errors"), new RegExp(`publishFields.*${field}|${field}.*publish`, "i"), field);
+  }
+});
+
+test("V2 rejects obvious non-English top-level copy and untraceable Chinese placeholders", () => {
+  const policy = resolveCreationListingPolicy({ platform: "etsy" });
+  const spanish = listingDraft.validateCreationListingDraft(makeV2Draft(policy, {
+    title: "Caja azul apilable para organizar el hogar",
+    zhDisplay: {
+      ...makeV2Draft(policy).zhDisplay,
+      title: "蓝色可叠放家用收纳盒",
+    },
+  }), { policy, source: SOURCE_FACTS, sourceFacts: SOURCE_FACTS });
+  assert.equal(spanish.ok, false);
+  assert.match(issueText(spanish, "errors"), /top-level.*English|non-English/i);
+
+  for (const zhDisplay of [
+    {
+      ...makeV2Draft(policy).zhDisplay,
+      title: "商品信息",
+      description: "商品说明",
+      highlights: ["第 1 项商品信息", "第 2 项商品信息", "第 3 项商品信息"],
+      searchTerms: ["商品关键词 1", "商品关键词 2", "商品关键词 3"],
+    },
+    {
+      ...makeV2Draft(policy).zhDisplay,
+      title: "厨房刀具套装",
+    },
+  ]) {
+    const validation = listingDraft.validateCreationListingDraft(makeV2Draft(policy, { zhDisplay }), {
+      policy,
+      source: SOURCE_FACTS,
+      sourceFacts: SOURCE_FACTS,
+    });
+    assert.equal(validation.ok, false);
+    assert.match(issueText(validation, "errors"), /generic placeholder|semantic correspondence|traceable.*anchor/i);
+  }
+});
+
+test("V2 semantic anchors accept a valid translated product phrase without shared Latin words", () => {
+  const policy = resolveCreationListingPolicy({ platform: "universal" });
+  const draft = makeV2Draft(policy, {
+    title: "Travel Bottle for Daily Hydration",
+    zhDisplay: {
+      ...makeV2Draft(policy).zhDisplay,
+      title: "日常补水便携水瓶",
+    },
+  });
+  const validation = listingDraft.validateCreationListingDraft(draft, {
+    policy,
+    source: SOURCE_FACTS,
+    sourceFacts: SOURCE_FACTS,
+  });
+  assert.doesNotMatch(issueText(validation, "errors"), /semantic correspondence|traceable fact anchor/i);
 });
 
 test("all platforms apply the same fact gate to generated-image-only high-risk claims", () => {
@@ -293,7 +672,7 @@ test("all platforms apply the same fact gate to generated-image-only high-risk c
   }
 });
 
-test("two invalid upstream attempts return only a reviewable input-only fallback", async () => {
+test("two invalid upstream attempts return a completed validated deterministic draft", async () => {
   const requestCreationListingDraft = requireFunction(listingAgent, "requestCreationListingDraft");
   const policy = resolveCreationListingPolicy({ platform: "etsy" });
   const calls = [];
@@ -321,18 +700,27 @@ test("two invalid upstream attempts return only a reviewable input-only fallback
       listingPolicy: policy,
       evidenceMode: "input-only",
       ...SOURCE_FACTS,
+      productName: "Acme Blue Storage Box",
+      brandName: "Acme",
+      storeName: "Northwind Store",
     },
     fetchImpl,
   });
 
   assert.equal(calls.length, 2);
-  assert.ok(["needs-review", "failed"].includes(fallback.status));
+  assert.equal(fallback.status, "completed");
   assert.equal(fallback.evidenceMode, "input-only");
   assert.equal(fallback.schemaVersion, "2");
   assert.equal(fallback.platformId, "etsy");
   assert.equal(fallback.marketplace, "etsy");
   assert.equal(fallback.listingPolicyVersion, policy.listingPolicyVersion);
-  assert.ok((fallback.warnings?.length || 0) + (fallback.missingInfo?.length || 0) > 0);
+  assert.ok(fallback.title);
+  assert.ok(fallback.highlights.length >= 1);
+  assert.ok(fallback.description);
+  for (const field of fallback.publishFields) {
+    const value = fallback[field];
+    assert.ok(Array.isArray(value) ? value.length > 0 : String(value || "").trim(), field);
+  }
   const publicText = [
     fallback.title,
     ...(fallback.highlights || []),
@@ -340,15 +728,147 @@ test("two invalid upstream attempts return only a reviewable input-only fallback
     ...(fallback.searchTerms || []),
   ].join("\n");
   assert.doesNotMatch(publicText, /FDA Certified|Miracle Cure|Guaranteed best seller|lifetime warranty/i);
-  assert.notEqual(fallback.status, "completed");
+  assertCompleteBilingualNoBrandDraft(fallback, /Acme|Northwind|Etsy/i);
+  const validation = listingDraft.validateCreationListingDraft(fallback, {
+    policy,
+    sourceFacts: SOURCE_FACTS,
+    source: SOURCE_FACTS,
+  });
+  assert.equal(validation.ok, true, validation.errors.join("; "));
 });
 
-test("set-scoped mock drafts use V2 for Amazon, universal, and legacy-missing records", () => {
+test("every platform rejects English and Chinese functional wording", () => {
+  for (const basePolicy of listCreationListingPolicies()) {
+    const policy = resolveCreationListingPolicy({ platform: basePolicy.id });
+    const baseline = makeV2Draft(policy);
+    const draft = makeV2Draft(policy, {
+      description: "Designed to improve organization and make storage easier.",
+      zhDisplay: {
+        ...baseline.zhDisplay,
+        description: "帮助改善收纳效果，使用更方便。",
+      },
+    });
+    const validation = listingDraft.validateCreationListingDraft(draft, {
+      policy,
+      sourceFacts: SOURCE_FACTS,
+    });
+    assert.equal(validation.ok, false, basePolicy.id);
+    assert.match(issueText(validation, "errors"), /functional or effect wording/i, basePolicy.id);
+  }
+});
+
+test("deterministic fallback removes identities declared only in free text and refuses an unresolved identity", async () => {
+  const policy = resolveCreationListingPolicy({ platform: "etsy" });
+  const invalidOutput = makeV2Draft(policy, {
+    title: "Caja sin validar para el hogar",
+  });
+  const fetchImpl = async () => new Response(JSON.stringify({
+    output_text: JSON.stringify(invalidOutput),
+  }), { status: 200 });
+  const [source] = listingDraft.buildCreationListingSources({
+    setId: "implicit-identities",
+    platform: "etsy",
+    productName: "Acme Blue Storage Box",
+    productDescription: "Sold by Northwind Store. Trademark: RocketMark.",
+    sellingPoints: ["品牌：Acme", "2 L capacity"],
+    skuSubjects: [{ id: "blue", title: "Blue Storage Box", note: "卖家：Northwind Store" }],
+    referenceImageRoles: [{ role: "hero", note: "商标：RocketMark" }],
+  });
+
+  for (const term of ["Acme", "Northwind Store", "RocketMark"]) {
+    assert.ok(source.forbiddenTerms.includes(term), term);
+  }
+  const fallback = await listingAgent.requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "test-model",
+    source,
+    fetchImpl,
+  });
+  assert.equal(fallback.status, "completed");
+  assertCompleteBilingualNoBrandDraft(fallback, /Acme|Northwind Store|RocketMark/i);
+
+  await assert.rejects(listingAgent.requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "test-model",
+    source: {
+      ...source,
+      productName: "Acme",
+      skuTitle: "Acme",
+      skuSubjects: [],
+      productDescription: "",
+      sellingPoints: [],
+      referenceImageRoles: [],
+      forbiddenTerms: [],
+    },
+    fetchImpl,
+  }), /safe no-brand product identity/i);
+});
+
+test("deterministic fallback keeps unknown Chinese product categories generatable without a brand", async () => {
+  const policy = resolveCreationListingPolicy({ platform: "universal" });
+  const invalidOutput = makeV2Draft(policy, {
+    title: "Mochila sin validar para el hogar",
+  });
+  const fetchImpl = async () => new Response(JSON.stringify({
+    output_text: JSON.stringify(invalidOutput),
+  }), { status: 200 });
+  const [source] = listingDraft.buildCreationListingSources({
+    setId: "unknown-chinese-category",
+    platform: "universal",
+    productName: "VANAHEIMR户外登山双肩包",
+    brandName: "VANAHEIMR",
+    productDescription: "适合户外、徒步、登山和旅行使用。",
+    sellingPoints: ["多分层结构便于分类收纳"],
+  });
+
+  const fallback = await listingAgent.requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "test-model",
+    source,
+    fetchImpl,
+  });
+
+  assert.equal(fallback.status, "completed");
+  assert.match(fallback.title, /Product Information/i);
+  assertCompleteBilingualNoBrandDraft(fallback, /VANAHEIMR|Amazon|Walmart|Etsy|Temu/i);
+});
+
+test("transient listing gateway failures use the validated deterministic fallback", async () => {
+  const policy = resolveCreationListingPolicy({ platform: "universal" });
+  const [source] = listingDraft.buildCreationListingSources({
+    setId: "gateway-outage-fallback",
+    platform: "universal",
+    productName: "Travel Bottle",
+    productDescription: "Compact bottle for daily hydration.",
+    sellingPoints: ["Portable and easy to carry"],
+  });
+
+  const fallback = await listingAgent.requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "test-model",
+    source,
+    fetchImpl: async () => new Response(JSON.stringify({
+      error: { message: "upstream unavailable" },
+    }), { status: 503 }),
+  });
+
+  assert.equal(fallback.status, "completed");
+  assert.equal(fallback.evidenceMode, "input-only");
+  assert.match(fallback.warnings.join("\n"), /upstream unavailable/i);
+  assertCompleteBilingualNoBrandDraft(fallback, /Amazon|Walmart|Etsy|Temu/i);
+});
+
+test("set-scoped mock drafts use completed validated V2 output for Amazon, universal, and legacy-missing records", () => {
   const makeMockCreationListingDraft = requireFunction(listingAgent, "makeMockCreationListingDraft");
   for (const set of [
-    { setId: "amazon-set", platform: "amazon", platformProvenance: "explicit", productName: "Blue Box" },
-    { setId: "universal-set", platform: "universal", platformProvenance: "explicit", productName: "Blue Box" },
-    { setId: "legacy-set", platformProvenance: "legacy-missing", productName: "Blue Box" },
+    { setId: "amazon-set", platform: "amazon", platformProvenance: "explicit", productName: "Acme Blue Box", brandName: "Acme" },
+    { setId: "coupang-set", platform: "coupang", platformProvenance: "explicit", productName: "Acme Extra Long Stackable Storage Organizer", brandName: "Acme" },
+    { setId: "universal-set", platform: "universal", platformProvenance: "explicit", productName: "Acme Blue Box", brandName: "Acme" },
+    { setId: "legacy-set", platformProvenance: "legacy-missing", productName: "Acme Blue Box", brandName: "Acme" },
   ]) {
     const [source] = listingDraft.buildCreationListingSources(set);
     const draft = makeMockCreationListingDraft(source);
@@ -356,7 +876,23 @@ test("set-scoped mock drafts use V2 for Amazon, universal, and legacy-missing re
     assert.equal(draft.platformId, source.platformId, set.setId);
     assert.equal(draft.listingPolicyVersion, source.listingPolicyVersion, set.setId);
     assert.equal(draft.evidenceMode, "input-only", set.setId);
-    assert.equal(draft.status, "needs-review", set.setId);
+    assert.equal(draft.status, "completed", set.setId);
+    assert.ok(draft.title, set.setId);
+    assert.ok(draft.highlights.length >= 1, set.setId);
+    assert.ok(draft.description, set.setId);
+    assertCompleteBilingualNoBrandDraft(draft, /Acme|Amazon|Walmart|Etsy|Temu/i);
+    const searchByteLimit = source.listingPolicy.searchRules?.hardMaxUtf8BytesPerItem;
+    if (Number.isFinite(searchByteLimit)) {
+      for (const term of draft.searchTerms) {
+        assert.ok(new TextEncoder().encode(term).length <= searchByteLimit, `${set.setId}: ${term}`);
+      }
+    }
+    const validation = listingDraft.validateCreationListingDraft(draft, {
+      policy: source.listingPolicy,
+      sourceFacts: source,
+      source,
+    });
+    assert.equal(validation.ok, true, `${set.setId}: ${validation.errors.join("; ")}`);
   }
 });
 

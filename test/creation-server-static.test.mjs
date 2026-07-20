@@ -402,23 +402,23 @@ test("creation infographic rebuild option is passed through planning generation 
 
   assert.match(
     server,
-    /handleCreationPlan[\s\S]*buildCreationPlan\(\{[\s\S]*infographicRebuildEnabled:\s*formData\.get\("infographicRebuildEnabled"\)/,
+    /handleCreationPlan[\s\S]*buildCreationPlan\(\{[\s\S]*skuGenerationEnabled:\s*formData\.get\("skuGenerationEnabled"\),[\s\S]*infographicRebuildEnabled:\s*formData\.get\("infographicRebuildEnabled"\)/,
   );
   assert.match(
     server,
-    /handleCreationGenerate[\s\S]*buildCreationSubmittedPlan\(\{[\s\S]*infographicRebuildEnabled:\s*formData\.get\("infographicRebuildEnabled"\)/,
+    /handleCreationGenerate[\s\S]*buildCreationSubmittedPlan\(\{[\s\S]*skuGenerationEnabled:\s*formData\.get\("skuGenerationEnabled"\),[\s\S]*infographicRebuildEnabled:\s*formData\.get\("infographicRebuildEnabled"\)/,
   );
   assert.match(
     worker,
-    /runCreationGenerate[\s\S]*buildCreationSubmittedPlan\(\{[\s\S]*infographicRebuildEnabled:\s*formData\.get\("infographicRebuildEnabled"\)/,
+    /runCreationGenerate[\s\S]*buildCreationSubmittedPlan\(\{[\s\S]*skuGenerationEnabled:\s*formData\.get\("skuGenerationEnabled"\),[\s\S]*infographicRebuildEnabled:\s*formData\.get\("infographicRebuildEnabled"\)/,
   );
+  assert.match(server, /skuGenerationEnabled:\s*plan\.skuGenerationEnabled/);
+  assert.match(worker, /skuGenerationEnabled:\s*plan\.skuGenerationEnabled/);
   assert.match(server, /infographicRebuildEnabled:\s*plan\.infographicRebuildEnabled/);
   assert.match(worker, /infographicRebuildEnabled:\s*plan\.infographicRebuildEnabled/);
-  assert.match(
-    server,
-    /handleCreationRepair[\s\S]*repairPlanningOverrides = \{[\s\S]*infographicRebuildEnabled:\s*formData\.get\("infographicRebuildEnabled"\)/,
-  );
-  assert.match(server, /repairPlan = \{[\s\S]*infographicRebuildEnabled:\s*existingSet\.infographicRebuildEnabled/);
+  const repairHandler = server.match(/async function handleCreationRepair[\s\S]*?\r?\n}\r?\n\r?\nasync function handleGenerate/)?.[0] || "";
+  assert.match(repairHandler, /repairPlan = buildCreationRepairPlan\(existingSet\)/);
+  assert.doesNotMatch(repairHandler, /skuGenerationEnabled:\s*formData\.get|infographicRebuildEnabled:\s*formData\.get/);
 });
 
 test("creation saved filenames prefer SKU filename tokens over display titles", async () => {
@@ -578,6 +578,9 @@ test("local creation plan preview exposes an independent route and shared overri
 test("creation repair route regenerates selected set items", async () => {
   const server = await readFile(serverPath, "utf8");
   const app = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
+  const repair = await readFile(new URL("../lib/creation-repair.mjs", import.meta.url), "utf8");
+  const repairHandler =
+    server.match(/async function handleCreationRepair[\s\S]*?\r?\n}\r?\n\r?\nasync function handleGenerate/)?.[0] || "";
 
   assert.match(server, /selectCreationRepairItems/);
   assert.match(server, /async function handleCreationRepair/);
@@ -589,8 +592,8 @@ test("creation repair route regenerates selected set items", async () => {
   assert.match(server, /formData\.get\("marketingCopyOverride"\)/);
   assert.match(server, /hydrateCreationRepairSkuSubjects/);
   assert.match(server, /(const|let) repairItems = hydrateCreationRepairSkuSubjects\(\s*selectCreationRepairItems/);
-  assert.match(server, /dimensionSpecs:\s*existingSet\.dimensionSpecs/);
-  assert.match(server, /industryTemplatePath:\s*existingSet\.industryTemplatePath/);
+  assert.match(repair, /dimensionSpecs:\s*creationSet\.dimensionSpecs/);
+  assert.match(repair, /industryTemplatePath:\s*creationSet\.industryTemplatePath/);
   assert.match(server, /applyCreationRepairOverrides/);
   assert.match(server, /const filename = buildCreationImageFilename\(\{\s*item:\s*repairItem,/);
   assert.match(server, /prompt:\s*repairItem\.prompt/);
@@ -598,15 +601,15 @@ test("creation repair route regenerates selected set items", async () => {
   assert.match(server, /buildCreationGenerationReferenceImageLabels\(\s*itemReferenceImages,\s*referenceImageRoles,/);
   assert.match(app, /function buildCreationPlanPreviewFormData\(\) \{(?:(?!function buildCreationRepairFormData)[\s\S])*formData\.set\("platform", getCreationSelectedPlatform\(\)\.value\)/);
   assert.doesNotMatch(app, /function buildCreationPlanPreviewFormData\(\) \{(?:(?!function buildCreationRepairFormData)[\s\S])*formData\.set\("visualLanguage"/);
-  assert.match(app, /function buildCreationRepairFormData[\s\S]*buildCreationPlanPreviewFormData\(\)\.entries\(\)/);
-  assert.match(server, /handleCreationRepair[\s\S]*visualLanguage:\s*formData\.get\("visualLanguage"\)/);
+  assert.match(app, /function buildCreationRepairFormData[\s\S]*applyCreationRepairTargetFormFields\(formData, currentSet\)/);
+  assert.doesNotMatch(app, /function buildCreationRepairFormData[\s\S]*buildCreationPlanPreviewFormData\(\)\.entries\(\)/);
+  assert.doesNotMatch(repairHandler, /visualLanguage:\s*formData\.get\("visualLanguage"\)/);
   assert.match(server, /refreshCreationRepairItemsFromPlan/);
+  assert.match(server, /resolveCreationRepairGenerationConfig\(repairItem, generationConfig\)/);
   assert.match(
     server,
-    /repairPlan = buildCreationRepairPlan\(existingSet,\s*repairPlanningOverrides\);[\s\S]*repairItems = refreshCreationRepairItemsFromPlan\(repairItems,\s*repairPlan\);/,
+    /repairPlan = buildCreationRepairPlan\(existingSet\);[\s\S]*repairItems = refreshCreationRepairItemsFromPlan\(repairItems,\s*repairPlan\);/,
   );
-  const repairHandler =
-    server.match(/async function handleCreationRepair[\s\S]*?\r?\n}\r?\n\r?\nasync function handlePortraitRepair/)?.[0] || "";
   assert.doesNotMatch(repairHandler, /hasCreationRepairPlanningOverride\(existingSet,\s*repairPlanningOverrides\) \|\| needsCreationRepairPlanRefresh\(repairItems\)/);
   assert.match(server, /writeSseEvent\(response, "repair_started"/);
 });

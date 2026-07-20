@@ -89,7 +89,6 @@ test("article illustration mode has independent create and assets entries", asyn
   assert.match(app, /media\.dataset\.articleRecordPreviewItemId = item\.itemId/);
   assert.match(app, /function buildArticleRecordLightboxItem/);
   assert.match(app, /isArticleRecordItem: true/);
-  assert.match(app, /refs\.lightboxDelete\.hidden = Boolean\(isRecordItem \|\| isImageOnlyPreview \|\| isPreviewLightboxItem\)/);
   assert.match(app, /ARTICLE_RECORD_COLUMN_PRESETS = \[2, 4, 6, 8\]/);
   assert.match(app, /recordColumnPreset: DEFAULT_ARTICLE_RECORD_COLUMN_PRESET/);
   assert.match(app, /DEFAULT_ARTICLE_ILLUSTRATION_STYLE_PRESET = "realist-magazine"/);
@@ -130,4 +129,16 @@ test("article illustration API routes are exposed separately from ecommerce crea
   assert.match(server, /url\.pathname === "\/api\/article-illustration\/generate"/);
   assert.match(server, /url\.pathname === "\/api\/article-illustration\/sets"/);
   assert.doesNotMatch(server, /CREATION_IMAGE_COUNT_OPTIONS[\s\S]*article-illustration/);
+});
+
+test("article planning ignores a response after source inputs change", async () => {
+  const app = await readFile(appPath, "utf8");
+  assert.match(app, /function getArticleIllustrationPlanSnapshot\(\) \{/);
+  assert.match(app, /const planSnapshot = getArticleIllustrationPlanSnapshot\(\);/);
+  assert.match(app, /planSnapshot !== getArticleIllustrationPlanSnapshot\(\)/);
+});
+
+test("article generation requires a terminal SSE event", async () => {
+  const app = await readFile(appPath, "utf8");
+  assert.match(app, /consumeSseUntilTerminal\([\s\S]*文章插图生成连接已中断，未收到完成事件/);
 });

@@ -27,26 +27,6 @@ const ITEM_OVERRIDE_FIELDS = [
   "prompt",
 ];
 const SAFE_FALLBACK_IMAGE_TYPES = ["clean-product-proof", "detail-macro", "material-proof", "craft-proof"];
-const EXTENDED_SLOT_IMAGE_TYPES = [
-  "clean-product-proof",
-  "usage-demo",
-  "material-proof",
-  "craft-proof",
-  "spec-table",
-  "brand-trust",
-  "comparison-proof",
-  "scale-proof",
-  "gift-packaging",
-  "label-detail",
-  "info-benefit",
-  "value-bundle",
-  "creator-demo",
-  "content-cover",
-  "long-detail",
-  "condition-proof",
-  "defect-disclosure",
-  "variant-comparison",
-];
 const IMAGE_TYPE_EVIDENCE_KEYS = {
   "value-bundle": "packageContents",
   "dimension-fit": "dimensions",
@@ -546,6 +526,13 @@ function applyEvidenceFallbacks(slots, evidence, warnings) {
   const resolved = [];
 
   for (const slot of slots) {
+    if (
+      slot.role === "size-capacity-fit" &&
+      ["dimension-fit", "scale-proof"].includes(slot.imageType)
+    ) {
+      resolved.push(slot);
+      continue;
+    }
     if (hasEvidenceForImageType(slot.imageType, evidence)) {
       resolved.push(slot);
       continue;
@@ -581,62 +568,22 @@ function applyEvidenceFallbacks(slots, evidence, warnings) {
   return resolved;
 }
 
-function applySetOverrides(slots, setOverrides, { profile, evidence, selectedRoles, warnings }) {
+function applySetOverrides(slots, setOverrides, { profile, warnings }) {
   let resized = [...slots];
   if (Number.isFinite(setOverrides.imageCount)) {
     const requestedCount = Math.max(0, setOverrides.imageCount);
-    resized = resized.slice(0, requestedCount);
-    const usedImageTypes = new Set(resized.map((slot) => slot.imageType));
-    while (resized.length < requestedCount) {
-      const nextImageType = EXTENDED_SLOT_IMAGE_TYPES.find(
-        (candidate) => !usedImageTypes.has(candidate) && hasEvidenceForImageType(candidate, evidence),
-      );
-      if (!nextImageType) {
-        const slotNumber = resized.length + 1;
-        const slotKey = `${profile.id}:extra:custom:${slotNumber}`;
-        const template = {
-          ...cloneValue(profile.slots[0]),
-          slotKey,
-          itemId: slotKey,
-          itemKind: "carousel",
-          enabled: true,
-          ratio: profile.defaultRatio,
-          resolutionTier: profile.resolutionTier,
-          targetLanguage: profile.targetLanguage,
-          recommendationSource: "set-count-extension-custom",
-        };
-        resized.push(createRoleLedCustomSlot(template, {
-          role: selectedRoles[resized.length] || "product-detail",
-          imageTypeLabel: `自定义图片 ${slotNumber}`,
-          recommendationSource: "set-count-extension-custom",
-        }));
-        warnings.push({
-          code: "image-count-extension-custom",
-          level: "warning",
-          requestedCount,
-          effectiveCount: resized.length,
-          slotKey,
-          message: "Added an advisory custom image slot to honor the requested image count without inventing unsupported product facts.",
-        });
-        continue;
-      }
-
-      const slotKey = `${profile.id}:extra:${nextImageType}`;
-      const template = {
-        ...cloneValue(profile.slots[0]),
-        slotKey,
-        itemId: slotKey,
-        itemKind: "carousel",
-        enabled: true,
-        ratio: profile.defaultRatio,
-        resolutionTier: profile.resolutionTier,
-        targetLanguage: profile.targetLanguage,
-        recommendationSource: "set-count-extension",
-      };
-      const nextSlot = createImageTypeSlot(nextImageType, template, "set-count-extension");
-      resized.push(nextSlot);
-      usedImageTypes.add(nextImageType);
+    const effectiveCount = Math.min(requestedCount, profile.slots.length, resized.length);
+    if (effectiveCount < requestedCount) {
+      warnings.push({
+        code: "image-count-extension-limited",
+        level: "warning",
+        requestedCount,
+        effectiveCount,
+        message: `The current platform provides ${effectiveCount} usable carousel image types; the requested count was reduced.`,
+      });
     }
+    setOverrides.imageCount = effectiveCount;
+    resized = resized.slice(0, effectiveCount);
   }
   return resized.map((slot) => {
     const next = { ...slot };
@@ -1021,12 +968,12 @@ export function resolveCreationPlatformPlan(input = {}) {
   }));
   slots = applyCategoryOverlays(slots, uniqueStrings(categorySignals));
   slots = applyReferenceCoverageOverlays(slots, referenceCoverage);
-  slots = applyEvidenceFallbacks(slots, evidence, warnings);
+  if (platform !== "universal") slots = applyEvidenceFallbacks(slots, evidence, warnings);
 
   const setOverrides = normalizeCreationPlatformSetOverrides(input.setOverrides || input.platformSetOverrides);
   const itemOverrides = normalizeCreationPlatformItemOverrides(input.itemOverrides || input.platformItemOverrides);
   const selectedRoles = normalizeSelectedRoles(input.selectedRoles);
-  slots = applySetOverrides(slots, setOverrides, { profile, evidence, selectedRoles, warnings });
+  slots = applySetOverrides(slots, setOverrides, { profile, warnings });
   slots = slots.map((slot, index) => selectedRoles[index] ? { ...slot, role: selectedRoles[index] } : slot);
   slots = applyItemOverrides(slots, itemOverrides, warnings);
   const referenceAudienceStrategy = getReferenceAnalysisAudienceStrategy(input.referenceAnalysis);

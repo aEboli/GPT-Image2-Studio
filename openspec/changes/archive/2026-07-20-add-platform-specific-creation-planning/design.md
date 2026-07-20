@@ -13,20 +13,22 @@ Listing 入口现已对所有平台开放，但 `marketplace=amazon-us`、`langu
 **Goals:**
 
 - 让不同平台得到真正不同的默认图片类型、顺序、张数、逐图比例、分辨率、语言、构图、文字密度和场景策略。
+- 让所有平台自动方案都包含至少一个尺寸或真实尺度槽位，并在没有精确尺寸依据时保留该图片用途而不编造数值。
+- 让平台 profile 的图库策略进入每个轮播项的最终提示词，避免平台差异只停留在类型名称和顺序上。
 - 让平台原生图片类型成为计划项的一等字段，同时保留现有角色 ID 以兼容历史记录、参考图覆盖和现有提示词分配逻辑。
-- 让用户可以覆盖所有自动值，并能清楚区分平台自动值、用户覆盖和官方硬规则。
+- 让用户通过套图级快捷控件和兼容图片类型启停调整计划，并能清楚区分平台自动值、用户覆盖和官方硬规则；不向用户开放逐图高级参数或提示词编辑。
 - 让本地服务和 Cloudflare Worker 共享同一策略解析结果，并让每张图使用自己的生成参数。
 - 让队列、保存、复用、补图和修复冻结当时的有效计划，不因未来策略更新发生漂移。
 - 以来源、核验日期和证据等级管理平台规则；只有有明确官方来源的规则才能成为阻断性约束。
-- 让 19 个 canonical 平台使用版本化 Listing policy、平台字段语义和跨类目转化 playbook，同时保持同一生成、校验、持久化和回退管线。
-- 让 Listing 草稿冻结平台、locale 与策略版本，兼容旧 Amazon 字段，并让本地服务与 Worker 对相同输入生成相同请求和校验结果。
-- 用统一事实门控和 claim 风险控制减少误导、无依据承诺和跨类目违规风险，同时明确输出仍需用户复核。
+- 让 19 个 canonical 平台使用版本化 Listing policy 和跨类目转化 playbook，同时对外统一生成旧版字段合同。
+- 让 Listing 草稿冻结平台、locale 与策略版本，并让本地服务与 Worker 对相同输入生成相同请求和直接完成结果。
+- 生成前后确定性移除品牌、商标、店铺、卖家和平台名称；不引入 validator 重试、人工审核态或复制/导出门控。
 
 **Non-Goals:**
 
 - 运行时抓取、登录或自动更新第三方平台规则。
 - 自动发布图片或 Listing 到第三方平台。
-- 使用视觉模型对最终生成图片做自动合规认证；平台约束仍需用户最终审核。
+- 使用视觉模型对最终生成图片做自动合规认证。
 - 建立平台乘以所有四级类目的完整静态笛卡尔矩阵。
 - 保证平台审核通过、法律合规、搜索排名、销量或转化率；系统只提供基于当前来源和输入事实的可复核草稿。
 
@@ -60,13 +62,15 @@ Listing 入口现已对所有平台开放，但 `marketplace=amazon-us`、`langu
 
 最终 plan item 保存上述有效字段，并继续保存 `role`、`prompt`、`itemId` 和 `slotIndex`。`carouselImageCount` 表示启用的平台轮播槽位数，兼容字段 `imageCount` 继续等于该值；`skuImageCount` 表示按稳定 SKU subject ID 去重后追加的一图一 SKU 数量；`infographicRebuildCount` 表示重构附加项数量；`totalPlannedItemCount` 必须等于三者之和。平台矩阵中的“SKU”或“变体”槽位表示一张对比多个已提供变体的轮播图；现有追加 SKU item 表示每个可售主体各生成一张独立图片。两者使用不同 item kind 和去重键，互不替代。少于两个可售 SKU 时，自动计划必须替换或省略变体对比槽位，避免与单 SKU 附加图重复；禁用对比槽位不影响追加 SKU items。
 
+每个 profile 的自动槽位必须至少包含一个 `dimension-fit` 或 `scale-proof`。这两个尺寸用途不因缺少精确数值而被 evidence fallback 删除；当用户没有提供尺寸值或尺寸参考时，规划器必须禁止数字标注和推测测量值，只允许不带数值的结构、适配或尺度表达。用户一旦提供尺寸输入或已应用的尺寸参考，同一槽位再承载精确可见标签。
+
 ### 3. 版本化平台 profile 与默认矩阵
 
-推荐张数是自动生成方案，不等于平台允许上传的最大数量。第一版 profile 如下：
+推荐张数是自动生成方案，不等于第三方平台允许上传的外部最大数量。通用电商 profile 保留原有 18 个角色对应的原生轮播槽位；每个命名平台的规范化槽位数则是本系统当前实际支持的该平台轮播图数量上限。数量控件不得提供超过当前 profile 上限的值，resolver 也不得用跨平台或通用 `custom` 槽位把命名平台扩展到固定 18 张。第一版 profile 如下：
 
 | 平台 | 默认图片顺序 | 参数 | 证据 |
 |---|---|---|---|
-| 通用电商 | 首图、卖点、场景、多角度、细节、尺寸、包装、SKU，8 张 | 1:1，1.5K，English | 基线 |
+| 通用电商 | 首图、核心信息、场景、多角度、氛围、细节、品牌质感、尺寸、效果、参数、工艺、包装、SKU、材质、痛点、卖点、真人手持、真人穿戴，18 张 | 1:1，1.5K，English | 基线 |
 | Amazon | 白底主图、功能证据、生活场景、多角度、细节、尺寸、包装清单，7 张 | 1:1，2K，English | A |
 | 淘宝/天猫 | 白底图、透明图、场景图、卖点文案图、细节、尺寸、SKU、2:3 长图，8 张 | 1:1 与 2:3，2K，简中 | A |
 | 京东 | 白底主图、参数、功能证明、细节、场景、尺寸、包装、品质证明，8 张 | 1:1，2K，简中 | B |
@@ -101,6 +105,9 @@ Listing 入口现已对所有平台开放，但 `marketplace=amazon-us`、`langu
 | `content-cover` | hero | 动态竖版封面 | concise | demo-context | allow-supplied | 无 |
 | `xhs-feed-cover` | hero | 3:4 编辑式封面 | concise | authentic-lifestyle | allow-supplied | 无，B 级建议 |
 | `lifestyle-first` | atmosphere | 环境型首图 | none-or-short | authentic-lifestyle | allow-supplied | 无 |
+| `scene-application` | scene | 多场景应用 | concise | authentic-use | allow-supplied | 无 |
+| `ownership-atmosphere` | atmosphere | 拥有感氛围 | concise | authentic-lifestyle | allow-supplied | 无 |
+| `use-style-story` | brand-story | 多场景使用与风格叙事 | moderate | multi-context | allow-supplied | 无 |
 | `benefit-proof` | benefit | 商品与证据融合 | concise | optional-context | allow-supplied | 无 |
 | `info-benefit` | benefit | 模块化信息层级 | moderate | neutral | allow-supplied | 无 |
 | `value-bundle` | accessory-gift | 套装与数量分组 | factual-short | studio-clean | allow-supplied | 无 |
@@ -113,11 +120,14 @@ Listing 入口现已对所有平台开放，但 `marketplace=amazon-us`、`langu
 | `spec-table` | spec-table | 参数表格 | factual-only | neutral | allow-supplied | 无 |
 | `usage-demo` | usage-suggestion | 使用或步骤演示 | concise | authentic-use | allow-supplied | 无 |
 | `creator-demo` | human-handheld | 真人手持或演示 | concise | authentic-use | allow-supplied | 无 |
+| `wearable-demo` | human-wearable | 真人穿戴或携带 | concise | authentic-use | allow-supplied | 无 |
 | `in-box` | accessory-gift | 到手清单平铺 | factual-only | studio-clean | allow-supplied | 无 |
 | `variant-comparison` | series-showcase | 已提供变体对比 | factual-only | studio-clean | allow-supplied | 无 |
 | `material-proof` | ingredient-material | 材质、成分或色卡 | factual-short | neutral | allow-supplied | 无 |
 | `craft-proof` | craft-process | 工艺或品质证据 | factual-short | process | allow-supplied | 无 |
 | `comparison-proof` | effect-comparison | 并列功能证据 | factual-only | controlled-context | allow-supplied | 无 |
+| `pain-solution` | after-sales | 痛点、解决路径与结果 | concise | authentic-use | allow-supplied | 无 |
+| `selling-point-stack` | usage-suggestion | 卖点与商品证据组合 | concise | optional-context | allow-supplied | 无 |
 | `condition-proof` | product-detail | 成色检查 | factual-only | studio-clean | preserve-existing-only | 无，需输入证据 |
 | `defect-disclosure` | product-detail | 瑕疵微距 | factual-only | studio-clean | preserve-existing-only | 无，需输入证据 |
 | `gift-packaging` | accessory-gift | 礼赠或开箱 | concise | gift-context | allow-supplied | 无 |
@@ -128,27 +138,27 @@ Listing 入口现已对所有平台开放，但 `marketplace=amazon-us`、`langu
 
 | 平台 | 规范化 slot sequence |
 |---|---|
-| 通用电商 | `generic-hero@1:1 > benefit-proof@1:1 > lifestyle-first@1:1 > multi-angle@1:1 > detail-macro@1:1 > dimension-fit@1:1 > in-box@1:1 > variant-comparison@1:1` |
+| 通用电商 | `generic-hero@1:1 > benefit-proof@1:1 > scene-application@1:1 > multi-angle@1:1 > ownership-atmosphere@1:1 > detail-macro@1:1 > use-style-story@1:1 > dimension-fit@1:1 > comparison-proof@1:1 > spec-table@1:1 > craft-proof@1:1 > in-box@1:1 > variant-comparison@1:1 > material-proof@1:1 > pain-solution@1:1 > selling-point-stack@1:1 > creator-demo@1:1 > wearable-demo@1:1` |
 | Amazon | `amazon-main@1:1 > benefit-proof@1:1 > lifestyle-first@1:1 > multi-angle@1:1 > detail-macro@1:1 > dimension-fit@1:1 > in-box@1:1` |
 | 淘宝/天猫 | `taobao-white-main@1:1 > transparent-cutout@1:1 > lifestyle-first@1:1 > info-benefit@1:1 > detail-macro@1:1 > dimension-fit@1:1 > variant-comparison@1:1 > long-detail@2:3` |
 | 京东 | `clean-catalog-main@1:1 > spec-table@1:1 > comparison-proof@1:1 > detail-macro@1:1 > lifestyle-first@1:1 > dimension-fit@1:1 > in-box@1:1 > craft-proof@1:1` |
 | 拼多多 | `clean-catalog-main@1:1 > value-bundle@1:1 > benefit-proof@1:1 > variant-comparison@1:1 > lifestyle-first@1:1 > dimension-fit@1:1 > detail-macro@1:1 > in-box@1:1` |
-| 抖音电商 | `clean-catalog-main@1:1 > content-cover@3:4 > creator-demo@3:4 > lifestyle-first@3:4 > detail-macro@1:1 > variant-comparison@1:1` |
+| 抖音电商 | `clean-catalog-main@1:1 > content-cover@3:4 > creator-demo@3:4 > lifestyle-first@3:4 > detail-macro@1:1 > dimension-fit@1:1` |
 | 小红书电商 | `xhs-feed-cover@3:4 > lifestyle-first@3:4 > usage-demo@3:4 > detail-macro@3:4 > scale-proof@3:4 > clean-product-proof@1:1` |
 | Temu | `clean-catalog-main@1:1 > value-bundle@1:1 > variant-comparison@1:1 > benefit-proof@1:1 > dimension-fit@1:1 > usage-demo@1:1 > detail-macro@1:1 > in-box@1:1` |
-| TikTok Shop | `tiktok-shop-main@1:1 > creator-demo@1:1 > lifestyle-first@1:1 > benefit-proof@1:1 > detail-macro@1:1 > variant-comparison@1:1` |
+| TikTok Shop | `tiktok-shop-main@1:1 > creator-demo@1:1 > lifestyle-first@1:1 > benefit-proof@1:1 > detail-macro@1:1 > dimension-fit@1:1` |
 | Shopee | `clean-catalog-main@1:1 > benefit-proof@1:1 > multi-angle@1:1 > detail-macro@1:1 > dimension-fit@1:1 > usage-demo@1:1 > variant-comparison@1:1 > in-box@1:1 > material-proof@1:1` |
 | Lazada | `clean-catalog-main@1:1 > benefit-proof@1:1 > lifestyle-first@1:1 > detail-macro@1:1 > dimension-fit@1:1 > variant-comparison@1:1 > in-box@1:1 > comparison-proof@1:1` |
 | Etsy | `lifestyle-first@4:3 > clean-product-proof@4:3 > craft-proof@4:3 > detail-macro@4:3 > scale-proof@4:3 > variant-comparison@4:3 > gift-packaging@4:3 > usage-demo@4:3` |
 | eBay | `clean-catalog-main@1:1 > multi-angle@1:1 > label-detail@1:1 > condition-proof@1:1 > scale-proof@1:1 > in-box@1:1 > usage-demo@1:1 > defect-disclosure@1:1` |
 | Walmart | `walmart-main@1:1 > multi-angle@1:1 > benefit-proof@1:1 > lifestyle-first@1:1 > dimension-fit@1:1 > in-box@1:1` |
-| Shopify/DTC | `brand-hero@1:1 > clean-product-proof@1:1 > lifestyle-first@1:1 > benefit-proof@1:1 > detail-macro@1:1 > usage-demo@1:1 > variant-comparison@1:1 > brand-trust@1:1` |
+| Shopify/DTC | `brand-hero@1:1 > clean-product-proof@1:1 > lifestyle-first@1:1 > benefit-proof@1:1 > detail-macro@1:1 > usage-demo@1:1 > dimension-fit@1:1 > brand-trust@1:1` |
 | AliExpress | `clean-catalog-main@1:1 > variant-comparison@1:1 > value-bundle@1:1 > benefit-proof@1:1 > dimension-fit@1:1 > usage-demo@1:1 > detail-macro@1:1 > in-box@1:1` |
-| Rakuten | `clean-catalog-main@1:1 > info-benefit@1:1 > detail-macro@1:1 > spec-table@1:1 > usage-demo@1:1 > gift-packaging@1:1 > variant-comparison@1:1 > in-box@1:1` |
+| Rakuten | `clean-catalog-main@1:1 > info-benefit@1:1 > detail-macro@1:1 > spec-table@1:1 > usage-demo@1:1 > gift-packaging@1:1 > dimension-fit@1:1 > in-box@1:1` |
 | Coupang | `clean-catalog-main@1:1 > benefit-proof@1:1 > detail-macro@1:1 > dimension-fit@1:1 > usage-demo@1:1 > in-box@1:1 > comparison-proof@1:1 > long-detail@3:4` |
 | Mercado Libre | `clean-catalog-main@1:1 > multi-angle@1:1 > label-detail@1:1 > dimension-fit@1:1 > usage-demo@1:1 > variant-comparison@1:1 > in-box@1:1 > condition-proof@1:1` |
 
-自动 resolver 不允许重复 `imageType`，除非 slot 显式声明 `allowDuplicate`；用户手工创建的重复 custom 槽位不受此限制。没有至少两个可售 SKU 时，`variant-comparison` 按 `[clean-product-proof, detail-macro, material-proof, craft-proof]` 顺序选择当前 profile 尚未使用且有证据支持的第一个 fallback；没有安全 fallback 时省略该槽位并减少轮播数。缺少成色或瑕疵证据时，`condition-proof` 和 `defect-disclosure` 使用相同的安全 fallback 规则。
+自动 resolver 不允许重复 `imageType`，除非 slot 显式声明 `allowDuplicate`。当前 UI 不创建超出 profile 的 `custom` 槽位；显式数量只能截取当前平台已有槽位，不能扩展 profile。没有至少两个可售 SKU 时，`variant-comparison` 按 `[clean-product-proof, detail-macro, material-proof, craft-proof]` 顺序选择当前 profile 尚未使用且有证据支持的第一个 fallback；没有安全 fallback 时省略该槽位并减少轮播数。缺少成色或瑕疵证据时，`condition-proof` 和 `defect-disclosure` 使用相同的安全 fallback 规则。
 
 证据等级 A 表示已核验明确官方资料，B 表示官方资料不完整但有平台页面或真实前后台观察，C 表示只能使用保守推断。等级属于 profile 总体提示；具体 `required` 约束必须逐条引用官方 source，不能仅凭 profile 等级升级为硬规则。
 
@@ -184,9 +194,11 @@ Temu 的 B 级结论来自用户登录态卖家后台的只读观察，没有稳
 5. 用户套图级和逐图覆盖。
 6. 对最终图片类型执行约束验证。
 
-套图级覆盖包括目标语言、默认比例、默认分辨率、视觉语言、默认构图模式、默认文字密度、默认场景策略、默认 Logo 策略和启用槽位数量；逐图覆盖包括启停、顺序、图片类型、比例、分辨率、语言、构图模式、文字密度、场景策略、Logo 策略和提示词。逐图值高于套图级值。现有 SKU 组合件数和 SKU 生成规则继续作为可编辑用户输入；平台只决定变体/SKU 图片槽位的自动推荐，不锁定 SKU 输入。
+套图级覆盖包括目标语言、默认比例、默认分辨率、视觉语言和启用槽位数量。用户修改目标语言、比例或分辨率时，浏览器必须立即把当前值写入 `platformSetOverrides`、清除旧预览并以该覆盖请求新计划；已有冻结计划或平台默认值不得覆盖当前表单的显式选择。兼容图片类型区域只允许启停当前计划槽位。界面不再提供逐图顺序、图片类型、比例、分辨率、语言、构图模式、文字密度、场景策略、Logo 策略或提示词编辑。历史记录中已冻结的逐图参数继续用于展示、重试和修复，但不能从当前 UI 自定义。现有 SKU 组合件数和 SKU 生成规则继续作为可编辑用户输入；平台只决定变体/SKU 图片槽位的自动推荐，不锁定 SKU 输入。
 
-官方硬规则属于图片类型语义而不是普通默认值。例如 `amazon-main` 不能同时要求营销文字、拼贴场景或外部 Logo 叠加。即使用户已上传并启用 Logo，resolver 也必须让严格主图使用 `forbid-overlay`，生成引用组装不得把 Logo 文件附加到该 item；商品参考图中本来存在的品牌印记仍按商品保真规则保留。用户显式把严格主图的 Logo 策略改为叠加时，计划预览返回阻断错误；用户可以把槽位改成 `custom` 后继续，界面必须显示“不保证平台合规”。推荐规则只产生警告，C 级策略不产生阻断性约束。
+SKU 图启停属于追加项开关，不是平台重规划来源。浏览器切换该开关时可以请求新的计数和追加项，但必须继续显示并提交当前平台、平台轮播槽位与覆盖快照；新预览返回前保留原平台轮播视图，不得清空 `effectivePlan` 后显示通用角色 fallback。关闭 SKU 图后 `skuImageCount=0`，`carouselImageCount`、轮播槽位顺序和图片类型保持不变。
+
+官方硬规则属于图片类型语义而不是普通默认值。例如 `amazon-main` 不能同时要求营销文字、拼贴场景或外部 Logo 叠加。即使用户已上传并启用 Logo，resolver 也必须让严格主图使用 `forbid-overlay`，生成引用组装不得把 Logo 文件附加到该 item；商品参考图中本来存在的品牌印记仍按商品保真规则保留。任何来源的冻结计划若违反硬规则，计划预览必须返回阻断错误；当前 UI 不提供把严格主图改成自定义类型以绕过校验的入口。推荐规则只产生警告，C 级策略不产生阻断性约束。
 
 ### 6. 每张图独立解析生成参数
 
@@ -194,9 +206,17 @@ Temu 的 B 级结论来自用户登录态卖家后台的只读观察，没有稳
 
 若 route 不支持推荐尺寸，选择同一比例下最接近的可用尺寸并把实际值写回 item 和 manifest。单图失败仍按现有方式隔离，重试使用保存的逐图参数。
 
-### 7. 浏览器保持简单默认并按需展开覆盖
+### 7. 浏览器保持简单默认且不开放逐图高级编辑
 
-平台控件下方显示自动方案摘要，例如“Amazon 自动方案 · 轮播 7 + SKU 3 + 重构 2 = 总计 12 · 1:1 · English · 2K”。现有张数、语言、比例、分辨率和视觉语言控件继续提供套图级快捷覆盖，修改后显示“已覆盖”。图片类型区域显示有顺序的槽位清单，支持增删、启停和上下移动；每个槽位按需展开图片类型、比例、分辨率、语言、构图模式、文字密度、场景策略、Logo 策略和提示词编辑。严格主图在用户启用 Logo 时显示“此图不叠加外部 Logo”，但不清除 Logo 文件或其他图片的 Logo 设置。
+平台控件下方显示当前可编辑表单的自动方案摘要，例如“Amazon 自动方案 · 轮播 7 + SKU 3 + 重构 2 = 总计 12 · 1:1 · English · 2K”。“套图数量”只覆盖轮播图数量，并必须始终与摘要中的 `carouselImageCount` 一一对应；SKU 和信息图重构继续作为独立追加项计入总计。数量选项按当前 profile 的规范化槽位数动态过滤，平台切换后立即重建选项；旧值超过新上限时收紧为新平台推荐值并重新规划。现有语言、比例、分辨率和视觉语言控件继续提供套图级快捷覆盖，修改后显示“已覆盖”，且预览、冻结计划、队列与实际逐图请求必须显示并使用相同值。兼容图片类型区域仅显示和启停当前有效轮播槽位；不显示逐图高级编辑、添加/删除/排序控件或任何提示词输入。严格主图在用户启用 Logo 时继续按冻结 `logoPolicy` 自动排除外部 Logo，但不清除 Logo 文件或其他图片的 Logo 设置。
+
+“套图数量”变化时，浏览器保存显式数量与对齐后的角色并立即发起新计划预览。生成提交若发生在该预览完成前，必须等待最新预览 Promise；只有最新 `effectivePlan` 已冻结且数量与当前选择一致时才允许入队。因此用户修改数量后的第一次生成即使用新数量，不依赖第二次点击。
+
+resolver 仍可记录完整 warning 供调试和 manifest 留痕，但 UI 不展示 `missing-evidence-slot-omitted`、`missing-evidence-slot-replaced` 和 `image-count-extension-custom` 这三类无需用户操作的例行内部调整。其余可见 warning 按代码与消息去重；未知平台、无法满足请求数量和阻断错误继续显示。
+
+每个轮播项的系统提示词必须包含当前 profile 的 `promptInstruction`，并把它作为整套图库的策划上下文，再叠加该槽位的 `imageType`、构图、文字、场景与 Logo 策略。通用角色 brief 只能补充内容意图，不能覆盖平台原生主图、内容封面、生活方式、尺度、详情和信息密度决策。
+
+活动生成和队列任务继续持有各自冻结的 `effectivePlan`，但队列快照只在队列或记录上下文中展示。用户编辑下一套表单时，当前计划摘要和高级槽位必须读取该表单的草稿计划，不得因为后台任务正在生成或某个队列任务被选中而切换到旧任务计数。若生成期间允许编辑但暂时不能重新预览，界面必须清楚标记计划待刷新，不能把旧计数显示成当前表单的有效计划。
 
 提供“恢复当前平台推荐”操作，只清除平台相关覆盖，不清除商品输入。官方硬规则显示来源和锁形提示，低证据 profile 显示“保守建议”。界面不需要在主表单展示完整来源列表，但计划摘要或说明入口必须能显示证据等级。
 
@@ -220,7 +240,7 @@ Temu 的 B 级结论来自用户登录态卖家后台的只读观察，没有稳
 - `search`：Amazon、京东、eBay、Walmart、Rakuten、Coupang、Mercado Libre。
 - `value`：淘宝/天猫、拼多多、Temu、Shopee、Lazada、AliExpress。
 - `content`：抖音电商、小红书电商、TikTok Shop。
-- `brand`：Etsy、Shopify/DTC。
+- `editorial`：Etsy、Shopify/DTC；只复用商品故事、工艺与使用语境的写作顺序，不携带品牌、商标、店铺或卖家语义。
 
 archetype 只复用跨类目写作顺序，不代表平台规则相同。每个平台 override 至少声明 `id`、`label`、`marketplaceId`、`defaultLocale`、`policyVersion`、`verifiedAt`、`evidenceLevel`、`sourceIds`、标题规则、高亮规则、描述规则、搜索面规则、转化顺序、变体策略、claim 风险组、发布字段与内部字段、fallback。标题和搜索限制同时支持字符与 UTF-8 字节语义；未被官方资料明确覆盖的长度、条数、语气和关键词建议必须标记为可配置的保守建议。
 
@@ -235,45 +255,54 @@ Listing 规则采用与图片规则相同的来源纪律：只有当前可核验
 - Shopify 商品描述与 SEO 关键词：<https://help.shopify.com/en/manual/products/details/product-descriptions/write> 与 <https://help.shopify.com/en/manual/promoting-marketing/seo/adding-keywords>。
 - 淘宝、京东、拼多多、抖音、小红书、Shopee、Lazada、Rakuten 与 Coupang 官方开放平台或卖家教育文档：<https://open.taobao.com/doc.htm?docId=119447&docType=1>、<https://jos.jd.com/apilist?apiGroupId=48&apiId=13420&apiName=jingdong.ware.write.add>、<https://open.pinduoduo.com/application/document/api?id=pdd.goods.add>、<https://op.jinritemai.com/docs/api-docs/14/249>、<https://op.jinritemai.com/docs/api-docs/14/1373>、<https://open.xiaohongshu.com/document/api?apiNavigationId=65&id=12&gatewayId=103&gatewayVersionId=1661&apiId=6487&apiParentNavigationId=14>、<https://seller.shopee.com.my/edu/article/2222>、<https://seller.shopee.sg/edu/article/87/product-descriptions-best-practices>、<https://open.lazada.com/apps/doc/doc?nodeId=30715&docId=120946>、<https://navi-manual.faq.rakuten.net/> 与 <https://developers.coupangcorp.com/hc/en-us/articles/360033877853-Product-Creation>。
 
-研究快照中的精确限制，例如 Amazon 标题 75 字符限制自 2026-07-27 起生效、Amazon 要点至少 3 条且每条 10-255 字符、TikTok Shop 标题 25-200 字符、eBay 标题 80 字符、Coupang 商品名不超过 100 字符且搜索标签最多 20 个并各不超过 20 字符，只能在对应 source 仍为当前策略依据时作为版本化规则。Amazon 75 字符限制在 2026-07-27 前只产生 recommendation warning，生效日及之后才成为 blocking error；validator 使用显式 validation date 或当前日期判断，无法解析的显式日期按保守阻断处理。Temu、AliExpress、Mercado Libre 以及其他没有稳定公开 Listing 细则的平台继续使用保守可配置值，不得标成官方硬限制。运行时不访问上述 URL。
+研究快照中的精确限制只能在对应可靠官方 source 仍为当前策略依据时作为版本化规则。当前基线包括 Etsy 标题最多 140 个字符、最多 13 个标签且每个标签最多 20 个字符；Amazon 标题 75 字符限制自 2026-07-27 起生效、要点至少 3 条且每条 10-255 字符，并且只有可靠官方 source 明确支持时才写入具体 backend search UTF-8 字节上限；TikTok Shop 标题 25-200 字符；eBay 标题 80 字符；Coupang 商品名不超过 100 字符，搜索标签数量和单标签上限按官方定义的 UTF-8 bytes 而不是 characters 计量。Amazon 75 字符限制在 2026-07-27 前只产生 recommendation warning，生效日及之后才成为 blocking error；validator 使用显式 validation date 或当前日期判断，无法解析的显式日期按保守阻断处理。Temu、AliExpress、Mercado Libre 以及其他没有稳定公开 Listing 细则的平台继续使用保守可配置值，不得标成官方硬限制。运行时不访问上述 URL。
 
-### 11. 冻结平台和 locale，并演进为 V2 superset draft
+### 11. 冻结平台和 locale，并统一恢复旧版 Listing 字段
 
-Listing policy 解析顺序为：`effectivePlan.platformPolicyId` 或 `effectivePlan.platform` > manifest `platformPolicyId` > manifest `platform` > `universal`。目标 locale 解析顺序为冻结 `effectivePlan.targetLanguage` > manifest `targetLanguage` > policy `defaultLocale`。未知平台、无法支持的 locale 或 `platformProvenance=legacy-missing` 回退到可说明的基线，并在草稿中记录 warning；不得把 reader 为兼容填充的 `platform=universal` 误当成旧记录曾经显式选择过平台。
+Listing policy 解析顺序为：`effectivePlan.platformPolicyId` 或 `effectivePlan.platform` > manifest `platformPolicyId` > manifest `platform` > `universal`。目标 locale 解析顺序为冻结 `effectivePlan.targetLanguage` > manifest `targetLanguage` > policy `defaultLocale`。未知平台、无法支持的 locale 或 `platformProvenance=legacy-missing` 使用通用基线；不得把 reader 为兼容填充的 `platform=universal` 误当成旧记录曾经显式选择过平台。
 
-新草稿使用 V2 superset：保存 `schemaVersion`、`platformId`、`marketplace`、`platformLabel`、`listingPolicyVersion`、`language`、`title`、`sellingPoints`、`buyerObjections`、`highlights`、`description`、`searchTerms`、`keywordBuckets`、证据、缺失信息、警告、状态、时间戳和中文复核视图。`highlights` 的平台显示标签、条数和引导格式由 policy 决定；`searchTerms` 可表示 Amazon 后台词、Etsy 标签、平台搜索词或仅供参考的关键词建议，UI 必须按 policy 显示用途，不能把所有平台都标为“后台搜索词”。`sellingPoints` 和 `buyerObjections` 是写作与复核依据，只有 profile 明确列入 `publishFields` 时才进入整段发布复制。
+新草稿直接使用旧版合同：`title`、`sellingPoints`、`painPoints`、`fiveBullets`、`description`、`backendSearchTerms`、`keywordBuckets`，并保存结构同构的简体中文 `zhDisplay`。所有平台都使用同一组字段名和“标题、卖点、痛点、五点描述、商品描述、后台搜索词、关键词分组”显示顺序；policy 只决定每个字段的内容侧重点、语言指导、关键词意图和写作顺序。
 
-reader 与视图继续接受 V1 `fiveBullets`、`backendSearchTerms`、`painPoints`、`marketplace=amazon-us` 和 `zhDisplay` 别名；旧草稿按原字段、原 marketplace 和原内容显示、复制与导出，不批量重写，也不在读取时套用新 profile。用户显式重写或重新生成时才创建 V2 草稿并冻结当前 Listing policy 版本。
+reader 与视图继续接受历史 V1 和 V2 草稿。历史 V1 按原内容读取；历史 V2 只在视图层映射到旧版显示、复制与导出字段，不批量改写存储。用户显式重写或重新生成时才创建新的旧版字段草稿并冻结当前 Listing policy 版本。
 
-### 12. 提示词、schema、校验和回退共用事实门控
+### 12. 单次提示词请求和直接回退
 
-请求提示词按“跨平台事实与安全底线 > 平台 policy > locale 与单位 > 跨类目 playbook > Source JSON > 重试错误”分层组装。Amazon US、Rufus、数量前置、英文、固定五点和大写引导词不再是全局指令，只在对应 policy 有依据时启用。strict JSON schema 使用稳定 V2 superset 并由 policy 约束条数；字符数、UTF-8 字节数、语言、字段用途和 claim 校验留在共享 validator，避免不同兼容网关对 JSON Schema 长度关键字支持不一致。
+请求提示词按“统一无品牌要求 > 平台 policy > locale 与单位 > 跨类目 playbook > Source JSON”分层组装。Amazon US、Rufus、数量前置和搜索密度等内容只在对应 policy 中启用；无论平台如何，模型都必须返回稳定的旧版 JSON 字段和英中对照。
 
 跨类目 playbook 固定为商品身份与搜索意图、事实支持的结果型卖点、真实使用场景、购买疑虑回答、尺寸/适配/变体/包装清晰度和证据不足披露。平台 override 可以重排、删减或改变字段表现，但不得创建平台乘以类目的静态矩阵，也不得加入用户没有提供的类目事实。
 
-统一事实门控只接受用户商品资料、SKU/包装/尺寸输入、参考图角色说明、保存的有效计划与可追溯 manifest 元数据作为公开 claim 的基础。生成图只能支持可直接观察的外观、数量和场景，不足以单独证明材质、认证、医疗/保健效果、安全、兼容性、耐久、性能、销量、排名、评价、价格、折扣、保修或退款承诺。无法证明的事实进入 `missingInfo` 或被删除；高风险绝对化、比较级、社会证明和促销 claim 进入 warning 或阻断。
+source builder 只把用户商品资料、SKU/包装/尺寸输入、参考图角色说明、保存的有效计划与可追溯 manifest 元数据中的可用商品事实交给模型，并在请求前移除已识别的品牌、商标、店铺、卖家和平台名称。
 
-模型输出先归一化再按 resolved policy 校验，失败时携带结构化错误重试一次。仍失败时只能返回 `needs-review` 或 `failed` 的 input-only 保守占位，不得把 mock 文案或通用模板标成可发布成品。任何成功状态也只表示通过当前机器校验，不表示平台审核、法律合规或高转化得到保证。
+模型只请求一次。解析成功时归一化为旧版字段并执行确定性的无品牌清洗后直接返回 `completed`；请求失败、上游限流、服务错误或 JSON 解析失败时，直接基于可用商品事实构造同字段的确定性 fallback，并返回 `completed`。流程不运行 validator 驱动的重试、不生成 `needs-review`、不要求人工审核，也不阻止复制或导出。缺少 API 配置时仍返回明确配置错误。
 
 ### 13. 浏览器、本地服务和 Worker 共享同一 Listing 语义
 
-浏览器从同步的 Listing policy 读取平台标签、字段标签、发布字段和内部字段；记录页按平台显示“要点/亮点/标签/搜索词”等真实用途，整段复制默认只包含 `publishFields`，同时保留证据、警告、缺失信息和结构化 JSON 导出。历史 V1 草稿继续使用兼容标签，不因当前表单平台变化而改写。
+浏览器始终按旧版顺序展示“标题、卖点、痛点、五点描述、商品描述、后台搜索词、关键词分组”，每个英文值下方紧邻对应的简体中文参考。单字段复制、整段复制和结构化导出直接可用且保留英中映射，不读取审核状态或访问门控。平台与 policy 信息只作为非内容 metadata 展示。
 
-本地服务从保存的 manifest 读取 set，Cloudflare Worker 从显式 payload 读取 set，但两者都必须调用相同的 source builder、policy resolver、schema builder、prompt builder、normalizer 和 validator。相同规范化 set 与配置必须产生相同的上游请求体、草稿元数据、校验和回退状态；端点不得复制 19 套策略，也不得在运行时抓取规则来源。
+本地服务从保存的 manifest 读取 set，Cloudflare Worker 从显式 payload 读取 set，但两者都调用相同的 source builder、policy resolver、旧版 schema、prompt builder、normalizer、无品牌 sanitizer 和 fallback。相同规范化 set 与配置应产生等价的上游请求体、草稿元数据和完成结果；端点不得复制 19 套策略，也不得在运行时抓取规则来源。
+
+### 14. 旧版字段使用英中逐项对照和统一无品牌清洗
+
+新生成或用户显式重写的草稿将顶层 `title`、`sellingPoints`、`painPoints`、`fiveBullets`、`description`、`backendSearchTerms`、`keywordBuckets` 作为英文内容字段，并在 `zhDisplay` 中保存同名、同类型、同顺序的简体中文逐项对照。平台 policy 仍决定内容侧重点，但 UI、单字段复制、整段复制和结构化导出不得丢失或错配英中对应关系。平台、policy、locale、来源和证据等级只作为非内容 metadata 保存，不得混入内容字段。
+
+所有上述英文和中文内容字段递归禁止任何品牌名、商标名、店铺名、卖家名和平台名。该 `no-brand` 约束是 GPT-Image2-Studio 的统一产品硬规则，不得写成第三方平台的官方规则，也不因源数据或平台 policy 放宽。
+
+source builder 在进入模型提示词前，从商品名称、描述、卖点、SKU、包装/尺寸、参考图说明和可追溯 manifest 文本中提取禁止词集合并从事实输入剥离。prompt 明确禁止输出这些词；sanitizer 对 model、mock 和确定性 fallback 的全部英中内容叶子执行确定性移除或中性替换，normalizer 保持英中结构同构。该清洗是输出转换的一部分，不产生审核状态、重试或访问门控。
+
+浏览器、本地服务与 Worker、model、mock 和确定性 fallback 必须复用同一提取、净化与归一化实现，并在产生草稿后直接标记 `completed`、开放复制和导出。历史草稿读取时不自动改写存储；新生成或显式重写后才使用本节合同。
 
 ## Risks / Trade-offs
 
 - [平台规则会变化] → 每个 profile 和 source 版本化并保存核验日期；历史记录冻结有效计划，更新策略需独立变更与测试。
 - [低证据平台默认值可能不准确] → 明确显示 C 级保守建议，不创建硬约束，并保持所有值可覆盖。
-- [逐图参数增加 UI 和数据复杂度] → 默认只显示自动摘要与套图快捷控件，逐图高级设置按需展开。
+- [逐图参数增加数据复杂度] → UI 只显示自动摘要、套图快捷控件和兼容图片类型启停；逐图参数由规划器生成并冻结，不开放高级编辑。
 - [生成模型仍可能不遵守主图规则] → 规划器阻止已知输入冲突并显示合规提示，但明确不把生成结果声明为已通过平台审核。
 - [平台与类目组合数量很大] → 使用确定性类目补位而不是维护 19 乘以全部四级类目的静态矩阵。
 - [脏工作树发生冲突] → 实施前记录当前 diff，只修改本变更需要的函数和测试，不格式化或清理无关文件。
 - [本地与 Worker 产生漂移] → 策略和 resolver 使用同一模块，并增加相同 payload 的计划深度相等测试。
 - [Listing 官方字段与限制会随站点、类目和后台版本变化] → Listing policy 单独版本化并保存来源与核验日期；只有当前官方依据形成硬规则，其余保持可配置建议。
-- [跨类目生成可能虚构或误导] → 所有平台共用事实门控，高风险 claim 不以生成图单独证明，证据不足进入缺失信息或阻断。
-- [高转化目标被误解为结果承诺] → UI 和导出明确标识草稿与复核状态，不宣称保证排名、销量、审核、合规或转化。
-- [V2 字段破坏历史草稿] → reader 接受 V1 aliases，旧草稿不自动迁移，重写才使用当前 policy。
+- [关闭审核与 validator 重试可能降低格式容错] → 使用严格旧版 JSON schema、归一化和确定性 fallback 保证字段完整，但不引入审核状态或复制门控。
+- [历史 V2 字段与当前旧版合同不同] → reader 在视图层映射 V2 aliases，旧草稿不自动迁移，重写才使用当前旧版合同。
 
 ## Migration Plan
 
@@ -283,10 +312,10 @@ reader 与视图继续接受 V1 `fiveBullets`、`backendSearchTerms`、`painPoin
 4. 更新浏览器自动应用与覆盖交互，再更新本地和 Worker 单图生成参数解析。
 5. 扩展队列、manifest、复用和 repair；运行迁移与旧 fixture 回归测试。
 6. 最后移除 Listing 平台资格限制，并对 19 个 canonical 平台、旧记录及真实浏览器控件进行验收。
-7. 用官方研究和失败测试固定 Listing source register、5 个 archetype、19 个 override、解析顺序、V2 aliases、事实门控和平台 validator。
-8. 更新 Listing source、schema、prompt、校验、回退、记录页、复制、导出与同步模块，并验证本地/Worker 请求和结果一致。
+7. 用研究和测试固定 Listing source register、5 个 archetype、19 个 override、解析顺序、旧版字段和平台内容差异。
+8. 更新 Listing source、旧版 schema、prompt、单次请求、直接 fallback、记录页、复制、导出与同步模块，并验证本地/Worker 请求和结果一致。
 
-回滚时可恢复旧 UI、全局参数提交和 V1 Listing 生成，同时保留新 manifest 的未知可选字段；V2 reader 必须继续读取已有 V1/V2 草稿。不得删除或批量重写已有 Creation manifest 或 Listing 草稿。
+回滚时可恢复旧 UI 和全局参数提交，同时保留新 manifest 的未知可选字段；reader 必须继续读取已有 V1/V2 草稿。不得删除或批量重写已有 Creation manifest 或 Listing 草稿。
 
 ## Open Questions
 

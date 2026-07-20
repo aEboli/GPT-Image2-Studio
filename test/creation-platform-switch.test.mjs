@@ -58,7 +58,7 @@ test("browser platform change directly resets and previews without confirmation"
   );
   assert.match(
     handler,
-    /creationPreviousPlatformValue = nextPlatform;[\s\S]*invalidateCreationReferenceAnalysisRequest\(\);[\s\S]*state\.creation\.platformSetOverrides = \{\};[\s\S]*state\.creation\.platformItemOverrides = \[\];[\s\S]*setFrozenCreationPlatformPayload\(\{ platformSetOverrides: \{\}, platformItemOverrides: \[\] \}\);[\s\S]*state\.creation\.effectivePlan = null;[\s\S]*state\.creation\.currentSet = null;[\s\S]*state\.creationRoleSelectionManuallyEdited = false;[\s\S]*renderCreationView\(\);[\s\S]*await previewCreationPlan\(\);/,
+    /creationPreviousPlatformValue = nextPlatform;[\s\S]*invalidateCreationReferenceAnalysisRequest\(\);[\s\S]*state\.creation\.platformSetOverrides = \{\};[\s\S]*state\.creation\.platformItemOverrides = \[\];[\s\S]*setFrozenCreationPlatformPayload\(\{ platformSetOverrides: \{\}, platformItemOverrides: \[\] \}\);[\s\S]*state\.creationRoleSelectionManuallyEdited = false;[\s\S]*resetCreationDraftPreview\(\);[\s\S]*await requestCreationPlanPreview\(\);/,
   );
   for (const protectedField of [
     "creationProductNameInput",
@@ -77,13 +77,13 @@ test("browser platform change directly resets and previews without confirmation"
   assert.doesNotMatch(app, /setCreationSelectValue\([\s\S]{0,120}dispatchEvent/);
 });
 
-test("platform confirmation removal stays isolated from reference analysis", async () => {
+test("platform confirmation removal stays isolated from automatic reference analysis", async () => {
   const app = await readFile(appPath, "utf8");
   const handler = app.match(
     /async function handleCreationPlatformChange\(\{ programmatic = false \} = \{\}\) \{[\s\S]*?\r?\n\}\r?\n\r?\nfunction invalidateCreationReferenceAnalysisRequest/,
   )?.[0] || "";
   assert.doesNotMatch(handler, /window\.confirm/);
   assert.match(handler, /invalidateCreationReferenceAnalysisRequest\(\)/);
-  assert.match(app, /creationReferenceApplyAnalysisButton: document\.querySelector\("#creationReferenceApplyAnalysisButton"\)/);
-  assert.match(app, /refs\.creationReferenceApplyAnalysisButton\.addEventListener\("click", applyCreationReferenceAnalysisRecommendations\)/);
+  assert.doesNotMatch(app, /creationReferenceApplyAnalysisButton/);
+  assert.match(app, /async function applyCreationReferenceAnalysis\(analysis\)[\s\S]*applyCreationReferenceAnalysisRecommendations\(\)/);
 });

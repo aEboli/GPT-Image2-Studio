@@ -11,11 +11,11 @@ import {
 
 const longText = "a".repeat(CREATION_LISTING_FIELD_MAX_CHARS + 1);
 const validBullets = [
-  "CORE VALUE: 2 Pack 3.5 in size keeps quantity and dimensions clear.",
-  "BUILT TO LAST: Compact profile supports clear product selection.",
-  "REAL-LIFE USE: Provided product facts keep the listing grounded.",
-  "SIZE & FIT: Search-focused wording supports US marketplace discovery.",
-  "PACKAGE SNAPSHOT: Concise copy keeps feature and outcome easy to scan.",
+  "PRODUCT TYPE: Blue fishing lure.",
+  "PACK DETAILS: Two supplied product units.",
+  "VISIBLE DETAILS: Blue profile and stated variant name.",
+  "SPECIFICATIONS: Review the stated size and pack information.",
+  "PACKAGE CONTENTS: Two fishing lure product units.",
 ];
 
 test("listing sources combine skuSubjects into one parent listing source", () => {
@@ -359,8 +359,8 @@ test("listing draft validation accepts equivalent mixed pack quantity prefixes",
   const draft = normalizeCreationListingDraft({
     id: "listing-mixed-pack-wording",
     title: "2 Pack / 3 Pack Electronic Fishing Lure Bass Trout Freshwater Swimbait",
-    sellingPoints: ["Grouped lure choices keep pack options clear for shoppers."],
-    painPoints: ["Dead-looking bait can get ignored during slow retrieves; visible colorway options help the lure stand out."],
+    sellingPoints: ["Grouped lure choices with stated pack options."],
+    painPoints: ["Review the stated pack option and colorway before purchase."],
     fiveBullets: validBullets,
     description: "Electronic fishing lure options cover two-pack and three-pack grouped SKU choices.",
     backendSearchTerms: "electronic fishing lure bass trout swimbait",
@@ -641,11 +641,11 @@ test("listing draft validation rejects internal template language in public fiel
   assert.match(validation.errors.join("\n"), /internal template language/);
 });
 
-test("listing draft validation rejects shopping-uncertainty pain points", () => {
+test("listing draft validation accepts neutral pre-purchase checks instead of functional pain points", () => {
   const draft = normalizeCreationListingDraft({
     id: "listing-shopping-uncertainty-pain",
     title: "1 Pack Bionic Fish Lure 13 cm (5.12 in)",
-    sellingPoints: ["Lifelike swim action helps the lure look active in the water."],
+    sellingPoints: ["Bionic fish lure with stated color options."],
     painPoints: [
       "Not sure which color to choose? The parent listing clearly groups blue/silver, yellow/green, and silver/gold options.",
       "Need size details before buying? The listing states 13 cm (5.12 in), 42 g (1.48 oz), and 2# hook size up front.",
@@ -658,9 +658,7 @@ test("listing draft validation rejects shopping-uncertainty pain points", () => 
 
   const validation = validateCreationListingDraft(draft, { expectedQuantity: "1 Pack", expectedSize: "13 cm (5.12 in)" });
 
-  assert.equal(validation.ok, false);
-  assert.match(validation.errors.join("\n"), /painPoints\[0\] must describe a usage-scene problem/);
-  assert.match(validation.errors.join("\n"), /painPoints\[1\] must describe a usage-scene problem/);
+  assert.equal(validation.ok, true, validation.errors.join("\n"));
 });
 
 test("listing draft validation rejects keyword-structure template language by itself", () => {
@@ -698,14 +696,14 @@ test("listing draft preserves Chinese display text without treating it as public
     backendSearchTerms: "blue fishing lure bass bait",
     zhDisplay: {
       title: "2 件 3.5 英寸蓝色路亚鱼饵",
-      sellingPoints: ["亮蓝色外观便于区分颜色变体。"],
-      fiveBullets: ["2 件 3.5 英寸规格让数量和尺寸更清晰。"],
+      sellingPoints: ["亮蓝色外观与已注明的颜色变体。"],
+      fiveBullets: ["2 件 3.5 英寸规格及已注明的尺寸。"],
     },
     language: "en-US",
   });
 
   assert.equal(draft.zhDisplay.title, "2 件 3.5 英寸蓝色路亚鱼饵");
-  assert.deepEqual(draft.zhDisplay.sellingPoints, ["亮蓝色外观便于区分颜色变体。"]);
+  assert.deepEqual(draft.zhDisplay.sellingPoints, ["亮蓝色外观与已注明的颜色变体。"]);
   assert.equal(validateCreationListingDraft(draft, { expectedQuantity: "2 Pack", expectedSize: "3.5 in" }).ok, true);
 });
 
@@ -722,9 +720,9 @@ test("listing draft preserves Chinese warning and missing info display text", ()
     warnings: ["Do not add waterproofing claims without source data."],
     zhDisplay: {
       title: "2 件装 3.5 英寸蓝色路亚鱼饵",
-      sellingPoints: ["明亮蓝色外观便于区分颜色变体。"],
-      painPoints: ["减少在浑水中选择颜色的判断成本。"],
-      fiveBullets: ["2 件装 3.5 英寸规格便于确认数量和尺寸。"],
+      sellingPoints: ["明亮蓝色外观与已注明的颜色变体。"],
+      painPoints: ["购买前核对颜色和包装数量。"],
+      fiveBullets: ["2 件装 3.5 英寸规格及已注明的尺寸。"],
       description: "蓝色路亚鱼饵的中文参考说明。",
       backendSearchTerms: "蓝色 路亚 鱼饵",
       keywordBuckets: {

@@ -165,7 +165,7 @@ test("Creation planner emits approved platform-native carousel plans and effecti
   }
 });
 
-test("planner preserves all 18 explicitly selected roles without evidence", () => {
+test("planner caps explicit roles at the current platform image-type limit", () => {
   const selectedRoles = [
     "hero", "benefit", "scene", "multi-angle", "product-detail", "size-capacity-fit",
     "accessory-gift", "series-showcase", "usage-suggestion", "ingredient-material",
@@ -178,19 +178,23 @@ test("planner preserves all 18 explicitly selected roles without evidence", () =
     platform: "amazon",
     imageCount: 18,
     selectedRoles,
+    platformEvidence: { dimensions: true, packageContents: true },
     infographicRebuildEnabled: false,
   });
   const carouselItems = plan.items.filter((item) => item.itemKind === "carousel");
 
-  assert.equal(plan.carouselImageCount, 18);
-  assert.equal(plan.imageCount, 18);
-  assert.equal(carouselItems.length, 18);
-  assert.equal(new Set(carouselItems.map((item) => item.slotKey)).size, 18);
-  assert.deepEqual(carouselItems.map((item) => item.role), selectedRoles);
+  assert.equal(plan.carouselImageCount, 7);
+  assert.equal(plan.imageCount, 7);
+  assert.equal(plan.platformSetOverrides.imageCount, 7);
+  assert.equal(carouselItems.length, 7);
+  assert.equal(new Set(carouselItems.map((item) => item.slotKey)).size, 7);
+  assert.deepEqual(carouselItems.map((item) => item.role), selectedRoles.slice(0, 7));
+  assert.equal(carouselItems.some((item) => item.imageType === "custom"), false);
+  assert.ok(plan.warnings.some((warning) => warning.code === "image-count-extension-limited"));
   assert.ok(carouselItems.every((item) => /Do not invent dimensions, materials, package contents, condition, defects, prices, certifications, sales, rankings, guarantees, reviews, or performance claims/i.test(item.prompt)));
 });
 
-test("Temu 16 and universal 18 custom items expose selected role purpose in title and prompt", () => {
+test("Temu is capped at eight while universal keeps its native 18 slots", () => {
   const selectedRoles = [
     "hero", "benefit", "scene", "multi-angle", "product-detail", "size-capacity-fit",
     "accessory-gift", "series-showcase", "usage-suggestion", "ingredient-material",
@@ -198,23 +202,32 @@ test("Temu 16 and universal 18 custom items expose selected role purpose in titl
     "human-wearable", "brand-story", "after-sales",
   ];
 
-  for (const [platform, imageCount] of [["temu", 16], ["universal", 18]]) {
+  for (const [platform, imageCount, expectedCount] of [["temu", 16, 8], ["universal", 18, 18]]) {
     const plan = buildCreationPlan({
       productName: "Fishing Lure",
       productDescription: "Product shown in the supplied image",
       platform,
       imageCount,
       selectedRoles: selectedRoles.slice(0, imageCount),
+      platformEvidence: {
+        craft: true,
+        defects: true,
+        dimensions: true,
+        materials: true,
+        packageContents: true,
+        performance: true,
+        skuVariants: true,
+      },
       infographicRebuildEnabled: false,
     });
-    const customItems = plan.items.filter((item) => item.itemKind === "carousel" && item.imageType === "custom");
+    const carouselItems = plan.items.filter((item) => item.itemKind === "carousel");
 
-    assert.ok(customItems.length >= 4, platform);
-    assert.ok(customItems.every((item) => item.title.endsWith("（自定义）")), platform);
-    assert.ok(customItems.every((item) => !/^自定义图片\s*\d*$/u.test(item.title)), platform);
-    assert.ok(customItems.every((item) => item.prompt.includes(item.title.replace("（自定义）", "")) || item.prompt.includes("Create ")), platform);
-    assert.ok(new Set(customItems.map((item) => item.prompt)).size === customItems.length, platform);
-    assert.ok(customItems.every((item) => /Do not invent dimensions, materials, package contents/i.test(item.prompt)), platform);
+    assert.equal(plan.carouselImageCount, expectedCount, platform);
+    assert.equal(plan.platformSetOverrides.imageCount, expectedCount, platform);
+    assert.equal(carouselItems.length, expectedCount, platform);
+    assert.equal(carouselItems.some((item) => item.imageType === "custom"), false, platform);
+    assert.deepEqual(carouselItems.map((item) => item.role), selectedRoles.slice(0, expectedCount), platform);
+    assert.equal(plan.warnings.some((warning) => warning.code === "image-count-extension-limited"), platform === "temu", platform);
   }
 });
 

@@ -11,6 +11,9 @@ import { isGenerationRequestRetryMessage, } from "/lib/generation-request-retry.
 import { cancelQueuedGenerationJob, getQueuedGenerationJobCount, getRunningGenerationJobCount, isQueuedGenerationJob, selectNextQueuedGenerationJobsByMode } from "/lib/generation-queue.mjs?v=20260611-mode-route-queue-1";
 import { buildCanceledGenerationActivityDetail, buildGenerationTaskActivityDetail, buildGenerationTaskStatusText, formatGenerationActivityModeLabel, getGenerationActivityDisplayText, sanitizeGenerationActivityDetail, sortGenerationActivityFeed, upsertGenerationActivityEntry } from "/lib/generation-activity-feed.mjs?v=20260504-vercel-static-lib-1";
 import { GENERATION_STREAM_EVENTS, recordFinalImageChunk } from "/lib/generation-stream-protocol.mjs";
+import { filterLocallyTerminatedGenerationTaskSnapshots } from "/lib/generation-task-reconciler.mjs";
+import { readHttpResponseErrorMessage } from "/lib/http-response-error.mjs";
+import { consumeSseUntilTerminal } from "/lib/sse-terminal-client.mjs";
 import { getStudioDensitySettings, getStudioLayoutMode, ALL_VARIABLE_NAMES } from "/lib/studio-density.mjs?v=20260713-cross-device-1";
 import { buildStyleTransferPresetLightboxItem } from "/lib/style-transfer-preset-lightbox.mjs";
 import { buildCreationRecordLightboxItem, normalizeCreationGenerationSnapshotForView } from "/lib/creation-record-lightbox.mjs";
@@ -19,10 +22,10 @@ import { appendBrowserConfigToFormData, getBrowserPrivateConfigRequestPayload, g
 import { cacheBrowserGalleryItem, clearBrowserImageCache, dataUrlToBlob, deleteBrowserCachedGalleryItem, fetchServerImageAsDataUrl, getBrowserCachedImageData, getImageUrl, getServerImageUrl, getServerThumbnailUrl, isCacheableBrowserImageUrl, mergeServerAndBrowserGalleryItems, readBrowserCachedGalleryItems } from "/lib/browser-image-cache.mjs";
 import { createImageEditShellBridge } from "/lib/image-edit-shell-bridge.mjs";
 import { createCreationLogoLibraryController } from "/lib/creation-logo-library.mjs";
-import { applyCreationPlanFieldOptions, buildCreationPlanFieldOptions } from "/lib/creation-plan-field-options.mjs";
 import { consumeSse, requestGenerationStream } from "/lib/generation-client.mjs";
 import { createConfigModelPickerController } from "/lib/config-model-picker.mjs";
 import { createLightboxImageViewer, createLightboxViewerState } from "/lib/lightbox-image-viewer.mjs";
+import { createAssetWorkspaceController } from "/lib/asset-workspace.mjs";
 import { createPreviewKeyboardNavigationController } from "/lib/preview-keyboard-navigation.mjs";
 import {
   API_ENDPOINT_CHAT_COMPLETIONS,
@@ -35,17 +38,19 @@ import {
   splitModelProtocolUrl,
 } from "/lib/image-route-config.mjs";
 import { createPptAnalysisController } from "/lib/ppt-analysis-client.mjs?v=20260527-density-overlap-1";
+import { createPortraitReferenceAnalysisController } from "/lib/portrait-reference-analysis-client.mjs";
 import { appendPptDeckDownloadLinks } from "/lib/ppt-record-links.mjs";
 import { buildCreationSkuSubjectsForPayload, normalizeCreationSkuBundleCountForPayload, normalizeCreationSkuSubjectForPayload } from "/lib/creation-sku-subjects.mjs";
 import { buildCreationReferenceLightboxItem } from "/lib/creation-reference-lightbox.mjs";
 import { bindCreationReferenceDrag, reorderCreationReferenceFiles } from "/lib/creation-reference-drag.mjs";
 import { isCreationSubjectReferenceRole } from "/lib/creation-reference-roles.mjs";
-import { appendCreationCoverageSummary, applyCreationReferenceCoverageRolePlan, normalizeCreationCoverageFields, toggleCreationSelectedRoles } from "/lib/creation-reference-coverage.mjs?v=20260703-latest-restore-1";
+import { applyCreationReferenceCoverageRolePlan, normalizeCreationCoverageFields, toggleCreationSelectedRoles } from "/lib/creation-reference-coverage.mjs?v=20260703-latest-restore-1";
 import { applyCreationReferenceAnalysisProductNameValue, buildCreationReferenceAnalysisAppliedFeedbackMessage, buildCreationReferenceAnalysisCategoryMatchText, getCreationReferenceAnalysisDisplayRoleLabel, getCreationReferenceAnalysisGroupedSubjectUnitCount, getCreationReferenceAnalysisRoleCorrectionReason, normalizeCreationReferenceAnalysisUnitCountNote, shouldDowngradeReferenceProductAnalysisRole } from "/lib/creation-reference-analysis-view.mjs";
 import { createCreationListingController, getCreationRecordListingMetaLabel, getCreationListingSearchValues, normalizeCreationListingDraftForView, renderCreationListingDrafts } from "/lib/creation-listing-view.mjs";
 import { getCreationAutoRepairNotice, getCreationCompletionFeedback, getCreationIncompleteItems, shouldAutoRepairCreationSet } from "/lib/creation-auto-repair.mjs";
 import { canRepairCreationItem as canRepairCreationItemFromQueue, getCreationRepairButtonText as getCreationRepairButtonTextFromQueue, isCreationItemRepairActive as isCreationItemRepairActiveInQueue, queueCreationItemRepair as queueCreationItemRepairInState, removeQueuedCreationItemRepair, shiftNextQueuedCreationItemRepair } from "/lib/creation-item-repair-queue.mjs";
-import { buildCreationPlatformSlotOrderOverrides, cloneCreationPlanValue, createCreationPlanPreviewRequestCoordinator, createCreationPlatformPayloadSnapshot, deepFreezeCreationPlanValue, formatCreationPlanWarning, getCreationCompatibleImageTypeState, getCreationSetPlanSource, insertCreationPlatformCustomSlotOverride, resolveCreationDisplayedPlanContext, resolveCreationSelectedRolesSubmission, shouldDisableCreationGenerateButton, updateCreationPlatformItemOverride } from "/lib/creation-browser-plan-state.mjs";
+import { cloneCreationPlanValue, createCreationPlanPreviewRequestCoordinator, createCreationPlatformPayloadSnapshot, deepFreezeCreationPlanValue, formatCreationPlanWarning, getCreationCompatibleImageTypeState, getCreationEditablePlanDisplayCounts, getCreationSetPlanSource, getVisibleCreationPlanWarnings, mergeCreationPlatformSetParameters, resolveCreationDisplayedPlanContext, resolveCreationPlatformImageCountState, resolveCreationSelectedRolesSubmission, shouldDisableCreationGenerateButton, updateCreationPlatformItemOverride } from "/lib/creation-browser-plan-state.mjs";
+import { normalizeCreationModuleEnabled, resolveCreationPlanCounts } from "/lib/creation-plan-counts.mjs";
 import { buildCreationQueuedRepairFormData, buildCreationQueuedSet as buildCreationQueuedSetFromState, createCreationQueueJob, getActiveCreationQueueJob as getActiveCreationQueueJobFromState, getCreationQueueJobs as getCreationQueueJobsFromState, getCreationRepairTargetSet as getCreationRepairTargetSetFromState, getPendingCreationQueueCount as getPendingCreationQueueCountFromState, getSelectedCreationQueueJob as getSelectedCreationQueueJobFromState, renderCreationQueueStrip as renderCreationQueueStripView, runCreationQueuedJob as runCreationQueuedJobFromQueue, scheduleCreationGenerationQueue as scheduleCreationGenerationQueueFromState, selectCreationQueueJob as selectCreationQueueJobInState, shouldSyncCreationQueueJobCurrentSet, syncActiveCreationQueueSet as syncActiveCreationQueueSetInState } from "/lib/creation-suite-queue.mjs?v=20260712-creation-queue-selection-isolation-1";
 import { DEFAULT_PORTRAIT_ACCESSORY_ASSETS, PORTRAIT_ACCESSORY_ASSET_CATEGORIES, getPortraitAccessoryAssetFileDescriptor } from "/lib/portrait-accessory-assets.mjs?v=20260528-portrait-assets-sort-1";
 import { createDefaultPortraitLocationState, createPortraitLocationSelectorController } from "/lib/portrait-location-selector.mjs?v=20260527-portrait-location-1";
@@ -95,7 +100,7 @@ const REASONING_ESTIMATES = {
   xhigh: "210s+",
 };
 const DEFAULT_LIMITS = { maxParallelTasksPerSession: 15, maxReferenceImages: 15, maxCreationReferenceImages: 15, maxPortraitPersonReferenceImages: 3, maxPortraitActionReferenceImages: 3, maxPortraitAccessoryReferenceImages: 9 };
-const CREATION_IMAGE_COUNT_OPTIONS = [0, 4, 6, 7, 8, 9, 10, 12, 14, 16, 18];
+const CREATION_IMAGE_COUNT_OPTIONS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
 const DEFAULT_PROMPT_ENHANCE_TEXT = ",sharp focus, macro details, rich textures, crisp edges, photorealistic texture, visible grain, detailed surface material, cinematic lighting"; function buildPromptModePrompt() { const prompt = refs.promptInput.value.trim(); if (!state.promptEnhanceEnabled) { return prompt; } const enhanceText = String(refs.promptEnhanceInput?.value || "").trim(); return enhanceText ? `${prompt}${enhanceText.startsWith(",") ? "" : "\n\n"}${enhanceText}` : prompt; } function syncPromptEnhanceMode() { refs.promptEnhanceToggle.classList.toggle("is-active", state.promptEnhanceEnabled); refs.promptEnhanceToggle.setAttribute("aria-checked", String(state.promptEnhanceEnabled)); refs.promptEnhanceToggle.querySelector("small").textContent = getUiLanguageText(state.promptEnhanceEnabled ? "promptEnhanceOn" : "promptEnhanceOff"); refs.promptEnhanceField.classList.toggle("hidden", !state.promptEnhanceEnabled); } function togglePromptEnhanceMode() { state.promptEnhanceEnabled = !state.promptEnhanceEnabled; syncPromptEnhanceMode(); if (state.promptEnhanceEnabled) { refs.promptEnhanceInput.focus(); } }
 const PROMPT_TEMPLATE_STORAGE_KEY = "image-studio-prompt-templates-v2";
 const DEFAULT_PROMPT_TEMPLATES = SURPRISE_PROMPTS.map((template, index) => ({
@@ -367,6 +372,8 @@ const galleryScrollDrag = {
 };
 const state = {
   activeView: "studio",
+  assetLoading: { article: false, creation: false, portrait: false, ppt: false },
+  assetLoadErrors: { article: "", creation: "", portrait: "", ppt: "" },
   activityFeed: [],
   aspectRatios: [],
   clientSessionId: "",
@@ -376,6 +383,7 @@ const state = {
     feedback: "",
     files: [],
     generating: false,
+    generationSnapshot: null,
     planning: false,
     recordQuery: "",
     recordColumnPreset: DEFAULT_ARTICLE_RECORD_COLUMN_PRESET,
@@ -388,16 +396,16 @@ const state = {
   creationPlatformResolverModule: null,
   creation: {
     currentSet: null,
+    draftSet: null,
     activeQueueId: "",
     autoRepairAttemptCount: 0,
-    editingItemId: "",
     effectivePlan: null,
     feedback: "",
     generationScope: "",
     generating: false,
-    itemDrafts: {},
     listingGeneratingSetId: "",
     planning: false,
+    planDirty: true,
     platformItemOverrides: [],
     platformPayload: null,
     platformSetOverrides: {},
@@ -421,6 +429,11 @@ const state = {
     generating: false,
     location: createDefaultPortraitLocationState(),
     planning: false,
+    referenceAnalysis: {
+      applied: false,
+      result: null,
+      running: false,
+    },
     recordQuery: "",
     recordSetId: "",
     sets: [],
@@ -462,6 +475,7 @@ const state = {
   galleryHistoryPage: 0,
   galleryColumnPreset: DEFAULT_GALLERY_COLUMN_PRESET,
   generationTasks: [],
+  locallyTerminatedGenerationTaskIds: new Set(),
   jobs: [],
   lightboxItem: null,
   lightboxNavigation: {
@@ -589,6 +603,10 @@ const state = {
 let creationReferenceAnalysisRequestToken = 0;
 let creationReferenceAnalysisAbortController = null;
 let creationReferenceAnalysisApplyGuard = null;
+let promptAgentAnalysisRequestToken = 0;
+let promptAgentAnalysisAbortController = null;
+let referenceAnalysisRequestToken = 0;
+let referenceAnalysisAbortController = null;
 let creationPreviousPlatformValue = "universal";
 const refs = {
   apiKeyInput: document.querySelector("#apiKeyInput"),
@@ -659,6 +677,7 @@ const refs = {
   articleRecordList: document.querySelector("#articleRecordList"),
   articleRecordRefreshButton: document.querySelector("#articleRecordRefreshButton"),
   articleRecordSearchInput: document.querySelector("#articleRecordSearchInput"),
+  articleRecordSelection: document.querySelector("#articleRecordSelection"),
   articleStoryboardSectionCount: document.querySelector("#articleStoryboardSectionCount"),
   creationBranchInputs: document.querySelectorAll('[name="creationBranch"]'),
   creationFeedback: document.querySelector("#creationFeedback"),
@@ -695,14 +714,11 @@ const refs = {
   creationLogoRemoveButton: document.querySelector("#creationLogoRemoveButton"),
   creationSavedLogoGrid: document.querySelector("#creationSavedLogoGrid"),
   creationOutputFormatInput: document.querySelector("#creationOutputFormatInput"),
-  creationPlanAdvancedToggle: document.querySelector("#creationPlanAdvancedToggle"),
   creationPlanButton: document.querySelector("#creationPlanButton"),
   creationPlanRestoreButton: document.querySelector("#creationPlanRestoreButton"),
-  creationPlanSlots: document.querySelector("#creationPlanSlots"),
   creationPlanSummary: document.querySelector("#creationPlanSummary"),
   creationPlanValidation: document.querySelector("#creationPlanValidation"),
   creationPlanWarnings: document.querySelector("#creationPlanWarnings"),
-  creationPromptEditorLayer: document.querySelector("#creationPromptEditorLayer"),
   creationProductDescriptionInput: document.querySelector("#creationProductDescriptionInput"),
   creationProductNameInput: document.querySelector("#creationProductNameInput"),
   creationProgressText: document.querySelector("#creationProgressText"),
@@ -713,7 +729,6 @@ const refs = {
   creationReferenceAnalysisSummary: document.querySelector("#creationReferenceAnalysisSummary"),
   creationReferenceAnalysisToggleButton: document.querySelector("#creationReferenceAnalysisToggleButton"),
   creationReferenceAnalyzeButton: document.querySelector("#creationReferenceAnalyzeButton"),
-  creationReferenceApplyAnalysisButton: document.querySelector("#creationReferenceApplyAnalysisButton"),
   creationReferenceCount: document.querySelector("#creationReferenceCount"),
   creationReferenceDropzone: document.querySelector("#creationReferenceDropzone"),
   creationReferenceGrid: document.querySelector("#creationReferenceGrid"),
@@ -743,6 +758,7 @@ const refs = {
   portraitRecordResultGrid: document.querySelector("#portraitRecordResultGrid"),
   portraitRecordReuseButton: document.querySelector("#portraitRecordReuseButton"),
   portraitRecordSearchInput: document.querySelector("#portraitRecordSearchInput"),
+  portraitRecordSelection: document.querySelector("#portraitRecordSelection"),
   portraitRecordSetList: document.querySelector("#portraitRecordSetList"),
   portraitAccessoryAssetButton: document.querySelector("#portraitAccessoryAssetButton"),
   portraitAccessoryAssetCloseButton: document.querySelector("#portraitAccessoryAssetCloseButton"),
@@ -760,6 +776,10 @@ const refs = {
   portraitActionReferenceInput: document.querySelector("#portraitActionReferenceInput"),
   portraitActionInputs: [...document.querySelectorAll("[name=\"portraitActions\"]")],
   portraitReferenceCount: document.querySelector("#portraitReferenceCount"),
+  portraitReferenceAnalyzeButton: document.querySelector("#portraitReferenceAnalyzeButton"),
+  portraitReferenceApplyAnalysisButton: document.querySelector("#portraitReferenceApplyAnalysisButton"),
+  portraitReferenceAnalysisFeedback: document.querySelector("#portraitReferenceAnalysisFeedback"),
+  portraitReferenceAnalysisPanel: document.querySelector("#portraitReferenceAnalysisPanel"),
   portraitReferenceDropzone: document.querySelector("#portraitReferenceDropzone"),
   portraitReferenceGrid: document.querySelector("#portraitReferenceGrid"),
   portraitReferenceInput: document.querySelector("#portraitReferenceInput"),
@@ -789,6 +809,7 @@ const refs = {
   creationRecordReuseButton: document.querySelector("#creationRecordReuseButton"),
   creationRecordResultGrid: document.querySelector("#creationRecordResultGrid"),
   creationRecordSearchInput: document.querySelector("#creationRecordSearchInput"),
+  creationRecordSelection: document.querySelector("#creationRecordSelection"),
   creationRecordSetList: document.querySelector("#creationRecordSetList"),
   creationQueueStrip: document.querySelector("#creationQueueStrip"),
   creationRepairFailedButton: document.querySelector("#creationRepairFailedButton"),
@@ -801,6 +822,7 @@ const refs = {
   creationSetMeta: document.querySelector("#creationSetMeta"),
   creationSizeInput: document.querySelector("#creationSizeInput"),
   creationSkuBundleCountInput: document.querySelector("#creationSkuBundleCountInput"),
+  creationSkuGenerationEnabledInput: document.querySelector("#creationSkuGenerationEnabledInput"),
   creationSkuGenerationRuleInput: document.querySelector("#creationSkuGenerationRuleInput"),
   creationRatioInput: document.querySelector("#creationRatioInput"),
   creationTargetLanguageInput: document.querySelector("#creationTargetLanguageInput"),
@@ -840,17 +862,18 @@ const refs = {
   lightboxBackdrop: document.querySelector("#lightboxBackdrop"),
   lightboxClose: document.querySelector("#lightboxClose"),
   copyPromptButton: document.querySelector("#copyPromptButton"),
-  lightboxCopyFullPathButton: document.querySelector("#lightboxCopyFullPathButton"),
-  lightboxCopyPathButton: document.querySelector("#lightboxCopyPathButton"),
-  lightboxDelete: document.querySelector("#lightboxDelete"),
   lightboxDownload: document.querySelector("#lightboxDownload"),
   lightboxId: document.querySelector("#lightboxId"),
+  lightboxFilename: document.querySelector("#lightboxFilename"),
   lightboxImage: document.querySelector("#lightboxImage"),
   lightboxImageShell: document.querySelector(".lightbox-image-shell"),
+  lightboxFields: document.querySelector(".lightbox-fields"),
   lightboxMediaStage: document.querySelector(".lightbox-media-stage"),
   lightboxModel: document.querySelector("#lightboxModel"),
   lightboxParams: document.querySelector("#lightboxParams"),
   lightboxPrompt: document.querySelector("#lightboxPrompt"),
+  lightboxPromptStructured: document.querySelector("#lightboxPromptStructured"),
+  lightboxRelativePath: document.querySelector("#lightboxRelativePath"),
   lightboxTime: document.querySelector("#lightboxTime"),
   lightboxActualSizeButton: document.querySelector("#lightboxActualSizeButton"),
   lightboxFitButton: document.querySelector("#lightboxFitButton"),
@@ -927,6 +950,7 @@ const refs = {
   pptRecordEmpty: document.querySelector("#pptRecordEmpty"),
   pptRecordList: document.querySelector("#pptRecordList"),
   pptRecordRefreshButton: document.querySelector("#pptRecordRefreshButton"),
+  pptRecordSelection: document.querySelector("#pptRecordSelection"),
   pptSlideList: document.querySelector("#pptSlideList"),
   pptSourceInput: document.querySelector("#pptSourceInput"),
   pptSourceModeInputs: [...document.querySelectorAll("input[name=\"pptSourceMode\"]")],
@@ -1059,6 +1083,7 @@ const refs = {
   zoomResetButton: document.querySelector("#zoomResetButton"),
 };
 const lightboxViewerController = createLightboxImageViewer({ refs, state });
+const assetWorkspaceController = createAssetWorkspaceController({ refs, state });
 const previewKeyboardNavigation = createPreviewKeyboardNavigationController({
   refs,
   state,
@@ -1076,6 +1101,14 @@ const pptAnalysis = createPptAnalysisController({
   buildFormData: buildPptFormData,
   compactErrorMessage,
   renderPptView,
+});
+const portraitReferenceAnalysis = createPortraitReferenceAnalysisController({
+  state,
+  appendCurrentConfigToFormData,
+  buildReferenceFingerprint,
+  compactErrorMessage,
+  renderPortraitView,
+  showError,
 });
 function pad(value) {
   return String(value).padStart(2, "0");
@@ -1865,12 +1898,7 @@ function openConfigGenerationLog() {
   });
 }
 function setLightboxOpen(open) {
-  refs.lightbox.classList.toggle("hidden", !open);
-  refs.lightbox.classList.toggle("open", open);
-  refs.lightbox.setAttribute("aria-hidden", String(!open));
-  if (!open) {
-    refs.lightbox.classList.remove("is-image-only-preview");
-  }
+  lightboxViewerController.setOpen(open);
 }
 function resetPromptCopyFeedback() {
   if (promptCopyFeedbackTimer) {
@@ -1900,26 +1928,6 @@ function resetLightboxViewer(options) {
 }
 function syncLightboxImageMetrics(options) {
   lightboxViewerController.syncMetrics(options);
-}
-function syncLightboxCreationRecordActions(fresh = {}) {
-  const isCreationRecordItem = Boolean(fresh.isCreationRecordItem);
-  const isArticleRecordItem = Boolean(fresh.isArticleRecordItem);
-  const isRecordItem = isCreationRecordItem || isArticleRecordItem;
-  const isImageOnlyPreview = Boolean(fresh.isImageOnlyLightboxItem);
-  const isPreviewLightboxItem = Boolean(fresh.isPreviewLightboxItem);
-  const hasRelativePath = Boolean(String(fresh.relativePath || "").trim());
-  refs.lightboxCopyPathButton?.classList.toggle("hidden", !isCreationRecordItem);
-  refs.lightboxCopyFullPathButton?.classList.toggle("hidden", !isCreationRecordItem);
-  if (refs.lightboxCopyPathButton) {
-    refs.lightboxCopyPathButton.disabled = !isCreationRecordItem || !hasRelativePath;
-  }
-  if (refs.lightboxCopyFullPathButton) {
-    refs.lightboxCopyFullPathButton.disabled = !isCreationRecordItem || !hasRelativePath;
-  }
-  if (refs.lightboxDelete) {
-    refs.lightboxDelete.hidden = Boolean(isRecordItem || isImageOnlyPreview || isPreviewLightboxItem);
-    refs.lightboxDelete.disabled = isRecordItem || isImageOnlyPreview || isPreviewLightboxItem || !fresh.filename;
-  }
 }
 function getStudioViewportMetrics() {
   return {
@@ -2735,6 +2743,7 @@ function createReferenceAnalysisItem(file) {
   };
 }
 function applyReferenceAnalysisFiles(fileList) {
+  invalidateReferenceAnalysisRequest();
   const incomingFiles = [...(fileList || [])].filter((file) => file.type.startsWith("image/"));
   if (incomingFiles.length === 0) {
     return;
@@ -2766,6 +2775,7 @@ function applyReferenceAnalysisFiles(fileList) {
   }
 }
 function removeReferenceAnalysisFile(referenceId) {
+  invalidateReferenceAnalysisRequest();
   const target = state.referenceAnalysis.files.find((item) => item.id === referenceId);
   if (state.referenceAnalysisPreviewItem?.id === referenceId) {
     closeReferencePreview();
@@ -4159,9 +4169,6 @@ function syncGenerationSize(value) {
   const ratioValue = refs.ratioInput.value || DEFAULT_UI_RATIO;
   const nextValue = normalizeSizeForSelectedRoute(ratioValue, value || "auto");
   refs.sizeInput.value = nextValue;
-  if (refs.referenceAnalysisSizeInput) {
-    refs.referenceAnalysisSizeInput.value = nextValue;
-  }
 }
 function renderSizeOptions(sizeInput = refs.sizeInput, ratioInput = refs.ratioInput) {
   if (!sizeInput || !ratioInput) {
@@ -4182,18 +4189,24 @@ function renderSizeOptions(sizeInput = refs.sizeInput, ratioInput = refs.ratioIn
 function renderReferenceAnalysisSizeOptions() {
   renderSizeOptions(refs.referenceAnalysisSizeInput, refs.referenceAnalysisRatioInput);
 }
+function syncReferenceAnalysisGenerationSize(value) {
+  const ratioValue = refs.referenceAnalysisRatioInput.value || DEFAULT_UI_RATIO;
+  refs.referenceAnalysisSizeInput.value = normalizeSizeForSelectedRoute(ratioValue, value || "auto");
+}
 function syncGenerationRatio(value) {
   const nextValue = getRatioOption(value)?.value || DEFAULT_UI_RATIO;
   refs.ratioInput.value = nextValue;
-  if (refs.referenceAnalysisRatioInput) {
-    refs.referenceAnalysisRatioInput.value = nextValue;
-  }
   renderRatioGrid();
   syncRatioOrientationSummary();
-  renderReferenceAnalysisRatioGrid();
   renderSizeOptions();
-  renderReferenceAnalysisSizeOptions();
   syncGenerationSize(refs.sizeInput.value);
+}
+function syncReferenceAnalysisRatio(value) {
+  const nextValue = getRatioOption(value)?.value || DEFAULT_UI_RATIO;
+  refs.referenceAnalysisRatioInput.value = nextValue;
+  renderReferenceAnalysisRatioGrid();
+  renderReferenceAnalysisSizeOptions();
+  syncReferenceAnalysisGenerationSize(refs.referenceAnalysisSizeInput.value);
 }
 function getCreationRatioCompactLabel(option) {
   return String(option?.value || DEFAULT_UI_RATIO);
@@ -4576,7 +4589,7 @@ function renderRatioGrid(ratioGrid = refs.ratioGrid, ratioInput = refs.ratioInpu
 }
 
 function renderReferenceAnalysisRatioGrid() {
-  renderRatioGrid(refs.referenceAnalysisRatioGrid, refs.referenceAnalysisRatioInput);
+  renderRatioGrid(refs.referenceAnalysisRatioGrid, refs.referenceAnalysisRatioInput, syncReferenceAnalysisRatio);
 }
 
 function getSelectedImageRoute() {
@@ -4821,7 +4834,6 @@ function syncLightboxItem() {
     refs.copyPromptButton.disabled = true;
     refs.lightbox.classList.remove("is-image-only-preview");
     resetPromptCopyFeedback();
-    syncLightboxCreationRecordActions();
     resetLightboxViewer();
     return;
   }
@@ -4840,15 +4852,17 @@ function syncLightboxItem() {
   refs.lightboxId.textContent = `ID: ${getDisplayId(fresh)}`;
   refs.lightboxPrompt.value = getDisplayPrompt(fresh);
   refs.lightboxParams.value = String(fresh.paramsText || "").trim() || buildParameterText(fresh, state.config || {});
+  assetWorkspaceController.renderStructuredPrompt(refs.lightboxPrompt.value);
+  if (refs.lightboxFilename) refs.lightboxFilename.textContent = fresh.filename || "--";
+  if (refs.lightboxRelativePath) refs.lightboxRelativePath.textContent = fresh.relativePath || fresh.filename || "--";
   refs.copyPromptButton.disabled = refs.lightboxPrompt.value.trim().length === 0;
   resetPromptCopyFeedback();
   resetLightboxViewer();
   refs.lightboxImage.src = imageUrl;
-  refs.lightboxImage.alt = getDisplayPrompt(fresh);
+  refs.lightboxImage.alt = fresh.filename ? `图片详情 ${fresh.filename}` : "生成图片详情";
   refs.lightboxAmbient.style.backgroundImage = imageUrl ? `url("${imageUrl}")` : "";
   refs.lightboxDownload.href = imageUrl || "#";
   refs.lightboxDownload.download = fresh.filename || "preview.png";
-  syncLightboxCreationRecordActions(fresh);
   if (refs.lightboxImage.complete) {
     syncLightboxImageMetrics();
   }
@@ -5211,6 +5225,7 @@ function syncPreviewLoadingShellItems(nodes, placeholderState = {}) {
     if (!nextIds.has(id)) orb.remove();
   });
   nodes.field.style.setProperty("--preview-loading-orb-count", String(nextItems.length));
+  nodes.field.classList.toggle("is-orbiting", nextItems.length >= 2);
 }
 
 function createPreviewLoadingShellNodes() {
@@ -5624,15 +5639,26 @@ function createGalleryTile(item) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "gallery-tile";
+  const filename = String(item?.filename || "图片").trim();
+  button.setAttribute("aria-label", `查看图片 ${filename}`);
   button.addEventListener("click", () => {
     openLightbox(item, { items: state.gallery });
   });
 
   const image = document.createElement("img");
   image.src = getImageUrl(item);
-  image.alt = getDisplayPrompt(item);
+  image.alt = filename === "图片" ? "生成图片" : `生成图片 ${filename}`;
   image.loading = "lazy";
   button.appendChild(image);
+
+  const overlay = document.createElement("span");
+  overlay.className = "gallery-tile-overlay";
+  const name = document.createElement("strong");
+  name.textContent = filename;
+  const meta = document.createElement("span");
+  meta.textContent = [item?.size || item?.dimensions, formatClock(item?.createdAt)].filter(Boolean).join(" · ");
+  overlay.append(name, meta);
+  button.appendChild(overlay);
   return button;
 }
 
@@ -5807,7 +5833,8 @@ function createGallerySection(section) {
 
   const masonry = document.createElement("div");
   masonry.className = "gallery-masonry";
-  const columnCount = Math.min(section.items.length || 1, getGalleryColumnCount());
+  const layoutMode = getCurrentStudioLayoutMode();
+  const columnCount = layoutMode === "mobile" ? 2 : layoutMode === "tablet" ? 4 : getGalleryColumnCount();
   masonry.style.setProperty("--gallery-columns", String(columnCount));
   distributeGalleryItemsIntoColumns(section.items, columnCount).forEach((columnItems) => {
     const column = document.createElement("div");
@@ -5841,12 +5868,51 @@ function renderGalleryView() {
     displayedCount === state.gallery.length
       ? `${state.gallery.length} 张`
       : `${displayedCount} / ${state.gallery.length} 张`;
-  refs.galleryEmpty.textContent =
-    state.gallery.length === 0
-      ? "还没有本地输出，先回到 Studio 生成一张图。"
-      : hasActiveGalleryFilters(filters)
-        ? "当前筛选没有命中结果，试试清空部分筛选。"
-        : "当前还没有可展示的本地输出。";
+  refs.galleryEmpty.replaceChildren();
+  const emptyTitle = document.createElement("strong");
+  const emptyCopy = document.createElement("p");
+  const emptyAction = document.createElement("a");
+  emptyAction.className = "toolbar-button asset-primary-action";
+  if (state.galleryLoading) {
+    emptyTitle.textContent = "正在加载图片";
+    emptyCopy.textContent = "正在读取本地资产，请稍候。";
+    emptyAction.classList.add("hidden");
+  } else if (state.galleryLoadError) {
+    emptyTitle.textContent = "画廊加载失败";
+    emptyCopy.textContent = state.galleryLoadError;
+    emptyAction.href = "#gallery";
+    emptyAction.textContent = "重新加载";
+    emptyAction.addEventListener("click", (event) => {
+      event.preventDefault();
+      loadGallery().catch((error) => showError(error.message));
+    });
+  } else if (state.gallery.length === 0) {
+    emptyTitle.textContent = "暂无图片";
+    emptyCopy.textContent = "还没有本地输出。";
+    emptyAction.href = "#studio";
+    emptyAction.textContent = "前往提示词生图";
+  } else if (hasActiveGalleryFilters(filters)) {
+    emptyTitle.textContent = "没有匹配的图片";
+    emptyCopy.textContent = "调整搜索词或清空筛选后重试。";
+    emptyAction.href = "#gallery";
+    emptyAction.textContent = "清空筛选";
+    emptyAction.addEventListener("click", (event) => {
+      event.preventDefault();
+      state.galleryControls = { ...DEFAULT_GALLERY_CONTROLS };
+      resetGalleryHistoryPage();
+      renderGalleryView();
+    });
+  } else {
+    emptyTitle.textContent = "暂无可展示图片";
+    emptyCopy.textContent = "刷新画廊后重试。";
+    emptyAction.href = "#gallery";
+    emptyAction.textContent = "刷新";
+    emptyAction.addEventListener("click", (event) => {
+      event.preventDefault();
+      loadGallery().catch((error) => showError(error.message));
+    });
+  }
+  refs.galleryEmpty.append(emptyTitle, emptyCopy, emptyAction);
   refs.galleryEmpty.classList.toggle("hidden", displayedCount > 0);
   renderGalleryPagination(pagination, shouldPaginateHistory);
   renderGalleryFilters(visibleItems, sections, pagination, shouldPaginateHistory);
@@ -6626,20 +6692,25 @@ function buildPptFormData() {
   return formData;
 }
 
+function getPptGenerationSnapshot() {
+  return { requestConfig: getCurrentPrivateConfigRequestPayload(), stylePreset: refs.pptStylePresetInput.value, exportMode: refs.pptExportModeInput.value, dynamicPreset: refs.pptDynamicPresetInput.value, transitionPreset: refs.pptTransitionPresetInput.value, transitionSpeed: refs.pptTransitionSpeedInput.value, autoAdvanceSeconds: refs.pptAutoAdvanceInput.value, reasoningEffort: refs.reasoningEffortInput.value || state.config?.defaults?.reasoningEffort || "xhigh" };
+}
+
 function buildPptCompletionRequest(slideNumbers) {
+  const snapshot = state.ppt.generationSnapshot || getPptGenerationSnapshot();
   return {
-    ...getCurrentPrivateConfigRequestPayload(),
+    ...snapshot.requestConfig,
     deckId: state.ppt.deckId,
     outline: state.ppt.outline,
     existingSlides: getCompletedPptSlides(),
     slideNumbers,
-    stylePreset: refs.pptStylePresetInput.value,
-    exportMode: refs.pptExportModeInput.value,
-    dynamicPreset: refs.pptDynamicPresetInput.value,
-    transitionPreset: refs.pptTransitionPresetInput.value,
-    transitionSpeed: refs.pptTransitionSpeedInput.value,
-    autoAdvanceSeconds: refs.pptAutoAdvanceInput.value,
-    reasoningEffort: refs.reasoningEffortInput.value || state.config?.defaults?.reasoningEffort || "xhigh",
+    stylePreset: snapshot.stylePreset,
+    exportMode: snapshot.exportMode,
+    dynamicPreset: snapshot.dynamicPreset,
+    transitionPreset: snapshot.transitionPreset,
+    transitionSpeed: snapshot.transitionSpeed,
+    autoAdvanceSeconds: snapshot.autoAdvanceSeconds,
+    reasoningEffort: snapshot.reasoningEffort,
   };
 }
 
@@ -6649,7 +6720,7 @@ async function requestPptGenerationStream() {
     body: buildPptFormData(),
   });
   if (!response.ok || !response.body) {
-    throw new Error("PPT 生成请求失败");
+    throw new Error(await readHttpResponseErrorMessage(response, "PPT 生成请求失败"));
   }
   return response;
 }
@@ -6661,7 +6732,7 @@ async function requestPptCompletionStream(slideNumbers) {
     body: JSON.stringify(buildPptCompletionRequest(slideNumbers)),
   });
   if (!response.ok || !response.body) {
-    throw new Error("PPT 补页请求失败");
+    throw new Error(await readHttpResponseErrorMessage(response, "PPT 补页请求失败"));
   }
   return response;
 }
@@ -6766,13 +6837,14 @@ function handlePptStreamEvent(eventName, payload) {
 }
 
 async function runPptStream(response) {
-  await consumeSse(response.body, async (eventName, payload) => {
-    handlePptStreamEvent(eventName, payload);
-  });
+  return consumeSseUntilTerminal({ stream: response.body, consumeSse, onEvent: handlePptStreamEvent, missingTerminalMessage: "PPT 生成连接已中断，未收到完成事件。" });
 }
 
 async function startPptGeneration(event) {
   event.preventDefault();
+  if (state.ppt.generating) {
+    return;
+  }
   clearError();
   setPptFeedback("");
 
@@ -6781,6 +6853,7 @@ async function startPptGeneration(event) {
     return;
   }
 
+  state.ppt.generationSnapshot = getPptGenerationSnapshot();
   state.ppt.generating = true;
   resetPptGenerationState();
   renderPptView();
@@ -6870,7 +6943,7 @@ const CREATION_PLATFORM_EVIDENCE_FIELDS = [
   "skuVariants",
 ];
 const FALLBACK_CREATION_PLATFORM_OPTIONS = [
-  { value: "universal", label: "通用电商", promptInstruction: "Use a platform-neutral ecommerce gallery strategy." },
+  { value: "universal", label: "通用电商", defaultRatio: "1:1", recommendedImageCount: 18, resolutionTier: "1.5K", targetLanguage: "en", promptInstruction: "Use a platform-neutral ecommerce gallery strategy." },
 ];
 const CREATION_DIMENSION_UNIT_MODE_LABELS = { metric: "公制", imperial: "英制", both: "公制和英制" };
 const DEFAULT_CREATION_SKU_GENERATION_RULE = "color-name-under-subject";
@@ -6961,8 +7034,9 @@ function getCreationReferenceRoleLabel(role) {
 }
 
 function getCreationSelectedImageCount() {
-  const value = Number.parseInt(refs.creationImageCountInput?.value || "18", 10);
-  return CREATION_IMAGE_COUNT_OPTIONS.includes(value) ? value : 18;
+  const value = Number.parseInt(refs.creationImageCountInput?.value || "", 10);
+  if (Number.isFinite(value) && CREATION_IMAGE_COUNT_OPTIONS.includes(value)) return value;
+  return normalizeCreationPlatform(getCreationSelectedPlatform().value).recommendedImageCount || 8;
 }
 
 function isCreationZeroImageCountMode() { return getCreationSelectedImageCount() === 0; } function isCreationInfographicRebuildRequired() { return isCreationZeroImageCountMode(); }
@@ -7013,6 +7087,60 @@ function renderCreationPlatformOptions() {
   select.value = options.some((platform) => platform.value === previousValue) ? previousValue : "universal";
   select.dataset.policyState = state.creationPlatformPoliciesModule ? "ready" : "fallback";
   select.title = state.creationPlatformPoliciesModule ? "" : "平台自动规划模块不可用，当前仅提供通用电商兜底。";
+  syncCreationPlatformImageCountOptions();
+  if (!state.creation.effectivePlan && Object.keys(state.creation.platformSetOverrides || {}).length === 0) {
+    syncCreationAutomaticPlatformControls(select.value);
+  }
+}
+
+function getCreationPlatformImageCountProfile(platformValue = refs.creationPlatformInput?.value || "universal") {
+  const platform = getCreationPlatformOptions().find((entry) => entry.value === platformValue)
+    || getCreationPlatformOptions().find((entry) => entry.value === "universal")
+    || FALLBACK_CREATION_PLATFORM_OPTIONS[0];
+  return state.creationPlatformPoliciesModule?.getCreationPlatformProfile?.(platform.value) || platform;
+}
+
+function syncCreationPlatformImageCountOptions({ preferredValue } = {}) {
+  const select = refs.creationImageCountInput;
+  if (!select) return null;
+  const countState = resolveCreationPlatformImageCountState({
+    baseOptions: CREATION_IMAGE_COUNT_OPTIONS,
+    currentValue: preferredValue ?? select.value,
+    profile: getCreationPlatformImageCountProfile(),
+  });
+  select.replaceChildren(...countState.options.map((count) => {
+    const option = document.createElement("option");
+    option.value = String(count);
+    option.textContent = `${count} 张`;
+    return option;
+  }));
+  select.value = String(countState.value);
+  select.dataset.maxImageCount = String(countState.maxImageCount);
+  return countState;
+}
+
+function setCreationResolutionTierValue(value = "auto") {
+  if (!refs.creationSizeInput) return;
+  const normalized = String(value || "auto").trim();
+  const matchingOption = Array.from(refs.creationSizeInput.options).find((option) => option.value === normalized);
+  refs.creationSizeInput.value = matchingOption ? normalized : "auto";
+}
+
+function syncCreationAutomaticPlatformControls(platformValue = refs.creationPlatformInput?.value || "universal") {
+  const profile = getCreationPlatformImageCountProfile(platformValue);
+  setCreationSelectValue(refs.creationTargetLanguageInput, profile.targetLanguage, "en");
+  setCreationSelectValue(refs.creationRatioInput, profile.defaultRatio, DEFAULT_UI_RATIO);
+  renderCreationSizeOptions();
+  setCreationResolutionTierValue("auto");
+}
+
+function syncCreationControlsFromEffectivePlan(plan = {}) {
+  const overrides = plan.platformSetOverrides || plan.setOverrides || {};
+  const profile = plan.platformProfile || getCreationPlatformImageCountProfile(plan.platform || plan.requestedPlatform);
+  setCreationSelectValue(refs.creationTargetLanguageInput, overrides.targetLanguage || plan.targetLanguage || profile.targetLanguage, "en");
+  setCreationSelectValue(refs.creationRatioInput, overrides.ratio || profile.defaultRatio, DEFAULT_UI_RATIO);
+  renderCreationSizeOptions();
+  setCreationResolutionTierValue(overrides.resolutionTier || "auto");
 }
 
 async function loadCreationPlatformModules() {
@@ -7109,6 +7237,7 @@ function normalizeCreationEffectivePlanForBrowser(plan = {}) {
   const warnings = cloneCreationPlanValue(source.warnings ?? source.validation?.warnings, []);
   const errors = cloneCreationPlanValue(source.errors ?? source.validation?.errors, []);
   const isValid = source.validation?.isValid !== false && source.canGenerate !== false && errors.length === 0;
+  const planCounts = resolveCreationPlanCounts({ ...source, items });
   return {
     ...cloneCreationPlanValue(source, {}),
     requestedPlatform: String(source.requestedPlatform || source.platform || "universal"),
@@ -7126,6 +7255,11 @@ function normalizeCreationEffectivePlanForBrowser(plan = {}) {
     warnings: warnings,
     errors,
     canGenerate: isValid,
+    imageCount: planCounts.imageCount,
+    carouselImageCount: planCounts.carouselImageCount,
+    skuImageCount: planCounts.skuImageCount,
+    infographicRebuildCount: planCounts.infographicRebuildCount,
+    totalPlannedItemCount: planCounts.totalPlannedItemCount,
     items,
   };
 }
@@ -7133,11 +7267,11 @@ function normalizeCreationEffectivePlanForBrowser(plan = {}) {
 function hydrateCreationEffectivePlan(plan = {}) {
   const normalized = normalizeCreationEffectivePlanForBrowser(plan);
   state.creation.effectivePlan = deepFreezeCreationPlanValue(normalized);
+  state.creation.planDirty = !normalized;
   if (normalized) {
     setFrozenCreationPlatformPayload(normalized);
-    if (!Object.prototype.hasOwnProperty.call(normalized.platformSetOverrides, "imageCount")) {
-      setCreationImageCountValue(normalized.carouselImageCount);
-    }
+    setCreationImageCountValue(normalized.carouselImageCount);
+    syncCreationControlsFromEffectivePlan(normalized);
   }
   return state.creation.effectivePlan;
 }
@@ -7145,6 +7279,7 @@ function hydrateCreationEffectivePlan(plan = {}) {
 function restoreCreationEffectivePlanFromSet(set = {}) {
   if (!hasCreationEffectivePlanData(set)) {
     state.creation.effectivePlan = null;
+    state.creation.planDirty = true;
     setFrozenCreationPlatformPayload({});
     return null;
   }
@@ -7582,7 +7717,7 @@ function setCreationIndustryTemplateValue(value, { searchText = "" } = {}) {
   renderCreationIndustryTemplateBrowser();
 }
 
-function setCreationImageCountValue(count) { if (!refs.creationImageCountInput) return; const normalizedCount = Number(count); refs.creationImageCountInput.value = CREATION_IMAGE_COUNT_OPTIONS.includes(normalizedCount) ? String(normalizedCount) : "18"; }
+function setCreationImageCountValue(count) { syncCreationPlatformImageCountOptions({ preferredValue: Number(count) }); }
 function getFiniteCreationImageCount(value) { return value !== undefined && value !== null && String(value).trim() !== "" && Number.isFinite(Number(value)) ? Number(value) : null; }
 
 function getCreationSelectedScenario() {
@@ -7654,7 +7789,7 @@ function getCreationRoleIdsForCount(
   return [...presetRoles, ...fallbackRoles].slice(0, count);
 }
 
-function alignCreationRoleIdsToCount(roles, count = getCreationSelectedImageCount()) { const normalizedCount = CREATION_IMAGE_COUNT_OPTIONS.includes(Number(count)) ? Number(count) : 18, roleIds = normalizeCreationRoleIds(roles), roleSet = new Set(roleIds); return [...roleIds, ...getCreationRoleIdsForCount(normalizedCount).filter((role) => !roleSet.has(role))].slice(0, normalizedCount); }
+function alignCreationRoleIdsToCount(roles, count = getCreationSelectedImageCount()) { const normalizedCount = CREATION_IMAGE_COUNT_OPTIONS.includes(Number(count)) ? Number(count) : getCreationSelectedImageCount(), roleIds = normalizeCreationRoleIds(roles), roleSet = new Set(roleIds); return [...roleIds, ...getCreationRoleIdsForCount(normalizedCount).filter((role) => !roleSet.has(role))].slice(0, normalizedCount); }
 
 function getCreationSelectedRoles() { if (isCreationZeroImageCountMode()) return []; const selectedRoles = normalizeCreationRoleIds(state.creationSelectedRoles); return selectedRoles.length > 0 ? selectedRoles : getDefaultCreationRoleIds(); }
 
@@ -7697,9 +7832,13 @@ function toggleCreationSelectedRole(role) {
 function getCreationPreviewSlots(count = getCreationSelectedImageCount()) { if (Number(count) === 0) return []; const selectedRoles = normalizeCreationRoleIds(state.creationSelectedRoles); const roleIds = selectedRoles.length > 0 ? selectedRoles : getDefaultCreationRoleIds(count); return roleIds.map((role) => CREATION_PREVIEW_SLOTS.find((slot) => slot.role === role)).filter(Boolean); }
 
 function resetCreationDraftPreview() {
+  creationPlanPreviewRequests.invalidate();
+  state.creation.planning = false;
+  state.creation.draftSet = null;
+  state.creation.effectivePlan = null;
+  state.creation.planDirty = true;
   if (!state.creation.generating && !state.creation.planning) {
     state.creation.currentSet = null;
-    state.creation.effectivePlan = null;
   }
   renderCreationView();
 }
@@ -8471,9 +8610,7 @@ function handleArticleIllustrationStreamEvent(eventName, payload = {}) {
 }
 
 async function runArticleIllustrationStream(response) {
-  await consumeSse(response.body, async (eventName, payload) => {
-    handleArticleIllustrationStreamEvent(eventName, payload);
-  });
+  return consumeSseUntilTerminal({ stream: response.body, consumeSse, onEvent: handleArticleIllustrationStreamEvent, missingTerminalMessage: "文章插图生成连接已中断，未收到完成事件。" });
 }
 
 async function previewArticleIllustrationPlan() {
@@ -8491,6 +8628,7 @@ async function previewArticleIllustrationPlan() {
   }
 
   state.articleIllustration.planning = true;
+  const planSnapshot = getArticleIllustrationPlanSnapshot();
   setArticleIllustrationFeedback("正在解析整篇文章...", "busy");
   renderArticleIllustrationView();
 
@@ -8500,6 +8638,10 @@ async function previewArticleIllustrationPlan() {
       body: buildArticleIllustrationPlanFormData(),
     });
     const payload = await response.json().catch(() => ({}));
+    if (planSnapshot !== getArticleIllustrationPlanSnapshot()) {
+      setArticleIllustrationFeedback("文章输入已变化，请重新解析。", "busy");
+      return;
+    }
     if (!response.ok) {
       throw new Error(payload.message || "文章插图解析失败");
     }
@@ -8548,7 +8690,7 @@ async function generateArticleIllustrations({ referenceOnly = false, itemIds = [
       ? await fetch("/api/article-illustration/generate-references", requestOptions)
       : await fetch("/api/article-illustration/generate", requestOptions);
     if (!response.ok || !response.body) {
-      throw new Error(referenceOnly ? "参考图生成请求失败" : "文章插图生成请求失败");
+      throw new Error(await readHttpResponseErrorMessage(response, referenceOnly ? "参考图生成请求失败" : "文章插图生成请求失败"));
     }
 
     await runArticleIllustrationStream(response);
@@ -8565,16 +8707,29 @@ async function generateArticleIllustrations({ referenceOnly = false, itemIds = [
 }
 
 async function loadArticleIllustrationSets() {
-  const response = await fetch("/api/article-illustration/sets", {
-    cache: "no-store",
-  });
+  state.assetLoading.article = true;
+  state.assetLoadErrors.article = "";
+  renderArticleRecordView();
+  let response;
+  try {
+    response = await fetch("/api/article-illustration/sets", { cache: "no-store" });
+  } catch (error) {
+    state.assetLoading.article = false;
+    state.assetLoadErrors.article = error instanceof Error ? error.message : String(error);
+    renderArticleRecordView();
+    throw error;
+  }
   if (response.status === 404) {
+    state.assetLoading.article = false;
     state.articleIllustration.sets = [];
     state.articleIllustration.recordSetId = "";
     renderArticleRecordView();
     return;
   }
   if (!response.ok) {
+    state.assetLoading.article = false;
+    state.assetLoadErrors.article = "读取文章插图记录失败";
+    renderArticleRecordView();
     throw new Error("读取文章插图记录失败");
   }
 
@@ -8582,6 +8737,8 @@ async function loadArticleIllustrationSets() {
   const nextSets = Array.isArray(payload) ? payload.map(normalizeArticleSetForView).filter(Boolean) : [];
   const currentSetId = state.articleIllustration.currentSet?.setId || "";
   state.articleIllustration.sets = nextSets;
+  state.assetLoading.article = false;
+  state.assetLoadErrors.article = "";
   if (currentSetId) {
     const matched = nextSets.find((set) => set.setId === currentSetId);
     if (matched) {
@@ -8706,17 +8863,37 @@ function renderArticleRecordList() {
   const filteredSets = filterArticleRecordSets();
   const selectedSet = getArticleRecordSelectedSet();
   refs.articleRecordList.replaceChildren();
+  refs.articleRecordList.setAttribute("aria-busy", String(state.assetLoading.article));
+  if (state.assetLoading.article || state.assetLoadErrors.article || filteredSets.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "asset-list-state";
+    empty.textContent = state.assetLoading.article
+      ? "正在加载文章记录..."
+      : state.assetLoadErrors.article
+        ? `加载失败：${state.assetLoadErrors.article}`
+        : state.articleIllustration.recordQuery
+          ? "没有匹配的文章记录"
+          : "暂无文章插图记录";
+    refs.articleRecordList.appendChild(empty);
+    return;
+  }
   filteredSets.forEach((set) => {
     const button = document.createElement("button");
     button.className = `article-record-card ${selectedSet?.setId === set.setId ? "active" : ""}`;
     button.type = "button";
+    button.setAttribute("role", "option");
+    button.setAttribute("aria-selected", String(selectedSet?.setId === set.setId));
     button.dataset.articleRecordSetId = set.setId;
     const title = document.createElement("strong");
     title.textContent = formatArticleDisplayText(set.title);
     const meta = document.createElement("small");
     const progress = getArticleProgressSummary(set);
-    meta.textContent = `${progress.completed}/${progress.total} · ${set.stylePreset} · ${formatClock(set.createdAt)}`;
-    button.append(title, meta);
+    meta.textContent = `${set.stylePreset || "默认风格"} · ${progress.completed}/${progress.total} · ${formatTime(set.updatedAt || set.createdAt)}`;
+    const status = document.createElement("span");
+    status.className = "asset-record-status";
+    status.dataset.state = progress.failed > 0 ? "failed" : progress.completed >= progress.total && progress.total > 0 ? "completed" : "running";
+    status.textContent = progress.failed > 0 ? `${progress.failed} 项失败` : progress.completed >= progress.total && progress.total > 0 ? "已完成" : "处理中";
+    button.append(title, meta, status);
     refs.articleRecordList.appendChild(button);
   });
 }
@@ -8812,7 +8989,10 @@ function renderArticleRecordView() {
     : `${state.articleIllustration.sets.length} 套`;
   refs.articleRecordCopyPromptsButton.disabled = !buildArticlePromptText(selectedSet);
   refs.articleRecordCopyCaptionsButton.disabled = !buildArticleCaptionText(selectedSet);
-  refs.articleRecordContinueButton.disabled = !selectedSet?.items?.some((item) => item.status === "failed");
+  const hasFailedItems = Boolean(selectedSet?.items?.some((item) => item.status === "failed"));
+  refs.articleRecordContinueButton.disabled = !hasFailedItems;
+  refs.articleRecordContinueButton.classList.toggle("hidden", !hasFailedItems);
+  if (refs.articleRecordSelection) refs.articleRecordSelection.textContent = selectedSet ? formatArticleDisplayText(selectedSet.title) : "尚未选择";
 
   renderArticleRecordColumnPresetButtons();
   renderArticleRecordList();
@@ -8895,18 +9075,15 @@ function normalizeCreationSetForView(set = {}) {
   const warnings = cloneCreationPlanValue(set.warnings ?? set.validation?.warnings ?? planSource.warnings ?? planSource.validation?.warnings, []);
   const errors = cloneCreationPlanValue(set.errors ?? set.validation?.errors ?? planSource.errors ?? planSource.validation?.errors, []);
   const validationIsValid = (set.validation?.isValid ?? planSource.validation?.isValid) !== false && (set.canGenerate ?? planSource.canGenerate) !== false && errors.length === 0;
-  const inferredCarouselImageCount = items.filter((item) => item.itemKind === "carousel" && item.enabled !== false).length;
-  const inferredSkuImageCount = items.filter((item) => item.itemKind === "sku" || item.role === "sku").length;
-  const inferredInfographicRebuildCount = items.filter(
-    (item) => item.itemKind === "infographic-rebuild" || item.role === "infographic-rebuild",
-  ).length;
-  const carouselImageCount = getFiniteCreationImageCount(set.carouselImageCount ?? planSource.carouselImageCount) ?? inferredCarouselImageCount;
-  const skuImageCount = getFiniteCreationImageCount(set.skuImageCount ?? planSource.skuImageCount) ?? inferredSkuImageCount;
-  const infographicRebuildCount = getFiniteCreationImageCount(set.infographicRebuildCount ?? planSource.infographicRebuildCount) ?? inferredInfographicRebuildCount;
-  const setImageCount = set.imageCount !== undefined && set.imageCount !== null && String(set.imageCount).trim() !== "" && Number.isFinite(Number(set.imageCount))
-    ? Number(set.imageCount)
-    : getFiniteCreationImageCount(planSource.imageCount);
-
+  const planCounts = resolveCreationPlanCounts({ ...planSource, ...set, items });
+  const skuGenerationEnabledValue = set.skuGenerationEnabled
+    ?? set.sku_generation_enabled
+    ?? planSource.skuGenerationEnabled
+    ?? planSource.sku_generation_enabled;
+  const infographicRebuildEnabledValue = set.infographicRebuildEnabled
+    ?? set.infographic_rebuild_enabled
+    ?? planSource.infographicRebuildEnabled
+    ?? planSource.infographic_rebuild_enabled;
   return {
     setId: String(set.setId || ""),
     productName: String(set.productName || ""),
@@ -8938,11 +9115,11 @@ function normalizeCreationSetForView(set = {}) {
     warnings: warnings,
     errors,
     canGenerate: validationIsValid,
-    imageCount: (setImageCount ?? items.length) || 10,
-    carouselImageCount: carouselImageCount,
-    skuImageCount: skuImageCount,
-    infographicRebuildCount: infographicRebuildCount,
-    totalPlannedItemCount: getFiniteCreationImageCount(set.totalPlannedItemCount ?? planSource.totalPlannedItemCount) ?? carouselImageCount + skuImageCount + infographicRebuildCount,
+    imageCount: planCounts.imageCount,
+    carouselImageCount: planCounts.carouselImageCount,
+    skuImageCount: planCounts.skuImageCount,
+    infographicRebuildCount: planCounts.infographicRebuildCount,
+    totalPlannedItemCount: planCounts.totalPlannedItemCount,
     selectedRoles: normalizeCreationRoleIds(set.selectedRoles || items.map((item) => item.role)),
     scenario: String(set.scenario || "standard"),
     scenarioLabel: String(set.scenarioLabel || CREATION_SCENARIO_LABELS[set.scenario] || ""),
@@ -8951,10 +9128,8 @@ function normalizeCreationSetForView(set = {}) {
     industryTemplate: String(set.industryTemplate || industryTemplate.value || "general"),
     industryTemplateLabel: String(set.industryTemplateLabel || industryTemplate.label || ""),
     industryTemplatePath: String(set.industryTemplatePath || industryTemplate.categoryPath || ""),
-    infographicRebuildEnabled:
-      set.infographicRebuildEnabled === undefined && set.infographic_rebuild_enabled === undefined
-        ? hasInfographicRebuildItems
-        : set.infographicRebuildEnabled !== false && set.infographic_rebuild_enabled !== false,
+    skuGenerationEnabled: normalizeCreationModuleEnabled(skuGenerationEnabledValue, true),
+    infographicRebuildEnabled: normalizeCreationModuleEnabled(infographicRebuildEnabledValue, hasInfographicRebuildItems),
     referenceImageNames: Array.isArray(set.referenceImageNames)
       ? set.referenceImageNames.map((item) => String(item)).filter(Boolean)
       : [],
@@ -9247,12 +9422,14 @@ function resetCreationLogoForRecordReuse(normalized = null) {
 
 function applyCreationSetToForm(set) {
   const normalized = normalizeCreationSetForView(set);
+  state.creation.draftSet = normalized;
   refs.creationProductNameInput.value = normalized.productName || "";
   refs.creationProductDescriptionInput.value = normalized.productDescription || "";
   refs.creationSellingPointsInput.value = normalized.sellingPoints.join("\n");
   refs.creationDimensionSpecsInput.value = normalized.dimensionSpecs || "";
   if (refs.creationSkuBundleCountInput) refs.creationSkuBundleCountInput.value = String(normalized.skuBundleCount || 1);
-  if (refs.creationInfographicRebuildEnabledInput) refs.creationInfographicRebuildEnabledInput.checked = normalized.infographicRebuildEnabled !== false;
+  if (refs.creationSkuGenerationEnabledInput) refs.creationSkuGenerationEnabledInput.checked = normalized.skuGenerationEnabled !== false;
+  if (refs.creationInfographicRebuildEnabledInput) refs.creationInfographicRebuildEnabledInput.checked = normalized.infographicRebuildEnabled === true;
   setCreationSelectValue(refs.creationSkuGenerationRuleInput, normalized.skuGenerationRule, DEFAULT_CREATION_SKU_GENERATION_RULE);
   setCreationSelectValue(refs.creationDimensionUnitModeInput, normalized.dimensionUnitMode, "both");
   setCreationSelectValue(refs.creationTargetLanguageInput, normalized.targetLanguage, "en");
@@ -9279,27 +9456,24 @@ function getCreationCurrentSet() {
   return state.creation.currentSet ? normalizeCreationSetForView(state.creation.currentSet) : null;
 }
 
+function getCreationDraftSet() {
+  return state.creation.draftSet ? normalizeCreationSetForView(state.creation.draftSet) : null;
+}
+
 function getCreationDisplayedSet() {
   const selectedQueueJob = isCreationLogoBatchBranch() ? null : getSelectedCreationQueueJob();
   return selectedQueueJob?.set ? normalizeCreationSetForView(selectedQueueJob.set) : getCreationCurrentSet();
 }
 
 function getCreationDisplayedPlanContext() {
-  const displayedQueueJob = isCreationLogoBatchBranch() ? null : getSelectedCreationQueueJob();
   return resolveCreationDisplayedPlanContext({
-    displayedSet: getCreationDisplayedSet(),
-    displayedQueueSet: displayedQueueJob?.set || null,
     frozenPlan: getFrozenCreationEffectivePlan(),
+    selectedCarouselCount: getCreationSelectedImageCount(),
   });
 }
 
-function getCreationPlatformPlanDisplayCounts(plan = null) {
-  return {
-    carouselImageCount: plan?.carouselImageCount ?? 0,
-    skuImageCount: plan?.skuImageCount ?? 0,
-    infographicRebuildCount: plan?.infographicRebuildCount ?? 0,
-    totalPlannedItemCount: plan?.totalPlannedItemCount ?? plan?.items?.length ?? 0,
-  };
+function getCreationPlatformPlanDisplayCounts(plan = null, selectedCarouselCount = getCreationSelectedImageCount()) {
+  return getCreationEditablePlanDisplayCounts(plan, selectedCarouselCount);
 }
 
 function getCreationQueueJobs() { return getCreationQueueJobsFromState(state.creation); }
@@ -9314,64 +9488,30 @@ function getCreationRepairTargetSet() { return getCreationRepairTargetSetFromSta
 function syncActiveCreationQueueSet(set) { syncActiveCreationQueueSetInState(state.creation, set, normalizeCreationSetForView); }
 function selectCreationQueueJob(queueId) {
   if (!selectCreationQueueJobInState(state.creation, queueId)) return;
-  state.creation.editingItemId = "";
   renderCreationView();
+}
+
+function syncCreationExplicitSetParameters(parameters = {}) {
+  const frozenPayload = getFrozenCreationPlatformPayload();
+  setFrozenCreationPlatformPayload({
+    ...frozenPayload.values,
+    platformSetOverrides: mergeCreationPlatformSetParameters(
+      frozenPayload.values.platformSetOverrides,
+      parameters,
+    ),
+  });
+  resetCreationDraftPreview();
+}
+
+function refreshCreationPlanAfterExplicitSetParameterChange(parameters = {}) {
+  syncCreationExplicitSetParameters(parameters);
+  if (!hasCreationPlanPreviewInput()) return;
+  requestCreationPlanPreview().catch((error) => setCreationFeedback(error.message, "error"));
 }
 
 function isCreationDraftSet(set = getCreationCurrentSet()) {
   const setId = String(set?.setId || "");
   return setId.startsWith("creation-local-") || setId.startsWith("creation-draft-");
-}
-
-function canEditCreationItem(set = getCreationCurrentSet()) {
-  return Boolean(set?.setId) && !state.creation.generating && !state.creation.planning && (canRepairCreationSet(set) || isCreationDraftSet(set));
-}
-
-function getCreationItemDraftKey(setId, itemId) {
-  return `${setId || "draft"}:${itemId || ""}`;
-}
-
-function getCreationItemDraft(itemId, set = getCreationCurrentSet()) {
-  const key = getCreationItemDraftKey(set?.setId, itemId);
-  return String(state.creation.itemDrafts[key] || "");
-}
-
-function toggleCreationItemEditor(itemId) {
-  state.creation.editingItemId = state.creation.editingItemId === itemId ? "" : itemId;
-  renderCreationView();
-}
-
-function closeCreationItemEditor(itemId = state.creation.editingItemId) {
-  if (!itemId || state.creation.editingItemId !== itemId) {
-    return;
-  }
-
-  state.creation.editingItemId = "";
-  renderCreationView();
-}
-
-function saveCreationItemDraft(itemId, promptOverride) {
-  const currentSet = getCreationCurrentSet();
-  if (!currentSet || !itemId) {
-    return;
-  }
-
-  const existingItem = currentSet.items.find((item) => item.itemId === itemId);
-  const nextPrompt = String(promptOverride || "").trim();
-  const key = getCreationItemDraftKey(currentSet.setId, itemId);
-  if (nextPrompt) {
-    state.creation.itemDrafts[key] = nextPrompt;
-  } else {
-    delete state.creation.itemDrafts[key];
-  }
-
-  updateCreationCurrentItem(itemId, {
-    prompt: nextPrompt || existingItem?.prompt || "",
-    updatedAt: nowIso(),
-  });
-  state.creation.editingItemId = "";
-  setCreationFeedback("已保存单张微调，重生成时会使用新的提示词。", "success");
-  renderCreationView();
 }
 
 function getCreationProgressSummary(set = getCreationCurrentSet()) {
@@ -9649,8 +9789,6 @@ function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
   }
   card.appendChild(media);
 
-  appendCreationCoverageSummary(card, item, { hideGenerationDetails });
-
   const shouldRenderPath = !imageUrl && !showRecordActions && !hideGenerationDetails;
   if (shouldRenderPath) {
     const path = document.createElement("span");
@@ -9661,62 +9799,9 @@ function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
     card.appendChild(path);
   }
 
-  if (showActions && !hideGenerationDetails && state.creation.editingItemId === item.itemId) {
-    const editor = document.createElement("div");
-    editor.className = "creation-card-editor";
-    editor.setAttribute("role", "dialog");
-    editor.setAttribute("aria-label", "微调提示词");
-
-    const editorHead = document.createElement("div");
-    editorHead.className = "creation-card-editor-head";
-
-    const editorTitle = document.createElement("strong");
-    editorTitle.textContent = "微调提示词";
-    editorHead.appendChild(editorTitle);
-
-    const closeButton = document.createElement("button");
-    closeButton.className = "creation-card-editor-close";
-    closeButton.type = "button";
-    closeButton.dataset.creationClosePromptEditor = item.itemId;
-    closeButton.textContent = "x";
-    closeButton.setAttribute("aria-label", "关闭微调浮窗");
-    editorHead.appendChild(closeButton);
-    editor.appendChild(editorHead);
-
-    const textarea = document.createElement("textarea");
-    textarea.dataset.creationPromptEditor = item.itemId;
-    textarea.rows = 4;
-    textarea.value = getCreationItemDraft(item.itemId) || item.prompt || "";
-    textarea.placeholder = "调整这张图的生成提示词";
-    editor.appendChild(textarea);
-
-    const editorActions = document.createElement("div");
-    editorActions.className = "creation-card-editor-actions";
-
-    const saveButton = document.createElement("button");
-    saveButton.className = "mini-action";
-    saveButton.type = "button";
-    saveButton.dataset.creationSavePromptItemId = item.itemId;
-    saveButton.textContent = "保存微调";
-    saveButton.disabled = state.creation.generating || state.creation.planning;
-    editorActions.appendChild(saveButton);
-
-    editor.appendChild(editorActions);
-    refs.creationPromptEditorLayer?.appendChild(editor);
-  }
-
   if (showActions && !hideGenerationDetails) {
     const actions = document.createElement("div");
     actions.className = "creation-card-actions";
-    const editButton = document.createElement("button");
-    editButton.className = "mini-action";
-    editButton.type = "button";
-    editButton.dataset.creationEditItemId = item.itemId;
-    editButton.textContent = state.creation.editingItemId === item.itemId ? "收起" : "微调";
-    editButton.disabled = !canEditCreationItem();
-    editButton.setAttribute("aria-label", `${item.title || "套图项"}微调提示词`);
-    actions.appendChild(editButton);
-
     const button = document.createElement("button");
     button.className = "mini-action";
     button.type = "button";
@@ -10036,18 +10121,6 @@ async function copyCreationRecordItemFullPath(itemId, setId = "") {
   setCreationRecordFeedback("已复制单张完整路径。", "success");
 }
 
-async function copyLightboxCreationRecordPath() {
-  const itemId = state.lightboxItem?.creationItemId || state.lightboxItem?.itemId || "";
-  const setId = state.lightboxItem?.creationSetId || "";
-  await copyCreationRecordItemPath(itemId, setId);
-}
-
-async function copyLightboxCreationRecordFullPath() {
-  const itemId = state.lightboxItem?.creationItemId || state.lightboxItem?.itemId || "";
-  const setId = state.lightboxItem?.creationSetId || "";
-  await copyCreationRecordItemFullPath(itemId, setId);
-}
-
 function renderCreationRecordSetList() {
   if (!refs.creationRecordSetList) {
     return;
@@ -10057,11 +10130,16 @@ function renderCreationRecordSetList() {
   const selectedSet = getCreationRecordSelectedSet();
   const selectedSetId = selectedSet?.setId || "";
   const sets = filterCreationRecordSets().slice(0, 60);
+  refs.creationRecordSetList.setAttribute("aria-busy", String(state.assetLoading.creation));
 
-  if (sets.length === 0) {
+  if (state.assetLoading.creation || state.assetLoadErrors.creation || sets.length === 0) {
     const empty = document.createElement("div");
-    empty.className = "creation-record";
-    empty.textContent = state.creation.recordQuery ? "没有匹配的套图记录" : "暂无套图记录";
+    empty.className = "creation-record asset-list-state";
+    empty.textContent = state.assetLoading.creation
+      ? "正在加载套图记录..."
+      : state.assetLoadErrors.creation
+        ? `加载失败：${state.assetLoadErrors.creation}`
+        : state.creation.recordQuery ? "没有匹配的套图记录" : "暂无套图记录";
     refs.creationRecordSetList.appendChild(empty);
     return;
   }
@@ -10072,6 +10150,8 @@ function renderCreationRecordSetList() {
     button.className = "creation-record";
     button.dataset.creationRecordSetId = set.setId;
     button.classList.toggle("active", set.setId === selectedSetId);
+    button.setAttribute("role", "option");
+    button.setAttribute("aria-selected", String(set.setId === selectedSetId));
 
     const title = document.createElement("strong");
     title.className = "creation-record-title";
@@ -10084,10 +10164,10 @@ function renderCreationRecordSetList() {
     const meta = document.createElement("span");
     meta.className = "creation-record-meta";
     const progress = getCreationProgressSummary(set);
-    const languageLabel = set.targetLanguageLabel || set.targetLanguage || "English";
+    const platformLabel = set.platformLabel || formatCreationPlatformLabel(set.platform);
     const listingLabel = getCreationRecordListingMetaLabel(set);
-    const metaParts = [languageLabel, `${progress.completed}/${progress.total}`].filter(Boolean);
-    const recordTimeText = formatClock(set.createdAt);
+    const metaParts = [platformLabel, `${progress.completed}/${progress.total}`].filter(Boolean);
+    const recordTimeText = formatTime(set.updatedAt || set.createdAt);
     meta.textContent = metaParts.join(" · ");
     if (recordTimeText) {
       const recordTime = document.createElement("span");
@@ -10105,6 +10185,12 @@ function renderCreationRecordSetList() {
     }
 
     button.appendChild(metaRow);
+
+    const status = document.createElement("span");
+    status.className = "asset-record-status";
+    status.dataset.state = progress.failed > 0 ? "failed" : progress.completed >= progress.total && progress.total > 0 ? "completed" : "running";
+    status.textContent = progress.failed > 0 ? `${progress.failed} 项失败` : progress.completed >= progress.total && progress.total > 0 ? "已完成" : "生成中";
+    button.appendChild(status);
 
     refs.creationRecordSetList.appendChild(button);
   });
@@ -10173,13 +10259,51 @@ function reuseCreationRecordSet() {
 
   applyCreationSetToForm(selectedSet);
   state.creation.currentSet = normalizeCreationSetForView(selectedSet);
-  state.creation.editingItemId = "";
   setCreationFeedback("已载入历史套图，商品信息与角色已同步；如需沿用参考图，请重新上传原图。", "success");
   setActiveView("creation");
   renderCreationView();
 }
 
-async function repairCreationRecordIncompleteImages() { if (state.creation.generating) return; const selectedSet = getCreationRecordSelectedSet(); if (!canRepairCreationSet(selectedSet)) { setCreationRecordFeedback("请先选择一个已保存的套图记录。", "error"); return; } const targetItems = getCreationIncompleteItems(selectedSet); const missingAssetCount = targetItems.filter(isCreationMissingAssetItem).length; if (targetItems.length === 0) { setCreationRecordFeedback("当前套图没有需要补齐的图像。", "success"); renderCreationRecordView(); return; } clearError(); applyCreationSetToForm(selectedSet); state.creation.currentSet = normalizeCreationSetForView(selectedSet); state.creation.recordSetId = selectedSet.setId; state.creation.generating = true; state.creation.generationScope = "repair"; state.creation.editingItemId = ""; targetItems.forEach((item) => updateCreationCurrentItem(item.itemId, { status: "generating", error: "", updatedAt: nowIso() })); setCreationRecordFeedback(missingAssetCount > 0 ? `正在补齐缺失的历史图像文件 ${missingAssetCount} 张...` : `正在补齐未生成图像 ${targetItems.length} 张...`, "busy"); renderCreationView(); renderCreationRecordView(); try { await runCreationRepairRequest({ scope: "incomplete", set: selectedSet }); const refreshedSet = getCreationRecordSelectedSet(); const remainingCount = getCreationIncompleteItems(refreshedSet).length; setCreationRecordFeedback(remainingCount > 0 ? `仍有 ${remainingCount} 张图像未生成。` : missingAssetCount > 0 ? "缺失图像文件已补齐。" : "未生成图像已补齐。", remainingCount > 0 ? "error" : "success"); } catch (error) { const message = compactErrorMessage(error instanceof Error ? error.message : String(error), "套图补图请求失败"); setCreationRecordFeedback(message, "error"); showError(message); } finally { state.creation.generating = false; state.creation.generationScope = ""; renderCreationView(); renderCreationRecordView(); } }
+async function repairCreationRecordIncompleteImages() {
+  if (state.creation.generating) return;
+  const selectedSet = getCreationRecordSelectedSet();
+  if (!canRepairCreationSet(selectedSet)) {
+    setCreationRecordFeedback("请先选择一个已保存的套图记录。", "error");
+    return;
+  }
+  const targetItems = getCreationIncompleteItems(selectedSet);
+  const missingAssetCount = targetItems.filter(isCreationMissingAssetItem).length;
+  if (targetItems.length === 0) {
+    setCreationRecordFeedback("当前套图没有需要补齐的图像。", "success");
+    renderCreationRecordView();
+    return;
+  }
+
+  clearError();
+  state.creation.recordSetId = selectedSet.setId;
+  state.creation.generating = true;
+  state.creation.generationScope = "repair";
+  setCreationRecordFeedback(missingAssetCount > 0 ? `正在补齐缺失的历史图像文件 ${missingAssetCount} 张...` : `正在补齐未生成图像 ${targetItems.length} 张...`, "busy");
+  renderCreationView();
+  renderCreationRecordView();
+
+  const recordRepairJob = { id: `creation-record-repair-${selectedSet.setId}`, set: normalizeCreationSetForView(selectedSet) };
+  try {
+    await runCreationRepairRequest({ scope: "incomplete", set: selectedSet, streamContext: { queueJob: recordRepairJob } });
+    const refreshedSet = getCreationRecordSelectedSet();
+    const remainingCount = getCreationIncompleteItems(refreshedSet).length;
+    setCreationRecordFeedback(remainingCount > 0 ? `仍有 ${remainingCount} 张图像未生成。` : missingAssetCount > 0 ? "缺失图像文件已补齐。" : "未生成图像已补齐。", remainingCount > 0 ? "error" : "success");
+  } catch (error) {
+    const message = compactErrorMessage(error instanceof Error ? error.message : String(error), "套图补图请求失败");
+    setCreationRecordFeedback(message, "error");
+    showError(message);
+  } finally {
+    state.creation.generating = false;
+    state.creation.generationScope = "";
+    renderCreationView();
+    renderCreationRecordView();
+  }
+}
 
 function toggleCreationRecordArchiveDetail() { state.creation.recordDetailExpanded = !state.creation.recordDetailExpanded; renderCreationRecordView(); }
 
@@ -10241,6 +10365,9 @@ function renderCreationRecordView() {
     refs.creationRecordExportManifestButton.disabled = !selectedSet;
   }
   if (refs.creationRecordRepairIncompleteButton) { refs.creationRecordRepairIncompleteButton.disabled = state.creation.generating || !canRepairCreationSet(selectedSet) || recordIncompleteItems.length === 0; refs.creationRecordRepairIncompleteButton.textContent = getCreationRecordRepairButtonLabel(recordIncompleteItems); }
+  refs.creationRecordRepairIncompleteButton?.classList.toggle("hidden", recordIncompleteItems.length === 0);
+  refs.creationRecordReuseButton?.classList.toggle("hidden", recordIncompleteItems.length > 0);
+  if (refs.creationRecordSelection) refs.creationRecordSelection.textContent = selectedSet?.productName || "尚未选择";
   creationListingController.syncRecordControls(selectedSet);
 
   renderCreationRecordSetList();
@@ -10295,6 +10422,87 @@ function removeCreationReferenceFile(referenceId) {
   markCreationReferenceRestoreEntryMissing(target?.restoreEntryId);
   markCreationReferenceAnalysisDirty();
   renderCreationReferenceGrid();
+}
+
+function normalizeCreationReferenceNoteText(value) {
+  return String(value || "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\r\n?/g, "\n")
+    .trim();
+}
+
+function updateCreationReferenceNote(referenceId, noteText) {
+  const referenceIndex = state.creationReferenceFiles.findIndex((item) => item.id === referenceId);
+  if (referenceIndex < 0) return false;
+
+  const note = normalizeCreationReferenceNoteText(noteText);
+  const reference = state.creationReferenceFiles[referenceIndex];
+  if (reference.note === note) return false;
+  const filename = reference.file?.name || `reference-image-${referenceIndex + 1}`;
+  state.creationReferenceFiles = state.creationReferenceFiles.map((item) =>
+    item.id === referenceId ? { ...item, note } : item,
+  );
+
+  const analysis = state.creationReferenceAnalysis.result;
+  const recommendations = Array.isArray(analysis?.recommendations) ? analysis.recommendations : [];
+  const filenameMatchIndex = recommendations.findIndex((entry) => entry.filename === filename);
+  const recommendationIndex = filenameMatchIndex >= 0 ? filenameMatchIndex : referenceIndex;
+  if (recommendations[recommendationIndex]) {
+    state.creationReferenceAnalysis.result = {
+      ...analysis,
+      recommendations: recommendations.map((entry, index) =>
+        index === recommendationIndex ? { ...entry, note } : entry,
+      ),
+    };
+  }
+
+  if (state.creationReferenceAnalysis.applied && !state.creationReferenceAnalysis.dirty) {
+    refreshCreationAppliedReferencePlanningSignals();
+  }
+  resetCreationDraftPreview();
+  return true;
+}
+
+function beginCreationReferenceNoteEditing(event) {
+  const note = event.target.closest?.("[data-creation-reference-note-id]");
+  if (!note || !refs.creationReferenceGrid.contains(note)) return;
+
+  const activeNote = refs.creationReferenceGrid.querySelector('.creation-reference-note[contenteditable="true"]');
+  if (activeNote && activeNote !== note) activeNote.blur();
+
+  event.preventDefault();
+  note.setAttribute("contenteditable", "true");
+  note.setAttribute("role", "textbox");
+  note.setAttribute("aria-label", "编辑套图参考图说明");
+  note.setAttribute("aria-multiline", "true");
+  note.closest("[data-creation-reference-card-id]")?.setAttribute("draggable", "false");
+  note.focus();
+
+  const selection = window.getSelection();
+  if (!selection?.anchorNode || !note.contains(selection.anchorNode)) {
+    const range = document.createRange();
+    range.selectNodeContents(note);
+    range.collapse(false);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  }
+}
+
+function commitCreationReferenceNoteEditing(note) {
+  if (!note?.matches?.('.creation-reference-note[contenteditable="true"]')) return;
+
+  const referenceId = note.dataset.creationReferenceNoteId || "";
+  const nextNote = normalizeCreationReferenceNoteText(note.innerText || note.textContent);
+  note.textContent = nextNote;
+  note.removeAttribute("contenteditable");
+  note.removeAttribute("role");
+  note.removeAttribute("aria-label");
+  note.removeAttribute("aria-multiline");
+  updateCreationReferenceNote(referenceId, nextNote);
+
+  const reference = state.creationReferenceFiles.find((item) => item.id === referenceId);
+  const card = note.closest("[data-creation-reference-card-id]");
+  if (card) card.draggable = isCreationSubjectReferenceRole(reference?.role || "product");
 }
 
 function updateCreationReferenceRole(referenceId, role) {
@@ -10388,7 +10596,6 @@ function setCreationBranch(branch = "set") {
   const nextBranch = branch === "logo-batch" ? "logo-batch" : "set";
   const changed = state.creationBranch !== nextBranch;
   state.creationBranch = nextBranch;
-  state.creation.editingItemId = "";
   syncCreationBranchPanels();
 
   if (changed && !state.creation.generating && !state.creation.planning) {
@@ -10704,12 +10911,12 @@ function renderCreationReferenceGrid() {
       card.appendChild(select);
     }
 
-    if (item.note) {
-      const note = document.createElement("span");
-      note.className = "creation-reference-note";
-      note.textContent = item.note;
-      card.appendChild(note);
-    }
+    const note = document.createElement("span");
+    note.className = "creation-reference-note";
+    note.dataset.creationReferenceNoteId = item.id;
+    note.dataset.placeholder = "暂无说明";
+    note.textContent = item.note || "";
+    card.appendChild(note);
 
     refs.creationReferenceGrid.appendChild(card);
   });
@@ -10816,19 +11023,8 @@ function setCreationReferenceProductNameValue(value) {
   return true;
 }
 
-function clearCreationReferenceAnalysisProductNameSuggestion() {
-  const result = applyCreationReferenceAnalysisProductNameValue({
-    analysis: {},
-    currentProductName: refs.creationProductNameInput?.value || "",
-    previousAutoProductName: state.creationReferenceAnalysis.productNameSuggestion,
-  });
-  state.creationReferenceAnalysis.productNameSuggestion = result.autoProductName;
-  return setCreationReferenceProductNameValue(result.productName);
-}
-
 function markCreationReferenceAnalysisDirty() {
   invalidateCreationReferenceAnalysisRequest();
-  clearCreationReferenceAnalysisProductNameSuggestion();
   if (state.creationReferenceAnalysis.result) {
     state.creationReferenceAnalysis.applied = false;
     state.creationReferenceAnalysis.dirty = true;
@@ -10927,9 +11123,8 @@ async function applyCreationReferenceAnalysis(analysis) {
   state.creationReferenceAnalysis.applied = false;
   state.creationReferenceAnalysis.collapsed = false;
   state.creationReferenceAnalysis.dirty = false;
-  const productNameApplied = applyCreationReferenceAnalysisProductNameSuggestion(normalized);
-  renderCreationReferenceAnalysis();
-  return { matchedTemplate, productNameApplied };
+  const appliedResult = applyCreationReferenceAnalysisRecommendations();
+  return { matchedTemplate, ...appliedResult };
 }
 
 function applyCreationReferenceAnalysisProductNameSuggestion(analysis = {}) {
@@ -10975,27 +11170,30 @@ function toggleCreationReferenceAnalysisPanel() {
 function applyCreationReferenceAnalysisRecommendations() {
   const analysis = state.creationReferenceAnalysis.result;
   if (!analysis || state.creationReferenceAnalysis.dirty) {
-    return;
+    return { applied: false, appliedMessage: "", productNameApplied: false };
   }
 
   const recommendationsByFilename = new Map(analysis.recommendations.map((entry) => [entry.filename, entry]));
   state.creationReferenceFiles = state.creationReferenceFiles.map((item, index) => {
     const filename = item.file?.name || `reference-image-${index + 1}`;
     const recommendation = recommendationsByFilename.get(filename) || analysis.recommendations[index];
-    return recommendation
-      ? {
-          ...item,
-          role: recommendation.role || item.role || "product",
-          note: recommendation.note || "",
-          subjectUnitCount: recommendation.subjectUnitCount || 0,
-        }
-      : item;
+    if (!recommendation) {
+      return item;
+    }
+    const nextItem = { ...item };
+    delete nextItem.roleLocked;
+    return {
+      ...nextItem,
+      role: recommendation.role || item.role || "product",
+      note: recommendation.note || "",
+      subjectUnitCount: recommendation.subjectUnitCount || 0,
+    };
   });
+  state.creationReferenceAnalysis.applied = true;
+  state.creationReferenceAnalysis.collapsed = true;
   const productNameApplied = applyCreationReferenceAnalysisProductNameSuggestion(analysis);
   refreshCreationAppliedReferencePlanningSignals();
   syncCreationSelectedRolesToReferenceCoverage(analysis);
-  state.creationReferenceAnalysis.applied = true;
-  state.creationReferenceAnalysis.collapsed = true;
   const appliedMessage = buildCreationReferenceAnalysisAppliedFeedbackMessage({
     recommendationCount: analysis.recommendations.length,
     productNameApplied,
@@ -11004,6 +11202,7 @@ function applyCreationReferenceAnalysisRecommendations() {
   setCreationReferenceAnalysisFeedback(appliedMessage, "success");
   renderCreationReferenceGrid();
   renderCreationReferenceAnalysis();
+  return { applied: true, appliedMessage, productNameApplied };
 }
 
 function renderCreationReferenceAnalysis() {
@@ -11015,16 +11214,6 @@ function renderCreationReferenceAnalysis() {
   refs.creationReferenceAnalyzeButton.replaceChildren(analyzingReferences ? "识别中" : "智能识别", ...(analyzingReferences ? [Object.assign(document.createElement("span"), { className: "creation-reference-analyze-spinner", ariaHidden: "true" })] : []));
 
   const analysis = state.creationReferenceAnalysis.result;
-  if (refs.creationReferenceApplyAnalysisButton) {
-    const canApply =
-      Boolean(analysis) &&
-      !state.creationReferenceAnalysis.dirty &&
-      !state.creationReferenceAnalysis.applied &&
-      !state.creationReferenceAnalysis.running;
-    refs.creationReferenceApplyAnalysisButton.classList.toggle("hidden", !analysis);
-    refs.creationReferenceApplyAnalysisButton.disabled = !canApply;
-    refs.creationReferenceApplyAnalysisButton.textContent = state.creationReferenceAnalysis.applied ? "已应用" : "应用建议";
-  }
   refs.creationReferenceAnalysisPanel.classList.toggle("hidden", !analysis);
   refs.creationReferenceAnalysisList.replaceChildren();
 
@@ -11038,7 +11227,7 @@ function renderCreationReferenceAnalysis() {
     refs.creationReferenceAnalysisToggleButton.classList.add("hidden");
     refs.creationReferenceAnalysisToggleButton.disabled = true;
     refs.creationReferenceAnalysisToggleButton.setAttribute("aria-expanded", "false");
-    refs.creationReferenceAnalysisToggleButton.textContent = "折叠建议";
+    refs.creationReferenceAnalysisToggleButton.textContent = "收起结果";
     refs.creationReferenceAnalysisList.classList.remove("hidden");
     syncCreationReferenceResetButton();
     return;
@@ -11046,11 +11235,11 @@ function renderCreationReferenceAnalysis() {
 
   refs.creationReferenceAnalysisSummary.textContent = analysis.summary || "已识别套图参考图用途";
   refs.creationReferenceAnalysisMeta.textContent = [
-    `${analysis.recommendations.length} 张建议`,
+    `${analysis.recommendations.length} 张已识别`,
     analysis.categoryTemplatePath || analysis.categoryPath || analysis.categoryHint
       ? `类目: ${analysis.categoryTemplatePath || analysis.categoryPath || analysis.categoryHint}`
       : "",
-    state.creationReferenceAnalysis.applied ? "已应用" : "待应用",
+    state.creationReferenceAnalysis.applied ? "已自动应用" : "",
     state.creationReferenceAnalysis.dirty ? "参考图已变化" : "",
   ]
     .filter(Boolean)
@@ -11058,7 +11247,7 @@ function renderCreationReferenceAnalysis() {
   refs.creationReferenceAnalysisToggleButton.classList.remove("hidden");
   refs.creationReferenceAnalysisToggleButton.disabled = false;
   refs.creationReferenceAnalysisToggleButton.setAttribute("aria-expanded", String(!state.creationReferenceAnalysis.collapsed));
-  refs.creationReferenceAnalysisToggleButton.textContent = state.creationReferenceAnalysis.collapsed ? "展开建议" : "折叠建议";
+  refs.creationReferenceAnalysisToggleButton.textContent = state.creationReferenceAnalysis.collapsed ? "展开结果" : "收起结果";
   refs.creationReferenceAnalysisPanel.classList.toggle("is-collapsed", state.creationReferenceAnalysis.collapsed);
   refs.creationReferenceAnalysisSummary.classList.toggle("hidden", state.creationReferenceAnalysis.collapsed);
   refs.creationReferenceAnalysisMeta.classList.toggle("hidden", state.creationReferenceAnalysis.collapsed);
@@ -11073,7 +11262,7 @@ function renderCreationReferenceAnalysis() {
     item.appendChild(title);
 
     const note = document.createElement("p");
-    note.textContent = entry.note || "可应用到参考图用途。";
+    note.textContent = entry.note || "已应用到参考图用途。";
     item.appendChild(note);
 
     if (entry.roleCorrectionReason) {
@@ -11152,16 +11341,15 @@ async function analyzeCreationReferenceImages() {
 
     creationReferenceAnalysisApplyGuard = () => requestToken === creationReferenceAnalysisRequestToken && referenceSnapshot === getCreationReferenceAnalysisSnapshot();
     // Compatibility shape retained for browser static contracts: applyCreationReferenceAnalysis(payload, { isCurrent })
-    const { matchedTemplate } = await applyCreationReferenceAnalysis(payload);
+    const { appliedMessage, matchedTemplate } = await applyCreationReferenceAnalysis(payload);
     creationReferenceAnalysisApplyGuard = null;
     if (requestToken !== creationReferenceAnalysisRequestToken || referenceSnapshot !== getCreationReferenceAnalysisSnapshot()) {
       return;
     }
-    const count = state.creationReferenceAnalysis.result?.recommendations?.length || 0;
     const categoryMessage = matchedTemplate
-      ? `，已切换到 ${matchedTemplate.categoryPath || matchedTemplate.label}`
+      ? ` 类目已切换到 ${matchedTemplate.categoryPath || matchedTemplate.label}。`
       : "";
-    setCreationReferenceAnalysisFeedback(`已识别 ${count} 张参考图用途建议${categoryMessage}，可点击应用建议。`, "success");
+    setCreationReferenceAnalysisFeedback(`${appliedMessage}${categoryMessage}`.trim(), "success");
   } catch (error) {
     if (requestToken !== creationReferenceAnalysisRequestToken || referenceSnapshot !== getCreationReferenceAnalysisSnapshot()) {
       return;
@@ -11186,7 +11374,6 @@ function renderCreationRolePicker() {
 
   const displayedPlanContext = getCreationDisplayedPlanContext();
   const compatibleImageTypes = getCreationCompatibleImageTypeState(displayedPlanContext.plan);
-  const isDisplayedQueueSnapshot = displayedPlanContext.readonly;
   if (compatibleImageTypes) {
     if (refs.creationRoleCount) {
       refs.creationRoleCount.textContent = `${compatibleImageTypes.enabledCount} / ${compatibleImageTypes.totalCount}`;
@@ -11202,7 +11389,6 @@ function renderCreationRolePicker() {
       input.type = "checkbox";
       input.value = slot.role;
       input.checked = slot.enabled !== false;
-      input.disabled = isDisplayedQueueSnapshot;
       input.dataset.creationPlanSlotKey = slot.slotKey;
 
       const text = document.createElement("span");
@@ -11211,6 +11397,14 @@ function renderCreationRolePicker() {
       label.append(input, text);
       refs.creationRoleGrid.appendChild(label);
     });
+    return;
+  }
+
+  if (displayedPlanContext.pending) {
+    if (refs.creationRoleCount) {
+      refs.creationRoleCount.textContent = "待刷新";
+    }
+    refs.creationRoleGrid.replaceChildren();
     return;
   }
 
@@ -11275,7 +11469,7 @@ async function restoreCurrentCreationPlatformRecommendations() {
     categorySignals: currentPayload.values.categorySignals,
     referenceCoverage: currentPayload.values.platformReferenceCoverage,
     evidence: currentPayload.values.platformEvidence,
-    skuSubjects: currentPlan.skuSubjects || buildCreationSkuSubjectPayload(),
+    skuSubjects: currentPlan.skuGenerationEnabled === false ? [] : currentPlan.skuSubjects || buildCreationSkuSubjectPayload(),
     infographicRebuildCount: currentPlan.infographicRebuildCount || 0,
     platformSetOverrides: {},
     platformItemOverrides: [],
@@ -11286,9 +11480,12 @@ async function restoreCurrentCreationPlatformRecommendations() {
     ...(previousItemsBySlotKey.get(item.slotKey) || {}),
     ...item,
   }));
-  const appendedItems = previousItems.filter(
-    (item) => item.itemKind !== "carousel" || item.role === "sku" || item.role === "infographic-rebuild",
-  );
+  const appendedItems = previousItems.filter((item) => {
+    if (item.itemKind === "carousel" && item.role !== "sku" && item.role !== "infographic-rebuild") return false;
+    if (item.itemKind === "sku" || item.role === "sku") return currentPlan.skuGenerationEnabled !== false;
+    if (item.itemKind === "infographic-rebuild" || item.role === "infographic-rebuild") return currentPlan.infographicRebuildEnabled === true;
+    return true;
+  });
   const restoredPlan = {
     ...cloneCreationPlanValue(currentPlan, {}),
     ...restored,
@@ -11301,21 +11498,38 @@ async function restoreCurrentCreationPlatformRecommendations() {
     items: [...restoredCarouselItems, ...appendedItems],
   };
   hydrateCreationEffectivePlan(restoredPlan);
-  const currentSet = getCreationCurrentSet();
-  if (currentSet) {
-    state.creation.currentSet = normalizeCreationSetForView({
-      ...currentSet,
+  const currentDraft = getCreationDraftSet();
+  if (currentDraft) {
+    const restoredDraft = normalizeCreationSetForView({
+      ...currentDraft,
       ...restoredPlan,
       effectivePlan: restoredPlan,
       items: restoredPlan.items,
       updatedAt: nowIso(),
     });
+    state.creation.draftSet = restoredDraft;
+    if (!state.creation.generating) state.creation.currentSet = restoredDraft;
   }
   renderCreationView();
-  await previewCreationPlan();
+  await requestCreationPlanPreview();
 }
 
 const creationPlanPreviewRequests = createCreationPlanPreviewRequestCoordinator();
+
+function requestCreationPlanPreview() {
+  return creationPlanPreviewRequests.track(previewCreationPlan());
+}
+
+async function waitForPendingCreationPlanPreview() {
+  await creationPlanPreviewRequests.waitForPending();
+}
+
+function refreshCreationPlanAfterSkuGenerationToggle() {
+  state.creation.planDirty = true;
+  renderCreationView();
+  if (!hasCreationPlanPreviewInput()) return;
+  requestCreationPlanPreview().catch((error) => setCreationFeedback(error.message, "error"));
+}
 
 function renderCreationPlatformPlan() {
   const displayedPlanContext = getCreationDisplayedPlanContext();
@@ -11324,29 +11538,24 @@ function renderCreationPlatformPlan() {
   const hasOverrides = Object.keys(payload.values.platformSetOverrides).length > 0 || payload.values.platformItemOverrides.length > 0;
   const plan = effectivePlan || null;
   const counts = getCreationPlatformPlanDisplayCounts(plan);
-  const isDisplayedQueueSnapshot = displayedPlanContext.readonly;
+  const isPlanPending = displayedPlanContext.pending;
 
   if (refs.creationPlanSummary) {
-    refs.creationPlanSummary.dataset.planState = hasOverrides ? "overridden" : "automatic";
+    refs.creationPlanSummary.dataset.planState = isPlanPending ? "pending" : hasOverrides ? "overridden" : "automatic";
     const stateLabel = refs.creationPlanSummary.querySelector("[data-creation-plan-state-label]");
-    if (stateLabel) stateLabel.textContent = hasOverrides ? "已覆盖" : "自动";
+    if (stateLabel) stateLabel.textContent = isPlanPending ? "待刷新" : hasOverrides ? "已覆盖" : "自动";
     refs.creationPlanSummary.dataset.summaryText = plan
       ? `${plan.platformLabel || formatCreationPlatformLabel(plan.platform)} 自动方案 · 轮播 ${counts.carouselImageCount} + SKU ${counts.skuImageCount} + 重构 ${counts.infographicRebuildCount} = 总计 ${counts.totalPlannedItemCount}`
-      : "预览后显示当前平台自动方案";
+      : `当前轮播 ${counts.carouselImageCount} 张，SKU、重构和总计待刷新`;
     const platformLabel = refs.creationPlanSummary.querySelector("#creationPlanPlatformLabel");
     if (platformLabel) platformLabel.textContent = plan?.platformLabel || (plan ? formatCreationPlatformLabel(plan.platform) : "");
-    [["#creationPlanCarouselCount", counts.carouselImageCount], ["#creationPlanSkuCount", counts.skuImageCount], ["#creationPlanRebuildCount", counts.infographicRebuildCount], ["#creationPlanTotalCount", counts.totalPlannedItemCount]].forEach(([selector, value]) => { const node = refs.creationPlanSummary.querySelector(selector); if (node) node.textContent = String(value); });
-  }
-  if (refs.creationPlanAdvancedToggle) {
-    const overrideCount = refs.creationPlanAdvancedToggle.querySelector("summary small");
-    const modifiedItemCount = Object.keys(payload.values.platformSetOverrides).length + payload.values.platformItemOverrides.length;
-    if (overrideCount) overrideCount.textContent = `${modifiedItemCount} 项修改`;
+    [["#creationPlanCarouselCount", counts.carouselImageCount], ["#creationPlanSkuCount", counts.skuImageCount], ["#creationPlanRebuildCount", counts.infographicRebuildCount], ["#creationPlanTotalCount", counts.totalPlannedItemCount]].forEach(([selector, value]) => { const node = refs.creationPlanSummary.querySelector(selector); if (node) node.textContent = value === null ? "待刷新" : String(value); });
   }
   if (refs.creationPlanRestoreButton) {
-    refs.creationPlanRestoreButton.disabled = !plan || !hasOverrides || state.creation.planning || isDisplayedQueueSnapshot;
+    refs.creationPlanRestoreButton.disabled = !plan || !hasOverrides || state.creation.planning || isPlanPending;
   }
   if (refs.creationPlanWarnings) {
-    const warnings = Array.isArray(plan?.warnings) ? plan.warnings : [];
+    const warnings = getVisibleCreationPlanWarnings(plan?.warnings);
     refs.creationPlanWarnings.replaceChildren(
       ...warnings.map((warning) => {
         const item = document.createElement("li");
@@ -11362,29 +11571,6 @@ function renderCreationPlatformPlan() {
     refs.creationPlanValidation.textContent = errors.length > 0
       ? errors.map((error) => String(error?.message || error)).filter(Boolean).join("；")
       : plan ? "计划已通过生成前约束校验" : ""; refs.creationPlanValidation.classList.toggle("hidden", !plan);
-  }
-  if (refs.creationPlanSlots) {
-    const planSlots = Array.isArray(plan?.slots) ? plan.slots : Array.isArray(plan?.items) ? plan.items : [];
-    const slots = planSlots.filter((item) => item.itemKind === "carousel");
-    refs.creationPlanSlots.replaceChildren(
-      ...slots.map((slot) => {
-        const item = document.querySelector("#creationPlanSlotTemplate")?.content?.firstElementChild?.cloneNode(true) || document.createElement("article");
-        item.dataset.creationPlanSlot = "true";
-        item.dataset.slotKey = slot.slotKey || slot.itemId;
-        const slotOverride = payload.values.platformItemOverrides.find((entry) => entry.slotKey === item.dataset.slotKey); item.dataset.overridden = String(Boolean(slotOverride));
-        item.querySelector("[data-creation-plan-order]")?.replaceChildren(document.createTextNode(String(slot.slotIndex)));
-        item.querySelector("[data-creation-plan-overridden]")?.classList.toggle("hidden", item.dataset.overridden !== "true");
-        item.querySelector("[data-creation-plan-enabled]")?.toggleAttribute("checked", slot.enabled !== false);
-        item.querySelectorAll("[data-creation-plan-field]").forEach((field) => { const key = field.dataset.creationPlanField; if (field.tagName === "TEXTAREA") field.value = String(slotOverride?.[key] ?? slot[key] ?? ""); else applyCreationPlanFieldOptions(field, buildCreationPlanFieldOptions(key, { imageTypes: state.creationPlatformPoliciesModule?.listCreationPlatformImageTypes?.() || [], ratios: getVisibleRatios() }), slotOverride?.[key]); });
-        return item;
-      }),
-    );
-  }
-  if (refs.creationPlanAdvancedToggle) {
-    refs.creationPlanAdvancedToggle.dataset.readonly = String(isDisplayedQueueSnapshot);
-    refs.creationPlanAdvancedToggle.querySelectorAll("button, input, select, textarea").forEach((control) => {
-      control.disabled = isDisplayedQueueSnapshot;
-    });
   }
 }
 
@@ -11437,7 +11623,7 @@ function renderCreationView() {
   }
   if (refs.creationPlanButton) {
     refs.creationPlanButton.textContent = state.creation.planning ? "预览中..." : "预览计划";
-    refs.creationPlanButton.disabled = state.creation.generating || state.creation.planning;
+    refs.creationPlanButton.disabled = state.creation.planning;
   }
   refs.creationProgressText.textContent = `${progress.completed} / ${progress.total}`;
   renderCreationRolePicker();
@@ -11458,32 +11644,8 @@ function renderCreationView() {
   renderCreationQueueStrip();
   renderCreationRecordDetail(currentSet);
 
-  refs.creationPromptEditorLayer?.replaceChildren();
   syncCreationResultGrid(items, { showActions: showCreationResultActions });
   renderCreationListingDrafts({ refs: getCreationInlineListingRefs(), state, set: currentSet });
-}
-
-function getCreationPlanOverrides() {
-  const currentSet = getCreationCurrentSet();
-  if (!currentSet?.items?.length) {
-    return [];
-  }
-
-  return currentSet.items
-    .map((item) => {
-      const prompt = getCreationItemDraft(item.itemId, currentSet);
-      if (!prompt) {
-        return null;
-      }
-
-      return {
-        itemId: item.itemId,
-        role: item.role,
-        slotIndex: item.slotIndex,
-        prompt,
-      };
-    })
-    .filter(Boolean);
 }
 
 function getCreationPlanPreviewImageCount(selectedRoles = getCreationSelectedRoles()) { return isCreationZeroImageCountMode() ? 0 : selectedRoles.length || getCreationSelectedImageCount(); }
@@ -11492,9 +11654,7 @@ function buildCreationPlanPreviewFormData() {
   const formData = new FormData();
   const effectivePlan = getFrozenCreationEffectivePlan();
   const frozenPayload = getFrozenCreationPlatformPayload();
-  const targetLanguage = effectivePlan?.targetLanguage
-    ? { value: effectivePlan.targetLanguage, label: effectivePlan.targetLanguageLabel || effectivePlan.targetLanguage }
-    : getCreationSelectedLanguage();
+  const targetLanguage = getCreationSelectedLanguage();
   const selectedRoles = getCreationSelectedRoles();
 
   formData.set("productName", refs.creationProductNameInput.value.trim());
@@ -11504,19 +11664,13 @@ function buildCreationPlanPreviewFormData() {
   formData.set("dimensionUnitMode", refs.creationDimensionUnitModeInput.value || "both");
   formData.set("targetLanguage", targetLanguage.value);
   formData.set("imageCount", String(getCreationPlanPreviewImageCount(selectedRoles)));
-  formData.set("infographicRebuildEnabled", String(isCreationInfographicRebuildRequired() || refs.creationInfographicRebuildEnabledInput?.checked !== false));
+  formData.set("skuGenerationEnabled", String(refs.creationSkuGenerationEnabledInput?.checked !== false));
+  formData.set("infographicRebuildEnabled", String(isCreationInfographicRebuildRequired() || refs.creationInfographicRebuildEnabledInput?.checked === true));
   formData.set("platform", getCreationSelectedPlatform().value);
-  if (effectivePlan?.requestedPlatform || effectivePlan?.platform) {
-    formData.set("platform", effectivePlan.requestedPlatform || effectivePlan.platform);
-  }
   formData.set("industryTemplate", refs.creationIndustryTemplateInput.value);
-  if (effectivePlan?.industryTemplate) formData.set("industryTemplate", effectivePlan.industryTemplate);
   formData.set("selectedRoles", JSON.stringify(getCreationSelectedRoles()));
   formData.set("referenceImageRoles", JSON.stringify(buildCreationReferenceRolePayload()));
   formData.set("skuSubjects", JSON.stringify(buildCreationSkuSubjectPayload()));
-  if (effectivePlan?.skuSubjects) {
-    formData.set("skuSubjects", JSON.stringify(effectivePlan.skuSubjects));
-  }
   formData.set("skuBundleCount", refs.creationSkuBundleCountInput?.value || "1");
   formData.set("skuGenerationRule", getCreationSelectedSkuGenerationRule().value);
   formData.set("logoOptions", JSON.stringify(getCreationLogoPayload()));
@@ -11527,7 +11681,6 @@ function buildCreationPlanPreviewFormData() {
   );
   if (audienceStrategy) formData.set("audienceStrategy", JSON.stringify(audienceStrategy));
   appendFrozenCreationPlatformPayload(formData);
-  formData.set("planOverrides", JSON.stringify(getCreationPlanOverrides()));
 
   const roleSubmission = resolveCreationSelectedRolesSubmission({
     effectivePlan,
@@ -11542,8 +11695,25 @@ function buildCreationPlanPreviewFormData() {
   if (!Object.prototype.hasOwnProperty.call(frozenPayload.values.platformSetOverrides, "targetLanguage")) {
     formData.delete("targetLanguage");
   }
+  if (frozenPayload.values.platformSetOverrides.ratio) {
+    formData.set("ratio", frozenPayload.values.platformSetOverrides.ratio);
+  }
+  if (frozenPayload.values.platformSetOverrides.resolutionTier) {
+    formData.set("resolutionTier", frozenPayload.values.platformSetOverrides.resolutionTier);
+  }
 
   return formData;
+}
+
+function getArticleIllustrationPlanSnapshot() {
+  return JSON.stringify({
+    title: refs.articleIllustrationTitleInput.value.trim(),
+    sourceText: refs.articleIllustrationSourceTextInput.value.trim(),
+    supplementalPrompt: refs.articleIllustrationSupplementInput.value.trim(),
+    contentType: refs.articleIllustrationContentTypeInput.value || "auto",
+    stylePreset: refs.articleIllustrationStylePresetInput.value || DEFAULT_ARTICLE_ILLUSTRATION_STYLE_PRESET,
+    files: state.articleIllustration.files.map((item) => item.file ? buildReferenceFingerprint(item.file) : ""),
+  });
 }
 
 function buildCreationFormData() {
@@ -11600,42 +11770,40 @@ function buildCreationLogoBatchFormData() {
   return formData;
 }
 
-function applyCreationRepairTargetFormFields(formData, set = {}) { Object.entries({ productName: set.productName || "", productDescription: set.productDescription || "", sellingPoints: Array.isArray(set.sellingPoints) ? set.sellingPoints.join("\n") : String(set.sellingPoints || ""), dimensionSpecs: set.dimensionSpecs || "", dimensionUnitMode: set.dimensionUnitMode || "both", targetLanguage: set.targetLanguage || "en", platform: set.platform || "universal", scenario: set.scenario || "standard", visualLanguage: set.visualLanguage || "classic-commercial", industryTemplate: set.industryTemplate || "general", selectedRoles: JSON.stringify(Array.isArray(set.selectedRoles) ? set.selectedRoles : []), infographicRebuildEnabled: String(set.infographicRebuildEnabled !== false), skuSubjects: JSON.stringify(Array.isArray(set.skuSubjects) ? set.skuSubjects : []), skuBundleCount: String(set.skuBundleCount || 1), skuGenerationRule: set.skuGenerationRule || DEFAULT_CREATION_SKU_GENERATION_RULE, logoOptions: JSON.stringify(set.logo || null) }).forEach(([key, value]) => formData.set(key, value)); }
+function applyCreationRepairTargetFormFields(formData, set = {}) { Object.entries({ productName: set.productName || "", productDescription: set.productDescription || "", sellingPoints: Array.isArray(set.sellingPoints) ? set.sellingPoints.join("\n") : String(set.sellingPoints || ""), dimensionSpecs: set.dimensionSpecs || "", dimensionUnitMode: set.dimensionUnitMode || "both", targetLanguage: set.targetLanguage || "en", platform: set.platform || "universal", scenario: set.scenario || "standard", visualLanguage: set.visualLanguage || "classic-commercial", industryTemplate: set.industryTemplate || "general", selectedRoles: JSON.stringify(Array.isArray(set.selectedRoles) ? set.selectedRoles : []), skuGenerationEnabled: String(set.skuGenerationEnabled !== false), infographicRebuildEnabled: String(set.infographicRebuildEnabled === true), skuSubjects: JSON.stringify(Array.isArray(set.skuSubjects) ? set.skuSubjects : []), skuBundleCount: String(set.skuBundleCount || 1), skuGenerationRule: set.skuGenerationRule || DEFAULT_CREATION_SKU_GENERATION_RULE, logoOptions: JSON.stringify(set.logo || null) }).forEach(([key, value]) => formData.set(key, value)); }
+
+function shouldUseCreationRepairDraftFiles(set = {}) {
+  const setId = String(set.setId || "");
+  return Boolean(setId && setId === String(getCreationDraftSet()?.setId || ""));
+}
 
 function buildCreationRepairFormData({ itemId = "", scope = "incomplete", set = getCreationRepairTargetSet() } = {}) {
-  const formData = new FormData(), currentSet = set ? normalizeCreationSetForView(set) : getCreationCurrentSet();
-  const shouldUseQueueTargetFields = Boolean(currentSet?.setId && currentSet.setId !== String(getCreationCurrentSet()?.setId || ""));
+  const formData = new FormData();
+  const currentSet = set ? normalizeCreationSetForView(set) : getCreationCurrentSet();
+  const useDraftFiles = shouldUseCreationRepairDraftFiles(currentSet);
+  const snapshotItem = currentSet?.items.find((item) => !itemId || item.itemId === itemId) || currentSet?.items[0] || {};
 
   formData.set("setId", currentSet?.setId || "");
-  for (const [key, value] of buildCreationPlanPreviewFormData().entries()) formData.set(key, value);
-  if (shouldUseQueueTargetFields) {
-    applyCreationRepairTargetFormFields(formData, currentSet);
-  }
+  applyCreationRepairTargetFormFields(formData, currentSet);
   if (itemId) {
     formData.set("itemId", itemId);
-    const promptOverride = getCreationItemDraft(itemId, currentSet);
-    if (promptOverride) {
-      formData.set("promptOverride", promptOverride);
-    }
   } else {
     formData.set("scope", scope);
   }
-  formData.set("format", normalizeOutputFormat(refs.creationOutputFormatInput.value || state.config?.defaults?.format || "png"));
-  formData.set("ratio", refs.creationRatioInput.value || DEFAULT_UI_RATIO);
-  formData.set("size", refs.creationSizeInput.value || "auto");
-  formData.set("reasoningEffort", refs.reasoningEffortInput.value || state.config?.defaults?.reasoningEffort || "xhigh");
+  formData.set("format", normalizeOutputFormat(snapshotItem.format || "png"));
+  formData.set("ratio", snapshotItem.ratio || DEFAULT_UI_RATIO);
+  formData.set("size", snapshotItem.effectiveSize || snapshotItem.requestedSize || snapshotItem.size || "auto");
+  formData.set("reasoningEffort", snapshotItem.reasoningEffort || "xhigh");
   formData.set("clientSessionId", state.clientSessionId);
-  formData.set("referenceImageRoles", JSON.stringify(getCreationRepairReferenceRolePayload(currentSet)));
-  state.creationReferenceFiles.forEach((item) => {
-    const file = getCreationReferenceGenerationFile(item);
-    if (file) {
-      formData.append("referenceImages", file);
-    }
-  });
-  formData.set("logoOptions", JSON.stringify(getCreationLogoPayload()));
-  const logoFile = getCreationLogoGenerationFile();
-  if (logoFile) {
-    formData.append("logoImage", logoFile);
+  formData.set("referenceImageRoles", JSON.stringify(useDraftFiles ? getCreationRepairReferenceRolePayload(currentSet) : currentSet?.referenceImageRoles || []));
+  if (useDraftFiles) {
+    state.creationReferenceFiles.forEach((item) => {
+      const file = getCreationReferenceGenerationFile(item);
+      if (file) formData.append("referenceImages", file);
+    });
+    formData.set("logoOptions", JSON.stringify(getCreationLogoPayload()));
+    const logoFile = getCreationLogoGenerationFile();
+    if (logoFile) formData.append("logoImage", logoFile);
   }
   appendCurrentConfigToFormData(formData);
 
@@ -11808,7 +11976,7 @@ async function runCreationStream(response, context = {}) {
 
 async function runCreationQueuedRepairRequest(queueJob, { itemId = "", scope = "incomplete", set } = {}) {
   const currentSet = set ? normalizeCreationSetForView(set) : normalizeCreationSetForView(queueJob?.set);
-  const body = buildCreationQueuedRepairFormData(queueJob, { itemId, promptOverride: itemId ? getCreationItemDraft(itemId, currentSet) : "", scope, set: currentSet });
+  const body = buildCreationQueuedRepairFormData(queueJob, { itemId, scope, set: currentSet });
   const response = await fetch("/api/creation/repair", { method: "POST", body });
   if (response.status === 404) throw new Error("当前部署不支持套图补图。");
   if (!response.ok || !response.body) throw new Error("套图补图请求失败");
@@ -11816,14 +11984,14 @@ async function runCreationQueuedRepairRequest(queueJob, { itemId = "", scope = "
   await loadCreationSets();
 }
 
-async function runCreationRepairRequest({ itemId = "", scope = "incomplete", set = getCreationRepairTargetSet() } = {}) {
+async function runCreationRepairRequest({ itemId = "", scope = "incomplete", set = getCreationRepairTargetSet(), streamContext = null } = {}) {
   const currentSet = set ? normalizeCreationSetForView(set) : getCreationRepairTargetSet(), queueJob = getCreationQueueJobForSet(currentSet);
-  if (queueJob?.formData && typeof queueJob.formData.entries === "function") { await runCreationQueuedRepairRequest(queueJob, { itemId, scope, set: currentSet }); return; }
-  await ensureCreationReferenceGenerationFilesReady();
+  if (!streamContext && queueJob?.formData && typeof queueJob.formData.entries === "function") { await runCreationQueuedRepairRequest(queueJob, { itemId, scope, set: currentSet }); return; }
+  if (shouldUseCreationRepairDraftFiles(currentSet)) await ensureCreationReferenceGenerationFilesReady();
   const response = await fetch("/api/creation/repair", { method: "POST", body: buildCreationRepairFormData({ itemId, scope, set: currentSet }) });
   if (response.status === 404) throw new Error("当前部署不支持套图补图。");
   if (!response.ok || !response.body) throw new Error("套图补图请求失败");
-  await runCreationStream(response);
+  await runCreationStream(response, streamContext || {});
   await loadCreationSets();
 }
 async function runCreationAutoRepairIfNeeded(set = getCreationCurrentSet()) {
@@ -11862,10 +12030,20 @@ async function runCreationQueuedAutoRepairIfNeeded(queueJob) {
 }
 
 async function loadCreationSets() {
-  const response = await fetch("/api/creation/sets", {
-    cache: "no-store",
-  });
+  state.assetLoading.creation = true;
+  state.assetLoadErrors.creation = "";
+  renderCreationRecordView();
+  let response;
+  try {
+    response = await fetch("/api/creation/sets", { cache: "no-store" });
+  } catch (error) {
+    state.assetLoading.creation = false;
+    state.assetLoadErrors.creation = error instanceof Error ? error.message : String(error);
+    renderCreationRecordView();
+    throw error;
+  }
   if (response.status === 404) {
+    state.assetLoading.creation = false;
     state.creation.sets = [];
     state.creation.recordSetId = "";
     renderCreationView();
@@ -11874,6 +12052,9 @@ async function loadCreationSets() {
   }
 
   if (!response.ok) {
+    state.assetLoading.creation = false;
+    state.assetLoadErrors.creation = "读取套图记录失败";
+    renderCreationRecordView();
     throw new Error("读取套图记录失败");
   }
 
@@ -11881,6 +12062,8 @@ async function loadCreationSets() {
   const nextSets = Array.isArray(payload) ? payload.map(normalizeCreationSetForView).filter(Boolean) : [];
   const currentSetId = state.creation.currentSet?.setId || "";
   state.creation.sets = nextSets;
+  state.assetLoading.creation = false;
+  state.assetLoadErrors.creation = "";
   if (currentSetId) {
     const matchedCurrentSet = nextSets.find((set) => set.setId === currentSetId);
     if (matchedCurrentSet) {
@@ -11894,11 +12077,15 @@ async function loadCreationSets() {
   renderCreationRecordView();
 }
 
-async function previewCreationPlan() {
-  if (state.creation.generating) {
-    return;
-  }
+function hasCreationPlanPreviewInput() {
+  return Boolean(
+    refs.creationProductNameInput.value.trim() ||
+    refs.creationProductDescriptionInput.value.trim() ||
+    getCreationSellingPoints(refs.creationSellingPointsInput.value).length > 0
+  );
+}
 
+async function previewCreationPlan() {
   clearError();
   setCreationFeedback("");
 
@@ -11932,7 +12119,7 @@ async function previewCreationPlan() {
     const plan = payload.plan || {};
     const effectivePlan = hydrateCreationEffectivePlan(plan);
     const createdAt = nowIso();
-    const previousDraft = isCreationDraftSet() ? getCreationCurrentSet() : null;
+    const previousDraft = getCreationDraftSet();
     const items = Array.isArray(plan.items)
       ? plan.items.map((item, index) => ({
           ...item,
@@ -11942,7 +12129,7 @@ async function previewCreationPlan() {
       : [];
     const planImageCount = getFiniteCreationImageCount(plan.imageCount);
 
-    state.creation.currentSet = normalizeCreationSetForView({
+    const nextDraftSet = normalizeCreationSetForView({
       ...effectivePlan,
       setId: previousDraft?.setId || `creation-draft-${Date.now()}`,
       productName: plan.productName || productName,
@@ -11977,8 +12164,11 @@ async function previewCreationPlan() {
       effectivePlan,
       items,
     });
-    state.creation.editingItemId = "";
-    setCreationFeedback(`已生成 ${items.length} 张套图计划，可以先微调再正式生成。`, "success");
+    state.creation.draftSet = nextDraftSet;
+    if (!state.creation.generating) {
+      state.creation.currentSet = nextDraftSet;
+    }
+    setCreationFeedback(`已生成 ${items.length} 张套图计划。`, "success");
   } catch (error) {
     if (error?.name === "AbortError" || !creationPlanPreviewRequests.isCurrent(request.revision)) return;
     const message = compactErrorMessage(error instanceof Error ? error.message : String(error), "套图计划生成失败");
@@ -12015,7 +12205,6 @@ async function startCreationLogoBatchGeneration() {
 
   state.creation.generating = true;
   state.creation.generationScope = "logo-batch";
-  state.creation.editingItemId = "";
   renderCreationView();
 
   try {
@@ -12068,7 +12257,7 @@ async function startCreationLogoBatchGeneration() {
   }
 }
 
-function buildCreationQueuedSet(input = {}) { return { ...buildCreationQueuedSetFromState({ ...input, buildCreationReferenceRolePayload, buildCreationSkuSubjectPayload, creationState: state.creation, formatCreationDimensionUnitModeLabel, formatCreationVisualLanguageLabel: (value) => CREATION_VISUAL_LANGUAGE_LABELS[normalizeCreationVisualLanguage(value)], getCreationCurrentSet, getFrozenCreationEffectivePlan, getCreationLogoPayload, getCreationPreviewSlots, getCreationSelectedDimensionUnitMode, getCreationSelectedImageCount, getCreationSelectedIndustryTemplate, getCreationSelectedLanguage, getCreationSelectedPlatform, getCreationSelectedRoles, getCreationSelectedScenario, getCreationSelectedSkuGenerationRule, isCreationDraftSet, normalizeCreationSkuBundleCountForPayload, normalizeCreationVisualLanguage, normalizeSet: normalizeCreationSetForView, referenceFiles: state.creationReferenceFiles, refs }), listingAgentEnabled: Boolean(refs.creationListingAgentEnabledInput?.checked) }; }
+function buildCreationQueuedSet(input = {}) { return { ...buildCreationQueuedSetFromState({ ...input, buildCreationReferenceRolePayload, buildCreationSkuSubjectPayload, creationState: state.creation, formatCreationDimensionUnitModeLabel, formatCreationVisualLanguageLabel: (value) => CREATION_VISUAL_LANGUAGE_LABELS[normalizeCreationVisualLanguage(value)], getCreationCurrentSet, getCreationDraftSet, getFrozenCreationEffectivePlan, getCreationLogoPayload, getCreationPreviewSlots, getCreationSelectedDimensionUnitMode, getCreationSelectedImageCount, getCreationSelectedIndustryTemplate, getCreationSelectedLanguage, getCreationSelectedPlatform, getCreationSelectedRoles, getCreationSelectedScenario, getCreationSelectedSkuGenerationRule, isCreationDraftSet, normalizeCreationSkuBundleCountForPayload, normalizeCreationVisualLanguage, normalizeSet: normalizeCreationSetForView, referenceFiles: state.creationReferenceFiles, refs }), listingAgentEnabled: Boolean(refs.creationListingAgentEnabledInput?.checked) }; }
 
 function enqueueCreationGeneration({ formData, set }) {
   const job = createCreationQueueJob({ creationState: state.creation, formData, set, normalizeSet: normalizeCreationSetForView, nowIso });
@@ -12092,6 +12281,7 @@ async function startCreationGeneration(event) {
     await startCreationLogoBatchGeneration();
     return;
   }
+  await waitForPendingCreationPlanPreview();
   if (state.creation.planning) {
     return;
   }
@@ -12107,6 +12297,14 @@ async function startCreationGeneration(event) {
     setCreationFeedback(message, "error");
     showError(message);
     return;
+  }
+
+  if (state.creation.planDirty || !getFrozenCreationEffectivePlan()) {
+    await requestCreationPlanPreview();
+    const refreshedEffectivePlan = getFrozenCreationEffectivePlan();
+    if (state.creation.planDirty || !refreshedEffectivePlan || refreshedEffectivePlan.canGenerate === false) {
+      return;
+    }
   }
 
   try {
@@ -12154,7 +12352,6 @@ async function repairCreationItems({ itemId = "", scope = "incomplete" } = {}) {
   }
   state.creation.generating = true;
   state.creation.generationScope = itemId ? "single" : "repair";
-  state.creation.editingItemId = "";
   state.creation.repairingItemId = String(itemId || "");
   state.creation.currentSet = normalizeCreationSetForView(currentSet);
   syncActiveCreationQueueSet(state.creation.currentSet);
@@ -12460,6 +12657,7 @@ function applyPortraitReferenceFiles(fileList, bucket = "person", options = {}) 
     fingerprints.add(fingerprint);
   }
 
+  portraitReferenceAnalysis.invalidate({ clearResult: true });
   state.portrait[config.filesKey] = next;
   if (!state.portrait.generating && !state.portrait.planning) {
     state.portrait.currentSet = null;
@@ -12639,6 +12837,10 @@ function removePortraitActionReferenceFile(referenceId) {
 function removePortraitReferenceFileFromBucket(referenceId, bucket = "person") {
   const config = getPortraitReferenceBucketConfig(bucket);
   const target = state.portrait[config.filesKey].find((item) => item.id === referenceId);
+  if (!target) {
+    return;
+  }
+  portraitReferenceAnalysis.invalidate({ clearResult: true });
   if (target?.previewUrl) {
     URL.revokeObjectURL(target.previewUrl);
   }
@@ -12705,6 +12907,9 @@ function renderPortraitReferenceGridForBucket(bucket = "person") {
 function buildPortraitFormData({ includeFiles = true, repair = false, includeActionFiles = true, includeAccessoryFiles = true } = {}) {
   const formData = new FormData();
   const currentSet = getPortraitCurrentSet();
+  const appliedAnalysis = state.portrait.referenceAnalysis.applied
+    ? state.portrait.referenceAnalysis.result || {}
+    : currentSet?.analysis || {};
   formData.set("subjectName", "");
   formData.set("subjectSummary", refs.portraitSubjectSummaryInput?.value.trim() || "");
   formData.set("imageCount", String(clampPortraitImageCount(refs.portraitImageCountInput?.value || currentSet?.imageCount || "12")));
@@ -12718,7 +12923,7 @@ function buildPortraitFormData({ includeFiles = true, repair = false, includeAct
   formData.set("ratio", refs.portraitRatioInput?.value || DEFAULT_PORTRAIT_RATIO);
   formData.set("size", refs.portraitSizeInput?.value || "auto");
   formData.set("format", normalizeOutputFormat(refs.portraitOutputFormatInput?.value || state.config?.defaults?.format || "png"));
-  formData.set("analysis", JSON.stringify(currentSet?.analysis || {}));
+  formData.set("analysis", JSON.stringify(appliedAnalysis));
   formData.set("reasoningEffort", refs.reasoningEffortInput?.value || state.config?.defaults?.reasoningEffort || "xhigh");
   formData.set("clientSessionId", state.clientSessionId);
   if (repair && currentSet?.setId) {
@@ -12749,7 +12954,7 @@ function buildPortraitFormData({ includeFiles = true, repair = false, includeAct
   return formData;
 }
 
-function buildPortraitRepairFormData({ itemId = "", scope = "failed" } = {}) { const formData = buildPortraitFormData({ includeFiles: true, repair: true }); formData.set(itemId ? "itemId" : "scope", itemId || scope || "failed"); return formData; }
+function buildPortraitRepairFormData({ itemId = "", scope = "failed" } = {}) { const currentSet = getPortraitCurrentSet(); const formData = buildPortraitFormData({ includeFiles: true, repair: true }); if (currentSet?.ratio) formData.set("ratio", currentSet.ratio); if (currentSet?.size) formData.set("size", currentSet.size); if (currentSet?.format) formData.set("format", currentSet.format); formData.set(itemId ? "itemId" : "scope", itemId || scope || "failed"); return formData; }
 
 function getPortraitReferenceFileNames() {
   return [...state.portrait.files, ...state.portrait.actionFiles, ...state.portrait.accessoryFiles]
@@ -12923,6 +13128,7 @@ function renderPortraitView() {
 
   portraitLocationController.render();
   renderPortraitReferenceGrid();
+  portraitReferenceAnalysis.render();
   renderPortraitAccessoryAssetLibrary();
   renderPortraitDetail(currentSet);
 
@@ -12946,6 +13152,7 @@ async function previewPortraitPlan() {
     return;
   }
   state.portrait.planning = true;
+  const planSnapshot = getPortraitPlanSnapshot();
   setPortraitFeedback("正在生成写真分镜计划...", "busy");
   renderPortraitView();
   try {
@@ -12954,6 +13161,10 @@ async function previewPortraitPlan() {
       body: buildPortraitFormData({ includeFiles: false }),
     });
     const payload = await response.json().catch(() => ({}));
+    if (planSnapshot !== getPortraitPlanSnapshot()) {
+      setPortraitFeedback("写真参数已变化，请重新预览计划。", "busy");
+      return;
+    }
     if (!response.ok) {
       throw new Error(payload.message || "写真计划生成失败");
     }
@@ -13049,7 +13260,7 @@ function handlePortraitStreamEvent(eventName, payload = {}) {
   }
 }
 
-async function runPortraitStream(response) { await consumeSse(response.body, async (eventName, payload) => handlePortraitStreamEvent(eventName, payload)); }
+async function runPortraitStream(response) { return consumeSseUntilTerminal({ stream: response.body, consumeSse, onEvent: handlePortraitStreamEvent, missingTerminalMessage: "写真生成连接已中断，未收到完成事件。" }); }
 
 async function startPortraitGeneration(event) {
   event?.preventDefault();
@@ -13119,15 +13330,28 @@ async function repairPortraitItems({ itemId = "", scope = "failed" } = {}) {
 }
 
 async function loadPortraitSets() {
-  const response = await fetch("/api/portrait/sets", { cache: "no-store" });
-  if (response.status === 404) {
-    state.portrait.sets = []; state.portrait.recordSetId = ""; renderPortraitView(); renderPortraitRecordView(); return;
+  state.assetLoading.portrait = true;
+  state.assetLoadErrors.portrait = "";
+  renderPortraitRecordView();
+  let response;
+  try {
+    response = await fetch("/api/portrait/sets", { cache: "no-store" });
+  } catch (error) {
+    state.assetLoading.portrait = false;
+    state.assetLoadErrors.portrait = error instanceof Error ? error.message : String(error);
+    renderPortraitRecordView();
+    throw error;
   }
-  if (!response.ok) throw new Error("读取写真记录失败");
+  if (response.status === 404) {
+    state.assetLoading.portrait = false; state.portrait.sets = []; state.portrait.recordSetId = ""; renderPortraitView(); renderPortraitRecordView(); return;
+  }
+  if (!response.ok) { state.assetLoading.portrait = false; state.assetLoadErrors.portrait = "读取写真记录失败"; renderPortraitRecordView(); throw new Error("读取写真记录失败"); }
   const payload = await response.json();
   const nextSets = Array.isArray(payload) ? payload.map(normalizePortraitSetForView).filter(Boolean) : [];
   const currentSetId = state.portrait.currentSet?.setId || "";
   state.portrait.sets = nextSets;
+  state.assetLoading.portrait = false;
+  state.assetLoadErrors.portrait = "";
   if (currentSetId) {
     const matchedCurrentSet = nextSets.find((set) => set.setId === currentSetId);
     if (matchedCurrentSet) state.portrait.currentSet = normalizePortraitSetForView(matchedCurrentSet);
@@ -13313,9 +13537,13 @@ function reusePortraitRecordSet() {
   const selectedActions = new Set(selectedSet.selectedActions || []);
   refs.portraitActionInputs.forEach((input) => { input.checked = selectedActions.size > 0 ? selectedActions.has(input.value) : true; });
   portraitLocationController.setFromSelection(selectedSet.locationSelection || {});
+  portraitReferenceAnalysis.invalidate();
   revokePortraitReferenceFiles();
   state.portrait.files = []; state.portrait.actionFiles = []; state.portrait.accessoryFiles = [];
   state.portrait.currentSet = normalizePortraitSetForView(selectedSet);
+  state.portrait.referenceAnalysis.result = selectedSet.analysis || null;
+  state.portrait.referenceAnalysis.applied = Boolean(selectedSet.analysis);
+  state.portrait.referenceAnalysis.running = false;
   if (refs.portraitReferenceInput) refs.portraitReferenceInput.value = "";
   if (refs.portraitActionReferenceInput) refs.portraitActionReferenceInput.value = "";
   if (refs.portraitAccessoryReferenceInput) refs.portraitAccessoryReferenceInput.value = "";
@@ -13332,10 +13560,15 @@ function renderPortraitRecordSetList() {
   const selectedSet = getPortraitRecordSelectedSet();
   const selectedSetId = selectedSet?.setId || "";
   const sets = filterPortraitRecordSets().slice(0, 60);
-  if (sets.length === 0) {
+  refs.portraitRecordSetList.setAttribute("aria-busy", String(state.assetLoading.portrait));
+  if (state.assetLoading.portrait || state.assetLoadErrors.portrait || sets.length === 0) {
     const empty = document.createElement("div");
-    empty.className = "creation-record portrait-record";
-    empty.textContent = state.portrait.recordQuery ? "没有匹配的写真记录" : "暂无写真记录";
+    empty.className = "creation-record portrait-record asset-list-state";
+    empty.textContent = state.assetLoading.portrait
+      ? "正在加载写真记录..."
+      : state.assetLoadErrors.portrait
+        ? `加载失败：${state.assetLoadErrors.portrait}`
+        : state.portrait.recordQuery ? "没有匹配的写真记录" : "暂无写真记录";
     refs.portraitRecordSetList.appendChild(empty);
     return;
   }
@@ -13345,6 +13578,8 @@ function renderPortraitRecordSetList() {
     button.className = "creation-record portrait-record";
     button.dataset.portraitRecordSetId = set.setId;
     button.classList.toggle("active", set.setId === selectedSetId);
+    button.setAttribute("role", "option");
+    button.setAttribute("aria-selected", String(set.setId === selectedSetId));
 
     const title = document.createElement("strong");
     title.className = "creation-record-title";
@@ -13354,8 +13589,13 @@ function renderPortraitRecordSetList() {
     const meta = document.createElement("span");
     meta.className = "creation-record-meta";
     const progress = getPortraitProgressSummary(set);
-    meta.textContent = `${formatPortraitStyleSummary(set)} · ${progress.completed}/${progress.total} · ${formatClock(set.createdAt)}`;
+    meta.textContent = [formatPortraitStyleSummary(set), set.locationName, `${progress.completed}/${progress.total}`, formatTime(set.updatedAt || set.createdAt)].filter(Boolean).join(" · ");
     button.appendChild(meta);
+    const status = document.createElement("span");
+    status.className = "asset-record-status";
+    status.dataset.state = progress.failed > 0 ? "failed" : progress.completed >= progress.total && progress.total > 0 ? "completed" : "running";
+    status.textContent = progress.failed > 0 ? `${progress.failed} 项失败` : progress.completed >= progress.total && progress.total > 0 ? "已完成" : "生成中";
+    button.appendChild(status);
     refs.portraitRecordSetList.appendChild(button);
   });
 }
@@ -13410,6 +13650,7 @@ function renderPortraitRecordView() {
   if (refs.portraitRecordCopyPromptsButton) refs.portraitRecordCopyPromptsButton.disabled = !buildPortraitRecordPromptText(selectedSet);
   if (refs.portraitRecordExportPromptsButton) refs.portraitRecordExportPromptsButton.disabled = !buildPortraitRecordPromptText(selectedSet);
   if (refs.portraitRecordExportManifestButton) refs.portraitRecordExportManifestButton.disabled = !selectedSet;
+  if (refs.portraitRecordSelection) refs.portraitRecordSelection.textContent = selectedSet ? getPortraitSetDisplayTitle(selectedSet) : "尚未选择";
 
   renderPortraitRecordSetList();
   state.portrait.recordSetId = selectedSet?.setId || "";
@@ -13467,12 +13708,28 @@ function openPortraitRecordItemPreview(itemId) {
 }
 
 async function loadPptDecks() {
-  const response = await fetch("/api/ppt/decks");
+  state.assetLoading.ppt = true;
+  state.assetLoadErrors.ppt = "";
+  renderPptRecordView();
+  let response;
+  try {
+    response = await fetch("/api/ppt/decks");
+  } catch (error) {
+    state.assetLoading.ppt = false;
+    state.assetLoadErrors.ppt = error instanceof Error ? error.message : String(error);
+    renderPptRecordView();
+    throw error;
+  }
   if (!response.ok) {
+    state.assetLoading.ppt = false;
+    state.assetLoadErrors.ppt = "读取 PPT 历史失败";
+    renderPptRecordView();
     throw new Error("读取 PPT 历史失败");
   }
   const payload = await response.json();
   state.ppt.decks = Array.isArray(payload) ? payload : [];
+  state.assetLoading.ppt = false;
+  state.assetLoadErrors.ppt = "";
   renderPptView();
   renderPptRecordView();
 }
@@ -13607,8 +13864,10 @@ function createPptDeckRecordItem(deck) {
   const recordKey = getPptDeckRecordKey(deck);
   item.dataset.pptRecordKey = getPptDeckRecordKey(deck);
   item.tabIndex = 0;
+  item.setAttribute("role", "option");
   item.setAttribute("aria-label", `查看 ${deck.title || "PPT 记录"} 预览`);
   item.classList.toggle("is-selected", state.ppt.recordDetail.deckKey === recordKey);
+  item.setAttribute("aria-selected", String(state.ppt.recordDetail.deckKey === recordKey));
 
   const title = document.createElement("strong");
   title.textContent = deck.title || "未命名演示";
@@ -13626,6 +13885,14 @@ function createPptDeckRecordItem(deck) {
   source.className = "ppt-record-source";
   source.textContent = getPptDeckSourceLabel(deck);
   item.appendChild(source);
+
+  const status = document.createElement("span");
+  const pageCount = getPptDeckPageCount(deck);
+  const completedPages = Array.isArray(deck.slides) ? deck.slides.filter((slide) => getPptSlideImageUrl(slide)).length : pageCount;
+  status.className = "asset-record-status";
+  status.dataset.state = completedPages >= pageCount && pageCount > 0 ? "completed" : "running";
+  status.textContent = completedPages >= pageCount && pageCount > 0 ? "已完成" : `${completedPages}/${pageCount} 页`;
+  item.appendChild(status);
 
   const actions = document.createElement("div");
   actions.className = "ppt-record-card-actions";
@@ -13747,7 +14014,33 @@ function renderPptRecordDetail(deck) {
 
 function renderPptRecordView() {
   refs.pptRecordCount.textContent = `${state.ppt.decks.length} 个`;
-  refs.pptRecordEmpty.classList.toggle("hidden", state.ppt.decks.length > 0);
+  refs.pptRecordEmpty.classList.toggle("hidden", state.ppt.decks.length > 0 && !state.assetLoading.ppt && !state.assetLoadErrors.ppt);
+  refs.pptRecordEmpty.replaceChildren();
+  const emptyTitle = document.createElement("strong");
+  const emptyCopy = document.createElement("p");
+  const emptyAction = document.createElement("a");
+  emptyAction.className = "toolbar-button asset-primary-action";
+  if (state.assetLoading.ppt) {
+    emptyTitle.textContent = "正在加载 PPT";
+    emptyCopy.textContent = "正在读取本地记录，请稍候。";
+    emptyAction.classList.add("hidden");
+  } else if (state.assetLoadErrors.ppt) {
+    emptyTitle.textContent = "PPT 记录加载失败";
+    emptyCopy.textContent = state.assetLoadErrors.ppt;
+    emptyAction.href = "#ppt-record";
+    emptyAction.textContent = "重新加载";
+    emptyAction.addEventListener("click", (event) => {
+      event.preventDefault();
+      loadPptDecks().catch((error) => showError(error.message));
+    });
+  } else {
+    emptyTitle.textContent = "暂无 PPT";
+    emptyCopy.textContent = "还没有找到本地 PPT 文件。";
+    emptyAction.href = "#ppt";
+    emptyAction.textContent = "前往 PPT 生成";
+  }
+  refs.pptRecordEmpty.append(emptyTitle, emptyCopy, emptyAction);
+  refs.pptRecordList.setAttribute("aria-busy", String(state.assetLoading.ppt));
   refs.pptRecordList.innerHTML = "";
 
   let selectedDeck = getPptRecordByKey(state.ppt.recordDetail.deckKey);
@@ -13756,6 +14049,7 @@ function renderPptRecordView() {
     state.ppt.recordDetail.slideNumber = 0;
     selectedDeck = null;
   }
+  if (refs.pptRecordSelection) refs.pptRecordSelection.textContent = selectedDeck?.title || selectedDeck?.pptxFilename || "尚未选择";
 
   state.ppt.decks.forEach((deck) => {
     refs.pptRecordList.appendChild(createPptDeckRecordItem(deck));
@@ -13969,6 +14263,7 @@ function updateJob(jobId, patch) {
 }
 
 function removeJob(jobId) {
+  state.locallyTerminatedGenerationTaskIds.add(jobId);
   state.jobs = state.jobs.filter((job) => job.id !== jobId);
 }
 
@@ -14081,7 +14376,7 @@ function normalizeGenerationTaskSnapshot(task) {
 
 function applyGenerationTaskSnapshots(tasks, { render = true } = {}) {
   const existingJobs = new Map(state.jobs.map((job) => [job.id, job]));
-  const snapshots = (Array.isArray(tasks) ? tasks : [])
+  const snapshots = filterLocallyTerminatedGenerationTaskSnapshots(tasks, state.locallyTerminatedGenerationTaskIds)
     .map(normalizeGenerationTaskSnapshot)
     .filter(Boolean)
     .map((snapshot) => {
@@ -14377,7 +14672,7 @@ function buildGenerationFormData(job) {
     formData.set("targetLanguage", job.targetLanguage);
     formData.set("targetLanguageLabel", job.targetLanguageLabel || job.targetLanguage);
   }
-  appendCurrentConfigToFormData(formData);
+  appendJobConfigToFormData(formData, job);
 
   if (job.mode === "quick-blend") {
     appendQuickBlendReferencesToFormData(formData, job);
@@ -14463,11 +14758,30 @@ async function handleCreationPlatformChange({ programmatic = false } = {}) {
   state.creation.platformSetOverrides = {};
   state.creation.platformItemOverrides = [];
   setFrozenCreationPlatformPayload({ platformSetOverrides: {}, platformItemOverrides: [] });
-  state.creation.effectivePlan = null;
-  state.creation.currentSet = null;
   state.creationRoleSelectionManuallyEdited = false;
-  renderCreationView();
-  await previewCreationPlan();
+  const nextProfile = getCreationPlatformImageCountProfile(nextPlatform);
+  syncCreationPlatformImageCountOptions({ preferredValue: nextProfile.recommendedImageCount });
+  syncCreationAutomaticPlatformControls(nextPlatform);
+  resetCreationDraftPreview();
+  await requestCreationPlanPreview();
+}
+
+function getPortraitPlanSnapshot() {
+  return JSON.stringify({
+    subjectSummary: refs.portraitSubjectSummaryInput?.value.trim() || "",
+    imageCount: clampPortraitImageCount(refs.portraitImageCountInput?.value, { write: false }),
+    selectedStyles: getPortraitSelectedStyles(),
+    selectedShotTypes: getPortraitSelectedShotTypes(),
+    selectedActions: getPortraitSelectedActions(),
+    customStyle: refs.portraitCustomStyleInput?.value.trim() || "",
+    location: portraitLocationController.getPayload().selection,
+    notes: refs.portraitNotesInput?.value.trim() || "",
+    ratio: refs.portraitRatioInput?.value || DEFAULT_PORTRAIT_RATIO,
+    size: refs.portraitSizeInput?.value || "auto",
+    format: refs.portraitOutputFormatInput?.value || "png",
+    analysis: state.portrait.referenceAnalysis.applied ? state.portrait.referenceAnalysis.result : null,
+    references: getPortraitReferenceFileNames(),
+  });
 }
 
 function invalidateCreationReferenceAnalysisRequest() { creationReferenceAnalysisAbortController?.abort(); creationReferenceAnalysisAbortController = null; creationReferenceAnalysisRequestToken += 1; state.creationReferenceAnalysis.running = false; }
@@ -14488,6 +14802,7 @@ function applyPromptAgentFile(fileList) {
     return;
   }
 
+  invalidatePromptAgentAnalysisRequest();
   revokePromptAgentPreview();
   state.promptAgent.file = file;
   state.promptAgent.previewUrl = URL.createObjectURL(file);
@@ -14495,6 +14810,18 @@ function applyPromptAgentFile(fileList) {
   refs.promptAgentImageInput.value = "";
   setPromptAgentFeedback("", "");
   renderPromptAgent();
+}
+
+function getPromptAgentAnalysisSnapshot() {
+  const file = state.promptAgent.file;
+  return file ? buildReferenceFingerprint(file) : "";
+}
+
+function invalidatePromptAgentAnalysisRequest() {
+  promptAgentAnalysisAbortController?.abort();
+  promptAgentAnalysisAbortController = null;
+  promptAgentAnalysisRequestToken += 1;
+  state.promptAgent.running = false;
 }
 
 async function buildPromptAgentFormData() {
@@ -14525,6 +14852,20 @@ async function buildReferenceAnalysisFormData() {
   return formData;
 }
 
+function getReferenceAnalysisRequestSnapshot() {
+  return JSON.stringify({
+    language: getReferenceAnalysisSelectedLanguage().value,
+    files: state.referenceAnalysis.files.map((item) => item.fingerprint || buildReferenceFingerprint(item.file)),
+  });
+}
+
+function invalidateReferenceAnalysisRequest() {
+  referenceAnalysisAbortController?.abort();
+  referenceAnalysisAbortController = null;
+  referenceAnalysisRequestToken += 1;
+  state.referenceAnalysis.running = false;
+}
+
 async function analyzePromptAgentImage() {
   clearError();
   if (!state.promptAgent.file) {
@@ -14532,16 +14873,30 @@ async function analyzePromptAgentImage() {
     return;
   }
 
+  const requestToken = promptAgentAnalysisRequestToken + 1;
+  promptAgentAnalysisRequestToken = requestToken;
+  promptAgentAnalysisAbortController?.abort();
+  const requestController = new AbortController();
+  promptAgentAnalysisAbortController = requestController;
+  const analysisSnapshot = getPromptAgentAnalysisSnapshot();
   state.promptAgent.running = true;
   setPromptAgentFeedback("正在分析图片...", "busy");
   renderPromptAgent();
 
   try {
+    const formData = await buildPromptAgentFormData();
+    if (requestToken !== promptAgentAnalysisRequestToken || analysisSnapshot !== getPromptAgentAnalysisSnapshot()) {
+      return;
+    }
     const response = await fetch("/api/prompt-agent/analyze", {
       method: "POST",
-      body: await buildPromptAgentFormData(),
+      signal: requestController.signal,
+      body: formData,
     });
     const payload = await response.json().catch(() => ({}));
+    if (requestToken !== promptAgentAnalysisRequestToken || analysisSnapshot !== getPromptAgentAnalysisSnapshot()) {
+      return;
+    }
     if (!response.ok) {
       throw new Error(payload.message || "图片分析失败。");
     }
@@ -14554,12 +14909,18 @@ async function analyzePromptAgentImage() {
     savePromptAgentResultAsTemplate(payload.item);
     setPromptAgentFeedback("已生成 JSON 提示词。", "success");
   } catch (error) {
+    if (requestToken !== promptAgentAnalysisRequestToken || analysisSnapshot !== getPromptAgentAnalysisSnapshot()) {
+      return;
+    }
     const message = error instanceof Error ? error.message : String(error);
     setPromptAgentFeedback(message, "error");
     showError(message);
   } finally {
-    state.promptAgent.running = false;
-    renderPromptAgent();
+    if (requestToken === promptAgentAnalysisRequestToken) {
+      promptAgentAnalysisAbortController = null;
+      state.promptAgent.running = false;
+      renderPromptAgent();
+    }
   }
 }
 
@@ -14570,16 +14931,30 @@ async function analyzeReferenceImages() {
     return;
   }
 
+  const requestToken = referenceAnalysisRequestToken + 1;
+  referenceAnalysisRequestToken = requestToken;
+  referenceAnalysisAbortController?.abort();
+  const requestController = new AbortController();
+  referenceAnalysisAbortController = requestController;
+  const analysisSnapshot = getReferenceAnalysisRequestSnapshot();
   state.referenceAnalysis.running = true;
   setReferenceAnalysisFeedback("正在分析参考图关系...", "busy");
   renderReferenceAnalysis();
 
   try {
+    const formData = await buildReferenceAnalysisFormData();
+    if (requestToken !== referenceAnalysisRequestToken || analysisSnapshot !== getReferenceAnalysisRequestSnapshot()) {
+      return;
+    }
     const response = await fetch("/api/prompt-agent/analyze", {
       method: "POST",
-      body: await buildReferenceAnalysisFormData(),
+      signal: requestController.signal,
+      body: formData,
     });
     const payload = await response.json().catch(() => ({}));
+    if (requestToken !== referenceAnalysisRequestToken || analysisSnapshot !== getReferenceAnalysisRequestSnapshot()) {
+      return;
+    }
     if (!response.ok) {
       throw new Error(payload.message || "参考图分析失败。");
     }
@@ -14596,12 +14971,18 @@ async function analyzeReferenceImages() {
     const promptCount = getReferenceAnalysisPrompts(payload.item).length;
     setReferenceAnalysisFeedback(`已生成 ${promptCount || 1} 条编排提示词。`, "success");
   } catch (error) {
+    if (requestToken !== referenceAnalysisRequestToken || analysisSnapshot !== getReferenceAnalysisRequestSnapshot()) {
+      return;
+    }
     const message = error instanceof Error ? error.message : String(error);
     setReferenceAnalysisFeedback(message, "error");
     showError(message);
   } finally {
-    state.referenceAnalysis.running = false;
-    renderReferenceAnalysis();
+    if (requestToken === referenceAnalysisRequestToken) {
+      referenceAnalysisAbortController = null;
+      state.referenceAnalysis.running = false;
+      renderReferenceAnalysis();
+    }
   }
 }
 
@@ -15197,27 +15578,6 @@ function handleStudioImagePaste(event) {
 
 function handleCreationReferenceImagePaste(event) { if (event.defaultPrevented || state.activeView !== "creation" || isCreationLogoBatchBranch()) return; const imageFiles = getClipboardImageFiles(event.clipboardData); if (imageFiles.length === 0) return; event.preventDefault(); applyCreationReferenceFiles(imageFiles); }
 
-function persistCreationPlatformSlotOrder(slotNodes) {
-  const slotKeys = [...slotNodes].map((node) => node.dataset?.slotKey || String(node || ""));
-  const overrides = buildCreationPlatformSlotOrderOverrides(getFrozenCreationPlatformPayload().values.platformItemOverrides, slotKeys);
-  setFrozenCreationPlatformPayload({ ...getFrozenCreationEffectivePlan(), platformItemOverrides: overrides });
-  return overrides;
-}
-
-function addCreationPlatformCustomSlot(afterSlotKey = "") {
-  const slotKeys = [...refs.creationPlanSlots.querySelectorAll("[data-creation-plan-slot]")]
-    .map((node) => node.dataset.slotKey)
-    .filter(Boolean);
-  const slotKey = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const overrides = insertCreationPlatformCustomSlotOverride(
-    getFrozenCreationPlatformPayload().values.platformItemOverrides,
-    slotKeys,
-    { afterSlotKey, slotKey },
-  );
-  setFrozenCreationPlatformPayload({ ...getFrozenCreationEffectivePlan(), platformItemOverrides: overrides });
-  return slotKey;
-}
-
 function setCreationPlatformItemOverride(slotKey, field, value) {
   const overrides = updateCreationPlatformItemOverride(
     getFrozenCreationPlatformPayload().values.platformItemOverrides,
@@ -15233,6 +15593,7 @@ function bindEvents() {
   bindGlobalNavEvents();
   bindTopbarRevealEvents();
   bindAdaptiveWorkbenchSections();
+  assetWorkspaceController.bindEvents();
   document.addEventListener("paste", handlePromptAgentImagePaste); document.addEventListener("paste", handleCreationReferenceImagePaste);
 
   refs.viewTabs.forEach((button) => {
@@ -15453,7 +15814,7 @@ function bindEvents() {
   });
   refs.creationForm.addEventListener("submit", startCreationGeneration);
   refs.creationPlanButton.addEventListener("click", () => {
-    previewCreationPlan().catch((error) => setCreationFeedback(error.message, "error"));
+    requestCreationPlanPreview().catch((error) => setCreationFeedback(error.message, "error"));
   });
   refs.creationPlanRestoreButton?.addEventListener("click", () => {
     restoreCurrentCreationPlatformRecommendations().catch((error) => {
@@ -15461,41 +15822,6 @@ function bindEvents() {
       setCreationFeedback(message, "error");
       showError(message);
     });
-  });
-  refs.creationPlanSlots?.addEventListener("change", (event) => {
-    const slot = event.target.closest("[data-creation-plan-slot]");
-    if (!slot) return;
-    const field = event.target.dataset.creationPlanField || (event.target.matches("[data-creation-plan-enabled]") ? "enabled" : "");
-    if (!field) return;
-    const value = field === "enabled" ? event.target.checked : event.target.value;
-    setCreationPlatformItemOverride(slot.dataset.slotKey, field, value);
-    previewCreationPlan().catch((error) => setCreationFeedback(error.message, "error"));
-  });
-  refs.creationPlanSlots?.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-creation-plan-action]");
-    const slot = button?.closest("[data-creation-plan-slot]");
-    if (!button || !slot) return;
-    const action = button.dataset.creationPlanAction;
-    const siblings = [...refs.creationPlanSlots.querySelectorAll("[data-creation-plan-slot]")];
-    const currentIndex = siblings.indexOf(slot);
-    if (action === "move-up" && currentIndex > 0) refs.creationPlanSlots.insertBefore(slot, siblings[currentIndex - 1]);
-    if (action === "move-down" && currentIndex >= 0 && currentIndex < siblings.length - 1) refs.creationPlanSlots.insertBefore(siblings[currentIndex + 1], slot);
-    if (action === "move-up" || action === "move-down") {
-      persistCreationPlatformSlotOrder(refs.creationPlanSlots.querySelectorAll("[data-creation-plan-slot]"));
-      previewCreationPlan().catch((error) => setCreationFeedback(error.message, "error"));
-    }
-    if (action === "remove") slot.querySelector("[data-creation-plan-enabled]")?.click();
-    if (action === "add-after") {
-      addCreationPlatformCustomSlot(slot.dataset.slotKey);
-      previewCreationPlan().catch((error) => setCreationFeedback(error.message, "error"));
-    }
-  });
-  refs.creationPlanAdvancedToggle?.addEventListener("click", (event) => {
-    const button = event.target.closest('[data-creation-plan-action="add"]');
-    if (!button) return;
-    if (!getFrozenCreationEffectivePlan()) return;
-    addCreationPlatformCustomSlot();
-    previewCreationPlan().catch((error) => setCreationFeedback(error.message, "error"));
   });
   refs.creationQueueStrip.addEventListener("click", (event) => {
     const button = event.target.closest("[data-creation-queue-id]");
@@ -15551,6 +15877,10 @@ function bindEvents() {
   refs.portraitPlanButton.addEventListener("click", () => {
     previewPortraitPlan().catch((error) => setPortraitFeedback(error.message, "error"));
   });
+  refs.portraitReferenceAnalyzeButton.addEventListener("click", () => {
+    portraitReferenceAnalysis.analyze().catch((error) => portraitReferenceAnalysis.setFeedback(error.message, "error"));
+  });
+  refs.portraitReferenceApplyAnalysisButton.addEventListener("click", portraitReferenceAnalysis.apply);
   refs.portraitRepairFailedButton.addEventListener("click", () => {
     repairPortraitItems({ scope: "failed" }).catch((error) => setPortraitFeedback(error.message, "error"));
   });
@@ -15713,50 +16043,10 @@ function bindEvents() {
       );
     }
   });
-  refs.creationPromptEditorLayer.addEventListener("click", (event) => {
-    const closeButton = event.target.closest("[data-creation-close-prompt-editor]");
-    if (closeButton) {
-      closeCreationItemEditor(closeButton.dataset.creationClosePromptEditor);
-      return;
-    }
-
-    const saveButton = event.target.closest("[data-creation-save-prompt-item-id]");
-    if (!saveButton) {
-      return;
-    }
-
-    const itemId = saveButton.dataset.creationSavePromptItemId;
-    const textarea = refs.creationPromptEditorLayer.querySelector(
-      `[data-creation-prompt-editor="${CSS.escape(itemId)}"]`,
-    );
-    saveCreationItemDraft(itemId, textarea?.value || "");
-  });
   refs.creationResultGrid.addEventListener("click", (event) => {
     const previewButton = event.target.closest("[data-creation-preview-item-id]");
     if (previewButton) {
       openCreationCurrentItemPreview(previewButton.dataset.creationPreviewItemId);
-      return;
-    }
-
-    const editButton = event.target.closest("[data-creation-edit-item-id]");
-    if (editButton) {
-      toggleCreationItemEditor(editButton.dataset.creationEditItemId);
-      return;
-    }
-
-    const closeButton = event.target.closest("[data-creation-close-prompt-editor]");
-    if (closeButton) {
-      closeCreationItemEditor(closeButton.dataset.creationClosePromptEditor);
-      return;
-    }
-
-    const saveButton = event.target.closest("[data-creation-save-prompt-item-id]");
-    if (saveButton) {
-      const itemId = saveButton.dataset.creationSavePromptItemId;
-      const textarea = [...refs.creationResultGrid.querySelectorAll("[data-creation-prompt-editor]")].find(
-        (node) => node.dataset.creationPromptEditor === itemId,
-      );
-      saveCreationItemDraft(itemId, textarea?.value || "");
       return;
     }
 
@@ -15770,7 +16060,10 @@ function bindEvents() {
     );
   });
   [refs.creationProductNameInput, refs.creationProductDescriptionInput, refs.creationSellingPointsInput, refs.creationDimensionSpecsInput].forEach((input) => input.addEventListener("input", resetCreationDraftPreview));
-  [refs.creationDimensionUnitModeInput, refs.creationTargetLanguageInput].forEach((input) => input?.addEventListener("change", resetCreationDraftPreview));
+  refs.creationDimensionUnitModeInput?.addEventListener("change", resetCreationDraftPreview);
+  refs.creationTargetLanguageInput?.addEventListener("change", () => {
+    refreshCreationPlanAfterExplicitSetParameterChange({ targetLanguage: getCreationSelectedLanguage().value });
+  });
   // Legacy static contract: [refs.creationDimensionUnitModeInput, refs.creationTargetLanguageInput, refs.creationPlatformInput].forEach((input) => input?.addEventListener("change", resetCreationDraftPreview));
   refs.creationPlatformInput?.addEventListener("pointerdown", () => {
     creationPreviousPlatformValue = getCreationSelectedPlatform().value;
@@ -15785,8 +16078,13 @@ function bindEvents() {
     invalidateCreationReferenceAnalysisRequest();
     resetCreationDraftPreview();
   });
-  refs.creationImageCountInput.addEventListener("change", syncCreationSelectedRolesToCount);
+  refs.creationImageCountInput.addEventListener("change", () => {
+    syncCreationSelectedRolesToCount();
+    if (!hasCreationPlanPreviewInput()) return;
+    requestCreationPlanPreview().catch((error) => setCreationFeedback(error.message, "error"));
+  });
   refs.creationImageCountInput.addEventListener("click", syncCreationSelectedRolesToCurrentCount);
+  refs.creationSkuGenerationEnabledInput?.addEventListener("change", refreshCreationPlanAfterSkuGenerationToggle);
   refs.creationInfographicRebuildEnabledInput?.addEventListener("change", resetCreationDraftPreview);
   refs.creationSkuBundleCountInput?.addEventListener("input", resetCreationDraftPreview);
   refs.creationSkuGenerationRuleInput?.addEventListener("change", resetCreationDraftPreview);
@@ -15838,6 +16136,14 @@ function bindEvents() {
   refs.creationRatioInput.addEventListener("change", () => {
     renderCreationSizeOptions();
     setCreationRatioOptionLabels({ expanded: false });
+    const parameters = { ratio: refs.creationRatioInput.value || DEFAULT_UI_RATIO };
+    if (refs.creationSizeInput.value && refs.creationSizeInput.value !== "auto") {
+      parameters.resolutionTier = refs.creationSizeInput.value;
+    }
+    refreshCreationPlanAfterExplicitSetParameterChange(parameters);
+  });
+  refs.creationSizeInput.addEventListener("change", () => {
+    refreshCreationPlanAfterExplicitSetParameterChange({ resolutionTier: refs.creationSizeInput.value || "auto" });
   });
   refs.creationRoleGrid.addEventListener("change", (event) => {
     const target = event.target.closest("[data-creation-role], [data-creation-plan-slot-key]");
@@ -15847,7 +16153,7 @@ function bindEvents() {
 
     if (target.dataset.creationPlanSlotKey) {
       setCreationPlatformItemOverride(target.dataset.creationPlanSlotKey, "enabled", target.checked);
-      previewCreationPlan().catch((error) => setCreationFeedback(error.message, "error"));
+      requestCreationPlanPreview().catch((error) => setCreationFeedback(error.message, "error"));
       return;
     }
 
@@ -15874,7 +16180,6 @@ function bindEvents() {
       showError(message);
     });
   });
-  refs.creationReferenceApplyAnalysisButton.addEventListener("click", applyCreationReferenceAnalysisRecommendations);
   refs.creationReferenceAnalysisToggleButton.addEventListener("click", toggleCreationReferenceAnalysisPanel);
   refs.creationReferenceGrid.addEventListener("click", (event) => {
     const target = event.target.closest("[data-creation-reference-preview-id]");
@@ -15883,6 +16188,10 @@ function bindEvents() {
     }
 
     openCreationReferencePreview(target.dataset.creationReferencePreviewId);
+  });
+  refs.creationReferenceGrid.addEventListener("dblclick", beginCreationReferenceNoteEditing);
+  refs.creationReferenceGrid.addEventListener("focusout", (event) => {
+    commitCreationReferenceNoteEditing(event.target);
   });
   refs.creationReferenceGrid.addEventListener("change", (event) => {
     const bindTarget = event.target.closest("[data-creation-reference-restore-bind-id]");
@@ -16044,9 +16353,10 @@ function bindEvents() {
     syncGenerationSize(event.target.value);
   });
   refs.referenceAnalysisSizeInput.addEventListener("change", (event) => {
-    syncGenerationSize(event.target.value);
+    syncReferenceAnalysisGenerationSize(event.target.value);
   });
   refs.referenceAnalysisLanguageInput.addEventListener("change", (event) => {
+    invalidateReferenceAnalysisRequest();
     state.referenceAnalysis.outputLanguage = event.target.value;
   });
   refs.imageDecompositionSizeInput.addEventListener("change", (event) => {
@@ -16358,13 +16668,6 @@ function bindEvents() {
   lightboxViewerController.bindEvents();
   refs.lightboxBackdrop.addEventListener("click", closeLightbox);
   refs.lightboxClose.addEventListener("click", closeLightbox);
-  refs.lightboxDelete.addEventListener("click", () => {
-    if (!state.lightboxItem?.filename) {
-      return;
-    }
-
-    deleteGalleryItem(state.lightboxItem).catch((error) => showError(error.message));
-  });
   refs.lightboxDownload.addEventListener("click", (event) => {
     event.preventDefault();
     downloadGalleryItem(state.lightboxItem, refs.lightboxImage).catch((error) => {
@@ -16376,20 +16679,22 @@ function bindEvents() {
       showError(error.message);
     });
   });
-  refs.lightboxCopyPathButton.addEventListener("click", () => {
-    copyLightboxCreationRecordPath().catch((error) => {
-      showError(error.message);
-    });
-  });
-  refs.lightboxCopyFullPathButton.addEventListener("click", () => {
-    copyLightboxCreationRecordFullPath().catch((error) => {
-      showError(error.message);
-    });
-  });
   document.addEventListener("keydown", handlePreviewArrowNavigation);
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
+      const openAssetMenu = document.querySelector("details[data-asset-menu][open]");
+      if (openAssetMenu) {
+        openAssetMenu.open = false;
+        openAssetMenu.querySelector("summary")?.focus();
+        return;
+      }
+      const openAssetPicker = document.querySelector("[data-asset-record-picker].is-open");
+      if (openAssetPicker) {
+        assetWorkspaceController.closeRecordPickers();
+        openAssetPicker.querySelector(".asset-record-picker-trigger")?.focus();
+        return;
+      }
       if (
         refs.portraitAccessoryAssetPopover &&
         !refs.portraitAccessoryAssetPopover.classList.contains("hidden")
@@ -16430,6 +16735,11 @@ function bindEvents() {
   });
 
   document.addEventListener("pointerdown", (event) => {
+    const editingReferenceNote = refs.creationReferenceGrid?.querySelector('.creation-reference-note[contenteditable="true"]');
+    if (editingReferenceNote && !editingReferenceNote.contains(event.target)) {
+      editingReferenceNote.blur();
+    }
+
     if (refs.creationIndustryTemplatePopover && !refs.creationIndustryTemplatePopover.hidden) {
       if (!refs.creationIndustryTemplateBrowser.contains(event.target)) {
         setCreationIndustryTemplateBrowserOpen(false);

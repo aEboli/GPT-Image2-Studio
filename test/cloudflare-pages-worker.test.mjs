@@ -95,28 +95,53 @@ function makeGenerationQueue() {
 }
 
 function makeListingDraft(overrides = {}) {
-  return {
-    title: "1 Pack Blue Travel Bottle Daily Hydration Compact Bottle",
-    sellingPoints: ["Compact bottle details make the blue travel option easy to compare."],
-    painPoints: ["Bulky bottles can be awkward during commutes; the compact format fits everyday hydration routines."],
-    fiveBullets: [
-      "CORE VALUE: 1 Pack 340.19 g (12 oz) format keeps quantity and size easy to review.",
-      "BUILT TO LAST: Blue bottle details keep the selected color easy to identify without extra claims.",
-      "REAL-LIFE USE: Daily hydration positioning supports home, office, travel, and gym routines.",
-      "SIZE & FIT: Compact bottle details keep the offer easy to compare before purchase.",
-      "PACKAGE SNAPSHOT: Concise product information keeps the draft focused on the included bottle.",
+  const draft = {
+    title: "1 Pack Blue Compact Travel Bottle",
+    sellingPoints: ["Compact blue bottle with a stated one-pack quantity."],
+    buyerObjections: ["Review the stated color, size, and pack quantity before purchase."],
+    highlights: [
+      "PRODUCT TYPE: Blue compact travel bottle.",
+      "PACK DETAILS: One supplied product unit.",
+      "VISIBLE DETAILS: Blue color and compact bottle shape.",
+      "SPECIFICATIONS: Stated size is 340.19 g (12 oz).",
+      "PACKAGE CONTENTS: One travel bottle.",
     ],
-    description: "Blue travel bottle option for shoppers comparing compact daily hydration bottles.",
-    backendSearchTerms: "blue travel bottle daily hydration",
+    description: "Blue compact travel bottle with a stated one-pack quantity and 12 oz size.",
+    searchTerms: ["blue travel bottle", "compact bottle"],
     keywordBuckets: {
       exact: ["blue travel bottle"],
       longTail: ["340.19 g 12 oz travel bottle"],
-      traffic: ["daily hydration bottle"],
+      traffic: ["travel bottle"],
       descriptive: ["compact blue bottle"],
     },
     missingInfo: [],
     warnings: [],
     ...overrides,
+  };
+  return {
+    ...draft,
+    zhDisplay: {
+      title: "1 件装蓝色小巧旅行水瓶",
+      sellingPoints: ["蓝色小巧瓶身与已注明的单件包装。"],
+      buyerObjections: ["购买前核对已注明的颜色、尺寸和包装数量。"],
+      highlights: [
+        "商品类型：蓝色小巧旅行水瓶。",
+        "包装信息：1 件商品。",
+        "外观信息：蓝色与小巧瓶身造型。",
+        "规格信息：已注明 340.19 克（12 盎司）。",
+        "包装内容：1 个旅行水瓶。",
+      ],
+      description: "蓝色小巧旅行水瓶，已注明单件包装和 12 盎司规格。",
+      searchTerms: ["蓝色旅行水瓶", "小巧水瓶"],
+      keywordBuckets: {
+        exact: ["蓝色旅行水瓶"],
+        longTail: ["340.19 克 12 盎司旅行水瓶"],
+        traffic: ["旅行水瓶"],
+        descriptive: ["小巧蓝色水瓶"],
+      },
+      warnings: [],
+      missingInfo: [],
+    },
   };
 }
 
@@ -166,7 +191,7 @@ test("Cloudflare creation listing route accepts explicit set metadata and return
   assert.equal(body.listingDrafts[0].evidenceMode, "input-only");
 });
 
-test("Cloudflare creation listing mock keeps mixed grouped SKU records as reviewable V2 input", async () => {
+test("Cloudflare creation listing mock returns completed old-style output for mixed grouped SKU records", async () => {
   const request = new Request("https://studio.example/api/creation/listings", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -206,12 +231,13 @@ test("Cloudflare creation listing mock keeps mixed grouped SKU records as review
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
   assert.equal(body.listingDrafts.length, 1);
-  assert.equal(body.listingDrafts[0].schemaVersion, "2");
+  assert.equal(body.listingDrafts[0].schemaVersion, undefined);
   assert.equal(body.listingDrafts[0].platformId, "universal");
-  assert.equal(body.listingDrafts[0].status, "needs-review");
+  assert.equal(body.listingDrafts[0].status, "completed");
   assert.equal(body.listingDrafts[0].evidenceMode, "input-only");
-  assert.equal(body.listingDrafts[0].title, "Electronic Fishing Lure");
-  assert.doesNotMatch(body.listingDrafts[0].title, /^2 Pack \/ 3 Pack\b/);
+  assert.match(body.listingDrafts[0].title, /^2 Pack \/ 3 Pack Electronic Fishing Lure\b/);
+  assert.ok(body.listingDrafts[0].fiveBullets.length > 0);
+  assert.ok(body.listingDrafts[0].zhDisplay?.title);
   assert.deepEqual(body.set.listingDrafts, body.listingDrafts);
 });
 
@@ -270,7 +296,7 @@ test("Cloudflare creation listing route uses payload API settings outside mock m
   assert.equal(seenRequests[0].auth, "Bearer payload-key");
   assert.equal(seenRequests[0].body.model, "gpt-payload");
   assert.equal(seenRequests[0].body.reasoning.effort, "high");
-  assert.equal(body.listingDrafts[0].title, "1 Pack Blue Travel Bottle Daily Hydration Compact Bottle");
+  assert.equal(body.listingDrafts[0].title, "1 Pack Blue Compact Travel Bottle");
   assert.doesNotMatch(JSON.stringify(body), /payload-key/);
 });
 
@@ -664,7 +690,7 @@ test("Cloudflare Amazon creation stays below the R2 custom metadata limit and fr
   assert.equal(set.platformPolicyId, "amazon");
   assert.equal(set.platformEvidenceLevel, "A");
   assert.equal(set.platformProvenance, "explicit");
-  assert.deepEqual(set.platformSetOverrides, { imageCount: 4, targetLanguage: "en" });
+  assert.deepEqual(set.platformSetOverrides, { imageCount: 4, ratio: "1:1", targetLanguage: "en" });
   assert.deepEqual(set.platformItemOverrides, [
     { slotKey: "amazon:benefit-proof", composition: "comparison-layout" },
   ]);
@@ -684,17 +710,22 @@ test("Cloudflare Amazon creation stays below the R2 custom metadata limit and fr
   assert.ok(set.effectivePlan.items.every((item) => item.prompt));
 });
 
-test("Cloudflare creation plan route returns the shared preview plan", async () => {
+test("Cloudflare creation plan route preserves explicit Xiaohongshu generation parameters and caps its count", async () => {
   const formData = new FormData();
-  formData.set("productName", "Jointed fishing lure");
-  formData.set("productDescription", "Segmented lifelike lure for bass fishing");
-  formData.set("sellingPoints", "realistic swim action");
-  formData.set("targetLanguage", "en");
-  formData.set("imageCount", "4");
+  formData.set("productName", "Travel mug");
+  formData.set("productDescription", "Insulated travel mug shown in supplied references");
+  formData.set("sellingPoints", "portable\nreusable");
+  formData.set("dimensionSpecs", "Height 20 cm; width 8 cm");
+  formData.set("platform", "xiaohongshu");
+  formData.set("platformSetOverrides", JSON.stringify({
+    imageCount: 18,
+    targetLanguage: "en",
+    ratio: "4:3",
+    resolutionTier: "2048x1536",
+  }));
   formData.set("scenario", "standard");
   formData.set("industryTemplate", "general");
-  formData.set("selectedRoles", JSON.stringify(["hero", "scene"]));
-  formData.set("visualLanguage", "lifestyle-editorial");
+  formData.set("infographicRebuildEnabled", "false");
 
   const response = await handleApiRequest(new Request("https://studio.example/api/creation/plan", {
     method: "POST",
@@ -704,9 +735,14 @@ test("Cloudflare creation plan route returns the shared preview plan", async () 
 
   assert.equal(response.status, 200);
   assert.equal(payload.ok, true);
-  assert.equal(payload.plan.productName, "Jointed fishing lure");
-  assert.equal(payload.plan.visualLanguage, "lifestyle-editorial");
-  assert.deepEqual(payload.plan.selectedRoles, ["hero", "scene"]);
+  assert.equal(payload.plan.productName, "Travel mug");
+  assert.equal(payload.plan.platform, "xiaohongshu");
+  assert.equal(payload.plan.carouselImageCount, 6);
+  assert.equal(payload.plan.platformSetOverrides.imageCount, 6);
+  assert.ok(payload.plan.items.every((item) => item.targetLanguage === "en"));
+  assert.ok(payload.plan.items.every((item) => item.ratio === "4:3"));
+  assert.ok(payload.plan.items.every((item) => item.resolutionTier === "2048x1536"));
+  assert.equal(payload.plan.items.some((item) => item.imageType === "custom"), false);
 });
 
 test("Cloudflare creation reference analysis route uses browser API settings", async () => {

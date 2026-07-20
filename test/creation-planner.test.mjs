@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   applyCreationPlanOverrides,
   buildCreationPlan,
+  buildCreationSubmittedPlan,
   CREATION_IMAGE_COUNT_OPTIONS,
   CREATION_ITEM_ROLES,
   CREATION_PLATFORM_OPTIONS,
@@ -26,6 +27,48 @@ import {
   normalizeCreationSkuSubjects,
   normalizeCreationTargetLanguage,
 } from "../lib/creation-planner.mjs";
+
+test("creation submitted plans accept a legitimate 33-item snapshot above the legacy byte threshold", () => {
+  const prompt = "平台套图事实提示词。".repeat(3500);
+  const items = Array.from({ length: 33 }, (_, index) => ({
+    itemId: `slot-${index + 1}`,
+    slotKey: index < 18 ? `universal:${index + 1}` : `append-${index + 1}`,
+    itemKind: index < 18 ? "carousel" : index < 20 ? "sku" : "infographic-rebuild",
+    role: index < 18 ? "hero" : index < 20 ? "sku" : "infographic-rebuild",
+    prompt,
+    ratio: "1:1",
+    resolutionTier: "auto",
+    targetLanguage: "en",
+  }));
+
+  const submitted = buildCreationSubmittedPlan({
+    effectivePlan: JSON.stringify({ platform: "universal", items }),
+  });
+
+  assert.equal(submitted.items.length, 33);
+  assert.equal(submitted.items[0].prompt, prompt);
+  assert.equal(submitted.totalPlannedItemCount, 33);
+});
+
+test("creation submitted plans still reject snapshots beyond the absolute byte limit", () => {
+  const oversized = {
+    platform: "universal",
+    items: [{
+      itemId: "slot-1",
+      slotKey: "universal:1",
+      role: "hero",
+      prompt: "x".repeat(4 * 1024 * 1024 + 1),
+      ratio: "1:1",
+      resolutionTier: "auto",
+      targetLanguage: "en",
+    }],
+  };
+
+  assert.throws(
+    () => buildCreationSubmittedPlan({ effectivePlan: JSON.stringify(oversized) }),
+    /冻结计划过大/,
+  );
+});
 
 test("creation planner applies preview plan prompt overrides without changing set shape", () => {
   const plan = buildCreationPlan({
@@ -55,13 +98,14 @@ test("creation planner applies preview plan prompt overrides without changing se
   assert.equal(plan.items[0].prompt.includes("Custom hero prompt"), false);
 });
 
-test("creation planner defaults infographic rebuild on and appends non-subject references after SKU items", () => {
+test("creation planner appends non-subject references after SKU items when infographic rebuild is enabled", () => {
   const plan = buildCreationPlan({
     productName: "Jointed fishing lure",
     productDescription: "Segmented bait with treble hooks and lifelike swimming action",
     sellingPoints: "realistic finish, durable body",
     targetLanguage: "en",
     selectedRoles: ["hero", "benefit"],
+    infographicRebuildEnabled: true,
     referenceImageRoles: [
       { index: 1, filename: "blue-lure.png", role: "product", note: "Blue lure subject" },
       { index: 2, filename: "silver-lure.png", role: "reference-product", note: "Primary silver lure subject" },
@@ -93,6 +137,41 @@ test("creation planner defaults infographic rebuild on and appends non-subject r
   assert.ok(rebuildItems.every((item) => item.prompt.includes("keep the original source information unchanged")));
   assert.ok(rebuildItems.every((item) => item.prompt.includes("Use the uploaded product subject references as the new product subject")));
   assert.ok(rebuildItems.every((item) => item.prompt.includes("Do not add unsupported")));
+});
+
+test("creation planner defaults SKU generation on and infographic rebuild off", () => {
+  const plan = buildCreationPlan({
+    productName: "Jointed fishing lure",
+    productDescription: "Segmented bait with treble hooks and lifelike swimming action",
+    selectedRoles: ["hero"],
+    referenceImageRoles: [
+      { index: 1, filename: "blue-lure.png", role: "product", note: "Blue lure subject" },
+      { index: 2, filename: "size-card.png", role: "dimensions", note: "Length 13 cm" },
+    ],
+    skuSubjects: [{ id: "blue-lure", title: "Blue lure", filenames: ["blue-lure.png"] }],
+  });
+
+  assert.equal(plan.skuGenerationEnabled, true);
+  assert.equal(plan.infographicRebuildEnabled, false);
+  assert.equal(plan.skuImageCount, 1);
+  assert.equal(plan.infographicRebuildCount, 0);
+  assert.deepEqual(plan.items.map((item) => item.role), ["hero", "sku"]);
+});
+
+test("creation planner omits appended SKU items when SKU generation is disabled", () => {
+  const plan = buildCreationPlan({
+    productName: "Jointed fishing lure",
+    productDescription: "Segmented bait with treble hooks and lifelike swimming action",
+    selectedRoles: ["hero"],
+    skuGenerationEnabled: "false",
+    skuSubjects: [{ id: "blue-lure", title: "Blue lure", filenames: ["blue-lure.png"] }],
+  });
+
+  assert.equal(plan.skuGenerationEnabled, false);
+  assert.equal(plan.skuImageCount, 0);
+  assert.equal(plan.totalPlannedItemCount, 1);
+  assert.equal(plan.skuSubjects.length, 1);
+  assert.deepEqual(plan.items.map((item) => item.role), ["hero"]);
 });
 
 test("creation planner disables infographic rebuild when requested", () => {
@@ -205,6 +284,26 @@ test("creation planner defaults to platform-aware ecommerce analysis without cha
   assert.equal(plan.skuGenerationRule, "color-name-under-subject");
   assert.ok(plan.items.every((item) => item.prompt.includes("PLATFORM FIT ANALYSIS")));
   assert.ok(plan.items.every((item) => item.prompt.includes("Platform: 通用电商")));
+});
+
+test("creation planner keeps the optimized eighteen image types when universal is explicit", () => {
+  const plan = buildCreationPlan({
+    productName: "Travel backpack",
+    productDescription: "Outdoor backpack with breathable straps and multiple colorways",
+    sellingPoints: "large capacity, breathable back panel, durable fabric",
+    platform: "universal",
+    imageCount: 18,
+    skuGenerationEnabled: false,
+  });
+
+  assert.deepEqual(plan.items.map((item) => item.title), CREATION_ITEM_ROLES.map((role) => role.title));
+  assert.deepEqual(plan.slots.map((item) => item.title), CREATION_ITEM_ROLES.map((role) => role.title));
+  assert.deepEqual(plan.items.map((item) => item.imageTypeLabel), CREATION_ITEM_ROLES.map((role) => role.title));
+  assert.deepEqual(plan.slots.map((item) => item.imageTypeLabel), CREATION_ITEM_ROLES.map((role) => role.title));
+  assert.match(plan.items[0].prompt, /conversion-first hero image/i);
+  assert.match(plan.items[0].prompt, /Role intent: create the first decision frame/i);
+  assert.match(plan.items[15].prompt, /selling-point image that connects 3-5 core selling points/i);
+  assert.doesNotMatch(plan.items[0].prompt, /Create 通用电商 通用首图 as a platform-native gallery asset/);
 });
 
 test("creation planner adapts prompts to selected platform and product category", () => {
@@ -1203,6 +1302,9 @@ test("creation planner allows zero carousel images and forces infographic rebuil
     targetLanguage: "en",
     imageCount: "0",
     infographicRebuildEnabled: "false",
+    skuSubjects: [
+      { id: "towel-pack", title: "Cooling towel pack", filenames: ["towel-subjects.png"] },
+    ],
     referenceImageRoles: [
       { index: 1, filename: "towel-subjects.png", role: "product", note: "Four towel cases as the sellable subject group." },
       { index: 2, filename: "feature-card.png", role: "material", note: "Cooling fabric callouts and airflow diagram." },
@@ -1211,9 +1313,64 @@ test("creation planner allows zero carousel images and forces infographic rebuil
   });
 
   assert.equal(plan.imageCount, 0);
+  assert.equal(plan.skuGenerationEnabled, true);
+  assert.equal(plan.skuImageCount, 1);
   assert.equal(plan.infographicRebuildEnabled, true);
   assert.deepEqual(plan.selectedRoles, []);
-  assert.deepEqual(plan.items.map((item) => item.role), ["infographic-rebuild", "infographic-rebuild"]);
+  assert.deepEqual(plan.items.map((item) => item.role), ["sku", "infographic-rebuild", "infographic-rebuild"]);
+});
+
+test("creation planner leads every named-platform item with its native gallery strategy", () => {
+  for (const platform of ["amazon", "xiaohongshu", "douyin", "shopify", "rakuten"]) {
+    const plan = buildCreationPlan({
+      productName: "Portable bottle",
+      productDescription: "Reusable bottle shown in supplied product references",
+      platform,
+      skuGenerationEnabled: false,
+    });
+
+    assert.ok(plan.items.every((item) => item.prompt.startsWith(
+      `Create ${plan.platformLabel} ${item.imageTypeLabel} as a platform-native gallery asset.`,
+    )), platform);
+    assert.ok(plan.items.every((item) => item.prompt.includes(
+      `Platform gallery strategy: ${plan.platformProfile.promptInstruction}`,
+    )), platform);
+    const sizeItem = plan.items.find((item) => item.role === "size-capacity-fit");
+    assert.ok(sizeItem, `${platform} requires a size-related item`);
+    assert.match(sizeItem.prompt, /non-numeric scale or fit image/i);
+    assert.match(sizeItem.prompt, /Do not invent missing measurements/i);
+  }
+
+  const xiaohongshu = buildCreationPlan({
+    productName: "Portable bottle",
+    productDescription: "Reusable bottle shown in supplied product references",
+    platform: "xiaohongshu",
+    skuGenerationEnabled: false,
+  });
+  assert.doesNotMatch(xiaohongshu.items[0].prompt, /multiple small circular scene frames/i);
+});
+
+test("creation planner SKU toggle changes only appended SKU counts", () => {
+  const input = {
+    productName: "Portable bottle",
+    productDescription: "Reusable bottle shown in supplied product references",
+    platform: "tiktok-shop",
+    skuSubjects: [
+      { id: "red", filenames: ["red.png"] },
+      { id: "blue", filenames: ["blue.png"] },
+    ],
+  };
+  const enabled = buildCreationPlan({ ...input, skuGenerationEnabled: true });
+  const disabled = buildCreationPlan({ ...input, skuGenerationEnabled: false });
+  const carouselSnapshot = (plan) => plan.items
+    .filter((item) => item.itemKind === "carousel")
+    .map((item) => [item.slotKey, item.imageType]);
+
+  assert.deepEqual(carouselSnapshot(disabled), carouselSnapshot(enabled));
+  assert.equal(disabled.carouselImageCount, enabled.carouselImageCount);
+  assert.equal(enabled.skuImageCount, 2);
+  assert.equal(disabled.skuImageCount, 0);
+  assert.equal(enabled.totalPlannedItemCount - disabled.totalPlannedItemCount, 2);
 });
 
 test("creation planner treats sixteen-image suites as a selectable ten-image upload candidate pool", () => {
@@ -1382,6 +1539,77 @@ test("creation planner labels every visible unit color under grouped SKU subject
   assert.match(skuItem.prompt, /label each complete visible product unit with its own color name directly below that corresponding unit/i);
   assert.match(skuItem.prompt, /Visible SKU color labels for the grouped subject: "blue", "gray", "black", "silver"/);
   assert.match(skuItem.prompt, /Do not render one shared color label for the whole grouped image/i);
+});
+
+test("creation planner keeps visually distinct backpack SKU colors exact", () => {
+  const plan = buildCreationPlan({
+    productName: "Travel backpack",
+    productDescription: "Four backpack colorways with shared charcoal trim",
+    sellingPoints: "breathable back panel, large capacity",
+    targetLanguage: "en",
+    selectedRoles: ["hero"],
+    skuSubjects: [
+      { id: "navy", title: "Backpack SKU 1", filenames: ["sku-1.png"], colorName: "navy blue" },
+      { id: "cyan", title: "Backpack SKU 2", filenames: ["sku-2.png"], colorName: "cyan" },
+      { id: "orange", title: "Backpack SKU 3", filenames: ["sku-3.png"], colorName: "orange" },
+      { id: "red", title: "Backpack SKU 4", filenames: ["sku-4.png"], colorName: "red" },
+    ],
+  });
+  const skuPrompts = plan.items.filter((item) => item.role === "sku").map((item) => item.prompt);
+
+  assert.match(skuPrompts[0], /Visible SKU color label under the subject: "navy blue"/);
+  assert.match(skuPrompts[1], /Visible SKU color label under the subject: "cyan blue"/);
+  assert.match(skuPrompts[2], /Visible SKU color label under the subject: "orange"/);
+  assert.match(skuPrompts[3], /Visible SKU color label under the subject: "red"/);
+  assert.ok(skuPrompts.every((prompt) => !/Visible SKU color label under the subject: "white"/.test(prompt)));
+});
+
+test("creation reference analysis carries structured SKU colors into generation prompts", () => {
+  const analysis = normalizeCreationReferenceAnalysis({
+    summary: "Four backpack colorways.",
+    reference_roles: [
+      { index: 1, filename: "sku-1.png", role: "product", note: "深蓝色背包主体。" },
+      { index: 2, filename: "sku-2.png", role: "product", note: "亮蓝色背包主体。" },
+      { index: 3, filename: "sku-3.png", role: "product", note: "橙色背包主体。" },
+      { index: 4, filename: "sku-4.png", role: "product", note: "红色背包主体。" },
+    ],
+    sku_subjects: [
+      { id: "navy", title: "Backpack 1", reference_indexes: [1], filenames: ["sku-1.png"], subject_unit_count: 1, color_names: ["navy blue"], note: "深蓝色背包。" },
+      { id: "cyan", title: "Backpack 2", reference_indexes: [2], filenames: ["sku-2.png"], subject_unit_count: 1, color_names: ["cyan"], note: "亮蓝色背包。" },
+      { id: "orange", title: "Backpack 3", reference_indexes: [3], filenames: ["sku-3.png"], subject_unit_count: 1, color_names: ["orange"], note: "橙色背包。" },
+      { id: "red", title: "Backpack 4", reference_indexes: [4], filenames: ["sku-4.png"], subject_unit_count: 1, color_names: ["red"], note: "红色背包。" },
+    ],
+  }, ["sku-1.png", "sku-2.png", "sku-3.png", "sku-4.png"]);
+  const plan = buildCreationPlan({
+    productName: "Travel backpack",
+    productDescription: "Four backpack colorways",
+    targetLanguage: "en",
+    selectedRoles: ["hero"],
+    referenceImageRoles: analysis.recommendations,
+    skuSubjects: analysis.skuSubjects,
+  });
+
+  assert.deepEqual(analysis.skuSubjects.map((subject) => subject.colorName), ["navy blue", "cyan", "orange", "red"]);
+  assert.deepEqual(
+    plan.items.filter((item) => item.role === "sku").map((item) => item.skuSubject.colorName),
+    ["navy blue", "cyan", "orange", "red"],
+  );
+});
+
+test("creation planner never guesses a missing SKU color label", () => {
+  const plan = buildCreationPlan({
+    productName: "Travel backpack",
+    productDescription: "Backpack product reference",
+    targetLanguage: "en",
+    selectedRoles: ["hero"],
+    skuSubjects: [
+      { id: "sku-unknown", title: "Backpack SKU", filenames: ["sku-unknown.png"] },
+    ],
+  });
+  const skuPrompt = plan.items.find((item) => item.role === "sku").prompt;
+
+  assert.match(skuPrompt, /Do not render any color-name label and never guess one/i);
+  assert.doesNotMatch(skuPrompt, /Visible SKU color label under the subject:/i);
 });
 
 test("creation planner keeps single multi-color SKU subjects as one color label", () => {
@@ -2328,7 +2556,7 @@ test("creation planner adds role-specific guidance inside each marketing scenari
 });
 
 test("creation planner normalizes supported scenario and image count options", () => {
-  assert.deepEqual(CREATION_IMAGE_COUNT_OPTIONS, [0, 4, 6, 7, 8, 9, 10, 12, 14, 16, 18]);
+  assert.deepEqual(CREATION_IMAGE_COUNT_OPTIONS, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]);
   assert.equal(normalizeCreationImageCount("6"), 6);
   assert.equal(normalizeCreationImageCount("7"), 7);
   assert.equal(normalizeCreationImageCount("8"), 8);

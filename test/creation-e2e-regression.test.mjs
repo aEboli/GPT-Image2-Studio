@@ -328,6 +328,32 @@ test("creation workflow reuses history, reuploads references, tweaks prompts, re
   assert.match(planBody.plan.items[1].prompt, /Shared visual language:/);
   assert.match(planBody.plan.items[1].prompt, /lifestyle magazine editorial/);
 
+  const xiaohongshuForm = new FormData();
+  xiaohongshuForm.set("productName", "Travel mug");
+  xiaohongshuForm.set("productDescription", "Insulated travel mug shown in supplied references");
+  xiaohongshuForm.set("sellingPoints", "portable\nreusable");
+  xiaohongshuForm.set("dimensionSpecs", "Height 20 cm; width 8 cm");
+  xiaohongshuForm.set("platform", "xiaohongshu");
+  xiaohongshuForm.set("platformSetOverrides", JSON.stringify({
+    imageCount: 18,
+    targetLanguage: "en",
+    ratio: "4:3",
+    resolutionTier: "2048x1536",
+  }));
+  xiaohongshuForm.set("infographicRebuildEnabled", "false");
+  const xiaohongshuResponse = await fetch(`${baseUrl}/api/creation/plan`, {
+    method: "POST",
+    body: xiaohongshuForm,
+  });
+  assert.equal(xiaohongshuResponse.status, 200);
+  const xiaohongshuPlan = (await xiaohongshuResponse.json()).plan;
+  assert.equal(xiaohongshuPlan.carouselImageCount, 6);
+  assert.equal(xiaohongshuPlan.platformSetOverrides.imageCount, 6);
+  assert.ok(xiaohongshuPlan.items.every((item) => item.targetLanguage === "en"));
+  assert.ok(xiaohongshuPlan.items.every((item) => item.ratio === "4:3"));
+  assert.ok(xiaohongshuPlan.items.every((item) => item.resolutionTier === "2048x1536"));
+  assert.equal(xiaohongshuPlan.items.some((item) => item.imageType === "custom"), false);
+
   const generateResult = await postForm(
     baseUrl,
     "/api/creation/generate",
@@ -381,13 +407,13 @@ test("creation workflow reuses history, reuploads references, tweaks prompts, re
   assert.ok(sets.some((set) => set.setId === generatedSet.setId), "generated set should appear in records");
 
   const listingResponse = await postJson(baseUrl, "/api/creation/listings", { setId: generatedSet.setId });
-  assert.equal(listingResponse.response.status, 200);
+  assert.equal(listingResponse.response.status, 200, JSON.stringify(listingResponse.body));
   assert.equal(listingResponse.body.ok, true);
   assert.equal(listingResponse.body.set.setId, generatedSet.setId);
   assert.equal(listingResponse.body.set.listingDrafts.length, 1);
-  assert.equal(listingResponse.body.set.listingDrafts[0].schemaVersion, "2");
-  assert.equal(listingResponse.body.set.listingDrafts[0].status, "needs-review");
-  assert.equal(listingResponse.body.set.listingDrafts[0].evidenceMode, "input-only");
+  assert.equal(listingResponse.body.set.listingDrafts[0].schemaVersion, undefined);
+  assert.equal(listingResponse.body.set.listingDrafts[0].status, "completed");
+  assert.equal(listingResponse.body.set.listingDrafts[0].evidenceMode, "image-backed");
 
   const listedAfterListingsResponse = await fetch(`${baseUrl}/api/creation/sets`);
   assert.equal(listedAfterListingsResponse.status, 200);
@@ -398,9 +424,9 @@ test("creation workflow reuses history, reuploads references, tweaks prompts, re
   const manifestPath = await findCreationManifestPath(outputDir, generatedSet.setId);
   const persistedListingManifest = JSON.parse(await readFile(manifestPath, "utf8"));
   assert.equal(persistedListingManifest.listingDrafts.length, 1);
-  assert.equal(persistedListingManifest.listingDrafts[0].schemaVersion, "2");
-  assert.equal(persistedListingManifest.listingDrafts[0].status, "needs-review");
-  assert.equal(persistedListingManifest.listingDrafts[0].evidenceMode, "input-only");
+  assert.equal(persistedListingManifest.listingDrafts[0].schemaVersion, undefined);
+  assert.equal(persistedListingManifest.listingDrafts[0].status, "completed");
+  assert.equal(persistedListingManifest.listingDrafts[0].evidenceMode, "image-backed");
 
   const initialPathReport = await postJson(baseUrl, "/api/creation/sets/paths", { setId: generatedSet.setId });
   assert.equal(initialPathReport.response.status, 200);
@@ -536,10 +562,12 @@ test("creation listing endpoint degrades to input-only when images failed", asyn
   );
 
   const listingResponse = await postJson(baseUrl, "/api/creation/listings", { setId: "creation-set-failed" });
-  assert.equal(listingResponse.response.status, 200);
+  assert.equal(listingResponse.response.status, 200, JSON.stringify(listingResponse.body));
   assert.equal(listingResponse.body.set.listingDrafts.length, 1);
   assert.equal(listingResponse.body.set.listingDrafts[0].evidenceMode, "input-only");
-  assert.match(listingResponse.body.set.listingDrafts[0].warnings.join("\n"), /Generated images were unavailable/);
+  assert.equal(Object.prototype.hasOwnProperty.call(listingResponse.body.set.listingDrafts[0], "warnings"), false);
+  assert.ok(listingResponse.body.set.listingDrafts[0].fiveBullets.length > 0);
+  assert.ok(listingResponse.body.set.listingDrafts[0].zhDisplay?.title);
 
   const persistedManifest = JSON.parse(await readFile(join(manifestsDir, "creation-set-failed.json"), "utf8"));
   assert.equal(persistedManifest.listingDrafts.length, 1);
@@ -610,21 +638,22 @@ test("creation listing endpoint preserves grouped mixed pack wording through val
     );
   };
 
-  const assertReviewableV2Listing = async ({ setId, expectedPackText }) => {
+  const assertCompletedOldStyleListing = async ({ setId, expectedPackText }) => {
     const listingResponse = await postJson(baseUrl, "/api/creation/listings", { setId });
-    assert.equal(listingResponse.response.status, 200);
+    assert.equal(listingResponse.response.status, 200, JSON.stringify(listingResponse.body));
     assert.equal(listingResponse.body.ok, true);
     assert.equal(listingResponse.body.listingDrafts.length, 1);
     assert.equal(listingResponse.body.set.listingDrafts.length, 1);
 
     const responseDraft = listingResponse.body.listingDrafts[0];
     const setDraft = listingResponse.body.set.listingDrafts[0];
-    assert.equal(responseDraft.schemaVersion, "2");
+    assert.equal(responseDraft.schemaVersion, undefined);
     assert.equal(responseDraft.platformId, "universal");
-    assert.equal(responseDraft.status, "needs-review");
+    assert.equal(responseDraft.status, "completed");
     assert.equal(responseDraft.evidenceMode, "input-only");
-    assert.equal(responseDraft.title, "Electronic Fishing Lure");
-    assert.doesNotMatch(responseDraft.title, new RegExp(`^${escapeRegExp(expectedPackText)}\\b`));
+    assert.match(responseDraft.title, new RegExp(`^${escapeRegExp(expectedPackText)} Electronic Fishing Lure\\b`));
+    assert.ok(responseDraft.fiveBullets.length > 0);
+    assert.ok(responseDraft.zhDisplay?.title);
     assert.equal(setDraft.title, responseDraft.title);
     assert.deepEqual(validateCreationListingDraft(responseDraft).errors, []);
 
@@ -635,13 +664,13 @@ test("creation listing endpoint preserves grouped mixed pack wording through val
   };
 
   await writeGroupedManifest({ setId: "creation-set-mixed-pack-plain", skuBundleCount: 1 });
-  await assertReviewableV2Listing({
+  await assertCompletedOldStyleListing({
     setId: "creation-set-mixed-pack-plain",
     expectedPackText: "2 Pack / 3 Pack",
   });
 
   await writeGroupedManifest({ setId: "creation-set-mixed-pack-bundled", skuBundleCount: 2 });
-  await assertReviewableV2Listing({
+  await assertCompletedOldStyleListing({
     setId: "creation-set-mixed-pack-bundled",
     expectedPackText: "4 Pack / 6 Pack",
   });
@@ -718,8 +747,8 @@ test("creation listing endpoint merges drafts into latest manifest after upstrea
       output_text: JSON.stringify({
         title: "1 Pack Blue Fishing Lure Bass Freshwater Bait Compact Tackle",
         sellingPoints: ["Blue profile helps organize fishing lure variants."],
-        painPoints: ["Flat lure movement can be ignored in stained water; the blue profile helps the bait stay noticeable."],
-        fiveBullets: [
+        buyerObjections: ["Flat lure movement can be ignored in stained water; the blue profile helps the bait stay noticeable."],
+        highlights: [
           "CORE VALUE: 1 Pack 8.89 cm (3.5 in) size keeps quantity and dimensions visible.",
           "BUILT TO LAST: Blue lure profile supports clear SKU identification.",
           "REAL-LIFE USE: Compact design works for bass fishing presentations.",
@@ -727,7 +756,7 @@ test("creation listing endpoint merges drafts into latest manifest after upstrea
           "PACKAGE SNAPSHOT: Keyword-focused copy keeps listing language concise.",
         ],
         description: "Blue fishing lure option for US marketplace shoppers comparing compact freshwater tackle.",
-        backendSearchTerms: "blue fishing lure bass bait compact lure",
+        searchTerms: ["blue fishing lure", "bass bait", "compact lure"],
         keywordBuckets: {
           exact: ["blue fishing lure"],
           longTail: ["3.5 in bass lure"],
@@ -736,6 +765,28 @@ test("creation listing endpoint merges drafts into latest manifest after upstrea
         },
         missingInfo: [],
         warnings: [],
+        zhDisplay: {
+          title: "一件装蓝色淡水钓鱼拟饵",
+          sellingPoints: ["蓝色外观便于区分已提供的拟饵选项。"],
+          buyerObjections: ["浑水环境中平淡动作不易被察觉，蓝色外观便于观察拟饵。"],
+          highlights: [
+            "一件装与尺寸信息便于核对。",
+            "蓝色拟饵外观便于识别当前选项。",
+            "紧凑设计适合淡水鲈鱼垂钓场景。",
+            "尺寸与颜色信息便于购买前比较。",
+            "简洁商品信息聚焦已提供的拟饵。",
+          ],
+          description: "蓝色钓鱼拟饵的中文商品说明。",
+          searchTerms: ["蓝色钓鱼拟饵", "鲈鱼拟饵", "紧凑拟饵"],
+          keywordBuckets: {
+            exact: ["蓝色钓鱼拟饵"],
+            longTail: ["3.5英寸鲈鱼拟饵"],
+            traffic: ["淡水拟饵"],
+            descriptive: ["紧凑蓝色拟饵"],
+          },
+          missingInfo: [],
+          warnings: [],
+        },
       }),
     }));
   });
@@ -752,7 +803,7 @@ test("creation listing endpoint merges drafts into latest manifest after upstrea
     responsesModel: "gpt-5.4",
     reasoningEffort: "low",
   });
-  assert.equal(listingResponse.response.status, 200);
+  assert.equal(listingResponse.response.status, 200, JSON.stringify(listingResponse.body));
   assert.equal(listingResponse.body.set.productName, "Updated Fishing Lure");
   assert.equal(listingResponse.body.set.items[0].prompt, "new prompt");
   assert.equal(listingResponse.body.set.items[0].status, "failed");

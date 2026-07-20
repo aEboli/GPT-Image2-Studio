@@ -6,7 +6,9 @@ const stylesPath = new URL("../public/styles.css", import.meta.url);
 const appPath = new URL("../public/app.js", import.meta.url);
 
 function readCssRule(styles, selector) {
-  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const escapedSelector = selector
+    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    .replace(/\n/g, "\\r?\\n");
   const matches = [...styles.matchAll(new RegExp(`(?:^|\\n)${escapedSelector}\\s*\\{([\\s\\S]*?)\\n\\}`, "g"))];
   return matches.at(-1)?.[1] || "";
 }
@@ -26,7 +28,7 @@ test("timeline activity rows use distinct status and metadata colors", async () 
   assert.doesNotMatch(styles, /\.timeline-item\.done[^\{]*\.timeline-start-time\s*\{/);
 });
 
-test("creation record colors only its time with the timeline time rule", async () => {
+test("creation record colors its full date and time with the timeline time rule", async () => {
   const [app, styles] = await Promise.all([
     readFile(appPath, "utf8"),
     readFile(stylesPath, "utf8"),
@@ -34,8 +36,8 @@ test("creation record colors only its time with the timeline time rule", async (
 
   assert.match(readCssRule(styles, ".creation-card-media span,\n.creation-record-meta"), /color:\s*var\(--muted\);/);
   assert.match(styles, /\.timeline-start-time,\s*\n\.creation-record-time\s*\{/);
-  assert.match(app, /const metaParts = \[languageLabel, `\$\{progress\.completed\}\/\$\{progress\.total\}`\]\.filter\(Boolean\);/);
-  assert.match(app, /const recordTimeText = formatClock\(set\.createdAt\);/);
+  assert.match(app, /const metaParts = \[platformLabel, `\$\{progress\.completed\}\/\$\{progress\.total\}`\]\.filter\(Boolean\);/);
+  assert.match(app, /const recordTimeText = formatTime\(set\.updatedAt \|\| set\.createdAt\);/);
   assert.match(app, /meta\.textContent = metaParts\.join\(" · "\);/);
   assert.match(app, /if \(recordTimeText\) \{/);
   assert.match(app, /recordTime\.className = "creation-record-time";/);

@@ -68,7 +68,7 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Sora:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260713-cross-device-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260720-creation-reference-apply-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -1364,15 +1364,12 @@
                     <button class="inline-button reference-analysis-button" id="creationReferenceAnalyzeButton" type="button">
                       智能识别
                     </button>
-                    <button class="inline-button reference-analysis-button hidden" id="creationReferenceApplyAnalysisButton" type="button">
-                      应用建议
-                    </button>
                     <p class="prompt-agent-feedback" id="creationReferenceAnalysisFeedback"></p>
                   </div>
                   <div class="reference-analysis-panel creation-reference-analysis-panel hidden" id="creationReferenceAnalysisPanel">
                     <div class="reference-analysis-head">
                       <div class="creation-reference-analysis-head-copy">
-                        <span>参考图建议</span>
+                        <span>识别结果</span>
                       </div>
                       <div class="creation-reference-analysis-head-actions">
                         <button
@@ -1383,7 +1380,7 @@
                           aria-controls="creationReferenceAnalysisList"
                           disabled
                         >
-                          折叠建议
+                          收起结果
                         </button>
                       </div>
                       <strong id="creationReferenceAnalysisSummary">--</strong>
@@ -1458,15 +1455,23 @@
                     <span>套图数量</span>
                     <select id="creationImageCountInput" name="imageCount">
                       <option value="0">0 张</option>
+                      <option value="1">1 张</option>
+                      <option value="2">2 张</option>
+                      <option value="3">3 张</option>
                       <option value="4">4 张</option>
+                      <option value="5">5 张</option>
                       <option value="6">6 张</option>
                       <option value="7">7 张</option>
                       <option value="8">8 张</option>
                       <option value="9">9 张</option>
                       <option value="10">10 张</option>
+                      <option value="11">11 张</option>
                       <option value="12">12 张</option>
+                      <option value="13">13 张</option>
                       <option value="14">14 张</option>
+                      <option value="15">15 张</option>
                       <option value="16">16 张</option>
+                      <option value="17">17 张</option>
                       <option value="18" selected>18 张</option>
                     </select>
                   </label>
@@ -1559,7 +1564,12 @@
 
                   <div class="creation-toggle-row" data-creation-set-only>
                     <label class="creation-listing-toggle">
-                      <input id="creationInfographicRebuildEnabledInput" name="infographicRebuildEnabled" type="checkbox" checked />
+                      <input id="creationSkuGenerationEnabledInput" name="skuGenerationEnabled" type="checkbox" checked />
+                      <span>SKU 图</span>
+                    </label>
+
+                    <label class="creation-listing-toggle">
+                      <input id="creationInfographicRebuildEnabledInput" name="infographicRebuildEnabled" type="checkbox" />
                       <span>信息图重构</span>
                     </label>
 
@@ -1647,116 +1657,15 @@
                     <div class="creation-plan-message validation hidden" id="creationPlanValidation" aria-live="polite"></div>
                   </div>
 
-                  <details class="creation-plan-advanced" id="creationPlanAdvancedToggle">
-                    <summary>
-                      <span>逐图高级编辑</span>
-                      <small>0 项修改</small>
-                    </summary>
-                    <div class="creation-plan-advanced-body">
-                      <div class="creation-plan-slot-toolbar">
-                        <span>图片顺序</span>
-                        <button class="inline-button" type="button" data-creation-plan-action="add">添加图片</button>
+                  <section class="creation-role-picker" id="creationRolePicker" aria-label="兼容套图图片类型" data-creation-set-only>
+                    <div class="field-head">
+                      <div>
+                        <span>兼容图片类型</span>
                       </div>
-                      <div class="creation-plan-slots" id="creationPlanSlots" role="list">
-                        <p class="creation-plan-empty" data-creation-plan-empty>暂无计划项</p>
-                      </div>
-
-                      <template id="creationPlanSlotTemplate">
-                        <article class="creation-plan-slot" data-creation-plan-slot data-slot-key="" data-overridden="false" role="listitem">
-                          <div class="creation-plan-slot-head">
-                            <span class="creation-plan-slot-order" data-creation-plan-order>1</span>
-                            <label class="creation-plan-slot-enabled">
-                              <input type="checkbox" data-creation-plan-enabled checked />
-                              <span>启用</span>
-                            </label>
-                            <span class="creation-plan-overridden hidden" data-creation-plan-overridden>已修改</span>
-                          </div>
-
-                          <div class="creation-plan-slot-actions" aria-label="调整图片顺序">
-                            <button class="inline-button" type="button" data-creation-plan-action="move-up" aria-label="上移" title="上移">上移</button>
-                            <button class="inline-button" type="button" data-creation-plan-action="move-down" aria-label="下移" title="下移">下移</button>
-                            <button class="inline-button" type="button" data-creation-plan-action="add-after">在后面添加</button>
-                            <button class="inline-button danger" type="button" data-creation-plan-action="remove">删除</button>
-                          </div>
-
-                          <div class="creation-plan-slot-fields">
-                            <label class="creation-plan-field" data-creation-plan-field-state="automatic">
-                              <span>图片类型</span>
-                              <select data-creation-plan-field="imageType">
-                                <option value="">跟随平台</option>
-                              </select>
-                            </label>
-                            <label class="creation-plan-field" data-creation-plan-field-state="automatic">
-                              <span>比例</span>
-                              <select data-creation-plan-field="ratio">
-                                <option value="">跟随平台</option>
-                              </select>
-                            </label>
-                            <label class="creation-plan-field" data-creation-plan-field-state="automatic">
-                              <span>分辨率</span>
-                              <select data-creation-plan-field="resolutionTier">
-                                <option value="">跟随平台</option>
-                                <option value="1.5K">1.5K</option>
-                                <option value="2K">2K</option>
-                                <option value="max">最大</option>
-                              </select>
-                            </label>
-                            <label class="creation-plan-field" data-creation-plan-field-state="automatic">
-                              <span>目标语言</span>
-                              <select data-creation-plan-field="targetLanguage">
-                                <option value="">跟随平台</option>
-                                <option value="zh-CN">简体中文</option>
-                                <option value="en">English</option>
-                                <option value="ja">日本語</option>
-                                <option value="ko">한국어</option>
-                                <option value="fr">Français</option>
-                                <option value="de">Deutsch</option>
-                                <option value="es">Español</option>
-                              </select>
-                            </label>
-                            <label class="creation-plan-field" data-creation-plan-field-state="automatic">
-                              <span>构图</span>
-                              <select data-creation-plan-field="composition">
-                                <option value="">跟随平台</option>
-                              </select>
-                            </label>
-                            <label class="creation-plan-field" data-creation-plan-field-state="automatic">
-                              <span>文字密度</span>
-                              <select data-creation-plan-field="textPolicy">
-                                <option value="">跟随平台</option>
-                              </select>
-                            </label>
-                            <label class="creation-plan-field" data-creation-plan-field-state="automatic">
-                              <span>场景策略</span>
-                              <select data-creation-plan-field="scenePolicy">
-                                <option value="">跟随平台</option>
-                              </select>
-                            </label>
-                            <label class="creation-plan-field" data-creation-plan-field-state="automatic">
-                              <span>Logo 策略</span>
-                              <select data-creation-plan-field="logoPolicy">
-                                <option value="">跟随平台</option>
-                              </select>
-                            </label>
-                            <label class="creation-plan-field creation-plan-prompt-field" data-creation-plan-field-state="automatic">
-                              <span>提示词</span>
-                              <textarea rows="3" data-creation-plan-field="prompt"></textarea>
-                            </label>
-                          </div>
-                        </article>
-                      </template>
-
-                      <section class="creation-role-picker" id="creationRolePicker" aria-label="兼容套图图片类型" data-creation-set-only>
-                        <div class="field-head">
-                          <div>
-                            <span>兼容图片类型</span>
-                          </div>
-                          <small id="creationRoleCount">18 / 18</small>
-                        </div>
-                        <div class="creation-role-grid" id="creationRoleGrid"></div>
-                      </section>
+                      <small id="creationRoleCount">18 / 18</small>
                     </div>
-                  </details>
+                    <div class="creation-role-grid" id="creationRoleGrid"></div>
+                  </section>
                 </section>
 
                 <div class="creation-plan-actions" data-creation-set-only>
@@ -1787,7 +1696,6 @@
                 </div>
                 <div class="creation-listing-drafts" id="creationInlineListingDrafts"></div>
               </section>
-              <div class="creation-prompt-editor-layer" id="creationPromptEditorLayer" aria-live="polite"></div>
             </section>
           </div>
         </section>
@@ -1816,6 +1724,12 @@
                     <span>上传人物参考图</span>
                   </label>
                   <div class="portrait-reference-grid hidden" id="portraitReferenceGrid"></div>
+                  <div class="creation-plan-actions portrait-reference-analysis-actions">
+                    <button class="toolbar-button" id="portraitReferenceAnalyzeButton" type="button">分析人物参考图</button>
+                    <button class="toolbar-button" id="portraitReferenceApplyAnalysisButton" type="button" disabled>应用分析草稿</button>
+                  </div>
+                  <p class="ppt-feedback" id="portraitReferenceAnalysisFeedback" aria-live="polite"></p>
+                  <section class="creation-record-detail hidden" id="portraitReferenceAnalysisPanel" aria-live="polite"></section>
                 </div>
 
                 <div class="portrait-reference-block">
@@ -2245,11 +2159,40 @@
         </section>
 
         <section class="view-panel gallery-view hidden" data-view-panel="gallery" data-gallery-layout="desktop">
-          <section class="studio-panel gallery-panel">
-            <div class="gallery-toolbar">
+          <section class="studio-panel gallery-panel asset-workspace">
+            <header class="asset-page-head">
+              <div class="asset-title-row">
+                <div class="asset-title-block">
+                  <span class="asset-eyebrow">资产</span>
+                  <h2>瀑布画廊 <span class="count-pill" id="galleryCount">0 张</span></h2>
+                </div>
+                <div class="asset-head-actions">
+                  <a class="toolbar-button asset-primary-action" href="#studio">前往提示词生图</a>
+                  <button class="header-button" id="refreshGalleryButton" type="button" aria-label="刷新瀑布画廊">刷新</button>
+                </div>
+              </div>
+              <nav class="asset-view-nav" aria-label="资产视图">
+                <a href="#gallery" aria-current="page">瀑布画廊</a>
+                <a href="#article-record">文章插图</a>
+                <a href="#creation-record">套图</a>
+                <a href="#portrait-record">写真</a>
+                <a href="#ppt-record">PPT</a>
+              </nav>
+            </header>
+
+            <div class="gallery-toolbar asset-filter-zone">
               <div class="gallery-toolbar-head">
+                <label class="gallery-search-field">
+                  <span>搜索</span>
+                  <input
+                    class="gallery-search-input"
+                    id="gallerySearchInput"
+                    type="search"
+                    placeholder="提示词、文件名、参考图名"
+                    autocomplete="off"
+                  />
+                </label>
                 <div class="gallery-top-actions">
-                  <span class="count-pill" id="galleryCount">0 张</span>
                   <div class="gallery-column-switch" role="group" aria-label="画廊列数">
                     <span class="gallery-column-label">列</span>
                     <button
@@ -2298,11 +2241,9 @@
                       18
                     </button>
                   </div>
-                  <button class="header-button" id="refreshGalleryButton" type="button">刷新画廊</button>
                 </div>
                 <div class="gallery-toolbar-meta">
                   <div class="gallery-filters" id="galleryFilters"></div>
-                  <p class="gallery-helper-text" id="galleryHelperText">按日期分组显示，可按关键词、日期、尺寸和参考图快速筛选。</p>
                   <div class="gallery-pagination hidden" id="galleryPagination" aria-label="画廊历史分页">
                     <button class="gallery-page-button" id="galleryPreviousPageButton" type="button">上一页</button>
                     <span class="gallery-page-status" id="galleryPageStatus">第 1 / 1 页</span>
@@ -2313,16 +2254,6 @@
               </div>
 
               <div class="gallery-filter-row">
-                <label class="gallery-search-field">
-                  <span>关键词</span>
-                  <input
-                    class="gallery-search-input"
-                    id="gallerySearchInput"
-                    type="search"
-                    placeholder="搜索提示词、文件名、参考图名"
-                    autocomplete="off"
-                  />
-                </label>
                 <label class="gallery-inline-field">
                   <span>日期</span>
                   <input class="gallery-date-input" id="galleryDateInput" type="date" />
@@ -2335,45 +2266,66 @@
                   <span>参考图</span>
                   <select class="gallery-filter-select" id="galleryReferenceFilterInput"></select>
                 </label>
+                <p class="gallery-helper-text" id="galleryHelperText" aria-live="polite">按日期分组显示，可按关键词、日期、尺寸和参考图快速筛选。</p>
               </div>
-
             </div>
 
             <div class="gallery-scroll-shell">
               <div class="gallery-scroll-region" id="galleryScrollRegion">
-                <div class="gallery-empty" id="galleryEmpty">还没有本地输出，先回到 Studio 生成一张图。</div>
-                <div class="gallery-sections" id="gallerySections"></div>
-              </div>
-
-              <div class="gallery-scrollbar" id="galleryScrollbar" data-disabled="true" aria-label="瀑布画廊滚动控制">
-                <button class="gallery-scroll-arrow" id="galleryScrollUp" type="button" aria-label="向上滚动">↑</button>
-                <div class="gallery-scroll-track" id="galleryScrollTrack">
-                  <button
-                    class="gallery-scroll-thumb"
-                    id="galleryScrollThumb"
-                    type="button"
-                    aria-label="拖动查看瀑布画廊"
-                  ></button>
+                <div class="gallery-empty asset-empty-state" id="galleryEmpty">
+                  <strong>暂无图片</strong>
+                  <p>还没有本地输出。</p>
+                  <a class="toolbar-button asset-primary-action" href="#studio">前往提示词生图</a>
                 </div>
-                <button class="gallery-scroll-arrow" id="galleryScrollDown" type="button" aria-label="向下滚动">↓</button>
+                <div class="gallery-sections" id="gallerySections"></div>
               </div>
             </div>
           </section>
         </section>
 
         <section class="view-panel article-record-view hidden" data-view-panel="article-record">
-          <section class="studio-panel article-record-panel">
-            <div class="panel-title between">
-              <div>
-                <h2>文章插图记录</h2>
+          <section class="studio-panel article-record-panel asset-workspace">
+            <header class="asset-page-head">
+              <div class="asset-title-row">
+                <div class="asset-title-block">
+                  <span class="asset-eyebrow">资产</span>
+                  <h2>文章插图 <span class="count-pill" id="articleRecordCount">0 套</span></h2>
+                </div>
+                <div class="asset-head-actions article-record-actions">
+                  <button class="toolbar-button asset-primary-action hidden" id="articleRecordContinueButton" type="button" disabled>继续失败项</button>
+                  <button class="toolbar-button" id="articleRecordRefreshButton" type="button">刷新</button>
+                  <details class="asset-command-menu" data-asset-menu>
+                    <summary aria-label="更多文章记录操作">更多</summary>
+                    <div class="asset-command-popover" role="group" aria-label="复制">
+                      <span class="asset-command-label">复制</span>
+                      <button class="toolbar-button" id="articleRecordCopyPromptsButton" type="button" disabled>复制提示词</button>
+                      <button class="toolbar-button" id="articleRecordCopyCaptionsButton" type="button" disabled>复制题注</button>
+                    </div>
+                  </details>
+                </div>
               </div>
-              <div class="article-record-actions">
+              <nav class="asset-view-nav" aria-label="资产视图">
+                <a href="#gallery">瀑布画廊</a><a href="#article-record" aria-current="page">文章插图</a><a href="#creation-record">套图</a><a href="#portrait-record">写真</a><a href="#ppt-record">PPT</a>
+              </nav>
+              <div class="asset-context-row">
                 <label class="creation-record-search">
                   <span>搜索</span>
                   <input id="articleRecordSearchInput" type="search" placeholder="标题、风格、正文摘要" autocomplete="off" />
                 </label>
-                <span class="count-pill" id="articleRecordCount">0 套</span>
-                <div class="gallery-column-switch article-record-column-switch" role="group" aria-label="文章插图记录列数">
+                <p class="prompt-agent-feedback creation-record-feedback" id="articleRecordFeedback" aria-live="polite"></p>
+              </div>
+            </header>
+            <div class="article-record-browser">
+              <div class="asset-record-picker" data-asset-record-picker>
+                <button class="asset-record-picker-trigger" type="button" aria-expanded="false" aria-controls="articleRecordList">
+                  <span>选择文章</span><strong id="articleRecordSelection">尚未选择</strong>
+                </button>
+                <div class="article-record-list" id="articleRecordList" role="listbox" aria-label="文章插图记录"></div>
+              </div>
+              <div class="article-record-detail-pane">
+                <div class="asset-content-toolbar">
+                  <span>图片密度</span>
+                  <div class="gallery-column-switch article-record-column-switch" role="group" aria-label="文章插图记录列数">
                   <span class="gallery-column-label">列</span>
                   <button
                     class="gallery-column-button"
@@ -2412,50 +2364,51 @@
                     8
                   </button>
                 </div>
-                <button class="toolbar-button" id="articleRecordCopyPromptsButton" type="button" disabled>复制提示词</button>
-                <button class="toolbar-button" id="articleRecordCopyCaptionsButton" type="button" disabled>复制题注</button>
-                <button class="toolbar-button" id="articleRecordContinueButton" type="button" disabled>继续失败项</button>
-                <button class="toolbar-button" id="articleRecordRefreshButton" type="button">刷新记录</button>
-                <p class="prompt-agent-feedback creation-record-feedback" id="articleRecordFeedback" aria-live="polite"></p>
+                  </div>
+                <article class="article-record-detail" id="articleRecordDetail" aria-live="polite" tabindex="-1"></article>
               </div>
-            </div>
-            <div class="article-record-browser">
-              <div class="article-record-list" id="articleRecordList"></div>
-              <article class="article-record-detail" id="articleRecordDetail" aria-live="polite" tabindex="-1"></article>
             </div>
           </section>
         </section>
 
         <section class="view-panel creation-record-view hidden" data-view-panel="creation-record">
-          <section class="studio-panel creation-record-panel">
-            <div class="panel-title between">
-              <div>
-                <h2>套图记录</h2>
-              </div>
-              <div class="creation-record-actions">
-                <label class="creation-record-search">
-                  <span>搜索</span>
-                  <input id="creationRecordSearchInput" type="search" placeholder="商品、场景、语言" autocomplete="off" />
-                </label>
-                <span class="count-pill" id="creationRecordCount">0 套</span>
-                <button class="toolbar-button" id="creationRecordOpenFolderButton" type="button" disabled>打开套图文件夹</button>
-                <button class="toolbar-button" id="creationRecordCopyFullPathsButton" type="button" disabled>复制完整路径</button>
-                <div class="creation-record-export-actions">
-                  <button class="toolbar-button" id="creationRecordCopyPromptsButton" type="button" disabled>复制提示词</button>
-                  <button class="toolbar-button" id="creationRecordExportPromptsButton" type="button" disabled>导出提示词</button>
-                  <button class="toolbar-button" id="creationRecordExportManifestButton" type="button" disabled>导出清单</button>
-                  <button class="toolbar-button" id="creationRecordGenerateListingsButton" type="button" disabled>生成 Listing</button>
-                  <button class="toolbar-button" id="creationRecordCopyListingsButton" type="button" disabled>复制 Listing</button>
-                  <button class="toolbar-button" id="creationRecordExportListingsButton" type="button" disabled>导出 Listing</button>
+          <section class="studio-panel creation-record-panel asset-workspace">
+            <header class="asset-page-head">
+              <div class="asset-title-row">
+                <div class="asset-title-block"><span class="asset-eyebrow">资产</span><h2>套图记录 <span class="count-pill" id="creationRecordCount">0 套</span></h2></div>
+                <div class="asset-head-actions creation-record-actions">
+                  <button class="toolbar-button asset-primary-action" id="creationRecordRepairIncompleteButton" type="button" disabled>补齐未生成图像</button>
+                  <button class="toolbar-button asset-primary-action" id="creationRecordReuseButton" type="button" disabled>复用到当前套图</button>
+                  <button class="toolbar-button" id="creationRecordRefreshButton" type="button">刷新</button>
+                  <details class="asset-command-menu" data-asset-menu>
+                    <summary aria-label="更多套图记录操作">更多</summary>
+                    <div class="asset-command-popover">
+                      <div class="asset-command-group" role="group" aria-label="文件">
+                        <span class="asset-command-label">文件</span>
+                        <button class="toolbar-button" id="creationRecordOpenFolderButton" type="button" disabled>打开文件夹</button>
+                        <button class="toolbar-button" id="creationRecordCopyFullPathsButton" type="button" disabled>复制完整路径</button>
+                      </div>
+                      <div class="asset-command-group creation-record-export-actions" role="group" aria-label="导出">
+                        <span class="asset-command-label">导出</span>
+                        <button class="toolbar-button" id="creationRecordCopyPromptsButton" type="button" disabled>复制提示词</button>
+                        <button class="toolbar-button" id="creationRecordExportPromptsButton" type="button" disabled>导出提示词</button>
+                        <button class="toolbar-button" id="creationRecordExportManifestButton" type="button" disabled>导出清单</button>
+                      </div>
+                    </div>
+                  </details>
                 </div>
-                <button class="toolbar-button" id="creationRecordReuseButton" type="button" disabled>复用到当前套图</button>
-                <button class="toolbar-button" id="creationRecordRepairIncompleteButton" type="button" disabled>补齐未生成图像</button>
-                <button class="toolbar-button" id="creationRecordRefreshButton" type="button">刷新记录</button>
+              </div>
+              <nav class="asset-view-nav" aria-label="资产视图"><a href="#gallery">瀑布画廊</a><a href="#article-record">文章插图</a><a href="#creation-record" aria-current="page">套图</a><a href="#portrait-record">写真</a><a href="#ppt-record">PPT</a></nav>
+              <div class="asset-context-row">
+                <label class="creation-record-search"><span>搜索</span><input id="creationRecordSearchInput" type="search" placeholder="商品、场景、语言" autocomplete="off" /></label>
                 <p class="prompt-agent-feedback creation-record-feedback" id="creationRecordActionFeedback" aria-live="polite"></p>
               </div>
-            </div>
+            </header>
             <div class="creation-record-browser">
-              <div class="creation-set-list creation-record-list" id="creationRecordSetList"></div>
+              <div class="asset-record-picker" data-asset-record-picker>
+                <button class="asset-record-picker-trigger" type="button" aria-expanded="false" aria-controls="creationRecordSetList"><span>选择套图</span><strong id="creationRecordSelection">尚未选择</strong></button>
+                <div class="creation-set-list creation-record-list" id="creationRecordSetList" role="listbox" aria-label="套图记录"></div>
+              </div>
               <article class="creation-record-archive" aria-live="polite" tabindex="-1">
                 <div class="creation-record-detail" id="creationRecordArchiveDetail"></div>
                 <div class="creation-record-results">
@@ -2464,6 +2417,11 @@
                     <div class="panel-title between">
                       <h3>Listing 草稿</h3>
                       <span class="count-pill small" id="creationRecordListingStatus">未生成</span>
+                    </div>
+                    <div class="asset-listing-actions" role="group" aria-label="Listing 操作">
+                      <button class="toolbar-button" id="creationRecordGenerateListingsButton" type="button" disabled>生成 Listing</button>
+                      <button class="toolbar-button" id="creationRecordCopyListingsButton" type="button" disabled>复制 Listing</button>
+                      <button class="toolbar-button" id="creationRecordExportListingsButton" type="button" disabled>导出 Listing</button>
                     </div>
                     <div class="creation-listing-drafts" id="creationRecordListingDrafts"></div>
                   </section>
@@ -2474,29 +2432,30 @@
         </section>
 
         <section class="view-panel portrait-record-view hidden" data-view-panel="portrait-record">
-          <section class="studio-panel portrait-record-panel">
-            <div class="panel-title between">
-              <div>
-                <h2>写真记录</h2>
+          <section class="studio-panel portrait-record-panel asset-workspace">
+            <header class="asset-page-head">
+              <div class="asset-title-row">
+                <div class="asset-title-block"><span class="asset-eyebrow">资产</span><h2>写真记录 <span class="count-pill" id="portraitRecordCount">0 组</span></h2></div>
+                <div class="asset-head-actions creation-record-actions">
+                  <button class="toolbar-button asset-primary-action" id="portraitRecordReuseButton" type="button" disabled>复用到当前写真</button>
+                  <button class="toolbar-button" id="portraitRecordRefreshButton" type="button">刷新</button>
+                  <details class="asset-command-menu" data-asset-menu>
+                    <summary aria-label="更多写真记录操作">更多</summary>
+                    <div class="asset-command-popover">
+                      <div class="asset-command-group" role="group" aria-label="文件"><span class="asset-command-label">文件</span><button class="toolbar-button" id="portraitRecordOpenFolderButton" type="button" disabled>打开文件夹</button><button class="toolbar-button" id="portraitRecordCopyPathsButton" type="button" disabled>复制路径</button></div>
+                      <div class="asset-command-group" role="group" aria-label="导出"><span class="asset-command-label">导出</span><button class="toolbar-button" id="portraitRecordCopyPromptsButton" type="button" disabled>复制提示词</button><button class="toolbar-button" id="portraitRecordExportPromptsButton" type="button" disabled>导出提示词</button><button class="toolbar-button" id="portraitRecordExportManifestButton" type="button" disabled>导出清单</button></div>
+                    </div>
+                  </details>
+                </div>
               </div>
-              <div class="creation-record-actions">
-                <label class="creation-record-search">
-                  <span>搜索</span>
-                  <input id="portraitRecordSearchInput" type="search" placeholder="人物、风格、提示词" autocomplete="off" />
-                </label>
-                <span class="count-pill" id="portraitRecordCount">0 组</span>
-                <button class="toolbar-button" id="portraitRecordOpenFolderButton" type="button" disabled>打开文件夹</button>
-                <button class="toolbar-button" id="portraitRecordCopyPathsButton" type="button" disabled>复制路径</button>
-                <button class="toolbar-button" id="portraitRecordCopyPromptsButton" type="button" disabled>复制提示词</button>
-                <button class="toolbar-button" id="portraitRecordExportPromptsButton" type="button" disabled>导出提示词</button>
-                <button class="toolbar-button" id="portraitRecordExportManifestButton" type="button" disabled>导出清单</button>
-                <button class="toolbar-button" id="portraitRecordReuseButton" type="button" disabled>复用到当前写真</button>
-                <button class="toolbar-button" id="portraitRecordRefreshButton" type="button">刷新记录</button>
-                <p class="prompt-agent-feedback creation-record-feedback" id="portraitRecordActionFeedback" aria-live="polite"></p>
-              </div>
-            </div>
+              <nav class="asset-view-nav" aria-label="资产视图"><a href="#gallery">瀑布画廊</a><a href="#article-record">文章插图</a><a href="#creation-record">套图</a><a href="#portrait-record" aria-current="page">写真</a><a href="#ppt-record">PPT</a></nav>
+              <div class="asset-context-row"><label class="creation-record-search"><span>搜索</span><input id="portraitRecordSearchInput" type="search" placeholder="人物、风格、提示词" autocomplete="off" /></label><p class="prompt-agent-feedback creation-record-feedback" id="portraitRecordActionFeedback" aria-live="polite"></p></div>
+            </header>
             <div class="portrait-record-browser">
-              <div class="creation-set-list portrait-record-list" id="portraitRecordSetList"></div>
+              <div class="asset-record-picker" data-asset-record-picker>
+                <button class="asset-record-picker-trigger" type="button" aria-expanded="false" aria-controls="portraitRecordSetList"><span>选择写真</span><strong id="portraitRecordSelection">尚未选择</strong></button>
+                <div class="creation-set-list portrait-record-list" id="portraitRecordSetList" role="listbox" aria-label="写真记录"></div>
+              </div>
               <article class="creation-record-archive portrait-record-archive" aria-live="polite" tabindex="-1">
                 <div class="creation-record-detail" id="portraitRecordArchiveDetail"></div>
                 <div class="creation-result-grid portrait-record-result-grid" id="portraitRecordResultGrid"></div>
@@ -2506,19 +2465,23 @@
         </section>
 
         <section class="view-panel ppt-record-view hidden" data-view-panel="ppt-record">
-          <section class="studio-panel ppt-record-panel">
-            <div class="panel-title between">
-              <div>
-                <h2>PPT记录</h2>
+          <section class="studio-panel ppt-record-panel asset-workspace">
+            <header class="asset-page-head">
+              <div class="asset-title-row">
+                <div class="asset-title-block"><span class="asset-eyebrow">资产</span><h2>PPT 记录 <span class="count-pill" id="pptRecordCount">0 个</span></h2></div>
+                <div class="asset-head-actions ppt-record-actions">
+                  <a class="toolbar-button asset-primary-action" href="#ppt">新建 PPT</a>
+                  <button class="toolbar-button" id="pptRecordRefreshButton" type="button">刷新</button>
+                </div>
               </div>
-              <div class="ppt-record-actions">
-                <span class="count-pill" id="pptRecordCount">0 个</span>
-                <button class="toolbar-button" id="pptRecordRefreshButton" type="button">刷新记录</button>
-              </div>
-            </div>
-            <div class="ppt-record-empty" id="pptRecordEmpty">还没有找到 PPT 文件。</div>
+              <nav class="asset-view-nav" aria-label="资产视图"><a href="#gallery">瀑布画廊</a><a href="#article-record">文章插图</a><a href="#creation-record">套图</a><a href="#portrait-record">写真</a><a href="#ppt-record" aria-current="page">PPT</a></nav>
+            </header>
+            <div class="ppt-record-empty asset-empty-state" id="pptRecordEmpty"><strong>暂无 PPT</strong><p>还没有找到本地 PPT 文件。</p><a class="toolbar-button asset-primary-action" href="#ppt">前往 PPT 生成</a></div>
             <div class="ppt-record-browser">
-              <div class="ppt-record-list" id="pptRecordList"></div>
+              <div class="asset-record-picker" data-asset-record-picker>
+                <button class="asset-record-picker-trigger" type="button" aria-expanded="false" aria-controls="pptRecordList"><span>选择 PPT</span><strong id="pptRecordSelection">尚未选择</strong></button>
+                <div class="ppt-record-list" id="pptRecordList" role="listbox" aria-label="PPT 记录"></div>
+              </div>
               <article class="ppt-record-detail" id="pptRecordDetail" aria-live="polite" tabindex="-1"></article>
             </div>
           </section>
@@ -2528,9 +2491,10 @@
 
     <aside class="lightbox hidden" id="lightbox" aria-hidden="true">
       <div class="lightbox-backdrop" id="lightboxBackdrop"></div>
-      <div class="lightbox-dialog" role="dialog" aria-modal="true" aria-label="图片详情">
+      <div class="lightbox-dialog" role="dialog" aria-modal="true" aria-labelledby="lightboxTitle">
         <div class="lightbox-top">
           <div class="lightbox-meta">
+            <strong id="lightboxTitle">图片详情</strong>
             <span class="model-badge" id="lightboxModel">GPT Image 2.0</span>
             <span id="lightboxTime"></span>
             <span id="lightboxId"></span>
@@ -2538,17 +2502,14 @@
 
           <div class="lightbox-actions">
             <div class="lightbox-viewer-controls hidden" role="group" aria-label="图片查看控制">
-              <button class="toolbar-button" id="lightboxZoomOutButton" type="button" aria-label="缩小图片">-</button>
+              <button class="toolbar-button" id="lightboxZoomOutButton" type="button" aria-label="缩小图片" title="缩小图片">−</button>
               <span class="lightbox-zoom-label" id="lightboxZoomLabel" aria-live="polite">适配</span>
-              <button class="toolbar-button" id="lightboxZoomInButton" type="button" aria-label="放大图片">+</button>
-              <button class="toolbar-button" id="lightboxFitButton" type="button">适配</button>
-              <button class="toolbar-button" id="lightboxActualSizeButton" type="button">100%</button>
+              <button class="toolbar-button" id="lightboxZoomInButton" type="button" aria-label="放大图片" title="放大图片">+</button>
+              <button class="toolbar-button" id="lightboxFitButton" type="button" aria-label="适配窗口" title="适配窗口">适配</button>
+              <button class="toolbar-button" id="lightboxActualSizeButton" type="button" aria-label="按原始尺寸查看" title="按原始尺寸查看">100%</button>
             </div>
-            <a class="toolbar-button" id="lightboxDownload" href="#" download>下载</a>
-            <button class="toolbar-button lightbox-record-action hidden" id="lightboxCopyPathButton" type="button">复制路径</button>
-            <button class="toolbar-button lightbox-record-action hidden" id="lightboxCopyFullPathButton" type="button">复制完整路径</button>
-            <button class="toolbar-button danger" id="lightboxDelete" type="button">删除</button>
-            <button class="toolbar-button" id="lightboxClose" type="button">关闭</button>
+            <a class="toolbar-button asset-primary-action" id="lightboxDownload" href="#" download>下载</a>
+            <button class="toolbar-button" id="lightboxClose" type="button" aria-label="关闭图片详情" title="关闭">关闭</button>
           </div>
         </div>
 
@@ -2558,20 +2519,22 @@
             <img id="lightboxImage" alt="放大预览" />
           </div>
 
-          <div class="lightbox-fields">
-            <div class="detail-field">
-              <div class="detail-field-head">
-                <span id="lightboxPromptLabel">提示词</span>
-                <button class="inline-button detail-copy-button" id="copyPromptButton" type="button">复制</button>
+          <aside class="lightbox-fields" aria-label="图片检查器">
+            <div id="lightboxInspectorBody">
+              <div class="lightbox-inspector-tabs" role="tablist" aria-label="图片信息">
+                <button type="button" role="tab" aria-selected="false" data-lightbox-tab="prompt">提示词</button>
+                <button type="button" role="tab" aria-selected="true" data-lightbox-tab="params">参数</button>
+                <button type="button" role="tab" aria-selected="false" data-lightbox-tab="file">文件</button>
               </div>
-              <textarea id="lightboxPrompt" rows="4" readonly aria-labelledby="lightboxPromptLabel"></textarea>
+              <section class="detail-field hidden" role="tabpanel" data-lightbox-panel="prompt">
+                <div class="detail-field-head"><span id="lightboxPromptLabel">提示词</span><button class="inline-button detail-copy-button" id="copyPromptButton" type="button">复制</button></div>
+                <div class="lightbox-structured-prompt" id="lightboxPromptStructured"></div>
+                <textarea id="lightboxPrompt" rows="4" readonly aria-labelledby="lightboxPromptLabel"></textarea>
+              </section>
+              <section class="detail-field" role="tabpanel" data-lightbox-panel="params"><span id="lightboxParamsLabel">参数</span><textarea id="lightboxParams" rows="6" readonly aria-labelledby="lightboxParamsLabel"></textarea></section>
+              <section class="detail-field hidden" role="tabpanel" data-lightbox-panel="file"><span>文件信息</span><dl class="lightbox-file-list"><div><dt>文件名</dt><dd id="lightboxFilename">--</dd></div><div><dt>相对路径</dt><dd id="lightboxRelativePath">--</dd></div></dl></section>
             </div>
-
-            <div class="detail-field">
-              <span id="lightboxParamsLabel">参数</span>
-              <textarea id="lightboxParams" rows="6" readonly aria-labelledby="lightboxParamsLabel"></textarea>
-            </div>
-          </div>
+          </aside>
         </div>
       </div>
     </aside>
@@ -2957,6 +2920,6 @@
       </div>
     </aside>
 
-    <script type="module" src="./app.js?v=20260713-cross-device-1"></script>
+    <script type="module" src="./app.js?v=20260720-creation-reference-apply-1"></script>
   </body>
 </html>
