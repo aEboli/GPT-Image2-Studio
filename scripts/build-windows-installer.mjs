@@ -23,6 +23,7 @@ const installCmd = join(installerDir, "install.cmd");
 const sedPath = join(installerDir, "installer.sed");
 const setupExe = join(buildRoot, `${appName}-Setup-v${version}.exe`);
 const IEXPRESS_TIMEOUT_MS = 600000;
+const NPM_CI_TIMEOUT_MS = 300000;
 
 const includePaths = [
   ".env.example",
@@ -35,7 +36,6 @@ const includePaths = [
   "lib",
   "package-lock.json",
   "package.json",
-  "node_modules",
   "public",
   "server.mjs",
   "stop-studio-services.cmd",
@@ -47,6 +47,19 @@ function run(command, args, options = {}) {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
     ...options,
+  });
+}
+
+function installProductionDependencies() {
+  const npmExecPath = String(process.env.npm_execpath || "").trim();
+  if (!npmExecPath) {
+    throw new Error("Cannot locate npm CLI. Run this build through npm run build:installer.");
+  }
+
+  const npmArgs = ["ci", "--omit=dev", "--no-audit", "--no-fund"];
+  run(process.execPath, [npmExecPath, ...npmArgs], {
+    cwd: appStageDir,
+    timeout: NPM_CI_TIMEOUT_MS,
   });
 }
 
@@ -265,6 +278,7 @@ async function main() {
   for (const relativePath of includePaths) {
     await copyRecursive(join(rootDir, relativePath), join(appStageDir, relativePath));
   }
+  installProductionDependencies();
 
   const nodeExe = findNodeExe();
   if (!nodeExe) {

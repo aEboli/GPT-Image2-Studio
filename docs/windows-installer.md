@@ -2,6 +2,8 @@
 
 `GPT-Image2-Studio-Setup-v0.2.2.exe` 是 Windows 自解压安装包，由系统自带 `iexpress.exe` 生成，用于 GitHub Release 分发。
 
+这个兼容安装包启动后会在默认浏览器中打开工作台。需要独立窗口、任务栏身份和标准 NSIS 卸载体验时，请使用 [Windows 桌面程序](./windows-desktop.md)。
+
 ## 安装内容
 
 安装器会把工作台写入：

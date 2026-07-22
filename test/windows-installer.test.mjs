@@ -20,3 +20,13 @@ test("Windows installer payload keeps DNS fallback module, docs, and env switche
   assert.match(script, /"docs",/);
   assert.match(script, /env: \{ \.\.\.process\.env, PORT: String\(port\) \}/);
 });
+
+test("Windows browser installer stages production dependencies without Electron tooling", async () => {
+  const script = await readFile(installerScriptPath, "utf8");
+
+  assert.doesNotMatch(script, /^\s*"node_modules",$/m);
+  assert.match(script, /function installProductionDependencies\(\)/);
+  assert.match(script, /process\.env\.npm_execpath/);
+  assert.match(script, /\["ci", "--omit=dev", "--no-audit", "--no-fund"\]/);
+  assert.match(script, /installProductionDependencies\(\);/);
+});

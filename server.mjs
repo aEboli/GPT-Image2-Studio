@@ -5959,13 +5959,53 @@ const server = createServer(async (request, response) => {
   }
 });
 
-server.listen(port, serverHost, () => {
-  const now = new Date();
-  console.log(`Responses Image Studio 正在运行: http://${serverHost}:${port}`);
-  if (explicitHost && !isLoopbackHostname(serverHost)) {
-    console.log(`远程写接口令牌: ${requestToken}`);
-  }
-  console.log(`输出根目录: ${outputDir}`);
-  console.log(`当前输出目录: ${join(outputDir, formatMonthFolder(now), formatDayFolder(now))}`);
-  console.log(`配置文件: ${configStore.configPath}`);
+let listeningPort = port;
+await new Promise((resolveListen, rejectListen) => {
+  const handleListenError = (error) => {
+    rejectListen(error);
+  };
+  server.once("error", handleListenError);
+  server.listen(port, serverHost, () => {
+    server.off("error", handleListenError);
+    const address = server.address();
+    if (address && typeof address === "object") {
+      listeningPort = address.port;
+    }
+
+    const now = new Date();
+    console.log(`Responses Image Studio 正在运行: http://${serverHost}:${listeningPort}`);
+    if (explicitHost && !isLoopbackHostname(serverHost)) {
+      console.log(`远程写接口令牌: ${requestToken}`);
+    }
+    console.log(`输出根目录: ${outputDir}`);
+    console.log(`当前输出目录: ${join(outputDir, formatMonthFolder(now), formatDayFolder(now))}`);
+    console.log(`配置文件: ${configStore.configPath}`);
+    resolveListen();
+  });
 });
+
+export const studioServer = server;
+export const studioServerUrl = `http://${serverHost}:${listeningPort}`;
+
+let closeStudioServerPromise = null;
+
+export function closeStudioServer() {
+  if (closeStudioServerPromise) {
+    return closeStudioServerPromise;
+  }
+  if (!server.listening) {
+    return Promise.resolve();
+  }
+
+  closeStudioServerPromise = new Promise((resolveClose, rejectClose) => {
+    server.close((error) => {
+      if (error && error.code !== "ERR_SERVER_NOT_RUNNING") {
+        rejectClose(error);
+        return;
+      }
+      resolveClose();
+    });
+    server.closeAllConnections?.();
+  });
+  return closeStudioServerPromise;
+}

@@ -27,12 +27,13 @@
 
 GPT-Image2-Studio 面向个人创作者、电商运营、设计师和内容团队。它不是单一的生图表单，而是一套围绕参考素材、创作计划、生成队列、失败重试、历史记录和本地输出目录组织的工作台。
 
-项目提供三种主要运行形态：
+项目提供四种主要运行形态：
 
 | 运行方式 | 适合场景 | 数据特点 |
 | --- | --- | --- |
 | 本地 Node.js | 日常创作、完整本地工作流 | 配置、历史和输出默认保存在本机，功能最完整 |
-| Windows 安装包 | 不想单独安装 Node.js 的 Windows 用户 | 内置 Node.js 运行时，安装后通过快捷方式启动 |
+| Windows 桌面程序 | 需要独立窗口、任务栏和标准安装卸载的 Windows 用户 | Electron 内置运行时，动态回环端口，关窗即停止服务 |
+| Windows 浏览器安装包 | 需要保留旧版浏览器启动方式的 Windows 用户 | 内置 `node.exe`，安装后通过快捷方式打开默认浏览器 |
 | Cloudflare Pages / Worker | 多设备访问或云端托管 | 依赖 R2，异步队列可使用 Queue；部分本地文件能力不可用 |
 
 仓库还包含 `vercel.json`。Vercel 环境使用临时目录，不能当作本地持久化存储；部署前应在 Preview 环境验证长任务、SSE 和文件生命周期。
@@ -188,7 +189,26 @@ cmd /c npm start
 
 Windows 用户也可以双击 `launch-studio.cmd` 启动，使用 `stop-studio-services.cmd` 停止 `3600-3606` 端口上的本项目服务。
 
-### 方式二：Windows 安装包
+### 方式二：Windows 桌面程序（推荐）
+
+从包含桌面产物的 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
+
+```text
+GPT-Image2-Studio-Desktop-Setup-v0.2.2-x64.exe
+```
+
+安装完成后通过桌面或开始菜单中的 `GPT-Image2-Studio` 启动。程序会在独立窗口中运行，内置服务使用动态回环端口，关闭窗口后不会遗留后台服务。无需另行安装 Node.js，完整说明见 [Windows 桌面程序文档](./docs/windows-desktop.md)。
+
+源码目录也可直接启动桌面开发版：
+
+桌面开发使用 Electron `43`，要求 Node.js `22.12` 或更高版本；普通 `npm start` 服务仍支持 Node.js `20+`。
+
+```powershell
+cmd /c npm ci
+cmd /c npm run desktop
+```
+
+### 方式三：Windows 浏览器安装包（兼容旧版）
 
 从 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
 
@@ -202,7 +222,7 @@ GPT-Image2-Studio-Setup-v0.2.2.exe
 %LOCALAPPDATA%\GPT-Image2-Studio
 ```
 
-安装包内置 `runtime\node.exe`，无需另行安装 Node.js。安装完成后可通过桌面或开始菜单中的 `GPT-Image2-Studio.cmd` 启动。完整说明见 [Windows 安装包文档](./docs/windows-installer.md)。
+安装包内置 `runtime\node.exe`，无需另行安装 Node.js。安装完成后可通过桌面或开始菜单中的 `GPT-Image2-Studio.cmd` 启动，并在默认浏览器中打开工作台。完整说明见 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
 
 ## 配置说明
 
@@ -330,7 +350,27 @@ vercel deploy --prod
 
 Vercel 运行时的输出和本地数据目录位于临时文件系统，实例回收后可能丢失。需要长期保存图片和历史时，优先使用本地运行，或为云端接入持久化存储。
 
-### 构建 Windows 安装包
+### 构建 Windows 桌面程序
+
+在 Windows x64 和 Node.js `22.12+` 环境运行：
+
+```powershell
+cmd /c npm ci
+node --test test/desktop-application.test.mjs
+cmd /c npm run test:desktop-smoke
+cmd /c npm run build:desktop
+```
+
+产物路径：
+
+```text
+artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.2-x64.exe
+artifacts/desktop/win-unpacked/GPT-Image2-Studio.exe
+```
+
+桌面版使用 Electron 独立窗口和 Electron Builder NSIS 安装包。完整说明见 [Windows 桌面程序文档](./docs/windows-desktop.md)。
+
+### 构建 Windows 浏览器安装包（兼容旧版）
 
 在 Windows 上运行：
 
@@ -345,7 +385,7 @@ cmd /c npm run build:installer
 artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.2.exe
 ```
 
-脚本使用系统 `iexpress.exe` 生成自解压安装包，并把当前 Node.js 运行时和依赖打入安装目录。
+脚本使用系统 `iexpress.exe` 生成自解压安装包，并把当前 Node.js 运行时和依赖打入安装目录；启动后仍使用默认浏览器显示工作台。
 
 ## 输出与本地数据
 
@@ -479,6 +519,8 @@ YYYY-MM-DD-ppt\
 
 ```text
 GPT-Image2-Studio/
+|-- build/desktop/                # Windows 桌面应用图标资产
+|-- desktop/                     # Electron 主进程与桌面安全策略
 |-- docs/                         # 安装、设计和开发文档
 |-- examples/                     # API 请求与 SSE 示例
 |-- lib/                          # 服务端与前端共享逻辑
@@ -508,6 +550,9 @@ GPT-Image2-Studio/
 # 启动开发服务
 cmd /c npm run dev
 
+# 启动 Electron 桌面开发版
+cmd /c npm run desktop
+
 # 查看命令行生图帮助
 cmd /c npm run help
 
@@ -530,9 +575,11 @@ cmd /c npm run build:pages
 git diff --check
 ```
 
-Windows 安装包发布还应运行：
+Windows 桌面与兼容安装包发布还应运行：
 
 ```powershell
+cmd /c npm run test:desktop-smoke
+cmd /c npm run build:desktop
 cmd /c npm run build:installer
 ```
 
@@ -541,4 +588,4 @@ cmd /c npm run build:installer
 - 版本号以 `package.json` 和 `package-lock.json` 为准。
 - Git tag 使用 `v<version>`，例如 `v0.2.2`。
 - Release 标题建议使用 `GPT-Image2-Studio v<version>`。
-- Release 应至少附带变更说明、验证结果和对应的 Windows 安装包（如本次发布包含安装包）。
+- Release 应至少附带变更说明、验证结果和对应的 Windows 桌面安装包；如仍分发兼容版，应明确区分两个文件的启动形态。

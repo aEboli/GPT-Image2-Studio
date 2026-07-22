@@ -3,15 +3,20 @@
   "version": "0.2.2",
   "private": true,
   "type": "module",
+  "main": "desktop/main.mjs",
   "description": "本地优先的 AI 图像生成与视觉创作工作台",
+  "author": "aEboli",
   "scripts": {
     "start": "node server.mjs",
     "dev": "node server.mjs",
+    "desktop": "electron .",
+    "test:desktop-smoke": "electron . --desktop-smoke",
     "generate": "node generate-image.mjs",
     "help": "node generate-image.mjs --help",
     "sync:public-lib": "node scripts/sync-public-lib.mjs",
     "build:pages": "node scripts/build-cloudflare-pages.mjs",
     "build:installer": "node scripts/build-windows-installer.mjs",
+    "build:desktop": "electron-builder --win nsis --x64",
     "test": "node --test ./test/*.test.mjs",
     "test:creation-e2e": "node --test ./test/creation-e2e-regression.test.mjs"
   },
@@ -21,5 +26,51 @@
   "dependencies": {
     "jszip": "^3.10.1",
     "pptxgenjs": "^4.0.1"
+  },
+  "devDependencies": {
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.aeboli.gptimage2studio",
+    "productName": "GPT-Image2-Studio",
+    "artifactName": "${productName}-Desktop-Setup-v${version}-${arch}.${ext}",
+    "asar": true,
+    "directories": {
+      "output": "artifacts/desktop",
+      "buildResources": "build/desktop"
+    },
+    "files": [
+      "desktop/**/*",
+      "server.mjs",
+      "generate-image.mjs",
+      "lib/**/*",
+      "public/**/*",
+      "build/desktop/icon.png",
+      "README.md",
+      "docs/windows-desktop.md",
+      "package.json"
+    ],
+    "win": {
+      "icon": "build/desktop/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "GPT-Image2-Studio",
+      "uninstallDisplayName": "${productName} ${version}",
+      "deleteAppDataOnUninstall": false
+    }
   }
 }
