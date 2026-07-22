@@ -25,8 +25,8 @@ const publicConfigModelPickerPath = new URL("../public/lib/config-model-picker.m
 const publicCreationListingViewPath = new URL("../public/lib/creation-listing-view.mjs", import.meta.url);
 const generationClientPath = new URL("../lib/generation-client.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20260720-creation-reference-apply-1";
-const appAssetVersion = "20260720-creation-reference-apply-1";
+const stylesAssetVersion = "20260722-asset-record-delete-1";
+const appAssetVersion = "20260722-asset-record-delete-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
 const creationQueueModuleAssetVersion = "20260712-creation-queue-selection-isolation-1";
 const quickBlendModuleAssetVersion = "20260608-quick-blend-time-sort-1";
@@ -4822,6 +4822,8 @@ test("creation record desktop grid keeps six cards per row", async () => {
   const creationRecordGridRule = readCssRule(styles, ".creation-record-result-grid");
 
   assert.match(creationRecordGridRule, /grid-template-columns:\s*repeat\(6,\s*minmax\(0,\s*1fr\)\);/);
+  assert.match(creationRecordGridRule, /row-gap:\s*16px;/);
+  assert.match(creationRecordGridRule, /column-gap:\s*10px;/);
   assert.doesNotMatch(creationRecordGridRule, /grid-template-columns:\s*repeat\(4,/);
 });
 
@@ -4834,6 +4836,7 @@ test("creation record cards constrain SKU media inside narrow grid tracks", asyn
   const recordImageRule = readCssRule(styles, ".creation-card.is-record-card .creation-card-media img");
 
   assert.match(recordCardRule, /overflow:\s*hidden;/);
+  assert.match(recordCardRule, /grid-template-rows:\s*auto auto;/);
   assert.match(recordHeadRule, /min-width:\s*0;/);
   assert.match(recordMediaRule, /width:\s*100%;/);
   assert.match(recordMediaRule, /max-width:\s*100%;/);
@@ -4878,11 +4881,10 @@ test("creation record cards open gallery-style lightbox details", async () => {
   const styles = await readFile(stylesPath, "utf8");
   const html = await readFile(indexPath, "utf8");
   const app = await readFile(appPath, "utf8");
+  const creationCardSource = extractFunctionBefore(app, "createCreationCard", "syncCreationResultGrid");
 
   assert.match(styles, /\.creation-card\.is-record-card\s+\.creation-card-media\s*\{/);
   assert.match(styles, /\.creation-record-preview-media\s*\{/);
-  assert.match(styles, /\.creation-record-card-actions\s*\{/);
-  assert.match(styles, /\.creation-record-card-actions \.mini-action\.is-disabled\s*\{/);
   assert.match(app, /const showRecordActions = options\.showRecordActions === true;/);
   assert.match(app, /card\.classList\.toggle\("is-record-card", showRecordActions\);/);
   assert.doesNotMatch(app, /creation-card-prompt/);
@@ -4893,11 +4895,9 @@ test("creation record cards open gallery-style lightbox details", async () => {
   assert.match(app, /import \{ buildCreationRecordLightboxItem, normalizeCreationGenerationSnapshotForView \} from "\/lib\/creation-record-lightbox\.mjs";/);
   assert.match(app, /function openCreationRecordItemPreview\(itemId, setId = ""\) \{/);
   assert.match(app, /async function copyCreationRecordItemPath\(itemId, setId = ""\) \{/);
-  assert.match(app, /actions\.className = "creation-card-actions creation-record-card-actions";/);
-  assert.match(app, /previewButton\.dataset\.creationRecordPreviewItemId = item\.itemId;/);
-  assert.match(app, /previewButton\.dataset\.creationRecordPreviewSetId = options\.creationSetId \|\| "";/);
+  assert.doesNotMatch(creationCardSource, /creation-record-card-actions|previewButton|textContent = "查看"/);
   assert.doesNotMatch(html, /lightboxCopyPathButton|lightboxCopyFullPathButton|lightboxDelete/);
-  assert.match(app, /refs\.creationRecordResultGrid\.addEventListener\("click",[\s\S]*openCreationRecordItemPreview\(\s*previewButton\.dataset\.creationRecordPreviewItemId,\s*previewButton\.dataset\.creationRecordPreviewSetId,\s*\)/);
+  assert.match(app, /refs\.creationRecordResultGrid\.addEventListener\("click",[\s\S]*openCreationRecordItemPreview\(\s*previewTarget\.dataset\.creationRecordPreviewItemId,\s*previewTarget\.dataset\.creationRecordPreviewSetId,\s*\)/);
   assert.match(app, /const firstRecordInfographicRebuildItem = selectedSet\.items\.find\(\(item\) => item\.role === "infographic-rebuild"\);/);
   assert.match(app, /isSkuStart: item === firstRecordSkuItem,/);
   assert.match(app, /isInfographicRebuildStart: item === firstRecordInfographicRebuildItem,/);
@@ -4924,6 +4924,69 @@ test("creation records expose prompt exports", async () => {
   assert.match(app, /refs\.creationRecordCopyPromptsButton\.addEventListener\("click",/);
   assert.match(app, /refs\.creationRecordExportPromptsButton\.addEventListener\("click",/);
   assert.match(app, /refs\.creationRecordExportManifestButton\.addEventListener\("click",/);
+});
+
+test("creation records support current selected and filtered deletion with an app dialog", async () => {
+  const [html, app, styles] = await Promise.all([
+    readFile(indexPath, "utf8"),
+    readFile(appPath, "utf8"),
+    readFile(stylesPath, "utf8"),
+  ]);
+
+  assert.match(html, /id="creationRecordDeleteCurrentButton"[^>]*>删除当前<\/button>/);
+  assert.match(html, /id="creationRecordDeleteSelectedButton"[^>]*>删除选中/);
+  assert.match(html, /id="creationRecordDeleteFilteredButton"[^>]*>删除筛选结果<\/button>/);
+  assert.match(html, /id="creationRecordDeleteDialog"[^>]*aria-labelledby="creationRecordDeleteDialogTitle"/);
+  assert.match(html, /id="creationRecordDeleteCancelButton"[^>]*>取消<\/button>/);
+  assert.match(html, /id="creationRecordDeleteConfirmButton"[^>]*>确认删除<\/button>/);
+  assert.match(app, /from "\/lib\/creation-record-delete\.mjs\?v=20260722-creation-record-delete-flow-1"/);
+  assert.match(app, /checkbox\.dataset\.creationRecordSelectSetId = set\.setId/);
+  assert.match(app, /getCreationRecordDeleteTargets\(\{/);
+  assert.match(app, /fetch\("\/api\/creation\/sets\/delete", \{/);
+  assert.match(app, /method: "POST"/);
+  assert.match(app, /state\.creation\.currentSet\?\.setId/);
+  const deleteFlowStart = app.indexOf("async function confirmCreationRecordDelete()");
+  const deleteFlowEnd = app.indexOf("function getCreationRecordImagePaths", deleteFlowStart);
+  const deleteFlow = app.slice(deleteFlowStart, deleteFlowEnd);
+  assert.notEqual(deleteFlowStart, -1);
+  assert.notEqual(deleteFlowEnd, -1);
+  assert.match(deleteFlow, /resolveCreationRecordSelectionAfterDelete\(/);
+  assert.doesNotMatch(deleteFlow, /loadCreationSets\(\)/);
+  assert.match(app, /refs\.creationRecordRefreshButton\.addEventListener\("click",[\s\S]*?loadCreationSets\(\)/);
+  assert.match(styles, /\.creation-record-list-item\s*\{/);
+  assert.match(styles, /\.creation-record-select\s*\{/);
+  assert.match(styles, /\.creation-record-delete-dialog\s*\{/);
+});
+
+test("creation records combine keyword and created-time filters across actions", async () => {
+  const [html, app, styles] = await Promise.all([
+    readFile(indexPath, "utf8"),
+    readFile(appPath, "utf8"),
+    readFile(stylesPath, "utf8"),
+  ]);
+
+  assert.match(html, /id="creationRecordTimeFilters"[^>]*aria-label="套图记录时间筛选"/);
+  assert.match(html, /id="creationRecordDateInput"[^>]*type="date"/);
+  assert.match(html, /id="creationRecordResetFiltersButton"[^>]*>清空筛选<\/button>/);
+  assert.match(app, /from "\/lib\/creation-record-filter\.mjs(?:\?[^\"]+)?"/);
+  assert.match(app, /recordTimeFilter:\s*"all"/);
+  assert.match(app, /recordDateFilter:\s*""/);
+  assert.match(app, /function getCreationRecordKeywordMatchedSets\(\) \{/);
+  assert.match(app, /filterCreationRecordSetsByTime\(/);
+  assert.match(app, /const sets = filterCreationRecordSets\(\)\.slice\(0, 60\);/);
+  assert.match(app, /buildCreationRecordTimeFilterOptions\(/);
+  assert.match(app, /const isActive = option\.value === filters\.window;/);
+  assert.match(app, /button\.setAttribute\("aria-pressed", String\(isActive\)\)/);
+  assert.match(app, /function hasCreationRecordActiveFilters\(\) \{/);
+  assert.match(app, /function getCreationRecordFilterLabel\(\) \{/);
+  assert.match(app, /hasFilter:\s*hasCreationRecordActiveFilters\(\)/);
+  assert.match(app, /filterLabel:\s*getCreationRecordFilterLabel\(\)/);
+  assert.match(app, /refs\.creationRecordDateInput\.addEventListener\("input",/);
+  assert.match(app, /refs\.creationRecordResetFiltersButton\.addEventListener\("click",/);
+  assert.match(styles, /\.creation-record-time-filters\s*\{/);
+  assert.match(styles, /\.creation-record-date\s*\{/);
+  assert.match(styles, /\.creation-record-reset-filters\s*\{/);
+  assert.match(styles, /html\[data-ui-layout="mobile"\] \.creation-record-filter-bar\s*\{/);
 });
 
 test("creation record toolbar stays compact without visible scrollbar or wrapped title", async () => {
@@ -4961,6 +5024,8 @@ test("creation mode exposes listing agent controls and record listing drafts", a
 
   assert.match(html, /id="creationListingAgentEnabledInput"/);
   assert.match(html, /id="creationRecordGenerateListingsButton"/);
+  assert.match(html, /id="creationRecordArchiveDetail"[^>]*>[\s\S]*?id="creationRecordGenerateListingsButton"[\s\S]*?<\/div>\s*<div class="creation-record-results">/);
+  assert.doesNotMatch(html, /class="asset-listing-actions"[^>]*>[\s\S]*?id="creationRecordGenerateListingsButton"/);
   assert.match(html, /id="creationRecordExportListingsButton"/);
   assert.match(html, /id="creationRecordCopyListingsButton"/);
   assert.match(html, /id="creationResultGrid"[\s\S]*id="creationInlineListingStatus"[\s\S]*id="creationInlineListingDrafts"/);
@@ -4982,9 +5047,13 @@ test("creation mode exposes listing agent controls and record listing drafts", a
   assert.match(app, /createCreationListingController\(\{/);
   assert.match(app, /renderCurrentView: renderCreationView,/);
   assert.match(app, /getCreationRecordListingMetaLabel\(set\)/);
+  assert.match(app, /creationRecordArchiveDetail\.insertBefore\(refs\.creationRecordGenerateListingsButton, detailToggle\)/);
   assert.match(app, /metaRow\.className = "creation-record-meta-row";/);
+  assert.match(app, /statusRow\.className = "creation-record-status-row";/);
   assert.match(app, /listingBadge\.className = "creation-record-listing-badge";/);
   assert.match(app, /button\.appendChild\(metaRow\);/);
+  assert.match(app, /statusRow\.appendChild\(status\);[\s\S]*statusRow\.appendChild\(listingBadge\);[\s\S]*button\.appendChild\(statusRow\);/);
+  assert.doesNotMatch(app, /metaRow\.appendChild\(listingBadge\);/);
   assert.match(app, /fetchImpl: \(\.\.\.args\) => fetch\(\.\.\.args\),/);
   assert.match(app, /getRequestConfig: getBrowserPrivateConfigRequestPayload,/);
   assert.match(app, /creationListingController\.syncRecordControls\(selectedSet\);/);
@@ -5011,19 +5080,21 @@ test("creation mode exposes listing agent controls and record listing drafts", a
   assert.match(listingView, /createCreationListingField\("后台搜索词", draft\.backendSearchTerms, \{[\s\S]*localizedValue: draft\.zhDisplay\?\.backendSearchTerms/);
   assert.match(listingView, /const copySource = copyValue \?\? value;/);
   assert.match(listingView, /const labelNode = document\.createElement\(copyable \? "button" : "span"\);[\s\S]*labelNode\.className = copyable \? "creation-listing-field-copy" : "creation-listing-field-label";/);
-  assert.match(listingView, /function buildCreationListingBilingualFieldCopyText\(value, localizedValue, \{ list = false \} = \{\}\) \{/);
-  assert.match(listingView, /function applyCreationListingCopyData\(target, label, value, \{ list = false, localizedValue, bilingual = false \} = \{\}\) \{/);
-  assert.match(listingView, /if \(copyable\) \{[\s\S]*applyCreationListingCopyData\(labelNode, label, copySource, \{[\s\S]*list: copyList,[\s\S]*localizedValue: localizedCopyValue \?\? localizedValue,[\s\S]*bilingual: bilingualCopy,[\s\S]*\}\);[\s\S]*\}/);
+  assert.match(listingView, /function applyCreationListingCopyData\(target, label, value, \{ list = false \} = \{\}\) \{/);
+  assert.match(listingView, /function createCreationListingValueCopyTarget\(displayText, copyText, label, \{ localized = false \} = \{\}\) \{[\s\S]*target\.className = localized \? "creation-listing-localized" : "creation-listing-value-copy";/);
+  assert.match(listingView, /if \(copyable\) \{[\s\S]*applyCreationListingCopyData\(labelNode, `\$\{label\}英文`, copySource, \{ list: copyList \}\);[\s\S]*\}/);
+  assert.match(listingView, /appendRowCopyTargets\(row, item, index\);/);
+  assert.match(listingView, /appendLocalizedText\(parent, row\.localizedText, \{[\s\S]*copyText: localizedCopyRows\[index\] \|\| row\.localizedText,[\s\S]*label: `\$\{itemLabel\}中文`,/);
   assert.doesNotMatch(listingView, /createCreationListingField\("警告"|createCreationListingField\("缺失信息"/u);
   assert.match(listingView, /titleCopy\.className = "creation-listing-title-copy";/);
-  assert.match(listingView, /applyCreationListingCopyData\(titleCopy, "标题", headerContent\.title, \{[\s\S]*localizedValue: draft\.zhDisplay\?\.title,[\s\S]*bilingual: true,[\s\S]*\}\);/);
+  assert.match(listingView, /applyCreationListingCopyData\(titleCopy, "标题英文", headerContent\.title\);/);
   assert.match(listingView, /getCreationListingPolicy\(requestedPolicyId\)/);
   assert.doesNotMatch(listingView, /needsCurrentRewrite|hasBlockedV2|待人工复核，不可直接发布/u);
   assert.match(listingView, /const CREATION_LISTING_BUCKET_COPY_LABELS = \{/);
   assert.match(listingView, /const localizedBucketLines = buildCreationListingLocalizedBucketLines\(draft\.zhDisplay\?\.keywordBuckets\);/);
   assert.match(listingView, /localizedCountValue: localizedBucketValues,/);
   assert.match(listingView, /copyValue: buildCreationListingBucketCopyLines\(draft\.keywordBuckets\),/);
-  assert.match(listingView, /localized\.className = "creation-listing-localized";/);
+  assert.match(listingView, /target\.className = localized \? "creation-listing-localized" : "creation-listing-value-copy";/);
   assert.match(listingView, /const listingDraftContainers = new Set\(\[[\s\S]*creationRecordListingDrafts,[\s\S]*creationInlineListingDrafts,[\s\S]*\]\.filter\(Boolean\)\);/);
   assert.match(listingView, /listingDraftContainers\.forEach\(\(container\) => \{[\s\S]*container\.addEventListener\("click",[\s\S]*closest\?\.\("\[data-creation-listing-copy-text\]"\)[\s\S]*copyCreationListingFieldButton/);
   assert.match(listingView, /export function buildCreationListingExportPayload\(set\) \{/);
@@ -5034,12 +5105,16 @@ test("creation mode exposes listing agent controls and record listing drafts", a
   assert.match(listingView, /function syncRecordControls\(selectedSet\) \{[\s\S]*creationRecordCopyListingsButton\.disabled = drafts\.length === 0 \|\| isGenerating;[\s\S]*creationRecordExportListingsButton\.disabled = drafts\.length === 0 \|\| isGenerating;[\s\S]*renderCreationListingDrafts\(\{ refs: context\.refs, state: context\.state, set: selectedSet \}\);/);
 
   assert.match(styles, /\.creation-listing-drafts\s*\{/);
+  assert.match(readCssRule(styles, "#creationRecordArchiveDetail.creation-record-detail.is-toggleable"), /grid-template-columns:\s*minmax\(0, 1fr\) auto auto;/);
+  assert.match(readCssRule(styles, ".creation-record-listing-action"), /min-height:\s*32px;/);
   assert.match(styles, /\.creation-listing-card\s*\{/);
   assert.match(styles, /\.creation-listing-card\.is-failed\s*\{/);
   assert.match(styles, /\.creation-listing-card\.is-needs-review\s*\{/);
   assert.match(styles, /\.creation-listing-field\.is-internal\s*\{/);
   assert.match(styles, /\.creation-listing-card[\s\S]*overflow-wrap:\s*anywhere;/);
-  assert.match(styles, /\.creation-record-meta-row\s*\{[\s\S]*justify-content:\s*space-between;/);
+  assert.match(styles, /\.creation-record-meta\s*\{[\s\S]*display:\s*block;[\s\S]*width:\s*100%;/);
+  assert.match(readCssRule(styles, ".creation-record-meta-row"), /display:\s*block;/);
+  assert.match(styles, /\.creation-record-status-row\s*\{[\s\S]*display:\s*flex;[\s\S]*gap:\s*6px;/);
   assert.match(styles, /\.creation-record-listing-badge\s*\{[\s\S]*background:\s*rgba\(54,\s*211,\s*153,\s*0\.14\);/);
   assert.match(styles, /\.creation-listing-content-frame\s*\{/);
   assert.match(readCssRule(styles, ".creation-listing-content-frame"), /border:\s*1px solid/);
@@ -5056,6 +5131,9 @@ test("creation mode exposes listing agent controls and record listing drafts", a
   assert.match(readCssRule(styles, ".creation-listing-character-count.english"), /color:\s*#/);
   assert.match(readCssRule(styles, ".creation-listing-character-count.chinese"), /color:\s*#/);
   assert.match(styles, /\.creation-listing-localized\s*\{/);
+  assert.match(styles, /\.creation-listing-value-copy,[\s\S]*\.creation-listing-localized\s*\{/);
+  assert.match(styles, /\.creation-listing-value-copy:hover,[\s\S]*\.creation-listing-localized:hover\s*\{/);
+  assert.match(styles, /\.creation-listing-value-copy:focus-visible,[\s\S]*\.creation-listing-localized:focus-visible\s*\{/);
   assert.match(styles, /\.creation-listing-localized::before\s*\{/);
   assert.match(styles, /\.creation-record-results\s*\{/);
   assert.match(readCssRule(styles, ".creation-record-results"), /display:\s*block;/);

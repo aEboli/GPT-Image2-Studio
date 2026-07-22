@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -161,4 +161,39 @@ test("portrait repair selects failed or incomplete items and applies prompt over
     applyPortraitRepairOverrides(portraitSet.items[1], { promptOverride: "new prompt" }).prompt,
     "new prompt",
   );
+});
+
+test("portrait store deletes a distinct batch without crossing portrait directory boundaries", async () => {
+  const outputDir = await mkdtemp(join(tmpdir(), "portrait-store-delete-"));
+  const store = createPortraitSetStore({ outputDir, publicBasePath: "/output" });
+  const relativeDir = "2026-07/07-22/2026-07-22-portrait/delete-portrait";
+  const outsideFile = join(outputDir, "outside.txt");
+
+  await store.saveManifest({
+    setId: "portrait-delete",
+    subjectName: "Delete",
+    relativeDir,
+    createdAt: "2026-07-22T08:00:00.000Z",
+  });
+  await store.saveManifest({
+    setId: "portrait-unsafe",
+    subjectName: "Unsafe",
+    relativeDir: "../outside",
+    createdAt: "2026-07-22T08:01:00.000Z",
+  });
+  await mkdir(join(outputDir, ...relativeDir.split("/")), { recursive: true });
+  await mkdir(join(outputDir, "json", ...relativeDir.split("/")), { recursive: true });
+  await writeFile(join(outputDir, ...relativeDir.split("/"), "portrait.png"), "image");
+  await writeFile(join(outputDir, "json", ...relativeDir.split("/"), "portrait.json"), "{}\n");
+  await writeFile(outsideFile, "keep");
+
+  const result = await store.deleteManifests(["portrait-delete", "portrait-unsafe"]);
+
+  assert.deepEqual(result.deletedSetIds, ["portrait-delete", "portrait-unsafe"]);
+  assert.deepEqual(result.notFoundSetIds, []);
+  assert.deepEqual(result.skippedUnsafePaths, ["../outside"]);
+  await assert.rejects(access(join(outputDir, ...relativeDir.split("/"))));
+  await assert.rejects(access(join(outputDir, "json", ...relativeDir.split("/"))));
+  await assert.rejects(access(store.manifestPath("portrait-unsafe")));
+  await access(outsideFile);
 });

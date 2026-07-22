@@ -9,6 +9,8 @@ const publicLibDir = join(rootDir, "public", "lib");
 
 export const PUBLIC_LIB_SYNC_TARGETS = [
   "asset-workspace.mjs",
+  "asset-record-delete.mjs",
+  "asset-record-delete-controller.mjs",
   "api-contract.mjs",
   "api-base-url.mjs",
   "aspect-ratios.mjs",
@@ -23,6 +25,8 @@ export const PUBLIC_LIB_SYNC_TARGETS = [
   "creation-listing-content-gate.mjs",
   "creation-listing-policies.mjs",
   "creation-record-lightbox.mjs",
+  "creation-record-delete.mjs",
+  "creation-record-filter.mjs",
   "creation-platform-policies.mjs",
   "creation-platform-resolver.mjs",
   "creation-browser-plan-state.mjs",

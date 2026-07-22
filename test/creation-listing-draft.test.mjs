@@ -279,6 +279,49 @@ test("listing sources compact generated items before prompt assembly", () => {
   assert.equal(JSON.stringify(sources[0]).includes("Very long image prompt"), false);
 });
 
+test("listing sources expose compact title value evidence without unresolved objections", () => {
+  const sources = buildCreationListingSources({
+    setId: "set-folding-wagon",
+    productName: "Folding Wagon",
+    productDescription: "",
+    sellingPoints: [],
+    items: [
+      {
+        itemId: "benefit",
+        role: "benefit",
+        status: "completed",
+        conversionIntent: {
+          audienceFocus: "Buyers carrying several items and concerned about storage space.",
+          motivationFocus: "Fold the wagon into a car trunk to reduce storage space.",
+          objectionFocus: "The exact folded dimensions and weight were not supplied.",
+          evidenceFocus: "The supplied scene reference shows the folded wagon inside a car trunk.",
+        },
+      },
+      {
+        itemId: "duplicate-benefit",
+        role: "human-handheld",
+        status: "completed",
+        conversionIntent: {
+          audienceFocus: "Buyers carrying several items and concerned about storage space.",
+          motivationFocus: "Fold the wagon into a car trunk to reduce storage space.",
+          objectionFocus: "The exact folded dimensions and weight were not supplied.",
+          evidenceFocus: "The supplied scene reference shows the folded wagon inside a car trunk.",
+        },
+      },
+    ],
+  });
+
+  assert.deepEqual(sources[0].titleValueEvidence, [
+    {
+      sourceRole: "benefit",
+      buyerContext: "Buyers carrying several items and concerned about storage space.",
+      supportedValue: "Fold the wagon into a car trunk to reduce storage space.",
+      evidenceFocus: "The supplied scene reference shows the folded wagon inside a car trunk.",
+    },
+  ]);
+  assert.doesNotMatch(JSON.stringify(sources[0].titleValueEvidence), /exact folded dimensions|not supplied/i);
+});
+
 test("listing sources convert reference dimension notes to the selected unit mode", () => {
   const sources = buildCreationListingSources({
     setId: "set-imperial-reference",

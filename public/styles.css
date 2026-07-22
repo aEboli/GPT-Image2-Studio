@@ -2485,7 +2485,7 @@ ul.creation-plan-message {
 
 #creationRecordArchiveDetail.creation-record-detail.is-toggleable {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 8px;
   padding: 7px 9px;
@@ -2519,6 +2519,13 @@ ul.creation-plan-message {
 .creation-record-detail-summary span {
   color: var(--muted);
   font-size: 12px;
+}
+
+.creation-record-listing-action {
+  min-height: 32px;
+  padding-inline: 12px;
+  border-radius: 8px;
+  white-space: nowrap;
 }
 
 .creation-record-detail-toggle {
@@ -2951,6 +2958,7 @@ ul.creation-plan-message {
 }
 
 .creation-card.is-record-card {
+  grid-template-rows: auto auto;
   overflow: hidden;
 }
 
@@ -3014,7 +3022,8 @@ ul.creation-plan-message {
 
 .creation-record-meta {
   min-width: 0;
-  flex: 1 1 auto;
+  display: block;
+  width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3138,6 +3147,45 @@ ul.creation-plan-message {
   text-align: left;
 }
 
+.creation-record-list-item {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 6px;
+}
+
+.creation-record-list-item .creation-record {
+  min-width: 0;
+  height: 100%;
+}
+
+.creation-record-select {
+  min-width: 34px;
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+  cursor: pointer;
+}
+
+.creation-record-select:hover,
+.creation-record-select:focus-within,
+.creation-record-list-item.is-checked .creation-record-select {
+  border-color: var(--border-strong);
+  background: var(--active-tab-bg);
+}
+
+.creation-record-select input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 .creation-record.active {
   border-color: var(--border-strong);
   background: var(--active-tab-bg);
@@ -3145,10 +3193,14 @@ ul.creation-plan-message {
 
 .creation-record-meta-row {
   min-width: 0;
+  display: block;
+}
+
+.creation-record-status-row {
+  min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
 }
 
 .creation-record-listing-badge {
@@ -3260,6 +3312,76 @@ ul.creation-plan-message {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
+.creation-record-filter-bar {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.asset-context-row.creation-record-filter-bar .creation-record-search {
+  flex: 1 1 300px;
+}
+
+.creation-record-time-filters {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.creation-record-time-filter {
+  min-height: 34px;
+  padding-inline: 10px;
+  border-color: var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.creation-record-time-filter[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--asset-selected-border) 68%, var(--border));
+  background: var(--asset-selected);
+  color: var(--text);
+}
+
+.creation-record-date {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(126px, 150px);
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.creation-record-date input {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel-strong) 72%, transparent);
+  color: var(--text);
+  color-scheme: light dark;
+  font: inherit;
+  outline: none;
+}
+
+.creation-record-date input:focus {
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.creation-record-reset-filters {
+  min-height: 34px;
+  white-space: nowrap;
+}
+
+.creation-record-filter-bar .creation-record-feedback {
+  margin-left: auto;
+}
+
 .creation-record-feedback {
   flex: 0 0 auto;
   min-height: 18px;
@@ -3307,6 +3429,59 @@ ul.creation-plan-message {
   padding-right: 4px;
   scrollbar-color: var(--scrollbar-thumb-color) transparent;
   scrollbar-width: thin;
+}
+
+.creation-record-delete-dialog {
+  width: min(460px, calc(100vw - 32px));
+  max-width: 100%;
+  padding: 0;
+  border: 1px solid var(--overlay-border);
+  border-radius: 8px;
+  background: var(--overlay-surface-bg);
+  color: var(--text);
+  box-shadow: var(--overlay-shadow);
+}
+
+.creation-record-delete-dialog::backdrop {
+  background: var(--overlay-strong-scrim);
+}
+
+.creation-record-delete-form {
+  display: grid;
+  gap: 20px;
+  padding: 22px;
+}
+
+.creation-record-delete-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.creation-record-delete-copy h2,
+.creation-record-delete-copy p {
+  margin: 0;
+}
+
+.creation-record-delete-copy h2 {
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.creation-record-delete-copy p {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.creation-record-delete-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.creation-record-delete-actions .toolbar-button {
+  min-width: 88px;
 }
 
 .creation-listing-panel {
@@ -3583,12 +3758,48 @@ ul.creation-plan-message {
   font-weight: 700;
 }
 
+.creation-listing-value-copy,
 .creation-listing-localized {
+  width: fit-content;
+  max-width: 100%;
   display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition: color 160ms ease, text-decoration-color 160ms ease;
+}
+
+.creation-listing-localized {
   margin-top: 4px;
   color: var(--muted);
   font-size: var(--type-caption-size);
   line-height: 1.45;
+}
+
+.creation-listing-value-copy:hover,
+.creation-listing-localized:hover {
+  color: #dffaff;
+  text-decoration: underline;
+  text-decoration-color: rgba(125, 211, 252, 0.62);
+  text-underline-offset: 3px;
+}
+
+.creation-listing-value-copy:focus-visible,
+.creation-listing-localized:focus-visible {
+  outline: 2px solid rgba(125, 211, 252, 0.72);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.creation-listing-value-copy[data-copied="true"],
+.creation-listing-localized[data-copied="true"] {
+  color: #c7f9d8;
 }
 
 .creation-listing-localized::before {
@@ -3607,6 +3818,8 @@ ul.creation-plan-message {
 
 .creation-record-result-grid {
   grid-template-columns: repeat(6, minmax(0, 1fr));
+  row-gap: 16px;
+  column-gap: 10px;
   min-height: max-content;
   overflow: visible;
   padding-right: 0;
@@ -3617,6 +3830,16 @@ ul.creation-plan-message {
 }
 
 @media (max-width: 520px) {
+  #creationRecordArchiveDetail.creation-record-detail.is-toggleable {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .creation-record-listing-action {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: start;
+  }
+
   .creation-listing-field-head {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -13401,6 +13624,20 @@ html[data-ui-layout="mobile"] .creation-record-search {
   grid-template-columns: auto minmax(0, 1fr);
 }
 
+html[data-ui-layout="tablet"] .creation-record-filter-bar {
+  align-items: center;
+}
+
+html[data-ui-layout="tablet"] .creation-record-time-filters {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+html[data-ui-layout="tablet"] .creation-record-time-filters::-webkit-scrollbar {
+  display: none;
+}
+
 html[data-ui-layout="tablet"] .creation-record-export-actions,
 html[data-ui-layout="mobile"] .creation-record-export-actions {
   display: contents;
@@ -13466,10 +13703,19 @@ html[data-ui-layout="mobile"] .ppt-record-list::-webkit-scrollbar {
 }
 
 html[data-ui-layout="mobile"] .article-record-card,
+html[data-ui-layout="mobile"] .creation-record-list-item,
 html[data-ui-layout="mobile"] .creation-record,
 html[data-ui-layout="mobile"] .ppt-record-card {
   height: 100%;
   scroll-snap-align: start;
+}
+
+html[data-ui-layout="mobile"] .creation-record-delete-dialog {
+  width: min(420px, calc(100vw - 20px));
+}
+
+html[data-ui-layout="mobile"] .creation-record-delete-form {
+  padding: 18px;
 }
 
 html[data-ui-layout="mobile"] .ppt-record-card {
@@ -13508,7 +13754,6 @@ html[data-ui-layout="tablet"] .creation-record-result-grid {
 
 html[data-ui-layout="mobile"] .creation-record-result-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
 }
 
 html[data-ui-layout="stacked"] .portrait-workspace,
@@ -15128,6 +15373,35 @@ html[data-ui-layout="mobile"] .asset-context-row .creation-record-search {
   grid-template-columns: auto minmax(0, 1fr);
 }
 
+html[data-ui-layout="mobile"] .creation-record-filter-bar {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+html[data-ui-layout="mobile"] .creation-record-filter-bar .creation-record-search,
+html[data-ui-layout="mobile"] .creation-record-time-filters,
+html[data-ui-layout="mobile"] .creation-record-filter-bar .creation-record-feedback {
+  grid-column: 1 / -1;
+}
+
+html[data-ui-layout="mobile"] .creation-record-time-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+html[data-ui-layout="mobile"] .creation-record-time-filter {
+  width: 100%;
+  justify-content: center;
+}
+
+html[data-ui-layout="mobile"] .creation-record-date {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+html[data-ui-layout="mobile"] .creation-record-filter-bar .creation-record-feedback {
+  margin-left: 0;
+}
+
 html[data-ui-layout="mobile"] .gallery-toolbar.asset-filter-zone {
   padding: 8px 10px;
 }
@@ -15387,4 +15661,118 @@ html[data-ui-layout="mobile"] .lightbox-fields .detail-field {
 
 html[data-ui-layout="mobile"] .lightbox-fields .detail-field textarea {
   min-height: 220px;
+}
+
+.asset-record-select-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 6px;
+}
+
+.asset-record-select-row > :not(.asset-record-select) {
+  min-width: 0;
+  height: 100%;
+}
+
+.asset-record-select {
+  width: 34px;
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--asset-border);
+  border-radius: 6px;
+  background: var(--asset-surface-soft);
+  cursor: pointer;
+}
+
+.asset-record-select:hover,
+.asset-record-select:focus-within,
+.asset-record-select-row.is-checked .asset-record-select {
+  border-color: var(--asset-selected-border);
+  background: var(--asset-selected);
+}
+
+.asset-record-select input,
+.gallery-tile-select input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.asset-record-select input:disabled,
+.gallery-tile-select input:disabled {
+  cursor: not-allowed;
+}
+
+.gallery-tile-shell {
+  position: relative;
+  min-width: 0;
+  border-radius: var(--gallery-tile-radius);
+}
+
+.gallery-tile.is-current {
+  box-shadow: inset 0 0 0 2px var(--asset-selected-border);
+}
+
+.gallery-tile-select {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 3;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 6px;
+  background: rgba(8, 12, 22, 0.78);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.24);
+  cursor: pointer;
+}
+
+.gallery-tile-select:hover,
+.gallery-tile-select:focus-within,
+.gallery-tile-shell.is-checked .gallery-tile-select {
+  border-color: var(--asset-selected-border);
+  background: color-mix(in srgb, var(--asset-selected) 82%, rgba(8, 12, 22, 0.9));
+}
+
+.asset-record-delete-dialog {
+  width: min(460px, calc(100vw - 32px));
+}
+
+.gallery-action-feedback,
+.ppt-record-feedback {
+  justify-self: end;
+  margin: 0;
+}
+
+html[data-ui-layout="mobile"] .asset-record-select-row {
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 8px;
+}
+
+html[data-ui-layout="mobile"] .asset-record-select {
+  width: 44px;
+  min-height: 44px;
+}
+
+html[data-ui-layout="mobile"] .gallery-tile-select {
+  width: 42px;
+  height: 42px;
+}
+
+html[data-ui-layout="mobile"] .asset-record-delete-dialog {
+  width: calc(100vw - 20px);
+  margin: auto;
+}
+
+html[data-ui-layout="mobile"] .gallery-action-feedback,
+html[data-ui-layout="mobile"] .ppt-record-feedback {
+  justify-self: stretch;
+  text-align: left;
 }

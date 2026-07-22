@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -165,4 +165,30 @@ test("article illustration set store writes and lists manifests newest first", a
   );
   assert.equal(manifests[0].status, "partial_failed");
   assert.match(raw, /"setId": "article-set-new"/);
+});
+
+test("article illustration store deletes exact manifests and dedicated asset directories", async () => {
+  const outputDir = await mkdtemp(join(tmpdir(), "article-illustration-delete-"));
+  const store = createArticleIllustrationSetStore({ outputDir, publicBasePath: "/output" });
+  const deletedRelativeDir = "2026-07/07-22/2026-07-22-article/delete-story";
+  const keptRelativeDir = "2026-07/07-22/2026-07-22-article/keep-story";
+
+  for (const [setId, relativeDir] of [["article-delete", deletedRelativeDir], ["article-keep", keptRelativeDir]]) {
+    await store.saveManifest({ setId, title: setId, relativeDir, createdAt: "2026-07-22T08:00:00.000Z" });
+    await mkdir(join(outputDir, ...relativeDir.split("/")), { recursive: true });
+    await mkdir(join(outputDir, "json", ...relativeDir.split("/")), { recursive: true });
+    await writeFile(join(outputDir, ...relativeDir.split("/"), "image.png"), "image");
+    await writeFile(join(outputDir, "json", ...relativeDir.split("/"), "image.json"), "{}\n");
+  }
+
+  const result = await store.deleteManifests(["article-delete", "article-delete", "article-missing"]);
+
+  assert.deepEqual(result.deletedSetIds, ["article-delete"]);
+  assert.deepEqual(result.notFoundSetIds, ["article-missing"]);
+  assert.deepEqual(result.skippedUnsafePaths, []);
+  await assert.rejects(access(store.manifestPath("article-delete")));
+  await assert.rejects(access(join(outputDir, ...deletedRelativeDir.split("/"))));
+  await assert.rejects(access(join(outputDir, "json", ...deletedRelativeDir.split("/"))));
+  await access(store.manifestPath("article-keep"));
+  await access(join(outputDir, ...keptRelativeDir.split("/"), "image.png"));
 });

@@ -1,6 +1,6 @@
 ## 1. Specification And Planning
 
-- [x] 1.1 Create scoped OpenSpec proposal, design, and task list for the first usability foundation batch.
+- [x] 1.1 Create scoped OpenSpec proposal, delta specification, design, and task list for the first usability foundation batch.
 - [x] 1.2 Keep Creation Mode restructuring, Brand Kit, quality checks, and export packages out of this first change.
 
 ## 2. Accessibility Fixes

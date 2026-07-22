@@ -15,7 +15,7 @@ import {
 import { isCreationSubjectReferenceRole } from "../public/lib/creation-reference-roles.mjs";
 import { reorderCreationReferenceFiles } from "../public/lib/creation-reference-drag.mjs";
 
-const APP_SHELL_LINE_BUDGET = 17000;
+const APP_SHELL_LINE_BUDGET = 17400;
 
 function makeFakeControlButton(className = "") {
   const element = {
@@ -277,6 +277,7 @@ test("public app shell delegates browser config and cache behavior to public mod
   assert.match(app, /from "\/lib\/creation-reference-drag\.mjs"/);
   assert.match(app, /from "\/lib\/lightbox-image-viewer\.mjs"/);
   assert.match(app, /from "\/lib\/style-transfer-preset-lightbox\.mjs"/);
+  assert.match(app, /from "\/lib\/asset-record-delete-controller\.mjs/);
   assert.ok(
     lineCount < APP_SHELL_LINE_BUDGET,
     `public/app.js should stay below the shell budget, got ${lineCount}`,

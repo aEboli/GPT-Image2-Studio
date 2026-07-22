@@ -240,8 +240,56 @@ test("rendered listing header title is a direct copy target", () => {
   assert.equal(titleCopyTargets[0].textContent, "1 Pack Travel Bottle");
   assert.equal(
     titleCopyTargets[0].dataset.creationListingCopyText,
-    "English:\n1 Pack Travel Bottle\n简体中文:\n无",
+    "1 Pack Travel Bottle",
   );
+});
+
+test("rendered listing values expose separate English and Chinese copy targets", () => {
+  const previousDocument = globalThis.document;
+  const root = makeFakeElement("div");
+  globalThis.document = {
+    createElement: makeFakeElement,
+  };
+
+  try {
+    renderCreationListingDrafts({
+      refs: { creationRecordListingDrafts: root },
+      state: {},
+      set: {
+        setId: "set-language-copy-targets",
+        listingDrafts: [{
+          title: "English title",
+          sellingPoints: ["English point one", "English point two"],
+          zhDisplay: {
+            title: "中文标题",
+            sellingPoints: ["中文卖点一", "中文卖点二"],
+          },
+        }],
+      },
+    });
+  } finally {
+    globalThis.document = previousDocument;
+  }
+
+  const englishCopies = collectFakeElements(root, (node) => (
+    String(node.className || "").split(/\s+/).includes("creation-listing-value-copy")
+  )).map((button) => button.dataset.creationListingCopyText);
+  const chineseCopies = collectFakeElements(root, (node) => (
+    String(node.className || "").split(/\s+/).includes("creation-listing-localized")
+  )).map((button) => button.dataset.creationListingCopyText);
+  const sellingFieldCopy = root.querySelectorAll("[data-creation-listing-copy-text]")
+    .find((button) => (
+      String(button.className || "").includes("creation-listing-field-copy")
+      && button.dataset.creationListingCopyLabel === "卖点英文"
+    ));
+
+  assert.ok(englishCopies.includes("English title"));
+  assert.ok(englishCopies.includes("English point one"));
+  assert.ok(englishCopies.includes("English point two"));
+  assert.doesNotMatch(englishCopies.join("\n"), /中文标题|中文卖点/u);
+  assert.deepEqual(chineseCopies, ["中文标题", "中文卖点一", "中文卖点二"]);
+  assert.doesNotMatch(chineseCopies.join("\n"), /English title|English point/u);
+  assert.equal(sellingFieldCopy?.dataset.creationListingCopyText, "English point one\nEnglish point two");
 });
 
 test("rendered listing panel recognizes concurrent generating set ids", () => {
@@ -411,7 +459,7 @@ test("rendered historical failed listing drafts remain directly usable without r
   const copyLabels = root.querySelectorAll("[data-creation-listing-copy-text]")
     .map((button) => button.dataset.creationListingCopyLabel);
   for (const label of ["标题", "卖点", "痛点", "五点描述", "商品描述", "后台搜索词", "关键词分组"]) {
-    assert.equal(copyLabels.includes(label), true, `${label} must remain directly copyable`);
+    assert.equal(copyLabels.includes(`${label}英文`), true, `${label} must remain directly copyable`);
   }
   assert.match(getFakeTextContent(root), /Compact first aid kit|Loose supplies|first aid kit home travel compact/u);
 });
@@ -539,7 +587,7 @@ test("review warnings never add extra sections to the old seven-field layout", (
   assert.doesNotMatch(getFakeTextContent(root), /复核|警告|缺失信息/u);
 });
 
-test("rendered V1 listing field copy preserves historical Unicode with Chinese references", () => {
+test("rendered V1 listing copy keeps historical Unicode while separating Chinese references", () => {
   const previousDocument = globalThis.document;
   const root = makeFakeElement("div");
   globalThis.document = {
@@ -587,15 +635,21 @@ test("rendered V1 listing field copy preserves historical Unicode with Chinese r
   }
 
   const copyButtons = root.querySelectorAll("[data-creation-listing-copy-text]");
-  const copyByLabel = Object.fromEntries(copyButtons.map((button) => [
-    button.dataset.creationListingCopyLabel,
-    button.dataset.creationListingCopyText,
-  ]));
+  const fieldCopyByLabel = Object.fromEntries(copyButtons
+    .filter((button) => String(button.className || "").includes("creation-listing-field-copy"))
+    .map((button) => [
+      button.dataset.creationListingCopyLabel,
+      button.dataset.creationListingCopyText,
+    ]));
+  const localizedCopies = copyButtons
+    .filter((button) => String(button.className || "").includes("creation-listing-localized"))
+    .map((button) => button.dataset.creationListingCopyText);
 
-  assert.match(copyByLabel["标题"], /1 Pack 13cm 路亚硬饵 Product Listing Draft[\s\S]*路亚硬饵/u);
-  assert.match(copyByLabel["关键词分组"], /Long-tail keywords: fishing lure[\s\S]*中文精准词/u);
-  assert.match(Object.values(copyByLabel).join("\n"), /路亚|银蓝|黄绿|硬饵/u);
-  assert.match(Object.values(copyByLabel).join("\n"), /中文卖点对照|中文精准词/u);
+  assert.equal(fieldCopyByLabel["标题英文"], "1 Pack 13cm 路亚硬饵 Product Listing Draft");
+  assert.match(fieldCopyByLabel["关键词分组英文"], /Long-tail keywords: fishing lure/u);
+  assert.match(Object.values(fieldCopyByLabel).join("\n"), /路亚|银蓝|黄绿|硬饵/u);
+  assert.doesNotMatch(Object.values(fieldCopyByLabel).join("\n"), /中文卖点对照|中文精准词/u);
+  assert.match(localizedCopies.join("\n"), /中文卖点对照|中文精准词/u);
 });
 
 test("V2 listing view keeps policy metadata separate while full copy preserves all bilingual fields", () => {
@@ -712,8 +766,12 @@ test("completed V2 drafts keep internal search suggestions in bilingual field an
       button.dataset.creationListingCopyText,
     ]),
   );
-  assert.match(copyByLabel["后台搜索词"], new RegExp(internalSearchToken));
-  assert.match(copyByLabel["后台搜索词"], /内部中文搜索标记/u);
+  assert.match(copyByLabel["后台搜索词英文"], new RegExp(internalSearchToken));
+  assert.doesNotMatch(copyByLabel["后台搜索词英文"], /内部中文搜索标记/u);
+  assert.ok(root.querySelectorAll("[data-creation-listing-copy-text]").some((button) => (
+    String(button.className || "").includes("creation-listing-localized")
+    && button.dataset.creationListingCopyText.includes("内部中文搜索标记")
+  )));
   assert.match(buildCreationRecordListingText(set), new RegExp(internalSearchToken));
   assert.match(buildCreationRecordListingText(set), /内部中文搜索标记/u);
 });
@@ -805,7 +863,7 @@ test("historical V2 review status maps to the old direct-output fields", () => {
   const labels = root.querySelectorAll("[data-creation-listing-copy-text]")
     .map((button) => button.dataset.creationListingCopyLabel);
   for (const label of ["标题", "卖点", "痛点", "五点描述", "商品描述", "后台搜索词", "关键词分组"]) {
-    assert.equal(labels.includes(label), true);
+    assert.equal(labels.includes(`${label}英文`), true);
   }
 });
 
@@ -853,7 +911,7 @@ function makeBilingualV2Draft() {
   };
 }
 
-test("completed V2 fields display and copy English with the same-name Chinese counterpart", () => {
+test("completed V2 fields display bilingual values with language-specific copy payloads", () => {
   const previousDocument = globalThis.document;
   const root = makeFakeElement("div");
   globalThis.document = { createElement: makeFakeElement };
@@ -881,6 +939,9 @@ test("completed V2 fields display and copy English with the same-name Chinese co
   const fieldCopies = root.querySelectorAll("[data-creation-listing-copy-text]")
     .filter((button) => String(button.className || "").includes("creation-listing-field-copy"))
     .map((button) => button.dataset.creationListingCopyText);
+  const localizedCopies = root.querySelectorAll("[data-creation-listing-copy-text]")
+    .filter((button) => String(button.className || "").includes("creation-listing-localized"))
+    .map((button) => button.dataset.creationListingCopyText);
   for (const [english, chinese] of [
     ["EN_TITLE_TOKEN", "中文标题标记"],
     ["EN_SELLING_TOKEN", "中文卖点标记"],
@@ -890,7 +951,9 @@ test("completed V2 fields display and copy English with the same-name Chinese co
     ["EN_SEARCH_TOKEN", "中文搜索标记"],
     ["EN_EXACT_TOKEN", "中文精准标记"],
   ]) {
-    assert.ok(fieldCopies.some((copy) => copy.includes(english) && copy.includes(chinese)), `${english} must copy with ${chinese}`);
+    assert.ok(fieldCopies.some((copy) => copy.includes(english)), `${english} must remain field-copyable`);
+    assert.ok(fieldCopies.every((copy) => !copy.includes(chinese)), `${chinese} must not leak into English field copy`);
+    assert.ok(localizedCopies.some((copy) => copy.includes(chinese)), `${chinese} must be independently copyable`);
   }
 });
 

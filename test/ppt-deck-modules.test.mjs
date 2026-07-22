@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import JSZip from "jszip";
@@ -665,4 +665,53 @@ test("PPT deck store merges manifest records with PPTX files found in output fol
     monthFolderOnly?.pptxUrl,
     "/output/2026-05/05-01/2026-05-01-ppt/folder-deck/month-folder-only.pptx",
   );
+});
+
+test("PPT deck store deletes generated folders and falls back to exact legacy PPTX files", async () => {
+  const outputDir = await mkdtemp(join(tmpdir(), "ppt-store-delete-"));
+  const store = createPptDeckStore({ outputDir, publicBasePath: "/output" });
+  const generatedRelativeDir = "2026-07/07-22/2026-07-22-ppt/generated-deck";
+  const folderOnlyRelativeDir = "2026-07/07-22/2026-07-22-ppt/folder-only-deck";
+  const legacyDir = "2026-07/07-22/2026-07-22-ppt";
+
+  await mkdir(join(outputDir, ...generatedRelativeDir.split("/")), { recursive: true });
+  await mkdir(join(outputDir, "json", ...generatedRelativeDir.split("/")), { recursive: true });
+  await mkdir(join(outputDir, ...folderOnlyRelativeDir.split("/")), { recursive: true });
+  await mkdir(join(outputDir, ...legacyDir.split("/")), { recursive: true });
+  await writeFile(join(outputDir, ...generatedRelativeDir.split("/"), "generated.pptx"), "pptx");
+  await writeFile(join(outputDir, ...generatedRelativeDir.split("/"), "slide.png"), "image");
+  await writeFile(join(outputDir, "json", ...generatedRelativeDir.split("/"), "slide.json"), "{}\n");
+  await writeFile(join(outputDir, ...folderOnlyRelativeDir.split("/"), "folder-only.pptx"), "pptx");
+  await writeFile(join(outputDir, ...legacyDir.split("/"), "legacy.pptx"), "pptx");
+  await writeFile(join(outputDir, ...legacyDir.split("/"), "keep.pptx"), "pptx");
+  await store.saveManifest({
+    deckId: "deck-generated",
+    title: "Generated",
+    createdAt: "2026-07-22T08:00:00.000Z",
+    slides: [{ slideNumber: 1, relativePath: `${generatedRelativeDir}/slide.png` }],
+    pptxRelativePath: `${generatedRelativeDir}/generated.pptx`,
+  });
+
+  const listed = await store.listManifests();
+  const folderOnly = listed.find((deck) => deck.pptxRelativePath === `${folderOnlyRelativeDir}/folder-only.pptx`);
+  const legacy = listed.find((deck) => deck.pptxRelativePath === `${legacyDir}/legacy.pptx`);
+  assert.ok(folderOnly?.deckId);
+  assert.ok(legacy?.deckId);
+
+  const result = await store.deleteRecords([
+    "deck-generated",
+    folderOnly.deckId,
+    legacy.deckId,
+    "missing-deck",
+  ]);
+
+  assert.deepEqual(result.deletedRecordKeys, ["deck-generated", folderOnly.deckId, legacy.deckId]);
+  assert.deepEqual(result.notFoundRecordKeys, ["missing-deck"]);
+  assert.deepEqual(result.skippedUnsafePaths, []);
+  await assert.rejects(access(store.manifestPath("deck-generated")));
+  await assert.rejects(access(join(outputDir, ...generatedRelativeDir.split("/"))));
+  await assert.rejects(access(join(outputDir, "json", ...generatedRelativeDir.split("/"))));
+  await assert.rejects(access(join(outputDir, ...folderOnlyRelativeDir.split("/"))));
+  await assert.rejects(access(join(outputDir, ...legacyDir.split("/"), "legacy.pptx")));
+  await access(join(outputDir, ...legacyDir.split("/"), "keep.pptx"));
 });

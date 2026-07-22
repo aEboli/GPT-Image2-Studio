@@ -6,6 +6,7 @@ const indexPath = new URL("../public/index.html", import.meta.url);
 const stylesPath = new URL("../public/styles.css", import.meta.url);
 const appPath = new URL("../public/app.js", import.meta.url);
 const controllerPath = new URL("../public/lib/asset-workspace.mjs", import.meta.url);
+const deleteControllerPath = new URL("../public/lib/asset-record-delete-controller.mjs", import.meta.url);
 
 test("five asset views expose the same compact navigation contract", async () => {
   const html = await readFile(indexPath, "utf8");
@@ -14,6 +15,17 @@ test("five asset views expose the same compact navigation contract", async () =>
     assert.match(html, new RegExp(`href="#${hash}"`));
     assert.match(html, new RegExp(`href="#${hash}" aria-current="page"`));
   }
+});
+
+test("creation record heading omits the redundant asset eyebrow", async () => {
+  const html = await readFile(indexPath, "utf8");
+  const sectionStart = html.indexOf('<section class="view-panel creation-record-view');
+  const sectionEnd = html.indexOf('<section class="view-panel portrait-record-view', sectionStart);
+  const creationRecordSection = html.slice(sectionStart, sectionEnd);
+
+  assert.ok(sectionStart >= 0 && sectionEnd > sectionStart);
+  assert.match(creationRecordSection, /<h2>套图记录 <span class="count-pill" id="creationRecordCount">0 套<\/span><\/h2>/);
+  assert.doesNotMatch(creationRecordSection, /<span class="asset-eyebrow">资产<\/span>/);
 });
 
 test("record commands are grouped and selection is exposed to assistive technology", async () => {
@@ -30,6 +42,36 @@ test("record commands are grouped and selection is exposed to assistive technolo
   assert.match(controller, /closeRecordPickers/);
   assert.match(controller, /closeCommandMenus/);
   assert.match(app, /if \(event\.key === "Escape"\)[\s\S]*details\[data-asset-menu\]\[open\]/);
+});
+
+test("all asset pages expose current and selected deletion without implicit filtered deletion", async () => {
+  const [html, app, styles, deleteController] = await Promise.all([
+    readFile(indexPath, "utf8"),
+    readFile(appPath, "utf8"),
+    readFile(stylesPath, "utf8"),
+    readFile(deleteControllerPath, "utf8"),
+  ]);
+  for (const prefix of ["gallery", "articleRecord", "portraitRecord", "pptRecord"]) {
+    assert.match(html, new RegExp(`id="${prefix}DeleteCurrentButton"[^>]*>删除当前<\\/button>`));
+    assert.match(html, new RegExp(`id="${prefix}DeleteSelectedButton"[^>]*>删除选中`));
+    assert.doesNotMatch(html, new RegExp(`id="${prefix}DeleteFilteredButton"`));
+  }
+  assert.match(html, /id="assetRecordDeleteDialog"[^>]*aria-labelledby="assetRecordDeleteDialogTitle"/);
+  assert.match(html, /id="assetRecordDeleteCancelButton"[^>]*>取消<\/button>/);
+  assert.match(html, /id="assetRecordDeleteConfirmButton"[^>]*>确认删除<\/button>/);
+  assert.match(app, /from "\/lib\/asset-record-delete-controller\.mjs\?v=/);
+  assert.match(deleteController, /from "\.\/asset-record-delete\.mjs"/);
+  assert.match(app, /data-gallery-select-filename/);
+  assert.match(app, /data-article-record-select-set-id/);
+  assert.match(app, /data-portrait-record-select-set-id/);
+  assert.match(app, /data-ppt-record-select-key/);
+  assert.match(deleteController, /fetch\("\/api\/article-illustration\/sets\/delete"/);
+  assert.match(deleteController, /fetch\("\/api\/portrait\/sets\/delete"/);
+  assert.match(deleteController, /fetch\("\/api\/ppt\/decks\/delete"/);
+  assert.match(styles, /\.asset-record-select-row\s*\{/);
+  assert.match(styles, /\.asset-record-select\s*\{/);
+  assert.match(styles, /\.gallery-tile-select\s*\{/);
+  assert.match(styles, /\.asset-record-delete-dialog\s*\{/);
 });
 
 test("asset empty states distinguish no data, no results, loading, and failure", async () => {

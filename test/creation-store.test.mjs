@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -16,6 +16,16 @@ async function writeOutputFile(outputDir, relativePath, content = "image") {
   const filename = segments.pop();
   await mkdir(join(outputDir, ...segments), { recursive: true });
   await writeFile(join(outputDir, ...segments, filename), content);
+}
+
+async function creationStorePathExists(path) {
+  try {
+    await stat(path);
+    return true;
+  } catch (error) {
+    if (error?.code === "ENOENT") return false;
+    throw error;
+  }
 }
 
 test("creation store builds dated creation directories beside image and ppt folders", () => {
@@ -705,4 +715,57 @@ test("creation set store writes and lists manifests newest first", async () => {
   assert.equal(manifests[0].status, "partial_failed");
   assert.equal(manifests[0].items[0].thumbnailUrl, manifests[0].items[0].imageUrl);
   assert.match(raw, /"setId": "creation-set-new"/);
+});
+
+test("creation set store deletes distinct manifests with dedicated images and sidecars", async () => {
+  const rootDir = await mkdtemp(join(tmpdir(), "creation-store-delete-"));
+  const outputDir = join(rootDir, "output");
+  const store = createCreationSetStore({ outputDir, publicBasePath: "/output" });
+  const deletedDir = "2026-07/07-22/2026-07-22-creation/delete-set";
+  const keptDir = "2026-07/07-22/2026-07-22-creation/keep-set";
+  const deletedImage = `${deletedDir}/01-hero.png`;
+  const keptImage = `${keptDir}/01-hero.png`;
+  const deletedMetadataDir = join(outputDir, "json", ...deletedDir.split("/"));
+
+  await writeOutputFile(outputDir, deletedImage);
+  await writeOutputFile(outputDir, keptImage);
+  await mkdir(deletedMetadataDir, { recursive: true });
+  await writeFile(join(deletedMetadataDir, "01-hero.json"), "{}\n");
+  await store.saveManifest({ setId: "set-delete", relativeDir: deletedDir, items: [] });
+  await store.saveManifest({ setId: "set-keep", relativeDir: keptDir, items: [] });
+
+  const result = await store.deleteManifests(["set-delete", "set-delete", "set-missing"]);
+
+  assert.deepEqual(result.deletedSetIds, ["set-delete"]);
+  assert.deepEqual(result.notFoundSetIds, ["set-missing"]);
+  assert.equal(await creationStorePathExists(store.manifestPath("set-delete")), false);
+  assert.equal(await creationStorePathExists(join(outputDir, ...deletedDir.split("/"))), false);
+  assert.equal(await creationStorePathExists(deletedMetadataDir), false);
+  assert.equal(await creationStorePathExists(store.manifestPath("set-keep")), true);
+  assert.equal(await creationStorePathExists(join(outputDir, ...keptDir.split("/"))), true);
+
+  await rm(rootDir, { recursive: true, force: true });
+});
+
+test("creation set store requires exact IDs and never recursively deletes an unsafe relative directory", async () => {
+  const rootDir = await mkdtemp(join(tmpdir(), "creation-store-delete-safety-"));
+  const outputDir = join(rootDir, "output");
+  const store = createCreationSetStore({ outputDir, publicBasePath: "/output" });
+  const outsideDir = join(rootDir, "outside");
+  await mkdir(outsideDir, { recursive: true });
+  await writeFile(join(outsideDir, "keep.txt"), "keep");
+
+  await store.saveManifest({ setId: "requestedid", relativeDir: "../outside", items: [] });
+  const collisionResult = await store.deleteManifests(["requested/id"]);
+  assert.deepEqual(collisionResult.deletedSetIds, []);
+  assert.deepEqual(collisionResult.notFoundSetIds, ["requested/id"]);
+  assert.equal(await creationStorePathExists(store.manifestPath("requestedid")), true);
+
+  const unsafeResult = await store.deleteManifests(["requestedid"]);
+  assert.deepEqual(unsafeResult.deletedSetIds, ["requestedid"]);
+  assert.equal(await creationStorePathExists(store.manifestPath("requestedid")), false);
+  assert.equal(await creationStorePathExists(join(outsideDir, "keep.txt")), true);
+  assert.equal(unsafeResult.skippedUnsafePaths.length, 1);
+
+  await rm(rootDir, { recursive: true, force: true });
 });

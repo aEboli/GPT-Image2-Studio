@@ -208,7 +208,7 @@ The system SHALL provide Creation Mode set record details that show the set-leve
 - **THEN** the detail view shows the set metadata and every planned item with its role, prompt, status, error message when present, and saved image path when present
 
 #### Scenario: User previews one saved item image
-- **WHEN** the user clicks a saved Creation Mode item thumbnail or its View action
+- **WHEN** the user clicks a saved Creation Mode item thumbnail
 - **THEN** the shared image lightbox opens with the saved image enlarged
 - **AND** the lightbox shows the actual per-item prompt sent to the upstream image request rather than the set planning prompt
 - **AND** the lightbox shows the saved per-item request snapshot, including route, models, endpoint, ratio, requested and effective sizes, output format, quality, reasoning effort, and the reference image names used by that request
@@ -216,7 +216,7 @@ The system SHALL provide Creation Mode set record details that show the set-leve
 - **AND** the saved planning prompt remains available for editing and repair without replacing the recovered generation prompt
 - **AND** missing historical request fields remain unrecorded instead of being filled from the current global configuration
 - **AND** the saved relative path, download action, and path-copy actions are available inside the lightbox
-- **AND** the record card itself does not render the full prompt or saved path inline below the image
+- **AND** the record card itself does not render a redundant View action, the full prompt, or the saved path inline below the image
 
 #### Scenario: User regenerates one saved item
 - **WHEN** the user requests regeneration for a completed item in a Creation Mode set record
@@ -574,15 +574,167 @@ The system SHALL omit or replace image types that require unavailable factual ev
 - **AND** it does not silently display or submit a named-platform plan built from stale duplicated defaults
 
 ### Requirement: Creation records display and expose Listing drafts in the old-style format
-The Creation record UI SHALL display every current Listing draft using the fixed section order 标题、卖点、痛点、五点描述、商品描述、后台搜索词、关键词分组. Each English value SHALL be followed by its corresponding Simplified Chinese reference, and copy/export actions SHALL be immediately available without validation or review gating.
+The Creation record UI SHALL display every current Listing draft using the fixed section order 标题、卖点、痛点、五点描述、商品描述、后台搜索词、关键词分组. Each English value SHALL be followed by its corresponding Simplified Chinese reference. Every visible English value SHALL be an independent copy target that copies only that English value, and every visible Chinese reference SHALL be an independent copy target that copies only that Chinese value. Field-title copy SHALL copy the complete English value for that field, while full-copy and export actions SHALL preserve the complete bilingual field mapping. All copy/export actions SHALL be immediately available without validation or review gating.
 
 #### Scenario: User opens a newly generated Listing draft
 - **WHEN** a completed Listing is rendered in a Creation record
 - **THEN** all seven old-style sections are shown in the fixed order
 - **AND** each English scalar or list entry is followed by its matching `中文参考` value
+- **AND** the English value and Chinese reference are rendered as separate copy targets
 - **AND** the UI does not show validation, retry-review or `needs-review` controls
 
+#### Scenario: User copies a visible English Listing value
+- **WHEN** the user clicks the visible English title, field value, or list information point
+- **THEN** the clipboard contains only the clicked English value
+- **AND** the clipboard does not contain its Chinese reference
+
+#### Scenario: User copies a visible Chinese Listing reference
+- **WHEN** the user clicks a visible `中文参考` value
+- **THEN** the clipboard contains only that Chinese value
+- **AND** the clipboard does not contain the English value
+
 #### Scenario: User copies or exports a Listing draft
-- **WHEN** the user invokes single-field copy, full copy or export
-- **THEN** the action uses the old-style bilingual field mapping
-- **AND** it is not blocked by validation, review, warnings or access state
+- **WHEN** the user invokes field-title copy, full copy or export
+- **THEN** field-title copy contains the selected field's English content only
+- **AND** full copy and structured export retain the old-style bilingual field mapping
+- **AND** the actions are not blocked by validation, review, warnings or access state
+
+### Requirement: Hard-information images use decision-meaningful visual structures
+
+The system SHALL keep complete supplied dimension and package facts in the effective Creation plan while composing the specification-table image as a product-led explanation of no more than four distinct, purchase-relevant specification attributes and composing the accessory/gift image as an unpacked inventory of confirmed included items. It MUST NOT invent values, items, quantities, packaging, or containers.
+
+#### Scenario: Specification evidence contains many or repeated measurements
+
+- **WHEN** a Creation plan includes the specification-table role and the supplied dimension evidence contains many values or repeated attribute labels
+- **THEN** the specification-table prompt selects no more than four different specification attributes for visible use
+- **AND** the product remains the dominant visual subject with selected values anchored through measurement lines, local callouts, or compact explanatory modules
+- **AND** the prompt forbids a full-canvas spreadsheet, database-like table, dense rows, and repeated same-label filler
+- **AND** the effective plan retains the complete normalized dimension facts for records and other dimension roles
+
+#### Scenario: A visible key specification is rendered
+
+- **WHEN** the specification-table image uses a selected supplied value
+- **THEN** its digits, decimal point, units, and selected metric/imperial mode remain exact
+- **AND** the image does not add unsupported parameters or explain the value with an unsupported performance claim
+
+#### Scenario: Included items are shown without packaging evidence
+
+- **WHEN** a Creation plan includes the accessory/gift or platform `in-box` role and supplied facts identify the product and included accessories but do not prove retail packaging
+- **THEN** the prompt requires an unpacked flat lay with the product and every confirmed item fully visible outside any container
+- **AND** it forbids adding a cardboard box, shipping carton, paper tray, blister tray, molded insert, or other invented packaging
+- **AND** quantities remain readable and no supplied item is hidden, cropped, merged, or omitted
+
+#### Scenario: Packaging is a confirmed included item
+
+- **WHEN** supplied input or an applied package reference explicitly proves that packaging, a storage case, or a gift box is included
+- **THEN** the prompt may show that packaging as a separate secondary inventory item beside the unpacked contents
+- **AND** it does not use the container as the default frame or place all products and accessories inside it unless the user explicitly requests that internal arrangement
+
+### Requirement: Creation set records can be deleted individually or in explicit batches
+The system SHALL let users permanently delete the current Creation set record, an explicitly checked group of Creation set records, or every Creation set record matching the current explicit keyword and time filters. Each deletion SHALL remove the set manifest, its dedicated generated-image directory, and its corresponding JSON metadata directory without deleting another set or an output root.
+
+#### Scenario: User deletes the current set record
+- **WHEN** the user chooses Delete current for a selected Creation set record and confirms the action
+- **THEN** the browser submits exactly that set ID to the batch deletion endpoint
+- **AND** the Local store deletes that set manifest, its dedicated generated images, and its corresponding JSON sidecars
+- **AND** the record list and detail selection refresh without the deleted set
+
+#### Scenario: User checks and deletes multiple set records
+- **WHEN** the user checks two or more Creation set records and chooses Delete selected
+- **THEN** checking records does not change the single record opened in the detail view
+- **AND** the confirmation identifies the number of checked sets
+- **AND** the browser submits the distinct checked set IDs in one request
+- **AND** successful deletion clears those checked IDs and refreshes the record list
+
+#### Scenario: User deletes all records matching a search filter
+- **WHEN** the user enters a non-empty Creation record search query, optionally combines it with a time condition, and chooses Delete filtered with matching sets
+- **THEN** the confirmation identifies the full number of matching sets and summarizes the active keyword and time filters
+- **AND** the deletion target includes every matching set in the complete filtered collection, including matches beyond the visible list rendering limit
+- **AND** records outside the filtered collection are preserved
+
+#### Scenario: User deletes all records matching a time filter
+- **WHEN** the user selects a non-default quick time window or an exact date with matching sets and chooses Delete filtered
+- **THEN** the confirmation identifies the full number of matching sets and summarizes the active time filter
+- **AND** the deletion target includes every matching set in the complete filtered collection, including matches beyond the visible list rendering limit
+- **AND** records outside the filtered collection are preserved
+
+#### Scenario: Search filter is empty or has no matches
+- **WHEN** the keyword is empty, the quick time window is All, and the exact date is empty, or when the active keyword and time filters match no sets
+- **THEN** Delete filtered is disabled
+- **AND** the default filter state cannot be used as an implicit Delete all action
+
+### Requirement: Creation record deletion is confirmed and path-safe
+The system SHALL present an application-modal confirmation before any Creation record deletion, SHALL send a bounded non-empty list of distinct set IDs, and SHALL resolve every recursive filesystem deletion as a non-root descendant of the configured output directory. Deletion SHALL be idempotent for records that no longer exist and SHALL NOT race a browser-known active Creation generation or planning operation.
+
+#### Scenario: User cancels deletion
+- **WHEN** the deletion confirmation is dismissed, cancelled, or closed with Escape
+- **THEN** no deletion request is sent
+- **AND** all records, generated files, metadata, selection, and filters remain unchanged
+
+#### Scenario: Requested ID does not exactly match its manifest
+- **WHEN** a requested set ID resolves through filename sanitization to a manifest whose stored set ID is different
+- **THEN** the store does not delete that manifest or any referenced directory
+- **AND** the requested ID is reported as not found
+
+#### Scenario: Manifest contains an unsafe output directory
+- **WHEN** a manifest has an empty, root, absolute, traversing, or otherwise out-of-root `relativeDir`
+- **THEN** the store does not recursively delete that directory
+- **AND** no other output directory is affected
+
+#### Scenario: Creation work is active
+- **WHEN** Creation planning, generation, or another record deletion is active in the browser
+- **THEN** all Creation record deletion commands are disabled
+- **AND** the browser does not start a competing delete request
+
+#### Scenario: Cloudflare receives a record deletion request
+- **WHEN** the Cloudflare runtime receives a valid Creation set deletion request but has no server-side Creation record store
+- **THEN** it returns an idempotent success for the submitted distinct set IDs
+- **AND** the browser removes matching current-session records without assuming local filesystem deletion
+
+### Requirement: Creation set records can be filtered by creation time
+The system SHALL let users filter Creation set records by the manifest `createdAt` value using All, Today, Recent 7 days, Older, or one exact local calendar date. Time filtering SHALL combine with keyword search, and the record count, empty state, detail selection, visible list, and filtered deletion target SHALL derive from the same complete filtered collection before the visible list rendering limit is applied.
+
+#### Scenario: User selects a quick time window
+- **WHEN** the user selects Today, Recent 7 days, or Older
+- **THEN** the system matches records created today, from today through six local calendar days ago, or at least seven local calendar days ago respectively
+- **AND** invalid or future creation timestamps do not match a bounded time window
+- **AND** selecting a non-default quick window clears an exact-date filter
+
+#### Scenario: User selects an exact date
+- **WHEN** the user enters a valid exact calendar date
+- **THEN** the system matches records whose `createdAt` falls on that local calendar date
+- **AND** the quick time window returns to All so the exact date is the only active time condition
+
+#### Scenario: Keyword and time filters are combined
+- **WHEN** the user enters a keyword and selects an explicit time condition
+- **THEN** only records matching both the existing keyword search text and the time condition are included
+- **AND** counts and detail fallback use the complete combined result even when more than 60 records match
+
+#### Scenario: User clears Creation record filters
+- **WHEN** the user activates Clear filters
+- **THEN** the keyword, quick time, and exact-date controls return to their defaults
+- **AND** all Creation set records, including records with missing or invalid creation timestamps, are available again
+
+### Requirement: Creation record deletion updates the open view in place
+The system SHALL update the current Creation record view from the successful batch deletion result without automatically reloading the complete Creation set collection. The update SHALL preserve active keyword and time filters, surviving checked records, and the current list scroll context, while manual Refresh SHALL remain available for explicit reconciliation with external changes.
+
+#### Scenario: Successful deletion does not reload all records
+- **WHEN** the Creation record batch deletion endpoint successfully processes the submitted set IDs
+- **THEN** the browser removes those deleted or already-absent records from its current set collection
+- **AND** it does not automatically request the complete Creation set list
+- **AND** count, filter options, list, detail, checked selection, queue, and deletion controls update in one final render
+
+#### Scenario: Current detail survives a batch deletion
+- **WHEN** a checked or filtered batch is deleted without including the record open in the detail view
+- **THEN** the open detail record remains selected
+- **AND** surviving checked records and active filters remain unchanged
+
+#### Scenario: Current detail is deleted
+- **WHEN** the record open in the detail view is included in a successful deletion
+- **THEN** the browser selects the next surviving record in the complete filtered order
+- **AND** it selects the previous surviving record when there is no next record
+- **AND** it shows an empty filtered result when no matching record remains
+
+#### Scenario: User explicitly refreshes records
+- **WHEN** the user activates Refresh after records may have changed in another window or outside the application
+- **THEN** the browser requests the complete Creation set list and reconciles its local record state

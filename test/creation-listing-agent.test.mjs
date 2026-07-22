@@ -97,7 +97,7 @@ test("strict listing schema marks every top-level property as required", () => {
   );
 });
 
-test("listing agent prompt uses dedicated SEO five-point constraints", async () => {
+test("platform V1 prompt restores prior field rules and adds title value instructions", async () => {
   const calls = [];
   const fetchImpl = async (_url, init) => {
     calls.push({ body: JSON.parse(init.body) });
@@ -114,9 +114,28 @@ test("listing agent prompt uses dedicated SEO five-point constraints", async () 
     responsesModel: "gpt-5.4",
     source: {
       ...standardSource,
-      productDescription: "Blue lure with metric and imperial size notes.",
+      platformPolicyId: "etsy",
+      language: "en-US",
+      forceV1: true,
+      productDescription: "Blue lure with a reflective finish that stays visible in the supplied use context.",
       dimensionSpecs: "3.5 in / 9 cm",
       sellingPoints: ["Reflective finish", "Compact shape"],
+      skuSubjects: [
+        {
+          id: "blue-compact",
+          title: "Blue compact lure",
+          bundleCount: 2,
+          note: "Two blue lure units with a compact body and reflective visible finish.",
+        },
+      ],
+      titleValueEvidence: [
+        {
+          sourceRole: "benefit",
+          buyerContext: "Anglers who need the lure to remain visible in the supplied use context.",
+          supportedValue: "Reflective finish stays visible in the supplied use context.",
+          evidenceFocus: "The supplied product reference shows a reflective finish.",
+        },
+      ],
     },
     fetchImpl,
   });
@@ -124,21 +143,69 @@ test("listing agent prompt uses dedicated SEO five-point constraints", async () 
   const prompt = calls[0].body.input;
   assert.match(prompt, /Listing SEO Agent/);
   assert.match(prompt, /Five-point listing quality constraints/);
-  assert.match(prompt, /high-search Amazon SEO/);
+  assert.match(prompt, /Platform search fit/);
+  assert.match(prompt, /Resolved platform policy/);
   assert.match(prompt, /Title formula/i);
-  assert.match(prompt, /quantity first/i);
   assert.match(prompt, /core product keyword/i);
   assert.match(prompt, /do not include size/i);
   assert.match(prompt, /search terms/i);
-  assert.doesNotMatch(prompt, /place it immediately after quantity/);
-  assert.doesNotMatch(prompt, /include every expected size unit/i);
-  assert.match(prompt, /Attribute-only rule/i);
-  assert.match(prompt, /no public field or zhDisplay field may contain functional/i);
-  assert.match(prompt, /Do not say or imply that the product helps/i);
-  assert.match(prompt, /exactly five bullets/);
-  assert.match(prompt, /uppercase lead label/i);
+  assert.match(prompt, /Non-title attribute-only rule/i);
+  assert.match(prompt, /non-title fields may contain functional/i);
+  assert.match(prompt, /Outside title and zhDisplay\.title, do not say or imply that the product helps/i);
+  assert.match(prompt, /Non-title completeness rule/i);
+  assert.match(prompt, /write 4-5 sellingPoints and 3-4 painPoints/i);
+  assert.match(prompt, /recommendations are not quotas/i);
+  assert.match(prompt, /complete, specific statement/i);
+  assert.match(prompt, /painPoints must use declarative statements only/i);
+  assert.match(prompt, /Never use a question mark.*\?.*？/is);
+  assert.match(prompt, /Do not begin English painPoints with How.*What.*Which.*Is.*Are.*Does.*Do.*Can/is);
+  assert.match(prompt, /Chinese painPoints.*是否.*什么.*多少.*如何/is);
+  assert.match(prompt, /unknown, missing, or not specified as filler/i);
+  assert.match(prompt, /PRODUCT TYPE.*product identity.*PACK DETAILS.*quantity.*VISIBLE DETAILS.*construction.*SPECIFICATIONS.*dimensions.*PACKAGE CONTENTS.*included items/is);
+  assert.match(prompt, /2-4 short paragraphs/i);
+  assert.match(prompt, /Aim for 350-500 English characters total/i);
+  assert.match(prompt, /Never exceed 500 characters or a stricter platform limit/i);
+  assert.match(prompt, /backendSearchTerms.*synonyms.*not already used verbatim/i);
+  assert.match(prompt, /Deduplicate case-insensitively across backendSearchTerms and all four keyword buckets/i);
+  assert.match(prompt, /mechanical singular\/plural variants/i);
+  assert.match(prompt, /same array lengths, order, facts, quantities, and units/i);
+  assert.match(prompt, /Do not repeat the title or another field merely to make content longer/i);
+  assert.match(prompt, /buyer-facing language rule/i);
+  assert.match(prompt, /write every non-title field for a shopper reading a finished product page/i);
+  assert.match(prompt, /never expose internal record, evidence, or generation workflow/i);
+  assert.match(prompt, /parent listing.*parent product.*saved creation set.*supplied configuration.*reference labels.*selected quantity.*confirmed selection/is);
+  assert.match(prompt, /The 1 Pack contains one thermal imaging scope\./i);
+  assert.match(prompt, /1件装内含1个热成像红外夜视瞄准镜。/u);
+  assert.doesNotMatch(prompt, /ask a practical product question/i);
+  assert.doesNotMatch(prompt, /question followed by a factual answer/i);
+  assert.match(prompt, /fixed bullet bodies.*state product facts directly/i);
+  assert.match(prompt, /description.*open with the product identity.*never describe the Listing record/is);
+  assert.match(prompt, /visible model markings include/i);
+  assert.match(prompt, /not a confirmed SKU, selected variant, or available option/i);
+  assert.match(prompt, /backendSearchTerms and keywordBuckets remain keyword phrases, not explanatory sentences/i);
+  assert.match(prompt, /Chinese counterparts.*same natural buyer-facing voice/i);
+  assert.match(prompt, /exactly five bullets/i);
   assert.match(prompt, /PRODUCT TYPE.*PACK DETAILS.*PACKAGE CONTENTS/i);
+  assert.match(prompt, /Title value exception/i);
+  assert.match(prompt, /strongest differentiating selling point/i);
+  assert.match(prompt, /pain point or purchase concern/i);
+  assert.match(prompt, /Mandatory title value evidence/i);
+  assert.match(prompt, /Reflective finish stays visible in the supplied use context/i);
+  assert.match(prompt, /attribute-only title is invalid/i);
+  assert.match(prompt, /after the required product identity and value phrase, append 2-4/i);
+  assert.match(prompt, /different search or purchase decision point/i);
+  assert.match(prompt, /visible construction, visible components, shape, color, variant, quantity, or package facts/i);
+  assert.match(prompt, /platform hard character and byte limits are absolute/i);
+  assert.match(prompt, /recommended title range is a soft readability target/i);
+  assert.match(prompt, /do not shorten or remove the supplied selling point or its supported pain-point resolution/i);
+  assert.match(prompt, /do not repeat concepts, stack synonyms, or add generic filler/i);
+  assert.match(prompt, /same appended facts in the same order/i);
+  assert.match(prompt, /Never use objectionFocus as a title claim/i);
+  assert.match(prompt, /Every other English and Chinese content field remains subject/i);
+  assert.doesNotMatch(prompt, /no public field or zhDisplay field may contain functional/i);
   assert.match(prompt, /Do not write gift/i);
+  assert.doesNotMatch(prompt, /senior ecommerce Listing strategist/i);
+  assert.doesNotMatch(prompt, /EVIDENCE-BASED BENEFITS|SILENT PLANNING|PLATFORM ADAPTATION/);
 });
 
 test("listing agent derives 2 Pack from grouped subject units when bundle count is one", async () => {
@@ -864,6 +931,202 @@ test("application Listing generation uses one platform-aware V1 request and remo
   assert.doesNotMatch(visibleDraftText(drafts[0]), /portable|fits|hydration/i);
 });
 
+test("platform V1 allows supported title value wording only in titles", async () => {
+  const titleValuePayload = {
+    title: "1 Pack Travel Bottle Flip Lid Helps Keep Opening Covered Between Sips",
+    sellingPoints: ["Flip lid and compact bottle shape."],
+    painPoints: ["Review the stated bottle option before purchase."],
+    fiveBullets: [
+      "PRODUCT TYPE: Travel bottle.",
+      "PACK DETAILS: One supplied bottle unit.",
+      "VISIBLE DETAILS: Flip lid and compact bottle shape.",
+      "SPECIFICATIONS: Review the stated bottle option.",
+      "PACKAGE CONTENTS: One travel bottle.",
+    ],
+    description: "Travel bottle with a supplied flip lid and compact bottle shape.",
+    backendSearchTerms: "travel bottle flip lid compact bottle",
+    keywordBuckets: {
+      exact: ["travel bottle"],
+      longTail: ["compact flip lid bottle"],
+      traffic: ["drink bottle"],
+      descriptive: ["compact bottle"],
+    },
+    zhDisplay: {
+      title: "1 件装旅行水瓶 翻盖有助于在饮水间隔保持瓶口覆盖",
+      sellingPoints: ["翻盖与紧凑瓶身形态。"],
+      painPoints: ["购买前核对已注明的水瓶选项。"],
+      fiveBullets: [
+        "商品类型：旅行水瓶。",
+        "包装信息：一只水瓶。",
+        "外观信息：翻盖与紧凑瓶身形态。",
+        "规格信息：核对已注明的水瓶选项。",
+        "包装内容：一只旅行水瓶。",
+      ],
+      description: "旅行水瓶，带有已提供资料中的翻盖与紧凑瓶身形态。",
+      backendSearchTerms: "旅行水瓶 翻盖 紧凑 水瓶",
+      keywordBuckets: {
+        exact: ["旅行水瓶"],
+        longTail: ["紧凑型翻盖水瓶"],
+        traffic: ["饮水瓶"],
+        descriptive: ["紧凑水瓶"],
+      },
+    },
+  };
+  const calls = [];
+  const draft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    source: {
+      ...standardSource,
+      platformPolicyId: "etsy",
+      forceV1: true,
+      productName: "Travel Bottle",
+      productDescription: "Travel bottle with a flip lid that helps keep the opening covered between sips.",
+      sellingPoints: ["Flip lid helps keep the opening covered between sips."],
+    },
+    fetchImpl: async (_url, init) => {
+      calls.push(JSON.parse(init.body).input);
+      return new Response(JSON.stringify({
+        output_text: JSON.stringify(titleValuePayload),
+      }), { status: 200 });
+    },
+  });
+
+  assert.equal(calls.length, 1);
+  assert.match(draft.title, /helps keep opening covered/i);
+  assert.match(draft.zhDisplay.title, /有助于.*保持瓶口覆盖/u);
+  assert.doesNotMatch(draft.sellingPoints.join("\n"), /helps|supports|improves/i);
+  assert.doesNotMatch(draft.title, /Product Details/i);
+
+  const nonTitleFunctionalPayload = {
+    ...titleValuePayload,
+    sellingPoints: ["Flip lid helps keep the opening covered between sips."],
+  };
+  const nonTitleFallbackDraft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    source: {
+      ...standardSource,
+      platformPolicyId: "etsy",
+      forceV1: true,
+      productName: "Travel Bottle",
+      productDescription: "Travel bottle with a flip lid that helps keep the opening covered between sips.",
+      sellingPoints: ["Flip lid helps keep the opening covered between sips."],
+    },
+    fetchImpl: async () => new Response(JSON.stringify({
+      output_text: JSON.stringify(nonTitleFunctionalPayload),
+    }), { status: 200 }),
+  });
+
+  assert.doesNotMatch(nonTitleFallbackDraft.sellingPoints.join("\n"), /helps keep/i);
+  assert.match(nonTitleFallbackDraft.title, /Product Details/i);
+
+  const riskyTitleDraft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    source: {
+      ...standardSource,
+      platformPolicyId: "etsy",
+      forceV1: true,
+      productName: "Travel Bottle",
+      productDescription: "Travel bottle with a flip lid that helps keep the opening covered between sips.",
+      sellingPoints: ["Flip lid helps keep the opening covered between sips."],
+    },
+    fetchImpl: async () => new Response(JSON.stringify({
+      output_text: JSON.stringify({
+        ...titleValuePayload,
+        title: "1 Pack Best Seller Travel Bottle With Guaranteed Performance",
+      }),
+    }), { status: 200 }),
+  });
+
+  assert.doesNotMatch(riskyTitleDraft.title, /Best Seller|Guaranteed/i);
+  assert.match(riskyTitleDraft.title, /Product Details/i);
+});
+
+test("platform V1 rejects interrogative pain points in either display language", async () => {
+  const basePayload = {
+    title: "2 Pack Fishing Lure Blue Compact Body",
+    sellingPoints: ["The two blue lures have compact bodies."],
+    painPoints: ["The 2 Pack contains two fishing lures."],
+    fiveBullets: [
+      "PRODUCT TYPE: These are blue fishing lures.",
+      "PACK DETAILS: The pack contains two fishing lures.",
+      "VISIBLE DETAILS: Both lures have blue compact bodies.",
+      "SPECIFICATIONS: The stated length is 3.5 inches.",
+      "PACKAGE CONTENTS: Two fishing lures are included.",
+    ],
+    description: "This 2 Pack contains two blue fishing lures with compact bodies and a stated length of 3.5 inches.",
+    backendSearchTerms: "blue fishing lure compact bait",
+    keywordBuckets: {
+      exact: ["fishing lure"],
+      longTail: ["2 pack blue fishing lure"],
+      traffic: ["freshwater bait"],
+      descriptive: ["compact blue lure"],
+    },
+    zhDisplay: {
+      title: "2件装 蓝色紧凑型路亚鱼饵",
+      sellingPoints: ["两个蓝色路亚鱼饵均为紧凑型饵身。"],
+      painPoints: ["2件装内含2个路亚鱼饵。"],
+      fiveBullets: [
+        "PRODUCT TYPE: 这是蓝色路亚鱼饵。",
+        "PACK DETAILS: 包装内含2个路亚鱼饵。",
+        "VISIBLE DETAILS: 两个鱼饵均为蓝色紧凑型饵身。",
+        "SPECIFICATIONS: 标示长度为3.5英寸。",
+        "PACKAGE CONTENTS: 包装内含2个路亚鱼饵。",
+      ],
+      description: "这款2件装产品内含2个蓝色紧凑型路亚鱼饵，标示长度为3.5英寸。",
+      backendSearchTerms: "蓝色 路亚鱼饵 紧凑 鱼饵",
+      keywordBuckets: {
+        exact: ["路亚鱼饵"],
+        longTail: ["2件装蓝色路亚鱼饵"],
+        traffic: ["淡水鱼饵"],
+        descriptive: ["蓝色紧凑鱼饵"],
+      },
+    },
+  };
+  const cases = [
+    {
+      painPoints: ["How many lures are included? The 2 Pack contains two fishing lures."],
+      zhPainPoints: basePayload.zhDisplay.painPoints,
+    },
+    {
+      painPoints: basePayload.painPoints,
+      zhPainPoints: ["内含多少个路亚鱼饵？2件装内含2个路亚鱼饵。"],
+    },
+  ];
+
+  for (const entry of cases) {
+    const draft = await requestCreationListingDraft({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      responsesModel: "gpt-5.4",
+      source: {
+        ...standardSource,
+        platformPolicyId: "etsy",
+        forceV1: true,
+      },
+      fetchImpl: async () => new Response(JSON.stringify({
+        output_text: JSON.stringify({
+          ...basePayload,
+          painPoints: entry.painPoints,
+          zhDisplay: {
+            ...basePayload.zhDisplay,
+            painPoints: entry.zhPainPoints,
+          },
+        }),
+      }), { status: 200 }),
+    });
+
+    assert.match(draft.title, /Product Details/i);
+    assert.doesNotMatch(draft.painPoints.join("\n"), /[?？]/u);
+    assert.doesNotMatch(draft.zhDisplay.painPoints.join("\n"), /[?？]/u);
+  }
+});
+
 test("application Listing generation falls back after one incomplete response without review", async () => {
   let requestCount = 0;
   const drafts = await generateCreationListingDrafts({
@@ -1130,6 +1393,25 @@ test("mock mode uses English Amazon-style titles for Chinese source inputs", asy
   assert.equal(mockDraft.title.length <= 200, true);
   assert.doesNotMatch(visibleDraftText(mockDraft), /[\u3400-\u9fff]/u);
   assert.equal(validateListingAgentDraft(mockDraft, "1 Pack").ok, true);
+});
+
+test("mock fallback recognizes Chinese folding wagons before numeric claim fragments", () => {
+  const draft = makeMockCreationListingDraft({
+    setId: "set-cn-folding-wagon",
+    productName: "四轮折叠手拉车",
+    skuTitle: "四轮折叠手拉车",
+    skuNote: "1个完整产品单位；不保留画面外置300KG文字。",
+    skuBundleCount: 1,
+    evidenceMode: "image-backed",
+    skuSubjects: [
+      { id: "wagon-black", title: "黑色折叠手拉车", bundleCount: 1 },
+      { id: "wagon-pink", title: "粉色折叠手拉车", bundleCount: 1 },
+    ],
+  });
+
+  assert.match(draft.title, /^1 Pack Folding Wagon Cart\b/);
+  assert.doesNotMatch(visibleDraftText(draft), /300\s*KG/i);
+  assert.equal(validateListingAgentDraft(draft, "1 Pack").ok, true);
 });
 
 test("mock listing draft does not infer product keywords from numbered first aid kit contents", () => {

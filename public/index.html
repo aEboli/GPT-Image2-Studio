@@ -68,7 +68,7 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Sora:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260720-creation-reference-apply-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260722-asset-record-delete-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -2169,6 +2169,8 @@
                 <div class="asset-head-actions">
                   <a class="toolbar-button asset-primary-action" href="#studio">前往提示词生图</a>
                   <button class="header-button" id="refreshGalleryButton" type="button" aria-label="刷新瀑布画廊">刷新</button>
+                  <button class="toolbar-button danger" id="galleryDeleteCurrentButton" type="button" disabled>删除当前</button>
+                  <button class="toolbar-button danger" id="galleryDeleteSelectedButton" type="button" disabled>删除选中</button>
                 </div>
               </div>
               <nav class="asset-view-nav" aria-label="资产视图">
@@ -2178,6 +2180,7 @@
                 <a href="#portrait-record">写真</a>
                 <a href="#ppt-record">PPT</a>
               </nav>
+              <p class="prompt-agent-feedback creation-record-feedback gallery-action-feedback" id="galleryActionFeedback" aria-live="polite"></p>
             </header>
 
             <div class="gallery-toolbar asset-filter-zone">
@@ -2294,6 +2297,8 @@
                 <div class="asset-head-actions article-record-actions">
                   <button class="toolbar-button asset-primary-action hidden" id="articleRecordContinueButton" type="button" disabled>继续失败项</button>
                   <button class="toolbar-button" id="articleRecordRefreshButton" type="button">刷新</button>
+                  <button class="toolbar-button danger" id="articleRecordDeleteCurrentButton" type="button" disabled>删除当前</button>
+                  <button class="toolbar-button danger" id="articleRecordDeleteSelectedButton" type="button" disabled>删除选中</button>
                   <details class="asset-command-menu" data-asset-menu>
                     <summary aria-label="更多文章记录操作">更多</summary>
                     <div class="asset-command-popover" role="group" aria-label="复制">
@@ -2375,11 +2380,14 @@
           <section class="studio-panel creation-record-panel asset-workspace">
             <header class="asset-page-head">
               <div class="asset-title-row">
-                <div class="asset-title-block"><span class="asset-eyebrow">资产</span><h2>套图记录 <span class="count-pill" id="creationRecordCount">0 套</span></h2></div>
+                <div class="asset-title-block"><h2>套图记录 <span class="count-pill" id="creationRecordCount">0 套</span></h2></div>
                 <div class="asset-head-actions creation-record-actions">
                   <button class="toolbar-button asset-primary-action" id="creationRecordRepairIncompleteButton" type="button" disabled>补齐未生成图像</button>
                   <button class="toolbar-button asset-primary-action" id="creationRecordReuseButton" type="button" disabled>复用到当前套图</button>
                   <button class="toolbar-button" id="creationRecordRefreshButton" type="button">刷新</button>
+                  <button class="toolbar-button danger" id="creationRecordDeleteCurrentButton" type="button" disabled>删除当前</button>
+                  <button class="toolbar-button danger" id="creationRecordDeleteSelectedButton" type="button" disabled>删除选中</button>
+                  <button class="toolbar-button danger" id="creationRecordDeleteFilteredButton" type="button" disabled>删除筛选结果</button>
                   <details class="asset-command-menu" data-asset-menu>
                     <summary aria-label="更多套图记录操作">更多</summary>
                     <div class="asset-command-popover">
@@ -2399,8 +2407,11 @@
                 </div>
               </div>
               <nav class="asset-view-nav" aria-label="资产视图"><a href="#gallery">瀑布画廊</a><a href="#article-record">文章插图</a><a href="#creation-record" aria-current="page">套图</a><a href="#portrait-record">写真</a><a href="#ppt-record">PPT</a></nav>
-              <div class="asset-context-row">
+              <div class="asset-context-row creation-record-filter-bar">
                 <label class="creation-record-search"><span>搜索</span><input id="creationRecordSearchInput" type="search" placeholder="商品、场景、语言" autocomplete="off" /></label>
+                <div class="creation-record-time-filters" id="creationRecordTimeFilters" role="group" aria-label="套图记录时间筛选"></div>
+                <label class="creation-record-date"><span>日期</span><input id="creationRecordDateInput" type="date" aria-label="按创建日期筛选套图记录" /></label>
+                <button class="toolbar-button creation-record-reset-filters" id="creationRecordResetFiltersButton" type="button" disabled>清空筛选</button>
                 <p class="prompt-agent-feedback creation-record-feedback" id="creationRecordActionFeedback" aria-live="polite"></p>
               </div>
             </header>
@@ -2410,7 +2421,9 @@
                 <div class="creation-set-list creation-record-list" id="creationRecordSetList" role="listbox" aria-label="套图记录"></div>
               </div>
               <article class="creation-record-archive" aria-live="polite" tabindex="-1">
-                <div class="creation-record-detail" id="creationRecordArchiveDetail"></div>
+                <div class="creation-record-detail" id="creationRecordArchiveDetail">
+                  <button class="toolbar-button asset-primary-action creation-record-listing-action" id="creationRecordGenerateListingsButton" type="button" disabled>生成 Listing</button>
+                </div>
                 <div class="creation-record-results">
                   <div class="creation-result-grid creation-record-result-grid" id="creationRecordResultGrid"></div>
                   <section class="creation-listing-panel hidden" aria-label="Listing 草稿">
@@ -2419,7 +2432,6 @@
                       <span class="count-pill small" id="creationRecordListingStatus">未生成</span>
                     </div>
                     <div class="asset-listing-actions" role="group" aria-label="Listing 操作">
-                      <button class="toolbar-button" id="creationRecordGenerateListingsButton" type="button" disabled>生成 Listing</button>
                       <button class="toolbar-button" id="creationRecordCopyListingsButton" type="button" disabled>复制 Listing</button>
                       <button class="toolbar-button" id="creationRecordExportListingsButton" type="button" disabled>导出 Listing</button>
                     </div>
@@ -2439,6 +2451,8 @@
                 <div class="asset-head-actions creation-record-actions">
                   <button class="toolbar-button asset-primary-action" id="portraitRecordReuseButton" type="button" disabled>复用到当前写真</button>
                   <button class="toolbar-button" id="portraitRecordRefreshButton" type="button">刷新</button>
+                  <button class="toolbar-button danger" id="portraitRecordDeleteCurrentButton" type="button" disabled>删除当前</button>
+                  <button class="toolbar-button danger" id="portraitRecordDeleteSelectedButton" type="button" disabled>删除选中</button>
                   <details class="asset-command-menu" data-asset-menu>
                     <summary aria-label="更多写真记录操作">更多</summary>
                     <div class="asset-command-popover">
@@ -2472,9 +2486,12 @@
                 <div class="asset-head-actions ppt-record-actions">
                   <a class="toolbar-button asset-primary-action" href="#ppt">新建 PPT</a>
                   <button class="toolbar-button" id="pptRecordRefreshButton" type="button">刷新</button>
+                  <button class="toolbar-button danger" id="pptRecordDeleteCurrentButton" type="button" disabled>删除当前</button>
+                  <button class="toolbar-button danger" id="pptRecordDeleteSelectedButton" type="button" disabled>删除选中</button>
                 </div>
               </div>
               <nav class="asset-view-nav" aria-label="资产视图"><a href="#gallery">瀑布画廊</a><a href="#article-record">文章插图</a><a href="#creation-record">套图</a><a href="#portrait-record">写真</a><a href="#ppt-record" aria-current="page">PPT</a></nav>
+              <p class="prompt-agent-feedback creation-record-feedback ppt-record-feedback" id="pptRecordFeedback" aria-live="polite"></p>
             </header>
             <div class="ppt-record-empty asset-empty-state" id="pptRecordEmpty"><strong>暂无 PPT</strong><p>还没有找到本地 PPT 文件。</p><a class="toolbar-button asset-primary-action" href="#ppt">前往 PPT 生成</a></div>
             <div class="ppt-record-browser">
@@ -2488,6 +2505,44 @@
         </section>
       </main>
     </div>
+
+    <dialog
+      class="creation-record-delete-dialog"
+      id="creationRecordDeleteDialog"
+      aria-labelledby="creationRecordDeleteDialogTitle"
+      aria-describedby="creationRecordDeleteDialogMessage"
+    >
+      <form class="creation-record-delete-form" id="creationRecordDeleteForm" method="dialog">
+        <div class="creation-record-delete-copy">
+          <span class="asset-eyebrow">永久删除</span>
+          <h2 id="creationRecordDeleteDialogTitle">删除套图？</h2>
+          <p id="creationRecordDeleteDialogMessage">对应记录、生成图片和 JSON 元数据将被永久删除，无法撤销。</p>
+        </div>
+        <div class="creation-record-delete-actions">
+          <button class="toolbar-button" id="creationRecordDeleteCancelButton" type="button" autofocus>取消</button>
+          <button class="toolbar-button danger" id="creationRecordDeleteConfirmButton" type="submit">确认删除</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog
+      class="creation-record-delete-dialog asset-record-delete-dialog"
+      id="assetRecordDeleteDialog"
+      aria-labelledby="assetRecordDeleteDialogTitle"
+      aria-describedby="assetRecordDeleteDialogMessage"
+    >
+      <form class="creation-record-delete-form" id="assetRecordDeleteForm" method="dialog">
+        <div class="creation-record-delete-copy">
+          <span class="asset-eyebrow">永久删除</span>
+          <h2 id="assetRecordDeleteDialogTitle">删除资产记录？</h2>
+          <p id="assetRecordDeleteDialogMessage">对应记录和资产将被永久删除，无法撤销。</p>
+        </div>
+        <div class="creation-record-delete-actions">
+          <button class="toolbar-button" id="assetRecordDeleteCancelButton" type="button" autofocus>取消</button>
+          <button class="toolbar-button danger" id="assetRecordDeleteConfirmButton" type="submit">确认删除</button>
+        </div>
+      </form>
+    </dialog>
 
     <aside class="lightbox hidden" id="lightbox" aria-hidden="true">
       <div class="lightbox-backdrop" id="lightboxBackdrop"></div>
@@ -2920,6 +2975,6 @@
       </div>
     </aside>
 
-    <script type="module" src="./app.js?v=20260720-creation-reference-apply-1"></script>
+    <script type="module" src="./app.js?v=20260722-asset-record-delete-1"></script>
   </body>
 </html>

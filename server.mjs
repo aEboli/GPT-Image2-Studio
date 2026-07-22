@@ -148,6 +148,8 @@ import {
   selectCreationRepairItems,
 } from "./lib/creation-repair.mjs";
 import { buildCreationRelativeDir, createCreationSetStore } from "./lib/creation-store.mjs";
+import { normalizeCreationRecordDeleteSetIds } from "./lib/creation-record-delete.mjs";
+import { normalizeAssetRecordDeleteIds } from "./lib/asset-record-delete.mjs";
 import { resolveCreationPlanCounts } from "./lib/creation-plan-counts.mjs";
 import { generateCreationListingDrafts } from "./lib/creation-listing-agent.mjs";
 import {
@@ -736,35 +738,54 @@ async function handleOpenOutput(response) {
 }
 
 async function handleDeleteOutput(request, response) {
-  const payload = await readJsonBody(request);
-  const filename = String(payload.filename || "").trim();
+  let payload;
+  try {
+    payload = await readJsonBody(request);
+  } catch {
+    return sendJson(response, 400, { message: "图片删除请求必须是有效 JSON。" });
+  }
+  const legacySingle = !Array.isArray(payload.filenames);
+  let filenames;
+  try {
+    filenames = normalizeAssetRecordDeleteIds(
+      legacySingle ? [String(payload.filename || "").trim()] : payload.filenames,
+      { recordLabel: "画廊图片" },
+    );
+  } catch (error) {
+    return sendJson(response, 400, { message: error instanceof Error ? error.message : String(error) });
+  }
 
-  if (!isSafeOutputFilename(filename)) {
+  if (filenames.some((filename) => !isSafeOutputFilename(filename))) {
     return sendJson(response, 400, {
       message: "Invalid filename",
     });
   }
 
-  try {
-    const deleted = await deleteGeneratedAsset({
-      outputDir,
-      filename,
-    });
-
-    return sendJson(response, 200, {
-      ok: true,
-      filename: deleted.filename,
-      absolutePath: deleted.absolutePath,
-    });
-  } catch (error) {
-    if (error && typeof error === "object" && error.code === "ENOENT") {
-      return sendJson(response, 404, {
-        message: "Not found",
-      });
+  const deletedItems = [];
+  const notFoundFilenames = [];
+  for (const filename of filenames) {
+    try {
+      deletedItems.push(await deleteGeneratedAsset({ outputDir, filename }));
+    } catch (error) {
+      if (error && typeof error === "object" && error.code === "ENOENT") {
+        notFoundFilenames.push(filename);
+        continue;
+      }
+      throw error;
     }
-
-    throw error;
   }
+
+  if (legacySingle && deletedItems.length === 0) {
+    return sendJson(response, 404, { message: "Not found" });
+  }
+  return sendJson(response, 200, {
+    ok: true,
+    filename: deletedItems[0]?.filename || filenames[0],
+    absolutePath: deletedItems[0]?.absolutePath || "",
+    deletedCount: deletedItems.length,
+    deletedFilenames: deletedItems.map((item) => item.filename),
+    notFoundFilenames,
+  });
 }
 
 async function handleGalleryMetadataRepair(request, response) {
@@ -1196,6 +1217,23 @@ function writeSseEventPayload(onEvent, type, payload) {
 
 async function handlePptDecksGet(response) {
   sendJson(response, 200, await pptDeckStore.listManifests());
+}
+
+async function handlePptDecksDelete(request, response) {
+  let payload;
+  try {
+    payload = await readJsonBody(request);
+  } catch {
+    return sendJson(response, 400, { message: "PPT 删除请求必须是有效 JSON。" });
+  }
+  let recordKeys;
+  try {
+    recordKeys = normalizeAssetRecordDeleteIds(payload.recordKeys, { recordLabel: "PPT 记录" });
+  } catch (error) {
+    return sendJson(response, 400, { message: error instanceof Error ? error.message : String(error) });
+  }
+  const result = await pptDeckStore.deleteRecords(recordKeys);
+  return sendJson(response, 200, { ok: true, deletedCount: result.deletedRecordKeys.length, ...result });
 }
 
 async function handlePptAnalyze(request, response) {
@@ -2193,6 +2231,23 @@ async function handleArticleIllustrationSetsGet(response) {
   });
 }
 
+async function handleArticleIllustrationSetsDelete(request, response) {
+  let payload;
+  try {
+    payload = await readJsonBody(request);
+  } catch {
+    return sendJson(response, 400, { message: "文章插图删除请求必须是有效 JSON。" });
+  }
+  let setIds;
+  try {
+    setIds = normalizeAssetRecordDeleteIds(payload.setIds, { recordLabel: "文章插图记录" });
+  } catch (error) {
+    return sendJson(response, 400, { message: error instanceof Error ? error.message : String(error) });
+  }
+  const result = await articleIllustrationSetStore.deleteManifests(setIds);
+  return sendJson(response, 200, { ok: true, deletedCount: result.deletedSetIds.length, ...result });
+}
+
 async function handleArticleIllustrationPlan(request, response) {
   try {
     const formData = await readFormDataBody(request);
@@ -2754,6 +2809,29 @@ async function handleCreationSetsGet(response) {
   });
 }
 
+async function handleCreationSetsDelete(request, response) {
+  let payload;
+  try {
+    payload = await readJsonBody(request);
+  } catch {
+    return sendJson(response, 400, { message: "套图删除请求必须是有效 JSON。" });
+  }
+
+  let setIds;
+  try {
+    setIds = normalizeCreationRecordDeleteSetIds(payload.setIds);
+  } catch (error) {
+    return sendJson(response, 400, { message: error instanceof Error ? error.message : String(error) });
+  }
+
+  const result = await creationSetStore.deleteManifests(setIds);
+  return sendJson(response, 200, {
+    ok: true,
+    deletedCount: result.deletedSetIds.length,
+    ...result,
+  });
+}
+
 async function handleCreationSetFolderOpen(request, response) {
   const payload = await readJsonBody(request);
   const setId = String(payload.setId || "").trim();
@@ -2927,6 +3005,23 @@ async function handlePortraitSetsGet(response) {
   sendJson(response, 200, await portraitSetStore.listManifests(), {
     "Cache-Control": "no-store",
   });
+}
+
+async function handlePortraitSetsDelete(request, response) {
+  let payload;
+  try {
+    payload = await readJsonBody(request);
+  } catch {
+    return sendJson(response, 400, { message: "写真删除请求必须是有效 JSON。" });
+  }
+  let setIds;
+  try {
+    setIds = normalizeAssetRecordDeleteIds(payload.setIds, { recordLabel: "写真记录" });
+  } catch (error) {
+    return sendJson(response, 400, { message: error instanceof Error ? error.message : String(error) });
+  }
+  const result = await portraitSetStore.deleteManifests(setIds);
+  return sendJson(response, 200, { ok: true, deletedCount: result.deletedSetIds.length, ...result });
 }
 
 async function handlePortraitSetFolderOpen(request, response) {
@@ -5650,16 +5745,32 @@ async function routeRequest(request, response) {
     return handlePptDecksGet(response);
   }
 
+  if (request.method === "POST" && url.pathname === "/api/ppt/decks/delete") {
+    return handlePptDecksDelete(request, response);
+  }
+
   if (request.method === "GET" && url.pathname === "/api/creation/sets") {
     return handleCreationSetsGet(response);
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/creation/sets/delete") {
+    return handleCreationSetsDelete(request, response);
   }
 
   if (request.method === "GET" && url.pathname === "/api/portrait/sets") {
     return handlePortraitSetsGet(response);
   }
 
+  if (request.method === "POST" && url.pathname === "/api/portrait/sets/delete") {
+    return handlePortraitSetsDelete(request, response);
+  }
+
   if (request.method === "GET" && url.pathname === "/api/article-illustration/sets") {
     return handleArticleIllustrationSetsGet(response);
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/article-illustration/sets/delete") {
+    return handleArticleIllustrationSetsDelete(request, response);
   }
 
   if (request.method === "POST" && url.pathname === "/api/article-illustration/plan") {

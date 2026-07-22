@@ -17,6 +17,9 @@ import { consumeSseUntilTerminal } from "/lib/sse-terminal-client.mjs";
 import { getStudioDensitySettings, getStudioLayoutMode, ALL_VARIABLE_NAMES } from "/lib/studio-density.mjs?v=20260713-cross-device-1";
 import { buildStyleTransferPresetLightboxItem } from "/lib/style-transfer-preset-lightbox.mjs";
 import { buildCreationRecordLightboxItem, normalizeCreationGenerationSnapshotForView } from "/lib/creation-record-lightbox.mjs";
+import { buildCreationRecordDeleteConfirmation, getCreationRecordDeleteTargets, normalizeCreationRecordDeleteSetIds, resolveCreationRecordSelectionAfterDelete } from "/lib/creation-record-delete.mjs?v=20260722-creation-record-delete-flow-1";
+import { createAssetRecordDeleteController } from "/lib/asset-record-delete-controller.mjs?v=20260722-asset-record-delete-1";
+import { buildCreationRecordTimeFilterOptions, filterCreationRecordSetsByTime, formatCreationRecordTimeFilterLabel, hasActiveCreationRecordTimeFilter, normalizeCreationRecordDateFilter, normalizeCreationRecordTimeFilter } from "/lib/creation-record-filter.mjs?v=20260722-creation-record-time-filter-1";
 import { ensureLazyViewModule, getMountedLazyViewModule } from "/lib/view-mode-loader.mjs?v=20260608-quick-blend-time-sort-1";
 import { appendBrowserConfigToFormData, getBrowserPrivateConfigRequestPayload, getOrCreateClientSessionId, readBrowserPrivateConfig, saveBrowserPrivateConfig, toPublicBrowserConfig } from "/lib/browser-config.mjs";
 import { cacheBrowserGalleryItem, clearBrowserImageCache, dataUrlToBlob, deleteBrowserCachedGalleryItem, fetchServerImageAsDataUrl, getBrowserCachedImageData, getImageUrl, getServerImageUrl, getServerThumbnailUrl, isCacheableBrowserImageUrl, mergeServerAndBrowserGalleryItems, readBrowserCachedGalleryItems } from "/lib/browser-image-cache.mjs";
@@ -358,6 +361,7 @@ let galleryScrollSyncFrame = 0;
 let galleryScrollObserver = null;
 let generationTaskPollTimer = 0;
 let creationRecordRefreshPromise = null;
+let creationRecordDeleteRestoreFocus = null;
 let portraitRecordRefreshPromise = null;
 let promptCopyFeedbackTimer = 0;
 let previewLoadingShellNodes = null;
@@ -372,6 +376,7 @@ const galleryScrollDrag = {
 };
 const state = {
   activeView: "studio",
+  assetRecordDeletion: { busy: false, request: null },
   assetLoading: { article: false, creation: false, portrait: false, ppt: false },
   assetLoadErrors: { article: "", creation: "", portrait: "", ppt: "" },
   activityFeed: [],
@@ -385,6 +390,7 @@ const state = {
     generating: false,
     generationSnapshot: null,
     planning: false,
+    recordCheckedSetIds: [],
     recordQuery: "",
     recordColumnPreset: DEFAULT_ARTICLE_RECORD_COLUMN_PRESET,
     recordSetId: "",
@@ -412,6 +418,11 @@ const state = {
     queue: [],
     queuedRepairItemIds: [],
     recordQuery: "",
+    recordTimeFilter: "all",
+    recordDateFilter: "",
+    recordCheckedSetIds: [],
+    recordDeleteBusy: false,
+    recordDeleteRequest: null,
     recordDetailExpanded: false,
     recordSetId: "",
     repairingItemId: "",
@@ -434,6 +445,7 @@ const state = {
       result: null,
       running: false,
     },
+    recordCheckedSetIds: [],
     recordQuery: "",
     recordSetId: "",
     sets: [],
@@ -468,6 +480,9 @@ const state = {
   creationRoleSelectionManuallyEdited: false,
   creationSelectedRoles: [],
   gallery: [],
+  galleryCheckedFilenames: [],
+  galleryCurrentFilename: "",
+  galleryDeleteFeedback: "",
   galleryLoading: true,
   galleryLoadError: "",
   galleryMetadataCache: {},
@@ -513,6 +528,7 @@ const state = {
     sourceMode: "upload",
     statusText: "等待生成",
     currentSlideNumber: 0,
+    recordCheckedKeys: [],
     recordDetail: {
       deckKey: "",
       slideNumber: 0,
@@ -610,6 +626,12 @@ let referenceAnalysisAbortController = null;
 let creationPreviousPlatformValue = "universal";
 const refs = {
   apiKeyInput: document.querySelector("#apiKeyInput"),
+  assetRecordDeleteCancelButton: document.querySelector("#assetRecordDeleteCancelButton"),
+  assetRecordDeleteConfirmButton: document.querySelector("#assetRecordDeleteConfirmButton"),
+  assetRecordDeleteDialog: document.querySelector("#assetRecordDeleteDialog"),
+  assetRecordDeleteDialogMessage: document.querySelector("#assetRecordDeleteDialogMessage"),
+  assetRecordDeleteDialogTitle: document.querySelector("#assetRecordDeleteDialogTitle"),
+  assetRecordDeleteForm: document.querySelector("#assetRecordDeleteForm"),
   baseUrlInput: document.querySelector("#baseUrlInput"),
   baseUrlFullToggle: document.querySelector("#baseUrlFullToggle"),
   directApiKeyInput: document.querySelector("#directApiKeyInput"),
@@ -673,6 +695,8 @@ const refs = {
   articleRecordCount: document.querySelector("#articleRecordCount"),
   articleRecordColumnButtons: [...document.querySelectorAll("[data-article-record-column-preset]")],
   articleRecordDetail: document.querySelector("#articleRecordDetail"),
+  articleRecordDeleteCurrentButton: document.querySelector("#articleRecordDeleteCurrentButton"),
+  articleRecordDeleteSelectedButton: document.querySelector("#articleRecordDeleteSelectedButton"),
   articleRecordFeedback: document.querySelector("#articleRecordFeedback"),
   articleRecordList: document.querySelector("#articleRecordList"),
   articleRecordRefreshButton: document.querySelector("#articleRecordRefreshButton"),
@@ -751,6 +775,8 @@ const refs = {
   portraitRecordCopyPromptsButton: document.querySelector("#portraitRecordCopyPromptsButton"),
   portraitRecordCopyPathsButton: document.querySelector("#portraitRecordCopyPathsButton"),
   portraitRecordCount: document.querySelector("#portraitRecordCount"),
+  portraitRecordDeleteCurrentButton: document.querySelector("#portraitRecordDeleteCurrentButton"),
+  portraitRecordDeleteSelectedButton: document.querySelector("#portraitRecordDeleteSelectedButton"),
   portraitRecordExportManifestButton: document.querySelector("#portraitRecordExportManifestButton"),
   portraitRecordExportPromptsButton: document.querySelector("#portraitRecordExportPromptsButton"),
   portraitRecordOpenFolderButton: document.querySelector("#portraitRecordOpenFolderButton"),
@@ -796,6 +822,16 @@ const refs = {
   creationRecordCopyListingsButton: document.querySelector("#creationRecordCopyListingsButton"),
   creationRecordCopyPromptsButton: document.querySelector("#creationRecordCopyPromptsButton"),
   creationRecordCount: document.querySelector("#creationRecordCount"),
+  creationRecordDateInput: document.querySelector("#creationRecordDateInput"),
+  creationRecordDeleteCancelButton: document.querySelector("#creationRecordDeleteCancelButton"),
+  creationRecordDeleteConfirmButton: document.querySelector("#creationRecordDeleteConfirmButton"),
+  creationRecordDeleteCurrentButton: document.querySelector("#creationRecordDeleteCurrentButton"),
+  creationRecordDeleteDialog: document.querySelector("#creationRecordDeleteDialog"),
+  creationRecordDeleteDialogMessage: document.querySelector("#creationRecordDeleteDialogMessage"),
+  creationRecordDeleteDialogTitle: document.querySelector("#creationRecordDeleteDialogTitle"),
+  creationRecordDeleteFilteredButton: document.querySelector("#creationRecordDeleteFilteredButton"),
+  creationRecordDeleteForm: document.querySelector("#creationRecordDeleteForm"),
+  creationRecordDeleteSelectedButton: document.querySelector("#creationRecordDeleteSelectedButton"),
   creationRecordDetail: document.querySelector("#creationRecordDetail"),
   creationRecordExportListingsButton: document.querySelector("#creationRecordExportListingsButton"),
   creationRecordExportManifestButton: document.querySelector("#creationRecordExportManifestButton"),
@@ -806,11 +842,13 @@ const refs = {
   creationRecordOpenFolderButton: document.querySelector("#creationRecordOpenFolderButton"),
   creationRecordRepairIncompleteButton: document.querySelector("#creationRecordRepairIncompleteButton"),
   creationRecordRefreshButton: document.querySelector("#creationRecordRefreshButton"),
+  creationRecordResetFiltersButton: document.querySelector("#creationRecordResetFiltersButton"),
   creationRecordReuseButton: document.querySelector("#creationRecordReuseButton"),
   creationRecordResultGrid: document.querySelector("#creationRecordResultGrid"),
   creationRecordSearchInput: document.querySelector("#creationRecordSearchInput"),
   creationRecordSelection: document.querySelector("#creationRecordSelection"),
   creationRecordSetList: document.querySelector("#creationRecordSetList"),
+  creationRecordTimeFilters: document.querySelector("#creationRecordTimeFilters"),
   creationQueueStrip: document.querySelector("#creationQueueStrip"),
   creationRepairFailedButton: document.querySelector("#creationRepairFailedButton"),
   creationResultGrid: document.querySelector("#creationResultGrid"),
@@ -829,9 +867,12 @@ const refs = {
   errorBanner: document.querySelector("#errorBanner"),
   filmstrip: document.querySelector("#filmstrip"),
   focusGalleryButton: document.querySelector("#focusGalleryButton"),
+  galleryActionFeedback: document.querySelector("#galleryActionFeedback"),
   galleryCount: document.querySelector("#galleryCount"),
   galleryColumnButtons: [...document.querySelectorAll("[data-gallery-column-preset]")],
   galleryDateInput: document.querySelector("#galleryDateInput"),
+  galleryDeleteCurrentButton: document.querySelector("#galleryDeleteCurrentButton"),
+  galleryDeleteSelectedButton: document.querySelector("#galleryDeleteSelectedButton"),
   galleryEmpty: document.querySelector("#galleryEmpty"),
   galleryFilters: document.querySelector("#galleryFilters"),
   galleryHelperText: document.querySelector("#galleryHelperText"),
@@ -946,8 +987,11 @@ const refs = {
   pptPageCountInput: document.querySelector("#pptPageCountInput"),
   pptProgressBar: document.querySelector("#pptProgressBar"),
   pptRecordCount: document.querySelector("#pptRecordCount"),
+  pptRecordDeleteCurrentButton: document.querySelector("#pptRecordDeleteCurrentButton"),
+  pptRecordDeleteSelectedButton: document.querySelector("#pptRecordDeleteSelectedButton"),
   pptRecordDetail: document.querySelector("#pptRecordDetail"),
   pptRecordEmpty: document.querySelector("#pptRecordEmpty"),
+  pptRecordFeedback: document.querySelector("#pptRecordFeedback"),
   pptRecordList: document.querySelector("#pptRecordList"),
   pptRecordRefreshButton: document.querySelector("#pptRecordRefreshButton"),
   pptRecordSelection: document.querySelector("#pptRecordSelection"),
@@ -5636,12 +5680,21 @@ function renderRecentOutputs() {
 }
 
 function createGalleryTile(item) {
+  const shell = document.createElement("div");
+  shell.className = "gallery-tile-shell";
+  const filename = String(item?.filename || "图片").trim();
+  const isChecked = state.galleryCheckedFilenames.includes(filename);
+  shell.classList.toggle("is-checked", isChecked);
+
   const button = document.createElement("button");
   button.type = "button";
   button.className = "gallery-tile";
-  const filename = String(item?.filename || "图片").trim();
+  button.classList.toggle("is-current", state.galleryCurrentFilename === filename);
   button.setAttribute("aria-label", `查看图片 ${filename}`);
+  button.setAttribute("aria-current", state.galleryCurrentFilename === filename ? "true" : "false");
   button.addEventListener("click", () => {
+    state.galleryCurrentFilename = filename;
+    renderGalleryView();
     openLightbox(item, { items: state.gallery });
   });
 
@@ -5659,7 +5712,20 @@ function createGalleryTile(item) {
   meta.textContent = [item?.size || item?.dimensions, formatClock(item?.createdAt)].filter(Boolean).join(" · ");
   overlay.append(name, meta);
   button.appendChild(overlay);
-  return button;
+
+  const selectLabel = document.createElement("label");
+  selectLabel.className = "gallery-tile-select";
+  selectLabel.title = `选择 ${filename}`;
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.checked = isChecked;
+  checkbox.disabled = state.assetRecordDeletion.busy;
+  checkbox.dataset.gallerySelectFilename = filename;
+  checkbox.setAttribute("aria-label", `选择画廊图片 ${filename}`);
+  selectLabel.appendChild(checkbox);
+
+  shell.append(button, selectLabel);
+  return shell;
 }
 
 function normalizeGalleryColumnPreset(value) {
@@ -5868,6 +5934,16 @@ function renderGalleryView() {
     displayedCount === state.gallery.length
       ? `${state.gallery.length} 张`
       : `${displayedCount} / ${state.gallery.length} 张`;
+  const availableFilenames = new Set(state.gallery.map((item) => item.filename));
+  const checkedCount = state.galleryCheckedFilenames.filter((filename) => availableFilenames.has(filename)).length;
+  const deleteBlocked = state.galleryLoading || state.assetRecordDeletion.busy;
+  refs.refreshGalleryButton.disabled = state.assetRecordDeletion.busy;
+  refs.galleryDeleteCurrentButton.disabled = deleteBlocked || !availableFilenames.has(state.galleryCurrentFilename);
+  refs.galleryDeleteSelectedButton.disabled = deleteBlocked || checkedCount === 0;
+  refs.galleryDeleteSelectedButton.textContent = checkedCount > 0 ? `删除选中 (${checkedCount})` : "删除选中";
+  if (refs.galleryActionFeedback && refs.galleryActionFeedback.textContent !== state.galleryDeleteFeedback) {
+    refs.galleryActionFeedback.textContent = state.galleryDeleteFeedback;
+  }
   refs.galleryEmpty.replaceChildren();
   const emptyTitle = document.createElement("strong");
   const emptyCopy = document.createElement("p");
@@ -7910,7 +7986,7 @@ function setCreationRecordFeedback(message = "", kind = "") {
 }
 
 function refreshCreationRecordSets() {
-  if (state.creation.generating || state.creation.planning || creationRecordRefreshPromise) {
+  if (state.creation.generating || state.creation.planning || state.creation.recordDeleteBusy || creationRecordRefreshPromise) {
     return;
   }
 
@@ -8723,6 +8799,7 @@ async function loadArticleIllustrationSets() {
     state.assetLoading.article = false;
     state.articleIllustration.sets = [];
     state.articleIllustration.recordSetId = "";
+    state.articleIllustration.recordCheckedSetIds = [];
     renderArticleRecordView();
     return;
   }
@@ -8737,6 +8814,8 @@ async function loadArticleIllustrationSets() {
   const nextSets = Array.isArray(payload) ? payload.map(normalizeArticleSetForView).filter(Boolean) : [];
   const currentSetId = state.articleIllustration.currentSet?.setId || "";
   state.articleIllustration.sets = nextSets;
+  const availableSetIds = new Set(nextSets.map((set) => set.setId));
+  state.articleIllustration.recordCheckedSetIds = state.articleIllustration.recordCheckedSetIds.filter((setId) => availableSetIds.has(setId));
   state.assetLoading.article = false;
   state.assetLoadErrors.article = "";
   if (currentSetId) {
@@ -8862,6 +8941,7 @@ function renderArticleRecordList() {
   }
   const filteredSets = filterArticleRecordSets();
   const selectedSet = getArticleRecordSelectedSet();
+  const checkedSetIds = new Set(state.articleIllustration.recordCheckedSetIds);
   refs.articleRecordList.replaceChildren();
   refs.articleRecordList.setAttribute("aria-busy", String(state.assetLoading.article));
   if (state.assetLoading.article || state.assetLoadErrors.article || filteredSets.length === 0) {
@@ -8878,6 +8958,21 @@ function renderArticleRecordList() {
     return;
   }
   filteredSets.forEach((set) => {
+    const row = document.createElement("div");
+    row.className = "asset-record-select-row";
+    row.classList.toggle("is-checked", checkedSetIds.has(set.setId));
+
+    const selectLabel = document.createElement("label");
+    selectLabel.className = "asset-record-select";
+    selectLabel.title = `选择 ${formatArticleDisplayText(set.title)}`;
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = checkedSetIds.has(set.setId);
+    checkbox.disabled = state.assetRecordDeletion.busy || state.articleIllustration.generating || state.articleIllustration.planning;
+    checkbox.dataset.articleRecordSelectSetId = set.setId;
+    checkbox.setAttribute("aria-label", `选择文章插图 ${formatArticleDisplayText(set.title)}`);
+    selectLabel.appendChild(checkbox);
+
     const button = document.createElement("button");
     button.className = `article-record-card ${selectedSet?.setId === set.setId ? "active" : ""}`;
     button.type = "button";
@@ -8894,7 +8989,8 @@ function renderArticleRecordList() {
     status.dataset.state = progress.failed > 0 ? "failed" : progress.completed >= progress.total && progress.total > 0 ? "completed" : "running";
     status.textContent = progress.failed > 0 ? `${progress.failed} 项失败` : progress.completed >= progress.total && progress.total > 0 ? "已完成" : "处理中";
     button.append(title, meta, status);
-    refs.articleRecordList.appendChild(button);
+    row.append(selectLabel, button);
+    refs.articleRecordList.appendChild(row);
   });
 }
 
@@ -8987,10 +9083,17 @@ function renderArticleRecordView() {
   refs.articleRecordCount.textContent = state.articleIllustration.recordQuery
     ? `${filteredSets.length} / ${state.articleIllustration.sets.length} 套`
     : `${state.articleIllustration.sets.length} 套`;
-  refs.articleRecordCopyPromptsButton.disabled = !buildArticlePromptText(selectedSet);
-  refs.articleRecordCopyCaptionsButton.disabled = !buildArticleCaptionText(selectedSet);
+  const deleteBlocked = state.articleIllustration.generating || state.articleIllustration.planning || state.articleIllustration.referenceGenerating || state.assetLoading.article || state.assetRecordDeletion.busy;
+  const availableSetIds = new Set(state.articleIllustration.sets.map((set) => set.setId));
+  const checkedCount = state.articleIllustration.recordCheckedSetIds.filter((setId) => availableSetIds.has(setId)).length;
+  refs.articleRecordCopyPromptsButton.disabled = state.assetRecordDeletion.busy || !buildArticlePromptText(selectedSet);
+  refs.articleRecordCopyCaptionsButton.disabled = state.assetRecordDeletion.busy || !buildArticleCaptionText(selectedSet);
+  refs.articleRecordRefreshButton.disabled = state.assetRecordDeletion.busy;
+  refs.articleRecordDeleteCurrentButton.disabled = deleteBlocked || !selectedSet;
+  refs.articleRecordDeleteSelectedButton.disabled = deleteBlocked || checkedCount === 0;
+  refs.articleRecordDeleteSelectedButton.textContent = checkedCount > 0 ? `删除选中 (${checkedCount})` : "删除选中";
   const hasFailedItems = Boolean(selectedSet?.items?.some((item) => item.status === "failed"));
-  refs.articleRecordContinueButton.disabled = !hasFailedItems;
+  refs.articleRecordContinueButton.disabled = state.assetRecordDeletion.busy || !hasFailedItems;
   refs.articleRecordContinueButton.classList.toggle("hidden", !hasFailedItems);
   if (refs.articleRecordSelection) refs.articleRecordSelection.textContent = selectedSet ? formatArticleDisplayText(selectedSet.title) : "尚未选择";
 
@@ -9813,24 +9916,6 @@ function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
     card.appendChild(actions);
   }
 
-  if (showRecordActions) {
-    const actions = document.createElement("div");
-    actions.className = "creation-card-actions creation-record-card-actions";
-    const itemTitle = item.title || "套图单张";
-
-    const previewButton = document.createElement("button");
-    previewButton.className = "mini-action";
-    previewButton.type = "button";
-    previewButton.dataset.creationRecordPreviewItemId = item.itemId;
-    previewButton.dataset.creationRecordPreviewSetId = options.creationSetId || "";
-    previewButton.textContent = "查看";
-    previewButton.disabled = !imageUrl;
-    previewButton.setAttribute("aria-label", `${itemTitle}查看大图`);
-    actions.appendChild(previewButton);
-
-    card.appendChild(actions);
-  }
-
   return card;
 }
 
@@ -9881,7 +9966,7 @@ function getCreationRecordSearchText(set = {}) {
     .toLowerCase();
 }
 
-function filterCreationRecordSets() {
+function getCreationRecordKeywordMatchedSets() {
   const query = String(state.creation.recordQuery || "").trim().toLowerCase();
   if (!query) {
     return state.creation.sets;
@@ -9890,9 +9975,173 @@ function filterCreationRecordSets() {
   return state.creation.sets.filter((set) => getCreationRecordSearchText(set).includes(query));
 }
 
+function getCreationRecordTimeFilterSnapshot() {
+  const date = normalizeCreationRecordDateFilter(state.creation.recordDateFilter);
+  const window = date ? "all" : normalizeCreationRecordTimeFilter(state.creation.recordTimeFilter);
+  state.creation.recordDateFilter = date;
+  state.creation.recordTimeFilter = window;
+  return { window, date };
+}
+
+function filterCreationRecordSets() {
+  return filterCreationRecordSetsByTime(
+    getCreationRecordKeywordMatchedSets(),
+    getCreationRecordTimeFilterSnapshot(),
+  );
+}
+
+function hasCreationRecordActiveFilters() {
+  return Boolean(
+    String(state.creation.recordQuery || "").trim() ||
+      hasActiveCreationRecordTimeFilter(getCreationRecordTimeFilterSnapshot()),
+  );
+}
+
+function getCreationRecordFilterLabel() {
+  const labels = [];
+  const query = String(state.creation.recordQuery || "").trim();
+  const timeLabel = formatCreationRecordTimeFilterLabel(getCreationRecordTimeFilterSnapshot());
+  if (query) labels.push(`关键词：${query}`);
+  if (timeLabel) labels.push(`时间：${timeLabel}`);
+  return labels.join("、");
+}
+
+function renderCreationRecordTimeFilters(keywordMatchedSets = getCreationRecordKeywordMatchedSets()) {
+  if (!refs.creationRecordTimeFilters) return;
+  const filters = getCreationRecordTimeFilterSnapshot();
+  refs.creationRecordTimeFilters.replaceChildren();
+  buildCreationRecordTimeFilterOptions(keywordMatchedSets).forEach((option) => {
+    const button = document.createElement("button");
+    const isActive = option.value === filters.window;
+    button.type = "button";
+    button.className = "toolbar-button creation-record-time-filter";
+    button.dataset.creationRecordTimeFilter = option.value;
+    button.setAttribute("aria-pressed", String(isActive));
+    button.textContent = `${option.label} · ${option.count}`;
+    button.addEventListener("click", () => {
+      state.creation.recordTimeFilter = option.value;
+      state.creation.recordDateFilter = "";
+      state.creation.recordDetailExpanded = false;
+      renderCreationRecordView();
+    });
+    refs.creationRecordTimeFilters.appendChild(button);
+  });
+}
+
 function getCreationRecordSelectedSet() {
   const sets = filterCreationRecordSets();
   return sets.find((set) => set.setId === state.creation.recordSetId) || sets[0] || null;
+}
+
+function getCreationRecordDeleteTargetsForMode(mode) {
+  return getCreationRecordDeleteTargets({
+    mode,
+    allSets: state.creation.sets,
+    filteredSets: filterCreationRecordSets(),
+    currentSetId: getCreationRecordSelectedSet()?.setId || "",
+    checkedSetIds: state.creation.recordCheckedSetIds,
+    query: state.creation.recordQuery,
+    hasFilter: hasCreationRecordActiveFilters(),
+  });
+}
+
+function closeCreationRecordDeleteDialog({ force = false } = {}) {
+  if (!refs.creationRecordDeleteDialog?.open || (state.creation.recordDeleteBusy && !force)) return;
+  refs.creationRecordDeleteDialog.close();
+}
+
+function requestCreationRecordDelete(mode) {
+  if (state.creation.generating || state.creation.planning || state.creation.recordDeleteBusy) return;
+  let targets;
+  try {
+    targets = getCreationRecordDeleteTargetsForMode(mode);
+  } catch (error) {
+    setCreationRecordFeedback(error instanceof Error ? error.message : String(error), "error");
+    return;
+  }
+  if (targets.length === 0) {
+    const message = mode === "filtered" && !hasCreationRecordActiveFilters()
+      ? "请先输入搜索条件或选择时间，再删除筛选结果。"
+      : mode === "selected"
+        ? "请先勾选需要删除的套图。"
+        : "请先选择一套记录。";
+    setCreationRecordFeedback(message, "error");
+    return;
+  }
+
+  const copy = buildCreationRecordDeleteConfirmation({
+    mode,
+    targets,
+    query: state.creation.recordQuery,
+    filterLabel: getCreationRecordFilterLabel(),
+  });
+  state.creation.recordDeleteRequest = {
+    mode,
+    query: state.creation.recordQuery,
+    setIds: targets.map((set) => set.setId),
+  };
+  refs.creationRecordDeleteDialogTitle.textContent = copy.title;
+  refs.creationRecordDeleteDialogMessage.textContent = copy.message;
+  refs.creationRecordDeleteConfirmButton.textContent = copy.confirmLabel;
+  refs.creationRecordDeleteConfirmButton.disabled = false;
+  refs.creationRecordDeleteCancelButton.disabled = false;
+  creationRecordDeleteRestoreFocus = document.activeElement;
+  refs.creationRecordDeleteDialog.showModal();
+}
+
+async function confirmCreationRecordDelete() {
+  if (state.creation.recordDeleteBusy || !state.creation.recordDeleteRequest) return;
+  const setIds = normalizeCreationRecordDeleteSetIds(state.creation.recordDeleteRequest.setIds);
+  const deletedIds = new Set(setIds);
+  const filteredSetsBeforeDelete = filterCreationRecordSets();
+  const selectedSetIdBeforeDelete = getCreationRecordSelectedSet()?.setId || "";
+  state.creation.recordDeleteBusy = true;
+  refs.creationRecordDeleteConfirmButton.disabled = true;
+  refs.creationRecordDeleteCancelButton.disabled = true;
+  refs.creationRecordDeleteConfirmButton.textContent = "正在删除...";
+  renderCreationRecordView();
+
+  try {
+    const response = await fetch("/api/creation/sets/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ setIds }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.message || "删除套图记录失败。");
+    }
+
+    state.creation.sets = state.creation.sets.filter((set) => !deletedIds.has(set.setId));
+    state.creation.recordCheckedSetIds = state.creation.recordCheckedSetIds.filter((setId) => !deletedIds.has(setId));
+    state.creation.recordSetId = resolveCreationRecordSelectionAfterDelete({
+      filteredSets: filteredSetsBeforeDelete,
+      currentSetId: selectedSetIdBeforeDelete,
+      deletedSetIds: setIds,
+    });
+    if (deletedIds.has(state.creation.currentSet?.setId)) state.creation.currentSet = null;
+    state.creation.queue = state.creation.queue.filter((job) => !deletedIds.has(job?.set?.setId));
+    if (!state.creation.queue.some((job) => job.id === state.creation.selectedQueueId)) state.creation.selectedQueueId = "";
+    if (deletedIds.has(state.lightboxItem?.creationSetId)) closeLightbox();
+    closeCreationRecordDeleteDialog({ force: true });
+
+    const deletedCount = Number(payload.deletedCount) || 0;
+    const skippedUnsafeCount = Array.isArray(payload.skippedUnsafePaths) ? payload.skippedUnsafePaths.length : 0;
+    if (skippedUnsafeCount > 0) {
+      setCreationRecordFeedback(`已删除 ${deletedCount} 套记录；${skippedUnsafeCount} 个异常目录未自动清理。`, "error");
+    } else if (deletedCount > 0) {
+      setCreationRecordFeedback(`已删除 ${deletedCount} 套套图。`, "success");
+    } else {
+      setCreationRecordFeedback("所选套图记录已不存在，已从当前列表移除。", "success");
+    }
+  } catch (error) {
+    closeCreationRecordDeleteDialog({ force: true });
+    setCreationRecordFeedback(error instanceof Error ? error.message : String(error), "error");
+  } finally {
+    state.creation.recordDeleteBusy = false;
+    renderCreationView();
+    renderCreationRecordView();
+  }
 }
 
 function getCreationRecordImagePaths(set) {
@@ -10130,6 +10379,7 @@ function renderCreationRecordSetList() {
   const selectedSet = getCreationRecordSelectedSet();
   const selectedSetId = selectedSet?.setId || "";
   const sets = filterCreationRecordSets().slice(0, 60);
+  const checkedSetIds = new Set(state.creation.recordCheckedSetIds);
   refs.creationRecordSetList.setAttribute("aria-busy", String(state.assetLoading.creation));
 
   if (state.assetLoading.creation || state.assetLoadErrors.creation || sets.length === 0) {
@@ -10139,12 +10389,27 @@ function renderCreationRecordSetList() {
       ? "正在加载套图记录..."
       : state.assetLoadErrors.creation
         ? `加载失败：${state.assetLoadErrors.creation}`
-        : state.creation.recordQuery ? "没有匹配的套图记录" : "暂无套图记录";
+        : hasCreationRecordActiveFilters() ? "没有匹配的套图记录" : "暂无套图记录";
     refs.creationRecordSetList.appendChild(empty);
     return;
   }
 
   sets.forEach((set) => {
+    const row = document.createElement("div");
+    row.className = "creation-record-list-item";
+    row.classList.toggle("is-checked", checkedSetIds.has(set.setId));
+
+    const selectLabel = document.createElement("label");
+    selectLabel.className = "creation-record-select";
+    selectLabel.title = `选择 ${set.productName || "未命名商品"}`;
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = checkedSetIds.has(set.setId);
+    checkbox.disabled = state.creation.recordDeleteBusy;
+    checkbox.dataset.creationRecordSelectSetId = set.setId;
+    checkbox.setAttribute("aria-label", `选择套图 ${set.productName || "未命名商品"}`);
+    selectLabel.appendChild(checkbox);
+
     const button = document.createElement("button");
     button.type = "button";
     button.className = "creation-record";
@@ -10177,22 +10442,28 @@ function renderCreationRecordSetList() {
     }
     metaRow.appendChild(meta);
 
-    if (listingLabel) {
-      const listingBadge = document.createElement("span");
-      listingBadge.className = "creation-record-listing-badge";
-      listingBadge.textContent = listingLabel;
-      metaRow.appendChild(listingBadge);
-    }
-
     button.appendChild(metaRow);
+
+    const statusRow = document.createElement("span");
+    statusRow.className = "creation-record-status-row";
 
     const status = document.createElement("span");
     status.className = "asset-record-status";
     status.dataset.state = progress.failed > 0 ? "failed" : progress.completed >= progress.total && progress.total > 0 ? "completed" : "running";
     status.textContent = progress.failed > 0 ? `${progress.failed} 项失败` : progress.completed >= progress.total && progress.total > 0 ? "已完成" : "生成中";
-    button.appendChild(status);
+    statusRow.appendChild(status);
 
-    refs.creationRecordSetList.appendChild(button);
+    if (listingLabel) {
+      const listingBadge = document.createElement("span");
+      listingBadge.className = "creation-record-listing-badge";
+      listingBadge.textContent = listingLabel;
+      statusRow.appendChild(listingBadge);
+    }
+
+    button.appendChild(statusRow);
+
+    row.append(selectLabel, button);
+    refs.creationRecordSetList.appendChild(row);
   });
 }
 
@@ -10315,6 +10586,7 @@ function renderCreationRecordArchiveDetail(set) {
   const detailSummary = document.createElement("div"); detailSummary.className = "creation-record-detail-summary"; const summaryTitle = document.createElement("strong"); summaryTitle.textContent = set.productName || "未命名商品"; const summaryMeta = document.createElement("span"); summaryMeta.textContent = [set.platformLabel || formatCreationPlatformLabel(set.platform), `${progress.completed}/${progress.total}`, formatClock(set.createdAt)].filter(Boolean).join(" / "); detailSummary.append(summaryTitle, summaryMeta);
   const detailToggle = document.createElement("button"); detailToggle.className = "creation-record-detail-toggle"; detailToggle.type = "button"; detailToggle.dataset.creationRecordDetailToggle = "true"; detailToggle.setAttribute("aria-expanded", String(isExpanded)); detailToggle.setAttribute("aria-label", isExpanded ? "折叠套图详情" : "展开套图详情"); detailToggle.title = isExpanded ? "折叠套图详情" : "展开套图详情";
   const detailBody = document.createElement("div"); detailBody.className = "creation-record-detail-body"; refs.creationRecordArchiveDetail.append(detailSummary, detailToggle, detailBody);
+  if (refs.creationRecordGenerateListingsButton) refs.creationRecordArchiveDetail.insertBefore(refs.creationRecordGenerateListingsButton, detailToggle);
   if (!isExpanded) return;
 
   const detailItems = [
@@ -10335,19 +10607,45 @@ function renderCreationRecordArchiveDetail(set) {
 }
 
 function renderCreationRecordView() {
+  const keywordMatchedSets = getCreationRecordKeywordMatchedSets();
   const filteredSets = filterCreationRecordSets();
   const selectedSet = getCreationRecordSelectedSet();
   const recordIncompleteItems = getCreationIncompleteItems(selectedSet);
+  const existingSetIds = new Set(state.creation.sets.map((set) => set.setId));
+  const checkedCount = new Set(state.creation.recordCheckedSetIds.filter((setId) => existingSetIds.has(setId))).size;
+  const deleteBlocked = state.creation.generating || state.creation.planning || state.creation.recordDeleteBusy;
   if (refs.creationRecordSearchInput && refs.creationRecordSearchInput.value !== state.creation.recordQuery) {
     refs.creationRecordSearchInput.value = state.creation.recordQuery;
   }
+  const timeFilters = getCreationRecordTimeFilterSnapshot();
+  if (refs.creationRecordDateInput && refs.creationRecordDateInput.value !== timeFilters.date) {
+    refs.creationRecordDateInput.value = timeFilters.date;
+  }
+  renderCreationRecordTimeFilters(keywordMatchedSets);
+  const hasActiveFilters = hasCreationRecordActiveFilters();
+  if (refs.creationRecordResetFiltersButton) {
+    refs.creationRecordResetFiltersButton.disabled = !hasActiveFilters;
+  }
   if (refs.creationRecordCount) {
-    refs.creationRecordCount.textContent = state.creation.recordQuery
+    refs.creationRecordCount.textContent = hasActiveFilters
       ? `${filteredSets.length} / ${state.creation.sets.length} 套`
       : `${state.creation.sets.length} 套`;
   }
   if (refs.creationRecordReuseButton) {
     refs.creationRecordReuseButton.disabled = !selectedSet;
+  }
+  if (refs.creationRecordDeleteCurrentButton) {
+    refs.creationRecordDeleteCurrentButton.disabled = deleteBlocked || !selectedSet;
+  }
+  if (refs.creationRecordDeleteSelectedButton) {
+    refs.creationRecordDeleteSelectedButton.disabled = deleteBlocked || checkedCount === 0;
+    refs.creationRecordDeleteSelectedButton.textContent = checkedCount > 0 ? `删除选中 (${checkedCount})` : "删除选中";
+  }
+  if (refs.creationRecordDeleteFilteredButton) {
+    refs.creationRecordDeleteFilteredButton.disabled = deleteBlocked || !hasActiveFilters || filteredSets.length === 0;
+    refs.creationRecordDeleteFilteredButton.textContent = hasActiveFilters && filteredSets.length > 0
+      ? `删除筛选结果 (${filteredSets.length})`
+      : "删除筛选结果";
   }
   if (refs.creationRecordOpenFolderButton) {
     refs.creationRecordOpenFolderButton.disabled = !selectedSet?.relativeDir;
@@ -12045,6 +12343,7 @@ async function loadCreationSets() {
   if (response.status === 404) {
     state.assetLoading.creation = false;
     state.creation.sets = [];
+    state.creation.recordCheckedSetIds = [];
     state.creation.recordSetId = "";
     renderCreationView();
     renderCreationRecordView();
@@ -12062,6 +12361,8 @@ async function loadCreationSets() {
   const nextSets = Array.isArray(payload) ? payload.map(normalizeCreationSetForView).filter(Boolean) : [];
   const currentSetId = state.creation.currentSet?.setId || "";
   state.creation.sets = nextSets;
+  const nextSetIds = new Set(nextSets.map((set) => set.setId));
+  state.creation.recordCheckedSetIds = state.creation.recordCheckedSetIds.filter((setId) => nextSetIds.has(setId));
   state.assetLoading.creation = false;
   state.assetLoadErrors.creation = "";
   if (currentSetId) {
@@ -13343,13 +13644,15 @@ async function loadPortraitSets() {
     throw error;
   }
   if (response.status === 404) {
-    state.assetLoading.portrait = false; state.portrait.sets = []; state.portrait.recordSetId = ""; renderPortraitView(); renderPortraitRecordView(); return;
+    state.assetLoading.portrait = false; state.portrait.sets = []; state.portrait.recordSetId = ""; state.portrait.recordCheckedSetIds = []; renderPortraitView(); renderPortraitRecordView(); return;
   }
   if (!response.ok) { state.assetLoading.portrait = false; state.assetLoadErrors.portrait = "读取写真记录失败"; renderPortraitRecordView(); throw new Error("读取写真记录失败"); }
   const payload = await response.json();
   const nextSets = Array.isArray(payload) ? payload.map(normalizePortraitSetForView).filter(Boolean) : [];
   const currentSetId = state.portrait.currentSet?.setId || "";
   state.portrait.sets = nextSets;
+  const availableSetIds = new Set(nextSets.map((set) => set.setId));
+  state.portrait.recordCheckedSetIds = state.portrait.recordCheckedSetIds.filter((setId) => availableSetIds.has(setId));
   state.assetLoading.portrait = false;
   state.assetLoadErrors.portrait = "";
   if (currentSetId) {
@@ -13560,6 +13863,7 @@ function renderPortraitRecordSetList() {
   const selectedSet = getPortraitRecordSelectedSet();
   const selectedSetId = selectedSet?.setId || "";
   const sets = filterPortraitRecordSets().slice(0, 60);
+  const checkedSetIds = new Set(state.portrait.recordCheckedSetIds);
   refs.portraitRecordSetList.setAttribute("aria-busy", String(state.assetLoading.portrait));
   if (state.assetLoading.portrait || state.assetLoadErrors.portrait || sets.length === 0) {
     const empty = document.createElement("div");
@@ -13573,6 +13877,21 @@ function renderPortraitRecordSetList() {
     return;
   }
   sets.forEach((set) => {
+    const row = document.createElement("div");
+    row.className = "asset-record-select-row";
+    row.classList.toggle("is-checked", checkedSetIds.has(set.setId));
+
+    const selectLabel = document.createElement("label");
+    selectLabel.className = "asset-record-select";
+    selectLabel.title = `选择 ${getPortraitSetDisplayTitle(set)}`;
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = checkedSetIds.has(set.setId);
+    checkbox.disabled = state.assetRecordDeletion.busy || state.portrait.generating || state.portrait.planning;
+    checkbox.dataset.portraitRecordSelectSetId = set.setId;
+    checkbox.setAttribute("aria-label", `选择写真 ${getPortraitSetDisplayTitle(set)}`);
+    selectLabel.appendChild(checkbox);
+
     const button = document.createElement("button");
     button.type = "button";
     button.className = "creation-record portrait-record";
@@ -13596,7 +13915,8 @@ function renderPortraitRecordSetList() {
     status.dataset.state = progress.failed > 0 ? "failed" : progress.completed >= progress.total && progress.total > 0 ? "completed" : "running";
     status.textContent = progress.failed > 0 ? `${progress.failed} 项失败` : progress.completed >= progress.total && progress.total > 0 ? "已完成" : "生成中";
     button.appendChild(status);
-    refs.portraitRecordSetList.appendChild(button);
+    row.append(selectLabel, button);
+    refs.portraitRecordSetList.appendChild(row);
   });
 }
 
@@ -13644,12 +13964,21 @@ function renderPortraitRecordView() {
       ? `${filteredSets.length} / ${state.portrait.sets.length} 组`
       : `${state.portrait.sets.length} 组`;
   }
-  if (refs.portraitRecordReuseButton) refs.portraitRecordReuseButton.disabled = !selectedSet;
-  if (refs.portraitRecordOpenFolderButton) refs.portraitRecordOpenFolderButton.disabled = !selectedSet?.relativeDir;
-  if (refs.portraitRecordCopyPathsButton) refs.portraitRecordCopyPathsButton.disabled = getPortraitRecordImagePaths(selectedSet).length === 0;
-  if (refs.portraitRecordCopyPromptsButton) refs.portraitRecordCopyPromptsButton.disabled = !buildPortraitRecordPromptText(selectedSet);
-  if (refs.portraitRecordExportPromptsButton) refs.portraitRecordExportPromptsButton.disabled = !buildPortraitRecordPromptText(selectedSet);
-  if (refs.portraitRecordExportManifestButton) refs.portraitRecordExportManifestButton.disabled = !selectedSet;
+  const deleteBlocked = state.portrait.generating || state.portrait.planning || state.assetLoading.portrait || Boolean(portraitRecordRefreshPromise) || state.assetRecordDeletion.busy;
+  const availableSetIds = new Set(state.portrait.sets.map((set) => set.setId));
+  const checkedCount = state.portrait.recordCheckedSetIds.filter((setId) => availableSetIds.has(setId)).length;
+  if (refs.portraitRecordReuseButton) refs.portraitRecordReuseButton.disabled = state.assetRecordDeletion.busy || !selectedSet;
+  if (refs.portraitRecordRefreshButton) refs.portraitRecordRefreshButton.disabled = state.assetRecordDeletion.busy || Boolean(portraitRecordRefreshPromise);
+  if (refs.portraitRecordDeleteCurrentButton) refs.portraitRecordDeleteCurrentButton.disabled = deleteBlocked || !selectedSet;
+  if (refs.portraitRecordDeleteSelectedButton) {
+    refs.portraitRecordDeleteSelectedButton.disabled = deleteBlocked || checkedCount === 0;
+    refs.portraitRecordDeleteSelectedButton.textContent = checkedCount > 0 ? `删除选中 (${checkedCount})` : "删除选中";
+  }
+  if (refs.portraitRecordOpenFolderButton) refs.portraitRecordOpenFolderButton.disabled = state.assetRecordDeletion.busy || !selectedSet?.relativeDir;
+  if (refs.portraitRecordCopyPathsButton) refs.portraitRecordCopyPathsButton.disabled = state.assetRecordDeletion.busy || getPortraitRecordImagePaths(selectedSet).length === 0;
+  if (refs.portraitRecordCopyPromptsButton) refs.portraitRecordCopyPromptsButton.disabled = state.assetRecordDeletion.busy || !buildPortraitRecordPromptText(selectedSet);
+  if (refs.portraitRecordExportPromptsButton) refs.portraitRecordExportPromptsButton.disabled = state.assetRecordDeletion.busy || !buildPortraitRecordPromptText(selectedSet);
+  if (refs.portraitRecordExportManifestButton) refs.portraitRecordExportManifestButton.disabled = state.assetRecordDeletion.busy || !selectedSet;
   if (refs.portraitRecordSelection) refs.portraitRecordSelection.textContent = selectedSet ? getPortraitSetDisplayTitle(selectedSet) : "尚未选择";
 
   renderPortraitRecordSetList();
@@ -13728,6 +14057,12 @@ async function loadPptDecks() {
   }
   const payload = await response.json();
   state.ppt.decks = Array.isArray(payload) ? payload : [];
+  const availableRecordKeys = new Set(state.ppt.decks.map(getPptDeckRecordKey));
+  state.ppt.recordCheckedKeys = state.ppt.recordCheckedKeys.filter((recordKey) => availableRecordKeys.has(recordKey));
+  if (!availableRecordKeys.has(state.ppt.recordDetail.deckKey)) {
+    state.ppt.recordDetail.deckKey = "";
+    state.ppt.recordDetail.slideNumber = 0;
+  }
   state.assetLoading.ppt = false;
   state.assetLoadErrors.ppt = "";
   renderPptView();
@@ -14043,6 +14378,15 @@ function renderPptRecordView() {
   refs.pptRecordList.setAttribute("aria-busy", String(state.assetLoading.ppt));
   refs.pptRecordList.innerHTML = "";
 
+  const availableRecordKeys = new Set(state.ppt.decks.map(getPptDeckRecordKey));
+  const checkedRecordKeys = new Set(state.ppt.recordCheckedKeys.filter((recordKey) => availableRecordKeys.has(recordKey)));
+  const checkedCount = checkedRecordKeys.size;
+  const deleteBlocked = state.ppt.generating || state.assetLoading.ppt || state.assetRecordDeletion.busy;
+  refs.pptRecordRefreshButton.disabled = state.assetRecordDeletion.busy;
+  refs.pptRecordDeleteCurrentButton.disabled = deleteBlocked || !availableRecordKeys.has(state.ppt.recordDetail.deckKey);
+  refs.pptRecordDeleteSelectedButton.disabled = deleteBlocked || checkedCount === 0;
+  refs.pptRecordDeleteSelectedButton.textContent = checkedCount > 0 ? `删除选中 (${checkedCount})` : "删除选中";
+
   let selectedDeck = getPptRecordByKey(state.ppt.recordDetail.deckKey);
   if (!selectedDeck) {
     state.ppt.recordDetail.deckKey = "";
@@ -14052,7 +14396,24 @@ function renderPptRecordView() {
   if (refs.pptRecordSelection) refs.pptRecordSelection.textContent = selectedDeck?.title || selectedDeck?.pptxFilename || "尚未选择";
 
   state.ppt.decks.forEach((deck) => {
-    refs.pptRecordList.appendChild(createPptDeckRecordItem(deck));
+    const recordKey = getPptDeckRecordKey(deck);
+    const row = document.createElement("div");
+    row.className = "asset-record-select-row";
+    row.classList.toggle("is-checked", checkedRecordKeys.has(recordKey));
+
+    const selectLabel = document.createElement("label");
+    selectLabel.className = "asset-record-select";
+    selectLabel.title = `选择 ${deck.title || deck.pptxFilename || "PPT 记录"}`;
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = checkedRecordKeys.has(recordKey);
+    checkbox.disabled = deleteBlocked;
+    checkbox.dataset.pptRecordSelectKey = recordKey;
+    checkbox.setAttribute("aria-label", `选择 PPT ${deck.title || deck.pptxFilename || "记录"}`);
+    selectLabel.appendChild(checkbox);
+
+    row.append(selectLabel, createPptDeckRecordItem(deck));
+    refs.pptRecordList.appendChild(row);
   });
 
   renderPptRecordDetail(selectedDeck);
@@ -14333,6 +14694,9 @@ async function loadGallery() {
     );
     const hydratedGallery = hydrateGalleryItems(sortedItems);
     state.gallery = sortGalleryItemsByCreatedAtDesc(hydratedGallery.items);
+    const availableFilenames = new Set(state.gallery.map((item) => item.filename));
+    state.galleryCheckedFilenames = state.galleryCheckedFilenames.filter((filename) => availableFilenames.has(filename));
+    if (!availableFilenames.has(state.galleryCurrentFilename)) state.galleryCurrentFilename = "";
     state.galleryLoading = false;
     state.galleryLoadError = "";
     renderAll();
@@ -14566,6 +14930,40 @@ async function openOutputDirectory() {
   }
 }
 
+const assetRecordDeleteController = createAssetRecordDeleteController({
+  refs,
+  state,
+  actions: {
+    closeLightbox,
+    deleteBrowserCachedGalleryItem,
+    filterArticleRecords: filterArticleRecordSets,
+    filterPortraitRecords: filterPortraitRecordSets,
+    forgetGalleryMetadata,
+    formatArticleTitle: formatArticleDisplayText,
+    getArticleCurrentRecord: getArticleRecordSelectedSet,
+    getGalleryVisibleItems: getVisibleGalleryItems,
+    getPortraitCurrentRecord: getPortraitRecordSelectedSet,
+    getPortraitTitle: getPortraitSetDisplayTitle,
+    getPptRecordKey: getPptDeckRecordKey,
+    isPortraitRefreshing: () => Boolean(portraitRecordRefreshPromise),
+    preserveGalleryItem: (item) => Promise.all([
+      preserveReferenceAnalysisGenerationItemForDelete(item),
+      preserveImageDecompositionGenerationItemForDelete(item),
+      preserveImageEditGenerationItemForDelete(item),
+      preserveQuickBlendGenerationItemForDelete(item),
+    ]),
+    renderArticleRecords: renderArticleRecordView,
+    renderArticleWorkspace: renderArticleIllustrationView,
+    renderGalleryWorkspace: renderAll,
+    renderPortraitRecords: renderPortraitRecordView,
+    renderPortraitWorkspace: renderPortraitView,
+    renderPptWorkspace: renderPptView,
+    setArticleFeedback: setArticleRecordFeedback,
+    setPortraitFeedback: setPortraitRecordFeedback,
+  },
+});
+const requestAssetRecordDelete = assetRecordDeleteController.requestDelete;
+const updateCheckedRecordIds = assetRecordDeleteController.updateCheckedRecordIds;
 async function deleteGalleryItem(item) {
   if (!item?.filename) {
     return;
@@ -15594,6 +15992,7 @@ function bindEvents() {
   bindTopbarRevealEvents();
   bindAdaptiveWorkbenchSections();
   assetWorkspaceController.bindEvents();
+  assetRecordDeleteController.bindEvents();
   document.addEventListener("paste", handlePromptAgentImagePaste); document.addEventListener("paste", handleCreationReferenceImagePaste);
 
   refs.viewTabs.forEach((button) => {
@@ -15725,6 +16124,8 @@ function bindEvents() {
   refs.articleRecordRefreshButton.addEventListener("click", () => {
     loadArticleIllustrationSets().catch((error) => setArticleRecordFeedback(error.message, "error"));
   });
+  refs.articleRecordDeleteCurrentButton.addEventListener("click", () => requestAssetRecordDelete("article", "current"));
+  refs.articleRecordDeleteSelectedButton.addEventListener("click", () => requestAssetRecordDelete("article", "selected"));
   refs.articleRecordSearchInput.addEventListener("input", (event) => {
     state.articleIllustration.recordQuery = event.target.value;
     renderArticleRecordView();
@@ -15746,6 +16147,16 @@ function bindEvents() {
       return;
     }
     state.articleIllustration.recordSetId = target.dataset.articleRecordSetId;
+    renderArticleRecordView();
+  });
+  refs.articleRecordList.addEventListener("change", (event) => {
+    const checkbox = event.target.closest("[data-article-record-select-set-id]");
+    if (!checkbox) return;
+    state.articleIllustration.recordCheckedSetIds = updateCheckedRecordIds(
+      state.articleIllustration.recordCheckedSetIds,
+      checkbox.dataset.articleRecordSelectSetId,
+      checkbox.checked,
+    );
     renderArticleRecordView();
   });
   refs.articleRecordDetail.addEventListener("click", (event) => {
@@ -15835,6 +16246,32 @@ function bindEvents() {
   refs.creationRecordRefreshButton.addEventListener("click", () => {
     loadCreationSets().catch((error) => setCreationRecordFeedback(error.message, "error"));
   });
+  refs.creationRecordDeleteCurrentButton.addEventListener("click", () => requestCreationRecordDelete("current"));
+  refs.creationRecordDeleteSelectedButton.addEventListener("click", () => requestCreationRecordDelete("selected"));
+  refs.creationRecordDeleteFilteredButton.addEventListener("click", () => requestCreationRecordDelete("filtered"));
+  refs.creationRecordDeleteForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    confirmCreationRecordDelete().catch((error) => setCreationRecordFeedback(error.message, "error"));
+  });
+  refs.creationRecordDeleteCancelButton.addEventListener("click", () => closeCreationRecordDeleteDialog());
+  refs.creationRecordDeleteDialog.addEventListener("cancel", (event) => {
+    if (state.creation.recordDeleteBusy) event.preventDefault();
+  });
+  refs.creationRecordDeleteDialog.addEventListener("click", (event) => {
+    if (event.target === refs.creationRecordDeleteDialog) closeCreationRecordDeleteDialog();
+  });
+  refs.creationRecordDeleteDialog.addEventListener("close", () => {
+    state.creation.recordDeleteRequest = null;
+    refs.creationRecordDeleteConfirmButton.disabled = false;
+    refs.creationRecordDeleteCancelButton.disabled = false;
+    refs.creationRecordDeleteConfirmButton.textContent = "确认删除";
+    const restoreTarget = creationRecordDeleteRestoreFocus;
+    creationRecordDeleteRestoreFocus = null;
+    window.setTimeout(() => {
+      if (restoreTarget?.isConnected && !restoreTarget.disabled) restoreTarget.focus();
+      else refs.creationRecordSearchInput?.focus();
+    }, 0);
+  });
   refs.creationRecordReuseButton.addEventListener("click", reuseCreationRecordSet);
   refs.creationRecordOpenFolderButton.addEventListener("click", () => {
     openCreationRecordFolder().catch((error) => setCreationRecordFeedback(error.message, "error"));
@@ -15855,6 +16292,21 @@ function bindEvents() {
     state.creation.recordDetailExpanded = false;
     renderCreationRecordView();
   });
+  refs.creationRecordDateInput.addEventListener("input", (event) => {
+    state.creation.recordDateFilter = normalizeCreationRecordDateFilter(event.target.value);
+    if (state.creation.recordDateFilter) state.creation.recordTimeFilter = "all";
+    state.creation.recordDetailExpanded = false;
+    renderCreationRecordView();
+  });
+  refs.creationRecordResetFiltersButton.addEventListener("click", () => {
+    state.creation.recordQuery = "";
+    state.creation.recordTimeFilter = "all";
+    state.creation.recordDateFilter = "";
+    state.creation.recordDetailExpanded = false;
+    setCreationRecordFeedback("");
+    renderCreationRecordView();
+    refs.creationRecordSearchInput.focus();
+  });
   refs.creationRecordSetList.addEventListener("click", (event) => {
     const target = event.target.closest("[data-creation-record-set-id]");
     if (!target) {
@@ -15863,12 +16315,25 @@ function bindEvents() {
 
     selectCreationRecord(target.dataset.creationRecordSetId);
   });
+  refs.creationRecordSetList.addEventListener("change", (event) => {
+    const checkbox = event.target.closest("[data-creation-record-select-set-id]");
+    if (!checkbox) return;
+    const selectedIds = new Set(state.creation.recordCheckedSetIds);
+    if (checkbox.checked) selectedIds.add(checkbox.dataset.creationRecordSelectSetId);
+    else selectedIds.delete(checkbox.dataset.creationRecordSelectSetId);
+    state.creation.recordCheckedSetIds = [...selectedIds];
+    const scrollTop = refs.creationRecordSetList.scrollTop;
+    const scrollLeft = refs.creationRecordSetList.scrollLeft;
+    renderCreationRecordView();
+    refs.creationRecordSetList.scrollTop = scrollTop;
+    refs.creationRecordSetList.scrollLeft = scrollLeft;
+  });
   refs.creationRecordResultGrid.addEventListener("click", (event) => {
-    const previewButton = event.target.closest("[data-creation-record-preview-item-id]");
-    if (previewButton) {
+    const previewTarget = event.target.closest("[data-creation-record-preview-item-id]");
+    if (previewTarget) {
       openCreationRecordItemPreview(
-        previewButton.dataset.creationRecordPreviewItemId,
-        previewButton.dataset.creationRecordPreviewSetId,
+        previewTarget.dataset.creationRecordPreviewItemId,
+        previewTarget.dataset.creationRecordPreviewSetId,
       );
       return;
     }
@@ -16004,6 +16469,8 @@ function bindEvents() {
     syncPortraitSize(event.target.value);
   });
   refs.portraitRecordRefreshButton.addEventListener("click", refreshPortraitRecordSets);
+  refs.portraitRecordDeleteCurrentButton.addEventListener("click", () => requestAssetRecordDelete("portrait", "current"));
+  refs.portraitRecordDeleteSelectedButton.addEventListener("click", () => requestAssetRecordDelete("portrait", "selected"));
   refs.portraitRecordReuseButton.addEventListener("click", reusePortraitRecordSet);
   refs.portraitRecordOpenFolderButton.addEventListener("click", () => {
     openPortraitRecordFolder().catch((error) => setPortraitRecordFeedback(error.message, "error"));
@@ -16026,6 +16493,16 @@ function bindEvents() {
       return;
     }
     selectPortraitRecord(target.dataset.portraitRecordSetId);
+  });
+  refs.portraitRecordSetList.addEventListener("change", (event) => {
+    const checkbox = event.target.closest("[data-portrait-record-select-set-id]");
+    if (!checkbox) return;
+    state.portrait.recordCheckedSetIds = updateCheckedRecordIds(
+      state.portrait.recordCheckedSetIds,
+      checkbox.dataset.portraitRecordSelectSetId,
+      checkbox.checked,
+    );
+    renderPortraitRecordView();
   });
   refs.portraitRecordResultGrid.addEventListener("click", (event) => {
     const previewButton = event.target.closest("[data-portrait-record-preview-item-id]");
@@ -16250,6 +16727,8 @@ function bindEvents() {
   refs.pptRecordRefreshButton.addEventListener("click", () => {
     loadPptDecks().catch((error) => showError(error.message));
   });
+  refs.pptRecordDeleteCurrentButton.addEventListener("click", () => requestAssetRecordDelete("ppt", "current"));
+  refs.pptRecordDeleteSelectedButton.addEventListener("click", () => requestAssetRecordDelete("ppt", "selected"));
   refs.pptRecordList.addEventListener("click", (event) => {
     if (event.target.closest("a")) {
       return;
@@ -16278,6 +16757,16 @@ function bindEvents() {
 
     event.preventDefault();
     selectPptRecord(target.dataset.pptRecordKey);
+  });
+  refs.pptRecordList.addEventListener("change", (event) => {
+    const checkbox = event.target.closest("[data-ppt-record-select-key]");
+    if (!checkbox) return;
+    state.ppt.recordCheckedKeys = updateCheckedRecordIds(
+      state.ppt.recordCheckedKeys,
+      checkbox.dataset.pptRecordSelectKey,
+      checkbox.checked,
+    );
+    renderPptRecordView();
   });
   refs.pptRecordDetail.addEventListener("click", (event) => {
     const target = event.target.closest("[data-ppt-record-slide]");
@@ -16536,6 +17025,18 @@ function bindEvents() {
   });
   refs.refreshGalleryButton.addEventListener("click", () => {
     loadGallery().catch((error) => showError(error.message));
+  });
+  refs.galleryDeleteCurrentButton.addEventListener("click", () => requestAssetRecordDelete("gallery", "current"));
+  refs.galleryDeleteSelectedButton.addEventListener("click", () => requestAssetRecordDelete("gallery", "selected"));
+  refs.gallerySections.addEventListener("change", (event) => {
+    const checkbox = event.target.closest("[data-gallery-select-filename]");
+    if (!checkbox) return;
+    state.galleryCheckedFilenames = updateCheckedRecordIds(
+      state.galleryCheckedFilenames,
+      checkbox.dataset.gallerySelectFilename,
+      checkbox.checked,
+    );
+    renderGalleryView();
   });
   refs.galleryColumnButtons.forEach((button) => {
     button.addEventListener("click", () => {

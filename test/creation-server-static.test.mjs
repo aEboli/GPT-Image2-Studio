@@ -421,6 +421,19 @@ test("creation infographic rebuild option is passed through planning generation 
   assert.doesNotMatch(repairHandler, /skuGenerationEnabled:\s*formData\.get|infographicRebuildEnabled:\s*formData\.get/);
 });
 
+test("creation record deletion exposes one validated batch endpoint", async () => {
+  const server = await readFile(serverPath, "utf8");
+  const store = await readFile(creationStorePath, "utf8");
+
+  assert.match(server, /async function handleCreationSetsDelete\(request, response\)/);
+  assert.match(server, /normalizeCreationRecordDeleteSetIds\(payload\.setIds\)/);
+  assert.match(server, /creationSetStore\.deleteManifests\(setIds\)/);
+  assert.match(server, /request\.method === "POST" && url\.pathname === "\/api\/creation\/sets\/delete"/);
+  assert.match(store, /async function deleteManifests\(setIds/);
+  assert.match(store, /enqueueManifestSave\(setId/);
+  assert.match(store, /skippedUnsafePaths/);
+});
+
 test("creation saved filenames prefer SKU filename tokens over display titles", async () => {
   const server = await readFile(serverPath, "utf8");
   const worker = await readFile(cloudflareWorkerPath, "utf8");

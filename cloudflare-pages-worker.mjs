@@ -120,6 +120,8 @@ import {
   REASONING_EFFORT_OPTIONS,
 } from "./lib/studio-constants.mjs";
 import { buildUnsupportedRuntimeCapabilityPayload } from "./lib/api-contract.mjs";
+import { normalizeCreationRecordDeleteSetIds } from "./lib/creation-record-delete.mjs";
+import { normalizeAssetRecordDeleteIds } from "./lib/asset-record-delete.mjs";
 
 const DEFAULT_RESPONSES_MODEL = "gpt-5.5";
 const PPT_SLIDE_SIZE = "2048x1152";
@@ -4249,8 +4251,40 @@ export async function handleApiRequest(request, options = {}) {
     return jsonResponse([]);
   }
 
+  if (request.method === "POST" && url.pathname === "/api/creation/sets/delete") {
+    try {
+      const payload = await request.json();
+      const setIds = normalizeCreationRecordDeleteSetIds(payload?.setIds);
+      return jsonResponse({
+        ok: true,
+        deletedCount: setIds.length,
+        deletedSetIds: setIds,
+        notFoundSetIds: [],
+        skippedUnsafePaths: [],
+      });
+    } catch (error) {
+      return jsonResponse({ message: error instanceof Error ? error.message : String(error) }, 400);
+    }
+  }
+
   if (request.method === "GET" && url.pathname === "/api/portrait/sets") {
     return jsonResponse([]);
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/portrait/sets/delete") {
+    try {
+      const payload = await request.json();
+      const setIds = normalizeAssetRecordDeleteIds(payload?.setIds, { recordLabel: "写真记录" });
+      return jsonResponse({
+        ok: true,
+        deletedCount: setIds.length,
+        deletedSetIds: setIds,
+        notFoundSetIds: [],
+        skippedUnsafePaths: [],
+      });
+    } catch (error) {
+      return jsonResponse({ message: error instanceof Error ? error.message : String(error) }, 400);
+    }
   }
 
   if (
@@ -4313,6 +4347,7 @@ export async function handleApiRequest(request, options = {}) {
     ["GET", "POST"].includes(request.method) &&
     [
       "/api/article-illustration/sets",
+      "/api/article-illustration/sets/delete",
       "/api/article-illustration/plan",
       "/api/article-illustration/generate-references",
       "/api/article-illustration/generate",
@@ -4326,7 +4361,23 @@ export async function handleApiRequest(request, options = {}) {
   }
 
   if (request.method === "POST" && url.pathname === "/api/output/delete") {
-    return jsonResponse({ ok: true });
+    try {
+      const payload = await request.json();
+      const legacySingle = !Array.isArray(payload?.filenames);
+      const filenames = normalizeAssetRecordDeleteIds(
+        legacySingle ? [String(payload?.filename || "").trim()] : payload.filenames,
+        { recordLabel: "画廊图片" },
+      );
+      return jsonResponse({
+        ok: true,
+        filename: filenames[0],
+        deletedCount: filenames.length,
+        deletedFilenames: filenames,
+        notFoundFilenames: [],
+      });
+    } catch (error) {
+      return jsonResponse({ message: error instanceof Error ? error.message : String(error) }, 400);
+    }
   }
 
   if (request.method === "POST" && url.pathname === "/api/gallery/metadata") {
@@ -4339,6 +4390,22 @@ export async function handleApiRequest(request, options = {}) {
 
   if (request.method === "POST" && url.pathname === "/api/ppt/analyze") {
     return handlePptAnalyze(request, fetchImpl);
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/ppt/decks/delete") {
+    try {
+      const payload = await request.json();
+      const recordKeys = normalizeAssetRecordDeleteIds(payload?.recordKeys, { recordLabel: "PPT 记录" });
+      return jsonResponse({
+        ok: true,
+        deletedCount: recordKeys.length,
+        deletedRecordKeys: recordKeys,
+        notFoundRecordKeys: [],
+        skippedUnsafePaths: [],
+      });
+    } catch (error) {
+      return jsonResponse({ message: error instanceof Error ? error.message : String(error) }, 400);
+    }
   }
 
   if (request.method === "POST" && url.pathname === "/api/ppt/generate") {

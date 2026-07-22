@@ -844,7 +844,7 @@ test("creation planner gives every ecommerce carousel role a shopper question", 
   assert.match(promptByRole.benefit, /which useful outcome does this product create/i);
   assert.match(promptByRole.scene, /which real scenarios make this product feel useful and worth buying/i);
   assert.match(promptByRole["product-detail"], /are the visible details trustworthy enough to buy/i);
-  assert.match(promptByRole["accessory-gift"], /what exactly will arrive in the box/i);
+  assert.match(promptByRole["accessory-gift"], /what exactly comes with this product/i);
   assert.match(promptByRole["after-sales"], /这个产品具体帮我解决什么问题？/);
   assert.match(promptByRole["usage-suggestion"], /我买它能获得哪些更明确的好处？/);
   assert.match(promptByRole["human-handheld"], /real person's hands or in actual use/i);
@@ -901,7 +901,7 @@ test("creation planner keeps hard information roles factual instead of emotional
   assert.doesNotMatch(promptByRole["size-capacity-fit"], /BUYER DECISION STRATEGY/i);
   assert.doesNotMatch(promptByRole["spec-table"], /BUYER DECISION STRATEGY/i);
   assert.match(promptByRole["size-capacity-fit"], /Role intent: show the product with callout measurement lines/i);
-  assert.match(promptByRole["spec-table"], /Role intent: build a legible parameter table/i);
+  assert.match(promptByRole["spec-table"], /Role intent: create a product-led key-spec explanation/i);
   assert.doesNotMatch(
     promptByRole["size-capacity-fit"],
     /shopper emotion|emotional payoff|owning this in my life|scenario imagination|purchase momentum|cover hero, benefits, lifestyle|this role's conversion job/i,
@@ -910,6 +910,38 @@ test("creation planner keeps hard information roles factual instead of emotional
     promptByRole["spec-table"],
     /shopper emotion|emotional payoff|owning this in my life|scenario imagination|purchase momentum|cover hero, benefits, lifestyle|this role's conversion job/i,
   );
+});
+
+test("creation planner turns specification tables into product-led key-spec explanations", () => {
+  const plan = buildCreationPlan({
+    productName: "Inflatable river tube",
+    productDescription: "Two-seat inflatable river tube with backrests and center cooler.",
+    sellingPoints: "two seats\nback support\ncenter cooler",
+    targetLanguage: "en",
+    dimensionUnitMode: "metric",
+    dimensionSpecs: [
+      "Length 238cm",
+      "Length 99cm",
+      "Height 58cm",
+      "Width 71cm",
+      "Width 48cm",
+      "Depth 43cm",
+      "Weight 1.2kg",
+    ].join("\n"),
+    selectedRoles: ["spec-table"],
+  });
+
+  const prompt = plan.items[0].prompt;
+  assert.match(plan.dimensionSpecs, /Length 99cm/);
+  assert.match(plan.dimensionSpecs, /Width 48cm/);
+  assert.match(plan.dimensionSpecs, /Depth 43cm/);
+  assert.match(prompt, /KEY SPECIFICATION SELECTION/i);
+  assert.match(prompt, /Visible key specifications: Length 238cm \/ Height 58cm \/ Width 71cm \/ Weight 1\.2kg/i);
+  assert.doesNotMatch(prompt, /Length 99cm|Width 48cm|Depth 43cm/i);
+  assert.match(prompt, /product as the dominant visual subject/i);
+  assert.match(prompt, /measurement lines, local callouts, or 2-4 compact explanatory modules/i);
+  assert.match(prompt, /Do not create a full-canvas data table, spreadsheet, database-like grid, or dense wall of rows/i);
+  assert.doesNotMatch(prompt, /Mandatory visible specification labels: render every listed/i);
 });
 
 test("creation planner keeps overlong product descriptions bounded and role-useful", () => {
@@ -1007,6 +1039,50 @@ test("creation planner keeps complete first aid inventory facts for package imag
   assert.match(packagePrompt, /First aid Kit\*1/);
   assert.match(packagePrompt, /Package inventory lock/i);
   assert.match(packagePrompt, /show every distinct visible included item and quantity/i);
+});
+
+test("creation planner lays out included items unpacked instead of putting them in a cardboard box", () => {
+  const plan = buildCreationPlan({
+    productName: "Inflatable river tube set",
+    productDescription: "Package contents: inflatable river tube*1, hand pump*1, repair patch*2.",
+    sellingPoints: "complete supplied set",
+    targetLanguage: "en",
+    selectedRoles: ["accessory-gift"],
+  });
+
+  const prompt = plan.items[0].prompt;
+  assert.match(prompt, /UNPACKED INVENTORY LAYOUT/i);
+  assert.match(prompt, /fully visible outside any box, tray, case, bag, or container/i);
+  assert.match(prompt, /Do not add or use a cardboard box, shipping carton, paper tray, blister tray, molded insert, or generic retail packaging/i);
+  assert.match(prompt, /Show packaging only when supplied evidence explicitly confirms it is included/i);
+  assert.match(prompt, /separate secondary inventory item beside the unpacked contents/i);
+  assert.match(prompt, /inflatable river tube\*1/i);
+  assert.match(prompt, /hand pump\*1/i);
+  assert.match(prompt, /repair patch\*2/i);
+});
+
+test("creation planner carries the information-image locks into named platform slots", () => {
+  const plan = buildCreationPlan({
+    platform: "jd",
+    productName: "Inflatable river tube set",
+    productDescription: "Package contents: inflatable river tube*1, hand pump*1, repair patch*2.",
+    sellingPoints: "complete supplied set",
+    targetLanguage: "en",
+    referenceImageRoles: [
+      { filename: "size.png", role: "dimensions", note: "Length 238cm, Height 58cm, Width 71cm, Weight 1.2kg" },
+      { filename: "package.png", role: "package", note: "Package contents: inflatable river tube*1, hand pump*1, repair patch*2" },
+    ],
+  });
+
+  const specItem = plan.items.find((item) => item.imageType === "spec-table");
+  const packageItem = plan.items.find((item) => item.imageType === "in-box");
+  assert.ok(specItem);
+  assert.ok(packageItem);
+  assert.equal(specItem.composition, "product-led-key-spec-callouts");
+  assert.equal(packageItem.composition, "unpacked-included-items-flat-lay");
+  assert.match(specItem.prompt, /PRODUCT-LED SPECIFICATION LAYOUT/i);
+  assert.match(packageItem.prompt, /UNPACKED INVENTORY LAYOUT/i);
+  assert.match(packageItem.prompt, /outside any box, tray, case, bag, or container/i);
 });
 
 test("creation planner avoids duplicated punctuation in composed prompt fields", () => {
@@ -1439,7 +1515,7 @@ test("creation planner supports the refactored ecommerce image types with dedica
   ]);
   assert.match(plan.items.find((item) => item.role === "craft-process").prompt, /quality and craft proof image/i);
   assert.match(plan.items.find((item) => item.role === "series-showcase").prompt, /variant and SKU choice image/i);
-  assert.match(plan.items.find((item) => item.role === "spec-table").prompt, /legible parameter table/i);
+  assert.match(plan.items.find((item) => item.role === "spec-table").prompt, /product-led key-specification explainer/i);
   assert.match(plan.items.find((item) => item.role === "usage-suggestion").prompt, /selling-point image/i);
   assert.match(plan.items.find((item) => item.role === "brand-story").prompt, /many-scene use-and-style collage/i);
   assert.match(plan.items.find((item) => item.role === "ingredient-material").prompt, /material or ingredient analysis image/i);
@@ -1982,6 +2058,47 @@ test("creation planner does not create SKU images for accessory or package refer
   assert.deepEqual(plan.items.map((item) => item.role), ["hero", "benefit", "sku"]);
   assert.match(plan.items[2].prompt, /lure-a\.png/);
   assert.doesNotMatch(plan.items[2].prompt, /hooks\.png/);
+});
+
+test("creation planner keeps product SKU subjects when notes describe usage context", () => {
+  const referenceImageRoles = [
+    {
+      filename: "图片1.jpg",
+      role: "product",
+      note: "用于详情页或内容场景展示双人充气漂流圈在泳池中的实际漂浮与休闲使用方式，并体现双座、靠背、中部冰饮储物区及旁侧单人浮圈的使用环境。",
+    },
+    {
+      filename: "图片7.jpg",
+      role: "product",
+      note: "用于详情页或移动端内容场景展示单人款在泳池中的休闲漂浮方式，并体现靠背、单座位、双扶手、双杯孔和外围安全绳。",
+    },
+  ];
+  const skuSubjects = referenceImageRoles.map((entry, index) => ({
+    id: entry.filename,
+    title: entry.filename,
+    referenceIndexes: [index + 1],
+    filenames: [entry.filename],
+    note: entry.note,
+  }));
+
+  const normalizedSubjects = normalizeCreationSkuSubjects(skuSubjects, referenceImageRoles);
+  assert.deepEqual(normalizedSubjects.map((subject) => subject.id), ["图片1.jpg", "图片7.jpg"]);
+
+  const plan = buildCreationPlan({
+    productName: "带靠背充气漂流圈",
+    productDescription: "双人款和单人款充气漂流圈",
+    targetLanguage: "en",
+    selectedRoles: ["hero"],
+    infographicRebuildEnabled: false,
+    referenceImageRoles,
+    skuSubjects,
+  });
+
+  assert.equal(plan.skuImageCount, 2);
+  assert.deepEqual(
+    plan.items.filter((item) => item.role === "sku").map((item) => item.skuSubject.id),
+    ["图片1.jpg", "图片7.jpg"],
+  );
 });
 
 test("creation planner uses selected ecommerce role set when provided", () => {

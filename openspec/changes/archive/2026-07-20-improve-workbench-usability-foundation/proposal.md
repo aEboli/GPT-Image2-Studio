@@ -19,6 +19,16 @@ GPT-Image2-Studio 已经覆盖普通生图、风格迁移、融图分析、图�
 - 不更改图片生成提示词、业务输出格式或存储路径。
 - 不修改用户已有生成记录或本地图片资产。
 
+## Capabilities
+
+### New Capabilities
+
+- `workbench-usability-foundation`: 定义工作台中可交互控件的隐藏语义、异步错误公告、浮层焦点进入与返回，以及浏览器共享模块同步护栏。
+
+### Modified Capabilities
+
+- 无。
+
 ## Impact
 
 - Frontend: `public/index.html`、`public/app.js` 需要小范围可访问性和焦点管理修复。
