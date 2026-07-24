@@ -97,14 +97,37 @@ test("strict listing schema marks every top-level property as required", () => {
   );
 });
 
-test("platform V1 prompt restores prior field rules and adds title value instructions", async () => {
+test("platform V1 prompt requests evidence-backed value copy and Amazon-style bullets", async () => {
   const calls = [];
+  const source = {
+    ...standardSource,
+    platformPolicyId: "etsy",
+    language: "en-US",
+    forceV1: true,
+    productDescription: "Blue lure with a reflective finish that stays visible in the supplied use context.",
+    dimensionSpecs: "3.5 in / 9 cm",
+    sellingPoints: ["Reflective finish", "Compact shape"],
+    skuSubjects: [
+      {
+        id: "blue-compact",
+        title: "Blue compact lure",
+        bundleCount: 2,
+        note: "Two blue lure units with a compact body and reflective visible finish.",
+      },
+    ],
+    titleValueEvidence: [
+      {
+        sourceRole: "benefit",
+        buyerContext: "Anglers who need the lure to remain visible in the supplied use context.",
+        supportedValue: "Reflective finish stays visible in the supplied use context.",
+        evidenceFocus: "The supplied product reference shows a reflective finish.",
+      },
+    ],
+  };
   const fetchImpl = async (_url, init) => {
     calls.push({ body: JSON.parse(init.body) });
     return new Response(JSON.stringify({
-      output_text: JSON.stringify(makeValidDraft({
-        title: "2 Pack Electric Fishing Lure Bass Trout Freshwater Swimbait",
-      })),
+      output_text: JSON.stringify(makeMockCreationListingDraft(source)),
     }), { status: 200 });
   };
 
@@ -112,31 +135,7 @@ test("platform V1 prompt restores prior field rules and adds title value instruc
     baseUrl: "https://example.test/v1",
     apiKey: "test-key",
     responsesModel: "gpt-5.4",
-    source: {
-      ...standardSource,
-      platformPolicyId: "etsy",
-      language: "en-US",
-      forceV1: true,
-      productDescription: "Blue lure with a reflective finish that stays visible in the supplied use context.",
-      dimensionSpecs: "3.5 in / 9 cm",
-      sellingPoints: ["Reflective finish", "Compact shape"],
-      skuSubjects: [
-        {
-          id: "blue-compact",
-          title: "Blue compact lure",
-          bundleCount: 2,
-          note: "Two blue lure units with a compact body and reflective visible finish.",
-        },
-      ],
-      titleValueEvidence: [
-        {
-          sourceRole: "benefit",
-          buyerContext: "Anglers who need the lure to remain visible in the supplied use context.",
-          supportedValue: "Reflective finish stays visible in the supplied use context.",
-          evidenceFocus: "The supplied product reference shows a reflective finish.",
-        },
-      ],
-    },
+    source,
     fetchImpl,
   });
 
@@ -149,10 +148,14 @@ test("platform V1 prompt restores prior field rules and adds title value instruc
   assert.match(prompt, /core product keyword/i);
   assert.match(prompt, /do not include size/i);
   assert.match(prompt, /search terms/i);
-  assert.match(prompt, /Non-title attribute-only rule/i);
-  assert.match(prompt, /non-title fields may contain functional/i);
-  assert.match(prompt, /Outside title and zhDisplay\.title, do not say or imply that the product helps/i);
-  assert.match(prompt, /Non-title completeness rule/i);
+  assert.doesNotMatch(prompt, /Non-title attribute-only rule/i);
+  assert.doesNotMatch(prompt, /no non-title fields may contain functional/i);
+  assert.match(prompt, /Evidence-backed buyer value rule/i);
+  assert.match(prompt, /supplied feature.*practical buyer relevance.*supplied proof/is);
+  assert.match(prompt, /category friction.*supplied product response.*supplied proof/is);
+  assert.match(prompt, /must not claim that other products cannot solve the problem/i);
+  assert.match(prompt, /better than competitors|comparative superiority/i);
+  assert.match(prompt, /Non-title value completeness rule/i);
   assert.match(prompt, /write 4-5 sellingPoints and 3-4 painPoints/i);
   assert.match(prompt, /recommendations are not quotas/i);
   assert.match(prompt, /complete, specific statement/i);
@@ -161,7 +164,8 @@ test("platform V1 prompt restores prior field rules and adds title value instruc
   assert.match(prompt, /Do not begin English painPoints with How.*What.*Which.*Is.*Are.*Does.*Do.*Can/is);
   assert.match(prompt, /Chinese painPoints.*是否.*什么.*多少.*如何/is);
   assert.match(prompt, /unknown, missing, or not specified as filler/i);
-  assert.match(prompt, /PRODUCT TYPE.*product identity.*PACK DETAILS.*quantity.*VISIBLE DETAILS.*construction.*SPECIFICATIONS.*dimensions.*PACKAGE CONTENTS.*included items/is);
+  assert.match(prompt, /primary value.*differentiating feature.*use context or fit.*specification.*variant.*package/is);
+  assert.match(prompt, /unique product-relevant.*1-3 word uppercase lead label/is);
   assert.match(prompt, /2-4 short paragraphs/i);
   assert.match(prompt, /Aim for 350-500 English characters total/i);
   assert.match(prompt, /Never exceed 500 characters or a stricter platform limit/i);
@@ -174,18 +178,18 @@ test("platform V1 prompt restores prior field rules and adds title value instruc
   assert.match(prompt, /write every non-title field for a shopper reading a finished product page/i);
   assert.match(prompt, /never expose internal record, evidence, or generation workflow/i);
   assert.match(prompt, /parent listing.*parent product.*saved creation set.*supplied configuration.*reference labels.*selected quantity.*confirmed selection/is);
-  assert.match(prompt, /The 1 Pack contains one thermal imaging scope\./i);
-  assert.match(prompt, /1件装内含1个热成像红外夜视瞄准镜。/u);
+  assert.match(prompt, /Changing light conditions can make a single viewing mode limiting/i);
+  assert.match(prompt, /光线条件变化时，单一观察模式容易受到限制/u);
   assert.doesNotMatch(prompt, /ask a practical product question/i);
   assert.doesNotMatch(prompt, /question followed by a factual answer/i);
-  assert.match(prompt, /fixed bullet bodies.*state product facts directly/i);
+  assert.match(prompt, /bullet bodies.*front-load.*buyer decision point/is);
   assert.match(prompt, /description.*open with the product identity.*never describe the Listing record/is);
   assert.match(prompt, /visible model markings include/i);
   assert.match(prompt, /not a confirmed SKU, selected variant, or available option/i);
   assert.match(prompt, /backendSearchTerms and keywordBuckets remain keyword phrases, not explanatory sentences/i);
   assert.match(prompt, /Chinese counterparts.*same natural buyer-facing voice/i);
   assert.match(prompt, /exactly five bullets/i);
-  assert.match(prompt, /PRODUCT TYPE.*PACK DETAILS.*PACKAGE CONTENTS/i);
+  assert.doesNotMatch(prompt, /start every fiveBullets item with PRODUCT TYPE/i);
   assert.match(prompt, /Title value exception/i);
   assert.match(prompt, /strongest differentiating selling point/i);
   assert.match(prompt, /pain point or purchase concern/i);
@@ -201,11 +205,11 @@ test("platform V1 prompt restores prior field rules and adds title value instruc
   assert.match(prompt, /do not repeat concepts, stack synonyms, or add generic filler/i);
   assert.match(prompt, /same appended facts in the same order/i);
   assert.match(prompt, /Never use objectionFocus as a title claim/i);
-  assert.match(prompt, /Every other English and Chinese content field remains subject/i);
+  assert.match(prompt, /non-title fields follow the separate evidence-backed buyer-value rules/i);
   assert.doesNotMatch(prompt, /no public field or zhDisplay field may contain functional/i);
   assert.match(prompt, /Do not write gift/i);
   assert.doesNotMatch(prompt, /senior ecommerce Listing strategist/i);
-  assert.doesNotMatch(prompt, /EVIDENCE-BASED BENEFITS|SILENT PLANNING|PLATFORM ADAPTATION/);
+  assert.match(prompt, /Buyer decision evidence/i);
 });
 
 test("listing agent derives 2 Pack from grouped subject units when bundle count is one", async () => {
@@ -878,10 +882,25 @@ test("application Listing generation uses one platform-aware V1 request and remo
   const calls = [];
   const draftPayload = {
     title: "Acme Travel Bottle",
-    sellingPoints: ["Acme portable design"],
-    painPoints: ["Acme bottles can be awkward to carry."],
-    fiveBullets: ["PORTABLE: Acme bottle fits daily travel."],
-    description: "Acme travel bottle for daily hydration.",
+    sellingPoints: [
+      "The compact Acme bottle profile takes up less room in a daily carry bag.",
+      "The Acme flip lid keeps the opening covered between sips.",
+      "The slim Acme shape is easy to hold during everyday travel.",
+      "One Acme bottle keeps the pack contents simple and clear.",
+    ],
+    painPoints: [
+      "Bulky drinkware can crowd a daily bag; the compact Acme bottle profile uses less carry space.",
+      "An exposed opening between sips can collect everyday contact; the Acme flip lid keeps it covered.",
+      "Unclear pack quantities make selection harder; this option contains one Acme travel bottle.",
+    ],
+    fiveBullets: [
+      "COMPACT CARRY: The compact Acme profile uses less room in a daily bag while keeping the bottle ready for travel.",
+      "COVERED OPENING: The Acme flip lid keeps the drinking opening covered between sips.",
+      "DAILY USE: The slim Acme bottle shape is easy to hold during commuting and everyday travel.",
+      "BOTTLE PROFILE: The supplied product has a compact body and flip-lid construction.",
+      "IN THE BOX: The package contains one Acme travel bottle.",
+    ],
+    description: "The compact Acme travel bottle is made for daily hydration without taking over a carry bag. Its slim profile is easy to hold, while the flip lid keeps the opening covered between sips. The package contains one bottle.",
     backendSearchTerms: "Acme travel bottle",
     keywordBuckets: {
       exact: ["Acme travel bottle"],
@@ -891,10 +910,25 @@ test("application Listing generation uses one platform-aware V1 request and remo
     },
     zhDisplay: {
       title: "Acme 旅行水瓶",
-      sellingPoints: ["Acme 便携设计"],
-      painPoints: ["Acme 水瓶不便携带。"],
-      fiveBullets: ["便携：Acme 水瓶适合日常旅行。"],
-      description: "Acme 日常补水旅行水瓶。",
+      sellingPoints: [
+        "紧凑的 Acme 瓶身轮廓可减少日常随身包内的占用空间。",
+        "Acme 翻盖可在两次饮水之间保持饮水口覆盖。",
+        "纤细的 Acme 瓶身便于日常出行时握持。",
+        "单个 Acme 水瓶让包装内容清晰明确。",
+      ],
+      painPoints: [
+        "体积较大的饮水容器容易占满随身包，紧凑的 Acme 瓶身可减少携带空间占用。",
+        "两次饮水之间裸露的饮水口容易接触外部物体，Acme 翻盖可保持瓶口覆盖。",
+        "包装数量不清会增加选择难度，此选项内含一个 Acme 旅行水瓶。",
+      ],
+      fiveBullets: [
+        "紧凑携带：紧凑的 Acme 瓶身减少日常包内占用空间，适合随身出行。",
+        "瓶口覆盖：Acme 翻盖可在两次饮水之间保持饮水口覆盖。",
+        "日常使用：纤细的 Acme 瓶身便于通勤和日常出行时握持。",
+        "瓶身结构：资料显示该产品采用紧凑瓶身和翻盖结构。",
+        "包装内容：包装内含一个 Acme 旅行水瓶。",
+      ],
+      description: "这款紧凑的 Acme 旅行水瓶用于日常补水，同时减少随身包内的空间占用。纤细瓶身便于握持，翻盖可在两次饮水之间保持瓶口覆盖。包装内含一个水瓶。",
       backendSearchTerms: "Acme 旅行水瓶",
       keywordBuckets: {
         exact: ["Acme 旅行水瓶"],
@@ -911,7 +945,7 @@ test("application Listing generation uses one platform-aware V1 request and remo
       platformPolicyId: "etsy",
       productName: "Acme Travel Bottle",
       brand: "Acme",
-      productDescription: "Compact travel bottle for daily hydration.",
+      productDescription: "Compact travel bottle with a slim profile that takes up less room in a daily carry bag and is easy to hold during commuting or everyday travel. The flip lid keeps the opening covered between sips. One bottle is included.",
     },
     config: { baseUrl: "https://example.test/v1", apiKey: "test-key", responsesModel: "gpt-5.4" },
     fetchImpl: async (_url, init) => {
@@ -927,23 +961,137 @@ test("application Listing generation uses one platform-aware V1 request and remo
   assert.equal(drafts[0].status, "completed");
   assert.doesNotMatch(visibleDraftText(drafts[0]), /Acme/i);
   assert.doesNotMatch(visibleChineseDisplayText(drafts[0]), /Acme/i);
-  assert.match(drafts[0].fiveBullets[0], /^PRODUCT TYPE:/);
-  assert.doesNotMatch(visibleDraftText(drafts[0]), /portable|fits|hydration/i);
+  assert.match(drafts[0].fiveBullets[0], /^COMPACT CARRY:/);
+  assert.match(visibleDraftText(drafts[0]), /takes up less room|keeps the opening covered/i);
 });
 
-test("platform V1 allows supported title value wording only in titles", async () => {
+test("platform V1 sanitizes unsupported low-risk terms and accepts recoverable formatting differences", async () => {
+  const source = {
+    ...standardSource,
+    platformPolicyId: "etsy",
+    forceV1: true,
+    productName: "Fishing Lure",
+    skuTitle: "Fishing Lure",
+    skuBundleCount: 1,
+    dimensionSpecs: "",
+  };
+  const payload = {
+    title: "1 Pack Adjustable Gray Black Rechargeable Fishing Lure",
+    sellingPoints: [
+      "The adjustable body keeps the lure profile easy to review.",
+      "The gray and black finish separates the visible sections.",
+      "The rechargeable design is stated in the generated copy.",
+    ],
+    painPoints: ["Need a clear lure option? Review the supplied pack before purchase."],
+    fiveBullets: [
+      "PRODUCT TYPE: Adjustable fishing lure.",
+      "PACK DETAILS: One gray and black lure is included.",
+      "PACKAGE CONTENTS: Rechargeable fishing lure.",
+    ],
+    description: "This adjustable gray black rechargeable fishing lure remains usable after low-risk term cleanup.",
+    backendSearchTerms: "adjustable gray black rechargeable",
+    keywordBuckets: {
+      exact: ["adjustable"],
+      longTail: ["gray"],
+      traffic: ["black"],
+      descriptive: ["rechargeable"],
+    },
+    zhDisplay: {
+      title: "1 件装路亚鱼饵",
+      sellingPoints: ["鱼饵主体和可见分区便于直接查看。"],
+      painPoints: ["需要清晰的鱼饵选项？购买前可查看包装信息。", "包装内含一个鱼饵。"],
+      fiveBullets: ["产品类型：路亚鱼饵。"],
+      description: "这款路亚鱼饵在清理低风险词后仍保留可用商品信息。",
+      backendSearchTerms: "路亚 鱼饵",
+      keywordBuckets: {
+        exact: ["路亚鱼饵"],
+        longTail: [],
+        traffic: [],
+        descriptive: [],
+      },
+    },
+  };
+  let requestCount = 0;
+
+  const draft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    source,
+    fetchImpl: async () => {
+      requestCount += 1;
+      return new Response(JSON.stringify({ output_text: JSON.stringify(payload) }), { status: 200 });
+    },
+  });
+
+  assert.equal(requestCount, 1);
+  assert.doesNotMatch(visibleDraftText(draft), /\b(?:adjustable|gray|black|rechargeable)\b/i);
+  assert.equal(draft.backendSearchTerms, "");
+  assert.deepEqual(Object.values(draft.keywordBuckets).flat(), []);
+  assert.equal(draft.fiveBullets.length, 3);
+  assert.equal(draft.zhDisplay.fiveBullets.length, 1);
+  assert.match(draft.painPoints[0], /\?/u);
+  assert.ok(draft.title);
+  assert.ok(draft.description);
+});
+
+test("platform V1 still rejects missing bilingual body content after low-risk cleanup", async () => {
+  await assert.rejects(
+    requestCreationListingDraft({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      responsesModel: "gpt-5.4",
+      source: {
+        ...standardSource,
+        platformPolicyId: "etsy",
+        forceV1: true,
+      },
+      fetchImpl: async () => new Response(JSON.stringify({
+        output_text: JSON.stringify({
+          ...makeValidDraft(),
+          zhDisplay: {
+            title: "2 件装蓝色路亚鱼饵",
+            sellingPoints: ["蓝色鱼饵主体。"],
+            painPoints: ["包装内含两个鱼饵。"],
+            fiveBullets: ["产品类型：蓝色路亚鱼饵。"],
+            description: "",
+            backendSearchTerms: "蓝色 路亚 鱼饵",
+            keywordBuckets: {
+              exact: ["蓝色路亚鱼饵"],
+              longTail: [],
+              traffic: [],
+              descriptive: [],
+            },
+          },
+        }),
+      }), { status: 200 }),
+    }),
+    /Listing generation failed validation after 1 attempt/i,
+  );
+});
+
+test("platform V1 retains supported buyer value across non-title fields", async () => {
   const titleValuePayload = {
     title: "1 Pack Travel Bottle Flip Lid Helps Keep Opening Covered Between Sips",
-    sellingPoints: ["Flip lid and compact bottle shape."],
-    painPoints: ["Review the stated bottle option before purchase."],
-    fiveBullets: [
-      "PRODUCT TYPE: Travel bottle.",
-      "PACK DETAILS: One supplied bottle unit.",
-      "VISIBLE DETAILS: Flip lid and compact bottle shape.",
-      "SPECIFICATIONS: Review the stated bottle option.",
-      "PACKAGE CONTENTS: One travel bottle.",
+    sellingPoints: [
+      "The flip lid keeps the opening covered between sips, limiting everyday contact with the drinking surface.",
+      "The compact bottle profile takes up less room in a daily carry bag.",
+      "The slim body is easy to hold while commuting or walking.",
+      "The single-bottle pack makes the included quantity clear before purchase.",
     ],
-    description: "Travel bottle with a supplied flip lid and compact bottle shape.",
+    painPoints: [
+      "An exposed opening between sips can collect everyday contact; the flip lid keeps the drinking surface covered.",
+      "Bulky drinkware can crowd a daily bag; the compact profile uses less carry space.",
+      "Unclear pack quantities make option selection harder; this pack contains one travel bottle.",
+    ],
+    fiveBullets: [
+      "BETWEEN SIPS: The flip lid keeps the drinking opening covered when the bottle is not in use.",
+      "COMPACT CARRY: The compact profile uses less room in a daily carry bag.",
+      "DAILY USE: The slim body is easy to hold while commuting or walking.",
+      "FLIP LID: The supplied bottle uses a flip-lid top and compact body construction.",
+      "IN THE BOX: The package contains one travel bottle.",
+    ],
+    description: "This compact travel bottle keeps daily hydration close without taking over a carry bag. Its slim body is easy to hold, while the flip lid keeps the drinking opening covered between sips. The package contains one bottle.",
     backendSearchTerms: "travel bottle flip lid compact bottle",
     keywordBuckets: {
       exact: ["travel bottle"],
@@ -953,16 +1101,25 @@ test("platform V1 allows supported title value wording only in titles", async ()
     },
     zhDisplay: {
       title: "1 件装旅行水瓶 翻盖有助于在饮水间隔保持瓶口覆盖",
-      sellingPoints: ["翻盖与紧凑瓶身形态。"],
-      painPoints: ["购买前核对已注明的水瓶选项。"],
-      fiveBullets: [
-        "商品类型：旅行水瓶。",
-        "包装信息：一只水瓶。",
-        "外观信息：翻盖与紧凑瓶身形态。",
-        "规格信息：核对已注明的水瓶选项。",
-        "包装内容：一只旅行水瓶。",
+      sellingPoints: [
+        "翻盖可在两次饮水之间保持瓶口覆盖，减少饮水表面的日常接触。",
+        "紧凑瓶身可减少日常随身包内的空间占用。",
+        "纤细瓶身便于通勤或步行时握持。",
+        "单瓶装让包装数量在购买前清晰明确。",
       ],
-      description: "旅行水瓶，带有已提供资料中的翻盖与紧凑瓶身形态。",
+      painPoints: [
+        "两次饮水之间裸露的饮水口容易接触外部物体，翻盖可保持饮水表面覆盖。",
+        "体积较大的饮水容器容易占满日常随身包，紧凑瓶身可减少携带空间占用。",
+        "包装数量不清会增加选项判断难度，此包装内含一个旅行水瓶。",
+      ],
+      fiveBullets: [
+        "饮水间隔：不使用水瓶时，翻盖可保持饮水口覆盖。",
+        "紧凑携带：紧凑瓶身可减少日常随身包内的空间占用。",
+        "日常使用：纤细瓶身便于通勤或步行时握持。",
+        "翻盖结构：资料显示该水瓶采用翻盖顶部和紧凑瓶身结构。",
+        "包装内容：包装内含一个旅行水瓶。",
+      ],
+      description: "这款紧凑旅行水瓶可满足日常补水需求，同时减少随身包内的空间占用。纤细瓶身便于握持，翻盖可在两次饮水之间保持饮水口覆盖。包装内含一个水瓶。",
       backendSearchTerms: "旅行水瓶 翻盖 紧凑 水瓶",
       keywordBuckets: {
         exact: ["旅行水瓶"],
@@ -982,8 +1139,13 @@ test("platform V1 allows supported title value wording only in titles", async ()
       platformPolicyId: "etsy",
       forceV1: true,
       productName: "Travel Bottle",
-      productDescription: "Travel bottle with a flip lid that helps keep the opening covered between sips.",
-      sellingPoints: ["Flip lid helps keep the opening covered between sips."],
+      skuBundleCount: 1,
+      productDescription: "Compact travel bottle with a slim body for a daily carry bag, commuting, or walking. The flip lid helps keep the opening covered between sips. One bottle is included.",
+      sellingPoints: [
+        "Compact profile takes up less room in a daily carry bag.",
+        "Slim body is easy to hold while commuting or walking.",
+        "Flip lid helps keep the opening covered between sips.",
+      ],
     },
     fetchImpl: async (_url, init) => {
       calls.push(JSON.parse(init.body).input);
@@ -996,14 +1158,12 @@ test("platform V1 allows supported title value wording only in titles", async ()
   assert.equal(calls.length, 1);
   assert.match(draft.title, /helps keep opening covered/i);
   assert.match(draft.zhDisplay.title, /有助于.*保持瓶口覆盖/u);
-  assert.doesNotMatch(draft.sellingPoints.join("\n"), /helps|supports|improves/i);
+  assert.match(draft.sellingPoints.join("\n"), /keeps the opening covered|takes up less room/i);
+  assert.match(draft.painPoints.join("\n"), /exposed opening|bulky drinkware/i);
+  assert.match(draft.fiveBullets[0], /^BETWEEN SIPS:/);
   assert.doesNotMatch(draft.title, /Product Details/i);
 
-  const nonTitleFunctionalPayload = {
-    ...titleValuePayload,
-    sellingPoints: ["Flip lid helps keep the opening covered between sips."],
-  };
-  const nonTitleFallbackDraft = await requestCreationListingDraft({
+  const sanitizedSparseDraft = await requestCreationListingDraft({
     baseUrl: "https://example.test/v1",
     apiKey: "test-key",
     responsesModel: "gpt-5.4",
@@ -1012,18 +1172,18 @@ test("platform V1 allows supported title value wording only in titles", async ()
       platformPolicyId: "etsy",
       forceV1: true,
       productName: "Travel Bottle",
+      skuBundleCount: 1,
       productDescription: "Travel bottle with a flip lid that helps keep the opening covered between sips.",
       sellingPoints: ["Flip lid helps keep the opening covered between sips."],
     },
     fetchImpl: async () => new Response(JSON.stringify({
-      output_text: JSON.stringify(nonTitleFunctionalPayload),
+      output_text: JSON.stringify(titleValuePayload),
     }), { status: 200 }),
   });
+  assert.match(visibleDraftText(sanitizedSparseDraft), /flip[- ]lid/i);
+  assert.doesNotMatch(visibleDraftText(sanitizedSparseDraft), /\b(?:compact|slim|commuting|walking)\b|daily carry bag/i);
 
-  assert.doesNotMatch(nonTitleFallbackDraft.sellingPoints.join("\n"), /helps keep/i);
-  assert.match(nonTitleFallbackDraft.title, /Product Details/i);
-
-  const riskyTitleDraft = await requestCreationListingDraft({
+  const legacyBulletDraft = await requestCreationListingDraft({
     baseUrl: "https://example.test/v1",
     apiKey: "test-key",
     responsesModel: "gpt-5.4",
@@ -1032,22 +1192,366 @@ test("platform V1 allows supported title value wording only in titles", async ()
       platformPolicyId: "etsy",
       forceV1: true,
       productName: "Travel Bottle",
-      productDescription: "Travel bottle with a flip lid that helps keep the opening covered between sips.",
-      sellingPoints: ["Flip lid helps keep the opening covered between sips."],
+      skuBundleCount: 1,
+      productDescription: "Compact travel bottle with a slim body for a daily carry bag, commuting, or walking. The flip lid helps keep the opening covered between sips. One bottle is included.",
+      sellingPoints: ["Compact profile", "Slim body", "Flip lid"],
     },
     fetchImpl: async () => new Response(JSON.stringify({
       output_text: JSON.stringify({
         ...titleValuePayload,
-        title: "1 Pack Best Seller Travel Bottle With Guaranteed Performance",
+        fiveBullets: [
+          "PRODUCT TYPE: Compact travel bottle with a flip lid.",
+          "PACK DETAILS: The package contains one travel bottle.",
+          "VISIBLE DETAILS: The bottle has a compact profile and slim body.",
+          "SPECIFICATIONS: The supplied bottle uses a flip-lid top.",
+          "PACKAGE CONTENTS: One travel bottle is included.",
+        ],
       }),
     }), { status: 200 }),
   });
+  assert.match(legacyBulletDraft.fiveBullets[0], /^PRODUCT TYPE:/u);
 
-  assert.doesNotMatch(riskyTitleDraft.title, /Best Seller|Guaranteed/i);
-  assert.match(riskyTitleDraft.title, /Product Details/i);
+  const unsupportedComparisonPayload = {
+    ...titleValuePayload,
+    sellingPoints: ["Unlike competitors, this bottle solves the opening-exposure problem better than other products."],
+  };
+  await assert.rejects(
+    requestCreationListingDraft({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      responsesModel: "gpt-5.4",
+      source: {
+        ...standardSource,
+        platformPolicyId: "etsy",
+        forceV1: true,
+        productName: "Travel Bottle",
+        skuBundleCount: 1,
+        productDescription: "Travel bottle with a flip lid that helps keep the opening covered between sips.",
+        sellingPoints: ["Flip lid helps keep the opening covered between sips."],
+      },
+      fetchImpl: async () => new Response(JSON.stringify({
+        output_text: JSON.stringify(unsupportedComparisonPayload),
+      }), { status: 200 }),
+    }),
+    /Listing generation failed validation/i,
+  );
+
+  for (const [englishComparison, chineseComparison] of [
+    ["Most alternatives leave the opening exposed.", titleValuePayload.zhDisplay.sellingPoints[0]],
+    [titleValuePayload.sellingPoints[0], "普通同类产品只有单一开口保护方式。"],
+  ]) {
+    await assert.rejects(
+      requestCreationListingDraft({
+        baseUrl: "https://example.test/v1",
+        apiKey: "test-key",
+        responsesModel: "gpt-5.4",
+        source: {
+          ...standardSource,
+          platformPolicyId: "etsy",
+          forceV1: true,
+          productName: "Travel Bottle",
+          skuBundleCount: 1,
+          productDescription: "Compact travel bottle with a slim body for a daily carry bag, commuting, or walking. The flip lid helps keep the opening covered between sips. One bottle is included.",
+          sellingPoints: ["Compact profile", "Slim body", "Flip lid"],
+        },
+        fetchImpl: async () => new Response(JSON.stringify({
+          output_text: JSON.stringify({
+            ...titleValuePayload,
+            sellingPoints: [englishComparison, ...titleValuePayload.sellingPoints.slice(1)],
+            zhDisplay: {
+              ...titleValuePayload.zhDisplay,
+              sellingPoints: [chineseComparison, ...titleValuePayload.zhDisplay.sellingPoints.slice(1)],
+            },
+          }),
+        }), { status: 200 }),
+      }),
+      /Listing generation failed validation/i,
+    );
+  }
+
+  await assert.rejects(
+    requestCreationListingDraft({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      responsesModel: "gpt-5.4",
+      source: {
+        ...standardSource,
+        platformPolicyId: "etsy",
+        forceV1: true,
+        productName: "Travel Bottle",
+        skuBundleCount: 1,
+        productDescription: "Travel bottle with a flip lid that helps keep the opening covered between sips.",
+        sellingPoints: ["Flip lid helps keep the opening covered between sips."],
+      },
+      fetchImpl: async () => new Response(JSON.stringify({
+        output_text: JSON.stringify({
+          ...titleValuePayload,
+          title: "1 Pack Best Seller Travel Bottle With Guaranteed Performance",
+        }),
+      }), { status: 200 }),
+    }),
+    /Listing generation failed validation/i,
+  );
 });
 
-test("platform V1 rejects interrogative pain points in either display language", async () => {
+test("explicit Platform V1 mock uses bounded buyer decision evidence for value copy", async () => {
+  const draft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    source: {
+      ...standardSource,
+      platformPolicyId: "amazon",
+      forceV1: true,
+      productName: "Thermal Imaging Scope",
+      skuBundleCount: 1,
+      productDescription: "Thermal imaging scope with thermal and night-vision modes.",
+      buyerDecisionEvidence: [{
+        sourceRole: "benefit",
+        buyerContext: "Buyers comparing visibility options for changing light conditions.",
+        buyerFriction: "A single viewing mode can limit decisions in changing light conditions.",
+        supportedValue: "Thermal and night-vision modes provide two viewing options.",
+        evidenceFocus: "The product information lists thermal imaging and night-vision modes.",
+      }],
+    },
+    mock: true,
+    fetchImpl: async () => new Response(JSON.stringify({ error: { message: "temporary upstream error" } }), { status: 503 }),
+  });
+
+  assert.match(draft.sellingPoints.join("\n"), /thermal and night-vision modes|two viewing options/i);
+  assert.match(draft.painPoints.join("\n"), /single viewing mode|changing light conditions/i);
+  assert.equal(draft.fiveBullets.length, 5);
+  assert.doesNotMatch(draft.fiveBullets.join("\n"), /^PRODUCT TYPE:|^PACK DETAILS:|^VISIBLE DETAILS:|^SPECIFICATIONS:|^PACKAGE CONTENTS:/m);
+});
+
+test("explicit Platform V1 mock localizes Chinese thermal scope evidence without leaking Chinese into English fields", async () => {
+  const [draft] = await generateCreationListingDrafts({
+    set: {
+      setId: "set-localized-thermal-scope-fallback",
+      platformPolicyId: "universal",
+      productName: "热成像红外夜视瞄准镜",
+      targetLanguage: "en",
+      referenceImageRoles: [
+        {
+          filename: "modes.jpg",
+          role: "material",
+          note: "展示热成像、黑白夜视、HD模式及热成像与夜视组合功能。",
+        },
+        {
+          filename: "fov.jpg",
+          role: "dimensions",
+          note: "标示热成像视场25°、红外夜视视场13°、观察距离220 yards、11 PALETTES和60Hz REFRESH。",
+        },
+        {
+          filename: "controls.jpg",
+          role: "usage",
+          note: "展示物镜调焦、视度调节、4-Inch Eye Relief、热成像传感器、红外照明器、显示屏、硅胶眼罩和十字线调节。",
+        },
+      ],
+      items: [{
+        itemId: "benefit",
+        role: "benefit",
+        conversionIntent: {
+          audienceFocus: "需要在夜间进行目标搜索与细节观察的买家。",
+          motivationFocus: "希望一台瞄准镜兼具热成像搜索与红外夜视细节确认。",
+          objectionFocus: "单一观察模式在光线变化时选择有限。",
+          evidenceFocus: "参考图展示25°热成像视场与13°夜视视场。",
+        },
+      }],
+    },
+    config: { baseUrl: "https://example.test/v1", apiKey: "test-key", responsesModel: "gpt-5.4" },
+    mock: true,
+    fetchImpl: async () => new Response(JSON.stringify({ error: { message: "temporary upstream error" } }), { status: 503 }),
+  });
+
+  const englishText = [
+    draft.title,
+    ...draft.sellingPoints,
+    ...draft.painPoints,
+    ...draft.fiveBullets,
+    draft.description,
+    draft.backendSearchTerms,
+    ...Object.values(draft.keywordBuckets).flat(),
+  ].join("\n");
+  assert.match(draft.title, /Thermal Imaging Infrared Night Vision Scope/i);
+  assert.ok(Array.from(draft.title).length >= 120);
+  assert.ok(Array.from(draft.title).length <= 200);
+  assert.match(
+    draft.title,
+    /^1 Pack Thermal Imaging Infrared Night Vision Scope Wide Thermal Search and Night Detail Confirmation/u,
+  );
+  assert.match(
+    draft.title,
+    /Objective Focus.*Diopter Adjustment.*Infrared Illuminator.*Silicone Eyecup/i,
+  );
+  assert.doesNotMatch(draft.title, /Product Product Details/i);
+  assert.doesNotMatch(englishText, /[\u3400-\u9fff]/u);
+  assert.match(draft.sellingPoints.join("\n"), /25° thermal|13° night-vision|60Hz/i);
+  assert.match(draft.painPoints.join("\n"), /different views|single viewing mode|image adjustment/i);
+  assert.equal(draft.sellingPoints.length, 5);
+  assert.equal(draft.painPoints.length, 4);
+  assert.equal(draft.fiveBullets.length, 5);
+  assert.ok(draft.description.length <= 500);
+  assert.match(draft.description, /Package quantity: 1 Pack$/i);
+  assert.doesNotMatch(draft.fiveBullets.join("\n"), /^PRODUCT TYPE:|^PACK DETAILS:|^VISIBLE DETAILS:|^SPECIFICATIONS:|^PACKAGE CONTENTS:/m);
+  assert.deepEqual(
+    draft.fiveBullets.map((item) => item.split(":", 1)[0]),
+    ["DUAL VIEW", "VIEWING MODES", "LIGHT CONDITIONS", "IMAGE SETTINGS", "PACK QUANTITY"],
+  );
+  assert.match(draft.fiveBullets[0], /25° thermal.*13° night-vision/i);
+  assert.match(draft.fiveBullets[1], /black-and-white night vision.*HD mode/i);
+  assert.match(draft.fiveBullets[2], /light conditions/i);
+  assert.match(draft.fiveBullets[3], /objective focus.*diopter.*11 thermal palettes.*60Hz/i);
+  assert.match(draft.fiveBullets[4], /1 Pack/i);
+  assert.match(draft.zhDisplay.title, /热成像红外夜视瞄准镜/u);
+  assert.match(draft.zhDisplay.title, /热成像广域搜索与夜视细节确认.*物镜调焦.*视度调节.*红外照明器.*硅胶眼罩/u);
+  assert.equal(draft.zhDisplay.sellingPoints.length, draft.sellingPoints.length);
+  assert.equal(draft.zhDisplay.painPoints.length, draft.painPoints.length);
+  assert.equal(draft.zhDisplay.fiveBullets.length, draft.fiveBullets.length);
+  assert.deepEqual(
+    draft.zhDisplay.fiveBullets.map((item) => item.split(/[:：]/u, 1)[0]),
+    ["双视场", "观察模式", "光线场景", "图像设置", "包装数量"],
+  );
+  assert.match(draft.zhDisplay.description, /十字线调节.*1件装/u);
+});
+
+test("localized thermal scope mock omits viewing and control claims missing from reference evidence", async () => {
+  const [draft] = await generateCreationListingDrafts({
+    set: {
+      setId: "set-localized-thermal-scope-minimal-evidence",
+      platformPolicyId: "universal",
+      productName: "热成像红外夜视瞄准镜",
+      targetLanguage: "en",
+      referenceImageRoles: [
+        {
+          filename: "fov.jpg",
+          role: "dimensions",
+          note: "标示热成像视场25°、红外夜视视场13°、11 PALETTES和60Hz REFRESH。",
+        },
+        {
+          filename: "controls.jpg",
+          role: "usage",
+          note: "展示物镜调焦、视度调节、热成像传感器、红外照明器、显示屏和硅胶眼罩。",
+        },
+      ],
+    },
+    config: { baseUrl: "https://example.test/v1", apiKey: "test-key", responsesModel: "gpt-5.4" },
+    mock: true,
+    fetchImpl: async () => new Response(JSON.stringify({ error: { message: "temporary upstream error" } }), { status: 503 }),
+  });
+
+  const englishText = [
+    draft.title,
+    ...draft.sellingPoints,
+    ...draft.painPoints,
+    ...draft.fiveBullets,
+    draft.description,
+    draft.backendSearchTerms,
+    ...Object.values(draft.keywordBuckets).flat(),
+  ].join("\n");
+  const chineseText = [
+    draft.zhDisplay.title,
+    ...draft.zhDisplay.sellingPoints,
+    ...draft.zhDisplay.painPoints,
+    ...draft.zhDisplay.fiveBullets,
+    draft.zhDisplay.description,
+    draft.zhDisplay.backendSearchTerms,
+    ...Object.values(draft.zhDisplay.keywordBuckets).flat(),
+  ].join("\n");
+
+  assert.doesNotMatch(englishText, /black-and-white|HD mode|three viewing|reticle|objective lens|broad search|detail confirmation/i);
+  assert.doesNotMatch(chineseText, /黑白夜视|HD模式|三种观察|十字线|广域搜索|细节确认/u);
+  assert.ok(Array.from(draft.title).length >= 120);
+  assert.ok(Array.from(draft.title).length <= 200);
+  assert.match(
+    draft.title,
+    /Two Viewing Modes.*Objective Focus.*Diopter Adjustment.*Infrared Illuminator.*Silicone Eyecup/i,
+  );
+  assert.match(draft.fiveBullets[4], /^PACK QUANTITY:.*1 Pack/i);
+  assert.match(draft.zhDisplay.fiveBullets[4], /^包装数量[:：].*1件装/u);
+});
+
+test("platform V1 fallback keeps the trusted parent identity when a SKU title is generic", () => {
+  const draft = makeMockCreationListingDraft({
+    setId: "set-parent-identity-over-generic-sku",
+    platformPolicyId: "universal",
+    forceV1: true,
+    parentProductName: "热成像红外夜视瞄准镜",
+    productName: "1 SKU 1 SKU",
+    skuTitle: "1 SKU 1 SKU",
+    skuPackQuantityText: "1 Pack",
+    listingEvidenceAliases: [
+      "Thermal Imaging Infrared Night Vision Scope",
+      "thermal imaging",
+      "infrared night vision",
+      "25° thermal field of view",
+      "13° night-vision field of view",
+      "11 thermal palettes",
+      "60Hz refresh rate",
+      "objective focus adjustment",
+      "diopter adjustment",
+      "thermal sensor",
+      "infrared illuminator",
+      "display",
+      "silicone eyecup",
+    ],
+    buyerDecisionEvidence: [{
+      buyerContext: "Buyers comparing thermal search and night detail viewing.",
+      buyerFriction: "A single viewing mode can limit decisions in changing light.",
+      supportedValue: "Thermal and night-vision modes provide two viewing options.",
+      evidenceFocus: "The supplied product information lists thermal imaging and infrared night vision.",
+    }],
+  });
+
+  assert.match(draft.title, /Thermal Imaging Infrared Night Vision Scope/i);
+  assert.doesNotMatch(draft.title, /1 SKU 1 SKU/i);
+  assert.match(draft.fiveBullets[0], /^DUAL VIEW:/u);
+  assert.match(draft.fiveBullets[4], /^PACK QUANTITY:.*1 Pack/u);
+  assert.match(draft.zhDisplay.title, /热成像红外夜视瞄准镜/u);
+  assert.doesNotMatch(visibleChineseDisplayText(draft), /1 SKU 1 SKU/u);
+});
+
+test("platform V1 fallback does not fill sparse product evidence with unsupplied attribute groups", () => {
+  const draft = makeMockCreationListingDraft({
+    setId: "set-sparse-travel-bottle",
+    platformPolicyId: "universal",
+    forceV1: true,
+    productName: "Travel Bottle",
+    skuBundleCount: 1,
+  });
+  const publicText = visibleDraftText(draft);
+
+  assert.match(publicText, /Travel Bottle/i);
+  assert.match(publicText, /1 Pack/i);
+  assert.doesNotMatch(
+    publicText,
+    /listed color|listed shape|stated dimensions|dimension details|listed variants|variant details|package contents follow|size and option details/i,
+  );
+});
+
+test("platform V1 fallback avoids duplicate Product title segments for unknown Chinese categories", () => {
+  const draft = makeMockCreationListingDraft({
+    ...standardSource,
+    forceV1: true,
+    productName: "未知商品类别",
+    skuTitle: "",
+    dimensionSpecs: "",
+    skuBundleCount: 1,
+    buyerDecisionEvidence: [{
+      buyerContext: "中文买家场景。",
+      buyerFriction: "中文购买顾虑。",
+      supportedValue: "中文卖点。",
+      evidenceFocus: "中文事实说明。",
+    }],
+  });
+
+  const englishText = [draft.title, ...draft.sellingPoints, ...draft.painPoints, ...draft.fiveBullets, draft.description].join("\n");
+  assert.match(draft.title, /^1 Pack Product Details$/i);
+  assert.doesNotMatch(draft.title, /Product Product/i);
+  assert.doesNotMatch(englishText, /[\u3400-\u9fff]/u);
+});
+
+test("platform V1 accepts interrogative pain points in either display language", async () => {
   const basePayload = {
     title: "2 Pack Fishing Lure Blue Compact Body",
     sellingPoints: ["The two blue lures have compact bodies."],
@@ -1120,53 +1624,103 @@ test("platform V1 rejects interrogative pain points in either display language",
         }),
       }), { status: 200 }),
     });
-
-    assert.match(draft.title, /Product Details/i);
-    assert.doesNotMatch(draft.painPoints.join("\n"), /[?？]/u);
-    assert.doesNotMatch(draft.zhDisplay.painPoints.join("\n"), /[?？]/u);
+    assert.match([draft.painPoints, draft.zhDisplay.painPoints].flat().join("\n"), /[?？]/u);
   }
 });
 
-test("application Listing generation falls back after one incomplete response without review", async () => {
-  let requestCount = 0;
-  const drafts = await generateCreationListingDrafts({
-    set: {
-      setId: "set-incomplete-direct",
-      platformPolicyId: "etsy",
-      productName: "Travel Bottle",
-      productDescription: "Compact bottle for daily travel.",
+test("platform V1 surfaces upstream and response parsing failures without mock drafts", async () => {
+  const cases = [
+    {
+      expected: /temporary upstream failure/i,
+      fetchImpl: async () => new Response(JSON.stringify({
+        error: { message: "temporary upstream failure" },
+      }), { status: 503 }),
     },
-    config: { baseUrl: "https://example.test/v1", apiKey: "test-key" },
-    fetchImpl: async () => {
-      requestCount += 1;
-      return new Response(JSON.stringify({
-        output_text: JSON.stringify({
-          title: "Travel Bottle",
-          sellingPoints: [],
-          painPoints: [],
-          fiveBullets: [],
-          description: "",
-          backendSearchTerms: "",
-          keywordBuckets: { exact: [], longTail: [], traffic: [], descriptive: [] },
-          zhDisplay: {
-            title: "旅行水瓶",
+    {
+      expected: /parse|JSON/i,
+      fetchImpl: async () => new Response(JSON.stringify({
+        output_text: "{not-json",
+      }), { status: 200 }),
+    },
+  ];
+
+  for (const entry of cases) {
+    await assert.rejects(
+      requestCreationListingDraft({
+        baseUrl: "https://example.test/v1",
+        apiKey: "test-key",
+        responsesModel: "gpt-5.4",
+        source: {
+          ...standardSource,
+          platformPolicyId: "etsy",
+          forceV1: true,
+          productName: "Travel Bottle",
+        },
+        fetchImpl: entry.fetchImpl,
+      }),
+      entry.expected,
+    );
+  }
+});
+
+test("platform V2 surfaces transient upstream failures without deterministic drafts", async () => {
+  await assert.rejects(
+    requestCreationListingDraft({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      responsesModel: "gpt-5.4",
+      source: {
+        ...standardSource,
+        platformPolicyId: "universal",
+        forceV2: true,
+      },
+      fetchImpl: async () => new Response(JSON.stringify({
+        error: { message: "transient V2 upstream failure" },
+      }), { status: 503 }),
+    }),
+    /transient V2 upstream failure/i,
+  );
+});
+
+test("application Listing generation rejects one incomplete response without mock output", async () => {
+  let requestCount = 0;
+  await assert.rejects(
+    generateCreationListingDrafts({
+      set: {
+        setId: "set-incomplete-direct",
+        platformPolicyId: "etsy",
+        productName: "Travel Bottle",
+        productDescription: "Compact bottle for daily travel.",
+      },
+      config: { baseUrl: "https://example.test/v1", apiKey: "test-key" },
+      fetchImpl: async () => {
+        requestCount += 1;
+        return new Response(JSON.stringify({
+          output_text: JSON.stringify({
+            title: "Travel Bottle",
             sellingPoints: [],
             painPoints: [],
             fiveBullets: [],
             description: "",
             backendSearchTerms: "",
             keywordBuckets: { exact: [], longTail: [], traffic: [], descriptive: [] },
-          },
-        }),
-      }), { status: 200 });
-    },
-  });
+            zhDisplay: {
+              title: "旅行水瓶",
+              sellingPoints: [],
+              painPoints: [],
+              fiveBullets: [],
+              description: "",
+              backendSearchTerms: "",
+              keywordBuckets: { exact: [], longTail: [], traffic: [], descriptive: [] },
+            },
+          }),
+        }), { status: 200 });
+      },
+    }),
+    /Listing generation failed validation/i,
+  );
 
   assert.equal(requestCount, 1);
-  assert.equal(drafts[0].status, "completed");
-  assert.ok(drafts[0].fiveBullets.length > 0);
-  assert.ok(drafts[0].zhDisplay?.fiveBullets.length > 0);
-  assert.ok(drafts[0].backendSearchTerms);
 });
 
 test("generateCreationListingDrafts keeps metric and imperial specs out of mock titles", async () => {
@@ -1393,6 +1947,222 @@ test("mock mode uses English Amazon-style titles for Chinese source inputs", asy
   assert.equal(mockDraft.title.length <= 200, true);
   assert.doesNotMatch(visibleDraftText(mockDraft), /[\u3400-\u9fff]/u);
   assert.equal(validateListingAgentDraft(mockDraft, "1 Pack").ok, true);
+});
+
+test("mock fallback maps a Chinese motorcycle-goggle parent before generic SKU metadata", () => {
+  const draft = makeMockCreationListingDraft({
+    setId: "set-cn-motorcycle-goggles",
+    productName: "复古摩托车骑行护目镜",
+    skuTitle: "1 SKU 1 SKU",
+    skuBundleCount: 1,
+    dimensionSpecs: "镜框高77mm，镜框宽180mm",
+    evidenceMode: "image-backed",
+    skuSubjects: [
+      { id: "black-smoke", title: "1 SKU 1 SKU", bundleCount: 1 },
+      { id: "brown-smoke", title: "1 SKU 1 SKU", bundleCount: 1 },
+    ],
+  });
+
+  assert.match(draft.title, /^1 Pack Vintage Motorcycle Riding Goggles\b/u);
+  assert.doesNotMatch(visibleDraftText(draft), /1 SKU 1 SKU/u);
+  assert.equal(validateListingAgentDraft(draft, "1 Pack").ok, true);
+});
+
+test("localized motorcycle-goggle mock writes buyer-facing value copy and Amazon-style roles", async () => {
+  const [draft] = await generateCreationListingDrafts({
+    set: {
+      setId: "set-localized-motorcycle-goggles-fallback",
+      platformPolicyId: "universal",
+      productName: "复古摩托车骑行护目镜",
+      targetLanguage: "en",
+      skuBundleCount: 1,
+      referenceImageRoles: [
+        {
+          filename: "lens.jpg",
+          role: "material",
+          note: "PC镜片，180°大视窗，间接通风和防雾涂层。",
+        },
+        {
+          filename: "fit.jpg",
+          role: "usage",
+          note: "可调节头带、柔软面框和鼻垫，适合户外、越野和骑行场景。",
+        },
+      ],
+      skuSubjects: Array.from({ length: 7 }, (_, index) => ({
+        id: `goggle-${index + 1}`,
+        title: "1 SKU 1 SKU",
+        bundleCount: index === 1 ? 4 : 1,
+      })),
+    },
+    config: { baseUrl: "https://example.test/v1", apiKey: "test-key", responsesModel: "gpt-5.4" },
+    mock: true,
+    fetchImpl: async () => new Response(JSON.stringify({ error: { message: "temporary upstream error" } }), { status: 503 }),
+  });
+
+  const englishText = [
+    draft.title,
+    ...draft.sellingPoints,
+    ...draft.painPoints,
+    ...draft.fiveBullets,
+    draft.description,
+  ].join("\n");
+  assert.match(draft.title, /^1 Pack \/ 4 Pack Vintage Motorcycle Riding Goggles 180 Wide View Anti Fog/i);
+  assert.ok(Array.from(draft.title).length >= 120, `expected at least 120 title characters, received ${Array.from(draft.title).length}`);
+  assert.ok(Array.from(draft.title).length <= 200, `expected no more than 200 title characters, received ${Array.from(draft.title).length}`);
+  assert.match(draft.title, /PC Lens.*Indirect Vents.*Adjustable Headband.*Soft Frame.*Nose Pad.*Outdoor.*Off[- ]Road Riding/i);
+  assert.doesNotMatch(englishText, /1 SKU 1 SKU/i);
+  assert.match(englishText, /180°|wide front field/i);
+  assert.match(englishText, /PC lens|indirect vents|anti-fog coating|adjustable headband/i);
+  assert.doesNotMatch(draft.painPoints.join("\n"), /[?？]/u);
+  assert.deepEqual(
+    draft.fiveBullets.map((item) => item.split(":", 1)[0]),
+    ["WIDE VIEW", "PC LENS", "ADJUSTABLE FIT", "AIRFLOW & FOG", "OPTIONS"],
+  );
+  assert.equal(new Set(draft.fiveBullets.map((item) => item.split(":", 1)[0])).size, 5);
+  assert.equal(draft.zhDisplay.sellingPoints.length, draft.sellingPoints.length);
+  assert.equal(draft.zhDisplay.painPoints.length, draft.painPoints.length);
+  assert.equal(draft.zhDisplay.fiveBullets.length, draft.fiveBullets.length);
+  assert.doesNotMatch(visibleChineseDisplayText(draft), /1 SKU 1 SKU/u);
+  assert.match(draft.zhDisplay.title, /180°大视窗.*防雾.*PC镜片.*间接通风口.*可调节头带.*柔软面框.*鼻垫.*户外.*越野骑行/u);
+  const chineseProse = [
+    ...draft.zhDisplay.sellingPoints,
+    ...draft.zhDisplay.painPoints,
+    ...draft.zhDisplay.fiveBullets,
+    draft.zhDisplay.description,
+  ].join("\n");
+  assert.doesNotMatch(chineseProse, /[,;:]/u);
+  assert.match(draft.zhDisplay.sellingPoints[1], /明确标示为PC镜片.*选购时可直接了解镜片材质/u);
+  assert.match(draft.zhDisplay.sellingPoints[2], /间接通风口.*防雾涂层.*镜片周围通风.*起雾/u);
+  assert.match(draft.zhDisplay.painPoints[2], /仅看外观.*佩戴结构.*可调节头带.*柔软面框.*鼻垫/u);
+  assert.match(draft.sellingPoints[2], /airflow around the lens.*fog buildup/i);
+  assert.match(draft.painPoints[1], /common riding concerns/i);
+});
+
+test("platform V1 accepts a short evidence-rich title while preserving low-limit platform titles", async () => {
+  const source = {
+    setId: "set-evidence-rich-title-minimum",
+    platformPolicyId: "universal",
+    forceV1: true,
+    productName: "复古摩托车骑行护目镜",
+    targetLanguage: "en",
+    skuPackQuantityText: "1 Pack / 4 Pack",
+    skuVariantCount: 7,
+    listingEvidenceAliases: [
+      "vintage motorcycle riding goggles",
+      "180° wide viewing window",
+      "PC lens construction",
+      "indirect vents",
+      "anti-fog coating",
+      "adjustable headband",
+      "soft frame",
+      "nose pad",
+      "outdoor and off-road riding context",
+    ],
+    skuSubjects: Array.from({ length: 7 }, (_, index) => ({
+      id: `goggle-${index + 1}`,
+      title: "1 SKU 1 SKU",
+      bundleCount: index === 1 ? 4 : 1,
+    })),
+  };
+  const fallback = makeMockCreationListingDraft(source);
+  const structurallyValidBullets = fallback.fiveBullets.map((item) => item.replace(/^AIRFLOW & FOG:/u, "AIRFLOW FOG:"));
+  const shortTitle = "1 Pack / 4 Pack Vintage Motorcycle Riding Goggles 180 Wide View Anti Fog";
+  let requestInput = "";
+  const directDraft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    source,
+    fetchImpl: async (_url, options) => {
+      requestInput = JSON.parse(options.body).input;
+      return new Response(JSON.stringify({
+        output_text: JSON.stringify({
+          ...fallback,
+          title: shortTitle,
+          fiveBullets: structurallyValidBullets,
+          zhDisplay: {
+            ...fallback.zhDisplay,
+            title: "1件装 / 4件装 复古摩托车骑行护目镜 180°大视窗 防雾",
+          },
+        }),
+      }), { status: 200 });
+    },
+  });
+
+  assert.match(requestInput, /at least 120 English characters/i);
+  assert.equal(directDraft.title, shortTitle);
+  assert.ok(Array.from(directDraft.title).length < 120);
+
+  const lowLimitSource = { ...source, platformPolicyId: "ebay" };
+  const lowLimitFallback = makeMockCreationListingDraft(lowLimitSource);
+  const lowLimitBullets = lowLimitFallback.fiveBullets.map((item) => item.replace(/^AIRFLOW & FOG:/u, "AIRFLOW FOG:"));
+  const lowLimitDraft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    source: lowLimitSource,
+    fetchImpl: async () => new Response(JSON.stringify({
+      output_text: JSON.stringify({
+        ...lowLimitFallback,
+        title: shortTitle,
+        fiveBullets: lowLimitBullets,
+        zhDisplay: {
+          ...lowLimitFallback.zhDisplay,
+          title: "1件装 / 4件装 复古摩托车骑行护目镜 180°大视窗 防雾",
+        },
+      }),
+    }), { status: 200 }),
+  });
+
+  assert.equal(lowLimitDraft.title, shortTitle);
+  assert.ok(Array.from(lowLimitDraft.title).length <= 80);
+});
+
+test("localized motorcycle-goggle mock omits absent lens and fit aliases", async () => {
+  const [draft] = await generateCreationListingDrafts({
+    set: {
+      setId: "set-localized-motorcycle-goggles-minimal",
+      platformPolicyId: "universal",
+      productName: "复古摩托车骑行护目镜",
+      targetLanguage: "en",
+      skuBundleCount: 1,
+      referenceImageRoles: [{
+        filename: "view.jpg",
+        role: "dimensions",
+        note: "PC镜片和180°大视窗。",
+      }],
+      skuSubjects: [
+        { id: "goggle-a", title: "黑色款", bundleCount: 1 },
+        { id: "goggle-b", title: "棕色款", bundleCount: 1 },
+      ],
+    },
+    config: { baseUrl: "https://example.test/v1", apiKey: "test-key", responsesModel: "gpt-5.4" },
+    mock: true,
+    fetchImpl: async () => new Response(JSON.stringify({ error: { message: "temporary upstream error" } }), { status: 503 }),
+  });
+
+  const englishText = [
+    draft.title,
+    ...draft.sellingPoints,
+    ...draft.painPoints,
+    ...draft.fiveBullets,
+    draft.description,
+    draft.backendSearchTerms,
+  ].join("\n");
+  const chineseText = [
+    draft.zhDisplay.title,
+    ...draft.zhDisplay.sellingPoints,
+    ...draft.zhDisplay.painPoints,
+    ...draft.zhDisplay.fiveBullets,
+    draft.zhDisplay.description,
+    draft.zhDisplay.backendSearchTerms,
+  ].join("\n");
+  assert.match(draft.title, /180 Wide View/i);
+  assert.ok(Array.from(draft.title).length < 120);
+  assert.doesNotMatch(englishText, /indirect vents|anti-fog|adjustable headband|soft frame|nose pad/i);
+  assert.doesNotMatch(chineseText, /通风|防雾|可调节头带|柔软面框|鼻垫/u);
+  assert.equal(draft.fiveBullets.length, 5);
+  assert.equal(draft.zhDisplay.fiveBullets.length, 5);
 });
 
 test("mock fallback recognizes Chinese folding wagons before numeric claim fragments", () => {

@@ -333,11 +333,11 @@ test("creation generation labels uploaded reference image count and file order",
   assert.match(worker, /buildCreationGenerationReferenceImageLabels/);
   assert.match(
     server,
-    /const itemReferenceImages = buildCreationItemReferenceImages\(item,\s*referenceImages,\s*referenceImageRoles\);[\s\S]*referenceImageLabels:\s*buildCreationGenerationReferenceImageLabels\(\s*itemReferenceImages,\s*referenceImageRoles,/,
+    /const itemReferenceImages = buildCreationItemReferenceImages\(item,\s*referenceImages,\s*referenceImageRoles\);[\s\S]*referenceImageLabels:\s*buildCreationGenerationReferenceImageLabels\(\s*itemReferenceImages,\s*referenceImageRoles,\s*item,/,
   );
   assert.match(
     worker,
-    /const itemReferenceImages = buildCreationItemReferenceImages\(item,\s*referenceImages,\s*plan\.referenceImageRoles\);[\s\S]*referenceImageLabels:\s*buildCreationGenerationReferenceImageLabels\(\s*itemReferenceImages,\s*plan\.referenceImageRoles,/,
+    /const itemReferenceImages = buildCreationItemReferenceImages\(item,\s*referenceImages,\s*plan\.referenceImageRoles\);[\s\S]*referenceImageLabels:\s*buildCreationGenerationReferenceImageLabels\(\s*itemReferenceImages,\s*plan\.referenceImageRoles,\s*item,/,
   );
   assert.match(worker, /normalizeCreationReferenceRoles\(formData\.get\("referenceImageRoles"\)\)/);
   assert.match(server, /skuGenerationRule:\s*formData\.get\("skuGenerationRule"\)/);
@@ -363,9 +363,21 @@ test("creation generation has no removed style-reference request path", async ()
   assert.match(generateHandler, /appendCreationItemLogoReference\(\s*item,\s*itemReferenceImages,\s*logoImage/);
   assert.match(repairHandler, /appendCreationItemLogoReference\(\s*repairItem,\s*itemReferenceImages,\s*logoImage/);
   assert.match(workerGenerateHandler, /appendCreationItemLogoReference\(\s*item,\s*itemReferenceImages,\s*logoImage/);
-  assert.match(generateHandler, /referenceImageLabels:\s*buildCreationGenerationReferenceImageLabels\(/);
-  assert.match(repairHandler, /referenceImageLabels:\s*buildCreationGenerationReferenceImageLabels\(/);
-  assert.match(workerGenerateHandler, /referenceImageLabels:\s*buildCreationGenerationReferenceImageLabels\(/);
+  assert.match(generateHandler, /buildCreationItemGenerationPrompt\(item\.prompt,\s*itemGenerationParameters,\s*item\)/);
+  assert.match(repairHandler, /buildCreationItemGenerationPrompt\(repairItem\.prompt,\s*itemGenerationParameters,\s*repairItem\)/);
+  assert.match(workerGenerateHandler, /buildCreationItemGenerationPrompt\(item\.prompt,\s*itemGenerationParameters,\s*item\)/);
+  assert.match(
+    generateHandler,
+    /buildCreationGenerationReferenceImageLabels\(\s*itemReferenceImages,\s*referenceImageRoles,\s*item,/,
+  );
+  assert.match(
+    repairHandler,
+    /buildCreationGenerationReferenceImageLabels\(\s*itemReferenceImages,\s*referenceImageRoles,\s*repairItem,/,
+  );
+  assert.match(
+    workerGenerateHandler,
+    /buildCreationGenerationReferenceImageLabels\(\s*itemReferenceImages,\s*plan\.referenceImageRoles,\s*item,/,
+  );
 });
 
 test("creation generation passes SKU subjects through local and worker planning", async () => {
@@ -611,7 +623,10 @@ test("creation repair route regenerates selected set items", async () => {
   assert.match(server, /const filename = buildCreationImageFilename\(\{\s*item:\s*repairItem,/);
   assert.match(server, /prompt:\s*repairItem\.prompt/);
   assert.match(server, /buildCreationItemReferenceImages\(repairItem,\s*referenceImages,\s*referenceImageRoles\)/);
-  assert.match(server, /buildCreationGenerationReferenceImageLabels\(\s*itemReferenceImages,\s*referenceImageRoles,/);
+  assert.match(
+    server,
+    /buildCreationGenerationReferenceImageLabels\(\s*itemReferenceImages,\s*referenceImageRoles,\s*repairItem,/,
+  );
   assert.match(app, /function buildCreationPlanPreviewFormData\(\) \{(?:(?!function buildCreationRepairFormData)[\s\S])*formData\.set\("platform", getCreationSelectedPlatform\(\)\.value\)/);
   assert.doesNotMatch(app, /function buildCreationPlanPreviewFormData\(\) \{(?:(?!function buildCreationRepairFormData)[\s\S])*formData\.set\("visualLanguage"/);
   assert.match(app, /function buildCreationRepairFormData[\s\S]*applyCreationRepairTargetFormFields\(formData, currentSet\)/);

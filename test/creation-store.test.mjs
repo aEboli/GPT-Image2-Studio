@@ -168,6 +168,7 @@ test("creation store preserves scenario image count and reference image metadata
       ["package.png", "package", "包装清单"],
     ],
   );
+  assert.deepEqual(manifest.referenceImageRoles.map((entry) => entry.index), [1, 2]);
 });
 
 test("creation store preserves zero carousel image count with appended rebuild items", () => {

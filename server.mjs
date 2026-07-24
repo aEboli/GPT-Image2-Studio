@@ -3792,6 +3792,7 @@ async function handleCreationGenerate(request, response) {
         fallbackRatio,
         fallbackSize,
         fallbackTargetLanguage: plan.targetLanguage,
+        fallbackFormat: finalFormat,
       });
       let finalBase64 = "";
       let slotClaimed = false;
@@ -3799,7 +3800,7 @@ async function handleCreationGenerate(request, response) {
       try {
         await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response);
         slotClaimed = true;
-        const finalPrompt = buildCreationItemGenerationPrompt(item.prompt, itemGenerationParameters);
+        const finalPrompt = buildCreationItemGenerationPrompt(item.prompt, itemGenerationParameters, item);
         const itemReferenceImages = buildCreationItemReferenceImages(item, referenceImages, referenceImageRoles);
         const itemGenerationReferenceImagesWithLogo = appendCreationItemLogoReference(
           item,
@@ -3838,6 +3839,7 @@ async function handleCreationGenerate(request, response) {
           referenceImageLabels: buildCreationGenerationReferenceImageLabels(
             itemReferenceImages,
             referenceImageRoles,
+            item,
           ),
           size: itemGenerationParameters.finalSize,
           aspectRatio: itemGenerationParameters.ratioOption.value,
@@ -4768,6 +4770,7 @@ async function handleCreationRepair(request, response) {
         fallbackRatio,
         fallbackSize,
         fallbackTargetLanguage: existingSet.targetLanguage,
+        fallbackFormat: itemFormat,
       });
       let finalBase64 = "";
       let slotClaimed = false;
@@ -4775,7 +4778,7 @@ async function handleCreationRepair(request, response) {
       try {
         await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response);
         slotClaimed = true;
-        const finalPrompt = buildCreationItemGenerationPrompt(repairItem.prompt, itemGenerationParameters);
+        const finalPrompt = buildCreationItemGenerationPrompt(repairItem.prompt, itemGenerationParameters, repairItem);
         const itemReferenceImages = buildCreationItemReferenceImages(repairItem, referenceImages, referenceImageRoles);
         const itemGenerationReferenceImagesWithLogo = appendCreationItemLogoReference(
           repairItem,
@@ -4809,6 +4812,7 @@ async function handleCreationRepair(request, response) {
           referenceImageLabels: buildCreationGenerationReferenceImageLabels(
             itemReferenceImages,
             referenceImageRoles,
+            repairItem,
           ),
           size: itemGenerationParameters.finalSize,
           aspectRatio: itemGenerationParameters.ratioOption.value,

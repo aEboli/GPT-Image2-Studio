@@ -108,7 +108,7 @@ test("listing field rows keep Chinese display text separate from copy text", () 
   assert.equal(buildCreationListingFieldCopyText(["English point"], { list: true }), "English point");
 });
 
-test("keyword bucket copy lines use English labels and skip empty buckets", () => {
+test("keyword bucket copy lines contain only keyword values and skip unsupported language content", () => {
   const lines = buildCreationListingBucketCopyLines({
     exact: ["路亚硬饵"],
     longTail: ["fishing lure"],
@@ -117,11 +117,14 @@ test("keyword bucket copy lines use English labels and skip empty buckets", () =
   });
 
   assert.deepEqual(lines, [
-    "Long-tail keywords: fishing lure",
-    "Traffic keywords: product listing",
-    "Descriptive keywords: sku specific",
+    "fishing lure",
+    "product listing",
+    "sku specific",
   ]);
-  assert.doesNotMatch(lines.join("\n"), /[\u3400-\u9fff]|精准|长尾|流量|描述|无/u);
+  assert.doesNotMatch(
+    lines.join("\n"),
+    /[\u3400-\u9fff]|精准关键词|长尾关键词|流量关键词|描述词|exact keywords|long-tail keywords|traffic keywords|descriptive keywords|无/iu,
+  );
 });
 
 test("listing draft view preserves UI-only Chinese display fields", () => {
@@ -244,6 +247,93 @@ test("rendered listing header title is a direct copy target", () => {
   );
 });
 
+test("listing workspace shows all bilingual fields on one page without view controls", () => {
+  const previousDocument = globalThis.document;
+  const root = makeFakeElement("div");
+  const state = { creation: { listingLanguageMode: "zh", listingSectionMode: "search" } };
+  globalThis.document = {
+    createElement: makeFakeElement,
+  };
+
+  try {
+    renderCreationListingDrafts({
+      refs: { creationRecordListingDrafts: root },
+      state,
+      set: {
+        setId: "set-listing-workspace-defaults",
+        listingDrafts: [{
+          title: "English title",
+          sellingPoints: ["English selling point"],
+          painPoints: ["English purchase fact"],
+          fiveBullets: ["PRODUCT TYPE: English bullet"],
+          description: "English description",
+          backendSearchTerms: "english search terms",
+          keywordBuckets: { exact: ["english keyword"] },
+          zhDisplay: {
+            title: "中文标题",
+            sellingPoints: ["中文卖点"],
+            painPoints: ["中文购买信息"],
+            fiveBullets: ["产品类型: 中文要点"],
+            description: "中文描述",
+            backendSearchTerms: "中文搜索词",
+            keywordBuckets: { exact: ["中文关键词"] },
+          },
+        }],
+      },
+    });
+  } finally {
+    globalThis.document = previousDocument;
+  }
+
+  const [card] = root.children;
+  const viewControls = collectFakeElements(root, (node) => (
+    node.dataset?.creationListingViewControl !== undefined
+  ));
+  const fieldGroups = collectFakeElements(root, (node) => (
+    String(node.className || "").split(/\s+/).includes("creation-listing-field-group")
+  ));
+  const fieldLabels = collectFakeElements(root, (node) => (
+    String(node.className || "").split(/\s+/).includes("creation-listing-field-label")
+  ));
+  const copyPairs = collectFakeElements(root, (node) => (
+    String(node.className || "").split(/\s+/).includes("creation-listing-copy-pair")
+  ));
+  const titleCopies = collectFakeElements(root, (node) => (
+    String(node.className || "").split(/\s+/).includes("creation-listing-title-copy")
+  ));
+
+  assert.equal(card.dataset.creationListingLanguageMode, undefined);
+  assert.equal(card.dataset.creationListingSectionMode, undefined);
+  assert.deepEqual(viewControls, []);
+  assert.deepEqual(fieldGroups, []);
+  assert.deepEqual(fieldLabels.map((label) => label.textContent), [
+    "标题",
+    "卖点",
+    "痛点",
+    "五点描述",
+    "商品描述",
+    "后台搜索词",
+    "关键词分组",
+  ]);
+  assert.deepEqual(
+    titleCopies.map((button) => [
+      button.dataset.creationListingCopyLanguage,
+      button.dataset.creationListingCopyText,
+    ]),
+    [["en", "English title"], ["zh", "中文标题"]],
+  );
+  copyPairs
+    .filter((pair) => pair.children.length === 2)
+    .forEach((pair) => {
+      assert.deepEqual(
+        pair.children.map((child) => child.dataset.creationListingCopyLanguage),
+        ["en", "zh"],
+      );
+    });
+  assert.equal(getFakeTextContent(root).split("English title").length - 1, 1);
+  assert.equal(getFakeTextContent(root).split("中文标题").length - 1, 1);
+});
+
 test("rendered listing values expose separate English and Chinese copy targets", () => {
   const previousDocument = globalThis.document;
   const root = makeFakeElement("div");
@@ -260,6 +350,7 @@ test("rendered listing values expose separate English and Chinese copy targets",
         listingDrafts: [{
           title: "English title",
           sellingPoints: ["English point one", "English point two"],
+          description: "English description without Chinese content",
           zhDisplay: {
             title: "中文标题",
             sellingPoints: ["中文卖点一", "中文卖点二"],
@@ -280,8 +371,15 @@ test("rendered listing values expose separate English and Chinese copy targets",
   const sellingFieldCopy = root.querySelectorAll("[data-creation-listing-copy-text]")
     .find((button) => (
       String(button.className || "").includes("creation-listing-field-copy")
+      && button.dataset.creationListingCopyLanguage === "en"
       && button.dataset.creationListingCopyLabel === "卖点英文"
     ));
+  const copyPairs = collectFakeElements(root, (node) => (
+    String(node.className || "").split(/\s+/).includes("creation-listing-copy-pair")
+  ));
+  const descriptionPair = copyPairs.find((pair) => (
+    pair.children[0]?.dataset?.creationListingCopyText === "English description without Chinese content"
+  ));
 
   assert.ok(englishCopies.includes("English title"));
   assert.ok(englishCopies.includes("English point one"));
@@ -290,6 +388,10 @@ test("rendered listing values expose separate English and Chinese copy targets",
   assert.deepEqual(chineseCopies, ["中文标题", "中文卖点一", "中文卖点二"]);
   assert.doesNotMatch(chineseCopies.join("\n"), /English title|English point/u);
   assert.equal(sellingFieldCopy?.dataset.creationListingCopyText, "English point one\nEnglish point two");
+  assert.deepEqual(
+    descriptionPair?.children.map((child) => child.dataset.creationListingCopyLanguage),
+    ["en"],
+  );
 });
 
 test("rendered listing panel recognizes concurrent generating set ids", () => {
@@ -325,7 +427,7 @@ test("rendered listing panel recognizes concurrent generating set ids", () => {
   assert.equal(root.children[0].textContent, "正在生成 Listing 草稿...");
 });
 
-test("rendered public listing fields show UI-only Chinese reference text", () => {
+test("rendered public listing compare view shows UI-only Chinese reference text", () => {
   const previousDocument = globalThis.document;
   const root = makeFakeElement("div");
   globalThis.document = {
@@ -335,7 +437,7 @@ test("rendered public listing fields show UI-only Chinese reference text", () =>
   try {
     renderCreationListingDrafts({
       refs: { creationRecordListingDrafts: root },
-      state: {},
+      state: { creation: { listingLanguageMode: "compare" } },
       set: {
         setId: "set-listing-counts",
         listingDrafts: [{
@@ -393,25 +495,69 @@ test("rendered public listing fields show UI-only Chinese reference text", () =>
     .map((button) => button.dataset.creationListingCopyText)
     .join("\n");
 
-  assert.match(titleText, /英文字符 8/u);
-  assert.match(titleText, /中文字符 4/u);
+  assert.match(titleText, /EN 8/u);
+  assert.match(titleText, /中文 4/u);
   assert.match(titleText, /迷你鱼竿/u);
-  assert.match(sellingText, /英文字符 9/u);
+  assert.match(sellingText, /EN 9/u);
   assert.match(sellingText, /抛投更远/u);
   assert.match(getFakeTextContent(painField), /鱼竿不易比较/u);
   assert.match(getFakeTextContent(bulletField), /尺寸信息清楚/u);
   assert.match(getFakeTextContent(descriptionField), /适合紧凑钓具套装。/u);
   assert.match(getFakeTextContent(backendField), /迷你 鱼竿 便携/u);
-  assert.match(getFakeTextContent(bucketField), /精准关键词: 迷你鱼竿/u);
-  assert.match(getFakeTextContent(bucketField), /长尾关键词: 迷你钓鱼竿/u);
+  assert.match(getFakeTextContent(bucketField), /精准关键词:.*迷你鱼竿/u);
+  assert.match(getFakeTextContent(bucketField), /长尾关键词:.*迷你钓鱼竿/u);
   assert.match(copyData, /迷你鱼竿|抛投更远|紧凑钓具/u);
   assert.ok(countNodes.some((node) => node.children?.[0]?.className === "creation-listing-character-count english"));
+  const bucketLabels = collectFakeElements(bucketField, (node) => (
+    String(node.className || "").split(/\s+/).includes("creation-listing-bucket-label")
+  ));
+  const bucketValueCopies = collectFakeElements(bucketField, (node) => (
+    String(node.className || "").split(/\s+/).includes("creation-listing-bucket-value")
+  ));
+  const bucketFieldCopies = bucketField.querySelectorAll("[data-creation-listing-copy-text]")
+    .filter((button) => String(button.className || "").includes("creation-listing-field-copy"));
+
+  assert.deepEqual(bucketLabels.map((label) => label.textContent), [
+    "精准关键词:", "精准关键词:",
+    "长尾关键词:", "长尾关键词:",
+    "流量关键词:", "流量关键词:",
+    "描述词:", "描述词:",
+  ]);
+  assert.equal(bucketLabels.every((label) => label.dataset.creationListingCopyText === undefined), true);
+  assert.deepEqual(
+    bucketValueCopies.map((button) => [
+      button.dataset.creationListingCopyLanguage,
+      button.dataset.creationListingCopyText,
+    ]),
+    [
+      ["en", "mini rod"], ["zh", "迷你鱼竿"],
+      ["en", "mini fishing rod"], ["zh", "迷你钓鱼竿"],
+      ["en", "compact fishing kit"], ["zh", "紧凑钓具套装"],
+      ["en", "portable rod"], ["zh", "便携鱼竿"],
+    ],
+  );
+  assert.deepEqual(
+    Object.fromEntries(bucketFieldCopies.map((button) => [
+      button.dataset.creationListingCopyLanguage,
+      button.dataset.creationListingCopyText,
+    ])),
+    {
+      en: "mini rod\nmini fishing rod\ncompact fishing kit\nportable rod",
+      zh: "迷你鱼竿\n迷你钓鱼竿\n紧凑钓具套装\n便携鱼竿",
+    },
+  );
+  assert.doesNotMatch(
+    bucketField.querySelectorAll("[data-creation-listing-copy-text]")
+      .map((button) => button.dataset.creationListingCopyText)
+      .join("\n"),
+    /精准关键词|长尾关键词|流量关键词|描述词|exact keywords|long-tail keywords|traffic keywords|descriptive keywords/iu,
+  );
   const [bucketCounts] = collectFakeElements(bucketField, (node) => (
     String(node.className || "").split(/\s+/).includes("creation-listing-character-counts")
   ));
 
-  assert.match(getFakeTextContent(bucketCounts), /英文字符 55/u);
-  assert.match(getFakeTextContent(bucketCounts), /中文字符 19/u);
+  assert.match(getFakeTextContent(bucketCounts), /EN 55/u);
+  assert.match(getFakeTextContent(bucketCounts), /中文 19/u);
 });
 
 test("rendered historical failed listing drafts remain directly usable without review controls", () => {
@@ -453,9 +599,9 @@ test("rendered historical failed listing drafts remain directly usable without r
 
   assert.doesNotMatch(getFakeTextContent(root), /重写|审核|复核|警告|缺失信息/u);
   assert.equal(String(root.children[0]?.className || ""), "creation-listing-card");
-  assert.equal(collectFakeElements(root, (node) => (
+  assert.deepEqual(collectFakeElements(root, (node) => (
     String(node.className || "").split(/\s+/).includes("creation-listing-title-copy")
-  )).length, 1);
+  )).map((button) => button.dataset.creationListingCopyLanguage), ["en"]);
   const copyLabels = root.querySelectorAll("[data-creation-listing-copy-text]")
     .map((button) => button.dataset.creationListingCopyLabel);
   for (const label of ["标题", "卖点", "痛点", "五点描述", "商品描述", "后台搜索词", "关键词分组"]) {
@@ -597,7 +743,7 @@ test("rendered V1 listing copy keeps historical Unicode while separating Chinese
   try {
     renderCreationListingDrafts({
       refs: { creationRecordListingDrafts: root },
-      state: {},
+      state: { creation: { listingLanguageMode: "compare" } },
       set: {
         setId: "set-listing-copy",
         listingDrafts: [{
@@ -636,7 +782,10 @@ test("rendered V1 listing copy keeps historical Unicode while separating Chinese
 
   const copyButtons = root.querySelectorAll("[data-creation-listing-copy-text]");
   const fieldCopyByLabel = Object.fromEntries(copyButtons
-    .filter((button) => String(button.className || "").includes("creation-listing-field-copy"))
+    .filter((button) => (
+      String(button.className || "").includes("creation-listing-field-copy")
+      && button.dataset.creationListingCopyLanguage === "en"
+    ))
     .map((button) => [
       button.dataset.creationListingCopyLabel,
       button.dataset.creationListingCopyText,
@@ -646,7 +795,7 @@ test("rendered V1 listing copy keeps historical Unicode while separating Chinese
     .map((button) => button.dataset.creationListingCopyText);
 
   assert.equal(fieldCopyByLabel["标题英文"], "1 Pack 13cm 路亚硬饵 Product Listing Draft");
-  assert.match(fieldCopyByLabel["关键词分组英文"], /Long-tail keywords: fishing lure/u);
+  assert.equal(fieldCopyByLabel["关键词分组英文"], "fishing lure\nproduct listing\nsku specific");
   assert.match(Object.values(fieldCopyByLabel).join("\n"), /路亚|银蓝|黄绿|硬饵/u);
   assert.doesNotMatch(Object.values(fieldCopyByLabel).join("\n"), /中文卖点对照|中文精准词/u);
   assert.match(localizedCopies.join("\n"), /中文卖点对照|中文精准词/u);
@@ -752,7 +901,7 @@ test("completed V2 drafts keep internal search suggestions in bilingual field an
   try {
     renderCreationListingDrafts({
       refs: { creationRecordListingDrafts: root },
-      state: {},
+      state: { creation: { listingLanguageMode: "compare" } },
       set,
     });
   } finally {
@@ -857,9 +1006,9 @@ test("historical V2 review status maps to the old direct-output fields", () => {
   assert.equal(String(root.children[0]?.className || ""), "creation-listing-card");
   assert.doesNotMatch(getFakeTextContent(root), /需按当前规则重写|重写后才能复制或导出|发布字段|内部策划与复核|警告英文字符|缺失信息英文字符/u);
   assert.match(getFakeTextContent(root), /Blue finish|blue storage box|Confirm dimensions/u);
-  assert.equal(collectFakeElements(root, (node) => (
+  assert.deepEqual(collectFakeElements(root, (node) => (
     String(node.className || "").split(/\s+/).includes("creation-listing-title-copy")
-  )).length, 1);
+  )).map((button) => button.dataset.creationListingCopyLanguage), ["en", "zh"]);
   const labels = root.querySelectorAll("[data-creation-listing-copy-text]")
     .map((button) => button.dataset.creationListingCopyLabel);
   for (const label of ["标题", "卖点", "痛点", "五点描述", "商品描述", "后台搜索词", "关键词分组"]) {
@@ -919,7 +1068,7 @@ test("completed V2 fields display bilingual values with language-specific copy p
   try {
     renderCreationListingDrafts({
       refs: { creationRecordListingDrafts: root },
-      state: {},
+      state: { creation: { listingLanguageMode: "compare" } },
       set: { setId: "set-bilingual-v2", listingDrafts: [makeBilingualV2Draft()] },
     });
   } finally {
@@ -937,7 +1086,10 @@ test("completed V2 fields display bilingual values with language-specific copy p
   }
 
   const fieldCopies = root.querySelectorAll("[data-creation-listing-copy-text]")
-    .filter((button) => String(button.className || "").includes("creation-listing-field-copy"))
+    .filter((button) => (
+      String(button.className || "").includes("creation-listing-field-copy")
+      && button.dataset.creationListingCopyLanguage === "en"
+    ))
     .map((button) => button.dataset.creationListingCopyText);
   const localizedCopies = root.querySelectorAll("[data-creation-listing-copy-text]")
     .filter((button) => String(button.className || "").includes("creation-listing-localized"))

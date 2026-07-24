@@ -331,10 +331,10 @@ test("creation suite queue appends queued rebuild cards when enabled", () => {
     role: "dimensions",
     roleLabel: "Dimensions",
     note: "Keep measurements",
-    index: 2,
+    index: 3,
   });
-  assert.deepEqual(set.items[3].referenceImageNames, ["subject-a.jpg", "subject-b.jpg", "size-chart.jpg"]);
-  assert.deepEqual(set.items[4].referenceImageNames, ["subject-a.jpg", "subject-b.jpg", "steps.jpg"]);
+  assert.deepEqual(set.items[3].referenceImageNames, ["size-chart.jpg"]);
+  assert.deepEqual(set.items[4].referenceImageNames, ["steps.jpg"]);
 });
 
 test("creation suite queue defaults infographic rebuild off", () => {
@@ -457,8 +457,8 @@ test("creation suite queue forces infographic rebuild when carousel count is zer
   assert.deepEqual(
     set.items.map((item) => item.referenceImageNames),
     [
-      ["subject.jpg", "feature-card.jpg"],
-      ["subject.jpg", "package-card.jpg"],
+      ["feature-card.jpg"],
+      ["package-card.jpg"],
     ],
   );
 });

@@ -322,6 +322,119 @@ test("listing sources expose compact title value evidence without unresolved obj
   assert.doesNotMatch(JSON.stringify(sources[0].titleValueEvidence), /exact folded dimensions|not supplied/i);
 });
 
+test("listing sources expose bounded buyer decision evidence and omit missing-info objections", () => {
+  const [source] = buildCreationListingSources({
+    setId: "set-thermal-scope",
+    productName: "Thermal Imaging Scope",
+    items: [
+      {
+        itemId: "benefit",
+        role: "benefit",
+        conversionIntent: {
+          audienceFocus: "Buyers comparing visibility options for changing light conditions.",
+          motivationFocus: "Thermal and night-vision modes provide two supplied viewing options.",
+          objectionFocus: "A single viewing mode can leave buyers uncertain about changing light conditions.",
+          evidenceFocus: "The supplied product information lists thermal imaging and night-vision modes.",
+        },
+      },
+      {
+        itemId: "dimensions",
+        role: "dimensions",
+        conversionIntent: {
+          audienceFocus: "Buyers checking fit before purchase.",
+          motivationFocus: "Dimensions support fit comparison.",
+          objectionFocus: "The exact mounted dimensions were not supplied.",
+          evidenceFocus: "No mounted dimensions are available.",
+        },
+      },
+    ],
+  });
+
+  assert.deepEqual(source.buyerDecisionEvidence, [
+    {
+      sourceRole: "benefit",
+      buyerContext: "Buyers comparing visibility options for changing light conditions.",
+      buyerFriction: "A single viewing mode can leave buyers uncertain about changing light conditions.",
+      supportedValue: "Thermal and night-vision modes provide two supplied viewing options.",
+      evidenceFocus: "The supplied product information lists thermal imaging and night-vision modes.",
+    },
+  ]);
+  assert.doesNotMatch(JSON.stringify(source.buyerDecisionEvidence), /not supplied|not available/i);
+});
+
+test("listing sources omit unverified values and unsupported comparison framing from buyer decision evidence", () => {
+  const [source] = buildCreationListingSources({
+    setId: "set-filtered-buyer-decisions",
+    productName: "Thermal Imaging Scope",
+    items: [
+      {
+        itemId: "unverified-value",
+        role: "benefit",
+        conversionIntent: {
+          audienceFocus: "Buyers checking viewing modes.",
+          motivationFocus: "Night-vision performance is unverified.",
+          objectionFocus: "Changing darkness can complicate viewing.",
+          evidenceFocus: "The product information lists a night-vision mode.",
+        },
+      },
+      {
+        itemId: "comparison-context",
+        role: "benefit",
+        conversionIntent: {
+          audienceFocus: "Buyers comparing typical products that struggle in changing light.",
+          motivationFocus: "Thermal and night-vision modes provide two viewing options.",
+          objectionFocus: "Changing light can affect mode selection.",
+          evidenceFocus: "The product information lists thermal and night-vision modes.",
+        },
+      },
+    ],
+  });
+
+  assert.equal(source.buyerDecisionEvidence, undefined);
+});
+
+test("listing sources expose conservative English evidence aliases for localized thermal scope facts", () => {
+  const [source] = buildCreationListingSources({
+    setId: "set-localized-thermal-scope",
+    productName: "热成像红外夜视瞄准镜",
+    referenceImageRoles: [
+      {
+        filename: "modes.jpg",
+        role: "material",
+        note: "展示热成像、黑白夜视和HD模式。",
+      },
+      {
+        filename: "fov.jpg",
+        role: "dimensions",
+        note: "标示热成像视场25°、红外夜视视场13°、11 PALETTES和60Hz REFRESH。",
+      },
+      {
+        filename: "controls.jpg",
+        role: "usage",
+        note: "展示物镜调焦、视度调节、热成像传感器、红外照明器、显示屏和硅胶眼罩。",
+      },
+    ],
+  });
+
+  assert.deepEqual(source.listingEvidenceAliases, [
+    "Thermal Imaging Infrared Night Vision Scope",
+    "thermal imaging",
+    "infrared night vision",
+    "black-and-white night vision",
+    "HD mode",
+    "25° thermal field of view",
+    "13° night-vision field of view",
+    "11 thermal palettes",
+    "60Hz refresh rate",
+    "objective focus adjustment",
+    "diopter adjustment",
+    "thermal sensor",
+    "infrared illuminator",
+    "display",
+    "silicone eyecup",
+  ]);
+});
+
 test("listing sources convert reference dimension notes to the selected unit mode", () => {
   const sources = buildCreationListingSources({
     setId: "set-imperial-reference",

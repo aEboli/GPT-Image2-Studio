@@ -672,7 +672,7 @@ test("all platforms apply the same fact gate to generated-image-only high-risk c
   }
 });
 
-test("two invalid upstream attempts return a completed validated deterministic draft", async () => {
+test("two invalid upstream attempts fail without a deterministic draft", async () => {
   const requestCreationListingDraft = requireFunction(listingAgent, "requestCreationListingDraft");
   const policy = resolveCreationListingPolicy({ platform: "etsy" });
   const calls = [];
@@ -687,54 +687,30 @@ test("two invalid upstream attempts return a completed validated deterministic d
     return new Response(JSON.stringify({ output_text: JSON.stringify(invalidOutput) }), { status: 200 });
   };
 
-  const fallback = await requestCreationListingDraft({
-    baseUrl: "https://example.test/v1",
-    apiKey: "test-key",
-    responsesModel: "test-model",
-    source: {
-      setId: "set-v2-fallback",
-      platformId: "etsy",
-      marketplace: "etsy",
-      listingPolicyVersion: policy.listingPolicyVersion,
-      language: "en-US",
-      listingPolicy: policy,
-      evidenceMode: "input-only",
-      ...SOURCE_FACTS,
-      productName: "Acme Blue Storage Box",
-      brandName: "Acme",
-      storeName: "Northwind Store",
-    },
-    fetchImpl,
-  });
+  await assert.rejects(
+    requestCreationListingDraft({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      responsesModel: "test-model",
+      source: {
+        setId: "set-v2-fallback",
+        platformId: "etsy",
+        marketplace: "etsy",
+        listingPolicyVersion: policy.listingPolicyVersion,
+        language: "en-US",
+        listingPolicy: policy,
+        evidenceMode: "input-only",
+        ...SOURCE_FACTS,
+        productName: "Acme Blue Storage Box",
+        brandName: "Acme",
+        storeName: "Northwind Store",
+      },
+      fetchImpl,
+    }),
+    /Listing generation failed validation after 2 attempts/i,
+  );
 
   assert.equal(calls.length, 2);
-  assert.equal(fallback.status, "completed");
-  assert.equal(fallback.evidenceMode, "input-only");
-  assert.equal(fallback.schemaVersion, "2");
-  assert.equal(fallback.platformId, "etsy");
-  assert.equal(fallback.marketplace, "etsy");
-  assert.equal(fallback.listingPolicyVersion, policy.listingPolicyVersion);
-  assert.ok(fallback.title);
-  assert.ok(fallback.highlights.length >= 1);
-  assert.ok(fallback.description);
-  for (const field of fallback.publishFields) {
-    const value = fallback[field];
-    assert.ok(Array.isArray(value) ? value.length > 0 : String(value || "").trim(), field);
-  }
-  const publicText = [
-    fallback.title,
-    ...(fallback.highlights || []),
-    fallback.description,
-    ...(fallback.searchTerms || []),
-  ].join("\n");
-  assert.doesNotMatch(publicText, /FDA Certified|Miracle Cure|Guaranteed best seller|lifetime warranty/i);
-  assertCompleteBilingualNoBrandDraft(fallback, /Acme|Northwind|Etsy/i);
-  const validation = listingDraft.validateCreationListingDraft(fallback, {
-    policy,
-    sourceFacts: SOURCE_FACTS,
-    source: SOURCE_FACTS,
-  });
-  assert.equal(validation.ok, true, validation.errors.join("; "));
 });
 
 test("every platform rejects English and Chinese functional wording", () => {
@@ -757,7 +733,7 @@ test("every platform rejects English and Chinese functional wording", () => {
   }
 });
 
-test("deterministic fallback removes identities declared only in free text and refuses an unresolved identity", async () => {
+test("invalid V2 output fails instead of creating an identity-sanitized deterministic draft", async () => {
   const policy = resolveCreationListingPolicy({ platform: "etsy" });
   const invalidOutput = makeV2Draft(policy, {
     title: "Caja sin validar para el hogar",
@@ -778,15 +754,16 @@ test("deterministic fallback removes identities declared only in free text and r
   for (const term of ["Acme", "Northwind Store", "RocketMark"]) {
     assert.ok(source.forbiddenTerms.includes(term), term);
   }
-  const fallback = await listingAgent.requestCreationListingDraft({
-    baseUrl: "https://example.test/v1",
-    apiKey: "test-key",
-    responsesModel: "test-model",
-    source,
-    fetchImpl,
-  });
-  assert.equal(fallback.status, "completed");
-  assertCompleteBilingualNoBrandDraft(fallback, /Acme|Northwind Store|RocketMark/i);
+  await assert.rejects(
+    listingAgent.requestCreationListingDraft({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      responsesModel: "test-model",
+      source,
+      fetchImpl,
+    }),
+    /Listing generation failed validation after 2 attempts/i,
+  );
 
   await assert.rejects(listingAgent.requestCreationListingDraft({
     baseUrl: "https://example.test/v1",
@@ -803,10 +780,10 @@ test("deterministic fallback removes identities declared only in free text and r
       forbiddenTerms: [],
     },
     fetchImpl,
-  }), /safe no-brand product identity/i);
+  }), /Listing generation failed validation after 2 attempts/i);
 });
 
-test("deterministic fallback keeps unknown Chinese product categories generatable without a brand", async () => {
+test("invalid V2 output for an unknown Chinese category fails without fallback", async () => {
   const policy = resolveCreationListingPolicy({ platform: "universal" });
   const invalidOutput = makeV2Draft(policy, {
     title: "Mochila sin validar para el hogar",
@@ -823,21 +800,19 @@ test("deterministic fallback keeps unknown Chinese product categories generatabl
     sellingPoints: ["多分层结构便于分类收纳"],
   });
 
-  const fallback = await listingAgent.requestCreationListingDraft({
-    baseUrl: "https://example.test/v1",
-    apiKey: "test-key",
-    responsesModel: "test-model",
-    source,
-    fetchImpl,
-  });
-
-  assert.equal(fallback.status, "completed");
-  assert.match(fallback.title, /Product Information/i);
-  assertCompleteBilingualNoBrandDraft(fallback, /VANAHEIMR|Amazon|Walmart|Etsy|Temu/i);
+  await assert.rejects(
+    listingAgent.requestCreationListingDraft({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      responsesModel: "test-model",
+      source,
+      fetchImpl,
+    }),
+    /Listing generation failed validation after 2 attempts/i,
+  );
 });
 
-test("transient listing gateway failures use the validated deterministic fallback", async () => {
-  const policy = resolveCreationListingPolicy({ platform: "universal" });
+test("transient listing gateway failures surface without a deterministic fallback", async () => {
   const [source] = listingDraft.buildCreationListingSources({
     setId: "gateway-outage-fallback",
     platform: "universal",
@@ -846,20 +821,18 @@ test("transient listing gateway failures use the validated deterministic fallbac
     sellingPoints: ["Portable and easy to carry"],
   });
 
-  const fallback = await listingAgent.requestCreationListingDraft({
-    baseUrl: "https://example.test/v1",
-    apiKey: "test-key",
-    responsesModel: "test-model",
-    source,
-    fetchImpl: async () => new Response(JSON.stringify({
-      error: { message: "upstream unavailable" },
-    }), { status: 503 }),
-  });
-
-  assert.equal(fallback.status, "completed");
-  assert.equal(fallback.evidenceMode, "input-only");
-  assert.match(fallback.warnings.join("\n"), /upstream unavailable/i);
-  assertCompleteBilingualNoBrandDraft(fallback, /Amazon|Walmart|Etsy|Temu/i);
+  await assert.rejects(
+    listingAgent.requestCreationListingDraft({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      responsesModel: "test-model",
+      source,
+      fetchImpl: async () => new Response(JSON.stringify({
+        error: { message: "upstream unavailable" },
+      }), { status: 503 }),
+    }),
+    /upstream unavailable/i,
+  );
 });
 
 test("set-scoped mock drafts use completed validated V2 output for Amazon, universal, and legacy-missing records", () => {

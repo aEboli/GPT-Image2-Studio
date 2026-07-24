@@ -837,6 +837,7 @@ const refs = {
   creationRecordExportManifestButton: document.querySelector("#creationRecordExportManifestButton"),
   creationRecordExportPromptsButton: document.querySelector("#creationRecordExportPromptsButton"),
   creationRecordGenerateListingsButton: document.querySelector("#creationRecordGenerateListingsButton"),
+  creationRecordRegenerateListingsButton: document.querySelector("#creationRecordRegenerateListingsButton"),
   creationRecordListingDrafts: document.querySelector("#creationRecordListingDrafts"),
   creationRecordListingStatus: document.querySelector("#creationRecordListingStatus"),
   creationRecordOpenFolderButton: document.querySelector("#creationRecordOpenFolderButton"),
@@ -2374,6 +2375,11 @@ function getGenerationReferenceFile(item) {
   return item?.generationFile || item?.file;
 }
 function getCreationReferenceGenerationFile(item) {
+  const infographicRebuildEnabled =
+    isCreationInfographicRebuildRequired() || refs.creationInfographicRebuildEnabledInput?.checked === true;
+  if (infographicRebuildEnabled && item?.file && !isCreationSubjectReferenceRole(item?.role || "product")) {
+    return item.file;
+  }
   return item?.generationFile || item?.file;
 }
 function getCreationLogoBatchSourceGenerationFile(item) {
@@ -9107,6 +9113,9 @@ function normalizeCreationItemForView(item = {}, fallbackIndex = 0) {
   const imageUrl = String(item.imageUrl || item.thumbnailUrl || item.previewUrl || "");
   const status = String(item.status || (imageUrl ? "completed" : "queued"));
   const skuSubject = item.skuSubject && typeof item.skuSubject === "object" ? item.skuSubject : item.sku_subject;
+  const sourceInfographic = item.sourceInfographic && typeof item.sourceInfographic === "object"
+    ? item.sourceInfographic
+    : item.source_infographic;
   const skuSubjectId = String(item.skuSubjectId || item.sku_subject_id || skuSubject?.id || "");
   const skuTitle = String(item.skuTitle || item.sku_title || skuSubject?.title || "");
   const role = String(item.role || CREATION_PREVIEW_SLOTS[fallbackIndex]?.role || "");
@@ -9151,6 +9160,7 @@ function normalizeCreationItemForView(item = {}, fallbackIndex = 0) {
     skuSubjectId,
     skuTitle,
     skuSubject: skuSubject ? { ...skuSubject } : null,
+    sourceInfographic: sourceInfographic ? cloneCreationPlanValue(sourceInfographic, null) : null,
   };
 }
 
@@ -9238,7 +9248,8 @@ function normalizeCreationSetForView(set = {}) {
       : [],
     referenceImageRoles: Array.isArray(set.referenceImageRoles)
       ? set.referenceImageRoles
-          .map((item) => ({
+          .map((item, index) => ({
+            index: Number(item?.index) > 0 ? Number(item.index) : index + 1,
             filename: String(item?.filename || ""),
             role: String(item?.role || "product"),
             roleLabel: String(item?.roleLabel || getCreationReferenceRoleLabel(item?.role || "product")),
@@ -9658,7 +9669,7 @@ function renderCreationRecordDetail(set) {
 
   const progress = getCreationProgressSummary(set);
   const detailSections = [
-    { items: [["商品", set.productName || "未命名商品"], ["平台", set.platformLabel || formatCreationPlatformLabel(set.platform)], ["行业", set.industryTemplateLabel || CREATION_INDUSTRY_TEMPLATE_LABELS[set.industryTemplate] || "通用电商"]] },
+    { items: [["商品", set.productName || "未命名商品"], ["平台", set.platformLabel || formatCreationPlatformLabel(set.platform)], ["商品类目", set.industryTemplateLabel || CREATION_INDUSTRY_TEMPLATE_LABELS[set.industryTemplate] || "通用电商"]] },
     { items: [["尺寸规格", set.dimensionSpecs || ""], ["规格单位", set.dimensionUnitModeLabel || formatCreationDimensionUnitModeLabel(set.dimensionUnitMode)], ["语言", set.targetLanguageLabel || set.targetLanguage || "English"], ["进度", `${progress.completed}/${progress.total}`]] },
     { wide: true, items: [["类目路径", set.industryTemplatePath || ""]] },
     { wide: true, items: [["参考图", set.referenceImageNames.length > 0 ? set.referenceImageNames.join("、") : "未使用"]] },
@@ -10592,7 +10603,7 @@ function renderCreationRecordArchiveDetail(set) {
   const detailItems = [
     ["商品", set.productName || "未命名商品"],
     ["平台", set.platformLabel || formatCreationPlatformLabel(set.platform)],
-    ["行业", set.industryTemplateLabel || CREATION_INDUSTRY_TEMPLATE_LABELS[set.industryTemplate] || "通用电商"],
+    ["商品类目", set.industryTemplateLabel || CREATION_INDUSTRY_TEMPLATE_LABELS[set.industryTemplate] || "通用电商"],
     ["类目路径", set.industryTemplatePath || ""],
     ["尺寸规格", set.dimensionSpecs || ""],
     ["规格单位", set.dimensionUnitModeLabel || formatCreationDimensionUnitModeLabel(set.dimensionUnitMode)],
@@ -11235,6 +11246,7 @@ function renderCreationReferenceGrid() {
 function buildCreationReferenceRolePayload() {
   return state.creationReferenceFiles
     .map((item, index) => ({
+      index: index + 1,
       filename: item.file?.name || `reference-image-${index + 1}`,
       role: item.role || "product",
       note: item.note || "",

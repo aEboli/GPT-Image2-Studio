@@ -11,7 +11,10 @@ import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { handleApiRequest } from "../cloudflare-pages-worker.mjs";
-import { generateCreationListingDrafts } from "../lib/creation-listing-agent.mjs";
+import {
+  generateCreationListingDrafts,
+  makeMockCreationListingDraft,
+} from "../lib/creation-listing-agent.mjs";
 import {
   buildCreationListingSources,
   validateCreationListingDraft,
@@ -143,95 +146,20 @@ function makeNormalizedSet({ id, platform, targetLanguage, legacyMissing = false
   return normalizeCreationSetManifest(normalizeCreationSetManifest(raw));
 }
 
-const localizedCopy = {
-  "en-US": {
-    title: "Blue Storage Box 2 L Stackable Home Organizer",
-    highlights: [
-      "Supplied product data states a 2 L capacity.",
-      "Blue finish is stated for this product option.",
-      "Stackable shape is stated in the product data.",
-    ],
-    description: "Blue storage box with the supplied 2 L capacity, stackable shape, and supplied dimensions.",
-    searchTerms: ["blue storage box", "2 L organizer", "stackable storage"],
-  },
-  "zh-CN": {
-    title: "蓝色2升可叠放家用收纳盒",
-    highlights: ["商品资料注明2升容量。", "商品资料注明蓝色外观。", "商品资料注明可叠放造型。"],
-    description: "蓝色收纳盒采用已提供的2升容量、可叠放造型和尺寸信息。",
-    searchTerms: ["蓝色收纳盒", "2升整理盒", "可叠放收纳"],
-  },
-  "ja-JP": {
-    title: "青い2リットル積み重ね収納ボックス",
-    highlights: ["提供された2リットル容量を確認できます。", "青色で選択肢を識別しやすくします。", "積み重ね形状で日常収納に使えます。"],
-    description: "提供された2リットル容量、積み重ね形状、寸法情報を備えた青い収納ボックスです。",
-    searchTerms: ["青い収納ボックス", "2リットル収納", "積み重ね収納"],
-  },
-  "ko-KR": {
-    title: "파란색 2리터 적층형 수납 상자",
-    highlights: ["제공된 2리터 용량을 확인할 수 있습니다.", "파란색으로 선택 옵션을 쉽게 구분합니다.", "적층형 모양으로 일상 수납에 사용합니다."],
-    description: "제공된 2리터 용량과 적층형 모양 및 치수 정보를 담은 파란색 수납 상자입니다.",
-    searchTerms: ["파란색 수납 상자", "2리터 정리함", "적층형 수납"],
-  },
-  "es-419": {
-    title: "Caja azul apilable de 2 litros para organizar",
-    highlights: ["La capacidad indicada de 2 litros aclara el tamaño.", "El acabado azul permite identificar la opción.", "La forma apilable facilita la organización diaria."],
-    description: "Caja azul con la capacidad indicada de 2 litros, forma apilable y dimensiones proporcionadas.",
-    searchTerms: ["caja azul apilable", "organizador 2 litros", "caja para organizar"],
-  },
-};
-
-function makeValidV2Draft(source) {
-  const policy = source.listingPolicy;
-  const copy = localizedCopy["en-US"];
-  const zhCopy = localizedCopy["zh-CN"];
-  const warnings = source.warnings || policy.warnings || [];
-  return {
-    schemaVersion: "2",
-    platformId: source.platformId,
-    platformLabel: source.platformLabel,
-    marketplace: source.marketplace,
-    listingPolicyVersion: source.listingPolicyVersion,
-    language: source.language,
-    title: copy.title,
-    sellingPoints: [copy.highlights[0]],
-    buyerObjections: ["Review the supplied dimensions before purchase."],
-    highlights: copy.highlights,
-    description: copy.description,
-    searchTerms: copy.searchTerms,
-    keywordBuckets: {
-      exact: [copy.searchTerms[0]],
-      longTail: [copy.searchTerms[1]],
-      traffic: [copy.searchTerms[2]],
-      descriptive: [copy.title],
-    },
-    evidence: ["product-input"],
-    missingInfo: [],
-    warnings,
-    status: "completed",
-    zhDisplay: {
-      title: zhCopy.title,
-      sellingPoints: [zhCopy.highlights[0]],
-      buyerObjections: ["购买前请核对已提供的尺寸。"],
-      highlights: zhCopy.highlights,
-      description: zhCopy.description,
-      searchTerms: zhCopy.searchTerms,
-      keywordBuckets: {
-        exact: [zhCopy.searchTerms[0]],
-        longTail: [zhCopy.searchTerms[1]],
-        traffic: [zhCopy.searchTerms[2]],
-        descriptive: [zhCopy.title],
-      },
-      warnings: warnings.map((warning) => `提示对照：${warning}`),
-      missingInfo: [],
-    },
-  };
+function makeValidV1Draft(source) {
+  return makeMockCreationListingDraft({
+    ...source,
+    schemaVersion: "",
+    forceV1: true,
+    forceV2: false,
+  });
 }
 
-function makeInvalidV2Draft(source) {
+function makeInvalidV1Draft(source) {
   return {
-    ...makeValidV2Draft(source),
+    ...makeValidV1Draft(source),
     title: "FDA Certified Miracle Cure Box",
-    highlights: [],
+    sellingPoints: [],
     description: "Guaranteed best seller with a lifetime warranty and refund.",
   };
 }
@@ -255,7 +183,7 @@ async function postJson(baseUrl, pathname, payload) {
   return { response, body: await response.json() };
 }
 
-test("shared, local, and Worker Listing paths keep platform-aware old-style requests and fallback equivalent", async (t) => {
+test("shared, local, and Worker Listing paths keep successful output and explicit failures equivalent", async (t) => {
   const tempRoot = await mkdtemp(join(tmpdir(), "creation-listing-parity-"));
   const outputDir = join(tempRoot, "output");
   const localDataRootDir = join(tempRoot, "local-data");
@@ -353,6 +281,46 @@ test("shared, local, and Worker Listing paths keep platform-aware old-style requ
     return { draft: drafts[0], requests: directRequests, validation: validations[0] };
   }
 
+  async function compareThreePathFailures(set, output) {
+    await writeFile(join(manifestsDir, `${set.setId}.json`), `${JSON.stringify(set, null, 2)}\n`, "utf8");
+    const directRequests = [];
+    const workerRequests = [];
+    const localRequestStart = localUpstream.requests.length;
+    localUpstream.outputs.push(structuredClone(output));
+    let directError;
+
+    await assert.rejects(
+      generateCreationListingDrafts({
+        set,
+        config,
+        fetchImpl: makeInjectedFetch(responsesUrl, [output], directRequests),
+      }),
+      (error) => {
+        directError = error;
+        return /Listing generation failed validation/i.test(error?.message || "");
+      },
+    );
+    const workerResponse = await handleApiRequest(new Request("https://studio.example/api/creation/listings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...config, set }),
+    }), {
+      fetchImpl: makeInjectedFetch(responsesUrl, [output], workerRequests),
+    });
+    const workerBody = await workerResponse.json();
+    const localResult = await postJson(localBaseUrl, "/api/creation/listings", { setId: set.setId, ...config });
+    const localRequests = localUpstream.requests.slice(localRequestStart);
+
+    assert.equal(workerResponse.status, 502);
+    assert.equal(localResult.response.status, 502);
+    assert.equal(workerBody.message, directError.message);
+    assert.equal(localResult.body.message, directError.message);
+    assert.deepEqual(withoutVolatileTimestamps(workerRequests), withoutVolatileTimestamps(directRequests));
+    assert.deepEqual(withoutVolatileTimestamps(localRequests), withoutVolatileTimestamps(directRequests));
+
+    return JSON.parse(await readFile(join(manifestsDir, `${set.setId}.json`), "utf8"));
+  }
+
   const cases = [
     ["amazon", "English", "A", "en-US"],
     ["etsy", "English", "A", "en-US"],
@@ -365,7 +333,7 @@ test("shared, local, and Worker Listing paths keep platform-aware old-style requ
   for (const [platform, targetLanguage, evidenceLevel, expectedLocale] of cases) {
     const set = makeNormalizedSet({ id: `parity-${platform}`, platform, targetLanguage });
     const source = buildCreationListingSources(set)[0];
-    const result = await compareThreePaths(set, [makeValidV2Draft(source)]);
+    const result = await compareThreePaths(set, [makeValidV1Draft(source)]);
     assert.equal(source.listingPolicy.evidenceLevel, evidenceLevel, platform);
     assert.equal(result.draft.platformId, platform, platform);
     assert.equal(result.draft.language, expectedLocale, platform);
@@ -378,36 +346,63 @@ test("shared, local, and Worker Listing paths keep platform-aware old-style requ
 
   const legacySet = makeNormalizedSet({ id: "parity-legacy-missing", legacyMissing: true });
   const legacySource = buildCreationListingSources(legacySet)[0];
-  const legacyResult = await compareThreePaths(legacySet, [makeValidV2Draft(legacySource)]);
+  const legacyResult = await compareThreePaths(legacySet, [makeValidV1Draft(legacySource)]);
   assert.equal(legacyResult.draft.platformId, "universal");
   assert.equal(legacyResult.draft.language, "en-US");
   assert.equal(Object.prototype.hasOwnProperty.call(legacyResult.draft, "warnings"), false);
   assert.ok(legacyResult.draft.fiveBullets.length > 0);
 
-  const fallbackSet = makeNormalizedSet({
-    id: "parity-temu-fallback",
+  const sanitizationSet = makeNormalizedSet({
+    id: "parity-etsy-low-risk-sanitization",
+    platform: "etsy",
+    targetLanguage: "English",
+  });
+  const sanitizationSource = buildCreationListingSources(sanitizationSet)[0];
+  const sanitizationOutput = makeValidV1Draft(sanitizationSource);
+  Object.assign(sanitizationOutput, {
+    title: `${sanitizationOutput.title} Adjustable Gray Black Rechargeable`,
+    description: `${sanitizationOutput.description} Adjustable gray black rechargeable details.`,
+    painPoints: ["Need a clear option? Review the supplied package."],
+    fiveBullets: sanitizationOutput.fiveBullets.slice(0, 3),
+    backendSearchTerms: "adjustable gray black rechargeable",
+    keywordBuckets: {
+      exact: ["adjustable"],
+      longTail: ["gray"],
+      traffic: ["black"],
+      descriptive: ["rechargeable"],
+    },
+  });
+  const sanitizationResult = await compareThreePaths(sanitizationSet, [sanitizationOutput]);
+  const sanitizedEnglish = [
+    sanitizationResult.draft.title,
+    sanitizationResult.draft.description,
+    sanitizationResult.draft.backendSearchTerms,
+    ...Object.values(sanitizationResult.draft.keywordBuckets).flat(),
+  ].join("\n");
+  assert.doesNotMatch(sanitizedEnglish, /\b(?:adjustable|gray|black|rechargeable)\b/i);
+  assert.equal(sanitizationResult.draft.backendSearchTerms, "");
+  assert.deepEqual(Object.values(sanitizationResult.draft.keywordBuckets).flat(), []);
+
+  const failureSet = makeNormalizedSet({
+    id: "parity-temu-failure",
     platform: "temu",
     targetLanguage: "English",
   });
-  const fallbackSource = buildCreationListingSources(fallbackSet)[0];
-  const invalidOutput = makeInvalidV2Draft(fallbackSource);
-  const fallbackResult = await compareThreePaths(fallbackSet, [invalidOutput, invalidOutput]);
-  assert.equal(fallbackResult.requests.length, 1);
-  assert.equal(fallbackResult.draft.schemaVersion, undefined);
-  assert.equal(fallbackResult.draft.platformId, "temu");
-  assert.equal(fallbackResult.draft.evidenceMode, "input-only");
-  assert.equal(fallbackResult.draft.status, "completed");
-  assert.ok(fallbackResult.draft.title);
-  assert.ok(fallbackResult.draft.fiveBullets.length > 0);
-  assert.ok(fallbackResult.draft.description);
-  assert.ok(fallbackResult.draft.zhDisplay?.title);
+  const failureSource = buildCreationListingSources(failureSet)[0];
+  const existingDraft = makeValidV1Draft(failureSource);
+  failureSet.listingDrafts = [existingDraft];
+  const persistedFailureSet = await compareThreePathFailures(
+    failureSet,
+    makeInvalidV1Draft(failureSource),
+  );
+  assert.deepEqual(persistedFailureSet.listingDrafts, [existingDraft]);
 
   const fetchLog = (await readFile(fetchLogPath, "utf8"))
     .trim()
     .split(/\r?\n/)
     .filter(Boolean)
     .map((line) => JSON.parse(line));
-  assert.equal(fetchLog.length, cases.length + 1 + 1);
+  assert.equal(fetchLog.length, cases.length + 1 + 1 + 1);
   assert.ok(fetchLog.every(({ url }) => url === responsesUrl));
 });
 

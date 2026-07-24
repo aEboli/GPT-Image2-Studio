@@ -330,7 +330,7 @@ test("historical V2 full copy maps old-style bilingual fields and excludes revie
   }
 });
 
-test("new V2 model, retry, mock, and fallback drafts remove identities from visible metadata and ids", async () => {
+test("new V2 model, retry, and explicit mock drafts remove identities from visible metadata and ids", async () => {
   const [source] = buildCreationListingSources({
     setId: "set-visible-metadata",
     platform: "universal",
@@ -352,12 +352,6 @@ test("new V2 model, retry, mock, and fallback drafts remove identities from visi
       name: "retry",
       mock: false,
       fetchImpl: async (_url, _init, state = {}) => response(state.unused),
-      expectedRequests: 2,
-    },
-    {
-      name: "fallback",
-      mock: false,
-      fetchImpl: async () => response("{}"),
       expectedRequests: 2,
     },
     {
@@ -399,6 +393,22 @@ test("new V2 model, retry, mock, and fallback drafts remove identities from visi
       assert.doesNotMatch(serializedLeaves, new RegExp(forbidden, "iu"), `${scenario.name}: ${forbidden}`);
     }
   }
+
+  let failedRequestCount = 0;
+  await assert.rejects(
+    requestCreationListingDraft({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      responsesModel: "test-model",
+      source,
+      fetchImpl: async () => {
+        failedRequestCount += 1;
+        return response("{}");
+      },
+    }),
+    /Listing generation failed validation after 2 attempts/i,
+  );
+  assert.equal(failedRequestCount, 2);
 
   const normalizedExplicitId = normalizeCreationListingDraft({
     ...makeV2Draft(policy, { warnings: source.warnings }),

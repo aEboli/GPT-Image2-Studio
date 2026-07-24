@@ -494,3 +494,87 @@ test("creation SKU payload preserves analyzed colors for each distinct subject",
 
   assert.deepEqual(subjects.map((subject) => subject.colorName), ["navy blue", "cyan", "orange", "red"]);
 });
+
+test("creation SKU payload preserves one multi-color characteristic label per visible unit", () => {
+  const subjects = buildCreationSkuSubjectsForPayload({
+    analysis: {
+      skuSubjects: [
+        {
+          id: "brown-goggles",
+          title: "Brown riding goggles",
+          filenames: ["brown-goggles.png"],
+          subjectUnitCount: 1,
+          color_names: ["brown, black, silver lenses"],
+        },
+        {
+          id: "goggles-pair",
+          title: "Two riding goggles",
+          filenames: ["goggles-pair.png"],
+          subjectUnitCount: 2,
+          color_names: ["brown, black strap, silver lenses", "red, black strap, gray lenses"],
+        },
+      ],
+    },
+    applied: true,
+    dirty: false,
+    referenceRoles: [
+      { filename: "brown-goggles.png", role: "product", note: "One complete visible product unit." },
+      { filename: "goggles-pair.png", role: "product", note: "Two complete visible product units." },
+    ],
+  });
+
+  assert.deepEqual(subjects[0].colorNames, ["brown, black, silver lenses"]);
+  assert.equal(subjects[0].colorName, "brown, black, silver lenses");
+  assert.deepEqual(subjects[1].colorNames, [
+    "brown, black strap, silver lenses",
+    "red, black strap, gray lenses",
+  ]);
+});
+
+test("creation SKU payload preserves an explicit empty characteristic-color label list", () => {
+  const subjects = buildCreationSkuSubjectsForPayload({
+    analysis: {
+      skuSubjects: [
+        {
+          id: "uncertain-color",
+          title: "Riding goggles",
+          filenames: ["brown-reflection.png"],
+          color_names: [],
+          note: "One complete product unit; physical colors are unclear.",
+        },
+      ],
+    },
+    applied: true,
+    dirty: false,
+    referenceRoles: [
+      { filename: "brown-reflection.png", role: "product", note: "One complete product unit with unclear reflections." },
+    ],
+  });
+
+  assert.deepEqual(subjects[0].colorNames, []);
+  assert.equal(subjects[0].colorName, undefined);
+});
+
+test("creation SKU payload preserves repeated labels for repeated visible units", () => {
+  const subjects = buildCreationSkuSubjectsForPayload({
+    analysis: {
+      skuSubjects: [
+        {
+          id: "matching-goggles-pair",
+          title: "Matching riding goggles pair",
+          filenames: ["matching-goggles-pair.png"],
+          subjectUnitCount: 2,
+          color_names: ["black, silver lenses", "black, silver lenses"],
+          note: "Two complete visible product units with matching colors.",
+        },
+      ],
+    },
+    applied: true,
+    dirty: false,
+    referenceRoles: [
+      { filename: "matching-goggles-pair.png", role: "product", note: "Two complete visible product units." },
+    ],
+  });
+
+  assert.deepEqual(subjects[0].colorNames, ["black, silver lenses", "black, silver lenses"]);
+});

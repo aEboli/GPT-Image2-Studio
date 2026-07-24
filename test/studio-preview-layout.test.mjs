@@ -4397,6 +4397,11 @@ test("creation mode exposes record detail and item repair actions", async () => 
   assert.match(app, /const detailToggle = document\.createElement\("button"\);[\s\S]*detailToggle\.dataset\.creationRecordDetailToggle = "true";/);
   assert.match(app, /refs\.creationRecordArchiveDetail\.addEventListener\("click",[\s\S]*closest\("\[data-creation-record-detail-toggle\]"\)[\s\S]*toggleCreationRecordArchiveDetail\(\);/);
   assert.match(app, /const detailSections = \[/);
+  assert.equal(
+    (app.match(/\["商品类目", set\.industryTemplateLabel \|\| CREATION_INDUSTRY_TEMPLATE_LABELS\[set\.industryTemplate\] \|\| "通用电商"\]/g) || []).length,
+    2,
+  );
+  assert.doesNotMatch(app, /\["行业", set\.industryTemplateLabel/);
   assert.match(app, /section\.className = `creation-record-section\$\{wide \? " is-wide" : ""\}`;/);
   assert.match(app, /item\.className = "creation-record-field";/);
   assert.match(app, /labelNode\.className = "creation-record-label";/);
@@ -4688,6 +4693,10 @@ test("creation mode uploads prepared reference images for generation and repair"
   const app = await readFile(appPath, "utf8");
 
   assert.match(app, /function getCreationReferenceGenerationFile\(item\) \{/);
+  assert.match(
+    app,
+    /function getCreationReferenceGenerationFile\(item\) \{[\s\S]*infographicRebuildEnabled[\s\S]*!isCreationSubjectReferenceRole\(item\?\.role \|\| "product"\)[\s\S]*return item\.file;/,
+  );
   assert.match(app, /async function ensureCreationReferenceGenerationFilesReady\(\) \{/);
   assert.match(app, /startCreationGeneration[\s\S]*await ensureCreationReferenceGenerationFilesReady\(\);[\s\S]*const generationFormData = buildCreationFormData\(\);/);
   assert.match(app, /function getCreationQueueJobForSet\(set = \{\}\) \{/);
@@ -5079,22 +5088,27 @@ test("creation mode exposes listing agent controls and record listing drafts", a
   assert.match(listingView, /createCreationListingField\("商品描述", draft\.description, \{[\s\S]*localizedValue: draft\.zhDisplay\?\.description/);
   assert.match(listingView, /createCreationListingField\("后台搜索词", draft\.backendSearchTerms, \{[\s\S]*localizedValue: draft\.zhDisplay\?\.backendSearchTerms/);
   assert.match(listingView, /const copySource = copyValue \?\? value;/);
-  assert.match(listingView, /const labelNode = document\.createElement\(copyable \? "button" : "span"\);[\s\S]*labelNode\.className = copyable \? "creation-listing-field-copy" : "creation-listing-field-label";/);
+  assert.match(listingView, /const labelNode = document\.createElement\("strong"\);[\s\S]*labelNode\.className = "creation-listing-field-label";/);
   assert.match(listingView, /function applyCreationListingCopyData\(target, label, value, \{ list = false \} = \{\}\) \{/);
-  assert.match(listingView, /function createCreationListingValueCopyTarget\(displayText, copyText, label, \{ localized = false \} = \{\}\) \{[\s\S]*target\.className = localized \? "creation-listing-localized" : "creation-listing-value-copy";/);
-  assert.match(listingView, /if \(copyable\) \{[\s\S]*applyCreationListingCopyData\(labelNode, `\$\{label\}英文`, copySource, \{ list: copyList \}\);[\s\S]*\}/);
-  assert.match(listingView, /appendRowCopyTargets\(row, item, index\);/);
-  assert.match(listingView, /appendLocalizedText\(parent, row\.localizedText, \{[\s\S]*copyText: localizedCopyRows\[index\] \|\| row\.localizedText,[\s\S]*label: `\$\{itemLabel\}中文`,/);
+  assert.match(listingView, /function createCreationListingValueCopyTarget\(displayText, copyText, label, \{[\s\S]*localized = false,[\s\S]*prominent = false,[\s\S]*\} = \{\}\) \{/);
+  assert.match(listingView, /fieldTools\.appendChild\(createCreationListingFieldCopyButton\(label, copySource, \{ list: copyList \}\)\);/);
+  assert.match(listingView, /appendRowCopyTargets\(row, index\);/);
+  assert.match(listingView, /if \(localizedText\) \{[\s\S]*localizedCopyRows\[index\] \|\| localizedText,[\s\S]*`\$\{itemLabel\}中文`/);
   assert.doesNotMatch(listingView, /createCreationListingField\("警告"|createCreationListingField\("缺失信息"/u);
-  assert.match(listingView, /titleCopy\.className = "creation-listing-title-copy";/);
-  assert.match(listingView, /applyCreationListingCopyData\(titleCopy, "标题英文", headerContent\.title\);/);
+  assert.doesNotMatch(listingView, /titleCopy\.className = "creation-listing-title-copy";/);
+  assert.match(listingView, /createCreationListingField\("标题", draft\.title, \{[\s\S]*prominent: true,[\s\S]*\}\)\);/);
+  assert.doesNotMatch(listingView, /CREATION_LISTING_(?:LANGUAGE|SECTION)_MODES|getCreationListingViewModes|setCreationListingViewMode|createCreationListingSegmentedControl|creationListingViewControl|listingLanguageMode|listingSectionMode/);
+  assert.doesNotMatch(listingView, /copyGroup|searchGroup|creation-listing-field-group/);
   assert.match(listingView, /getCreationListingPolicy\(requestedPolicyId\)/);
   assert.doesNotMatch(listingView, /needsCurrentRewrite|hasBlockedV2|待人工复核，不可直接发布/u);
-  assert.match(listingView, /const CREATION_LISTING_BUCKET_COPY_LABELS = \{/);
-  assert.match(listingView, /const localizedBucketLines = buildCreationListingLocalizedBucketLines\(draft\.zhDisplay\?\.keywordBuckets\);/);
+  assert.doesNotMatch(listingView, /CREATION_LISTING_BUCKET_COPY_LABELS|Exact keywords:|Long-tail keywords:|Traffic keywords:|Descriptive keywords:/);
+  assert.match(listingView, /const bucketRows = buildCreationListingBucketRows\([\s\S]*draft\.keywordBuckets,[\s\S]*draft\.zhDisplay\?\.keywordBuckets/);
+  assert.match(listingView, /fixedLabel\.className = "creation-listing-bucket-label";[\s\S]*fixedLabel\.textContent = `\$\{rowValue\.label\}:`;/);
+  assert.match(listingView, /copyTarget\.classList\.add\("creation-listing-bucket-value"\);/);
   assert.match(listingView, /localizedCountValue: localizedBucketValues,/);
   assert.match(listingView, /copyValue: buildCreationListingBucketCopyLines\(draft\.keywordBuckets\),/);
-  assert.match(listingView, /target\.className = localized \? "creation-listing-localized" : "creation-listing-value-copy";/);
+  assert.match(listingView, /localizedCopyValue: buildCreationListingLocalizedBucketCopyLines\(draft\.zhDisplay\?\.keywordBuckets\),/);
+  assert.match(listingView, /localized \? "creation-listing-localized" : "creation-listing-value-copy"/);
   assert.match(listingView, /const listingDraftContainers = new Set\(\[[\s\S]*creationRecordListingDrafts,[\s\S]*creationInlineListingDrafts,[\s\S]*\]\.filter\(Boolean\)\);/);
   assert.match(listingView, /listingDraftContainers\.forEach\(\(container\) => \{[\s\S]*container\.addEventListener\("click",[\s\S]*closest\?\.\("\[data-creation-listing-copy-text\]"\)[\s\S]*copyCreationListingFieldButton/);
   assert.match(listingView, /export function buildCreationListingExportPayload\(set\) \{/);
@@ -5117,29 +5131,37 @@ test("creation mode exposes listing agent controls and record listing drafts", a
   assert.match(styles, /\.creation-record-status-row\s*\{[\s\S]*display:\s*flex;[\s\S]*gap:\s*6px;/);
   assert.match(styles, /\.creation-record-listing-badge\s*\{[\s\S]*background:\s*rgba\(54,\s*211,\s*153,\s*0\.14\);/);
   assert.match(styles, /\.creation-listing-content-frame\s*\{/);
-  assert.match(readCssRule(styles, ".creation-listing-content-frame"), /border:\s*1px solid/);
-  assert.match(readCssRule(styles, ".creation-listing-field"), /border:\s*1px solid/);
-  assert.match(readCssRule(styles, ".creation-listing-field:first-child"), /background:\s*rgba\(125,\s*211,\s*252,\s*0\.055\)/);
+  assert.match(readCssRule(styles, ".creation-listing-content-frame"), /border-top:\s*1px solid/);
+  assert.match(readCssRule(styles, ".creation-listing-field"), /border-bottom:\s*1px solid/);
+  assert.match(readCssRule(styles, ".creation-listing-field:first-child"), /background:\s*rgba\(125,\s*211,\s*252,\s*0\.035\)/);
+  assert.doesNotMatch(styles, /\.creation-listing-view-toolbar\s*\{|\.creation-listing-segmented\s*\{|\.creation-listing-view-control|data-creation-listing-(?:language|section)-mode/);
+  assert.match(readCssRule(styles, ".creation-listing-copy-pair"), /display:\s*grid;/);
+  assert.match(readCssRule(styles, ".creation-listing-copy-pair"), /grid-template-columns:\s*minmax\(0,\s*1fr\);/);
+  assert.doesNotMatch(readCssRule(styles, ".creation-listing-copy-pair"), /repeat\(2/);
+  assert.match(readCssRuleContaining(styles, ".creation-listing-localized", "border-top"), /border-top:\s*1px solid/);
   assert.match(styles, /\.creation-listing-field-copy\s*\{/);
   assert.match(styles, /\.creation-listing-field-copy:hover\s*\{/);
   assert.match(styles, /\.creation-listing-title-copy\s*\{/);
   assert.match(styles, /\.creation-listing-title-copy:hover\s*\{/);
-  assert.match(readCssRule(styles, ".creation-listing-field:first-child p"), /font-size:\s*var\(--type-subtitle-size\)/);
-  assert.match(readCssRule(styles, ".creation-listing-field:first-child p"), /font-weight:\s*800/);
   assert.match(styles, /\.creation-listing-character-count\s*\{/);
-  assert.match(readCssRule(styles, ".creation-listing-character-count"), /background:\s*rgba\(/);
-  assert.match(readCssRule(styles, ".creation-listing-character-count.english"), /color:\s*#/);
-  assert.match(readCssRule(styles, ".creation-listing-character-count.chinese"), /color:\s*#/);
+  assert.match(readCssRule(styles, ".creation-listing-character-count"), /background:\s*transparent/);
+  assert.match(readCssRule(styles, ".creation-listing-character-count.english"), /color:\s*var\(--text-soft\)/);
+  assert.match(readCssRule(styles, ".creation-listing-character-count.chinese"), /color:\s*color-mix/);
   assert.match(styles, /\.creation-listing-localized\s*\{/);
   assert.match(styles, /\.creation-listing-value-copy,[\s\S]*\.creation-listing-localized\s*\{/);
   assert.match(styles, /\.creation-listing-value-copy:hover,[\s\S]*\.creation-listing-localized:hover\s*\{/);
   assert.match(styles, /\.creation-listing-value-copy:focus-visible,[\s\S]*\.creation-listing-localized:focus-visible\s*\{/);
-  assert.match(styles, /\.creation-listing-localized::before\s*\{/);
+  assert.doesNotMatch(styles, /\.creation-listing-localized::before\s*\{/);
+  assert.match(readCssRule(styles, ".creation-listing-bucket-label"), /user-select:\s*none;/);
   assert.match(styles, /\.creation-record-results\s*\{/);
   assert.match(readCssRule(styles, ".creation-record-results"), /display:\s*block;/);
   assert.doesNotMatch(readCssRule(styles, ".creation-record-results"), /display:\s*grid;/);
   assert.match(styles, /\.creation-record-result-grid\s*\{[\s\S]*min-height:\s*max-content;[\s\S]*overflow:\s*visible;/);
   assert.match(styles, /\.creation-result-grid \+ \.creation-listing-panel:not\(\.hidden\)\s*\{[\s\S]*margin-top:\s*12px;/);
+  assert.match(
+    readCssRule(styles, 'html[data-ui-layout="mobile"] .creation-record-panel > .asset-page-head'),
+    /position:\s*static;/,
+  );
   assert.doesNotMatch(styles, /creation-card-listing-draft/);
 });
 

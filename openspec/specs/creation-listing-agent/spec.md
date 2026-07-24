@@ -102,13 +102,23 @@ The system SHALL keep one versioned Listing policy for each canonical platform a
 - **AND** no validation or review state blocks the generated draft
 
 ### Requirement: New Listing drafts use the old-style bilingual field contract
-Every new or explicitly rewritten Listing SHALL contain `title`, `sellingPoints`, `painPoints`, `fiveBullets`, `description`, `backendSearchTerms`, `keywordBuckets`, and a structurally corresponding Simplified Chinese `zhDisplay`. `keywordBuckets` SHALL contain `exact`, `longTail`, `traffic`, and `descriptive` arrays in both languages.
+Every successfully generated or explicitly test-mocked Listing SHALL contain `title`, `sellingPoints`, `painPoints`, `fiveBullets`, `description`, `backendSearchTerms`, `keywordBuckets`, and a Simplified Chinese `zhDisplay` with the same field value types. `keywordBuckets` SHALL contain `exact`, `longTail`, `traffic`, and `descriptive` arrays in both languages. The system SHALL allow keyword strings or buckets to become empty and bilingual list counts to differ when normalization or low-risk term removal deletes unusable content. A failed real generation SHALL NOT create a Listing draft.
 
 #### Scenario: A new Listing is generated
-- **WHEN** Listing generation completes from model, mock or deterministic fallback
+- **WHEN** the model returns a Listing that passes parsing, normalization, minimum bilingual structure, low-risk term sanitization, and high-risk safety checks
 - **THEN** English content is stored in the top-level old-style fields
-- **AND** Simplified Chinese content is stored in matching `zhDisplay` fields with the same value types and item order
+- **AND** Simplified Chinese content is stored in matching `zhDisplay` field types
 - **AND** the status is `completed`
+
+#### Scenario: Low-risk terms are removed from generated content
+- **WHEN** normalization finds an unsupported low-risk concrete attribute, material, color, shape, construction, mode, or use-context term
+- **THEN** the system removes that term from public Listing fields before returning the draft
+- **AND** empty search terms or keyword entries do not make the generation fail
+
+#### Scenario: Explicit test mock mode is used
+- **WHEN** a test directly enables the explicit mock mode
+- **THEN** the mock uses the old-style bilingual field contract
+- **AND** a real request failure never enables that mode implicitly
 
 #### Scenario: A historical V2 draft is opened
 - **WHEN** a stored draft uses `buyerObjections`, `highlights` or `searchTerms`
@@ -116,17 +126,38 @@ Every new or explicitly rewritten Listing SHALL contain `title`, `sellingPoints`
 - **AND** the historical stored draft is not rewritten automatically
 
 ### Requirement: Listing generation completes without validation or review gates
-The system SHALL make one upstream model request. It SHALL NOT perform validator-driven retries, manual review, `needs-review`, failed rewrite gates, or status-based copy/export blocking. If the model request or response parsing fails, the system SHALL directly return a deterministic old-style fallback with status `completed`. Missing required API configuration MAY remain an explicit configuration error.
+The system SHALL make one upstream model request for Platform V1. It SHALL NOT perform validator-driven retries, manual review, `needs-review`, failed rewrite gates, or status-based copy/export blocking. After parsing and normalization, it SHALL remove unsupported low-risk evidence terms and SHALL accept non-critical title-length, Bullet-format, pain-point-form, bilingual-count, and keyword-population differences when the minimum bilingual Listing structure remains usable. If the real model request, response parsing, normalization, minimum bilingual structure, or high-risk safety validation fails, the system SHALL return an explicit generation error and SHALL NOT create a mock, deterministic fallback, or `completed` draft. Missing required API configuration SHALL remain an explicit configuration error.
 
 #### Scenario: Model returns usable old-style JSON
-- **WHEN** the single model response can be normalized
-- **THEN** the system returns the normalized draft as `completed`
-- **AND** no second model request or validator review occurs
+- **WHEN** the single model response can be normalized and retains non-empty English and Chinese titles and descriptions
+- **THEN** the system returns the normalized and sanitized draft as `completed`
+- **AND** no second Platform V1 model request or validator review occurs
+
+#### Scenario: Unsupported low-risk terms are recoverable
+- **WHEN** the model response contains low-risk concrete attributes, materials, colors, shapes, construction details, modes, or use contexts that are absent from traceable source evidence
+- **THEN** the system removes those terms from public Listing content
+- **AND** it returns the remaining usable draft as `completed` without another model request
+
+#### Scenario: Non-critical formatting differs from the prompt target
+- **WHEN** the normalized response uses a shorter title, legacy or non-unique Bullet labels, a non-five Bullet count, interrogative pain-point copy, unequal bilingual list counts, or empty keyword buckets
+- **AND** the minimum bilingual Listing structure remains usable
+- **THEN** the system returns the draft as `completed`
+- **AND** none of those format differences produces a generation error
 
 #### Scenario: Model request or parsing fails
-- **WHEN** the upstream returns a rate limit, server error, unusable JSON or incompatible shape
-- **THEN** the system immediately builds a deterministic old-style bilingual fallback
-- **AND** returns it as `completed` without `needs-review` or a rewrite requirement
+- **WHEN** the upstream returns a rate limit, server error, empty response, unusable JSON or incompatible shape
+- **THEN** the system returns an explicit non-success error
+- **AND** it does not return a mock, deterministic fallback or `completed` draft
+
+#### Scenario: Model content fails acceptance
+- **WHEN** parsed model content lacks a non-empty English or Chinese title or description, or retains an unsupported high-risk claim after sanitization
+- **THEN** the system returns an explicit non-success error describing the failed acceptance boundary
+- **AND** it does not return a sanitized mock or deterministic replacement draft
+
+#### Scenario: Regeneration fails for a record with an existing Listing
+- **WHEN** a record already has `listingDrafts` and a regeneration request fails
+- **THEN** the API returns the generation error
+- **AND** the existing stored `listingDrafts` are not overwritten by mock, deterministic, partial, or empty output
 
 #### Scenario: User copies or exports a completed draft
 - **WHEN** any old-style draft is visible
@@ -134,7 +165,7 @@ The system SHALL make one upstream model request. It SHALL NOT perform validator
 - **AND** those actions do not inspect validation, review or access-gate state
 
 ### Requirement: All newly generated Listing content is brand-free
-The system SHALL remove brand names, trademarks, store names, seller names and platform names from every English and Chinese content field. This requirement SHALL apply to model, mock and deterministic fallback outputs as a product output transformation, not as a platform claim or review workflow.
+The system SHALL remove brand names, trademarks, store names, seller names and platform names from every English and Chinese content field. This requirement SHALL apply to accepted model outputs and explicitly test-mocked outputs as a product output transformation, not as a platform claim or review workflow.
 
 #### Scenario: Source data contains prohibited identity terms
 - **WHEN** product input, SKU data, reference notes or manifest text contains a prohibited identity term
@@ -142,7 +173,7 @@ The system SHALL remove brand names, trademarks, store names, seller names and p
 - **AND** the prompt instructs the model not to output it
 
 #### Scenario: Generated output contains a prohibited identity term
-- **WHEN** model, mock or deterministic fallback content contains a prohibited identity term
+- **WHEN** accepted model content or explicitly test-mocked content contains a prohibited identity term
 - **THEN** the shared sanitizer removes or neutrally rewrites it before the draft is returned
 - **AND** the final English and Chinese content fields do not contain the term
 - **AND** the draft remains a direct `completed` result rather than entering review
@@ -153,139 +184,199 @@ The system SHALL remove brand names, trademarks, store names, seller names and p
 - **AND** the platform name does not appear in any Listing content field or Chinese counterpart
 
 ### Requirement: Local service and Cloudflare Worker share Listing semantics
-The local service and Cloudflare Worker SHALL use the same policy resolver, source builder, old-style schema, prompt builder, normalizer, sanitizer and deterministic fallback.
+The local service and Cloudflare Worker SHALL use the same policy resolver, source builder, old-style schema, prompt builder, normalizer, sanitizer, acceptance checks, and explicit failure behavior.
 
 #### Scenario: Equivalent normalized inputs use different runtimes
 - **WHEN** local and Worker paths receive equivalent normalized Creation sets and configuration
 - **THEN** they resolve the same platform policy and old-style field contract
-- **AND** they use the same one-request and direct-fallback behavior
+- **AND** both return a completed draft only for accepted model output and otherwise return a non-success error without automatic fallback
 - **AND** neither runtime fetches platform rule URLs during generation
 
 ### Requirement: Platform V1 Listing titles communicate evidence-backed value
-The system SHALL use the restored platform V1 Listing rules for the old-style bilingual fields. Selling points, pain points, five bullets, description, backend search terms, and keyword buckets SHALL retain the prior objective, attribute-only generation rules. The title and `zhDisplay.title` SHALL place the product identity early and SHALL include one supplied differentiating selling point plus the directly supported buyer pain point or purchase concern that the selling point resolves. After this required core, when traceable evidence and platform hard limits allow, the title SHALL add two to four distinct search-relevant or purchase-decision attributes selected from supplied quantity, visible construction, visible components, shape, color, variant, or package facts. Platform hard character and byte limits SHALL always take precedence; recommended length ranges SHALL remain readability targets rather than hard validation limits. Traceable title evidence SHALL include explicit product inputs and compact structured Creation planning evidence whose buyer motivation or use context is directly supported by its evidence focus or reference-image notes. Objections that only identify missing, disputed, or unverified information SHALL NOT become title evidence. The title SHALL NOT repeat concepts to fill space or invent a problem, result, function, effect, performance claim, or other fact that is absent from traceable product evidence.
+
+The system SHALL preserve the existing platform V1 title prompt behavior and old-style bilingual field contract. The prompt SHALL ask the title and `zhDisplay.title` to place product identity early and include one supplied differentiating selling point plus the directly supported buyer pain point or purchase concern that the selling point resolves. After this required core, when traceable evidence and platform hard limits allow, the prompt SHALL ask for distinct search-relevant or purchase-decision attributes selected from supplied quantity, visible construction, visible components, shape, color, variant, package, or use-context facts. When the resolved platform has no hard title limit below 120 English characters and the source supplies enough distinct traceable title facts to write naturally without repetition, the prompt SHALL target at least 120 English characters after trimming. Platform hard character and byte limits and factual support SHALL take precedence over this target. Traceable title evidence SHALL include explicit product inputs and compact structured Creation planning evidence whose buyer motivation or use context is directly supported by its evidence focus or reference-image notes. Objections that only identify missing, disputed, or unverified information SHALL NOT become title evidence. The prompt SHALL prohibit repeated padding and invented facts. The system SHALL sanitize unsupported low-risk title terms and SHALL NOT reject an otherwise usable direct response solely because it is shorter than the title target. `zhDisplay.title` SHALL preserve the same facts naturally when the model follows the prompt, without mechanical character padding.
 
 #### Scenario: Platform V1 prompt restores the prior field rules
 - **WHEN** a platform V1 Listing request is built
-- **THEN** the prompt contains the prior Listing SEO, objective-attribute, fixed five-bullet, bilingual and platform-policy rules
-- **AND** the objective-attribute and functional-wording restrictions explicitly apply to non-title fields while preserving the title-only value requirement
+- **THEN** the prompt retains the existing title ordering, evidence, completeness, bilingual, and platform-policy rules
+- **AND** it applies evidence-backed buyer-value rules to non-title fields instead of the former objective-only and fixed-label restrictions
+- **AND** it requests alignment between title and `zhDisplay.title` in identity, value, facts, quantity, and order
 
 #### Scenario: Title communicates supplied value and a resolved pain point
 - **WHEN** product evidence supplies a differentiating selling point and the buyer problem or purchase concern that it directly addresses
-- **THEN** the title places the core product phrase near the beginning
-- **AND** the title includes the supplied selling point and a concise statement of the directly supported pain point resolution
-- **AND** a title containing only quantity, structure, color, model, or variant attributes is not considered compliant while such value evidence exists
-- **AND** `zhDisplay.title` preserves the same facts and meaning
+- **THEN** the prompt places the core product phrase near the beginning
+- **AND** it requests the supplied selling point and a concise statement of the directly supported pain point resolution
+- **AND** it does not treat quantity, structure, color, model, or variant attributes alone as the preferred result while value evidence exists
 
 #### Scenario: Title adds supported decision attributes after the value phrase
 - **WHEN** product evidence supplies at least two distinct search-relevant or purchase-decision attributes in addition to the required title value
 - **AND** the resolved platform hard limits leave enough space
-- **THEN** the title appends two to four of the strongest supplied attributes after the required core
-- **AND** each appended attribute represents a different decision point
-- **AND** the title does not repeat synonyms, restate the same value, add unsupported filler, or include prohibited dimensions and specifications
-- **AND** `zhDisplay.title` preserves the same appended facts in the same order
+- **THEN** the prompt requests two to four of the strongest supplied attributes after the required core
+- **AND** it may request additional distinct facts to reach the 120-character target
+- **AND** it prohibits repeated synonyms, restated value, unsupported filler, and prohibited dimensions or specifications
 
 #### Scenario: Platform length guidance conflicts with title completeness
 - **WHEN** a platform supplies a hard title limit and a recommended title range
-- **THEN** the generated title never exceeds the hard character or byte limit
-- **AND** the recommended range guides readability but does not override required evidence-backed title content
-- **AND** lower-priority appended attributes are omitted before product identity or the supported value relationship is removed
+- **THEN** the prompt gives the hard character or byte limit precedence
+- **AND** the recommended range remains readability guidance rather than a direct-response acceptance gate
+
+#### Scenario: Source cannot support a title benefit or pain resolution
+- **WHEN** no traceable source evidence supports a differentiating benefit or resolved buyer pain point
+- **THEN** the prompt instructs the model to omit that unsupported relationship
+- **AND** the returned title may remain limited to supported identity, quantity, search intent, and other title-eligible facts
+
+#### Scenario: Platform hard title limit applies
+- **WHEN** the resolved platform has a hard character or UTF-8 byte limit
+- **THEN** the prompt requires the generated title to remain within that limit
+- **AND** lower-priority appended attributes are omitted before product identity or a supported value relationship
 
 #### Scenario: Structured suite evidence supplies title value when manual fields are empty
 - **WHEN** product description and manual selling points are empty
 - **AND** saved Creation items contain structured motivation, audience or use context, and supporting evidence focus
-- **THEN** the Listing source includes a bounded, deduplicated title-only evidence block with the source role
+- **THEN** the Listing source includes a bounded, deduplicated evidence block with the source role
 - **AND** it excludes objection text that only describes missing, disputed, or unverified facts
 - **AND** the prompt requires the title to select only a candidate directly supported by product or reference evidence
 
 #### Scenario: Evidence does not support a product outcome
 - **WHEN** product evidence does not supply a functional problem or outcome
-- **THEN** the title does not invent one
+- **THEN** the prompt prohibits inventing one
 - **AND** it may instead express a purchase concern resolved by supplied quantity, option, variant, or package facts without adding title-prohibited dimensions or specifications
 
 #### Scenario: Functional wording appears outside the title
-- **WHEN** a platform V1 response contains functional or effect wording outside `title` and `zhDisplay.title`
-- **THEN** the response is not retained as the direct result
-- **AND** the deterministic conservative fallback is returned
+- **WHEN** supplied evidence directly supports a conservative feature-to-benefit relationship outside `title` and `zhDisplay.title`
+- **THEN** the Platform V1 response is not rejected solely because it contains that supported functional or benefit wording
+- **AND** unsupported outcomes, performance claims, and existing high-risk claims still cause the direct response to be rejected
+
+#### Scenario: Concrete low-risk attribute is not supplied
+- **WHEN** a Platform V1 response adds a concrete attribute, construction detail, color, shape, material, or specific use context that is absent from traceable product and buyer-decision evidence
+- **THEN** the system removes the unsupported term from the public Listing content
+- **AND** it returns the remaining usable direct response without a deterministic or mock replacement
 
 #### Scenario: Title contains a high-risk claim
-- **WHEN** a title contains an unsupported ranking, certification, medical, price, guarantee, refund, material, compatibility, performance, or other high-risk claim
-- **THEN** the response is not retained as the direct result
-- **AND** the deterministic conservative fallback is returned
+- **WHEN** a title contains an unsupported ranking, certification, medical, price, guarantee, refund, compatibility, performance, or other high-risk claim
+- **THEN** the response is rejected with an explicit generation error
+- **AND** no deterministic or mock replacement draft is returned
 
 #### Scenario: Transient upstream failure retains a safe recognized product identity
-- **WHEN** a Chinese folding-wagon Listing request falls back after an upstream failure
-- **AND** SKU or reference notes contain a disputed numeric claim such as `300KG`
-- **THEN** the deterministic title identifies the product as a folding wagon cart
-- **AND** it does not use the disputed numeric claim as the product identity or a title fact
+- **WHEN** a localized Listing request receives a transient upstream failure
+- **THEN** the failure is returned to the caller without deriving a product identity or title
+- **AND** no generic or recognized-product fallback Listing is created
+
+#### Scenario: Evidence-rich title uses the explicit English target
+- **WHEN** the source supplies enough distinct traceable title facts to express a natural title of at least 120 English characters
+- **AND** the resolved platform has no hard character or UTF-8 byte title limit below 120
+- **THEN** the prompt targets at least 120 English characters
+- **AND** it requests supported product details and use context without repeated synonyms or generic filler
+
+#### Scenario: A short evidence-rich model title remains usable
+- **WHEN** a platform V1 model response supplies fewer than 120 English title characters for a source that qualifies for the target
+- **AND** the normalized draft retains the minimum bilingual structure and passes high-risk safety checks
+- **THEN** the short title does not cause a generation error
+- **AND** the direct model draft is returned without a fallback
+
+#### Scenario: Platform hard title limit is below the target
+- **WHEN** the resolved platform hard character or UTF-8 byte title limit is below 120
+- **THEN** the platform hard limit takes precedence in the prompt
+- **AND** a title is not rejected solely because it contains fewer than 120 English characters
+
+#### Scenario: Evidence cannot support 120 characters naturally
+- **WHEN** the source supplies too few distinct title facts to reach 120 characters without repetition, padding, or invention
+- **THEN** the system may return a shorter title
+- **AND** it does not invent use contexts, attributes, benefits, package facts, or performance claims to satisfy the target
 
 ### Requirement: Platform V1 non-title Listing fields provide complete objective information
 
-The system SHALL instruct platform V1 generation to make `sellingPoints`, `painPoints`, `fiveBullets`, `description`, `backendSearchTerms`, `keywordBuckets`, and their Simplified Chinese counterparts complete, distinct, useful, natural, and buyer-facing while retaining the objective, attribute-only content boundary. Public copy SHALL state product facts directly and SHALL NOT expose internal record, evidence, generation, selection-state, or parent-draft terminology. When traceable evidence supports enough distinct decision points, selling points SHALL contain four to five complete entries and pain points SHALL contain three to four concise declarative statements, each directly presenting one positive supplied pre-purchase fact rather than using missing-information, evidence-provenance, interrogative, rhetorical, or question-and-answer wording. English and Chinese `painPoints` SHALL NOT contain question marks or begin with question constructions. The five bullets SHALL retain the fixed `PRODUCT TYPE`, `PACK DETAILS`, `VISIBLE DETAILS`, `SPECIFICATIONS`, and `PACKAGE CONTENTS` labels, with one unique responsibility per bullet and a direct factual body. The description SHALL organize supported identity, visible construction, specifications, variants, quantity, and package facts as connected product prose without narrating how those facts were obtained or repeating text merely to increase length. When evidence supports a fuller English description, the prompt SHALL target 350 to 500 characters and SHALL never exceed the existing 500-character universal limit or a stricter platform limit. Backend search terms and keyword buckets SHALL remain publishable keyword phrases and SHALL broaden directly relevant objective search coverage while removing case, punctuation, mechanical singular/plural, and semantic duplicates within and across buckets. A model, core, SKU, or variant identifier visible only in image or reference evidence SHALL be qualified as a visible marking and SHALL NOT be presented as a confirmed selection or available option. Evidence scarcity and platform hard limits SHALL take precedence over recommended completeness; the system SHALL omit unsupported content rather than inventing or repeating it. The existing title rules SHALL remain unchanged.
+The system SHALL instruct platform V1 generation to make `sellingPoints`, `painPoints`, `fiveBullets`, `description`, `backendSearchTerms`, `keywordBuckets`, and their Simplified Chinese counterparts complete, distinct, useful, natural, buyer-facing, and evidence-backed. Product facts SHALL remain traceable to supplied product inputs, SKU and package facts, reference notes, visible image evidence, or structured buyer-decision evidence whose stated value is supported by its evidence focus. The prompt SHALL prohibit internal workflow language, unsupported competitor comparisons, high-risk claims, question-and-answer pain points, duplicate decision points, and unsupported outcomes. It SHALL request four to five selling points, three to four declarative pain points, five unique product-relevant Bullet labels, natural description prose, and distinct search coverage when evidence and platform limits permit. These count, label, sentence-form, bilingual-count, and keyword-population rules SHALL be generation quality targets rather than direct-response failure gates. The system SHALL remove unsupported low-risk evidence terms before returning a usable response, while unsupported high-risk claims SHALL remain rejection conditions.
 
 #### Scenario: Evidence supports multiple non-title decision points
-
-- **WHEN** platform V1 product evidence contains at least four distinct objective facts across identity, visible construction, specifications, variants, quantity, or package contents
-- **THEN** the prompt requests four to five distinct selling points and three to four objective pre-purchase statements
-- **AND** each entry uses a complete, specific statement rather than an isolated label or generic adjective
-- **AND** every pain point directly states one supplied fact instead of asking a question or saying that information is unknown, missing, or not specified
-- **AND** no entry introduces a function, effect, performance result, benefit, or problem-solution claim
+- **WHEN** Platform V1 product evidence contains at least four distinct supported facts or buyer-decision relationships
+- **THEN** the prompt requests four to five distinct selling points and three to four declarative pain-point entries when limits permit
+- **AND** each requested item connects supplied facts to supported buyer relevance without unsupported praise
 
 #### Scenario: Buyer-visible copy does not expose internal workflow language
+- **WHEN** Platform V1 generation instructions are built
+- **THEN** they prohibit parent-listing, saved-record, supplied-configuration, reference-label, source-evidence, selected-quantity, and confirmed-selection narration
+- **AND** they request natural storefront language in both languages
 
-- **WHEN** Platform V1 generates non-title English and Chinese content
-- **THEN** selling points, pain points, fixed bullets, and descriptions state product facts directly in natural storefront language
-- **AND** they do not mention parent listings, parent products, saved Creation sets, supplied configurations, reference labels, source evidence, selected quantities, confirmed selections, or equivalent Chinese workflow terms
-- **AND** each pain point uses a declarative sentence such as a direct quantity, dimension, variant, visible-detail, or package statement
-- **AND** pain points contain neither `?` nor `？`, do not begin with interrogative constructions, and do not combine a question with its answer
-
-#### Scenario: Interrogative model output is not accepted
-
+#### Scenario: Interrogative model output remains usable
 - **WHEN** a Platform V1 model response contains an English or Chinese pain point with a question mark, rhetorical question, or interrogative opening
-- **THEN** the response is not accepted as the completed Listing
-- **AND** the system returns the existing deterministic objective fallback whose pain points are declarative statements
-- **AND** it does not add another model retry or manual review state
+- **AND** the minimum bilingual structure and high-risk safety checks pass
+- **THEN** the sentence form alone does not cause a generation error
+- **AND** the direct model response is returned without a deterministic or mock replacement
 
-#### Scenario: Fixed bullets divide supported facts by responsibility
-
-- **WHEN** a platform V1 Listing is generated
-- **THEN** the prompt retains the fixed five-bullet labels in their existing order
-- **AND** product identity, pack or variant details, visible construction, supplied specifications, and package contents are assigned to their matching bullet
-- **AND** each bullet body states its product fact directly without evidence-provenance narration
-- **AND** the same sentence or decision point is not repeated under multiple labels
+#### Scenario: Bullet guidance divides supported facts by responsibility
+- **WHEN** a Platform V1 prompt is built
+- **THEN** it requests exactly five unique, product-relevant lead labels rather than the former fixed label script
+- **AND** it assigns primary value, differentiating feature, use context or fit, supplied specification or construction, and variant, quantity, or package clarity to distinct bullets
 
 #### Scenario: Description uses supported facts without padding
-
 - **WHEN** evidence and platform limits permit a fuller description
-- **THEN** the prompt organizes facts in the order of product identity, visible construction, specifications, variants, quantity, and package contents
-- **AND** it uses short natural paragraphs rather than a list of disconnected fragments
-- **AND** it targets 350 to 500 English characters when the evidence supports that range
-- **AND** it never exceeds the existing 500-character universal field limit or a stricter platform limit
-- **AND** it does not repeat the title or other fields merely to meet a target length
-- **AND** it does not describe the Listing record, source provenance, or generation process
+- **THEN** the prompt organizes product identity, intended context, supported value, relevant details, selection guidance, and package contents as connected natural prose
+- **AND** it prohibits repeated padding, provenance narration, and content beyond the applicable hard limit
 
 #### Scenario: Image-only identifiers remain qualified
-
 - **WHEN** a model, core, SKU, or variant identifier appears only as visible text or a reference annotation
-- **THEN** non-title copy may say that visible markings include that identifier
-- **AND** it does not call the identifier a selected, confirmed, included, or available option without structured product or SKU evidence
+- **THEN** the prompt permits describing it only as a visible marking
+- **AND** it prohibits presenting it as a confirmed option without structured product or SKU evidence
 
 #### Scenario: Search terms and keyword buckets have distinct coverage
-
 - **WHEN** backend search terms and keyword buckets are generated
-- **THEN** the prompt assigns exact category phrases, objective attribute long tails, broader directly relevant categories, and descriptive attribute phrases to distinct search surfaces
-- **AND** it removes case-only, punctuation-only, mechanical singular/plural, and semantic duplicates within and across keyword buckets
-- **AND** it excludes functions, effects, competitors, unsupported claims, irrelevant traffic terms, and internal evidence or generation terminology
+- **THEN** the prompt assigns exact category phrases, supported attribute long tails, broader directly relevant categories, and supported descriptive phrases to distinct search surfaces
+- **AND** it excludes competitors, unsupported claims, irrelevant traffic terms, duplicates, and internal workflow terminology
 
 #### Scenario: English and Chinese non-title fields correspond
-
-- **WHEN** the bilingual platform V1 result is returned
-- **THEN** corresponding arrays preserve the same item counts, order, facts, quantities, and units
-- **AND** Chinese content translates the matching English meaning naturally without adding or removing claims
-- **AND** neither language exposes internal workflow terminology or uses question-and-answer pain points
+- **WHEN** the bilingual Platform V1 prompt is built
+- **THEN** it requests corresponding item counts, order, facts, quantities, units, buyer relevance, and proof
+- **AND** normalization or low-risk term removal may leave different list counts without rejecting an otherwise usable response
 
 #### Scenario: Product evidence is insufficient for recommended completeness
+- **WHEN** the source cannot support a direct benefit, category-friction response, recommended item count, or target length
+- **THEN** the prompt instructs the model to state only the supplied attribute, return fewer entries, or shorten the content
+- **AND** it prohibits duplication, invented technical outcomes, competitor comparisons, and generic filler
 
-- **WHEN** the source does not support the recommended number of distinct facts or the platform hard limit is smaller
-- **THEN** the prompt instructs the model to return fewer supported entries or shorter content
-- **AND** it does not duplicate, paraphrase, infer, or invent facts to reach a count or length target
-- **AND** title generation continues to use the existing title rules without modification
+#### Scenario: Selling points explain why and where the product is useful
+- **WHEN** product evidence supplies multiple differentiating features and directly supported buyer relevance
+- **THEN** the prompt asks every selling point to identify one supplied feature, explain its practical relevance, and include concrete supplied proof
+- **AND** it prohibits isolated labels, generic adjectives, and cross-field paraphrases
+
+#### Scenario: Pain points resolve real category friction
+- **WHEN** the exact product category and supplied evidence support a specific shopping or use friction
+- **THEN** the prompt requests the friction, supplied product response, and supporting feature or specification in one natural declarative entry
+- **AND** question form remains a quality target rather than a direct-response failure gate
+
+#### Scenario: Comparative failure is unsupported
+- **WHEN** generated copy says or implies that competitors fail or that this product is better than alternatives without exact comparative evidence
+- **THEN** the response is treated as containing an unsupported high-risk comparison
+- **AND** it is rejected unless the unsupported claim is absent from the final sanitized content
+
+#### Scenario: Comparative failure is implied through a generic competitor class
+- **WHEN** generated copy says that most alternatives, typical products, standard models, ordinary products, or an equivalent Chinese competitor class lacks, struggles, leaves a problem, or offers only a limitation
+- **AND** exact comparative evidence is absent
+- **THEN** the response is treated as an unsupported competitor comparison
+
+#### Scenario: Five bullets follow Amazon-style buyer decisions
+- **WHEN** a Platform V1 prompt is built
+- **THEN** it requests five unique product-relevant uppercase English lead labels followed by colons
+- **AND** a different Bullet count or label format in the direct response does not alone cause a generation error
+
+#### Scenario: Model reuses the legacy fixed Bullet script
+- **WHEN** five bullets use the complete former `PRODUCT TYPE`, `PACK DETAILS`, `VISIBLE DETAILS`, `SPECIFICATIONS`, and `PACKAGE CONTENTS` label set
+- **AND** the minimum bilingual structure and high-risk safety checks pass
+- **THEN** the label choice alone does not cause a generation error
+- **AND** the direct response is returned without a deterministic or mock replacement
+
+#### Scenario: Deterministic fallback has buyer-decision evidence
+- **WHEN** the model response is unavailable or fails a non-recoverable acceptance condition
+- **AND** bounded buyer-decision evidence contains otherwise usable supported facts
+- **THEN** the system returns an explicit generation error
+- **AND** it does not convert that evidence into a deterministic or mock Listing
+
+#### Scenario: English fallback receives localized product evidence
+- **WHEN** an English Listing request fails and the saved evidence contains Simplified Chinese
+- **THEN** the system returns the generation error without constructing localized fallback copy
+- **AND** no translated, generic, deterministic, or mock Listing is saved
+
+#### Scenario: Fallback preserves the parent identity over a generic SKU title
+- **WHEN** a failed request supplies a trusted parent `productName` and a generic SKU subject title
+- **THEN** neither identity is used to construct a fallback Listing
+- **AND** the caller receives the original generation error

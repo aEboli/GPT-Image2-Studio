@@ -424,12 +424,24 @@ test("prompt agent request can identify ecommerce creation reference roles", () 
   assert.ok(requestBody.text.format.schema.properties.sku_subjects.items.required.includes("color_names"));
   assert.equal(requestBody.text.format.schema.properties.sku_subjects.items.properties.subject_unit_count.type, "integer");
   assert.equal(requestBody.text.format.schema.properties.sku_subjects.items.properties.subject_unit_count.minimum, 1);
+  assert.equal(requestBody.text.format.schema.properties.sku_subjects.items.properties.color_names.minItems, 0);
   assert.match(input[0].content[0].text, /navy blue versus cyan or sky blue/i);
   assert.match(input[0].content[0].text, /orange versus red/i);
-  assert.match(input[0].content[0].text, /not the white\/transparent background/i);
+  assert.match(input[0].content[0].text, /exclude the white\/transparent background/i);
+  assert.match(input[0].content[0].text, /brown, black, silver lenses/i);
+  assert.match(input[0].content[0].text, /shared neutral component colors/i);
+  assert.match(input[0].content[0].text, /empty color_names array/i);
   assert.match(
     requestBody.text.format.schema.properties.sku_subjects.items.properties.color_names.description,
-    /not the background, overlay text, lighting, or shared neutral trim/i,
+    /all clearly visible characteristic colors of the physical product/i,
+  );
+  assert.match(
+    requestBody.text.format.schema.properties.sku_subjects.items.properties.color_names.description,
+    /preserve each complete unit label as one array item/i,
+  );
+  assert.match(
+    requestBody.text.format.schema.properties.sku_subjects.items.properties.color_names.description,
+    /shared neutral-colored physical components/i,
   );
   assert.match(input[0].content[0].text, /dimensions/);
   assert.match(input[0].content[0].text, /role=dimensions/);
@@ -743,6 +755,40 @@ test("prompt agent lifts grouped SKU subject unit count from note evidence", () 
   });
 
   assert.equal(result.sku_subjects[0].subject_unit_count, 2);
+});
+
+test("prompt agent preserves an explicit empty SKU color-label result", () => {
+  const result = extractPromptAgentJson({
+    output: [
+      {
+        content: [
+          {
+            type: "output_text",
+            text: JSON.stringify({
+              summary: "One product reference has uncertain reflected colors.",
+              reference_roles: [
+                { index: 1, filename: "brown-reflection.png", role: "product", note: "One complete product unit with unclear surface reflections." },
+              ],
+              sku_subjects: [
+                {
+                  id: "uncertain-color",
+                  title: "Riding goggles",
+                  reference_indexes: [1],
+                  filenames: ["brown-reflection.png"],
+                  subject_unit_count: 1,
+                  color_names: [],
+                  note: "One complete product unit; physical colors are not safely distinguishable from reflections.",
+                },
+              ],
+              risks: ["Color evidence is unclear."],
+            }),
+          },
+        ],
+      },
+    ],
+  });
+
+  assert.deepEqual(result.sku_subjects[0].color_names, []);
 });
 
 test("prompt agent ignores legacy creation reference visual language recommendation", () => {

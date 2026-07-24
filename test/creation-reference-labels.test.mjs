@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  appendCreationItemLogoReference,
+  buildCreationGenerationReferenceImageLabels,
   buildCreationItemReferenceImages,
   buildCreationReferenceImageLabels,
 } from "../lib/creation-reference-labels.mjs";
@@ -64,7 +66,7 @@ test("creation SKU item reference images only include the matching subject files
   ]);
 });
 
-test("creation infographic rebuild item reference images keep subject references plus only its source infographic", () => {
+test("creation infographic rebuild item reference images keep only its source infographic", () => {
   const item = {
     role: "infographic-rebuild",
     sourceInfographic: {
@@ -89,7 +91,71 @@ test("creation infographic rebuild item reference images keep subject references
 
   assert.deepEqual(
     buildCreationItemReferenceImages(item, images, roles).map((image) => image.filename),
-    ["blue-lure.png", "silver-anchor.png", "size-card.png"],
+    ["size-card.png"],
+  );
+});
+
+test("creation infographic rebuild resolves compressed source renames by stable reference index", () => {
+  const item = {
+    role: "infographic-rebuild",
+    sourceInfographic: {
+      filename: "original-size-card.png",
+      index: 2,
+    },
+  };
+  const images = [
+    { filename: "compressed-product.webp" },
+    { filename: "compressed-size-card.webp" },
+    { filename: "compressed-package-card.webp" },
+  ];
+
+  assert.deepEqual(buildCreationItemReferenceImages(item, images).map((image) => image.filename), [
+    "compressed-size-card.webp",
+  ]);
+});
+
+test("creation infographic rebuild accepts historical itemKind-only records", () => {
+  const item = {
+    itemKind: "infographic-rebuild",
+    sourceInfographic: { filename: "source-card.png", index: 2 },
+  };
+  const images = [
+    { filename: "product-reference.jpg" },
+    { filename: "source-card-reference.jpg" },
+  ];
+
+  assert.deepEqual(buildCreationItemReferenceImages(item, images), [images[1]]);
+});
+
+test("creation infographic rebuild fails closed when its source image is missing", () => {
+  assert.throws(
+    () => buildCreationItemReferenceImages(
+      {
+        role: "infographic-rebuild",
+        sourceInfographic: { filename: "missing-source.png", index: 4 },
+      },
+      [
+        { filename: "product.png" },
+        { filename: "other-infographic.png" },
+      ],
+    ),
+    /信息图重构源图缺失.*missing-source\.png/,
+  );
+});
+
+test("creation infographic rebuild adds neither logo references nor reference labels", () => {
+  const item = { role: "infographic-rebuild", logoPolicy: "allow-supplied" };
+  const sourceImages = [{ filename: "source-infographic.png" }];
+  const logoImage = { filename: "brand-mark.png" };
+
+  assert.deepEqual(appendCreationItemLogoReference(item, sourceImages, logoImage), sourceImages);
+  assert.deepEqual(
+    buildCreationGenerationReferenceImageLabels(
+      sourceImages,
+      [{ filename: "source-infographic.png", role: "dimensions", note: "OTHER_NOTE_SENTINEL" }],
+      item,
+    ),
+    [],
   );
 });
 

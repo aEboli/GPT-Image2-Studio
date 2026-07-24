@@ -574,29 +574,67 @@ The system SHALL omit or replace image types that require unavailable factual ev
 - **AND** it does not silently display or submit a named-platform plan built from stale duplicated defaults
 
 ### Requirement: Creation records display and expose Listing drafts in the old-style format
-The Creation record UI SHALL display every current Listing draft using the fixed section order 标题、卖点、痛点、五点描述、商品描述、后台搜索词、关键词分组. Each English value SHALL be followed by its corresponding Simplified Chinese reference. Every visible English value SHALL be an independent copy target that copies only that English value, and every visible Chinese reference SHALL be an independent copy target that copies only that Chinese value. Field-title copy SHALL copy the complete English value for that field, while full-copy and export actions SHALL preserve the complete bilingual field mapping. All copy/export actions SHALL be immediately available without validation or review gating.
+The Creation record UI SHALL preserve every current Listing draft in the fixed field order 标题、卖点、痛点、五点描述、商品描述、后台搜索词、关键词分组 and SHALL display all seven fields continuously on one page without content-group or language-view controls. Within every field or list item, the UI SHALL display the English value first and its corresponding Simplified Chinese value immediately below it when that localized value exists; this bilingual comparison SHALL remain vertical at every supported viewport width. Every visible English value SHALL remain an independent copy target that copies only that English value, and every visible Simplified Chinese value SHALL remain an independent copy target that copies only that Chinese value. Field-level English and Chinese copy controls SHALL copy the complete corresponding language value for that field, while full-copy and export actions SHALL preserve the complete bilingual field mapping. Generate, full-copy, and export controls SHALL remain available from a compact Listing workspace toolbar while the user reviews a long draft. All copy and export actions SHALL be immediately available without validation or review gating.
 
 #### Scenario: User opens a newly generated Listing draft
 - **WHEN** a completed Listing is rendered in a Creation record
-- **THEN** all seven old-style sections are shown in the fixed order
-- **AND** each English scalar or list entry is followed by its matching `中文参考` value
-- **AND** the English value and Chinese reference are rendered as separate copy targets
+- **THEN** 标题、卖点、痛点、五点描述、商品描述、后台搜索词 and 关键词分组 are all visible on the same page in that fixed order
+- **AND** 后台搜索词 and 关键词分组 follow 商品描述 without requiring a content-group switch
+- **AND** the UI does not render `商品文案`, `搜索优化`, `英文`, `中文`, or `对照` view controls
+- **AND** the UI does not duplicate the complete English title above the title field
 - **AND** the UI does not show validation, retry-review or `needs-review` controls
 
+#### Scenario: User compares bilingual Listing values
+- **WHEN** a Listing field or list item has both English and corresponding Simplified Chinese content
+- **THEN** the English value is displayed above the corresponding Chinese value within the same field or item
+- **AND** the Chinese value immediately follows its English counterpart before the next field or item
+- **AND** desktop, stacked, and mobile layouts do not place the two values in side-by-side columns
+
+#### Scenario: User switches the Listing language view
+- **WHEN** an existing application session still contains a previous `en`, `zh`, or `compare` Listing language selection
+- **THEN** the UI ignores that obsolete selection and displays the fixed English-above-Chinese comparison
+- **AND** the UI does not render a language-view control that can hide either language
+
+#### Scenario: User switches the Listing content view
+- **WHEN** an existing application session still contains a previous `copy` or `search` Listing content selection
+- **THEN** the UI ignores that obsolete selection and displays all seven fields on the same page
+- **AND** the UI does not render a content-group control that can hide product-copy or search fields
+
+#### Scenario: Historical Listing value has no Chinese counterpart
+- **WHEN** a historical Listing field or item has an English value but no corresponding Simplified Chinese value
+- **THEN** the English value remains visible and copyable in the fixed field order
+- **AND** the UI does not invent or display a Chinese placeholder
+
 #### Scenario: User copies a visible English Listing value
-- **WHEN** the user clicks the visible English title, field value, or list information point
-- **THEN** the clipboard contains only the clicked English value
-- **AND** the clipboard does not contain its Chinese reference
+- **WHEN** the user clicks a visible English title, field value, list information point, or English field-level copy control
+- **THEN** the clipboard contains only the selected English value or complete English field
+- **AND** the clipboard does not contain its Chinese counterpart
 
 #### Scenario: User copies a visible Chinese Listing reference
-- **WHEN** the user clicks a visible `中文参考` value
-- **THEN** the clipboard contains only that Chinese value
+- **WHEN** the user clicks a visible Simplified Chinese value or Chinese field-level copy control
+- **THEN** the clipboard contains only the selected Chinese value or complete Chinese field
 - **AND** the clipboard does not contain the English value
 
+#### Scenario: User copies Listing keyword buckets
+- **WHEN** the Listing workspace displays or copies 精准关键词、长尾关键词、流量关键词 or 描述词
+- **THEN** each bucket name remains a visible, non-selectable page label and is not a copy target
+- **AND** clicking an English or Simplified Chinese keyword value copies only that row's actual keyword value
+- **AND** the field-level English or Chinese copy control copies only that language's keyword values without any bucket-name prefix
+
+#### Scenario: User reviews a long Listing draft
+- **WHEN** the Listing workspace reaches the top of the scrollable Creation record result area
+- **THEN** the Listing heading, generation action, complete-copy action, and export action remain visible while the draft content scrolls
+- **AND** character counts are presented as secondary metadata rather than primary status badges
+
+#### Scenario: User reaches Listing controls on a narrow mobile screen
+- **WHEN** the user scrolls a mobile Creation record to its Listing workspace
+- **THEN** the record header and filter controls remain in normal document flow instead of covering the Listing workspace
+- **AND** the Listing actions and continuous vertical bilingual content remain visible and directly operable
+
 #### Scenario: User copies or exports a Listing draft
-- **WHEN** the user invokes field-title copy, full copy or export
-- **THEN** field-title copy contains the selected field's English content only
-- **AND** full copy and structured export retain the old-style bilingual field mapping
+- **WHEN** the user invokes generation, full copy, or export from the Listing workspace
+- **THEN** generation reuses the existing selected-record Listing controller and concurrent-generation guard
+- **AND** full copy and structured export retain the old-style bilingual field mapping for all seven fields
 - **AND** the actions are not blocked by validation, review, warnings or access state
 
 ### Requirement: Hard-information images use decision-meaningful visual structures
@@ -738,3 +776,174 @@ The system SHALL update the current Creation record view from the successful bat
 #### Scenario: User explicitly refreshes records
 - **WHEN** the user activates Refresh after records may have changed in another window or outside the application
 - **THEN** the browser requests the complete Creation set list and reconciles its local record state
+
+### Requirement: SKU color labels cover visible characteristic component colors
+Each reliable complete visible SKU unit SHALL have one ordered characteristic-color label. The label SHALL include every clear subject color, including neutral parts shared by variants, and a short part name when needed. Multiple colors for one unit SHALL remain one structured value. Backgrounds, shadows, highlights, reflections, source-card text, and uncertain colors SHALL NOT be evidence. The SKU prompt SHALL render the whole label below its unit in the target language.
+
+#### Scenario: One subject has several characteristic component colors
+- **WHEN** one complete SKU subject visibly has a brown exterior, a black strap, and silver lenses
+- **THEN** reference analysis returns one color-label value for that product unit covering brown, black, and silver lenses
+- **AND** the planned SKU prompt requests one complete label below the subject containing all three characteristic colors
+
+#### Scenario: Grouped subjects each have multi-color labels
+- **WHEN** one SKU subject image contains multiple complete visible product units and each unit has several characteristic component colors
+- **THEN** reference analysis returns exactly one ordered label value per complete product unit
+- **AND** commas or component qualifiers inside one label do not create additional product-unit labels
+- **AND** two units with the same characteristic colors retain two ordered label values instead of being deduplicated
+- **AND** the planned SKU prompt places each complete label below its corresponding unit
+
+#### Scenario: A visible neutral component is shared across variants
+- **WHEN** each visible variant uses the same black strap or gray frame as a physical part of the sellable subject
+- **THEN** the shared neutral component color remains eligible for every applicable characteristic-color label
+- **AND** it is not discarded merely because all variants share it
+
+#### Scenario: Color evidence is unsafe
+- **WHEN** a possible color comes only from the background, shadow, highlight, environmental reflection, source-card text, or an unclear region
+- **THEN** reference analysis excludes that possible color from the characteristic-color label
+- **AND** if no reliable subject color remains, the planner does not request a guessed color label
+
+### Requirement: Structured non-sensitive audience analysis
+The system SHALL let Creation reference analysis return a normalized `audienceStrategy` containing a product-use or purchase-context audience, purchase motivations, purchase objections, desired outcome, evidence basis, confidence, and source. The analysis MUST use only supplied product facts, visible product/use evidence, platform context, and category context, and MUST NOT infer protected or sensitive personal attributes from people in reference images.
+
+#### Scenario: Analysis returns evidence-backed audience guidance
+- **WHEN** the user analyzes product references with a selected platform, category, and supplied product facts
+- **THEN** the response includes a normalized audience strategy whose motivations and objections cite supplied or visible evidence and whose source and confidence are explicit
+
+#### Scenario: Sensitive attributes are not inferred
+- **WHEN** a reference image contains a person but the user did not explicitly provide demographic targeting
+- **THEN** the analysis does not infer age, sex, gender identity, race, ethnicity, nationality, religion, health, disability, pregnancy, sexual orientation, income, or other sensitive attributes and falls back to a non-sensitive product-use context
+
+#### Scenario: Uncertain audience stays conservative
+- **WHEN** the product facts and references do not support a specific usage or buying context
+- **THEN** the analysis returns a generic category buyer suggestion with low confidence instead of inventing a precise persona
+
+### Requirement: Versioned platform marketing context
+The system SHALL define a structured `marketingContext` for the universal profile and every supported platform profile, including shopper intent, proof style, copy style, default motivations, and default objections. Marketing context MUST remain advisory and MUST NOT be represented as an official platform rule unless independently covered by the existing sourced constraint model.
+
+#### Scenario: Every platform has structured marketing context
+- **WHEN** the platform policy registry is loaded
+- **THEN** all supported platform profiles expose valid structured marketing context in addition to their existing sourced image policies
+
+#### Scenario: Platform advice does not become a hard rule
+- **WHEN** a profile marketing context has no official blocking source
+- **THEN** it affects planning guidance only and does not create a blocking validation constraint
+
+### Requirement: Deterministic audience strategy resolution
+The system SHALL resolve `effectiveAudienceStrategy` using `universal fallback < platform marketing context < category context < reference-analysis suggestion < user set input < user item override`. Empty values MUST NOT erase lower-priority evidence, list fields MUST be normalized and de-duplicated, and the resolved result MUST record provenance.
+
+#### Scenario: Reference analysis overrides platform fallback
+- **WHEN** a platform default describes value-comparison shoppers and an applied reference analysis provides evidence for a gift-buying context
+- **THEN** the effective strategy uses the evidence-backed gift context while retaining compatible platform proof and copy guidance
+
+#### Scenario: User input overrides analysis suggestion
+- **WHEN** a caller explicitly supplies a non-sensitive target audience or purchase objection after applying an analysis suggestion
+- **THEN** the explicit user value becomes effective and its provenance is recorded as user input
+
+#### Scenario: Item override affects one slot only
+- **WHEN** a caller supplies a valid per-item conversion override
+- **THEN** only the matching item changes and all other items keep their deterministic effective strategy
+
+### Requirement: Per-item conversion intent
+The system SHALL deterministically assign each planned item a `conversionIntent` containing audience focus, motivation focus, objection focus, conversion goal, and evidence focus. Different roles SHALL cover distinct buyer-decision jobs so the suite does not repeat the same generic selling-point board.
+
+#### Scenario: Suite roles cover different decision jobs
+- **WHEN** a suite contains hero, benefit, scene, detail, size, package, and SKU items
+- **THEN** the hero handles recognition and the primary motivation, benefit and scene items show outcomes and use relevance, detail and size items reduce evidence or fit uncertainty, and package and SKU items reduce completeness or choice uncertainty
+
+#### Scenario: Conversion intent is deterministic
+- **WHEN** Local and Worker resolve the same normalized platform, category, audience strategy, overrides, and product evidence
+- **THEN** they produce deeply equivalent effective audience strategies and per-item conversion intents in the same order
+
+### Requirement: Evidence-bounded conversion prompts
+The system SHALL include the effective per-item conversion intent in eligible carousel and SKU prompts while limiting every product claim, proof, outcome, and reassurance to supplied product facts or reference evidence. Missing evidence MUST produce a conservative question or visual emphasis instead of an invented fact. Source-only `infographic-rebuild` prompts MUST NOT include audience or conversion guidance.
+
+#### Scenario: Source-only infographic rebuild bypasses conversion decoration
+- **WHEN** a plan contains an `infographic-rebuild` item and an effective audience strategy
+- **THEN** the item may retain conversion metadata for plan compatibility
+- **AND** its final reconstruction prompt does not include audience focus, motivations, objections, evidence focus, or conversion guidance
+
+#### Scenario: Prompt uses supplied motivation evidence
+- **WHEN** the supplied facts support quick setup and the effective audience values convenience
+- **THEN** the assigned benefit or usage prompt connects quick setup to convenience without adding unsupported setup time, performance numbers, certifications, reviews, or guarantees
+
+#### Scenario: Prompt does not invent proof
+- **WHEN** the effective audience has a durability objection but no material, test, warranty, or durability evidence is supplied
+- **THEN** no item prompt invents durability proof, test results, warranty terms, ratings, sales, testimonials, or performance claims
+
+### Requirement: Platform hard rules override conversion strategy
+The system MUST apply official sourced blocking constraints and effective `textPolicy`, `logoPolicy`, and `scenePolicy` after all audience, conversion, set, item, and prompt overrides. A strict main image MUST NOT gain text, collage, external Logo, scene props, or unsupported claims from conversion guidance.
+
+#### Scenario: Amazon main image remains strict
+- **WHEN** an Amazon plan has a persuasive audience strategy and an Amazon main image slot
+- **THEN** the main image remains a compliant white-background product image with no added marketing text, collage, external Logo, scene, or unsupported claim while later eligible images may use the conversion strategy
+
+#### Scenario: Invalid item override remains blocked
+- **WHEN** a per-item conversion or prompt override conflicts with a sourced blocking constraint
+- **THEN** validation reports the conflict and generation is rejected
+
+### Requirement: Audience strategy is part of the frozen effective plan
+The system SHALL include original `audienceStrategy`, resolved `effectiveAudienceStrategy`, and every item's `conversionIntent` and final prompt in the versioned `effectivePlan`. Queue snapshots, Local manifests, record reuse, and repair MUST preserve these values without recomputing them from current form or current platform defaults. A source-only `infographic-rebuild` SHALL preserve compatible metadata but MUST execute the canonical reconstruction prompt at generation and repair time instead of a decorated historical saved prompt.
+
+#### Scenario: Queue submission freezes audience decisions
+- **WHEN** a user previews a plan, submits it to the queue, and then changes platform, category, product fields, or reference analysis
+- **THEN** the queued job retains the submitted audience strategy, item conversion intents, order, parameters, and prompts
+
+#### Scenario: Saved set round-trips conversion fields
+- **WHEN** a completed Local set is saved and loaded
+- **THEN** its effective plan and item conversion fields are deeply equivalent to the submitted frozen values
+
+#### Scenario: Repair reuses saved item intent
+- **WHEN** a saved item is retried or repaired after current strategy defaults change
+- **THEN** repair reuses the saved conversion intent, eligible item prompt, ratio, size, language, and platform constraints unless the user explicitly edits that item
+- **AND** an `infographic-rebuild` executes its canonical source-only prompt while retaining the saved compatible metadata and technical parameters
+
+### Requirement: Generation submits and validates the frozen plan
+The browser SHALL submit the complete frozen `effectivePlan` for formal Creation generation. Local and Worker SHALL prefer a valid submitted snapshot over replanning, SHALL limit snapshot byte size and item count, SHALL normalize required fields, and SHALL recompute counts and validation from snapshot items without trusting client-supplied `canGenerate`, validation, or count fields.
+
+#### Scenario: Formal generation uses previewed items
+- **WHEN** a valid frozen plan is submitted after preview
+- **THEN** Local and Worker execute the submitted item order, eligible saved prompts, conversion intents, ratios, sizes, and languages without calling the current platform strategy to rebuild them
+- **AND** any `infographic-rebuild` executes the canonical source-only reconstruction prompt instead of a decorated submitted prompt
+
+#### Scenario: Client cannot bypass hard-rule validation
+- **WHEN** a submitted snapshot declares `canGenerate=true` but an item violates a sourced platform constraint
+- **THEN** the server recomputes validation, rejects generation, and does not trust the client declaration
+
+#### Scenario: Oversized or malformed snapshot is rejected
+- **WHEN** a submitted snapshot exceeds the allowed byte or item limit or lacks required item identifiers, prompts, or generation parameters
+- **THEN** Local and Worker reject the request with a compact validation error before image generation
+
+#### Scenario: Legacy request replans
+- **WHEN** an older client submits a generation request without `effectivePlan`
+- **THEN** Local and Worker continue to build and validate a plan from the legacy fields
+
+### Requirement: Runtime and metadata boundaries remain compatible
+The system SHALL keep Local and Worker plan/generation results equivalent for the same normalized payload and SHALL keep full audience structures inside the set-level effective plan rather than per-image R2 custom metadata. Old manifests without audience fields MUST remain readable and MUST NOT be rewritten solely to add fallback strategy fields.
+
+#### Scenario: Local and Worker remain equivalent
+- **WHEN** the same audience-aware preview or generation payload is processed in Local and Worker environments
+- **THEN** the effective audience strategy, per-item conversion intents, prompts, counts, validation, and generation parameters are deeply equivalent
+
+#### Scenario: R2 metadata stays bounded
+- **WHEN** Worker emits generated image metadata for an audience-aware suite
+- **THEN** the full audience strategy is not copied into each image's R2 custom metadata and the existing metadata size limit remains satisfied
+
+#### Scenario: Legacy manifest remains readable
+- **WHEN** a Local manifest lacks `audienceStrategy`, `effectiveAudienceStrategy`, and `conversionIntent`
+- **THEN** it loads with its historical items and prompts intact and only explicit replanning creates new audience-aware fields
+
+### Requirement: Source-only infographic rebuild overrides suite-wide prompt decoration
+Creation Mode SHALL treat `infographic-rebuild` as a source-only reconstruction item. Requirements that normally apply shared visual language, marketing scenario, target language, reference-analysis notes, platform or category guidance, audience strategy, conversion intent, product facts, subject references, or Logo references to every planned item SHALL apply only to eligible carousel and SKU items and SHALL NOT alter an `infographic-rebuild` prompt or its reference-image collection.
+
+Requirements that normally execute a frozen or saved item prompt unchanged SHALL preserve the stored item metadata for record compatibility, but generation and repair MUST replace an `infographic-rebuild` runtime prompt with the canonical source-only reconstruction prompt. Its saved technical parameters remain frozen and MUST NOT be recomputed from the current form.
+
+#### Scenario: Shared Creation settings change
+- **WHEN** a user changes any shared Creation setting while an information source image and its rebuild item remain the same
+- **THEN** eligible carousel and SKU prompts may reflect the changed setting
+- **AND** the infographic rebuild prompt and its one-image source collection remain unchanged
+- **AND** the rebuild item continues using its own frozen technical generation parameters
+
+#### Scenario: Historical saved prompt contains suite decoration
+- **WHEN** a frozen plan or saved record contains an `infographic-rebuild` prompt with product, platform, language, visual-style, Logo, audience, conversion, or reference-note instructions
+- **THEN** Local generation, Worker generation, and Local repair execute the canonical source-only reconstruction prompt instead
+- **AND** they retain the item's saved model route, model, ratio, size, quality, format, reasoning, source identity, and compatible conversion metadata

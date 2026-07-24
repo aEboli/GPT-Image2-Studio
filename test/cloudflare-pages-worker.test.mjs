@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 import { handleApiRequest, handleGenerationQueue } from "../cloudflare-pages-worker.mjs";
+import { buildCreationInfographicRebuildPrompt } from "../lib/creation-generation-parameters.mjs";
+import { buildCreationPlan } from "../lib/creation-planner.mjs";
 import { MAX_CREATION_REFERENCE_IMAGES } from "../lib/studio-constants.mjs";
 
 function makeSseResponse(base64 = "ZmluYWw=") {
@@ -100,17 +102,17 @@ function makeListingDraft(overrides = {}) {
     sellingPoints: ["Compact blue bottle with a stated one-pack quantity."],
     buyerObjections: ["Review the stated color, size, and pack quantity before purchase."],
     highlights: [
-      "PRODUCT TYPE: Blue compact travel bottle.",
-      "PACK DETAILS: One supplied product unit.",
-      "VISIBLE DETAILS: Blue color and compact bottle shape.",
-      "SPECIFICATIONS: Stated size is 340.19 g (12 oz).",
-      "PACKAGE CONTENTS: One travel bottle.",
+      "COMPACT PROFILE: Compact travel bottle in the supplied blue option.",
+      "BLUE OPTION: The supplied bottle option is blue.",
+      "TRAVEL FORMAT: The supplied product type is a travel bottle.",
+      "12 OZ SIZE: The stated bottle size is 12 oz.",
+      "ONE BOTTLE: The package contains one travel bottle.",
     ],
     description: "Blue compact travel bottle with a stated one-pack quantity and 12 oz size.",
     searchTerms: ["blue travel bottle", "compact bottle"],
     keywordBuckets: {
       exact: ["blue travel bottle"],
-      longTail: ["340.19 g 12 oz travel bottle"],
+      longTail: ["12 oz travel bottle"],
       traffic: ["travel bottle"],
       descriptive: ["compact blue bottle"],
     },
@@ -125,17 +127,17 @@ function makeListingDraft(overrides = {}) {
       sellingPoints: ["蓝色小巧瓶身与已注明的单件包装。"],
       buyerObjections: ["购买前核对已注明的颜色、尺寸和包装数量。"],
       highlights: [
-        "商品类型：蓝色小巧旅行水瓶。",
-        "包装信息：1 件商品。",
-        "外观信息：蓝色与小巧瓶身造型。",
-        "规格信息：已注明 340.19 克（12 盎司）。",
-        "包装内容：1 个旅行水瓶。",
+        "紧凑瓶身：资料注明这款旅行水瓶采用蓝色小巧瓶身。",
+        "蓝色选项：所提供的水瓶选项为蓝色。",
+        "旅行水瓶：所提供的商品类型为旅行水瓶。",
+        "12 盎司规格：资料注明水瓶规格为 12 盎司。",
+        "单瓶包装：包装内含 1 个旅行水瓶。",
       ],
       description: "蓝色小巧旅行水瓶，已注明单件包装和 12 盎司规格。",
       searchTerms: ["蓝色旅行水瓶", "小巧水瓶"],
       keywordBuckets: {
         exact: ["蓝色旅行水瓶"],
-        longTail: ["340.19 克 12 盎司旅行水瓶"],
+        longTail: ["12 盎司旅行水瓶"],
         traffic: ["旅行水瓶"],
         descriptive: ["小巧蓝色水瓶"],
       },
@@ -270,6 +272,7 @@ test("Cloudflare creation listing route uses payload API settings outside mock m
       set: {
         setId: "worker-set-upstream",
         productName: "Travel Bottle",
+        productDescription: "Compact travel bottle.",
         dimensionSpecs: "12 oz",
         skuSubjects: [{ id: "blue", title: "Blue Bottle", bundleCount: 1 }],
         items: [{ itemId: "1-hero", role: "hero", status: "failed" }],
@@ -314,6 +317,7 @@ test("Cloudflare creation listing route uses direct text vision settings in dire
       set: {
         setId: "worker-set-direct-upstream",
         productName: "Travel Bottle",
+        productDescription: "Compact blue travel bottle with a stated 12 oz size.",
         dimensionSpecs: "12 oz",
         skuSubjects: [{ id: "blue", title: "Blue Bottle", bundleCount: 1 }],
         items: [{ itemId: "1-hero", role: "hero", status: "failed" }],
@@ -352,6 +356,7 @@ test("Cloudflare creation listing route uses env API settings outside mock mode"
       set: {
         setId: "worker-set-env",
         productName: "Travel Bottle",
+        productDescription: "Compact blue travel bottle with a stated 12 oz size.",
         dimensionSpecs: "12 oz",
         skuSubjects: [{ id: "blue", title: "Blue Bottle", bundleCount: 1 }],
         items: [{ itemId: "1-hero", role: "hero", status: "failed" }],
@@ -1463,6 +1468,145 @@ test("Cloudflare creation SKU bundle generation only sends the selected SKU subj
   assert.doesNotMatch(inputText, /package\.png/);
   assert.match(storedCreationFilenames, /silver-lure\.png/);
   assert.doesNotMatch(storedCreationFilenames, /Silverlure/);
+});
+
+test("Cloudflare infographic rebuild sends one source image and honors four output controls", async () => {
+  const seenRequests = [];
+  const imageBucket = makeImageBucket();
+  const referenceImageRoles = [
+    { index: 1, filename: "product.png", role: "product", note: "OTHER_PRODUCT_NOTE_SENTINEL" },
+    { index: 2, filename: "target-infographic.png", role: "dimensions", note: "OTHER_SOURCE_NOTE_SENTINEL" },
+    { index: 3, filename: "other-infographic.png", role: "package", note: "OTHER_INFOGRAPHIC_NOTE_SENTINEL" },
+  ];
+  const previewPlan = buildCreationPlan({
+    productName: "OTHER_PRODUCT_SENTINEL",
+    productDescription: "OTHER_DESCRIPTION_SENTINEL",
+    sellingPoints: "OTHER_SELLING_POINT_SENTINEL",
+    platform: "universal",
+    imageCount: "0",
+    skuGenerationEnabled: "false",
+    infographicRebuildEnabled: "true",
+    targetLanguage: "en",
+    ratio: "4:5",
+    resolutionTier: "1.5K",
+    visualLanguage: "bold-campaign",
+    audienceStrategy: {
+      targetAudience: "OTHER_AUDIENCE_SENTINEL",
+      purchaseMotivations: ["OTHER_MOTIVATION_SENTINEL"],
+      purchaseObjections: ["OTHER_OBJECTION_SENTINEL"],
+      evidenceBasis: ["OTHER_EVIDENCE_SENTINEL"],
+      source: "user",
+      confidence: "high",
+    },
+    logoOptions: { enabled: true, filename: "brand-mark.png", placement: "bottom-right" },
+    referenceImageRoles,
+  });
+  const targetItem = previewPlan.items.find(
+    (item) => item.sourceInfographic?.filename === "target-infographic.png",
+  );
+  assert.ok(targetItem);
+  const effectivePlan = { ...previewPlan, items: [targetItem] };
+  const formData = new FormData();
+  formData.set("productName", "CURRENT_FORM_PRODUCT_SENTINEL");
+  formData.set("targetLanguage", "zh-CN");
+  formData.set("ratio", "1:1");
+  formData.set("size", "1024x1024");
+  formData.set("format", "jpg");
+  formData.set("reasoningEffort", "high");
+  formData.set("baseUrl", "https://example.test/v1");
+  formData.set("apiKey", "test-browser-key");
+  formData.set("responsesModel", "gpt-5.5");
+  formData.set("effectivePlan", JSON.stringify(effectivePlan));
+  formData.set("referenceImageRoles", JSON.stringify(referenceImageRoles));
+  formData.set("logoOptions", JSON.stringify({
+    enabled: true,
+    filename: "brand-mark.png",
+    placement: "bottom-right",
+    background: "transparent",
+  }));
+  formData.append("referenceImages", new File(["product-bytes"], "product.png", { type: "image/png" }));
+  formData.append(
+    "referenceImages",
+    new File(["target-infographic-bytes"], "target-infographic.png", { type: "image/png" }),
+  );
+  formData.append(
+    "referenceImages",
+    new File(["other-infographic-bytes"], "other-infographic.png", { type: "image/png" }),
+  );
+  formData.append("logoImage", new File(["logo-bytes"], "brand-mark.png", { type: "image/png" }));
+
+  const response = await handleApiRequest(new Request("https://studio.example/api/creation/generate", {
+    method: "POST",
+    body: formData,
+  }), {
+    imageBucket,
+    async fetchImpl(url, init) {
+      seenRequests.push({ url, body: JSON.parse(init.body) });
+      return makeSseResponse();
+    },
+  });
+
+  const text = await response.text();
+  const events = parseSseEvents(text);
+  const started = events.find((event) => event.eventName === "item_started");
+  const complete = events.find((event) => event.eventName === "complete");
+  const content = seenRequests[0]?.body.input[0].content || [];
+  const inputTexts = content.filter((item) => item.type === "input_text").map((item) => item.text);
+  const inputImages = content.filter((item) => item.type === "input_image");
+  const completedItem = complete?.payload?.set?.items?.[0];
+
+  assert.equal(response.status, 200);
+  assert.equal(seenRequests.length, 1);
+  assert.equal(seenRequests[0].url, "https://example.test/v1/responses");
+  assert.deepEqual(inputTexts, [buildCreationInfographicRebuildPrompt({
+    targetLanguage: "en",
+    ratio: "4:5",
+    requestedSize: "1.5K",
+    effectiveSize: "1536x1920",
+    format: "jpg",
+  })]);
+  assert.deepEqual(inputImages, [{
+    type: "input_image",
+    image_url: `data:image/png;base64,${Buffer.from("target-infographic-bytes").toString("base64")}`,
+  }]);
+  assert.doesNotMatch(
+    inputTexts.join("\n"),
+    /OTHER_|product\.png|target-infographic\.png|other-infographic\.png|brand-mark\.png/i,
+  );
+  assert.match(inputTexts.join("\n"), /target language:\s*English \(en\)/i);
+  assert.match(inputTexts.join("\n"), /output format:\s*JPG/i);
+  assert.match(inputTexts.join("\n"), /resolution:\s*requested 1\.5K; effective canvas 1536x1920/i);
+  assert.match(inputTexts.join("\n"), /aspect ratio:\s*4:5/i);
+  assert.equal(seenRequests[0].body.tools[0].size, "1536x1920");
+  assert.equal(seenRequests[0].body.tools[0].output_format, "jpeg");
+  assert.equal(seenRequests[0].body.reasoning.effort, "high");
+  assert.deepEqual(
+    {
+      ratio: started?.payload?.ratio,
+      requestedSize: started?.payload?.requestedSize,
+      effectiveSize: started?.payload?.effectiveSize,
+      targetLanguage: started?.payload?.targetLanguage,
+    },
+    { ratio: "4:5", requestedSize: "1.5K", effectiveSize: "1536x1920", targetLanguage: "en" },
+  );
+  assert.deepEqual(
+    {
+      ratio: completedItem?.ratio,
+      requestedSize: completedItem?.requestedSize,
+      effectiveSize: completedItem?.effectiveSize,
+      targetLanguage: completedItem?.targetLanguage,
+      format: completedItem?.format,
+      referenceImageNames: completedItem?.referenceImageNames,
+    },
+    {
+      ratio: "4:5",
+      requestedSize: "1.5K",
+      effectiveSize: "1536x1920",
+      targetLanguage: "en",
+      format: "jpg",
+      referenceImageNames: ["target-infographic.png"],
+    },
+  );
 });
 
 test("Cloudflare creation logo batch edits each uploaded source with the shared logo", async () => {

@@ -2427,13 +2427,16 @@
                 <div class="creation-record-results">
                   <div class="creation-result-grid creation-record-result-grid" id="creationRecordResultGrid"></div>
                   <section class="creation-listing-panel hidden" aria-label="Listing 草稿">
-                    <div class="panel-title between">
-                      <h3>Listing 草稿</h3>
-                      <span class="count-pill small" id="creationRecordListingStatus">未生成</span>
-                    </div>
-                    <div class="asset-listing-actions" role="group" aria-label="Listing 操作">
-                      <button class="toolbar-button" id="creationRecordCopyListingsButton" type="button" disabled>复制 Listing</button>
-                      <button class="toolbar-button" id="creationRecordExportListingsButton" type="button" disabled>导出 Listing</button>
+                    <div class="creation-listing-workspace-bar">
+                      <div class="panel-title between">
+                        <h3>Listing 草稿</h3>
+                        <span class="count-pill small" id="creationRecordListingStatus">未生成</span>
+                      </div>
+                      <div class="asset-listing-actions" role="group" aria-label="Listing 工作区操作">
+                        <button class="toolbar-button asset-primary-action" id="creationRecordRegenerateListingsButton" type="button" disabled>重新生成</button>
+                        <button class="toolbar-button" id="creationRecordCopyListingsButton" type="button" title="复制完整双语 Listing" disabled>复制全部</button>
+                        <button class="toolbar-button" id="creationRecordExportListingsButton" type="button" title="导出完整双语 Listing JSON" disabled>导出 JSON</button>
+                      </div>
                     </div>
                     <div class="creation-listing-drafts" id="creationRecordListingDrafts"></div>
                   </section>

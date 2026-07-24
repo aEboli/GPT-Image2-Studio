@@ -27,6 +27,7 @@ import {
   normalizeCreationSkuSubjects,
   normalizeCreationTargetLanguage,
 } from "../lib/creation-planner.mjs";
+import { buildCreationInfographicRebuildPrompt } from "../lib/creation-generation-parameters.mjs";
 
 test("creation submitted plans accept a legitimate 33-item snapshot above the legacy byte threshold", () => {
   const prompt = "平台套图事实提示词。".repeat(3500);
@@ -133,10 +134,81 @@ test("creation planner appends non-subject references after SKU items when infog
     rebuildItems.map((item) => item.slotIndex),
     [4, 5, 6],
   );
-  assert.ok(rebuildItems.every((item) => item.prompt.includes("INFOGRAPHIC REBUILD")));
-  assert.ok(rebuildItems.every((item) => item.prompt.includes("keep the original source information unchanged")));
-  assert.ok(rebuildItems.every((item) => item.prompt.includes("Use the uploaded product subject references as the new product subject")));
-  assert.ok(rebuildItems.every((item) => item.prompt.includes("Do not add unsupported")));
+  assert.deepEqual(
+    rebuildItems.map((item) => item.sourceInfographic.index),
+    [3, 4, 5],
+  );
+  assert.ok(rebuildItems.every((item) => item.prompt === buildCreationInfographicRebuildPrompt()));
+  assert.ok(rebuildItems.every((item) => !/blue-lure|silver-lure|package-list|size-card|detail-card/i.test(item.prompt)));
+});
+
+test("creation infographic rebuild prompt is canonical across all suite context", () => {
+  const firstPlan = buildCreationPlan({
+    productName: "OTHER_PRODUCT_NAME_SENTINEL_A",
+    productDescription: "OTHER_DESCRIPTION_SENTINEL_A",
+    sellingPoints: "OTHER_SELLING_POINT_SENTINEL_A",
+    platform: "universal",
+    industryTemplate: "outdoor",
+    imageCount: "0",
+    skuGenerationEnabled: "false",
+    infographicRebuildEnabled: "true",
+    targetLanguage: "zh-CN",
+    ratio: "1:1",
+    resolutionTier: "2K",
+    visualLanguage: "warm-handcrafted",
+    audienceStrategy: {
+      targetAudience: "OTHER_AUDIENCE_SENTINEL_A",
+      purchaseMotivations: ["OTHER_MOTIVATION_SENTINEL_A"],
+      purchaseObjections: ["OTHER_OBJECTION_SENTINEL_A"],
+      evidenceBasis: ["OTHER_EVIDENCE_SENTINEL_A"],
+      source: "user",
+      confidence: "high",
+    },
+    logoOptions: { enabled: true, filename: "OTHER_LOGO_SENTINEL_A.png", placement: "top-left" },
+    referenceImageRoles: [
+      { index: 2, filename: "OTHER_PRODUCT_REFERENCE_SENTINEL_A.png", role: "product", note: "OTHER_PRODUCT_NOTE_SENTINEL_A" },
+      { index: 7, filename: "target-source-a.png", role: "dimensions", note: "OTHER_SOURCE_NOTE_SENTINEL_A" },
+    ],
+  });
+  const secondPlan = buildCreationPlan({
+    productName: "OTHER_PRODUCT_NAME_SENTINEL_B",
+    productDescription: "OTHER_DESCRIPTION_SENTINEL_B",
+    sellingPoints: "OTHER_SELLING_POINT_SENTINEL_B",
+    platform: "amazon",
+    industryTemplate: "beauty",
+    imageCount: "0",
+    skuGenerationEnabled: "false",
+    infographicRebuildEnabled: "true",
+    targetLanguage: "en",
+    ratio: "4:5",
+    resolutionTier: "1.5K",
+    visualLanguage: "bold-campaign",
+    audienceStrategy: {
+      targetAudience: "OTHER_AUDIENCE_SENTINEL_B",
+      purchaseMotivations: ["OTHER_MOTIVATION_SENTINEL_B"],
+      purchaseObjections: ["OTHER_OBJECTION_SENTINEL_B"],
+      evidenceBasis: ["OTHER_EVIDENCE_SENTINEL_B"],
+      source: "user",
+      confidence: "high",
+    },
+    logoOptions: { enabled: true, filename: "OTHER_LOGO_SENTINEL_B.png", placement: "bottom-right" },
+    referenceImageRoles: [
+      { index: 3, filename: "OTHER_PRODUCT_REFERENCE_SENTINEL_B.png", role: "reference-product", note: "OTHER_PRODUCT_NOTE_SENTINEL_B" },
+      { index: 11, filename: "target-source-b.png", role: "usage", note: "OTHER_SOURCE_NOTE_SENTINEL_B" },
+    ],
+  });
+  const firstItem = firstPlan.items.find((item) => item.sourceInfographic?.filename === "target-source-a.png");
+  const secondItem = secondPlan.items.find((item) => item.sourceInfographic?.filename === "target-source-b.png");
+  const canonicalPrompt = buildCreationInfographicRebuildPrompt();
+
+  assert.ok(firstItem);
+  assert.ok(secondItem);
+  assert.equal(firstItem.sourceInfographic.index, 7);
+  assert.equal(secondItem.sourceInfographic.index, 11);
+  assert.equal(firstItem.prompt, canonicalPrompt);
+  assert.equal(secondItem.prompt, canonicalPrompt);
+  assert.doesNotMatch(canonicalPrompt, /OTHER_|target-source|\.png|1:1|4:5|zh-CN/i);
+  assert.match(canonicalPrompt, /selected target language, output format, resolution, and aspect ratio are output controls only/i);
 });
 
 test("creation planner defaults SKU generation on and infographic rebuild off", () => {
@@ -1707,9 +1779,126 @@ test("creation planner keeps single multi-color SKU subjects as one color label"
 
   const skuItem = plan.items.find((item) => item.role === "sku");
 
-  assert.match(skuItem.prompt, /Visible SKU color label under the subject: "blue"/);
+  assert.match(skuItem.prompt, /Visible SKU color label under the subject: "blue, silver"/);
+  assert.match(skuItem.prompt, /keep all supplied colors and component qualifiers together in one label/i);
   assert.doesNotMatch(skuItem.prompt, /Visible SKU color labels for the grouped subject/i);
   assert.doesNotMatch(skuItem.prompt, /each complete visible product unit needs its own label/i);
+});
+
+test("creation reference analysis keeps a goggles characteristic-color phrase as one SKU label", () => {
+  const analysis = normalizeCreationReferenceAnalysis({
+    summary: "One riding-goggles SKU.",
+    reference_roles: [
+      { index: 1, filename: "brown-goggles.png", role: "product", note: "One complete visible riding-goggles product unit." },
+    ],
+    sku_subjects: [
+      {
+        id: "brown-goggles",
+        title: "Brown riding goggles",
+        reference_indexes: [1],
+        filenames: ["brown-goggles.png"],
+        subject_unit_count: 1,
+        color_names: ["brown, black, silver lenses"],
+        note: "One complete visible unit with a brown exterior, black strap, and silver lenses.",
+      },
+    ],
+  }, ["brown-goggles.png"]);
+  const plan = buildCreationPlan({
+    productName: "Riding goggles",
+    productDescription: "Protective riding goggles shown in the supplied product reference.",
+    targetLanguage: "zh-CN",
+    selectedRoles: ["hero"],
+    referenceImageRoles: analysis.recommendations,
+    skuSubjects: analysis.skuSubjects,
+  });
+  const skuItem = plan.items.find((item) => item.role === "sku");
+
+  assert.deepEqual(analysis.skuSubjects[0].colorNames, ["brown, black, silver lenses"]);
+  assert.match(skuItem.prompt, /Visible SKU color label under the subject: "brown, black, silver lenses"/);
+  assert.match(skuItem.prompt, /translate the complete label into the selected target language/i);
+  assert.match(skuItem.prompt, /do not drop shared neutral component colors/i);
+});
+
+test("creation planner preserves grouped multi-color label boundaries", () => {
+  const plan = buildCreationPlan({
+    productName: "Riding goggles pair",
+    productDescription: "Two visible riding-goggles variants.",
+    targetLanguage: "en",
+    selectedRoles: ["hero"],
+    skuSubjects: [
+      {
+        id: "goggles-pair",
+        title: "Riding goggles pair",
+        filenames: ["goggles-pair.png"],
+        subjectUnitCount: 2,
+        colorNames: ["brown, black strap, silver lenses", "red, black strap, gray lenses"],
+        note: "Two complete visible product units.",
+      },
+    ],
+  });
+  const skuItem = plan.items.find((item) => item.role === "sku");
+
+  assert.match(
+    skuItem.prompt,
+    /Visible SKU color labels for the grouped subject: "brown, black strap, silver lenses", "red, black strap, gray lenses"/,
+  );
+  assert.doesNotMatch(skuItem.prompt, /"brown", "black strap"/);
+});
+
+test("creation planner does not infer a color after analysis explicitly marks it unsafe", () => {
+  const analysis = normalizeCreationReferenceAnalysis({
+    summary: "One product reference with unclear reflected colors.",
+    reference_roles: [
+      { index: 1, filename: "brown-reflection.png", role: "product", note: "One complete product unit with unclear reflections." },
+    ],
+    sku_subjects: [
+      {
+        id: "uncertain-color",
+        title: "Brown reflection goggles",
+        reference_indexes: [1],
+        filenames: ["brown-reflection.png"],
+        subject_unit_count: 1,
+        color_names: [],
+        note: "One complete product unit; physical colors are not safely distinguishable from reflections.",
+      },
+    ],
+  }, ["brown-reflection.png"]);
+  const plan = buildCreationPlan({
+    productName: "Riding goggles",
+    targetLanguage: "en",
+    selectedRoles: ["hero"],
+    referenceImageRoles: analysis.recommendations,
+    skuSubjects: analysis.skuSubjects,
+  });
+  const skuItem = plan.items.find((item) => item.role === "sku");
+
+  assert.deepEqual(analysis.skuSubjects[0].colorNames, []);
+  assert.match(skuItem.prompt, /The exact SKU color name is unavailable/);
+  assert.doesNotMatch(skuItem.prompt, /Visible SKU color label under the subject:/);
+});
+
+test("creation planner keeps repeated labels for matching grouped units", () => {
+  const plan = buildCreationPlan({
+    productName: "Matching riding goggles pair",
+    targetLanguage: "en",
+    selectedRoles: ["hero"],
+    skuSubjects: [
+      {
+        id: "matching-goggles-pair",
+        title: "Matching riding goggles pair",
+        filenames: ["matching-goggles-pair.png"],
+        subjectUnitCount: 2,
+        colorNames: ["black, silver lenses", "black, silver lenses"],
+        note: "Two complete visible product units with matching colors.",
+      },
+    ],
+  });
+  const skuItem = plan.items.find((item) => item.role === "sku");
+
+  assert.match(
+    skuItem.prompt,
+    /Visible SKU color labels for the grouped subject: "black, silver lenses", "black, silver lenses"/,
+  );
 });
 
 test("creation planner preserves explicit grouped SKU colors outside the color dictionary", () => {
@@ -1734,7 +1923,7 @@ test("creation planner preserves explicit grouped SKU colors outside the color d
   const skuItem = plan.items.find((item) => item.role === "sku");
 
   assert.match(skuItem.prompt, /Visible SKU color labels for the grouped subject: "azul marino", "beige"/);
-  assert.match(skuItem.prompt, /place each exact label below the corresponding visible product unit/i);
+  assert.match(skuItem.prompt, /preserve every complete label and place it below the corresponding visible product unit/i);
 });
 
 test("creation planner SKU prompts treat source card text as non-subject noise", () => {

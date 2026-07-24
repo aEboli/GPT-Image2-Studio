@@ -12,6 +12,7 @@ import { File } from "node:buffer";
 import { setTimeout as delay } from "node:timers/promises";
 
 import { validateCreationListingDraft } from "../lib/creation-listing-draft.mjs";
+import { buildCreationInfographicRebuildPrompt } from "../lib/creation-generation-parameters.mjs";
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -149,6 +150,47 @@ function makeCreationForm(overrides = {}) {
   return formData;
 }
 
+function makeInfographicRebuildForm({ effectivePlan = null, includeReferenceImages = true, fields = {} } = {}) {
+  const formData = new FormData();
+  const referenceImageRoles = [
+    { index: 1, filename: "product.png", role: "product", note: "OTHER_PRODUCT_NOTE_SENTINEL" },
+    { index: 2, filename: "target-infographic.png", role: "dimensions", note: "OTHER_SOURCE_NOTE_SENTINEL" },
+    { index: 3, filename: "other-infographic.png", role: "package", note: "OTHER_INFOGRAPHIC_NOTE_SENTINEL" },
+  ];
+  formData.set("productName", "OTHER_PRODUCT_SENTINEL");
+  formData.set("productDescription", "OTHER_DESCRIPTION_SENTINEL");
+  formData.set("targetLanguage", "en");
+  formData.set("platform", "universal");
+  formData.set("imageCount", "0");
+  formData.set("skuGenerationEnabled", "false");
+  formData.set("infographicRebuildEnabled", "true");
+  formData.set("referenceImageRoles", JSON.stringify(referenceImageRoles));
+  formData.set("ratio", "4:5");
+  formData.set("resolutionTier", "1.5K");
+  formData.set("size", "1536x1920");
+  formData.set("format", "png");
+  formData.set("reasoningEffort", "high");
+  formData.set("baseUrl", "http://127.0.0.1:9/v1");
+  formData.set("apiKey", "test-key");
+  formData.set("responsesModel", "gpt-5.4");
+  formData.set("clientSessionId", "creation-infographic-e2e-session");
+  formData.set("logoOptions", JSON.stringify({
+    enabled: true,
+    filename: "brand-mark.png",
+    placement: "bottom-right",
+    background: "transparent",
+  }));
+  if (effectivePlan) formData.set("effectivePlan", JSON.stringify(effectivePlan));
+  if (includeReferenceImages) {
+    formData.append("referenceImages", new File(["product-bytes"], "product.png", { type: "image/png" }));
+    formData.append("referenceImages", new File(["target-bytes"], "target-infographic.png", { type: "image/png" }));
+    formData.append("referenceImages", new File(["other-bytes"], "other-infographic.png", { type: "image/png" }));
+    formData.append("logoImage", new File(["logo-bytes"], "brand-mark.png", { type: "image/png" }));
+  }
+  for (const [key, value] of Object.entries(fields)) formData.set(key, value);
+  return formData;
+}
+
 function makeLogoBatchForm(overrides = {}) {
   const formData = new FormData();
   formData.set("title", "Logo batch invalid settings");
@@ -280,6 +322,135 @@ test("logo batch validation errors do not create empty completed set records", a
   const setsResponse = await fetch(`${baseUrl}/api/creation/sets`);
   assert.equal(setsResponse.status, 200);
   assert.deepEqual(await setsResponse.json(), []);
+});
+
+test("local infographic rebuild generation and repair keep one source image and canonical runtime prompt", async (t) => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "creation-infographic-e2e-"));
+  const outputDir = join(tempRoot, "output");
+  const localDataRootDir = join(tempRoot, "local-data");
+  const port = await getFreePort();
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const server = spawn(process.execPath, ["server.mjs"], {
+    cwd: rootDir,
+    env: {
+      ...process.env,
+      PORT: String(port),
+      VERCEL: "1",
+      TMP: tempRoot,
+      TEMP: tempRoot,
+      IMAGE_STUDIO_MOCK_IMAGE_GENERATION: "1",
+      IMAGE_STUDIO_OUTPUT_DIR: outputDir,
+      IMAGE_STUDIO_LOCAL_DATA_DIR: localDataRootDir,
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const diagnostics = collectDiagnostics(server);
+
+  t.after(async () => {
+    await stopServer(server);
+    await rm(tempRoot, { recursive: true, force: true });
+  });
+
+  await waitForServer(baseUrl, server, diagnostics);
+
+  const planResponse = await fetch(`${baseUrl}/api/creation/plan`, {
+    method: "POST",
+    body: makeInfographicRebuildForm({ includeReferenceImages: false }),
+  });
+  assert.equal(planResponse.status, 200);
+  const previewPlan = (await planResponse.json()).plan;
+  const targetItem = previewPlan.items.find(
+    (item) => item.sourceInfographic?.filename === "target-infographic.png",
+  );
+  assert.ok(targetItem);
+  const frozenPlan = {
+    ...previewPlan,
+    items: [{ ...targetItem, prompt: "OTHER_FROZEN_PROMPT_SENTINEL" }],
+  };
+
+  const generateResult = await postForm(
+    baseUrl,
+    "/api/creation/generate",
+    makeInfographicRebuildForm({ effectivePlan: frozenPlan }),
+  );
+  assert.equal(generateResult.response.status, 200);
+  assert.deepEqual(generateResult.events.filter((event) => event.eventName === "error"), [], generateResult.text);
+  const generatedSet = getCompleteSet(generateResult.events);
+  const generatedItem = generatedSet.items[0];
+  assert.equal(generatedItem.role, "infographic-rebuild");
+  assert.equal(generatedItem.prompt, "OTHER_FROZEN_PROMPT_SENTINEL");
+  assert.equal(generatedItem.generationPrompt, buildCreationInfographicRebuildPrompt({
+    targetLanguage: "en",
+    ratio: "4:5",
+    requestedSize: "1.5K",
+    effectiveSize: "1536x1920",
+    format: "png",
+  }));
+  assert.deepEqual(generatedItem.referenceImageNames, ["target-infographic.png"]);
+  assert.equal(generatedItem.sourceInfographic.index, 2);
+  assert.equal(generatedItem.ratio, "4:5");
+  assert.equal(generatedItem.requestedSize, "1.5K");
+  assert.equal(generatedItem.effectiveSize, "1536x1920");
+  assert.equal(generatedItem.targetLanguage, "en");
+  assert.equal(generatedItem.reasoningEffort, "high");
+
+  const manifestPath = await findCreationManifestPath(outputDir, generatedSet.setId);
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  manifest.items[0] = {
+    ...manifest.items[0],
+    status: "failed",
+    filename: "",
+    relativePath: "",
+    imageUrl: "",
+    thumbnailUrl: "",
+    prompt: "OTHER_SAVED_REPAIR_PROMPT_SENTINEL",
+    error: "forced infographic repair gap",
+  };
+  manifest.effectivePlan.items[0].prompt = "OTHER_EFFECTIVE_REPAIR_PROMPT_SENTINEL";
+  manifest.status = "partial_failed";
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+
+  const repairResult = await postForm(
+    baseUrl,
+    "/api/creation/repair",
+    makeInfographicRebuildForm({
+      fields: {
+        setId: generatedSet.setId,
+        scope: "incomplete",
+        targetLanguage: "zh-CN",
+        ratio: "1:1",
+        resolutionTier: "1K",
+        size: "1024x1024",
+        format: "jpg",
+      },
+    }),
+  );
+  assert.equal(repairResult.response.status, 200);
+  assert.deepEqual(repairResult.events.filter((event) => event.eventName === "error"), [], repairResult.text);
+  const repairedItem = getCompleteSet(repairResult.events).items[0];
+  assert.equal(repairedItem.prompt, "OTHER_SAVED_REPAIR_PROMPT_SENTINEL");
+  assert.equal(repairedItem.generationPrompt, buildCreationInfographicRebuildPrompt({
+    targetLanguage: "en",
+    ratio: "4:5",
+    requestedSize: "1.5K",
+    effectiveSize: "1536x1920",
+    format: "png",
+  }));
+  assert.deepEqual(repairedItem.referenceImageNames, ["target-infographic.png"]);
+  assert.equal(repairedItem.ratio, generatedItem.ratio);
+  assert.equal(repairedItem.effectiveSize, generatedItem.effectiveSize);
+  assert.equal(repairedItem.targetLanguage, generatedItem.targetLanguage);
+  for (const field of [
+    "resolutionTier",
+    "imageRoute",
+    "responsesModel",
+    "imageModel",
+    "format",
+    "quality",
+    "reasoningEffort",
+  ]) {
+    assert.equal(repairedItem[field], generatedItem[field], `repair changed ${field}`);
+  }
 });
 
 test("creation workflow reuses history, reuploads references, tweaks prompts, repairs items, and exposes asset paths", async (t) => {
@@ -745,47 +916,43 @@ test("creation listing endpoint merges drafts into latest manifest after upstrea
     response.writeHead(200, { "content-type": "application/json" });
     response.end(JSON.stringify({
       output_text: JSON.stringify({
-        title: "1 Pack Blue Fishing Lure Bass Freshwater Bait Compact Tackle",
-        sellingPoints: ["Blue profile helps organize fishing lure variants."],
-        buyerObjections: ["Flat lure movement can be ignored in stained water; the blue profile helps the bait stay noticeable."],
-        highlights: [
-          "CORE VALUE: 1 Pack 8.89 cm (3.5 in) size keeps quantity and dimensions visible.",
-          "BUILT TO LAST: Blue lure profile supports clear SKU identification.",
-          "REAL-LIFE USE: Compact design works for bass fishing presentations.",
-          "SIZE & FIT: Compact profile keeps size and color details easy to compare.",
-          "PACKAGE SNAPSHOT: Keyword-focused copy keeps listing language concise.",
+        title: "1 Pack Fishing Lure Compact Freshwater Option",
+        sellingPoints: ["The supplied lure has a compact profile for freshwater fishing."],
+        painPoints: ["The stated one-pack quantity and 3.5 in size clarify the supplied lure option."],
+        fiveBullets: [
+          "COMPACT PROFILE: The supplied fishing lure has a compact profile.",
+          "FRESHWATER USE: The supplied description identifies freshwater fishing.",
+          "LURE TYPE: The supplied product type is a fishing lure.",
+          "STATED SIZE: The stated lure size is 3.5 in.",
+          "PACK QUANTITY: The package contains one fishing lure.",
         ],
-        description: "Blue fishing lure option for US marketplace shoppers comparing compact freshwater tackle.",
-        searchTerms: ["blue fishing lure", "bass bait", "compact lure"],
+        description: "Compact fishing lure for freshwater fishing with a stated 3.5 in size and one-pack quantity.",
+        backendSearchTerms: "fishing lure compact freshwater",
         keywordBuckets: {
-          exact: ["blue fishing lure"],
-          longTail: ["3.5 in bass lure"],
-          traffic: ["freshwater bait"],
-          descriptive: ["compact blue lure"],
+          exact: ["fishing lure"],
+          longTail: ["3.5 in fishing lure"],
+          traffic: ["freshwater fishing lure"],
+          descriptive: ["compact fishing lure"],
         },
-        missingInfo: [],
-        warnings: [],
         zhDisplay: {
-          title: "一件装蓝色淡水钓鱼拟饵",
-          sellingPoints: ["蓝色外观便于区分已提供的拟饵选项。"],
-          buyerObjections: ["浑水环境中平淡动作不易被察觉，蓝色外观便于观察拟饵。"],
-          highlights: [
-            "一件装与尺寸信息便于核对。",
-            "蓝色拟饵外观便于识别当前选项。",
-            "紧凑设计适合淡水鲈鱼垂钓场景。",
-            "尺寸与颜色信息便于购买前比较。",
-            "简洁商品信息聚焦已提供的拟饵。",
+          title: "1件装紧凑型淡水钓鱼拟饵",
+          sellingPoints: ["所提供的钓鱼拟饵采用紧凑外形，用于淡水垂钓。"],
+          painPoints: ["已注明的1件装数量和3.5英寸尺寸可明确当前拟饵选项。"],
+          fiveBullets: [
+            "紧凑外形：所提供的钓鱼拟饵采用紧凑外形。",
+            "淡水用途：所提供的说明注明用于淡水垂钓。",
+            "拟饵类型：所提供的商品类型为钓鱼拟饵。",
+            "标示尺寸：拟饵标示尺寸为3.5英寸。",
+            "包装数量：包装内含1个钓鱼拟饵。",
           ],
-          description: "蓝色钓鱼拟饵的中文商品说明。",
-          searchTerms: ["蓝色钓鱼拟饵", "鲈鱼拟饵", "紧凑拟饵"],
+          description: "紧凑型钓鱼拟饵，用于淡水垂钓，标示尺寸为3.5英寸，包装数量为1件装。",
+          backendSearchTerms: "钓鱼拟饵 紧凑 淡水",
           keywordBuckets: {
-            exact: ["蓝色钓鱼拟饵"],
-            longTail: ["3.5英寸鲈鱼拟饵"],
-            traffic: ["淡水拟饵"],
-            descriptive: ["紧凑蓝色拟饵"],
+            exact: ["钓鱼拟饵"],
+            longTail: ["3.5英寸钓鱼拟饵"],
+            traffic: ["淡水钓鱼拟饵"],
+            descriptive: ["紧凑钓鱼拟饵"],
           },
-          missingInfo: [],
-          warnings: [],
         },
       }),
     }));

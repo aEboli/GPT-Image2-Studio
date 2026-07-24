@@ -2792,13 +2792,14 @@ async function runCreationGenerate(request, writer, { fetchImpl, imageBucket } =
       fallbackRatio,
       fallbackSize,
       fallbackTargetLanguage: plan.targetLanguage,
+      fallbackFormat: finalFormat,
     });
     let finalPrompt = "";
     let generationSnapshot = {};
     let finalBase64 = "";
 
     try {
-      finalPrompt = buildCreationItemGenerationPrompt(item.prompt, itemGenerationParameters);
+      finalPrompt = buildCreationItemGenerationPrompt(item.prompt, itemGenerationParameters, item);
       const itemReferenceImages = buildCreationItemReferenceImages(item, referenceImages, plan.referenceImageRoles);
       const itemGenerationReferenceImagesWithLogo = appendCreationItemLogoReference(
         item,
@@ -2834,6 +2835,7 @@ async function runCreationGenerate(request, writer, { fetchImpl, imageBucket } =
         referenceImageLabels: buildCreationGenerationReferenceImageLabels(
           itemReferenceImages,
           plan.referenceImageRoles,
+          item,
         ),
         size: itemGenerationParameters.finalSize,
         aspectRatio: itemGenerationParameters.ratioOption.value,

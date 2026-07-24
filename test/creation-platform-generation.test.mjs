@@ -11,6 +11,7 @@ import {
   buildCreationSubmittedPlan,
 } from "../lib/creation-planner.mjs";
 import {
+  buildCreationInfographicRebuildPrompt,
   buildCreationItemGenerationPrompt,
   resolveCreationItemGenerationParameters,
 } from "../lib/creation-generation-parameters.mjs";
@@ -93,6 +94,83 @@ test("per-item generation prompt carries matching ratio and target-language guid
   assert.match(prompt, /target language: en/i);
 });
 
+test("infographic rebuild runtime prompt honors only the four selected output controls", () => {
+  const item = {
+    role: "infographic-rebuild",
+    prompt: "OTHER_FROZEN_PROMPT_SENTINEL with suite facts, source notes, and platform styling.",
+    ratio: "4:5",
+    resolutionTier: "1.5K",
+    targetLanguage: "en",
+  };
+  const parameters = resolveCreationItemGenerationParameters(item, {
+    imageRoute: "a",
+    fallbackRatio: "1:1",
+    fallbackSize: "1024x1024",
+    fallbackTargetLanguage: "zh-CN",
+    fallbackFormat: "jpg",
+  });
+  const prompt = buildCreationItemGenerationPrompt(item.prompt, parameters, item);
+
+  assert.equal(prompt, buildCreationInfographicRebuildPrompt({
+    targetLanguage: "en",
+    ratio: "4:5",
+    requestedSize: "1.5K",
+    effectiveSize: "1536x1920",
+    format: "jpg",
+  }));
+  assert.match(prompt, /target language:\s*English \(en\)/i);
+  assert.match(prompt, /output format:\s*JPG/i);
+  assert.match(prompt, /resolution:\s*requested 1\.5K; effective canvas 1536x1920/i);
+  assert.match(prompt, /aspect ratio:\s*4:5/i);
+  assert.doesNotMatch(prompt, /OTHER_FROZEN_PROMPT_SENTINEL/);
+  assert.deepEqual(
+    {
+      ratio: parameters.ratioOption.value,
+      requestedSize: parameters.requestedSize,
+      finalSize: parameters.finalSize,
+      targetLanguage: parameters.targetLanguage,
+      format: parameters.format,
+    },
+    {
+      ratio: "4:5",
+      requestedSize: "1.5K",
+      finalSize: "1536x1920",
+      targetLanguage: "en",
+      format: "jpg",
+    },
+  );
+});
+
+test("infographic rebuild prompt requires substantial visual redesign while locking source facts", () => {
+  const prompt = buildCreationInfographicRebuildPrompt();
+
+  assert.match(prompt, /clearly new, professionally designed infographic/i);
+  assert.match(prompt, /substantially redesigned at first glance/i);
+  assert.match(prompt, /new overall layout and information architecture/i);
+  assert.match(prompt, /at least three additional visual dimensions/i);
+  assert.match(prompt, /composition and product placement/i);
+  assert.match(prompt, /background treatment/i);
+  assert.match(prompt, /typography system/i);
+  assert.match(prompt, /color treatment/i);
+  assert.match(prompt, /spacing and grouping/i);
+  assert.match(prompt, /cards, icons, arrows, callouts/i);
+  assert.match(prompt, /not a valid rebuild if it keeps substantially the same grid/i);
+  assert.match(prompt, /only upscales, cleans, or sharpens/i);
+  assert.match(prompt, /minor spacing, color, or typography changes/i);
+
+  assert.match(prompt, /single attached source infographic/i);
+  assert.match(prompt, /only visual and information authority/i);
+  assert.match(prompt, /exact visible product identity, variant, product colors, parts, and quantities/i);
+  assert.match(prompt, /render every translatable visible text string completely in the selected target language/i);
+  assert.match(prompt, /brand names, model names, numbers, units/i);
+  assert.match(prompt, /numbers, units, parameters, claims, steps, and lists exactly/i);
+  assert.match(prompt, /do not summarize, omit, add, invent, replace, or contradict/i);
+
+  assert.doesNotMatch(prompt, /preserve every visible element unchanged/i);
+  assert.doesNotMatch(prompt, /do not .*redesign or restyle/i);
+  assert.doesNotMatch(prompt, /extend only the existing background or margins/i);
+});
+
 test("local planner and Worker endpoint produce deeply equivalent plans for one normalized payload", async () => {
   const input = normalizedPlatformInput();
   const localPlan = buildCreationPlan(input);
@@ -162,6 +240,32 @@ test("submitted effective plans are bounded, normalized, recounted, and hard-rul
   );
 });
 
+test("submitted zero-carousel infographic rebuild stays source-only under strict platform slots", () => {
+  const input = {
+    productName: "Bottle",
+    platform: "amazon",
+    imageCount: "0",
+    skuGenerationEnabled: "false",
+    infographicRebuildEnabled: "true",
+    referenceImageRoles: [
+      { index: 1, filename: "product.png", role: "product" },
+      { index: 2, filename: "size-card.png", role: "dimensions" },
+    ],
+  };
+  const preview = buildCreationPlan(input);
+  const submitted = buildCreationSubmittedPlan({
+    ...input,
+    effectivePlan: JSON.stringify(preview),
+  });
+
+  assert.equal(submitted.items.length, 1);
+  assert.equal(submitted.items[0].itemKind, "infographic-rebuild");
+  assert.equal(submitted.items[0].role, "infographic-rebuild");
+  assert.equal(submitted.items[0].imageType, "infographic-rebuild");
+  assert.equal(submitted.items[0].prompt, buildCreationInfographicRebuildPrompt());
+  assert.deepEqual(submitted.items[0].sourceInfographic, preview.items[0].sourceInfographic);
+});
+
 test("Local and Worker persist the outer server-validated Creation plan", async () => {
   const [server, worker] = await Promise.all([readFile(serverPath, "utf8"), readFile(workerPath, "utf8")]);
   for (const source of [server, worker]) {
@@ -178,7 +282,7 @@ test("local and Worker Creation loops resolve and expose parameters inside each 
   for (const source of [local, cloud]) {
     const callback = source.match(/runWithConcurrency\(plan\.items[\s\S]*?async \(item\) => \{[\s\S]*/)?.[0] || "";
     assert.match(callback, /resolveCreationItemGenerationParameters\(item,/);
-    assert.match(callback, /buildCreationItemGenerationPrompt\(item\.prompt, itemGenerationParameters\)/);
+    assert.match(callback, /buildCreationItemGenerationPrompt\(item\.prompt, itemGenerationParameters, item\)/);
     assert.match(callback, /aspectRatio:\s*itemGenerationParameters\.ratioOption\.value/);
     assert.match(callback, /size:\s*itemGenerationParameters\.finalSize/);
     assert.match(callback, /targetLanguage:\s*itemGenerationParameters\.targetLanguage/);

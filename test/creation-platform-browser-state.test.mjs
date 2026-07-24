@@ -55,6 +55,7 @@ test("Creation record normalization preserves zero carousel mode and reconciles 
   assert.match(normalizer, /resolveCreationPlanCounts\(/);
   assert.match(normalizer, /normalizeCreationModuleEnabled\(skuGenerationEnabledValue, true\)/);
   assert.match(normalizer, /normalizeCreationModuleEnabled\(infographicRebuildEnabledValue, hasInfographicRebuildItems\)/);
+  assert.match(normalizer, /index:\s*Number\(item\?\.index\) > 0 \? Number\(item\.index\) : index \+ 1/);
   assert.doesNotMatch(normalizer, /imageCount:\s*\(setImageCount \?\? items\.length\) \|\| 10/);
 });
 
@@ -280,6 +281,7 @@ test("Creation browser normalization retains the effective platform plan contrac
     "logoPolicy",
     "constraints",
     "conversionIntent",
+    "sourceInfographic",
   ]) {
     assert.match(itemNormalizer, new RegExp(`\\b${field}:`), `missing item field ${field}`);
   }
