@@ -30,6 +30,7 @@ import { createConfigModelPickerController } from "/lib/config-model-picker.mjs"
 import { createLightboxImageViewer, createLightboxViewerState } from "/lib/lightbox-image-viewer.mjs";
 import { createAssetWorkspaceController } from "/lib/asset-workspace.mjs";
 import { createPreviewKeyboardNavigationController } from "/lib/preview-keyboard-navigation.mjs";
+import { createProductImageImportController } from "/lib/product-image-import-controller.mjs";
 import {
   API_ENDPOINT_CHAT_COMPLETIONS,
   API_ENDPOINT_IMAGE_EDITS,
@@ -11052,23 +11053,24 @@ function renderCreationLogoBatchSourceGrid() {
 function applyCreationReferenceFiles(fileList) {
   const incomingFiles = [...(fileList || [])].filter((file) => file.type.startsWith("image/"));
   if (incomingFiles.length === 0) {
-    return;
+    return { importedCount: 0, duplicateCount: 0, overflowCount: 0 };
   }
 
   const maxReferenceImages = getCreationMaxProductReferenceImageCount();
   const next = [...state.creationReferenceFiles];
   let restoreQueue = [...state.creationReferenceRestoreQueue];
   const fingerprints = new Set(next.map((item) => item.fingerprint));
-  let overflowed = false;
+  let importedCount = 0; let duplicateCount = 0; let overflowCount = 0;
 
-  for (const file of incomingFiles) {
+  for (const [index, file] of incomingFiles.entries()) {
     if (next.length >= maxReferenceImages) {
-      overflowed = true;
+      overflowCount = incomingFiles.length - index;
       break;
     }
 
     const fingerprint = buildReferenceFingerprint(file);
     if (fingerprints.has(fingerprint)) {
+      duplicateCount += 1;
       continue;
     }
 
@@ -11088,6 +11090,7 @@ function applyCreationReferenceFiles(fileList) {
     };
     startCreationReferenceGenerationCompression(referenceItem);
     next.push(referenceItem);
+    importedCount += 1;
     if (restoreEntry) {
       restoreQueue = restoreQueue.map((entry) =>
         entry.id === restoreEntry.id
@@ -11112,9 +11115,10 @@ function applyCreationReferenceFiles(fileList) {
   renderCreationReferenceGrid();
   renderCreationView();
 
-  if (overflowed) {
+  if (overflowCount > 0) {
     showError(`套图参考图最多支持 ${maxReferenceImages} 张。`);
   }
+  return { importedCount, duplicateCount, overflowCount };
 }
 
 function renderCreationLogo() {
@@ -14942,6 +14946,8 @@ async function openOutputDirectory() {
   }
 }
 
+const productImageImportController = createProductImageImportController({ applyFiles: applyCreationReferenceFiles, getMaximumCount: getCreationMaxProductReferenceImageCount, getRemainingCapacity: () => getCreationMaxProductReferenceImageCount() - state.creationReferenceFiles.length, onError: showError, setFeedback: setCreationFeedback });
+
 const assetRecordDeleteController = createAssetRecordDeleteController({
   refs,
   state,
@@ -16000,6 +16006,7 @@ function setCreationPlatformItemOverride(slotKey, field, value) {
 
 function bindEvents() {
   creationLogoLibrary.bind();
+  productImageImportController.bind();
   bindGlobalNavEvents();
   bindTopbarRevealEvents();
   bindAdaptiveWorkbenchSections();

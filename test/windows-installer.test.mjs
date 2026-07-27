@@ -18,6 +18,7 @@ test("Windows installer payload keeps DNS fallback module, docs, and env switche
   assert.match(script, /"lib",/);
   assert.match(script, /"\.env\.example",/);
   assert.match(script, /"docs",/);
+  assert.match(script, /"extensions\/product-image-collector",/);
   assert.match(script, /env: \{ \.\.\.process\.env, PORT: String\(port\) \}/);
 });
 

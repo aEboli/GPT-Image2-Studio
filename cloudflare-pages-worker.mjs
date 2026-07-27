@@ -4320,6 +4320,13 @@ export async function handleApiRequest(request, options = {}) {
     return handleCreationReferenceAnalyze(request, fetchImpl);
   }
 
+  if (
+    (request.method === "POST" && url.pathname === "/api/product-image-collector/image") ||
+    (request.method === "GET" && url.pathname === "/api/product-image-collector/package")
+  ) {
+    return unsupportedFeature(request, "Cloudflare 部署版不支持商品图代理或本地插件打包，请使用本地应用。");
+  }
+
   if (request.method === "POST" && url.pathname === "/api/creation/plan") {
     return handleCreationPlan(request);
   }

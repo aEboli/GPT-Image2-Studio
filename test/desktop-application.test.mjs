@@ -158,6 +158,7 @@ test("desktop package config uses a minimal x64 NSIS distribution", async () => 
     "generate-image.mjs",
     "lib/**/*",
     "public/**/*",
+    "extensions/product-image-collector/**/*",
     "build/desktop/icon.png",
     "README.md",
     "docs/windows-desktop.md",

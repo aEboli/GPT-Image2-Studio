@@ -123,6 +123,7 @@
                     <span class="mega-menu-title" data-ui-i18n="menuTools">工具</span>
                     <button class="mega-menu-action large" type="button" data-nav-action="prompt-agent" data-ui-i18n="promptAgent">图片转提示词</button>
                     <a class="mega-menu-link" href="#image-compress" data-ui-i18n="menuImageCompress">图片压缩</a>
+                    <button class="mega-menu-action" type="button" data-nav-action="product-image-collector" data-product-image-extension-action>商品图采集插件</button>
                   </section>
                 </div>
               </div>
@@ -1343,6 +1344,9 @@
                       <span>套图参考图</span>
                     </div>
                     <div class="creation-reference-head-actions">
+                      <button class="inline-button creation-reference-reset-button" id="creationClipboardImportButton" type="button">
+                        从剪贴板导入
+                      </button>
                       <button class="inline-button creation-reference-reset-button" id="creationReferenceResetButton" type="button">
                         清空参考图
                       </button>
@@ -2546,6 +2550,39 @@
         </div>
       </form>
     </dialog>
+
+    <dialog
+      class="product-image-import-dialog"
+      id="productImageImportDialog"
+      aria-labelledby="productImageImportTitle"
+      aria-describedby="productImageImportFeedback"
+    >
+      <div class="product-image-import-shell">
+        <header class="product-image-import-head">
+          <div>
+            <span class="asset-eyebrow">剪贴板商品图</span>
+            <h2 id="productImageImportTitle">选择要导入的图片</h2>
+            <p id="productImageImportProductTitle">1688 商品图</p>
+          </div>
+          <button class="icon-button" id="productImageImportCloseButton" type="button" aria-label="关闭商品图导入" title="关闭">×</button>
+        </header>
+        <div class="product-image-import-counts" aria-live="polite">
+          <span>候选 <strong id="productImageImportAvailableCount">0</strong></span>
+          <span>已选 <strong id="productImageImportSelectedCount">0</strong></span>
+          <span>剩余槽位 <strong id="productImageImportCapacityCount">0</strong></span>
+        </div>
+        <div class="product-image-import-groups" id="productImageImportGroups"></div>
+        <footer class="product-image-import-footer">
+          <p id="productImageImportFeedback" aria-live="polite"></p>
+          <div>
+            <button class="toolbar-button" id="productImageImportCancelButton" type="button">取消</button>
+            <button class="toolbar-button strong" id="productImageImportConfirmButton" type="button">导入所选</button>
+          </div>
+        </footer>
+      </div>
+    </dialog>
+
+    <div class="global-action-toast" id="globalActionToast" role="status" aria-live="polite"></div>
 
     <aside class="lightbox hidden" id="lightbox" aria-hidden="true">
       <div class="lightbox-backdrop" id="lightboxBackdrop"></div>

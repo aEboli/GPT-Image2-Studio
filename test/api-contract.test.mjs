@@ -29,6 +29,10 @@ test("API capability matrix documents local and Cloudflare runtime differences",
   assert.equal(isApiRouteSupported("cloudflare", "POST", "/api/creation/logo-batch"), true);
   assert.equal(isApiRouteSupported("local", "POST", "/api/creation/reference/analyze"), true);
   assert.equal(isApiRouteSupported("cloudflare", "POST", "/api/creation/reference/analyze"), true);
+  assert.equal(isApiRouteSupported("local", "POST", "/api/product-image-collector/image"), true);
+  assert.equal(isApiRouteSupported("cloudflare", "POST", "/api/product-image-collector/image"), false);
+  assert.equal(isApiRouteSupported("local", "GET", "/api/product-image-collector/package"), true);
+  assert.equal(isApiRouteSupported("cloudflare", "GET", "/api/product-image-collector/package"), false);
   assert.equal(isApiRouteSupported("local", "POST", "/api/creation/plan"), true);
   assert.equal(isApiRouteSupported("cloudflare", "POST", "/api/creation/plan"), true);
   assert.equal(isApiRouteSupported("local", "POST", "/api/creation/sets/delete"), true);

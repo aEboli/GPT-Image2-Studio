@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "GPT-Image2-Studio 商品图采集",
+  "description": "按需采集 1688 商品详情页中的主图、SKU 图和详情图。",
+  "version": "1.0.3",
+  "minimum_chrome_version": "116",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "downloads",
+    "clipboardWrite"
+  ],
+  "background": {
+    "service_worker": "service-worker.mjs",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://detail.1688.com/offer/*"
+      ],
+      "js": [
+        "floating-launcher.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "商品图采集"
+  }
+}

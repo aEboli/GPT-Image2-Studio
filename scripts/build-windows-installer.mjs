@@ -30,6 +30,7 @@ const includePaths = [
   "README.md",
   "docs",
   "examples",
+  "extensions/product-image-collector",
   "generate-image.mjs",
   "launch-studio.cmd",
   "launch-studio.ps1",

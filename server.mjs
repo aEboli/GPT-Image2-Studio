@@ -104,6 +104,8 @@ import { analyzePptDocument } from "./lib/ppt-document-analysis.mjs";
 import { buildSlideEditPrompt, buildSlideImagePrompts } from "./lib/ppt-slide-prompts.mjs";
 import { createPptDeckStore } from "./lib/ppt-deck-store.mjs";
 import { configureNodeDnsFallback } from "./lib/node-dns-fallback.mjs";
+import { fetchTrustedProductImage } from "./lib/product-image-proxy.mjs";
+import { buildProductImageCollectorArchive } from "./lib/product-image-extension-package.mjs";
 
 try {
   configureNodeDnsFallback({ dns });
@@ -210,6 +212,7 @@ const ARTICLE_ILLUSTRATION_FORMAT = "png";
 const IMAGE_EDIT_MODE = "image-edit";
 const IMAGE_EDIT_ASSET_KIND = "image-edit";
 const MAX_LOCAL_MASK_FILE_BYTES = 50 * 1024 * 1024;
+const MAX_PRODUCT_IMAGE_PROXY_BODY_BYTES = 16 * 1024;
 const MOCK_IMAGE_GENERATION_ENABLED = process.env.IMAGE_STUDIO_MOCK_IMAGE_GENERATION === "1";
 const MOCK_IMAGE_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==";
@@ -441,10 +444,18 @@ function writeSseEvent(response, type, payload) {
   return writeNodeSseEvent(response, type, payload);
 }
 
-async function readJsonBody(request) {
+async function readJsonBody(request, { maxBytes = Number.POSITIVE_INFINITY } = {}) {
   const chunks = [];
+  let totalBytes = 0;
   for await (const chunk of request) {
-    chunks.push(Buffer.from(chunk));
+    const bytes = Buffer.from(chunk);
+    totalBytes += bytes.byteLength;
+    if (totalBytes > maxBytes) {
+      const error = new Error("JSON 请求体超过允许大小。");
+      error.code = "PAYLOAD_TOO_LARGE";
+      throw error;
+    }
+    chunks.push(bytes);
   }
 
   if (chunks.length === 0) {
@@ -452,6 +463,51 @@ async function readJsonBody(request) {
   }
 
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+}
+
+let productImageCollectorArchivePromise = null;
+
+async function handleProductImageCollectorImage(request, response) {
+  let payload;
+  try {
+    payload = await readJsonBody(request, { maxBytes: MAX_PRODUCT_IMAGE_PROXY_BODY_BYTES });
+  } catch (error) {
+    return sendJson(response, error?.code === "PAYLOAD_TOO_LARGE" ? 413 : 400, {
+      ok: false,
+      message: error instanceof Error ? error.message : "商品图请求必须是有效 JSON。",
+    });
+  }
+
+  try {
+    const image = await fetchTrustedProductImage({
+      sourcePageUrl: payload.sourcePageUrl,
+      imageUrl: payload.imageUrl,
+    });
+    response.writeHead(200, {
+      "Content-Type": image.mimeType,
+      "Content-Length": image.bytes.byteLength,
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+    });
+    response.end(Buffer.from(image.bytes));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const statusCode = /大小限制/.test(message) ? 413 : /超时/.test(message) ? 504 : /HTTP/.test(message) ? 502 : 400;
+    return sendJson(response, statusCode, { ok: false, message });
+  }
+}
+
+async function handleProductImageCollectorPackage(response) {
+  productImageCollectorArchivePromise ||= buildProductImageCollectorArchive({ rootDir });
+  const archive = await productImageCollectorArchivePromise;
+  response.writeHead(200, {
+    "Content-Type": "application/zip",
+    "Content-Length": archive.bytes.byteLength,
+    "Content-Disposition": `attachment; filename="${archive.filename}"`,
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+  });
+  response.end(archive.bytes);
 }
 
 async function readFormDataBody(request) {
@@ -5807,6 +5863,14 @@ async function routeRequest(request, response) {
 
   if (request.method === "POST" && url.pathname === "/api/creation/reference/analyze") {
     return handleCreationReferenceAnalyze(request, response);
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/product-image-collector/image") {
+    return handleProductImageCollectorImage(request, response);
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/product-image-collector/package") {
+    return handleProductImageCollectorPackage(response);
   }
 
   if (request.method === "POST" && url.pathname === "/api/portrait/reference/analyze") {
