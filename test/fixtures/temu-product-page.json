@@ -1,0 +1,50 @@
+{
+  "href": "https://www.temu.com/de-en/irregular-lace-bowl-mold-for-resin-crafts-g-606585678043033.html",
+  "title": "Irregular Lace Bowl Mold",
+  "jsonLd": {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    "sku": "606585678043033",
+    "name": "Irregular Lace Bowl Mold",
+    "image": [
+      "https://img.kwcdn.com/product/main-a.png?imageView2/2/w/800/q/70/format/avif",
+      "https://img.kwcdn.com/product/main-b.png?imageView2/2/w/800/q/70/format/avif"
+    ]
+  },
+  "images": [
+    {
+      "selector": "[data-testid='product-gallery'] img",
+      "attributes": {
+        "src": "https://img.kwcdn.com/product/main-a.png?imageView2/2/w/400/q/70/format/avif"
+      },
+      "width": 800,
+      "height": 800
+    },
+    {
+      "selector": "[data-testid='product-description'] img",
+      "attributes": {
+        "data-src": "https://aimg.kwcdn.com/product/detail-a.jpg?imageMogr2/thumbnail/1200x"
+      },
+      "width": 1200,
+      "height": 1600
+    },
+    {
+      "selector": "[data-testid='sku-selector'] img",
+      "attributes": {
+        "src": "https://img.kwcdn.com/product/sku-blue.jpg",
+        "alt": "Blue"
+      },
+      "width": 120,
+      "height": 120
+    },
+    {
+      "selector": "[data-testid='product-description'] img",
+      "attributes": {
+        "src": "https://aimg.kwcdn.com/product/recommend-a.jpg"
+      },
+      "width": 800,
+      "height": 800,
+      "excluded": "recommend-products"
+    }
+  ]
+}

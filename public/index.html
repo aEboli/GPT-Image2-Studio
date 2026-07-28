@@ -68,7 +68,7 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Sora:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260722-asset-record-delete-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260728-product-collector-tooltip-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -123,7 +123,18 @@
                     <span class="mega-menu-title" data-ui-i18n="menuTools">工具</span>
                     <button class="mega-menu-action large" type="button" data-nav-action="prompt-agent" data-ui-i18n="promptAgent">图片转提示词</button>
                     <a class="mega-menu-link" href="#image-compress" data-ui-i18n="menuImageCompress">图片压缩</a>
-                    <button class="mega-menu-action" type="button" data-nav-action="product-image-collector" data-product-image-extension-action>商品图采集插件</button>
+                    <div class="mega-menu-description-entry">
+                      <button
+                        class="mega-menu-action"
+                        type="button"
+                        data-nav-action="product-image-collector"
+                        data-product-image-extension-action
+                        aria-describedby="productImageCollectorDescription"
+                      >商品图采集插件</button>
+                      <span class="mega-menu-description-tooltip" id="productImageCollectorDescription" role="tooltip">
+                        支持在 1688、Amazon、Temu、TikTok Shop、SHEIN 和大健云仓商品详情页采集主图、详情图与 SKU 图。可筛选、预览、复制到 Studio 或按商品文件夹下载；只在用户主动采集时读取受支持商品区域，不读取登录凭据。点击后下载 Chrome/Edge 插件 ZIP，安装或更新仍需在浏览器扩展管理页确认。
+                      </span>
+                    </div>
                   </section>
                 </div>
               </div>
@@ -2562,14 +2573,23 @@
           <div>
             <span class="asset-eyebrow">剪贴板商品图</span>
             <h2 id="productImageImportTitle">选择要导入的图片</h2>
-            <p id="productImageImportProductTitle">1688 商品图</p>
+            <p id="productImageImportProductTitle">商品图</p>
           </div>
           <button class="icon-button" id="productImageImportCloseButton" type="button" aria-label="关闭商品图导入" title="关闭">×</button>
         </header>
-        <div class="product-image-import-counts" aria-live="polite">
-          <span>候选 <strong id="productImageImportAvailableCount">0</strong></span>
-          <span>已选 <strong id="productImageImportSelectedCount">0</strong></span>
-          <span>剩余槽位 <strong id="productImageImportCapacityCount">0</strong></span>
+        <div class="product-image-import-counts">
+          <div class="product-image-import-count-summary" aria-live="polite">
+            <span>候选 <strong id="productImageImportAvailableCount">0</strong></span>
+            <span>已选 <strong id="productImageImportSelectedCount">0</strong></span>
+            <span>剩余槽位 <strong id="productImageImportCapacityCount">0</strong></span>
+          </div>
+          <div class="product-image-import-actions" aria-label="批量选择商品图">
+            <button class="toolbar-button product-image-import-select-button" id="productImageImportSelectAllButton" type="button" disabled>全选</button>
+            <button class="toolbar-button product-image-import-select-button" id="productImageImportInvertButton" type="button" disabled>反选</button>
+            <button class="toolbar-button product-image-import-select-button" id="productImageImportSelectMainButton" type="button" disabled>选择主图</button>
+            <button class="toolbar-button product-image-import-select-button" id="productImageImportSelectDetailButton" type="button" disabled>选择详情图</button>
+            <button class="toolbar-button product-image-import-select-button" id="productImageImportSelectSkuButton" type="button" disabled>选择 SKU</button>
+          </div>
         </div>
         <div class="product-image-import-groups" id="productImageImportGroups"></div>
         <footer class="product-image-import-footer">
@@ -2579,6 +2599,23 @@
             <button class="toolbar-button strong" id="productImageImportConfirmButton" type="button">导入所选</button>
           </div>
         </footer>
+        <section
+          class="product-image-import-image-viewer"
+          id="productImageImportImageViewer"
+          role="dialog"
+          aria-modal="true"
+          aria-hidden="true"
+          aria-labelledby="productImageImportViewerTitle"
+          hidden
+        >
+          <header class="product-image-import-viewer-head">
+            <strong id="productImageImportViewerTitle">图片预览</strong>
+            <button class="icon-button" id="productImageImportViewerCloseButton" type="button" aria-label="关闭图片预览" title="关闭">×</button>
+          </header>
+          <div class="product-image-import-viewer-stage" id="productImageImportViewerStage">
+            <img id="productImageImportViewerImage" alt="" decoding="async" />
+          </div>
+        </section>
       </div>
     </dialog>
 

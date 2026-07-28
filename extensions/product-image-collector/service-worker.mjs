@@ -3,6 +3,7 @@ import {
   normalizeProductImageImportManifest,
   serializeProductImageImportManifest,
 } from "./lib/product-image-import.mjs";
+import { getProductImagePlatformForSourceUrl } from "./lib/product-image-platforms.mjs";
 
 const MESSAGE_COLLECT = "product-image-collector:collect";
 const MESSAGE_COPY = "product-image-collector:copy";
@@ -10,19 +11,12 @@ const MESSAGE_DOWNLOAD = "product-image-collector:download";
 const MESSAGE_OPEN = "product-image-collector:open";
 
 function isSupportedProductTab(value) {
-  try {
-    const url = new URL(String(value || ""));
-    return url.protocol === "https:" &&
-      (url.hostname === "1688.com" || url.hostname.endsWith(".1688.com")) &&
-      /^\/offer\/[^/]+(?:\.html)?\/?$/i.test(url.pathname);
-  } catch {
-    return false;
-  }
+  return Boolean(getProductImagePlatformForSourceUrl(value));
 }
 
 async function collectFromTab(tab, pageUrl) {
   if (!tab?.id || !isSupportedProductTab(pageUrl || tab.url)) {
-    throw new Error("请在 1688 商品详情页中使用商品图采集。");
+    throw new Error("请在受支持平台的商品详情页中使用商品图采集。");
   }
   const results = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
@@ -37,7 +31,7 @@ async function collectFromTab(tab, pageUrl) {
 
 async function openPanel(tab, pageUrl) {
   if (!tab?.id || !isSupportedProductTab(pageUrl || tab.url)) {
-    throw new Error("请在 1688 商品详情页中使用商品图采集。");
+    throw new Error("请在受支持平台的商品详情页中使用商品图采集。");
   }
   await chrome.scripting.executeScript({
     target: { tabId: tab.id },

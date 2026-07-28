@@ -10,8 +10,8 @@ test("extension ZIP contains reviewable sources and the exact shared import prot
   const zip = await JSZip.loadAsync(archive.bytes);
   const filenames = Object.keys(zip.files).filter((name) => !zip.files[name].dir);
 
-  assert.match(archive.filename, /^GPT-Image2-Studio-Product-Image-Collector-v1\.0\.3\.zip$/);
-  for (const filename of ["manifest.json", "collector.js", "floating-launcher.js", "floating-panel.js", "service-worker.mjs", "README.md", "lib/product-image-import.mjs"]) {
+  assert.match(archive.filename, /^GPT-Image2-Studio-Product-Image-Collector-v1\.1\.17\.zip$/);
+  for (const filename of ["manifest.json", "collector.js", "floating-launcher.js", "floating-panel.js", "service-worker.mjs", "README.md", "lib/product-image-import.mjs", "lib/product-image-platforms.mjs"]) {
     assert.ok(filenames.includes(filename), `${filename} should be packaged`);
   }
   assert.doesNotMatch(filenames.join("\n"), /sidepanel/i);

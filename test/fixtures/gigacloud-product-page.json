@@ -1,0 +1,112 @@
+{
+  "href": "https://www.gigab2b.com/index.php?route=product/product&product_id=1149324",
+  "title": "FKZNPJ Kids Bike 18 Inch",
+  "images": [
+    {
+      "selector": "#image-show .el-image.full-width img",
+      "attributes": { "src": "https://b2bfiles1.gigab2b.cn/image/wkseller/55471/main-1.jpg?x-oss-process=image%2Fresize%2Cw_500%2Ch_500%2Cm_pad" },
+      "width": 500,
+      "height": 500
+    },
+    {
+      "selector": "#image-show .el-image.full-width img",
+      "attributes": { "src": "https://b2bfiles1.gigab2b.cn/image/wkseller/55471/main-2.jpg?x-oss-process=image%2Fresize%2Cw_500%2Ch_500%2Cm_pad" },
+      "width": 500,
+      "height": 500
+    },
+    {
+      "selector": "#image-show .el-image.full-width img",
+      "attributes": { "src": "https://b2bfiles1.gigab2b.cn/image/wkseller/55471/main-3.jpg?x-oss-process=image%2Fresize%2Cw_500%2Ch_500%2Cm_pad" },
+      "width": 500,
+      "height": 500
+    },
+    {
+      "selector": "#image-show .el-image.full-width img",
+      "attributes": { "src": "https://b2bfiles1.gigab2b.cn/image/wkseller/55471/main-4.jpg?x-oss-process=image%2Fresize%2Cw_500%2Ch_500%2Cm_pad" },
+      "width": 500,
+      "height": 500
+    },
+    {
+      "selector": "#image-show .el-image.full-width img",
+      "attributes": { "src": "https://b2bfiles1.gigab2b.cn/image/wkseller/55471/main-5.jpg?x-oss-process=image%2Fresize%2Cw_500%2Ch_500%2Cm_pad" },
+      "width": 500,
+      "height": 500
+    },
+    {
+      "selector": "#image-show .el-image.full-width img",
+      "attributes": { "src": "https://b2bfiles1.gigab2b.cn/image/wkseller/55471/main-6.jpg?x-oss-process=image%2Fresize%2Cw_500%2Ch_500%2Cm_pad" },
+      "width": 500,
+      "height": 500
+    },
+    {
+      "selector": "#image-show .el-image.full-width img",
+      "attributes": { "src": "https://b2bfiles1.gigab2b.cn/image/wkseller/55471/main-7.jpg?x-oss-process=image%2Fresize%2Cw_500%2Ch_500%2Cm_pad" },
+      "width": 500,
+      "height": 500
+    },
+    {
+      "selector": "#image-show .el-image.full-width img",
+      "attributes": { "src": "https://b2bfiles1.gigab2b.cn/image/wkseller/55471/main-8.jpg?x-oss-process=image%2Fresize%2Cw_500%2Ch_500%2Cm_pad" },
+      "width": 500,
+      "height": 500
+    },
+    {
+      "selector": "#image-show .el-image.full-width img",
+      "attributes": { "src": "https://b2bfiles1.gigab2b.cn/image/wkseller/55471/main-9.jpg?x-oss-process=image%2Fresize%2Cw_500%2Ch_500%2Cm_pad" },
+      "width": 500,
+      "height": 500
+    },
+    {
+      "selector": ".options-wrap .options-item img",
+      "attributes": { "src": "https://b2bfiles1.gigab2b.cn/image/wkseller/55471/gray.jpg?x-oss-process=image%2Fresize%2Cw_74%2Ch_74%2Cm_pad" },
+      "owner": { "selector": ".options-item", "text": "16in+Gray + ABS+Rubber+Steel (Q235) + Cycling", "attributes": { "class": "options-item" } },
+      "width": 74,
+      "height": 74
+    },
+    {
+      "selector": ".options-wrap .options-item img",
+      "attributes": { "src": "https://b2bfiles1.gigab2b.cn/image/wkseller/55471/pink.jpg?x-oss-process=image%2Fresize%2Cw_74%2Ch_74%2Cm_pad" },
+      "owner": { "selector": ".options-item", "text": "16in+Pink + ABS+Rubber+Steel (Q235)", "attributes": { "class": "options-item" } },
+      "width": 74,
+      "height": 74
+    },
+    {
+      "selector": ".options-wrap .options-item img",
+      "attributes": { "src": "https://b2bfiles1.gigab2b.cn/image/wkseller/55471/purple-16.jpg?x-oss-process=image%2Fresize%2Cw_74%2Ch_74%2Cm_pad" },
+      "owner": { "selector": ".options-item", "text": "16in+Purple + ABS+Rubber+Steel (Q235)", "attributes": { "class": "options-item" } },
+      "width": 74,
+      "height": 74
+    },
+    {
+      "selector": ".options-wrap .options-item img",
+      "attributes": { "src": "https://b2bfiles1.gigab2b.cn/image/wkseller/55471/gray.jpg?x-oss-process=image%2Fresize%2Cw_74%2Ch_74%2Cm_pad" },
+      "owner": { "selector": ".options-item", "text": "18in+Gray + ABS+Rubber+Steel (Q235)", "attributes": { "class": "options-item options-item-no-qty" } },
+      "width": 74,
+      "height": 74
+    },
+    {
+      "selector": ".options-wrap .options-item img",
+      "attributes": { "src": "https://b2bfiles1.gigab2b.cn/image/wkseller/55471/pink.jpg?x-oss-process=image%2Fresize%2Cw_74%2Ch_74%2Cm_pad" },
+      "owner": { "selector": ".options-item", "text": "18in+Pink + ABS+Rubber+Steel (Q235)", "attributes": { "class": "options-item options-item-active" } },
+      "width": 74,
+      "height": 74
+    },
+    {
+      "selector": ".options-wrap .options-item img",
+      "attributes": { "src": "https://b2bfiles1.gigab2b.cn/image/wkseller/55471/purple-18.jpg?x-oss-process=image%2Fresize%2Cw_74%2Ch_74%2Cm_pad" },
+      "owner": { "selector": ".options-item", "text": "18in+Purple + ABS+Rubber+Steel (Q235)", "attributes": { "class": "options-item" } },
+      "width": 74,
+      "height": 74
+    },
+    {
+      "selector": ".similar-products .product-item-image img",
+      "attributes": {
+        "src": "https://b2bfiles1.gigab2b.cn/image/wkseller/33/recommendation.jpg",
+        "alt": "Recommended product"
+      },
+      "width": 368,
+      "height": 368,
+      "excluded": "similar-products"
+    }
+  ]
+}

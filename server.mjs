@@ -467,15 +467,22 @@ async function readJsonBody(request, { maxBytes = Number.POSITIVE_INFINITY } = {
 
 let productImageCollectorArchivePromise = null;
 
-async function handleProductImageCollectorImage(request, response) {
+async function handleProductImageCollectorImage(request, response, url) {
   let payload;
-  try {
-    payload = await readJsonBody(request, { maxBytes: MAX_PRODUCT_IMAGE_PROXY_BODY_BYTES });
-  } catch (error) {
-    return sendJson(response, error?.code === "PAYLOAD_TOO_LARGE" ? 413 : 400, {
-      ok: false,
-      message: error instanceof Error ? error.message : "商品图请求必须是有效 JSON。",
-    });
+  if (request.method === "GET") {
+    payload = {
+      sourcePageUrl: url.searchParams.get("sourcePageUrl") || "",
+      imageUrl: url.searchParams.get("imageUrl") || "",
+    };
+  } else {
+    try {
+      payload = await readJsonBody(request, { maxBytes: MAX_PRODUCT_IMAGE_PROXY_BODY_BYTES });
+    } catch (error) {
+      return sendJson(response, error?.code === "PAYLOAD_TOO_LARGE" ? 413 : 400, {
+        ok: false,
+        message: error instanceof Error ? error.message : "商品图请求必须是有效 JSON。",
+      });
+    }
   }
 
   try {
@@ -5865,8 +5872,8 @@ async function routeRequest(request, response) {
     return handleCreationReferenceAnalyze(request, response);
   }
 
-  if (request.method === "POST" && url.pathname === "/api/product-image-collector/image") {
-    return handleProductImageCollectorImage(request, response);
+  if ((request.method === "GET" || request.method === "POST") && url.pathname === "/api/product-image-collector/image") {
+    return handleProductImageCollectorImage(request, response, url);
   }
 
   if (request.method === "GET" && url.pathname === "/api/product-image-collector/package") {

@@ -4321,7 +4321,7 @@ export async function handleApiRequest(request, options = {}) {
   }
 
   if (
-    (request.method === "POST" && url.pathname === "/api/product-image-collector/image") ||
+    ((request.method === "GET" || request.method === "POST") && url.pathname === "/api/product-image-collector/image") ||
     (request.method === "GET" && url.pathname === "/api/product-image-collector/package")
   ) {
     return unsupportedFeature(request, "Cloudflare 部署版不支持商品图代理或本地插件打包，请使用本地应用。");

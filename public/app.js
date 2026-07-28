@@ -14946,7 +14946,7 @@ async function openOutputDirectory() {
   }
 }
 
-const productImageImportController = createProductImageImportController({ applyFiles: applyCreationReferenceFiles, getMaximumCount: getCreationMaxProductReferenceImageCount, getRemainingCapacity: () => getCreationMaxProductReferenceImageCount() - state.creationReferenceFiles.length, onError: showError, setFeedback: setCreationFeedback });
+const productImageImportController = createProductImageImportController({ applyFiles: applyCreationReferenceFiles, canHandlePaste: () => state.activeView === "creation" && !isCreationLogoBatchBranch(), getMaximumCount: getCreationMaxProductReferenceImageCount, getRemainingCapacity: () => getCreationMaxProductReferenceImageCount() - state.creationReferenceFiles.length, onError: showError, setFeedback: setCreationFeedback });
 
 const assetRecordDeleteController = createAssetRecordDeleteController({
   refs,

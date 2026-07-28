@@ -43,6 +43,18 @@ test("trusted product image proxy revalidates every redirect", async () => {
     }),
     /重定向图片地址不受支持/,
   );
+
+  await assert.rejects(
+    () => fetchTrustedProductImage({
+      sourcePageUrl: "https://www.amazon.com/example/dp/B008N4NIBS",
+      imageUrl: "https://m.media-amazon.com/images/I/start.jpg",
+      fetchImpl: async () => new Response(null, {
+        status: 302,
+        headers: { location: "https://img.kwcdn.com/cross-platform.jpg" },
+      }),
+    }),
+    /重定向图片地址不受支持/,
+  );
 });
 
 test("trusted product image proxy rejects non-images and oversized responses", async () => {
@@ -82,7 +94,43 @@ test("trusted product image proxy rejects unsupported source pages before fetchi
         return new Response(Uint8Array.from([1]), { headers: { "content-type": "image/jpeg" } });
       },
     }),
-    /1688 商品页/,
+    /受支持平台的商品详情页/,
+  );
+  assert.equal(called, false);
+});
+
+test("trusted product image proxy accepts supported platform pairs and rejects mismatches before fetching", async () => {
+  const cases = [
+    ["https://www.amazon.com/example/dp/B008N4NIBS", "https://m.media-amazon.com/images/I/example.jpg"],
+    ["https://www.temu.com/de-en/example-g-606585678043033.html", "https://img.kwcdn.com/product/example.jpg"],
+    ["https://shop.tiktok.com/us/pdp/example/1730536456942949185", "https://p16-oec-general-no.tiktokcdn-us.com/example.webp"],
+    ["https://www.tiktok.com/shop/pdp/example/1730536456942949185", "https://p16-oec-general-no.tiktokcdn-us.com/legacy.webp"],
+    ["https://us.shein.com/example-p-57067643.html", "https://img.ltwebstatic.com/example.webp"],
+    ["https://www.gigab2b.com/index.php?route=product/product&product_id=GC-10001", "https://b2bfiles1.gigab2b.cn/product/example.jpg"],
+  ];
+  for (const [platformSource, platformImage] of cases) {
+    const result = await fetchTrustedProductImage({
+      sourcePageUrl: platformSource,
+      imageUrl: platformImage,
+      fetchImpl: async () => new Response(Uint8Array.from([1]), {
+        status: 200,
+        headers: { "content-type": "image/jpeg", "content-length": "1" },
+      }),
+    });
+    assert.equal(result.bytes.byteLength, 1);
+  }
+
+  let called = false;
+  await assert.rejects(
+    () => fetchTrustedProductImage({
+      sourcePageUrl: cases[0][0],
+      imageUrl: cases[1][1],
+      fetchImpl: async () => {
+        called = true;
+        return new Response(Uint8Array.from([1]), { headers: { "content-type": "image/jpeg" } });
+      },
+    }),
+    /图片地址不受支持/,
   );
   assert.equal(called, false);
 });

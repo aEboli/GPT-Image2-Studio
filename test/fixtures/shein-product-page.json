@@ -1,0 +1,107 @@
+{
+  "href": "https://us.shein.com/SHEIN-EZwear-Women-Solid-Color-Shorts-p-57067643.html",
+  "title": "SHEIN EZwear Solid Color Shorts",
+  "jsonLd": {
+    "@context": "https://schema.org",
+    "@type": "ProductGroup",
+    "productGroupID": "z57067643",
+    "name": "SHEIN EZwear Solid Color Shorts",
+    "image": [
+      "https://img.ltwebstatic.com/v4/j/spmp/2024/01/01/aa/main-a_thumbnail_900x.webp",
+      "https://img.ltwebstatic.com/v4/j/spmp/2024/01/01/bb/main-b_thumbnail_900x.webp"
+    ]
+  },
+  "images": [
+    {
+      "selector": "section.main-picture[role='region'][aria-label='Product images'] .normal-picture__content-list img",
+      "attributes": {
+        "src": "https://img.ltwebstatic.com/v4/j/spmp/2024/01/01/aa/main-a_thumbnail_900x.webp"
+      },
+      "width": 900,
+      "height": 1199
+    },
+    {
+      "selector": "section.main-picture[role='region'][aria-label='Product images'] ul.thumbs-picture img",
+      "attributes": {
+        "src": "https://img.ltwebstatic.com/v4/j/spmp/2024/01/01/aa/main-a_thumbnail_220x293.webp"
+      },
+      "width": 220,
+      "height": 293
+    },
+    {
+      "selector": "section.main-picture[role='region'][aria-label='Product images'] ul.thumbs-picture img",
+      "attributes": {
+        "src": "https://img.ltwebstatic.com/v4/j/spmp/2024/01/01/bb/main-b_thumbnail_220x293.webp"
+      },
+      "width": 220,
+      "height": 293
+    },
+    {
+      "selector": ".details-pic__img img",
+      "attributes": {
+        "data-src": "https://img.ltwebstatic.com/images3_pi/2024/01/01/detail-a.jpg"
+      },
+      "width": 900,
+      "height": 1400
+    },
+    {
+      "selector": ".product-intro__color-radio img",
+      "attributes": {
+        "src": "https://img.ltwebstatic.com/v4/j/spmp/2024/01/01/cc/sku-black_thumbnail_220x293.webp",
+        "alt": "Black"
+      },
+      "width": 120,
+      "height": 120
+    },
+    {
+      "selector": "[class*='goods-detail'] img",
+      "attributes": {
+        "src": "https://img.ltwebstatic.com/v4/j/spmp/2024/01/01/aa/main-a_thumbnail_220x293.webp"
+      },
+      "width": 220,
+      "height": 293
+    },
+    {
+      "selector": "[class*='goods-detail'] img",
+      "attributes": {
+        "src": "https://sc.ltwebstatic.com/she_dist/images/prime/prime_twitter.png"
+      },
+      "width": 48,
+      "height": 48
+    },
+    {
+      "selector": "[class*='goods-detail'] img",
+      "attributes": {
+        "src": "https://img.ltwebstatic.com/v4/p/pi/2025/04/28/feature-comfort.png"
+      },
+      "width": 512,
+      "height": 512
+    },
+    {
+      "selector": "[class*='goods-detail'] img",
+      "attributes": {
+        "src": "https://img.ltwebstatic.com/v4/p/psrm/2025/07/14/store-xhgg.png"
+      },
+      "width": 500,
+      "height": 500
+    },
+    {
+      "selector": "[class*='goods-detail'] img",
+      "attributes": {
+        "src": "https://img.ltwebstatic.com/v4/j/spmp/2024/01/01/cc/sku-black_thumbnail_220x293.webp",
+        "alt": "Black"
+      },
+      "width": 220,
+      "height": 293
+    },
+    {
+      "selector": "[class*='goods-detail'] img",
+      "attributes": {
+        "src": "https://img.ltwebstatic.com/images3_pi/2024/01/01/review-a.jpg"
+      },
+      "width": 900,
+      "height": 1200,
+      "excluded": "common-reviews"
+    }
+  ]
+}

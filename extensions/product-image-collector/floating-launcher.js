@@ -1,14 +1,62 @@
 (() => {
   const HOST_ID = "gpt-image2-studio-product-image-launcher";
   const PANEL_HOST_ID = "gpt-image2-studio-product-image-collector";
-  const LAUNCHER_VERSION = "1.0.3";
+  const LAUNCHER_VERSION = "1.1.17";
   const MESSAGE_OPEN = "product-image-collector:open";
   const PANEL_OPENED_EVENT = "gpt-image2-studio-product-image-collector:panel-opened";
   const PANEL_CLOSED_EVENT = "gpt-image2-studio-product-image-collector:panel-closed";
+  const AMAZON_HOSTS = [
+    "amazon.com", "amazon.ca", "amazon.co.uk", "amazon.de", "amazon.fr", "amazon.it",
+    "amazon.es", "amazon.co.jp", "amazon.com.au", "amazon.com.mx", "amazon.in"
+  ];
+
+  function isHostOrSubdomain(hostname, suffix) {
+    return hostname === suffix || hostname.endsWith(`.${suffix}`);
+  }
+
+  function isSupportedProductPage(value) {
+    try {
+      const url = new URL(String(value || ""));
+      if (url.protocol !== "https:") return false;
+      if (isHostOrSubdomain(url.hostname, "1688.com")) {
+        return /^\/offer\/[^/.]+(?:\.html)?\/?$/i.test(url.pathname);
+      }
+      if (AMAZON_HOSTS.some((host) => isHostOrSubdomain(url.hostname, host))) {
+        return /\/(?:dp|gp\/product|gp\/aw\/d)\/[a-z0-9]{10}(?:[/?]|$)/i.test(url.pathname);
+      }
+      if (isHostOrSubdomain(url.hostname, "temu.com")) {
+        return /-g-\d+\.html\/?$/i.test(url.pathname) ||
+          (url.pathname.toLowerCase().endsWith("/goods.html") && /^\d+$/.test(url.searchParams.get("goods_id") || ""));
+      }
+      if (url.hostname === "www.tiktok.com") {
+        return /^\/shop\/pdp\/(?:[^/]+\/)?\d+\/?$/i.test(url.pathname);
+      }
+      if (url.hostname === "shop.tiktok.com") {
+        return /^\/[a-z]{2}(?:-[a-z]{2})?\/pdp\/(?:[^/]+\/)?\d+\/?$/i.test(url.pathname);
+      }
+      if (isHostOrSubdomain(url.hostname, "shein.com")) {
+        return /-p-\d+\.html\/?$/i.test(url.pathname);
+      }
+      if (isHostOrSubdomain(url.hostname, "gigab2b.com")) {
+        return url.pathname === "/index.php" && url.searchParams.get("route") === "product/product" &&
+          /^[a-z0-9_-]{1,120}$/i.test(url.searchParams.get("product_id") || "");
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  if (!isSupportedProductPage(location.href)) return;
+
+  function isPanelVisible() {
+    const panelHost = document.getElementById(PANEL_HOST_ID);
+    return Boolean(panelHost && panelHost.dataset.panelHidden !== "true");
+  }
 
   const existing = document.getElementById(HOST_ID);
   if (existing?.dataset.launcherVersion === LAUNCHER_VERSION) {
-    existing.dataset.panelOpen = String(Boolean(document.getElementById(PANEL_HOST_ID)));
+    existing.dataset.panelOpen = String(isPanelVisible());
     return;
   }
   existing?.remove();
@@ -16,7 +64,7 @@
   const host = document.createElement("div");
   host.id = HOST_ID;
   host.dataset.launcherVersion = LAUNCHER_VERSION;
-  host.dataset.panelOpen = String(Boolean(document.getElementById(PANEL_HOST_ID)));
+  host.dataset.panelOpen = String(isPanelVisible());
   document.documentElement.appendChild(host);
 
   const shadow = host.attachShadow({ mode: "open" });

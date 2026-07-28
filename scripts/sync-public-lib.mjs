@@ -63,6 +63,7 @@ export const PUBLIC_LIB_SYNC_TARGETS = [
   "portrait-location-selector.mjs",
   "portrait-reference-analysis-client.mjs",
   "product-image-import.mjs",
+  "product-image-platforms.mjs",
   "product-image-import-controller.mjs",
   "ppt-analysis-client.mjs",
   "ppt-record-links.mjs",

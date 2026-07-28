@@ -1,0 +1,135 @@
+{
+  "href": "https://www.amazon.co.jp/-/en/MUJI-Sensitive-Cleansing-300mL-84464843/dp/B0F1MCXQ3M?th=1",
+  "title": "MUJI 無印良品 Sensitive Skin Oil Cleansing ・ 300mL 84464843",
+  "jsonLd": {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    "sku": "B0F1MCXQ3M",
+    "name": "MUJI 無印良品 Sensitive Skin Oil Cleansing ・ 300mL 84464843",
+    "image": [
+      "https://m.media-amazon.com/images/I/51INBV0wEnL._AC_SL1500_.jpg"
+    ]
+  },
+  "amazonDeclared": {
+    "mainImages": [
+      "https://m.media-amazon.com/images/I/51INBV0wEnL._AC_SL1500_.jpg",
+      "https://m.media-amazon.com/images/I/61E3WJ4O2YL._AC_SL1500_.jpg",
+      "https://m.media-amazon.com/images/I/61b4cxDf8cL._AC_SL1500_.jpg",
+      "https://m.media-amazon.com/images/I/51XeE9XD70L._AC_SL1500_.jpg",
+      "https://m.media-amazon.com/images/I/51cZmmgS0fL._AC_SL1500_.jpg"
+    ],
+    "variants": [
+      {
+        "label": "Unscented 携帯用 (× 2)",
+        "asin": "B0H99J1372",
+        "image": "https://m.media-amazon.com/images/I/61cSLespdBL._AC_SL1500_.jpg"
+      },
+      {
+        "label": "Unscented Main body",
+        "asin": "B0F1MCXQ3M",
+        "image": "https://m.media-amazon.com/images/I/51INBV0wEnL._AC_SL1500_.jpg"
+      },
+      {
+        "label": "Unscented 50 ml",
+        "asin": "B0F1MCXHGM",
+        "image": "https://m.media-amazon.com/images/I/51gyDP1aHPL._AC_SL1500_.jpg"
+      },
+      {
+        "label": "Unscented For refill",
+        "asin": "B0F1MBT5XM",
+        "image": "https://m.media-amazon.com/images/I/51z1bY5b01L._AC_SL1500_.jpg"
+      }
+    ]
+  },
+  "images": [
+    {
+      "selector": "#landingImage",
+      "attributes": {
+        "src": "https://m.media-amazon.com/images/I/51INBV0wEnL._AC_SX679_.jpg",
+        "data-old-hires": "https://m.media-amazon.com/images/I/51INBV0wEnL._AC_SL1500_.jpg",
+        "alt": "MUJI 無印良品 Sensitive Skin Oil Cleansing ・ 300mL 84464843"
+      },
+      "width": 679,
+      "height": 679
+    },
+    {
+      "selector": "[data-csa-c-content-id='image-block'] img",
+      "attributes": {
+        "src": "https://m.media-amazon.com/images/I/61cSLespdBL._AC_SX679_.jpg",
+        "data-old-hires": "https://m.media-amazon.com/images/I/61cSLespdBL._AC_SL1500_.jpg"
+      },
+      "width": 679,
+      "height": 784
+    },
+    {
+      "selector": "#altImages img",
+      "attributes": { "src": "https://m.media-amazon.com/images/I/31MP6pqpG2L._AC_US40_.jpg" },
+      "width": 40,
+      "height": 40
+    },
+    {
+      "selector": "#altImages img",
+      "attributes": { "src": "https://m.media-amazon.com/images/I/31Zbwfob6SL._AC_US40_.jpg" },
+      "width": 40,
+      "height": 40
+    },
+    {
+      "selector": "#altImages img",
+      "attributes": { "src": "https://m.media-amazon.com/images/I/31WI6lVPMaL._AC_US40_.jpg" },
+      "width": 40,
+      "height": 40
+    },
+    {
+      "selector": "#altImages img",
+      "attributes": { "src": "https://m.media-amazon.com/images/I/21GOkviuj3L._AC_US40_.jpg" },
+      "width": 40,
+      "height": 40
+    },
+    {
+      "selector": "#altImages img",
+      "attributes": { "src": "https://m.media-amazon.com/images/I/31kUFn9jf5L._AC_US40_.jpg" },
+      "width": 40,
+      "height": 40
+    },
+    {
+      "selector": "#aplus img",
+      "attributes": {
+        "src": "https://images-na.ssl-images-amazon.com/images/G/01/x-locale/common/grey-pixel.gif",
+        "data-src": "https://m.media-amazon.com/images/S/aplus-media-library-service-media/6acc1e0b-e02e-440d-a1e6-bc339ccda861.__CR0,0,300,300_PT0_SX300_V1___.jpg"
+      },
+      "width": 1,
+      "height": 1
+    },
+    {
+      "selector": "#aplus img",
+      "attributes": { "src": "https://m.media-amazon.com/images/I/31fzviKr52L.__AC_SR150,300___.jpg" },
+      "width": 150,
+      "height": 300
+    },
+    {
+      "selector": "#aplus img",
+      "attributes": { "src": "https://m.media-amazon.com/images/I/315U3%2B4melL.__AC_SR150,300___.jpg" },
+      "width": 150,
+      "height": 300
+    },
+    {
+      "selector": "#aplus img",
+      "attributes": { "src": "https://m.media-amazon.com/images/I/31MP6pqpG2L.__AC_SR150,300___.jpg" },
+      "width": 150,
+      "height": 300
+    },
+    {
+      "selector": "#aplus img",
+      "attributes": { "src": "https://m.media-amazon.com/images/I/31wN4369-rL.__AC_SR150,300___.jpg" },
+      "width": 150,
+      "height": 300
+    },
+    {
+      "selector": "#aplus img",
+      "attributes": { "src": "https://m.media-amazon.com/images/I/review-photo.jpg" },
+      "width": 800,
+      "height": 800,
+      "excluded": "customer-review"
+    }
+  ]
+}

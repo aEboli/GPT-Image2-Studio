@@ -24,7 +24,7 @@ test("local collector package endpoint returns a valid attachment ZIP", async ()
 
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("content-type"), "application/zip");
-  assert.match(response.headers.get("content-disposition") || "", /attachment; filename="GPT-Image2-Studio-Product-Image-Collector-v1\.0\.3\.zip"/);
+  assert.match(response.headers.get("content-disposition") || "", /attachment; filename="GPT-Image2-Studio-Product-Image-Collector-v1\.1\.17\.zip"/);
   assert.ok(zip.file("manifest.json"));
   assert.ok(zip.file("lib/product-image-import.mjs"));
 });
@@ -47,12 +47,19 @@ test("local collector proxy rejects untrusted and oversized requests before fetc
     body: JSON.stringify({ value: "x".repeat(17 * 1024) }),
   });
   assert.equal(oversized.status, 413);
+
+  const untrustedPreview = await fetch(
+    `${runtime.studioServerUrl}/api/product-image-collector/image?sourcePageUrl=${encodeURIComponent("https://detail.1688.com/offer/123.html")}&imageUrl=${encodeURIComponent("https://127.0.0.1/private.jpg")}`,
+  );
+  assert.equal(untrustedPreview.status, 400);
+  assert.match((await untrustedPreview.json()).message, /图片地址不受支持/);
 });
 
 test("Cloudflare collector endpoints return the structured unsupported contract", async () => {
   const worker = await import("../cloudflare-pages-worker.mjs");
   for (const [method, path] of [
     ["POST", "/api/product-image-collector/image"],
+    ["GET", "/api/product-image-collector/image"],
     ["GET", "/api/product-image-collector/package"],
   ]) {
     const response = await worker.handleApiRequest(new Request(`https://studio.example${path}`, { method }));
