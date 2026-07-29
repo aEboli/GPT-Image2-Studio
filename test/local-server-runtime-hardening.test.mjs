@@ -169,6 +169,40 @@ async function startServer(t) {
   return { baseUrl, diagnostics, outputDir, port };
 }
 
+test("plain HTTP non-loopback binding fails closed without explicit opt-in", async (t) => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "image-studio-remote-bind-"));
+  const env = {
+    ...process.env,
+    PORT: String(await getFreePort()),
+    HOST: "0.0.0.0",
+    VERCEL: "1",
+    TMP: tempRoot,
+    TEMP: tempRoot,
+    IMAGE_STUDIO_OUTPUT_DIR: join(tempRoot, "output"),
+    IMAGE_STUDIO_LOCAL_DATA_DIR: join(tempRoot, "local-data"),
+  };
+  delete env.IMAGE_STUDIO_ALLOW_INSECURE_REMOTE_HTTP;
+  const server = spawn(process.execPath, ["server.mjs"], {
+    cwd: rootDir,
+    env,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const diagnostics = collectDiagnostics(server);
+  t.after(async () => {
+    await stopServer(server);
+    await rm(tempRoot, { recursive: true, force: true });
+  });
+
+  const [exitCode] = await Promise.race([
+    once(server, "exit"),
+    delay(7000).then(() => { throw new Error("remote bind did not fail before listening"); }),
+  ]);
+
+  assert.notEqual(exitCode, 0);
+  assert.match(diagnostics.stderr, /IMAGE_STUDIO_ALLOW_INSECURE_REMOTE_HTTP=1/);
+  assert.match(diagnostics.stderr, /TLS/);
+});
+
 test("local portrait mock emits non-empty success and error SSE and persists the completed set", async (t) => {
   const { baseUrl, outputDir } = await startServer(t);
 
@@ -213,6 +247,8 @@ test("local server defaults to loopback and rejects cross-origin or non-loopback
   const { baseUrl, diagnostics, port } = await startServer(t);
 
   assert.match(diagnostics.stdout, new RegExp(`http://127\\.0\\.0\\.1:${port}`));
+  assert.match(diagnostics.stdout, /远程浏览器认证用户名: studio/);
+  assert.match(diagnostics.stdout, /远程访问令牌: runtime-test-token/);
 
   const localAddress = getNonLoopbackIpv4Address();
   if (localAddress) {
@@ -231,6 +267,14 @@ test("local server defaults to loopback and rejects cross-origin or non-loopback
 
   const hostileHost = await postWithHost({ port, hostHeader: `evil.example:${port}` });
   assert.equal(hostileHost.status, 403);
+
+  for (const malformedHost of [
+    `evil.example@127.0.0.1:${port}`,
+    `127.0.0.1#@evil.example:${port}`,
+  ]) {
+    const malformed = await postWithHost({ port, hostHeader: malformedHost });
+    assert.equal(malformed.status, 403, malformedHost);
+  }
 
   const sameOrigin = await fetch(`${baseUrl}/api/portrait/plan`, {
     method: "POST",

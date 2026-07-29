@@ -5,10 +5,13 @@ import {
   applyCreationReferenceAnalysisProductNameValue,
   buildCreationReferenceAnalysisCategoryMatchText,
   buildCreationReferenceAnalysisAppliedFeedbackMessage,
+  getCreationReferenceAnalysisCategoryProductName,
   getCreationReferenceAnalysisProductNameSuggestion,
   getCreationReferenceAnalysisDisplayRoleLabel,
   getCreationReferenceAnalysisRoleCorrectionReason,
   normalizeCreationReferenceAnalysisUnitCountNote,
+  resolveCreationReferenceAnalysisCategoryValue,
+  resolveCreationReferenceAnalysisContextCategoryValue,
   shouldDowngradeReferenceProductAnalysisRole,
   summarizeCreationReferenceAnalysisRoleCorrections,
 } from "../lib/creation-reference-analysis-view.mjs";
@@ -38,6 +41,95 @@ test("creation reference category matching ignores stale form product copy", () 
   assert.match(text, /pleated upper and lower garment set/);
   assert.match(text, /matching skirt/);
   assert.doesNotMatch(text, /fishing lure|bass bait|swimming action/);
+});
+
+test("creation reference category fallback exposes only the current analyzed product name", () => {
+  assert.equal(
+    getCreationReferenceAnalysisCategoryProductName({ productName: "长毛绒猫耳发箍" }),
+    "长毛绒猫耳发箍",
+  );
+  assert.equal(
+    getCreationReferenceAnalysisCategoryProductName({ product_name: "长毛绒猫耳发箍" }),
+    "长毛绒猫耳发箍",
+  );
+  assert.equal(getCreationReferenceAnalysisCategoryProductName({ categoryHint: "发箍" }), "");
+  assert.equal(getCreationReferenceAnalysisCategoryProductName({ productName: "product" }), "");
+});
+
+test("creation reference category replaces or clears only stale analysis-managed values", () => {
+  assert.equal(
+    resolveCreationReferenceAnalysisContextCategoryValue({
+      analysisDirty: true,
+      categorySuggestionStale: true,
+      currentCategoryValue: "category:C01-006-004-001",
+      previousAutoCategoryValue: "category:C01-006-004-001",
+    }),
+    "general",
+  );
+
+  assert.equal(
+    resolveCreationReferenceAnalysisContextCategoryValue({
+      analysisDirty: true,
+      categorySuggestionStale: false,
+      currentCategoryValue: "category:C01-006-004-001",
+      previousAutoCategoryValue: "category:C01-006-004-001",
+    }),
+    "category:C01-006-004-001",
+  );
+
+  assert.equal(
+    resolveCreationReferenceAnalysisContextCategoryValue({
+      analysisDirty: true,
+      categoryManuallyEdited: true,
+      categorySuggestionStale: true,
+      currentCategoryValue: "category:C01-006-004-001",
+      previousAutoCategoryValue: "category:C01-006-004-001",
+    }),
+    "category:C01-006-004-001",
+  );
+
+  assert.deepEqual(
+    resolveCreationReferenceAnalysisCategoryValue({
+      currentCategoryValue: "category:C01-006-004-001",
+      matchedCategoryValue: "category:C11-001-001-002",
+      previousAutoCategoryValue: "category:C01-006-004-001",
+    }),
+    {
+      applied: true,
+      autoCategoryValue: "category:C11-001-001-002",
+      categoryValue: "category:C11-001-001-002",
+      cleared: false,
+    },
+  );
+
+  assert.deepEqual(
+    resolveCreationReferenceAnalysisCategoryValue({
+      currentCategoryValue: "category:C01-006-004-001",
+      matchedCategoryValue: "",
+      previousAutoCategoryValue: "category:C01-006-004-001",
+    }),
+    {
+      applied: true,
+      autoCategoryValue: "",
+      categoryValue: "general",
+      cleared: true,
+    },
+  );
+
+  assert.deepEqual(
+    resolveCreationReferenceAnalysisCategoryValue({
+      categoryManuallyEdited: true,
+      currentCategoryValue: "category:C01-006-004-001",
+      matchedCategoryValue: "category:C11-001-001-002",
+      previousAutoCategoryValue: "category:C01-006-004-001",
+    }),
+    {
+      applied: false,
+      autoCategoryValue: "",
+      categoryValue: "category:C01-006-004-001",
+      cleared: false,
+    },
+  );
 });
 
 test("creation reference product name suggestion preserves form text and replaces only analysis-managed names", () => {

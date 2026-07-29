@@ -71,6 +71,11 @@ function getCreationReferenceAnalysisSkuSubjectProductName(analysis = {}) {
   return "";
 }
 
+export function getCreationReferenceAnalysisCategoryProductName(analysis = {}) {
+  const directName = getCreationReferenceAnalysisDirectProductName(analysis);
+  return isUsefulCreationReferenceProductName(directName) ? directName : "";
+}
+
 export function buildCreationReferenceAnalysisCategoryMatchText(analysis = {}) {
   const recommendationText = Array.isArray(analysis.recommendations)
     ? analysis.recommendations.flatMap((entry = {}) => [entry.filename, entry.roleLabel, entry.note])
@@ -89,9 +94,69 @@ export function buildCreationReferenceAnalysisCategoryMatchText(analysis = {}) {
     .join(" ");
 }
 
+export function resolveCreationReferenceAnalysisContextCategoryValue({
+  analysisDirty = false,
+  categoryManuallyEdited = false,
+  categorySuggestionStale = analysisDirty,
+  currentCategoryValue = "general",
+  fallbackCategoryValue = "general",
+  previousAutoCategoryValue = "",
+} = {}) {
+  const fallback = cleanCreationReferenceAnalysisText(fallbackCategoryValue) || "general";
+  const current = cleanCreationReferenceAnalysisText(currentCategoryValue) || fallback;
+  const previousAuto = cleanCreationReferenceAnalysisText(previousAutoCategoryValue);
+  const hasStaleAutoCategory =
+    Boolean(categorySuggestionStale) &&
+    !categoryManuallyEdited &&
+    Boolean(previousAuto) &&
+    current === previousAuto;
+
+  return hasStaleAutoCategory ? fallback : current;
+}
+
+export function resolveCreationReferenceAnalysisCategoryValue({
+  categoryManuallyEdited = false,
+  currentCategoryValue = "general",
+  fallbackCategoryValue = "general",
+  matchedCategoryValue = "",
+  previousAutoCategoryValue = "",
+} = {}) {
+  const fallback = cleanCreationReferenceAnalysisText(fallbackCategoryValue) || "general";
+  const current = cleanCreationReferenceAnalysisText(currentCategoryValue) || fallback;
+  const matched = cleanCreationReferenceAnalysisText(matchedCategoryValue);
+  const previousAuto = cleanCreationReferenceAnalysisText(previousAutoCategoryValue);
+  const isCurrentAnalysisManaged = Boolean(previousAuto && current === previousAuto);
+
+  if (categoryManuallyEdited || (current !== fallback && !isCurrentAnalysisManaged)) {
+    return {
+      applied: false,
+      autoCategoryValue: "",
+      categoryValue: current,
+      cleared: false,
+    };
+  }
+
+  if (!matched) {
+    const cleared = isCurrentAnalysisManaged && current !== fallback;
+    return {
+      applied: cleared,
+      autoCategoryValue: "",
+      categoryValue: fallback,
+      cleared,
+    };
+  }
+
+  return {
+    applied: current !== matched,
+    autoCategoryValue: matched,
+    categoryValue: matched,
+    cleared: false,
+  };
+}
+
 export function getCreationReferenceAnalysisProductNameSuggestion(analysis = {}) {
-  const directName = getCreationReferenceAnalysisDirectProductName(analysis);
-  if (isUsefulCreationReferenceProductName(directName)) {
+  const directName = getCreationReferenceAnalysisCategoryProductName(analysis);
+  if (directName) {
     return directName;
   }
 

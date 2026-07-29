@@ -79,6 +79,13 @@ export const API_RUNTIME_CAPABILITIES = Object.freeze([
   },
   {
     method: "GET",
+    path: "/api/product-image-collector/image",
+    local: API_RUNTIME_STATUS.SUPPORTED,
+    cloudflare: API_RUNTIME_STATUS.UNSUPPORTED,
+    reason: "Cloudflare cannot proxy third-party product images through the local trust boundary.",
+  },
+  {
+    method: "GET",
     path: "/api/product-image-collector/package",
     local: API_RUNTIME_STATUS.SUPPORTED,
     cloudflare: API_RUNTIME_STATUS.UNSUPPORTED,

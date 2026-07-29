@@ -54,6 +54,10 @@ function makeV2Draft(policy, overrides = {}) {
       traffic: ["home organizer"],
       descriptive: ["blue stackable box"],
     },
+    packageDimensions: "Estimated: 22 x 14 x 12 cm (8.66 x 5.51 x 4.72 in)",
+    productDimensions: "20 x 12 x 10 cm (7.87 x 4.72 x 3.94 in)",
+    packageWeight: "Estimated: 350 g (12.35 oz)",
+    productWeight: "Estimated: 250 g (8.82 oz)",
     evidence: ["product-input"],
     missingInfo: [],
     warnings: [],
@@ -72,6 +76,18 @@ function makeV2Draft(policy, overrides = {}) {
         key,
         buildTraceableChineseRows(values, "中文关键词"),
       ])),
+      packageDimensions: /^Estimated\s*:/iu.test(draft.packageDimensions)
+        ? `预估：${draft.packageDimensions.replace(/^Estimated\s*:\s*/iu, "")}`
+        : `包装尺寸：${draft.packageDimensions}`,
+      productDimensions: /^Estimated\s*:/iu.test(draft.productDimensions)
+        ? `预估：${draft.productDimensions.replace(/^Estimated\s*:\s*/iu, "")}`
+        : `产品尺寸：${draft.productDimensions}`,
+      packageWeight: /^Estimated\s*:/iu.test(draft.packageWeight)
+        ? `预估：${draft.packageWeight.replace(/^Estimated\s*:\s*/iu, "")}`
+        : `包装重量：${draft.packageWeight}`,
+      productWeight: /^Estimated\s*:/iu.test(draft.productWeight)
+        ? `预估：${draft.productWeight.replace(/^Estimated\s*:\s*/iu, "")}`
+        : `产品重量：${draft.productWeight}`,
       warnings: buildTraceableChineseRows(draft.warnings, "中文警告"),
       missingInfo: buildTraceableChineseRows(draft.missingInfo, "中文缺失信息"),
     };
@@ -131,7 +147,10 @@ test("compact Listing Source JSON and upstream request omit internal marketingCo
   const fetchImpl = async (_url, init) => {
     requests.push(JSON.parse(init.body));
     return new Response(JSON.stringify({
-      output_text: JSON.stringify(makeV2Draft(policy, { warnings: source.warnings || [] })),
+      output_text: JSON.stringify(makeV2Draft(policy, {
+        warnings: source.warnings || [],
+        productDimensions: "Estimated: 18 x 12 x 6 cm (7.1 x 4.7 x 2.4 in)",
+      })),
     }), { status: 200 });
   };
 
@@ -339,7 +358,10 @@ test("new V2 model, retry, and explicit mock drafts remove identities from visib
     sellingPoints: ["Blue finish", "Stackable shape"],
   });
   const policy = source.listingPolicy;
-  const validOutput = JSON.stringify(makeV2Draft(policy, { warnings: source.warnings }));
+  const validOutput = JSON.stringify(makeV2Draft(policy, {
+    warnings: source.warnings,
+    productDimensions: "Estimated: 18 x 12 x 6 cm (7.1 x 4.7 x 2.4 in)",
+  }));
   const response = (outputText) => new Response(JSON.stringify({ output_text: outputText }), { status: 200 });
   const scenarios = [
     {
@@ -411,7 +433,10 @@ test("new V2 model, retry, and explicit mock drafts remove identities from visib
   assert.equal(failedRequestCount, 2);
 
   const normalizedExplicitId = normalizeCreationListingDraft({
-    ...makeV2Draft(policy, { warnings: source.warnings }),
+    ...makeV2Draft(policy, {
+      warnings: source.warnings,
+      productDimensions: "Estimated: 18 x 12 x 6 cm (7.1 x 4.7 x 2.4 in)",
+    }),
     id: "listing-acme-blue-storage-box",
   }, source);
   assert.equal(normalizedExplicitId.id, "listing-blue-storage-box");

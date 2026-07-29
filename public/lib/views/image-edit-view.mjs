@@ -1,6 +1,7 @@
 import { getImageUrl, fetchServerImageAsDataUrl } from "../browser-image-cache.mjs";
 import { sortGalleryItemsByCreatedAtDesc } from "../gallery-organizer.mjs";
 import { getDefaultGenerationSize, normalizeGenerationSize } from "../generation-size-options.mjs";
+import { DEFAULT_RESPONSES_MODEL } from "../model-defaults.mjs";
 import {
   IMAGE_EDIT_LOCAL_MASK_MODE,
   buildLocalMaskMergedPrompt,
@@ -1185,7 +1186,7 @@ export function createImageEditController(options = {}) {
         refs.imageEditOutputFormatInput?.value || refs.outputFormatInput?.value || state.config?.defaults?.format || "png",
       ),
       baseUrl: state.config?.baseUrl || refs.baseUrlInput?.value?.trim() || "",
-      responsesModel: state.config?.responsesModel || refs.responsesModelInput?.value?.trim() || "gpt-5.4",
+      responsesModel: state.config?.responsesModel || refs.responsesModelInput?.value?.trim() || DEFAULT_RESPONSES_MODEL,
       imageModel: "gpt-image-2",
       reasoningEffort: refs.reasoningEffortInput?.value || state.config?.defaults?.reasoningEffort || "xhigh",
       requestRetryCount: 0,

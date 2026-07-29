@@ -1,3 +1,10 @@
+import {
+  DEFAULT_DIRECT_IMAGE_MODEL,
+  DEFAULT_DIRECT_RESPONSES_MODEL,
+  DEFAULT_PROTOCOL_IMAGE_MODEL,
+  DEFAULT_RESPONSES_MODEL,
+} from "./model-defaults.mjs";
+
 export function createConfigModelPickerController({
   refs,
   state,
@@ -141,7 +148,7 @@ export function createConfigModelPickerController({
         getInputValue(refs.responsesModelInput) ||
         browserPayload.responsesModel ||
         state.config?.responsesModel ||
-        "gpt-5.5",
+        DEFAULT_RESPONSES_MODEL,
       directBaseUrl:
         getInputValue(refs.directBaseUrlInput) || browserPayload.directBaseUrl || state.config?.directBaseUrl || "",
       directEndpointPath:
@@ -154,12 +161,12 @@ export function createConfigModelPickerController({
         getInputValue(refs.directImageModelInput) ||
         browserPayload.directImageModel ||
         state.config?.directImageModel ||
-        "gpt-image-2",
+        DEFAULT_DIRECT_IMAGE_MODEL,
       directResponsesModel:
         getInputValue(refs.directResponsesModelInput) ||
         browserPayload.directResponsesModel ||
         state.config?.directResponsesModel ||
-        "gpt-5.5",
+        DEFAULT_DIRECT_RESPONSES_MODEL,
       protocolBaseUrl:
         getInputValue(refs.protocolBaseUrlInput) ||
         browserPayload.protocolBaseUrl ||
@@ -170,7 +177,7 @@ export function createConfigModelPickerController({
         getInputValue(refs.protocolImageModelInput) ||
         browserPayload.protocolImageModel ||
         state.config?.protocolImageModel ||
-        "gemini-3.1-flash-image-preview",
+        DEFAULT_PROTOCOL_IMAGE_MODEL,
     };
   }
 

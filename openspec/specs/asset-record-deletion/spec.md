@@ -2,7 +2,6 @@
 
 ## Purpose
 定义资产工作区各类记录的当前项删除、显式多选删除、应用内确认、原位状态更新、持久化边界，以及 Local 与 Cloudflare 运行时的 API 行为，确保删除能力一致且不会越界清理其他资产。
-
 ## Requirements
 ### Requirement: Asset pages expose current and explicit multi-selection deletion
 The system SHALL expose Delete current and Delete selected on Waterfall Gallery, Article Illustration records, Creation set records, Portrait records, and PPT records. A checked batch MUST remain independent from the single current item used by the page detail or preview, and only Creation records SHALL additionally expose Delete filtered.
@@ -23,9 +22,10 @@ The system SHALL expose Delete current and Delete selected on Waterfall Gallery,
 - **AND** no deletion request can be started from that command
 
 #### Scenario: Non-Creation page has active filters
-- **WHEN** the user filters Gallery, Article, or Portrait assets
+- **WHEN** the user filters Gallery, Article, Portrait, or PPT assets
 - **THEN** the page still exposes only Delete current and Delete selected
-- **AND** it does not turn the current filter into an implicit Delete all or Delete filtered command
+- **AND** Delete current targets only the current filtered record while Delete selected targets only explicitly checked records
+- **AND** the current filter does not become an implicit Delete all or Delete filtered command
 
 ### Requirement: Asset deletion uses one explicit application confirmation flow
 The system SHALL present an application-modal confirmation before every newly added current or selected deletion. The confirmation MUST identify the asset type and target name or count, describe the permanent storage scope, and submit a bounded non-empty list of distinct identifiers only after explicit confirmation.

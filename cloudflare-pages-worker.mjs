@@ -81,6 +81,7 @@ import {
   API_ENDPOINT_RESPONSES,
   DEFAULT_DIRECT_RESPONSES_MODEL,
   DEFAULT_PROTOCOL_IMAGE_MODEL,
+  DEFAULT_RESPONSES_MODEL,
   IMAGE_ROUTE_B,
   IMAGE_ROUTE_C,
   getSelectedImageGenerationConfig,
@@ -123,7 +124,6 @@ import { buildUnsupportedRuntimeCapabilityPayload } from "./lib/api-contract.mjs
 import { normalizeCreationRecordDeleteSetIds } from "./lib/creation-record-delete.mjs";
 import { normalizeAssetRecordDeleteIds } from "./lib/asset-record-delete.mjs";
 
-const DEFAULT_RESPONSES_MODEL = "gpt-5.5";
 const PPT_SLIDE_SIZE = "2048x1152";
 const PPT_SLIDE_FORMAT = "png";
 const UPSTREAM_STATUS_HEARTBEAT_MS = 59000;
@@ -316,8 +316,6 @@ async function handlePromptAgentAnalyze(request, fetchImpl) {
       ? REFERENCE_ORCHESTRATION_REASONING_EFFORT
       : PROMPT_AGENT_ANALYSIS_REASONING_EFFORT;
   const reasoningEffort = normalizeReasoningEffort(formData.get("reasoningEffort") || reasoningFallback);
-  const platform = normalizeCreationPlatform(formData.get("platform"));
-  const platformLabel = String(formData.get("platformLabel") || platform.label).trim() || platform.label;
   const json = await requestPromptAgentAnalysis({
     baseUrl: textVisionConfig.baseUrl,
     endpointPath: textVisionConfig.endpointPath,
@@ -331,15 +329,6 @@ async function handlePromptAgentAnalyze(request, fetchImpl) {
     responsesModel: textVisionConfig.responsesModel,
     imageModel: textVisionConfig.imageModel,
     reasoningEffort,
-    contextPrompt: [
-      "套图分析上下文：",
-      `平台选择：${platformLabel}`,
-      `商品类目：${String(formData.get("industryTemplateLabel") || formData.get("industryTemplate") || "通用电商").trim() || "通用电商"}`,
-      String(formData.get("industryTemplatePath") || "").trim() ? `类目路径：${String(formData.get("industryTemplatePath")).trim()}` : "",
-      "请根据该平台和商品类型判断每张参考图最适合支持主图、详情页信息、SKU 对比、规格核对、移动端缩略图或直播/内容场景中的哪类套图生成用途。",
-    ]
-      .filter(Boolean)
-      .join("\n"),
     fetchImpl,
   });
 
@@ -610,7 +599,7 @@ function buildCloudFilename({ taskId, createdAt, format, filenameToken = "", fil
     .trim()
     .replace(/[^a-zA-Z0-9._-]/g, "");
   const idTail = extractCloudFilenameId(taskId);
-  return `${formatCloudHourMinutePrefix(createdAt)}-${prefix ? `${prefix}-` : ""}${keyword}-${idTail}.${safeFormat}`;
+  return `${prefix ? `${prefix}-` : ""}${formatCloudHourMinutePrefix(createdAt)}-${keyword}-${idTail}.${safeFormat}`;
 }
 
 function base64ToUint8Array(base64) {
@@ -4324,7 +4313,7 @@ export async function handleApiRequest(request, options = {}) {
     ((request.method === "GET" || request.method === "POST") && url.pathname === "/api/product-image-collector/image") ||
     (request.method === "GET" && url.pathname === "/api/product-image-collector/package")
   ) {
-    return unsupportedFeature(request, "Cloudflare 部署版不支持商品图代理或本地插件打包，请使用本地应用。");
+    return unsupportedFeature(request, "Cloudflare 部署版不支持商品图代理或插件打包，请使用本地应用。");
   }
 
   if (request.method === "POST" && url.pathname === "/api/creation/plan") {

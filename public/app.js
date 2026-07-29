@@ -7,6 +7,7 @@ import { getOutputFormatOptions, normalizeOutputFormat, } from "/lib/output-form
 import { normalizeReferenceAnalysisLanguage, } from "/lib/reference-analysis-language.mjs?v=20260522-reference-language-1";
 import { getPreviewLoadingOrbLimit, getPreviewLoadingOrbRenderState, getPreviewLoadingShellItems, getPreviewLoadingShellTheme, shouldReusePreviewLoadingShell } from "/lib/preview-loading-shell.mjs";
 import { createCreationCardLoading as createCreationCardLoadingShell, getCreationCardDomKey, syncCreationLoadingCard, syncCreationResultGrid as syncCreationResultGridShell } from "/lib/creation-card-loading.mjs";
+import { createCreationCardIdleRippleController } from "/lib/creation-card-idle-ripple.mjs?v=20260725-creation-card-idle-ripple-1";
 import { isGenerationRequestRetryMessage, } from "/lib/generation-request-retry.mjs";
 import { cancelQueuedGenerationJob, getQueuedGenerationJobCount, getRunningGenerationJobCount, isQueuedGenerationJob, selectNextQueuedGenerationJobsByMode } from "/lib/generation-queue.mjs?v=20260611-mode-route-queue-1";
 import { buildCanceledGenerationActivityDetail, buildGenerationTaskActivityDetail, buildGenerationTaskStatusText, formatGenerationActivityModeLabel, getGenerationActivityDisplayText, sanitizeGenerationActivityDetail, sortGenerationActivityFeed, upsertGenerationActivityEntry } from "/lib/generation-activity-feed.mjs?v=20260504-vercel-static-lib-1";
@@ -19,6 +20,7 @@ import { buildStyleTransferPresetLightboxItem } from "/lib/style-transfer-preset
 import { buildCreationRecordLightboxItem, normalizeCreationGenerationSnapshotForView } from "/lib/creation-record-lightbox.mjs";
 import { buildCreationRecordDeleteConfirmation, getCreationRecordDeleteTargets, normalizeCreationRecordDeleteSetIds, resolveCreationRecordSelectionAfterDelete } from "/lib/creation-record-delete.mjs?v=20260722-creation-record-delete-flow-1";
 import { createAssetRecordDeleteController } from "/lib/asset-record-delete-controller.mjs?v=20260722-asset-record-delete-1";
+import { createAssetRecordTimeFilterController, getArticleRecordSearchText, getPortraitRecordSearchText } from "/lib/asset-record-time-filter-controller.mjs?v=20260724-asset-record-time-filter-controller-1";
 import { buildCreationRecordTimeFilterOptions, filterCreationRecordSetsByTime, formatCreationRecordTimeFilterLabel, hasActiveCreationRecordTimeFilter, normalizeCreationRecordDateFilter, normalizeCreationRecordTimeFilter } from "/lib/creation-record-filter.mjs?v=20260722-creation-record-time-filter-1";
 import { ensureLazyViewModule, getMountedLazyViewModule } from "/lib/view-mode-loader.mjs?v=20260608-quick-blend-time-sort-1";
 import { appendBrowserConfigToFormData, getBrowserPrivateConfigRequestPayload, getOrCreateClientSessionId, readBrowserPrivateConfig, saveBrowserPrivateConfig, toPublicBrowserConfig } from "/lib/browser-config.mjs";
@@ -36,6 +38,10 @@ import {
   API_ENDPOINT_IMAGE_EDITS,
   API_ENDPOINT_IMAGE_GENERATIONS,
   API_ENDPOINT_RESPONSES,
+  DEFAULT_DIRECT_IMAGE_MODEL,
+  DEFAULT_DIRECT_RESPONSES_MODEL,
+  DEFAULT_PROTOCOL_IMAGE_MODEL,
+  DEFAULT_RESPONSES_MODEL,
   appendApiEndpointPath,
   normalizeApiEndpointPath,
   splitApiEndpointUrl,
@@ -49,7 +55,7 @@ import { buildCreationReferenceLightboxItem } from "/lib/creation-reference-ligh
 import { bindCreationReferenceDrag, reorderCreationReferenceFiles } from "/lib/creation-reference-drag.mjs";
 import { isCreationSubjectReferenceRole } from "/lib/creation-reference-roles.mjs";
 import { applyCreationReferenceCoverageRolePlan, normalizeCreationCoverageFields, toggleCreationSelectedRoles } from "/lib/creation-reference-coverage.mjs?v=20260703-latest-restore-1";
-import { applyCreationReferenceAnalysisProductNameValue, buildCreationReferenceAnalysisAppliedFeedbackMessage, buildCreationReferenceAnalysisCategoryMatchText, getCreationReferenceAnalysisDisplayRoleLabel, getCreationReferenceAnalysisGroupedSubjectUnitCount, getCreationReferenceAnalysisRoleCorrectionReason, normalizeCreationReferenceAnalysisUnitCountNote, shouldDowngradeReferenceProductAnalysisRole } from "/lib/creation-reference-analysis-view.mjs";
+import { applyCreationReferenceAnalysisProductNameValue, buildCreationReferenceAnalysisAppliedFeedbackMessage, buildCreationReferenceAnalysisCategoryMatchText, getCreationReferenceAnalysisCategoryProductName, getCreationReferenceAnalysisDisplayRoleLabel, getCreationReferenceAnalysisGroupedSubjectUnitCount, getCreationReferenceAnalysisRoleCorrectionReason, normalizeCreationReferenceAnalysisUnitCountNote, resolveCreationReferenceAnalysisCategoryValue, resolveCreationReferenceAnalysisContextCategoryValue, shouldDowngradeReferenceProductAnalysisRole } from "/lib/creation-reference-analysis-view.mjs";
 import { createCreationListingController, getCreationRecordListingMetaLabel, getCreationListingSearchValues, normalizeCreationListingDraftForView, renderCreationListingDrafts } from "/lib/creation-listing-view.mjs";
 import { getCreationAutoRepairNotice, getCreationCompletionFeedback, getCreationIncompleteItems, shouldAutoRepairCreationSet } from "/lib/creation-auto-repair.mjs";
 import { canRepairCreationItem as canRepairCreationItemFromQueue, getCreationRepairButtonText as getCreationRepairButtonTextFromQueue, isCreationItemRepairActive as isCreationItemRepairActiveInQueue, queueCreationItemRepair as queueCreationItemRepairInState, removeQueuedCreationItemRepair, shiftNextQueuedCreationItemRepair } from "/lib/creation-item-repair-queue.mjs";
@@ -58,6 +64,7 @@ import { normalizeCreationModuleEnabled, resolveCreationPlanCounts } from "/lib/
 import { buildCreationQueuedRepairFormData, buildCreationQueuedSet as buildCreationQueuedSetFromState, createCreationQueueJob, getActiveCreationQueueJob as getActiveCreationQueueJobFromState, getCreationQueueJobs as getCreationQueueJobsFromState, getCreationRepairTargetSet as getCreationRepairTargetSetFromState, getPendingCreationQueueCount as getPendingCreationQueueCountFromState, getSelectedCreationQueueJob as getSelectedCreationQueueJobFromState, renderCreationQueueStrip as renderCreationQueueStripView, runCreationQueuedJob as runCreationQueuedJobFromQueue, scheduleCreationGenerationQueue as scheduleCreationGenerationQueueFromState, selectCreationQueueJob as selectCreationQueueJobInState, shouldSyncCreationQueueJobCurrentSet, syncActiveCreationQueueSet as syncActiveCreationQueueSetInState } from "/lib/creation-suite-queue.mjs?v=20260712-creation-queue-selection-isolation-1";
 import { DEFAULT_PORTRAIT_ACCESSORY_ASSETS, PORTRAIT_ACCESSORY_ASSET_CATEGORIES, getPortraitAccessoryAssetFileDescriptor } from "/lib/portrait-accessory-assets.mjs?v=20260528-portrait-assets-sort-1";
 import { createDefaultPortraitLocationState, createPortraitLocationSelectorController } from "/lib/portrait-location-selector.mjs?v=20260527-portrait-location-1";
+import { getLegacyPromptAgentTemplatePrompt, getPromptAgentDisplayName, getPromptAgentTemplateDisplayName, isStructuredImagePromptJson } from "/lib/prompt-agent-display-name.mjs?v=20260726-prompt-name-1";
 const SURPRISE_PROMPTS = [
   { name: "清晨通勤", prompt: "生成一张清晨城市通勤生活照，年轻上班族手拿咖啡走出地铁站，晨光穿过街边树影，画面自然真实，轻微运动模糊，适合生活方式摄影。" },
   { name: "家庭早餐", prompt: "生成一张温暖家庭早餐场景，木质餐桌上有吐司、煎蛋、牛奶和水果，家人围坐聊天，窗外柔和日光洒入，构图干净，有真实居家氛围。" },
@@ -392,7 +399,6 @@ const state = {
     generationSnapshot: null,
     planning: false,
     recordCheckedSetIds: [],
-    recordQuery: "",
     recordColumnPreset: DEFAULT_ARTICLE_RECORD_COLUMN_PRESET,
     recordSetId: "",
     referenceGenerating: false,
@@ -447,7 +453,6 @@ const state = {
       running: false,
     },
     recordCheckedSetIds: [],
-    recordQuery: "",
     recordSetId: "",
     sets: [],
   },
@@ -466,6 +471,7 @@ const state = {
   creationReferenceRestoreQueue: [],
   creationReferenceAnalysis: {
     applied: false,
+    categoryManuallyEdited: false, categorySuggestionStale: false, categoryTemplateSuggestion: "",
     collapsed: false,
     dirty: false,
     productNameSuggestion: "",
@@ -693,7 +699,6 @@ const refs = {
   articleRecordContinueButton: document.querySelector("#articleRecordContinueButton"),
   articleRecordCopyCaptionsButton: document.querySelector("#articleRecordCopyCaptionsButton"),
   articleRecordCopyPromptsButton: document.querySelector("#articleRecordCopyPromptsButton"),
-  articleRecordCount: document.querySelector("#articleRecordCount"),
   articleRecordColumnButtons: [...document.querySelectorAll("[data-article-record-column-preset]")],
   articleRecordDetail: document.querySelector("#articleRecordDetail"),
   articleRecordDeleteCurrentButton: document.querySelector("#articleRecordDeleteCurrentButton"),
@@ -701,7 +706,6 @@ const refs = {
   articleRecordFeedback: document.querySelector("#articleRecordFeedback"),
   articleRecordList: document.querySelector("#articleRecordList"),
   articleRecordRefreshButton: document.querySelector("#articleRecordRefreshButton"),
-  articleRecordSearchInput: document.querySelector("#articleRecordSearchInput"),
   articleRecordSelection: document.querySelector("#articleRecordSelection"),
   articleStoryboardSectionCount: document.querySelector("#articleStoryboardSectionCount"),
   creationBranchInputs: document.querySelectorAll('[name="creationBranch"]'),
@@ -775,7 +779,6 @@ const refs = {
   portraitRecordArchiveDetail: document.querySelector("#portraitRecordArchiveDetail"),
   portraitRecordCopyPromptsButton: document.querySelector("#portraitRecordCopyPromptsButton"),
   portraitRecordCopyPathsButton: document.querySelector("#portraitRecordCopyPathsButton"),
-  portraitRecordCount: document.querySelector("#portraitRecordCount"),
   portraitRecordDeleteCurrentButton: document.querySelector("#portraitRecordDeleteCurrentButton"),
   portraitRecordDeleteSelectedButton: document.querySelector("#portraitRecordDeleteSelectedButton"),
   portraitRecordExportManifestButton: document.querySelector("#portraitRecordExportManifestButton"),
@@ -784,7 +787,6 @@ const refs = {
   portraitRecordRefreshButton: document.querySelector("#portraitRecordRefreshButton"),
   portraitRecordResultGrid: document.querySelector("#portraitRecordResultGrid"),
   portraitRecordReuseButton: document.querySelector("#portraitRecordReuseButton"),
-  portraitRecordSearchInput: document.querySelector("#portraitRecordSearchInput"),
   portraitRecordSelection: document.querySelector("#portraitRecordSelection"),
   portraitRecordSetList: document.querySelector("#portraitRecordSetList"),
   portraitAccessoryAssetButton: document.querySelector("#portraitAccessoryAssetButton"),
@@ -988,7 +990,6 @@ const refs = {
   pptOutlineBox: document.querySelector("#pptOutlineBox"),
   pptPageCountInput: document.querySelector("#pptPageCountInput"),
   pptProgressBar: document.querySelector("#pptProgressBar"),
-  pptRecordCount: document.querySelector("#pptRecordCount"),
   pptRecordDeleteCurrentButton: document.querySelector("#pptRecordDeleteCurrentButton"),
   pptRecordDeleteSelectedButton: document.querySelector("#pptRecordDeleteSelectedButton"),
   pptRecordDetail: document.querySelector("#pptRecordDetail"),
@@ -1128,8 +1129,16 @@ const refs = {
   zoomOutButton: document.querySelector("#zoomOutButton"),
   zoomResetButton: document.querySelector("#zoomResetButton"),
 };
+const assetRecordTimeFilterController = createAssetRecordTimeFilterController({
+  pages: {
+    article: { countSuffix: "套", getRecords: () => state.articleIllustration.sets, getSearchText: getArticleRecordSearchText, prefix: "articleRecord", renderView: renderArticleRecordView },
+    portrait: { countSuffix: "组", getRecords: () => state.portrait.sets, getSearchText: (record) => getPortraitRecordSearchText(record, formatPortraitStyleSummary), prefix: "portraitRecord", renderView: renderPortraitRecordView },
+    ppt: { countSuffix: "个", getRecords: () => state.ppt.decks, prefix: "pptRecord", renderView: renderPptRecordView },
+  },
+});
 const lightboxViewerController = createLightboxImageViewer({ refs, state });
 const assetWorkspaceController = createAssetWorkspaceController({ refs, state });
+const creationCardIdleRippleController = createCreationCardIdleRippleController();
 const previewKeyboardNavigation = createPreviewKeyboardNavigationController({
   refs,
   state,
@@ -2232,19 +2241,25 @@ function getPromptAgentJsonText(item = state.promptAgent.result) {
   }
   return JSON.stringify(item.json, null, 2);
 }
+function getPromptAgentReusableText(item) {
+  if (isStructuredImagePromptJson(item?.json)) {
+    return getPromptAgentJsonText(item);
+  }
+  return getPromptAgentPrompt(item) || getPromptAgentJsonText(item);
+}
 function getPromptAgentTemplateId(item) {
   const rawId = String(item?.id || item?.createdAt || item?.filename || "latest").trim();
   const safeId = rawId.replace(/[^a-zA-Z0-9_-]/g, "-") || "latest";
   return `prompt-agent-${safeId}`;
 }
 function savePromptAgentResultAsTemplate(item) {
-  const prompt = getPromptAgentJsonText(item);
+  const prompt = getPromptAgentReusableText(item);
   if (!prompt) {
     return;
   }
   const template = {
     id: getPromptAgentTemplateId(item),
-    name: item.json?.title || item.filename || "图片 JSON 提示词",
+    name: getPromptAgentDisplayName(item),
     prompt,
   };
   state.promptTemplates = [
@@ -2294,7 +2309,7 @@ function createPromptAgentHistoryCard(item) {
   titleButton.className = "prompt-agent-history-title-button";
   titleButton.type = "button";
   titleButton.dataset.promptAgentMapId = item.id;
-  titleButton.textContent = item.json?.title || "图片提示词";
+  titleButton.textContent = getPromptAgentDisplayName(item);
   titleButton.title = titleButton.textContent;
   const time = document.createElement("span");
   time.className = "prompt-agent-history-time";
@@ -2313,11 +2328,13 @@ function createPromptAgentHistoryCard(item) {
   titleRow.append(titleButton, time, expandButton);
   const promptText = document.createElement("p");
   promptText.className = "prompt-agent-history-prompt";
-  promptText.textContent = getPromptAgentPrompt(item) || "未返回 prompt 字段";
+  promptText.textContent = getPromptAgentReusableText(item) || "未返回可复用结果";
   const meta = document.createElement("div");
   meta.className = "prompt-agent-history-meta";
   const tags = Array.isArray(item.json?.style_tags) ? item.json.style_tags.slice(0, 4).join(" / ") : "";
-  meta.textContent = [item.filename, item.json?.aspect_ratio, tags].filter(Boolean).join(" · ");
+  meta.textContent = [item.filename, item.json?.framing?.aspect_ratio || item.json?.aspect_ratio, tags]
+    .filter(Boolean)
+    .join(" · ");
   const actions = document.createElement("div");
   actions.className = "prompt-agent-history-actions";
   const copyButton = document.createElement("button");
@@ -2363,8 +2380,9 @@ function renderPromptAgent() {
     busyText: "分析中",
     idleText: "分析图片",
   });
-  refs.copyPromptAgentJsonButton.disabled = !state.promptAgent.result?.json;
-  refs.promptAgentResult.value = getPromptAgentJsonText();
+  const resultText = getPromptAgentReusableText(state.promptAgent.result);
+  refs.copyPromptAgentJsonButton.disabled = !resultText;
+  refs.promptAgentResult.value = resultText;
   renderPromptAgentHistory();
 }
 function revokeReferencePreview(item) {
@@ -3358,8 +3376,8 @@ function createImageDecompositionJob() {
     quality: state.config?.defaults?.quality || "high",
     format: normalizeOutputFormat(refs.outputFormatInput.value || state.config?.defaults?.format || "png"),
     baseUrl: state.config?.baseUrl || refs.baseUrlInput.value.trim(),
-    responsesModel: state.config?.responsesModel || refs.responsesModelInput.value.trim() || "gpt-5.4",
-    imageModel: "gpt-image-2",
+    responsesModel: state.config?.responsesModel || refs.responsesModelInput.value.trim() || DEFAULT_RESPONSES_MODEL,
+    imageModel: DEFAULT_DIRECT_IMAGE_MODEL,
     reasoningEffort: refs.reasoningEffortInput.value || state.config?.defaults?.reasoningEffort || "xhigh",
     requestRetryCount: 0,
     referenceFiles: sourceItem ? [createImageDecompositionGenerationFile(sourceItem)] : [],
@@ -4708,7 +4726,7 @@ function getCurrentPrivateConfigRequestPayload() {
   const browserPayload = getBrowserPrivateConfigRequestPayload();
   const routeAEndpoint = readEndpointFields("a");
   const routeBEndpoint = readEndpointFields("b");
-  return { imageRoute: getSelectedImageRoute(), baseUrl: routeAEndpoint.baseUrl || browserPayload.baseUrl || state.config?.baseUrl || "", endpointPath: routeAEndpoint.endpointPath || browserPayload.endpointPath || state.config?.endpointPath || API_ENDPOINT_RESPONSES, apiKey: refs.apiKeyInput.value.trim() || browserPayload.apiKey || "", responsesModel: refs.responsesModelInput.value.trim() || browserPayload.responsesModel || state.config?.responsesModel || "gpt-5.5", directBaseUrl: routeBEndpoint.baseUrl || browserPayload.directBaseUrl || state.config?.directBaseUrl || "", directEndpointPath: routeBEndpoint.endpointPath || browserPayload.directEndpointPath || state.config?.directEndpointPath || API_ENDPOINT_IMAGE_GENERATIONS, directApiKey: refs.directApiKeyInput.value.trim() || browserPayload.directApiKey || "", directImageModel: refs.directImageModelInput.value.trim() || browserPayload.directImageModel || state.config?.directImageModel || "gpt-image-2", directResponsesModel: refs.directResponsesModelInput.value.trim() || browserPayload.directResponsesModel || state.config?.directResponsesModel || "gpt-5.5", protocolBaseUrl: refs.protocolBaseUrlInput.value.trim() || browserPayload.protocolBaseUrl || state.config?.protocolBaseUrl || "", protocolApiKey: refs.protocolApiKeyInput.value.trim() || browserPayload.protocolApiKey || "", protocolImageModel: refs.protocolImageModelInput.value.trim() || browserPayload.protocolImageModel || state.config?.protocolImageModel || "gemini-3.1-flash-image-preview" };
+  return { imageRoute: getSelectedImageRoute(), baseUrl: routeAEndpoint.baseUrl || browserPayload.baseUrl || state.config?.baseUrl || "", endpointPath: routeAEndpoint.endpointPath || browserPayload.endpointPath || state.config?.endpointPath || API_ENDPOINT_RESPONSES, apiKey: refs.apiKeyInput.value.trim() || browserPayload.apiKey || "", responsesModel: refs.responsesModelInput.value.trim() || browserPayload.responsesModel || state.config?.responsesModel || DEFAULT_RESPONSES_MODEL, directBaseUrl: routeBEndpoint.baseUrl || browserPayload.directBaseUrl || state.config?.directBaseUrl || "", directEndpointPath: routeBEndpoint.endpointPath || browserPayload.directEndpointPath || state.config?.directEndpointPath || API_ENDPOINT_IMAGE_GENERATIONS, directApiKey: refs.directApiKeyInput.value.trim() || browserPayload.directApiKey || "", directImageModel: refs.directImageModelInput.value.trim() || browserPayload.directImageModel || state.config?.directImageModel || DEFAULT_DIRECT_IMAGE_MODEL, directResponsesModel: refs.directResponsesModelInput.value.trim() || browserPayload.directResponsesModel || state.config?.directResponsesModel || DEFAULT_DIRECT_RESPONSES_MODEL, protocolBaseUrl: refs.protocolBaseUrlInput.value.trim() || browserPayload.protocolBaseUrl || state.config?.protocolBaseUrl || "", protocolApiKey: refs.protocolApiKeyInput.value.trim() || browserPayload.protocolApiKey || "", protocolImageModel: refs.protocolImageModelInput.value.trim() || browserPayload.protocolImageModel || state.config?.protocolImageModel || DEFAULT_PROTOCOL_IMAGE_MODEL };
 }
 
 function appendCurrentConfigToFormData(formData) { appendBrowserConfigToFormData(formData, undefined, getCurrentPrivateConfigRequestPayload()); return formData; }
@@ -4724,12 +4742,12 @@ function appendJobConfigToFormData(formData, job) {
 
 function syncConfigUi(config) {
   syncEndpointInputDisplay("a", config.baseUrl || "", config.endpointPath || API_ENDPOINT_RESPONSES);
-  refs.responsesModelInput.value = config.responsesModel || "gpt-5.5";
+  refs.responsesModelInput.value = config.responsesModel || DEFAULT_RESPONSES_MODEL;
   syncEndpointInputDisplay("b", config.directBaseUrl || config.baseUrl || "", config.directEndpointPath || API_ENDPOINT_IMAGE_GENERATIONS);
-  refs.directImageModelInput.value = config.directImageModel || "gpt-image-2";
-  refs.directResponsesModelInput.value = config.directResponsesModel || "gpt-5.5";
+  refs.directImageModelInput.value = config.directImageModel || DEFAULT_DIRECT_IMAGE_MODEL;
+  refs.directResponsesModelInput.value = config.directResponsesModel || DEFAULT_DIRECT_RESPONSES_MODEL;
   refs.protocolBaseUrlInput.value = config.protocolBaseUrl || config.baseUrl || "https://api.openai.com/v1";
-  refs.protocolImageModelInput.value = config.protocolImageModel || "gemini-3.1-flash-image-preview";
+  refs.protocolImageModelInput.value = config.protocolImageModel || DEFAULT_PROTOCOL_IMAGE_MODEL;
   syncProtocolEndpointPreview();
   refs.imageRouteInputs.forEach((input) => {
     input.checked = input.value === (config.imageRoute === "c" ? "c" : config.imageRoute === "b" ? "b" : "a");
@@ -5941,11 +5959,11 @@ function renderGalleryView() {
     displayedCount === state.gallery.length
       ? `${state.gallery.length} 张`
       : `${displayedCount} / ${state.gallery.length} 张`;
-  const availableFilenames = new Set(state.gallery.map((item) => item.filename));
-  const checkedCount = state.galleryCheckedFilenames.filter((filename) => availableFilenames.has(filename)).length;
+  const visibleFilenames = new Set(visibleItems.map((item) => item.filename));
+  const checkedCount = state.galleryCheckedFilenames.filter((filename) => visibleFilenames.has(filename)).length;
   const deleteBlocked = state.galleryLoading || state.assetRecordDeletion.busy;
   refs.refreshGalleryButton.disabled = state.assetRecordDeletion.busy;
-  refs.galleryDeleteCurrentButton.disabled = deleteBlocked || !availableFilenames.has(state.galleryCurrentFilename);
+  refs.galleryDeleteCurrentButton.disabled = deleteBlocked || !visibleFilenames.has(state.galleryCurrentFilename);
   refs.galleryDeleteSelectedButton.disabled = deleteBlocked || checkedCount === 0;
   refs.galleryDeleteSelectedButton.textContent = checkedCount > 0 ? `删除选中 (${checkedCount})` : "删除选中";
   if (refs.galleryActionFeedback && refs.galleryActionFeedback.textContent !== state.galleryDeleteFeedback) {
@@ -6130,15 +6148,30 @@ function createPromptTemplateId() {
   return `template-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function parsePromptAgentTemplateJson(template, prompt) {
+  if (!String(template?.id || "").startsWith("prompt-agent-") || !prompt.startsWith("{")) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(prompt);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 function normalizePromptTemplate(template, index = 0) {
-  const prompt = String(template?.prompt || "").trim();
+  const rawPrompt = String(template?.prompt || "").trim();
+  const parsedPromptJson = parsePromptAgentTemplateJson(template, rawPrompt);
+  const prompt = getLegacyPromptAgentTemplatePrompt(template, parsedPromptJson) || rawPrompt;
   if (!prompt) {
     return null;
   }
 
   return {
     id: String(template?.id || createPromptTemplateId()),
-    name: String(template?.name || `模板 ${index + 1}`).trim() || `模板 ${index + 1}`,
+    name: getPromptAgentTemplateDisplayName(template, parsedPromptJson, index),
     prompt,
   };
 }
@@ -7127,6 +7160,7 @@ function isCreationZeroImageCountMode() { return getCreationSelectedImageCount()
 function createEmptyCreationReferenceAnalysisState() {
   return {
     applied: false,
+    categoryManuallyEdited: false, categorySuggestionStale: false, categoryTemplateSuggestion: "",
     collapsed: false,
     dirty: false,
     productNameSuggestion: "",
@@ -7423,6 +7457,10 @@ function searchCreationIndustryTemplates(query, options) {
 
 function findCreationIndustryTemplateMatch(text) {
   return state.creationCategoryTemplatesModule?.findCreationIndustryTemplateMatch?.(text) || null;
+}
+
+function findCreationIndustryTemplateProductNameMatch(productName) {
+  return state.creationCategoryTemplatesModule?.findCreationIndustryTemplateProductNameMatch?.(productName) || null;
 }
 
 async function loadCreationCategoryTemplatesModule() {
@@ -7799,6 +7837,8 @@ function setCreationIndustryTemplateValue(value, { searchText = "" } = {}) {
   }
   renderCreationIndustryTemplateBrowser();
 }
+
+function markCreationIndustryTemplateManuallyEdited() { state.creationReferenceAnalysis.categoryManuallyEdited = true; state.creationReferenceAnalysis.categorySuggestionStale = false; state.creationReferenceAnalysis.categoryTemplateSuggestion = ""; }
 
 function setCreationImageCountValue(count) { syncCreationPlatformImageCountOptions({ preferredValue: Number(count) }); }
 function getFiniteCreationImageCount(value) { return value !== undefined && value !== null && String(value).trim() !== "" && Number.isFinite(Number(value)) ? Number(value) : null; }
@@ -8838,30 +8878,8 @@ async function loadArticleIllustrationSets() {
   renderArticleRecordView();
 }
 
-function getArticleRecordSearchText(set = {}) {
-  return [
-    set.title,
-    set.sourceSummary,
-    set.contentType,
-    set.stylePreset,
-    set.styleBible,
-    ...(Array.isArray(set.characters) ? set.characters.map((item) => item.name) : []),
-    ...(Array.isArray(set.scenes) ? set.scenes.map((item) => item.name) : []),
-  ]
-    .join(" ")
-    .toLowerCase();
-}
-
-function filterArticleRecordSets() {
-  const query = String(state.articleIllustration.recordQuery || "").trim().toLowerCase();
-  if (!query) {
-    return state.articleIllustration.sets;
-  }
-  return state.articleIllustration.sets.filter((set) => getArticleRecordSearchText(set).includes(query));
-}
-
 function getArticleRecordSelectedSet() {
-  const filtered = filterArticleRecordSets();
+  const filtered = assetRecordTimeFilterController.filter("article");
   return (
     filtered.find((set) => set.setId === state.articleIllustration.recordSetId) ||
     filtered[0] ||
@@ -8946,7 +8964,7 @@ function renderArticleRecordList() {
   if (!refs.articleRecordList) {
     return;
   }
-  const filteredSets = filterArticleRecordSets();
+  const filteredSets = assetRecordTimeFilterController.filter("article");
   const selectedSet = getArticleRecordSelectedSet();
   const checkedSetIds = new Set(state.articleIllustration.recordCheckedSetIds);
   refs.articleRecordList.replaceChildren();
@@ -8958,7 +8976,7 @@ function renderArticleRecordList() {
       ? "正在加载文章记录..."
       : state.assetLoadErrors.article
         ? `加载失败：${state.assetLoadErrors.article}`
-        : state.articleIllustration.recordQuery
+        : assetRecordTimeFilterController.hasActive("article")
           ? "没有匹配的文章记录"
           : "暂无文章插图记录";
     refs.articleRecordList.appendChild(empty);
@@ -9082,17 +9100,11 @@ function renderArticleRecordView() {
     return;
   }
 
-  const filteredSets = filterArticleRecordSets();
+  assetRecordTimeFilterController.render("article");
   const selectedSet = getArticleRecordSelectedSet();
-  if (refs.articleRecordSearchInput && refs.articleRecordSearchInput.value !== state.articleIllustration.recordQuery) {
-    refs.articleRecordSearchInput.value = state.articleIllustration.recordQuery;
-  }
-  refs.articleRecordCount.textContent = state.articleIllustration.recordQuery
-    ? `${filteredSets.length} / ${state.articleIllustration.sets.length} 套`
-    : `${state.articleIllustration.sets.length} 套`;
   const deleteBlocked = state.articleIllustration.generating || state.articleIllustration.planning || state.articleIllustration.referenceGenerating || state.assetLoading.article || state.assetRecordDeletion.busy;
-  const availableSetIds = new Set(state.articleIllustration.sets.map((set) => set.setId));
-  const checkedCount = state.articleIllustration.recordCheckedSetIds.filter((setId) => availableSetIds.has(setId)).length;
+  const visibleSetIds = new Set(assetRecordTimeFilterController.filter("article").map((set) => set.setId));
+  const checkedCount = state.articleIllustration.recordCheckedSetIds.filter((setId) => visibleSetIds.has(setId)).length;
   refs.articleRecordCopyPromptsButton.disabled = state.assetRecordDeletion.busy || !buildArticlePromptText(selectedSet);
   refs.articleRecordCopyCaptionsButton.disabled = state.assetRecordDeletion.busy || !buildArticleCaptionText(selectedSet);
   refs.articleRecordRefreshButton.disabled = state.assetRecordDeletion.busy;
@@ -9493,6 +9505,8 @@ function clearCreationReferenceFiles() {
     markCreationReferenceRestoreEntryMissing(item.restoreEntryId);
   });
   state.creationReferenceFiles = [];
+  clearCreationReferenceAnalysisManagedCategory();
+  state.creation.planDirty = true;
   state.creationReferenceAnalysis.running = false;
   if (refs.creationReferenceInput) {
     refs.creationReferenceInput.value = "";
@@ -10731,6 +10745,9 @@ function removeCreationReferenceFile(referenceId) {
   state.creationReferenceFiles = state.creationReferenceFiles.filter((item) => item.id !== referenceId);
   markCreationReferenceRestoreEntryMissing(target?.restoreEntryId);
   markCreationReferenceAnalysisDirty();
+  if (state.creationReferenceFiles.length === 0) {
+    clearCreationReferenceAnalysisManagedCategory();
+  }
   renderCreationReferenceGrid();
 }
 
@@ -10824,7 +10841,7 @@ function updateCreationReferenceRole(referenceId, role) {
         ? { ...item, role: item.role === "reference-product" ? "product" : item.role }
         : item;
   });
-  markCreationReferenceAnalysisDirty();
+  markCreationReferenceAnalysisDirty({ invalidateCategorySuggestion: false });
   resetCreationDraftPreview();
   renderCreationReferenceGrid();
 }
@@ -10833,7 +10850,7 @@ function reorderCreationReferenceFile(referenceId, beforeReferenceId) {
   const next = reorderCreationReferenceFiles(state.creationReferenceFiles, referenceId, beforeReferenceId);
   if (!next) return false;
   state.creationReferenceFiles = next;
-  markCreationReferenceAnalysisDirty(); resetCreationDraftPreview(); renderCreationReferenceGrid(); renderCreationView();
+  markCreationReferenceAnalysisDirty({ invalidateCategorySuggestion: false }); resetCreationDraftPreview(); renderCreationReferenceGrid(); renderCreationView();
   return true;
 }
 
@@ -11337,15 +11354,36 @@ function setCreationReferenceProductNameValue(value) {
   return true;
 }
 
-function markCreationReferenceAnalysisDirty() {
+function markCreationReferenceAnalysisDirty({ invalidateCategorySuggestion = true } = {}) {
   invalidateCreationReferenceAnalysisRequest();
+  resetCreationDraftPreview();
   if (state.creationReferenceAnalysis.result) {
     state.creationReferenceAnalysis.applied = false;
     state.creationReferenceAnalysis.dirty = true;
+    if (invalidateCategorySuggestion) state.creationReferenceAnalysis.categorySuggestionStale = true;
     setCreationReferenceAnalysisFeedback("参考图已变化，请重新识别。", "busy");
   } else {
     setCreationReferenceAnalysisFeedback("", "");
   }
+}
+
+function clearCreationReferenceAnalysisManagedCategory() {
+  const currentCategoryValue = refs.creationIndustryTemplateInput?.value || "general";
+  const resolution = resolveCreationReferenceAnalysisCategoryValue({
+    categoryManuallyEdited: state.creationReferenceAnalysis.categoryManuallyEdited,
+    currentCategoryValue,
+    matchedCategoryValue: "",
+    previousAutoCategoryValue: state.creationReferenceAnalysis.categoryTemplateSuggestion,
+  });
+  if (!resolution.cleared) {
+    return false;
+  }
+
+  state.creationReferenceAnalysis.categoryTemplateSuggestion = "";
+  state.creationReferenceAnalysis.categorySuggestionStale = false;
+  setCreationIndustryTemplateValue(resolution.categoryValue, { searchText: "" });
+  syncCreationSelectedRolesToIndustry();
+  return true;
 }
 const hasCreationReferenceDimensionSpecIntent = (value) => /dimension(s)?\s*(chart|guide|card|table|sheet|info|information|specifications?|feel|reference|focus|value|values)|size\s*(chart|guide|card|table|sheet|feel|reference|focus|value|values)|spec(ification)?\s*(table|chart|card|sheet|info|information|feel|reference|focus|value|values)|measurement\s*(chart|guide|card|table)|尺寸\s*(图|表|卡|规格|信息|参数|感|参考|依据|值|数值|重点|焦点)|规格\s*(图|表|卡|信息|参数|感|参考|依据|值|数值|重点|焦点)|尺码\s*(图|表|卡|信息|指南)|实物握持尺度|规格信息|尺寸规格|规格感|尺寸感/.test(String(value || "").trim().toLowerCase());
 const hasCreationReferenceDimensionSpecValue = (value) => { const text = String(value || "").trim().toLowerCase(); return /#\s*\d+|\d+\s*#\s*(?:hook|hooks|钩)?|\d+\s*(?:号|號)\s*钩|size\s*#?\s*\d+\s*hooks?/iu.test(text) || /(^|[^\p{L}\p{N}_])([+-]?(?:\d+(?:\.\d+)?|\.\d+))\s*(fl\.?\s*oz|fluid\s*ounces?|inches?|inch|in\.?|ft\.?|feet|foot|yards?|yard|yd\.?|毫米|厘米|英寸|英尺|毫升|液量盎司|千克|克|磅|盎司|升|mm|cm|kg|g|ml|lb|lbs|oz|m|l)(?=$|[^\p{L}\p{N}_])/iu.test(text); };
@@ -11406,24 +11444,33 @@ function getCreationReferenceAnalysisCategoryText(analysis = {}) {
 
 async function applyCreationReferenceAnalysisCategoryMatch(analysis, isCurrent = () => true) {
   await loadCreationCategoryTemplatesModule();
-  if (!isCurrent()) return null;
-  const match = findCreationIndustryTemplateMatch(getCreationReferenceAnalysisCategoryText(analysis));
-  if (!match?.template) {
-    return null;
-  }
-
-  const template = match.template;
+  if (!isCurrent()) return { applied: false, cleared: false, template: null };
+  const match =
+    findCreationIndustryTemplateMatch(getCreationReferenceAnalysisCategoryText(analysis)) ||
+    findCreationIndustryTemplateProductNameMatch(getCreationReferenceAnalysisCategoryProductName(analysis));
+  const template = match?.template || null;
   const previousValue = refs.creationIndustryTemplateInput?.value || "general";
-  analysis.categoryTemplateValue = template.value;
-  analysis.categoryTemplateLabel = template.label;
-  analysis.categoryTemplatePath = template.categoryPath || "";
-  setCreationIndustryTemplateValue(template.value, {
-    searchText: template.categoryPath || template.label,
+  if (template) {
+    analysis.categoryTemplateValue = template.value;
+    analysis.categoryTemplateLabel = template.label;
+    analysis.categoryTemplatePath = template.categoryPath || "";
+  }
+  const resolution = resolveCreationReferenceAnalysisCategoryValue({
+    categoryManuallyEdited: state.creationReferenceAnalysis.categoryManuallyEdited,
+    currentCategoryValue: previousValue,
+    matchedCategoryValue: template?.value || "",
+    previousAutoCategoryValue: state.creationReferenceAnalysis.categoryTemplateSuggestion,
   });
-  if (previousValue !== template.value) {
+  if (!isCurrent()) return { applied: false, cleared: false, template: null };
+  state.creationReferenceAnalysis.categoryTemplateSuggestion = resolution.autoCategoryValue;
+  if (resolution.applied) {
+    state.creationReferenceAnalysis.categoryManuallyEdited = false;
+    setCreationIndustryTemplateValue(resolution.categoryValue, {
+      searchText: resolution.categoryValue === template?.value ? template.categoryPath || template.label : "",
+    });
     syncCreationSelectedRolesToIndustry();
   }
-  return template;
+  return { applied: resolution.applied, cleared: resolution.cleared, template: template && resolution.categoryValue === template.value ? template : null };
 }
 
 async function applyCreationReferenceAnalysis(analysis) {
@@ -11431,14 +11478,20 @@ async function applyCreationReferenceAnalysis(analysis) {
   if (!isCurrent()) return { matchedTemplate: null, productNameApplied: false, stale: true };
   const normalized = normalizeCreationReferenceAnalysisPayload(analysis);
   if (!isCurrent()) return { matchedTemplate: null, productNameApplied: false, stale: true };
-  const matchedTemplate = await applyCreationReferenceAnalysisCategoryMatch(normalized, isCurrent);
+  const categoryMatch = await applyCreationReferenceAnalysisCategoryMatch(normalized, isCurrent);
   if (!isCurrent()) return { matchedTemplate: null, productNameApplied: false, stale: true };
   state.creationReferenceAnalysis.result = normalized;
   state.creationReferenceAnalysis.applied = false;
   state.creationReferenceAnalysis.collapsed = false;
   state.creationReferenceAnalysis.dirty = false;
+  state.creationReferenceAnalysis.categorySuggestionStale = false;
   const appliedResult = applyCreationReferenceAnalysisRecommendations();
-  return { matchedTemplate, ...appliedResult };
+  return {
+    categoryApplied: categoryMatch.applied,
+    categoryCleared: categoryMatch.cleared,
+    matchedTemplate: categoryMatch.template,
+    ...appliedResult,
+  };
 }
 
 function applyCreationReferenceAnalysisProductNameSuggestion(analysis = {}) {
@@ -11612,9 +11665,18 @@ async function buildCreationReferenceAnalysisFormData() {
   });
   formData.set("platform", getCreationSelectedPlatform().value);
   formData.set("platformLabel", getCreationSelectedPlatform().label);
-  formData.set("industryTemplate", getCreationSelectedIndustryTemplate().value);
-  formData.set("industryTemplateLabel", getCreationSelectedIndustryTemplate().label);
-  formData.set("industryTemplatePath", getCreationSelectedIndustryTemplate().categoryPath || "");
+  const selectedIndustryTemplate = getCreationSelectedIndustryTemplate();
+  const contextIndustryTemplateValue = resolveCreationReferenceAnalysisContextCategoryValue({
+    analysisDirty: state.creationReferenceAnalysis.dirty,
+    categoryManuallyEdited: state.creationReferenceAnalysis.categoryManuallyEdited,
+    categorySuggestionStale: state.creationReferenceAnalysis.categorySuggestionStale,
+    currentCategoryValue: selectedIndustryTemplate.value,
+    previousAutoCategoryValue: state.creationReferenceAnalysis.categoryTemplateSuggestion,
+  });
+  const contextIndustryTemplate = normalizeCreationIndustryTemplate(contextIndustryTemplateValue);
+  formData.set("industryTemplate", contextIndustryTemplate.value);
+  formData.set("industryTemplateLabel", contextIndustryTemplate.label);
+  formData.set("industryTemplatePath", contextIndustryTemplate.categoryPath || "");
   formData.set("productName", refs.creationProductNameInput?.value?.trim() || "");
   formData.set("productDescription", refs.creationProductDescriptionInput?.value?.trim() || "");
   formData.set("sellingPoints", refs.creationSellingPointsInput?.value?.trim() || "");
@@ -11655,13 +11717,15 @@ async function analyzeCreationReferenceImages() {
 
     creationReferenceAnalysisApplyGuard = () => requestToken === creationReferenceAnalysisRequestToken && referenceSnapshot === getCreationReferenceAnalysisSnapshot();
     // Compatibility shape retained for browser static contracts: applyCreationReferenceAnalysis(payload, { isCurrent })
-    const { appliedMessage, matchedTemplate } = await applyCreationReferenceAnalysis(payload);
+    const { appliedMessage, categoryApplied, categoryCleared, matchedTemplate } = await applyCreationReferenceAnalysis(payload);
     creationReferenceAnalysisApplyGuard = null;
     if (requestToken !== creationReferenceAnalysisRequestToken || referenceSnapshot !== getCreationReferenceAnalysisSnapshot()) {
       return;
     }
-    const categoryMessage = matchedTemplate
+    const categoryMessage = categoryApplied && matchedTemplate
       ? ` 类目已切换到 ${matchedTemplate.categoryPath || matchedTemplate.label}。`
+      : categoryCleared
+        ? " 本轮未识别到可靠商品类目，已恢复为通用电商。"
       : "";
     setCreationReferenceAnalysisFeedback(`${appliedMessage}${categoryMessage}`.trim(), "success");
   } catch (error) {
@@ -11981,7 +12045,7 @@ function buildCreationPlanPreviewFormData() {
   formData.set("skuGenerationEnabled", String(refs.creationSkuGenerationEnabledInput?.checked !== false));
   formData.set("infographicRebuildEnabled", String(isCreationInfographicRebuildRequired() || refs.creationInfographicRebuildEnabledInput?.checked === true));
   formData.set("platform", getCreationSelectedPlatform().value);
-  formData.set("industryTemplate", refs.creationIndustryTemplateInput.value);
+  formData.set("industryTemplate", resolveCreationReferenceAnalysisContextCategoryValue({ analysisDirty: state.creationReferenceAnalysis.dirty, categoryManuallyEdited: state.creationReferenceAnalysis.categoryManuallyEdited, categorySuggestionStale: state.creationReferenceAnalysis.categorySuggestionStale, currentCategoryValue: refs.creationIndustryTemplateInput.value, previousAutoCategoryValue: state.creationReferenceAnalysis.categoryTemplateSuggestion }));
   formData.set("selectedRoles", JSON.stringify(getCreationSelectedRoles()));
   formData.set("referenceImageRoles", JSON.stringify(buildCreationReferenceRolePayload()));
   formData.set("skuSubjects", JSON.stringify(buildCreationSkuSubjectPayload()));
@@ -13695,35 +13759,13 @@ function refreshPortraitRecordSets() {
     });
 }
 
-function getPortraitRecordSearchText(set = {}) {
-  return [
-    set.subjectName,
-    set.subjectSummary,
-    formatPortraitStyleSummary(set),
-    set.customStyle,
-    set.notes,
-    ...(Array.isArray(set.referenceImageNames) ? set.referenceImageNames : []),
-    ...(Array.isArray(set.items)
-      ? set.items.flatMap((item) => [item.title, item.styleLabel, item.shotLabel, item.actionLabel, item.prompt, item.filename, item.relativePath])
-      : []),
-  ].filter(Boolean).join(" ").toLowerCase();
-}
-
-function filterPortraitRecordSets() {
-  const query = String(state.portrait.recordQuery || "").trim().toLowerCase();
-  if (!query) {
-    return state.portrait.sets;
-  }
-  return state.portrait.sets.filter((set) => getPortraitRecordSearchText(set).includes(query));
-}
-
 function getPortraitRecordSelectedSet() {
-  const sets = filterPortraitRecordSets();
+  const sets = assetRecordTimeFilterController.filter("portrait");
   return sets.find((set) => set.setId === state.portrait.recordSetId) || sets[0] || null;
 }
 
 function selectPortraitRecord(setId) {
-  const set = filterPortraitRecordSets().find((entry) => entry.setId === setId);
+  const set = assetRecordTimeFilterController.filter("portrait").find((entry) => entry.setId === setId);
   if (!set) {
     return;
   }
@@ -13878,7 +13920,7 @@ function renderPortraitRecordSetList() {
   refs.portraitRecordSetList.innerHTML = "";
   const selectedSet = getPortraitRecordSelectedSet();
   const selectedSetId = selectedSet?.setId || "";
-  const sets = filterPortraitRecordSets().slice(0, 60);
+  const sets = assetRecordTimeFilterController.filter("portrait").slice(0, 60);
   const checkedSetIds = new Set(state.portrait.recordCheckedSetIds);
   refs.portraitRecordSetList.setAttribute("aria-busy", String(state.assetLoading.portrait));
   if (state.assetLoading.portrait || state.assetLoadErrors.portrait || sets.length === 0) {
@@ -13888,7 +13930,7 @@ function renderPortraitRecordSetList() {
       ? "正在加载写真记录..."
       : state.assetLoadErrors.portrait
         ? `加载失败：${state.assetLoadErrors.portrait}`
-        : state.portrait.recordQuery ? "没有匹配的写真记录" : "暂无写真记录";
+        : assetRecordTimeFilterController.hasActive("portrait") ? "没有匹配的写真记录" : "暂无写真记录";
     refs.portraitRecordSetList.appendChild(empty);
     return;
   }
@@ -13970,19 +14012,11 @@ function renderPortraitRecordArchiveDetail(set) {
 }
 
 function renderPortraitRecordView() {
-  const filteredSets = filterPortraitRecordSets();
+  assetRecordTimeFilterController.render("portrait");
   const selectedSet = getPortraitRecordSelectedSet();
-  if (refs.portraitRecordSearchInput && refs.portraitRecordSearchInput.value !== state.portrait.recordQuery) {
-    refs.portraitRecordSearchInput.value = state.portrait.recordQuery;
-  }
-  if (refs.portraitRecordCount) {
-    refs.portraitRecordCount.textContent = state.portrait.recordQuery
-      ? `${filteredSets.length} / ${state.portrait.sets.length} 组`
-      : `${state.portrait.sets.length} 组`;
-  }
   const deleteBlocked = state.portrait.generating || state.portrait.planning || state.assetLoading.portrait || Boolean(portraitRecordRefreshPromise) || state.assetRecordDeletion.busy;
-  const availableSetIds = new Set(state.portrait.sets.map((set) => set.setId));
-  const checkedCount = state.portrait.recordCheckedSetIds.filter((setId) => availableSetIds.has(setId)).length;
+  const visibleSetIds = new Set(assetRecordTimeFilterController.filter("portrait").map((set) => set.setId));
+  const checkedCount = state.portrait.recordCheckedSetIds.filter((setId) => visibleSetIds.has(setId)).length;
   if (refs.portraitRecordReuseButton) refs.portraitRecordReuseButton.disabled = state.assetRecordDeletion.busy || !selectedSet;
   if (refs.portraitRecordRefreshButton) refs.portraitRecordRefreshButton.disabled = state.assetRecordDeletion.busy || Boolean(portraitRecordRefreshPromise);
   if (refs.portraitRecordDeleteCurrentButton) refs.portraitRecordDeleteCurrentButton.disabled = deleteBlocked || !selectedSet;
@@ -14173,7 +14207,7 @@ function getPptDeckPreviewSlides(deck) {
 }
 
 function selectPptRecord(recordKey) {
-  const deck = getPptRecordByKey(recordKey);
+  const deck = assetRecordTimeFilterController.filter("ppt").find((entry) => getPptDeckRecordKey(entry) === recordKey);
   if (!deck) {
     return;
   }
@@ -14364,8 +14398,8 @@ function renderPptRecordDetail(deck) {
 }
 
 function renderPptRecordView() {
-  refs.pptRecordCount.textContent = `${state.ppt.decks.length} 个`;
-  refs.pptRecordEmpty.classList.toggle("hidden", state.ppt.decks.length > 0 && !state.assetLoading.ppt && !state.assetLoadErrors.ppt);
+  const { records: filteredDecks, hasActiveFilters } = assetRecordTimeFilterController.render("ppt");
+  refs.pptRecordEmpty.classList.toggle("hidden", filteredDecks.length > 0 && !state.assetLoading.ppt && !state.assetLoadErrors.ppt);
   refs.pptRecordEmpty.replaceChildren();
   const emptyTitle = document.createElement("strong");
   const emptyCopy = document.createElement("p");
@@ -14384,6 +14418,15 @@ function renderPptRecordView() {
       event.preventDefault();
       loadPptDecks().catch((error) => showError(error.message));
     });
+  } else if (hasActiveFilters) {
+    emptyTitle.textContent = "没有匹配的 PPT";
+    emptyCopy.textContent = "当前时间条件没有匹配记录。";
+    emptyAction.href = "#ppt-record";
+    emptyAction.textContent = "清空筛选";
+    emptyAction.addEventListener("click", (event) => {
+      event.preventDefault();
+      assetRecordTimeFilterController.reset("ppt");
+    });
   } else {
     emptyTitle.textContent = "暂无 PPT";
     emptyCopy.textContent = "还没有找到本地 PPT 文件。";
@@ -14394,24 +14437,26 @@ function renderPptRecordView() {
   refs.pptRecordList.setAttribute("aria-busy", String(state.assetLoading.ppt));
   refs.pptRecordList.innerHTML = "";
 
-  const availableRecordKeys = new Set(state.ppt.decks.map(getPptDeckRecordKey));
-  const checkedRecordKeys = new Set(state.ppt.recordCheckedKeys.filter((recordKey) => availableRecordKeys.has(recordKey)));
+  const visibleRecordKeys = new Set(filteredDecks.map(getPptDeckRecordKey));
+  const checkedRecordKeys = new Set(state.ppt.recordCheckedKeys.filter((recordKey) => visibleRecordKeys.has(recordKey)));
   const checkedCount = checkedRecordKeys.size;
   const deleteBlocked = state.ppt.generating || state.assetLoading.ppt || state.assetRecordDeletion.busy;
   refs.pptRecordRefreshButton.disabled = state.assetRecordDeletion.busy;
-  refs.pptRecordDeleteCurrentButton.disabled = deleteBlocked || !availableRecordKeys.has(state.ppt.recordDetail.deckKey);
+  let selectedDeck = filteredDecks.find((deck) => getPptDeckRecordKey(deck) === state.ppt.recordDetail.deckKey) || filteredDecks[0] || null;
+  if (selectedDeck && getPptDeckRecordKey(selectedDeck) !== state.ppt.recordDetail.deckKey) {
+    state.ppt.recordDetail.deckKey = getPptDeckRecordKey(selectedDeck);
+    state.ppt.recordDetail.slideNumber = Number(getPptDeckPreviewSlides(selectedDeck)[0]?.slideNumber) || 0;
+  } else if (!selectedDeck) {
+    state.ppt.recordDetail.deckKey = "";
+    state.ppt.recordDetail.slideNumber = 0;
+  }
+  refs.pptRecordDeleteCurrentButton.disabled = deleteBlocked || !selectedDeck;
   refs.pptRecordDeleteSelectedButton.disabled = deleteBlocked || checkedCount === 0;
   refs.pptRecordDeleteSelectedButton.textContent = checkedCount > 0 ? `删除选中 (${checkedCount})` : "删除选中";
 
-  let selectedDeck = getPptRecordByKey(state.ppt.recordDetail.deckKey);
-  if (!selectedDeck) {
-    state.ppt.recordDetail.deckKey = "";
-    state.ppt.recordDetail.slideNumber = 0;
-    selectedDeck = null;
-  }
   if (refs.pptRecordSelection) refs.pptRecordSelection.textContent = selectedDeck?.title || selectedDeck?.pptxFilename || "尚未选择";
 
-  state.ppt.decks.forEach((deck) => {
+  filteredDecks.forEach((deck) => {
     const recordKey = getPptDeckRecordKey(deck);
     const row = document.createElement("div");
     row.className = "asset-record-select-row";
@@ -14522,8 +14567,8 @@ function createJob() {
     quality: state.config?.defaults?.quality || "high",
     format: normalizeOutputFormat(refs.outputFormatInput.value || state.config?.defaults?.format || "png"),
     baseUrl: state.config?.baseUrl || refs.baseUrlInput.value.trim(),
-    responsesModel: state.config?.responsesModel || refs.responsesModelInput.value.trim() || "gpt-5.4",
-    imageModel: "gpt-image-2",
+    responsesModel: state.config?.responsesModel || refs.responsesModelInput.value.trim() || DEFAULT_RESPONSES_MODEL,
+    imageModel: DEFAULT_DIRECT_IMAGE_MODEL,
     reasoningEffort: refs.reasoningEffortInput.value || state.config?.defaults?.reasoningEffort || "xhigh",
     requestRetryCount: 0,
     referenceFiles,
@@ -14560,8 +14605,8 @@ function createStyleTransferJob() {
     quality: state.config?.defaults?.quality || "high",
     format: normalizeOutputFormat(refs.outputFormatInput.value || state.config?.defaults?.format || "png"),
     baseUrl: state.config?.baseUrl || refs.baseUrlInput.value.trim(),
-    responsesModel: state.config?.responsesModel || refs.responsesModelInput.value.trim() || "gpt-5.4",
-    imageModel: "gpt-image-2",
+    responsesModel: state.config?.responsesModel || refs.responsesModelInput.value.trim() || DEFAULT_RESPONSES_MODEL,
+    imageModel: DEFAULT_DIRECT_IMAGE_MODEL,
     reasoningEffort: refs.reasoningEffortInput.value || state.config?.defaults?.reasoningEffort || "xhigh",
     requestRetryCount: 0,
     referenceFiles: getStyleTransferReferenceFiles(),
@@ -14612,8 +14657,8 @@ function createReferenceAnalysisJob() {
     quality: state.config?.defaults?.quality || "high",
     format: normalizeOutputFormat(state.config?.defaults?.format || "png"),
     baseUrl: state.config?.baseUrl || refs.baseUrlInput.value.trim(),
-    responsesModel: state.config?.responsesModel || refs.responsesModelInput.value.trim() || "gpt-5.4",
-    imageModel: "gpt-image-2",
+    responsesModel: state.config?.responsesModel || refs.responsesModelInput.value.trim() || DEFAULT_RESPONSES_MODEL,
+    imageModel: DEFAULT_DIRECT_IMAGE_MODEL,
     reasoningEffort: refs.reasoningEffortInput.value || state.config?.defaults?.reasoningEffort || "xhigh",
     requestRetryCount: 0,
     referenceFiles,
@@ -14954,8 +14999,9 @@ const assetRecordDeleteController = createAssetRecordDeleteController({
   actions: {
     closeLightbox,
     deleteBrowserCachedGalleryItem,
-    filterArticleRecords: filterArticleRecordSets,
-    filterPortraitRecords: filterPortraitRecordSets,
+    filterArticleRecords: () => assetRecordTimeFilterController.filter("article"),
+    filterPortraitRecords: () => assetRecordTimeFilterController.filter("portrait"),
+    filterPptRecords: () => assetRecordTimeFilterController.filter("ppt"),
     forgetGalleryMetadata,
     formatArticleTitle: formatArticleDisplayText,
     getArticleCurrentRecord: getArticleRecordSelectedSet,
@@ -15152,7 +15198,6 @@ function appendImageEditReferencesToFormData(formData, job) {
 function getCreationReferenceAnalysisSnapshot() {
   return JSON.stringify({
     platform: getCreationSelectedPlatform().value,
-    category: getCreationSelectedIndustryTemplate().value,
     files: state.creationReferenceFiles.map((item) => ({
     name: item?.file?.name || item?.name || "",
     size: item?.file?.size || item?.size || 0,
@@ -15323,7 +15368,7 @@ async function analyzePromptAgentImage() {
       ...state.promptAgent.history.filter((item) => item.id !== payload.item.id),
     ];
     savePromptAgentResultAsTemplate(payload.item);
-    setPromptAgentFeedback("已生成 JSON 提示词。", "success");
+    setPromptAgentFeedback("已生成结构化反推 JSON。", "success");
   } catch (error) {
     if (requestToken !== promptAgentAnalysisRequestToken || analysisSnapshot !== getPromptAgentAnalysisSnapshot()) {
       return;
@@ -15458,9 +15503,9 @@ async function copyReferenceAnalysisSelectedPrompt() {
 
 function mapPromptAgentPrompt(itemId) {
   const item = getPromptAgentItem(itemId);
-  const promptText = getPromptAgentPrompt(item);
+  const promptText = getPromptAgentReusableText(item);
   if (!promptText) {
-    setPromptAgentFeedback("这条记录没有可映射的 prompt 字段。", "error");
+    setPromptAgentFeedback("这条记录没有可映射的反推结果。", "error");
     return;
   }
 
@@ -16012,6 +16057,8 @@ function bindEvents() {
   bindAdaptiveWorkbenchSections();
   assetWorkspaceController.bindEvents();
   assetRecordDeleteController.bindEvents();
+  assetRecordTimeFilterController.bind();
+  creationCardIdleRippleController.bind();
   document.addEventListener("paste", handlePromptAgentImagePaste); document.addEventListener("paste", handleCreationReferenceImagePaste);
 
   refs.viewTabs.forEach((button) => {
@@ -16145,10 +16192,6 @@ function bindEvents() {
   });
   refs.articleRecordDeleteCurrentButton.addEventListener("click", () => requestAssetRecordDelete("article", "current"));
   refs.articleRecordDeleteSelectedButton.addEventListener("click", () => requestAssetRecordDelete("article", "selected"));
-  refs.articleRecordSearchInput.addEventListener("input", (event) => {
-    state.articleIllustration.recordQuery = event.target.value;
-    renderArticleRecordView();
-  });
   refs.articleRecordColumnButtons.forEach((button) => {
     button.addEventListener("click", () => {
       const columnPreset = normalizeArticleRecordColumnPreset(button.dataset.articleRecordColumnPreset);
@@ -16502,10 +16545,6 @@ function bindEvents() {
   });
   refs.portraitRecordExportPromptsButton.addEventListener("click", exportPortraitRecordPrompts);
   refs.portraitRecordExportManifestButton.addEventListener("click", exportPortraitRecordManifest);
-  refs.portraitRecordSearchInput.addEventListener("input", (event) => {
-    state.portrait.recordQuery = event.target.value;
-    renderPortraitRecordView();
-  });
   refs.portraitRecordSetList.addEventListener("click", (event) => {
     const target = event.target.closest("[data-portrait-record-set-id]");
     if (!target) {
@@ -16571,6 +16610,7 @@ function bindEvents() {
     handleCreationPlatformChange().catch((error) => setCreationFeedback(error.message, "error"));
   });
   refs.creationIndustryTemplateInput?.addEventListener("change", () => {
+    markCreationIndustryTemplateManuallyEdited();
     invalidateCreationReferenceAnalysisRequest();
     resetCreationDraftPreview();
   });
@@ -16604,6 +16644,7 @@ function bindEvents() {
     if (templateValue) {
       const previousValue = refs.creationIndustryTemplateInput.value || "general";
       setCreationIndustryTemplateValue(templateValue, { searchText: "" });
+      markCreationIndustryTemplateManuallyEdited();
       setCreationIndustryTemplateBrowserOpen(false);
       if (previousValue !== refs.creationIndustryTemplateInput.value) {
         invalidateCreationReferenceAnalysisRequest();

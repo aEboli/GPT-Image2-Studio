@@ -495,7 +495,7 @@ test("creation SKU payload preserves analyzed colors for each distinct subject",
   assert.deepEqual(subjects.map((subject) => subject.colorName), ["navy blue", "cyan", "orange", "red"]);
 });
 
-test("creation SKU payload preserves one multi-color characteristic label per visible unit", () => {
+test("creation SKU payload keeps only colors in one multi-color label per visible unit", () => {
   const subjects = buildCreationSkuSubjectsForPayload({
     analysis: {
       skuSubjects: [
@@ -523,12 +523,13 @@ test("creation SKU payload preserves one multi-color characteristic label per vi
     ],
   });
 
-  assert.deepEqual(subjects[0].colorNames, ["brown, black, silver lenses"]);
-  assert.equal(subjects[0].colorName, "brown, black, silver lenses");
+  assert.deepEqual(subjects[0].colorNames, ["brown black silver"]);
+  assert.equal(subjects[0].colorName, "brown black silver");
   assert.deepEqual(subjects[1].colorNames, [
-    "brown, black strap, silver lenses",
-    "red, black strap, gray lenses",
+    "brown black silver",
+    "red black gray",
   ]);
+  assert.equal(subjects[1].colorName, "brown black silver red black gray");
 });
 
 test("creation SKU payload preserves an explicit empty characteristic-color label list", () => {
@@ -555,7 +556,7 @@ test("creation SKU payload preserves an explicit empty characteristic-color labe
   assert.equal(subjects[0].colorName, undefined);
 });
 
-test("creation SKU payload preserves repeated labels for repeated visible units", () => {
+test("creation SKU payload preserves repeated pure-color labels for repeated visible units", () => {
   const subjects = buildCreationSkuSubjectsForPayload({
     analysis: {
       skuSubjects: [
@@ -576,5 +577,29 @@ test("creation SKU payload preserves repeated labels for repeated visible units"
     ],
   });
 
-  assert.deepEqual(subjects[0].colorNames, ["black, silver lenses", "black, silver lenses"]);
+  assert.deepEqual(subjects[0].colorNames, ["black silver", "black silver"]);
+  assert.equal(subjects[0].colorName, "black silver black silver");
+});
+
+test("creation SKU payload drops a supplied label when it contains no recognized color", () => {
+  const subjects = buildCreationSkuSubjectsForPayload({
+    analysis: {
+      skuSubjects: [
+        {
+          id: "unknown-color",
+          title: "Riding goggles",
+          filenames: ["unknown-color.png"],
+          color_names: ["matte nylon strap, Model X"],
+        },
+      ],
+    },
+    applied: true,
+    dirty: false,
+    referenceRoles: [
+      { filename: "unknown-color.png", role: "product", note: "One complete visible product unit." },
+    ],
+  });
+
+  assert.deepEqual(subjects[0].colorNames, []);
+  assert.equal(subjects[0].colorName, undefined);
 });

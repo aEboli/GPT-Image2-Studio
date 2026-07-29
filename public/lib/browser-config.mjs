@@ -4,11 +4,12 @@ import {
   DEFAULT_PROTOCOL_IMAGE_MODEL,
   normalizeImageRouteConfig,
 } from "./image-route-config.mjs";
+import { DEFAULT_RESPONSES_MODEL } from "./model-defaults.mjs";
 
 export const BROWSER_CONFIG_STORAGE_KEY = "image-studio-browser-config-v1";
 export const CLIENT_SESSION_STORAGE_KEY = "image-studio-client-session-id";
 export const DEFAULT_BROWSER_BASE_URL = "https://api.openai.com/v1";
-export const DEFAULT_BROWSER_RESPONSES_MODEL = "gpt-5.5";
+export const DEFAULT_BROWSER_RESPONSES_MODEL = DEFAULT_RESPONSES_MODEL;
 
 function getLocalStorage() {
   return globalThis.window?.localStorage || null;

@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import {
   CREATION_REFERENCE_ANALYSIS_JSON_SCHEMA,
   CREATION_REFERENCE_ANALYSIS_MODE,
+  PROMPT_AGENT_JSON_SCHEMA,
   PORTRAIT_REFERENCE_ANALYSIS_JSON_SCHEMA,
   PORTRAIT_REFERENCE_ANALYSIS_MODE,
   REFERENCE_ORCHESTRATION_JSON_SCHEMA,
@@ -198,7 +199,7 @@ test("prompt agent request analyzes an uploaded image without invoking image gen
   assert.match(input[0].content[0].text, /反推|逆向|复刻/);
   assert.deepEqual(input[0].content[1], {
     type: "input_text",
-    text: "待分析图片 1：sample.png。请按此序号分析这张图片的角色、内容和可融合元素。",
+    text: "待分析图片 1：sample.png。请只根据这张图片反推一份主体和景别详细、背景与视觉精简且无同义重复的结构化生图 JSON。",
   });
   assert.deepEqual(input[0].content[2], {
     type: "input_image",
@@ -212,7 +213,59 @@ test("prompt agent request analyzes an uploaded image without invoking image gen
   assert.equal(requestBody.text.format.type, "json_schema");
   assert.equal(requestBody.text.format.name, "image_prompt_json");
   assert.equal(requestBody.text.format.strict, true);
-  assert.ok(requestBody.text.format.schema.required.includes("prompt"));
+  assert.deepEqual(requestBody.text.format.schema.required, ["subject", "framing", "scene", "visual", "avoid"]);
+  assert.equal("prompt" in requestBody.text.format.schema.properties, false);
+});
+
+test("image-to-prompt instruction requests detailed subject and reproducible framing without duplicate prompt", () => {
+  const input = buildPromptAgentInput({
+    image: {
+      filename: "sample.png",
+      mimeType: "image/png",
+      base64: "ZmFrZQ==",
+    },
+  });
+  const instruction = input[0].content[0].text;
+
+  assert.match(instruction, /只保留会改变可见画面|影响最终像素/);
+  assert.match(instruction, /空泛|精美|高级|震撼/);
+  assert.match(instruction, /近义|同义|重复/);
+  assert.match(instruction, /用途建议|主图|详情页|SKU|直播|缩略图/);
+  assert.match(instruction, /subject.*framing.*scene.*visual.*avoid/s);
+  assert.match(instruction, /景别|主体占比/);
+  assert.match(instruction, /全画幅等效|焦段/);
+  assert.match(instruction, /拍摄距离.*光圈.*对焦目标/s);
+  assert.match(instruction, /EXIF|原始元数据/);
+  assert.match(instruction, /只出现一次|不得.*重复|不要.*重复/);
+  assert.deepEqual(Object.keys(PROMPT_AGENT_JSON_SCHEMA.properties), [
+    "subject",
+    "framing",
+    "scene",
+    "visual",
+    "avoid",
+  ]);
+  assert.deepEqual(PROMPT_AGENT_JSON_SCHEMA.properties.subject.required, [
+    "type",
+    "pose",
+    "expression",
+    "appearance",
+    "clothing",
+    "interaction",
+  ]);
+  assert.deepEqual(PROMPT_AGENT_JSON_SCHEMA.properties.framing.required, [
+    "aspect_ratio",
+    "shot_size",
+    "subject_scale",
+    "placement",
+    "negative_space",
+    "foreground_frame",
+    "camera",
+    "angle",
+    "crop",
+    "perspective",
+    "depth_of_field",
+  ]);
+  assert.match(PROMPT_AGENT_JSON_SCHEMA.properties.framing.properties.camera.description, /明确|单一/);
 });
 
 test("prompt agent request can orchestrate multiple reference images into scene prompts", () => {
@@ -428,12 +481,17 @@ test("prompt agent request can identify ecommerce creation reference roles", () 
   assert.match(input[0].content[0].text, /navy blue versus cyan or sky blue/i);
   assert.match(input[0].content[0].text, /orange versus red/i);
   assert.match(input[0].content[0].text, /exclude the white\/transparent background/i);
-  assert.match(input[0].content[0].text, /brown, black, silver lenses/i);
-  assert.match(input[0].content[0].text, /shared neutral component colors/i);
+  assert.match(input[0].content[0].text, /brown black silver/i);
+  assert.doesNotMatch(input[0].content[0].text, /brown, black, silver/i);
+  assert.match(input[0].content[0].text, /color names, spaces, and internal hyphens/i);
+  assert.match(input[0].content[0].text, /off-white/i);
+  assert.match(input[0].content[0].text, /separate colors with single spaces/i);
+  assert.match(input[0].content[0].text, /no other punctuation/i);
+  assert.match(input[0].content[0].text, /must not include component names, materials, finishes, styles, model identifiers, product names/i);
   assert.match(input[0].content[0].text, /empty color_names array/i);
   assert.match(
     requestBody.text.format.schema.properties.sku_subjects.items.properties.color_names.description,
-    /all clearly visible characteristic colors of the physical product/i,
+    /multiple reliable colors but only color names, spaces, and internal hyphens/i,
   );
   assert.match(
     requestBody.text.format.schema.properties.sku_subjects.items.properties.color_names.description,
@@ -441,7 +499,7 @@ test("prompt agent request can identify ecommerce creation reference roles", () 
   );
   assert.match(
     requestBody.text.format.schema.properties.sku_subjects.items.properties.color_names.description,
-    /shared neutral-colored physical components/i,
+    /only color names, spaces, and internal hyphens/i,
   );
   assert.match(input[0].content[0].text, /dimensions/);
   assert.match(input[0].content[0].text, /role=dimensions/);
@@ -789,6 +847,40 @@ test("prompt agent preserves an explicit empty SKU color-label result", () => {
   });
 
   assert.deepEqual(result.sku_subjects[0].color_names, []);
+});
+
+test("prompt agent strips non-color words from SKU color labels", () => {
+  const result = extractPromptAgentJson({
+    output: [
+      {
+        content: [
+          {
+            type: "output_text",
+            text: JSON.stringify({
+              summary: "One riding-goggles SKU.",
+              reference_roles: [
+                { index: 1, filename: "brown-goggles.png", role: "product", note: "One complete visible product unit." },
+              ],
+              sku_subjects: [
+                {
+                  id: "brown-goggles",
+                  title: "Riding goggles",
+                  reference_indexes: [1],
+                  filenames: ["brown-goggles.png"],
+                  subject_unit_count: 1,
+                  color_names: ["matte brown leather, black strap, silver lenses, Model X goggles"],
+                  note: "One complete visible product unit.",
+                },
+              ],
+              risks: [],
+            }),
+          },
+        ],
+      },
+    ],
+  });
+
+  assert.deepEqual(result.sku_subjects[0].color_names, ["brown black silver"]);
 });
 
 test("prompt agent ignores legacy creation reference visual language recommendation", () => {
@@ -1318,7 +1410,55 @@ test("prompt agent returns compact upstream HTTP errors", async () => {
   );
 });
 
-test("prompt agent extracts JSON prompt data from Responses output text", () => {
+test("prompt agent preserves the five-group structured reverse prompt without legacy fields", () => {
+  const structuredPrompt = {
+    subject: {
+      type: "年轻女性",
+      pose: "坐在木长凳上，双腿交叠，低头操作手机",
+      expression: "神情安静自然",
+      appearance: ["深红色长发", "身形纤细"],
+      clothing: "黑色吊带背心、白色衬衫和牛仔短裤",
+      interaction: "双手握持浅色智能手机",
+    },
+    framing: {
+      aspect_ratio: "9:16 竖幅",
+      shot_size: "带大量环境的全身远景",
+      subject_scale: "人物整体高度约占画面高度的 34%",
+      placement: "人物位于画面下半部偏右",
+      negative_space: "人物上方保留约三分之一画面高度的墙面",
+      foreground_frame: "深绿色旧窗框形成画中框",
+      camera: "全画幅等效 70mm 焦段，约 6 米拍摄距离，f/2.8，对焦于人物",
+      angle: "隔着近处旧窗框平视拍摄",
+      crop: "完整保留人物、长凳和鞋子",
+      perspective: "中长焦环境人像透视",
+      depth_of_field: "人物和墙面较清晰，近处窗框明显虚化",
+    },
+    scene: "灰白斑驳墙面、木长凳和灰色石砖地面。",
+    visual: "阴天自然散射光，低饱和灰绿色纪实街拍质感。",
+    avoid: ["放大人物并减少留白", "移除前景窗框"],
+  };
+  const payload = {
+    output: [
+      {
+        content: [
+          {
+            type: "output_text",
+            text: JSON.stringify(structuredPrompt),
+          },
+        ],
+      },
+    ],
+  };
+
+  const result = extractPromptAgentJson(payload);
+
+  assert.deepEqual(result, structuredPrompt);
+  assert.equal("prompt" in result, false);
+  assert.equal("title" in result, false);
+  assert.equal("style_tags" in result, false);
+});
+
+test("prompt agent still extracts legacy JSON prompt data from Responses output text", () => {
   const payload = {
     output: [
       {

@@ -11,6 +11,7 @@ export function createAssetRecordDeleteController({ refs, state, actions }) {
     deleteBrowserCachedGalleryItem,
     filterArticleRecords,
     filterPortraitRecords,
+    filterPptRecords,
     forgetGalleryMetadata,
     formatArticleTitle,
     getArticleCurrentRecord,
@@ -99,7 +100,7 @@ export function createAssetRecordDeleteController({ refs, state, actions }) {
     if (kind === "ppt") {
       return {
         records: state.ppt.decks,
-        visibleRecords: state.ppt.decks,
+        visibleRecords: filterPptRecords(),
         getId: getPptRecordKey,
         currentId: state.ppt.recordDetail.deckKey,
         checkedIds: state.ppt.recordCheckedKeys,
@@ -155,7 +156,7 @@ export function createAssetRecordDeleteController({ refs, state, actions }) {
     if (!context || context.blocked) return;
     const targets = getAssetRecordDeleteTargets({
       mode,
-      records: context.records,
+      records: context.visibleRecords,
       getId: context.getId,
       currentId: context.currentId,
       checkedIds: context.checkedIds,

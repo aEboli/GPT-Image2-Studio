@@ -5,6 +5,7 @@ import {
   CREATION_CATEGORY_TEMPLATE_OPTIONS,
   CREATION_INDUSTRY_TEMPLATE_OPTIONS,
   findCreationIndustryTemplateMatch,
+  findCreationIndustryTemplateProductNameMatch,
   normalizeCreationIndustryTemplate,
   searchCreationIndustryTemplates,
 } from "../lib/creation-category-templates.mjs";
@@ -29,7 +30,7 @@ function assertTemplateHasInheritedPromptStrategy(template) {
 }
 
 test("creation category templates expose every fourth-level ecommerce category with stable code values", () => {
-  assert.equal(CREATION_CATEGORY_TEMPLATE_OPTIONS.length, 1577);
+  assert.equal(CREATION_CATEGORY_TEMPLATE_OPTIONS.length, 1578);
 
   const smartphone = normalizeCreationIndustryTemplate("category:C06-001-001-001");
   assert.equal(smartphone.value, "category:C06-001-001-001");
@@ -38,6 +39,12 @@ test("creation category templates expose every fourth-level ecommerce category w
   assert.match(smartphone.promptInstruction, /Ecommerce category path: 数码电子 > 手机通讯 > 手机 > 智能手机/);
   assert.match(smartphone.promptInstruction, /智能手机/);
   assert.deepEqual(smartphone.rolePreset.slice(0, 3), ["hero", "benefit", "size-capacity-fit"]);
+
+  const ridingGoggles = normalizeCreationIndustryTemplate("category:C10-006-001-005");
+  assert.equal(ridingGoggles.value, "category:C10-006-001-005");
+  assert.equal(ridingGoggles.label, "骑行护目镜");
+  assert.equal(ridingGoggles.categoryPath, "汽车摩托 > 摩托车用品 > 摩托装备 > 骑行护目镜");
+  assert.match(ridingGoggles.promptInstruction, /Ecommerce category path: 汽车摩托 > 摩托车用品 > 摩托装备 > 骑行护目镜/);
 
   assert.ok(CREATION_INDUSTRY_TEMPLATE_OPTIONS.length > CREATION_CATEGORY_TEMPLATE_OPTIONS.length);
 });
@@ -135,6 +142,45 @@ test("creation category template auto matching requires unambiguous category con
   assert.equal(fullPath.template.value, "category:C06-001-001-001");
 });
 
+test("creation category product-name matching requires reliable category semantics", () => {
+  const hairband = findCreationIndustryTemplateProductNameMatch("发箍");
+  assert.equal(hairband.template.value, "category:C01-006-007-003");
+
+  assert.equal(findCreationIndustryTemplateProductNameMatch("长毛绒猫耳发箍"), null);
+  assert.equal(findCreationIndustryTemplateProductNameMatch("发箍收纳架"), null);
+  assert.equal(findCreationIndustryTemplateProductNameMatch("医用手套"), null);
+  assert.equal(findCreationIndustryTemplateProductNameMatch("吸盘"), null);
+  assert.equal(findCreationIndustryTemplateMatch("支架"), null);
+  assert.equal(findCreationIndustryTemplateProductNameMatch("支架"), null);
+  for (const productName of ["钢琴支架", "硬盘支架", "相机支架", "投影仪支架"]) {
+    assert.equal(findCreationIndustryTemplateProductNameMatch(productName), null);
+  }
+});
+
+test("motorcycle riding goggles category supports search and narrow automatic aliases", () => {
+  const byName = searchCreationIndustryTemplates("骑行护目镜", { limit: 5, includeBase: false });
+  assert.equal(byName[0].value, "category:C10-006-001-005");
+
+  const byPath = searchCreationIndustryTemplates("汽车摩托 > 摩托车用品 > 摩托装备 > 骑行护目镜", {
+    limit: 5,
+    includeBase: false,
+  });
+  assert.equal(byPath[0].value, "category:C10-006-001-005");
+
+  const byCode = searchCreationIndustryTemplates("C10-006-001-005", { limit: 5, includeBase: false });
+  assert.equal(byCode.length, 1);
+  assert.equal(byCode[0].label, "骑行护目镜");
+
+  const windGoggles = findCreationIndustryTemplateMatch("复古摩托车骑行风镜");
+  assert.equal(windGoggles.template.value, "category:C10-006-001-005");
+
+  const ridingGoggles = findCreationIndustryTemplateMatch("复古摩托车骑行护目镜");
+  assert.equal(ridingGoggles.template.value, "category:C10-006-001-005");
+
+  assert.equal(findCreationIndustryTemplateMatch("护目镜"), null);
+  assert.equal(findCreationIndustryTemplateMatch("复古风镜"), null);
+});
+
 test("representative fourth-level category templates expose inherited targeted prompt strategy fields", () => {
   const representativeCategoryCodes = [
     "category:C06-001-001-001", // 智能手机
@@ -170,7 +216,7 @@ test("smartphone category template includes phone-specific prompt strategy terms
 });
 
 test("every fourth-level category template exposes non-empty inherited prompt strategy", () => {
-  assert.equal(CREATION_CATEGORY_TEMPLATE_OPTIONS.length, 1577);
+  assert.equal(CREATION_CATEGORY_TEMPLATE_OPTIONS.length, 1578);
 
   for (const templateOption of CREATION_CATEGORY_TEMPLATE_OPTIONS) {
     const template = normalizeCreationIndustryTemplate(templateOption.value);

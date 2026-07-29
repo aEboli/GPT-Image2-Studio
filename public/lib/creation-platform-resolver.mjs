@@ -583,7 +583,10 @@ function applySetOverrides(slots, setOverrides, { profile, warnings }) {
       });
     }
     setOverrides.imageCount = effectiveCount;
-    resized = resized.slice(0, effectiveCount);
+    resized = resized.map((slot, index) => ({
+      ...slot,
+      enabled: index < effectiveCount && slot.enabled !== false,
+    }));
   }
   return resized.map((slot) => {
     const next = { ...slot };

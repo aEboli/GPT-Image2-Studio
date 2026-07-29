@@ -7,8 +7,10 @@ import { getProductImagePlatformForSourceUrl } from "./lib/product-image-platfor
 
 const MESSAGE_COLLECT = "product-image-collector:collect";
 const MESSAGE_COPY = "product-image-collector:copy";
+const MESSAGE_COPY_IMAGES = "product-image-collector:copy-images";
 const MESSAGE_DOWNLOAD = "product-image-collector:download";
 const MESSAGE_OPEN = "product-image-collector:open";
+const NATIVE_CLIPBOARD_HOST = "com.aeboli.gpt_image2_studio.product_image_clipboard";
 
 function isSupportedProductTab(value) {
   return Boolean(getProductImagePlatformForSourceUrl(value));
@@ -35,7 +37,7 @@ async function openPanel(tab, pageUrl) {
   }
   await chrome.scripting.executeScript({
     target: { tabId: tab.id },
-    files: ["floating-panel.js"],
+    files: ["floating-launcher.js", "floating-panel.js"],
   });
   return { ok: true };
 }
@@ -56,6 +58,37 @@ function serializeSelection(message) {
     count: items.length,
     text: serializeProductImageImportManifest({ ...manifest, items }),
   };
+}
+
+function selectedManifest(message) {
+  const manifest = normalizeProductImageImportManifest(message.manifest);
+  const selected = selectedItemIds(message.selectedIds);
+  const items = manifest.items.filter((item) => selected.has(item.id));
+  if (items.length === 0) {
+    throw new Error("请先选择要复制的商品图。");
+  }
+  return { ...manifest, items };
+}
+
+async function copyImagesSelection(message) {
+  const manifest = selectedManifest(message);
+  let result;
+  try {
+    result = await chrome.runtime.sendNativeMessage(NATIVE_CLIPBOARD_HOST, {
+      type: "copy-images",
+      manifest,
+    });
+  } catch (error) {
+    const messageText = error instanceof Error ? error.message : String(error || "");
+    if (/native messaging host|specified native host|not found|not registered|forbidden/i.test(messageText)) {
+      throw new Error("未安装商品图本地剪贴板助手。请运行插件 native-host 目录中的 install-native-host.cmd，随后重试。");
+    }
+    throw new Error(messageText || "本地剪贴板助手连接失败。");
+  }
+  if (!result?.ok) {
+    throw new Error(result?.message || "本地剪贴板助手未能写入批量图片。");
+  }
+  return result;
 }
 
 async function downloadSelection(message) {
@@ -102,6 +135,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     operation = openPanel(sender.tab, message.pageUrl);
   } else if (message.type === MESSAGE_COPY) {
     operation = Promise.resolve().then(() => serializeSelection(message));
+  } else if (message.type === MESSAGE_COPY_IMAGES) {
+    operation = copyImagesSelection(message);
   } else if (message.type === MESSAGE_DOWNLOAD) {
     operation = downloadSelection(message);
   } else {

@@ -84,6 +84,19 @@ test("product image manifest rejects unsupported clipboard text and excessive it
   assert.throws(() => serializeProductImageImportManifest(excessive), /最多包含/);
 });
 
+test("product image manifest supports one thousand independent items", () => {
+  assert.equal(MAX_PRODUCT_IMAGE_IMPORT_ITEMS, 1000);
+  const items = Array.from({ length: MAX_PRODUCT_IMAGE_IMPORT_ITEMS }, (_, index) =>
+    makeItem(`detail-${index + 1}`, "detail", index + 1),
+  );
+
+  const parsed = parseProductImageImportText(serializeProductImageImportManifest(makeManifest(items)));
+
+  assert.equal(parsed.items.length, 1000);
+  assert.equal(parsed.items[0].id, "detail-1");
+  assert.equal(parsed.items[999].id, "detail-1000");
+});
+
 test("product image manifest rejects untrusted sources, targets, ports, and credentials", () => {
   assert.equal(isTrustedProductSourceUrl("https://detail.1688.com/offer/1.html"), true);
   assert.equal(isTrustedProductSourceUrl("https://evil.example/offer/1.html"), false);

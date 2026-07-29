@@ -106,6 +106,11 @@ import { createPptDeckStore } from "./lib/ppt-deck-store.mjs";
 import { configureNodeDnsFallback } from "./lib/node-dns-fallback.mjs";
 import { fetchTrustedProductImage } from "./lib/product-image-proxy.mjs";
 import { buildProductImageCollectorArchive } from "./lib/product-image-extension-package.mjs";
+import {
+  authorizeLocalServerRequest,
+  getLocalServerPlainHttpBindingPolicy,
+  isLoopbackHostname,
+} from "./lib/local-server-auth.mjs";
 
 try {
   configureNodeDnsFallback({ dns });
@@ -153,7 +158,10 @@ import { buildCreationRelativeDir, createCreationSetStore } from "./lib/creation
 import { normalizeCreationRecordDeleteSetIds } from "./lib/creation-record-delete.mjs";
 import { normalizeAssetRecordDeleteIds } from "./lib/asset-record-delete.mjs";
 import { resolveCreationPlanCounts } from "./lib/creation-plan-counts.mjs";
-import { generateCreationListingDrafts } from "./lib/creation-listing-agent.mjs";
+import {
+  generateCreationListingDrafts,
+  hydrateCreationListingDimensionsForRead,
+} from "./lib/creation-listing-agent.mjs";
 import {
   applyPortraitPlanOverrides,
   buildPortraitPlan,
@@ -194,6 +202,15 @@ const port = Number(process.env.PORT || 3600);
 const explicitHost = String(process.env.HOST || "").trim();
 const serverHost = explicitHost || "127.0.0.1";
 const requestToken = String(process.env.IMAGE_STUDIO_REQUEST_TOKEN || randomUUID()).trim();
+const plainHttpBindingPolicy = getLocalServerPlainHttpBindingPolicy({
+  host: serverHost,
+  allowInsecureRemoteHttp: process.env.IMAGE_STUDIO_ALLOW_INSECURE_REMOTE_HTTP,
+});
+if (!plainHttpBindingPolicy.allowed) {
+  throw new Error(
+    "非回环 HOST 不能直接使用明文 HTTP。请保持 HOST 为空并通过 TLS 反向代理访问；仅在明确接受风险时设置 IMAGE_STUDIO_ALLOW_INSECURE_REMOTE_HTTP=1。",
+  );
+}
 const DEFAULT_CREATION_LISTING_REASONING_EFFORT = "medium";
 const CREATION_REFERENCE_ANALYSIS_REASONING_EFFORT = "low";
 const PORTRAIT_REFERENCE_ANALYSIS_REASONING_EFFORT = "low";
@@ -328,73 +345,6 @@ function sendText(response, statusCode, message) {
 function compactErrorMessage(message, fallbackLabel = "请求失败") {
   const raw = String(message || fallbackLabel).replace(/\s+/g, " ").trim() || fallbackLabel;
   return raw.length > 500 ? `${raw.slice(0, 497)}...` : raw;
-}
-
-function normalizeNetworkHostname(value) {
-  const hostname = String(value || "").trim().toLowerCase();
-  return hostname.startsWith("[") && hostname.endsWith("]") ? hostname.slice(1, -1) : hostname;
-}
-
-function parseHostHeader(value) {
-  try {
-    const parsed = new URL(`http://${String(value || "").trim()}`);
-    return {
-      host: parsed.host.toLowerCase(),
-      hostname: normalizeNetworkHostname(parsed.hostname),
-    };
-  } catch {
-    return { host: "", hostname: "" };
-  }
-}
-
-function isLoopbackHostname(value) {
-  const hostname = normalizeNetworkHostname(value);
-  return hostname === "localhost" || hostname === "::1" || /^127(?:\.\d{1,3}){3}$/.test(hostname);
-}
-
-function isLoopbackRemoteAddress(value) {
-  const address = normalizeNetworkHostname(value).replace(/^::ffff:/, "");
-  return address === "::1" || /^127(?:\.\d{1,3}){3}$/.test(address);
-}
-
-function hasValidRequestToken(request) {
-  const suppliedToken = String(request.headers["x-image-studio-token"] || "").trim();
-  return Boolean(requestToken) && suppliedToken === requestToken;
-}
-
-function isSameOriginRequest(request, requestHost) {
-  const origin = String(request.headers.origin || "").trim();
-  if (!origin) {
-    return false;
-  }
-  try {
-    const parsedOrigin = new URL(origin);
-    return ["http:", "https:"].includes(parsedOrigin.protocol) && parsedOrigin.host.toLowerCase() === requestHost;
-  } catch {
-    return false;
-  }
-}
-
-function isAuthorizedSensitiveRequest(request, pathname) {
-  if (request.method === "GET" || !pathname.startsWith("/api/")) {
-    return true;
-  }
-  if (hasValidRequestToken(request)) {
-    return true;
-  }
-
-  const requestHost = parseHostHeader(request.headers.host);
-  if (!requestHost.host || (!explicitHost && !isLoopbackHostname(requestHost.hostname))) {
-    return false;
-  }
-  if (String(request.headers["sec-fetch-site"] || "").trim().toLowerCase() === "cross-site") {
-    return false;
-  }
-  if (request.headers.origin) {
-    return isSameOriginRequest(request, requestHost.host);
-  }
-
-  return isLoopbackHostname(requestHost.hostname) && isLoopbackRemoteAddress(request.socket?.remoteAddress);
 }
 
 async function requestStudioImageGeneration(options) {
@@ -1740,8 +1690,6 @@ async function handlePromptAgentAnalyze(request, response) {
       : PROMPT_AGENT_ANALYSIS_REASONING_EFFORT;
   const reasoningEffort = normalizeReasoningEffort(formData.get("reasoningEffort") || reasoningFallback);
   const createdAt = new Date().toISOString();
-  const platform = normalizeCreationPlatform(formData.get("platform"));
-  const platformLabel = String(formData.get("platformLabel") || platform.label).trim() || platform.label;
   const json = await requestPromptAgentAnalysis({
     baseUrl: textVisionConfig.baseUrl,
     endpointPath: textVisionConfig.endpointPath,
@@ -1755,15 +1703,6 @@ async function handlePromptAgentAnalyze(request, response) {
     responsesModel: textVisionConfig.responsesModel,
     imageModel: textVisionConfig.imageModel,
     reasoningEffort,
-    contextPrompt: [
-      "套图分析上下文：",
-      `平台选择：${platformLabel}`,
-      `商品类目：${String(formData.get("industryTemplateLabel") || formData.get("industryTemplate") || "通用电商").trim() || "通用电商"}`,
-      String(formData.get("industryTemplatePath") || "").trim() ? `类目路径：${String(formData.get("industryTemplatePath")).trim()}` : "",
-      "请根据该平台和商品类型判断每张参考图最适合支持主图、详情页信息、SKU 对比、规格核对、移动端缩略图或直播/内容场景中的哪类套图生成用途。",
-    ]
-      .filter(Boolean)
-      .join("\n"),
   });
   const filenames = images.map((image) => image.filename).filter(Boolean);
   const item = await promptAgentStore.append({
@@ -1992,7 +1931,8 @@ function buildCreationImageFilename({ item, createdAt, setId, format }) {
   return createTimestampedFilename({
     format,
     prompt: item.title || item.filenameToken || item.role || item.prompt,
-    filenameKeyword: `${filenameSequence}-${filenameToken}`,
+    filenamePrefix: filenameSequence,
+    filenameKeyword: filenameToken,
     createdAt,
     idSource: `${setId}-${item.slotIndex || item.itemId}`,
   });
@@ -2867,7 +2807,8 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
 }
 
 async function handleCreationSetsGet(response) {
-  sendJson(response, 200, await creationSetStore.listManifests(), {
+  const sets = await creationSetStore.listManifests();
+  sendJson(response, 200, sets.map(hydrateCreationListingDimensionsForRead), {
     "Cache-Control": "no-store",
   });
 }
@@ -5785,11 +5726,20 @@ async function handleGenerate(request, response) {
 
 async function routeRequest(request, response) {
   const url = new URL(request.url || "/", "http://localhost");
+  const authorization = authorizeLocalServerRequest({
+    method: request.method,
+    pathname: url.pathname,
+    headers: request.headers,
+    remoteAddress: request.socket?.remoteAddress,
+    requestToken,
+  });
 
-  if (!isAuthorizedSensitiveRequest(request, url.pathname)) {
-    return sendJson(response, 403, {
-      message: "请求来源未通过本地服务安全校验。",
-    });
+  if (!authorization.authorized) {
+    return sendJson(response, authorization.statusCode, {
+      message: authorization.statusCode === 401
+        ? "远程访问需要使用当前服务令牌完成认证。"
+        : "请求来源未通过本地服务安全校验。",
+    }, authorization.headers);
   }
 
   if (request.method === "GET" && url.pathname === "/api/config") {
@@ -6049,9 +5999,11 @@ await new Promise((resolveListen, rejectListen) => {
 
     const now = new Date();
     console.log(`Responses Image Studio 正在运行: http://${serverHost}:${listeningPort}`);
-    if (explicitHost && !isLoopbackHostname(serverHost)) {
-      console.log(`远程写接口令牌: ${requestToken}`);
+    if (plainHttpBindingPolicy.insecure) {
+      console.warn("警告：远程访问正在使用明文 HTTP，访问令牌、提示词和生成资产可能被网络监听。请改用 TLS 反向代理。");
     }
+    console.log("远程浏览器认证用户名: studio");
+    console.log(`远程访问令牌: ${requestToken}`);
     console.log(`输出根目录: ${outputDir}`);
     console.log(`当前输出目录: ${join(outputDir, formatMonthFolder(now), formatDayFolder(now))}`);
     console.log(`配置文件: ${configStore.configPath}`);

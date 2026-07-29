@@ -24,7 +24,7 @@ test("local collector package endpoint returns a valid attachment ZIP", async ()
 
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("content-type"), "application/zip");
-  assert.match(response.headers.get("content-disposition") || "", /attachment; filename="GPT-Image2-Studio-Product-Image-Collector-v1\.1\.17\.zip"/);
+  assert.match(response.headers.get("content-disposition") || "", /attachment; filename="GPT-Image2-Studio-Product-Image-Collector-v1\.1\.23\.zip"/);
   assert.ok(zip.file("manifest.json"));
   assert.ok(zip.file("lib/product-image-import.mjs"));
 });
@@ -53,6 +53,7 @@ test("local collector proxy rejects untrusted and oversized requests before fetc
   );
   assert.equal(untrustedPreview.status, 400);
   assert.match((await untrustedPreview.json()).message, /图片地址不受支持/);
+
 });
 
 test("Cloudflare collector endpoints return the structured unsupported contract", async () => {

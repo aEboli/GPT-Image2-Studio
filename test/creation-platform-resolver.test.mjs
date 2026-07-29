@@ -305,6 +305,43 @@ resolverTest("variant carousel slot stays distinct from deduplicated appended SK
   assert.equal(plan.totalPlannedItemCount, 21);
 });
 
+resolverTest("image-count overrides preserve the full compatible catalog while limiting generated items", () => {
+  const plan = resolver.resolveCreationPlatformPlan({
+    platform: "universal",
+    skuSubjects: [{ id: "one" }, { id: "two" }],
+    infographicRebuildCount: 1,
+    setOverrides: { imageCount: 5 },
+  });
+
+  assert.equal(plan.slots.length, 18);
+  assert.equal(plan.slots.filter((slot) => slot.enabled !== false).length, 5);
+  assert.ok(plan.slots.slice(5).every((slot) => slot.enabled === false));
+  assert.equal(plan.items.length, 5);
+  assert.equal(plan.carouselImageCount, 5);
+  assert.equal(plan.totalPlannedItemCount, 8);
+
+  const swapped = resolver.resolveCreationPlatformPlan({
+    platform: "universal",
+    setOverrides: { imageCount: 5 },
+    itemOverrides: [
+      { slotKey: plan.slots[0].slotKey, enabled: false },
+      { slotKey: plan.slots[17].slotKey, enabled: true },
+    ],
+  });
+  assert.equal(swapped.slots.length, 18);
+  assert.equal(swapped.carouselImageCount, 5);
+  assert.equal(swapped.items.some((slot) => slot.slotKey === plan.slots[0].slotKey), false);
+  assert.equal(swapped.items.some((slot) => slot.slotKey === plan.slots[17].slotKey), true);
+
+  const zero = resolver.resolveCreationPlatformPlan({
+    platform: "universal",
+    setOverrides: { imageCount: 0 },
+  });
+  assert.equal(zero.slots.length, 18);
+  assert.equal(zero.items.length, 0);
+  assert.equal(zero.carouselImageCount, 0);
+});
+
 resolverTest("set and item enablement or ordering overrides derive final carousel counts", () => {
   const plan = resolver.resolveCreationPlatformPlan({
     platform: "universal",
@@ -319,7 +356,9 @@ resolverTest("set and item enablement or ordering overrides derive final carouse
     ],
   });
 
-  assert.deepEqual(plan.slots.map((item) => item.imageType), ["benefit-proof", "generic-hero", "scene-application", "multi-angle"]);
+  assert.deepEqual(plan.slots.slice(0, 4).map((item) => item.imageType), ["benefit-proof", "generic-hero", "scene-application", "multi-angle"]);
+  assert.equal(plan.slots.length, 18);
+  assert.ok(plan.slots.slice(4).every((item) => item.enabled === false));
   assert.equal(plan.slots.find((item) => item.imageType === "scene-application").enabled, false);
   assert.equal(plan.items.length, 3);
   assert.equal(plan.items[0].textPolicy, "factual-short");

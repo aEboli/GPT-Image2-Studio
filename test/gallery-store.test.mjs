@@ -48,6 +48,18 @@ test("gallery store can create hour-minute prefixed filenames from explicit keyw
   assert.equal(filename, "1542-a-dress-b-shoe-c3d4.png");
 });
 
+test("gallery store can place an explicit sequence before the hour-minute timestamp", () => {
+  const filename = createTimestampedFilename({
+    format: "png",
+    createdAt: "2026-04-26T15:42:33",
+    idSource: "creation-set-item-a1b2c3d4",
+    filenamePrefix: "3",
+    filenameKeyword: "核心卖点图",
+  });
+
+  assert.equal(filename, "3-1542-核心卖点图-c3d4.png");
+});
+
 test("gallery store prefixes the prompt image folder with the image date", async () => {
   const rootDir = await mkdtemp(join(tmpdir(), "responses-gallery-date-prefix-"));
   const outputDir = join(rootDir, "output");

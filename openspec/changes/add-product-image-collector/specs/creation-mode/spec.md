@@ -29,7 +29,7 @@ Creation Mode SHALL expose a From Clipboard action in its reference-image header
 - **AND** displays a compact actionable error
 
 ### Requirement: Collector batches preserve the Creation reference limit
-The batch review SHALL show selected, available, and remaining-capacity counts, SHALL display a real lazy-loaded thumbnail for every normalized candidate through the same-origin bounded proxy, and SHALL prevent selection beyond the current remaining Creation reference capacity. It SHALL provide Select All, Invert, Main, Detail, and SKU selection commands in one non-wrapping row, with horizontal scrolling when a narrow viewport cannot contain the row. Each command SHALL replace the current selection and deterministically keep no more items than the remaining capacity. Each candidate SHALL expose an icon-only enlarge action below its thumbnail; the action SHALL open a contained enlarged preview inside the current batch dialog without changing that candidate's selected state. The batch dialog SHALL ignore Escape dismissal while its candidate list is visible. When an enlarged candidate is visible, Escape SHALL close only that enlarged preview and return to the unchanged batch list. Its initial selection SHALL prefer main, SKU, then detail images while preserving order within each group. Thumbnail loading MUST NOT add candidates to Creation reference state. The system MUST NOT silently truncate a confirmed selection, increase the configured 15-image limit, or send unselected candidates to analysis or generation.
+The batch review SHALL show selected, available, and remaining-capacity counts, SHALL display a real lazy-loaded thumbnail for every normalized candidate through the same-origin bounded proxy, and SHALL prevent selection beyond the current remaining Creation reference capacity. It SHALL provide Select All, Invert, Main, Detail, and SKU selection commands in one non-wrapping row, with horizontal scrolling when a narrow viewport cannot contain the row. Each command SHALL replace the current selection and deterministically keep no more items than the remaining capacity. After the initial batch render, selection and busy-state changes SHALL update existing candidate cards, checkboxes, and actions in place without replacing the candidate list; the list scroll offsets, focused control, and already loaded thumbnails SHALL remain stable. The Studio batch dialog SHALL use a responsive review surface up to approximately 1980px wide by 1180px tall on desktop, with safe viewport margins and an internally scrolling candidate list on smaller screens. Its desktop candidate grid SHALL use an approximately 210px minimum card width so the maximum-width surface naturally shows no more than eight cards per row, while narrow layouts retain their explicit three- and two-column fallbacks. Each candidate SHALL expose an icon-only enlarge action below its thumbnail; the action SHALL open a contained enlarged preview inside the current batch dialog without changing that candidate's selected state. The Studio enlarged preview SHALL use the same interaction contract as the collector plugin: contain on open, a stage-local cover Fullscreen command, 90-degree left/right rotation, bounded 1.15-factor toolbar and wheel zoom between the computed contain floor and 400%, left-button dragging at every scale with per-axis bounds, double-click reset without closing, previous/next navigation that resets view state, outside-image or upper-right close, and Escape that closes only the preview while preserving the dialog. It SHALL continue to use the same-origin bounded proxy for the viewer image. The batch dialog SHALL ignore Escape dismissal while its candidate list is visible. When an enlarged candidate is visible, Escape SHALL close only that enlarged preview and return to the unchanged batch list. Its initial selection SHALL prefer main, SKU, then detail images while preserving order within each group. Thumbnail loading MUST NOT add candidates to Creation reference state. The system MUST NOT silently truncate a confirmed selection, increase the configured 15-image limit, or send unselected candidates to analysis or generation.
 
 #### Scenario: Manifest contains fewer images than remaining capacity
 - **WHEN** all normalized manifest items fit in the remaining Creation reference slots
@@ -40,6 +40,17 @@ The batch review SHALL show selected, available, and remaining-capacity counts, 
 - **WHEN** a normalized candidate thumbnail enters the batch review loading range
 - **THEN** its image is requested from the current Studio origin through the trusted product-image proxy
 - **AND** the browser does not set the remote CDN URL as the thumbnail source or send 1688 authentication state
+
+#### Scenario: Non-square candidate remains complete in the Studio card
+- **WHEN** a candidate image is wider or taller than 1:1
+- **THEN** the fixed square media area renders the complete original image with `object-fit: contain` over a pure white background
+- **AND** the unused axis remains white instead of cropping or stretching the image
+- **AND** the category, order, and dimension text appears in a separate left information block below the media while the enlarge button remains in a separate right block
+
+#### Scenario: Candidate media fails without collapsing the card
+- **WHEN** a candidate thumbnail cannot be loaded through the trusted proxy
+- **THEN** the square media area shows a readable image-load failure state
+- **AND** the separate information and enlarge blocks retain their stable row dimensions
 
 #### Scenario: Manifest exceeds remaining capacity
 - **WHEN** the normalized manifest contains more images than the remaining Creation reference slots
@@ -53,10 +64,24 @@ The batch review SHALL show selected, available, and remaining-capacity counts, 
 - **AND** no command selects more images than the current remaining capacity
 - **AND** all five commands remain in one row, with horizontal scrolling instead of wrapping on a narrow viewport
 
+#### Scenario: User applies a batch selection command while the list is scrolled
+- **GIVEN** the candidate list has a non-zero scroll offset and at least one thumbnail has loaded
+- **WHEN** the user selects all, inverts the current selection, or selects only main, detail, or SKU images
+- **THEN** the same candidate list and card nodes remain mounted
+- **AND** the list scroll offset, focused control, and loaded thumbnail state remain unchanged
+
 #### Scenario: User enlarges a candidate image
 - **WHEN** the user clicks the icon-only enlarge action below a candidate thumbnail
 - **THEN** the same proxied image opens fitted inside the current import dialog
 - **AND** closing the enlarged preview restores the batch list without changing any selected image
+
+#### Scenario: User operates the Studio viewer like the collector viewer
+- **WHEN** an enlarged candidate is open
+- **THEN** the viewer shows the six translucent toolbar commands for stage-local Fullscreen, left rotation, right rotation, zoom in, zoom out, and restoring the initial view
+- **AND** wheel zoom prevents the underlying dialog/list from scrolling
+- **AND** the image remains draggable with the left mouse button at every zoom level within bounded per-axis offsets
+- **AND** double-clicking the image restores contain without closing the viewer
+- **AND** Previous and Next switch candidates while resetting rotation, scale, and offset
 
 #### Scenario: User presses Escape from the batch list
 - **WHEN** the candidate list is visible in the import dialog

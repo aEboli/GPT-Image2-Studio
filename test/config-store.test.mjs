@@ -15,7 +15,7 @@ test("config store returns empty public config before any save", async () => {
   assert.equal(config.baseUrl, "https://api.openai.com/v1");
   assert.equal(config.apiKeyConfigured, false);
   assert.equal(config.apiKeyMask, undefined);
-  assert.equal(config.responsesModel, "gpt-5.4");
+  assert.equal(config.responsesModel, "gpt-5.4-mini");
   assert.equal(config.endpointPath, "responses");
   assert.equal(config.imageRoute, "a");
   assert.equal(config.directBaseUrl, "https://api.openai.com/v1");
@@ -23,7 +23,7 @@ test("config store returns empty public config before any save", async () => {
   assert.equal(config.directApiKeyConfigured, false);
   assert.equal(config.directApiKeyMask, undefined);
   assert.equal(config.directImageModel, "gpt-image-2");
-  assert.equal(config.directResponsesModel, "gpt-5.5");
+  assert.equal(config.directResponsesModel, "gpt-5.4-mini");
   assert.equal(config.protocolBaseUrl, "https://api.openai.com/v1");
   assert.equal(config.protocolApiKeyConfigured, false);
   assert.equal(config.protocolApiKeyMask, undefined);
@@ -182,7 +182,7 @@ test("config store does not let stale direct config leak into a direct route see
   assert.equal(publicConfig.directApiKeyConfigured, true);
   assert.equal(publicConfig.directApiKeyMask, "env-***7890");
   assert.equal(publicConfig.directImageModel, "gpt-image-2");
-  assert.equal(publicConfig.directResponsesModel, "gpt-5.5");
+  assert.equal(publicConfig.directResponsesModel, "gpt-5.4-mini");
   assert.equal(privateConfig.directApiKey, "env-route-key-1234567890");
   assert.equal(privateConfig.directBaseUrl, "https://env-route.example.test/openai/v1");
   assert.equal(privateConfig.directEndpointPath, "images/generations");

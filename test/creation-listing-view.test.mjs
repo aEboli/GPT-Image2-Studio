@@ -134,12 +134,16 @@ test("listing draft view preserves UI-only Chinese display fields", () => {
       title: "1 件路亚鱼饵",
       sellingPoints: ["中文卖点"],
       fiveBullets: ["中文五点"],
+      packageDimensions: "预估：15 x 10 x 5 厘米",
+      productDimensions: "长度 9 厘米",
     },
   });
 
   assert.equal(draft.zhDisplay.title, "1 件路亚鱼饵");
   assert.deepEqual(draft.zhDisplay.sellingPoints, ["中文卖点"]);
   assert.deepEqual(draft.zhDisplay.fiveBullets, ["中文五点"]);
+  assert.equal(draft.zhDisplay.packageDimensions, "预估：15 x 10 x 5 厘米");
+  assert.equal(draft.zhDisplay.productDimensions, "长度 9 厘米");
 });
 
 test("listing draft view preserves Chinese warning and missing info display fields", () => {
@@ -269,6 +273,10 @@ test("listing workspace shows all bilingual fields on one page without view cont
           description: "English description",
           backendSearchTerms: "english search terms",
           keywordBuckets: { exact: ["english keyword"] },
+          packageDimensions: "Estimated: 6 x 4 x 2 in",
+          productDimensions: "3.5 in long",
+          packageWeight: "Estimated: 12.35 oz",
+          productWeight: "Estimated: 8.82 oz",
           zhDisplay: {
             title: "中文标题",
             sellingPoints: ["中文卖点"],
@@ -277,6 +285,10 @@ test("listing workspace shows all bilingual fields on one page without view cont
             description: "中文描述",
             backendSearchTerms: "中文搜索词",
             keywordBuckets: { exact: ["中文关键词"] },
+            packageDimensions: "预估：15 x 10 x 5 厘米",
+            productDimensions: "长度 9 厘米",
+            packageWeight: "预估：12.35 盎司",
+            productWeight: "预估：8.82 盎司",
           },
         }],
       },
@@ -314,6 +326,8 @@ test("listing workspace shows all bilingual fields on one page without view cont
     "商品描述",
     "后台搜索词",
     "关键词分组",
+    "包装尺寸和重量",
+    "产品尺寸和重量",
   ]);
   assert.deepEqual(
     titleCopies.map((button) => [
@@ -321,6 +335,21 @@ test("listing workspace shows all bilingual fields on one page without view cont
       button.dataset.creationListingCopyText,
     ]),
     [["en", "English title"], ["zh", "中文标题"]],
+  );
+  const specificationCopies = collectFakeElements(root, (node) => (
+    String(node.className || "").split(/\s+/).includes("creation-listing-field-copy")
+  ));
+  assert.equal(
+    specificationCopies.find((button) => (
+      button.dataset.creationListingCopyLabel === "包装尺寸和重量英文"
+    ))?.dataset.creationListingCopyText,
+    "尺寸: Estimated: 6 x 4 x 2 in\n重量: Estimated: 12.35 oz",
+  );
+  assert.equal(
+    specificationCopies.find((button) => (
+      button.dataset.creationListingCopyLabel === "产品尺寸和重量中文"
+    ))?.dataset.creationListingCopyText,
+    "尺寸：长度 9 厘米\n重量：预估：8.82 盎司",
   );
   copyPairs
     .filter((pair) => pair.children.length === 2)
@@ -332,6 +361,35 @@ test("listing workspace shows all bilingual fields on one page without view cont
     });
   assert.equal(getFakeTextContent(root).split("English title").length - 1, 1);
   assert.equal(getFakeTextContent(root).split("中文标题").length - 1, 1);
+  const fullCopy = buildCreationRecordListingText({
+    setId: "set-listing-workspace-defaults",
+    listingDrafts: [{
+      title: "English title",
+      keywordBuckets: { exact: ["english keyword"] },
+      packageDimensions: "Estimated: 6 x 4 x 2 in",
+      productDimensions: "3.5 in long",
+      packageWeight: "Estimated: 12.35 oz",
+      productWeight: "Estimated: 8.82 oz",
+      zhDisplay: {
+        title: "中文标题",
+        keywordBuckets: { exact: ["中文关键词"] },
+        packageDimensions: "预估：15 x 10 x 5 厘米",
+        productDimensions: "长度 9 厘米",
+        packageWeight: "预估：12.35 盎司",
+        productWeight: "预估：8.82 盎司",
+      },
+    }],
+  });
+  assert.ok(fullCopy.indexOf("关键词分组:") < fullCopy.indexOf("包装尺寸和重量:"));
+  assert.ok(fullCopy.indexOf("包装尺寸和重量:") < fullCopy.indexOf("产品尺寸和重量:"));
+  assert.match(
+    fullCopy,
+    /包装尺寸和重量:\n尺寸: Estimated: 6 x 4 x 2 in\n重量: Estimated: 12\.35 oz\n中文参考:\n尺寸：预估：15 x 10 x 5 厘米\n重量：预估：12\.35 盎司/u,
+  );
+  assert.match(
+    fullCopy,
+    /产品尺寸和重量:\n尺寸: 3\.5 in long\n重量: Estimated: 8\.82 oz\n中文参考:\n尺寸：长度 9 厘米\n重量：预估：8\.82 盎司/u,
+  );
 });
 
 test("rendered listing values expose separate English and Chinese copy targets", () => {
@@ -597,20 +655,21 @@ test("rendered historical failed listing drafts remain directly usable without r
     globalThis.document = previousDocument;
   }
 
-  assert.doesNotMatch(getFakeTextContent(root), /重写|审核|复核|警告|缺失信息/u);
+  assert.doesNotMatch(getFakeTextContent(root), /重写|审核/u);
+  assert.match(getFakeTextContent(root), /警告|缺失信息/u);
   assert.equal(String(root.children[0]?.className || ""), "creation-listing-card");
   assert.deepEqual(collectFakeElements(root, (node) => (
     String(node.className || "").split(/\s+/).includes("creation-listing-title-copy")
   )).map((button) => button.dataset.creationListingCopyLanguage), ["en"]);
   const copyLabels = root.querySelectorAll("[data-creation-listing-copy-text]")
     .map((button) => button.dataset.creationListingCopyLabel);
-  for (const label of ["标题", "卖点", "痛点", "五点描述", "商品描述", "后台搜索词", "关键词分组"]) {
+  for (const label of ["标题", "卖点", "痛点", "五点描述", "商品描述", "后台搜索词", "关键词分组", "包装尺寸和重量", "产品尺寸和重量"]) {
     assert.equal(copyLabels.includes(`${label}英文`), true, `${label} must remain directly copyable`);
   }
   assert.match(getFakeTextContent(root), /Compact first aid kit|Loose supplies|first aid kit home travel compact/u);
 });
 
-test("old review-only warning and missing-info fields are not rendered", () => {
+test("warning and missing-info fields render their saved Chinese references", () => {
   const previousDocument = globalThis.document;
   const root = makeFakeElement("div");
   globalThis.document = {
@@ -645,15 +704,15 @@ test("old review-only warning and missing-info fields are not rendered", () => {
   const warningField = fields.find((field) => field.children?.[0]?.children?.[0]?.textContent === "警告");
   const missingInfoField = fields.find((field) => field.children?.[0]?.children?.[0]?.textContent === "缺失信息");
 
-  assert.equal(warningField, undefined);
-  assert.equal(missingInfoField, undefined);
-  assert.doesNotMatch(
+  assert.ok(warningField);
+  assert.ok(missingInfoField);
+  assert.match(
     root.querySelectorAll("[data-creation-listing-copy-text]").map((button) => button.dataset.creationListingCopyText).join("\n"),
     /没有来源数据|未提供实际包袋/u,
   );
 });
 
-test("older drafts do not synthesize Chinese review fallback fields", () => {
+test("older drafts synthesize readable Chinese review fallback fields", () => {
   const previousDocument = globalThis.document;
   const root = makeFakeElement("div");
   globalThis.document = {
@@ -684,11 +743,12 @@ test("older drafts do not synthesize Chinese review fallback fields", () => {
   const warningField = fields.find((field) => field.children?.[0]?.children?.[0]?.textContent === "警告");
   const missingInfoField = fields.find((field) => field.children?.[0]?.children?.[0]?.textContent === "缺失信息");
 
-  assert.equal(warningField, undefined);
-  assert.equal(missingInfoField, undefined);
+  assert.ok(warningField);
+  assert.ok(missingInfoField);
+  assert.match(getFakeTextContent(root), /警告|缺失信息|发布前|源数据/u);
 });
 
-test("review warnings never add extra sections to the old seven-field layout", () => {
+test("review warnings add explicit review sections to historical layouts", () => {
   const previousDocument = globalThis.document;
   const root = makeFakeElement("div");
   globalThis.document = {
@@ -728,9 +788,28 @@ test("review warnings never add extra sections to the old seven-field layout", (
   ));
   const warningField = fields.find((field) => field.children?.[0]?.children?.[0]?.textContent === "警告");
   const missingInfoField = fields.find((field) => field.children?.[0]?.children?.[0]?.textContent === "缺失信息");
-  assert.equal(warningField, undefined);
-  assert.equal(missingInfoField, undefined);
-  assert.doesNotMatch(getFakeTextContent(root), /复核|警告|缺失信息/u);
+  assert.ok(warningField);
+  assert.ok(missingInfoField);
+  assert.match(getFakeTextContent(root), /复核|警告|缺失信息/u);
+});
+
+test("empty review arrays do not render empty warning sections", () => {
+  const previousDocument = globalThis.document;
+  const root = makeFakeElement("div");
+  globalThis.document = { createElement: makeFakeElement };
+  try {
+    renderCreationListingDrafts({
+      refs: { creationRecordListingDrafts: root },
+      state: {},
+      set: {
+        setId: "set-empty-review-fields",
+        listingDrafts: [{ title: "1 Pack First Aid Kit", warnings: [], missingInfo: [] }],
+      },
+    });
+  } finally {
+    globalThis.document = previousDocument;
+  }
+  assert.doesNotMatch(getFakeTextContent(root), /警告|缺失信息/u);
 });
 
 test("rendered V1 listing copy keeps historical Unicode while separating Chinese references", () => {
@@ -1037,6 +1116,10 @@ function makeBilingualV2Draft() {
       traffic: ["EN_TRAFFIC_TOKEN"],
       descriptive: ["EN_DESCRIPTIVE_TOKEN"],
     },
+    packageDimensions: "Estimated: EN_PACKAGE_DIMENSIONS_TOKEN 20 x 15 x 8 cm",
+    productDimensions: "Estimated: EN_PRODUCT_DIMENSIONS_TOKEN 18 x 12 x 6 cm",
+    packageWeight: "Estimated: EN_PACKAGE_WEIGHT_TOKEN 350 g",
+    productWeight: "Estimated: EN_PRODUCT_WEIGHT_TOKEN 250 g",
     warnings: ["EN_WARNING_TOKEN"],
     missingInfo: ["EN_MISSING_TOKEN"],
     zhDisplay: {
@@ -1052,6 +1135,10 @@ function makeBilingualV2Draft() {
         traffic: ["中文流量标记 EN_TRAFFIC_TOKEN"],
         descriptive: ["中文描述词标记 EN_DESCRIPTIVE_TOKEN"],
       },
+      packageDimensions: "预估：中文包装尺寸标记 EN_PACKAGE_DIMENSIONS_TOKEN 20 x 15 x 8 厘米",
+      productDimensions: "预估：中文产品尺寸标记 EN_PRODUCT_DIMENSIONS_TOKEN 18 x 12 x 6 厘米",
+      packageWeight: "预估：中文包装重量标记 EN_PACKAGE_WEIGHT_TOKEN 350 克",
+      productWeight: "预估：中文产品重量标记 EN_PRODUCT_WEIGHT_TOKEN 250 克",
       warnings: ["中文警告标记 EN_WARNING_TOKEN"],
       missingInfo: ["中文缺失标记 EN_MISSING_TOKEN"],
     },
@@ -1079,6 +1166,8 @@ test("completed V2 fields display bilingual values with language-specific copy p
   for (const token of [
     "EN_TITLE_TOKEN", "EN_SELLING_TOKEN", "EN_OBJECTION_TOKEN", "EN_HIGHLIGHT_TOKEN",
     "EN_DESCRIPTION_TOKEN", "EN_SEARCH_TOKEN", "EN_EXACT_TOKEN",
+    "EN_PACKAGE_DIMENSIONS_TOKEN", "EN_PRODUCT_DIMENSIONS_TOKEN",
+    "EN_PACKAGE_WEIGHT_TOKEN", "EN_PRODUCT_WEIGHT_TOKEN",
     "中文标题标记", "中文卖点标记", "中文疑虑标记", "中文亮点标记", "中文描述标记",
     "中文搜索标记", "中文精准标记",
   ]) {
@@ -1102,6 +1191,10 @@ test("completed V2 fields display bilingual values with language-specific copy p
     ["EN_DESCRIPTION_TOKEN", "中文描述标记"],
     ["EN_SEARCH_TOKEN", "中文搜索标记"],
     ["EN_EXACT_TOKEN", "中文精准标记"],
+    ["EN_PACKAGE_DIMENSIONS_TOKEN", "中文包装尺寸标记"],
+    ["EN_PRODUCT_DIMENSIONS_TOKEN", "中文产品尺寸标记"],
+    ["EN_PACKAGE_WEIGHT_TOKEN", "中文包装重量标记"],
+    ["EN_PRODUCT_WEIGHT_TOKEN", "中文产品重量标记"],
   ]) {
     assert.ok(fieldCopies.some((copy) => copy.includes(english)), `${english} must remain field-copyable`);
     assert.ok(fieldCopies.every((copy) => !copy.includes(chinese)), `${chinese} must not leak into English field copy`);
@@ -1119,6 +1212,8 @@ test("V2 full copy keeps both languages and excludes set, platform, and policy m
   for (const token of [
     "EN_TITLE_TOKEN", "EN_SELLING_TOKEN", "EN_OBJECTION_TOKEN", "EN_HIGHLIGHT_TOKEN",
     "EN_DESCRIPTION_TOKEN", "EN_SEARCH_TOKEN", "EN_EXACT_TOKEN",
+    "EN_PACKAGE_DIMENSIONS_TOKEN", "EN_PRODUCT_DIMENSIONS_TOKEN",
+    "EN_PACKAGE_WEIGHT_TOKEN", "EN_PRODUCT_WEIGHT_TOKEN",
     "中文标题标记", "中文卖点标记", "中文疑虑标记", "中文亮点标记", "中文描述标记",
     "中文搜索标记", "中文精准标记",
   ]) {
@@ -1149,7 +1244,19 @@ test("V2 structured export maps historical fields to the old bilingual contract 
   assert.deepEqual(payload.listingDrafts[0].painPoints, ["EN_OBJECTION_TOKEN"]);
   assert.deepEqual(payload.listingDrafts[0].fiveBullets, ["EN_HIGHLIGHT_TOKEN"]);
   assert.equal(payload.listingDrafts[0].backendSearchTerms, "EN_SEARCH_TOKEN");
+  assert.equal(payload.listingDrafts[0].packageDimensions, "Estimated: EN_PACKAGE_DIMENSIONS_TOKEN 20 x 15 x 8 cm");
+  assert.equal(payload.listingDrafts[0].productDimensions, "Estimated: EN_PRODUCT_DIMENSIONS_TOKEN 18 x 12 x 6 cm");
+  assert.equal(payload.listingDrafts[0].packageWeight, "Estimated: EN_PACKAGE_WEIGHT_TOKEN 350 g");
+  assert.equal(payload.listingDrafts[0].productWeight, "Estimated: EN_PRODUCT_WEIGHT_TOKEN 250 g");
+  assert.match(payload.listingDrafts[0].zhDisplay.packageWeight, /中文包装重量标记/u);
+  assert.match(payload.listingDrafts[0].zhDisplay.productWeight, /中文产品重量标记/u);
+  const exportedFields = Object.keys(payload.listingDrafts[0]);
+  assert.ok(exportedFields.indexOf("packageDimensions") < exportedFields.indexOf("packageWeight"));
+  assert.ok(exportedFields.indexOf("packageWeight") < exportedFields.indexOf("productDimensions"));
+  assert.ok(exportedFields.indexOf("productDimensions") < exportedFields.indexOf("productWeight"));
   assert.equal(payload.listingDrafts[0].zhDisplay.title, "中文标题标记 EN_TITLE_TOKEN");
+  assert.match(payload.listingDrafts[0].zhDisplay.packageDimensions, /中文包装尺寸标记/u);
+  assert.match(payload.listingDrafts[0].zhDisplay.productDimensions, /中文产品尺寸标记/u);
   assert.deepEqual(payload.listingDrafts[0].keywordBuckets.exact, ["EN_EXACT_TOKEN"]);
   assert.deepEqual(payload.listingDrafts[0].zhDisplay.keywordBuckets.exact, ["中文精准标记 EN_EXACT_TOKEN"]);
   assert.doesNotMatch(exported, /FORBIDDEN_BRAND_PRODUCT_NAME/u);
@@ -1178,6 +1285,81 @@ test("V1 structured export preserves the historical payload and draft verbatim",
     productName: "Legacy Brand Product",
     listingDrafts: [legacyDraft],
   });
+});
+
+test("listing generation rejects a stale service response without dimension fields", async () => {
+  const selectedSet = { setId: "set-stale-listing-service", listingDrafts: [] };
+  const feedback = [];
+  let upserted = false;
+  const controller = createCreationListingController({
+    state: { creation: { sets: [selectedSet] } },
+    getSelectedSet: () => selectedSet,
+    fetchImpl: async () => ({
+      ok: true,
+      json: async () => ({
+        set: {
+          ...selectedSet,
+          listingDrafts: [{
+            title: "1 Pack Door Latch",
+            zhDisplay: { title: "1 件装门插销" },
+          }],
+        },
+      }),
+    }),
+    upsertSet: () => {
+      upserted = true;
+      return selectedSet;
+    },
+    compactErrorMessage: (message) => message,
+    setFeedback: (message, type) => feedback.push({ message, type }),
+  });
+
+  await assert.rejects(
+    controller.generate(selectedSet.setId),
+    /缺少包装尺寸或产品尺寸/u,
+  );
+  assert.equal(upserted, false);
+  assert.equal(feedback.at(-1)?.type, "error");
+  assert.match(feedback.at(-1)?.message || "", /重启 Image Studio/u);
+});
+
+test("listing generation rejects a stale service response without weight fields", async () => {
+  const selectedSet = { setId: "set-stale-listing-weight-service", listingDrafts: [] };
+  let upserted = false;
+  const controller = createCreationListingController({
+    state: { creation: { sets: [selectedSet] } },
+    getSelectedSet: () => selectedSet,
+    fetchImpl: async () => ({
+      ok: true,
+      json: async () => ({
+        set: {
+          ...selectedSet,
+          listingDrafts: [{
+            title: "1 Pack Door Latch",
+            packageDimensions: "Estimated: 8 x 5 x 2 in",
+            productDimensions: "7 x 2 x 1 in",
+            zhDisplay: {
+              title: "1 件装门插销",
+              packageDimensions: "预估：20 x 13 x 5 厘米",
+              productDimensions: "18 x 5 x 3 厘米",
+            },
+          }],
+        },
+      }),
+    }),
+    upsertSet: () => {
+      upserted = true;
+      return selectedSet;
+    },
+    compactErrorMessage: (message) => message,
+    setFeedback: () => {},
+  });
+
+  await assert.rejects(
+    controller.generate(selectedSet.setId),
+    /缺少包装重量或产品重量/u,
+  );
+  assert.equal(upserted, false);
 });
 
 test("old branded V2 drafts remain directly copyable and exportable without review gates", async () => {

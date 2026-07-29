@@ -155,12 +155,10 @@ function makeValidV1Draft(source) {
   });
 }
 
-function makeInvalidV1Draft(source) {
+function makeIncompatibleV1Draft(source) {
   return {
     ...makeValidV1Draft(source),
-    title: "FDA Certified Miracle Cure Box",
-    sellingPoints: [],
-    description: "Guaranteed best seller with a lifetime warranty and refund.",
+    zhDisplay: null,
   };
 }
 
@@ -360,8 +358,8 @@ test("shared, local, and Worker Listing paths keep successful output and explici
   const sanitizationSource = buildCreationListingSources(sanitizationSet)[0];
   const sanitizationOutput = makeValidV1Draft(sanitizationSource);
   Object.assign(sanitizationOutput, {
-    title: `${sanitizationOutput.title} Adjustable Gray Black Rechargeable`,
-    description: `${sanitizationOutput.description} Adjustable gray black rechargeable details.`,
+    title: `${sanitizationOutput.title} Adjustable Gray Black Rechargeable Compatible with Reel X.`,
+    description: `${sanitizationOutput.description} Adjustable gray black rechargeable details. Compatible with Reel X.`,
     painPoints: ["Need a clear option? Review the supplied package."],
     fiveBullets: sanitizationOutput.fiveBullets.slice(0, 3),
     backendSearchTerms: "adjustable gray black rechargeable",
@@ -370,6 +368,11 @@ test("shared, local, and Worker Listing paths keep successful output and explici
       longTail: ["gray"],
       traffic: ["black"],
       descriptive: ["rechargeable"],
+    },
+    zhDisplay: {
+      ...sanitizationOutput.zhDisplay,
+      title: `${sanitizationOutput.zhDisplay.title}兼容 Reel X。`,
+      description: `${sanitizationOutput.zhDisplay.description}兼容 Reel X。`,
     },
   });
   const sanitizationResult = await compareThreePaths(sanitizationSet, [sanitizationOutput]);
@@ -380,6 +383,11 @@ test("shared, local, and Worker Listing paths keep successful output and explici
     ...Object.values(sanitizationResult.draft.keywordBuckets).flat(),
   ].join("\n");
   assert.doesNotMatch(sanitizedEnglish, /\b(?:adjustable|gray|black|rechargeable)\b/i);
+  assert.doesNotMatch(sanitizedEnglish, /compatible\s+with|Reel X/iu);
+  assert.doesNotMatch(
+    `${sanitizationResult.draft.zhDisplay.title}\n${sanitizationResult.draft.zhDisplay.description}`,
+    /兼容|Reel X/u,
+  );
   assert.equal(sanitizationResult.draft.backendSearchTerms, "");
   assert.deepEqual(Object.values(sanitizationResult.draft.keywordBuckets).flat(), []);
 
@@ -393,7 +401,7 @@ test("shared, local, and Worker Listing paths keep successful output and explici
   failureSet.listingDrafts = [existingDraft];
   const persistedFailureSet = await compareThreePathFailures(
     failureSet,
-    makeInvalidV1Draft(failureSource),
+    makeIncompatibleV1Draft(failureSource),
   );
   assert.deepEqual(persistedFailureSet.listingDrafts, [existingDraft]);
 
@@ -412,7 +420,7 @@ test("local and Worker Listing endpoints delegate policy behavior without copyin
     readFile(new URL("../cloudflare-pages-worker.mjs", import.meta.url), "utf8"),
   ]);
   for (const [label, source] of [["server", serverSource], ["Worker", workerSource]]) {
-    assert.match(source, /import\s*\{\s*generateCreationListingDrafts\s*\}\s*from\s*["']\.\/lib\/creation-listing-agent\.mjs["']/);
+    assert.match(source, /import\s*\{[^}]*\bgenerateCreationListingDrafts\b[^}]*\}\s*from\s*["']\.\/lib\/creation-listing-agent\.mjs["']/);
     assert.doesNotMatch(source, /creation-listing-policies|CREATION_LISTING_(?:SOURCE|PLATFORM)|listing-policy-2026/i, label);
     for (const { url } of Object.values(CREATION_LISTING_SOURCE_REGISTER)) {
       assert.doesNotMatch(source, new RegExp(url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), label);

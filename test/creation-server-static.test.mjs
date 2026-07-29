@@ -103,7 +103,8 @@ test("creation record list responses are not cacheable", async () => {
 
   assert.match(server, /async function handleCreationSetsGet\(response\) \{/);
   assert.match(server, /function sendJson\(response, statusCode, payload, headers = \{\}\) \{/);
-  assert.match(server, /sendJson\(response, 200, await creationSetStore\.listManifests\(\), \{\s*"Cache-Control": "no-store"/);
+  assert.match(server, /const sets = await creationSetStore\.listManifests\(\);/);
+  assert.match(server, /sendJson\(response, 200, sets\.map\(hydrateCreationListingDimensionsForRead\), \{\s*"Cache-Control": "no-store"/);
 });
 
 test("local static assets revalidate instead of being downloaded from scratch", async () => {
@@ -539,6 +540,18 @@ test("local creation reference analysis has an independent route and does not wr
   assert.match(workerHandler, /contextPrompt:/);
   assert.match(handler, /normalizeCreationReferenceAnalysis/);
   assert.doesNotMatch(handler, /promptAgentStore\.append/);
+});
+
+test("generic prompt agent routes do not inject Creation Mode context", async () => {
+  const server = await readFile(serverPath, "utf8");
+  const worker = await readFile(cloudflareWorkerPath, "utf8");
+  const localHandler =
+    server.match(/async function handlePromptAgentAnalyze[\s\S]*?\r?\n}\r?\n\r?\nfunction buildSavedItem/)?.[0] || "";
+  const workerHandler =
+    worker.match(/async function handlePromptAgentAnalyze[\s\S]*?\r?\n}\r?\n\r?\nfunction getImageExtension/)?.[0] || "";
+
+  assert.doesNotMatch(localHandler, /套图分析上下文|平台选择：|商品类目：|主图、详情页信息|SKU 对比|移动端缩略图/);
+  assert.doesNotMatch(workerHandler, /套图分析上下文|平台选择：|商品类目：|主图、详情页信息|SKU 对比|移动端缩略图/);
 });
 
 test("creation reference analysis defaults to low reasoning effort on local and Cloudflare routes", async () => {

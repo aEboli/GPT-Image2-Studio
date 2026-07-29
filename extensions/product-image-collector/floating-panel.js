@@ -1,12 +1,24 @@
 (() => {
   const HOST_ID = "gpt-image2-studio-product-image-collector";
-  const PANEL_VERSION = "1.1.17";
+  const CONTROLLER_KEY = "__gptImage2StudioProductImagePanelController";
+  const PANEL_VERSION = "1.1.23";
   const REVEAL_EVENT = "gpt-image2-studio-product-image-collector:reveal";
   const PANEL_OPENED_EVENT = "gpt-image2-studio-product-image-collector:panel-opened";
   const PANEL_CLOSED_EVENT = "gpt-image2-studio-product-image-collector:panel-closed";
+  const PANEL_NAVIGATED_EVENT = "gpt-image2-studio-product-image-collector:page-navigated";
   const MESSAGE_COLLECT = "product-image-collector:collect";
   const MESSAGE_COPY = "product-image-collector:copy";
+  const MESSAGE_COPY_IMAGES = "product-image-collector:copy-images";
   const MESSAGE_DOWNLOAD = "product-image-collector:download";
+  const MESSAGE_TIMEOUT_MS = Object.freeze({
+    [MESSAGE_COLLECT]: 20000,
+    [MESSAGE_COPY]: 10000,
+    [MESSAGE_DOWNLOAD]: 60000,
+  });
+  const COPY_IMAGES_MIN_TIMEOUT_MS = 45000;
+  const COPY_IMAGES_MAX_TIMEOUT_MS = 10 * 60 * 1000;
+  const NATIVE_DOWNLOAD_CONCURRENCY = 8;
+  const NATIVE_DOWNLOAD_TIMEOUT_MS = 35000;
   const DOCK_THRESHOLD = 40;
   const VIEWER_MIN_SCALE = 0.5;
   const VIEWER_MAX_SCALE = 4;
@@ -14,7 +26,17 @@
   const VIEWER_DRAG_THRESHOLD = 3;
   const VARIANT_FONT_MAX_PX = 10;
   const VARIANT_FONT_MIN_PX = 1;
+  const VARIANT_HORIZONTAL_PADDING_PX = 10;
+  const COPY_SUCCESS_TOAST_MS = 1800;
   const CATEGORY_LABELS = { main: "主图", detail: "详情图", sku: "SKU 图" };
+  const PLATFORM_LABELS = {
+    "1688": "1688",
+    amazon: "Amazon",
+    temu: "Temu",
+    tiktok: "TikTok Shop",
+    shein: "SHEIN",
+    gigacloud: "大健云仓",
+  };
   const ICON_MARKUP = {
     eye: '<svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>',
     download: '<svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>',
@@ -29,12 +51,13 @@
     x: '<svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
   };
 
-  const existing = document.getElementById(HOST_ID);
-  if (existing?.dataset.collectorVersion === PANEL_VERSION) {
-    existing.dispatchEvent(new CustomEvent(REVEAL_EVENT));
-    document.dispatchEvent(new CustomEvent(PANEL_OPENED_EVENT));
+  const currentController = globalThis[CONTROLLER_KEY];
+  if (currentController?.version === PANEL_VERSION && currentController.reveal) {
+    currentController.reveal();
     return;
   }
+  if (currentController?.destroy) currentController.destroy();
+  const existing = document.getElementById(HOST_ID);
   existing?.remove();
 
   const host = document.createElement("div");
@@ -133,9 +156,9 @@
       .panel[data-dragging="true"] .panel-head { cursor: grabbing; }
       .product-summary { min-width: 0; align-self: stretch; display: flex; align-items: center; }
       .product-summary strong { min-width: 0; font-size: 11px; line-height: 1.35; overflow-wrap: anywhere; white-space: normal; }
-      .title-block { width: 96px; min-width: 0; padding-left: 6px; border-left: 1px solid #e4e8ed; }
-      .brand { display: block; overflow: hidden; color: #d94b22; font-size: 8px; font-weight: 700; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
-      h1 { margin: 1px 0 0; overflow: hidden; font-size: 12px; line-height: 1.2; letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; }
+      .title-block { width: 96px; min-width: 0; align-self: stretch; display: grid; place-content: center; justify-items: center; padding-left: 6px; border-left: 1px solid #e4e8ed; text-align: center; }
+      .brand { width: 100%; display: block; overflow: hidden; color: #d94b22; font-size: 8px; font-weight: 700; line-height: 1.2; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+      .platform-name { width: 100%; margin: 1px 0 0; overflow: hidden; font-size: 12px; line-height: 1.2; letter-spacing: 0; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
       .head-actions { display: flex; flex: 0 0 auto; gap: 4px; }
       .icon-button {
         width: 28px;
@@ -202,9 +225,9 @@
       .image-card.is-selected { border-color: #5b9cff; }
       .image-card-media { position: relative; width: 100%; height: auto; min-width: 0; aspect-ratio: 1; display: block; overflow: hidden; background: #fff; cursor: pointer; }
       .image-card-media input { position: absolute; top: 3px; left: 3px; z-index: 2; width: 14px; height: 14px; accent-color: #1769aa; }
-      .image-card-media img { width: 100%; height: 100%; display: block; object-fit: contain; }
+      .image-card-media img { width: 100%; height: 100%; display: block; content-visibility: auto; contain-intrinsic-size: 1px 1px; object-fit: contain; }
       .image-card-media img.is-broken { opacity: 0.18; }
-      .image-card-meta { position: absolute; left: 4px; right: 4px; bottom: 4px; min-width: 0; display: grid; grid-template-columns: minmax(0, auto) auto; align-items: center; justify-content: space-between; gap: 4px; padding: 2px 4px; border: 1px solid rgba(203, 213, 225, 0.72); border-radius: 4px; background: rgba(248, 250, 252, 0.88); color: #263241; box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); pointer-events: none; }
+      .image-card-meta { position: absolute; left: 4px; right: 4px; bottom: 4px; min-width: 0; display: grid; grid-template-columns: minmax(0, auto) auto; align-items: center; justify-content: space-between; gap: 4px; padding: 2px 4px; border: 1px solid rgba(255, 255, 255, 0.72); border-radius: 4px; background: rgba(248, 250, 252, 0.64); color: #263241; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); pointer-events: none; }
       .image-card-name { min-width: 0; padding: 0; background: transparent; color: inherit; font-size: 10px; font-weight: 700; line-height: 1.25; white-space: nowrap; }
       .image-card-resolution { justify-self: end; padding: 0; background: transparent; color: inherit; font-size: 9px; font-weight: 700; line-height: 1.25; white-space: nowrap; }
       .image-card-variant { min-width: 0; overflow: hidden; padding: 2px 5px; border-top: 1px solid #e1e5ea; background: #fff; color: #334155; font-size: 10px; font-weight: 600; line-height: 15px; letter-spacing: 0; text-align: center; white-space: nowrap; }
@@ -214,11 +237,13 @@
       .image-card-actions button:hover { background: #eef2f6; color: #155d97; }
       .image-card-actions button:disabled { cursor: wait; opacity: 0.45; }
       .button-icon { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
-      .action-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 6px 8px 8px; border-top: 1px solid #dce2e9; background: #fff; }
+      .action-bar { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 6px 8px 8px; border-top: 1px solid #dce2e9; background: #fff; }
       .action-bar button { min-height: 32px; border-radius: 5px; font-size: 12px; font-weight: 700; cursor: pointer; }
       .action-bar button:disabled, .selection-tools button:disabled, .icon-button:disabled { opacity: 0.45; cursor: not-allowed; }
       .secondary { border: 1px solid #1769aa; background: #fff; color: #155d97; }
       .primary { border: 1px solid #d94b22; background: #e9542a; color: #fff; }
+      .copy-success-toast { position: absolute; z-index: 35; left: 50%; bottom: 60px; max-width: calc(100% - 32px); overflow: hidden; padding: 8px 12px; border: 1px solid rgba(255, 255, 255, 0.56); border-radius: 6px; background: rgba(8, 118, 79, 0.78); color: #fff; box-shadow: 0 6px 18px rgba(15, 23, 42, 0.16); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); font-size: 12px; font-weight: 700; line-height: 1.4; text-align: center; text-overflow: ellipsis; white-space: nowrap; opacity: 0; visibility: hidden; pointer-events: none; transform: translate(-50%, 8px); transition: opacity 180ms ease, transform 180ms ease, visibility 0s linear 180ms; }
+      .copy-success-toast[data-visible="true"] { opacity: 1; visibility: visible; transform: translate(-50%, 0); transition: opacity 180ms ease, transform 180ms ease, visibility 0s; }
       .image-viewer {
         position: absolute;
         inset: 0;
@@ -263,7 +288,7 @@
         </div>
         <div class="title-block">
           <span class="brand">GPT-Image2-Studio</span>
-          <h1>商品图采集</h1>
+          <h1 class="platform-name" id="platformName">商品平台</h1>
         </div>
         <div class="head-actions">
           <button class="icon-button" id="collectButton" type="button" title="重新采集" aria-label="重新采集">↻</button>
@@ -284,8 +309,10 @@
       <div class="groups" id="groups"></div>
       <footer class="action-bar">
         <button class="secondary" id="copyButton" type="button" disabled>复制到 Studio</button>
+        <button class="secondary" id="copyImagesButton" type="button" disabled>复制图片</button>
         <button class="primary" id="downloadButton" type="button" disabled>下载所选</button>
       </footer>
+      <output class="copy-success-toast" id="copySuccessToast" role="status" aria-live="polite" aria-atomic="true" data-visible="false"></output>
       <button class="fold-rail" id="foldRailButton" type="button" title="展开采集窗" aria-label="展开采集窗"></button>
       <section class="image-viewer" id="imageViewer" role="dialog" aria-label="查看商品图" hidden>
         <button class="viewer-close-button" id="viewerCloseButton" type="button" title="关闭查看" aria-label="关闭查看"></button>
@@ -313,6 +340,8 @@
     closeButton: shadow.querySelector("#closeButton"),
     collectButton: shadow.querySelector("#collectButton"),
     copyButton: shadow.querySelector("#copyButton"),
+    copyImagesButton: shadow.querySelector("#copyImagesButton"),
+    copySuccessToast: shadow.querySelector("#copySuccessToast"),
     downloadButton: shadow.querySelector("#downloadButton"),
     dragHandle: shadow.querySelector("#dragHandle"),
     foldRailButton: shadow.querySelector("#foldRailButton"),
@@ -323,6 +352,7 @@
     selectMainButton: shadow.querySelector("#selectMainButton"),
     selectSkuButton: shadow.querySelector("#selectSkuButton"),
     panel: shadow.querySelector(".panel"),
+    platformName: shadow.querySelector("#platformName"),
     productTitle: shadow.querySelector("#productTitle"),
     selectAllButton: shadow.querySelector("#selectAllButton"),
     status: shadow.querySelector("#status"),
@@ -357,7 +387,10 @@
     viewerRotation: 0,
     viewerScale: 1,
   };
+  let copySuccessToastTimer = 0;
   let variantFitFrame = 0;
+  let panelController = null;
+  let panelDestroyed = false;
 
   refs.foldRailButton.append(createIcon("chevron-left"));
   refs.viewerPreviousButton.append(createIcon("chevron-left"));
@@ -375,14 +408,72 @@
     refs.status.dataset.state = kind;
   }
 
+  function hideCopySuccessToast() {
+    window.clearTimeout(copySuccessToastTimer);
+    copySuccessToastTimer = 0;
+    refs.copySuccessToast.dataset.visible = "false";
+  }
+
+  function showCopySuccessToast(message) {
+    window.clearTimeout(copySuccessToastTimer);
+    copySuccessToastTimer = 0;
+    refs.copySuccessToast.dataset.visible = "false";
+    refs.copySuccessToast.textContent = "";
+    void refs.copySuccessToast.offsetWidth;
+    refs.copySuccessToast.textContent = message;
+    refs.copySuccessToast.dataset.visible = "true";
+    copySuccessToastTimer = window.setTimeout(() => {
+      refs.copySuccessToast.dataset.visible = "false";
+      copySuccessToastTimer = 0;
+    }, COPY_SUCCESS_TOAST_MS);
+  }
+
+  function messageTimeoutMs(type, payload) {
+    if (type !== MESSAGE_COPY_IMAGES) return MESSAGE_TIMEOUT_MS[type] || 30000;
+    const count = Math.max(1, Array.isArray(payload?.selectedIds) ? payload.selectedIds.length : 1);
+    const downloadWaves = Math.ceil(count / NATIVE_DOWNLOAD_CONCURRENCY);
+    return Math.min(
+      COPY_IMAGES_MAX_TIMEOUT_MS,
+      Math.max(COPY_IMAGES_MIN_TIMEOUT_MS, downloadWaves * NATIVE_DOWNLOAD_TIMEOUT_MS + 10000),
+    );
+  }
+
+  function messageTimeoutText(type) {
+    if (type === MESSAGE_COLLECT) return "读取商品页超时，请重试。";
+    if (type === MESSAGE_COPY_IMAGES) return "准备图片超时，操作已恢复，请检查网络后重试。";
+    if (type === MESSAGE_DOWNLOAD) return "提交下载超时，操作已恢复，请重试。";
+    return "商品图采集操作超时，请重试。";
+  }
+
   function sendMessage(type, payload = {}) {
     return new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage({ type, ...payload }, (response) => {
-        const runtimeError = chrome.runtime.lastError;
-        if (runtimeError) return reject(new Error(runtimeError.message));
-        if (!response?.ok) return reject(new Error(response?.message || "商品图采集操作失败。"));
-        resolve(response);
-      });
+      let settled = false;
+      const timeoutId = window.setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        reject(new Error(messageTimeoutText(type)));
+      }, messageTimeoutMs(type, payload));
+
+      function finish(callback) {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timeoutId);
+        callback();
+      }
+
+      try {
+        chrome.runtime.sendMessage({ type, ...payload }, (response) => {
+          const runtimeError = chrome.runtime.lastError;
+          if (settled) return;
+          finish(() => {
+            if (runtimeError) reject(new Error(runtimeError.message));
+            else if (!response?.ok) reject(new Error(response?.message || "商品图采集操作失败。"));
+            else resolve(response);
+          });
+        });
+      } catch (error) {
+        finish(() => reject(error instanceof Error ? error : new Error(String(error || "商品图采集操作失败。"))));
+      }
     });
   }
 
@@ -442,26 +533,23 @@
 
   function variantRows(nodes) {
     const rows = [];
+    let row = null;
     for (const node of nodes) {
       const card = node.closest(".image-card");
       if (!card) continue;
       const top = Math.round(card.getBoundingClientRect().top);
-      let row = rows.find((candidate) => Math.abs(candidate.top - top) <= 1);
-      if (!row) {
+      if (!row || Math.abs(row.top - top) > 1) {
         row = { top, nodes: [] };
         rows.push(row);
       }
       row.nodes.push(node);
     }
-    rows.sort((left, right) => left.top - right.top);
     return rows.map((row) => row.nodes);
   }
 
   function fittingVariantFontSize(node) {
-    const style = window.getComputedStyle(node);
-    const horizontalPadding = (Number.parseFloat(style.paddingLeft) || 0) + (Number.parseFloat(style.paddingRight) || 0);
-    const availableWidth = Math.max(1, node.clientWidth - horizontalPadding);
-    const textWidth = Math.max(1, node.scrollWidth - horizontalPadding);
+    const availableWidth = Math.max(1, node.clientWidth - VARIANT_HORIZONTAL_PADDING_PX);
+    const textWidth = Math.max(1, node.scrollWidth - VARIANT_HORIZONTAL_PADDING_PX);
     if (textWidth <= availableWidth) return VARIANT_FONT_MAX_PX;
     const scaled = VARIANT_FONT_MAX_PX * availableWidth / textWidth;
     return Math.max(VARIANT_FONT_MIN_PX, Math.floor(scaled * 10) / 10);
@@ -471,12 +559,8 @@
     const nodes = Array.from(shadow.querySelectorAll(".image-card-variant"));
     for (const node of nodes) node.style.fontSize = `${VARIANT_FONT_MAX_PX}px`;
     for (const row of variantRows(nodes)) {
-      let fontSize = Math.min(...row.map(fittingVariantFontSize));
+      const fontSize = Math.min(...row.map(fittingVariantFontSize));
       for (const node of row) node.style.fontSize = `${fontSize}px`;
-      while (fontSize > VARIANT_FONT_MIN_PX && row.some((node) => node.scrollWidth > node.clientWidth)) {
-        fontSize = Math.max(VARIANT_FONT_MIN_PX, Number((fontSize - 0.1).toFixed(1)));
-        for (const node of row) node.style.fontSize = `${fontSize}px`;
-      }
     }
   }
 
@@ -654,16 +738,17 @@
   function syncActions() {
     const total = state.manifest?.items.length || 0;
     const selected = state.selectedIds.size;
+    refs.groups.setAttribute("aria-busy", String(state.busy));
     refs.copyButton.disabled = state.busy || selected === 0;
+    refs.copyImagesButton.disabled = state.busy || selected === 0;
     refs.downloadButton.disabled = state.busy || selected === 0;
     refs.collectButton.disabled = state.busy;
-    refs.selectAllButton.disabled = state.busy || total === 0;
-    refs.invertButton.disabled = state.busy || total === 0;
-    refs.selectMainButton.disabled = state.busy || !(state.manifest?.items || []).some((item) => item.category === "main");
-    refs.selectDetailButton.disabled = state.busy || !(state.manifest?.items || []).some((item) => item.category === "detail");
-    refs.selectSkuButton.disabled = state.busy || !(state.manifest?.items || []).some((item) => item.category === "sku");
-    for (const button of shadow.querySelectorAll(".image-card-actions button")) button.disabled = state.busy;
-    for (const checkbox of shadow.querySelectorAll(".group-select-all input")) checkbox.disabled = state.busy;
+    refs.selectAllButton.disabled = total === 0;
+    refs.invertButton.disabled = total === 0;
+    refs.selectMainButton.disabled = !(state.manifest?.items || []).some((item) => item.category === "main");
+    refs.selectDetailButton.disabled = !(state.manifest?.items || []).some((item) => item.category === "detail");
+    refs.selectSkuButton.disabled = !(state.manifest?.items || []).some((item) => item.category === "sku");
+    for (const button of shadow.querySelectorAll('[data-transfer-action="download"]')) button.disabled = state.busy;
     for (const button of shadow.querySelectorAll(".group-download-button")) {
       button.disabled = state.busy || selectedCategoryItems(button.dataset.category).length === 0;
     }
@@ -698,9 +783,26 @@
     refs.groups.scrollTop = scrollTop;
   }
 
+  function platformLabelFor(manifest) {
+    const platform = String(manifest?.source?.platform || "").trim().toLowerCase();
+    return PLATFORM_LABELS[platform] || "商品平台";
+  }
+
+  function panelProductTitleFor(manifest) {
+    const title = String(manifest?.product?.title || "").trim();
+    if (!title) return "等待采集当前商品";
+    const platformLabel = platformLabelFor(manifest);
+    const suffixes = [`——${platformLabel}`, `——“${platformLabel}”`, `——"${platformLabel}"`];
+    for (const suffix of suffixes) {
+      if (title.endsWith(suffix)) return title.slice(0, -suffix.length).trim() || title;
+    }
+    return title;
+  }
+
   function render() {
     refs.groups.replaceChildren();
-    refs.productTitle.textContent = state.manifest?.product?.title || "等待采集当前商品";
+    refs.productTitle.textContent = panelProductTitleFor(state.manifest);
+    refs.platformName.textContent = platformLabelFor(state.manifest);
     for (const category of ["main", "detail", "sku"]) {
       const items = (state.manifest?.items || []).filter((item) => item.category === category);
       if (items.length === 0) continue;
@@ -764,6 +866,8 @@
         const image = document.createElement("img");
         image.alt = filename;
         image.loading = "lazy";
+        image.decoding = "async";
+        image.fetchPriority = "low";
         image.addEventListener("error", () => image.classList.add("is-broken"));
         const meta = document.createElement("div");
         meta.className = "image-card-meta";
@@ -798,6 +902,8 @@
         viewButton.addEventListener("click", () => openImageViewer(item));
         const downloadButton = document.createElement("button");
         downloadButton.type = "button";
+        downloadButton.dataset.transferAction = "download";
+        downloadButton.disabled = state.busy;
         downloadButton.append(createIcon("download"));
         downloadButton.title = `下载 ${filename}`;
         downloadButton.setAttribute("aria-label", `下载 ${filename}`);
@@ -829,18 +935,20 @@
     setStatus("正在读取当前商品页...");
     try {
       const response = await sendMessage(MESSAGE_COLLECT, { pageUrl: location.href });
+      if (panelDestroyed) return;
       state.manifest = response.manifest;
       state.selectedIds = new Set(response.manifest.items.map((item) => item.id));
       state.collectionNotice = String(response.notice || "");
       syncSelectionStatus();
     } catch (error) {
+      if (panelDestroyed) return;
       state.manifest = null;
       state.selectedIds.clear();
       state.collectionNotice = "";
       setStatus(error instanceof Error ? error.message : String(error), "error");
     } finally {
       state.busy = false;
-      render();
+      if (!panelDestroyed) render();
     }
   }
 
@@ -869,14 +977,15 @@
         manifest: state.manifest,
         selectedIds: items.map((item) => item.id),
       });
+      if (panelDestroyed) return;
       await writeClipboard(response.text);
       const variantCount = skuVariantCount(items);
       setStatus(`已复制 ${response.count} 张商品图清单${variantCount ? `，SKU 共 ${variantCount} 个规格` : ""}，可到 Studio 导入。`, "success");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error), "error");
+      if (!panelDestroyed) setStatus(error instanceof Error ? error.message : String(error), "error");
     } finally {
       state.busy = false;
-      syncActions();
+      if (!panelDestroyed) syncActions();
     }
   }
 
@@ -889,6 +998,7 @@
         manifest: state.manifest,
         selectedIds: items.map((item) => item.id),
       });
+      if (panelDestroyed) return;
       setStatus(
         single
           ? `已提交 ${displayFilename(items[0])} 到 ${response.folder}。`
@@ -896,10 +1006,38 @@
         "success",
       );
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error), "error");
+      if (!panelDestroyed) setStatus(error instanceof Error ? error.message : String(error), "error");
     } finally {
       state.busy = false;
-      syncActions();
+      if (!panelDestroyed) syncActions();
+    }
+  }
+
+  async function copyImagesSelection() {
+    const items = selectedItems();
+    if (items.length === 0) return setStatus("请先选择要复制的商品图。", "error");
+    hideCopySuccessToast();
+    state.busy = true;
+    syncActions();
+    setStatus(`正在准备 ${items.length} 张图片...`);
+    try {
+      const response = await sendMessage(MESSAGE_COPY_IMAGES, {
+        manifest: state.manifest,
+        selectedIds: items.map((item) => item.id),
+      });
+      if (panelDestroyed) return;
+      setStatus(
+        response.failedCount > 0
+          ? `已复制 ${response.count} 张图片，${response.failedCount} 张失败，可直接粘贴到聊天软件。`
+          : `已复制 ${response.count} 张图片，可直接粘贴到聊天软件。`,
+        "success",
+      );
+      showCopySuccessToast(`已复制 ${response.count} 张图片`);
+    } catch (error) {
+      if (!panelDestroyed) setStatus(error instanceof Error ? error.message : String(error), "error");
+    } finally {
+      state.busy = false;
+      if (!panelDestroyed) syncActions();
     }
   }
 
@@ -1091,6 +1229,9 @@
   }
 
   function closePanel() {
+    if (panelDestroyed) return;
+    panelDestroyed = true;
+    hideCopySuccessToast();
     endViewerDrag();
     window.removeEventListener("pointermove", moveDrag);
     window.removeEventListener("pointerup", endDrag);
@@ -1098,7 +1239,9 @@
     window.removeEventListener("resize", clampFloatingPanel);
     window.removeEventListener("resize", scheduleVariantRowFit);
     if (variantFitFrame) window.cancelAnimationFrame(variantFitFrame);
+    host.removeEventListener(PANEL_NAVIGATED_EVENT, closePanel);
     host.remove();
+    if (globalThis[CONTROLLER_KEY] === panelController) delete globalThis[CONTROLLER_KEY];
     document.dispatchEvent(new CustomEvent(PANEL_CLOSED_EVENT));
   }
 
@@ -1113,6 +1256,7 @@
 
   refs.collectButton.addEventListener("click", collectCurrentPage);
   refs.copyButton.addEventListener("click", copySelection);
+  refs.copyImagesButton.addEventListener("click", copyImagesSelection);
   refs.downloadButton.addEventListener("click", downloadSelection);
   refs.selectAllButton.addEventListener("click", () => {
     state.selectedIds = new Set((state.manifest?.items || []).map((item) => item.id));
@@ -1158,9 +1302,20 @@
     setPanelFolded(false);
     clampFloatingPanel();
   });
+  host.addEventListener(PANEL_NAVIGATED_EVENT, closePanel);
   window.addEventListener("resize", clampFloatingPanel);
   window.addEventListener("resize", scheduleVariantRowFit);
 
+  panelController = {
+    version: PANEL_VERSION,
+    reveal() {
+      if (panelDestroyed) return;
+      host.dispatchEvent(new CustomEvent(REVEAL_EVENT));
+      document.dispatchEvent(new CustomEvent(PANEL_OPENED_EVENT));
+    },
+    destroy: closePanel,
+  };
+  globalThis[CONTROLLER_KEY] = panelController;
   document.dispatchEvent(new CustomEvent(PANEL_OPENED_EVENT));
   render();
   collectCurrentPage();

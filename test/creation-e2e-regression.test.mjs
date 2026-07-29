@@ -566,10 +566,10 @@ test("creation workflow reuses history, reuploads references, tweaks prompts, re
   assert.match(generatedSet.items[1].prompt, /Shared visual language:/);
   assert.match(generatedSet.items[1].prompt, /lifestyle magazine editorial/);
   assert.ok(generatedSet.items[0].relativePath);
-  assert.match(generatedSet.items[0].filename, /^\d{4}-1-首图成交主视觉-[a-z0-9]{4}\.png$/u);
-  assert.match(generatedSet.items[1].filename, /^\d{4}-2-核心信息融合图-[a-z0-9]{4}\.png$/u);
-  assert.match(generatedSet.items[2].filename, /^\d{4}-3-到手清单配件图-[a-z0-9]{4}\.png$/u);
-  assert.match(generatedSet.items[3].filename, /^\d{4}-4-痛点图-[a-z0-9]{4}\.png$/u);
+  assert.match(generatedSet.items[0].filename, /^1-\d{4}-首图成交主视觉-[a-z0-9]{4}\.png$/u);
+  assert.match(generatedSet.items[1].filename, /^2-\d{4}-核心信息融合图-[a-z0-9]{4}\.png$/u);
+  assert.match(generatedSet.items[2].filename, /^3-\d{4}-到手清单配件图-[a-z0-9]{4}\.png$/u);
+  assert.match(generatedSet.items[3].filename, /^4-\d{4}-痛点图-[a-z0-9]{4}\.png$/u);
   assert.doesNotMatch(generatedSet.items.map((item) => item.filename).join("\n"), /\b(?:hero|benefit|accessory|gift|after|sales)\b/i);
 
   const listResponse = await fetch(`${baseUrl}/api/creation/sets`);
@@ -934,6 +934,8 @@ test("creation listing endpoint merges drafts into latest manifest after upstrea
           traffic: ["freshwater fishing lure"],
           descriptive: ["compact fishing lure"],
         },
+        packageDimensions: "Estimated: 6 x 4 x 2 in (15.2 x 10.2 x 5.1 cm)",
+        productDimensions: "3.5 in (8.89 cm) long",
         zhDisplay: {
           title: "1件装紧凑型淡水钓鱼拟饵",
           sellingPoints: ["所提供的钓鱼拟饵采用紧凑外形，用于淡水垂钓。"],
@@ -953,6 +955,8 @@ test("creation listing endpoint merges drafts into latest manifest after upstrea
             traffic: ["淡水钓鱼拟饵"],
             descriptive: ["紧凑钓鱼拟饵"],
           },
+          packageDimensions: "预估：15.2 x 10.2 x 5.1 厘米（6 x 4 x 2 英寸）",
+          productDimensions: "长度 8.89 厘米（3.5 英寸）",
         },
       }),
     }));

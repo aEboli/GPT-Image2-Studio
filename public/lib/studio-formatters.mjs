@@ -1,3 +1,5 @@
+import { DEFAULT_RESPONSES_MODEL } from "./model-defaults.mjs";
+
 const REASONING_LABELS = {
   low: "Low",
   medium: "Medium",
@@ -91,7 +93,7 @@ export function buildParameterText(item = {}, fallbackConfig = {}, options = {})
   lines.push(`图像模型：${item.imageModel || !strictSnapshot ? formatImageModelLabel(item.imageModel) : "未记录"}`);
 
   if (!isDirectImageRoute) {
-    lines.push(`外层模型：${item.responsesModel || (strictSnapshot ? "未记录" : fallbackConfig.responsesModel || "gpt-5.4")}`);
+    lines.push(`外层模型：${item.responsesModel || (strictSnapshot ? "未记录" : fallbackConfig.responsesModel || DEFAULT_RESPONSES_MODEL)}`);
   }
 
   if (item.endpointPath) {

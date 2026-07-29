@@ -25,6 +25,142 @@ const platformLabels = {
   gigacloud: "大健云仓",
 };
 
+class LauncherControl extends EventTarget {
+  constructor() {
+    super();
+    this.attributes = new Map();
+    this.disabled = false;
+    this.hidden = false;
+    this.textContent = "";
+    this.title = "";
+  }
+
+  setAttribute(name, value) {
+    this.attributes.set(name, String(value));
+  }
+
+  getAttribute(name) {
+    return this.attributes.get(name) ?? null;
+  }
+
+  click() {
+    this.dispatchEvent(new Event("click"));
+  }
+}
+
+class LauncherNode extends EventTarget {
+  constructor(ownerDocument) {
+    super();
+    this.ownerDocument = ownerDocument;
+    this.dataset = {};
+    this.id = "";
+    this.isConnected = false;
+    this.shadowRoot = null;
+  }
+
+  attachShadow() {
+    const button = new LauncherControl();
+    const status = new LauncherControl();
+    this.shadowRoot = {
+      innerHTML: "",
+      querySelector(selector) {
+        if (selector === "#launcherButton") return button;
+        if (selector === "#launcherStatus") return status;
+        return null;
+      },
+      button,
+      status,
+    };
+    return this.shadowRoot;
+  }
+
+  remove() {
+    if (this.ownerDocument.nodes.get(this.id) === this) this.ownerDocument.nodes.delete(this.id);
+    this.isConnected = false;
+  }
+}
+
+class LauncherDocument extends EventTarget {
+  constructor() {
+    super();
+    this.nodes = new Map();
+    this.documentElement = {
+      appendChild: (node) => {
+        node.isConnected = true;
+        this.nodes.set(node.id, node);
+        return node;
+      },
+    };
+  }
+
+  createElement() {
+    return new LauncherNode(this);
+  }
+
+  getElementById(id) {
+    return this.nodes.get(id) || null;
+  }
+}
+
+test("floating launcher follows SPA product routes and recovers from an unanswered open request", async () => {
+  const document = new LauncherDocument();
+  const staleHost = document.createElement("div");
+  staleHost.id = "gpt-image2-studio-product-image-launcher";
+  document.documentElement.appendChild(staleHost);
+  const location = { href: "https://www.amazon.com/s?k=storage" };
+  const messages = [];
+  const RuntimeCustomEvent = globalThis.CustomEvent || class CustomEvent extends Event {};
+  const sandbox = {
+    CustomEvent: RuntimeCustomEvent,
+    Error,
+    Event,
+    String,
+    URL,
+    chrome: {
+      runtime: {
+        lastError: null,
+        sendMessage(message) { messages.push(message); },
+      },
+    },
+    document,
+    location,
+    window: { clearInterval, clearTimeout, setInterval, setTimeout },
+  };
+  const runtimeSource = floatingLauncherSource
+    .replace("const OPEN_TIMEOUT_MS = 8000;", "const OPEN_TIMEOUT_MS = 5;")
+    .replace("const LOCATION_POLL_MS = 750;", "const LOCATION_POLL_MS = 5;");
+
+  vm.runInNewContext(runtimeSource, sandbox);
+  assert.equal(staleHost.isConnected, false);
+  assert.equal(document.getElementById(staleHost.id), null);
+
+  location.href = "https://www.amazon.com/dp/B000000001";
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  const launcher = document.getElementById(staleHost.id);
+  assert.ok(launcher?.isConnected);
+  const launcherController = sandbox.__gptImage2StudioProductImageLauncherController;
+  vm.runInNewContext(runtimeSource, sandbox);
+  const reusedController = sandbox.__gptImage2StudioProductImageLauncherController;
+  if (reusedController !== launcherController) reusedController.destroy();
+  assert.equal(document.getElementById(staleHost.id), launcher);
+  assert.equal(reusedController, launcherController);
+  const { button, status } = launcher.shadowRoot;
+  button.click();
+  assert.equal(button.disabled, true);
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].type, "product-image-collector:open");
+
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(button.disabled, false);
+  assert.equal(status.hidden, false);
+  assert.equal(status.textContent, "商品图采集打开超时，请重试。");
+
+  location.href = "https://www.amazon.com/s?k=storage";
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(document.getElementById(staleHost.id), null);
+  sandbox.__gptImage2StudioProductImageLauncherController.destroy();
+});
+
 function titledForPlatform(title, platform) {
   return `${title}——${platformLabels[platform] || platform}`;
 }
@@ -1037,7 +1173,7 @@ test("extension action and floating launcher open the panel using the sending ta
   });
   assert.equal(openResponse.ok, true);
   assert.equal(executions[1].target.tabId, 42);
-  assert.equal(executions[1].files.join(","), "floating-panel.js");
+  assert.equal(executions[1].files.join(","), "floating-launcher.js,floating-panel.js");
 
   const response = await new Promise((resolve) => {
     const keepChannelOpen = messageListener(
@@ -1106,13 +1242,89 @@ test("extension download message submits images only and never a JSON data URL",
   assert.ok(downloadCalls.every((call) => !call.url.startsWith("data:application/json")));
 });
 
+test("extension direct image copy uses its dedicated native host without Studio tabs", async () => {
+  const workerWithoutImport = serviceWorkerSource.replace(
+    /^(?:import\s*\{[\s\S]*?\}\s*from\s*"\.\/lib\/[^\"]+";\s*)+/,
+    "",
+  );
+  let messageListener;
+  const nativeMessages = [];
+  const chrome = {
+    action: { onClicked: { addListener() {} } },
+    downloads: { async download() { return 1; } },
+    runtime: {
+      onMessage: { addListener(listener) { messageListener = listener; } },
+      async sendNativeMessage(host, payload) {
+        nativeMessages.push({ host, payload });
+        return { ok: true, count: 2, failedCount: 1 };
+      },
+    },
+    tabs: {
+      async query() {
+        assert.fail("direct image copy must not query Studio tabs");
+      },
+    },
+    scripting: { async executeScript() { return []; } },
+  };
+  const manifest = {
+    version: 1,
+    source: { platform: "1688", pageUrl: "https://detail.1688.com/offer/123.html" },
+    product: { id: "123", title: "测试商品——1688" },
+    capturedAt: "2026-07-29T00:00:00.000Z",
+    items: [
+      { id: "main-1", category: "main" },
+      { id: "detail-1", category: "detail" },
+      { id: "sku-1", category: "sku" },
+    ],
+  };
+  vm.runInNewContext(workerWithoutImport, {
+    Array,
+    Error,
+    JSON,
+    Promise,
+    Set,
+    String,
+    URL,
+    chrome,
+    console,
+    buildProductImageDownloadPlan() { return { items: [] }; },
+    normalizeProductImageImportManifest(value) { return value; },
+    serializeProductImageImportManifest() { return ""; },
+    getProductImagePlatformForSourceUrl() { return "1688"; },
+  });
+
+  const response = await new Promise((resolve) => {
+    const keepChannelOpen = messageListener(
+      {
+        type: "product-image-collector:copy-images",
+        manifest,
+        selectedIds: ["main-1", "sku-1"],
+      },
+      { tab: { id: 42 } },
+      resolve,
+    );
+    assert.equal(keepChannelOpen, true);
+  });
+
+  assert.equal(response.ok, true);
+  assert.equal(response.count, 2);
+  assert.equal(response.failedCount, 1);
+  assert.equal(nativeMessages.length, 1);
+  assert.equal(nativeMessages[0].host, "com.aeboli.gpt_image2_studio.product_image_clipboard");
+  assert.deepEqual(
+    [...nativeMessages[0].payload.manifest.items].map(({ id }) => id),
+    ["main-1", "sku-1"],
+  );
+  assert.equal(nativeMessages[0].payload.type, "copy-images");
+});
+
 test("extension manifest uses an on-demand minimum-permission MV3 surface", async () => {
   const manifest = JSON.parse(await readFile(new URL("../extensions/product-image-collector/manifest.json", import.meta.url), "utf8"));
   const serviceWorker = await readFile(new URL("../extensions/product-image-collector/service-worker.mjs", import.meta.url), "utf8");
   const floatingPanel = await readFile(new URL("../extensions/product-image-collector/floating-panel.js", import.meta.url), "utf8");
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, "1.1.17");
-  assert.deepEqual(manifest.permissions, ["activeTab", "scripting", "downloads", "clipboardWrite"]);
+  assert.equal(manifest.version, "1.1.23");
+  assert.deepEqual(manifest.permissions, ["activeTab", "scripting", "downloads", "clipboardWrite", "nativeMessaging"]);
   for (const permission of [
     "https://detail.1688.com/*",
     "https://*.amazon.com/*",
@@ -1122,17 +1334,19 @@ test("extension manifest uses an on-demand minimum-permission MV3 surface", asyn
     "https://*.shein.com/*",
     "https://*.gigab2b.com/*",
   ]) assert.ok(manifest.host_permissions.includes(permission), permission);
+  assert.ok(typeof manifest.key === "string" && manifest.key.length > 300);
+  assert.ok(manifest.host_permissions.every((permission) => !/^http:\/\//.test(permission)));
   assert.equal(manifest.content_scripts.length, 1);
   assert.deepEqual(manifest.content_scripts[0].js, ["floating-launcher.js"]);
   assert.equal(manifest.content_scripts[0].run_at, "document_idle");
   for (const match of [
-    "https://detail.1688.com/offer/*",
-    "https://*.amazon.com/dp/*",
-    "https://*.temu.com/*-g-*.html",
-    "https://www.tiktok.com/shop/pdp/*",
-    "https://shop.tiktok.com/*/pdp/*",
-    "https://*.shein.com/*-p-*.html",
-    "https://*.gigab2b.com/index.php*",
+    "https://detail.1688.com/*",
+    "https://*.amazon.com/*",
+    "https://*.temu.com/*",
+    "https://www.tiktok.com/*",
+    "https://shop.tiktok.com/*",
+    "https://*.shein.com/*",
+    "https://*.gigab2b.com/*",
   ]) assert.ok(manifest.content_scripts[0].matches.includes(match), match);
   assert.equal(manifest.side_panel, undefined);
   assert.doesNotMatch(JSON.stringify(manifest), /<all_urls>|history|cookies|webRequest|sidePanel|"tabs"/i);
@@ -1140,9 +1354,11 @@ test("extension manifest uses an on-demand minimum-permission MV3 surface", asyn
   assert.match(serviceWorker, /sender\.tab/);
   assert.match(serviceWorker, /collectFromTab\(sender\.tab, message\.pageUrl\)/);
   assert.match(serviceWorker, /files:\s*\["floating-launcher\.js",\s*"floating-panel\.js"\]/);
-  assert.doesNotMatch(serviceWorker, /chrome\.tabs\.query|chrome\.sidePanel/);
-  assert.match(floatingPanel, /PANEL_VERSION\s*=\s*"1\.1\.17"/);
-  assert.match(floatingLauncherSource, /LAUNCHER_VERSION\s*=\s*"1\.1\.17"/);
+  assert.match(serviceWorker, /chrome\.runtime\.sendNativeMessage\(NATIVE_CLIPBOARD_HOST/);
+  assert.match(serviceWorker, /com\.aeboli\.gpt_image2_studio\.product_image_clipboard/);
+  assert.doesNotMatch(serviceWorker, /chrome\.tabs\.query|STUDIO_TAB_URL_PATTERNS|product-image-collector\/clipboard|chrome\.sidePanel/);
+  assert.match(floatingPanel, /PANEL_VERSION\s*=\s*"1\.1\.23"/);
+  assert.match(floatingLauncherSource, /LAUNCHER_VERSION\s*=\s*"1\.1\.23"/);
   assert.match(floatingPanel, /function previewUrlFor\(item\)/);
   assert.match(floatingPanel, /state\.manifest\?\.source\?\.platform !== "gigacloud"/);
   assert.match(floatingPanel, /searchParams\.set\("x-oss-process", "image\/resize,w_300,h_300,m_pad"\)/);
@@ -1150,11 +1366,16 @@ test("extension manifest uses an on-demand minimum-permission MV3 surface", asyn
   assert.match(floatingPanel, /viewerImage\.src = item\.url/);
   assert.match(floatingLauncherSource, /function isSupportedProductPage\(value\)/);
   assert.match(floatingLauncherSource, /route"\) === "product\/product"/);
-  assert.match(floatingLauncherSource, /if \(!isSupportedProductPage\(location\.href\)\) return/);
+  assert.doesNotMatch(floatingLauncherSource, /if \(!isSupportedProductPage\(location\.href\)\) return/);
+  assert.match(floatingLauncherSource, /setInterval\([\s\S]*?syncLocation/);
+  assert.match(floatingLauncherSource, /OPEN_TIMEOUT_MS/);
+  assert.match(floatingLauncherSource, /clearTimeout\(timeoutId\)/);
+  assert.match(floatingLauncherSource, /try\s*\{[\s\S]*?chrome\.runtime\.sendMessage[\s\S]*?catch/);
   assert.match(floatingLauncherSource, /product-image-collector:open/);
   assert.match(floatingLauncherSource, /dataset\.launcherVersion/);
   assert.match(floatingLauncherSource, /function isPanelVisible\(\)[\s\S]*?dataset\.panelHidden !== "true"/);
-  assert.match(floatingLauncherSource, /existing\?\.remove\(\)/);
+  assert.match(floatingLauncherSource, /previousController\?\.destroy/);
+  assert.match(floatingLauncherSource, /document\.getElementById\(HOST_ID\)\?\.remove\(\)/);
   assert.match(floatingLauncherSource, /attachShadow\(\{\s*mode:\s*"open"\s*\}\)/);
   assert.match(floatingLauncherSource, /panel-opened/);
   assert.match(floatingLauncherSource, /panel-closed/);
@@ -1174,14 +1395,41 @@ test("extension manifest uses an on-demand minimum-permission MV3 surface", asyn
   assert.match(floatingPanel, /dataset\.collectorVersion/);
   assert.match(floatingPanel, /existing\?\.remove\(\)/);
   assert.match(floatingPanel, /REVEAL_EVENT/);
-  assert.match(floatingPanel, /existing\.dispatchEvent\(new CustomEvent\(REVEAL_EVENT\)\)/);
+  assert.match(floatingPanel, /currentController\?\.version === PANEL_VERSION[\s\S]*?currentController\.reveal\(\)/);
+  assert.match(floatingPanel, /globalThis\[CONTROLLER_KEY\]\s*=\s*panelController/);
   assert.match(floatingPanel, /host\.addEventListener\(REVEAL_EVENT,\s*\(\)\s*=>\s*\{[\s\S]*?setPanelFolded\(false\)/);
   assert.match(floatingPanel, /data-dock="right"/);
   assert.match(floatingPanel, /\.panel\[data-dock="right"\][\s\S]*height:\s*100dvh/);
   assert.match(floatingPanel, /width:\s*clamp\(520px,\s*31vw,\s*540px\)/);
   assert.match(floatingPanel, /grid-template-rows:\s*auto auto auto minmax\(0,\s*1fr\) auto/);
+  assert.match(floatingPanel, /\.action-bar\s*\{[\s\S]*?grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(floatingPanel, /<footer class="action-bar">[\s\S]*?id="copyButton"[^>]*>复制到 Studio<\/button>[\s\S]*?id="copyImagesButton"[^>]*>复制图片<\/button>[\s\S]*?id="downloadButton"[^>]*>下载所选<\/button>/);
+  assert.match(floatingPanel, /refs\.copyImagesButton\.addEventListener\("click",\s*copyImagesSelection\)/);
+  assert.match(floatingPanel, /MESSAGE_TIMEOUT_MS/);
+  assert.match(floatingPanel, /messageTimeoutMs\(type, payload\)/);
+  assert.match(floatingPanel, /if \(settled\) return/);
+  assert.doesNotMatch(floatingPanel, /selectAllButton\.disabled\s*=\s*state\.busy/);
+  assert.match(floatingPanel, /\[data-transfer-action="download"\][\s\S]*?button\.disabled\s*=\s*state\.busy/);
+  assert.match(floatingPanel, /if \(!panelDestroyed\) render\(\)/);
+  assert.doesNotMatch(floatingPanel, /while \(fontSize > VARIANT_FONT_MIN_PX/);
+  assert.match(floatingPanel, /content-visibility:\s*auto/);
+  assert.match(floatingPanel, /image\.decoding\s*=\s*"async"/);
+  assert.match(floatingPanel, /MESSAGE_COPY_IMAGES\s*=\s*"product-image-collector:copy-images"/);
+  assert.match(floatingPanel, /<output class="copy-success-toast" id="copySuccessToast" role="status" aria-live="polite" aria-atomic="true" data-visible="false"><\/output>/);
+  assert.match(floatingPanel, /\.copy-success-toast\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?bottom:\s*60px;[\s\S]*?background:\s*rgba\([^)]+\);[\s\S]*?opacity:\s*0;[\s\S]*?visibility:\s*hidden;[\s\S]*?transition:[^}]*opacity[^}]*transform/);
+  assert.match(floatingPanel, /\.copy-success-toast\[data-visible="true"\]\s*\{[\s\S]*?opacity:\s*1;[\s\S]*?visibility:\s*visible/);
+  assert.match(floatingPanel, /function showCopySuccessToast\(message\)[\s\S]*?clearTimeout\(copySuccessToastTimer\)[\s\S]*?dataset\.visible\s*=\s*"false"[\s\S]*?offsetWidth[\s\S]*?dataset\.visible\s*=\s*"true"[\s\S]*?setTimeout/);
+  assert.match(floatingPanel, /showCopySuccessToast\(`已复制 \$\{response\.count\} 张图片`\)/);
   assert.match(floatingPanel, /\.panel-head\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\) auto auto/);
-  assert.match(floatingPanel, /<header class="panel-head" id="dragHandle">[\s\S]*?<div class="product-summary"[^>]*>[\s\S]*?id="productTitle"[\s\S]*?<div class="title-block">[\s\S]*?GPT-Image2-Studio[\s\S]*?商品图采集[\s\S]*?<div class="head-actions">/);
+  assert.match(floatingPanel, /<header class="panel-head" id="dragHandle">[\s\S]*?<div class="product-summary"[^>]*>[\s\S]*?id="productTitle"[\s\S]*?<div class="title-block">[\s\S]*?GPT-Image2-Studio[\s\S]*?id="platformName"[^>]*>商品平台<[\s\S]*?<div class="head-actions">/);
+  assert.doesNotMatch(floatingPanel, /<h1[^>]*>商品图采集<\/h1>/);
+  assert.match(floatingPanel, /const PLATFORM_LABELS\s*=\s*\{[\s\S]*?"1688":\s*"1688"[\s\S]*?amazon:\s*"Amazon"[\s\S]*?gigacloud:\s*"大健云仓"/);
+  assert.match(floatingPanel, /function platformLabelFor\(manifest\)[\s\S]*?manifest\?\.source\?\.platform[\s\S]*?商品平台/);
+  assert.match(floatingPanel, /function panelProductTitleFor\(manifest\)[\s\S]*?title\.endsWith\(suffix\)[\s\S]*?title\.slice\(0,\s*-suffix\.length\)\.trim\(\)/);
+  assert.match(floatingPanel, /refs\.productTitle\.textContent\s*=\s*panelProductTitleFor\(state\.manifest\)/);
+  assert.match(floatingPanel, /refs\.platformName\.textContent\s*=\s*platformLabelFor\(state\.manifest\)/);
+  assert.match(floatingPanel, /\.title-block\s*\{[\s\S]*?display:\s*grid;[\s\S]*?place-content:\s*center;[\s\S]*?text-align:\s*center/);
+  assert.match(floatingPanel, /\.platform-name\s*\{[\s\S]*?text-align:\s*center/);
   assert.doesNotMatch(floatingPanel, /id="selectionCount"/);
   assert.match(floatingPanel, /\.product-summary strong\s*\{[\s\S]*?overflow-wrap:\s*anywhere;[\s\S]*?white-space:\s*normal/);
   assert.match(floatingPanel, /function selectionStatusMessage\(\)[\s\S]*?已选 \$\{selected\} \/ 共 \$\{total\} 张商品图[\s\S]*?SKU 共 \$\{variantCount\} 个规格/);
@@ -1189,13 +1437,13 @@ test("extension manifest uses an on-demand minimum-permission MV3 surface", asyn
   assert.match(floatingPanel, /\.group\s*\{[\s\S]*?gap:\s*6px[\s\S]*?padding:\s*7px 8px 9px/);
   assert.match(floatingPanel, /\.group-head\s*\{[\s\S]*?min-height:\s*36px[\s\S]*?justify-content:\s*space-between[\s\S]*?padding:\s*0 7px/);
   assert.match(floatingPanel, /\.image-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)[\s\S]*?gap:\s*6px/);
-  assert.doesNotMatch(floatingPanel, /repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
+  assert.doesNotMatch(floatingPanel, /\.image-grid\s*\{[^}]*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
   assert.match(floatingPanel, /\.image-card\s*\{[\s\S]*?grid-template-rows:\s*auto 24px[\s\S]*?border:\s*2px solid #d7dee7[\s\S]*?border-radius:\s*5px/);
   assert.match(floatingPanel, /\.image-card\.is-selected\s*\{\s*border-color:\s*#5b9cff/);
   assert.match(floatingPanel, /\.image-card-media\s*\{[\s\S]*?width:\s*100%;[\s\S]*?aspect-ratio:\s*1/);
   assert.match(floatingPanel, /\.image-card-media\s*\{[\s\S]*?background:\s*#fff/);
   assert.match(floatingPanel, /\.image-card-media img\s*\{[\s\S]*?object-fit:\s*contain/);
-  assert.match(floatingPanel, /\.image-card-meta\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?grid-template-columns:\s*minmax\(0,\s*auto\) auto;[\s\S]*?background:\s*rgba\(248,\s*250,\s*252,\s*0\.88\)[\s\S]*?backdrop-filter:\s*blur\(4px\)/);
+  assert.match(floatingPanel, /\.image-card-meta\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?grid-template-columns:\s*minmax\(0,\s*auto\) auto;[\s\S]*?background:\s*rgba\(248,\s*250,\s*252,\s*0\.64\)[\s\S]*?backdrop-filter:\s*blur\(2px\)/);
   assert.match(floatingPanel, /\.image-card-name\s*\{[\s\S]*?background:\s*transparent;[\s\S]*?color:\s*inherit;[\s\S]*?font-size:\s*10px[\s\S]*?white-space:\s*nowrap/);
   assert.match(floatingPanel, /\.image-card-resolution\s*\{[\s\S]*?background:\s*transparent;[\s\S]*?color:\s*inherit;[\s\S]*?font-size:\s*9px[\s\S]*?white-space:\s*nowrap/);
   assert.match(floatingPanel, /\.image-card\.has-variant\s*\{[\s\S]*?grid-template-rows:\s*auto 20px 24px/);

@@ -23,6 +23,10 @@ const V2_SCHEMA_FIELDS = [
   "description",
   "searchTerms",
   "keywordBuckets",
+  "packageDimensions",
+  "productDimensions",
+  "packageWeight",
+  "productWeight",
   "evidence",
   "missingInfo",
   "warnings",
@@ -44,6 +48,10 @@ const BILINGUAL_CONTENT_FIELDS = [
   "description",
   "searchTerms",
   "keywordBuckets",
+  "packageDimensions",
+  "productDimensions",
+  "packageWeight",
+  "productWeight",
   "warnings",
   "missingInfo",
 ];
@@ -78,6 +86,10 @@ function makeV2Draft(policy, overrides = {}) {
       traffic: ["home organizer"],
       descriptive: ["blue stackable box"],
     },
+    packageDimensions: "Estimated: 22 x 14 x 12 cm (8.66 x 5.51 x 4.72 in)",
+    productDimensions: "20 x 12 x 10 cm (7.87 x 4.72 x 3.94 in)",
+    packageWeight: "Estimated: 350 g (12.35 oz)",
+    productWeight: "Estimated: 250 g (8.82 oz)",
     evidence: ["product-input"],
     missingInfo: [],
     warnings: [],
@@ -99,6 +111,10 @@ function makeV2Draft(policy, overrides = {}) {
         traffic: ["家用整理盒"],
         descriptive: ["蓝色可叠放盒"],
       },
+      packageDimensions: "预估：22 x 14 x 12 厘米（8.66 x 5.51 x 4.72 英寸）",
+      productDimensions: "20 x 12 x 10 厘米（7.87 x 4.72 x 3.94 英寸）",
+      packageWeight: "预估：350 克（12.35 盎司）",
+      productWeight: "预估：250 克（8.82 盎司）",
       warnings: [],
       missingInfo: [],
     },
@@ -116,6 +132,18 @@ function makeV2Draft(policy, overrides = {}) {
         key,
         values.map((item) => `中文事实对照：${item}`),
       ])),
+      packageDimensions: /^Estimated\s*:/iu.test(merged.packageDimensions)
+        ? `预估：${merged.packageDimensions.replace(/^Estimated\s*:\s*/iu, "")}`
+        : `包装尺寸：${merged.packageDimensions}`,
+      productDimensions: /^Estimated\s*:/iu.test(merged.productDimensions)
+        ? `预估：${merged.productDimensions.replace(/^Estimated\s*:\s*/iu, "")}`
+        : `产品尺寸：${merged.productDimensions}`,
+      packageWeight: /^Estimated\s*:/iu.test(merged.packageWeight)
+        ? `预估：${merged.packageWeight.replace(/^Estimated\s*:\s*/iu, "")}`
+        : `包装重量：${merged.packageWeight}`,
+      productWeight: /^Estimated\s*:/iu.test(merged.productWeight)
+        ? `预估：${merged.productWeight.replace(/^Estimated\s*:\s*/iu, "")}`
+        : `产品重量：${merged.productWeight}`,
       warnings: merged.warnings.map((item) => `中文事实对照：${item}`),
       missingInfo: merged.missingInfo.map((item) => `中文事实对照：${item}`),
     };

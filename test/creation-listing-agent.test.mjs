@@ -1,15 +1,22 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { validateCreationListingDraft } from "../lib/creation-listing-draft.mjs";
+import {
+  buildCreationListingSources,
+  getCreationListingDimensionFieldErrors,
+  getCreationListingWeightEvidence,
+  validateCreationListingDraft,
+} from "../lib/creation-listing-draft.mjs";
 import {
   CREATION_LISTING_JSON_SCHEMA,
   generateCreationListingDrafts,
+  hydrateCreationListingDimensionsForRead,
   makeMockCreationListingDraft,
   requestCreationListingDraft,
 } from "../lib/creation-listing-agent.mjs";
 
 function makeValidDraft(overrides = {}) {
+  const { zhDisplay: zhOverrides = {}, ...englishOverrides } = overrides;
   return {
     title: "2 Pack Blue Fishing Lures Bass Trout Freshwater Swimbait",
     sellingPoints: ["Bright blue profile with a stated two-pack quantity."],
@@ -29,9 +36,46 @@ function makeValidDraft(overrides = {}) {
       traffic: ["freshwater bait"],
       descriptive: ["compact blue lure"],
     },
+    packageDimensions: "Estimated: 6 x 4 x 2 in (15.2 x 10.2 x 5.1 cm)",
+    productDimensions: "3.5 in (8.9 cm) long",
+    packageWeight: "Estimated: 350 g (12.35 oz)",
+    productWeight: "Estimated: 250 g (8.82 oz)",
     missingInfo: [],
     warnings: [],
-    ...overrides,
+    ...englishOverrides,
+    zhDisplay: {
+      packageDimensions: "预估：15.2 x 10.2 x 5.1 厘米（6 x 4 x 2 英寸）",
+      productDimensions: "长度 8.9 厘米（3.5 英寸）",
+      packageWeight: "预估：350 克（12.35 盎司）",
+      productWeight: "预估：250 克（8.82 盎司）",
+      ...zhOverrides,
+    },
+  };
+}
+
+function makeValidPlatformV1Draft(overrides = {}) {
+  const { zhDisplay: zhOverrides = {}, ...englishOverrides } = overrides;
+  return {
+    ...makeValidDraft(englishOverrides),
+    zhDisplay: {
+      title: "2 件装蓝色路亚鱼饵",
+      sellingPoints: ["蓝色鱼饵主体，包装数量为两件。"],
+      painPoints: ["购买前请核对颜色款式和包装数量。"],
+      fiveBullets: ["产品类型：蓝色路亚鱼饵。"],
+      description: "面向美国市场的蓝色路亚鱼饵。",
+      backendSearchTerms: "蓝色 路亚 鱼饵",
+      keywordBuckets: {
+        exact: ["蓝色路亚鱼饵"],
+        longTail: ["淡水路亚鱼饵"],
+        traffic: ["淡水鱼饵"],
+        descriptive: ["紧凑蓝色鱼饵"],
+      },
+      packageDimensions: "预估：15.2 x 10.2 x 5.1 厘米（6 x 4 x 2 英寸）",
+      productDimensions: "长度 8.9 厘米（3.5 英寸）",
+      packageWeight: "预估：350 克（12.35 盎司）",
+      productWeight: "预估：250 克（8.82 盎司）",
+      ...zhOverrides,
+    },
   };
 }
 
@@ -44,6 +88,10 @@ function visibleDraftText(draft) {
     draft.description,
     draft.backendSearchTerms,
     ...Object.values(draft.keywordBuckets || {}).flat(),
+    draft.packageDimensions,
+    draft.productDimensions,
+    draft.packageWeight,
+    draft.productWeight,
   ].join("\n");
 }
 
@@ -56,6 +104,10 @@ function visibleChineseDisplayText(draft) {
     draft.zhDisplay?.description,
     draft.zhDisplay?.backendSearchTerms,
     ...Object.values(draft.zhDisplay?.keywordBuckets || {}).flat(),
+    draft.zhDisplay?.packageDimensions,
+    draft.zhDisplay?.productDimensions,
+    draft.zhDisplay?.packageWeight,
+    draft.zhDisplay?.productWeight,
   ].join("\n");
 }
 
@@ -95,6 +147,290 @@ test("strict listing schema marks every top-level property as required", () => {
     [...CREATION_LISTING_JSON_SCHEMA.required].sort(),
     Object.keys(CREATION_LISTING_JSON_SCHEMA.properties).sort(),
   );
+  assert.ok(CREATION_LISTING_JSON_SCHEMA.required.includes("packageDimensions"));
+  assert.ok(CREATION_LISTING_JSON_SCHEMA.required.includes("productDimensions"));
+  assert.ok(CREATION_LISTING_JSON_SCHEMA.required.includes("packageWeight"));
+  assert.ok(CREATION_LISTING_JSON_SCHEMA.required.includes("productWeight"));
+  assert.ok(CREATION_LISTING_JSON_SCHEMA.properties.zhDisplay.required.includes("packageDimensions"));
+  assert.ok(CREATION_LISTING_JSON_SCHEMA.properties.zhDisplay.required.includes("productDimensions"));
+  assert.ok(CREATION_LISTING_JSON_SCHEMA.properties.zhDisplay.required.includes("packageWeight"));
+  assert.ok(CREATION_LISTING_JSON_SCHEMA.properties.zhDisplay.required.includes("productWeight"));
+});
+
+test("listing sources separate product and package dimension evidence", () => {
+  const [source] = buildCreationListingSources({
+    setId: "set-dimension-evidence",
+    productName: "Door Latch",
+    productDescription: "Package dimensions: 22 x 6 x 3 cm.",
+    dimensionSpecs: "Main body 194 mm x 35 mm; keeper 46 mm x 34 mm",
+    dimensionUnitMode: "both",
+  });
+
+  assert.match(source.productDimensionEvidence, /194\s*mm.*35\s*mm/iu);
+  assert.match(source.packageDimensionEvidence, /Package dimensions: 22 x 6 x 3 cm/iu);
+
+  const [missingSource] = buildCreationListingSources({
+    setId: "set-dimension-evidence-missing",
+    productName: "Door Latch",
+    dimensionSpecs: "Weight 120 g",
+  });
+  assert.equal(missingSource.productDimensionEvidence, "");
+  assert.equal(missingSource.packageDimensionEvidence, "");
+
+  const [negatedPackageSource] = buildCreationListingSources({
+    setId: "set-negated-package-dimension",
+    productName: "Storage Box",
+    productDescription: "Package dimensions not provided. Product dimensions: 20 x 10 x 5 cm.",
+  });
+  assert.equal(negatedPackageSource.packageDimensionEvidence, "");
+  assert.match(negatedPackageSource.productDimensionEvidence, /20\s*x\s*10\s*x\s*5\s*cm/iu);
+});
+
+test("listing sources separate gross and net weight evidence without using package dimension labels", () => {
+  const [source] = buildCreationListingSources({
+    setId: "set-weight-evidence",
+    productName: "Door Latch",
+    dimensionSpecs: "Gross Weight 500 g / Net Weight 350 g",
+    dimensionUnitMode: "both",
+  });
+
+  assert.equal(source.packageWeightEvidence, "500 g (1.1 lb)");
+  assert.equal(source.productWeightEvidence, "350 g (12.35 oz)");
+
+  const [productOnlySource] = buildCreationListingSources({
+    setId: "set-product-weight-evidence",
+    productName: "Door Latch",
+    productDescription: "Package dimensions: 22 x 6 x 3 cm. Net weight 350 g.",
+    dimensionUnitMode: "both",
+  });
+  assert.equal(productOnlySource.packageWeightEvidence, "");
+  assert.equal(productOnlySource.productWeightEvidence, "350 g (12.35 oz)");
+
+  const [packageOnlySource] = buildCreationListingSources({
+    setId: "set-package-weight-evidence",
+    productName: "Door Latch",
+    productDescription: "Package weight 500 g.",
+    dimensionUnitMode: "both",
+  });
+  assert.equal(packageOnlySource.packageWeightEvidence, "500 g (1.1 lb)");
+  assert.equal(packageOnlySource.productWeightEvidence, "");
+});
+
+test("listing weight evidence follows the selected unit mode for Chinese kilogram values", () => {
+  const source = {
+    dimensionSpecs: "净重：0.35公斤",
+    dimensionUnitMode: "imperial",
+  };
+
+  assert.equal(getCreationListingWeightEvidence(source, "package"), "");
+  assert.equal(getCreationListingWeightEvidence(source, "product"), "12.35 oz");
+});
+
+test("dimension provenance validates complete tuples instead of one shared number", () => {
+  const source = {
+    productDimensionEvidence: "Product dimensions: 10 x 5 x 3 cm (3.94 x 1.97 x 1.18 in)",
+    packageDimensionEvidence: "",
+    dimensionUnitMode: "both",
+  };
+  const valid = makeValidDraft({
+    productDimensions: "10 x 5 x 3 cm (3.94 x 1.97 x 1.18 in)",
+    zhDisplay: { productDimensions: "10 x 5 x 3 厘米（3.94 x 1.97 x 1.18 英寸）" },
+  });
+  assert.deepEqual(getCreationListingDimensionFieldErrors(valid, source), []);
+
+  const fabricated = makeValidDraft({
+    productDimensions: "10 x 999 x 999 cm (3.94 x 99 x 99 in)",
+    zhDisplay: { productDimensions: "10 x 999 x 999 厘米（3.94 x 99 x 99 英寸）" },
+  });
+  assert.match(
+    getCreationListingDimensionFieldErrors(fabricated, source).join("\n"),
+    /complete source dimension tuple/iu,
+  );
+});
+
+test("dimension mode ignores weight units and enforces the shared field ceiling", () => {
+  const weightOnlyImperial = makeValidDraft({
+    packageDimensions: "Estimated: 20 cm, 2 lb",
+    productDimensions: "Estimated: 20 cm, 2 lb",
+    zhDisplay: {
+      packageDimensions: "预估：20 厘米，2 磅",
+      productDimensions: "预估：20 厘米，2 磅",
+    },
+  });
+  const unitErrors = getCreationListingDimensionFieldErrors(weightOnlyImperial, {
+    dimensionSpecs: "Weight 2 lb",
+    dimensionUnitMode: "both",
+  });
+  assert.match(unitErrors.join("\n"), /must include both metric and imperial units/iu);
+
+  const overlongDimension = `Estimated: ${"1 x 1 x 1 cm ".repeat(42)}`;
+  assert.ok(Array.from(overlongDimension).length > 500);
+  const lengthErrors = getCreationListingDimensionFieldErrors(makeValidDraft({
+    packageDimensions: overlongDimension,
+    productDimensions: overlongDimension,
+    zhDisplay: {
+      packageDimensions: `预估：${"1 x 1 x 1 厘米 ".repeat(42)}`,
+      productDimensions: `预估：${"1 x 1 x 1 厘米 ".repeat(42)}`,
+    },
+  }), {
+    dimensionSpecs: "Weight 2 lb",
+    dimensionUnitMode: "metric",
+  });
+  assert.match(lengthErrors.join("\n"), /exceeds 500 characters/iu);
+});
+
+test("historical completed listings receive non-persistent dimension readback", () => {
+  const storedSet = {
+    setId: "set-historical-dimension-readback",
+    dimensionSpecs: [
+      "Length 194mm (7.64 in)",
+      "Length 76mm (2.99 in)",
+      "Length 5mm (0.2 in)",
+      "Length 46mm (1.81 in)",
+      "Width 35mm (1.38 in)",
+      "Width 26mm (1.02 in)",
+      "Width 34mm (1.34 in)",
+    ].join("\n"),
+    dimensionUnitMode: "both",
+    listingDrafts: [{
+      title: "1 Pack Door Latch",
+      status: "completed",
+      fiveBullets: [
+        "VERIFIED SIZE: The main body measures 194mm (7.64 in) long by 35mm (1.38 in) wide; the keeper measures 46mm (1.81 in) long by 34mm (1.34 in) wide",
+      ],
+      zhDisplay: {
+        title: "1 件装门插销",
+        fiveBullets: [
+          "核对尺寸：主体长194mm (7.64 in)、宽35mm (1.38 in)；扣件长46mm (1.81 in)、宽34mm (1.34 in)",
+        ],
+      },
+    }],
+  };
+
+  const hydratedSet = hydrateCreationListingDimensionsForRead(storedSet);
+  const hydratedDraft = hydratedSet.listingDrafts[0];
+
+  assert.notEqual(hydratedSet, storedSet);
+  assert.equal(Object.prototype.hasOwnProperty.call(storedSet.listingDrafts[0], "packageDimensions"), false);
+  assert.match(hydratedDraft.packageDimensions, /^Estimated:/u);
+  assert.match(hydratedDraft.zhDisplay.packageDimensions, /^预估：/u);
+  assert.equal(
+    hydratedDraft.productDimensions,
+    "Main body: 194 x 35 mm (7.64 x 1.38 in); Keeper: 46 x 34 mm (1.81 x 1.34 in)",
+  );
+  assert.equal(
+    hydratedDraft.zhDisplay.productDimensions,
+    "主体：194 × 35 mm（7.64 × 1.38 in）；扣件：46 × 34 mm（1.81 × 1.34 in）",
+  );
+  assert.doesNotMatch(hydratedDraft.productDimensions, /^Estimated:/u);
+  assert.doesNotMatch(hydratedDraft.productDimensions, /(?:^|[^\d])(?:76|5|26)\s*mm\b/iu);
+  assert.equal(hydratedDraft.title, "1 Pack Door Latch");
+});
+
+test("historical completed listings receive non-persistent sourced or estimated weight readback", () => {
+  const storedSet = {
+    setId: "set-historical-weight-readback",
+    dimensionSpecs: "Net Weight 350 g",
+    dimensionUnitMode: "both",
+    listingDrafts: [{
+      title: "1 Pack Door Latch",
+      status: "completed",
+      zhDisplay: { title: "1 件装门插销" },
+    }],
+  };
+
+  const hydratedSet = hydrateCreationListingDimensionsForRead(storedSet);
+  const hydratedDraft = hydratedSet.listingDrafts[0];
+
+  assert.equal(Object.prototype.hasOwnProperty.call(storedSet.listingDrafts[0], "productWeight"), false);
+  assert.equal(hydratedDraft.productWeight, "Weight: 350 g (12.35 oz)");
+  assert.equal(hydratedDraft.zhDisplay.productWeight, "重量：350 克（12.35 盎司）");
+  assert.equal(hydratedDraft.packageWeight, "Estimated: 350 g (12.35 oz)");
+  assert.equal(hydratedDraft.zhDisplay.packageWeight, "预估：350 克（12.35 盎司）");
+});
+
+test("historical component dimension readback rejects measurements absent from source evidence", () => {
+  const hydratedSet = hydrateCreationListingDimensionsForRead({
+    setId: "set-historical-unbacked-component-dimensions",
+    dimensionSpecs: "Length 194mm (7.64 in) Width 35mm (1.38 in)",
+    dimensionUnitMode: "both",
+    listingDrafts: [{
+      title: "1 Pack Door Latch",
+      status: "completed",
+      fiveBullets: [
+        "VERIFIED SIZE: The main body measures 194mm (7.64 in) long by 40mm (1.57 in) wide",
+      ],
+      zhDisplay: { title: "1 件装门插销" },
+    }],
+  });
+
+  assert.doesNotMatch(hydratedSet.listingDrafts[0].productDimensions, /40\s*mm|1\.57\s*in/iu);
+  assert.match(hydratedSet.listingDrafts[0].productDimensions, /194\s*mm.*35\s*mm/iu);
+});
+
+test("historical component dimensions retain axes that share a trailing unit", () => {
+  const hydratedSet = hydrateCreationListingDimensionsForRead({
+    setId: "set-historical-shared-unit-dimensions",
+    dimensionSpecs: "Main body: 194 x 35 mm; Keeper: 46 x 34 mm",
+    dimensionUnitMode: "metric",
+    listingDrafts: [{
+      title: "Door Latch",
+      status: "completed",
+      fiveBullets: ["Main body: 194 x 35 mm; Keeper: 46 x 34 mm"],
+      zhDisplay: { title: "门插销" },
+    }],
+  });
+
+  assert.equal(hydratedSet.listingDrafts[0].productDimensions, "Main body: 194 x 35 mm; Keeper: 46 x 34 mm");
+  assert.equal(hydratedSet.listingDrafts[0].zhDisplay.productDimensions, "主体：194 × 35 mm；扣件：46 × 34 mm");
+});
+
+test("mock listings keep sourced product dimensions and visibly mark missing estimates", () => {
+  const sourced = makeMockCreationListingDraft({
+    ...standardSource,
+    productName: "Door Latch",
+    dimensionSpecs: "Main body 194 mm x 35 mm; keeper 46 mm x 34 mm",
+    productDimensionEvidence: "Main body 194 mm x 35 mm; keeper 46 mm x 34 mm",
+    packageDimensionEvidence: "",
+  });
+  assert.doesNotMatch(sourced.productDimensions, /^Estimated:/iu);
+  assert.match(sourced.productDimensions, /194\s*mm/iu);
+  assert.match(sourced.packageDimensions, /^Estimated:/iu);
+  assert.match(sourced.zhDisplay.packageDimensions, /^预估：/u);
+
+  const estimated = makeMockCreationListingDraft({
+    ...standardSource,
+    dimensionSpecs: "Weight 42 g",
+    productDimensionEvidence: "",
+    packageDimensionEvidence: "",
+  });
+  assert.match(estimated.productDimensions, /^Estimated:/iu);
+  assert.match(estimated.packageDimensions, /^Estimated:/iu);
+  assert.match(estimated.zhDisplay.productDimensions, /^预估：/u);
+  assert.match(estimated.zhDisplay.packageDimensions, /^预估：/u);
+});
+
+test("mock listings keep sourced weights and estimate only the missing weight type", () => {
+  const sourced = makeMockCreationListingDraft({
+    ...standardSource,
+    dimensionSpecs: "Net Weight 350 g",
+    dimensionUnitMode: "both",
+  });
+
+  assert.equal(sourced.productWeight, "Weight: 350 g (12.35 oz)");
+  assert.equal(sourced.zhDisplay.productWeight, "重量：350 克（12.35 盎司）");
+  assert.equal(sourced.packageWeight, "Estimated: 350 g (12.35 oz)");
+  assert.equal(sourced.zhDisplay.packageWeight, "预估：350 克（12.35 盎司）");
+
+  const imperial = makeMockCreationListingDraft({
+    ...standardSource,
+    dimensionSpecs: "",
+    dimensionUnitMode: "imperial",
+  });
+  assert.equal(imperial.packageWeight, "Estimated: 12.35 oz");
+  assert.equal(imperial.productWeight, "Estimated: 8.82 oz");
+  assert.equal(imperial.zhDisplay.packageWeight, "预估：12.35 盎司");
+  assert.equal(imperial.zhDisplay.productWeight, "预估：8.82 盎司");
 });
 
 test("platform V1 prompt requests evidence-backed value copy and Amazon-style bullets", async () => {
@@ -156,6 +492,9 @@ test("platform V1 prompt requests evidence-backed value copy and Amazon-style bu
   assert.match(prompt, /must not claim that other products cannot solve the problem/i);
   assert.match(prompt, /better than competitors|comparative superiority/i);
   assert.match(prompt, /Non-title value completeness rule/i);
+  assert.match(prompt, /packageDimensions.*productDimensions/is);
+  assert.match(prompt, /Estimated:.*预估：/is);
+  assert.match(prompt, /must not reuse product dimensions as package dimensions/i);
   assert.match(prompt, /write 4-5 sellingPoints and 3-4 painPoints/i);
   assert.match(prompt, /recommendations are not quotas/i);
   assert.match(prompt, /complete, specific statement/i);
@@ -210,6 +549,84 @@ test("platform V1 prompt requests evidence-backed value copy and Amazon-style bu
   assert.match(prompt, /Do not write gift/i);
   assert.doesNotMatch(prompt, /senior ecommerce Listing strategist/i);
   assert.match(prompt, /Buyer decision evidence/i);
+});
+
+test("platform V1 accepts sourced product dimensions and requires explicit estimate markers for missing evidence", async () => {
+  const source = {
+    ...standardSource,
+    platformPolicyId: "etsy",
+    forceV1: true,
+    dimensionSpecs: "Product length 3.5 in (8.9 cm)",
+    productDimensionEvidence: "Product length 3.5 in (8.9 cm)",
+    packageDimensionEvidence: "",
+  };
+  const validDraft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    source,
+    fetchImpl: async () => new Response(JSON.stringify({
+      output_text: JSON.stringify(makeValidPlatformV1Draft()),
+    }), { status: 200 }),
+  });
+
+  assert.equal(validDraft.productDimensions, "3.5 in (8.9 cm) long");
+  assert.match(validDraft.packageDimensions, /^Estimated:/u);
+  assert.match(validDraft.zhDisplay.packageDimensions, /^预估：/u);
+
+  await assert.rejects(
+    requestCreationListingDraft({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      responsesModel: "gpt-5.4",
+      source: {
+        ...source,
+        dimensionSpecs: "Weight 42 g",
+        productDimensionEvidence: "",
+      },
+      fetchImpl: async () => new Response(JSON.stringify({
+        output_text: JSON.stringify(makeValidPlatformV1Draft({
+          packageDimensions: "6 x 4 x 2 in (15.2 x 10.2 x 5.1 cm)",
+          productDimensions: "5 x 2 x 1 in (12.7 x 5.1 x 2.5 cm)",
+          zhDisplay: {
+            packageDimensions: "15.2 x 10.2 x 5.1 厘米（6 x 4 x 2 英寸）",
+            productDimensions: "12.7 x 5.1 x 2.5 厘米（5 x 2 x 1 英寸）",
+          },
+        })),
+      }), { status: 200 }),
+    }),
+    /packageDimensions.*Estimated|productDimensions.*Estimated|预估/iu,
+  );
+});
+
+test("platform V1 rejects dimension fields over the shared 500-character ceiling", async () => {
+  const overlongDimension = `Estimated: ${"1 x 1 x 1 cm ".repeat(42)}`;
+  await assert.rejects(
+    requestCreationListingDraft({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      responsesModel: "gpt-5.4",
+      source: {
+        ...standardSource,
+        forceV1: true,
+        dimensionSpecs: "Weight 42 g",
+        productDimensionEvidence: "",
+        packageDimensionEvidence: "",
+        dimensionUnitMode: "metric",
+      },
+      fetchImpl: async () => new Response(JSON.stringify({
+        output_text: JSON.stringify(makeValidPlatformV1Draft({
+          packageDimensions: overlongDimension,
+          productDimensions: overlongDimension,
+          zhDisplay: {
+            packageDimensions: `预估：${"1 x 1 x 1 厘米 ".repeat(42)}`,
+            productDimensions: `预估：${"1 x 1 x 1 厘米 ".repeat(42)}`,
+          },
+        })),
+      }), { status: 200 }),
+    }),
+    /exceeds 500 characters/iu,
+  );
 });
 
 test("listing agent derives 2 Pack from grouped subject units when bundle count is one", async () => {
@@ -448,6 +865,10 @@ test("listing agent sends a strict JSON schema request with prompt guardrails", 
   assert.ok(calls[0].body.text.format.schema.required.includes("zhDisplay"));
   assert.ok(calls[0].body.text.format.schema.properties.zhDisplay.required.includes("warnings"));
   assert.ok(calls[0].body.text.format.schema.properties.zhDisplay.required.includes("missingInfo"));
+  assert.ok(calls[0].body.text.format.schema.required.includes("packageDimensions"));
+  assert.ok(calls[0].body.text.format.schema.required.includes("productDimensions"));
+  assert.ok(calls[0].body.text.format.schema.required.includes("packageWeight"));
+  assert.ok(calls[0].body.text.format.schema.required.includes("productWeight"));
   assert.match(calls[0].body.input, /Amazon US English listing writer/);
   assert.match(calls[0].body.input, /Every field and every bullet must be 500 characters or fewer/);
   assert.match(calls[0].body.input, /Title formula: start with 2 Pack/i);
@@ -459,6 +880,9 @@ test("listing agent sends a strict JSON schema request with prompt guardrails", 
   assert.match(calls[0].body.input, /sellingPoints and painPoints must each be 500 English characters or fewer in total/);
   assert.match(calls[0].body.input, /zhDisplay/);
   assert.match(calls[0].body.input, /warnings and missingInfo/);
+  assert.match(calls[0].body.input, /packageDimensions.*productDimensions/is);
+  assert.match(calls[0].body.input, /packageWeight.*productWeight/is);
+  assert.match(calls[0].body.input, /Estimated:.*预估：/is);
   assert.ok(calls[0].body.text.format.schema.properties.zhDisplay);
   assert.match(calls[0].body.input, /Do not use the phrase "Listing Draft"/);
   assert.match(calls[0].body.input, /search-friendly structure/);
@@ -788,9 +1212,21 @@ test("listing agent retries when imperial mode output includes metric equivalent
     const draft = callCount === 1
       ? makeValidDraft({
         title: "1 Pack Fishing Lure Electric Swimbait 5.12 in / 130 mm 1.23 oz / 35 g",
+        packageDimensions: "Estimated: 6 x 4 x 2 in",
+        productDimensions: "5.12 in long",
+        zhDisplay: {
+          packageDimensions: "预估：6 x 4 x 2 英寸",
+          productDimensions: "长度 5.12 英寸",
+        },
       })
       : makeValidDraft({
         title: "1 Pack Fishing Lure Electric Swimbait Slow Sinking Bass Bait",
+        packageDimensions: "Estimated: 6 x 4 x 2 in",
+        productDimensions: "5.12 in long",
+        zhDisplay: {
+          packageDimensions: "预估：6 x 4 x 2 英寸",
+          productDimensions: "长度 5.12 英寸",
+        },
       });
     return new Response(JSON.stringify({ output_text: JSON.stringify(draft) }), { status: 200 });
   };
@@ -908,6 +1344,10 @@ test("application Listing generation uses one platform-aware V1 request and remo
       traffic: [],
       descriptive: [],
     },
+    packageDimensions: "Estimated: 20 x 15 x 8 cm (7.9 x 5.9 x 3.1 in)",
+    productDimensions: "Estimated: 18 x 12 x 6 cm (7.1 x 4.7 x 2.4 in)",
+    packageWeight: "Estimated: 350 g (12.35 oz)",
+    productWeight: "Estimated: 250 g (8.82 oz)",
     zhDisplay: {
       title: "Acme 旅行水瓶",
       sellingPoints: [
@@ -936,6 +1376,10 @@ test("application Listing generation uses one platform-aware V1 request and remo
         traffic: [],
         descriptive: [],
       },
+      packageDimensions: "预估：20 x 15 x 8 厘米（7.9 x 5.9 x 3.1 英寸）",
+      productDimensions: "预估：18 x 12 x 6 厘米（7.1 x 4.7 x 2.4 英寸）",
+      packageWeight: "预估：350 克（12.35 盎司）",
+      productWeight: "预估：250 克（8.82 盎司）",
     },
   };
 
@@ -996,6 +1440,8 @@ test("platform V1 sanitizes unsupported low-risk terms and accepts recoverable f
       traffic: ["black"],
       descriptive: ["rechargeable"],
     },
+    packageDimensions: "Estimated: 20 x 15 x 8 cm (7.9 x 5.9 x 3.1 in)",
+    productDimensions: "Estimated: 18 x 12 x 6 cm (7.1 x 4.7 x 2.4 in)",
     zhDisplay: {
       title: "1 件装路亚鱼饵",
       sellingPoints: ["鱼饵主体和可见分区便于直接查看。"],
@@ -1009,6 +1455,8 @@ test("platform V1 sanitizes unsupported low-risk terms and accepts recoverable f
         traffic: [],
         descriptive: [],
       },
+      packageDimensions: "预估：20 x 15 x 8 厘米（7.9 x 5.9 x 3.1 英寸）",
+      productDimensions: "预估：18 x 12 x 6 厘米（7.1 x 4.7 x 2.4 英寸）",
     },
   };
   let requestCount = 0;
@@ -1033,6 +1481,191 @@ test("platform V1 sanitizes unsupported low-risk terms and accepts recoverable f
   assert.match(draft.painPoints[0], /\?/u);
   assert.ok(draft.title);
   assert.ok(draft.description);
+});
+
+test("platform V1 removes unsupported English and Chinese compatibility claims without failing", async () => {
+  const source = {
+    ...standardSource,
+    platformPolicyId: "etsy",
+    forceV1: true,
+  };
+  const payload = makeValidPlatformV1Draft({
+    title: "2 Pack Fishing Lures Compatible with Reel X.",
+    description: "Fishing lures compatible with Reel X. Supplied pack details remain available.",
+    backendSearchTerms: "fishing lure compatible with Reel X",
+    zhDisplay: {
+      title: "2 件装路亚鱼饵兼容 Reel X。",
+      description: "路亚鱼饵兼容 Reel X。包装信息仍可查看。",
+      backendSearchTerms: "路亚鱼饵兼容 Reel X",
+    },
+  });
+  let requestCount = 0;
+
+  const draft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    source,
+    fetchImpl: async () => {
+      requestCount += 1;
+      return new Response(JSON.stringify({ output_text: JSON.stringify(payload) }), { status: 200 });
+    },
+  });
+
+  assert.equal(requestCount, 1);
+  assert.equal(draft.status, "completed");
+  assert.doesNotMatch(visibleDraftText(draft), /compatible\s+with|Reel X/iu);
+  assert.doesNotMatch(visibleChineseDisplayText(draft), /兼容|Reel X/u);
+  assert.match(draft.title, /Fishing Lures/i);
+  assert.match(draft.zhDisplay.title, /路亚鱼饵/u);
+});
+
+test("platform V1 removes every unsupported blocking claim category across multilingual fields", async () => {
+  const source = {
+    ...standardSource,
+    platformPolicyId: "etsy",
+    forceV1: true,
+  };
+  const payload = makeValidPlatformV1Draft({
+    title: "2 Pack Best Seller Fishing Lures",
+    sellingPoints: [
+      "Fishing lure. FDA certified product.",
+      "Fishing lure with five-star reviews.",
+      "Fishing lure better than other products.",
+      "Medical grade fishing lure.",
+      "Fishing lure with lifetime warranty.",
+      "Stainless steel body fishing lure.",
+      "Fishing lure with 12-hour battery runtime.",
+      "Guaranteed fishing lure with refund.",
+      "最高",
+      "최고",
+      "El mejor",
+    ],
+    zhDisplay: {
+      title: "2 件装最佳路亚鱼饵",
+      sellingPoints: [
+        "路亚鱼饵。FDA认证产品。",
+        "路亚鱼饵获得五星好评。",
+        "路亚鱼饵优于其他竞品。",
+        "医疗级路亚鱼饵。",
+        "路亚鱼饵提供终身质保。",
+        "不锈钢材质路亚鱼饵。",
+        "路亚鱼饵具备12小时电池续航。",
+        "保证路亚鱼饵支持退款。",
+      ],
+    },
+  });
+
+  const draft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    source,
+    fetchImpl: async () => new Response(JSON.stringify({
+      output_text: JSON.stringify(payload),
+    }), { status: 200 }),
+  });
+
+  assert.equal(draft.status, "completed");
+  assert.doesNotMatch(
+    visibleDraftText(draft),
+    /best seller|FDA certified|five-star|better than other products|medical grade|lifetime warranty|stainless steel|12-hour battery runtime|guaranteed|refund|最高|최고|el mejor/iu,
+  );
+  assert.doesNotMatch(
+    visibleChineseDisplayText(draft),
+    /最佳|FDA认证|五星好评|优于其他竞品|医疗级|终身质保|不锈钢|12小时电池续航|保证|退款/u,
+  );
+});
+
+test("platform V1 preserves an exact-evidence compatibility claim", async () => {
+  const source = {
+    ...standardSource,
+    platformPolicyId: "etsy",
+    forceV1: true,
+    productDescription: "Compatible with Reel X.",
+  };
+  const payload = makeValidPlatformV1Draft({
+    description: "Compatible with Reel X.",
+  });
+
+  const draft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    source,
+    fetchImpl: async () => new Response(JSON.stringify({
+      output_text: JSON.stringify(payload),
+    }), { status: 200 }),
+  });
+
+  assert.match(draft.description, /Compatible with Reel X/iu);
+});
+
+test("platform V1 does not fail on blocking words stored only in non-public metadata", async () => {
+  const source = {
+    ...standardSource,
+    platformPolicyId: "etsy",
+    forceV1: true,
+    productName: "Fishing Lure",
+    skuTitle: "Best Seller Fishing Lure",
+  };
+
+  const draft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    source,
+    fetchImpl: async () => new Response(JSON.stringify({
+      output_text: JSON.stringify(makeValidPlatformV1Draft()),
+    }), { status: 200 }),
+  });
+
+  assert.equal(draft.status, "completed");
+  assert.doesNotMatch(visibleDraftText(draft), /best seller/iu);
+});
+
+test("platform V1 repairs required bilingual text emptied by blocking-claim cleanup", async () => {
+  const source = {
+    ...standardSource,
+    platformPolicyId: "etsy",
+    forceV1: true,
+    productName: "Fishing Lure",
+    skuTitle: "Fishing Lure",
+  };
+  const payload = makeValidPlatformV1Draft({
+    title: "Best Seller",
+    sellingPoints: [],
+    painPoints: [],
+    fiveBullets: [],
+    description: "Guaranteed",
+    backendSearchTerms: "",
+    keywordBuckets: { exact: [], longTail: [], traffic: [], descriptive: [] },
+    zhDisplay: {
+      title: "最佳",
+      sellingPoints: [],
+      painPoints: [],
+      fiveBullets: [],
+      description: "保证",
+      backendSearchTerms: "",
+      keywordBuckets: { exact: [], longTail: [], traffic: [], descriptive: [] },
+    },
+  });
+
+  const draft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    source,
+    fetchImpl: async () => new Response(JSON.stringify({
+      output_text: JSON.stringify(payload),
+    }), { status: 200 }),
+  });
+
+  assert.equal(draft.title, "Fishing Lure");
+  assert.equal(draft.description, "Fishing Lure");
+  assert.equal(draft.zhDisplay.title, "商品");
+  assert.equal(draft.zhDisplay.description, "商品");
+  assert.doesNotMatch(`${visibleDraftText(draft)}\n${visibleChineseDisplayText(draft)}`, /best seller|guaranteed|最佳|保证/iu);
 });
 
 test("platform V1 still rejects missing bilingual body content after low-risk cleanup", async () => {
@@ -1099,6 +1732,8 @@ test("platform V1 retains supported buyer value across non-title fields", async 
       traffic: ["drink bottle"],
       descriptive: ["compact bottle"],
     },
+    packageDimensions: "Estimated: 6 x 4 x 10 in (15.2 x 10.2 x 25.4 cm)",
+    productDimensions: "3.5 in (8.9 cm) long",
     zhDisplay: {
       title: "1 件装旅行水瓶 翻盖有助于在饮水间隔保持瓶口覆盖",
       sellingPoints: [
@@ -1127,6 +1762,8 @@ test("platform V1 retains supported buyer value across non-title fields", async 
         traffic: ["饮水瓶"],
         descriptive: ["紧凑水瓶"],
       },
+      packageDimensions: "预估：15.2 x 10.2 x 25.4 厘米（6 x 4 x 10 英寸）",
+      productDimensions: "长度 8.9 厘米（3.5 英寸）",
     },
   };
   const calls = [];
@@ -1215,62 +1852,33 @@ test("platform V1 retains supported buyer value across non-title fields", async 
     ...titleValuePayload,
     sellingPoints: ["Unlike competitors, this bottle solves the opening-exposure problem better than other products."],
   };
-  await assert.rejects(
-    requestCreationListingDraft({
-      baseUrl: "https://example.test/v1",
-      apiKey: "test-key",
-      responsesModel: "gpt-5.4",
-      source: {
-        ...standardSource,
-        platformPolicyId: "etsy",
-        forceV1: true,
-        productName: "Travel Bottle",
-        skuBundleCount: 1,
-        productDescription: "Travel bottle with a flip lid that helps keep the opening covered between sips.",
-        sellingPoints: ["Flip lid helps keep the opening covered between sips."],
-      },
-      fetchImpl: async () => new Response(JSON.stringify({
-        output_text: JSON.stringify(unsupportedComparisonPayload),
-      }), { status: 200 }),
-    }),
-    /Listing generation failed validation/i,
+  const sanitizedComparisonDraft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    source: {
+      ...standardSource,
+      platformPolicyId: "etsy",
+      forceV1: true,
+      productName: "Travel Bottle",
+      skuBundleCount: 1,
+      productDescription: "Travel bottle with a flip lid that helps keep the opening covered between sips.",
+      sellingPoints: ["Flip lid helps keep the opening covered between sips."],
+    },
+    fetchImpl: async () => new Response(JSON.stringify({
+      output_text: JSON.stringify(unsupportedComparisonPayload),
+    }), { status: 200 }),
+  });
+  assert.doesNotMatch(
+    visibleDraftText(sanitizedComparisonDraft),
+    /unlike competitors|better than other products/iu,
   );
 
   for (const [englishComparison, chineseComparison] of [
     ["Most alternatives leave the opening exposed.", titleValuePayload.zhDisplay.sellingPoints[0]],
     [titleValuePayload.sellingPoints[0], "普通同类产品只有单一开口保护方式。"],
   ]) {
-    await assert.rejects(
-      requestCreationListingDraft({
-        baseUrl: "https://example.test/v1",
-        apiKey: "test-key",
-        responsesModel: "gpt-5.4",
-        source: {
-          ...standardSource,
-          platformPolicyId: "etsy",
-          forceV1: true,
-          productName: "Travel Bottle",
-          skuBundleCount: 1,
-          productDescription: "Compact travel bottle with a slim body for a daily carry bag, commuting, or walking. The flip lid helps keep the opening covered between sips. One bottle is included.",
-          sellingPoints: ["Compact profile", "Slim body", "Flip lid"],
-        },
-        fetchImpl: async () => new Response(JSON.stringify({
-          output_text: JSON.stringify({
-            ...titleValuePayload,
-            sellingPoints: [englishComparison, ...titleValuePayload.sellingPoints.slice(1)],
-            zhDisplay: {
-              ...titleValuePayload.zhDisplay,
-              sellingPoints: [chineseComparison, ...titleValuePayload.zhDisplay.sellingPoints.slice(1)],
-            },
-          }),
-        }), { status: 200 }),
-      }),
-      /Listing generation failed validation/i,
-    );
-  }
-
-  await assert.rejects(
-    requestCreationListingDraft({
+    const sanitizedComparisonLanguageDraft = await requestCreationListingDraft({
       baseUrl: "https://example.test/v1",
       apiKey: "test-key",
       responsesModel: "gpt-5.4",
@@ -1280,18 +1888,46 @@ test("platform V1 retains supported buyer value across non-title fields", async 
         forceV1: true,
         productName: "Travel Bottle",
         skuBundleCount: 1,
-        productDescription: "Travel bottle with a flip lid that helps keep the opening covered between sips.",
-        sellingPoints: ["Flip lid helps keep the opening covered between sips."],
+        productDescription: "Compact travel bottle with a slim body for a daily carry bag, commuting, or walking. The flip lid helps keep the opening covered between sips. One bottle is included.",
+        sellingPoints: ["Compact profile", "Slim body", "Flip lid"],
       },
       fetchImpl: async () => new Response(JSON.stringify({
         output_text: JSON.stringify({
           ...titleValuePayload,
-          title: "1 Pack Best Seller Travel Bottle With Guaranteed Performance",
+          sellingPoints: [englishComparison, ...titleValuePayload.sellingPoints.slice(1)],
+          zhDisplay: {
+            ...titleValuePayload.zhDisplay,
+            sellingPoints: [chineseComparison, ...titleValuePayload.zhDisplay.sellingPoints.slice(1)],
+          },
         }),
       }), { status: 200 }),
-    }),
-    /Listing generation failed validation/i,
-  );
+    });
+    assert.doesNotMatch(visibleDraftText(sanitizedComparisonLanguageDraft), /most alternatives leave/iu);
+    assert.doesNotMatch(visibleChineseDisplayText(sanitizedComparisonLanguageDraft), /普通同类产品只有/u);
+  }
+
+  const sanitizedTitleDraft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    source: {
+      ...standardSource,
+      platformPolicyId: "etsy",
+      forceV1: true,
+      productName: "Travel Bottle",
+      skuBundleCount: 1,
+      productDescription: "Travel bottle with a flip lid that helps keep the opening covered between sips.",
+      sellingPoints: ["Flip lid helps keep the opening covered between sips."],
+    },
+    fetchImpl: async () => new Response(JSON.stringify({
+      output_text: JSON.stringify({
+        ...titleValuePayload,
+        title: "1 Pack Best Seller Travel Bottle With Guaranteed Performance",
+      }),
+    }), { status: 200 }),
+  });
+  assert.match(sanitizedTitleDraft.title, /Travel Bottle/iu);
+  assert.doesNotMatch(sanitizedTitleDraft.title, /Best Seller|Guaranteed/iu);
 });
 
 test("explicit Platform V1 mock uses bounded buyer decision evidence for value copy", async () => {
@@ -1571,6 +2207,8 @@ test("platform V1 accepts interrogative pain points in either display language",
       traffic: ["freshwater bait"],
       descriptive: ["compact blue lure"],
     },
+    packageDimensions: "Estimated: 6 x 4 x 2 in (15.2 x 10.2 x 5.1 cm)",
+    productDimensions: "3.5 in (8.9 cm) long",
     zhDisplay: {
       title: "2件装 蓝色紧凑型路亚鱼饵",
       sellingPoints: ["两个蓝色路亚鱼饵均为紧凑型饵身。"],
@@ -1590,6 +2228,8 @@ test("platform V1 accepts interrogative pain points in either display language",
         traffic: ["淡水鱼饵"],
         descriptive: ["蓝色紧凑鱼饵"],
       },
+      packageDimensions: "预估：15.2 x 10.2 x 5.1 厘米（6 x 4 x 2 英寸）",
+      productDimensions: "长度 8.9 厘米（3.5 英寸）",
     },
   };
   const cases = [

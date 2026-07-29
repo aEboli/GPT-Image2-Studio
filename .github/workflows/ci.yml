@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run serial test suite
+        run: npm test
+
+      - name: Check shared browser modules
+        run: npm run sync:public-lib -- --check
+
+      - name: Check release facts
+        run: npm run check:release
+
+      - name: Build Cloudflare Pages bundle
+        run: npm run build:pages
+
+      - name: Validate OpenSpec
+        run: npx --no-install openspec validate --all --strict
+
+      - name: Check whitespace
+        run: git diff --check
+
+      - name: Reject tracked generated drift
+        run: git diff --exit-code

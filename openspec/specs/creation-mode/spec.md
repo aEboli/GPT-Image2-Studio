@@ -168,15 +168,35 @@ The system SHALL allow Creation Mode to upload its own reference images and choo
 - **AND** generated item prompts include any applied reference-image analysis notes
 
 ### Requirement: Target language controls marketing prompts
-The system SHALL apply the selected target language to every Creation Mode item prompt and marketing copy while preserving product names, model names, numbers, and units from the user's product input. The system SHALL support Simplified Chinese, English, Japanese, Korean, French, German, and Spanish presets.
+For ordinary Creation carousel and SKU items, the system SHALL apply the selected target language to newly added marketing copy outside the supplied physical product or packaging subject while preserving product names, model names, numbers, and units from the user's product input. The system SHALL support Simplified Chinese, English, Japanese, Korean, French, German, and Spanish presets.
+
+The target language MUST NOT translate, transliterate, rewrite, correct, localize, redraw, replace, remove, cover, or restyle any existing content on a supplied physical product or packaging subject. Protected subject content SHALL include patterns, artwork, illustrations, symbols, Logo and brand marks, printed, engraved, embossed, or embroidered text, exact characters and spelling, writing system, original language, placement, orientation, proportions, and colors. Existing subject content in a different language SHALL remain visible in that original language and SHALL be an explicit exception to target-language-only rules for newly added text. Source-card overlays outside the physical subject, including badges, prices, captions, and watermarks, SHALL NOT become protected subject content solely because they are present in a reference image.
+
+Local generation, Worker generation, and repair SHALL enforce the same protection at runtime for current plans and historical frozen prompts. The dedicated `infographic-rebuild` item SHALL remain outside this ordinary-item rule and SHALL continue following its source-only target-language translation contract.
 
 #### Scenario: User selects English target language
-- **WHEN** the user starts a Creation Mode set with English selected
-- **THEN** each generated item prompt instructs the image generator to use concise English marketing copy for image text
+- **WHEN** the user starts an ordinary Creation Mode set with English selected
+- **THEN** each eligible generated item prompt instructs the image generator to use concise English for newly added marketing copy outside the physical subject
+- **AND** it does not treat the target language as permission to translate or redraw existing subject-surface content
 
 #### Scenario: User selects Chinese target language
-- **WHEN** the user starts a Creation Mode set with Chinese selected
-- **THEN** each generated item prompt instructs the image generator to use concise Simplified Chinese marketing copy for image text
+- **WHEN** the user starts an ordinary Creation Mode set with Chinese selected
+- **THEN** each eligible generated item prompt instructs the image generator to use concise Simplified Chinese for newly added marketing copy outside the physical subject
+- **AND** it preserves any different original language already printed or rendered on the physical subject
+
+#### Scenario: Product packaging carries original artwork and foreign-language text
+- **WHEN** a carousel or SKU item uses a supplied package subject whose surface contains patterns, illustrations, symbols, branding, and text in a language different from the selected target language
+- **THEN** the prompt requires those subject-surface elements, exact characters, spelling, writing system, language, placement, orientation, proportions, and colors to remain unchanged
+- **AND** only new captions, callouts, labels, or marketing typography outside the package use the selected target language
+
+#### Scenario: Historical frozen prompt is generated or repaired
+- **WHEN** Local, Worker, or repair executes an ordinary saved item whose frozen prompt predates the subject-content protection rule
+- **THEN** the runtime prompt adds the same subject-content protection and target-language scope without requiring replanning
+
+#### Scenario: Dedicated infographic rebuild translates source text
+- **WHEN** an `infographic-rebuild` item is generated with a selected target language
+- **THEN** its canonical source-only prompt continues requiring complete faithful translation of translatable source text
+- **AND** the ordinary carousel and SKU subject-content rule is not appended to that dedicated prompt
 
 ### Requirement: Creation assets are stored under the creation folder
 The system SHALL save Creation Mode generated images under `Pictures/YYYY-MM/MM-DD/YYYY-MM-DD-creation/<set-folder>/`, which is beside the prompt, style-transfer, reference-analysis, image-decomposition, and PPT folders for the same date.
@@ -467,32 +487,6 @@ The system SHALL allow users to override platform-derived target language, defau
 - **AND** it recomputes the profile, category, and reference-derived plan
 - **AND** it preserves product information, category, dimensions, references, Logo, SKU, output format, and model/API configuration
 
-### Requirement: Platform switching is confirmed and race-safe
-The system SHALL treat a platform change as a confirmable state transaction. Confirming SHALL clear platform-related overrides and apply the new profile while preserving product evidence; cancelling SHALL restore the previous platform and all previous field values. Reference analysis results SHALL only apply to the platform and category snapshot that initiated them.
-
-#### Scenario: User confirms a platform switch
-- **WHEN** the user changes from one platform to another and confirms the warning
-- **THEN** the system resets image types, order, enabled carousel count, automatic language, automatic ratios, automatic resolutions, composition strategy, and platform-related overrides
-- **AND** it preserves product name, description, selling points, category, dimensions, reference files and metadata, Logo, SKU, output format, and model/API configuration
-- **AND** it immediately exposes the newly resolved platform plan for preview
-
-#### Scenario: User cancels a platform switch
-- **WHEN** the user changes the platform but cancels the warning
-- **THEN** the prior platform selection is restored
-- **AND** no form value, override, reference state, plan preview, or queued set snapshot changes
-
-#### Scenario: Old reference analysis finishes after a switch
-- **WHEN** a reference analysis request was started for an earlier platform or category
-- **AND** its response arrives after the current platform or category has changed
-- **THEN** the response is ignored and cannot alter product suggestions, reference roles, notes, category, selected slots, or plan preview
-
-#### Scenario: 用户应用参考图分析后刷新冻结规划证据
-- **WHEN** 用户点击应用当前参考图分析建议，且建议被写入参考图角色与说明
-- **THEN** 浏览器从已应用的参考图角色重建 `platformReferenceCoverage` 和派生 `platformEvidence`
-- **AND** 已冻结的套图级覆盖、逐图覆盖和类目信号保持不变，旧的 coverage/evidence 不会覆盖新应用结果
-- **AND** 材质、包装和尺寸参考角色可恢复相应的 `material-proof`、`in-box` 和 `dimension-fit` 类型
-- **AND** 未经用户应用的原始识别结果不直接成为商品事实证据
-
 ### Requirement: Creation generation uses per-item effective parameters consistently
 The system SHALL include effective ratio, resolution tier, resolved size, and target language on each planned item. Local generation and Cloudflare Worker generation SHALL resolve and submit those values per item, and the same planning payload SHALL produce equivalent plans in both environments.
 
@@ -574,7 +568,7 @@ The system SHALL omit or replace image types that require unavailable factual ev
 - **AND** it does not silently display or submit a named-platform plan built from stale duplicated defaults
 
 ### Requirement: Creation records display and expose Listing drafts in the old-style format
-The Creation record UI SHALL preserve every current Listing draft in the fixed field order 标题、卖点、痛点、五点描述、商品描述、后台搜索词、关键词分组 and SHALL display all seven fields continuously on one page without content-group or language-view controls. Within every field or list item, the UI SHALL display the English value first and its corresponding Simplified Chinese value immediately below it when that localized value exists; this bilingual comparison SHALL remain vertical at every supported viewport width. Every visible English value SHALL remain an independent copy target that copies only that English value, and every visible Simplified Chinese value SHALL remain an independent copy target that copies only that Chinese value. Field-level English and Chinese copy controls SHALL copy the complete corresponding language value for that field, while full-copy and export actions SHALL preserve the complete bilingual field mapping. Generate, full-copy, and export controls SHALL remain available from a compact Listing workspace toolbar while the user reviews a long draft. All copy and export actions SHALL be immediately available without validation or review gating.
+The Creation record UI SHALL preserve every current Listing draft in the fixed field order 标题、卖点、痛点、五点描述、商品描述、后台搜索词、关键词分组 and SHALL display all seven fields continuously on one page without content-group or language-view controls. Within every field or list item, the UI SHALL display the English value first and its corresponding Simplified Chinese value immediately below it when that localized value exists; this bilingual comparison SHALL remain vertical at every supported viewport width. English and Simplified Chinese values belonging to the same list item SHALL form one compact visual pair. A divider SHALL appear only between adjacent list items, SHALL follow the complete bilingual pair rather than separate its two languages, and SHALL match the rendered width of the longer value in that pair without exceeding the available content width. Every visible English value SHALL remain an independent copy target that copies only that English value, and every visible Simplified Chinese value SHALL remain an independent copy target that copies only that Chinese value. Field-level English and Chinese copy controls SHALL copy the complete corresponding language value for that field, while full-copy and export actions SHALL preserve the complete bilingual field mapping. Generate, full-copy, and export controls SHALL remain available from a compact Listing workspace toolbar while the user reviews a long draft. All copy and export actions SHALL be immediately available without validation or review gating.
 
 #### Scenario: User opens a newly generated Listing draft
 - **WHEN** a completed Listing is rendered in a Creation record
@@ -778,29 +772,40 @@ The system SHALL update the current Creation record view from the successful bat
 - **THEN** the browser requests the complete Creation set list and reconciles its local record state
 
 ### Requirement: SKU color labels cover visible characteristic component colors
-Each reliable complete visible SKU unit SHALL have one ordered characteristic-color label. The label SHALL include every clear subject color, including neutral parts shared by variants, and a short part name when needed. Multiple colors for one unit SHALL remain one structured value. Backgrounds, shadows, highlights, reflections, source-card text, and uncertain colors SHALL NOT be evidence. The SKU prompt SHALL render the whole label below its unit in the target language.
+Each reliable complete visible SKU unit SHALL have one ordered pure-color label. The label SHALL contain only reliable color names. Its characters MUST be limited to Unicode letters, numbers, spaces, and a single hyphen located between letters or numbers inside a recognized compound color name. Multiple separate colors inside one unit label SHALL be separated by single spaces only. A hyphen MUST NOT separate independent colors. The label MUST NOT contain commas, quotation marks, slashes, brackets, list markers, or any other punctuation, and it MUST NOT contain part names, materials, finishes, styles, model identifiers, product names, sizes, marketing words, or any other non-color text. Neutral colors shared by variants SHALL remain eligible, but the associated part names SHALL be removed. Multiple colors for one unit SHALL remain one structured value, while separate complete units SHALL remain separate ordered array values. Backgrounds, shadows, highlights, reflections, source-card text, and uncertain colors SHALL NOT be evidence. The system SHALL normalize analyzed, submitted, and historical labels before planning, and the SKU prompt SHALL render only the normalized color label below its unit in the target language.
 
 #### Scenario: One subject has several characteristic component colors
 - **WHEN** one complete SKU subject visibly has a brown exterior, a black strap, and silver lenses
-- **THEN** reference analysis returns one color-label value for that product unit covering brown, black, and silver lenses
-- **AND** the planned SKU prompt requests one complete label below the subject containing all three characteristic colors
+- **THEN** reference analysis returns one color-label value `brown black silver` for that product unit
+- **AND** the planned SKU prompt requests that exact color-only label below the subject without `exterior`, `strap`, `lenses`, quotation marks, commas, or other non-color characters
+
+#### Scenario: A color name originally contains a hyphen
+- **WHEN** a reliable recognized compound SKU color is supplied as `off-white`
+- **THEN** the system preserves the visible label as `off-white`
+- **AND** the internal hyphen remains because it belongs to the color name
+- **AND** a hyphen used only between separate colors is removed and replaced by the normal single-space separator
 
 #### Scenario: Grouped subjects each have multi-color labels
-- **WHEN** one SKU subject image contains multiple complete visible product units and each unit has several characteristic component colors
-- **THEN** reference analysis returns exactly one ordered label value per complete product unit
-- **AND** commas or component qualifiers inside one label do not create additional product-unit labels
-- **AND** two units with the same characteristic colors retain two ordered label values instead of being deduplicated
-- **AND** the planned SKU prompt places each complete label below its corresponding unit
+- **WHEN** one SKU subject image contains multiple complete visible product units and each unit has several characteristic colors
+- **THEN** reference analysis returns exactly one ordered color-only label value per complete product unit
+- **AND** each array value uses spaces between separate colors while retaining any recognized compound color's internal hyphen
+- **AND** two units with the same colors retain two ordered label values instead of being deduplicated
+- **AND** the planned SKU prompt places each complete label below its corresponding product unit without adding quotes, commas, bullets, indexes, or brackets to the visible text
 
 #### Scenario: A visible neutral component is shared across variants
 - **WHEN** each visible variant uses the same black strap or gray frame as a physical part of the sellable subject
-- **THEN** the shared neutral component color remains eligible for every applicable characteristic-color label
-- **AND** it is not discarded merely because all variants share it
+- **THEN** `black` or `gray` remains eligible for every applicable color label
+- **AND** `strap`, `frame`, and other part names do not appear in the visible label
+
+#### Scenario: Submitted label contains non-color qualifiers
+- **WHEN** analysis, browser input, or a historical record supplies a label such as `matte brown leather, black strap, silver lenses`
+- **THEN** the system normalizes the label to `brown black silver` before building the SKU prompt
+- **AND** no removed word or disallowed punctuation is rendered below the subject
 
 #### Scenario: Color evidence is unsafe
-- **WHEN** a possible color comes only from the background, shadow, highlight, environmental reflection, source-card text, or an unclear region
-- **THEN** reference analysis excludes that possible color from the characteristic-color label
-- **AND** if no reliable subject color remains, the planner does not request a guessed color label
+- **WHEN** a possible color comes only from the background, shadow, highlight, environmental reflection, source-card text, an unclear region, or a value that cannot be reliably normalized as a color
+- **THEN** reference analysis and local normalization exclude that possible color from the label
+- **AND** if no reliable subject color remains, the planner does not request a guessed or fallback label
 
 ### Requirement: Structured non-sensitive audience analysis
 The system SHALL let Creation reference analysis return a normalized `audienceStrategy` containing a product-use or purchase-context audience, purchase motivations, purchase objections, desired outcome, evidence basis, confidence, and source. The analysis MUST use only supplied product facts, visible product/use evidence, platform context, and category context, and MUST NOT infer protected or sensitive personal attributes from people in reference images.
@@ -947,3 +952,208 @@ Requirements that normally execute a frozen or saved item prompt unchanged SHALL
 - **WHEN** a frozen plan or saved record contains an `infographic-rebuild` prompt with product, platform, language, visual-style, Logo, audience, conversion, or reference-note instructions
 - **THEN** Local generation, Worker generation, and Local repair execute the canonical source-only reconstruction prompt instead
 - **AND** they retain the item's saved model route, model, ratio, size, quality, format, reasoning, source identity, and compatible conversion metadata
+
+### Requirement: Creation result cards expose orange hover feedback
+
+The system SHALL show an orange boundary highlight around both current and saved Creation result cards while a pointing device hovers the card. The highlight SHALL transition smoothly between resting and active states and SHALL NOT change the card dimensions, grid placement, or surrounding layout. A card containing keyboard focus SHALL expose the same boundary feedback. When the pointer remains stationary over a highlighted Creation result card for 30 seconds, the system SHALL emit one outward orange ripple without changing layout. Continued pointer inactivity SHALL repeat the ripple at 30-second intervals, while any pointer movement SHALL cancel the active ripple and restart the full interval. The system SHALL suppress the ripple when reduced motion is requested.
+
+#### Scenario: Pointer enters and leaves a Creation result card
+
+- **WHEN** the pointer enters a current or saved Creation result card
+- **THEN** the card border and outer glow become orange without moving or resizing the card
+- **AND** when the pointer leaves, the card transitions back to its resting border
+
+#### Scenario: Keyboard focus enters a Creation result card
+
+- **WHEN** a keyboard user focuses an interactive control inside a Creation result card
+- **THEN** the card displays the same orange boundary highlight without changing the layout
+
+#### Scenario: Stationary pointer triggers a repeating ripple
+
+- **WHEN** the pointer remains over a current or saved Creation result card without moving for 30 seconds
+- **THEN** one orange ripple expands outward from that card boundary and fades without moving or resizing the card
+- **AND** while the pointer remains stationary, another ripple is emitted after each additional 30-second interval
+
+#### Scenario: Pointer movement restarts the idle interval
+
+- **WHEN** the pointer moves before or during an idle ripple
+- **THEN** any active ripple is removed immediately
+- **AND** the next ripple cannot occur until another uninterrupted 30-second interval has elapsed over a Creation result card
+
+#### Scenario: Reduced motion suppresses the ripple
+
+- **WHEN** the operating system requests reduced motion
+- **THEN** the static orange hover or focus highlight remains available
+- **AND** the outward idle ripple is not animated
+
+### Requirement: 套图图片文件名以编号开头
+
+系统 SHALL 对本地服务与 Cloudflare Worker 新生成的套图图片使用 `编号-时间-图片类型-短标识.扩展名` 的文件名结构。编号 SHALL 位于四位时分时间之前，非套图模式的文件名结构 SHALL 保持不变。
+
+#### Scenario: 生成或修复一张套图图片
+
+- **WHEN** 用户首次生成、补齐或重生成一张套图图片
+- **THEN** 文件名以该图片在套图中的编号开头
+- **AND** 紧随编号之后的是四位时分时间
+- **AND** 图片类型、短标识和扩展名仍保留在文件名中
+
+### Requirement: 摩托车骑行护目镜使用真实四级类目
+
+Creation Mode SHALL 提供代码为 `C10-006-001-005`、名称为“骑行护目镜”、路径为“汽车摩托 > 摩托车用品 > 摩托装备 > 骑行护目镜”的四级商品类目，并 SHALL 在类目选择、搜索、参考分析自动匹配、计划和新套图记录中使用该稳定类目代码与路径。
+
+#### Scenario: 用户搜索并选择骑行护目镜
+- **WHEN** 用户按 `C10-006-001-005`、骑行护目镜或完整类目路径搜索四级类目
+- **THEN** 系统返回名称为“骑行护目镜”的唯一类目模板
+- **AND** 选择后控件、计划和新套图记录显示完整真实类目路径而不是“通用电商”
+
+#### Scenario: 明确的摩托骑行风镜自动命中
+- **WHEN** 参考分析文本同时包含摩托车或机车语境以及护目镜或风镜商品词
+- **THEN** 系统自动匹配 `C10-006-001-005`
+- **AND** 旧自动类目不会被继承到本轮商品上下文
+
+#### Scenario: 宽泛护目镜文本保持未匹配
+- **WHEN** 参考分析文本只包含“护目镜”或“风镜”而没有摩托车、摩托或机车语境
+- **THEN** 系统不自动匹配骑行护目镜
+- **AND** 系统不因此覆盖用户手工选择的类目或误匹配工业防护眼镜
+
+#### Scenario: 修正已有错误回退记录
+- **WHEN** 已知受影响的摩托车骑行风镜记录因类目库缺失而保存为通用电商
+- **THEN** 系统维护操作将其顶层当前类目修正为 `C10-006-001-005` 及完整类目路径
+- **AND** 已冻结的历史逐图提示词保持不变并可作为生成时审计证据
+
+### Requirement: Image-count overrides preserve the compatible image-type catalog
+
+The system SHALL keep every resolved carousel slot for the current platform addressable in `effectivePlan.slots` when a set-level image-count override is lower than the platform's compatible image-type count. The count override SHALL define the default enabled prefix without removing later compatible slots. `effectivePlan.items`, `carouselImageCount`, and actual generation SHALL continue to include only enabled carousel slots.
+
+#### Scenario: 通用电商选择 5 张仍显示完整 18 种类型
+
+- **WHEN** 用户在通用电商平台把套图数量设置为 5
+- **THEN** `effectivePlan.slots` 和兼容图片类型区域保留全部 18 个通用电商原生类型
+- **AND** 前 5 个默认槽位启用，其余 13 个槽位未启用
+- **AND** 兼容图片类型计数显示 `5 / 18`
+- **AND** `effectivePlan.items`、`carouselImageCount` 和实际生成只包含 5 个启用轮播项
+
+#### Scenario: 零张与完整数量使用同一类型目录
+
+- **WHEN** 用户把通用电商套图数量设置为 0、1 或 18
+- **THEN** 每种数量下兼容图片类型区域都显示相同的 18 个原生类型
+- **AND** 启用项数量分别为 0、1 或 18
+- **AND** 未启用类型不会进入生成请求
+
+#### Scenario: 用户等量替换兼容图片类型
+
+- **WHEN** 通用电商当前启用 5 个类型，用户取消其中一个并启用第 18 个类型
+- **THEN** 第 18 个类型保持可见且可以直接启用
+- **AND** 最终 `effectivePlan.items` 和 `carouselImageCount` 仍为 5
+- **AND** 实际生成包含新启用类型且不包含被取消类型
+
+#### Scenario: 命名平台目录不扩展为通用 18 项
+
+- **WHEN** 当前命名平台只提供 6 个解析后可用的规范化轮播槽位，且用户选择少于 6 张
+- **THEN** 兼容图片类型区域持续显示该平台的 6 个槽位
+- **AND** resolver 不增加第 7 至 18 个通用或 `custom` 类型
+
+#### Scenario: 追加生成项不进入兼容类型目录
+
+- **WHEN** 当前计划还包含 SKU 图或信息图重构项
+- **THEN** 这些追加项不进入 `effectivePlan.slots` 的兼容轮播目录或其分母
+- **AND** 它们继续只计入各自计数与 `totalPlannedItemCount`
+
+### Requirement: Creation Mode shows set-level generation queue
+The Creation Mode workbench SHALL show a compact queue strip for submitted image sets when a set is running or waiting.
+
+#### Scenario: A set is currently generating
+- **WHEN** a Creation Mode set is generating
+- **THEN** the output panel shows that set in the queue strip as the current generation
+- **AND** the main image grid displays that set's item-level progress
+
+#### Scenario: Another set is queued
+- **WHEN** the user submits a second Creation Mode set while one is already generating
+- **THEN** the second set is added behind the active set
+- **AND** the queue strip shows the waiting set as a compact pill labeled by queue order, such as "队列一" and "队列二"
+- **AND** the queued set preview includes any SKU image cards derived from the submitted SKU subjects
+
+### Requirement: Creation Mode keeps one set visible in the main grid
+The Creation Mode main result grid SHALL display one selected set at a time instead of merging images from multiple queued sets.
+
+#### Scenario: User selects a queued set
+- **WHEN** the user clicks a queued set in the queue strip
+- **THEN** the main grid switches to that set's queued preview cards
+- **AND** the active generation continues without changing order
+
+#### Scenario: A queued set finishes while another set starts
+- **WHEN** one queued set completes and the next queued set starts generating
+- **THEN** the completed set remains visible in the queue strip for the current browser session
+- **AND** the user can switch back to the completed set without refreshing the page
+
+### Requirement: Creation Mode can enqueue during generation
+The Creation Mode primary generation action SHALL remain available for valid set submissions while another set is running, up to the configured queue limit.
+
+#### Scenario: User submits while another set is running
+- **WHEN** a Creation Mode set is already running
+- **AND** the user submits valid product inputs for another set
+- **THEN** the button communicates the queue action
+- **AND** the app stores a snapshot of that set's form data for later execution
+- **AND** the queued set starts after the active set finishes
+
+### Requirement: Platform switching is immediate and race-safe
+The system SHALL accept a valid Creation platform selected by the user immediately, without displaying a confirmation dialog or offering a cancel rollback. The switch SHALL clear platform-related planning state, reset the draft preview, and resolve the new platform plan while preserving product evidence and generation configuration. Reference analysis results SHALL only apply to the platform and category snapshot that initiated them.
+
+#### Scenario: User switches directly to another platform
+- **WHEN** the user selects a valid platform different from the current Creation platform
+- **THEN** the selected platform becomes current without calling `window.confirm` or displaying another confirmation dialog
+- **AND** the system clears platform-related image types, order, enabled carousel count, automatic language, automatic ratios, automatic resolutions, composition strategy, and set/item overrides
+- **AND** it resets the previous draft preview and immediately exposes the newly resolved platform plan
+
+#### Scenario: Direct platform switching preserves product evidence and configuration
+- **WHEN** the system directly accepts a new Creation platform
+- **THEN** it preserves product name, description, selling points, category, dimensions, reference files and metadata, Logo, SKU, output format, and model/API configuration
+- **AND** only platform-related planning state is cleared
+
+#### Scenario: User selects the previous platform again
+- **WHEN** the user selects a platform that was active before an intervening platform switch
+- **THEN** the system directly accepts that selection and resolves the platform using current rules
+- **AND** it does not restore the platform-specific set or item overrides that were cleared by the earlier switch
+
+#### Scenario: Old reference analysis finishes after a direct switch
+- **WHEN** a reference analysis request was started for an earlier platform or category
+- **AND** its response arrives after the current platform or category has changed
+- **THEN** the response is ignored and cannot alter product suggestions, reference roles, notes, category, selected slots, or plan preview
+
+### Requirement: Platform confirmation removal is isolated to platform selection
+The system SHALL retain the existing Creation reference-analysis recommendation application flow and SHALL keep platform planning, preview, and generation contracts unchanged apart from removing confirmation and cancellation from the platform select interaction.
+
+#### Scenario: Reference analysis suggestions still require their existing apply action
+- **WHEN** Creation reference analysis returns role, note, product, category, or SKU suggestions
+- **THEN** the existing recommendation summary and Apply suggestions action remain available
+- **AND** changing platform does not automatically apply or discard those suggestions except through existing freshness rules
+
+#### Scenario: Platform planner and APIs remain compatible
+- **WHEN** a directly accepted platform is previewed or submitted for generation
+- **THEN** the browser uses the existing platform, override, preview, and generation API fields
+- **AND** Local and Worker use the existing platform resolver, Creation planner, validation, queue, and persistence behavior
+
+### Requirement: SKU color recognition is context-safe and target-localized
+The SKU color normalizer SHALL reject ambiguous token occurrences inside unrelated words or conjunction phrases and SHALL emit canonical color-only values. When one unit has multiple recognized colors, the planner SHALL localize every color into the selected supported target language before composing the exact visible label.
+
+#### Scenario: Product text contains ambiguous CJK substrings
+- **WHEN** product text contains `青少年防紫外线` without reliable visible color evidence
+- **THEN** the normalizer does not infer blue, cyan, or purple labels from those substrings
+
+#### Scenario: English conjunction resembles a foreign color token
+- **WHEN** an English value contains `black or rose`
+- **THEN** the normalizer does not emit `black or rose` as one color-only label
+- **AND** conjunction text is never preserved as a color name
+
+#### Scenario: Chinese target receives a multi-color English label
+- **WHEN** a reliable unit label is `brown black silver` and the selected target language is Simplified Chinese
+- **THEN** the planned exact visible label contains the corresponding Chinese color names in the same order
+- **AND** no English color token remains in that label
+
+### Requirement: Product-name category matching requires reliable category semantics
+Automatic fourth-level category matching from a product name SHALL use exact category identity, explicit aliases, or existing scored context that reliably identifies the category path. A unique but broad leaf-name suffix alone SHALL NOT select or write a category.
+
+#### Scenario: Unrelated products share a broad leaf suffix
+- **WHEN** a product name is `钢琴支架`, `硬盘支架`, `相机支架`, or `投影仪支架` without mobile-accessory context
+- **THEN** the system does not assign `数码电子 > 手机通讯 > 手机配件 > 支架`
+- **AND** automatic selection falls back without overwriting a manual category

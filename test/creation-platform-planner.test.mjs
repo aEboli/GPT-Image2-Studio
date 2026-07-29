@@ -321,6 +321,18 @@ test("planner keeps disabled carousel slots available for browser re-enablement"
   assert.equal(plan.items.some((item) => item.slotKey === disabledSlot.slotKey), false);
 });
 
+test("planner keeps all 18 universal image types visible when five are requested", () => {
+  const plan = buildPlatformPlan("universal", { imageCount: 5 });
+  const carouselItems = plan.items.filter((item) => item.itemKind === "carousel");
+
+  assert.equal(plan.slots.length, 18);
+  assert.equal(plan.slots.filter((slot) => slot.enabled !== false).length, 5);
+  assert.ok(plan.slots.slice(5).every((slot) => slot.enabled === false));
+  assert.equal(carouselItems.length, 5);
+  assert.equal(plan.carouselImageCount, 5);
+  assert.equal(plan.imageCount, 5);
+});
+
 test("planner preserves an unknown requested platform and exposes the universal fallback warning", () => {
   const plan = buildPlatformPlan("future-market");
 

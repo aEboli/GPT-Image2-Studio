@@ -151,7 +151,7 @@ GPT-Image2-Studio 面向个人创作者、电商运营、设计师和内容团�
 | --- | --- | --- |
 | 图片详情灯箱 | 生成预览中的“查看”，或点击画廊/记录页图片 | 支持适配、缩放、平移、前后切换、下载、删除、复制相对/完整路径，并展示提示词、模型、比例、尺寸和工作流快照 |
 | Prompt Agent | 顶栏“图片转提示词”，或创作菜单中的同名入口 | 上传 1 张图片，分析为可复制的 JSON 提示词；历史记录长期保存在当前运行环境的数据存储中 |
-| 商品图采集插件 | 创作 -> 工具 -> 商品图采集插件 | 鼠标悬停或键盘聚焦名称可查看完整说明；点击后下载 Chrome/Edge 插件 ZIP，用于从受支持商城详情页采集主图、详情图和 SKU 图，再复制到 Studio 或按商品文件夹下载 |
+| 商品图采集插件 | 创作 -> 工具 -> 商品图采集插件 | 鼠标悬停或键盘聚焦名称可查看完整说明；点击后下载 Chrome/Edge 插件 ZIP，用于从受支持商城详情页采集主图、详情图和 SKU 图，再复制到 Studio、批量复制到聊天软件或按商品文件夹下载 |
 | 连接配置 / 生成日志 | 顶栏“配置”，或配置菜单 -> 生成日志 | 在路由模式、直接调用模式和“Gemini模型”之间切换，分别管理端点、API Key、文本/视觉模型和生图模型，并可获取模型、测试连接和保存浏览器私有配置；日志会展示当前会话的通道、时间、参数摘要、进度、结果和错误，用于定位上游超时、协议不兼容或无最终图片等问题 |
 | Prompt Kit | 提示词输入区的模板按钮 | 从内置模板开始组织主体、场景、构图和视觉语言，再把模板内容带回提示词编辑区继续修改 |
 | Logo 库 | 套图模式的 Logo 控件 | 上传、长期保存、选择和删除常用 Logo；可设置位置和背景策略，也可对最多 15 张上传图执行同一 Logo 批处理 |
@@ -161,9 +161,9 @@ GPT-Image2-Studio 面向个人创作者、电商运营、设计师和内容团�
 
 ### 商品图采集插件
 
-该浏览器扩展支持 1688、Amazon、Temu、TikTok Shop、SHEIN 和大健云仓消费者商品详情页。它按平台边界识别主图、详情图和带名称的 SKU 图，提供分组筛选、原图预览、复制到 Studio、单图下载和按商品文件夹批量下载；页面结构不受支持时会停止，不扫描整页图片。
+该浏览器扩展支持 1688、Amazon、Temu、TikTok Shop、SHEIN 和大健云仓消费者商品详情页。它按平台边界识别主图、详情图和带名称的 SKU 图，提供分组筛选、原图预览、复制到 Studio、Windows 多文件“复制图片”、单图下载和按商品文件夹批量下载；页面结构不受支持时会停止，不扫描整页图片。“复制图片”由扩展专用的 Windows Native Messaging 助手完成，不要求启动或打开 Studio；单批最多支持 1000 张，成功后插件内会短暂显示半透明提示，当前选中图片可一次粘贴到聊天软件。
 
-扩展只在用户主动点击采集后读取已支持的商品区域，不读取 Cookie、API Key、密码或其他登录凭据。Studio 菜单只负责生成并下载可审查的 ZIP，不会静默安装或更新浏览器扩展；Chrome/Edge 仍需用户在扩展管理页确认加载或重载。详细安装、平台路由和操作说明见 [商品图采集插件说明](./extensions/product-image-collector/README.md)。
+扩展只在用户主动点击采集后读取已支持的商品区域，不读取 Cookie、API Key、密码或其他登录凭据。Studio 菜单只负责生成并下载可审查的 ZIP，不会静默安装或更新浏览器扩展；Chrome/Edge 仍需用户在扩展管理页确认加载或重载，本地剪贴板助手也需用户运行包内安装脚本。详细安装、平台路由和操作说明见 [商品图采集插件说明](./extensions/product-image-collector/README.md)。
 
 ## 快速开始
 
@@ -267,10 +267,11 @@ Base URL: https://vendor.example/openai/v1
 ```dotenv
 OPENAI_API_KEY=<your-api-key>
 OPENAI_BASE_URL=https://api.openai.com/v1
-RESPONSES_MODEL=gpt-5.4
+RESPONSES_MODEL=gpt-5.4-mini
 
 HOST=
 IMAGE_STUDIO_REQUEST_TOKEN=
+IMAGE_STUDIO_ALLOW_INSECURE_REMOTE_HTTP=0
 
 IMAGE_STUDIO_DISABLE_DNS_FALLBACK=0
 IMAGE_STUDIO_DNS_FALLBACK_SERVERS=
@@ -280,12 +281,13 @@ IMAGE_STUDIO_DNS_FALLBACK_SERVERS=
 | --- | --- |
 | `OPENAI_API_KEY` | 默认 API Key |
 | `OPENAI_BASE_URL` | 默认 API Base URL |
-| `RESPONSES_MODEL` | 默认 Responses 模型；应以实际服务支持的模型为准 |
+| `RESPONSES_MODEL` | 默认 Responses 模型，未配置时为 `gpt-5.4-mini`；应以实际服务支持的模型为准 |
 | `PORT` | 本地服务端口，默认 `3600` |
 | `HOST` | 监听地址；留空时为 `127.0.0.1` |
 | `IMAGE_STUDIO_OUTPUT_DIR` | 自定义生成文件根目录 |
 | `IMAGE_STUDIO_LOCAL_DATA_DIR` | 自定义本地配置和记录根目录 |
-| `IMAGE_STUDIO_REQUEST_TOKEN` | 固定远程命令行写请求使用的令牌 |
+| `IMAGE_STUDIO_REQUEST_TOKEN` | 固定所有非回环请求使用的远程访问令牌 |
+| `IMAGE_STUDIO_ALLOW_INSECURE_REMOTE_HTTP` | 设为 `1` 时显式允许非回环地址直接使用未加密 HTTP；默认拒绝 |
 | `IMAGE_STUDIO_DISABLE_DNS_FALLBACK` | 设为 `1` 时禁用 Node DNS fallback |
 | `IMAGE_STUDIO_DNS_FALLBACK_SERVERS` | 自定义 fallback DNS，支持逗号、分号或空白分隔 |
 
@@ -293,21 +295,31 @@ IMAGE_STUDIO_DNS_FALLBACK_SERVERS=
 
 ### 局域网访问与请求令牌
 
-本地服务默认仅监听回环地址。需要局域网访问时可显式设置：
+本地服务默认仅监听回环地址。远程访问推荐保持 `HOST` 为空，由 TLS 反向代理连接 `127.0.0.1`。该模式应在启动前显式设置固定的 `IMAGE_STUDIO_REQUEST_TOKEN`，由反向代理完成外部认证，并向每个后端请求注入同一个 `X-Image-Studio-Token` 或 Bearer 令牌。
+
+仅在隔离且可信的网络中需要保留直接局域网 HTTP 兼容时，才显式设置：
 
 ```powershell
 $env:HOST="0.0.0.0"
 $env:IMAGE_STUDIO_REQUEST_TOKEN="<strong-random-token>"
+$env:IMAGE_STUDIO_ALLOW_INSECURE_REMOTE_HTTP="1"
 cmd /c npm start
 ```
 
-同源浏览器请求可以正常使用。非回环、无 `Origin` 的命令行写请求需要携带：
+该兼容模式不会加密 HTTP Basic、Bearer、提示词或生成资产，局域网监听者可以读取这些内容。没有显式开启兼容变量时，非回环 `HOST` 会在监听前失败。
+
+在显式开启的直接局域网 HTTP 兼容模式下，远程浏览器首次访问时会显示 HTTP Basic 登录框：用户名固定为 `studio`，密码为当前远程访问令牌。认证后，浏览器会为同源页面、静态资源、API 和输出文件复用凭据。
+
+命令行与代理可以使用任一请求头：
 
 ```text
+Authorization: Bearer <strong-random-token>
 X-Image-Studio-Token: <strong-random-token>
 ```
 
-如果没有设置 `IMAGE_STUDIO_REQUEST_TOKEN`，服务会在每次启动时随机生成令牌并打印到终端。
+所有非回环 Host 请求都必须认证，同源请求头和回环代理连接不能绕过认证。只有回环 socket 与回环 Host 同时成立时才保留免登录体验。后端会故意拒绝无令牌的“回环 socket + 非回环 Host”请求，不会为这类请求发起 Basic 登录挑战，因此 TLS 反向代理不能依赖后端弹出登录框。
+
+如果没有设置 `IMAGE_STUDIO_REQUEST_TOKEN`，服务会在每次启动时随机生成令牌并打印到终端；反向代理必须在远程访问前同步该令牌并重新加载配置。长期运行的反向代理应显式配置固定强令牌，避免每次服务重启后代理继续发送已失效的旧值。
 
 ### Node DNS fallback
 
@@ -571,6 +583,9 @@ cmd /c npm test
 
 # 构建 Cloudflare Pages
 cmd /c npm run build:pages
+
+# 检查版本与发布文档一致性
+cmd /c npm run check:release
 ```
 
 发布前建议执行：
@@ -578,7 +593,9 @@ cmd /c npm run build:pages
 ```powershell
 cmd /c npm test
 cmd /c npm run sync:public-lib -- --check
+cmd /c npm run check:release
 cmd /c npm run build:pages
+cmd /c npx --no-install openspec validate --all --strict
 git diff --check
 ```
 
@@ -596,3 +613,4 @@ cmd /c npm run build:installer
 - Git tag 使用 `v<version>`，例如 `v0.2.3`。
 - Release 标题建议使用 `GPT-Image2-Studio v<version>`。
 - Release 应至少附带变更说明、验证结果和对应的 Windows 桌面安装包；如仍分发兼容版，应明确区分两个文件的启动形态。
+- 正式发布提交与标签就绪后运行 `npm run check:release:strict`，确认工作树干净且标签与版本一致。

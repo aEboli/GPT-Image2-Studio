@@ -2327,11 +2327,14 @@
               <nav class="asset-view-nav" aria-label="资产视图">
                 <a href="#gallery">瀑布画廊</a><a href="#article-record" aria-current="page">文章插图</a><a href="#creation-record">套图</a><a href="#portrait-record">写真</a><a href="#ppt-record">PPT</a>
               </nav>
-              <div class="asset-context-row">
+              <div class="asset-context-row creation-record-filter-bar asset-record-filter-bar">
                 <label class="creation-record-search">
                   <span>搜索</span>
                   <input id="articleRecordSearchInput" type="search" placeholder="标题、风格、正文摘要" autocomplete="off" />
                 </label>
+                <div class="creation-record-time-filters asset-record-time-filters" id="articleRecordTimeFilters" role="group" aria-label="文章插图记录时间筛选"></div>
+                <label class="creation-record-date asset-record-date"><span>日期</span><input id="articleRecordDateInput" type="date" aria-label="按创建日期筛选文章插图记录" /></label>
+                <button class="toolbar-button creation-record-reset-filters asset-record-reset-filters" id="articleRecordResetFiltersButton" type="button" disabled>清空筛选</button>
                 <p class="prompt-agent-feedback creation-record-feedback" id="articleRecordFeedback" aria-live="polite"></p>
               </div>
             </header>
@@ -2481,7 +2484,13 @@
                 </div>
               </div>
               <nav class="asset-view-nav" aria-label="资产视图"><a href="#gallery">瀑布画廊</a><a href="#article-record">文章插图</a><a href="#creation-record">套图</a><a href="#portrait-record" aria-current="page">写真</a><a href="#ppt-record">PPT</a></nav>
-              <div class="asset-context-row"><label class="creation-record-search"><span>搜索</span><input id="portraitRecordSearchInput" type="search" placeholder="人物、风格、提示词" autocomplete="off" /></label><p class="prompt-agent-feedback creation-record-feedback" id="portraitRecordActionFeedback" aria-live="polite"></p></div>
+              <div class="asset-context-row creation-record-filter-bar asset-record-filter-bar">
+                <label class="creation-record-search"><span>搜索</span><input id="portraitRecordSearchInput" type="search" placeholder="人物、风格、提示词" autocomplete="off" /></label>
+                <div class="creation-record-time-filters asset-record-time-filters" id="portraitRecordTimeFilters" role="group" aria-label="写真记录时间筛选"></div>
+                <label class="creation-record-date asset-record-date"><span>日期</span><input id="portraitRecordDateInput" type="date" aria-label="按创建日期筛选写真记录" /></label>
+                <button class="toolbar-button creation-record-reset-filters asset-record-reset-filters" id="portraitRecordResetFiltersButton" type="button" disabled>清空筛选</button>
+                <p class="prompt-agent-feedback creation-record-feedback" id="portraitRecordActionFeedback" aria-live="polite"></p>
+              </div>
             </header>
             <div class="portrait-record-browser">
               <div class="asset-record-picker" data-asset-record-picker>
@@ -2509,7 +2518,12 @@
                 </div>
               </div>
               <nav class="asset-view-nav" aria-label="资产视图"><a href="#gallery">瀑布画廊</a><a href="#article-record">文章插图</a><a href="#creation-record">套图</a><a href="#portrait-record">写真</a><a href="#ppt-record" aria-current="page">PPT</a></nav>
-              <p class="prompt-agent-feedback creation-record-feedback ppt-record-feedback" id="pptRecordFeedback" aria-live="polite"></p>
+              <div class="asset-context-row creation-record-filter-bar asset-record-filter-bar">
+                <div class="creation-record-time-filters asset-record-time-filters" id="pptRecordTimeFilters" role="group" aria-label="PPT 记录时间筛选"></div>
+                <label class="creation-record-date asset-record-date"><span>日期</span><input id="pptRecordDateInput" type="date" aria-label="按创建日期筛选 PPT 记录" /></label>
+                <button class="toolbar-button creation-record-reset-filters asset-record-reset-filters" id="pptRecordResetFiltersButton" type="button" disabled>清空筛选</button>
+                <p class="prompt-agent-feedback creation-record-feedback ppt-record-feedback" id="pptRecordFeedback" aria-live="polite"></p>
+              </div>
             </header>
             <div class="ppt-record-empty asset-empty-state" id="pptRecordEmpty"><strong>暂无 PPT</strong><p>还没有找到本地 PPT 文件。</p><a class="toolbar-button asset-primary-action" href="#ppt">前往 PPT 生成</a></div>
             <div class="ppt-record-browser">
@@ -2605,16 +2619,26 @@
           role="dialog"
           aria-modal="true"
           aria-hidden="true"
-          aria-labelledby="productImageImportViewerTitle"
+          aria-label="查看商品图"
           hidden
         >
-          <header class="product-image-import-viewer-head">
-            <strong id="productImageImportViewerTitle">图片预览</strong>
-            <button class="icon-button" id="productImageImportViewerCloseButton" type="button" aria-label="关闭图片预览" title="关闭">×</button>
-          </header>
+          <button class="product-image-import-viewer-close-button" id="productImageImportViewerCloseButton" type="button" aria-label="关闭图片预览" title="关闭"></button>
           <div class="product-image-import-viewer-stage" id="productImageImportViewerStage">
-            <img id="productImageImportViewerImage" alt="" decoding="async" />
+            <div class="product-image-import-viewer-frame"><img id="productImageImportViewerImage" alt="" decoding="async" draggable="false" /></div>
+            <div class="product-image-import-viewer-toolbar" role="toolbar" aria-label="图片查看工具">
+              <button class="product-image-import-viewer-tool-button" id="productImageImportViewerFitButton" type="button" aria-label="全屏显示在弹窗内" title="全屏" data-tooltip="全屏"></button>
+              <button class="product-image-import-viewer-tool-button" id="productImageImportViewerRotateLeftButton" type="button" aria-label="向左旋转" title="向左旋转" data-tooltip="向左旋转"></button>
+              <button class="product-image-import-viewer-tool-button" id="productImageImportViewerRotateRightButton" type="button" aria-label="向右旋转" title="向右旋转" data-tooltip="向右旋转"></button>
+              <button class="product-image-import-viewer-tool-button" id="productImageImportViewerZoomInButton" type="button" aria-label="放大" title="放大" data-tooltip="放大"></button>
+              <button class="product-image-import-viewer-tool-button" id="productImageImportViewerZoomOutButton" type="button" aria-label="缩小" title="缩小" data-tooltip="缩小"></button>
+              <button class="product-image-import-viewer-tool-button" id="productImageImportViewerOriginalSizeButton" type="button" aria-label="恢复初始视图" title="恢复初始视图" data-tooltip="恢复初始视图"></button>
+              <output class="product-image-import-viewer-zoom-output" id="productImageImportViewerZoomLabel" aria-live="polite">100%</output>
+            </div>
           </div>
+          <footer class="product-image-import-viewer-nav">
+            <button class="product-image-import-viewer-nav-button" id="productImageImportViewerPreviousButton" type="button" aria-label="上一张" title="上一张"></button>
+            <button class="product-image-import-viewer-nav-button" id="productImageImportViewerNextButton" type="button" aria-label="下一张" title="下一张"></button>
+          </footer>
         </section>
       </div>
     </dialog>
@@ -2626,6 +2650,10 @@
       <div class="lightbox-dialog" role="dialog" aria-modal="true" aria-labelledby="lightboxTitle">
         <div class="lightbox-top">
           <div class="lightbox-meta">
+            <button class="toolbar-button lightbox-back-button" id="lightboxClose" type="button" aria-label="返回图片列表" title="返回">
+              <span class="lightbox-back-icon" aria-hidden="true">←</span>
+              <span>返回</span>
+            </button>
             <strong id="lightboxTitle">图片详情</strong>
             <span class="model-badge" id="lightboxModel">GPT Image 2.0</span>
             <span id="lightboxTime"></span>
@@ -2641,7 +2669,6 @@
               <button class="toolbar-button" id="lightboxActualSizeButton" type="button" aria-label="按原始尺寸查看" title="按原始尺寸查看">100%</button>
             </div>
             <a class="toolbar-button asset-primary-action" id="lightboxDownload" href="#" download>下载</a>
-            <button class="toolbar-button" id="lightboxClose" type="button" aria-label="关闭图片详情" title="关闭">关闭</button>
           </div>
         </div>
 
@@ -2677,7 +2704,7 @@
         <div class="prompt-agent-head">
           <div>
             <p class="drawer-eyebrow">Prompt Agent</p>
-            <h2>图片转 JSON 提示词</h2>
+            <h2>图片转提示词</h2>
           </div>
           <button class="header-button" id="promptAgentCloseButton" type="button">关闭</button>
         </div>
@@ -2688,7 +2715,7 @@
               <input id="promptAgentImageInput" type="file" accept="image/*" />
               <div class="reference-icon" aria-hidden="true"></div>
               <strong>上传图片后分析</strong>
-              <span>返回可长期保留的 JSON 提示词</span>
+              <span>主体与景别详细、背景与视觉精简的 JSON</span>
               <em>选择图片</em>
             </label>
 
@@ -2723,8 +2750,10 @@
           <section class="prompt-agent-output">
             <div class="detail-field">
               <div class="detail-field-head">
-                <span id="promptAgentResultLabel">JSON 结果</span>
-                <button class="inline-button detail-copy-button" id="copyPromptAgentJsonButton" type="button">复制 JSON</button>
+                <span id="promptAgentResultLabel">结构化反推 JSON</span>
+                <div class="prompt-agent-result-actions">
+                  <button class="inline-button detail-copy-button" id="copyPromptAgentJsonButton" type="button">复制 JSON</button>
+                </div>
               </div>
               <textarea id="promptAgentResult" rows="12" readonly aria-labelledby="promptAgentResultLabel"></textarea>
             </div>
@@ -2845,7 +2874,7 @@
                       <button class="inline-button" id="fetchModelsButton" type="button" data-ui-i18n="fetchModels">获取模型列表</button>
                     </div>
                     <div class="model-picker-control">
-                      <input id="responsesModelInput" name="responsesModel" type="text" placeholder="gpt-5.5" autocomplete="off" aria-controls="modelOptionsList" />
+                      <input id="responsesModelInput" name="responsesModel" type="text" placeholder="gpt-5.4-mini" autocomplete="off" aria-controls="modelOptionsList" />
                       <button class="model-picker-toggle" id="modelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="modelOptionsList" data-ui-i18n-aria-label="expandModels" hidden></button>
                       <div class="model-options-list" id="modelOptionsList" role="listbox" hidden></div>
                     </div>
@@ -2896,7 +2925,7 @@
                       <button class="inline-button" id="directResponsesFetchModelsButton" type="button" data-ui-i18n="fetchModels">获取模型列表</button>
                     </div>
                     <div class="model-picker-control">
-                      <input id="directResponsesModelInput" name="directResponsesModel" type="text" placeholder="gpt-5.5" autocomplete="off" aria-controls="directResponsesModelOptionsList" />
+                      <input id="directResponsesModelInput" name="directResponsesModel" type="text" placeholder="gpt-5.4-mini" autocomplete="off" aria-controls="directResponsesModelOptionsList" />
                       <button class="model-picker-toggle" id="directResponsesModelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="directResponsesModelOptionsList" data-ui-i18n-aria-label="expandModels" hidden></button>
                       <div class="model-options-list" id="directResponsesModelOptionsList" role="listbox" hidden></div>
                     </div>
@@ -3052,6 +3081,6 @@
       </div>
     </aside>
 
-    <script type="module" src="./app.js?v=20260722-asset-record-delete-1"></script>
+    <script type="module" src="./app.js?v=20260726-prompt-name-1"></script>
   </body>
 </html>

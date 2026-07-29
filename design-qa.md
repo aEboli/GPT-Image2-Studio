@@ -1,5 +1,86 @@
 # 商品图采集设计 QA
 
+## Studio 批次卡片完整预览与双区操作栏
+
+- 源视觉真值：`artifacts/design-qa/studio-import-card-reference-full.png` 与 `studio-import-card-reference-actions.png`，来自用户提供的 Studio 批次全景和卡片局部标注。
+- 实现截图：`artifacts/design-qa/studio-import-card-contain-implementation-720x878.png`；桌面截图：`studio-import-card-contain-implementation-2559x1314.png`；窄屏截图：`studio-import-card-contain-implementation-390x844.png`。
+- 视口与状态：卡片局部 `720×878`；桌面 `2559×1314`；窄屏 `390×844`。Studio 批次弹窗打开，使用同源受限代理加载 Amazon 真实 `1448×1671` 商品图，主图、详情图和 SKU 图均处于已选状态。
+- 完整对照：`artifacts/design-qa/studio-import-card-contain-full-comparison.png`。两侧使用同一桌面视口；测试清单仅保留 3 张代表图，因此完整对照只判断弹窗尺寸、网格密度和卡片结构，不把商品内容数量差异当作视觉漂移。
+- 聚焦对照：`artifacts/design-qa/studio-import-card-contain-focused-comparison.png`。左侧为用户标注的旧卡片，右侧为当前实现卡片；卡片媒体区和底部操作栏均清晰可读，无需额外裁片。
+
+### Findings
+
+- 最终对照没有发现可执行的 P0、P1 或 P2 问题。
+- 非 1:1 图片在固定方形媒体区内计算为 `object-fit: contain`，背景为 `rgb(255, 255, 255)`；`1448×1671` 原图完整可见，左右留白而未裁切或拉伸。
+- 分类、序号和尺寸从图片覆层移到下方左侧信息块；放大按钮固定在右侧 `42px` 独立块，中间边界清楚，文字不再遮挡商品图。
+- `2559×1314` 下弹窗为 `1980×1180px`，网格计算为 8 列、单卡约 `231px`；`390×844` 下弹窗为 `372×826px`，网格回退 2 列，页面和卡片均无水平溢出。
+- 加载失败文案默认通过 `hidden` 离开可访问树，仅在真实图片错误时显示；成功图片的复选框名称保持为“主图 1”等正常文本。
+
+### 必查表面
+
+- 字体与排版：沿用现有 12px 分类标签和 10px 元数据，字重、行高和零字距保持一致；左侧信息块对齐明确，窄卡片内没有文字覆盖或撑宽。
+- 间距与布局：媒体区继续固定 1:1；操作栏为 `minmax(0, 1fr) 42px` 两列，桌面 8 列和窄屏 2 列都保持稳定。
+- 颜色与视觉令牌：图片展示面使用纯白，信息与操作区继续使用现有深色面板、边框和悬停令牌，没有引入新的主题色。
+- 图片质量与资源：验证图从同源受限代理加载，保留自然尺寸与原始宽高比；卡片显示修改不改变查看、导入或下载使用的原始 URL。
+- 文案与内容：保留“主图/详情图/SKU 图 + 序号”和尺寸或规格值；新增“图片加载失败”只属于真实错误状态。
+
+### 交互与浏览器检查
+
+- 右侧“放大查看主图 1”按钮唯一可定位，点击后查看器打开并继续使用 `/api/product-image-collector/image` 同源代理；关闭后正确返回批次列表。
+- 当前 Studio 页面控制台 `warn/error` 为 0；成功图片不再错误暴露加载失败的可访问名称。
+
+### 对照历史
+
+1. 用户标注中的旧卡片使用 `cover` 并把分类和尺寸压在图片底部；底部操作栏只有居中的放大按钮。
+2. 首轮实现改为纯白 `contain` 媒体区，并把操作栏拆为左信息、右放大两个区域；宽窄视口未发现 P0、P1 或 P2 视觉问题。
+3. 可访问性复核发现透明的失败文案仍会进入成功图片名称；最终实现改为默认真实隐藏、失败时再显示，视觉结果不变，复核通过。
+
+### Open Questions
+
+- 无阻塞项。完整对照的商品内容不同于用户截图，但聚焦卡片使用相同结构和交互状态，足以验证本次明确要求的完整显示与双区操作栏。
+
+final result: passed
+
+## v1.1.18 标题分工与图片信息条
+
+- 源视觉真值：`artifacts/design-qa/product-image-panel-v1.1.18-reference.png`，来自用户提供的 1688 商品页截图。
+- 实现截图：`artifacts/design-qa/product-image-panel-v1.1.18.png`；窄面板截图：`product-image-panel-v1.1.18-narrow.png`。
+- 验收页面：`artifacts/design-qa/product-image-panel-v1.1.18.html`，直接加载当前 `extensions/product-image-collector/floating-panel.js` 和仓库内真实商品测试图片。
+- 视口与状态：完整视图 `1707×932`，窄面板 `480×844`；1688、5 张主图、7 张详情图、3 张 SKU 图，共 15 张且全部加载成功。
+- 完整对照：`artifacts/design-qa/product-image-panel-v1.1.18-comparison.png`；头部与首行卡片局部：`product-image-panel-v1.1.18-panel-comparison.png`；信息条局部：`product-image-panel-v1.1.18-metadata-comparison.png`。三组图均把目标与实现放入同一比较输入后检查。
+
+### Findings
+
+- 最终对照没有发现可执行的 P0、P1 或 P2 问题。
+- 左侧显示 `跨境新品 Quirky Cat Vase 精致的古怪小猫花瓶家居桌面树脂摆件`，不再显示末尾 `——1688`；清单数据仍保留完整标题，未改变复制、下载、文件夹或文件名输入。
+- 右侧标题块显示 `GPT-Image2-Studio` 和 `1688`。完整视图中标题右边界为 `1513.24px`、标题块左边界为 `1536.67px`；标题块右边界为 `1632.67px`、操作区左边界为 `1638.67px`，没有重叠。
+- `480×844` 窄面板中商品标题自然换为两行，`clientHeight / scrollHeight` 均为 `30px`；标题、平台块和操作区仍无重叠，面板水平溢出为 `0`。
+- 图片名与分辨率共用的信息条计算样式为 `rgba(248, 250, 252, 0.64)` 和 `blur(2px)`。同框局部可见图片纹理继续透过，深浅图片上的文字仍保持可读。
+
+### 必查表面
+
+- 字体与排版：沿用现有微软雅黑/Segoe UI 字体、字号、行高和字重；只改变标题内容分工，没有引入缩放字号或负字距。
+- 间距与布局：右侧 96px 标题块使用网格居中；宽窄视口下头部边界、卡片网格和底部操作栏均无重叠或水平溢出。
+- 颜色与视觉令牌：信息条保留浅灰中性色与深色文字，把背景不透明度从 `0.88` 降至 `0.64`，模糊从 `4px` 降至 `2px`，视觉更轻但对比仍足够。
+- 图片质量与资源：15 张仓库真实测试图片均以 `object-fit: contain` 加载，没有占位图、裁切、拉伸或 URL 改写；验收图片内容与用户商品不同属于隔离测试数据差异，不是采集器 UI 漂移。
+- 文案与内容：左侧只保留商品标题，右侧由“商品图采集”改为平台名称；选中数、分组名称、图片名、分辨率和操作文案保持原契约。
+
+### 交互与浏览器检查
+
+- 当前面板版本为 `1.1.18`，15 个卡片节点及 15 张图片全部完成加载；面板宽屏宽度为 `529.27px`，水平溢出为 `0`。
+- 页面与商品图采集器控制台没有错误或警告。Chrome 日志中两条 `Failed to fetch` 来自无关的已安装扩展 `hdgbmcpjcflbhcgdgbdaooeohnjfabhi`，调用栈不包含本项目页面、验收脚本或采集器脚本。
+
+### 对照历史
+
+1. 用户截图中的旧头部把 `——1688` 留在左侧标题末尾，右侧仍显示“商品图采集”，图片信息条遮挡较重。
+2. `v1.1.18` 首轮同框对照已实现左侧纯商品标题、右侧居中平台名和更透明的信息条；宽屏及窄屏均未发现需要二次修正的 P0/P1/P2 差异。
+
+### Open Questions
+
+- 无阻塞项。最终验收页加载当前工作区脚本；Chrome 已安装的解压插件若未自动更新，仍需在扩展管理页重新加载 `artifacts/extensions/product-image-collector-unpacked` 才能看到同一版本。
+
+final result: passed
+
 ## v1.1.10 完整规格名与纯平台标题
 
 - 隔离验收页：`artifacts/design-qa/product-image-panel-v1.1.10.html`；完整截图：`product-image-panel-v1.1.10.png`；面板裁片：`product-image-panel-v1.1.10-crop.png`。
@@ -78,3 +159,33 @@ final result: passed
 - 无阻塞项。继续降低按钮底色会削弱复杂商品图上的辨识度，本轮透明度已在自然与清晰之间取得平衡。
 
 final result: passed
+## v1.1.20 批量复制成功提示
+
+- Chrome 临时验收页直接加载当前 `v1.1.20` 面板脚本和 4 张真实 1688 商品缩略图；底部按顺序显示“复制到 Studio”“复制图片”“下载所选”。
+- 点击“复制图片”后显示 `已复制 4 张图片`，计算背景为 `rgba(8, 118, 79, 0.78)`；提示位于插件边界内和页脚上方，不改变列表或三个按钮的位置，约 1.8 秒后恢复为 `opacity: 0`、`visibility: hidden`。
+- 桌面视口中三个按钮等宽约 `166.7px`；CSS `480×845` 窄视口中三个按钮等宽 `150px`。两种状态下操作栏和面板均无水平溢出，提示不接触页脚。
+- Windows 实际写入两张 PNG 后，`.NET Clipboard.GetFileDropList()` 返回 `Count=2`，两个临时文件均存在，证明复制结果是多个独立文件而不是合成图或首图回退。
+- Chrome 已安装实例检查到 `v1.1.19`，包含第三按钮但不包含本次成功提示；由于扩展管理页不能由测试会话接管，仍需手动重新加载 `artifacts/extensions/product-image-collector-unpacked` 后完成最终安装态复核。
+
+final result: implementation passed; installed v1.1.20 reload pending
+
+## v1.1.22 Native Messaging 复制验收
+
+- 最终构建包：`artifacts/extensions/GPT-Image2-Studio-Product-Image-Collector-v1.1.22.zip`；Chrome 当前稳定扩展 ID 为 `gbdkgkooddcicpkikaklapgeakhjjcan`，Native host 为 `com.aeboli.gpt_image2_studio.product_image_clipboard`。
+- 在真实 1688 商品页 `1061922615487` 的 `v1.1.22` 安装态，面板识别并全选 31 张商品图；点击“复制图片”后状态行显示 `已复制 31 张图片，可直接粘贴到聊天软件。`，提示文本为 `已复制 31 张图片`。
+- 通过 250ms 采样记录到提示状态：约 `750ms` 时 `data-visible="true"`，约 `2250ms` 时恢复 `data-visible="false"`；提示位于插件内部，不改变底部三按钮布局。
+- Windows 系统剪贴板读取结果为 `Count=31`、`UniqueCount=31`、`ExistingCount=31`，31 个路径均指向临时批次中的独立图片文件。助手 `--self-test-filedrop 500` 返回成功，随后读取结果为 `Count=500`、`UniqueCount=500`、`ExistingCount=500`。
+- Native host 的异步路径自检返回 `STA`；扩展聚焦测试 `35/35` 通过，并断言直接复制不查询 Studio 标签页或本地 HTTP 端点。最终 Chrome 验收在 Studio 页面未参与复制请求的情况下完成；未关闭用户现有 Studio 标签页，以避免丢失其未保存状态。
+
+final result: passed; remaining OpenSpec item is the separately scoped closed-Studio manual check
+
+## v1.1.23 悬浮入口与长批量响应
+
+- 最终构建包为 `artifacts/extensions/GPT-Image2-Studio-Product-Image-Collector-v1.1.23.zip`（68,201 字节，SHA-256 `9D29E79ACD5E8A1A6E09A75BB5AE805B1196F822A6F760B1391DFE5CBF460B76`）；解压目录的入口、面板、后台和 Manifest 与工作区源码逐项一致，安装后的 Native host 与解压目录 EXE 哈希一致。
+- 真实 Chrome 1688 商品 `1061922615487` 当前仍保留 `v1.1.22` 入口控制器，但从最终解压目录动态注入的面板已为 `v1.1.23`。未点击扩展栏 action，从网页入口连续关闭和打开 3 次，每次都只有 1 个入口、1 个面板和 31 张商品图；重新采集后仍为已选 `31 / 31`。
+- 直接复制 31 张图片时，重新采集、清单复制、图片复制和下载命令处于禁用状态；全选、折叠、关闭和 31 个查看按钮全部保持可用。完成后状态为 `已复制 31 张图片，可直接粘贴到聊天软件。`，插件内提示为 `已复制 31 张图片`。
+- 成功提示完成时为可见，约 2.25 秒后计算样式恢复为 `opacity: 0`、`visibility: hidden`；Windows FileDrop 剪贴板读取为 `Count=31`、`UniqueCount=31`、`ExistingCount=31`。最终安装助手的线程自检为 `STA`。
+- 当前采集扩展 ID 没有匹配到新的 `warn/error` 日志。页面已有的 AliCDN 组件重复注册、1688 页面脚本错误和另一扩展 `hdgbmcpjcflbhcgdgbdaooeohnjfabhi` 的请求错误不属于本项目；缓存旧入口上下文在本轮验收前留有一条消息通道关闭记录。
+- 站点级内容脚本清单仍需在 `chrome://extensions/` 对 `artifacts/extensions/product-image-collector-unpacked` 手动点击一次“重新加载”。该管理页不由浏览器测试会话接管，因此 Amazon 等商城从非商品页无刷新进入详情页的最终安装态验收仍保持待办；源码执行级回归已经覆盖进入、离开、超时恢复和失效 DOM 清理。
+
+final result: implementation and dynamic panel passed; installed v1.1.23 manifest reload pending

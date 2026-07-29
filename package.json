@@ -18,7 +18,9 @@
     "build:pages": "node scripts/build-cloudflare-pages.mjs",
     "build:installer": "node scripts/build-windows-installer.mjs",
     "build:desktop": "electron-builder --win nsis --x64",
-    "test": "node --test ./test/*.test.mjs",
+    "check:release": "node scripts/check-release-readiness.mjs",
+    "check:release:strict": "node scripts/check-release-readiness.mjs --strict",
+    "test": "node --test --test-concurrency=1 ./test/*.test.mjs",
     "test:creation-e2e": "node --test ./test/creation-e2e-regression.test.mjs"
   },
   "engines": {
@@ -29,6 +31,7 @@
     "pptxgenjs": "^4.0.1"
   },
   "devDependencies": {
+    "@fission-ai/openspec": "1.6.0",
     "electron": "^43.2.0",
     "electron-builder": "^26.15.3"
   },

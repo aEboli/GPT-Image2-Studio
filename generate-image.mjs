@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, resolve } from "node:path";
 
 import { normalizeApiBaseUrl } from "./lib/api-base-url.mjs";
+import { DEFAULT_RESPONSES_MODEL } from "./lib/model-defaults.mjs";
 import { DEFAULT_BASE_URL } from "./lib/studio-constants.mjs";
 
 const DEFAULT_PROMPT =
@@ -18,7 +19,7 @@ function printHelp() {
   --format      输出格式，默认 jpeg
   --output      输出文件路径，默认写入 output/<timestamp>.<ext>
   --base-url    接口根路径，默认读取 OPENAI_BASE_URL 或 ${DEFAULT_BASE_URL}
-  --model       外层 Responses 模型，默认读取 RESPONSES_MODEL 或 gpt-5.4
+  --model       外层 Responses 模型，默认读取 RESPONSES_MODEL 或 ${DEFAULT_RESPONSES_MODEL}
 
 环境变量:
   OPENAI_API_KEY
@@ -34,7 +35,7 @@ function parseArgs(argv) {
     format: "jpeg",
     output: "",
     baseUrl: process.env.OPENAI_BASE_URL || DEFAULT_BASE_URL,
-    model: process.env.RESPONSES_MODEL || "gpt-5.4",
+    model: process.env.RESPONSES_MODEL || DEFAULT_RESPONSES_MODEL,
   };
 
   for (let index = 0; index < argv.length; index += 1) {

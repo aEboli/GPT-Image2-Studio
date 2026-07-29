@@ -22,28 +22,32 @@ test("analysis guard accepts only the current request and snapshot", () => {
   assert.equal(guard.isCurrent(newer), true);
 });
 
-test("browser request snapshots platform and category, aborts old work, and gates apply", async () => {
+test("browser request snapshots platform and files while manual category changes abort old work", async () => {
   const app = await readFile(appPath, "utf8");
+  const snapshotBody = app.match(/function getCreationReferenceAnalysisSnapshot\(\) \{[\s\S]*?\n\}/)?.[0] || "";
   assert.match(app, /let creationReferenceAnalysisAbortController = null/);
   assert.match(app, /creationReferenceAnalysisAbortController\?\.abort\(\)/);
   assert.match(app, /signal:\s*requestController\.signal/);
-  assert.match(app, /platform:\s*getCreationSelectedPlatform\(\)\.value/);
-  assert.match(app, /category:\s*getCreationSelectedIndustryTemplate\(\)\.value/);
+  assert.match(snapshotBody, /platform:\s*getCreationSelectedPlatform\(\)\.value/);
+  assert.match(snapshotBody, /files:\s*state\.creationReferenceFiles\.map/);
+  assert.doesNotMatch(snapshotBody, /category|getCreationSelectedIndustryTemplate/);
+  assert.match(app, /refs\.creationIndustryTemplateInput\?\.addEventListener\("change", \(\) => \{[\s\S]*invalidateCreationReferenceAnalysisRequest\(\);/);
   assert.match(app, /applyCreationReferenceAnalysis\(payload,\s*\{\s*isCurrent/);
 });
 
 test("analysis apply checks freshness after async category loading before mutating state", async () => {
   const app = await readFile(appPath, "utf8");
-  assert.match(app, /async function applyCreationReferenceAnalysisCategoryMatch\(analysis, isCurrent = \(\) => true\) \{[\s\S]*await loadCreationCategoryTemplatesModule\(\);[\s\S]*if \(!isCurrent\(\)\) return null;/);
-  assert.match(app, /const matchedTemplate = await applyCreationReferenceAnalysisCategoryMatch\(normalized, isCurrent\);[\s\S]*state\.creationReferenceAnalysis\.result = normalized;/);
+  assert.match(app, /async function applyCreationReferenceAnalysisCategoryMatch\(analysis, isCurrent = \(\) => true\) \{[\s\S]*await loadCreationCategoryTemplatesModule\(\);[\s\S]*if \(!isCurrent\(\)\) return \{ applied: false, cleared: false, template: null \};/);
+  assert.match(app, /const categoryMatch = await applyCreationReferenceAnalysisCategoryMatch\(normalized, isCurrent\);[\s\S]*state\.creationReferenceAnalysis\.result = normalized;/);
   assert.match(app, /if \(previousValue !== refs\.creationIndustryTemplateInput\.value\) \{\s*invalidateCreationReferenceAnalysisRequest\(\);/);
 });
 
 test("reference mutations invalidate analysis without clearing product form fields", async () => {
   const app = await readFile(appPath, "utf8");
-  const dirtyBody = app.match(/function markCreationReferenceAnalysisDirty\(\) \{[\s\S]*?\n\}/)?.[0] || "";
+  const dirtyBody = app.match(/function markCreationReferenceAnalysisDirty\(\{ invalidateCategorySuggestion = true \} = \{\}\) \{[\s\S]*?\n\}/)?.[0] || "";
 
   assert.match(dirtyBody, /invalidateCreationReferenceAnalysisRequest\(\);/);
+  assert.match(dirtyBody, /resetCreationDraftPreview\(\);/);
   assert.doesNotMatch(dirtyBody, /creationProductNameInput|setCreationReferenceProductNameValue|clearCreationReferenceAnalysisProductNameSuggestion/);
 });
 
@@ -59,7 +63,7 @@ test("reference analysis applies automatically and keeps the detected role edita
   assert.doesNotMatch(recommendationsBody, /roleLocked\s*:/);
   assert.match(renderGridBody, /roleSelect\.dataset\.creationReferenceRoleId = item\.id;/);
   assert.doesNotMatch(renderGridBody, /creation-reference-role-readonly/);
-  assert.match(app, /const \{ appliedMessage, matchedTemplate \} = await applyCreationReferenceAnalysis\(payload\);/);
+  assert.match(app, /const \{ appliedMessage, categoryApplied, categoryCleared, matchedTemplate \} = await applyCreationReferenceAnalysis\(payload\);/);
   assert.doesNotMatch(app, /creationReferenceApplyAnalysisButton|应用建议/);
 
   const appliedIndex = recommendationsBody.indexOf("state.creationReferenceAnalysis.applied = true;");

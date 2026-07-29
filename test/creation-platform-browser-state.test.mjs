@@ -170,6 +170,16 @@ test("compatible image types follow the enabled carousel slots in the frozen eff
     { slots: carouselSlots, enabledCount: 7, totalCount: 7 },
   );
 
+  const universalCatalogSlots = Array.from({ length: 18 }, (_, index) => ({
+    slotKey: `universal-${index + 1}`,
+    itemKind: "carousel",
+    enabled: index < 5,
+  }));
+  assert.deepEqual(
+    creationBrowserPlanState.getCreationCompatibleImageTypeState({ slots: universalCatalogSlots }),
+    { slots: universalCatalogSlots, enabledCount: 5, totalCount: 18 },
+  );
+
   const slotsWithDisabledItem = carouselSlots.map((slot, index) => index === 3 ? { ...slot, enabled: false } : slot);
   const disabledState = creationBrowserPlanState.getCreationCompatibleImageTypeState({
     slots: slotsWithDisabledItem,

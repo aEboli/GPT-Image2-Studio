@@ -26,7 +26,7 @@ const publicCreationListingViewPath = new URL("../public/lib/creation-listing-vi
 const generationClientPath = new URL("../lib/generation-client.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
 const stylesAssetVersion = "20260728-product-collector-tooltip-1";
-const appAssetVersion = "20260722-asset-record-delete-1";
+const appAssetVersion = "20260726-prompt-name-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
 const creationQueueModuleAssetVersion = "20260712-creation-queue-selection-isolation-1";
 const quickBlendModuleAssetVersion = "20260608-quick-blend-time-sort-1";
@@ -1532,7 +1532,7 @@ test("quick blend defaults to square output and reads shared generation controls
   assert.doesNotMatch(quickBlendView, /document\.querySelector\("#responsesModel"\)/);
 
   assert.match(quickBlendView, /const baseUrlValue = String\(state\.config\?\.baseUrl \|\| refs\.baseUrlInput\?\.value \|\| ""\)\.trim\(\);/);
-  assert.match(quickBlendView, /const responsesModelValue = String\(state\.config\?\.responsesModel \|\| refs\.responsesModelInput\?\.value \|\| "gpt-5\.4"\)\.trim\(\);/);
+  assert.match(quickBlendView, /const responsesModelValue = String\(state\.config\?\.responsesModel \|\| refs\.responsesModelInput\?\.value \|\| DEFAULT_RESPONSES_MODEL\)\.trim\(\);/);
   assert.match(quickBlendView, /refs\.quickBlendRatioInput\?\.value \|\| DEFAULT_QUICK_BLEND_RATIO/);
   assert.match(quickBlendView, /refs\.quickBlendSizeInput\?\.value \|\| "auto"/);
 });
@@ -2153,6 +2153,7 @@ test("prompt agent long-term history keeps prompts collapsed behind title rows",
 
   assert.match(app, /className = "prompt-agent-history-title-button"/);
   assert.match(app, /titleButton\.dataset\.promptAgentMapId = item\.id;/);
+  assert.match(app, /titleButton\.textContent = getPromptAgentDisplayName\(item\);/);
   assert.match(app, /className = "prompt-agent-history-expand-button"/);
   assert.match(app, /expandButton\.dataset\.promptAgentExpandId = item\.id;/);
   assert.match(app, /className = "prompt-agent-history-detail hidden"/);
@@ -2162,15 +2163,37 @@ test("prompt agent long-term history keeps prompts collapsed behind title rows",
   assert.match(styles, /\.prompt-agent-history-detail\.hidden\s*\{[\s\S]*display:\s*none;/);
 });
 
-test("prompt agent analysis also keeps JSON prompts in prompt templates", async () => {
+test("prompt agent uses one structured JSON result for display, copy, mapping, and templates", async () => {
   const app = await readFile(appPath, "utf8");
+  const html = await readFile(indexPath, "utf8");
 
   assert.match(app, /function getPromptAgentTemplateId\(item\) \{/);
-  assert.match(app, /function savePromptAgentResultAsTemplate\(item\) \{[\s\S]*const prompt = getPromptAgentJsonText\(item\);/);
-  assert.match(app, /id:\s*getPromptAgentTemplateId\(item\),[\s\S]*name:\s*item\.json\?\.title \|\| item\.filename \|\| "图片 JSON 提示词",[\s\S]*prompt,/);
+  assert.match(app, /getPromptAgentDisplayName, getPromptAgentTemplateDisplayName, isStructuredImagePromptJson/);
+  assert.match(app, /function getPromptAgentReusableText\(item\) \{[\s\S]*getPromptAgentJsonText\(item\)/);
+  assert.match(app, /function savePromptAgentResultAsTemplate\(item\) \{[\s\S]*const prompt = getPromptAgentReusableText\(item\);/);
+  assert.match(app, /id:\s*getPromptAgentTemplateId\(item\),[\s\S]*name:\s*getPromptAgentDisplayName\(item\),[\s\S]*prompt,/);
+  assert.match(app, /const resultText = getPromptAgentReusableText\(state\.promptAgent\.result\);[\s\S]*refs\.promptAgentResult\.value = resultText;/);
+  assert.match(app, /function mapPromptAgentPrompt\(itemId\) \{[\s\S]*getPromptAgentReusableText\(item\)/);
+  assert.match(html, /id="copyPromptAgentJsonButton"[\s\S]*复制 JSON/);
+  assert.doesNotMatch(html, /id="copyPromptAgentPromptButton"/);
+  assert.match(html, /id="promptAgentResultLabel">结构化反推 JSON/);
+  assert.match(html, /<h2>图片转提示词<\/h2>[\s\S]*主体与景别详细、背景与视觉精简/);
+  assert.match(app, /setPromptAgentFeedback\("已生成结构化反推 JSON。", "success"\);/);
   assert.match(app, /state\.promptTemplates = \[[\s\S]*template,[\s\S]*\.\.\.state\.promptTemplates\.filter\(\(entry\) => entry\.id !== template\.id\),[\s\S]*\];/);
   assert.match(app, /writePromptTemplates\(\);[\s\S]*renderPromptTemplates\(\);/);
   assert.match(app, /savePromptAgentResultAsTemplate\(payload\.item\);/);
+});
+
+test("legacy image-to-prompt JSON templates normalize to their single prompt", async () => {
+  const app = await readFile(appPath, "utf8");
+
+  assert.match(app, /getLegacyPromptAgentTemplatePrompt/);
+  assert.match(app, /function parsePromptAgentTemplateJson\(template, prompt\) \{/);
+  assert.match(app, /String\(template\?\.id \|\| ""\)\.startsWith\("prompt-agent-"\)/);
+  assert.match(app, /JSON\.parse\(prompt\)/);
+  assert.match(app, /const parsedPromptJson = parsePromptAgentTemplateJson\(template, rawPrompt\);/);
+  assert.match(app, /const prompt = getLegacyPromptAgentTemplatePrompt\(template, parsedPromptJson\) \|\| rawPrompt;/);
+  assert.match(app, /name: getPromptAgentTemplateDisplayName\(template, parsedPromptJson, index\),/);
 });
 
 test("prompt image analysis compresses large browser uploads before posting to Vercel", async () => {
@@ -2912,12 +2935,12 @@ test("studio stores API settings in the browser and sends them with cloud genera
   assert.match(browserConfig, /formData\.set\("protocolImageModel", config\.protocolImageModel\);/);
   assert.match(app, /directResponsesModelInput:\s*document\.querySelector\("#directResponsesModelInput"\),/);
   assert.match(app, /directResponsesModel:\s*refs\.directResponsesModelInput\.value\.trim\(\) \|\| browserPayload\.directResponsesModel/);
-  assert.match(app, /refs\.directResponsesModelInput\.value = config\.directResponsesModel \|\| "gpt-5\.5";/);
+  assert.match(app, /refs\.directResponsesModelInput\.value = config\.directResponsesModel \|\| DEFAULT_DIRECT_RESPONSES_MODEL;/);
   assert.match(app, /protocolBaseUrlInput:\s*document\.querySelector\("#protocolBaseUrlInput"\),/);
   assert.match(app, /protocolApiKeyInput:\s*document\.querySelector\("#protocolApiKeyInput"\),/);
   assert.match(app, /protocolImageModelInput:\s*document\.querySelector\("#protocolImageModelInput"\),/);
   assert.match(app, /protocolImageModel:\s*refs\.protocolImageModelInput\.value\.trim\(\) \|\| browserPayload\.protocolImageModel/);
-  assert.match(app, /refs\.protocolImageModelInput\.value = config\.protocolImageModel \|\| "gemini-3\.1-flash-image-preview";/);
+  assert.match(app, /refs\.protocolImageModelInput\.value = config\.protocolImageModel \|\| DEFAULT_PROTOCOL_IMAGE_MODEL;/);
   assert.match(app, /const payload = getCurrentPrivateConfigRequestPayload\(\);/);
   assert.match(app, /function buildPptFormData\(\) \{[\s\S]*appendCurrentConfigToFormData\(formData\);[\s\S]*return formData;/);
   assert.match(app, /function getPptGenerationSnapshot\(\) \{[\s\S]*requestConfig: getCurrentPrivateConfigRequestPayload\(\)/);
@@ -3972,9 +3995,11 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(app, /async function applyCreationReferenceAnalysisCategoryMatch\(analysis, isCurrent = \(\) => true\) \{/);
   assert.match(app, /await applyCreationReferenceAnalysisCategoryMatch\(normalized, isCurrent\)/);
   assert.match(app, /buildCreationReferenceAnalysisCategoryMatchText\(analysis\)/);
+  assert.match(app, /getCreationReferenceAnalysisCategoryProductName\(analysis\)/);
   assert.doesNotMatch(app, /refs\.creationProductNameInput\?\.value,[\s\S]*refs\.creationProductDescriptionInput\?\.value,[\s\S]*refs\.creationSellingPointsInput\?\.value,/);
   assert.match(app, /analysis\?\.reference_roles/);
   assert.match(app, /findCreationIndustryTemplateMatch/);
+  assert.match(app, /findCreationIndustryTemplateProductNameMatch/);
   assert.match(app, /function applyCreationReferenceAnalysisRecommendations\(\) \{/);
   assert.doesNotMatch(app, /function applyCreationReferenceAnalysisVisualLanguage\(\) \{/);
   assert.match(app, /from "\/lib\/creation-reference-analysis-view\.mjs"/);
@@ -4106,7 +4131,7 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(app, /fetch\("\/api\/creation\/plan"/);
   assert.match(app, /formData\.set\("selectedRoles", JSON\.stringify\(getCreationSelectedRoles\(\)\)\)/);
   assert.match(app, /roleSelect\.dataset\.creationReferenceRoleId = item\.id;/);
-  assert.match(app, /function updateCreationReferenceRole\(referenceId, role\) \{\s*state\.creationReferenceFiles = state\.creationReferenceFiles\.map\([\s\S]*?\);\s*markCreationReferenceAnalysisDirty\(\);\s*resetCreationDraftPreview\(\);\s*renderCreationReferenceGrid\(\);\s*\}/);
+  assert.match(app, /function updateCreationReferenceRole\(referenceId, role\) \{\s*state\.creationReferenceFiles = state\.creationReferenceFiles\.map\([\s\S]*?\);\s*markCreationReferenceAnalysisDirty\(\{ invalidateCategorySuggestion: false \}\);\s*resetCreationDraftPreview\(\);\s*renderCreationReferenceGrid\(\);\s*\}/);
   assert.doesNotMatch(app, /creationStyleReference|applyCreationStyleReferenceFiles/);
   assert.match(app, /formData\.set\("imageCount", String\(getCreationPlanPreviewImageCount\(selectedRoles\)\)\)/);
   assert.doesNotMatch(app, /formData\.set\("scenario", refs\.creationScenarioInput\.value\)/);
@@ -4119,7 +4144,7 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(app, /refs\.creationInfographicRebuildEnabledInput\.checked = normalized\.infographicRebuildEnabled === true;/);
   assert.match(app, /const DEFAULT_CREATION_SKU_GENERATION_RULE = "color-name-under-subject";/);
   assert.match(app, /"color-name-under-subject": "主体下方显示颜色名"/);
-  assert.match(app, /formData\.set\("industryTemplate", refs\.creationIndustryTemplateInput\.value\)/);
+  assert.match(app, /formData\.set\("industryTemplate", resolveCreationReferenceAnalysisContextCategoryValue\(\{ analysisDirty: state\.creationReferenceAnalysis\.dirty,[^\n]*categorySuggestionStale: state\.creationReferenceAnalysis\.categorySuggestionStale,[^\n]*previousAutoCategoryValue: state\.creationReferenceAnalysis\.categoryTemplateSuggestion \}\)\)/);
   assert.match(app, /\[refs\.creationProductNameInput, refs\.creationProductDescriptionInput, refs\.creationSellingPointsInput, refs\.creationDimensionSpecsInput\]\.forEach\(\(input\) => input\.addEventListener\("input", resetCreationDraftPreview\)\)/);
   assert.match(app, /\[refs\.creationDimensionUnitModeInput, refs\.creationTargetLanguageInput, refs\.creationPlatformInput\]\.forEach\(\(input\) => input\?\.addEventListener\("change", resetCreationDraftPreview\)\)/);
   assert.match(app, /refs\.creationImageCountInput\.addEventListener\("change",\s*\(\) => \{[\s\S]*syncCreationSelectedRolesToCount\(\)[\s\S]*requestCreationPlanPreview\(\)/);
@@ -4311,9 +4336,17 @@ test("creation reference analysis auto-fills product name after recognition", as
   const app = await readFile(appPath, "utf8");
   const applyBody = app.match(/async function applyCreationReferenceAnalysis\(analysis\) \{[\s\S]*?\n\}/)?.[0] || "";
 
+  assert.match(applyBody, /const categoryMatch = await applyCreationReferenceAnalysisCategoryMatch\(normalized, isCurrent\);/);
   assert.match(applyBody, /const appliedResult = applyCreationReferenceAnalysisRecommendations\(\);/);
-  assert.match(applyBody, /return \{ matchedTemplate, \.\.\.appliedResult \};/);
-  assert.match(app, /const \{ appliedMessage, matchedTemplate \} = await applyCreationReferenceAnalysis\(payload\);/);
+  assert.match(applyBody, /categoryApplied: categoryMatch\.applied,[\s\S]*categoryCleared: categoryMatch\.cleared,[\s\S]*matchedTemplate: categoryMatch\.template,[\s\S]*\.\.\.appliedResult/);
+  assert.match(app, /resolveCreationReferenceAnalysisContextCategoryValue\(\{[\s\S]*categorySuggestionStale: state\.creationReferenceAnalysis\.categorySuggestionStale,[\s\S]*previousAutoCategoryValue: state\.creationReferenceAnalysis\.categoryTemplateSuggestion/);
+  assert.match(app, /formData\.set\("industryTemplate", resolveCreationReferenceAnalysisContextCategoryValue\(\{ analysisDirty: state\.creationReferenceAnalysis\.dirty,[^\n]*categorySuggestionStale: state\.creationReferenceAnalysis\.categorySuggestionStale,[^\n]*previousAutoCategoryValue: state\.creationReferenceAnalysis\.categoryTemplateSuggestion \}\)\);/);
+  assert.match(app, /function markCreationReferenceAnalysisDirty\(\{ invalidateCategorySuggestion = true \} = \{\}\) \{[\s\S]*if \(invalidateCategorySuggestion\) state\.creationReferenceAnalysis\.categorySuggestionStale = true;/);
+  assert.match(app, /markCreationReferenceAnalysisDirty\(\{ invalidateCategorySuggestion: false \}\); resetCreationDraftPreview\(\); renderCreationReferenceGrid\(\); renderCreationView\(\);/);
+  assert.match(app, /function clearCreationReferenceAnalysisManagedCategory\(\) \{[\s\S]*resolveCreationReferenceAnalysisCategoryValue\([\s\S]*if \(!resolution\.cleared\)[\s\S]*setCreationIndustryTemplateValue\(resolution\.categoryValue/);
+  assert.match(app, /state\.creationReferenceFiles = \[\];[\s\S]*clearCreationReferenceAnalysisManagedCategory\(\);[\s\S]*state\.creation\.planDirty = true;/);
+  assert.match(app, /const \{ appliedMessage, categoryApplied, categoryCleared, matchedTemplate \} = await applyCreationReferenceAnalysis\(payload\);/);
+  assert.match(app, /categoryCleared[\s\S]*本轮未识别到可靠商品类目，已恢复为通用电商/);
 });
 
 test("creation reference analysis preserves grouped product labels on reference cards", async () => {
@@ -4335,7 +4368,7 @@ test("creation reference analysis ignores stale in-flight image batches", async 
     /function invalidateCreationReferenceAnalysisRequest\(\) \{[^\n]*creationReferenceAnalysisRequestToken \+= 1;[^\n]*state\.creationReferenceAnalysis\.running = false;[^\n]*\}/,
   );
 
-  const dirtyBody = app.match(/function markCreationReferenceAnalysisDirty\(\) \{[\s\S]*?\n\}/)?.[0] || "";
+  const dirtyBody = app.match(/function markCreationReferenceAnalysisDirty\(\{ invalidateCategorySuggestion = true \} = \{\}\) \{[\s\S]*?\n\}/)?.[0] || "";
   assert.match(dirtyBody, /invalidateCreationReferenceAnalysisRequest\(\);/);
 
   const analyzeStart = app.indexOf("async function analyzeCreationReferenceImages()");
@@ -4375,6 +4408,14 @@ test("creation mode exposes record detail and item repair actions", async () => 
   assert.match(styles, /\.creation-card-actions\s*\{/);
   assert.match(styles, /\.creation-card-path\s*\{/);
   assert.match(styles, /\.creation-card\s*\{[\s\S]*position:\s*relative;[\s\S]*isolation:\s*isolate;[\s\S]*gap:\s*8px;[\s\S]*min-height:\s*max-content;[\s\S]*padding:\s*8px;/);
+  assert.match(
+    styles,
+    /\.creation-card\s*\{[\s\S]*transition:\s*border-color\s+160ms\s+ease,\s*box-shadow\s+160ms\s+ease;/,
+  );
+  assert.match(
+    styles,
+    /\.creation-card:hover,\s*\.creation-card:focus-within\s*\{[\s\S]*border-color:\s*#ff9f43;[\s\S]*box-shadow:\s*0\s+0\s+0\s+1px\s+rgba\(255,\s*159,\s*67,\s*0\.28\),\s*0\s+0\s+16px\s+rgba\(255,\s*136,\s*40,\s*0\.24\);/,
+  );
   assert.match(styles, /\.creation-card-head\s*\{[\s\S]*min-width:\s*0;/);
   assert.match(styles, /\.creation-card-head strong\s*\{[\s\S]*font-size:\s*0\.82rem;[\s\S]*white-space:\s*nowrap;/);
   assert.match(styles, /\.creation-result-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(6,\s*minmax\(0,\s*1fr\)\);[\s\S]*grid-auto-rows:\s*max-content;[\s\S]*gap:\s*10px;/);
@@ -5094,7 +5135,8 @@ test("creation mode exposes listing agent controls and record listing drafts", a
   assert.match(listingView, /fieldTools\.appendChild\(createCreationListingFieldCopyButton\(label, copySource, \{ list: copyList \}\)\);/);
   assert.match(listingView, /appendRowCopyTargets\(row, index\);/);
   assert.match(listingView, /if \(localizedText\) \{[\s\S]*localizedCopyRows\[index\] \|\| localizedText,[\s\S]*`\$\{itemLabel\}中文`/);
-  assert.doesNotMatch(listingView, /createCreationListingField\("警告"|createCreationListingField\("缺失信息"/u);
+  assert.match(listingView, /createCreationListingField\("警告"/u);
+  assert.match(listingView, /createCreationListingField\("缺失信息"/u);
   assert.doesNotMatch(listingView, /titleCopy\.className = "creation-listing-title-copy";/);
   assert.match(listingView, /createCreationListingField\("标题", draft\.title, \{[\s\S]*prominent: true,[\s\S]*\}\)\);/);
   assert.doesNotMatch(listingView, /CREATION_LISTING_(?:LANGUAGE|SECTION)_MODES|getCreationListingViewModes|setCreationListingViewMode|createCreationListingSegmentedControl|creationListingViewControl|listingLanguageMode|listingSectionMode/);
@@ -5138,7 +5180,14 @@ test("creation mode exposes listing agent controls and record listing drafts", a
   assert.match(readCssRule(styles, ".creation-listing-copy-pair"), /display:\s*grid;/);
   assert.match(readCssRule(styles, ".creation-listing-copy-pair"), /grid-template-columns:\s*minmax\(0,\s*1fr\);/);
   assert.doesNotMatch(readCssRule(styles, ".creation-listing-copy-pair"), /repeat\(2/);
-  assert.match(readCssRuleContaining(styles, ".creation-listing-localized", "border-top"), /border-top:\s*1px solid/);
+  assert.match(readCssRule(styles, ".creation-listing-copy-pair"), /width:\s*fit-content;/);
+  assert.match(readCssRule(styles, ".creation-listing-copy-pair"), /max-width:\s*100%;/);
+  assert.match(
+    readCssRule(styles, ".creation-listing-field li:not(:last-child) > .creation-listing-copy-pair"),
+    /border-bottom:\s*1px solid/,
+  );
+  assert.doesNotMatch(readCssRule(styles, ".creation-listing-localized"), /border-top:\s*1px solid/);
+  assert.doesNotMatch(readCssRule(styles, ".creation-listing-bucket-line.is-localized"), /border-top:\s*1px solid/);
   assert.match(styles, /\.creation-listing-field-copy\s*\{/);
   assert.match(styles, /\.creation-listing-field-copy:hover\s*\{/);
   assert.match(styles, /\.creation-listing-title-copy\s*\{/);

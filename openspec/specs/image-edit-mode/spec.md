@@ -1,9 +1,7 @@
 ## Purpose
 
 Image Edit Mode provides a focused GPT Image 2 workflow for editing exactly one uploaded source image with a text instruction while reusing the Studio generation queue, preview, and gallery persistence flows.
-
 ## Requirements
-
 ### Requirement: Image Edit Mode is an independent Create view
 The system SHALL expose Image Edit Mode through the Create menu at `#image-edit` and SHALL keep its uploaded source image, edit instruction, generated preview state, thumbnail state, and feedback independent from prompt mode, style transfer, reference analysis, image decomposition, quick blend, Creation Mode, Portrait Mode, Article Illustration, and PPT generation.
 
@@ -91,10 +89,21 @@ The system SHALL save completed Image Edit outputs into the normal gallery with 
 - **THEN** Image Edit preview state no longer points to the removed saved asset
 - **AND** other Create modes remain unaffected
 
-### Requirement: Image Edit v1 excludes masks
-The system SHALL treat Image Edit v1 as whole-image editing and SHALL NOT expose mask painting or mask upload controls.
+### Requirement: Image Edit offers optional local mask editing
+The system SHALL keep whole-image Image Edit as the default workflow and SHALL offer local mask editing as an optional workflow inside the same `#image-edit` view.
 
 #### Scenario: User opens Image Edit controls
 - **WHEN** the user opens `#image-edit`
-- **THEN** the system displays source upload and edit instruction controls
-- **AND** it does not display brush, erase, mask upload, or alpha-mask controls
+- **THEN** the system displays source upload, edit instruction, ratio, resolution, output format, preview, and thumbnail controls
+- **AND** it can display local mask controls after a source image is uploaded
+- **AND** users who do not create painted regions can still use the whole-image edit workflow
+
+#### Scenario: User submits whole-image edit
+- **WHEN** the user starts Image Edit without `editMode=local-mask`
+- **THEN** the backend uses the existing whole-image edit request behavior
+- **AND** no mask is required
+
+#### Scenario: User submits local-mask edit
+- **WHEN** the user starts Image Edit with `editMode=local-mask`
+- **THEN** the backend applies local-mask validation and execution behavior
+- **AND** existing whole-image Image Edit requirements still apply unless superseded by local-mask requirements

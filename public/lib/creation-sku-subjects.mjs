@@ -1,4 +1,5 @@
 import { isCreationSubjectReferenceRole } from "./creation-reference-roles.mjs";
+import { normalizeCreationSkuColorLabels } from "./creation-sku-colors.mjs";
 
 function cleanString(value) {
   return String(value || "").trim();
@@ -81,36 +82,9 @@ function normalizeStringArray(value) {
   return Array.isArray(value) ? value.map(cleanString).filter(Boolean) : [];
 }
 
-function normalizeColorNames(value, splitScalar = true) {
-  const isStructured = Array.isArray(value);
-  const values = Array.isArray(value)
-    ? value
-    : value && splitScalar
-      ? cleanString(value).split(/[,，、;；|/]+/)
-      : value
-        ? [value]
-        : [];
-  const normalized = values
-    .map(cleanString)
-    .filter(Boolean);
-  if (isStructured) {
-    return normalized;
-  }
-  const seen = new Set();
-  return normalized
-    .filter((item) => {
-      const key = item.toLowerCase();
-      if (seen.has(key)) {
-        return false;
-      }
-      seen.add(key);
-      return true;
-    });
-}
-
 function uniqueColorNames(value) {
   const seen = new Set();
-  return normalizeColorNames(value).filter((item) => {
+  return normalizeCreationSkuColorLabels(value).filter((item) => {
     const key = item.toLowerCase();
     if (seen.has(key)) {
       return false;
@@ -209,7 +183,7 @@ function buildProductReferenceSkuSubjects(referenceRoles = []) {
       const note = entry.note || "";
       const subjectUnitCount = normalizeSubjectUnitCount(entry.subjectUnitCount ?? entry.subject_unit_count) ||
         inferSubjectUnitCount([entry.filename, note].join(" "));
-      const colorNames = normalizeColorNames(
+      const colorNames = normalizeCreationSkuColorLabels(
         entry.colorNames ?? entry.color_names ?? entry.colorName ?? entry.color_name ?? entry.colors ?? entry.colours,
         subjectUnitCount > 1,
       );
@@ -219,7 +193,7 @@ function buildProductReferenceSkuSubjects(referenceRoles = []) {
         referenceIndexes: [entry.referenceIndex],
         filenames: [entry.filename].filter(Boolean),
         note,
-        ...(colorNames.length > 0 ? { colorNames, colorName: colorNames.join(", ") } : {}),
+        ...(colorNames.length > 0 ? { colorNames, colorName: colorNames.join(" ") } : {}),
         ...(subjectUnitCount ? { subjectUnitCount } : {}),
       };
     });
@@ -284,11 +258,11 @@ function enrichSkuSubjectFromProductReferences(subject = {}, productReferenceSub
     ? subject.colorNames
     : matchedSubjects.find((entry) => Array.isArray(entry.colorNames))?.colorNames;
   const colorNames = structuredColorSource !== undefined
-    ? normalizeColorNames(structuredColorSource)
+    ? normalizeCreationSkuColorLabels(structuredColorSource)
     : uniqueColorNames([
-        ...normalizeColorNames(subject.colorName, subjectUnitCount > 1),
+        ...normalizeCreationSkuColorLabels(subject.colorName, subjectUnitCount > 1),
         ...matchedSubjects.flatMap((entry) =>
-          normalizeColorNames(entry.colorName, normalizeSubjectUnitCount(entry.subjectUnitCount) > 1),
+          normalizeCreationSkuColorLabels(entry.colorName, normalizeSubjectUnitCount(entry.subjectUnitCount) > 1),
         ),
       ]);
 
@@ -296,7 +270,7 @@ function enrichSkuSubjectFromProductReferences(subject = {}, productReferenceSub
     ...subject,
     ...(referenceIndexes.length > 0 ? { referenceIndexes } : {}),
     ...(note ? { note } : {}),
-    ...(colorNames.length > 0 ? { colorNames, colorName: colorNames.join(", ") } : {}),
+    ...(colorNames.length > 0 ? { colorNames, colorName: colorNames.join(" ") } : {}),
     ...(subjectUnitCount ? { subjectUnitCount } : {}),
   };
 }
@@ -440,7 +414,7 @@ export function normalizeCreationSkuSubjectForPayload(entry = {}, index = 0) {
     entry.unit_count;
   const subjectUnitCount = normalizeSubjectUnitCount(rawSubjectUnitCount) || inferSubjectUnitCount([title, note].join(" "));
   const hasStructuredColorNames = Array.isArray(entry.colorNames) || Array.isArray(entry.color_names);
-  const colorNames = normalizeColorNames(
+  const colorNames = normalizeCreationSkuColorLabels(
     entry.colorNames ?? entry.color_names ?? entry.colorName ?? entry.color_name ?? entry.colors ?? entry.colours,
     subjectUnitCount > 1,
   );
@@ -453,7 +427,7 @@ export function normalizeCreationSkuSubjectForPayload(entry = {}, index = 0) {
         filenames,
         note,
         ...(hasStructuredColorNames || colorNames.length > 0 ? { colorNames } : {}),
-        ...(colorNames.length > 0 ? { colorName: colorNames.join(", ") } : {}),
+        ...(colorNames.length > 0 ? { colorName: colorNames.join(" ") } : {}),
         ...(bundleCount ? { bundleCount } : {}),
         ...(subjectUnitCount ? { subjectUnitCount } : {}),
       }
@@ -504,9 +478,9 @@ function mergeSameReferenceSubjects(subjects = [], roleMap = new Map()) {
     if (group[0] !== subject) {
       return [];
     }
-    const colorNames = normalizeColorNames(
+    const colorNames = normalizeCreationSkuColorLabels(
       group.flatMap((item) =>
-        normalizeColorNames(item.colorNames ?? item.colorName, normalizeSubjectUnitCount(item.subjectUnitCount) > 1),
+        normalizeCreationSkuColorLabels(item.colorNames ?? item.colorName, normalizeSubjectUnitCount(item.subjectUnitCount) > 1),
       ),
     );
     return [{
@@ -515,7 +489,7 @@ function mergeSameReferenceSubjects(subjects = [], roleMap = new Map()) {
       referenceIndexes: uniqueNumbers(group.flatMap((item) => item.referenceIndexes || [])),
       filenames: [filename],
       note: group.map((item) => cleanString(item.note)).filter(Boolean).join(" | "),
-      ...(colorNames.length > 0 ? { colorNames, colorName: colorNames.join(", ") } : {}),
+      ...(colorNames.length > 0 ? { colorNames, colorName: colorNames.join(" ") } : {}),
       subjectUnitCount: Math.max(group.length, ...group.map((item) => Number(item.subjectUnitCount) || 0)),
     }];
   });

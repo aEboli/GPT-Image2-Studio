@@ -94,6 +94,50 @@ test("per-item generation prompt carries matching ratio and target-language guid
   assert.match(prompt, /target language: en/i);
 });
 
+test("ordinary runtime prompts protect subject graphics, original text, and language for current and historical plans", () => {
+  const historicalItem = {
+    role: "hero",
+    prompt: "Historical frozen prompt that asks for concise English marketing copy.",
+    ratio: "1:1",
+    resolutionTier: "1K",
+    targetLanguage: "en",
+  };
+  const historicalParameters = resolveCreationItemGenerationParameters(historicalItem, { imageRoute: "a" });
+  const historicalPrompt = buildCreationItemGenerationPrompt(
+    historicalItem.prompt,
+    historicalParameters,
+    historicalItem,
+  );
+
+  assert.match(historicalPrompt, /SUBJECT CONTENT LOCK:/);
+  assert.match(historicalPrompt, /patterns, artwork, illustrations, symbols/i);
+  assert.match(historicalPrompt, /exact characters, spelling, writing system, and original language/i);
+  assert.match(historicalPrompt, /OUTPUT LANGUAGE BOUNDARY:/);
+  assert.match(historicalPrompt, /newly authored wording outside the physical product or packaging subject, only that separate wording follows the selected language/i);
+
+  const currentItem = buildCreationPlan({
+    productName: "Cooling patch package",
+    productDescription: "A supplied retail package with Japanese artwork and printed text.",
+    sellingPoints: "cooling sensation",
+    targetLanguage: "en",
+    selectedRoles: ["hero"],
+    referenceImageRoles: [{ filename: "package.png", role: "product" }],
+  }).items[0];
+  const currentParameters = resolveCreationItemGenerationParameters(currentItem, { imageRoute: "a" });
+  const currentPrompt = buildCreationItemGenerationPrompt(currentItem.prompt, currentParameters, currentItem);
+
+  assert.equal([...currentPrompt.matchAll(/SUBJECT CONTENT LOCK:/g)].length, 1);
+
+  const noTextItem = { ...historicalItem, textPolicy: "none" };
+  const noTextPrompt = buildCreationItemGenerationPrompt(
+    noTextItem.prompt,
+    resolveCreationItemGenerationParameters(noTextItem, { imageRoute: "a" }),
+    noTextItem,
+  );
+  assert.match(noTextPrompt, /SUBJECT CONTENT LOCK:/);
+  assert.doesNotMatch(noTextPrompt, /Newly added marketing copy target language:/i);
+});
+
 test("infographic rebuild runtime prompt honors only the four selected output controls", () => {
   const item = {
     role: "infographic-rebuild",
@@ -123,6 +167,7 @@ test("infographic rebuild runtime prompt honors only the four selected output co
   assert.match(prompt, /resolution:\s*requested 1\.5K; effective canvas 1536x1920/i);
   assert.match(prompt, /aspect ratio:\s*4:5/i);
   assert.doesNotMatch(prompt, /OTHER_FROZEN_PROMPT_SENTINEL/);
+  assert.doesNotMatch(prompt, /SUBJECT CONTENT LOCK:/);
   assert.deepEqual(
     {
       ratio: parameters.ratioOption.value,

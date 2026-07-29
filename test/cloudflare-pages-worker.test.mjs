@@ -34,6 +34,35 @@ function parseSseEvents(text) {
     .filter(Boolean);
 }
 
+function makeStructuredImagePrompt() {
+  return {
+    subject: {
+      type: "古堡阳台",
+      pose: "建筑主体静止",
+      expression: "",
+      appearance: ["石砌墙体", "拱形开口"],
+      clothing: "",
+      interaction: "阳台与远处山谷形成前后空间关系",
+    },
+    framing: {
+      aspect_ratio: "16:9 横幅",
+      shot_size: "建筑环境远景",
+      subject_scale: "阳台约占画面高度的 45%",
+      placement: "主体位于画面左侧三分之一处",
+      negative_space: "右侧保留远处山谷和天空",
+      foreground_frame: "近处石墙形成局部框景",
+      camera: "全画幅等效 35mm 焦段，约 20 米拍摄距离，f/5.6，对焦于阳台",
+      angle: "略低机位平视",
+      crop: "保留完整阳台边缘与背景山谷",
+      perspective: "自然广角环境透视",
+      depth_of_field: "主体和远景均较清晰",
+    },
+    scene: "山谷上方的石砌古堡阳台。",
+    visual: "柔和日光，自然写实的奇幻建筑摄影。",
+    avoid: ["改变拱形结构", "裁掉远处山谷"],
+  };
+}
+
 function makeImageBucket({ customMetadataByteLimit = Number.POSITIVE_INFINITY } = {}) {
   const objects = new Map();
   return {
@@ -116,6 +145,8 @@ function makeListingDraft(overrides = {}) {
       traffic: ["travel bottle"],
       descriptive: ["compact blue bottle"],
     },
+    packageDimensions: "Estimated: 20 x 15 x 8 cm (7.9 x 5.9 x 3.1 in)",
+    productDimensions: "Estimated: 18 x 12 x 6 cm (7.1 x 4.7 x 2.4 in)",
     missingInfo: [],
     warnings: [],
     ...overrides,
@@ -141,6 +172,8 @@ function makeListingDraft(overrides = {}) {
         traffic: ["旅行水瓶"],
         descriptive: ["小巧蓝色水瓶"],
       },
+      packageDimensions: "预估：20 x 15 x 8 厘米（7.9 x 5.9 x 3.1 英寸）",
+      productDimensions: "预估：18 x 12 x 6 厘米（7.1 x 4.7 x 2.4 英寸）",
       warnings: [],
       missingInfo: [],
     },
@@ -640,8 +673,8 @@ test("Cloudflare creation filenames use Chinese image type names", async () => {
   const filenames = complete.payload.set.items.map((item) => item.filename).join("\n");
 
   assert.equal(response.status, 200);
-  assert.match(complete.payload.set.items[0].filename, /^\d{4}-1-首图成交主-[a-z0-9]{4}\.png$/u);
-  assert.match(complete.payload.set.items[1].filename, /^\d{4}-2-痛点图-[a-z0-9]{4}\.png$/u);
+  assert.match(complete.payload.set.items[0].filename, /^1-\d{4}-首图成交主-[a-z0-9]{4}\.png$/u);
+  assert.match(complete.payload.set.items[1].filename, /^2-\d{4}-痛点图-[a-z0-9]{4}\.png$/u);
   assert.doesNotMatch(filenames, /(?:^|-)hero(?:-|\.|$)|(?:^|-)after(?:-|\.|$)|(?:^|-)sales(?:-|\.|$)/i);
   assert.equal(complete.payload.set.platformProvenance, "legacy-missing");
   assert.equal(imageBucket.objects.size, 2);
@@ -2158,12 +2191,7 @@ test("Cloudflare prompt agent image analysis defaults to medium reasoning effort
           [
             "event: response.output_text.done",
             `data: {"type":"response.output_text.done","text":${JSON.stringify(
-              JSON.stringify({
-                title: "Castle balcony",
-                summary: "A fantasy balcony scene.",
-                prompt: "Generate a detailed fantasy balcony scene.",
-                tags: ["fantasy", "balcony"],
-              }),
+              JSON.stringify(makeStructuredImagePrompt()),
             )}}`,
             "",
             "",
@@ -2187,6 +2215,15 @@ test("Cloudflare prompt agent image analysis defaults to medium reasoning effort
   assert.equal(seenRequests[0].body.text.format.name, "image_prompt_json");
   assert.equal(seenRequests[0].body.reasoning?.effort, "medium");
   assert.equal(payload.item.reasoningEffort, "medium");
+  assert.deepEqual(Object.keys(payload.item.json), ["subject", "framing", "scene", "visual", "avoid"]);
+  assert.equal(payload.item.json.framing.camera.includes("35mm"), true);
+  assert.equal("prompt" in payload.item.json, false);
+  const inputText = seenRequests[0].body.input[0].content
+    .filter((item) => item.type === "input_text")
+    .map((item) => item.text)
+    .join("\n");
+  assert.doesNotMatch(inputText, /套图分析上下文|平台选择：|商品类目：|请根据该平台和商品类型判断/);
+  assert.match(inputText, /不要输出主图、详情页、SKU、直播、移动端缩略图等用途建议/);
 });
 
 test("Cloudflare prompt agent Route C uses protocol settings for image analysis", async () => {
@@ -2217,12 +2254,7 @@ test("Cloudflare prompt agent Route C uses protocol settings for image analysis"
                 content: {
                   parts: [
                     {
-                      text: JSON.stringify({
-                        title: "Castle balcony",
-                        summary: "A fantasy balcony scene.",
-                        prompt: "Generate a detailed fantasy balcony scene.",
-                        style_tags: ["fantasy", "balcony"],
-                      }),
+                      text: JSON.stringify(makeStructuredImagePrompt()),
                     },
                   ],
                 },
@@ -2242,9 +2274,11 @@ test("Cloudflare prompt agent Route C uses protocol settings for image analysis"
   assert.equal(seenRequests[0].url, "https://protocol.example.test/v1/images/generations");
   assert.equal(seenRequests[0].auth, "Bearer protocol-browser-key");
   assert.equal(seenRequests[0].body.model, "gemini-3.1-flash-image-preview");
+  assert.deepEqual(Object.keys(payload.item.json), ["subject", "framing", "scene", "visual", "avoid"]);
+  assert.equal(payload.item.json.framing.camera.includes("35mm"), true);
+  assert.equal("prompt" in payload.item.json, false);
   assert.deepEqual(seenRequests[0].body.generationConfig.responseModalities, ["TEXT"]);
   assert.equal(payload.item.responsesModel, "gemini-3.1-flash-image-preview");
-  assert.equal(payload.item.json.prompt, "Generate a detailed fantasy balcony scene.");
   assert.doesNotMatch(JSON.stringify(payload), /protocol-browser-key/);
 });
 
@@ -2686,8 +2720,8 @@ test("Cloudflare config endpoint never returns a saved API key", async () => {
   assert.equal(response.status, 200);
   assert.equal(payload.apiKeyConfigured, false);
   assert.equal("apiKey" in payload, false);
-  assert.equal(payload.responsesModel, "gpt-5.5");
-  assert.equal(payload.directResponsesModel, "gpt-5.5");
+  assert.equal(payload.responsesModel, "gpt-5.4-mini");
+  assert.equal(payload.directResponsesModel, "gpt-5.4-mini");
   assert.equal(payload.defaults.size, "1024x1280");
 });
 

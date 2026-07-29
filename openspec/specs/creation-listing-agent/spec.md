@@ -43,11 +43,13 @@ The system SHALL display listing drafts in Creation record details and SHALL pro
 
 #### Scenario: User reviews generated listings
 - **WHEN** listing drafts exist for a Creation set
-- **THEN** the Creation record detail shows each listing draft with title, selling points, pain points, five bullets, description, backend search terms, keyword buckets, evidence mode, warnings, and missing information
+- **THEN** the Creation record detail shows each listing draft with title, selling points, pain points, five bullets, description, backend search terms, keyword buckets, package dimensions, product dimensions, evidence mode, warnings, and missing information
+- **AND** package dimensions and product dimensions appear after keyword buckets at the bottom of the Listing
 
 #### Scenario: User exports listing drafts
 - **WHEN** the user exports listing drafts
 - **THEN** the app downloads a structured JSON file for the selected Creation set
+- **AND** each newly generated exported draft retains `packageDimensions`, `productDimensions`, and their Simplified Chinese counterparts
 - **AND** the export excludes API keys and local absolute paths
 
 ### Requirement: Creation Mode supports direct Listing generation for every platform
@@ -75,7 +77,7 @@ The system SHALL allow Listing generation for all 19 canonical platforms and leg
 - **AND** it still returns the same old-style Listing field contract
 
 ### Requirement: Platform policies produce different content without changing fields
-The system SHALL keep one versioned Listing policy for each canonical platform and SHALL use platform-specific title emphasis, conversion order, search intent, locale guidance and field content. Platform rules SHALL NOT rename, remove, add or reorder the old-style outward fields.
+The system SHALL keep one versioned Listing policy for each canonical platform and SHALL use platform-specific title emphasis, conversion order, search intent, locale guidance and field content. Platform rules SHALL NOT rename, remove or reorder the shared outward fields. The existing title-through-keyword field order SHALL remain stable, followed by `packageDimensions` and `productDimensions` in that order.
 
 #### Scenario: Title includes quantity but excludes dimensions
 - **WHEN** an Amazon US Listing draft is generated from product input with a known quantity and dimension
@@ -94,7 +96,7 @@ The system SHALL keep one versioned Listing policy for each canonical platform a
 - **WHEN** the same normalized product source is generated for two different canonical platforms
 - **THEN** their prompts include different platform policy instructions
 - **AND** their resulting field content may differ according to those policies
-- **AND** both results expose the identical old-style field names and bilingual structure
+- **AND** both results expose identical shared field names and bilingual structure, including the two appended dimension fields
 
 #### Scenario: Low-evidence platform policy is used
 - **WHEN** a platform lacks reliable public evidence for an exact rule
@@ -102,12 +104,13 @@ The system SHALL keep one versioned Listing policy for each canonical platform a
 - **AND** no validation or review state blocks the generated draft
 
 ### Requirement: New Listing drafts use the old-style bilingual field contract
-Every successfully generated or explicitly test-mocked Listing SHALL contain `title`, `sellingPoints`, `painPoints`, `fiveBullets`, `description`, `backendSearchTerms`, `keywordBuckets`, and a Simplified Chinese `zhDisplay` with the same field value types. `keywordBuckets` SHALL contain `exact`, `longTail`, `traffic`, and `descriptive` arrays in both languages. The system SHALL allow keyword strings or buckets to become empty and bilingual list counts to differ when normalization or low-risk term removal deletes unusable content. A failed real generation SHALL NOT create a Listing draft.
+Every successfully generated or explicitly test-mocked Listing SHALL contain `title`, `sellingPoints`, `painPoints`, `fiveBullets`, `description`, `backendSearchTerms`, `keywordBuckets`, `packageDimensions`, `productDimensions`, and a Simplified Chinese `zhDisplay` with the same field value types. `keywordBuckets` SHALL contain `exact`, `longTail`, `traffic`, and `descriptive` arrays in both languages. The two dimension fields SHALL be non-empty strings containing numeric physical dimensions. The system SHALL allow keyword strings or buckets to become empty and bilingual list counts to differ when normalization, low-risk evidence cleanup, or blocking-claim cleanup deletes unusable content. A failed real generation SHALL NOT create a Listing draft.
 
 #### Scenario: A new Listing is generated
-- **WHEN** the model returns a Listing that passes parsing, normalization, minimum bilingual structure, low-risk term sanitization, and high-risk safety checks
+- **WHEN** the model returns a Listing that passes parsing, normalization, minimum bilingual structure, dimension provenance checks, evidence-term sanitization, and blocking-claim sanitization
 - **THEN** English content is stored in the top-level old-style fields
 - **AND** Simplified Chinese content is stored in matching `zhDisplay` field types
+- **AND** package dimensions precede product dimensions in display, full copy, and export
 - **AND** the status is `completed`
 
 #### Scenario: Low-risk terms are removed from generated content
@@ -115,22 +118,42 @@ Every successfully generated or explicitly test-mocked Listing SHALL contain `ti
 - **THEN** the system removes that term from public Listing fields before returning the draft
 - **AND** empty search terms or keyword entries do not make the generation fail
 
+#### Scenario: Blocking claim terms are removed from generated content
+- **WHEN** a normalized Platform V1 response contains an unsupported compatibility, certification, ranking, social-proof, medical, safety, warranty, material, performance, price, discount, refund, or competitor-comparison match
+- **THEN** the system removes the matched content from public Listing fields before returning the draft
+- **AND** it preserves a match whose rule permits exact evidence and whose exact evidence exists in the source
+- **AND** the matched keyword or claim does not cause Listing generation to fail
+
 #### Scenario: Explicit test mock mode is used
 - **WHEN** a test directly enables the explicit mock mode
-- **THEN** the mock uses the old-style bilingual field contract
+- **THEN** the mock uses the old-style bilingual field contract including package and product dimensions
 - **AND** a real request failure never enables that mode implicitly
+
+#### Scenario: A historical draft without dimension fields is opened
+- **WHEN** a completed stored draft predates the two dimension fields
+- **THEN** the reader fills the missing response fields from corresponding set-level physical dimension evidence when available
+- **AND** if the historical buyer-facing copy contains component-labeled product dimensions whose complete numeric-unit tokens exist in the source product evidence, the reader presents those dimensions as concise component groups in English and Simplified Chinese
+- **AND** it does not concatenate an ambiguous sequence of detached Length and Width measurements or infer component pairings from their order
+- **AND** it provides explicitly marked numeric estimates for dimension types without corresponding evidence
+- **AND** display, copy and export receive package dimensions followed by product dimensions
+- **AND** the historical stored draft is not rewritten automatically
 
 #### Scenario: A historical V2 draft is opened
 - **WHEN** a stored draft uses `buyerObjections`, `highlights` or `searchTerms`
-- **THEN** the reader maps those values to `painPoints`, `fiveBullets` and `backendSearchTerms` for display, copy and export
+- **THEN** the reader maps historical values for display, copy and export without rejecting the draft
 - **AND** the historical stored draft is not rewritten automatically
 
+#### Scenario: An old service returns a dimensionless success payload
+- **WHEN** the browser receives a successful Listing generation response with any missing English or Simplified Chinese dimension field
+- **THEN** the browser reports that the Image Studio service may require restart
+- **AND** it does not accept that response into current frontend state as a completed generation
+
 ### Requirement: Listing generation completes without validation or review gates
-The system SHALL make one upstream model request for Platform V1. It SHALL NOT perform validator-driven retries, manual review, `needs-review`, failed rewrite gates, or status-based copy/export blocking. After parsing and normalization, it SHALL remove unsupported low-risk evidence terms and SHALL accept non-critical title-length, Bullet-format, pain-point-form, bilingual-count, and keyword-population differences when the minimum bilingual Listing structure remains usable. If the real model request, response parsing, normalization, minimum bilingual structure, or high-risk safety validation fails, the system SHALL return an explicit generation error and SHALL NOT create a mock, deterministic fallback, or `completed` draft. Missing required API configuration SHALL remain an explicit configuration error.
+The system SHALL make one upstream model request for Platform V1. It SHALL NOT perform validator-driven retries, manual review, `needs-review`, failed rewrite gates, or status-based copy/export blocking. After parsing and normalization, it SHALL remove unsupported low-risk evidence terms and every unsupported match from the blocking claim rules, then SHALL repair an emptied required title or description from remaining safe public content, a sanitized source product identity, or a neutral product identity. It SHALL accept non-critical title-length, Bullet-format, pain-point-form, bilingual-count, and keyword-population differences. If the real model request, response parsing, normalization, or minimum old-style bilingual shape fails for a reason unrelated to removable claim content, the system SHALL return an explicit generation error and SHALL NOT create a mock or deterministic replacement Listing. Missing required API configuration SHALL remain an explicit configuration error.
 
 #### Scenario: Model returns usable old-style JSON
-- **WHEN** the single model response can be normalized and retains non-empty English and Chinese titles and descriptions
-- **THEN** the system returns the normalized and sanitized draft as `completed`
+- **WHEN** the single model response can be normalized into the old-style bilingual field types
+- **THEN** the system returns the normalized, sanitized, and minimally repaired draft as `completed`
 - **AND** no second Platform V1 model request or validator review occurs
 
 #### Scenario: Unsupported low-risk terms are recoverable
@@ -138,9 +161,21 @@ The system SHALL make one upstream model request for Platform V1. It SHALL NOT p
 - **THEN** the system removes those terms from public Listing content
 - **AND** it returns the remaining usable draft as `completed` without another model request
 
+#### Scenario: Compatibility claim is recoverable
+- **WHEN** a Platform V1 response contains an unsupported phrase such as `compatible with ...`, `works with every ...`, `兼容...`, or an equivalent configured compatibility match
+- **THEN** the system removes the complete matched compatibility phrase in that language
+- **AND** it returns the remaining direct response as `completed` without another model request
+- **AND** it does not return `content contains unsupported claim "compatibility claim"`
+
+#### Scenario: Blocking claim cleanup empties required text
+- **WHEN** blocking-claim cleanup empties an English or Chinese title or description
+- **THEN** the system fills the field from remaining safe same-language content, a sanitized source product identity, or `Product` / `商品`
+- **AND** the cleanup does not cause Listing generation to fail
+- **AND** the system does not reconstruct the removed claim or invent a replacement fact
+
 #### Scenario: Non-critical formatting differs from the prompt target
 - **WHEN** the normalized response uses a shorter title, legacy or non-unique Bullet labels, a non-five Bullet count, interrogative pain-point copy, unequal bilingual list counts, or empty keyword buckets
-- **AND** the minimum bilingual Listing structure remains usable
+- **AND** the minimum old-style bilingual shape remains usable
 - **THEN** the system returns the draft as `completed`
 - **AND** none of those format differences produces a generation error
 
@@ -150,12 +185,12 @@ The system SHALL make one upstream model request for Platform V1. It SHALL NOT p
 - **AND** it does not return a mock, deterministic fallback or `completed` draft
 
 #### Scenario: Model content fails acceptance
-- **WHEN** parsed model content lacks a non-empty English or Chinese title or description, or retains an unsupported high-risk claim after sanitization
+- **WHEN** parsed model content cannot be normalized into the old-style bilingual field types or does not contain a usable `zhDisplay` object
 - **THEN** the system returns an explicit non-success error describing the failed acceptance boundary
-- **AND** it does not return a sanitized mock or deterministic replacement draft
+- **AND** it does not return a mock or deterministic replacement draft
 
 #### Scenario: Regeneration fails for a record with an existing Listing
-- **WHEN** a record already has `listingDrafts` and a regeneration request fails
+- **WHEN** a record already has `listingDrafts` and a regeneration request fails for an upstream, parsing, or incompatible-shape error
 - **THEN** the API returns the generation error
 - **AND** the existing stored `listingDrafts` are not overwritten by mock, deterministic, partial, or empty output
 
@@ -194,7 +229,7 @@ The local service and Cloudflare Worker SHALL use the same policy resolver, sour
 
 ### Requirement: Platform V1 Listing titles communicate evidence-backed value
 
-The system SHALL preserve the existing platform V1 title prompt behavior and old-style bilingual field contract. The prompt SHALL ask the title and `zhDisplay.title` to place product identity early and include one supplied differentiating selling point plus the directly supported buyer pain point or purchase concern that the selling point resolves. After this required core, when traceable evidence and platform hard limits allow, the prompt SHALL ask for distinct search-relevant or purchase-decision attributes selected from supplied quantity, visible construction, visible components, shape, color, variant, package, or use-context facts. When the resolved platform has no hard title limit below 120 English characters and the source supplies enough distinct traceable title facts to write naturally without repetition, the prompt SHALL target at least 120 English characters after trimming. Platform hard character and byte limits and factual support SHALL take precedence over this target. Traceable title evidence SHALL include explicit product inputs and compact structured Creation planning evidence whose buyer motivation or use context is directly supported by its evidence focus or reference-image notes. Objections that only identify missing, disputed, or unverified information SHALL NOT become title evidence. The prompt SHALL prohibit repeated padding and invented facts. The system SHALL sanitize unsupported low-risk title terms and SHALL NOT reject an otherwise usable direct response solely because it is shorter than the title target. `zhDisplay.title` SHALL preserve the same facts naturally when the model follows the prompt, without mechanical character padding.
+The system SHALL preserve the existing platform V1 title prompt behavior and old-style bilingual field contract. The prompt SHALL ask the title and `zhDisplay.title` to place product identity early and include supplied evidence-backed value and decision attributes within platform limits. It SHALL prohibit unsupported ranking, certification, medical, price, guarantee, refund, compatibility, performance, comparison, padding, and invented facts. Before acceptance, the system SHALL remove unsupported low-risk title terms and every unsupported blocking-claim match. A supported exact-evidence match SHALL remain when its rule permits exact evidence. The system SHALL repair a title emptied by cleanup with safe product identity text and SHALL NOT reject an otherwise normalizable direct response solely because of a removed title claim or title length.
 
 #### Scenario: Platform V1 prompt restores the prior field rules
 - **WHEN** a platform V1 Listing request is built
@@ -245,7 +280,7 @@ The system SHALL preserve the existing platform V1 title prompt behavior and old
 #### Scenario: Functional wording appears outside the title
 - **WHEN** supplied evidence directly supports a conservative feature-to-benefit relationship outside `title` and `zhDisplay.title`
 - **THEN** the Platform V1 response is not rejected solely because it contains that supported functional or benefit wording
-- **AND** unsupported outcomes, performance claims, and existing high-risk claims still cause the direct response to be rejected
+- **AND** any separate unsupported blocking-claim match is removed before the direct response is returned
 
 #### Scenario: Concrete low-risk attribute is not supplied
 - **WHEN** a Platform V1 response adds a concrete attribute, construction detail, color, shape, material, or specific use context that is absent from traceable product and buyer-decision evidence
@@ -253,9 +288,9 @@ The system SHALL preserve the existing platform V1 title prompt behavior and old
 - **AND** it returns the remaining usable direct response without a deterministic or mock replacement
 
 #### Scenario: Title contains a high-risk claim
-- **WHEN** a title contains an unsupported ranking, certification, medical, price, guarantee, refund, compatibility, performance, or other high-risk claim
-- **THEN** the response is rejected with an explicit generation error
-- **AND** no deterministic or mock replacement draft is returned
+- **WHEN** a title contains an unsupported ranking, certification, medical, price, guarantee, refund, compatibility, performance, comparison, or other configured blocking claim
+- **THEN** the system removes the complete matched content and repairs the title if needed
+- **AND** it returns the remaining direct model draft without a generation error, deterministic fallback, or mock replacement
 
 #### Scenario: Transient upstream failure retains a safe recognized product identity
 - **WHEN** a localized Listing request receives a transient upstream failure
@@ -270,7 +305,7 @@ The system SHALL preserve the existing platform V1 title prompt behavior and old
 
 #### Scenario: A short evidence-rich model title remains usable
 - **WHEN** a platform V1 model response supplies fewer than 120 English title characters for a source that qualifies for the target
-- **AND** the normalized draft retains the minimum bilingual structure and passes high-risk safety checks
+- **AND** the normalized draft retains the minimum bilingual shape after claim sanitization
 - **THEN** the short title does not cause a generation error
 - **AND** the direct model draft is returned without a fallback
 
@@ -286,7 +321,7 @@ The system SHALL preserve the existing platform V1 title prompt behavior and old
 
 ### Requirement: Platform V1 non-title Listing fields provide complete objective information
 
-The system SHALL instruct platform V1 generation to make `sellingPoints`, `painPoints`, `fiveBullets`, `description`, `backendSearchTerms`, `keywordBuckets`, and their Simplified Chinese counterparts complete, distinct, useful, natural, buyer-facing, and evidence-backed. Product facts SHALL remain traceable to supplied product inputs, SKU and package facts, reference notes, visible image evidence, or structured buyer-decision evidence whose stated value is supported by its evidence focus. The prompt SHALL prohibit internal workflow language, unsupported competitor comparisons, high-risk claims, question-and-answer pain points, duplicate decision points, and unsupported outcomes. It SHALL request four to five selling points, three to four declarative pain points, five unique product-relevant Bullet labels, natural description prose, and distinct search coverage when evidence and platform limits permit. These count, label, sentence-form, bilingual-count, and keyword-population rules SHALL be generation quality targets rather than direct-response failure gates. The system SHALL remove unsupported low-risk evidence terms before returning a usable response, while unsupported high-risk claims SHALL remain rejection conditions.
+The system SHALL instruct platform V1 generation to make `sellingPoints`, `painPoints`, `fiveBullets`, `description`, `backendSearchTerms`, `keywordBuckets`, and their Simplified Chinese counterparts complete, distinct, useful, natural, buyer-facing, and evidence-backed. The prompt SHALL prohibit internal workflow language, unsupported competitor comparisons, blocking claims, question-and-answer pain points, duplicate decision points, and unsupported outcomes. Count, label, sentence-form, bilingual-count, and keyword-population rules SHALL remain generation quality targets rather than direct-response failure gates. Before returning a usable response, the system SHALL remove unsupported low-risk evidence terms and every unsupported match from the configured blocking claim rules. A blocking-claim keyword, phrase, or emptied keyword field SHALL NOT reject the response.
 
 #### Scenario: Evidence supports multiple non-title decision points
 - **WHEN** Platform V1 product evidence contains at least four distinct supported facts or buyer-decision relationships
@@ -300,7 +335,7 @@ The system SHALL instruct platform V1 generation to make `sellingPoints`, `painP
 
 #### Scenario: Interrogative model output remains usable
 - **WHEN** a Platform V1 model response contains an English or Chinese pain point with a question mark, rhetorical question, or interrogative opening
-- **AND** the minimum bilingual structure and high-risk safety checks pass
+- **AND** the minimum bilingual shape remains after claim sanitization
 - **THEN** the sentence form alone does not cause a generation error
 - **AND** the direct model response is returned without a deterministic or mock replacement
 
@@ -327,7 +362,7 @@ The system SHALL instruct platform V1 generation to make `sellingPoints`, `painP
 #### Scenario: English and Chinese non-title fields correspond
 - **WHEN** the bilingual Platform V1 prompt is built
 - **THEN** it requests corresponding item counts, order, facts, quantities, units, buyer relevance, and proof
-- **AND** normalization or low-risk term removal may leave different list counts without rejecting an otherwise usable response
+- **AND** normalization or claim removal may leave different list counts without rejecting an otherwise usable response
 
 #### Scenario: Product evidence is insufficient for recommended completeness
 - **WHEN** the source cannot support a direct benefit, category-friction response, recommended item count, or target length
@@ -346,13 +381,14 @@ The system SHALL instruct platform V1 generation to make `sellingPoints`, `painP
 
 #### Scenario: Comparative failure is unsupported
 - **WHEN** generated copy says or implies that competitors fail or that this product is better than alternatives without exact comparative evidence
-- **THEN** the response is treated as containing an unsupported high-risk comparison
-- **AND** it is rejected unless the unsupported claim is absent from the final sanitized content
+- **THEN** the system removes the configured unsupported-comparison match from the final public content
+- **AND** the comparison does not cause the remaining normalizable direct response to fail
 
 #### Scenario: Comparative failure is implied through a generic competitor class
 - **WHEN** generated copy says that most alternatives, typical products, standard models, ordinary products, or an equivalent Chinese competitor class lacks, struggles, leaves a problem, or offers only a limitation
 - **AND** exact comparative evidence is absent
-- **THEN** the response is treated as an unsupported competitor comparison
+- **THEN** the system removes the configured unsupported-comparison match before returning the response
+- **AND** it does not fail the Listing solely because of that comparison
 
 #### Scenario: Five bullets follow Amazon-style buyer decisions
 - **WHEN** a Platform V1 prompt is built
@@ -361,18 +397,18 @@ The system SHALL instruct platform V1 generation to make `sellingPoints`, `painP
 
 #### Scenario: Model reuses the legacy fixed Bullet script
 - **WHEN** five bullets use the complete former `PRODUCT TYPE`, `PACK DETAILS`, `VISIBLE DETAILS`, `SPECIFICATIONS`, and `PACKAGE CONTENTS` label set
-- **AND** the minimum bilingual structure and high-risk safety checks pass
+- **AND** the minimum bilingual shape remains after claim sanitization
 - **THEN** the label choice alone does not cause a generation error
 - **AND** the direct response is returned without a deterministic or mock replacement
 
 #### Scenario: Deterministic fallback has buyer-decision evidence
-- **WHEN** the model response is unavailable or fails a non-recoverable acceptance condition
+- **WHEN** the model response is unavailable or fails a non-recoverable parsing or shape condition
 - **AND** bounded buyer-decision evidence contains otherwise usable supported facts
 - **THEN** the system returns an explicit generation error
 - **AND** it does not convert that evidence into a deterministic or mock Listing
 
 #### Scenario: English fallback receives localized product evidence
-- **WHEN** an English Listing request fails and the saved evidence contains Simplified Chinese
+- **WHEN** an English Listing request fails for a non-recoverable upstream, parsing, or shape condition and the saved evidence contains Simplified Chinese
 - **THEN** the system returns the generation error without constructing localized fallback copy
 - **AND** no translated, generic, deterministic, or mock Listing is saved
 
@@ -380,3 +416,100 @@ The system SHALL instruct platform V1 generation to make `sellingPoints`, `painP
 - **WHEN** a failed request supplies a trusted parent `productName` and a generic SKU subject title
 - **THEN** neither identity is used to construct a fallback Listing
 - **AND** the caller receives the original generation error
+
+### Requirement: Listing dimensions distinguish sourced facts from estimates
+Every newly generated Listing SHALL provide package and product physical dimensions. The system SHALL reproduce corresponding explicit source dimensions without changing their factual meaning. When corresponding evidence is absent, it SHALL provide a conservative numeric estimate and SHALL mark the English value with `Estimated:` and the Simplified Chinese value with `预估：`. Product dimensions MUST NOT be presented as sourced package dimensions. Image pixel resolution MUST NOT be treated as a physical product or package dimension.
+
+#### Scenario: Product dimensions are supplied but package dimensions are absent
+- **WHEN** source product facts contain a physical product length, width, height, depth or diameter but no explicit packaging, packed, carton, color-box or outer-box dimensions
+- **THEN** `productDimensions` reproduces the supplied physical dimension facts without an estimate marker
+- **AND** `packageDimensions` contains a numeric conservative estimate marked `Estimated:`
+- **AND** `zhDisplay.packageDimensions` contains the same estimate marked `预估：`
+
+#### Scenario: Both dimension types are supplied
+- **WHEN** source facts explicitly identify both product dimensions and package dimensions
+- **THEN** both output fields reproduce the corresponding sourced values
+- **AND** neither field relabels the other dimension type
+
+#### Scenario: Neither dimension type is supplied
+- **WHEN** source facts provide no physical product or package dimensions
+- **THEN** both fields contain conservative numeric estimates
+- **AND** both English values use `Estimated:` and both Simplified Chinese values use `预估：`
+
+#### Scenario: Unit mode is selected
+- **WHEN** Listing generation receives metric, imperial or both as the dimension unit mode
+- **THEN** sourced and estimated dimension fields follow that selected mode
+- **AND** the dimensions remain within the shared 500-character field ceiling
+
+### Requirement: Listing drafts expose sourced or estimated weight fields
+
+Every newly generated or explicitly test-mocked Listing SHALL contain non-empty `packageWeight` and `productWeight` strings and matching Simplified Chinese fields under `zhDisplay`. Explicit package/gross/shipping weight evidence SHALL populate `packageWeight`; explicit product/net/item weight evidence SHALL populate `productWeight`. When the corresponding evidence is absent, the English field SHALL start with `Estimated:` and the Chinese field SHALL start with `预估：`. Weight fields SHALL follow the selected metric, imperial, or both unit mode and SHALL NOT be placed in the title.
+
+#### Scenario: Product weight is supplied and package weight is absent
+- **WHEN** source facts contain a product or net weight but no package, gross, packed, or shipping weight
+- **THEN** `productWeight` reproduces the supplied weight in the selected unit mode without an estimate marker
+- **AND** `packageWeight` contains a numeric conservative estimate marked `Estimated:`
+- **AND** `zhDisplay.packageWeight` contains the same estimate marked `预估：`
+
+#### Scenario: Package and product weights are supplied
+- **WHEN** source facts explicitly identify both weight types
+- **THEN** each field reproduces its corresponding source weight
+- **AND** package weight is not copied into product weight or vice versa
+
+#### Scenario: Neither weight type is supplied
+- **WHEN** source facts provide no traceable weight value
+- **THEN** both weight fields contain conservative numeric estimates
+- **AND** both English values use `Estimated:` and both Chinese values use `预估：`
+
+#### Scenario: Historical Listing predates weight fields
+- **WHEN** a completed stored Listing lacks one or more weight fields
+- **THEN** the read response fills the missing fields from set-level weight evidence or explicit estimates
+- **AND** the stored historical Listing is not rewritten automatically
+
+#### Scenario: Weight is copied or exported
+- **WHEN** a Listing is displayed, copied as full text, or exported as structured JSON
+- **THEN** package dimensions and package weight appear in one package specification section
+- **AND** product dimensions and product weight appear in one product specification section
+- **AND** each section places dimensions before weight in English and Simplified Chinese
+- **AND** structured JSON retains `packageDimensions`, `packageWeight`, `productDimensions`, and `productWeight` as independent fields with matching Simplified Chinese fields
+- **AND** no combined display string replaces those source fields
+
+### Requirement: Dimension evidence is label-scoped and tuple-complete
+The system SHALL associate sourced package and product dimensions only with a non-negated clause containing the corresponding label and physical length tuple. Every unmarked generated dimension tuple SHALL match a complete corresponding source tuple, including every axis and any displayed unit conversion; sharing one numeric token SHALL NOT establish provenance.
+
+#### Scenario: Package evidence is explicitly absent beside product dimensions
+- **WHEN** source text says package dimensions are not provided and separately supplies product dimensions
+- **THEN** the product tuple is accepted only as product evidence
+- **AND** package dimensions remain an explicitly marked estimate
+
+#### Scenario: A generated tuple changes sourced axes
+- **WHEN** source evidence is `10 x 5 x 3 cm` and a generated field contains `10 x 999 x 999 cm`
+- **THEN** validation rejects the generated field
+- **AND** matching the first numeric token does not satisfy provenance
+
+### Requirement: Dimension validation uses length units and the shared field ceiling
+Dimension unit-mode validation SHALL count only physical length units, and every English and Simplified Chinese package or product dimension field SHALL remain within the shared 500-character ceiling on every generation path.
+
+#### Scenario: Weight accompanies one length system
+- **WHEN** both-unit mode receives `20 cm, 2 lb` without an imperial length
+- **THEN** validation reports the missing imperial length system
+
+#### Scenario: Legacy Platform V1 returns an overlong dimension
+- **WHEN** an English or Simplified Chinese dimension field exceeds 500 characters
+- **THEN** the Platform V1 response is rejected before it is returned or stored
+
+### Requirement: Historical grouped dimensions retain every axis
+The historical read compatibility layer SHALL recognize grouped `N x N [x N] unit` dimensions with a shared trailing unit and SHALL retain every axis while deriving concise component groups. It SHALL change only the read model and SHALL NOT rewrite stored history.
+
+#### Scenario: Component dimensions share trailing units
+- **WHEN** historical evidence contains `Main body: 194 x 35 mm; Keeper: 46 x 34 mm`
+- **THEN** the hydrated display retains `194 x 35 mm` and `46 x 34 mm`
+- **AND** neither leading axis is discarded
+
+### Requirement: Listing review exposes unresolved generation context
+Creation record details SHALL render non-empty Listing `warnings` and `missingInfo` after the public copy fields so reviewers can distinguish generated copy from unresolved evidence gaps.
+
+#### Scenario: A saved Listing contains warnings and missing information
+- **WHEN** the user opens that Listing in Creation record details
+- **THEN** each non-empty warning and missing-information item is visible
+- **AND** the fields remain excluded when their arrays are empty

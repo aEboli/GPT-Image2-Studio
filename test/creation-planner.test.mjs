@@ -523,6 +523,46 @@ test("creation planner rewrites Chinese visible copy when target language is Eng
   );
 });
 
+test("creation planner limits output language to copy outside the supplied product subject", () => {
+  const plan = buildCreationPlan({
+    productName: "Kobayashi cooling patch",
+    productDescription: "Retail cooling patch package with original Japanese surface artwork and writing.",
+    sellingPoints: "cooling sensation\nhot-weather use",
+    targetLanguage: "en",
+    selectedRoles: ["hero"],
+    skuGenerationEnabled: true,
+    referenceImageRoles: [
+      {
+        filename: "kobayashi-package.png",
+        role: "product",
+        note: "The physical retail package is the sellable subject.",
+      },
+    ],
+    skuSubjects: [
+      {
+        id: "original-package",
+        title: "Original package",
+        filenames: ["kobayashi-package.png"],
+        note: "One complete package subject.",
+      },
+    ],
+  });
+  const ordinaryItems = plan.items.filter((item) => item.role !== "infographic-rebuild");
+
+  assert.equal(ordinaryItems.length, 2);
+  for (const item of ordinaryItems) {
+    assert.match(item.prompt, /SUBJECT CONTENT LOCK:/);
+    assert.match(item.prompt, /patterns, artwork, illustrations, symbols/i);
+    assert.match(item.prompt, /printed, engraved, embossed, or embroidered text/i);
+    assert.match(item.prompt, /exact characters, spelling, writing system, and original language/i);
+    assert.match(item.prompt, /do not translate, transliterate, rewrite, correct, localize, redraw, replace, remove, cover, or restyle/i);
+    assert.match(item.prompt, /OUTPUT LANGUAGE BOUNDARY:/);
+    assert.match(item.prompt, /newly authored wording outside the physical product or packaging subject, only that separate wording follows the selected language/i);
+    assert.match(item.prompt, /different original language.*required exception/i);
+    assert.doesNotMatch(item.prompt, /Translate or rewrite any source-language wording into the target language/i);
+  }
+});
+
 test("creation planner treats detailed descriptions as selective set-wide source material", () => {
   const plan = buildCreationPlan({
     productName: "Handheld vacuum",
@@ -1660,7 +1700,7 @@ test("creation planner defaults SKU generation to show English color names under
 
   assert.equal(plan.skuGenerationRule, "color-name-under-subject");
   assert.match(skuItem.prompt, /SKU generation rule: show the color name below the subject/i);
-  assert.match(skuItem.prompt, /Visible SKU color label under the subject: "red"/);
+  assert.match(skuItem.prompt, /Visible SKU color label line under the subject follows\.\nred\n/);
 });
 
 test("creation planner labels every visible unit color under grouped SKU subjects", () => {
@@ -1685,7 +1725,10 @@ test("creation planner labels every visible unit color under grouped SKU subject
   const skuItem = plan.items.find((item) => item.role === "sku");
 
   assert.match(skuItem.prompt, /label each complete visible product unit with its own color name directly below that corresponding unit/i);
-  assert.match(skuItem.prompt, /Visible SKU color labels for the grouped subject: "blue", "gray", "black", "silver"/);
+  assert.match(
+    skuItem.prompt,
+    /Visible SKU color label lines for the grouped subject follow in product-unit order\.\nblue\ngray\nblack\nsilver\n/,
+  );
   assert.match(skuItem.prompt, /Do not render one shared color label for the whole grouped image/i);
 });
 
@@ -1705,11 +1748,11 @@ test("creation planner keeps visually distinct backpack SKU colors exact", () =>
   });
   const skuPrompts = plan.items.filter((item) => item.role === "sku").map((item) => item.prompt);
 
-  assert.match(skuPrompts[0], /Visible SKU color label under the subject: "navy blue"/);
-  assert.match(skuPrompts[1], /Visible SKU color label under the subject: "cyan blue"/);
-  assert.match(skuPrompts[2], /Visible SKU color label under the subject: "orange"/);
-  assert.match(skuPrompts[3], /Visible SKU color label under the subject: "red"/);
-  assert.ok(skuPrompts.every((prompt) => !/Visible SKU color label under the subject: "white"/.test(prompt)));
+  assert.match(skuPrompts[0], /Visible SKU color label line under the subject follows\.\nnavy blue\n/);
+  assert.match(skuPrompts[1], /Visible SKU color label line under the subject follows\.\ncyan blue\n/);
+  assert.match(skuPrompts[2], /Visible SKU color label line under the subject follows\.\norange\n/);
+  assert.match(skuPrompts[3], /Visible SKU color label line under the subject follows\.\nred\n/);
+  assert.ok(skuPrompts.every((prompt) => !/Visible SKU color label line under the subject follows\.\nwhite\n/.test(prompt)));
 });
 
 test("creation reference analysis carries structured SKU colors into generation prompts", () => {
@@ -1757,7 +1800,7 @@ test("creation planner never guesses a missing SKU color label", () => {
   const skuPrompt = plan.items.find((item) => item.role === "sku").prompt;
 
   assert.match(skuPrompt, /Do not render any color-name label and never guess one/i);
-  assert.doesNotMatch(skuPrompt, /Visible SKU color label under the subject:/i);
+  assert.doesNotMatch(skuPrompt, /Visible SKU color label line under the subject follows/i);
 });
 
 test("creation planner keeps single multi-color SKU subjects as one color label", () => {
@@ -1779,13 +1822,37 @@ test("creation planner keeps single multi-color SKU subjects as one color label"
 
   const skuItem = plan.items.find((item) => item.role === "sku");
 
-  assert.match(skuItem.prompt, /Visible SKU color label under the subject: "blue, silver"/);
-  assert.match(skuItem.prompt, /keep all supplied colors and component qualifiers together in one label/i);
-  assert.doesNotMatch(skuItem.prompt, /Visible SKU color labels for the grouped subject/i);
+  assert.match(skuItem.prompt, /Visible SKU color label line under the subject follows\.\nblue silver\n/);
+  assert.doesNotMatch(skuItem.prompt, /"blue silver"|blue, silver/);
+  assert.match(skuItem.prompt, /color-label text may contain color names, spaces, and internal hyphens only/i);
+  assert.doesNotMatch(skuItem.prompt, /Visible SKU color label lines for the grouped subject/i);
   assert.doesNotMatch(skuItem.prompt, /each complete visible product unit needs its own label/i);
 });
 
-test("creation reference analysis keeps a goggles characteristic-color phrase as one SKU label", () => {
+test("creation planner preserves a recognized compound-color hyphen", () => {
+  const plan = buildCreationPlan({
+    productName: "Travel pouch",
+    targetLanguage: "en",
+    selectedRoles: ["hero"],
+    skuSubjects: [
+      {
+        id: "light-variant",
+        title: "Light variant",
+        filenames: ["light-variant.png"],
+        colorNames: ["off-white"],
+        note: "One complete visible product unit.",
+      },
+    ],
+  });
+  const skuItem = plan.items.find((item) => item.role === "sku");
+  const labelLine = skuItem.prompt.match(/Visible SKU color label line under the subject follows\.\n([^\n]+)/)?.[1];
+
+  assert.equal(labelLine, "off-white");
+  assert.match(labelLine, /^[\p{L}\p{N}]+(?:[ -][\p{L}\p{N}]+)*$/u);
+  assert.match(skuItem.prompt, /hyphen that belongs inside a recognized compound color name such as off-white/i);
+});
+
+test("creation reference analysis strips component words from a goggles color label", () => {
   const analysis = normalizeCreationReferenceAnalysis({
     summary: "One riding-goggles SKU.",
     reference_roles: [
@@ -1812,11 +1879,13 @@ test("creation reference analysis keeps a goggles characteristic-color phrase as
     skuSubjects: analysis.skuSubjects,
   });
   const skuItem = plan.items.find((item) => item.role === "sku");
+  const labelLine = skuItem.prompt.match(/Visible SKU color label line under the subject follows\.\n([^\n]+)/)?.[1];
 
-  assert.deepEqual(analysis.skuSubjects[0].colorNames, ["brown, black, silver lenses"]);
-  assert.match(skuItem.prompt, /Visible SKU color label under the subject: "brown, black, silver lenses"/);
+  assert.deepEqual(analysis.skuSubjects[0].colorNames, ["brown black silver"]);
+  assert.equal(labelLine, "棕色 黑色 银色");
+  assert.doesNotMatch(labelLine, /brown|black|silver/i);
   assert.match(skuItem.prompt, /translate the complete label into the selected target language/i);
-  assert.match(skuItem.prompt, /do not drop shared neutral component colors/i);
+  assert.match(skuItem.prompt, /do not add part names such as strap, frame, or lenses/i);
 });
 
 test("creation planner preserves grouped multi-color label boundaries", () => {
@@ -1840,9 +1909,10 @@ test("creation planner preserves grouped multi-color label boundaries", () => {
 
   assert.match(
     skuItem.prompt,
-    /Visible SKU color labels for the grouped subject: "brown, black strap, silver lenses", "red, black strap, gray lenses"/,
+    /Visible SKU color label lines for the grouped subject follow in product-unit order\.\nbrown black silver\nred black gray\n/,
   );
-  assert.doesNotMatch(skuItem.prompt, /"brown", "black strap"/);
+  assert.doesNotMatch(skuItem.prompt, /"brown black silver"|brown, black, silver|"red black gray"|red, black, gray/);
+  assert.doesNotMatch(skuItem.prompt, /black strap|silver lenses|gray lenses/i);
 });
 
 test("creation planner does not infer a color after analysis explicitly marks it unsafe", () => {
@@ -1874,7 +1944,7 @@ test("creation planner does not infer a color after analysis explicitly marks it
 
   assert.deepEqual(analysis.skuSubjects[0].colorNames, []);
   assert.match(skuItem.prompt, /The exact SKU color name is unavailable/);
-  assert.doesNotMatch(skuItem.prompt, /Visible SKU color label under the subject:/);
+  assert.doesNotMatch(skuItem.prompt, /Visible SKU color label line under the subject follows/);
 });
 
 test("creation planner keeps repeated labels for matching grouped units", () => {
@@ -1897,8 +1967,31 @@ test("creation planner keeps repeated labels for matching grouped units", () => 
 
   assert.match(
     skuItem.prompt,
-    /Visible SKU color labels for the grouped subject: "black, silver lenses", "black, silver lenses"/,
+    /Visible SKU color label lines for the grouped subject follow in product-unit order\.\nblack silver\nblack silver\n/,
   );
+  assert.doesNotMatch(skuItem.prompt, /"black silver"|black, silver/);
+});
+
+test("creation planner removes non-color words from historical SKU labels", () => {
+  const plan = buildCreationPlan({
+    productName: "Travel pouch",
+    targetLanguage: "en",
+    selectedRoles: ["hero"],
+    skuSubjects: [
+      {
+        id: "legacy-pouch",
+        title: "Travel pouch Model X",
+        filenames: ["legacy-pouch.png"],
+        colorNames: ["matte olive green nylon pouch, rose gold buckle, Model X"],
+        note: "One complete visible product unit.",
+      },
+    ],
+  });
+  const skuItem = plan.items.find((item) => item.role === "sku");
+
+  assert.match(skuItem.prompt, /Visible SKU color label line under the subject follows\.\nolive green rose gold\n/);
+  assert.doesNotMatch(skuItem.prompt, /"olive green rose gold"|olive green, rose gold/);
+  assert.doesNotMatch(skuItem.prompt, /(?:matte|nylon|pouch|buckle|Model X).*\nRender that exact color-only line/i);
 });
 
 test("creation planner preserves explicit grouped SKU colors outside the color dictionary", () => {
@@ -1922,8 +2015,12 @@ test("creation planner preserves explicit grouped SKU colors outside the color d
 
   const skuItem = plan.items.find((item) => item.role === "sku");
 
-  assert.match(skuItem.prompt, /Visible SKU color labels for the grouped subject: "azul marino", "beige"/);
-  assert.match(skuItem.prompt, /preserve every complete label and place it below the corresponding visible product unit/i);
+  assert.match(
+    skuItem.prompt,
+    /Visible SKU color label lines for the grouped subject follow in product-unit order\.\nazul marino\nbeige\n/,
+  );
+  assert.doesNotMatch(skuItem.prompt, /"azul marino"|"beige"|azul marino, beige/);
+  assert.match(skuItem.prompt, /preserve every complete label line and place only its color words below the corresponding visible product unit/i);
 });
 
 test("creation planner SKU prompts treat source card text as non-subject noise", () => {

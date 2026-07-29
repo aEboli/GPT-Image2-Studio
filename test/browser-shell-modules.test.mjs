@@ -387,7 +387,19 @@ test("creation listing controller sends browser-private request config", async (
           ok: true,
           set: {
             ...selectedSet,
-            listingDrafts: [{ title: "1 Pack Listing Probe" }],
+            listingDrafts: [{
+              title: "1 Pack Listing Probe",
+              packageDimensions: "Estimated: 6 x 4 x 2 in",
+              productDimensions: "Estimated: 4 x 2 x 1 in",
+              packageWeight: "Estimated: 12.35 oz",
+              productWeight: "Estimated: 8.82 oz",
+              zhDisplay: {
+                packageDimensions: "预估：6 x 4 x 2 英寸",
+                productDimensions: "预估：4 x 2 x 1 英寸",
+                packageWeight: "预估：12.35 盎司",
+                productWeight: "预估：8.82 盎司",
+              },
+            }],
           },
         }),
         {
@@ -521,7 +533,19 @@ test("creation listing controller preserves other in-flight records when generat
           ok: true,
           set: {
             ...selectedSet,
-            listingDrafts: [{ title: "1 Pack Available Listing" }],
+            listingDrafts: [{
+              title: "1 Pack Available Listing",
+              packageDimensions: "Estimated: 6 x 4 x 2 in",
+              productDimensions: "Estimated: 4 x 2 x 1 in",
+              packageWeight: "Estimated: 12.35 oz",
+              productWeight: "Estimated: 8.82 oz",
+              zhDisplay: {
+                packageDimensions: "预估：6 x 4 x 2 英寸",
+                productDimensions: "预估：4 x 2 x 1 英寸",
+                packageWeight: "预估：12.35 盎司",
+                productWeight: "预估：8.82 盎司",
+              },
+            }],
           },
         }),
         {

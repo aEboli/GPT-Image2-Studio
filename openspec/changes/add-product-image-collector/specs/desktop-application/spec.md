@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Desktop application exposes only purpose-bound collector support
-The desktop application SHALL make the local product-image proxy and extension-package endpoint available through the existing loopback Studio origin without enabling Node.js integration, a preload script, general-purpose IPC, a fixed port, arbitrary external navigation, or arbitrary remote URL fetching.
+The desktop application SHALL make the local product-image proxy and extension-package endpoint available through the existing loopback Studio origin without enabling Node.js integration, a preload script, general-purpose IPC, a fixed port, arbitrary external navigation, or arbitrary remote URL fetching. Direct Windows file-clipboard copy SHALL remain outside the desktop runtime in the extension's dedicated Native Messaging host.
 
 #### Scenario: Desktop user imports a collector manifest
 - **WHEN** the desktop workbench resolves a confirmed trusted collector image
