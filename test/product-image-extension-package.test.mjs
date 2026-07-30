@@ -10,7 +10,7 @@ test("extension ZIP contains reviewable sources and the exact shared import prot
   const zip = await JSZip.loadAsync(archive.bytes);
   const filenames = Object.keys(zip.files).filter((name) => !zip.files[name].dir);
 
-  assert.match(archive.filename, /^GPT-Image2-Studio-Product-Image-Collector-v1\.1\.23\.zip$/);
+  assert.match(archive.filename, /^GPT-Image2-Studio-Product-Image-Collector-v1\.1\.29\.zip$/);
   for (const filename of [
     "manifest.json",
     "collector.js",

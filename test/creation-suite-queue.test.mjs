@@ -118,7 +118,7 @@ test("creation suite queue builds a complete queued set from current form state"
     getCreationSelectedPlatform: () => ({ value: "amazon", label: "Amazon" }),
     getCreationSelectedRoles: () => [{ itemId: "hero", role: "main" }],
     getCreationSelectedScenario: () => ({ value: "standard", label: "Standard" }),
-    getCreationSelectedSkuGenerationRule: () => ({ value: "package-list", label: "添加包装清单" }),
+    getCreationSelectedSkuGenerationRule: () => ({ value: "package-list", label: "显示清单" }),
     isCreationDraftSet: () => false,
     normalizeCreationSkuBundleCountForPayload: (value) => Number(value),
     normalizeCreationVisualLanguage: (value) => value || "classic-commercial",
@@ -145,7 +145,7 @@ test("creation suite queue builds a complete queued set from current form state"
   assert.deepEqual(set.referenceImageRoles, [{ id: "ref-1", role: "product" }]);
   assert.deepEqual(set.skuSubjects, [{ id: "sku-a", title: "SKU A", filenames: ["sku-a.jpg"] }]);
   assert.equal(set.skuGenerationRule, "package-list");
-  assert.equal(set.skuGenerationRuleLabel, "添加包装清单");
+  assert.equal(set.skuGenerationRuleLabel, "显示清单");
   assert.deepEqual(set.logo, { placement: "top-left" });
   assert.equal(set.skuBundleCount, 2);
   assert.equal(set.items[0].status, "queued");
@@ -275,7 +275,7 @@ test("creation suite queue defaults SKU rule to color-name labels when no getter
   });
 
   assert.equal(set.skuGenerationRule, "color-name-under-subject");
-  assert.equal(set.skuGenerationRuleLabel, "主体下方显示颜色名");
+  assert.equal(set.skuGenerationRuleLabel, "显示颜色");
 });
 
 test("creation suite queue appends queued rebuild cards when enabled", () => {

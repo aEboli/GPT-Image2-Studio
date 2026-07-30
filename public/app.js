@@ -7063,7 +7063,7 @@ const FALLBACK_CREATION_PLATFORM_OPTIONS = [
 ];
 const CREATION_DIMENSION_UNIT_MODE_LABELS = { metric: "公制", imperial: "英制", both: "公制和英制" };
 const DEFAULT_CREATION_SKU_GENERATION_RULE = "color-name-under-subject";
-const CREATION_SKU_GENERATION_RULE_LABELS = { "color-name-under-subject": "主体下方显示颜色名", none: "无", "package-list": "添加包装清单", dimensions: "添加尺寸", "package-list-dimensions": "添加包装清单和尺寸" };
+const CREATION_SKU_GENERATION_RULE_LABELS = { "color-name-under-subject": "显示颜色", none: "无", "package-list": "显示清单", dimensions: "显示尺寸", "package-list-dimensions": "显示清单和尺寸" };
 
 const CREATION_CATEGORY_TEMPLATE_MODULE_URL = "/lib/creation-category-templates.mjs?v=20260509-category-search-2";
 const CREATION_BASE_INDUSTRY_TEMPLATE_OPTIONS = [

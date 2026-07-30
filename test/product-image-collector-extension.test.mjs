@@ -1318,12 +1318,32 @@ test("extension direct image copy uses its dedicated native host without Studio 
   assert.equal(nativeMessages[0].payload.type, "copy-images");
 });
 
+test("blue collector theme uses a distinct blue-hour palette", async () => {
+  const floatingPanel = await readFile(new URL("../extensions/product-image-collector/floating-panel.js", import.meta.url), "utf8");
+  assert.match(floatingPanel, /\.panel\[data-theme="blue"\]\s*\{[\s\S]*?color-scheme:\s*dark;[\s\S]*?--panel-bg:\s*#1e3a5f;[\s\S]*?--surface:\s*#294b73;[\s\S]*?--text:\s*#f3f8ff;[\s\S]*?--group-main:\s*#2a527e;[\s\S]*?--selection-accent:\s*#4de0d2;[\s\S]*?--variant-border:\s*#38d5f5;[\s\S]*?--variant-bg:\s*#07566b;[\s\S]*?--variant-text:\s*#ffffff;[\s\S]*?--primary-bg:\s*#c5532d;[\s\S]*?--viewer-backdrop:\s*rgba\(4,\s*18,\s*38,\s*0\.9\);/);
+  assert.doesNotMatch(floatingPanel, /\.panel\[data-theme="blue"\]\s*\{[\s\S]*?--panel-bg:\s*#e5eff9;/);
+});
+
+test("SKU variant labels keep readable fixed type, natural height, and high-contrast themed wrapping", async () => {
+  const floatingPanel = await readFile(new URL("../extensions/product-image-collector/floating-panel.js", import.meta.url), "utf8");
+  assert.match(floatingPanel, /\.panel\s*\{[\s\S]*?--variant-border:\s*#f59e0b;[\s\S]*?--variant-bg:\s*#ffe08a;[\s\S]*?--variant-text:\s*#4a1f00;/);
+  assert.match(floatingPanel, /\.panel\[data-theme="blue"\]\s*\{[\s\S]*?--variant-border:\s*#38d5f5;[\s\S]*?--variant-bg:\s*#07566b;[\s\S]*?--variant-text:\s*#ffffff;/);
+  assert.match(floatingPanel, /\.panel\[data-theme="night"\]\s*\{[\s\S]*?--variant-border:\s*#ff79c6;[\s\S]*?--variant-bg:\s*#5b204f;[\s\S]*?--variant-text:\s*#fff7fb;/);
+  assert.match(floatingPanel, /\.image-card\.has-variant\s*\{\s*grid-template-rows:\s*auto auto 24px;/);
+  assert.doesNotMatch(floatingPanel, /\.image-card\.has-variant\s*\{[^}]*minmax\(56px/);
+  assert.match(floatingPanel, /\.image-card-variant\s*\{[\s\S]*?font-size:\s*12px;[\s\S]*?font-weight:\s*700;[\s\S]*?line-height:\s*16px;[\s\S]*?white-space:\s*normal;[\s\S]*?overflow-wrap:\s*anywhere;/);
+  assert.doesNotMatch(floatingPanel, /\.image-card-variant\s*\{[^}]*(?:overflow:\s*hidden|text-overflow:\s*ellipsis)/);
+  assert.doesNotMatch(floatingPanel, /\bVARIANT_FONT_MAX_PX\b|\bVARIANT_FONT_MIN_PX\b|\bVARIANT_HORIZONTAL_PADDING_PX\b|\bvariantFitFrame\b/);
+  assert.doesNotMatch(floatingPanel, /function\s+(?:variantRows|fittingVariantFontSize|fitVariantRows|scheduleVariantRowFit)\b/);
+  assert.doesNotMatch(floatingPanel, /\.style\.fontSize\s*=|(?:add|remove)EventListener\("resize",\s*scheduleVariantRowFit\)/);
+});
+
 test("extension manifest uses an on-demand minimum-permission MV3 surface", async () => {
   const manifest = JSON.parse(await readFile(new URL("../extensions/product-image-collector/manifest.json", import.meta.url), "utf8"));
   const serviceWorker = await readFile(new URL("../extensions/product-image-collector/service-worker.mjs", import.meta.url), "utf8");
   const floatingPanel = await readFile(new URL("../extensions/product-image-collector/floating-panel.js", import.meta.url), "utf8");
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, "1.1.23");
+  assert.equal(manifest.version, "1.1.29");
   assert.deepEqual(manifest.permissions, ["activeTab", "scripting", "downloads", "clipboardWrite", "nativeMessaging"]);
   for (const permission of [
     "https://detail.1688.com/*",
@@ -1357,8 +1377,8 @@ test("extension manifest uses an on-demand minimum-permission MV3 surface", asyn
   assert.match(serviceWorker, /chrome\.runtime\.sendNativeMessage\(NATIVE_CLIPBOARD_HOST/);
   assert.match(serviceWorker, /com\.aeboli\.gpt_image2_studio\.product_image_clipboard/);
   assert.doesNotMatch(serviceWorker, /chrome\.tabs\.query|STUDIO_TAB_URL_PATTERNS|product-image-collector\/clipboard|chrome\.sidePanel/);
-  assert.match(floatingPanel, /PANEL_VERSION\s*=\s*"1\.1\.23"/);
-  assert.match(floatingLauncherSource, /LAUNCHER_VERSION\s*=\s*"1\.1\.23"/);
+  assert.match(floatingPanel, /PANEL_VERSION\s*=\s*"1\.1\.29"/);
+  assert.match(floatingLauncherSource, /LAUNCHER_VERSION\s*=\s*"1\.1\.29"/);
   assert.match(floatingPanel, /function previewUrlFor\(item\)/);
   assert.match(floatingPanel, /state\.manifest\?\.source\?\.platform !== "gigacloud"/);
   assert.match(floatingPanel, /searchParams\.set\("x-oss-process", "image\/resize,w_300,h_300,m_pad"\)/);
@@ -1416,12 +1436,12 @@ test("extension manifest uses an on-demand minimum-permission MV3 surface", asyn
   assert.match(floatingPanel, /image\.decoding\s*=\s*"async"/);
   assert.match(floatingPanel, /MESSAGE_COPY_IMAGES\s*=\s*"product-image-collector:copy-images"/);
   assert.match(floatingPanel, /<output class="copy-success-toast" id="copySuccessToast" role="status" aria-live="polite" aria-atomic="true" data-visible="false"><\/output>/);
-  assert.match(floatingPanel, /\.copy-success-toast\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?bottom:\s*60px;[\s\S]*?background:\s*rgba\([^)]+\);[\s\S]*?opacity:\s*0;[\s\S]*?visibility:\s*hidden;[\s\S]*?transition:[^}]*opacity[^}]*transform/);
+  assert.match(floatingPanel, /\.copy-success-toast\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?bottom:\s*60px;[\s\S]*?background:\s*var\(--toast-bg\);[\s\S]*?opacity:\s*0;[\s\S]*?visibility:\s*hidden;[\s\S]*?transition:[^}]*opacity[^}]*transform/);
   assert.match(floatingPanel, /\.copy-success-toast\[data-visible="true"\]\s*\{[\s\S]*?opacity:\s*1;[\s\S]*?visibility:\s*visible/);
   assert.match(floatingPanel, /function showCopySuccessToast\(message\)[\s\S]*?clearTimeout\(copySuccessToastTimer\)[\s\S]*?dataset\.visible\s*=\s*"false"[\s\S]*?offsetWidth[\s\S]*?dataset\.visible\s*=\s*"true"[\s\S]*?setTimeout/);
   assert.match(floatingPanel, /showCopySuccessToast\(`已复制 \$\{response\.count\} 张图片`\)/);
   assert.match(floatingPanel, /\.panel-head\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\) auto auto/);
-  assert.match(floatingPanel, /<header class="panel-head" id="dragHandle">[\s\S]*?<div class="product-summary"[^>]*>[\s\S]*?id="productTitle"[\s\S]*?<div class="title-block">[\s\S]*?GPT-Image2-Studio[\s\S]*?id="platformName"[^>]*>商品平台<[\s\S]*?<div class="head-actions">/);
+  assert.match(floatingPanel, /<header class="panel-head" id="dragHandle">[\s\S]*?<div class="product-summary"[^>]*>[\s\S]*?id="productTitle"[\s\S]*?<button class="title-block"[^>]*>[\s\S]*?GPT-Image2-Studio[\s\S]*?id="platformName"[^>]*>商品平台<[\s\S]*?<div class="head-actions">/);
   assert.doesNotMatch(floatingPanel, /<h1[^>]*>商品图采集<\/h1>/);
   assert.match(floatingPanel, /const PLATFORM_LABELS\s*=\s*\{[\s\S]*?"1688":\s*"1688"[\s\S]*?amazon:\s*"Amazon"[\s\S]*?gigacloud:\s*"大健云仓"/);
   assert.match(floatingPanel, /function platformLabelFor\(manifest\)[\s\S]*?manifest\?\.source\?\.platform[\s\S]*?商品平台/);
@@ -1430,6 +1450,14 @@ test("extension manifest uses an on-demand minimum-permission MV3 surface", asyn
   assert.match(floatingPanel, /refs\.platformName\.textContent\s*=\s*platformLabelFor\(state\.manifest\)/);
   assert.match(floatingPanel, /\.title-block\s*\{[\s\S]*?display:\s*grid;[\s\S]*?place-content:\s*center;[\s\S]*?text-align:\s*center/);
   assert.match(floatingPanel, /\.platform-name\s*\{[\s\S]*?text-align:\s*center/);
+  assert.match(floatingPanel, /const PANEL_THEMES\s*=\s*Object\.freeze\(\[[\s\S]*?id:\s*"day",\s*label:\s*"白天",\s*icon:\s*"sun"[\s\S]*?id:\s*"blue",\s*label:\s*"蓝调",\s*icon:\s*"droplet"[\s\S]*?id:\s*"night",\s*label:\s*"夜晚",\s*icon:\s*"moon"/);
+  assert.match(floatingPanel, /<button class="title-block" id="themeButton" type="button"[\s\S]*?id="platformName"[\s\S]*?<span class="theme-icon" id="themeIcon"><\/span>[\s\S]*?<\/button>/);
+  assert.match(floatingPanel, /function syncThemeUi\(\)[\s\S]*?refs\.panel\.dataset\.theme\s*=\s*theme\.id[\s\S]*?refs\.themeIcon\.replaceChildren\(createIcon\(theme\.icon\)\)[\s\S]*?refs\.themeButton\.setAttribute\("aria-label"/);
+  assert.match(floatingPanel, /function cyclePanelTheme\(\)[\s\S]*?\(currentIndex \+ 1\) % PANEL_THEMES\.length[\s\S]*?syncThemeUi\(\)/);
+  assert.match(floatingPanel, /refs\.themeButton\.addEventListener\("click", cyclePanelTheme\)/);
+  assert.doesNotMatch(floatingPanel, /function cyclePanelTheme\(\)\s*\{[^}]*\brender\(\)/);
+  assert.match(floatingPanel, /\.panel\s*\{[\s\S]*?--selection-accent:\s*#0f766e;[\s\S]*?--variant-bg:\s*#ffe08a;[\s\S]*?--variant-text:\s*#4a1f00;/);
+  assert.match(floatingPanel, /\.panel\[data-theme="night"\]\s*\{[\s\S]*?color-scheme:\s*dark;[\s\S]*?--panel-bg:\s*#151a20;[\s\S]*?--selection-accent:\s*#2dd4bf;[\s\S]*?--variant-bg:\s*#5b204f;[\s\S]*?--viewer-backdrop:\s*rgba\(2,\s*6,\s*12,\s*0\.88\);/);
   assert.doesNotMatch(floatingPanel, /id="selectionCount"/);
   assert.match(floatingPanel, /\.product-summary strong\s*\{[\s\S]*?overflow-wrap:\s*anywhere;[\s\S]*?white-space:\s*normal/);
   assert.match(floatingPanel, /function selectionStatusMessage\(\)[\s\S]*?已选 \$\{selected\} \/ 共 \$\{total\} 张商品图[\s\S]*?SKU 共 \$\{variantCount\} 个规格/);
@@ -1438,29 +1466,26 @@ test("extension manifest uses an on-demand minimum-permission MV3 surface", asyn
   assert.match(floatingPanel, /\.group-head\s*\{[\s\S]*?min-height:\s*36px[\s\S]*?justify-content:\s*space-between[\s\S]*?padding:\s*0 7px/);
   assert.match(floatingPanel, /\.image-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)[\s\S]*?gap:\s*6px/);
   assert.doesNotMatch(floatingPanel, /\.image-grid\s*\{[^}]*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
-  assert.match(floatingPanel, /\.image-card\s*\{[\s\S]*?grid-template-rows:\s*auto 24px[\s\S]*?border:\s*2px solid #d7dee7[\s\S]*?border-radius:\s*5px/);
-  assert.match(floatingPanel, /\.image-card\.is-selected\s*\{\s*border-color:\s*#5b9cff/);
+  assert.match(floatingPanel, /\.image-card\s*\{[\s\S]*?grid-template-rows:\s*auto 24px[\s\S]*?border:\s*2px solid var\(--card-border\)[\s\S]*?border-radius:\s*5px/);
+  assert.match(floatingPanel, /\.image-card\.is-selected\s*\{\s*border-color:\s*var\(--selection-accent\)/);
   assert.match(floatingPanel, /\.image-card-media\s*\{[\s\S]*?width:\s*100%;[\s\S]*?aspect-ratio:\s*1/);
   assert.match(floatingPanel, /\.image-card-media\s*\{[\s\S]*?background:\s*#fff/);
-  assert.match(floatingPanel, /\.image-card-media img\s*\{[\s\S]*?object-fit:\s*contain/);
-  assert.match(floatingPanel, /\.image-card-meta\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?grid-template-columns:\s*minmax\(0,\s*auto\) auto;[\s\S]*?background:\s*rgba\(248,\s*250,\s*252,\s*0\.64\)[\s\S]*?backdrop-filter:\s*blur\(2px\)/);
+  assert.match(floatingPanel, /\.image-card-media img\s*\{[\s\S]*?width:\s*98%;[\s\S]*?height:\s*98%;[\s\S]*?margin:\s*1%;[\s\S]*?object-fit:\s*contain/);
+  assert.match(floatingPanel, /\.image-card-meta\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?grid-template-columns:\s*minmax\(0,\s*auto\) auto;[\s\S]*?background:\s*rgba\(0,\s*0,\s*0,\s*0\.62\);[\s\S]*?color:\s*#fff;[\s\S]*?backdrop-filter:\s*blur\(2px\)/);
   assert.match(floatingPanel, /\.image-card-name\s*\{[\s\S]*?background:\s*transparent;[\s\S]*?color:\s*inherit;[\s\S]*?font-size:\s*10px[\s\S]*?white-space:\s*nowrap/);
   assert.match(floatingPanel, /\.image-card-resolution\s*\{[\s\S]*?background:\s*transparent;[\s\S]*?color:\s*inherit;[\s\S]*?font-size:\s*9px[\s\S]*?white-space:\s*nowrap/);
-  assert.match(floatingPanel, /\.image-card\.has-variant\s*\{[\s\S]*?grid-template-rows:\s*auto 20px 24px/);
-  assert.match(floatingPanel, /\.image-card-variant\s*\{[\s\S]*?font-size:\s*10px;[\s\S]*?white-space:\s*nowrap/);
+  assert.match(floatingPanel, /\.image-card\.has-variant\s*\{[\s\S]*?grid-template-rows:\s*auto auto 24px/);
+  assert.doesNotMatch(floatingPanel, /\.image-card\.has-variant\s*\{[^}]*minmax\(56px/);
+  assert.match(floatingPanel, /\.image-card-variant\s*\{[\s\S]*?border-top:\s*1px solid var\(--variant-border\);[\s\S]*?background:\s*var\(--variant-bg\);[\s\S]*?color:\s*var\(--variant-text\);[\s\S]*?font-size:\s*12px;[\s\S]*?font-weight:\s*700;[\s\S]*?line-height:\s*16px;[\s\S]*?white-space:\s*normal;[\s\S]*?overflow-wrap:\s*anywhere/);
   assert.doesNotMatch(floatingPanel, /\.image-card-variant\s*\{[^}]*text-overflow:\s*ellipsis/);
   assert.match(floatingPanel, /if \(item\.category === "sku" && variantTitle\)[\s\S]*?card\.classList\.add\("has-variant"\)[\s\S]*?variant\.textContent\s*=\s*variantTitle[\s\S]*?card\.append\(label, variant, actions\)/);
-  assert.match(floatingPanel, /const VARIANT_FONT_MAX_PX\s*=\s*10/);
-  assert.match(floatingPanel, /const VARIANT_FONT_MIN_PX\s*=\s*1/);
-  assert.match(floatingPanel, /function variantRows\(nodes\)[\s\S]*?getBoundingClientRect\(\)\.top[\s\S]*?return rows\.map/);
-  assert.match(floatingPanel, /function fittingVariantFontSize\(node\)[\s\S]*?node\.clientWidth[\s\S]*?node\.scrollWidth/);
-  assert.match(floatingPanel, /function fitVariantRows\(\)[\s\S]*?Math\.min\(\.\.\.row\.map\(fittingVariantFontSize\)\)[\s\S]*?node\.style\.fontSize\s*=\s*`\$\{fontSize\}px`/);
-  assert.match(floatingPanel, /function scheduleVariantRowFit\(\)[\s\S]*?requestAnimationFrame/);
+  assert.doesNotMatch(floatingPanel, /\bVARIANT_FONT_MAX_PX\b|\bVARIANT_FONT_MIN_PX\b|\bVARIANT_HORIZONTAL_PADDING_PX\b|\bvariantFitFrame\b/);
+  assert.doesNotMatch(floatingPanel, /function\s+(?:variantRows|fittingVariantFontSize|fitVariantRows|scheduleVariantRowFit)\b/);
   assert.doesNotMatch(floatingPanel, /rgba\(20,\s*27,\s*36,\s*0\.82\)/);
   assert.match(floatingPanel, /section\.dataset\.category\s*=\s*category/);
-  assert.match(floatingPanel, /\.group\[data-category="main"\]\s*\{\s*background:\s*hsl\(210 24% 98%\)/);
-  assert.match(floatingPanel, /\.group\[data-category="detail"\]\s*\{\s*background:\s*hsl\(210 24% 95%\)/);
-  assert.match(floatingPanel, /\.group\[data-category="sku"\]\s*\{\s*background:\s*hsl\(210 24% 92%\)/);
+  assert.match(floatingPanel, /\.group\[data-category="main"\]\s*\{\s*background:\s*var\(--group-main\)/);
+  assert.match(floatingPanel, /\.group\[data-category="detail"\]\s*\{\s*background:\s*var\(--group-detail\)/);
+  assert.match(floatingPanel, /\.group\[data-category="sku"\]\s*\{\s*background:\s*var\(--group-sku\)/);
   assert.match(floatingPanel, /dock:\s*"right"/);
   assert.match(floatingPanel, /\.selection-row\[data-columns="6"\]\s*\{[\s\S]*?grid-template-columns:\s*repeat\(6,\s*minmax\(66px,\s*1fr\)\)[\s\S]*?min-width:\s*421px/);
   assert.match(floatingPanel, /\.selection-tools button\s*\{[\s\S]*?min-height:\s*27px[\s\S]*?font-size:\s*11px[\s\S]*?white-space:\s*nowrap/);
@@ -1475,7 +1500,7 @@ test("extension manifest uses an on-demand minimum-permission MV3 surface", asyn
   assert.match(floatingPanel, /class="image-viewer"[\s\S]*id="viewerCloseButton"[\s\S]*id="viewerStage"[\s\S]*id="viewerImage"[\s\S]*id="viewerPreviousButton"[\s\S]*id="viewerNextButton"/);
   assert.match(floatingPanel, /<aside class="panel"[\s\S]*?<section class="image-viewer"[\s\S]*?<\/section>\s*<\/aside>/);
   assert.doesNotMatch(floatingPanel, /<\/aside>\s*<section class="image-viewer"/);
-  assert.match(floatingPanel, /\.image-viewer\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?inset:\s*0;[\s\S]*?background:\s*rgba\(/);
+  assert.match(floatingPanel, /\.image-viewer\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?inset:\s*0;[\s\S]*?background:\s*var\(--viewer-backdrop\)/);
   assert.match(floatingPanel, /\.viewer-image-frame\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?inset:\s*14px 14px 58px;[\s\S]*?pointer-events:\s*none/);
   assert.match(floatingPanel, /\.image-viewer-stage img\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?left:\s*50%;[\s\S]*?top:\s*50%;[\s\S]*?width:\s*auto;[\s\S]*?height:\s*auto;[\s\S]*?max-width:\s*none;[\s\S]*?max-height:\s*none;[\s\S]*?translate:\s*-50% -50%/);
   assert.doesNotMatch(floatingPanel, /\.image-viewer-stage img\s*\{[^}]*max-width:\s*100%;[^}]*max-height:\s*100%/);
@@ -1483,8 +1508,8 @@ test("extension manifest uses an on-demand minimum-permission MV3 surface", asyn
   assert.match(floatingPanel, /class="viewer-close-button" id="viewerCloseButton"/);
   assert.match(floatingPanel, /refs\.viewerCloseButton\.addEventListener\("click", closeImageViewer\)/);
   assert.match(floatingPanel, /class="image-viewer-toolbar"[\s\S]*?id="viewerFitButton"[\s\S]*?id="viewerRotateLeftButton"[\s\S]*?id="viewerRotateRightButton"[\s\S]*?id="viewerZoomInButton"[\s\S]*?id="viewerZoomOutButton"[\s\S]*?id="viewerOriginalSizeButton"/);
-  assert.match(floatingPanel, /\.image-viewer-toolbar\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?left:\s*50%;[\s\S]*?background:\s*rgba\(248,\s*250,\s*252,\s*0\.[0-9]+\)/);
-  assert.match(floatingPanel, /\.viewer-tool-button\s*\{[\s\S]*?border:\s*1px solid rgba\([\s\S]*?background:\s*rgba\(/);
+  assert.match(floatingPanel, /\.image-viewer-toolbar\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?left:\s*50%;[\s\S]*?background:\s*var\(--viewer-toolbar\)/);
+  assert.match(floatingPanel, /\.viewer-tool-button\s*\{[\s\S]*?border:\s*1px solid var\(--viewer-border\)[\s\S]*?background:\s*var\(--viewer-surface\)/);
   assert.doesNotMatch(floatingPanel, /\.viewer-tool-button\.is-active|classList\.toggle\("is-active"/);
   assert.match(floatingPanel, /<footer class="image-viewer-nav">\s*<button id="viewerPreviousButton"[\s\S]*?<button id="viewerNextButton"[\s\S]*?<\/footer>/);
   assert.doesNotMatch(floatingPanel, /viewerPositionLabel|第 0 \/ 共 0 张/);
@@ -1531,8 +1556,9 @@ test("extension manifest uses an on-demand minimum-permission MV3 surface", asyn
   assert.match(floatingPanel, /\.group-head h2\s*\{[\s\S]*?font-size:\s*13px;[\s\S]*?font-weight:\s*700/);
   assert.match(floatingPanel, /\.group-head-actions\s*\{[\s\S]*?display:\s*flex/);
   assert.match(floatingPanel, /\.group-selection-count\s*\{[\s\S]*?font-size:\s*11px;[\s\S]*?font-weight:\s*700/);
-  assert.match(floatingPanel, /\.group-select-all input\s*\{[\s\S]*?accent-color:\s*#3f78ff/);
-  assert.match(floatingPanel, /\.group-download-button\s*\{[\s\S]*?color:\s*#356dff/);
+  assert.match(floatingPanel, /\.group-select-all input\s*\{[\s\S]*?accent-color:\s*var\(--selection-accent\)/);
+  assert.match(floatingPanel, /\.image-card-media input\s*\{[\s\S]*?accent-color:\s*var\(--selection-accent\)/);
+  assert.match(floatingPanel, /\.group-download-button\s*\{[\s\S]*?color:\s*var\(--download\)/);
   assert.match(floatingPanel, /heading\.textContent\s*=\s*`\$\{CATEGORY_LABELS\[category\]\}（\$\{items\.length\}张）`/);
   assert.match(floatingPanel, /groupSelectionCount\.textContent\s*=\s*`已选 \$\{selectedInGroup\.length\} 张`/);
   assert.match(floatingPanel, /groupSelectAllCheckbox\.indeterminate\s*=\s*selectedInGroup\.length > 0 && selectedInGroup\.length < items\.length/);

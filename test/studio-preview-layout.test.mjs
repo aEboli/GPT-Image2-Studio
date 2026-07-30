@@ -25,7 +25,7 @@ const publicConfigModelPickerPath = new URL("../public/lib/config-model-picker.m
 const publicCreationListingViewPath = new URL("../public/lib/creation-listing-view.mjs", import.meta.url);
 const generationClientPath = new URL("../lib/generation-client.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20260728-product-collector-tooltip-1";
+const stylesAssetVersion = "20260730-product-image-card-inset-1";
 const appAssetVersion = "20260726-prompt-name-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
 const creationQueueModuleAssetVersion = "20260712-creation-queue-selection-isolation-1";
@@ -3705,7 +3705,7 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(creationImageCountMarkup, /<option value="0">0 张<\/option>[\s\S]*<option value="1">1 张<\/option>[\s\S]*<option value="18" selected>18 张<\/option>/);
   assert.match(app, /function syncCreationPlatformImageCountOptions\(/);
   assert.match(app, /resolveCreationPlatformImageCountState\(/);
-  assert.match(html, /SKU 生成规则[\s\S]*id="creationSkuGenerationRuleInput"[\s\S]*name="skuGenerationRule"[\s\S]*<option value="color-name-under-subject" selected>主体下方显示颜色名<\/option>[\s\S]*<option value="none">无<\/option>[\s\S]*<option value="package-list">添加包装清单<\/option>[\s\S]*<option value="dimensions">添加尺寸<\/option>[\s\S]*<option value="package-list-dimensions">添加包装清单和尺寸<\/option>/);
+  assert.match(html, /SKU 生成规则[\s\S]*id="creationSkuGenerationRuleInput"[\s\S]*name="skuGenerationRule"[\s\S]*<option value="color-name-under-subject" selected>显示颜色<\/option>[\s\S]*<option value="none">无<\/option>[\s\S]*<option value="package-list">显示清单<\/option>[\s\S]*<option value="dimensions">显示尺寸<\/option>[\s\S]*<option value="package-list-dimensions">显示清单和尺寸<\/option>/);
   assert.doesNotMatch(html, /id="creationScenarioInput"/);
   assert.doesNotMatch(html, /id="creationVisualLanguageInput"/);
   assert.match(html, /平台选择[\s\S]*id="creationPlatformInput"[\s\S]*name="platform"[\s\S]*<option value="universal" selected>通用电商<\/option>/);
@@ -4143,7 +4143,7 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(app, /refs\.creationSkuGenerationEnabledInput\.checked = normalized\.skuGenerationEnabled !== false;/);
   assert.match(app, /refs\.creationInfographicRebuildEnabledInput\.checked = normalized\.infographicRebuildEnabled === true;/);
   assert.match(app, /const DEFAULT_CREATION_SKU_GENERATION_RULE = "color-name-under-subject";/);
-  assert.match(app, /"color-name-under-subject": "主体下方显示颜色名"/);
+  assert.match(app, /"color-name-under-subject": "显示颜色"/);
   assert.match(app, /formData\.set\("industryTemplate", resolveCreationReferenceAnalysisContextCategoryValue\(\{ analysisDirty: state\.creationReferenceAnalysis\.dirty,[^\n]*categorySuggestionStale: state\.creationReferenceAnalysis\.categorySuggestionStale,[^\n]*previousAutoCategoryValue: state\.creationReferenceAnalysis\.categoryTemplateSuggestion \}\)\)/);
   assert.match(app, /\[refs\.creationProductNameInput, refs\.creationProductDescriptionInput, refs\.creationSellingPointsInput, refs\.creationDimensionSpecsInput\]\.forEach\(\(input\) => input\.addEventListener\("input", resetCreationDraftPreview\)\)/);
   assert.match(app, /\[refs\.creationDimensionUnitModeInput, refs\.creationTargetLanguageInput, refs\.creationPlatformInput\]\.forEach\(\(input\) => input\?\.addEventListener\("change", resetCreationDraftPreview\)\)/);

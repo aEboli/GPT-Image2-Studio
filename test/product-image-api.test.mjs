@@ -24,7 +24,7 @@ test("local collector package endpoint returns a valid attachment ZIP", async ()
 
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("content-type"), "application/zip");
-  assert.match(response.headers.get("content-disposition") || "", /attachment; filename="GPT-Image2-Studio-Product-Image-Collector-v1\.1\.23\.zip"/);
+  assert.match(response.headers.get("content-disposition") || "", /attachment; filename="GPT-Image2-Studio-Product-Image-Collector-v1\.1\.29\.zip"/);
   assert.ok(zip.file("manifest.json"));
   assert.ok(zip.file("lib/product-image-import.mjs"));
 });

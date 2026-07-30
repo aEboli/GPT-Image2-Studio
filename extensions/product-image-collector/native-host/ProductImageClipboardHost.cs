@@ -103,7 +103,7 @@ namespace GPTImage2Studio.ProductImageClipboardHost
             };
             client.DefaultRequestHeaders.TryAddWithoutValidation(
                 "User-Agent",
-                "GPT-Image2-Studio-Product-Image-Clipboard/1.1.23"
+                "GPT-Image2-Studio-Product-Image-Clipboard/1.1.29"
             );
             return client;
         }

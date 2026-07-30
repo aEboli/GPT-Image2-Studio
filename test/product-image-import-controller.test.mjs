@@ -129,6 +129,7 @@ class FakeImportDocument {
       "#productImageImportSelectAllButton",
       "#productImageImportSelectDetailButton",
       "#productImageImportSelectMainButton",
+      "#productImageImportSelectNoneButton",
       "#productImageImportSelectSkuButton",
       "#productImageImportSelectedCount",
       "#globalActionToast",
@@ -243,6 +244,7 @@ test("batch selection commands replace the selection without exceeding remaining
     "sku-1",
     "detail-1",
   ]);
+  assert.deepEqual(selectProductImageImportIdsForAction(items, ["main-1", "detail-1"], "none", 3), []);
   assert.deepEqual(selectProductImageImportIdsForAction(items, [], "sku", 0), []);
 });
 
@@ -337,6 +339,7 @@ test("batch selection commands update existing cards without moving the candidat
   assert.equal(preview.children[1].hidden, false);
   const actions = [
     "#productImageImportSelectAllButton",
+    "#productImageImportSelectNoneButton",
     "#productImageImportInvertButton",
     "#productImageImportSelectMainButton",
     "#productImageImportSelectDetailButton",
@@ -349,6 +352,10 @@ test("batch selection commands update existing cards without moving the candidat
     assert.equal(groups.scrollTop, 640, `${selector} changed the candidate scroll position`);
     assert.deepEqual(groups.children, childrenBefore, `${selector} rebuilt the candidate list`);
   }
+  documentRef.querySelector("#productImageImportSelectAllButton").dispatch("click");
+  documentRef.querySelector("#productImageImportSelectNoneButton").dispatch("click");
+  assert.equal(firstCard.classList.contains("is-selected"), false);
+  assert.equal(media.children[0].checked, false);
 });
 
 test("candidate viewer mirrors the plugin controls while keeping the proxied source", () => {

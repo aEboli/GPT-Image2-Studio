@@ -62,6 +62,31 @@ test("structured image prompt name separates a concise subject action from frami
   assert.equal(getStructuredImagePromptDisplayName(json), "阴天看手机年轻女性·窗框长凳");
 });
 
+test("structured image prompt name keeps a distinctive styled subject and bed context", () => {
+  const json = structuredPrompt({
+    subject: {
+      type: "躺在床上的Q版动漫少女",
+      pose: "仰躺在床上，头偏向画面右侧。",
+      appearance: ["浅紫蓝色长发", "左右两条粗麻花辫"],
+      interaction: "后脑枕在白色枕头上，周围放有抽纸盒与多个揉皱纸团。",
+    },
+    scene: "浅蓝床单铺满背景，角色头部垫在白色枕头上，床面散落揉皱纸团。",
+  });
+
+  assert.equal(getStructuredImagePromptDisplayName(json), "躺卧Q版动漫少女·床铺纸巾盒");
+});
+
+test("structured image prompt name preserves a descriptive non-human subject type", () => {
+  const json = structuredPrompt({
+    subject: {
+      type: "坐在废墟中的全身装甲人形机器人",
+    },
+    visual: "阴天漫射光下的末日题材写实摄影。",
+  });
+
+  assert.equal(getStructuredImagePromptDisplayName(json), "阴天坐在废墟中的全身装甲人形机器人");
+});
+
 test("display name keeps a legacy title ahead of derived content", () => {
   const json = {
     ...structuredPrompt({ subject: { type: "年轻女性" }, scene: "夜晚街道与路灯" }),

@@ -139,7 +139,7 @@ function formatVisualLanguageLabelForQueue(value, normalizedVisualLanguage, form
 const QUEUE_NUMBER_LABELS = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
 const DEFAULT_CREATION_SKU_GENERATION_RULE = {
   value: "color-name-under-subject",
-  label: "主体下方显示颜色名",
+  label: "显示颜色",
 };
 const DEFAULT_CREATION_PLATFORM = {
   value: "universal",

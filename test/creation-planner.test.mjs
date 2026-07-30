@@ -1675,7 +1675,7 @@ test("creation planner applies SKU generation rules for package-list content and
   const skuItem = plan.items.find((item) => item.role === "sku");
 
   assert.equal(plan.skuGenerationRule, "package-list-dimensions");
-  assert.equal(plan.skuGenerationRuleLabel, "添加包装清单和尺寸");
+  assert.equal(plan.skuGenerationRuleLabel, "显示清单和尺寸");
   assert.deepEqual(skuItem.skuSupportingReferenceRoles, ["dimensions"]);
   assert.match(skuItem.prompt, /SKU generation rule: add package-list content and dimensions/i);
   assert.match(skuItem.prompt, /Bottle body\*1/);

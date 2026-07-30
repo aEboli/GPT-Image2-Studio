@@ -68,7 +68,7 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Sora:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260728-product-collector-tooltip-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260730-product-image-card-inset-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -1560,11 +1560,11 @@
                   <label class="compact-field creation-sku-generation-rule-field" data-creation-set-only>
                     <span>SKU 生成规则</span>
                     <select id="creationSkuGenerationRuleInput" name="skuGenerationRule">
-                      <option value="color-name-under-subject" selected>主体下方显示颜色名</option>
+                      <option value="color-name-under-subject" selected>显示颜色</option>
                       <option value="none">无</option>
-                      <option value="package-list">添加包装清单</option>
-                      <option value="dimensions">添加尺寸</option>
-                      <option value="package-list-dimensions">添加包装清单和尺寸</option>
+                      <option value="package-list">显示清单</option>
+                      <option value="dimensions">显示尺寸</option>
+                      <option value="package-list-dimensions">显示清单和尺寸</option>
                     </select>
                   </label>
 
@@ -2599,6 +2599,7 @@
           </div>
           <div class="product-image-import-actions" aria-label="批量选择商品图">
             <button class="toolbar-button product-image-import-select-button" id="productImageImportSelectAllButton" type="button" disabled>全选</button>
+            <button class="toolbar-button product-image-import-select-button" id="productImageImportSelectNoneButton" type="button" disabled>全不选</button>
             <button class="toolbar-button product-image-import-select-button" id="productImageImportInvertButton" type="button" disabled>反选</button>
             <button class="toolbar-button product-image-import-select-button" id="productImageImportSelectMainButton" type="button" disabled>选择主图</button>
             <button class="toolbar-button product-image-import-select-button" id="productImageImportSelectDetailButton" type="button" disabled>选择详情图</button>

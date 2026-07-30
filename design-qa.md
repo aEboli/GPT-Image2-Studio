@@ -41,6 +41,28 @@
 
 final result: passed
 
+## v1.1.29 Studio 与采集窗图片四边 1% 白边
+
+### Comparison Target
+
+- source visual truth: `C:/Users/AEboli/AppData/Local/Temp/codex-clipboard-ce47bd96-6028-45f6-9411-910e1d949ba3.png` 与 `C:/Users/AEboli/AppData/Local/Temp/codex-clipboard-9b310a63-634b-42e6-b423-e639d3b1b688.png`。
+- implementation screenshots: `artifacts/design-qa/product-image-inset-v1.1.29-studio-wide.png`、`product-image-inset-v1.1.29-studio-narrow.png`、`product-image-inset-v1.1.29-panel-wide.png` 与 `product-image-inset-v1.1.29-panel-narrow.png`。
+
+### Measured Evidence
+
+- Studio `1440×900`：方形预览区约 `210.89px`，图片约 `206.67px`，四边约 `2.10–2.11px`；6 张代理图片均成功加载且自然尺寸为 `2560×2560`。
+- Studio `390×844`：图片宽高均为预览区的约 `97.996%`，四边约 `1.53–1.54px`；卡片媒体区约 `157.33px`、操作栏约 `42.67px`，候选区 `clientWidth = scrollWidth = 355px`，没有横向溢出。
+- 扩展 `900×900`：最终源码面板版本为 `v1.1.29`，方形媒体区约 `114.67px`，图片约 `112.36px`，四边约 `1.15px`；四列宽度稳定，操作栏保持 `24px`。
+- 扩展 `480×844`：两列卡片的方形媒体区约 `219.33px`，图片约 `214.94px`，四边约 `2.19–2.21px`；图片占媒体区约 `97.996%`，黑色信息条和复选框均保持在媒体区内，分组区 `clientWidth = scrollWidth = 469px`。
+- 两处图片继续使用 `object-fit: contain`；卡片尺寸、选择边框、信息覆层、复选框、SKU 名称行、操作栏和查看器原图行为没有改变。验收控制台 `warn/error` 为 0。
+
+### Verification
+
+- 实现前聚焦范围 `29/31` 通过，两个失败分别命中 Studio 与扩展仍使用 `100% × 100%`；实现后相关聚焦回归 `221/221`、全量测试 `1510/1510`、`public/lib` 同步检查 `88/88` 和 OpenSpec 严格全项目校验 `23/23` 通过。
+- 扩展与 Pages 构建、发布一致性检查成功，生产依赖审计为 0 个漏洞。最终 ZIP 为 `artifacts/extensions/GPT-Image2-Studio-Product-Image-Collector-v1.1.29.zip`（70,087 字节，SHA-256 `4161AEB5B563AB127A1E7A89B8147FB8D5AEEA68509E6E76DD3065E8382F2341`）。
+
+final result: passed
+
 ## v1.1.18 标题分工与图片信息条
 
 - 源视觉真值：`artifacts/design-qa/product-image-panel-v1.1.18-reference.png`，来自用户提供的 1688 商品页截图。
@@ -189,3 +211,87 @@ final result: passed; remaining OpenSpec item is the separately scoped closed-St
 - 站点级内容脚本清单仍需在 `chrome://extensions/` 对 `artifacts/extensions/product-image-collector-unpacked` 手动点击一次“重新加载”。该管理页不由浏览器测试会话接管，因此 Amazon 等商城从非商品页无刷新进入详情页的最终安装态验收仍保持待办；源码执行级回归已经覆盖进入、离开、超时恢复和失效 DOM 清理。
 
 final result: implementation and dynamic panel passed; installed v1.1.23 manifest reload pending
+
+## v1.1.24 黑色信息条与橙色选中边框
+
+- 最终构建包为 `artifacts/extensions/GPT-Image2-Studio-Product-Image-Collector-v1.1.24.zip`（68,211 字节，SHA-256 `D04E570928E4E8C342FBD23CD0BEAD43D705471D4C831B9EEBAFE62BC3F23FA4`）；真实页面截图为 `artifacts/design-qa/product-image-panel-v1.1.24-live.png`。
+- 真实 Chrome 1688 商品 `1061922615487` 从网页入口打开的动态面板为 `v1.1.24`，展示 31 张已选商品图。图片信息条计算样式为 `rgba(0, 0, 0, 0.62)`、白色文字和 `blur(2px)`，选中卡片边框为 2px `rgb(233, 84, 42)`。
+- 前 12 张卡片的信息文字全部满足 `scrollWidth <= clientWidth + 1`，信息条全部位于方形媒体区内；媒体区约 `116.98×116.98px`、操作栏 24px、面板约 `529.27px`，没有因颜色变化造成尺寸、换行或重叠变化。
+- 当前采集扩展 ID 没有匹配到新的 `warn/error`。页面已有的 AliCDN 组件重复注册、1688 页面脚本错误和另一扩展 `hdgbmcpjcflbhcgdgbdaooeohnjfabhi` 的请求错误不属于本项目。
+- Chrome 缓存入口在刷新商品页后为 `v1.1.23`，但从最终解压目录动态注入的面板已为 `v1.1.24`。扩展管理页仍需手动点击一次“重新加载”才能让 Manifest 与常驻入口版本同步更新；本轮动态面板视觉验收已经通过。
+
+final result: implementation and live v1.1.24 panel passed; installed manifest reload pending
+
+## v1.1.25 青绿色选择状态与 SKU 名称强调
+
+- 真实 Chrome 1688 商品 `1061922615487` 动态加载当前工作区面板后采集 31 张图片、19 个 SKU 规格，并保持 `31 / 31` 全选。
+- 白天主题中，已选卡片边框、卡片勾选框和组内全选框均为 `rgb(15, 118, 110)`；SKU 名称行计算样式为背景 `rgb(231, 245, 242)`、文字 `rgb(11, 95, 87)`、上边框 `rgb(155, 207, 196)`。
+- 卡片媒体区约 `114.67px`、操作栏 `24px`、SKU 名称行 `20px`；19 个 SKU 名称均无文本溢出，图片白底与黑色半透明信息条保持不变。
+- 本轮 `v1.1.26` 三主题验收继续覆盖以上选择与 SKU 样式；`v1.1.25` 已由后续主题版本完整取代，不再单独交付旧 ZIP。
+
+final result: passed and superseded by v1.1.26
+
+## v1.1.26 白天、蓝调与夜晚主题
+
+- 最终构建包为 `artifacts/extensions/GPT-Image2-Studio-Product-Image-Collector-v1.1.26.zip`（70,432 字节，SHA-256 `7B07EFA0B3F87201EEA66F235B341EE0625B56A16598CCB35A26233963E728CA`）。真实页面截图为 `artifacts/design-qa/product-image-panel-v1.1.26-day.png`、`product-image-panel-v1.1.26-blue.png`、`product-image-panel-v1.1.26-night.png`，夜晚查看器截图为 `product-image-panel-v1.1.26-night-viewer.png`。
+- 真实 Chrome 1688 商品 `1061922615487` 动态加载当前工作区采集器和面板后采集 31 张图片、19 个 SKU 规格。点击右上角品牌区依次得到白天、蓝调、夜晚并回到白天；平台名称后分别显示太阳、水滴和月亮，`title` 与 `aria-label` 同步说明当前及下一主题。
+- 白天面板背景/文字为 `rgb(246, 247, 249)` / `rgb(23, 32, 43)`；蓝调为 `rgb(229, 239, 249)` / `rgb(20, 37, 58)`；夜晚为 `rgb(21, 26, 32)` / `rgb(238, 243, 248)`。夜晚选中边框与勾选为 `rgb(45, 212, 191)`，SKU 行为背景 `rgb(18, 61, 57)`、文字 `rgb(167, 243, 231)`、上边框 `rgb(46, 140, 131)`；缩略图媒体区继续纯白。
+- 三次切换期间 31 张选择、列表 `scrollTop = 1073.33px`、首张卡片 DOM 节点和已打开查看器均原地保持。关闭面板前切到非默认蓝调，重新执行当前工作区面板后仍恢复蓝调和 31 张选择，证明当前页面内主题记忆生效。
+- 三主题下媒体区约 `114.67px`、操作栏 `24px`、SKU 行 `20px`；19 个 SKU 名称和其余面板文字无实际溢出。夜晚查看器图片成功加载，六个工具按钮、关闭按钮和前后导航均可见，背景及控件已使用夜晚变量。
+- 商品图聚焦测试 `67/67`、全量测试 `1508/1508`、`public/lib` 同步检查 `88/88` 和 OpenSpec 严格全项目校验 `23/23` 通过；扩展与 Pages 构建成功。
+- 浏览器验收属于真实商品页加当前工作区代码动态加载，不冒充重新加载后的安装态。仍需在 `chrome://extensions/` 对 `artifacts/extensions/product-image-collector-unpacked` 手动点击一次“重新加载”，才能让已安装扩展使用 `v1.1.26` 清单和入口。
+
+final result: implementation and live v1.1.26 panel passed; installed manifest reload pending
+
+## v1.1.27 蓝调时刻配色修正
+
+- 最终构建包为 `artifacts/extensions/GPT-Image2-Studio-Product-Image-Collector-v1.1.27.zip`（70,550 字节，SHA-256 `09DB95FBE5FDA6E08CE805D559E71EA07780AC5556E96AC1F9A96E372737EDBD`）。真实页面截图为 `artifacts/design-qa/product-image-panel-v1.1.27-blue-hour.png`，查看器截图为 `product-image-panel-v1.1.27-blue-hour-viewer.png`。
+- 真实 Chrome 1688 商品 `1061922615487` 动态加载当前工作区面板后采集 24 张图片，其中 5 张主图、19 张 SKU 图；详情接口本次不可用，面板明确显示部分结果提示，没有把页面其他图片补作详情图。
+- 蓝调面板、通用表面、主图/详情图/SKU 分组的计算背景分别为 `rgb(30, 58, 95)`、`rgb(41, 75, 115)`、`rgb(42, 82, 126)`、`rgb(37, 73, 111)`、`rgb(32, 63, 97)`。白天与夜晚面板背景仍为 `rgb(246, 247, 249)` 和 `rgb(21, 26, 32)`，三套主题不再互相接近。
+- 正文冷白色与面板、表面对比度分别为 `10.78:1`、`8.38:1`；亮青选择态与主图分组为 `4.95:1`，SKU 文字与名称行为 `7.00:1`，橙色主按钮与白字为 `4.52:1`。截图复核中标题栏、选择工具、状态行、三组表面、SKU 名称和页脚均无可见重叠或溢出。
+- 在蓝调、夜晚、白天主题循环中，24 张选择、列表 `scrollTop = 350px`、首张卡片 DOM 节点和已打开查看器均原地保持。蓝调查看器遮罩为 `rgba(4, 18, 38, 0.9)`，图片加载成功，六个工具按钮、关闭按钮和两个导航按钮均正常显示。
+- 蓝调与版本专项测试 `34/34`、商品图相关聚焦测试 `68/68`、全量测试 `1509/1509`、`public/lib` 同步检查 `88/88` 和 OpenSpec 严格全项目校验 `23/23` 通过；扩展与 Pages 构建成功，差异及 19 个相关文件的严格 UTF-8 检查通过。
+- 浏览器验收属于真实商品页加当前工作区代码动态加载。仍需在 `chrome://extensions/` 对 `artifacts/extensions/product-image-collector-unpacked` 手动点击一次“重新加载”，才能让已安装扩展使用 `v1.1.27` 清单和常驻入口。
+
+final result: implementation and live v1.1.27 blue-hour panel passed; installed manifest reload pending
+
+## v1.1.28 SKU 名称自然高度、完整换行与命名修复
+
+### Comparison Target
+
+- source visual truth: `C:/Users/AEboli/AppData/Local/Temp/codex-clipboard-3fa116d5-d05a-46b6-a209-8caa35f4fd44.png`（女巫帽 SKU 名称区过高反馈）与 `C:/Users/AEboli/AppData/Local/Temp/codex-clipboard-c587652e-4515-4208-a681-8511ea28e3f2.png`（图片转提示词历史名称退化为“女生”）。
+- implementation screenshots: `artifacts/design-qa/product-image-panel-v1.1.28-natural-day.jpg`、`product-image-panel-v1.1.28-natural-blue.jpg`、`product-image-panel-v1.1.28-natural-night.jpg`、`product-image-panel-v1.1.28-natural-day-sku.png`、`product-image-panel-v1.1.28-long-label-check.jpg` 与 `prompt-agent-distinctive-name-live.jpg`。
+- viewport and state: 商品页为真实 Chrome `1707×876`、1688 商品 `1051486927553`、10 张详情图与 3 张 SKU 图全选；Studio 为新开的本地 `2276×1168` 标签页，打开图片转提示词长期保留列表。
+
+### Full-view and Focused Evidence
+
+- `artifacts/design-qa/product-image-panel-v1.1.28-natural-height-comparison.png` 将用户反馈截图与同商品、同白天主题的新版 SKU 区并排归一化；旧版名称区至少 56px，新版三个单行名称均约 `24.67px`，卡片整体高度明显回到内容所需范围。
+- `artifacts/design-qa/product-image-panel-v1.1.28-theme-comparison.png` 同框展示白天、蓝调和夜晚；名称行分别为黄橙、深青和深洋红表面，文字对比度为 `10.95:1`、`8.23:1`、`11.31:1`，三套配色彼此可辨且都超过普通文字 4.5:1。
+- 临时长名称 `大号Oi猫【折纸材料包】+剪刀+双面胶+发光装饰配件套装` 在固定 `12px/700/16px` 下自然换行到约 `72.67px`；`clientHeight = scrollHeight = 72px`、`clientWidth = scrollWidth = 119px`，没有裁切或水平溢出。同排三个操作栏底边均为 `899.58px`。检查后已还原真实名称，三个短名称恢复约 `24.67px`，操作栏底边均为 `841.93px`。
+- Studio 长期保留列表中，原截图对应的 `2026-07-29 18:39:27` 记录唯一显示为 `躺卧Q版动漫少女·床铺纸巾盒`，不再退化为“女生”；其余代表项继续显示具体动作、主体与环境组合。
+
+### Required Fidelity Surfaces
+
+- fonts and typography: SKU 固定为 12px、700、16px 行高，正常换行与 `overflow-wrap: anywhere` 生效；历史名称使用当前列表既有字号与层级，未发生截断。
+- spacing and layout rhythm: 单行 SKU 名称取消 56px 空白下限，内容自适应；方形媒体区和 24px 操作栏不变，同一网格行操作栏继续底部对齐。
+- colors and visual tokens: 白天计算值为背景 `rgb(255, 224, 138)`、文字 `rgb(74, 31, 0)`；蓝调为 `rgb(7, 86, 107)` / `rgb(255, 255, 255)`；夜晚为 `rgb(91, 32, 79)` / `rgb(255, 247, 251)`。
+- image quality and asset fidelity: 商品缩略图仍为真实页面原图的白底 `contain` 预览，黑色半透明信息条、分辨率和青绿色选择态未变；本轮没有替换或伪造图片资产。
+- copy and content: 三个真实 SKU 名称完整显示；临时长名称只用于渲染边界检查并已还原。图片转提示词历史名称由结构化 JSON 的具体主体、动作和环境派生。
+
+### Interaction and Console Checks
+
+- 点击品牌区依次验证白天、蓝调、夜晚并回到白天；三张选择、卡片节点和操作栏对齐保持。当前已安装面板同为 `v1.1.28` 但仍缓存旧 CSS，因此真实页验收临时加载了与最终源码一致的 `auto` 名称轨道覆盖；当前标签页保留该覆盖供复核，页面刷新后仍需重新加载解压扩展目录获得持久版本。
+- 商品页采集器相关 `warn/error` 为 0；页面其余 69 条既有警告或错误不匹配本扩展。新开的本地 Studio 验收标签页 `warn/error` 为 0，验收后已关闭。
+
+### Comparison History
+
+1. 首轮 `v1.1.28` 将动态缩字改为固定 12px 完整换行，但 `minmax(56px, 1fr)` 让所有短名称至少占三行高度，用户实页截图判定过高。
+2. 增量规格、设计、README、测试和实现同步改为 `grid-template-rows: auto auto 24px`，并新增禁止旧 56px 下限的回归断言。
+3. 同商品复核确认短名称约 24.67px，长名称按内容增长且无裁切，三主题高对比配色与操作栏对齐保持；没有剩余 P0/P1/P2 视觉问题。
+
+### Verification
+
+- 命名专项测试 `9/9`、商品图聚焦范围 `44/44`、最终面板专项测试 `30/30`、全量测试 `1510/1510`、`public/lib` 同步检查 `88/88`、OpenSpec 严格全项目校验 `23/23` 通过。
+- 扩展与 Pages 构建成功；最终 ZIP 为 `artifacts/extensions/GPT-Image2-Studio-Product-Image-Collector-v1.1.28.zip`（70,078 字节，SHA-256 `6FF7B93D79F83381FE092C9E6E7B2151B6BF03E48780A477E780BAA75C00198E`）。`git diff --check` 无空白错误，31 个修改文件通过严格 UTF-8 与中文替换字符检查。
+
+final result: passed
