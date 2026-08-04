@@ -15,7 +15,7 @@ import {
 import { isCreationSubjectReferenceRole } from "../public/lib/creation-reference-roles.mjs";
 import { reorderCreationReferenceFiles } from "../public/lib/creation-reference-drag.mjs";
 
-const APP_SHELL_LINE_BUDGET = 17400;
+const APP_SHELL_LINE_BUDGET = 17600;
 
 function makeFakeControlButton(className = "") {
   const element = {
@@ -274,6 +274,7 @@ test("public app shell delegates browser config and cache behavior to public mod
   assert.match(app, /from "\/lib\/view-mode-loader\.mjs\?v=20260608-quick-blend-time-sort-1"/);
   assert.match(app, /from "\/lib\/generation-client\.mjs"/);
   assert.match(app, /from "\/lib\/creation-listing-view\.mjs"/);
+  assert.match(app, /from "\/lib\/creation-temu-export-ui\.mjs"/);
   assert.match(app, /from "\/lib\/creation-reference-drag\.mjs"/);
   assert.match(app, /from "\/lib\/lightbox-image-viewer\.mjs"/);
   assert.match(app, /from "\/lib\/style-transfer-preset-lightbox\.mjs"/);
@@ -442,6 +443,70 @@ test("creation listing controller sends browser-private request config", async (
   assert.equal(state.creation.listingGeneratingSetId, "");
   assert.equal(state.creation.recordSetId, selectedSet.setId);
   assert.equal(currentViewRenderCount, 2);
+});
+
+test("creation listing controller upserts a successful draft without physical fields", async () => {
+  let requestCount = 0;
+  let upsertedSet = null;
+  const feedback = [];
+  const selectedSet = {
+    setId: "creation-set-incomplete-physical-fields",
+    productName: "Listing Probe",
+    items: [{ itemId: "sku-1", role: "sku", status: "completed", relativePath: "creation/sku-1.png" }],
+  };
+  const state = {
+    creation: {
+      listingGeneratingSetId: "",
+      recordSetId: "",
+      sets: [selectedSet],
+    },
+  };
+  const controller = createCreationListingController({
+    compactErrorMessage: (message) => message,
+    fetchImpl: async () => {
+      requestCount += 1;
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          set: {
+            ...selectedSet,
+            listingDrafts: [{
+              title: "Parsed Listing Draft",
+              status: "completed",
+              zhDisplay: { title: "已解析的 Listing 草稿" },
+            }],
+          },
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    },
+    getRequestConfig: () => ({}),
+    getSelectedSet: () => selectedSet,
+    nowIso: () => "2026-05-24T00:00:00.000Z",
+    refs: {},
+    renderCurrentView: () => {},
+    renderRecordView: () => {},
+    setFeedback: (message, type) => feedback.push({ message, type }),
+    state,
+    upsertSet: (set) => {
+      upsertedSet = set;
+      state.creation.sets = [set];
+      return set;
+    },
+  });
+
+  const nextSet = await controller.generate();
+
+  assert.equal(requestCount, 1);
+  assert.equal(upsertedSet, nextSet);
+  assert.equal(nextSet.listingDrafts.length, 1);
+  assert.equal(nextSet.listingDrafts[0].title, "Parsed Listing Draft");
+  assert.equal(state.creation.listingGeneratingSetId, "");
+  assert.equal(state.creation.recordSetId, selectedSet.setId);
+  assert.deepEqual(feedback.at(-1), { message: "Listing 已生成。", type: "success" });
 });
 
 test("creation listing controls only disable the record currently generating", () => {

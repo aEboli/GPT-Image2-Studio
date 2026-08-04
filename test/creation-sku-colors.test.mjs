@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { normalizeCreationSkuColorLabels } from "../lib/creation-sku-colors.mjs";
+import {
+  formatCreationSkuItemColorNames,
+  getCreationSkuColorNames,
+  normalizeCreationSkuColorLabels,
+} from "../lib/creation-sku-colors.mjs";
 
 test("SKU color normalization keeps only ordered color names", () => {
   assert.deepEqual(
@@ -59,4 +63,33 @@ test("SKU color normalization rejects ambiguous CJK substrings and strips conjun
   );
   assert.deepEqual(normalizeCreationSkuColorLabels(["black or rose"]), ["black rose"]);
   assert.deepEqual(normalizeCreationSkuColorLabels(["choose gold or rose gold"]), ["gold rose gold"]);
+});
+
+test("SKU item names compact only same-subject Chinese multi-color labels", () => {
+  const multiColorSubject = { title: "red black blue" };
+
+  assert.equal(
+    formatCreationSkuItemColorNames(multiColorSubject, { value: "zh-CN" }),
+    "红黑蓝色",
+  );
+  assert.equal(
+    formatCreationSkuItemColorNames(multiColorSubject, { value: "en" }),
+    "red black blue",
+  );
+  assert.deepEqual(
+    getCreationSkuColorNames(multiColorSubject, { value: "zh-CN" }),
+    ["红色", "黑色", "蓝色"],
+  );
+  assert.equal(
+    formatCreationSkuItemColorNames({ colorNames: ["red", "black"] }, { value: "zh-CN" }),
+    "红色 / 黑色",
+  );
+  assert.equal(
+    formatCreationSkuItemColorNames({ subjectUnitCount: 2, title: "red black" }, { value: "zh-CN" }),
+    "红色 / 黑色",
+  );
+  assert.equal(
+    formatCreationSkuItemColorNames({ colorNames: ["navy blue"] }, { value: "zh-CN" }),
+    "深蓝色",
+  );
 });

@@ -39,6 +39,8 @@ test("API capability matrix documents local and Cloudflare runtime differences",
   assert.equal(isApiRouteSupported("cloudflare", "POST", "/api/creation/plan"), true);
   assert.equal(isApiRouteSupported("local", "POST", "/api/creation/sets/delete"), true);
   assert.equal(isApiRouteSupported("cloudflare", "POST", "/api/creation/sets/delete"), true);
+  assert.equal(isApiRouteSupported("local", "POST", "/api/creation/sets/export-temu-excel"), true);
+  assert.equal(isApiRouteSupported("cloudflare", "POST", "/api/creation/sets/export-temu-excel"), false);
   assert.equal(isApiRouteSupported("local", "POST", "/api/article-illustration/sets/delete"), true);
   assert.equal(isApiRouteSupported("cloudflare", "POST", "/api/article-illustration/sets/delete"), false);
   assert.equal(isApiRouteSupported("local", "POST", "/api/portrait/sets/delete"), true);
@@ -129,6 +131,23 @@ test("Cloudflare unsupported API routes use the shared capability contract", asy
   assert.equal(payload.runtime, "cloudflare");
   assert.equal(payload.path, "/api/output/open");
   assert.equal(payload.message, "Cloudflare 部署版不支持打开本机输出目录，请使用预览区的下载按钮保存图片。");
+});
+
+test("Cloudflare Temu Excel export is explicitly unsupported", async () => {
+  const worker = await import("../cloudflare-pages-worker.mjs");
+  const response = await worker.handleApiRequest(
+    new Request("https://studio.example/api/creation/sets/export-temu-excel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ setIds: ["set-a"] }),
+    }),
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 400);
+  assert.equal(payload.ok, false);
+  assert.equal(payload.code, "unsupported_runtime_capability");
+  assert.equal(payload.path, "/api/creation/sets/export-temu-excel");
 });
 
 test("article illustration routes expose an explicit Cloudflare capability contract", async () => {

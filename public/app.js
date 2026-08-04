@@ -19,6 +19,7 @@ import { getStudioDensitySettings, getStudioLayoutMode, ALL_VARIABLE_NAMES } fro
 import { buildStyleTransferPresetLightboxItem } from "/lib/style-transfer-preset-lightbox.mjs";
 import { buildCreationRecordLightboxItem, normalizeCreationGenerationSnapshotForView } from "/lib/creation-record-lightbox.mjs";
 import { buildCreationRecordDeleteConfirmation, getCreationRecordDeleteTargets, normalizeCreationRecordDeleteSetIds, resolveCreationRecordSelectionAfterDelete } from "/lib/creation-record-delete.mjs?v=20260722-creation-record-delete-flow-1";
+import { createCreationTemuExportController } from "/lib/creation-temu-export-ui.mjs";
 import { createAssetRecordDeleteController } from "/lib/asset-record-delete-controller.mjs?v=20260722-asset-record-delete-1";
 import { createAssetRecordTimeFilterController, getArticleRecordSearchText, getPortraitRecordSearchText } from "/lib/asset-record-time-filter-controller.mjs?v=20260724-asset-record-time-filter-controller-1";
 import { buildCreationRecordTimeFilterOptions, filterCreationRecordSetsByTime, formatCreationRecordTimeFilterLabel, hasActiveCreationRecordTimeFilter, normalizeCreationRecordDateFilter, normalizeCreationRecordTimeFilter } from "/lib/creation-record-filter.mjs?v=20260722-creation-record-time-filter-1";
@@ -341,6 +342,7 @@ const PROMPT_ANALYSIS_IMAGE_JPEG_QUALITY = 0.82;
 const GENERATION_REFERENCE_IMAGE_MAX_EDGE = 1024;
 const GENERATION_REFERENCE_IMAGE_COMPRESS_THRESHOLD_BYTES = 900 * 1024;
 const GENERATION_REFERENCE_IMAGE_JPEG_QUALITY = 0.82;
+const PREVIEW_REFERENCE_DRAG_MIME = "application/x-gpt-image2-preview";
 const GENERATION_TASK_POLL_INTERVAL_MS = 10000;
 const GENERATION_TASK_STATUS_LABELS = { running: "生成中", completed: "生成完成", error: "错误" };
 const GENERATION_TASK_TIMELINE_STATUS = { running: "active", completed: "done", error: "error" };
@@ -432,6 +434,7 @@ const state = {
     recordDeleteRequest: null,
     recordDetailExpanded: false,
     recordSetId: "",
+    recordTemuExportBusy: false,
     repairingItemId: "",
     selectedQueueId: "",
     sets: [],
@@ -935,6 +938,7 @@ const refs = {
   previewDownloadButton: document.querySelector("#previewDownloadButton"),
   previewId: document.querySelector("#previewId"),
   previewImage: document.querySelector("#previewImage"),
+  previewAddReferenceButton: document.querySelector("#previewAddReferenceButton"),
   previewLightboxButton: document.querySelector("#previewLightboxButton"),
   previewModel: document.querySelector("#previewModel"),
   previewPlaceholder: document.querySelector("#previewPlaceholder"),
@@ -1009,6 +1013,7 @@ const refs = {
   pptTopicInput: document.querySelector("#pptTopicInput"),
   pptTransitionPresetInput: document.querySelector("#pptTransitionPresetInput"),
   pptTransitionSpeedInput: document.querySelector("#pptTransitionSpeedInput"),
+  clearPromptButton: document.querySelector("#clearPromptButton"),
   promptInput: document.querySelector("#promptInput"),
   promptModeBlocks: [document.querySelector(".reference-field-group"), ...document.querySelectorAll("[data-prompt-mode-block]")].filter(Boolean),
   promptTemplateFeedback: document.querySelector("#promptTemplateFeedback"),
@@ -1023,6 +1028,7 @@ const refs = {
   reasoningEffortInput: document.querySelector("#reasoningEffortInput"),
   recentEmpty: document.querySelector("#recentEmpty"),
   recentList: document.querySelector("#recentList"),
+  clearReferenceButton: document.querySelector("#clearReferenceButton"),
   referenceCount: document.querySelector("#referenceCount"),
   referenceAnalysisAutoCollapseButton: document.querySelector("#referenceAnalysisAutoCollapseButton"),
   referenceAnalysisCount: document.querySelector("#referenceAnalysisCount"),
@@ -2151,6 +2157,12 @@ async function setActiveView(view) {
 function updatePromptCounter() {
   refs.promptCounter.textContent = `${refs.promptInput.value.length} ${getUiLanguageText("promptCounterSuffix") || "字"}`;
 }
+function clearPromptInput() {
+  refs.promptInput.value = "";
+  updatePromptCounter();
+  updateGenerateButton();
+  refs.promptInput.focus();
+}
 function getMaxQueuedJobCount() {
   return Number.POSITIVE_INFINITY;
 }
@@ -2720,6 +2732,69 @@ async function ensureImageDecompositionGenerationFilesReady() {
     renderImageDecompositionView();
   }
 }
+function isPromptReferenceWorkflow() {
+  return state.activeView === "studio" && state.studioMode === "prompt";
+}
+function getPreviewReferenceDragKey(dataTransfer) {
+  const key = String(dataTransfer?.getData?.(PREVIEW_REFERENCE_DRAG_MIME) || "").trim();
+  return key && key === state.selectedPreviewKey ? key : "";
+}
+function getPreviewReferenceFilename(item, blob) {
+  const rawName = String(item?.filename || "")
+    .split(/[\\/]/)
+    .pop()
+    ?.trim();
+  if (rawName && /\.[a-z\d]{2,8}$/i.test(rawName)) {
+    return rawName;
+  }
+  const extension = String(blob?.type || "image/png").split("/")[1]?.replace(/[^a-z\d]/gi, "") || "png";
+  return `${rawName || "preview"}.${extension}`;
+}
+function getStablePreviewFileTimestamp(item) {
+  const source = String(item?.id || item?.filename || "preview");
+  let hash = 0;
+  for (const character of source) {
+    hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+  }
+  return hash || 1;
+}
+async function addCurrentPreviewToReferences(previewKey = state.selectedPreviewKey) {
+  if (!isPromptReferenceWorkflow() || !previewKey || previewKey !== state.selectedPreviewKey) {
+    return;
+  }
+  const item = getCurrentPreviewItem();
+  if (!item || !getImageUrl(item)) {
+    showError("当前没有可添加的图片。");
+    return;
+  }
+  try {
+    const blob = await resolveDownloadImageBlob(item, refs.previewImage);
+    if (!blob?.type?.startsWith("image/")) {
+      throw new Error("当前预览不是有效图片。");
+    }
+    if (!isPromptReferenceWorkflow() || previewKey !== state.selectedPreviewKey) {
+      return;
+    }
+    const file = new File([blob], getPreviewReferenceFilename(item, blob), {
+      type: blob.type,
+      lastModified: getStablePreviewFileTimestamp(item),
+    });
+    applyReferenceFiles([file], { feedback: true });
+  } catch (error) {
+    showError(error instanceof Error ? error.message : "无法读取当前图片，请刷新页面后重试。");
+  }
+}
+function handleReferenceDrop(event) {
+  event.preventDefault();
+  refs.referenceDropzone.classList.remove("dragover");
+  refs.referenceGrid.classList.remove("dragover");
+  const previewKey = getPreviewReferenceDragKey(event.dataTransfer);
+  if (previewKey) {
+    void addCurrentPreviewToReferences(previewKey);
+    return;
+  }
+  applyReferenceFiles(event.dataTransfer?.files);
+}
 function resetReferenceFiles() {
   closeReferencePreview();
   state.referenceFiles.forEach(revokeReferencePreview);
@@ -2762,10 +2837,15 @@ function removeReferenceFile(referenceId) {
   renderReferenceGrid();
   updateGenerateButton();
 }
-function applyReferenceFiles(fileList) {
-  const incomingFiles = [...(fileList || [])].filter((file) => file.type.startsWith("image/"));
+function applyReferenceFiles(fileList, { feedback = false } = {}) {
+  const allFiles = [...(fileList || [])];
+  const incomingFiles = allFiles.filter((file) => file.type.startsWith("image/"));
+  const result = { addedCount: 0, duplicateCount: 0, invalidCount: allFiles.length - incomingFiles.length, overflowed: false };
   if (incomingFiles.length === 0) {
-    return;
+    if (feedback && result.invalidCount > 0) {
+      showError("当前预览不是有效图片。");
+    }
+    return result;
   }
   const next = [...state.referenceFiles];
   const fingerprints = new Set(next.map((item) => item.fingerprint));
@@ -2777,6 +2857,7 @@ function applyReferenceFiles(fileList) {
     }
     const fingerprint = buildReferenceFingerprint(file);
     if (fingerprints.has(fingerprint)) {
+      result.duplicateCount += 1;
       continue;
     }
     const referenceItem = {
@@ -2791,14 +2872,21 @@ function applyReferenceFiles(fileList) {
     startReferenceGenerationCompression(referenceItem);
     next.push(referenceItem);
     fingerprints.add(fingerprint);
+    result.addedCount += 1;
   }
+  result.overflowed = overflowed;
   state.referenceFiles = next;
   refs.referenceInput.value = "";
   renderReferenceGrid();
   updateGenerateButton();
   if (overflowed) {
     showError(`参考图最多支持 ${state.limits.maxReferenceImages} 张。`);
+  } else if (feedback && result.duplicateCount > 0 && result.addedCount === 0) {
+    showError("这张图片已经在参考图中。");
+  } else if (feedback && result.duplicateCount > 0) {
+    showError(`已添加 ${result.addedCount} 张，${result.duplicateCount} 张重复图片未添加。`);
   }
+  return result;
 }
 function createReferenceAnalysisItem(file) {
   return {
@@ -4387,7 +4475,7 @@ function syncStudioHeight() {
   document.documentElement.style.removeProperty("--studio-column-height");
   void refs.settingsPanel.offsetHeight;
   const viewRootRect = refs.viewRoot.getBoundingClientRect();
-  const availableHeight = Math.max(600, Math.floor(window.innerHeight - viewRootRect.top - WORKSPACE_BOTTOM_GAP_PX));
+  const availableHeight = Math.max(320, Math.floor(Math.max(1, Math.round(window.visualViewport?.height || window.innerHeight)) - viewRootRect.top - WORKSPACE_BOTTOM_GAP_PX));
   const resolvedHeight = availableHeight;
   if (resolvedHeight > 0) {
     document.documentElement.style.setProperty("--studio-column-height", `${resolvedHeight}px`);
@@ -5397,6 +5485,10 @@ function renderPreview() {
     refs.previewDownloadButton.removeAttribute("href");
     refs.previewDownloadButton.removeAttribute("download");
     refs.previewDownloadButton.classList.add("disabled");
+    refs.previewAddReferenceButton.disabled = true;
+    refs.previewImage.draggable = false;
+    refs.previewImage.removeAttribute("title");
+    refs.previewImage.classList.remove("is-dragging");
     refs.previewLightboxButton.disabled = true;
     refs.previewDeleteButton.disabled = true;
     return;
@@ -5415,6 +5507,10 @@ function renderPreview() {
     refs.previewDownloadButton.removeAttribute("href");
     refs.previewDownloadButton.removeAttribute("download");
     refs.previewDownloadButton.classList.add("disabled");
+    refs.previewAddReferenceButton.disabled = true;
+    refs.previewImage.draggable = false;
+    refs.previewImage.removeAttribute("title");
+    refs.previewImage.classList.remove("is-dragging");
     refs.previewLightboxButton.disabled = true;
     refs.previewDeleteButton.disabled = true;
     return;
@@ -5443,6 +5539,10 @@ function renderPreview() {
   refs.previewDownloadButton.href = imageUrl;
   refs.previewDownloadButton.download = item.filename || "preview.png";
   refs.previewDownloadButton.classList.remove("disabled");
+  const canAddPreviewReference = isPromptReferenceWorkflow() && Boolean(imageUrl);
+  refs.previewAddReferenceButton.disabled = !canAddPreviewReference;
+  refs.previewImage.draggable = canAddPreviewReference;
+  refs.previewImage.title = canAddPreviewReference ? "拖动到参考图区域即可添加" : "";
   refs.previewLightboxButton.disabled = false;
   refs.previewDeleteButton.disabled = !item.filename;
 }
@@ -7034,7 +7134,7 @@ const CREATION_ITEM_STATUS_LABELS = {
   planning: "待开始",
 };
 
-const CREATION_PREVIEW_SLOTS = "1-hero|hero|首图成交主视觉|主商品占主视觉，周围用多个小圆框展示工具、穿搭或使用场景;2-benefit|benefit|核心信息融合图|融合产品、结果、痛点和可信证据，让买家明白为什么需要;3-scene|scene|适用多场景图|用 2-4 个真实适用场景展示产品价值，带宣传片式层次和购买代入感;4-multi-angle|multi-angle|多角度产品展示图|3-4 个清晰视角展示形态、结构、厚度和表面，不堆营销字;5-atmosphere|atmosphere|冲动下单氛围图|用真实拥有感和生活情绪触发想买冲动，同时保持产品清楚可看;6-product-detail|product-detail|产品细节特写图|用微距、局部和指向标注证明材质、结构、做工或关键部位;7-brand-story|brand-story|品牌质感/礼品价值图|做成多场景用途与风格拼贴，展示多种真实使用场景和底部使用方式小图标;8-size-capacity-fit|size-capacity-fit|尺寸容量适配图|用准确尺寸、容量、比例和适配参照降低买错风险;9-effect-comparison|effect-comparison|功能效果渲染图|用高级 3D/CGI 或广告级可视化表现功能路径、机制、效果和结果;10-spec-table|spec-table|参数规格图|用清晰参数表呈现型号、尺寸、单位和关键规格，便于快速核对;11-craft-process|craft-process|品质工艺证明图|把工艺、材料处理、装配或检测事实转成质量证据;12-accessory-gift|accessory-gift|到手清单/配件图|完整展示到手包含物、数量、包装和配件，减少到货不确定;13-series-showcase|series-showcase|多款式/SKU选择图|只展示已提供的颜色、款式、尺码、套装或 SKU，帮助快速选择;14-ingredient-material|ingredient-material|材质成分解析图|用材质、成分、结构或组件解释为什么值得信任或偏好;15-after-sales|after-sales|痛点图|用真实使用困扰、解决路径和结果变化，让买家知道它具体替我解决什么问题;16-usage-suggestion|usage-suggestion|卖点图|用 3-5 个核心卖点连接功能证据和买后收益，让买家知道买它能获得什么好处;17-human-handheld|human-handheld|真人手持展示图|真人出镜，手持、举到镜头前或用鱼线悬挂展示商品，让尺度、细节和真实使用感更直观;18-human-wearable|human-wearable|真人穿戴场景图|真人穿着、背着、提着或佩戴商品，在真实场景里展示版型、比例、背负关系和生活代入感".split(";").map((entry) => { const [itemId, role, title, brief] = entry.split("|"); return { itemId, role, title, brief }; });
+const CREATION_PREVIEW_SLOTS = "1-hero|hero|首图成交主视觉|主商品占主视觉，周围用多个小圆框展示工具、穿搭或使用场景;2-benefit|benefit|核心信息融合图|融合产品、结果、痛点和可信证据，让买家明白为什么需要;3-scene|scene|适用多场景图|用 2-4 个真实适用场景展示产品价值，带宣传片式层次和购买代入感;4-multi-angle|multi-angle|多角度产品展示图|3-4 个清晰视角展示形态、结构、厚度和表面，不堆营销字;5-atmosphere|atmosphere|冲动下单氛围图|用真实拥有感和生活情绪触发想买冲动，同时保持产品清楚可看;6-product-detail|product-detail|产品细节特写图|用微距、局部和指向标注证明材质、结构、做工或关键部位;7-brand-story|brand-story|品牌质感/礼品价值图|做成多场景用途与风格拼贴，展示多种真实使用场景和底部使用方式小图标;8-size-capacity-fit|size-capacity-fit|尺寸容量适配图|用准确尺寸、容量、比例和适配参照降低买错风险;9-effect-comparison|effect-comparison|功能效果渲染图|以一个清晰完整的商品主体为核心，围绕它展现所有已提供功能、机制、效果路径和渲染结果，不做前后或左右对比;10-spec-table|spec-table|参数规格图|用清晰参数表呈现型号、尺寸、单位和关键规格，便于快速核对;11-craft-process|craft-process|品质工艺证明图|把工艺、材料处理、装配或检测事实转成质量证据;12-accessory-gift|accessory-gift|到手清单/配件图|完整展示到手包含物、数量、包装和配件，减少到货不确定;13-series-showcase|series-showcase|多款式/SKU选择图|只展示已提供的颜色、款式、尺码、套装或 SKU，帮助快速选择;14-ingredient-material|ingredient-material|材质成分解析图|用材质、成分、结构或组件解释为什么值得信任或偏好;15-after-sales|after-sales|痛点图|用真实使用困扰、解决路径和结果变化，让买家知道它具体替我解决什么问题;16-usage-suggestion|usage-suggestion|卖点图|用 3-5 个核心卖点连接功能证据和买后收益，让买家知道买它能获得什么好处;17-human-handheld|human-handheld|真人手持展示图|真人出镜，手持、举到镜头前或用鱼线悬挂展示商品，让尺度、细节和真实使用感更直观;18-human-wearable|human-wearable|真人穿戴场景图|真人穿着、背着、提着或佩戴商品，在真实场景里展示版型、比例、背负关系和生活代入感".split(";").map((entry) => { const [itemId, role, title, brief] = entry.split("|"); return { itemId, role, title, brief }; });
 
 const CREATION_SCENARIO_LABELS = { standard: "标准电商", "detail-page": "详情页转化", "social-seeding": "社媒种草", launch: "新品发布", promotion: "活动促销", livestream: "直播电商", "gift-guide": "礼品推荐", "marketplace-search": "平台搜索", "brand-story": "品牌故事" };
 const CREATION_VISUAL_LANGUAGE_LABELS = { "classic-commercial": "经典商业摄影", "premium-studio": "高端棚拍", "clean-marketplace": "平台清爽白底", "lifestyle-editorial": "生活方式杂志", "social-ugc": "社媒实拍", "detail-infographic": "详情页信息图", "macro-material": "微距材质", "outdoor-context": "户外场景", "minimal-luxury": "极简奢华", "bold-campaign": "活动海报", "warm-handcrafted": "手作温度" };
@@ -8033,7 +8133,7 @@ function setCreationRecordFeedback(message = "", kind = "") {
 }
 
 function refreshCreationRecordSets() {
-  if (state.creation.generating || state.creation.planning || state.creation.recordDeleteBusy || creationRecordRefreshPromise) {
+  if (state.creation.generating || state.creation.planning || state.creation.recordDeleteBusy || state.creation.recordTemuExportBusy || creationRecordRefreshPromise) {
     return;
   }
 
@@ -10077,7 +10177,7 @@ function closeCreationRecordDeleteDialog({ force = false } = {}) {
 }
 
 function requestCreationRecordDelete(mode) {
-  if (state.creation.generating || state.creation.planning || state.creation.recordDeleteBusy) return;
+  if (state.creation.generating || state.creation.planning || state.creation.recordDeleteBusy || state.creation.recordTemuExportBusy) return;
   let targets;
   try {
     targets = getCreationRecordDeleteTargetsForMode(mode);
@@ -10235,7 +10335,7 @@ const creationListingController = createCreationListingController({
   upsertSet: upsertCreationSet,
   writeTextToClipboard,
 });
-
+const creationRecordTemuExportController = createCreationTemuExportController({ state, getCurrentSetIds: () => state.creation.sets.map((set) => set?.setId), setRecordFeedback: setCreationRecordFeedback, renderRecordView: renderCreationRecordView, compactErrorMessage });
 async function fetchCreationRecordPathReport(set) {
   if (!set?.setId) {
     throw new Error("请先选择一套记录。");
@@ -10639,7 +10739,7 @@ function renderCreationRecordView() {
   const recordIncompleteItems = getCreationIncompleteItems(selectedSet);
   const existingSetIds = new Set(state.creation.sets.map((set) => set.setId));
   const checkedCount = new Set(state.creation.recordCheckedSetIds.filter((setId) => existingSetIds.has(setId))).size;
-  const deleteBlocked = state.creation.generating || state.creation.planning || state.creation.recordDeleteBusy;
+  const deleteBlocked = state.creation.generating || state.creation.planning || state.creation.recordDeleteBusy || state.creation.recordTemuExportBusy;
   if (refs.creationRecordSearchInput && refs.creationRecordSearchInput.value !== state.creation.recordQuery) {
     refs.creationRecordSearchInput.value = state.creation.recordQuery;
   }
@@ -10660,6 +10760,8 @@ function renderCreationRecordView() {
   if (refs.creationRecordReuseButton) {
     refs.creationRecordReuseButton.disabled = !selectedSet;
   }
+  creationRecordTemuExportController.syncControls(deleteBlocked, checkedCount);
+  if (refs.creationRecordRefreshButton) refs.creationRecordRefreshButton.disabled = state.creation.recordTemuExportBusy;
   if (refs.creationRecordDeleteCurrentButton) {
     refs.creationRecordDeleteCurrentButton.disabled = deleteBlocked || !selectedSet;
   }
@@ -16894,6 +16996,7 @@ function bindEvents() {
   refs.promptInput.addEventListener("input", updatePromptCounter);
   refs.promptInput.addEventListener("keydown", handlePromptGenerationShortcut);
   refs.promptInput.addEventListener("paste", handleStudioImagePaste); refs.promptEnhanceToggle.addEventListener("click", togglePromptEnhanceMode); refs.promptEnhanceInput.addEventListener("keydown", handlePromptGenerationShortcut);
+  refs.clearPromptButton.addEventListener("click", clearPromptInput);
   refs.styleTransferInstructionInput.addEventListener("keydown", handlePromptGenerationShortcut);
   refs.styleTransferInstructionInput.addEventListener("paste", handleStudioImagePaste);
   refs.styleTransferPresetComparison.addEventListener("click", handleStyleTransferPresetComparisonClick);
@@ -16922,6 +17025,11 @@ function bindEvents() {
   refs.referenceInput.addEventListener("change", (event) => {
     applyReferenceFiles(event.target.files);
   });
+  refs.clearReferenceButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    resetReferenceFiles();
+  });
   refs.referenceGrid.addEventListener("click", (event) => {
     const target = event.target.closest("[data-reference-preview-id]");
     if (!target) {
@@ -16938,9 +17046,17 @@ function bindEvents() {
     refs.referenceDropzone.classList.remove("dragover");
   });
   refs.referenceDropzone.addEventListener("drop", (event) => {
+    handleReferenceDrop(event);
+  });
+  refs.referenceGrid.addEventListener("dragover", (event) => {
     event.preventDefault();
-    refs.referenceDropzone.classList.remove("dragover");
-    applyReferenceFiles(event.dataTransfer?.files);
+    refs.referenceGrid.classList.add("dragover");
+  });
+  refs.referenceGrid.addEventListener("dragleave", () => {
+    refs.referenceGrid.classList.remove("dragover");
+  });
+  refs.referenceGrid.addEventListener("drop", (event) => {
+    handleReferenceDrop(event);
   });
   refs.referencePreviewBackdrop.addEventListener("click", closeReferencePreview);
   refs.referencePreviewClose.addEventListener("click", closeReferencePreview);
@@ -17150,6 +17266,9 @@ function bindEvents() {
   refs.clearHistoryButton?.addEventListener("click", () => {
     clearHistory().catch((error) => showError(error.message));
   });
+  refs.previewAddReferenceButton.addEventListener("click", () => {
+    void addCurrentPreviewToReferences();
+  });
   refs.previewLightboxButton.addEventListener("click", () => {
     const item = getCurrentPreviewItem();
     if (item && getImageUrl(item)) {
@@ -17176,6 +17295,22 @@ function bindEvents() {
     if (item && getImageUrl(item)) {
       openLightbox(item, { items: getCurrentPreviewNavigationItems() });
     }
+  });
+  refs.previewImage.addEventListener("dragstart", (event) => {
+    const item = getCurrentPreviewItem();
+    if (!isPromptReferenceWorkflow() || !item || !getImageUrl(item) || !state.selectedPreviewKey) {
+      event.preventDefault();
+      return;
+    }
+    event.dataTransfer?.setData(PREVIEW_REFERENCE_DRAG_MIME, state.selectedPreviewKey);
+    event.dataTransfer?.setData("text/plain", "添加到参考图");
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "copy";
+    }
+    refs.previewImage.classList.add("is-dragging");
+  });
+  refs.previewImage.addEventListener("dragend", () => {
+    refs.previewImage.classList.remove("is-dragging");
   });
   refs.referenceAnalysisGenerationCanvas.addEventListener("click", openReferenceAnalysisGeneratedPreview);
   refs.referenceAnalysisGenerationCanvas.addEventListener("keydown", (event) => {

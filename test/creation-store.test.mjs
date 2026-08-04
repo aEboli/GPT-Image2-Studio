@@ -770,3 +770,43 @@ test("creation set store requires exact IDs and never recursively deletes an uns
 
   await rm(rootDir, { recursive: true, force: true });
 });
+
+test("creation set store preserves and serially merges Temu image cache without sensitive fields", async () => {
+  const outputDir = await mkdtemp(join(tmpdir(), "creation-store-temu-cache-"));
+  const store = createCreationSetStore({ outputDir, publicBasePath: "/output" });
+  const base = {
+    setId: "set-temu-cache",
+    productName: "缓存商品",
+    createdAt: "2026-08-03T00:00:00.000Z",
+    status: "completed",
+    items: [],
+  };
+  await store.saveManifest({ ...base, listingDrafts: [{ title: "旧 Listing" }] });
+
+  const listingSave = store.saveManifest({ ...base, listingDrafts: [{ title: "新 Listing" }] });
+  const cacheMerge = store.mergeTemuExcelImageCache("set-temu-cache", new Map([
+    ["hero", {
+      sourceRelativePath: "2026-08/08-03/hero.png",
+      sourceSha256: `sha256:${"a".repeat(64)}`,
+      cloudName: "demo-cloud",
+      secureUrl: "https://res.cloudinary.com/demo-cloud/image/upload/v1/hero.png",
+      assetId: "asset-1",
+      publicId: "hero",
+      uploadedAt: "2026-08-03T00:00:01.000Z",
+      uploadPreset: "must-not-persist",
+      apiSecret: "must-not-persist",
+    }],
+  ]));
+  await Promise.all([listingSave, cacheMerge]);
+
+  const stored = await store.readManifest("set-temu-cache");
+  assert.equal(stored.listingDrafts[0].title, "新 Listing");
+  assert.equal(stored.temuExcelImageCache.version, 1);
+  assert.equal(stored.temuExcelImageCache.entries.hero.secureUrl, "https://res.cloudinary.com/demo-cloud/image/upload/v1/hero.png");
+  assert.equal("uploadPreset" in stored.temuExcelImageCache.entries.hero, false);
+  assert.equal("apiSecret" in stored.temuExcelImageCache.entries.hero, false);
+
+  const raw = await readFile(store.manifestPath("set-temu-cache"), "utf8");
+  assert.doesNotMatch(raw, /must-not-persist/u);
+  await rm(outputDir, { recursive: true, force: true });
+});

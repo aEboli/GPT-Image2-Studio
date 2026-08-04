@@ -1287,10 +1287,10 @@ test("V1 structured export preserves the historical payload and draft verbatim",
   });
 });
 
-test("listing generation rejects a stale service response without dimension fields", async () => {
+test("listing generation accepts a successful service response without dimension fields", async () => {
   const selectedSet = { setId: "set-stale-listing-service", listingDrafts: [] };
   const feedback = [];
-  let upserted = false;
+  let upsertedSet = null;
   const controller = createCreationListingController({
     state: { creation: { sets: [selectedSet] } },
     getSelectedSet: () => selectedSet,
@@ -1306,26 +1306,24 @@ test("listing generation rejects a stale service response without dimension fiel
         },
       }),
     }),
-    upsertSet: () => {
-      upserted = true;
-      return selectedSet;
+    upsertSet: (set) => {
+      upsertedSet = set;
+      return set;
     },
     compactErrorMessage: (message) => message,
     setFeedback: (message, type) => feedback.push({ message, type }),
   });
 
-  await assert.rejects(
-    controller.generate(selectedSet.setId),
-    /缺少包装尺寸或产品尺寸/u,
-  );
-  assert.equal(upserted, false);
-  assert.equal(feedback.at(-1)?.type, "error");
-  assert.match(feedback.at(-1)?.message || "", /重启 Image Studio/u);
+  const nextSet = await controller.generate(selectedSet.setId);
+
+  assert.equal(upsertedSet, nextSet);
+  assert.equal(nextSet.listingDrafts[0].title, "1 Pack Door Latch");
+  assert.equal(feedback.at(-1)?.type, "success");
 });
 
-test("listing generation rejects a stale service response without weight fields", async () => {
+test("listing generation accepts a successful service response without weight fields", async () => {
   const selectedSet = { setId: "set-stale-listing-weight-service", listingDrafts: [] };
-  let upserted = false;
+  let upsertedSet = null;
   const controller = createCreationListingController({
     state: { creation: { sets: [selectedSet] } },
     getSelectedSet: () => selectedSet,
@@ -1347,19 +1345,18 @@ test("listing generation rejects a stale service response without weight fields"
         },
       }),
     }),
-    upsertSet: () => {
-      upserted = true;
-      return selectedSet;
+    upsertSet: (set) => {
+      upsertedSet = set;
+      return set;
     },
     compactErrorMessage: (message) => message,
     setFeedback: () => {},
   });
 
-  await assert.rejects(
-    controller.generate(selectedSet.setId),
-    /缺少包装重量或产品重量/u,
-  );
-  assert.equal(upserted, false);
+  const nextSet = await controller.generate(selectedSet.setId);
+
+  assert.equal(upsertedSet, nextSet);
+  assert.equal(nextSet.listingDrafts[0].title, "1 Pack Door Latch");
 });
 
 test("old branded V2 drafts remain directly copyable and exportable without review gates", async () => {

@@ -391,24 +391,14 @@ test("V2 validator recursively rejects forbidden terms in English and Chinese co
   assert.match(issueText(validation, "errors"), /zhDisplay\.description.*北风商店/i);
 });
 
-test("V2 model retry sanitizes brands and platform aliases and returns complete bilingual content", async () => {
+test("V2 model accepts its first parsed response without bilingual completeness", async () => {
   const policy = resolveCreationListingPolicy({ platform: "etsy" });
   const attempts = [];
   const first = makeV2Draft(policy);
   delete first.zhDisplay;
-  const second = makeV2Draft(policy, {
-    title: "Acme Labs Storage Box for Etsy",
-    sellingPoints: ["Available from Northwind Store."],
-    zhDisplay: {
-      ...makeV2Draft(policy).zhDisplay,
-      title: "Acme Labs 收纳盒",
-      sellingPoints: ["由北风商店提供。"],
-    },
-  });
   const fetchImpl = async (_url, init) => {
     attempts.push(JSON.parse(init.body));
-    const output = attempts.length === 1 ? first : second;
-    return new Response(JSON.stringify({ output_text: JSON.stringify(output) }), { status: 200 });
+    return new Response(JSON.stringify({ output_text: JSON.stringify(first) }), { status: 200 });
   };
   const draft = await listingAgent.requestCreationListingDraft({
     baseUrl: "https://example.test/v1",
@@ -429,12 +419,13 @@ test("V2 model retry sanitizes brands and platform aliases and returns complete 
     fetchImpl,
   });
 
-  assert.equal(attempts.length, 2);
+  assert.equal(attempts.length, 1);
   assert.match(attempts[0].input, /own hard rule, not an official marketplace rule/i);
   assert.match(attempts[0].input, /Acme Labs/);
   assert.ok(attempts[0].text.format.schema.required.includes("zhDisplay"));
   assert.equal(draft.status, "completed");
-  assertCompleteBilingualNoBrandDraft(draft, /Acme|Northwind|北风商店|Etsy/i);
+  assert.equal(draft.title, first.title);
+  assert.equal(draft.zhDisplay?.title, "");
 });
 
 test("V1 aliases remain readable without mutating or discarding historical content", () => {
@@ -700,7 +691,7 @@ test("all platforms apply the same fact gate to generated-image-only high-risk c
   }
 });
 
-test("two invalid upstream attempts fail without a deterministic draft", async () => {
+test("parsed V2 output that fails local validation is accepted after one request", async () => {
   const requestCreationListingDraft = requireFunction(listingAgent, "requestCreationListingDraft");
   const policy = resolveCreationListingPolicy({ platform: "etsy" });
   const calls = [];
@@ -714,31 +705,37 @@ test("two invalid upstream attempts fail without a deterministic draft", async (
     calls.push(JSON.parse(init.body));
     return new Response(JSON.stringify({ output_text: JSON.stringify(invalidOutput) }), { status: 200 });
   };
+  const source = {
+    setId: "set-v2-fallback",
+    platformId: "etsy",
+    marketplace: "etsy",
+    listingPolicyVersion: policy.listingPolicyVersion,
+    language: "en-US",
+    listingPolicy: policy,
+    evidenceMode: "input-only",
+    ...SOURCE_FACTS,
+    productName: "Acme Blue Storage Box",
+    brandName: "Acme",
+    storeName: "Northwind Store",
+  };
 
-  await assert.rejects(
-    requestCreationListingDraft({
-      baseUrl: "https://example.test/v1",
-      apiKey: "test-key",
-      responsesModel: "test-model",
-      source: {
-        setId: "set-v2-fallback",
-        platformId: "etsy",
-        marketplace: "etsy",
-        listingPolicyVersion: policy.listingPolicyVersion,
-        language: "en-US",
-        listingPolicy: policy,
-        evidenceMode: "input-only",
-        ...SOURCE_FACTS,
-        productName: "Acme Blue Storage Box",
-        brandName: "Acme",
-        storeName: "Northwind Store",
-      },
-      fetchImpl,
-    }),
-    /Listing generation failed validation after 2 attempts/i,
-  );
+  const draft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "test-model",
+    source,
+    fetchImpl,
+  });
 
-  assert.equal(calls.length, 2);
+  const validation = listingDraft.validateCreationListingDraft(draft, {
+    policy,
+    sourceFacts: source,
+    source,
+  });
+  assert.equal(draft.status, "completed");
+  assert.match(draft.title, /Miracle Cure Box/i);
+  assert.equal(calls.length, 1);
+  assert.equal(validation.ok, false);
 });
 
 test("every platform rejects English and Chinese functional wording", () => {
@@ -761,14 +758,18 @@ test("every platform rejects English and Chinese functional wording", () => {
   }
 });
 
-test("invalid V2 output fails instead of creating an identity-sanitized deterministic draft", async () => {
+test("parsed V2 output with local identity and language issues is accepted on first response", async () => {
   const policy = resolveCreationListingPolicy({ platform: "etsy" });
   const invalidOutput = makeV2Draft(policy, {
-    title: "Caja sin validar para el hogar",
+    title: "Acme Caja sin validar para Northwind Store RocketMark",
   });
-  const fetchImpl = async () => new Response(JSON.stringify({
-    output_text: JSON.stringify(invalidOutput),
-  }), { status: 200 });
+  let requestCount = 0;
+  const fetchImpl = async () => {
+    requestCount += 1;
+    return new Response(JSON.stringify({
+      output_text: JSON.stringify(invalidOutput),
+    }), { status: 200 });
+  };
   const [source] = listingDraft.buildCreationListingSources({
     setId: "implicit-identities",
     platform: "etsy",
@@ -782,18 +783,20 @@ test("invalid V2 output fails instead of creating an identity-sanitized determin
   for (const term of ["Acme", "Northwind Store", "RocketMark"]) {
     assert.ok(source.forbiddenTerms.includes(term), term);
   }
-  await assert.rejects(
-    listingAgent.requestCreationListingDraft({
-      baseUrl: "https://example.test/v1",
-      apiKey: "test-key",
-      responsesModel: "test-model",
-      source,
-      fetchImpl,
-    }),
-    /Listing generation failed validation after 2 attempts/i,
-  );
+  const identifiedDraft = await listingAgent.requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "test-model",
+    source,
+    fetchImpl,
+  });
 
-  await assert.rejects(listingAgent.requestCreationListingDraft({
+  assert.equal(identifiedDraft.status, "completed");
+  assert.match(identifiedDraft.title, /Caja sin validar/i);
+  assert.doesNotMatch(JSON.stringify(identifiedDraft), /Acme|Northwind Store|RocketMark/i);
+  assert.equal(requestCount, 1);
+
+  const sparseIdentityDraft = await listingAgent.requestCreationListingDraft({
     baseUrl: "https://example.test/v1",
     apiKey: "test-key",
     responsesModel: "test-model",
@@ -808,17 +811,25 @@ test("invalid V2 output fails instead of creating an identity-sanitized determin
       forbiddenTerms: [],
     },
     fetchImpl,
-  }), /Listing generation failed validation after 2 attempts/i);
+  });
+
+  assert.equal(sparseIdentityDraft.status, "completed");
+  assert.match(sparseIdentityDraft.title, /Caja sin validar/i);
+  assert.equal(requestCount, 2);
 });
 
-test("invalid V2 output for an unknown Chinese category fails without fallback", async () => {
+test("parsed V2 output for an unknown Chinese category is accepted without fallback", async () => {
   const policy = resolveCreationListingPolicy({ platform: "universal" });
   const invalidOutput = makeV2Draft(policy, {
     title: "Mochila sin validar para el hogar",
   });
-  const fetchImpl = async () => new Response(JSON.stringify({
-    output_text: JSON.stringify(invalidOutput),
-  }), { status: 200 });
+  let requestCount = 0;
+  const fetchImpl = async () => {
+    requestCount += 1;
+    return new Response(JSON.stringify({
+      output_text: JSON.stringify(invalidOutput),
+    }), { status: 200 });
+  };
   const [source] = listingDraft.buildCreationListingSources({
     setId: "unknown-chinese-category",
     platform: "universal",
@@ -828,16 +839,17 @@ test("invalid V2 output for an unknown Chinese category fails without fallback",
     sellingPoints: ["多分层结构便于分类收纳"],
   });
 
-  await assert.rejects(
-    listingAgent.requestCreationListingDraft({
-      baseUrl: "https://example.test/v1",
-      apiKey: "test-key",
-      responsesModel: "test-model",
-      source,
-      fetchImpl,
-    }),
-    /Listing generation failed validation after 2 attempts/i,
-  );
+  const draft = await listingAgent.requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "test-model",
+    source,
+    fetchImpl,
+  });
+
+  assert.equal(draft.status, "completed");
+  assert.match(draft.title, /sin validar para el hogar/i);
+  assert.equal(requestCount, 1);
 });
 
 test("transient listing gateway failures surface without a deterministic fallback", async () => {

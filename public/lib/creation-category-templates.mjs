@@ -88,7 +88,7 @@ export const CREATION_BASE_INDUSTRY_TEMPLATE_OPTIONS = [
   {
     "value": "electronics",
     "label": "3C 数码",
-    "promptInstruction": "Consumer electronics industry template: emphasize ports, dimensions, screen or device details, specification clarity, and comparison proof without fake UI or logos.",
+    "promptInstruction": "Consumer electronics industry template: emphasize ports, dimensions, screen or device details, specification clarity, and functional proof without fake UI or logos.",
     "rolePreset": [
       "hero",
       "benefit",
@@ -141,12 +141,12 @@ const CATEGORY_PROFILE_BY_CODE_PREFIX = {
   C05: {
     rolePreset: ["hero", "scene", "size-capacity-fit", "product-detail", "usage-suggestion", "benefit", "effect-comparison", "after-sales"],
     promptInstruction:
-      "Home improvement focus: show installation context, material finish, dimensions, compatibility, and before-after value with clear technical proof.",
+      "Home improvement focus: show installation context, material finish, dimensions, compatibility, and functional outcome proof with clear technical evidence.",
   },
   C06: {
     rolePreset: ["hero", "benefit", "size-capacity-fit", "usage-suggestion", "product-detail", "effect-comparison", "accessory-gift", "after-sales"],
     promptInstruction:
-      "Consumer electronics focus: show ports, screen or device details, dimensions, specifications, comparison proof, and avoid fake UI or unsupplied logos.",
+      "Consumer electronics focus: show ports, screen or device details, dimensions, specifications, functional proof, and avoid fake UI or unsupplied logos.",
   },
   C07: {
     rolePreset: ["hero", "benefit", "size-capacity-fit", "usage-suggestion", "product-detail", "effect-comparison", "scene", "after-sales"],
@@ -206,7 +206,7 @@ const CATEGORY_PROFILE_BY_CODE_PREFIX = {
   C18: {
     rolePreset: ["hero", "scene", "product-detail", "usage-suggestion", "benefit", "accessory-gift", "after-sales", "effect-comparison"],
     promptInstruction:
-      "Agriculture and gardening focus: show planting or tool use context, material detail, before-after value, package contents, and practical scale.",
+      "Agriculture and gardening focus: show planting or tool use context, material detail, functional outcome proof, package contents, and practical scale.",
   },
 };
 
@@ -229,7 +229,7 @@ const DEFAULT_CATEGORY_PROMPT_STRATEGY = {
     "size-capacity-fit": "Role category focus: make scale, capacity, size, compatibility, or quantity easy to understand without inventing numbers.",
     "usage-suggestion": "Role category focus: turn practical setup, operation, wearing, serving, cleaning, or assembly cues into selling-point evidence and buyer payoff for this category.",
     "accessory-gift": "Role category focus: clarify packaging, included items, accessories, and what the shopper receives.",
-    "effect-comparison": "Role category focus: compare category-relevant variants, materials, sizes, capacities, or use cases without fake metrics.",
+    "effect-comparison": "Role category focus: create one unified product-led functional rendering that shows every supported category-relevant function, mechanism, effect path, or outcome around the same dominant product; do not compare variants, materials, sizes, capacities, or use cases.",
   },
 };
 
@@ -305,7 +305,7 @@ const CATEGORY_PROMPT_STRATEGY_BY_CODE_PREFIX = {
       "product-detail": "Role category focus: emphasize ports, buttons, bezels, camera or lens modules, hinges, vents, cables, and included accessories.",
       "size-capacity-fit": "Role category focus: clarify device size, screen ratio, body thickness, grip scale, connector placement, or accessory fit.",
       "usage-suggestion": "Role category focus: turn setup, charging, connection, shooting, gaming, audio playback, data transfer, or device pairing cues into selling-point evidence and buyer payoff.",
-      "effect-comparison": "Role category focus: compare colors, storage, size, accessory compatibility, or use scenarios without fake benchmarks.",
+      "effect-comparison": "Role category focus: create one unified device-led functional rendering that shows every supported function, connection, effect path, or usage outcome around the same dominant device; do not compare colors, storage, size, accessory compatibility, or use scenarios.",
     },
   },
   C07: {
@@ -422,7 +422,7 @@ const CATEGORY_PROMPT_STRATEGY_BY_CODE_PREFIX = {
       scene: "Role category focus: use a workplace, printing area, meeting, checkout, display, catering, warehouse, or logistics workflow.",
       "product-detail": "Role category focus: show paper path, ports, buttons, storage capacity, consumables, display, mechanism, or commercial-duty structure.",
       "size-capacity-fit": "Role category focus: clarify desk footprint, capacity, aisle fit, storage volume, or commercial space scale.",
-      "effect-comparison": "Role category focus: compare office/home, small business/commercial, capacity, media, or use-case differences without fake numbers.",
+      "effect-comparison": "Role category focus: create one unified equipment-led functional rendering that shows every supported workflow, mechanism, effect path, or usage outcome around the same dominant product; do not compare office/home, small business/commercial, capacity, media, or use-case differences.",
     },
   },
   C17: {
@@ -510,7 +510,7 @@ const CATEGORY_PROMPT_STRATEGY_BY_LEVEL2 = {
     rolePromptInstructions: {
       hero: "Role category focus: show the machine front, paper output or operation surface, and compact footprint clearly.",
       scene: "Role category focus: use office, study, service counter, or small-business workflow scenes.",
-      "effect-comparison": "Role category focus: compare home/office, black-and-white/color, paper/media, or workflow use cases without fake numeric claims.",
+      "effect-comparison": "Role category focus: create one unified machine-led functional rendering that shows every supported workflow, mechanism, effect path, or outcome around the same dominant product; do not compare home/office, black-and-white/color, paper/media, or workflow use cases.",
     },
   },
 };
@@ -527,7 +527,7 @@ const CATEGORY_PROMPT_STRATEGY_BY_LEVEL3 = {
       "product-detail": "Role category focus: emphasize 屏幕边框、摄像头模组、接口与按键、机身边缘 and package accessories.",
       "size-capacity-fit": "Role category focus: emphasize 机身厚度、屏幕比例、摄像头凸起和握持尺度 without inventing numbers.",
       "usage-suggestion": "Role category focus: use 拍摄、游戏、充电、连接、数据传输 or first setup cues as 卖点证据 / selling-point evidence with abstract non-branded UI.",
-      "effect-comparison": "Role category focus: compare colors, storage, screen size, or battery use cases without fake benchmarks.",
+      "effect-comparison": "Role category focus: create one unified phone-led functional rendering that shows every supported feature, connection, effect path, or outcome around the same dominant device; do not compare colors, storage, screen size, or battery use cases.",
     },
   },
   唇妆: {

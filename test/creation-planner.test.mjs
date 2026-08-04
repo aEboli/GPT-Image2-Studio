@@ -13,6 +13,7 @@ import {
   getCreationIndustryRolePreset,
   getCreationScenarioRoleInstruction,
   getCreationScenarioRolePreset,
+  formatCreationDimensionSpecsForMode,
   normalizeCreationSkuGenerationRule,
   normalizeCreationVisualLanguage,
   normalizeCreationLogoOptions,
@@ -869,10 +870,14 @@ test("creation planner prevents conversion roles from becoming redundant white-b
   });
   const promptByRole = Object.fromEntries(plan.items.map((item) => [item.role, item.prompt]));
 
-  ["brand-story", "after-sales", "atmosphere", "effect-comparison"].forEach((role) => {
+  ["brand-story", "after-sales", "atmosphere"].forEach((role) => {
     assert.match(promptByRole[role], /Do not create another plain white-background product-only card/i);
     assert.match(promptByRole[role], /Do not rely on generic novelty, new-arrival, or feature-highlights poster language/i);
   });
+  assert.match(promptByRole["effect-comparison"], /one dominant, fully visible product/i);
+  assert.match(promptByRole["effect-comparison"], /single unified composition/i);
+  assert.match(promptByRole["effect-comparison"], /Do not use before-and-after, comparison, side-by-side, split-screen, paired-state, duplicate-product, or multi-panel layouts/i);
+  assert.doesNotMatch(promptByRole["effect-comparison"], /stage a believable buyer-facing situation, objection, comparison/i);
   assert.doesNotMatch(promptByRole["size-capacity-fit"], /Do not create another plain white-background product-only card/i);
   assert.doesNotMatch(promptByRole["spec-table"], /Do not create another plain white-background product-only card/i);
 });
@@ -928,7 +933,7 @@ test("creation planner adds buyer-decision strategy to formerly templated conver
   assert.match(promptByRole["multi-angle"], /can I trust what I am getting from every side/i);
   assert.match(promptByRole.atmosphere, /can I imagine owning this in my life/i);
   assert.match(promptByRole["brand-story"], /does this product fit many real occasions and usage styles/i);
-  assert.match(promptByRole["effect-comparison"], /meaningful enough to choose this product/i);
+  assert.match(promptByRole["effect-comparison"], /understand every supported feature/i);
   assert.match(promptByRole["craft-process"], /why should I trust the making quality/i);
   assert.match(promptByRole["accessory-gift"], /what exactly arrives and does it feel complete/i);
   assert.match(promptByRole["series-showcase"], /which variant should I choose/i);
@@ -994,10 +999,51 @@ test("creation planner makes scene and effect roles feel like advertising instea
   assert.match(promptByRole.scene, /multi-scenario application image/i);
   assert.match(promptByRole.scene, /show 2-4 believable use scenarios/i);
   assert.match(promptByRole.scene, /advertising campaign energy/i);
-  assert.match(promptByRole["effect-comparison"], /functional effect rendering image/i);
+  assert.match(promptByRole["effect-comparison"], /single-product functional effect rendering/i);
+  assert.match(promptByRole["effect-comparison"], /one dominant, fully visible product/i);
+  assert.match(promptByRole["effect-comparison"], /single unified composition/i);
   assert.match(promptByRole["effect-comparison"], /premium 3D\/CGI rendering is allowed/i);
-  assert.match(promptByRole["effect-comparison"], /visualize the function, mechanism, effect path, or outcome/i);
+  assert.match(promptByRole["effect-comparison"], /showing every supported function, mechanism, effect path, or outcome/i);
+  assert.match(promptByRole["effect-comparison"], /Do not use before-and-after, comparison, side-by-side, split-screen, paired-state, duplicate-product, or multi-panel layouts/i);
+  assert.doesNotMatch(promptByRole["effect-comparison"], /before-after panels|before-after payoff|advantage comparison|fast scan comparison/i);
   assert.match(promptByRole.atmosphere, /not a rigid template board/i);
+});
+
+test("creation planner keeps platform-native functional renderings product-led instead of comparative", () => {
+  const plan = buildCreationPlan({
+    platform: "coupang",
+    productName: "Portable fan",
+    productDescription: "Rechargeable fan with adjustable airflow and foldable stand.",
+    sellingPoints: "adjustable airflow\nrechargeable power\nfoldable stand",
+    targetLanguage: "en",
+    imageCount: 8,
+    platformEvidence: { performance: true, dimensions: true, packageContents: true },
+  });
+  const lazadaPlan = buildCreationPlan({
+    platform: "lazada",
+    productName: "Portable fan",
+    productDescription: "Rechargeable fan with adjustable airflow and foldable stand.",
+    sellingPoints: "adjustable airflow\nrechargeable power\nfoldable stand",
+    targetLanguage: "en",
+    imageCount: 8,
+    platformEvidence: { performance: true, dimensions: true, packageContents: true },
+  });
+  const effectItem = plan.items.find((item) => item.imageType === "comparison-proof");
+  const lazadaEffectItem = lazadaPlan.items.find((item) => item.imageType === "comparison-proof");
+
+  assert.ok(effectItem);
+  assert.ok(lazadaEffectItem);
+  assert.equal(effectItem.role, "effect-comparison");
+  assert.equal(effectItem.imageTypeLabel, "功能效果渲染图");
+  assert.equal(effectItem.composition, "single-product-functional-rendering");
+  assert.match(effectItem.prompt, /one dominant, fully visible product/i);
+  assert.match(effectItem.prompt, /single unified composition/i);
+  assert.match(effectItem.prompt, /Do not use before-and-after, comparison, side-by-side, split-screen, paired-state, duplicate-product, or multi-panel layouts/i);
+  assert.doesNotMatch(effectItem.prompt, /side-by-side-functional-evidence|before-after panels|before-after payoff/i);
+  assert.doesNotMatch(
+    `${effectItem.prompt}\n${lazadaEffectItem.prompt}`,
+    /comparison-friendly product information|included items, comparison, and a portrait detail asset/i,
+  );
 });
 
 test("creation planner keeps hard information roles factual instead of emotional conversion prompts", () => {
@@ -1699,6 +1745,7 @@ test("creation planner defaults SKU generation to show English color names under
   const skuItem = plan.items.find((item) => item.role === "sku");
 
   assert.equal(plan.skuGenerationRule, "color-name-under-subject");
+  assert.equal(skuItem.title, "SKU image 1 - red");
   assert.match(skuItem.prompt, /SKU generation rule: show the color name below the subject/i);
   assert.match(skuItem.prompt, /Visible SKU color label line under the subject follows\.\nred\n/);
 });
@@ -1729,6 +1776,7 @@ test("creation planner labels every visible unit color under grouped SKU subject
     skuItem.prompt,
     /Visible SKU color label lines for the grouped subject follow in product-unit order\.\nblue\ngray\nblack\nsilver\n/,
   );
+  assert.equal(skuItem.title, "SKU image 1 - blue / gray / black / silver");
   assert.match(skuItem.prompt, /Do not render one shared color label for the whole grouped image/i);
 });
 
@@ -1797,10 +1845,11 @@ test("creation planner never guesses a missing SKU color label", () => {
       { id: "sku-unknown", title: "Backpack SKU", filenames: ["sku-unknown.png"] },
     ],
   });
-  const skuPrompt = plan.items.find((item) => item.role === "sku").prompt;
+  const skuItem = plan.items.find((item) => item.role === "sku");
 
-  assert.match(skuPrompt, /Do not render any color-name label and never guess one/i);
-  assert.doesNotMatch(skuPrompt, /Visible SKU color label line under the subject follows/i);
+  assert.equal(skuItem.title, "SKU image 1 - Backpack SKU");
+  assert.match(skuItem.prompt, /Do not render any color-name label and never guess one/i);
+  assert.doesNotMatch(skuItem.prompt, /Visible SKU color label line under the subject follows/i);
 });
 
 test("creation planner keeps single multi-color SKU subjects as one color label", () => {
@@ -1882,10 +1931,32 @@ test("creation reference analysis strips component words from a goggles color la
   const labelLine = skuItem.prompt.match(/Visible SKU color label line under the subject follows\.\n([^\n]+)/)?.[1];
 
   assert.deepEqual(analysis.skuSubjects[0].colorNames, ["brown black silver"]);
+  assert.equal(skuItem.title, "SKU image 1 - 棕黑银色");
   assert.equal(labelLine, "棕色 黑色 银色");
   assert.doesNotMatch(labelLine, /brown|black|silver/i);
   assert.match(skuItem.prompt, /translate the complete label into the selected target language/i);
   assert.match(skuItem.prompt, /do not add part names such as strap, frame, or lenses/i);
+});
+
+test("creation planner compacts Chinese multi-color SKU item names without changing the prompt label", () => {
+  const plan = buildCreationPlan({
+    productName: "Three-color fishing lure",
+    productDescription: "A single lure body with red, black, and blue finish.",
+    targetLanguage: "zh-CN",
+    selectedRoles: ["hero"],
+    skuSubjects: [
+      {
+        id: "triple-color-lure",
+        title: "red black blue fishing lure",
+        filenames: ["triple-color-lure.png"],
+        note: "One complete visible product unit.",
+      },
+    ],
+  });
+  const skuItem = plan.items.find((item) => item.role === "sku");
+
+  assert.equal(skuItem.title, "SKU image 1 - 红黑蓝色");
+  assert.match(skuItem.prompt, /Visible SKU color label line under the subject follows\.\n红色 黑色 蓝色\n/);
 });
 
 test("creation planner preserves grouped multi-color label boundaries", () => {
@@ -2055,7 +2126,7 @@ test("creation planner SKU prompts treat source card text as non-subject noise",
   assert.doesNotMatch(skuItem.prompt, /Preserve the SKU subject exactly:.*printed text/);
 });
 
-test("creation planner SKU item titles keep the original subject names", () => {
+test("creation planner names SKU items by reliable color while preserving source filename tokens", () => {
   const plan = buildCreationPlan({
     productName: "Fishing lure assortment",
     productDescription: "Two sellable lure colors photographed on white background",
@@ -2063,8 +2134,8 @@ test("creation planner SKU item titles keep the original subject names", () => {
     targetLanguage: "en",
     selectedRoles: ["hero"],
     skuSubjects: [
-      { id: "blue", title: "blue-white-bg.png", filenames: ["blue-white-bg.png"], note: "Blue lure SKU subject" },
-      { id: "green", title: "green-white-bg.png", filenames: ["green-white-bg.png"], note: "Green lure SKU subject" },
+      { id: "blue", title: "blue-white-bg.png", filenames: ["blue-white-bg.png"], colorNames: ["blue"], note: "Blue lure SKU subject" },
+      { id: "green", title: "green-white-bg.png", filenames: ["green-white-bg.png"], colorNames: ["green"], note: "Green lure SKU subject" },
     ],
   });
 
@@ -2072,7 +2143,7 @@ test("creation planner SKU item titles keep the original subject names", () => {
 
   assert.deepEqual(
     skuItems.map((item) => item.title),
-    ["SKU image 1 - blue-white-bg.png", "SKU image 2 - green-white-bg.png"],
+    ["SKU image 1 - blue", "SKU image 2 - green"],
   );
   assert.deepEqual(
     skuItems.map((item) => item.filenameToken),
@@ -2515,6 +2586,13 @@ test("creation planner applies selected unit mode to dimensions recognized from 
   );
 });
 
+test("creation planner converts Chinese package dimensions without truncating decimal values", () => {
+  assert.equal(
+    formatCreationDimensionSpecsForMode("包装盒可见尺寸12.2厘米×6.5厘米", "both"),
+    "包装盒可见尺寸12.2厘米 (4.8 in)×6.5厘米 (2.56 in)",
+  );
+});
+
 test("creation planner locks decimal backpack weight and Chinese height width depth specs", () => {
   const plan = buildCreationPlan({
     productName: "Outdoor Backpack",
@@ -2844,7 +2922,7 @@ test("creation planner applies category role prompt instructions to matching set
   const categoryStrategy = [
     "Category template: 智能手机",
     "Ecommerce category path: 数码电子 > 手机通讯 > 手机 > 智能手机",
-    "Consumer electronics focus: show ports, screen or device details, dimensions, specifications, comparison proof",
+    "Consumer electronics focus: show ports, screen or device details, dimensions, specifications, functional proof",
   ];
 
   assert.deepEqual(plan.selectedRoles, selectedRoles);
@@ -2917,6 +2995,14 @@ test("creation planner adds role-specific guidance inside each marketing scenari
     scenario: "marketplace-search",
     selectedRoles: ["hero", "effect-comparison"],
   });
+  const promotionPlan = buildCreationPlan({
+    productName: "AeroPress Clear",
+    productDescription: "Transparent portable coffee brewer",
+    sellingPoints: "lightweight, easy to clean, stable taste",
+    targetLanguage: "en",
+    scenario: "promotion",
+    selectedRoles: ["effect-comparison"],
+  });
   const socialSeedingPlan = buildCreationPlan({
     productName: "Jointed fishing lure",
     productDescription: "Segmented lifelike lure with scale texture and steel treble hooks",
@@ -2942,6 +3028,12 @@ test("creation planner adds role-specific guidance inside each marketing scenari
     marketplacePlan.items.find((item) => item.role === "effect-comparison").prompt,
     /crowded search result pages/,
   );
+  const marketplaceEffectPrompt = marketplacePlan.items.find((item) => item.role === "effect-comparison").prompt;
+  const promotionEffectPrompt = promotionPlan.items.find((item) => item.role === "effect-comparison").prompt;
+  assert.match(marketplaceEffectPrompt, /one dominant product and its supported functional effect/i);
+  assert.match(promotionEffectPrompt, /one dominant product in a unified functional rendering/i);
+  assert.match(promotionEffectPrompt, /without before-after or comparison layouts/i);
+  assert.doesNotMatch(`${marketplaceEffectPrompt}\n${promotionEffectPrompt}`, /advantage comparison|fast scan comparison|before-after payoff/i);
   assert.match(
     socialSeedingPlan.items.find((item) => item.role === "atmosphere").prompt,
     /mood, environment, and lifestyle aspiration/,

@@ -279,46 +279,6 @@ test("shared, local, and Worker Listing paths keep successful output and explici
     return { draft: drafts[0], requests: directRequests, validation: validations[0] };
   }
 
-  async function compareThreePathFailures(set, output) {
-    await writeFile(join(manifestsDir, `${set.setId}.json`), `${JSON.stringify(set, null, 2)}\n`, "utf8");
-    const directRequests = [];
-    const workerRequests = [];
-    const localRequestStart = localUpstream.requests.length;
-    localUpstream.outputs.push(structuredClone(output));
-    let directError;
-
-    await assert.rejects(
-      generateCreationListingDrafts({
-        set,
-        config,
-        fetchImpl: makeInjectedFetch(responsesUrl, [output], directRequests),
-      }),
-      (error) => {
-        directError = error;
-        return /Listing generation failed validation/i.test(error?.message || "");
-      },
-    );
-    const workerResponse = await handleApiRequest(new Request("https://studio.example/api/creation/listings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...config, set }),
-    }), {
-      fetchImpl: makeInjectedFetch(responsesUrl, [output], workerRequests),
-    });
-    const workerBody = await workerResponse.json();
-    const localResult = await postJson(localBaseUrl, "/api/creation/listings", { setId: set.setId, ...config });
-    const localRequests = localUpstream.requests.slice(localRequestStart);
-
-    assert.equal(workerResponse.status, 502);
-    assert.equal(localResult.response.status, 502);
-    assert.equal(workerBody.message, directError.message);
-    assert.equal(localResult.body.message, directError.message);
-    assert.deepEqual(withoutVolatileTimestamps(workerRequests), withoutVolatileTimestamps(directRequests));
-    assert.deepEqual(withoutVolatileTimestamps(localRequests), withoutVolatileTimestamps(directRequests));
-
-    return JSON.parse(await readFile(join(manifestsDir, `${set.setId}.json`), "utf8"));
-  }
-
   const cases = [
     ["amazon", "English", "A", "en-US"],
     ["etsy", "English", "A", "en-US"],
@@ -399,11 +359,18 @@ test("shared, local, and Worker Listing paths keep successful output and explici
   const failureSource = buildCreationListingSources(failureSet)[0];
   const existingDraft = makeValidV1Draft(failureSource);
   failureSet.listingDrafts = [existingDraft];
-  const persistedFailureSet = await compareThreePathFailures(
+  const acceptedIncompleteResult = await compareThreePaths(
     failureSet,
-    makeIncompatibleV1Draft(failureSource),
+    [makeIncompatibleV1Draft(failureSource)],
   );
-  assert.deepEqual(persistedFailureSet.listingDrafts, [existingDraft]);
+  assert.equal(acceptedIncompleteResult.draft.status, "completed");
+  assert.equal(acceptedIncompleteResult.draft.zhDisplay?.title, "");
+  const persistedAcceptedSet = JSON.parse(
+    await readFile(join(manifestsDir, `${failureSet.setId}.json`), "utf8"),
+  );
+  assert.equal(persistedAcceptedSet.listingDrafts.length, 1);
+  assert.equal(persistedAcceptedSet.listingDrafts[0].status, "completed");
+  assert.equal(persistedAcceptedSet.listingDrafts[0].zhDisplay?.title, "");
 
   const fetchLog = (await readFile(fetchLogPath, "utf8"))
     .trim()

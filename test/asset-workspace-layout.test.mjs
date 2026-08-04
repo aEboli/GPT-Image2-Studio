@@ -102,10 +102,11 @@ test("lightbox prioritizes the image and exposes concise accessible controls", a
   assert.match(html, /aria-label="缩小图片" title="缩小图片"/);
   assert.match(html, /<div class="lightbox-meta">\s*<button class="toolbar-button lightbox-back-button" id="lightboxClose"[^>]*aria-label="返回图片列表"[^>]*>[\s\S]*?←[\s\S]*?返回[\s\S]*?<\/button>\s*<strong id="lightboxTitle"/);
   assert.doesNotMatch(html, /id="lightboxDownload"[\s\S]{0,300}id="lightboxClose"/);
-  assert.match(html, /data-lightbox-tab="prompt"[\s\S]*data-lightbox-tab="params"[\s\S]*data-lightbox-tab="file"/);
-  assert.match(html, /data-lightbox-tab="prompt">提示词<\/button>[\s\S]*data-lightbox-tab="params">参数<\/button>[\s\S]*data-lightbox-panel="prompt"[\s\S]*data-lightbox-panel="params"/);
+  assert.match(html, /data-lightbox-tab="prompt"[\s\S]*data-lightbox-tab="params"/);
+  assert.doesNotMatch(html, /data-lightbox-tab="file"|data-lightbox-panel="file"/);
+  assert.match(html, /data-lightbox-tab="prompt">提示词<\/button>[\s\S]*data-lightbox-tab="params">参数<\/button>[\s\S]*data-lightbox-panel="prompt"[\s\S]*data-lightbox-panel="params"[\s\S]*lightbox-file-list/);
   assert.match(html, /aria-selected="false" data-lightbox-tab="prompt"[\s\S]*aria-selected="true" data-lightbox-tab="params"/);
-  assert.match(html, /class="detail-field hidden" role="tabpanel" data-lightbox-panel="prompt"[\s\S]*class="detail-field" role="tabpanel" data-lightbox-panel="params"/);
+  assert.match(html, /class="detail-field hidden" role="tabpanel" data-lightbox-panel="prompt"[\s\S]*class="detail-field lightbox-params-field" role="tabpanel" data-lightbox-panel="params"/);
   assert.doesNotMatch(html, /lightboxInspectorToggle|lightbox-more-menu|lightbox-inspector-head/);
   assert.match(styles, /\.lightbox-fields,[\s\S]*\.lightbox-media-stage\.is-viewer-inspecting \.lightbox-fields\s*\{[^}]*grid-template-rows:\s*minmax\(0,\s*1fr\);/);
   assert.match(styles, /\.lightbox-actions > \.toolbar-button\s*\{[^}]*display:\s*inline-flex;[^}]*align-items:\s*center;[^}]*justify-content:\s*center;[^}]*line-height:\s*1;/);

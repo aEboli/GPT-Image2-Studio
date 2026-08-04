@@ -184,6 +184,17 @@ test("listing sources separate product and package dimension evidence", () => {
   });
   assert.equal(negatedPackageSource.packageDimensionEvidence, "");
   assert.match(negatedPackageSource.productDimensionEvidence, /20\s*x\s*10\s*x\s*5\s*cm/iu);
+
+  const [visiblePackageSource] = buildCreationListingSources({
+    setId: "set-visible-package-dimension",
+    productName: "Electric Minnow Fishing Lure",
+    productDescription: "Transparent storage case and charging cable.",
+    dimensionSpecs: "Length 10 cm",
+    dimensionUnitMode: "both",
+    referenceImageRoles: [{ note: "包装盒可见尺寸12.2厘米×6.5厘米" }],
+  });
+  assert.match(visiblePackageSource.packageDimensionEvidence, /12\.2厘米×6\.5厘米/u);
+  assert.doesNotMatch(visiblePackageSource.packageDimensionEvidence, /0\.79\s*in/iu);
 });
 
 test("listing sources separate gross and net weight evidence without using package dimension labels", () => {
@@ -245,6 +256,35 @@ test("dimension provenance validates complete tuples instead of one shared numbe
   assert.match(
     getCreationListingDimensionFieldErrors(fabricated, source).join("\n"),
     /complete source dimension tuple/iu,
+  );
+
+  const completedPackage = makeValidDraft({
+    packageDimensions: "12.2 x 6.5 x 2.8 cm (4.8 x 2.56 x 1.1 in)",
+    productDimensions: "Estimated: 18 x 12 x 6 cm (7.1 x 4.7 x 2.4 in)",
+    zhDisplay: {
+      packageDimensions: "12.2 × 6.5 × 2.8 厘米（4.8 × 2.56 × 1.1 英寸）",
+      productDimensions: "预估：18 × 12 × 6 厘米（7.1 × 4.7 × 2.4 英寸）",
+    },
+  });
+  assert.deepEqual(getCreationListingDimensionFieldErrors(completedPackage, {
+    packageDimensionEvidence: "Package dimensions: 12.2 x 6.5 cm",
+    dimensionUnitMode: "both",
+  }), []);
+
+  const incompletePackage = makeValidDraft({
+    packageDimensions: "12.2 x 6.5 cm (4.8 x 2.56 in)",
+    productDimensions: "Estimated: 18 x 12 x 6 cm (7.1 x 4.7 x 2.4 in)",
+    zhDisplay: {
+      packageDimensions: "12.2 × 6.5 厘米（4.8 × 2.56 英寸）",
+      productDimensions: "预估：18 × 12 × 6 厘米（7.1 × 4.7 × 2.4 英寸）",
+    },
+  });
+  assert.match(
+    getCreationListingDimensionFieldErrors(incompletePackage, {
+      packageDimensionEvidence: "Package dimensions: 12.2 x 6.5 cm",
+      dimensionUnitMode: "both",
+    }).join("\n"),
+    /length x width x height/iu,
   );
 });
 
@@ -325,6 +365,35 @@ test("historical completed listings receive non-persistent dimension readback", 
   assert.doesNotMatch(hydratedDraft.productDimensions, /^Estimated:/u);
   assert.doesNotMatch(hydratedDraft.productDimensions, /(?:^|[^\d])(?:76|5|26)\s*mm\b/iu);
   assert.equal(hydratedDraft.title, "1 Pack Door Latch");
+});
+
+test("historical readback completes a two-axis visible package measurement without rewriting history", () => {
+  const storedSet = {
+    setId: "set-historical-visible-package-dimension",
+    productName: "Electric Minnow Fishing Lure",
+    productDescription: "Transparent storage case and charging cable.",
+    dimensionSpecs: "Length 10 cm",
+    dimensionUnitMode: "both",
+    referenceImageRoles: [{ note: "包装盒可见尺寸12.2厘米×6.5厘米" }],
+    listingDrafts: [{
+      title: "Electric Minnow Fishing Lure",
+      status: "completed",
+      packageDimensions: "12.2 cm (0.79 in) x 6.5 cm (2.56 in)",
+      zhDisplay: {
+        title: "电动仿生米诺鱼饵",
+        packageDimensions: "12.2 厘米（0.79 英寸）×6.5 厘米（2.56 英寸）",
+      },
+    }],
+  };
+
+  const hydratedSet = hydrateCreationListingDimensionsForRead(storedSet);
+  const hydratedDraft = hydratedSet.listingDrafts[0];
+
+  assert.equal(storedSet.listingDrafts[0].packageDimensions, "12.2 cm (0.79 in) x 6.5 cm (2.56 in)");
+  assert.match(hydratedDraft.packageDimensions, /^12\.2 x 6\.5 x \d+(?:\.\d+)? cm \(4\.8 x 2\.56 x \d+(?:\.\d+)? in\)$/u);
+  assert.match(hydratedDraft.zhDisplay.packageDimensions, /^12\.2 × 6\.5 × \d+(?:\.\d+)? 厘米（4\.8 × 2\.56 × \d+(?:\.\d+)? 英寸）$/u);
+  assert.doesNotMatch(hydratedDraft.packageDimensions, /^Estimated:/iu);
+  assert.doesNotMatch(hydratedDraft.zhDisplay.packageDimensions, /^预估[:：]/u);
 });
 
 test("historical completed listings receive non-persistent sourced or estimated weight readback", () => {
@@ -408,6 +477,101 @@ test("mock listings keep sourced product dimensions and visibly mark missing est
   assert.match(estimated.packageDimensions, /^Estimated:/iu);
   assert.match(estimated.zhDisplay.productDimensions, /^预估：/u);
   assert.match(estimated.zhDisplay.packageDimensions, /^预估：/u);
+});
+
+test("package dimensions complete measured axes without marking the completion as an estimate", () => {
+  const twoAxisPackage = makeMockCreationListingDraft({
+    ...standardSource,
+    productName: "Steel Door Latch",
+    productDescription: "Package dimensions: 22 x 6 cm. Steel latch body.",
+    dimensionUnitMode: "metric",
+  });
+  assert.match(twoAxisPackage.packageDimensions, /^22 x 6 x \d+(?:\.\d+)? cm$/u);
+  assert.match(twoAxisPackage.zhDisplay.packageDimensions, /^22 × 6 × \d+(?:\.\d+)? 厘米$/u);
+  assert.doesNotMatch(twoAxisPackage.packageDimensions, /^Estimated:/iu);
+  assert.doesNotMatch(twoAxisPackage.zhDisplay.packageDimensions, /^预估[:：]/u);
+
+  const oneAxisPackage = makeMockCreationListingDraft({
+    ...standardSource,
+    productName: "Fishing Lure",
+    productDescription: "Package length: 18 cm. Plastic lure body.",
+    dimensionUnitMode: "metric",
+  });
+  assert.match(oneAxisPackage.packageDimensions, /^18 x \d+(?:\.\d+)? x \d+(?:\.\d+)? cm$/u);
+  assert.doesNotMatch(oneAxisPackage.packageDimensions, /^Estimated:/iu);
+
+  const parenthesizedPackage = makeMockCreationListingDraft({
+    ...standardSource,
+    productName: "Fishing Lure",
+    productDescription: "Plastic lure body.",
+    packageDimensionEvidence: "Package dimensions (12.2 x 6.5 cm)",
+    dimensionUnitMode: "metric",
+  });
+  assert.match(parenthesizedPackage.packageDimensions, /^12\.2 x 6\.5 x \d+(?:\.\d+)? cm$/u);
+  assert.doesNotMatch(parenthesizedPackage.packageDimensions, /^Estimated:/iu);
+});
+
+test("package estimates are complete and vary with supplied product form", () => {
+  const lure = makeMockCreationListingDraft({
+    ...standardSource,
+    productName: "Electric Minnow Fishing Lure",
+    productDescription: "Plastic lure body with diving lip.",
+    dimensionSpecs: "",
+    dimensionUnitMode: "metric",
+  });
+  const bottle = makeMockCreationListingDraft({
+    ...standardSource,
+    productName: "Stainless Steel Travel Bottle",
+    productDescription: "Steel bottle with screw lid.",
+    dimensionSpecs: "",
+    dimensionUnitMode: "metric",
+  });
+  assert.match(lure.packageDimensions, /^Estimated: \d+(?:\.\d+)? x \d+(?:\.\d+)? x \d+(?:\.\d+)? cm$/u);
+  assert.match(bottle.packageDimensions, /^Estimated: \d+(?:\.\d+)? x \d+(?:\.\d+)? x \d+(?:\.\d+)? cm$/u);
+  assert.notEqual(lure.packageDimensions, bottle.packageDimensions);
+  assert.match(lure.zhDisplay.packageDimensions, /^预估：\d+(?:\.\d+)? × \d+(?:\.\d+)? × \d+(?:\.\d+)? 厘米$/u);
+
+  const shortLure = makeMockCreationListingDraft({
+    ...standardSource,
+    productName: "Electric Minnow Fishing Lure",
+    productDescription: "Plastic lure body.",
+    dimensionSpecs: "Length 10 cm",
+    dimensionUnitMode: "metric",
+  });
+  const longLure = makeMockCreationListingDraft({
+    ...standardSource,
+    productName: "Electric Minnow Fishing Lure",
+    productDescription: "Plastic lure body.",
+    dimensionSpecs: "Length 30 cm",
+    dimensionUnitMode: "metric",
+  });
+  assert.match(shortLure.packageDimensions, /^Estimated: \d+(?:\.\d+)? x \d+(?:\.\d+)? x \d+(?:\.\d+)? cm$/u);
+  assert.match(longLure.packageDimensions, /^Estimated: \d+(?:\.\d+)? x \d+(?:\.\d+)? x \d+(?:\.\d+)? cm$/u);
+  assert.notEqual(shortLure.packageDimensions, longLure.packageDimensions);
+
+  const cardSizedAccessory = makeMockCreationListingDraft({
+    ...standardSource,
+    productName: "Portable Accessory",
+    productDescription: "Thin plastic accessory.",
+    dimensionSpecs: "",
+    dimensionUnitMode: "metric",
+    referenceImageRoles: [{ note: "商品约银行卡大小，便于放入钱包。" }],
+  });
+  const phoneSizedAccessory = makeMockCreationListingDraft({
+    ...standardSource,
+    productName: "Portable Accessory",
+    productDescription: "Thin plastic accessory.",
+    dimensionSpecs: "",
+    dimensionUnitMode: "metric",
+    referenceImageRoles: [{ note: "商品约手机大小，便于随身携带。" }],
+  });
+  assert.match(cardSizedAccessory.packageDimensions, /^Estimated: \d+(?:\.\d+)? x \d+(?:\.\d+)? x \d+(?:\.\d+)? cm$/u);
+  assert.match(phoneSizedAccessory.packageDimensions, /^Estimated: \d+(?:\.\d+)? x \d+(?:\.\d+)? x \d+(?:\.\d+)? cm$/u);
+  assert.notEqual(cardSizedAccessory.packageDimensions, phoneSizedAccessory.packageDimensions);
+  assert.ok(
+    Number(cardSizedAccessory.packageDimensions.match(/^Estimated: (\d+(?:\.\d+)?)/u)?.[1])
+      < Number(phoneSizedAccessory.packageDimensions.match(/^Estimated: (\d+(?:\.\d+)?)/u)?.[1]),
+  );
 });
 
 test("mock listings keep sourced weights and estimate only the missing weight type", () => {
@@ -551,7 +715,7 @@ test("platform V1 prompt requests evidence-backed value copy and Amazon-style bu
   assert.match(prompt, /Buyer decision evidence/i);
 });
 
-test("platform V1 accepts sourced product dimensions and requires explicit estimate markers for missing evidence", async () => {
+test("platform V1 accepts sourced dimensions and marks unattributed package dimensions as estimated without retrying", async () => {
   const source = {
     ...standardSource,
     platformPolicyId: "etsy",
@@ -574,17 +738,19 @@ test("platform V1 accepts sourced product dimensions and requires explicit estim
   assert.match(validDraft.packageDimensions, /^Estimated:/u);
   assert.match(validDraft.zhDisplay.packageDimensions, /^预估：/u);
 
-  await assert.rejects(
-    requestCreationListingDraft({
-      baseUrl: "https://example.test/v1",
-      apiKey: "test-key",
-      responsesModel: "gpt-5.4",
-      source: {
-        ...source,
-        dimensionSpecs: "Weight 42 g",
-        productDimensionEvidence: "",
-      },
-      fetchImpl: async () => new Response(JSON.stringify({
+  let unmarkedRequestCount = 0;
+  const unmarkedDraft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    source: {
+      ...source,
+      dimensionSpecs: "Weight 42 g",
+      productDimensionEvidence: "",
+    },
+    fetchImpl: async () => {
+      unmarkedRequestCount += 1;
+      return new Response(JSON.stringify({
         output_text: JSON.stringify(makeValidPlatformV1Draft({
           packageDimensions: "6 x 4 x 2 in (15.2 x 10.2 x 5.1 cm)",
           productDimensions: "5 x 2 x 1 in (12.7 x 5.1 x 2.5 cm)",
@@ -593,28 +759,89 @@ test("platform V1 accepts sourced product dimensions and requires explicit estim
             productDimensions: "12.7 x 5.1 x 2.5 厘米（5 x 2 x 1 英寸）",
           },
         })),
-      }), { status: 200 }),
-    }),
-    /packageDimensions.*Estimated|productDimensions.*Estimated|预估/iu,
-  );
+      }), { status: 200 });
+    },
+  });
+
+  assert.equal(unmarkedRequestCount, 1);
+  assert.equal(unmarkedDraft.status, "completed");
+  assert.match(unmarkedDraft.packageDimensions, /^Estimated: \d+(?:\.\d+)? x \d+(?:\.\d+)? x \d+(?:\.\d+)? cm \(\d+(?:\.\d+)? x \d+(?:\.\d+)? x \d+(?:\.\d+)? in\)$/u);
+  assert.match(unmarkedDraft.zhDisplay.packageDimensions, /^预估：\d+(?:\.\d+)? × \d+(?:\.\d+)? × \d+(?:\.\d+)? 厘米（\d+(?:\.\d+)? × \d+(?:\.\d+)? × \d+(?:\.\d+)? 英寸）$/u);
+  assert.equal(unmarkedDraft.productDimensions, "5 x 2 x 1 in (12.7 x 5.1 x 2.5 cm)");
 });
 
-test("platform V1 rejects dimension fields over the shared 500-character ceiling", async () => {
-  const overlongDimension = `Estimated: ${"1 x 1 x 1 cm ".repeat(42)}`;
-  await assert.rejects(
-    requestCreationListingDraft({
-      baseUrl: "https://example.test/v1",
-      apiKey: "test-key",
-      responsesModel: "gpt-5.4",
+test("V1 and V2 complete two-axis package dimensions without a retry", async () => {
+  const cases = [
+    {
+      name: "V1",
       source: {
         ...standardSource,
         forceV1: true,
-        dimensionSpecs: "Weight 42 g",
-        productDimensionEvidence: "",
-        packageDimensionEvidence: "",
-        dimensionUnitMode: "metric",
+        platformPolicyId: "etsy",
+        packageDimensionEvidence: "Package dimensions: 12.2 x 6.5 cm",
+        dimensionUnitMode: "both",
       },
-      fetchImpl: async () => new Response(JSON.stringify({
+      draft: makeValidPlatformV1Draft({
+        packageDimensions: "12.2 x 6.5 cm",
+        zhDisplay: { packageDimensions: "12.2 × 6.5 厘米" },
+      }),
+    },
+    {
+      name: "V2",
+      source: {
+        ...standardSource,
+        forceV2: true,
+        platformPolicyId: "universal",
+        packageDimensionEvidence: "Package dimensions: 12.2 x 6.5 cm",
+        dimensionUnitMode: "both",
+      },
+      draft: makeValidDraft({
+        packageDimensions: "12.2 x 6.5 cm",
+        zhDisplay: { packageDimensions: "12.2 × 6.5 厘米" },
+      }),
+    },
+  ];
+
+  for (const entry of cases) {
+    let requestCount = 0;
+    const draft = await requestCreationListingDraft({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      responsesModel: "gpt-5.4",
+      source: entry.source,
+      fetchImpl: async () => {
+        requestCount += 1;
+        return new Response(JSON.stringify({ output_text: JSON.stringify(entry.draft) }), { status: 200 });
+      },
+    });
+
+    assert.equal(requestCount, 1, entry.name);
+    assert.equal(draft.status, "completed", entry.name);
+    assert.match(draft.packageDimensions, /^12\.2 x 6\.5 x \d+(?:\.\d+)? cm \(4\.8 x 2\.56 x \d+(?:\.\d+)? in\)$/u, entry.name);
+    assert.match(draft.zhDisplay.packageDimensions, /^12\.2 × 6\.5 × \d+(?:\.\d+)? 厘米（4\.8 × 2\.56 × \d+(?:\.\d+)? 英寸）$/u, entry.name);
+    assert.doesNotMatch(draft.packageDimensions, /^Estimated:/iu, entry.name);
+    assert.doesNotMatch(draft.zhDisplay.packageDimensions, /^预估[:：]/u, entry.name);
+  }
+});
+
+test("platform V1 accepts dimension fields over the shared 500-character ceiling", async () => {
+  const overlongDimension = `Estimated: ${"1 x 1 x 1 cm ".repeat(42)}`;
+  let requestCount = 0;
+  const draft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    source: {
+      ...standardSource,
+      forceV1: true,
+      dimensionSpecs: "Weight 42 g",
+      productDimensionEvidence: "",
+      packageDimensionEvidence: "",
+      dimensionUnitMode: "metric",
+    },
+    fetchImpl: async () => {
+      requestCount += 1;
+      return new Response(JSON.stringify({
         output_text: JSON.stringify(makeValidPlatformV1Draft({
           packageDimensions: overlongDimension,
           productDimensions: overlongDimension,
@@ -623,10 +850,14 @@ test("platform V1 rejects dimension fields over the shared 500-character ceiling
             productDimensions: `预估：${"1 x 1 x 1 厘米 ".repeat(42)}`,
           },
         })),
-      }), { status: 200 }),
-    }),
-    /exceeds 500 characters/iu,
-  );
+      }), { status: 200 });
+    },
+  });
+
+  assert.equal(requestCount, 1);
+  assert.equal(draft.status, "completed");
+  assert.equal(draft.packageDimensions, overlongDimension.trim());
+  assert.ok(Array.from(draft.packageDimensions).length > 500);
 });
 
 test("listing agent derives 2 Pack from grouped subject units when bundle count is one", async () => {
@@ -708,7 +939,7 @@ test("listing agent prompt uses readable mixed pack quantity wording", async () 
   assert.match(draft.title, /^2 Pack \/ 3 Pack Electronic Fishing Lure\b/);
 });
 
-test("listing agent retries when grouped subject description omits unit count", async () => {
+test("listing agent accepts a grouped subject description that omits the unit count", async () => {
   const prompts = [];
   let callCount = 0;
   const groupedPairSource = {
@@ -731,9 +962,7 @@ test("listing agent retries when grouped subject description omits unit count", 
     return new Response(JSON.stringify({
       output_text: JSON.stringify(makeValidDraft({
         title: "2 Pack Fishing Lure Jointed Swimbait Bass Trout Freshwater Bait",
-        description: callCount === 1
-          ? "This listing covers one lure body for freshwater fishing."
-          : "This listing covers two complete visible lure bodies from the grouped SKU subject.",
+        description: "This listing covers one lure body for freshwater fishing.",
       })),
     }), { status: 200 });
   };
@@ -746,12 +975,13 @@ test("listing agent retries when grouped subject description omits unit count", 
     fetchImpl,
   });
 
-  assert.equal(callCount, 2);
-  assert.match(prompts[1], /Fix these validation errors: description must mention grouped SKU subject quantity/i);
-  assert.match(draft.description, /two complete visible lure bodies/i);
+  assert.equal(callCount, 1);
+  assert.equal(prompts.length, 1);
+  assert.equal(draft.status, "completed");
+  assert.equal(draft.description, "This listing covers one lure body for freshwater fishing.");
 });
 
-test("listing agent repairs grouped subject description quantity after retry budget", async () => {
+test("listing agent accepts a grouped subject description without rewriting it", async () => {
   const prompts = [];
   let callCount = 0;
   const groupedPairSource = {
@@ -787,13 +1017,13 @@ test("listing agent repairs grouped subject description quantity after retry bud
     fetchImpl,
   });
 
-  assert.equal(callCount, 2);
-  assert.match(prompts[1], /Fix these validation errors: description must mention grouped SKU subject quantity/i);
-  assert.match(draft.description, /^This offer includes two complete visible lure bodies/i);
-  assert.equal(validateListingAgentDraft(draft, "2 Pack").ok, true);
+  assert.equal(callCount, 1);
+  assert.equal(prompts.length, 1);
+  assert.equal(draft.status, "completed");
+  assert.equal(draft.description, "This fishing lure option includes the stated freshwater bait details.");
 });
 
-test("listing agent repairs grouped subject quantity from Chinese source notes in English", async () => {
+test("listing agent accepts missing grouped subject quantity from Chinese source notes", async () => {
   let callCount = 0;
   const groupedChineseSource = {
     ...standardSource,
@@ -829,10 +1059,10 @@ test("listing agent repairs grouped subject quantity from Chinese source notes i
     fetchImpl,
   });
 
-  assert.equal(callCount, 2);
-  assert.match(draft.description, /^This offer includes two complete visible product units/i);
+  assert.equal(callCount, 1);
+  assert.equal(draft.status, "completed");
+  assert.equal(draft.description, "This electric fishing lure option includes the stated freshwater bait details.");
   assert.doesNotMatch(draft.description, /[\u3400-\u9fff]/u);
-  assert.equal(validateListingAgentDraft(draft, "2 Pack").ok, true);
 });
 
 test("listing agent sends a strict JSON schema request with prompt guardrails", async () => {
@@ -1007,7 +1237,7 @@ test("listing agent extracts Responses output content text", async () => {
   assert.equal(draft.title, "2 Pack Blue Fishing Lures Bass Trout Freshwater Swimbait");
 });
 
-test("listing agent retries once after validation failure", async () => {
+test("listing agent accepts the first parsed response after local validation differences", async () => {
   const prompts = [];
   let callCount = 0;
   const fetchImpl = async (_url, init) => {
@@ -1026,13 +1256,14 @@ test("listing agent retries once after validation failure", async () => {
     fetchImpl,
   });
 
-  assert.equal(callCount, 2);
-  assert.match(prompts[1], /Fix these validation errors: title must start with quantity/);
-  assert.match(draft.title, /^2 Pack Blue Fishing Lures\b/);
-  assert.doesNotMatch(draft.title, /\b3\.5\s*in\b/i);
+  assert.equal(callCount, 1);
+  assert.equal(prompts.length, 1);
+  assert.doesNotMatch(prompts[0], /Fix these validation errors/i);
+  assert.equal(draft.status, "completed");
+  assert.equal(draft.title, "Bad title without quantity");
 });
 
-test("listing agent retries when public listing fields contain Chinese", async () => {
+test("listing agent accepts parsed public listing fields that contain Chinese", async () => {
   const prompts = [];
   let callCount = 0;
   const fetchImpl = async (_url, init) => {
@@ -1066,13 +1297,14 @@ test("listing agent retries when public listing fields contain Chinese", async (
     fetchImpl,
   });
 
-  assert.equal(callCount, 2);
-  assert.match(prompts[1], /public listing fields must be English/i);
-  assert.equal(draft.title, "2 Pack Electric Fishing Lure Bass Trout Freshwater Swimbait");
-  assert.doesNotMatch(visibleDraftText(draft), /[\u3400-\u9fff]/u);
+  assert.equal(callCount, 1);
+  assert.equal(prompts.length, 1);
+  assert.equal(draft.status, "completed");
+  assert.match(draft.title, /路亚硬饵/u);
+  assert.match(visibleDraftText(draft), /路亚硬饵/u);
 });
 
-test("listing agent retries when any field contains functional wording", async () => {
+test("listing agent accepts parsed functional wording without a validation retry", async () => {
   const prompts = [];
   let callCount = 0;
   const fetchImpl = async (_url, init) => {
@@ -1101,12 +1333,13 @@ test("listing agent retries when any field contains functional wording", async (
     fetchImpl,
   });
 
-  assert.equal(callCount, 2);
-  assert.match(prompts[1], /functional or effect wording/i);
-  assert.doesNotMatch(draft.painPoints.join("\n"), /helps|supports|improves/i);
+  assert.equal(callCount, 1);
+  assert.equal(prompts.length, 1);
+  assert.equal(draft.status, "completed");
+  assert.match(draft.painPoints.join("\n"), /helps/u);
 });
 
-test("listing agent rejects after two invalid listing responses", async () => {
+test("listing agent accepts parsed policy differences without retrying", async () => {
   let callCount = 0;
   const fetchImpl = async () => {
     callCount += 1;
@@ -1118,24 +1351,19 @@ test("listing agent rejects after two invalid listing responses", async () => {
     }), { status: 200 });
   };
 
-  await assert.rejects(
-    requestCreationListingDraft({
-      baseUrl: "https://example.test/v1",
-      apiKey: "test-key",
-      responsesModel: "gpt-5.4",
-      reasoningEffort: "medium",
-      source: standardSource,
-      fetchImpl,
-    }),
-    (error) => {
-      assert.match(error.message, /Listing generation failed validation after 2 attempts/);
-      assert.match(error.message, /title must start with quantity/);
-      assert.match(error.message, /sellingPoints\[0\] contains unsupported claim "certification claim"/);
-      return true;
-    },
-  );
+  const draft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    reasoningEffort: "medium",
+    source: standardSource,
+    fetchImpl,
+  });
 
-  assert.equal(callCount, 2);
+  assert.equal(callCount, 1);
+  assert.equal(draft.status, "completed");
+  assert.equal(draft.title, "Bad title without quantity");
+  assert.match(draft.sellingPoints.join("\n"), /FDA Certified/u);
 });
 
 test("listing agent keeps compound dimensions out of search-focused titles", async () => {
@@ -1203,31 +1431,21 @@ test("listing agent accepts titles without dimensions when source dimensions exi
   assert.doesNotMatch(draft.title, /3\.5\s*in|9\s*cm/i);
 });
 
-test("listing agent retries when imperial mode output includes metric equivalents", async () => {
+test("listing agent accepts metric equivalents in an imperial-mode parsed response", async () => {
   const prompts = [];
   let callCount = 0;
   const fetchImpl = async (_url, init) => {
     callCount += 1;
     prompts.push(JSON.parse(init.body).input);
-    const draft = callCount === 1
-      ? makeValidDraft({
-        title: "1 Pack Fishing Lure Electric Swimbait 5.12 in / 130 mm 1.23 oz / 35 g",
-        packageDimensions: "Estimated: 6 x 4 x 2 in",
-        productDimensions: "5.12 in long",
-        zhDisplay: {
-          packageDimensions: "预估：6 x 4 x 2 英寸",
-          productDimensions: "长度 5.12 英寸",
-        },
-      })
-      : makeValidDraft({
-        title: "1 Pack Fishing Lure Electric Swimbait Slow Sinking Bass Bait",
-        packageDimensions: "Estimated: 6 x 4 x 2 in",
-        productDimensions: "5.12 in long",
-        zhDisplay: {
-          packageDimensions: "预估：6 x 4 x 2 英寸",
-          productDimensions: "长度 5.12 英寸",
-        },
-      });
+    const draft = makeValidDraft({
+      title: "1 Pack Fishing Lure Electric Swimbait 5.12 in / 130 mm 1.23 oz / 35 g",
+      packageDimensions: "Estimated: 6 x 4 x 2 in",
+      productDimensions: "5.12 in long",
+      zhDisplay: {
+        packageDimensions: "预估：6 x 4 x 2 英寸",
+        productDimensions: "长度 5.12 英寸",
+      },
+    });
     return new Response(JSON.stringify({ output_text: JSON.stringify(draft) }), { status: 200 });
   };
 
@@ -1244,25 +1462,21 @@ test("listing agent retries when imperial mode output includes metric equivalent
     fetchImpl,
   });
 
-  assert.equal(callCount, 2);
+  assert.equal(callCount, 1);
   assert.match(prompts[0], /imperial units only/i);
-  assert.match(prompts[1], /imperial units only/i);
-  assert.equal(draft.title, "1 Pack Fishing Lure Electric Swimbait Slow Sinking Bass Bait");
+  assert.equal(draft.status, "completed");
+  assert.equal(draft.title, "1 Pack Fishing Lure Electric Swimbait 5.12 in / 130 mm 1.23 oz / 35 g");
 });
 
-test("listing agent retries when title includes size and specification values", async () => {
+test("listing agent accepts a parsed title that includes size and specification values", async () => {
   const prompts = [];
   let callCount = 0;
   const fetchImpl = async (_url, init) => {
     callCount += 1;
     prompts.push(JSON.parse(init.body).input);
-    const draft = callCount === 1
-      ? makeValidDraft({
-        title: "3 Pack Electronic Fishing Lure Propeller Swimbait Hook Size 4# 130 mm 35 g",
-      })
-      : makeValidDraft({
-        title: "3 Pack Electronic Fishing Lure Propeller Swimbait Slow Sinking Bass Trout Freshwater Bait",
-      });
+    const draft = makeValidDraft({
+      title: "3 Pack Electronic Fishing Lure Propeller Swimbait Hook Size 4# 130 mm 35 g",
+    });
     return new Response(JSON.stringify({ output_text: JSON.stringify(draft) }), { status: 200 });
   };
 
@@ -1279,10 +1493,10 @@ test("listing agent retries when title includes size and specification values", 
     fetchImpl,
   });
 
-  assert.equal(callCount, 2);
-  assert.match(prompts[1], /title must not include size or specification values/);
-  assert.equal(draft.title, "3 Pack Electronic Fishing Lure Propeller Swimbait Slow Sinking Bass Trout Freshwater Bait");
-  assert.doesNotMatch(draft.title, /130\s*mm|35\s*g|hook size|4#/i);
+  assert.equal(callCount, 1);
+  assert.equal(prompts.length, 1);
+  assert.equal(draft.status, "completed");
+  assert.equal(draft.title, "3 Pack Electronic Fishing Lure Propeller Swimbait Hook Size 4# 130 mm 35 g");
 });
 
 test("generateCreationListingDrafts creates one completed V1 parent draft for all SKU variants", async () => {
@@ -1668,18 +1882,20 @@ test("platform V1 repairs required bilingual text emptied by blocking-claim clea
   assert.doesNotMatch(`${visibleDraftText(draft)}\n${visibleChineseDisplayText(draft)}`, /best seller|guaranteed|最佳|保证/iu);
 });
 
-test("platform V1 still rejects missing bilingual body content after low-risk cleanup", async () => {
-  await assert.rejects(
-    requestCreationListingDraft({
-      baseUrl: "https://example.test/v1",
-      apiKey: "test-key",
-      responsesModel: "gpt-5.4",
-      source: {
-        ...standardSource,
-        platformPolicyId: "etsy",
-        forceV1: true,
-      },
-      fetchImpl: async () => new Response(JSON.stringify({
+test("platform V1 accepts missing bilingual body content after low-risk cleanup", async () => {
+  let requestCount = 0;
+  const draft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    source: {
+      ...standardSource,
+      platformPolicyId: "etsy",
+      forceV1: true,
+    },
+    fetchImpl: async () => {
+      requestCount += 1;
+      return new Response(JSON.stringify({
         output_text: JSON.stringify({
           ...makeValidDraft(),
           zhDisplay: {
@@ -1697,10 +1913,13 @@ test("platform V1 still rejects missing bilingual body content after low-risk cl
             },
           },
         }),
-      }), { status: 200 }),
-    }),
-    /Listing generation failed validation after 1 attempt/i,
-  );
+      }), { status: 200 });
+    },
+  });
+
+  assert.equal(requestCount, 1);
+  assert.equal(draft.status, "completed");
+  assert.equal(draft.zhDisplay.description, "");
 });
 
 test("platform V1 retains supported buyer value across non-title fields", async () => {
@@ -2303,6 +2522,226 @@ test("platform V1 surfaces upstream and response parsing failures without mock d
   }
 });
 
+const listingResponseBoundarySourceCases = [
+  {
+    name: "V1",
+    source: { ...standardSource, platformPolicyId: "etsy", forceV1: true },
+  },
+  {
+    name: "V2",
+    source: { ...standardSource, platformPolicyId: "universal", forceV2: true },
+  },
+];
+
+const usableListingResponseError = "Listing response did not contain a usable Listing object.";
+
+test("V1 and V2 accept recognized minimal Listing fields without local completeness gates", async () => {
+  const acceptedCases = [
+    {
+      name: "V1 top-level title",
+      source: listingResponseBoundarySourceCases[0].source,
+      payload: { title: "Travel Bottle" },
+      assertDraft(draft) {
+        assert.equal(draft.title, "Travel Bottle");
+      },
+    },
+    {
+      name: "V1 zhDisplay title",
+      source: listingResponseBoundarySourceCases[0].source,
+      payload: { zhDisplay: { title: "旅行水瓶" } },
+      assertDraft(draft) {
+        assert.equal(draft.zhDisplay?.title, "旅行水瓶");
+      },
+    },
+    {
+      name: "V2 top-level title",
+      source: listingResponseBoundarySourceCases[1].source,
+      payload: { title: "Travel Bottle" },
+      assertDraft(draft) {
+        assert.equal(draft.title, "Travel Bottle");
+      },
+    },
+    {
+      name: "V2 zhDisplay title",
+      source: listingResponseBoundarySourceCases[1].source,
+      payload: { zhDisplay: { title: "旅行水瓶" } },
+      assertDraft(draft) {
+        assert.equal(draft.zhDisplay?.title, "旅行水瓶");
+      },
+    },
+  ];
+
+  for (const entry of acceptedCases) {
+    let requestCount = 0;
+    const draft = await requestCreationListingDraft({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      responsesModel: "gpt-5.4",
+      source: entry.source,
+      fetchImpl: async () => {
+        requestCount += 1;
+        return new Response(JSON.stringify(entry.payload), { status: 200 });
+      },
+    });
+
+    assert.equal(requestCount, 1, entry.name);
+    assert.equal(draft.status, "completed", entry.name);
+    entry.assertDraft(draft);
+  }
+});
+
+test("Listing response retries once after an empty, non-object, or unrecognized response before accepting V1 and V2", async () => {
+  const unusableResponses = [
+    { name: "empty object", payload: {} },
+    { name: "unrecognized object", payload: { upstreamListing: "returned directly" } },
+    { name: "misspelled top-level Listing field", payload: { titel: "Travel Bottle" } },
+    { name: "misspelled zhDisplay Listing field", payload: { zhDisplay: { titel: "旅行水瓶" } } },
+    { name: "array", payload: [] },
+    { name: "null", payload: null },
+    { name: "string", payload: "not a Listing" },
+    { name: "number", payload: 42 },
+  ];
+
+  for (const sourceCase of listingResponseBoundarySourceCases) {
+    for (const unusableResponse of unusableResponses) {
+      let requestCount = 0;
+      const prompts = [];
+      const draft = await requestCreationListingDraft({
+        baseUrl: "https://example.test/v1",
+        apiKey: "test-key",
+        responsesModel: "gpt-5.4",
+        source: sourceCase.source,
+        fetchImpl: async (_url, init) => {
+          requestCount += 1;
+          prompts.push(JSON.parse(init.body).input);
+          const payload = requestCount === 1
+            ? unusableResponse.payload
+            : { title: "Travel Bottle" };
+          return new Response(JSON.stringify(payload), { status: 200 });
+        },
+      });
+
+      const label = `${sourceCase.name}: ${unusableResponse.name}`;
+      assert.equal(requestCount, 2, label);
+      assert.equal(draft.status, "completed", label);
+      assert.equal(draft.title, "Travel Bottle", label);
+      assert.match(prompts[1], /previous response did not return a usable Listing JSON object/i, label);
+      assert.doesNotMatch(prompts[1], /Fix these validation errors|title must start with quantity/i, label);
+    }
+  }
+});
+
+test("Listing response rejects after two unusable values in V1 and V2", async () => {
+  const unusableResponses = [
+    { name: "empty object", payload: {} },
+    { name: "unrecognized object", payload: { upstreamListing: "returned directly" } },
+    { name: "array", payload: [] },
+    { name: "null", payload: null },
+    { name: "string", payload: "not a Listing" },
+    { name: "number", payload: 42 },
+  ];
+
+  for (const sourceCase of listingResponseBoundarySourceCases) {
+    for (const unusableResponse of unusableResponses) {
+      let requestCount = 0;
+      const label = `${sourceCase.name}: ${unusableResponse.name}`;
+      await assert.rejects(
+        requestCreationListingDraft({
+          baseUrl: "https://example.test/v1",
+          apiKey: "test-key",
+          responsesModel: "gpt-5.4",
+          source: sourceCase.source,
+          fetchImpl: async () => {
+            requestCount += 1;
+            return new Response(JSON.stringify(unusableResponse.payload), { status: 200 });
+          },
+        }),
+        (error) => {
+          assert.equal(error.message, usableListingResponseError, label);
+          return true;
+        },
+      );
+      assert.equal(requestCount, 2, label);
+    }
+  }
+});
+
+test("Listing response retries after empty and whitespace HTTP bodies", async () => {
+  const bodyCases = [
+    { name: "V1 empty body", source: listingResponseBoundarySourceCases[0].source, firstBody: "" },
+    { name: "V2 whitespace body", source: listingResponseBoundarySourceCases[1].source, firstBody: " \r\n\t " },
+  ];
+
+  for (const entry of bodyCases) {
+    let requestCount = 0;
+    const draft = await requestCreationListingDraft({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      responsesModel: "gpt-5.4",
+      source: entry.source,
+      fetchImpl: async () => {
+        requestCount += 1;
+        const body = requestCount === 1
+          ? entry.firstBody
+          : JSON.stringify({ title: "Travel Bottle" });
+        return new Response(body, { status: 200 });
+      },
+    });
+
+    assert.equal(requestCount, 2, entry.name);
+    assert.equal(draft.status, "completed", entry.name);
+    assert.equal(draft.title, "Travel Bottle", entry.name);
+  }
+});
+
+test("Listing response extraction prefers direct Listing objects and later usable output chunks", async () => {
+  let directRequestCount = 0;
+  const directDraft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    source: listingResponseBoundarySourceCases[0].source,
+    fetchImpl: async () => {
+      directRequestCount += 1;
+      return new Response(JSON.stringify({
+        title: "Direct Travel Bottle",
+        content: "incidental non-Listing response content",
+      }), { status: 200 });
+    },
+  });
+
+  assert.equal(directRequestCount, 1);
+  assert.equal(directDraft.status, "completed");
+  assert.equal(directDraft.title, "Direct Travel Bottle");
+
+  let chunkedRequestCount = 0;
+  const chunkedDraft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    source: listingResponseBoundarySourceCases[1].source,
+    fetchImpl: async () => {
+      chunkedRequestCount += 1;
+      return new Response(JSON.stringify({
+        output: [
+          {
+            type: "message",
+            content: [{ type: "output_text", text: JSON.stringify({}) }],
+          },
+          {
+            type: "message",
+            content: [{ type: "output_text", text: JSON.stringify({ title: "Travel Bottle" }) }],
+          },
+        ],
+      }), { status: 200 });
+    },
+  });
+
+  assert.equal(chunkedRequestCount, 1);
+  assert.equal(chunkedDraft.status, "completed");
+  assert.equal(chunkedDraft.title, "Travel Bottle");
+});
+
 test("platform V2 surfaces transient upstream failures without deterministic drafts", async () => {
   await assert.rejects(
     requestCreationListingDraft({
@@ -2322,45 +2761,46 @@ test("platform V2 surfaces transient upstream failures without deterministic dra
   );
 });
 
-test("application Listing generation rejects one incomplete response without mock output", async () => {
+test("application Listing generation accepts one incomplete parsed response without mock output", async () => {
   let requestCount = 0;
-  await assert.rejects(
-    generateCreationListingDrafts({
-      set: {
-        setId: "set-incomplete-direct",
-        platformPolicyId: "etsy",
-        productName: "Travel Bottle",
-        productDescription: "Compact bottle for daily travel.",
-      },
-      config: { baseUrl: "https://example.test/v1", apiKey: "test-key" },
-      fetchImpl: async () => {
-        requestCount += 1;
-        return new Response(JSON.stringify({
-          output_text: JSON.stringify({
-            title: "Travel Bottle",
+  const drafts = await generateCreationListingDrafts({
+    set: {
+      setId: "set-incomplete-direct",
+      platformPolicyId: "etsy",
+      productName: "Travel Bottle",
+      productDescription: "Compact bottle for daily travel.",
+    },
+    config: { baseUrl: "https://example.test/v1", apiKey: "test-key" },
+    fetchImpl: async () => {
+      requestCount += 1;
+      return new Response(JSON.stringify({
+        output_text: JSON.stringify({
+          title: "Travel Bottle",
+          sellingPoints: [],
+          painPoints: [],
+          fiveBullets: [],
+          description: "",
+          backendSearchTerms: "",
+          keywordBuckets: { exact: [], longTail: [], traffic: [], descriptive: [] },
+          zhDisplay: {
+            title: "旅行水瓶",
             sellingPoints: [],
             painPoints: [],
             fiveBullets: [],
             description: "",
             backendSearchTerms: "",
             keywordBuckets: { exact: [], longTail: [], traffic: [], descriptive: [] },
-            zhDisplay: {
-              title: "旅行水瓶",
-              sellingPoints: [],
-              painPoints: [],
-              fiveBullets: [],
-              description: "",
-              backendSearchTerms: "",
-              keywordBuckets: { exact: [], longTail: [], traffic: [], descriptive: [] },
-            },
-          }),
-        }), { status: 200 });
-      },
-    }),
-    /Listing generation failed validation/i,
-  );
+          },
+        }),
+      }), { status: 200 });
+    },
+  });
 
   assert.equal(requestCount, 1);
+  assert.equal(drafts.length, 1);
+  assert.equal(drafts[0].status, "completed");
+  assert.match(drafts[0].packageDimensions, /^Estimated: \d+(?:\.\d+)? x \d+(?:\.\d+)? x \d+(?:\.\d+)? cm \(/u);
+  assert.equal(drafts[0].productDimensions, "");
 });
 
 test("generateCreationListingDrafts keeps metric and imperial specs out of mock titles", async () => {

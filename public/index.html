@@ -68,7 +68,7 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Sora:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260730-product-image-card-inset-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260804-prompt-reference-preview-2" />
   </head>
   <body>
     <div class="app-shell">
@@ -216,7 +216,17 @@
                     <div>
                       <span data-ui-i18n="reference">参考图</span>
                     </div>
-                    <small id="referenceCount">0 / 15</small>
+                    <div class="field-heading-actions">
+                      <button
+                        class="icon-button field-clear-button"
+                        id="clearReferenceButton"
+                        type="button"
+                        aria-label="清空参考图"
+                        title="清空参考图"
+                        data-tooltip="清空参考图"
+                      >×</button>
+                      <small id="referenceCount">0 / 15</small>
+                    </div>
                   </summary>
 
                   <label class="reference-dropzone" id="referenceDropzone">
@@ -283,9 +293,19 @@
                     <div>
                       <span data-ui-i18n="prompt">提示词</span>
                     </div>
-                    <button class="icon-button" id="surprisePromptButton" type="button" title="提示词模板" aria-expanded="false" data-ui-i18n-title="promptTemplate">
-                      ✦
-                    </button>
+                    <div class="field-heading-actions">
+                      <button
+                        class="icon-button field-clear-button"
+                        id="clearPromptButton"
+                        type="button"
+                        aria-label="清空提示词"
+                        title="清空提示词"
+                        data-tooltip="清空提示词"
+                      >×</button>
+                      <button class="icon-button" id="surprisePromptButton" type="button" title="提示词模板" aria-expanded="false" data-ui-i18n-title="promptTemplate">
+                        ✦
+                      </button>
+                    </div>
                   </div>
                   <label class="prompt-field">
                     <textarea
@@ -406,6 +426,14 @@
                   </div>
 
                   <div class="preview-actions">
+                    <button
+                      class="toolbar-button preview-add-reference-button"
+                      id="previewAddReferenceButton"
+                      type="button"
+                      aria-label="添加当前图片到参考图"
+                      title="添加到参考图；也可拖动预览图片到参考图区域"
+                      data-tooltip="添加到参考图；也可拖动预览图片到参考图区域"
+                    >添加到参考图</button>
                     <a class="toolbar-button" id="previewDownloadButton" href="#" download data-ui-i18n="download">下载</a>
                     <button class="toolbar-button" id="previewLightboxButton" type="button" data-ui-i18n="view">查看</button>
                     <button class="toolbar-button danger" id="previewDeleteButton" type="button" data-ui-i18n="delete">删除</button>
@@ -2402,6 +2430,7 @@
                 <div class="asset-head-actions creation-record-actions">
                   <button class="toolbar-button asset-primary-action" id="creationRecordRepairIncompleteButton" type="button" disabled>补齐未生成图像</button>
                   <button class="toolbar-button asset-primary-action" id="creationRecordReuseButton" type="button" disabled>复用到当前套图</button>
+                  <button class="toolbar-button asset-primary-action" id="creationRecordExportTemuButton" type="button" disabled>导出 Temu Excel</button>
                   <button class="toolbar-button" id="creationRecordRefreshButton" type="button">刷新</button>
                   <button class="toolbar-button danger" id="creationRecordDeleteCurrentButton" type="button" disabled>删除当前</button>
                   <button class="toolbar-button danger" id="creationRecordDeleteSelectedButton" type="button" disabled>删除选中</button>
@@ -2558,6 +2587,92 @@
     </dialog>
 
     <dialog
+      class="creation-temu-export-dialog"
+      id="creationRecordTemuExportDialog"
+      aria-labelledby="creationRecordTemuExportTitle"
+      aria-describedby="creationRecordTemuExportDescription"
+    >
+      <form class="creation-temu-export-form" id="creationRecordTemuExportForm">
+        <header class="creation-temu-export-head">
+          <div>
+            <span class="asset-eyebrow">Temu 快速上架</span>
+            <h2 id="creationRecordTemuExportTitle">导出 Temu Excel</h2>
+            <p id="creationRecordTemuExportDescription">已选择 <strong id="creationRecordTemuExportSelectedCount">0</strong> 套；缺失字段会留空并记录在导出问题工作表。</p>
+          </div>
+          <button class="icon-button" id="creationRecordTemuExportCloseButton" type="button" aria-label="关闭 Temu Excel 导出" title="关闭">×</button>
+        </header>
+
+        <fieldset class="creation-temu-export-fields" id="creationRecordTemuExportFields">
+          <section class="creation-temu-export-section" aria-labelledby="creationRecordTemuDefaultsTitle">
+            <div class="creation-temu-export-section-head">
+              <h3 id="creationRecordTemuDefaultsTitle">批次默认值</h3>
+              <span>仅补齐记录中的空字段</span>
+            </div>
+            <div class="creation-temu-export-grid">
+              <label class="compact-field">
+                <span>第一变种属性名</span>
+                <input id="creationRecordTemuVariantAttributeName" name="variantAttributeName" type="text" value="颜色" maxlength="50" required autofocus />
+              </label>
+              <label class="compact-field">
+                <span>默认申报价格（店铺币种）</span>
+                <input id="creationRecordTemuDefaultPrice" name="defaultPrice" type="number" inputmode="decimal" min="0.000001" max="1000000000" step="any" placeholder="留空则待补" />
+              </label>
+              <label class="compact-field">
+                <span>默认包装长度（cm）</span>
+                <input id="creationRecordTemuDefaultPackageLengthCm" name="defaultPackageLengthCm" type="number" inputmode="decimal" min="0.000001" max="100000" step="any" placeholder="留空则待补" />
+              </label>
+              <label class="compact-field">
+                <span>默认包装宽度（cm）</span>
+                <input id="creationRecordTemuDefaultPackageWidthCm" name="defaultPackageWidthCm" type="number" inputmode="decimal" min="0.000001" max="100000" step="any" placeholder="留空则待补" />
+              </label>
+              <label class="compact-field">
+                <span>默认包装高度（cm）</span>
+                <input id="creationRecordTemuDefaultPackageHeightCm" name="defaultPackageHeightCm" type="number" inputmode="decimal" min="0.000001" max="100000" step="any" placeholder="留空则待补" />
+              </label>
+              <label class="compact-field">
+                <span>默认包装重量（g）</span>
+                <input id="creationRecordTemuDefaultPackageWeightG" name="defaultPackageWeightG" type="number" inputmode="decimal" min="0.000001" max="1000000000" step="any" placeholder="留空则待补" />
+              </label>
+              <label class="compact-field">
+                <span>默认库存</span>
+                <input id="creationRecordTemuDefaultStock" name="defaultStock" type="number" inputmode="numeric" min="0" max="1000000000" step="1" placeholder="留空则待补" />
+              </label>
+              <label class="compact-field">
+                <span>默认产地</span>
+                <input id="creationRecordTemuDefaultOriginCountry" name="defaultOriginCountry" type="text" maxlength="100" placeholder="例如：中国-广东省" />
+              </label>
+            </div>
+          </section>
+
+          <section class="creation-temu-export-section" aria-labelledby="creationRecordTemuCloudinaryTitle">
+            <div class="creation-temu-export-section-head">
+              <h3 id="creationRecordTemuCloudinaryTitle">Cloudinary 图片上传（可选）</h3>
+              <span>仅使用 unsigned upload preset，不需要 API Secret</span>
+            </div>
+            <div class="creation-temu-export-grid creation-temu-export-cloudinary-grid">
+              <label class="compact-field">
+                <span>Cloud name</span>
+                <input id="creationRecordTemuCloudName" name="cloudName" type="text" maxlength="128" pattern="[A-Za-z0-9_-]+" autocomplete="off" placeholder="两项同时填写或留空" />
+              </label>
+              <label class="compact-field">
+                <span>Unsigned upload preset</span>
+                <input id="creationRecordTemuUploadPreset" name="uploadPreset" type="text" maxlength="128" pattern="[A-Za-z0-9_.-]+" autocomplete="off" placeholder="两项同时填写或留空" />
+              </label>
+            </div>
+          </section>
+        </fieldset>
+
+        <footer class="creation-temu-export-footer">
+          <p class="prompt-agent-feedback" id="creationRecordTemuExportFeedback" aria-live="polite"></p>
+          <div class="creation-temu-export-actions">
+            <button class="toolbar-button" id="creationRecordTemuExportCancelButton" type="button">取消</button>
+            <button class="toolbar-button asset-primary-action" id="creationRecordTemuExportSubmitButton" type="submit">生成并下载 XLSX</button>
+          </div>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog
       class="creation-record-delete-dialog asset-record-delete-dialog"
       id="assetRecordDeleteDialog"
       aria-labelledby="assetRecordDeleteDialogTitle"
@@ -2684,15 +2799,20 @@
               <div class="lightbox-inspector-tabs" role="tablist" aria-label="图片信息">
                 <button type="button" role="tab" aria-selected="false" data-lightbox-tab="prompt">提示词</button>
                 <button type="button" role="tab" aria-selected="true" data-lightbox-tab="params">参数</button>
-                <button type="button" role="tab" aria-selected="false" data-lightbox-tab="file">文件</button>
               </div>
               <section class="detail-field hidden" role="tabpanel" data-lightbox-panel="prompt">
                 <div class="detail-field-head"><span id="lightboxPromptLabel">提示词</span><button class="inline-button detail-copy-button" id="copyPromptButton" type="button">复制</button></div>
                 <div class="lightbox-structured-prompt" id="lightboxPromptStructured"></div>
                 <textarea id="lightboxPrompt" rows="4" readonly aria-labelledby="lightboxPromptLabel"></textarea>
               </section>
-              <section class="detail-field" role="tabpanel" data-lightbox-panel="params"><span id="lightboxParamsLabel">参数</span><textarea id="lightboxParams" rows="6" readonly aria-labelledby="lightboxParamsLabel"></textarea></section>
-              <section class="detail-field hidden" role="tabpanel" data-lightbox-panel="file"><span>文件信息</span><dl class="lightbox-file-list"><div><dt>文件名</dt><dd id="lightboxFilename">--</dd></div><div><dt>相对路径</dt><dd id="lightboxRelativePath">--</dd></div></dl></section>
+              <section class="detail-field lightbox-params-field" role="tabpanel" data-lightbox-panel="params">
+                <span id="lightboxParamsLabel">参数</span>
+                <textarea id="lightboxParams" rows="6" readonly aria-labelledby="lightboxParamsLabel"></textarea>
+                <dl class="lightbox-file-list" aria-label="文件信息">
+                  <div><dt>文件名</dt><dd id="lightboxFilename">--</dd></div>
+                  <div><dt>相对路径</dt><dd id="lightboxRelativePath">--</dd></div>
+                </dl>
+              </section>
             </div>
           </aside>
         </div>
@@ -3082,6 +3202,6 @@
       </div>
     </aside>
 
-    <script type="module" src="./app.js?v=20260726-prompt-name-1"></script>
+    <script type="module" src="./app.js?v=20260804-prompt-reference-preview-1"></script>
   </body>
 </html>

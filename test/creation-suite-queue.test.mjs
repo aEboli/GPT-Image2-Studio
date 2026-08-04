@@ -205,7 +205,7 @@ test("creation suite queue appends SKU preview cards to queued sets", () => {
     buildCreationReferenceRolePayload: () => [{ filename: "red.jpg", role: "product" }],
     buildCreationSkuSubjectPayload: () => [
       { id: "red", title: "红色", filenames: ["red.jpg"] },
-      { id: "blue", title: "蓝色", filenames: ["blue.jpg"] },
+      { id: "blue", title: "原始蓝色标题", filenames: ["blue.jpg"], colorNames: ["blue", "gray"] },
     ],
     createdAt: "2026-05-26T08:00:00.000Z",
     creationState: { generating: true },
@@ -238,9 +238,52 @@ test("creation suite queue appends SKU preview cards to queued sets", () => {
   });
 
   assert.deepEqual(set.items.map((item) => item.role), ["hero", "scene", "sku", "sku"]);
-  assert.equal(set.items[2].title, "SKU image 1 - 红色");
+  assert.equal(set.items[2].title, "SKU image 1 - red");
+  assert.equal(set.items[3].title, "SKU image 2 - blue / gray");
   assert.equal(set.items[3].itemId, "queued-sku-2");
   assert.equal(set.items[3].status, "queued");
+});
+
+test("creation suite queue compacts Chinese same-subject multi-color SKU titles", () => {
+  const set = buildCreationQueuedSet({
+    buildCreationReferenceRolePayload: () => [],
+    buildCreationSkuSubjectPayload: () => [
+      {
+        id: "red-black-blue-lure",
+        title: "Three-color fishing lure",
+        filenames: ["red-black-blue-lure.png"],
+        colorNames: ["red black blue"],
+      },
+    ],
+    createdAt: "2026-05-26T08:00:00.000Z",
+    creationState: { generating: true },
+    formatCreationDimensionUnitModeLabel: (value) => `Unit ${value}`,
+    formatCreationVisualLanguageLabel: (value) => `Visual ${value}`,
+    getCreationCurrentSet: () => null,
+    getCreationLogoPayload: () => null,
+    getCreationPreviewSlots: () => [{ itemId: "hero", role: "hero", title: "主图" }],
+    getCreationSelectedDimensionUnitMode: () => "both",
+    getCreationSelectedImageCount: () => 1,
+    getCreationSelectedIndustryTemplate: () => ({ value: "general", label: "General", categoryPath: "" }),
+    getCreationSelectedLanguage: () => ({ value: "zh-CN", label: "简体中文" }),
+    getCreationSelectedRoles: () => ["hero"],
+    getCreationSelectedScenario: () => ({ value: "standard", label: "Standard" }),
+    isCreationDraftSet: () => false,
+    normalizeCreationSkuBundleCountForPayload: (value) => Number(value),
+    normalizeCreationVisualLanguage: (value) => value || "classic-commercial",
+    normalizeSet,
+    productDescription: "Description",
+    productName: "Queued product",
+    refs: {
+      creationDimensionSpecsInput: { value: "" },
+      creationSkuBundleCountInput: { value: "1" },
+      creationVisualLanguageInput: { value: "classic-commercial" },
+    },
+    sellingPoints: [],
+  });
+
+  assert.equal(set.items[1].title, "SKU image 1 - 红黑蓝色");
+  assert.deepEqual(set.items[1].skuSubject.colorNames, ["red black blue"]);
 });
 
 test("creation suite queue defaults SKU rule to color-name labels when no getter is provided", () => {

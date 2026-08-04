@@ -393,7 +393,7 @@ const IMAGE_TYPE_CONTRACT = {
   "variant-comparison": ["series-showcase", "supplied-variant-comparison", "factual-only", "studio-clean", "allow-supplied"],
   "material-proof": ["ingredient-material", "material-ingredient-or-color-swatches", "factual-short", "neutral", "allow-supplied"],
   "craft-proof": ["craft-process", "craft-or-quality-evidence", "factual-short", "process", "allow-supplied"],
-  "comparison-proof": ["effect-comparison", "side-by-side-functional-evidence", "factual-only", "controlled-context", "allow-supplied"],
+  "comparison-proof": ["effect-comparison", "single-product-functional-rendering", "factual-only", "controlled-context", "allow-supplied"],
   "pain-solution": ["after-sales", "pain-solution-payoff", "concise", "authentic-use", "allow-supplied"],
   "selling-point-stack": ["usage-suggestion", "selling-points-with-evidence", "concise", "optional-context", "allow-supplied"],
   "condition-proof": ["product-detail", "condition-inspection", "factual-only", "studio-clean", "preserve-existing-only"],
@@ -488,6 +488,10 @@ policyTest("image-type catalog preserves the approved legacy roles and visual po
     );
     assert.ok(definition.imageTypeLabel.trim(), `${imageType} requires a user-facing label`);
     assert.ok(VALID_LEGACY_ROLES.has(definition.role), `${imageType} has unsupported legacy role ${definition.role}`);
+  }
+  assert.equal(policies.CREATION_PLATFORM_IMAGE_TYPE_REGISTRY["comparison-proof"].imageTypeLabel, "功能效果渲染图");
+  for (const platformId of ["lazada", "coupang"]) {
+    assert.doesNotMatch(policies.CREATION_PLATFORM_PROFILE_REGISTRY[platformId].promptInstruction, /comparison/i);
   }
 });
 

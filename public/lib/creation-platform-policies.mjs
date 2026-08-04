@@ -324,7 +324,7 @@ const IMAGE_TYPE_DEFINITIONS = [
   imageType("variant-comparison", "变体对比图", "series-showcase", "supplied-variant-comparison", "factual-only", "studio-clean", "allow-supplied"),
   imageType("material-proof", "材质证明图", "ingredient-material", "material-ingredient-or-color-swatches", "factual-short", "neutral", "allow-supplied"),
   imageType("craft-proof", "工艺证明图", "craft-process", "craft-or-quality-evidence", "factual-short", "process", "allow-supplied"),
-  imageType("comparison-proof", "功能对比图", "effect-comparison", "side-by-side-functional-evidence", "factual-only", "controlled-context", "allow-supplied"),
+  imageType("comparison-proof", "功能效果渲染图", "effect-comparison", "single-product-functional-rendering", "factual-only", "controlled-context", "allow-supplied"),
   imageType("pain-solution", "痛点解决图", "after-sales", "pain-solution-payoff", "concise", "authentic-use", "allow-supplied"),
   imageType("selling-point-stack", "核心卖点图", "usage-suggestion", "selling-points-with-evidence", "concise", "optional-context", "allow-supplied"),
   imageType("condition-proof", "成色证明图", "product-detail", "condition-inspection", "factual-only", "studio-clean", "preserve-existing-only"),
@@ -520,7 +520,7 @@ const PROFILE_DEFINITIONS = [
     "en",
     "1.5K",
     ["lazada-conservative-guidance"],
-    "Use conservative Lazada guidance for clean regional cataloging and comparison-friendly product information; treat it as an editable recommendation, not an official hard rule.",
+    "Use conservative Lazada guidance for clean regional cataloging and clear product information; treat it as an editable recommendation, not an official hard rule.",
     ["clean-catalog-main@1:1", "benefit-proof@1:1", "lifestyle-first@1:1", "detail-macro@1:1", "dimension-fit@1:1", "variant-comparison@1:1", "in-box@1:1", "comparison-proof@1:1"],
   ),
   profile(
@@ -590,7 +590,7 @@ const PROFILE_DEFINITIONS = [
     "ko",
     "2K",
     ["coupang-conservative-guidance"],
-    "Use conservative Coupang guidance for Korean mobile-shopping clarity, benefits, detail, dimensions, usage, included items, comparison, and a portrait detail asset.",
+    "Use conservative Coupang guidance for Korean mobile-shopping clarity, benefits, detail, dimensions, usage, included items, functional effect rendering, and a portrait detail asset.",
     ["clean-catalog-main@1:1", "benefit-proof@1:1", "detail-macro@1:1", "dimension-fit@1:1", "usage-demo@1:1", "in-box@1:1", "comparison-proof@1:1", "long-detail@3:4"],
   ),
   profile(

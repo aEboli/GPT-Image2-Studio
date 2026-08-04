@@ -25,8 +25,8 @@ const publicConfigModelPickerPath = new URL("../public/lib/config-model-picker.m
 const publicCreationListingViewPath = new URL("../public/lib/creation-listing-view.mjs", import.meta.url);
 const generationClientPath = new URL("../lib/generation-client.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20260730-product-image-card-inset-1";
-const appAssetVersion = "20260726-prompt-name-1";
+const stylesAssetVersion = "20260804-prompt-reference-preview-2";
+const appAssetVersion = "20260804-prompt-reference-preview-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
 const creationQueueModuleAssetVersion = "20260712-creation-queue-selection-isolation-1";
 const quickBlendModuleAssetVersion = "20260608-quick-blend-time-sort-1";
@@ -369,7 +369,7 @@ test("lightbox detail image exposes PS-style zoom and pan viewer controls", asyn
   );
   assert.match(
     html,
-    /<div class="lightbox-media-stage">[\s\S]*<div class="lightbox-image-shell">[\s\S]*<img id="lightboxImage"[\s\S]*<aside class="lightbox-fields"[\s\S]*data-lightbox-tab="prompt"[\s\S]*data-lightbox-tab="params"[\s\S]*data-lightbox-tab="file"[\s\S]*id="lightboxPrompt"[\s\S]*id="lightboxParams"/,
+    /<div class="lightbox-media-stage">[\s\S]*<div class="lightbox-image-shell">[\s\S]*<img id="lightboxImage"[\s\S]*<aside class="lightbox-fields"[\s\S]*data-lightbox-tab="prompt"[\s\S]*data-lightbox-tab="params"[\s\S]*id="lightboxPrompt"[\s\S]*id="lightboxParams"[\s\S]*lightbox-file-list/,
   );
   assert.match(styles, /\.lightbox-viewer-controls\s*\{[\s\S]*display:\s*flex;[\s\S]*align-items:\s*center;/);
   assert.match(styles, /\.lightbox-zoom-label\s*\{[\s\S]*min-width:\s*54px;[\s\S]*text-align:\s*center;/);
@@ -888,6 +888,44 @@ test("studio prompt counter displays character count without a hard limit", asyn
   assert.doesNotMatch(html, /id="promptCounter">0<\/span>\s*\/\s*1000/);
   assert.match(app, /refs\.promptCounter\.textContent = `\$\{refs\.promptInput\.value\.length\} \$\{getUiLanguageText\("promptCounterSuffix"\) \|\| "字"\}`;/);
   assert.doesNotMatch(app, /refs\.promptCounter\.textContent = String\(refs\.promptInput\.value\.length\);/);
+});
+
+test("prompt studio exposes independent clear and reference-recycling controls", async () => {
+  const html = await readFile(indexPath, "utf8");
+  const app = await readFile(appPath, "utf8");
+  const styles = await readFile(stylesPath, "utf8");
+
+  assert.match(html, /id="clearReferenceButton"[\s\S]*aria-label="清空参考图"/);
+  assert.match(html, /id="clearPromptButton"[\s\S]*aria-label="清空提示词"/);
+  assert.match(html, /id="previewAddReferenceButton"[\s\S]*>添加到参考图<\/button>/);
+  assert.match(html, /id="previewAddReferenceButton"[\s\S]*data-tooltip="添加到参考图；也可拖动预览图片到参考图区域"/);
+  assert.match(app, /function clearPromptInput\(\) \{[\s\S]*updatePromptCounter\(\);[\s\S]*updateGenerateButton\(\);/);
+  assert.match(app, /refs\.clearReferenceButton\.addEventListener\("click",[\s\S]*resetReferenceFiles\(\);/);
+  assert.match(app, /async function addCurrentPreviewToReferences\(previewKey = state\.selectedPreviewKey\)/);
+  assert.match(app, /new File\(\[blob\],[\s\S]*applyReferenceFiles\(\[file\], \{ feedback: true \}\);/);
+  assert.match(app, /event\.dataTransfer\?\.setData\(PREVIEW_REFERENCE_DRAG_MIME, state\.selectedPreviewKey\)/);
+  assert.match(app, /function handleReferenceDrop\(event\) \{[\s\S]*getPreviewReferenceDragKey\(event\.dataTransfer\)[\s\S]*addCurrentPreviewToReferences/);
+  assert.match(
+    styles,
+    /\.field-clear-button\[data-tooltip\]::after,[\s\S]*\.preview-add-reference-button\[data-tooltip\]::after\s*\{[\s\S]*width:\s*max-content;[\s\S]*max-width:\s*min\(280px,\s*calc\(100vw\s*-\s*32px\)\);[\s\S]*white-space:\s*normal;[\s\S]*overflow-wrap:\s*anywhere;/,
+  );
+  assert.match(
+    styles,
+    /\.preview-add-reference-button\[data-tooltip\]::after\s*\{[\s\S]*width:\s*min\(260px,\s*calc\(100vw\s*-\s*32px\)\);[\s\S]*min-width:\s*min\(200px,\s*calc\(100vw\s*-\s*32px\)\);/,
+  );
+  assert.match(
+    styles,
+    /#clearPromptButton\[data-tooltip\]::after\s*\{[\s\S]*top:\s*calc\(100%\s*\+\s*7px\);[\s\S]*bottom:\s*auto;/,
+  );
+  assert.match(
+    styles,
+    /html:is\(\[data-ui-layout="tablet"\],\s*\[data-ui-layout="mobile"\]\) \.reference-field-group:has\(\.field-clear-button\[data-tooltip\]:focus-visible\)\s*\{[\s\S]*overflow:\s*visible;/,
+  );
+  assert.match(styles, /\.reference-grid\.dragover\s*\{/);
+  assert.match(styles, /\.reference-preview-viewer \.reference-preview-backdrop\s*\{[\s\S]*background:\s*rgba\(0,\s*0,\s*0,\s*0\.24\);[\s\S]*backdrop-filter:\s*none;[\s\S]*-webkit-backdrop-filter:\s*none;/);
+  assert.match(styles, /\.lightbox-fields \.lightbox-params-field\s*\{[\s\S]*grid-template-rows:\s*auto minmax\(120px,\s*1fr\) auto;[\s\S]*overflow:\s*auto;/);
+  assert.match(styles, /\.lightbox-fields \.lightbox-params-field textarea\s*\{[\s\S]*height:\s*auto;[\s\S]*min-height:\s*120px;/);
+  assert.match(styles, /html:is\(\[data-ui-layout="tablet"\],\s*\[data-ui-layout="mobile"\]\) \.lightbox-fields \.lightbox-params-field\s*\{[\s\S]*minmax\(140px,\s*1fr\) auto;/);
 });
 
 test("reference preview cards do not render uploaded filenames", async () => {
@@ -2567,7 +2605,9 @@ test("mobile and Pad studio layout uses dedicated compact workbench layouts", as
     /html\[data-ui-layout="mobile"\] \.app-shell\s*\{[\s\S]*height:\s*auto;[\s\S]*min-height:\s*100dvh;[\s\S]*display:\s*block;[\s\S]*overflow:\s*visible;/,
   );
   assert.match(styles, /html\[data-ui-layout="tablet"\]\[data-ui-orientation="portrait"\] \.studio-grid,[\s\S]*html\[data-ui-layout="stacked"\]\[data-ui-orientation="portrait"\] \.studio-grid\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);[\s\S]*grid-template-areas:\s*"settings"[\s\S]*"preview";/);
-  assert.match(styles, /@media \(min-width:\s*900px\) and \(min-height:\s*600px\)[\s\S]*html\[data-ui-orientation="landscape"\]\[data-ui-layout="tablet"\] \.studio-grid,[\s\S]*html\[data-ui-orientation="landscape"\]\[data-ui-layout="stacked"\] \.studio-grid\s*\{[\s\S]*grid-template-columns:\s*minmax\(320px,\s*380px\)\s*minmax\(0,\s*1fr\);[\s\S]*grid-template-areas:\s*"settings preview";/);
+  assert.match(styles, /@media \(min-width:\s*900px\) and \(min-height:\s*600px\)[\s\S]*html\[data-ui-orientation="landscape"\]\[data-ui-layout="tablet"\] \.studio-grid,[\s\S]*html\[data-ui-orientation="landscape"\]\[data-ui-layout="stacked"\] \.studio-grid\s*\{[\s\S]*grid-template-columns:\s*minmax\(320px,\s*380px\)\s*minmax\(0,\s*1fr\);[\s\S]*grid-template-areas:\s*"settings preview";[\s\S]*height:\s*calc\(var\(--visual-viewport-height,\s*100dvh\)\s*-\s*var\(--view-root-offset,\s*12px\)\);[\s\S]*overflow:\s*hidden;/);
+  assert.match(styles, /html\[data-ui-orientation="landscape"\]:is\(\[data-ui-layout="tablet"\],\s*\[data-ui-layout="stacked"\]\) :is\(\.settings-panel,\s*\.preview-panel\)\s*\{[\s\S]*height:\s*100%;[\s\S]*min-height:\s*0;[\s\S]*overflow:\s*hidden;/);
+  assert.match(styles, /html\[data-ui-orientation="landscape"\]:is\(\[data-ui-layout="tablet"\],\s*\[data-ui-layout="stacked"\]\) \.settings-form\s*\{[\s\S]*height:\s*100%;[\s\S]*min-height:\s*0;[\s\S]*overflow:\s*auto;/);
   assert.match(
     styles,
     /html\[data-ui-layout="mobile"\] \.studio-grid\s*\{[\s\S]*grid-template-rows:\s*none;[\s\S]*"settings"[\s\S]*"preview";[\s\S]*height:\s*auto;[\s\S]*overflow:\s*visible;/,
@@ -2605,6 +2645,7 @@ test("compact preview toolbar keeps controls evenly distributed and centered", a
   const zoomLabelRule = readCssRule(styles, ".zoom-label");
 
   assert.match(previewActions, /<a class="toolbar-button" id="previewDownloadButton"[^>]*>下载<\/a>/);
+  assert.match(previewActions, /id="previewAddReferenceButton"[^>]*>添加到参考图<\/button>/);
   assert.match(
     previewActions,
     /id="previewDownloadButton"[\s\S]*id="previewLightboxButton"[\s\S]*id="previewDeleteButton"/,
@@ -2886,20 +2927,25 @@ test("config drawer suppresses auto-hidden topbar reveal on tablet and mobile", 
 test("studio columns use synchronized desktop height so wide screens do not leave a dead zone under the workspace", async () => {
   const styles = await readFile(stylesPath, "utf8");
   const app = await readFile(appPath, "utf8");
+  const studioGridRule = readCssRule(styles, ".studio-grid");
+  const settingsPanelRule = readCssRule(styles, ".settings-panel");
+  const previewPanelRule = readCssRule(styles, ".preview-panel");
   const studioGridBlock = styles.match(/\.studio-view \.studio-grid\s*\{[\s\S]*?\}/)?.[0] || "";
 
-  assert.match(styles, /\.settings-panel\s*\{[\s\S]*height:\s*var\(--studio-column-height,\s*auto\);/);
-  assert.match(styles, /\.preview-panel\s*\{[\s\S]*height:\s*var\(--studio-column-height,\s*auto\);/);
+  assert.match(studioGridRule, /--studio-panel-height:\s*var\(--studio-column-height,\s*100%\);/);
+  assert.match(settingsPanelRule, /height:\s*var\(--studio-panel-height,\s*var\(--studio-column-height,\s*auto\)\);/);
+  assert.match(previewPanelRule, /height:\s*var\(--studio-panel-height,\s*var\(--studio-column-height,\s*auto\)\);/);
   assert.match(studioGridBlock, /min-height:\s*0;/);
   assert.match(studioGridBlock, /height:\s*100%;/);
   assert.doesNotMatch(studioGridBlock, /calc\(100% - 48px\)/);
   assert.doesNotMatch(app, /!refs\.settingsPanel \|\| !refs\.previewPanel \|\| !refs\.sideColumn \|\| !refs\.viewRoot/);
   assert.match(
     app,
-    /const viewRootRect = refs\.viewRoot\.getBoundingClientRect\(\);[\s\S]*const availableHeight = Math\.max\(600,\s*Math\.floor\(window\.innerHeight - viewRootRect\.top - WORKSPACE_BOTTOM_GAP_PX\)\);[\s\S]*const resolvedHeight = availableHeight;/,
+    /const viewRootRect = refs\.viewRoot\.getBoundingClientRect\(\);[\s\S]*const availableHeight = Math\.max\(320,\s*Math\.floor\(Math\.max\(1,\s*Math\.round\(window\.visualViewport\?\.height \|\| window\.innerHeight\)\) - viewRootRect\.top - WORKSPACE_BOTTOM_GAP_PX\)\);[\s\S]*const resolvedHeight = availableHeight;/,
   );
   assert.match(app, /const WORKSPACE_BOTTOM_GAP_PX = 2;/);
-  assert.match(app, /const availableHeight = Math\.max\(320,\s*Math\.floor\(window\.innerHeight - viewRootRect\.top - WORKSPACE_BOTTOM_GAP_PX\)\);/);
+  assert.doesNotMatch(app, /const availableHeight = Math\.max\(600,/);
+  assert.match(app, /const availableHeight = Math\.max\(320,\s*Math\.floor\(Math\.max\(1,\s*Math\.round\(window\.visualViewport\?\.height \|\| window\.innerHeight\)\) - viewRootRect\.top - WORKSPACE_BOTTOM_GAP_PX\)\);/);
 });
 
 test("generation task refresh tolerates older servers without the task endpoint", async () => {
@@ -3934,6 +3980,7 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(app, /7-brand-story\|brand-story\|品牌质感\/礼品价值图\|做成多场景用途与风格拼贴/);
   assert.match(app, /8-size-capacity-fit\|size-capacity-fit\|尺寸容量适配图/);
   assert.match(app, /9-effect-comparison\|effect-comparison\|功能效果渲染图/);
+  assert.match(app, /9-effect-comparison\|effect-comparison\|功能效果渲染图\|以一个清晰完整的商品主体为核心，围绕它展现所有已提供功能、机制、效果路径和渲染结果，不做前后或左右对比/);
   assert.match(app, /10-spec-table\|spec-table\|参数规格图/);
   assert.match(app, /11-craft-process\|craft-process\|品质工艺证明图/);
   assert.match(app, /12-accessory-gift\|accessory-gift\|到手清单\/配件图/);

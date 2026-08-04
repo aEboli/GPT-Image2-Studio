@@ -62,24 +62,24 @@ test("Cloudflare public configuration exposes the shared model defaults", async 
 test("Listing requests use the shared default only when no model is supplied", async () => {
   async function captureModels(config) {
     const models = [];
-    await assert.rejects(
-      generateCreationListingDrafts({
-        set: {
-          setId: "default-model-listing",
-          productName: "Blue Travel Bottle",
-          productDescription: "One blue travel bottle.",
-        },
-        config: {
-          baseUrl: "https://example.test/v1",
-          apiKey: "test-key",
-          ...config,
-        },
-        async fetchImpl(_url, init) {
-          models.push(JSON.parse(init.body).model);
-          return new Response(JSON.stringify({ output_text: "{}" }), { status: 200 });
-        },
-      }),
-    );
+    const drafts = await generateCreationListingDrafts({
+      set: {
+        setId: "default-model-listing",
+        productName: "Blue Travel Bottle",
+        productDescription: "One blue travel bottle.",
+      },
+      config: {
+        baseUrl: "https://example.test/v1",
+        apiKey: "test-key",
+        ...config,
+      },
+      async fetchImpl(_url, init) {
+        models.push(JSON.parse(init.body).model);
+        return new Response(JSON.stringify({ output_text: JSON.stringify({ title: "Blue Travel Bottle" }) }), { status: 200 });
+      },
+    });
+    assert.equal(drafts.length, 1);
+    assert.equal(drafts[0].status, "completed");
     return models;
   }
 

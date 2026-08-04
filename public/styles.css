@@ -1176,6 +1176,7 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .generation-m
 }
 
 .studio-grid {
+  --studio-panel-height: var(--studio-column-height, 100%);
   display: grid;
   grid-template-columns: var(--studio-grid-left, 392px) minmax(0, 1fr);
   gap: var(--studio-grid-gap, 14px);
@@ -3676,6 +3677,157 @@ ul.creation-plan-message {
   min-width: 88px;
 }
 
+.creation-temu-export-dialog {
+  width: min(760px, calc(100vw - 32px));
+  max-width: 100%;
+  max-height: min(820px, calc(100dvh - 32px));
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--overlay-border);
+  border-radius: 8px;
+  background: var(--overlay-surface-bg);
+  color: var(--text);
+  box-shadow: var(--overlay-shadow);
+}
+
+.creation-temu-export-dialog::backdrop {
+  background: var(--overlay-strong-scrim);
+}
+
+.creation-temu-export-form {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  max-height: inherit;
+}
+
+.creation-temu-export-head,
+.creation-temu-export-footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+}
+
+.creation-temu-export-head {
+  border-bottom: 1px solid var(--overlay-border);
+}
+
+.creation-temu-export-head > div {
+  min-width: 0;
+}
+
+.creation-temu-export-head h2,
+.creation-temu-export-head p,
+.creation-temu-export-section h3 {
+  margin: 0;
+}
+
+.creation-temu-export-head h2 {
+  margin-top: 4px;
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.creation-temu-export-head p {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.creation-temu-export-fields {
+  min-width: 0;
+  margin: 0;
+  padding: 18px 20px;
+  overflow: auto;
+  border: 0;
+}
+
+.creation-temu-export-section {
+  display: grid;
+  gap: 12px;
+}
+
+.creation-temu-export-section + .creation-temu-export-section {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--overlay-border);
+}
+
+.creation-temu-export-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.creation-temu-export-section h3 {
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.creation-temu-export-section-head span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: right;
+}
+
+.creation-temu-export-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.creation-temu-export-grid .compact-field input {
+  min-width: 0;
+  min-height: 40px;
+}
+
+.creation-temu-export-footer {
+  align-items: center;
+  border-top: 1px solid var(--overlay-border);
+}
+
+.creation-temu-export-footer .prompt-agent-feedback {
+  min-width: 0;
+  margin: 0;
+}
+
+.creation-temu-export-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+@media (max-width: 620px) {
+  .creation-temu-export-dialog {
+    width: calc(100vw - 18px);
+    max-height: calc(100dvh - 18px);
+  }
+
+  .creation-temu-export-head,
+  .creation-temu-export-fields,
+  .creation-temu-export-footer {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .creation-temu-export-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .creation-temu-export-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .creation-temu-export-actions {
+    justify-content: flex-end;
+  }
+}
+
 .creation-listing-panel {
   position: relative;
   min-width: 0;
@@ -5243,7 +5395,7 @@ html[data-ui-layout="mobile"] .creation-listing-workspace-bar .asset-listing-act
 }
 
 .settings-panel {
-  height: var(--studio-column-height, auto);
+  height: var(--studio-panel-height, var(--studio-column-height, auto));
 }
 
 .panel-title,
@@ -8738,7 +8890,7 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
 }
 
 .preview-panel {
-  height: var(--studio-column-height, auto);
+  height: var(--studio-panel-height, var(--studio-column-height, auto));
 }
 
 #previewImage {
@@ -14281,8 +14433,20 @@ html[data-ui-layout="mobile"] :is(.image-decomposition-upload-panel, .image-deco
     grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
     grid-template-areas: "settings preview";
     min-height: 0;
-    height: 100%;
+    height: calc(var(--visual-viewport-height, 100dvh) - var(--view-root-offset, 12px));
     overflow: hidden;
+  }
+
+  html[data-ui-orientation="landscape"]:is([data-ui-layout="tablet"], [data-ui-layout="stacked"]) :is(.settings-panel, .preview-panel) {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  html[data-ui-orientation="landscape"]:is([data-ui-layout="tablet"], [data-ui-layout="stacked"]) .settings-form {
+    height: 100%;
+    min-height: 0;
+    overflow: auto;
   }
 
   html[data-ui-orientation="landscape"][data-ui-layout="tablet"] :is(.app-shell, .view-root, .view-panel, .studio-view),
@@ -16080,4 +16244,167 @@ html[data-ui-layout="mobile"] .gallery-action-feedback,
 html[data-ui-layout="mobile"] .ppt-record-feedback {
   justify-self: stretch;
   text-align: left;
+}
+
+.field-heading-actions {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.field-clear-button {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.field-clear-button:hover,
+.field-clear-button:focus-visible {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--danger) 44%, var(--border));
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+#clearPromptButton[data-tooltip]::after {
+  top: calc(100% + 7px);
+  bottom: auto;
+}
+
+.field-clear-button[data-tooltip]::after,
+.preview-add-reference-button[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  z-index: 20;
+  right: 0;
+  bottom: calc(100% + 7px);
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 64px;
+  max-width: min(280px, calc(100vw - 32px));
+  padding: 6px 8px;
+  border: 1px solid var(--overlay-border);
+  border-radius: 5px;
+  background: var(--overlay-surface-bg);
+  color: var(--text);
+  box-shadow: var(--overlay-shadow);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.45;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(3px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.field-clear-button[data-tooltip]::after {
+  top: calc(100% + 7px);
+  bottom: auto;
+  transform: translateY(-3px);
+}
+
+html:is([data-ui-layout="tablet"], [data-ui-layout="mobile"]) .reference-field-group:has(.field-clear-button[data-tooltip]:hover),
+html:is([data-ui-layout="tablet"], [data-ui-layout="mobile"]) .reference-field-group:has(.field-clear-button[data-tooltip]:focus-visible) {
+  overflow: visible;
+}
+
+.field-clear-button[data-tooltip]:hover::after,
+.field-clear-button[data-tooltip]:focus-visible::after,
+.preview-add-reference-button[data-tooltip]:hover::after,
+.preview-add-reference-button[data-tooltip]:focus-visible::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.preview-add-reference-button {
+  position: relative;
+  min-width: 118px;
+}
+
+.preview-add-reference-button[data-tooltip]::after {
+  width: min(260px, calc(100vw - 32px));
+  min-width: min(200px, calc(100vw - 32px));
+}
+
+.preview-add-reference-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+#previewImage[draggable="true"] {
+  cursor: grab;
+}
+
+#previewImage[draggable="true"].is-dragging {
+  cursor: grabbing;
+  opacity: 0.66;
+}
+
+.reference-grid.dragover {
+  outline: 1px dashed color-mix(in srgb, var(--accent) 62%, transparent);
+  outline-offset: 4px;
+  border-radius: 12px;
+}
+
+.reference-dropzone.dragover,
+.reference-grid.dragover {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.reference-preview-viewer .reference-preview-backdrop {
+  background: rgba(0, 0, 0, 0.24);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html[data-theme="light"] .reference-preview-viewer .reference-preview-backdrop {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.lightbox-fields .lightbox-params-field {
+  grid-template-rows: auto minmax(120px, 1fr) auto;
+  overflow: auto;
+}
+
+.lightbox-fields .lightbox-params-field textarea {
+  height: auto;
+  min-height: 120px;
+  max-height: none;
+}
+
+.lightbox-fields .lightbox-params-field .lightbox-file-list {
+  min-width: 0;
+  margin-top: 2px;
+}
+
+html:is([data-ui-layout="tablet"], [data-ui-layout="mobile"]) .preview-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+html:is([data-ui-layout="tablet"], [data-ui-layout="mobile"]) .preview-add-reference-button {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+html:is([data-ui-layout="tablet"], [data-ui-layout="mobile"]) .lightbox-fields .lightbox-params-field {
+  grid-template-rows: auto minmax(140px, 1fr) auto;
+}
+
+html:is([data-ui-layout="tablet"], [data-ui-layout="mobile"]) .lightbox-fields .lightbox-params-field textarea {
+  min-height: 140px;
+}
+
+html:is([data-ui-layout="tablet"], [data-ui-layout="mobile"]) .field-clear-button {
+  width: 38px;
+  height: 38px;
+  min-height: 38px;
 }

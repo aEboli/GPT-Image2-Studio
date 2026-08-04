@@ -349,7 +349,7 @@ test("historical V2 full copy maps old-style bilingual fields and excludes revie
   }
 });
 
-test("new V2 model, retry, and explicit mock drafts remove identities from visible metadata and ids", async () => {
+test("new V2 model, parsed incomplete, and explicit mock drafts remove identities from visible metadata and ids", async () => {
   const [source] = buildCreationListingSources({
     setId: "set-visible-metadata",
     platform: "universal",
@@ -371,12 +371,6 @@ test("new V2 model, retry, and explicit mock drafts remove identities from visib
       expectedRequests: 1,
     },
     {
-      name: "retry",
-      mock: false,
-      fetchImpl: async (_url, _init, state = {}) => response(state.unused),
-      expectedRequests: 2,
-    },
-    {
       name: "mock",
       mock: true,
       fetchImpl: async () => {
@@ -388,15 +382,10 @@ test("new V2 model, retry, and explicit mock drafts remove identities from visib
 
   for (const scenario of scenarios) {
     let requestCount = 0;
-    const fetchImpl = scenario.name === "retry"
-      ? async () => {
-        requestCount += 1;
-        return response(requestCount === 1 ? "{}" : validOutput);
-      }
-      : async (...args) => {
-        requestCount += 1;
-        return scenario.fetchImpl(...args);
-      };
+    const fetchImpl = async (...args) => {
+      requestCount += 1;
+      return scenario.fetchImpl(...args);
+    };
     const draft = await requestCreationListingDraft({
       baseUrl: "https://example.test/v1",
       apiKey: "test-key",
@@ -416,21 +405,29 @@ test("new V2 model, retry, and explicit mock drafts remove identities from visib
     }
   }
 
-  let failedRequestCount = 0;
-  await assert.rejects(
-    requestCreationListingDraft({
-      baseUrl: "https://example.test/v1",
-      apiKey: "test-key",
-      responsesModel: "test-model",
-      source,
-      fetchImpl: async () => {
-        failedRequestCount += 1;
-        return response("{}");
-      },
-    }),
-    /Listing generation failed validation after 2 attempts/i,
-  );
-  assert.equal(failedRequestCount, 2);
+  let parseableIncompleteRequestCount = 0;
+  const incompleteDraft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "test-model",
+    source,
+    fetchImpl: async () => {
+      parseableIncompleteRequestCount += 1;
+      return response(JSON.stringify(makeV2Draft(policy, {
+        highlights: [],
+        packageDimensions: "",
+        productDimensions: "",
+        packageWeight: "",
+        productWeight: "",
+      })));
+    },
+  });
+  assert.equal(parseableIncompleteRequestCount, 1);
+  assert.equal(incompleteDraft.status, "completed");
+  assert.match(incompleteDraft.packageDimensions, /^Estimated: \d+(?:\.\d+)? x \d+(?:\.\d+)? x \d+(?:\.\d+)? cm \(/u);
+  assert.match(incompleteDraft.zhDisplay.packageDimensions, /^预估：\d+(?:\.\d+)? × \d+(?:\.\d+)? × \d+(?:\.\d+)? 厘米/u);
+  assert.equal(incompleteDraft.productDimensions, "");
+  assert.equal(incompleteDraft.highlights.length, 0);
 
   const normalizedExplicitId = normalizeCreationListingDraft({
     ...makeV2Draft(policy, {

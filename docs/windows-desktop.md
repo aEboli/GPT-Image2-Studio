@@ -1,13 +1,13 @@
 # Windows 桌面程序说明
 
-`GPT-Image2-Studio-Desktop-Setup-v0.2.4-x64.exe` 是使用 Electron 和 NSIS 构建的 Windows x64 桌面安装包。安装后会以独立应用窗口运行完整工作台，不需要单独安装 Node.js，也不会用浏览器标签页承载主界面。
+`GPT-Image2-Studio-Desktop-Setup-v0.2.5-x64.exe` 是使用 Electron 和 NSIS 构建的 Windows x64 桌面安装包。安装后会以独立应用窗口运行完整工作台，不需要单独安装 Node.js，也不会用浏览器标签页承载主界面。
 
 ## 与旧安装包的区别
 
 | 产物 | 启动界面 | 运行时 | 适用场景 |
 | --- | --- | --- | --- |
-| `GPT-Image2-Studio-Desktop-Setup-v0.2.4-x64.exe` | 独立桌面窗口 | Electron 内置 Node.js | 推荐给日常 Windows 桌面用户 |
-| `GPT-Image2-Studio-Setup-v0.2.4.exe` | 默认浏览器标签页 | 独立 `runtime\node.exe` | 保留兼容的旧启动方式 |
+| `GPT-Image2-Studio-Desktop-Setup-v0.2.5-x64.exe` | 独立桌面窗口 | Electron 内置 Node.js | 推荐给日常 Windows 桌面用户 |
+| `GPT-Image2-Studio-Setup-v0.2.5.exe` | 默认浏览器标签页 | 独立 `runtime\node.exe` | 保留兼容的旧启动方式 |
 
 两种产物复用同一套工作台、API 和本地输出格式。桌面程序不会删除旧安装包或源码运行方式。
 
@@ -75,7 +75,7 @@ cmd /c npm run build:desktop
 冒烟测试会实际创建独立窗口、加载真实首页、保存 `artifacts/desktop-smoke.png`，然后自动退出。NSIS 产物路径为：
 
 ```text
-artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.4-x64.exe
+artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.5-x64.exe
 ```
 
 未安装的可执行程序位于：

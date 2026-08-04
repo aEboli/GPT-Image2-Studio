@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.4-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.5-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages%20Ready-f38020.svg)](https://pages.cloudflare.com/)
 [![Windows](https://img.shields.io/badge/Windows-Installer-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
@@ -11,9 +11,16 @@
 
 把提示词生图、参考图分析、图片编辑、电商套图、人物写真、文章插图、PPT 生成和素材管理集中到一个浏览器界面中。
 
-当前版本：`v0.2.4`
+当前版本：`v0.2.5`
 
 </div>
+
+## v0.2.5 更新说明
+
+- 套图记录支持勾选多套记录生成 Temu 标准 Excel：每个 SKU 独占一行，已存在的公网 HTTPS 图片会直接复用；本地图片可选择使用 Cloudinary unsigned upload 获取 `secure_url`。
+- 缺少 Listing、价格、尺寸、重量、库存、产地或可公开访问图片时，导出文件会保持对应单元格为空，并在“导出问题”工作表列出具体待补项，不会猜测或伪造商品事实。
+- 导出仅在本地 Node.js 或 Windows 桌面程序中可用；它不会登录、导入或发布到 Temu。上传前仍需人工核对工作簿与 Temu 的实际校验结果。
+- Creation 与 Listing 的兼容读取、SKU 颜色标签和套图生成规则得到完善，历史记录仍按既有字段来源和数据边界处理。
 
 ## 重要说明
 
@@ -141,9 +148,15 @@ GPT-Image2-Studio 面向个人创作者、电商运营、设计师和内容团�
 | --- | --- | --- | --- | --- |
 | 瀑布画廊 | `#gallery`，资产 -> 瀑布画廊 | 工作流、日期、关键词和列数 | 合并服务端记录与浏览器缓存，按筛选条件构建瀑布流 | 灯箱缩放/平移、前后切换、下载、复制路径、查看完整参数，以及删除当前或勾选图片 |
 | 文章插图记录 | `#article-record`，资产 -> 文章插图记录 | 记录搜索、列数、文章插图集 | 按文章集加载参考卡、正文插图、标题和说明文字 | 继续创作、复制说明、逐图查看/下载和重新生成，以及删除当前或勾选记录 |
-| 套图记录 | `#creation-record`，资产 -> 套图记录 | 商品/平台搜索、创建时间与已保存套图 | 按关键词、今天、近 7 天、更早或精确日期筛选，恢复生成快照、有效计划、进度、Listing 和逐图结果 | 导出 TXT/JSON、按冻结计划补齐缺失项、查看灯箱和下载；支持删除当前、勾选批量删除和按显式筛选结果删除 |
+| 套图记录 | `#creation-record`，资产 -> 套图记录 | 商品/平台搜索、创建时间与已保存套图 | 按关键词、今天、近 7 天、更早或精确日期筛选，恢复生成快照、有效计划、进度、Listing 和逐图结果 | 导出 TXT/JSON、勾选多套记录导出 Temu 标准 Excel、按冻结计划补齐缺失项、查看灯箱和下载；支持删除当前、勾选批量删除和按显式筛选结果删除 |
 | 写真记录 | `#portrait-record`，资产 -> 写真记录 | 写真集搜索与已保存计划 | 恢复人物、地点、风格、景别、动作和生成进度 | 导出 JSON、重试失败项、查看/下载结果、继续创作，以及删除当前或勾选记录 |
 | PPT 记录 | `#ppt-record`，资产 -> PPT记录 | 已生成演示文稿列表 | 读取大纲、页面缩略图、导出文件和完成状态 | 逐页预览、下载 PPTX、继续补页或进入单页编辑器，以及删除当前或勾选记录 |
+
+### Temu 快速上架 Excel
+
+在“套图记录”勾选一套或多套记录后，使用“导出 Temu Excel”生成基于项目内置标准模板的 `.xlsx`。每个 SKU 独占一行；已有的公网 HTTPS 图片链接会直接写入模板，本地输出图片可选使用 Cloudinary unsigned upload 转成 `secure_url`。`cloudName` 与 `uploadPreset` 不是 API Secret，应用不会收集或保存 Cloudinary API Key、API Secret、签名、Authorization 或 Cookie。
+
+这项能力只在本地 Node.js 或 Windows 桌面运行时可用，不会自动登录、导入或发布到 Temu。缺少 Listing、价格、尺寸、重量、库存、产地或公网图片时，导出的工作簿会保留空单元格，并在“导出问题”工作表列出待补全项目；上传前仍需人工核对模板和 Temu 的实际校验结果。Cloudinary 远端资源的配额、生命周期和删除由 Cloudinary 账户自行管理。
 
 ## 重要工具与弹窗
 
@@ -201,7 +214,7 @@ Windows 用户也可以双击 `launch-studio.cmd` 启动，使用 `stop-studio-s
 从包含桌面产物的 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
 
 ```text
-GPT-Image2-Studio-Desktop-Setup-v0.2.4-x64.exe
+GPT-Image2-Studio-Desktop-Setup-v0.2.5-x64.exe
 ```
 
 安装完成后通过桌面或开始菜单中的 `GPT-Image2-Studio` 启动。程序会在独立窗口中运行，内置服务使用动态回环端口，关闭窗口后不会遗留后台服务。无需另行安装 Node.js，完整说明见 [Windows 桌面程序文档](./docs/windows-desktop.md)。
@@ -220,7 +233,7 @@ cmd /c npm run desktop
 从 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
 
 ```text
-GPT-Image2-Studio-Setup-v0.2.4.exe
+GPT-Image2-Studio-Setup-v0.2.5.exe
 ```
 
 安装器默认写入：
@@ -383,7 +396,7 @@ cmd /c npm run build:desktop
 产物路径：
 
 ```text
-artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.4-x64.exe
+artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.5-x64.exe
 artifacts/desktop/win-unpacked/GPT-Image2-Studio.exe
 ```
 
@@ -401,7 +414,7 @@ cmd /c npm run build:installer
 产物路径格式：
 
 ```text
-artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.4.exe
+artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.5.exe
 ```
 
 脚本使用系统 `iexpress.exe` 生成自解压安装包，并把当前 Node.js 运行时和依赖打入安装目录；启动后仍使用默认浏览器显示工作台。
@@ -530,7 +543,7 @@ YYYY-MM-DD-ppt\
 | 图片压缩 | 浏览器可解码的图片，界面提示 JPG/PNG/WebP 等 | 可保留原格式，或输出 PNG、JPEG、WebP；JPEG/WebP 支持质量/目标体积控制，PNG 不支持有损质量参数 |
 | 文章插图材料 | TXT、MD、CSV、JSON，可多选；也可直接粘贴正文 | 参考卡和正文插图固定输出 PNG |
 | PPT 材料 | PDF、DOCX、PPTX、TXT、MD、CSV，可多选；也可输入文本或主题 | 页面固定输出 PNG；可导出整页图片型 PPTX 或可编辑重建 PPTX |
-| 套图/写真记录导出 | 应用内记录 | 套图可导出 TXT/JSON，写真可导出 JSON；这些是记录数据，不是图片格式 |
+| 套图/写真记录导出 | 应用内记录 | 套图可导出 TXT/JSON，勾选记录还可生成 Temu 标准 Excel；写真可导出 JSON。Temu Excel 需要本地运行、可用 HTTPS 图片链接和人工上传前核对 |
 
 高分辨率、大文件和大批量任务更容易触发浏览器内存压力、上游超时、限流或“响应结束但没有最终图片”。建议先用自动适配或中等档位、小批量验证画面方向和协议兼容性，再提高尺寸或数量。
 
@@ -610,7 +623,7 @@ cmd /c npm run build:installer
 ## 版本发布
 
 - 版本号以 `package.json` 和 `package-lock.json` 为准。
-- Git tag 使用 `v<version>`，例如 `v0.2.4`。
+- Git tag 使用 `v<version>`，例如 `v0.2.5`。
 - Release 标题建议使用 `GPT-Image2-Studio v<version>`。
 - Release 应至少附带变更说明、验证结果和对应的 Windows 桌面安装包；如仍分发兼容版，应明确区分两个文件的启动形态。
 - 正式发布提交与标签就绪后运行 `npm run check:release:strict`，确认工作树干净且标签与版本一致。

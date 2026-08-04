@@ -156,6 +156,14 @@ import {
 } from "./lib/creation-repair.mjs";
 import { buildCreationRelativeDir, createCreationSetStore } from "./lib/creation-store.mjs";
 import { normalizeCreationRecordDeleteSetIds } from "./lib/creation-record-delete.mjs";
+import {
+  TEMU_EXPORT_LIMITS,
+  createTemuExportPlan,
+  finalizeTemuExportPlan,
+  normalizeTemuExportRequest,
+} from "./lib/creation-temu-export.mjs";
+import { resolveTemuImageRequirements } from "./lib/creation-temu-images.mjs";
+import { buildTemuWorkbookBuffer, verifyTemuTemplate } from "./lib/creation-temu-workbook.mjs";
 import { normalizeAssetRecordDeleteIds } from "./lib/asset-record-delete.mjs";
 import { resolveCreationPlanCounts } from "./lib/creation-plan-counts.mjs";
 import {
@@ -2834,6 +2842,138 @@ async function handleCreationSetsDelete(request, response) {
     deletedCount: result.deletedSetIds.length,
     ...result,
   });
+}
+
+function appendTemuImageCacheWriteIssues(plan, setId) {
+  const affectedRows = plan.rows.filter((row) => row.setId === setId);
+  const rows = affectedRows.length > 0 ? affectedRows : [{ setId, productName: "", skuId: "", skuName: "", dataRow: null }];
+  for (const row of rows) {
+    plan.issues.push({
+      severity: "警告",
+      code: "IMAGE_CACHE_WRITE_FAILED",
+      setId,
+      productName: row.productName,
+      skuId: row.skuId,
+      skuName: row.skuName,
+      dataRow: row.dataRow,
+      field: "图片缓存",
+      message: "本次上传地址已写入工作簿，但图片缓存未能保存到套图记录。",
+      source: "Cloudinary 上传结果",
+      suggestion: "工作簿仍可使用；下次导出前检查套图记录存储是否可写。",
+    });
+  }
+}
+
+async function handleCreationSetsTemuExcelExport(request, response) {
+  let payload;
+  try {
+    payload = await readJsonBody(request, { maxBytes: TEMU_EXPORT_LIMITS.maxRequestBytes });
+  } catch (error) {
+    const statusCode = error?.code === "PAYLOAD_TOO_LARGE" ? 413 : 400;
+    return sendJson(response, statusCode, {
+      message: statusCode === 413 ? "Temu Excel 导出请求体超过 256 KiB。" : "Temu Excel 导出请求必须是有效 JSON。",
+    });
+  }
+
+  let exportRequest;
+  try {
+    exportRequest = normalizeTemuExportRequest(payload);
+  } catch (error) {
+    return sendJson(response, 400, { message: error instanceof Error ? error.message : String(error) });
+  }
+
+  const sets = [];
+  for (const setId of exportRequest.setIds) {
+    let set;
+    try {
+      set = await creationSetStore.readManifest(setId);
+    } catch (error) {
+      if (error?.code === "ENOENT") {
+        return sendJson(response, 404, { message: `套图记录不存在：${setId}` });
+      }
+      throw error;
+    }
+    if (String(set?.setId || "").trim() !== setId) {
+      return sendJson(response, 409, { message: "套图记录身份与请求 ID 不一致，已停止导出。" });
+    }
+    sets.push(set);
+  }
+
+  let plan;
+  try {
+    plan = createTemuExportPlan({ sets, defaults: exportRequest.defaults });
+  } catch (error) {
+    return sendJson(response, 413, { message: error instanceof Error ? error.message : String(error) });
+  }
+
+  try {
+    await verifyTemuTemplate();
+  } catch (error) {
+    return sendJson(response, 500, {
+      message: error?.code === "TEMU_WORKBOOK_INVALID"
+        ? error.message
+        : "Temu 标准模板校验失败。",
+    });
+  }
+
+  let imageResolution;
+  try {
+    imageResolution = await resolveTemuImageRequirements({
+      requirements: plan.imageRequirements,
+      sets,
+      outputDir,
+      cloudinary: exportRequest.cloudinary,
+    });
+  } catch (error) {
+    const statusCode = ["IMAGE_FILE_TOO_LARGE", "IMAGE_LIMIT_EXCEEDED"].includes(error?.code) ? 413 : 400;
+    return sendJson(response, statusCode, {
+      message: error instanceof Error ? error.message : "Temu 图片检查失败。",
+    });
+  }
+
+  for (const [setId, entries] of imageResolution.cacheEntriesBySet) {
+    try {
+      await creationSetStore.mergeTemuExcelImageCache(setId, entries);
+    } catch {
+      appendTemuImageCacheWriteIssues(plan, setId);
+    }
+  }
+
+  const finalizedPlan = finalizeTemuExportPlan(plan, imageResolution.results);
+  let workbookResult;
+  try {
+    workbookResult = await buildTemuWorkbookBuffer({ plan: finalizedPlan });
+  } catch (error) {
+    return sendJson(response, 500, {
+      message: error?.code === "TEMU_WORKBOOK_INVALID"
+        ? error.message
+        : "Temu Excel 工作簿生成失败。",
+    });
+  }
+
+  const now = new Date();
+  const timestamp = [
+    now.getUTCFullYear(),
+    String(now.getUTCMonth() + 1).padStart(2, "0"),
+    String(now.getUTCDate()).padStart(2, "0"),
+    "-",
+    String(now.getUTCHours()).padStart(2, "0"),
+    String(now.getUTCMinutes()).padStart(2, "0"),
+    String(now.getUTCSeconds()).padStart(2, "0"),
+  ].join("");
+  const filename = `temu-import-${timestamp}.xlsx`;
+  response.writeHead(200, {
+    "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "Content-Length": workbookResult.buffer.length,
+    "Content-Disposition": `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+    "X-Temu-Export-Set-Count": exportRequest.setIds.length,
+    "X-Temu-Export-Row-Count": workbookResult.rowCount,
+    "X-Temu-Export-Issue-Count": workbookResult.issueCount,
+    "X-Temu-Export-Issue-Sheet": encodeURIComponent(workbookResult.issueSheetName),
+  });
+  response.end(workbookResult.buffer);
 }
 
 async function handleCreationSetFolderOpen(request, response) {
@@ -5772,6 +5912,10 @@ async function routeRequest(request, response) {
 
   if (request.method === "POST" && url.pathname === "/api/creation/sets/delete") {
     return handleCreationSetsDelete(request, response);
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/creation/sets/export-temu-excel") {
+    return handleCreationSetsTemuExcelExport(request, response);
   }
 
   if (request.method === "GET" && url.pathname === "/api/portrait/sets") {
