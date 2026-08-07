@@ -1157,7 +1157,7 @@ test("style transfer mode can use every style preset with before and after previ
   const app = await readFile(appPath, "utf8");
   const presetAssets = [
     "custom-style-reference.svg",
-    "cinematic-photo.png",
+    "style-before.png",
     "anime-cel.png",
     "hand-drawn.png",
     "pencil-sketch.png",
@@ -1183,7 +1183,8 @@ test("style transfer mode can use every style preset with before and after previ
   );
   assert.match(app, /const STYLE_TRANSFER_CUSTOM_PRESET = "custom";/);
   assert.match(app, /const STYLE_TRANSFER_DEFAULT_PRESET = "clay-toy";/);
-  assert.match(app, /const STYLE_TRANSFER_PRESET_BEFORE_IMAGE = "\.\/assets\/style-presets\/style-before\.png";/);
+  assert.match(app, /const STYLE_TRANSFER_PRESET_BEFORE_IMAGE = "\.\/assets\/style-presets\/cinematic-photo\.png";/);
+  assert.match(app, /value:\s*"cinematic-photo"[\s\S]*beforeImage:\s*STYLE_TRANSFER_PRESET_BEFORE_IMAGE,[\s\S]*image:\s*"\.\/assets\/style-presets\/style-before\.png"/);
   assert.match(app, /const STYLE_TRANSFER_PRESETS = \[/);
   assert.match(app, /beforeImage:\s*STYLE_TRANSFER_PRESET_BEFORE_IMAGE/);
   for (const asset of presetAssets) {
@@ -1197,29 +1198,35 @@ test("style transfer mode can use every style preset with before and after previ
   assert.match(app, /styleTransferReferenceImageName:\s*stylePresetFile\?\.name \|\| styleItem\?\.file\?\.name \|\| ""/);
 });
 
-test("style transfer preset comparison opens clicked preset images directly", async () => {
-  const [app, styles, styleTransferPresetLightbox] = await Promise.all([
+test("style transfer preset comparison opens both images without detail metadata", async () => {
+  const [app, html, styles, styleTransferPresetLightbox] = await Promise.all([
     readFile(appPath, "utf8"),
+    readFile(indexPath, "utf8"),
     readFile(stylesPath, "utf8"),
     readFile(styleTransferPresetLightboxPath, "utf8"),
   ]);
 
   assert.match(app, /from "\/lib\/style-transfer-preset-lightbox\.mjs"/);
-  assert.match(app, /function openStyleTransferPresetPreview\(slot\) \{/);
-  assert.match(app, /buildStyleTransferPresetLightboxItem\(\{ preset, slot, nowIso \}\)/);
-  assert.match(
-    app,
-    /openLightbox\(lightboxItem,\s*\{\s*items:\s*\["before", "after"\]\.map\(\(previewSlot\) => buildStyleTransferPresetLightboxItem\(\{ preset, slot: previewSlot, nowIso \}\)\)\.filter\(Boolean\),\s*\}\);/,
-  );
+  assert.match(app, /function openStyleTransferPresetComparison\(\) \{/);
+  assert.match(app, /buildStyleTransferPresetComparisonItem\(\{ preset, nowIso \}\)/);
+  assert.match(app, /openLightbox\(comparisonItem\);/);
   assert.match(app, /refs\.styleTransferPresetComparison\.addEventListener\("click",\s*handleStyleTransferPresetComparisonClick\);/);
-  assert.match(app, /openStyleTransferPresetPreview\(trigger\.dataset\.styleTransferPresetPreview\)/);
-  assert.match(app, /button\.dataset\.styleTransferPresetPreview = previewSlot;/);
+  assert.match(app, /openStyleTransferPresetComparison\(\)/);
+  assert.match(app, /button\.dataset\.styleTransferPresetPreview = "comparison";/);
   assert.match(app, /button\.title = `放大查看 \$\{preset\.label\}\$\{label\}`;/);
-  assert.match(styleTransferPresetLightbox, /export function buildStyleTransferPresetLightboxItem/);
-  assert.match(styleTransferPresetLightbox, /imageUrl,/);
-  assert.match(styleTransferPresetLightbox, /thumbnailUrl:\s*imageUrl,/);
-  assert.match(styleTransferPresetLightbox, /prompt:\s*`风格：\$\{preset\.label\}`/);
-  assert.match(styleTransferPresetLightbox, /paramsText:\s*`预设风格：\$\{preset\.label\}\\n预览内容：\$\{slotLabel\}原图`/);
+  assert.match(styleTransferPresetLightbox, /export function buildStyleTransferPresetComparisonItem/);
+  assert.match(styleTransferPresetLightbox, /comparisonImages:\s*\[/);
+  assert.match(styleTransferPresetLightbox, /slot:\s*"before"[\s\S]*imageUrl:\s*beforeImage/);
+  assert.match(styleTransferPresetLightbox, /slot:\s*"after"[\s\S]*imageUrl:\s*afterImage/);
+  assert.match(styleTransferPresetLightbox, /prompt:\s*""/);
+  assert.doesNotMatch(styleTransferPresetLightbox, /paramsText|imageModel/);
+  assert.match(html, /id="lightboxComparison"[^>]*aria-label="风格迁移前后对比"/);
+  assert.match(app, /refs\.lightbox\.classList\.toggle\("is-style-transfer-comparison",\s*Boolean\(fresh\.isStyleTransferComparisonItem\)\)/);
+  assert.match(app, /renderStyleTransferLightboxComparison\(fresh\)/);
+  assert.match(app, /function closeLightbox\(\) \{[\s\S]*refs\.lightbox\.classList\.remove\("is-style-transfer-comparison"\);[\s\S]*renderStyleTransferLightboxComparison\(null\);/);
+  assert.match(styles, /\.lightbox\.is-style-transfer-comparison\s+\.lightbox-comparison/);
+  assert.match(styles, /\.lightbox\.is-style-transfer-comparison\s+:is\(\.lightbox-meta > :not\(#lightboxClose\), \.lightbox-actions, \.lightbox-image-shell, \.lightbox-fields\)/);
+  assert.match(styles, /\.lightbox\.is-style-transfer-comparison \.lightbox-dialog\s*\{[\s\S]*width:\s*min\(1560px, calc\(100vw - 32px\), 180dvh\);[\s\S]*height:\s*auto;[\s\S]*aspect-ratio:\s*1\.96 \/ 1;[\s\S]*grid-template-rows:\s*minmax\(0, 1fr\);/);
   assert.doesNotMatch(styleTransferPresetLightbox, /canvas|toDataURL|drawImage/);
   assert.match(styles, /\.style-transfer-comparison-button\s*\{[\s\S]*cursor:\s*zoom-in;/);
   assert.match(styles, /\.style-transfer-comparison-button:hover \.style-transfer-comparison-frame/);

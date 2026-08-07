@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { buildStyleTransferPresetLightboxItem } from "../lib/style-transfer-preset-lightbox.mjs";
+import { buildStyleTransferPresetComparisonItem } from "../lib/style-transfer-preset-lightbox.mjs";
 
-test("style transfer preset lightbox item opens the clicked preset image directly", () => {
+test("style transfer preset comparison item always contains the ordered before and after pair", () => {
   const preset = {
     value: "hand-drawn",
     label: "手绘插画",
@@ -11,32 +11,43 @@ test("style transfer preset lightbox item opens the clicked preset image directl
     image: "./after.png",
   };
 
-  const beforeItem = buildStyleTransferPresetLightboxItem({
+  const comparisonItem = buildStyleTransferPresetComparisonItem({
     preset,
-    slot: "before",
-    nowIso: () => "2026-07-05T00:00:00.000Z",
-  });
-  const afterItem = buildStyleTransferPresetLightboxItem({
-    preset,
-    slot: "after",
     nowIso: () => "2026-07-05T00:00:00.000Z",
   });
 
-  assert.equal(beforeItem.id, "style-transfer-preset:hand-drawn:before");
-  assert.equal(beforeItem.filename, "hand-drawn-before.png");
-  assert.equal(beforeItem.imageModel, "风格预设");
-  assert.equal(beforeItem.imageUrl, "./before.png");
-  assert.equal(beforeItem.thumbnailUrl, "./before.png");
-  assert.equal(beforeItem.prompt, "风格：手绘插画");
-  assert.equal(beforeItem.paramsText, "预设风格：手绘插画\n预览内容：风格前原图");
-  assert.equal(beforeItem.isPreviewLightboxItem, true);
+  assert.deepEqual(comparisonItem, {
+    id: "style-transfer-preset:hand-drawn:comparison",
+    filename: "hand-drawn-comparison.png",
+    imageUrl: "./before.png",
+    thumbnailUrl: "./before.png",
+    createdAt: "2026-07-05T00:00:00.000Z",
+    prompt: "",
+    comparisonImages: [
+      {
+        slot: "before",
+        imageUrl: "./before.png",
+        alt: "手绘插画 风格前原图",
+      },
+      {
+        slot: "after",
+        imageUrl: "./after.png",
+        alt: "手绘插画 风格后效果图",
+      },
+    ],
+    isPreviewLightboxItem: true,
+    isStyleTransferComparisonItem: true,
+  });
+  assert.equal("imageModel" in comparisonItem, false);
+  assert.equal("paramsText" in comparisonItem, false);
+});
 
-  assert.equal(afterItem.id, "style-transfer-preset:hand-drawn:after");
-  assert.equal(afterItem.filename, "hand-drawn-after.png");
-  assert.equal(afterItem.imageUrl, "./after.png");
-  assert.equal(afterItem.thumbnailUrl, "./after.png");
-  assert.equal(afterItem.paramsText, "预设风格：手绘插画\n预览内容：风格后原图");
-  assert.equal(afterItem.isPreviewLightboxItem, true);
-
-  assert.equal(buildStyleTransferPresetLightboxItem({ preset, slot: "unknown" }), null);
+test("style transfer preset comparison requires both source and result images", () => {
+  assert.equal(buildStyleTransferPresetComparisonItem(), null);
+  assert.equal(buildStyleTransferPresetComparisonItem({
+    preset: { value: "cinematic-photo", label: "电影写实", beforeImage: "./before.png" },
+  }), null);
+  assert.equal(buildStyleTransferPresetComparisonItem({
+    preset: { value: "cinematic-photo", label: "电影写实", image: "./after.png" },
+  }), null);
 });

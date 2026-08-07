@@ -2,45 +2,36 @@ function getNow(nowIso) {
   return typeof nowIso === "function" ? nowIso() : new Date().toISOString();
 }
 
-function getSlotConfig(preset, slot) {
-  if (slot === "before") {
-    return {
-      imageUrl: preset?.beforeImage,
-      label: "风格前",
-    };
-  }
-
-  if (slot === "after") {
-    return {
-      imageUrl: preset?.image,
-      label: "风格后",
-    };
-  }
-
-  return null;
-}
-
-export function buildStyleTransferPresetLightboxItem({
+export function buildStyleTransferPresetComparisonItem({
   preset,
-  slot,
   nowIso,
 } = {}) {
-  const slotConfig = getSlotConfig(preset, slot);
-  const imageUrl = String(slotConfig?.imageUrl || "").trim();
-  if (!preset?.value || !preset?.label || !imageUrl) {
+  const beforeImage = String(preset?.beforeImage || "").trim();
+  const afterImage = String(preset?.image || "").trim();
+  if (!preset?.value || !preset?.label || !beforeImage || !afterImage) {
     return null;
   }
 
-  const slotLabel = slotConfig.label;
   return {
-    id: `style-transfer-preset:${preset.value}:${slot}`,
-    filename: `${preset.value}-${slot}.png`,
-    imageModel: "风格预设",
-    imageUrl,
-    thumbnailUrl: imageUrl,
+    id: `style-transfer-preset:${preset.value}:comparison`,
+    filename: `${preset.value}-comparison.png`,
+    imageUrl: beforeImage,
+    thumbnailUrl: beforeImage,
     createdAt: getNow(nowIso),
-    prompt: `风格：${preset.label}`,
-    paramsText: `预设风格：${preset.label}\n预览内容：${slotLabel}原图`,
+    prompt: "",
+    comparisonImages: [
+      {
+        slot: "before",
+        imageUrl: beforeImage,
+        alt: `${preset.label} 风格前原图`,
+      },
+      {
+        slot: "after",
+        imageUrl: afterImage,
+        alt: `${preset.label} 风格后效果图`,
+      },
+    ],
     isPreviewLightboxItem: true,
+    isStyleTransferComparisonItem: true,
   };
 }

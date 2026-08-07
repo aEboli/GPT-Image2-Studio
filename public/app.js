@@ -16,7 +16,7 @@ import { filterLocallyTerminatedGenerationTaskSnapshots } from "/lib/generation-
 import { readHttpResponseErrorMessage } from "/lib/http-response-error.mjs";
 import { consumeSseUntilTerminal } from "/lib/sse-terminal-client.mjs";
 import { getStudioDensitySettings, getStudioLayoutMode, ALL_VARIABLE_NAMES } from "/lib/studio-density.mjs?v=20260713-cross-device-1";
-import { buildStyleTransferPresetLightboxItem } from "/lib/style-transfer-preset-lightbox.mjs";
+import { buildStyleTransferPresetComparisonItem } from "/lib/style-transfer-preset-lightbox.mjs";
 import { buildCreationRecordLightboxItem, normalizeCreationGenerationSnapshotForView } from "/lib/creation-record-lightbox.mjs";
 import { buildCreationRecordDeleteConfirmation, getCreationRecordDeleteTargets, normalizeCreationRecordDeleteSetIds, resolveCreationRecordSelectionAfterDelete } from "/lib/creation-record-delete.mjs?v=20260722-creation-record-delete-flow-1";
 import { createCreationTemuExportController } from "/lib/creation-temu-export-ui.mjs";
@@ -206,7 +206,7 @@ const CREATION_LOGO_BACKGROUND_LABELS = {
 };
 const STYLE_TRANSFER_CUSTOM_PRESET = "custom";
 const STYLE_TRANSFER_DEFAULT_PRESET = "clay-toy";
-const STYLE_TRANSFER_PRESET_BEFORE_IMAGE = "./assets/style-presets/style-before.png";
+const STYLE_TRANSFER_PRESET_BEFORE_IMAGE = "./assets/style-presets/cinematic-photo.png";
 const STYLE_TRANSFER_PRESET_REFERENCE_SIZE = 1024;
 const STYLE_TRANSFER_PRESETS = [
   {
@@ -222,7 +222,7 @@ const STYLE_TRANSFER_PRESETS = [
     label: "电影写实",
     description: "真实镜头、胶片色调、自然光影和电影级景深。",
     beforeImage: STYLE_TRANSFER_PRESET_BEFORE_IMAGE,
-    image: "./assets/style-presets/cinematic-photo.png",
+    image: "./assets/style-presets/style-before.png",
     prompt: "Use a cinematic photoreal look with natural lens behavior, realistic lighting, filmic color grading, and believable texture.",
   },
   {
@@ -924,6 +924,7 @@ const refs = {
   lightboxAmbient: document.querySelector("#lightboxAmbient"),
   lightboxBackdrop: document.querySelector("#lightboxBackdrop"),
   lightboxClose: document.querySelector("#lightboxClose"),
+  lightboxComparison: document.querySelector("#lightboxComparison"),
   copyPromptButton: document.querySelector("#copyPromptButton"),
   lightboxDownload: document.querySelector("#lightboxDownload"),
   lightboxId: document.querySelector("#lightboxId"),
@@ -3637,20 +3638,18 @@ async function ensureStyleTransferPresetReferenceFileReady() {
 function getStyleTransferPresetReferenceFile() {
   return hasSelectedStyleTransferPreset() ? state.styleTransfer.presetReferenceFile : null;
 }
-function openStyleTransferPresetPreview(slot) {
+function openStyleTransferPresetComparison() {
   const preset = getStyleTransferPreset();
-  const lightboxItem = buildStyleTransferPresetLightboxItem({ preset, slot, nowIso });
-  if (lightboxItem) {
-    openLightbox(lightboxItem, {
-      items: ["before", "after"].map((previewSlot) => buildStyleTransferPresetLightboxItem({ preset, slot: previewSlot, nowIso })).filter(Boolean),
-    });
+  const comparisonItem = buildStyleTransferPresetComparisonItem({ preset, nowIso });
+  if (comparisonItem) {
+    openLightbox(comparisonItem);
   }
 }
 function handleStyleTransferPresetComparisonClick(event) {
   const trigger = event.target?.closest?.("[data-style-transfer-preset-preview]");
-  if (trigger && refs.styleTransferPresetComparison?.contains(trigger)) openStyleTransferPresetPreview(trigger.dataset.styleTransferPresetPreview);
+  if (trigger && refs.styleTransferPresetComparison?.contains(trigger)) openStyleTransferPresetComparison();
 }
-function createStyleTransferComparisonCard({ label, src, alt, previewSlot, preset = getStyleTransferPreset() }) {
+function createStyleTransferComparisonCard({ label, src, alt, preset = getStyleTransferPreset() }) {
   const card = document.createElement("div");
   card.className = "style-transfer-comparison-card";
   const caption = document.createElement("span");
@@ -3658,7 +3657,7 @@ function createStyleTransferComparisonCard({ label, src, alt, previewSlot, prese
   card.appendChild(caption);
   const button = document.createElement("button");
   button.type = "button"; button.className = "style-transfer-comparison-button";
-  button.dataset.styleTransferPresetPreview = previewSlot;
+  button.dataset.styleTransferPresetPreview = "comparison";
   button.title = `放大查看 ${preset.label}${label}`;
   button.setAttribute("aria-label", button.title);
   const frame = document.createElement("span");
@@ -3707,13 +3706,11 @@ function renderStyleTransferPresetPreview() {
           label: "风格前",
           src: preset.beforeImage,
           alt: `${preset.label} 风格前示意图`,
-          previewSlot: "before",
         }),
         createStyleTransferComparisonCard({
           label: "风格后",
           src: preset.image,
           alt: `${preset.label} 风格后示意图`,
-          previewSlot: "after",
         }),
       );
     }
@@ -4993,14 +4990,47 @@ function closeLightbox() {
   previewKeyboardNavigation.clearLightboxNavigation();
   resetPromptCopyFeedback();
   resetLightboxViewer();
+  refs.lightbox.classList.remove("is-style-transfer-comparison");
+  renderStyleTransferLightboxComparison(null);
   setLightboxOpen(false);
   restoreOverlayTriggerFocus("lightbox");
+}
+
+function renderStyleTransferLightboxComparison(item) {
+  if (!refs.lightboxComparison) {
+    return;
+  }
+
+  refs.lightboxComparison.replaceChildren();
+  if (!item?.isStyleTransferComparisonItem) {
+    return;
+  }
+
+  const images = Array.isArray(item.comparisonImages) ? item.comparisonImages : [];
+  images.forEach((comparisonImage) => {
+    const imageUrl = String(comparisonImage?.imageUrl || "").trim();
+    if (!imageUrl) {
+      return;
+    }
+
+    const figure = document.createElement("figure");
+    figure.className = "lightbox-comparison-figure";
+    figure.dataset.comparisonSlot = comparisonImage.slot === "after" ? "after" : "before";
+    const image = document.createElement("img");
+    image.src = imageUrl;
+    image.alt = String(comparisonImage.alt || "风格迁移对比图");
+    image.decoding = "async";
+    figure.appendChild(image);
+    refs.lightboxComparison.appendChild(figure);
+  });
 }
 
 function syncLightboxItem() {
   if (!state.lightboxItem) {
     refs.copyPromptButton.disabled = true;
     refs.lightbox.classList.remove("is-image-only-preview");
+    refs.lightbox.classList.remove("is-style-transfer-comparison");
+    renderStyleTransferLightboxComparison(null);
     resetPromptCopyFeedback();
     resetLightboxViewer();
     return;
@@ -5015,6 +5045,8 @@ function syncLightboxItem() {
   const imageUrl = getImageUrl(fresh);
   state.lightboxItem = fresh;
   refs.lightbox.classList.toggle("is-image-only-preview", Boolean(fresh.isImageOnlyLightboxItem));
+  refs.lightbox.classList.toggle("is-style-transfer-comparison", Boolean(fresh.isStyleTransferComparisonItem));
+  renderStyleTransferLightboxComparison(fresh);
   refs.lightboxModel.textContent = formatImageModelLabel(fresh.imageModel);
   refs.lightboxTime.textContent = formatTime(fresh.createdAt);
   refs.lightboxId.textContent = `ID: ${getDisplayId(fresh)}`;
