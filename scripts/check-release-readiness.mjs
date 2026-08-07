@@ -59,6 +59,12 @@ export async function checkReleaseReadiness({ rootDir = projectRootDir, strict =
       join(rootDir, "README.md"),
       "README.md",
       versionLabel,
+      /^Current version:\s*`(v[0-9A-Za-z.+-]+)`\s*$/gmu,
+    ),
+    requireVersionFact(
+      join(rootDir, "README.zh-CN.md"),
+      "README.zh-CN.md",
+      versionLabel,
       /^当前版本：\s*`(v[0-9A-Za-z.+-]+)`\s*$/gmu,
     ),
     requireVersionFact(

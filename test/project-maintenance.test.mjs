@@ -49,7 +49,8 @@ test("release readiness detects consistent and inconsistent version facts", asyn
     '{"version":"1.2.3","packages":{"":{"version":"1.2.3"}}}\n',
     "utf8",
   );
-  await writeFile(join(fixtureRoot, "README.md"), "当前版本：`v1.2.3`\n", "utf8");
+  await writeFile(join(fixtureRoot, "README.md"), "Current version: `v1.2.3`\n", "utf8");
+  await writeFile(join(fixtureRoot, "README.zh-CN.md"), "当前版本：`v1.2.3`\n", "utf8");
   await writeFile(
     join(fixtureRoot, "docs", "windows-desktop.md"),
     "`GPT-Image2-Studio-Desktop-Setup-v1.2.3-x64.exe` 是桌面安装包。\n",
@@ -64,10 +65,13 @@ test("release readiness detects consistent and inconsistent version facts", asyn
   const result = await checkReleaseReadiness({ rootDir: fixtureRoot });
   assert.equal(result.version, "1.2.3");
 
-  await writeFile(join(fixtureRoot, "README.md"), "当前版本：`v1.2.2`\n示例标签：v1.2.3\n", "utf8");
+  await writeFile(join(fixtureRoot, "README.md"), "Current version: `v1.2.2`\nExample tag: v1.2.3\n", "utf8");
   await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /README\.md.*v1\.2\.3/);
 
-  await writeFile(join(fixtureRoot, "README.md"), "当前版本：`v1.2.3`\n", "utf8");
+  await writeFile(join(fixtureRoot, "README.md"), "Current version: `v1.2.3`\n", "utf8");
+  await writeFile(join(fixtureRoot, "README.zh-CN.md"), "当前版本：`v1.2.2`\n示例标签：v1.2.3\n", "utf8");
+  await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /README\.zh-CN\.md.*v1\.2\.3/);
+  await writeFile(join(fixtureRoot, "README.zh-CN.md"), "当前版本：`v1.2.3`\n", "utf8");
   await writeFile(
     join(fixtureRoot, "docs", "windows-desktop.md"),
     "`GPT-Image2-Studio-Desktop-Setup-v1.2.2-x64.exe` 是桌面安装包。\n示例标签：v1.2.3\n",
@@ -103,8 +107,9 @@ test("release readiness detects consistent and inconsistent version facts", asyn
 });
 
 test("security and contribution guidance are tracked project documents", async () => {
-  const [readme, security, contributing] = await Promise.all([
+  const [readme, chineseReadme, security, contributing] = await Promise.all([
     readFile(new URL("../README.md", import.meta.url), "utf8"),
+    readFile(new URL("../README.zh-CN.md", import.meta.url), "utf8"),
     readFile(new URL("../SECURITY.md", import.meta.url), "utf8"),
     readFile(new URL("../CONTRIBUTING.md", import.meta.url), "utf8"),
   ]);
@@ -115,8 +120,10 @@ test("security and contribution guidance are tracked project documents", async (
   assert.match(security, /反向代理/);
   assert.match(security, /不会由后端发起 Basic 登录挑战/u);
   assert.match(security, /显式配置的固定 Bearer 或 `X-Image-Studio-Token` 令牌/u);
-  assert.match(readme, /TLS 反向代理不能依赖后端弹出登录框/u);
-  assert.match(readme, /长期运行的反向代理应显式配置固定强令牌/u);
+  assert.match(readme, /reverse proxy/i);
+  assert.match(readme, /fixed token/i);
+  assert.match(chineseReadme, /TLS 反向代理不能依赖后端弹出登录框/u);
+  assert.match(chineseReadme, /长期运行的反向代理应显式配置固定强令牌/u);
   assert.match(contributing, /OpenSpec/);
   assert.match(contributing, /sync:public-lib/);
   assert.match(contributing, /check:release/);

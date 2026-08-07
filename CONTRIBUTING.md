@@ -27,6 +27,8 @@ cmd /c npm run sync:public-lib -- --check
 
 ## 验证要求
 
+仓库首页 `README.md` 使用英文，`README.zh-CN.md` 保留简体中文版。更新版本事实、安装包名称、功能边界或验证结果时，两份 README 都应同步维护；发布检查会分别验证它们的当前版本行。
+
 提交前至少运行：
 
 ```powershell
@@ -42,7 +44,7 @@ git diff --check
 
 ## 发布
 
-日常分支使用 `npm run check:release` 检查 `package.json`、锁文件、README、Windows 文档和当前版本发布说明。创建正式发布提交与 `v<version>` 标签后，再运行：
+日常分支使用 `npm run check:release` 检查 `package.json`、锁文件、两份 README、Windows 文档和当前版本发布说明。创建正式发布提交与 `v<version>` 标签后，再运行：
 
 ```powershell
 cmd /c npm run check:release:strict

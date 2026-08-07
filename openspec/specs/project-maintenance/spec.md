@@ -4,7 +4,7 @@
 TBD - created by archiving change harden-project-maintenance. Update Purpose after archive.
 ## Requirements
 ### Requirement: Repository CI executes the maintained verification contract
-The repository SHALL define an automated CI workflow that installs locked dependencies and runs the full serial test suite, public-library synchronization check, release consistency check, Cloudflare Pages build, OpenSpec strict validation, diff whitespace check, and generated-drift check on supported pull requests and main-branch pushes.
+The repository SHALL provide an English `README.md` homepage and a synchronized Simplified Chinese `README.zh-CN.md` companion. It SHALL also define an automated CI workflow that installs locked dependencies and runs the full serial test suite, public-library synchronization check, release consistency check, Cloudflare Pages build, OpenSpec strict validation, diff whitespace check, and generated-drift check on supported pull requests and main-branch pushes.
 
 #### Scenario: A pull request changes application code or specifications
 - **WHEN** repository CI runs for the pull request
@@ -17,7 +17,7 @@ The repository SHALL define an automated CI workflow that installs locked depend
 - **AND** the job fails instead of accepting generated drift
 
 ### Requirement: Release facts are checked consistently
-The repository SHALL provide a release consistency command that compares the package version with the lockfile and with explicit current-version facts in the README, Windows distribution documentation, and current release notes. A target version appearing only in examples, migration notes, tag commands, or other unrelated text SHALL NOT satisfy the check. A strict release mode SHALL additionally require a clean worktree and a matching version tag on the current commit.
+The repository SHALL provide a release consistency command that compares the package version with the lockfile and with explicit current-version facts in both README files, Windows distribution documentation, and current release notes. A target version appearing only in examples, migration notes, tag commands, or other unrelated text SHALL NOT satisfy the check. A strict release mode SHALL additionally require a clean worktree and a matching version tag on the current commit.
 
 #### Scenario: Maintainer checks an ordinary branch
 - **WHEN** the maintainer runs the standard release consistency command

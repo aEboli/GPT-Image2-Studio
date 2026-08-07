@@ -193,17 +193,18 @@ test("server guards DNS fallback setup with a stable warning", async () => {
 
 test("package docs expose DNS fallback defaults and runtime switches", async () => {
   const readme = await readFile(new URL("../README.md", import.meta.url), "utf8");
+  const chineseReadme = await readFile(new URL("../README.zh-CN.md", import.meta.url), "utf8");
   const installerDoc = await readFile(new URL("../docs/windows-installer.md", import.meta.url), "utf8");
   const envExample = await readFile(new URL("../.env.example", import.meta.url), "utf8");
 
-  for (const source of [readme, installerDoc, envExample]) {
+  for (const source of [readme, chineseReadme, installerDoc, envExample]) {
     assert.match(source, /223\.5\.5\.5/);
     assert.match(source, /1\.1\.1\.1/);
     assert.match(source, /IMAGE_STUDIO_DISABLE_DNS_FALLBACK/);
     assert.match(source, /IMAGE_STUDIO_DNS_FALLBACK_SERVERS/);
   }
 
-  assert.match(readme, /逗号、分号或空白分隔/);
+  assert.match(chineseReadme, /逗号、分号或空白分隔/);
   assert.match(readme, /dns\.lookup/);
   assert.match(installerDoc, /安装包会继承启动环境变量/);
   assert.match(installerDoc, /命令行/);
