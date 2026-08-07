@@ -163,6 +163,8 @@ import {
   normalizeTemuExportRequest,
 } from "./lib/creation-temu-export.mjs";
 import { resolveTemuImageRequirements } from "./lib/creation-temu-images.mjs";
+import { buildCreationTemuPreflightSummary } from "./lib/creation-temu-preflight.mjs";
+import { verifyCreationTemuRemoteImages } from "./lib/creation-temu-remote-images.mjs";
 import { buildTemuWorkbookBuffer, verifyTemuTemplate } from "./lib/creation-temu-workbook.mjs";
 import { normalizeAssetRecordDeleteIds } from "./lib/asset-record-delete.mjs";
 import { resolveCreationPlanCounts } from "./lib/creation-plan-counts.mjs";
@@ -209,6 +211,7 @@ const articleIllustrationSetStore = createArticleIllustrationSetStore({ outputDi
 const port = Number(process.env.PORT || 3600);
 const explicitHost = String(process.env.HOST || "").trim();
 const serverHost = explicitHost || "127.0.0.1";
+let isServerlessRuntime = false;
 const requestToken = String(process.env.IMAGE_STUDIO_REQUEST_TOKEN || randomUUID()).trim();
 const plainHttpBindingPolicy = getLocalServerPlainHttpBindingPolicy({
   host: serverHost,
@@ -2864,22 +2867,122 @@ function appendTemuImageCacheWriteIssues(plan, setId) {
   }
 }
 
+function appendTemuExportStateWriteIssues(plan, setId) {
+  const affectedRows = plan.rows.filter((row) => row.setId === setId);
+  const rows = affectedRows.length > 0 ? affectedRows : [{ setId, productName: "", skuId: "", skuName: "", dataRow: null }];
+  for (const row of rows) {
+    plan.issues.push({
+      severity: "警告",
+      code: "EXPORT_STATE_WRITE_FAILED",
+      setId,
+      productName: row.productName,
+      skuId: row.skuId,
+      skuName: row.skuName,
+      dataRow: row.dataRow,
+      field: "导出状态",
+      message: "工作簿已生成，但最近一次 Temu 导出状态未能保存到套图记录。",
+      source: "本地套图记录",
+      suggestion: "工作簿仍可使用；刷新套图记录后确认导出状态，必要时重新导出。",
+    });
+  }
+}
+
 async function handleCreationSetsTemuExcelExport(request, response) {
+  const prepared = await prepareCreationSetsTemuExcelExport(request, response);
+  if (!prepared) return;
+
+  if (prepared.exportRequest.mode === "strict") {
+    const summary = await buildCreationTemuStrictSummary(prepared);
+    if (!summary.strictReady) {
+      return sendJson(response, 422, {
+        ok: false,
+        code: "TEMU_STRICT_EXPORT_BLOCKED",
+        message: `Temu 严格导出存在 ${summary.stats.blockerCount} 个阻塞项。`,
+        ...summary,
+      }, {
+        "Cache-Control": "no-store",
+      });
+    }
+  }
+
+  let workbookResult;
+  try {
+    workbookResult = await buildTemuWorkbookBuffer({ plan: prepared.finalizedPlan });
+  } catch (error) {
+    return sendJson(response, 500, {
+      ok: false,
+      code: error?.code === "TEMU_WORKBOOK_INVALID" ? error.code : "TEMU_WORKBOOK_BUILD_FAILED",
+      message: error?.code === "TEMU_WORKBOOK_INVALID"
+        ? error.message
+        : "Temu Excel 工作簿生成失败。",
+    }, {
+      "Cache-Control": "no-store",
+    });
+  }
+
+  const exportedAt = new Date().toISOString();
+  const stateWriteFailures = await persistTemuExportStates({
+    sets: prepared.sets,
+    plan: prepared.finalizedPlan,
+    mode: prepared.exportRequest.mode,
+    exportedAt,
+  });
+  if (stateWriteFailures.length > 0) {
+    for (const setId of stateWriteFailures) appendTemuExportStateWriteIssues(prepared.finalizedPlan, setId);
+    try {
+      workbookResult = await buildTemuWorkbookBuffer({ plan: prepared.finalizedPlan });
+    } catch {
+      // The already verified workbook remains downloadable even if adding the state warning unexpectedly fails.
+    }
+  }
+
+  const filename = buildTemuExportFilename(new Date(exportedAt));
+  const responseHeaders = {
+    "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "Content-Length": workbookResult.buffer.length,
+    "Content-Disposition": `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+    "X-Temu-Export-Mode": prepared.exportRequest.mode,
+    "X-Temu-Export-Set-Count": prepared.exportRequest.setIds.length,
+    "X-Temu-Export-Row-Count": workbookResult.rowCount,
+    "X-Temu-Export-Issue-Count": workbookResult.issueCount,
+    "X-Temu-Export-Issue-Sheet": encodeURIComponent(workbookResult.issueSheetName),
+    "X-Temu-Export-State-Write-Failure-Count": stateWriteFailures.length,
+  };
+  if (stateWriteFailures.length > 0) {
+    responseHeaders["X-Temu-Export-State-Code"] = "EXPORT_STATE_WRITE_FAILED";
+  }
+  response.writeHead(200, responseHeaders);
+  response.end(workbookResult.buffer);
+}
+
+async function prepareCreationSetsTemuExcelExport(request, response) {
   let payload;
   try {
     payload = await readJsonBody(request, { maxBytes: TEMU_EXPORT_LIMITS.maxRequestBytes });
   } catch (error) {
     const statusCode = error?.code === "PAYLOAD_TOO_LARGE" ? 413 : 400;
-    return sendJson(response, statusCode, {
+    sendJson(response, statusCode, {
+      ok: false,
       message: statusCode === 413 ? "Temu Excel 导出请求体超过 256 KiB。" : "Temu Excel 导出请求必须是有效 JSON。",
+    }, {
+      "Cache-Control": "no-store",
     });
+    return null;
   }
 
   let exportRequest;
   try {
     exportRequest = normalizeTemuExportRequest(payload);
   } catch (error) {
-    return sendJson(response, 400, { message: error instanceof Error ? error.message : String(error) });
+    sendJson(response, 400, {
+      ok: false,
+      message: error instanceof Error ? error.message : String(error),
+    }, {
+      "Cache-Control": "no-store",
+    });
+    return null;
   }
 
   const sets = [];
@@ -2889,12 +2992,20 @@ async function handleCreationSetsTemuExcelExport(request, response) {
       set = await creationSetStore.readManifest(setId);
     } catch (error) {
       if (error?.code === "ENOENT") {
-        return sendJson(response, 404, { message: `套图记录不存在：${setId}` });
+        sendJson(response, 404, { ok: false, message: `套图记录不存在：${setId}` }, { "Cache-Control": "no-store" });
+        return null;
       }
       throw error;
     }
     if (String(set?.setId || "").trim() !== setId) {
-      return sendJson(response, 409, { message: "套图记录身份与请求 ID 不一致，已停止导出。" });
+      sendJson(response, 409, {
+        ok: false,
+        code: "MANIFEST_ID_MISMATCH",
+        message: "套图记录身份与请求 ID 不一致，已停止导出。",
+      }, {
+        "Cache-Control": "no-store",
+      });
+      return null;
     }
     sets.push(set);
   }
@@ -2903,17 +3014,30 @@ async function handleCreationSetsTemuExcelExport(request, response) {
   try {
     plan = createTemuExportPlan({ sets, defaults: exportRequest.defaults });
   } catch (error) {
-    return sendJson(response, 413, { message: error instanceof Error ? error.message : String(error) });
+    sendJson(response, 413, {
+      ok: false,
+      code: "TEMU_EXPORT_LIMIT_EXCEEDED",
+      message: error instanceof Error ? error.message : String(error),
+    }, {
+      "Cache-Control": "no-store",
+    });
+    return null;
   }
 
+  let template;
   try {
-    await verifyTemuTemplate();
+    template = await verifyTemuTemplate();
   } catch (error) {
-    return sendJson(response, 500, {
+    sendJson(response, 500, {
+      ok: false,
+      code: "TEMU_WORKBOOK_INVALID",
       message: error?.code === "TEMU_WORKBOOK_INVALID"
         ? error.message
         : "Temu 标准模板校验失败。",
+    }, {
+      "Cache-Control": "no-store",
     });
+    return null;
   }
 
   let imageResolution;
@@ -2926,9 +3050,14 @@ async function handleCreationSetsTemuExcelExport(request, response) {
     });
   } catch (error) {
     const statusCode = ["IMAGE_FILE_TOO_LARGE", "IMAGE_LIMIT_EXCEEDED"].includes(error?.code) ? 413 : 400;
-    return sendJson(response, statusCode, {
+    sendJson(response, statusCode, {
+      ok: false,
+      code: String(error?.code || "TEMU_IMAGE_VALIDATION_FAILED"),
       message: error instanceof Error ? error.message : "Temu 图片检查失败。",
+    }, {
+      "Cache-Control": "no-store",
     });
+    return null;
   }
 
   for (const [setId, entries] of imageResolution.cacheEntriesBySet) {
@@ -2940,18 +3069,118 @@ async function handleCreationSetsTemuExcelExport(request, response) {
   }
 
   const finalizedPlan = finalizeTemuExportPlan(plan, imageResolution.results);
-  let workbookResult;
-  try {
-    workbookResult = await buildTemuWorkbookBuffer({ plan: finalizedPlan });
-  } catch (error) {
-    return sendJson(response, 500, {
-      message: error?.code === "TEMU_WORKBOOK_INVALID"
-        ? error.message
-        : "Temu Excel 工作簿生成失败。",
-    });
-  }
+  return {
+    exportRequest,
+    sets,
+    template: {
+      name: "temu-import-template-v1.xlsx",
+      version: "v1",
+      sheetName: template.sheetName,
+    },
+    plan,
+    imageResolution,
+    finalizedPlan,
+  };
+}
 
-  const now = new Date();
+function buildCreationTemuRemoteImageEntries(finalizedPlan) {
+  const entries = [];
+  for (const row of Array.isArray(finalizedPlan?.rows) ? finalizedPlan.rows : []) {
+    const rowKey = String(row?.rowKey || `${row?.setId || "set"}:${row?.skuId || row?.dataRow || "row"}`).trim();
+    const previewUrl = String(row?.cells?.["预览图"] || "").trim();
+    if (row?.skuId && previewUrl) {
+      entries.push({
+        key: `${rowKey}:preview`,
+        path: `rows.${row?.dataRow || "unknown"}.preview`,
+        label: "SKU 预览图",
+        role: "sku",
+        url: previewUrl,
+      });
+    }
+    String(row?.cells?.["*轮播图"] || "")
+      .split(/[\r\n]+/u)
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .forEach((url, index) => entries.push({
+        key: `${rowKey}:carousel:${index}`,
+        path: `rows.${row?.dataRow || "unknown"}.carousel.${index}`,
+        label: "轮播图",
+        role: "carousel",
+        url,
+      }));
+    const materialUrl = String(row?.cells?.["*产品素材图"] || "").trim();
+    if (materialUrl) {
+      entries.push({
+        key: `${rowKey}:material`,
+        path: `rows.${row?.dataRow || "unknown"}.material`,
+        label: "产品素材图",
+        role: "material",
+        url: materialUrl,
+      });
+    }
+  }
+  return entries;
+}
+
+async function buildCreationTemuStrictSummary(prepared) {
+  let remoteVerification;
+  try {
+    remoteVerification = await verifyCreationTemuRemoteImages({
+      entries: buildCreationTemuRemoteImageEntries(prepared.finalizedPlan),
+    });
+  } catch (error) {
+    remoteVerification = {
+      valid: false,
+      results: new Map(),
+      issues: [{
+        severity: "error",
+        code: String(error?.code || "REMOTE_IMAGE_VALIDATION_FAILED"),
+        message: error instanceof Error ? error.message : "远程图片验证失败。",
+        suggestion: "检查最终公网图片地址后重新预检。",
+      }],
+    };
+  }
+  const summaryRemoteVerification = {
+    ...remoteVerification,
+    issues: (Array.isArray(remoteVerification.issues) ? remoteVerification.issues : []).map((issue) => ({
+      ...issue,
+      ...(remoteVerification.dimensions instanceof Map
+        ? remoteVerification.dimensions.get(issue.key)
+        : null),
+    })),
+  };
+  return buildCreationTemuPreflightSummary({
+    template: prepared.template,
+    finalizedPlan: prepared.finalizedPlan,
+    imageResolution: prepared.imageResolution,
+    remoteVerification: summaryRemoteVerification,
+    sets: prepared.sets,
+  });
+}
+
+async function persistTemuExportStates({ sets, plan, mode, exportedAt }) {
+  const failures = [];
+  for (const set of sets) {
+    const setId = String(set?.setId || "").trim();
+    const rowCount = plan.rows.filter((row) => row.setId === setId).length;
+    const issueCount = plan.issues.filter((issue) => issue.setId === setId).length;
+    try {
+      await creationSetStore.mergeTemuExcelExportState(setId, {
+        version: 1,
+        mode,
+        exportedAt,
+        sourceUpdatedAt: String(set?.updatedAt || set?.createdAt || "").trim(),
+        rowCount,
+        issueCount,
+      });
+    } catch {
+      failures.push(setId);
+    }
+  }
+  return failures;
+}
+
+function buildTemuExportFilename(now) {
   const timestamp = [
     now.getUTCFullYear(),
     String(now.getUTCMonth() + 1).padStart(2, "0"),
@@ -2961,19 +3190,19 @@ async function handleCreationSetsTemuExcelExport(request, response) {
     String(now.getUTCMinutes()).padStart(2, "0"),
     String(now.getUTCSeconds()).padStart(2, "0"),
   ].join("");
-  const filename = `temu-import-${timestamp}.xlsx`;
-  response.writeHead(200, {
-    "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "Content-Length": workbookResult.buffer.length,
-    "Content-Disposition": `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+  return `temu-import-${timestamp}.xlsx`;
+}
+
+async function handleCreationSetsTemuExcelPreflight(request, response) {
+  const prepared = await prepareCreationSetsTemuExcelExport(request, response);
+  if (!prepared) return;
+  const summary = await buildCreationTemuStrictSummary(prepared);
+  return sendJson(response, 200, {
+    ok: true,
+    ...summary,
+  }, {
     "Cache-Control": "no-store",
-    "X-Content-Type-Options": "nosniff",
-    "X-Temu-Export-Set-Count": exportRequest.setIds.length,
-    "X-Temu-Export-Row-Count": workbookResult.rowCount,
-    "X-Temu-Export-Issue-Count": workbookResult.issueCount,
-    "X-Temu-Export-Issue-Sheet": encodeURIComponent(workbookResult.issueSheetName),
   });
-  response.end(workbookResult.buffer);
 }
 
 async function handleCreationSetFolderOpen(request, response) {
@@ -5866,13 +6095,15 @@ async function handleGenerate(request, response) {
 
 async function routeRequest(request, response) {
   const url = new URL(request.url || "/", "http://localhost");
-  const authorization = authorizeLocalServerRequest({
-    method: request.method,
-    pathname: url.pathname,
-    headers: request.headers,
-    remoteAddress: request.socket?.remoteAddress,
-    requestToken,
-  });
+  const authorization = isServerlessRuntime
+    ? { authorized: true, statusCode: 200, headers: {} }
+    : authorizeLocalServerRequest({
+      method: request.method,
+      pathname: url.pathname,
+      headers: request.headers,
+      remoteAddress: request.socket?.remoteAddress,
+      requestToken,
+    });
 
   if (!authorization.authorized) {
     return sendJson(response, authorization.statusCode, {
@@ -5916,6 +6147,10 @@ async function routeRequest(request, response) {
 
   if (request.method === "POST" && url.pathname === "/api/creation/sets/export-temu-excel") {
     return handleCreationSetsTemuExcelExport(request, response);
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/creation/sets/export-temu-excel/preflight") {
+    return handleCreationSetsTemuExcelPreflight(request, response);
   }
 
   if (request.method === "GET" && url.pathname === "/api/portrait/sets") {
@@ -6113,7 +6348,7 @@ async function routeRequest(request, response) {
 await mkdir(outputDir, { recursive: true });
 await migrateOutputDirectoryMonths({ outputDir });
 
-const server = createServer(async (request, response) => {
+async function handleIncomingRequest(request, response) {
   try {
     await routeRequest(request, response);
   } catch (error) {
@@ -6126,36 +6361,53 @@ const server = createServer(async (request, response) => {
 
     response.end();
   }
-});
+}
+
+const server = createServer(handleIncomingRequest);
 
 let listeningPort = port;
-await new Promise((resolveListen, rejectListen) => {
-  const handleListenError = (error) => {
-    rejectListen(error);
-  };
-  server.once("error", handleListenError);
-  server.listen(port, serverHost, () => {
-    server.off("error", handleListenError);
-    const address = server.address();
-    if (address && typeof address === "object") {
-      listeningPort = address.port;
-    }
-
-    const now = new Date();
-    console.log(`Responses Image Studio 正在运行: http://${serverHost}:${listeningPort}`);
-    if (plainHttpBindingPolicy.insecure) {
-      console.warn("警告：远程访问正在使用明文 HTTP，访问令牌、提示词和生成资产可能被网络监听。请改用 TLS 反向代理。");
-    }
-    console.log("远程浏览器认证用户名: studio");
-    console.log(`远程访问令牌: ${requestToken}`);
-    console.log(`输出根目录: ${outputDir}`);
-    console.log(`当前输出目录: ${join(outputDir, formatMonthFolder(now), formatDayFolder(now))}`);
-    console.log(`配置文件: ${configStore.configPath}`);
-    resolveListen();
-  });
+let resolveListen;
+let rejectListen;
+const listenPromise = new Promise((resolve, reject) => {
+  resolveListen = resolve;
+  rejectListen = reject;
 });
+const handleListenError = (error) => {
+  rejectListen(error);
+};
+server.once("error", handleListenError);
+
+// Vercel captures the first listen call and restores the prototype without running its callback.
+// Keep waiting for the real listener locally, but let the captured server be exported immediately.
+const listenMethodBeforeCapture = server.listen;
+server.listen(port, serverHost, () => {
+  server.off("error", handleListenError);
+  const address = server.address();
+  if (address && typeof address === "object") {
+    listeningPort = address.port;
+  }
+
+  const now = new Date();
+  console.log(`Responses Image Studio 正在运行: http://${serverHost}:${listeningPort}`);
+  if (plainHttpBindingPolicy.insecure) {
+    console.warn("警告：远程访问正在使用明文 HTTP，访问令牌、提示词和生成资产可能被网络监听。请改用 TLS 反向代理。");
+  }
+  console.log("远程浏览器认证用户名: studio");
+  console.log(`远程访问令牌: ${requestToken}`);
+  console.log(`输出根目录: ${outputDir}`);
+  console.log(`当前输出目录: ${join(outputDir, formatMonthFolder(now), formatDayFolder(now))}`);
+  console.log(`配置文件: ${configStore.configPath}`);
+  resolveListen();
+});
+isServerlessRuntime = server.listen !== listenMethodBeforeCapture;
+if (!isServerlessRuntime) {
+  await listenPromise;
+} else {
+  server.off("error", handleListenError);
+}
 
 export const studioServer = server;
+export default handleIncomingRequest;
 export const studioServerUrl = `http://${serverHost}:${listeningPort}`;
 
 let closeStudioServerPromise = null;

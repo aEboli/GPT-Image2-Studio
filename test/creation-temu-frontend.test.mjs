@@ -14,6 +14,8 @@ function createElement({ disabled = false, textContent = "" } = {}) {
   return {
     disabled,
     textContent,
+    hidden: false,
+    children: [],
     dataset: {},
     isConnected: true,
     addEventListener(type, handler) {
@@ -27,6 +29,16 @@ function createElement({ disabled = false, textContent = "" } = {}) {
     focus() {
       this.focused = true;
     },
+    append(...children) {
+      this.children.push(...children);
+    },
+    appendChild(child) {
+      this.children.push(child);
+      return child;
+    },
+    replaceChildren(...children) {
+      this.children = [...children];
+    },
   };
 }
 
@@ -37,11 +49,13 @@ function createTemuExportDom({ values = {} } = {}) {
   for (const [name, value] of Object.entries(defaultValues)) {
     fields.set(name, { value: String(value) });
   }
+  const modeControl = { value: "draft" };
   const form = createElement();
-  form.elements = { namedItem: (name) => fields.get(name) || null };
+  form.elements = { namedItem: (name) => name === "mode" ? modeControl : fields.get(name) || null };
   form.reportValidity = () => true;
   form.reset = () => {
     for (const [name, field] of fields) field.value = name === "variantAttributeName" ? "颜色" : "";
+    modeControl.value = "draft";
   };
 
   const dialog = createElement();
@@ -62,6 +76,24 @@ function createTemuExportDom({ values = {} } = {}) {
     creationRecordTemuExportFeedback: createElement(),
     creationRecordTemuExportFields: createElement(),
     creationRecordTemuExportForm: form,
+    creationRecordTemuPreflightButton: createElement(),
+    creationRecordTemuPreflightState: createElement(),
+    creationRecordTemuProblemPanel: createElement(),
+    creationRecordTemuStrictReason: createElement(),
+    creationRecordTemuStrictMode: createElement({ disabled: true }),
+    creationRecordTemuTemplateName: createElement(),
+    creationRecordTemuBlockerList: createElement(),
+    creationRecordTemuWarningList: createElement(),
+    creationRecordTemuRecordSummary: createElement(),
+    creationRecordTemuRecordList: createElement(),
+    creationRecordTemuStatSetCount: createElement(),
+    creationRecordTemuStatSkuCount: createElement(),
+    creationRecordTemuStatImageCount: createElement(),
+    creationRecordTemuStatPendingUploadCount: createElement(),
+    creationRecordTemuStatUploadedCount: createElement(),
+    creationRecordTemuStatCacheReuseCount: createElement(),
+    creationRecordTemuStatBlockerCount: createElement(),
+    creationRecordTemuStatWarningCount: createElement(),
     creationRecordSearchInput: createElement(),
     creationRecordSetList: createElement(),
     creationRecordTemuExportSelectedCount: createElement(),
@@ -84,7 +116,7 @@ function createTemuExportDom({ values = {} } = {}) {
       return controls[id] || null;
     },
   };
-  return { controls, documentRef, downloads, fields };
+  return { controls, documentRef, downloads, fields, modeControl };
 }
 
 class FakeFormData {
@@ -173,6 +205,7 @@ test("Temu export controller filters stale selections, sends only approved field
   assert.equal(dom.controls.creationRecordExportTemuButton.textContent, "导出 Temu Excel (2)");
   controller.syncControls(true, 2);
   assert.equal(dom.controls.creationRecordExportTemuButton.disabled, true);
+  controller.syncControls(false, 2);
 
   controller.open();
   assert.equal(dom.controls.creationRecordTemuExportDialog.open, true);
@@ -187,6 +220,7 @@ test("Temu export controller filters stale selections, sends only approved field
   assert.equal(fetchRequests.length, 1);
   assert.equal(fetchRequests[0].url, "/api/creation/sets/export-temu-excel");
   assert.deepEqual(JSON.parse(fetchRequests[0].options.body), {
+    mode: "draft",
     setIds: ["set-a", "set-b"],
     defaults: {
       variantAttributeName: "颜色",
@@ -204,7 +238,7 @@ test("Temu export controller filters stale selections, sends only approved field
   assert.deepEqual(rendered, [true, false]);
   assert.equal(dom.controls.creationRecordSetList.scrollTop, 137);
   assert.equal(dom.controls.creationRecordSetList.scrollLeft, 23);
-  assert.match(feedback.at(-1)[0], /已导出 2 套、3 个 SKU；导出问题共 1 项/u);
+  assert.match(feedback.at(-1)[0], /已待补全导出 2 套、3 个 SKU；导出问题共 1 项/u);
   const saved = JSON.parse(windowRef.storage.get(CREATION_TEMU_EXPORT_STORAGE_KEY));
   assert.deepEqual(Object.keys(saved).sort(), [
     "cloudName",
@@ -256,20 +290,149 @@ test("Temu export controller keeps the dialog open for invalid Cloudinary pairin
   assert.equal(state.creation.recordTemuExportBusy, false);
 });
 
+test("Temu export workbench enables strict export only for a current successful preflight", async () => {
+  const dom = createTemuExportDom({ defaultPrice: "29.9" });
+  const windowRef = createBrowserWindow();
+  const state = {
+    creation: {
+      sets: [
+        { setId: "set-a", productName: "商品 A", updatedAt: "2026-08-05T01:00:00.000Z", items: [{ role: "sku", skuSubjectId: "A-red", relativePath: "a.png" }] },
+      ],
+      recordCheckedSetIds: ["set-a"],
+      recordTemuExportBusy: false,
+    },
+  };
+  const requests = [];
+  const feedback = [];
+  const controller = createCreationTemuExportController({
+    state,
+    getCurrentSetIds: () => state.creation.sets.map((set) => set.setId),
+    getCurrentSets: () => state.creation.sets,
+    setRecordFeedback: (...args) => feedback.push(args),
+    renderRecordView() {},
+    documentRef: dom.documentRef,
+    windowRef,
+    urlApi: {
+      createObjectURL: () => "blob:strict-export",
+      revokeObjectURL() {},
+    },
+    fetchImpl: async (url, options) => {
+      requests.push({ url, body: JSON.parse(options.body) });
+      if (url.endsWith("/preflight")) {
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            template: { name: "Temu 标准模板", version: "v1" },
+            stats: { setCount: 1, skuCount: 1, imageCount: 3, pendingUploadCount: 0, uploadedCount: 1, cacheReuseCount: 1, blockerCount: 0, warningCount: 0 },
+            strictReady: true,
+            blockers: [],
+            warnings: [],
+            records: [{ setId: "set-a", productName: "商品 A", sourceUpdatedAt: "2026-08-05T01:00:00.000Z", skuCount: 1, imageCount: 3, strictReady: true, blockerCount: 0, warningCount: 0 }],
+          }),
+        };
+      }
+      return {
+        ok: true,
+        blob: async () => new Blob(["strict-xlsx"]),
+        headers: new Headers({
+          "Content-Disposition": "attachment; filename=temu-strict.xlsx",
+          "X-Temu-Export-Set-Count": "1",
+          "X-Temu-Export-Row-Count": "1",
+          "X-Temu-Export-Issue-Count": "0",
+        }),
+      };
+    },
+  });
+
+  controller.syncControls(false, 1);
+  controller.open();
+  await controller.runPreflight();
+
+  assert.equal(dom.controls.creationRecordTemuStrictMode.disabled, false);
+  assert.equal(dom.controls.creationRecordTemuPreflightState.textContent, "预检通过");
+  assert.equal(dom.controls.creationRecordTemuStatUploadedCount.textContent, "1");
+  assert.equal(dom.controls.creationRecordTemuStrictReason.dataset.state, "success");
+  dom.modeControl.value = "strict";
+  dom.controls.creationRecordTemuExportForm.dispatch("change");
+  assert.equal(dom.controls.creationRecordTemuExportSubmitButton.textContent, "导出严格 XLSX");
+
+  await controller.submit({ preventDefault() {} });
+
+  assert.equal(requests.length, 2);
+  assert.equal(requests[0].url, "/api/creation/sets/export-temu-excel/preflight");
+  assert.equal(requests[0].body.mode, "strict");
+  assert.equal(requests[1].url, "/api/creation/sets/export-temu-excel");
+  assert.equal(requests[1].body.mode, "strict");
+  assert.match(feedback.at(-1)[0], /已严格导出 1 套、1 个 SKU/u);
+});
+
+test("Temu preflight becomes stale when batch defaults change", async () => {
+  const dom = createTemuExportDom({ defaultPrice: "19.9" });
+  const state = {
+    creation: {
+      sets: [{ setId: "set-a", productName: "商品 A", updatedAt: "2026-08-05T02:00:00.000Z" }],
+      recordCheckedSetIds: ["set-a"],
+      recordTemuExportBusy: false,
+    },
+  };
+  const controller = createCreationTemuExportController({
+    state,
+    getCurrentSetIds: () => ["set-a"],
+    getCurrentSets: () => state.creation.sets,
+    renderRecordView() {},
+    setRecordFeedback() {},
+    documentRef: dom.documentRef,
+    windowRef: createBrowserWindow(),
+    fetchImpl: async () => ({
+      ok: true,
+      json: async () => ({
+        template: { name: "Temu 标准模板" },
+        stats: { setCount: 1, skuCount: 1, blockerCount: 0, warningCount: 0 },
+        strictReady: true,
+        blockers: [],
+        warnings: [],
+        records: [{ setId: "set-a", sourceUpdatedAt: "2026-08-05T02:00:00.000Z", skuCount: 1, strictReady: true }],
+      }),
+    }),
+  });
+
+  controller.syncControls(false, 1);
+  controller.open();
+  await controller.runPreflight();
+  assert.equal(dom.controls.creationRecordTemuStrictMode.disabled, false);
+
+  dom.fields.get("defaultPrice").value = "20.9";
+  dom.controls.creationRecordTemuExportForm.dispatch("input");
+
+  assert.equal(dom.controls.creationRecordTemuStrictMode.disabled, true);
+  assert.equal(dom.controls.creationRecordTemuPreflightState.textContent, "预检已过期");
+  assert.equal(dom.controls.creationRecordTemuStrictReason.dataset.state, "stale");
+});
+
 test("Temu export frontend keeps the record refresh binding and HTML form contract", async () => {
-  const [app, html] = await Promise.all([
+  const [app, html, styles] = await Promise.all([
     readFile(new URL("../public/app.js", import.meta.url), "utf8"),
     readFile(new URL("../public/index.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/styles.css", import.meta.url), "utf8"),
   ]);
 
   assert.match(app, /from "\/lib\/creation-temu-export-ui\.mjs"/u);
-  assert.match(app, /creationRecordTemuExportController\.syncControls\(deleteBlocked, checkedCount\)/u);
+  assert.match(app, /from "\/lib\/creation-record-list-model\.mjs(?:\?[^"]+)?"/u);
+  assert.match(app, /creationRecordTemuExportController\.syncControls\(temuStartBlocked, checkedCount\)/u);
+  assert.doesNotMatch(app, /filterCreationRecordSets\(\)\.slice\(0, 60\)/u);
   assert.match(await readFile(new URL("../lib/creation-temu-export-ui.mjs", import.meta.url), "utf8"), /renderRecordViewPreservingListScroll/u);
-  assert.match(app, /creationRecordRefreshButton\.addEventListener\("click"[\s\S]*?loadCreationSets\(\)/u);
+  assert.match(app, /creationRecordRefreshButton\.addEventListener\("click", refreshCreationRecordSets\)/u);
+  assert.match(app, /\.finally\(\(\) => \{\s*creationRecordRefreshPromise = null;\s*renderCreationRecordView\(\);\s*\}\)/u);
   assert.match(html, /id="creationRecordExportTemuButton"/u);
   assert.match(html, /id="creationRecordTemuExportDialog"/u);
+  assert.match(html, /id="creationRecordTemuPreflightButton"/u);
+  assert.match(html, /id="creationRecordTemuStrictMode"/u);
+  assert.match(html, /id="creationRecordLoadMoreButton"/u);
+  assert.match(html, /id="creationRecordSetList" role="list"/u);
   assert.match(html, /name="cloudName"/u);
   assert.match(html, /name="uploadPreset"/u);
+  assert.match(styles, /\.creation-temu-export-mode input\s*\{[^}]*width:\s*16px;[^}]*height:\s*16px;/us);
   assert.doesNotMatch(app, /apiSecret|authorization|cookie/iu);
 });
 

@@ -810,3 +810,175 @@ test("creation set store preserves and serially merges Temu image cache without 
   assert.doesNotMatch(raw, /must-not-persist/u);
   await rm(outputDir, { recursive: true, force: true });
 });
+
+test("creation set store preserves set and SKU Temu export facts through save and read", async () => {
+  const outputDir = await mkdtemp(join(tmpdir(), "creation-store-temu-facts-"));
+  const store = createCreationSetStore({ outputDir, publicBasePath: "/output" });
+  const setTemuExport = {
+    declaredPrice: 19.9,
+    stock: 120,
+    origin: "中国-浙江省",
+    nested: { preserve: true },
+  };
+  const skuTemuExport = {
+    declaredPrice: 18.8,
+    stock: 60,
+    origin: "中国-江苏省",
+  };
+
+  const saved = await store.saveManifest({
+    setId: "set-temu-facts",
+    productName: "Temu facts",
+    temuExport: setTemuExport,
+    skuSubjects: [
+      {
+        id: "blue",
+        title: "Blue SKU",
+        filenames: ["blue.png"],
+        temuExport: skuTemuExport,
+      },
+    ],
+    items: [],
+  });
+  const stored = await store.readManifest("set-temu-facts");
+
+  assert.deepEqual(saved.temuExport, setTemuExport);
+  assert.deepEqual(saved.skuSubjects[0].temuExport, skuTemuExport);
+  assert.deepEqual(stored.temuExport, setTemuExport);
+  assert.deepEqual(stored.skuSubjects[0].temuExport, skuTemuExport);
+
+  await rm(outputDir, { recursive: true, force: true });
+});
+
+test("creation set store keeps Temu facts and export state after image cache merge", async () => {
+  const outputDir = await mkdtemp(join(tmpdir(), "creation-store-temu-state-cache-"));
+  const store = createCreationSetStore({ outputDir, publicBasePath: "/output" });
+  const exportState = {
+    version: 1,
+    mode: "strict",
+    exportedAt: "2026-08-05T12:00:00.000Z",
+    sourceUpdatedAt: "2026-08-05T11:58:00.000Z",
+    rowCount: 2,
+    issueCount: 0,
+  };
+  await store.saveManifest({
+    setId: "set-temu-state-cache",
+    productName: "Cached export",
+    createdAt: "2026-08-05T11:00:00.000Z",
+    updatedAt: "2026-08-05T11:58:00.000Z",
+    temuExport: { stock: 25 },
+    temuExcelExportState: exportState,
+    skuSubjects: [
+      { id: "blue", filenames: ["blue.png"], temuExport: { declaredPrice: 12.5 } },
+    ],
+    items: [],
+  });
+
+  await store.mergeTemuExcelImageCache("set-temu-state-cache", new Map([
+    ["hero", {
+      sourceRelativePath: "2026-08/08-05/hero.png",
+      sourceSha256: `sha256:${"b".repeat(64)}`,
+      cloudName: "demo-cloud",
+      secureUrl: "https://res.cloudinary.com/demo-cloud/image/upload/v1/hero.png",
+      uploadedAt: "2026-08-05T12:00:01.000Z",
+    }],
+  ]));
+
+  const stored = await store.readManifest("set-temu-state-cache");
+  assert.deepEqual(stored.temuExport, { stock: 25 });
+  assert.deepEqual(stored.skuSubjects[0].temuExport, { declaredPrice: 12.5 });
+  assert.deepEqual(stored.temuExcelExportState, exportState);
+  assert.equal(stored.temuExcelImageCache.version, 1);
+
+  await rm(outputDir, { recursive: true, force: true });
+});
+
+test("creation set store serially merges Temu export state without advancing business updatedAt", async () => {
+  const outputDir = await mkdtemp(join(tmpdir(), "creation-store-temu-state-merge-"));
+  const store = createCreationSetStore({ outputDir, publicBasePath: "/output" });
+  const updatedAt = "2026-08-05T11:58:00.000Z";
+  await store.saveManifest({
+    setId: "set-temu-state-merge",
+    productName: "Before export",
+    createdAt: "2026-08-05T11:00:00.000Z",
+    updatedAt,
+    listingDrafts: [{ id: "listing-blue", title: "Blue listing" }],
+    temuExport: { stock: 42 },
+    skuSubjects: [
+      { id: "blue", filenames: ["blue.png"], temuExport: { declaredPrice: 13.5 } },
+    ],
+    items: [{ itemId: "queued", slotIndex: 1, status: "queued" }],
+  });
+  await store.mergeTemuExcelImageCache("set-temu-state-merge", new Map([
+    ["hero", {
+      sourceRelativePath: "2026-08/08-05/hero.png",
+      sourceSha256: `sha256:${"c".repeat(64)}`,
+      cloudName: "demo-cloud",
+      secureUrl: "https://res.cloudinary.com/demo-cloud/image/upload/v1/hero.png",
+      uploadedAt: "2026-08-05T12:00:01.000Z",
+    }],
+  ]));
+  const exportState = {
+    version: 1,
+    mode: "draft",
+    exportedAt: "2026-08-05T12:02:00.000Z",
+    sourceUpdatedAt: updatedAt,
+    rowCount: 1,
+    issueCount: 3,
+  };
+
+  const merged = await store.mergeTemuExcelExportState("set-temu-state-merge", exportState);
+
+  assert.equal(merged.updatedAt, updatedAt);
+  assert.deepEqual(merged.temuExcelExportState, exportState);
+  assert.equal(merged.listingDrafts[0].id, "listing-blue");
+  assert.equal(merged.items[0].itemId, "queued");
+  assert.deepEqual(merged.temuExport, { stock: 42 });
+  assert.deepEqual(merged.skuSubjects[0].temuExport, { declaredPrice: 13.5 });
+  assert.equal(merged.temuExcelImageCache.entries.hero.cloudName, "demo-cloud");
+
+  const stored = await store.readManifest("set-temu-state-merge");
+  assert.equal(stored.updatedAt, updatedAt);
+  assert.deepEqual(stored.temuExcelExportState, exportState);
+
+  await rm(outputDir, { recursive: true, force: true });
+});
+
+test("creation set store rejects invalid Temu export state without polluting stored state", async () => {
+  const outputDir = await mkdtemp(join(tmpdir(), "creation-store-temu-state-invalid-"));
+  const store = createCreationSetStore({ outputDir, publicBasePath: "/output" });
+  const validState = {
+    version: 1,
+    mode: "strict",
+    exportedAt: "2026-08-05T12:00:00.000Z",
+    sourceUpdatedAt: "2026-08-05T11:58:00.000Z",
+    rowCount: 2,
+    issueCount: 0,
+  };
+  await store.saveManifest({
+    setId: "set-temu-state-invalid",
+    productName: "Valid export state",
+    updatedAt: "2026-08-05T11:58:00.000Z",
+    temuExcelExportState: validState,
+    items: [],
+  });
+
+  await assert.rejects(
+    store.mergeTemuExcelExportState("set-temu-state-invalid", {
+      ...validState,
+      mode: "unsupported",
+      rowCount: -1,
+    }),
+    (error) => error?.code === "INVALID_TEMU_EXCEL_EXPORT_STATE",
+  );
+  const stored = await store.readManifest("set-temu-state-invalid");
+  assert.deepEqual(stored.temuExcelExportState, validState);
+
+  const normalized = normalizeCreationSetManifest({
+    setId: "set-invalid-state-normalize",
+    temuExcelExportState: { ...validState, version: 2 },
+  });
+  assert.equal("temuExcelExportState" in normalized, false);
+
+  await rm(outputDir, { recursive: true, force: true });
+});

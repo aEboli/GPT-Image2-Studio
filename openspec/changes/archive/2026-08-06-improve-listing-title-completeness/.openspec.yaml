@@ -1,0 +1,3 @@
+schema: spec-driven
+created: 2026-08-05
+goal: 新生成标题排除货号且避免无必要短标题，SKU 图显示名和落盘文件名不含货号。

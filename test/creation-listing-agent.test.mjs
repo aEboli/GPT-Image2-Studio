@@ -5,6 +5,8 @@ import {
   buildCreationListingSources,
   getCreationListingDimensionFieldErrors,
   getCreationListingWeightEvidence,
+  sanitizeCreationListingBlockingClaimText,
+  sanitizeCreationListingUnsupportedEvidenceTerms,
   validateCreationListingDraft,
 } from "../lib/creation-listing-draft.mjs";
 import {
@@ -414,8 +416,8 @@ test("historical completed listings receive non-persistent sourced or estimated 
   assert.equal(Object.prototype.hasOwnProperty.call(storedSet.listingDrafts[0], "productWeight"), false);
   assert.equal(hydratedDraft.productWeight, "Weight: 350 g (12.35 oz)");
   assert.equal(hydratedDraft.zhDisplay.productWeight, "重量：350 克（12.35 盎司）");
-  assert.equal(hydratedDraft.packageWeight, "Estimated: 350 g (12.35 oz)");
-  assert.equal(hydratedDraft.zhDisplay.packageWeight, "预估：350 克（12.35 盎司）");
+  assert.equal(hydratedDraft.packageWeight, "Estimated: 330 g (11.64 oz)");
+  assert.equal(hydratedDraft.zhDisplay.packageWeight, "预估：330 克（11.64 盎司）");
 });
 
 test("historical component dimension readback rejects measurements absent from source evidence", () => {
@@ -583,18 +585,88 @@ test("mock listings keep sourced weights and estimate only the missing weight ty
 
   assert.equal(sourced.productWeight, "Weight: 350 g (12.35 oz)");
   assert.equal(sourced.zhDisplay.productWeight, "重量：350 克（12.35 盎司）");
-  assert.equal(sourced.packageWeight, "Estimated: 350 g (12.35 oz)");
-  assert.equal(sourced.zhDisplay.packageWeight, "预估：350 克（12.35 盎司）");
+  assert.equal(sourced.packageWeight, "Estimated: 170 g (6 oz)");
+  assert.equal(sourced.zhDisplay.packageWeight, "预估：170 克（6 盎司）");
 
   const imperial = makeMockCreationListingDraft({
     ...standardSource,
     dimensionSpecs: "",
     dimensionUnitMode: "imperial",
   });
-  assert.equal(imperial.packageWeight, "Estimated: 12.35 oz");
-  assert.equal(imperial.productWeight, "Estimated: 8.82 oz");
-  assert.equal(imperial.zhDisplay.packageWeight, "预估：12.35 盎司");
-  assert.equal(imperial.zhDisplay.productWeight, "预估：8.82 盎司");
+  assert.equal(imperial.packageWeight, "Estimated: 6 oz");
+  assert.equal(imperial.productWeight, "Estimated: 3.17 oz");
+  assert.equal(imperial.zhDisplay.packageWeight, "预估：6 盎司");
+  assert.equal(imperial.zhDisplay.productWeight, "预估：3.17 盎司");
+});
+
+test("mock listings estimate weights from product profiles instead of one fixed constant", () => {
+  const qipao = makeMockCreationListingDraft({
+    setId: "set-qipao-weight",
+    productName: "轻薄中长款旗袍",
+    productDescription: "短袖修身提花缎面，无钉珠装饰",
+    industryTemplatePath: "服饰鞋包 > 女装 > 特色女装 > 旗袍",
+    skuBundleCount: 1,
+    dimensionUnitMode: "metric",
+  });
+  const electronic = makeMockCreationListingDraft({
+    setId: "set-camera-weight",
+    productName: "Portable Camera",
+    productDescription: "Compact electronic camera body.",
+    skuBundleCount: 1,
+    dimensionUnitMode: "metric",
+  });
+  const paper = makeMockCreationListingDraft({
+    setId: "set-paper-weight",
+    productName: "Paper Sticker Sheet",
+    productDescription: "Thin paper sticker sheet.",
+    skuBundleCount: 1,
+    dimensionUnitMode: "metric",
+  });
+  const unknown = makeMockCreationListingDraft({
+    setId: "set-generic-weight",
+    productName: "Generic Product",
+    skuBundleCount: 1,
+    dimensionUnitMode: "metric",
+  });
+
+  assert.equal(qipao.productWeight, "Estimated: 320 g");
+  assert.equal(qipao.packageWeight, "Estimated: 420 g");
+  assert.equal(qipao.zhDisplay.productWeight, "预估：320 克");
+  assert.equal(qipao.zhDisplay.packageWeight, "预估：420 克");
+  assert.notEqual(electronic.productWeight, qipao.productWeight);
+  assert.notEqual(paper.productWeight, unknown.productWeight);
+  assert.notEqual(electronic.packageWeight, paper.packageWeight);
+});
+
+test("parsed numeric weight estimates are preserved when source evidence is absent", async () => {
+  const source = {
+    ...standardSource,
+    forceV1: true,
+    dimensionSpecs: "",
+    productWeightEvidence: "",
+    packageWeightEvidence: "",
+    dimensionUnitMode: "metric",
+  };
+  const parsed = makeValidPlatformV1Draft({
+    packageWeight: "Estimated: 420 g",
+    productWeight: "Estimated: 320 g",
+    zhDisplay: {
+      packageWeight: "预估：420 克",
+      productWeight: "预估：320 克",
+    },
+  });
+  const draft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    source,
+    fetchImpl: async () => new Response(JSON.stringify({ output_text: JSON.stringify(parsed) }), { status: 200 }),
+  });
+
+  assert.equal(draft.packageWeight, "Estimated: 420 g");
+  assert.equal(draft.productWeight, "Estimated: 320 g");
+  assert.equal(draft.zhDisplay.packageWeight, "预估：420 克");
+  assert.equal(draft.zhDisplay.productWeight, "预估：320 克");
 });
 
 test("platform V1 prompt requests evidence-backed value copy and Amazon-style bullets", async () => {
@@ -652,6 +724,8 @@ test("platform V1 prompt requests evidence-backed value copy and Amazon-style bu
   assert.doesNotMatch(prompt, /no non-title fields may contain functional/i);
   assert.match(prompt, /Evidence-backed buyer value rule/i);
   assert.match(prompt, /supplied feature.*practical buyer relevance.*supplied proof/is);
+  assert.match(prompt, /ordinary supplied attributes.*portable design.*USB charging/is);
+  assert.match(prompt, /qualification-sensitive.*high-power.*high-brightness.*waterproof/is);
   assert.match(prompt, /category friction.*supplied product response.*supplied proof/is);
   assert.match(prompt, /must not claim that other products cannot solve the problem/i);
   assert.match(prompt, /better than competitors|comparative superiority/i);
@@ -1346,7 +1420,7 @@ test("listing agent accepts parsed policy differences without retrying", async (
     return new Response(JSON.stringify({
       output_text: JSON.stringify(makeValidDraft({
         title: "Bad title without quantity",
-        sellingPoints: ["FDA Certified product quality"],
+        sellingPoints: ["Objective product quality"],
       })),
     }), { status: 200 });
   };
@@ -1363,7 +1437,7 @@ test("listing agent accepts parsed policy differences without retrying", async (
   assert.equal(callCount, 1);
   assert.equal(draft.status, "completed");
   assert.equal(draft.title, "Bad title without quantity");
-  assert.match(draft.sellingPoints.join("\n"), /FDA Certified/u);
+  assert.match(draft.sellingPoints.join("\n"), /Objective product quality/u);
 });
 
 test("listing agent keeps compound dimensions out of search-focused titles", async () => {
@@ -1697,6 +1771,54 @@ test("platform V1 sanitizes unsupported low-risk terms and accepts recoverable f
   assert.ok(draft.description);
 });
 
+test("Listing claim filters keep sourced ordinary attributes and remove qualification-sensitive performance terms", () => {
+  const ordinarySource = {
+    productName: "Portable Personal Blender",
+    productDescription: "Portable design with USB charging.",
+  };
+  const unsupportedOrdinary = sanitizeCreationListingUnsupportedEvidenceTerms({
+    title: "Portable USB Charging Personal Blender",
+  }, {
+    productName: "Portable Personal Blender",
+    productDescription: "Portable design.",
+  });
+  assert.match(unsupportedOrdinary.title, /Portable/i);
+  assert.doesNotMatch(unsupportedOrdinary.title, /USB Charging/i);
+
+  const sourcedFromChinese = sanitizeCreationListingUnsupportedEvidenceTerms({
+    title: "Portable Design USB Charging Personal Blender",
+    zhDisplay: { title: "便携设计 USB充电 榨汁杯" },
+  }, {
+    productName: "便携榨汁杯",
+    productDescription: "便携设计，USB充电。",
+  });
+  assert.match(sourcedFromChinese.title, /Portable Design USB Charging/i);
+  assert.match(sourcedFromChinese.zhDisplay.title, /便携设计 USB充电/u);
+
+  const unsupportedBilingual = sanitizeCreationListingUnsupportedEvidenceTerms({
+    title: "Portable Design USB Charging Personal Blender",
+    zhDisplay: { title: "USB充电便携设计榨汁杯" },
+  }, {
+    productName: "Personal Blender",
+    productDescription: "Personal blender cup.",
+  });
+  assert.doesNotMatch(unsupportedBilingual.title, /Portable|USB Charging/i);
+  assert.doesNotMatch(unsupportedBilingual.zhDisplay.title, /便携设计|USB充电/u);
+
+  const english = sanitizeCreationListingBlockingClaimText(
+    "Portable Design USB Charging High-Power High-Brightness Waterproof Personal Blender",
+    ordinarySource,
+  );
+  const chinese = sanitizeCreationListingBlockingClaimText(
+    "便携设计 USB充电 高功率 高亮 防水 便携榨汁杯",
+    ordinarySource,
+  );
+  assert.match(english, /Portable Design USB Charging/i);
+  assert.doesNotMatch(english, /High-Power|High-Brightness|Waterproof/i);
+  assert.match(chinese, /便携设计 USB充电/u);
+  assert.doesNotMatch(chinese, /高功率|高亮|防水/u);
+});
+
 test("platform V1 removes unsupported English and Chinese compatibility claims without failing", async () => {
   const source = {
     ...standardSource,
@@ -1739,6 +1861,7 @@ test("platform V1 removes every unsupported blocking claim category across multi
     ...standardSource,
     platformPolicyId: "etsy",
     forceV1: true,
+    productDescription: "High-power, high-brightness, waterproof fishing lure.",
   };
   const payload = makeValidPlatformV1Draft({
     title: "2 Pack Best Seller Fishing Lures",
@@ -1750,6 +1873,9 @@ test("platform V1 removes every unsupported blocking claim category across multi
       "Fishing lure with lifetime warranty.",
       "Stainless steel body fishing lure.",
       "Fishing lure with 12-hour battery runtime.",
+      "High-power fishing lure.",
+      "High-brightness fishing lure.",
+      "Waterproof fishing lure.",
       "Guaranteed fishing lure with refund.",
       "最高",
       "최고",
@@ -1765,6 +1891,9 @@ test("platform V1 removes every unsupported blocking claim category across multi
         "路亚鱼饵提供终身质保。",
         "不锈钢材质路亚鱼饵。",
         "路亚鱼饵具备12小时电池续航。",
+        "高功率路亚鱼饵。",
+        "高亮路亚鱼饵。",
+        "防水路亚鱼饵。",
         "保证路亚鱼饵支持退款。",
       ],
     },
@@ -1783,11 +1912,11 @@ test("platform V1 removes every unsupported blocking claim category across multi
   assert.equal(draft.status, "completed");
   assert.doesNotMatch(
     visibleDraftText(draft),
-    /best seller|FDA certified|five-star|better than other products|medical grade|lifetime warranty|stainless steel|12-hour battery runtime|guaranteed|refund|最高|최고|el mejor/iu,
+    /best seller|FDA certified|five-star|better than other products|medical grade|lifetime warranty|stainless steel|12-hour battery runtime|high-power|high-brightness|waterproof|guaranteed|refund|最高|최고|el mejor/iu,
   );
   assert.doesNotMatch(
     visibleChineseDisplayText(draft),
-    /最佳|FDA认证|五星好评|优于其他竞品|医疗级|终身质保|不锈钢|12小时电池续航|保证|退款/u,
+    /最佳|FDA认证|五星好评|优于其他竞品|医疗级|终身质保|不锈钢|12小时电池续航|高功率|高亮|防水|保证|退款/u,
   );
 });
 
@@ -2803,6 +2932,283 @@ test("application Listing generation accepts one incomplete parsed response with
   assert.equal(drafts[0].productDimensions, "");
 });
 
+test("application Listing generation removes source part numbers from bilingual titles only", async () => {
+  let requestInput = "";
+  const sourceSku = {
+    id: "F4J16",
+    title: "电动仿生米诺鱼饵 F4J16",
+    filenames: ["260526-SKU-F4J16.png"],
+    referenceIndexes: [1],
+  };
+  const drafts = await generateCreationListingDrafts({
+    set: {
+      setId: "set-part-number-title",
+      productName: "电动仿生米诺鱼饵 F4J16",
+      productDescription: "Electric bionic minnow lure for freshwater fishing.",
+      skuSubjects: [sourceSku],
+      referenceImageRoles: [
+        { filename: "260526-SKU-F4J16.png", role: "product", referenceIndex: 1 },
+      ],
+    },
+    config: { baseUrl: "https://example.test/v1", apiKey: "test-key", responsesModel: "gpt-5.4" },
+    fetchImpl: async (_url, init) => {
+      requestInput = JSON.parse(init.body).input;
+      return new Response(JSON.stringify({
+        output_text: JSON.stringify(makeValidPlatformV1Draft({
+          title: "Electric Bionic Minnow Fishing Lure F4J16",
+          description: "F4J16 reference remains available outside title normalization.",
+          zhDisplay: {
+            title: "电动仿生米诺鱼饵 F4J16",
+            description: "F4J16 参考标识保留在非标题内容中。",
+          },
+        })),
+      }), { status: 200 });
+    },
+  });
+
+  const [draft] = drafts;
+  assert.match(requestInput, /internal product part number|SKU part number|reference-only identifier/i);
+  assert.match(requestInput, /F4J16/);
+  assert.doesNotMatch(draft.title, /F4J16/i);
+  assert.doesNotMatch(draft.zhDisplay.title, /F4J16/i);
+  assert.match(draft.title, /Electric Bionic Minnow Fishing Lure/i);
+  assert.match(draft.zhDisplay.title, /电动仿生米诺鱼饵/u);
+  assert.match(draft.description, /F4J16/i);
+  assert.match(draft.zhDisplay.description, /F4J16/i);
+
+  const [listingSource] = buildCreationListingSources({
+    productName: "电动仿生米诺鱼饵 F4J16",
+    skuSubjects: [sourceSku],
+  });
+  assert.equal(listingSource.skuSubjects[0].id, "F4J16");
+  assert.deepEqual(listingSource.skuSubjects[0].filenames, ["260526-SKU-F4J16.png"]);
+});
+
+test("Listing title cleanup removes compound part numbers and repairs identifier-only titles", async () => {
+  const source = {
+    ...standardSource,
+    productName: "Electric Minnow Lure F4J-16",
+    skuTitle: "Electric Minnow Lure F4J-16",
+    skuSubjects: [{ id: "F4J-16", title: "Electric Minnow Lure F4J-16", filenames: ["lot-F4J-16.png"] }],
+    skuFilenames: ["lot-F4J-16.png"],
+    forceV1: true,
+  };
+  const draft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    source,
+    fetchImpl: async () => new Response(JSON.stringify({
+      title: "F4J-16",
+      description: "Electric minnow lure.",
+      zhDisplay: { title: "F4J-16", description: "电动米诺鱼饵。" },
+    }), { status: 200 }),
+  });
+
+  assert.equal(draft.title, "Electric Minnow Lure");
+  assert.equal(draft.zhDisplay.title, "商品 电动米诺鱼饵");
+  assert.doesNotMatch([draft.title, draft.zhDisplay.title].join(" "), /F4J|(?:^|\s)16(?:$|\s)/i);
+});
+
+test("Listing title completion extracts bounded phrases from labeled English and continuous Chinese prose", async () => {
+  const source = {
+    ...standardSource,
+    productName: "Portable Personal Blender PN-77",
+    skuTitle: "Portable Personal Blender PN-77",
+    skuSubjects: [{ id: "PN-77", title: "Portable Personal Blender PN-77" }],
+    listingEvidenceAliases: [
+      "portable personal blender",
+      "portable design",
+      "USB charging",
+      "compact cup",
+      "slim profile",
+      "home office use",
+      "travel use",
+    ],
+    platformPolicyId: "universal",
+    forceV1: true,
+  };
+  const draft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    source,
+    fetchImpl: async () => new Response(JSON.stringify(makeValidPlatformV1Draft({
+      title: "Portable Personal Blender PN-77",
+      sellingPoints: [
+        "PORTABLE DESIGN: Compact cup profile.",
+        "TURBO MOTOR: Compact cup profile.",
+      ],
+      fiveBullets: [
+        "USB CHARGING: USB charging input.",
+        "PRODUCT TYPE: Personal blender.",
+      ],
+      painPoints: [],
+      description: "Personal blender for quick drinks at home and work.",
+      backendSearchTerms: "portable smoothie blender travel cup",
+      keywordBuckets: { exact: [], longTail: [], traffic: [], descriptive: [] },
+      zhDisplay: {
+        title: "便携榨汁杯 PN-77",
+        sellingPoints: ["便携设计：紧凑杯身。", "涡轮电机：紧凑杯身。"],
+        fiveBullets: ["USB充电：USB充电接口。", "产品类型：便携榨汁杯。"],
+        painPoints: [],
+        description: "便携榨汁杯适合制作日常饮品。居家办公和旅行时均可使用。",
+        backendSearchTerms: "便携 榨汁杯 随行杯",
+        keywordBuckets: { exact: [], longTail: [], traffic: [], descriptive: [] },
+      },
+    })), { status: 200 }),
+  });
+
+  assert.ok(Array.from(draft.title).length >= 120);
+  assert.doesNotMatch(draft.title, /PN-77|PRODUCT TYPE|[,.;:]|\bwhile\b/i);
+  assert.match(draft.title, /PORTABLE DESIGN/i);
+  assert.match(draft.title, /USB CHARGING/i);
+  assert.doesNotMatch(draft.title, /TURBO MOTOR/i);
+  assert.doesNotMatch(draft.zhDisplay.title, /PN-77|产品类型|[，。；：]/u);
+  assert.match(draft.zhDisplay.title, /便携设计/u);
+  assert.match(draft.zhDisplay.title, /USB充电/u);
+  assert.doesNotMatch(draft.zhDisplay.title, /涡轮电机/u);
+});
+
+test("Listing title completion falls through to pain points description and search keywords", async () => {
+  const source = {
+    ...standardSource,
+    productName: "Stainless Steel Travel Mug",
+    skuTitle: "Stainless Steel Travel Mug",
+    listingEvidenceAliases: [
+      "stainless steel travel mug",
+      "slim cup profile",
+      "removable lid",
+      "office desk",
+      "commuter bag",
+      "blue finish",
+    ],
+    platformPolicyId: "universal",
+    forceV1: true,
+  };
+  const draft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    source,
+    fetchImpl: async () => new Response(JSON.stringify(makeValidPlatformV1Draft({
+      title: "Stainless Steel Travel Mug",
+      sellingPoints: [],
+      fiveBullets: [],
+      painPoints: ["Bulky drinkware takes more bag space, while the slim cup profile fits narrow side pockets."],
+      description: "Blue stainless steel travel mug with a removable lid. The narrow shape suits office desks and commuter bags.",
+      backendSearchTerms: "slim travel mug removable lid commuter cup",
+      keywordBuckets: {
+        exact: ["stainless steel travel mug"],
+        longTail: ["slim commuter cup"],
+        traffic: [],
+        descriptive: ["blue narrow travel mug"],
+      },
+      zhDisplay: {
+        title: "不锈钢随行杯",
+        sellingPoints: [],
+        fiveBullets: [],
+        painPoints: ["宽大的杯体会占用更多包内空间，纤细杯身适合较窄的侧袋。"],
+        description: "蓝色不锈钢随行杯配有可拆卸杯盖。窄杯身适合办公桌和通勤包。",
+        backendSearchTerms: "纤细 随行杯 可拆卸杯盖 通勤杯",
+        keywordBuckets: { exact: [], longTail: [], traffic: [], descriptive: [] },
+      },
+    })), { status: 200 }),
+  });
+
+  assert.ok(Array.from(draft.title).length >= 120);
+  assert.match(draft.title, /slim cup profile/i);
+  assert.match(draft.title, /removable lid|office desks|commuter bags/i);
+  assert.doesNotMatch(draft.title, /[,.;:]|\bwhile\b/i);
+  assert.doesNotMatch(draft.zhDisplay.title, /[，。；：]/u);
+  assert.match(draft.zhDisplay.title, /纤细杯身|可拆卸杯盖|办公桌|通勤包/u);
+});
+
+test("Listing title completion keeps English additions on whole-word boundaries at the platform limit", async () => {
+  const source = {
+    ...standardSource,
+    productName: "Portable Blender",
+    skuTitle: "Portable Blender",
+    listingEvidenceAliases: ["rechargeable power"],
+    forceV1: true,
+    listingPolicy: {
+      id: "word-boundary-test",
+      platformId: "word-boundary-test",
+      label: "Word boundary test",
+      defaultLocale: "en-US",
+      titleRules: { recommendedMinChars: 34, hardMaxChars: 34 },
+    },
+  };
+  const draft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    source,
+    fetchImpl: async () => new Response(JSON.stringify(makeValidPlatformV1Draft({
+      title: "Portable Blender",
+      sellingPoints: ["Rechargeable countertop convenience"],
+      fiveBullets: [],
+      painPoints: [],
+      description: "",
+      backendSearchTerms: "",
+      keywordBuckets: { exact: [], longTail: [], traffic: [], descriptive: [] },
+      zhDisplay: {
+        title: "便携榨汁杯",
+        sellingPoints: [],
+        fiveBullets: [],
+        painPoints: [],
+        description: "",
+        backendSearchTerms: "",
+        keywordBuckets: { exact: [], longTail: [], traffic: [], descriptive: [] },
+      },
+    })), { status: 200 }),
+  });
+
+  assert.equal(draft.title, "Portable Blender Rechargeable");
+  assert.ok(Array.from(draft.title).length <= 34);
+  assert.doesNotMatch(draft.title, /counter/i);
+});
+
+test("Listing title completion keeps compound filename part numbers out of appended content", async () => {
+  const source = {
+    ...standardSource,
+    productName: "Electric Minnow Lure F4J-16",
+    skuTitle: "Electric Minnow Lure F4J-16",
+    skuSubjects: [{ id: "F4J-16", title: "Electric Minnow Lure F4J-16", filenames: ["260526-SKU-F4J-16.png"] }],
+    skuFilenames: ["260526-SKU-F4J-16.png"],
+    platformPolicyId: "universal",
+    forceV1: true,
+  };
+  const draft = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-5.4",
+    source,
+    fetchImpl: async () => new Response(JSON.stringify({
+      title: "Electric Minnow Lure F4J-16",
+      sellingPoints: ["Streamlined minnow profile 260526-SKU-F4J-16 for freshwater fishing."],
+      painPoints: [],
+      fiveBullets: [],
+      description: "A minnow-shaped fishing lure for freshwater casting.",
+      backendSearchTerms: "minnow fishing lure freshwater bait",
+      keywordBuckets: { exact: [], longTail: [], traffic: [], descriptive: [] },
+      zhDisplay: {
+        title: "电动米诺鱼饵 F4J-16",
+        sellingPoints: ["流线型米诺外形 260526-SKU-F4J-16，适合淡水垂钓。"],
+        painPoints: [],
+        fiveBullets: [],
+        description: "用于淡水抛投的米诺外形鱼饵。",
+        backendSearchTerms: "米诺 鱼饵 淡水 路亚",
+        keywordBuckets: { exact: [], longTail: [], traffic: [], descriptive: [] },
+      },
+    }), { status: 200 }),
+  });
+
+  assert.doesNotMatch(draft.title + " " + draft.zhDisplay.title, /F4J|260526|SKU/i);
+  assert.match(draft.title, /Streamlined minnow profile|freshwater fishing/i);
+  assert.match(draft.zhDisplay.title, /流线型米诺外形|淡水垂钓/u);
+});
+
 test("generateCreationListingDrafts keeps metric and imperial specs out of mock titles", async () => {
   const drafts = await generateCreationListingDrafts({
     set: {
@@ -3170,8 +3576,9 @@ test("platform V1 accepts a short evidence-rich title while preserving low-limit
   });
 
   assert.match(requestInput, /at least 120 English characters/i);
-  assert.equal(directDraft.title, shortTitle);
-  assert.ok(Array.from(directDraft.title).length < 120);
+  assert.ok(directDraft.title.length >= shortTitle.length);
+  assert.ok(Array.from(directDraft.title).length >= 120);
+  assert.match(directDraft.title, /180° viewing window|riding scene/i);
 
   const lowLimitSource = { ...source, platformPolicyId: "ebay" };
   const lowLimitFallback = makeMockCreationListingDraft(lowLimitSource);

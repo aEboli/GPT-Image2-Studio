@@ -1,6 +1,6 @@
 import { buildParameterText, formatImageModelLabel, formatRecentOutputMeta } from "/lib/studio-formatters.mjs";
 import { formatLoadingThumbnailStatusLabel, getPreviewPlaceholderState, getStablePreviewLoadingItems } from "/lib/preview-placeholder-state.mjs?v=20260618-thumbnail-status-1";
-import { buildGalleryReferenceFilterOptions, buildGallerySections, buildGallerySizeFilterOptions, buildGalleryTimeFilterOptions, distributeGalleryItemsIntoColumns, filterGalleryItems, getGalleryLayoutModeForWidth, getPromptGenerationGalleryItems, getRecentGalleryItems, normalizeGalleryFilters, paginateGallerySections, sortGalleryItemsByCreatedAtDesc } from "/lib/gallery-organizer.mjs";
+import { buildGalleryReferenceFilterOptions, buildGallerySections, buildGallerySizeFilterOptions, buildGalleryTimeFilterOptions, distributeGalleryItemsIntoColumns, filterGalleryItems, getGalleryHistorySectionLayouts, getGalleryLayoutModeForWidth, getPromptGenerationGalleryItems, getRecentGalleryItems, normalizeGalleryFilters, paginateGallerySections, sortGalleryItemsByCreatedAtDesc } from "/lib/gallery-organizer.mjs?v=20260806-gallery-five-date-page-1";
 import { buildGalleryMetadataCacheEntry, collectGalleryMetadataRepairPatch, mergeGalleryItemWithCachedMetadata, pruneGalleryMetadataCache } from "/lib/gallery-metadata-recovery.mjs";
 import { getDefaultGenerationSize, getGenerationSizeOptions, getModelProtocolImageSizeOptions, normalizeGenerationSize, normalizeModelProtocolImageSize } from "/lib/generation-size-options.mjs?v=20260614-image2-sizes-1";
 import { getOutputFormatOptions, normalizeOutputFormat, } from "/lib/output-format-options.mjs?v=20260504-vercel-static-lib-1";
@@ -23,6 +23,8 @@ import { createCreationTemuExportController } from "/lib/creation-temu-export-ui
 import { createAssetRecordDeleteController } from "/lib/asset-record-delete-controller.mjs?v=20260722-asset-record-delete-1";
 import { createAssetRecordTimeFilterController, getArticleRecordSearchText, getPortraitRecordSearchText } from "/lib/asset-record-time-filter-controller.mjs?v=20260724-asset-record-time-filter-controller-1";
 import { buildCreationRecordTimeFilterOptions, filterCreationRecordSetsByTime, formatCreationRecordTimeFilterLabel, hasActiveCreationRecordTimeFilter, normalizeCreationRecordDateFilter, normalizeCreationRecordTimeFilter } from "/lib/creation-record-filter.mjs?v=20260722-creation-record-time-filter-1";
+import { buildCreationRecordListModel, createCreationRecordListState, loadMoreCreationRecordListState } from "/lib/creation-record-list-model.mjs?v=20260807-creation-record-split-workspace-1";
+import { createCreationRecordListRow } from "/lib/creation-record-list-view.mjs?v=20260807-creation-record-split-workspace-1";
 import { ensureLazyViewModule, getMountedLazyViewModule } from "/lib/view-mode-loader.mjs?v=20260608-quick-blend-time-sort-1";
 import { appendBrowserConfigToFormData, getBrowserPrivateConfigRequestPayload, getOrCreateClientSessionId, readBrowserPrivateConfig, saveBrowserPrivateConfig, toPublicBrowserConfig } from "/lib/browser-config.mjs";
 import { cacheBrowserGalleryItem, clearBrowserImageCache, dataUrlToBlob, deleteBrowserCachedGalleryItem, fetchServerImageAsDataUrl, getBrowserCachedImageData, getImageUrl, getServerImageUrl, getServerThumbnailUrl, isCacheableBrowserImageUrl, mergeServerAndBrowserGalleryItems, readBrowserCachedGalleryItems } from "/lib/browser-image-cache.mjs";
@@ -58,6 +60,7 @@ import { isCreationSubjectReferenceRole } from "/lib/creation-reference-roles.mj
 import { applyCreationReferenceCoverageRolePlan, normalizeCreationCoverageFields, toggleCreationSelectedRoles } from "/lib/creation-reference-coverage.mjs?v=20260703-latest-restore-1";
 import { applyCreationReferenceAnalysisProductNameValue, buildCreationReferenceAnalysisAppliedFeedbackMessage, buildCreationReferenceAnalysisCategoryMatchText, getCreationReferenceAnalysisCategoryProductName, getCreationReferenceAnalysisDisplayRoleLabel, getCreationReferenceAnalysisGroupedSubjectUnitCount, getCreationReferenceAnalysisRoleCorrectionReason, normalizeCreationReferenceAnalysisUnitCountNote, resolveCreationReferenceAnalysisCategoryValue, resolveCreationReferenceAnalysisContextCategoryValue, shouldDowngradeReferenceProductAnalysisRole } from "/lib/creation-reference-analysis-view.mjs";
 import { createCreationListingController, getCreationRecordListingMetaLabel, getCreationListingSearchValues, normalizeCreationListingDraftForView, renderCreationListingDrafts } from "/lib/creation-listing-view.mjs";
+import { getCreationItemDisplayTitle } from "/lib/creation-item-display.mjs";
 import { getCreationAutoRepairNotice, getCreationCompletionFeedback, getCreationIncompleteItems, shouldAutoRepairCreationSet } from "/lib/creation-auto-repair.mjs";
 import { canRepairCreationItem as canRepairCreationItemFromQueue, getCreationRepairButtonText as getCreationRepairButtonTextFromQueue, isCreationItemRepairActive as isCreationItemRepairActiveInQueue, queueCreationItemRepair as queueCreationItemRepairInState, removeQueuedCreationItemRepair, shiftNextQueuedCreationItemRepair } from "/lib/creation-item-repair-queue.mjs";
 import { cloneCreationPlanValue, createCreationPlanPreviewRequestCoordinator, createCreationPlatformPayloadSnapshot, deepFreezeCreationPlanValue, formatCreationPlanWarning, getCreationCompatibleImageTypeState, getCreationEditablePlanDisplayCounts, getCreationSetPlanSource, getVisibleCreationPlanWarnings, mergeCreationPlatformSetParameters, resolveCreationDisplayedPlanContext, resolveCreationPlatformImageCountState, resolveCreationSelectedRolesSubmission, shouldDisableCreationGenerateButton, updateCreationPlatformItemOverride } from "/lib/creation-browser-plan-state.mjs";
@@ -111,7 +114,7 @@ const REASONING_ESTIMATES = {
   high: "150s+",
   xhigh: "210s+",
 };
-const DEFAULT_LIMITS = { maxParallelTasksPerSession: 15, maxReferenceImages: 15, maxCreationReferenceImages: 15, maxPortraitPersonReferenceImages: 3, maxPortraitActionReferenceImages: 3, maxPortraitAccessoryReferenceImages: 9 };
+const DEFAULT_LIMITS = { maxParallelTasksPerSession: 15, maxReferenceImages: 15, maxCreationReferenceImages: 15, maxPortraitPersonReferenceImages: 3, maxPortraitActionReferenceImages: 3, maxPortraitAccessoryReferenceImages: 9 }; const PROMPT_FILMSTRIP_INITIAL_HISTORY_LIMIT = 10; const PROMPT_FILMSTRIP_GENERATED_HISTORY_LIMIT = 50;
 const CREATION_IMAGE_COUNT_OPTIONS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
 const DEFAULT_PROMPT_ENHANCE_TEXT = ",sharp focus, macro details, rich textures, crisp edges, photorealistic texture, visible grain, detailed surface material, cinematic lighting"; function buildPromptModePrompt() { const prompt = refs.promptInput.value.trim(); if (!state.promptEnhanceEnabled) { return prompt; } const enhanceText = String(refs.promptEnhanceInput?.value || "").trim(); return enhanceText ? `${prompt}${enhanceText.startsWith(",") ? "" : "\n\n"}${enhanceText}` : prompt; } function syncPromptEnhanceMode() { refs.promptEnhanceToggle.classList.toggle("is-active", state.promptEnhanceEnabled); refs.promptEnhanceToggle.setAttribute("aria-checked", String(state.promptEnhanceEnabled)); refs.promptEnhanceToggle.querySelector("small").textContent = getUiLanguageText(state.promptEnhanceEnabled ? "promptEnhanceOn" : "promptEnhanceOff"); refs.promptEnhanceField.classList.toggle("hidden", !state.promptEnhanceEnabled); } function togglePromptEnhanceMode() { state.promptEnhanceEnabled = !state.promptEnhanceEnabled; syncPromptEnhanceMode(); if (state.promptEnhanceEnabled) { refs.promptEnhanceInput.focus(); } }
 const PROMPT_TEMPLATE_STORAGE_KEY = "image-studio-prompt-templates-v2";
@@ -433,6 +436,8 @@ const state = {
     recordDeleteBusy: false,
     recordDeleteRequest: null,
     recordDetailExpanded: false,
+    recordListScrollTop: 0,
+    recordListState: createCreationRecordListState(),
     recordSetId: "",
     recordTemuExportBusy: false,
     repairingItemId: "",
@@ -491,10 +496,11 @@ const state = {
   creationSelectedRoles: [],
   gallery: [],
   galleryCheckedFilenames: [],
+  gallerySelectionMode: false,
   galleryCurrentFilename: "",
   galleryDeleteFeedback: "",
   galleryLoading: true,
-  galleryLoadError: "",
+  galleryLoadError: "", promptFilmstripHistoryLimit: PROMPT_FILMSTRIP_INITIAL_HISTORY_LIMIT,
   galleryMetadataCache: {},
   galleryControls: { ...DEFAULT_GALLERY_CONTROLS },
   galleryHistoryPage: 0,
@@ -832,12 +838,15 @@ const refs = {
   creationRecordDeleteCancelButton: document.querySelector("#creationRecordDeleteCancelButton"),
   creationRecordDeleteConfirmButton: document.querySelector("#creationRecordDeleteConfirmButton"),
   creationRecordDeleteCurrentButton: document.querySelector("#creationRecordDeleteCurrentButton"),
+  creationRecordDeleteCurrentMenuButton: document.querySelector("#creationRecordDeleteCurrentMenuButton"),
   creationRecordDeleteDialog: document.querySelector("#creationRecordDeleteDialog"),
   creationRecordDeleteDialogMessage: document.querySelector("#creationRecordDeleteDialogMessage"),
   creationRecordDeleteDialogTitle: document.querySelector("#creationRecordDeleteDialogTitle"),
   creationRecordDeleteFilteredButton: document.querySelector("#creationRecordDeleteFilteredButton"),
+  creationRecordDeleteFilteredMenuButton: document.querySelector("#creationRecordDeleteFilteredMenuButton"),
   creationRecordDeleteForm: document.querySelector("#creationRecordDeleteForm"),
   creationRecordDeleteSelectedButton: document.querySelector("#creationRecordDeleteSelectedButton"),
+  creationRecordDeleteSelectedMenuButton: document.querySelector("#creationRecordDeleteSelectedMenuButton"),
   creationRecordDetail: document.querySelector("#creationRecordDetail"),
   creationRecordExportListingsButton: document.querySelector("#creationRecordExportListingsButton"),
   creationRecordExportManifestButton: document.querySelector("#creationRecordExportManifestButton"),
@@ -848,13 +857,17 @@ const refs = {
   creationRecordListingStatus: document.querySelector("#creationRecordListingStatus"),
   creationRecordOpenFolderButton: document.querySelector("#creationRecordOpenFolderButton"),
   creationRecordRepairIncompleteButton: document.querySelector("#creationRecordRepairIncompleteButton"),
+  creationRecordRepairIncompleteMenuButton: document.querySelector("#creationRecordRepairIncompleteMenuButton"),
   creationRecordRefreshButton: document.querySelector("#creationRecordRefreshButton"),
+  creationRecordRefreshMenuButton: document.querySelector("#creationRecordRefreshMenuButton"),
   creationRecordResetFiltersButton: document.querySelector("#creationRecordResetFiltersButton"),
   creationRecordReuseButton: document.querySelector("#creationRecordReuseButton"),
   creationRecordResultGrid: document.querySelector("#creationRecordResultGrid"),
   creationRecordSearchInput: document.querySelector("#creationRecordSearchInput"),
   creationRecordSelection: document.querySelector("#creationRecordSelection"),
   creationRecordSetList: document.querySelector("#creationRecordSetList"),
+  creationRecordListSummary: document.querySelector("#creationRecordListSummary"),
+  creationRecordLoadMoreButton: document.querySelector("#creationRecordLoadMoreButton"),
   creationRecordTimeFilters: document.querySelector("#creationRecordTimeFilters"),
   creationQueueStrip: document.querySelector("#creationQueueStrip"),
   creationRepairFailedButton: document.querySelector("#creationRepairFailedButton"),
@@ -877,6 +890,7 @@ const refs = {
   galleryActionFeedback: document.querySelector("#galleryActionFeedback"),
   galleryCount: document.querySelector("#galleryCount"),
   galleryColumnButtons: [...document.querySelectorAll("[data-gallery-column-preset]")],
+  galleryColumnSwitch: document.querySelector("#galleryColumnSwitch"),
   galleryDateInput: document.querySelector("#galleryDateInput"),
   galleryDeleteCurrentButton: document.querySelector("#galleryDeleteCurrentButton"),
   galleryDeleteSelectedButton: document.querySelector("#galleryDeleteSelectedButton"),
@@ -891,6 +905,7 @@ const refs = {
   galleryReferenceFilterInput: document.querySelector("#galleryReferenceFilterInput"),
   galleryResetFiltersButton: document.querySelector("#galleryResetFiltersButton"),
   gallerySearchInput: document.querySelector("#gallerySearchInput"),
+  gallerySelectionModeButton: document.querySelector("#gallerySelectionModeButton"),
   gallerySections: document.querySelector("#gallerySections"),
   gallerySizeFilterInput: document.querySelector("#gallerySizeFilterInput"),
   galleryScrollbar: document.querySelector("#galleryScrollbar"),
@@ -2058,12 +2073,7 @@ function getGalleryLayoutWidth() {
     window.innerWidth || 0,
   );
 }
-function syncGalleryLayoutMode() {
-  if (!refs.galleryView) {
-    return;
-  }
-  refs.galleryView.dataset.galleryLayout = getGalleryLayoutModeForWidth(getGalleryLayoutWidth());
-}
+function syncGalleryLayoutMode() { if (!refs.galleryView) return; const layoutMode = getGalleryLayoutModeForWidth(getGalleryLayoutWidth()); const changed = refs.galleryView.dataset.galleryLayout !== layoutMode; refs.galleryView.dataset.galleryLayout = layoutMode; if (changed && state.activeView === "gallery" && !state.galleryLoading) renderGalleryView(); }
 function syncStudioDensity() {
   const viewportMetrics = getStudioViewportMetrics();
   const settings = getStudioDensitySettings(viewportMetrics);
@@ -2115,6 +2125,7 @@ function bindStudioDensitySync() {
 }
 async function setActiveView(view) {
   state.activeView = view;
+  document.querySelector("[data-product-image-extension-menu-entry]").hidden = view !== "creation";
   syncHash(view);
   const activeNavSection = CREATE_VIEW_IDS.has(view) ? "create" : ASSET_VIEW_IDS.has(view) ? "assets" : "";
   const activeTabView = CREATE_VIEW_IDS.has(view) ? "studio" : ASSET_VIEW_IDS.has(view) ? "gallery" : view;
@@ -5553,17 +5564,13 @@ function getFilmstripItems() {
     item: job,
     label: formatFilmstripSizeLabel(job) || job.statusText || formatClock(job.createdAt),
   }));
-
-  const recentGallery = getPromptGenerationGalleryItems(state.gallery).slice(0, 12).map((item) => ({
+  const recentGallery = getPromptGenerationGalleryItems(state.gallery).slice(0, state.promptFilmstripHistoryLimit).map((item) => ({
     key: makeGalleryPreviewKey(item.filename),
     item,
     label: formatFilmstripSizeLabel(item) || formatClock(item.createdAt),
   }));
-
-  return [...activeJobs, ...recentGallery].slice(0, 14);
-}
-
-function getCurrentPreviewNavigationItems() {
+  return [...activeJobs, ...recentGallery];
+} function getCurrentPreviewNavigationItems() {
   return getFilmstripItems().map((entry) => entry.item).filter((item) => item && getImageUrl(item));
 }
 
@@ -5809,7 +5816,7 @@ function createGalleryTile(item) {
   shell.className = "gallery-tile-shell";
   const filename = String(item?.filename || "图片").trim();
   const isChecked = state.galleryCheckedFilenames.includes(filename);
-  shell.classList.toggle("is-checked", isChecked);
+  shell.classList.toggle("is-checked", state.gallerySelectionMode && isChecked);
 
   const button = document.createElement("button");
   button.type = "button";
@@ -5838,18 +5845,7 @@ function createGalleryTile(item) {
   overlay.append(name, meta);
   button.appendChild(overlay);
 
-  const selectLabel = document.createElement("label");
-  selectLabel.className = "gallery-tile-select";
-  selectLabel.title = `选择 ${filename}`;
-  const checkbox = document.createElement("input");
-  checkbox.type = "checkbox";
-  checkbox.checked = isChecked;
-  checkbox.disabled = state.assetRecordDeletion.busy;
-  checkbox.dataset.gallerySelectFilename = filename;
-  checkbox.setAttribute("aria-label", `选择画廊图片 ${filename}`);
-  selectLabel.appendChild(checkbox);
-
-  shell.append(button, selectLabel);
+  shell.append(button); if (state.gallerySelectionMode) { const selectLabel = document.createElement("label"); selectLabel.className = "gallery-tile-select"; selectLabel.title = `选择 ${filename}`; const checkbox = document.createElement("input"); checkbox.type = "checkbox"; checkbox.checked = isChecked; checkbox.disabled = state.assetRecordDeletion.busy; checkbox.dataset.gallerySelectFilename = filename; checkbox.setAttribute("aria-label", `选择画廊图片 ${filename}`); selectLabel.appendChild(checkbox); shell.appendChild(selectLabel); }
   return shell;
 }
 
@@ -5938,7 +5934,7 @@ function setGalleryHistoryPage(page) {
   refs.galleryScrollRegion?.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function renderGalleryFilters(visibleItems, sections, pagination, shouldPaginateHistory) {
+function renderGalleryFilters(visibleItems, sections, pagination, shouldPaginateHistory, sectionLayouts) {
   const filters = getGalleryFilterSnapshot();
   const timeOptions = buildGalleryTimeFilterOptions(getVisibleGalleryItems({ window: "all" }));
   const sizeOptions = buildGallerySizeFilterOptions(getVisibleGalleryItems({ size: "all" }));
@@ -5992,14 +5988,15 @@ function renderGalleryFilters(visibleItems, sections, pagination, shouldPaginate
   }
 
   if (pagination.totalPages > 1) {
-    refs.galleryHelperText.textContent = `${prefix}每页显示 5 天历史，第 ${pagination.page + 1} / ${pagination.totalPages} 页，当前 ${sections.length} 组、${displayedCount} / ${visibleItems.length} 张。`;
+    const layoutText = sectionLayouts.map((layout) => `${layout.columnCount} 列`).join(" / ");
+    refs.galleryHelperText.textContent = `${prefix}每页显示 5 个日期，第 ${pagination.page + 1} / ${pagination.totalPages} 页，自动 ${layoutText}，每 2 个日期最多 3 行，当前 ${displayedCount} / ${visibleItems.length} 张。`;
     return;
   }
 
   refs.galleryHelperText.textContent = `${prefix}按日期分组显示，当前共 ${sections.length} 组，显示 ${visibleItems.length} / ${state.gallery.length} 张。`;
 }
 
-function createGallerySection(section) {
+function createGallerySection(section, columnCount) {
   const wrapper = document.createElement("section");
   wrapper.className = "gallery-section";
 
@@ -6024,8 +6021,6 @@ function createGallerySection(section) {
 
   const masonry = document.createElement("div");
   masonry.className = "gallery-masonry";
-  const layoutMode = getCurrentStudioLayoutMode();
-  const columnCount = layoutMode === "mobile" ? 2 : layoutMode === "tablet" ? 4 : getGalleryColumnCount();
   masonry.style.setProperty("--gallery-columns", String(columnCount));
   distributeGalleryItemsIntoColumns(section.items, columnCount).forEach((columnItems) => {
     const column = document.createElement("div");
@@ -6053,6 +6048,12 @@ function renderGalleryView() {
   }
   const sections = pagination.sections;
   const displayedCount = getGallerySectionItemCount(sections);
+  const layoutMode = getGalleryLayoutModeForWidth(getGalleryLayoutWidth());
+  refs.galleryView.dataset.galleryLayout = layoutMode;
+  const historyLayouts = shouldPaginateHistory && layoutMode === "desktop" ? getGalleryHistorySectionLayouts(allSections) : [];
+  const layoutBySectionKey = new Map(historyLayouts.map((layout) => [layout.key, layout]));
+  const sectionLayouts = sections.map((section) => layoutBySectionKey.get(section.key) || ({ key: section.key, columnCount: layoutMode === "mobile" ? 2 : layoutMode === "tablet" ? 4 : getGalleryColumnCount() }));
+  refs.galleryColumnSwitch?.classList.toggle("hidden", shouldPaginateHistory);
 
   refs.gallerySections.innerHTML = "";
   refs.galleryCount.textContent =
@@ -6062,9 +6063,10 @@ function renderGalleryView() {
   const visibleFilenames = new Set(visibleItems.map((item) => item.filename));
   const checkedCount = state.galleryCheckedFilenames.filter((filename) => visibleFilenames.has(filename)).length;
   const deleteBlocked = state.galleryLoading || state.assetRecordDeletion.busy;
+  refs.gallerySelectionModeButton.disabled = deleteBlocked; refs.gallerySelectionModeButton.setAttribute("aria-pressed", String(state.gallerySelectionMode)); refs.gallerySelectionModeButton.setAttribute("aria-label", state.gallerySelectionMode ? "关闭图片勾选" : "开启图片勾选"); refs.gallerySelectionModeButton.textContent = `勾选图片${checkedCount > 0 ? ` (${checkedCount})` : ""}`;
   refs.refreshGalleryButton.disabled = state.assetRecordDeletion.busy;
   refs.galleryDeleteCurrentButton.disabled = deleteBlocked || !visibleFilenames.has(state.galleryCurrentFilename);
-  refs.galleryDeleteSelectedButton.disabled = deleteBlocked || checkedCount === 0;
+  refs.galleryDeleteSelectedButton.disabled = deleteBlocked || !state.gallerySelectionMode || checkedCount === 0;
   refs.galleryDeleteSelectedButton.textContent = checkedCount > 0 ? `删除选中 (${checkedCount})` : "删除选中";
   if (refs.galleryActionFeedback && refs.galleryActionFeedback.textContent !== state.galleryDeleteFeedback) {
     refs.galleryActionFeedback.textContent = state.galleryDeleteFeedback;
@@ -6116,11 +6118,11 @@ function renderGalleryView() {
   refs.galleryEmpty.append(emptyTitle, emptyCopy, emptyAction);
   refs.galleryEmpty.classList.toggle("hidden", displayedCount > 0);
   renderGalleryPagination(pagination, shouldPaginateHistory);
-  renderGalleryFilters(visibleItems, sections, pagination, shouldPaginateHistory);
+  renderGalleryFilters(visibleItems, sections, pagination, shouldPaginateHistory, sectionLayouts);
   renderGalleryColumnPresetButtons();
 
-  sections.forEach((section) => {
-    refs.gallerySections.appendChild(createGallerySection(section));
+  sectionLayouts.forEach((layout, index) => {
+    refs.gallerySections.appendChild(createGallerySection(sections[index], layout.columnCount));
   });
 
   scheduleGalleryPanelHeightSync();
@@ -7134,7 +7136,7 @@ const CREATION_ITEM_STATUS_LABELS = {
   planning: "待开始",
 };
 
-const CREATION_PREVIEW_SLOTS = "1-hero|hero|首图成交主视觉|主商品占主视觉，周围用多个小圆框展示工具、穿搭或使用场景;2-benefit|benefit|核心信息融合图|融合产品、结果、痛点和可信证据，让买家明白为什么需要;3-scene|scene|适用多场景图|用 2-4 个真实适用场景展示产品价值，带宣传片式层次和购买代入感;4-multi-angle|multi-angle|多角度产品展示图|3-4 个清晰视角展示形态、结构、厚度和表面，不堆营销字;5-atmosphere|atmosphere|冲动下单氛围图|用真实拥有感和生活情绪触发想买冲动，同时保持产品清楚可看;6-product-detail|product-detail|产品细节特写图|用微距、局部和指向标注证明材质、结构、做工或关键部位;7-brand-story|brand-story|品牌质感/礼品价值图|做成多场景用途与风格拼贴，展示多种真实使用场景和底部使用方式小图标;8-size-capacity-fit|size-capacity-fit|尺寸容量适配图|用准确尺寸、容量、比例和适配参照降低买错风险;9-effect-comparison|effect-comparison|功能效果渲染图|以一个清晰完整的商品主体为核心，围绕它展现所有已提供功能、机制、效果路径和渲染结果，不做前后或左右对比;10-spec-table|spec-table|参数规格图|用清晰参数表呈现型号、尺寸、单位和关键规格，便于快速核对;11-craft-process|craft-process|品质工艺证明图|把工艺、材料处理、装配或检测事实转成质量证据;12-accessory-gift|accessory-gift|到手清单/配件图|完整展示到手包含物、数量、包装和配件，减少到货不确定;13-series-showcase|series-showcase|多款式/SKU选择图|只展示已提供的颜色、款式、尺码、套装或 SKU，帮助快速选择;14-ingredient-material|ingredient-material|材质成分解析图|用材质、成分、结构或组件解释为什么值得信任或偏好;15-after-sales|after-sales|痛点图|用真实使用困扰、解决路径和结果变化，让买家知道它具体替我解决什么问题;16-usage-suggestion|usage-suggestion|卖点图|用 3-5 个核心卖点连接功能证据和买后收益，让买家知道买它能获得什么好处;17-human-handheld|human-handheld|真人手持展示图|真人出镜，手持、举到镜头前或用鱼线悬挂展示商品，让尺度、细节和真实使用感更直观;18-human-wearable|human-wearable|真人穿戴场景图|真人穿着、背着、提着或佩戴商品，在真实场景里展示版型、比例、背负关系和生活代入感".split(";").map((entry) => { const [itemId, role, title, brief] = entry.split("|"); return { itemId, role, title, brief }; });
+const CREATION_PREVIEW_SLOTS = "1-hero|hero|首图成交主视觉|主商品占主视觉，合并除尺寸外的可靠信息并用目标语言电商排版，周围保留多个小圆框展示工具、穿搭或使用场景;2-benefit|benefit|目标人群共鸣图|锁定一个目标买家和熟悉的需求或犹豫瞬间，让商品成为有共情的选择，不重复卖点列表;3-scene|scene|适用多场景图|用 2-4 个真实适用场景展示产品价值，带宣传片式层次和购买代入感;4-multi-angle|multi-angle|多角度产品展示图|3-4 个清晰视角展示形态、结构、厚度和表面，不堆营销字;5-atmosphere|atmosphere|冲动下单氛围图|把商品融入有动作、有目标人群、有情绪触发的决定性使用或拥有瞬间，而不是平淡陈列;6-product-detail|product-detail|产品细节特写图|用微距、局部和指向标注证明材质、结构、做工或关键部位;7-brand-story|brand-story|品牌质感/礼品价值图|做成多场景用途与风格拼贴，展示多种真实使用场景和底部使用方式小图标;8-size-capacity-fit|size-capacity-fit|尺寸容量适配图|用准确尺寸、容量、比例和适配参照降低买错风险;9-effect-comparison|effect-comparison|功能效果渲染图|以一个清晰完整的商品主体为核心覆盖所有可靠功能；同屏不清晰时使用连续无损场景拼接，不做对比或遗漏;10-spec-table|spec-table|参数规格图|用清晰参数表呈现型号、尺寸、单位和关键规格，便于快速核对;11-craft-process|craft-process|品质工艺证明图|把工艺、材料处理、装配或检测事实转成质量证据;12-accessory-gift|accessory-gift|到手清单/配件图|完整展示到手包含物、数量、包装和配件，减少到货不确定;13-series-showcase|series-showcase|多款式/SKU选择图|只展示已提供的颜色、款式、尺码、套装或 SKU，帮助快速选择;14-ingredient-material|ingredient-material|材质成分解析图|用材质、成分、结构或组件解释为什么值得信任或偏好;15-after-sales|after-sales|痛点图|用真实使用困扰、解决路径和结果变化，让买家知道它具体替我解决什么问题;16-usage-suggestion|usage-suggestion|卖点图|用 3-5 个核心卖点连接功能证据和买后收益，让买家知道买它能获得什么好处;17-human-handheld|human-handheld|真人手持展示图|真人出镜，手持、举到镜头前或用鱼线悬挂展示商品，让尺度、细节和真实使用感更直观;18-human-wearable|human-wearable|真人穿戴场景图|真人穿着、背着、提着或佩戴商品，在真实场景里展示版型、比例、背负关系和生活代入感".split(";").map((entry) => { const [itemId, role, title, brief] = entry.split("|"); return { itemId, role, title, brief }; });
 
 const CREATION_SCENARIO_LABELS = { standard: "标准电商", "detail-page": "详情页转化", "social-seeding": "社媒种草", launch: "新品发布", promotion: "活动促销", livestream: "直播电商", "gift-guide": "礼品推荐", "marketplace-search": "平台搜索", "brand-story": "品牌故事" };
 const CREATION_VISUAL_LANGUAGE_LABELS = { "classic-commercial": "经典商业摄影", "premium-studio": "高端棚拍", "clean-marketplace": "平台清爽白底", "lifestyle-editorial": "生活方式杂志", "social-ugc": "社媒实拍", "detail-infographic": "详情页信息图", "macro-material": "微距材质", "outdoor-context": "户外场景", "minimal-luxury": "极简奢华", "bold-campaign": "活动海报", "warm-handcrafted": "手作温度" };
@@ -8143,6 +8145,7 @@ function refreshCreationRecordSets() {
     })
     .finally(() => {
       creationRecordRefreshPromise = null;
+      renderCreationRecordView();
     });
 }
 
@@ -9257,6 +9260,7 @@ function normalizeCreationItemForView(item = {}, fallbackIndex = 0) {
     sourceIds: Array.isArray(item.sourceIds) ? item.sourceIds.map((entry) => String(entry)).filter(Boolean) : [],
     recommendationSource: String(item.recommendationSource || ""),
     conversionIntent: cloneCreationPlanValue(item.conversionIntent, null),
+    filenameToken: String(item.filenameToken || item.filename_token || ""),
     filename: String(item.filename || ""),
     relativePath: String(item.relativePath || ""),
     prompt: String(item.prompt || ""),
@@ -9378,6 +9382,7 @@ function normalizeCreationSetForView(set = {}) {
     listingDrafts: Array.isArray(set.listingDrafts)
       ? set.listingDrafts.map((draft, index) => normalizeCreationListingDraftForView(draft, index)).filter((draft) => draft.id)
       : [],
+    temuExcelExportState: cloneCreationPlanValue(set.temuExcelExportState, null),
     createdAt: String(set.createdAt || nowIso()),
     updatedAt: String(set.updatedAt || set.createdAt || nowIso()),
     status: resolvedStatus,
@@ -9966,7 +9971,7 @@ function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
 
   const title = document.createElement("strong");
   title.dataset.creationCardTitle = "true";
-  title.textContent = item.title || CREATION_PREVIEW_SLOTS[fallbackIndex]?.title || `第 ${fallbackIndex + 1} 张`;
+  title.textContent = getCreationItemDisplayTitle(item, CREATION_PREVIEW_SLOTS[fallbackIndex]?.title || `第 ${fallbackIndex + 1} 张`);
   head.appendChild(title);
 
   const status = document.createElement("span");
@@ -9987,12 +9992,12 @@ function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
     media.classList.add("creation-record-preview-media");
     media.dataset.creationRecordPreviewItemId = item.itemId;
     media.dataset.creationRecordPreviewSetId = options.creationSetId || "";
-    media.setAttribute("aria-label", `${item.title || "套图项"}查看大图`);
+    media.setAttribute("aria-label", `${getCreationItemDisplayTitle(item, "套图项")}查看大图`);
   } else if (isResultPreviewMedia) {
     media.type = "button";
     media.classList.add("creation-result-preview-media");
     media.dataset.creationPreviewItemId = item.itemId;
-    media.setAttribute("aria-label", `${item.title || "Creation item"} preview image`);
+    media.setAttribute("aria-label", `${getCreationItemDisplayTitle(item, "Creation item")} preview image`);
   }
 
   if (isLoadingCard) {
@@ -10003,7 +10008,7 @@ function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
     const image = document.createElement("img");
     image.loading = "lazy";
     image.decoding = "async";
-    image.alt = item.title || `套图 ${fallbackIndex + 1}`;
+    image.alt = getCreationItemDisplayTitle(item, `套图 ${fallbackIndex + 1}`);
     image.src = imageUrl;
     media.appendChild(image);
   } else {
@@ -10037,7 +10042,7 @@ function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
     button.dataset.creationRetryItemId = item.itemId;
     button.textContent = getCreationRepairButtonText(item);
     button.disabled = !canRepairCreationItem(item.itemId);
-    button.setAttribute("aria-label", `${item.title || "套图项"}${button.textContent}`);
+    button.setAttribute("aria-label", `${getCreationItemDisplayTitle(item, "套图项")}${button.textContent}`);
     actions.appendChild(button);
     card.appendChild(actions);
   }
@@ -10148,6 +10153,8 @@ function renderCreationRecordTimeFilters(keywordMatchedSets = getCreationRecordK
       state.creation.recordTimeFilter = option.value;
       state.creation.recordDateFilter = "";
       state.creation.recordDetailExpanded = false;
+      state.creation.recordListScrollTop = 0;
+      if (refs.creationRecordSetList) refs.creationRecordSetList.scrollTop = 0;
       renderCreationRecordView();
     });
     refs.creationRecordTimeFilters.appendChild(button);
@@ -10245,6 +10252,9 @@ async function confirmCreationRecordDelete() {
       currentSetId: selectedSetIdBeforeDelete,
       deletedSetIds: setIds,
     });
+    if (deletedIds.has(selectedSetIdBeforeDelete)) {
+      state.creation.recordDetailExpanded = false;
+    }
     if (deletedIds.has(state.creation.currentSet?.setId)) state.creation.currentSet = null;
     state.creation.queue = state.creation.queue.filter((job) => !deletedIds.has(job?.set?.setId));
     if (!state.creation.queue.some((job) => job.id === state.creation.selectedQueueId)) state.creation.selectedQueueId = "";
@@ -10287,7 +10297,7 @@ function buildCreationRecordPromptText(set) {
     `行业: ${set.industryTemplateLabel || set.industryTemplate || "general"}`,
     "",
     ...items.flatMap((item, index) => [
-      `${index + 1}. ${item.title || item.role || item.itemId || "套图单张"}`,
+      `${index + 1}. ${getCreationItemDisplayTitle(item, item.role || item.itemId || "套图单张")}`,
       item.prompt ? item.prompt : "",
       item.marketingCopy ? `文案: ${item.marketingCopy}` : "",
       "",
@@ -10335,7 +10345,22 @@ const creationListingController = createCreationListingController({
   upsertSet: upsertCreationSet,
   writeTextToClipboard,
 });
-const creationRecordTemuExportController = createCreationTemuExportController({ state, getCurrentSetIds: () => state.creation.sets.map((set) => set?.setId), setRecordFeedback: setCreationRecordFeedback, renderRecordView: renderCreationRecordView, compactErrorMessage });
+const creationRecordTemuExportController = createCreationTemuExportController({
+  state,
+  getCurrentSetIds: () => state.creation.sets.map((set) => set?.setId),
+  getCurrentSets: () => state.creation.sets,
+  isMutationBusy: () => Boolean(
+    state.creation.generating ||
+    state.creation.planning ||
+    state.creation.recordDeleteBusy ||
+    state.creation.listingGeneratingSetId ||
+    creationRecordRefreshPromise
+  ),
+  refreshSets: () => loadCreationSets(),
+  setRecordFeedback: setCreationRecordFeedback,
+  renderRecordView: renderCreationRecordView,
+  compactErrorMessage,
+});
 async function fetchCreationRecordPathReport(set) {
   if (!set?.setId) {
     throw new Error("请先选择一套记录。");
@@ -10496,19 +10521,48 @@ async function copyCreationRecordItemFullPath(itemId, setId = "") {
   setCreationRecordFeedback("已复制单张完整路径。", "success");
 }
 
-function renderCreationRecordSetList() {
+function getCreationRecordListFilterSignature() {
+  const filters = getCreationRecordTimeFilterSnapshot();
+  return JSON.stringify([
+    String(state.creation.recordQuery || "").trim().toLowerCase(),
+    filters.window,
+    filters.date,
+  ]);
+}
+
+function renderCreationRecordSetList(filteredSets = filterCreationRecordSets()) {
   if (!refs.creationRecordSetList) {
     return;
   }
 
-  refs.creationRecordSetList.innerHTML = "";
+  const filterSignature = getCreationRecordListFilterSignature();
+  if (state.creation.recordListState?.filterSignature === filterSignature) {
+    state.creation.recordListScrollTop = Number(refs.creationRecordSetList.scrollTop) || 0;
+  } else {
+    state.creation.recordListScrollTop = 0;
+  }
+  const listModel = buildCreationRecordListModel(filteredSets, {
+    state: state.creation.recordListState,
+    filterSignature,
+  });
+  state.creation.recordListState = listModel.state;
+  refs.creationRecordSetList.replaceChildren();
   const selectedSet = getCreationRecordSelectedSet();
   const selectedSetId = selectedSet?.setId || "";
-  const sets = filterCreationRecordSets().slice(0, 60);
   const checkedSetIds = new Set(state.creation.recordCheckedSetIds);
   refs.creationRecordSetList.setAttribute("aria-busy", String(state.assetLoading.creation));
+  if (refs.creationRecordListSummary) {
+    refs.creationRecordListSummary.textContent = `已显示 ${listModel.shownCount} / 匹配 ${listModel.totalCount}`;
+  }
+  if (refs.creationRecordLoadMoreButton) {
+    refs.creationRecordLoadMoreButton.hidden = !listModel.hasMore;
+    refs.creationRecordLoadMoreButton.disabled = state.assetLoading.creation;
+    refs.creationRecordLoadMoreButton.textContent = listModel.hasMore
+      ? `加载更多（剩余 ${listModel.totalCount - listModel.shownCount}）`
+      : "已显示全部";
+  }
 
-  if (state.assetLoading.creation || state.assetLoadErrors.creation || sets.length === 0) {
+  if (state.assetLoading.creation || state.assetLoadErrors.creation || listModel.visibleSets.length === 0) {
     const empty = document.createElement("div");
     empty.className = "creation-record asset-list-state";
     empty.textContent = state.assetLoading.creation
@@ -10520,77 +10574,20 @@ function renderCreationRecordSetList() {
     return;
   }
 
-  sets.forEach((set) => {
-    const row = document.createElement("div");
-    row.className = "creation-record-list-item";
-    row.classList.toggle("is-checked", checkedSetIds.has(set.setId));
-
-    const selectLabel = document.createElement("label");
-    selectLabel.className = "creation-record-select";
-    selectLabel.title = `选择 ${set.productName || "未命名商品"}`;
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.checked = checkedSetIds.has(set.setId);
-    checkbox.disabled = state.creation.recordDeleteBusy;
-    checkbox.dataset.creationRecordSelectSetId = set.setId;
-    checkbox.setAttribute("aria-label", `选择套图 ${set.productName || "未命名商品"}`);
-    selectLabel.appendChild(checkbox);
-
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "creation-record";
-    button.dataset.creationRecordSetId = set.setId;
-    button.classList.toggle("active", set.setId === selectedSetId);
-    button.setAttribute("role", "option");
-    button.setAttribute("aria-selected", String(set.setId === selectedSetId));
-
-    const title = document.createElement("strong");
-    title.className = "creation-record-title";
-    title.textContent = set.productName || "未命名商品";
-    button.appendChild(title);
-
-    const metaRow = document.createElement("span");
-    metaRow.className = "creation-record-meta-row";
-
-    const meta = document.createElement("span");
-    meta.className = "creation-record-meta";
-    const progress = getCreationProgressSummary(set);
-    const platformLabel = set.platformLabel || formatCreationPlatformLabel(set.platform);
-    const listingLabel = getCreationRecordListingMetaLabel(set);
-    const metaParts = [platformLabel, `${progress.completed}/${progress.total}`].filter(Boolean);
-    const recordTimeText = formatTime(set.updatedAt || set.createdAt);
-    meta.textContent = metaParts.join(" · ");
-    if (recordTimeText) {
-      const recordTime = document.createElement("span");
-      recordTime.className = "creation-record-time";
-      recordTime.textContent = recordTimeText;
-      meta.append(metaParts.length ? " · " : "", recordTime);
-    }
-    metaRow.appendChild(meta);
-
-    button.appendChild(metaRow);
-
-    const statusRow = document.createElement("span");
-    statusRow.className = "creation-record-status-row";
-
-    const status = document.createElement("span");
-    status.className = "asset-record-status";
-    status.dataset.state = progress.failed > 0 ? "failed" : progress.completed >= progress.total && progress.total > 0 ? "completed" : "running";
-    status.textContent = progress.failed > 0 ? `${progress.failed} 项失败` : progress.completed >= progress.total && progress.total > 0 ? "已完成" : "生成中";
-    statusRow.appendChild(status);
-
-    if (listingLabel) {
-      const listingBadge = document.createElement("span");
-      listingBadge.className = "creation-record-listing-badge";
-      listingBadge.textContent = listingLabel;
-      statusRow.appendChild(listingBadge);
-    }
-
-    button.appendChild(statusRow);
-
-    row.append(selectLabel, button);
-    refs.creationRecordSetList.appendChild(row);
+  listModel.visibleSets.forEach((set) => {
+    refs.creationRecordSetList.appendChild(createCreationRecordListRow({
+      set,
+      selectedSetId,
+      checked: checkedSetIds.has(set.setId),
+      checkboxDisabled: state.creation.recordDeleteBusy,
+      getProgressSummary: getCreationProgressSummary,
+      getListingLabel: getCreationRecordListingMetaLabel,
+      formatPlatformLabel: formatCreationPlatformLabel,
+      formatTime,
+      documentRef: document,
+    }));
   });
+  refs.creationRecordSetList.scrollTop = state.creation.recordListScrollTop;
 }
 
 function selectCreationRecord(setId) {
@@ -10599,6 +10596,7 @@ function selectCreationRecord(setId) {
     return;
   }
 
+  state.creation.recordListScrollTop = Number(refs.creationRecordSetList?.scrollTop) || 0;
   state.creation.recordSetId = set.setId;
   state.creation.recordDetailExpanded = false;
   setCreationRecordFeedback();
@@ -10740,6 +10738,7 @@ function renderCreationRecordView() {
   const existingSetIds = new Set(state.creation.sets.map((set) => set.setId));
   const checkedCount = new Set(state.creation.recordCheckedSetIds.filter((setId) => existingSetIds.has(setId))).size;
   const deleteBlocked = state.creation.generating || state.creation.planning || state.creation.recordDeleteBusy || state.creation.recordTemuExportBusy;
+  const temuStartBlocked = deleteBlocked || Boolean(state.creation.listingGeneratingSetId);
   if (refs.creationRecordSearchInput && refs.creationRecordSearchInput.value !== state.creation.recordQuery) {
     refs.creationRecordSearchInput.value = state.creation.recordQuery;
   }
@@ -10760,18 +10759,33 @@ function renderCreationRecordView() {
   if (refs.creationRecordReuseButton) {
     refs.creationRecordReuseButton.disabled = !selectedSet;
   }
-  creationRecordTemuExportController.syncControls(deleteBlocked, checkedCount);
-  if (refs.creationRecordRefreshButton) refs.creationRecordRefreshButton.disabled = state.creation.recordTemuExportBusy;
+  creationRecordTemuExportController.syncControls(temuStartBlocked, checkedCount);
+  const refreshBlocked = state.creation.recordTemuExportBusy || Boolean(creationRecordRefreshPromise);
+  if (refs.creationRecordRefreshButton) refs.creationRecordRefreshButton.disabled = refreshBlocked;
+  if (refs.creationRecordRefreshMenuButton) refs.creationRecordRefreshMenuButton.disabled = refreshBlocked;
   if (refs.creationRecordDeleteCurrentButton) {
     refs.creationRecordDeleteCurrentButton.disabled = deleteBlocked || !selectedSet;
+  }
+  if (refs.creationRecordDeleteCurrentMenuButton) {
+    refs.creationRecordDeleteCurrentMenuButton.disabled = deleteBlocked || !selectedSet;
   }
   if (refs.creationRecordDeleteSelectedButton) {
     refs.creationRecordDeleteSelectedButton.disabled = deleteBlocked || checkedCount === 0;
     refs.creationRecordDeleteSelectedButton.textContent = checkedCount > 0 ? `删除选中 (${checkedCount})` : "删除选中";
   }
+  if (refs.creationRecordDeleteSelectedMenuButton) {
+    refs.creationRecordDeleteSelectedMenuButton.disabled = deleteBlocked || checkedCount === 0;
+    refs.creationRecordDeleteSelectedMenuButton.textContent = checkedCount > 0 ? `删除选中 (${checkedCount})` : "删除选中";
+  }
   if (refs.creationRecordDeleteFilteredButton) {
     refs.creationRecordDeleteFilteredButton.disabled = deleteBlocked || !hasActiveFilters || filteredSets.length === 0;
     refs.creationRecordDeleteFilteredButton.textContent = hasActiveFilters && filteredSets.length > 0
+      ? `删除筛选结果 (${filteredSets.length})`
+      : "删除筛选结果";
+  }
+  if (refs.creationRecordDeleteFilteredMenuButton) {
+    refs.creationRecordDeleteFilteredMenuButton.disabled = deleteBlocked || !hasActiveFilters || filteredSets.length === 0;
+    refs.creationRecordDeleteFilteredMenuButton.textContent = hasActiveFilters && filteredSets.length > 0
       ? `删除筛选结果 (${filteredSets.length})`
       : "删除筛选结果";
   }
@@ -10790,13 +10804,20 @@ function renderCreationRecordView() {
   if (refs.creationRecordExportManifestButton) {
     refs.creationRecordExportManifestButton.disabled = !selectedSet;
   }
-  if (refs.creationRecordRepairIncompleteButton) { refs.creationRecordRepairIncompleteButton.disabled = state.creation.generating || !canRepairCreationSet(selectedSet) || recordIncompleteItems.length === 0; refs.creationRecordRepairIncompleteButton.textContent = getCreationRecordRepairButtonLabel(recordIncompleteItems); }
+  const repairBlocked = state.creation.generating || state.creation.recordTemuExportBusy || !canRepairCreationSet(selectedSet) || recordIncompleteItems.length === 0;
+  if (refs.creationRecordRepairIncompleteButton) { refs.creationRecordRepairIncompleteButton.disabled = repairBlocked; refs.creationRecordRepairIncompleteButton.textContent = getCreationRecordRepairButtonLabel(recordIncompleteItems); }
+  if (refs.creationRecordRepairIncompleteMenuButton) { refs.creationRecordRepairIncompleteMenuButton.disabled = repairBlocked; refs.creationRecordRepairIncompleteMenuButton.textContent = getCreationRecordRepairButtonLabel(recordIncompleteItems); }
   refs.creationRecordRepairIncompleteButton?.classList.toggle("hidden", recordIncompleteItems.length === 0);
+  refs.creationRecordRepairIncompleteMenuButton?.classList.toggle("hidden", recordIncompleteItems.length === 0);
   refs.creationRecordReuseButton?.classList.toggle("hidden", recordIncompleteItems.length > 0);
   if (refs.creationRecordSelection) refs.creationRecordSelection.textContent = selectedSet?.productName || "尚未选择";
   creationListingController.syncRecordControls(selectedSet);
+  if (state.creation.recordTemuExportBusy) {
+    if (refs.creationRecordGenerateListingsButton) refs.creationRecordGenerateListingsButton.disabled = true;
+    if (refs.creationRecordRegenerateListingsButton) refs.creationRecordRegenerateListingsButton.disabled = true;
+  }
 
-  renderCreationRecordSetList();
+  renderCreationRecordSetList(filteredSets);
   state.creation.recordSetId = selectedSet?.setId || "";
   renderCreationRecordArchiveDetail(selectedSet);
   if (!refs.creationRecordResultGrid) {
@@ -15919,7 +15940,7 @@ async function startGeneration(event) {
   await ensureReferenceGenerationFilesReady();
 
   const job = createJob();
-  state.jobs.unshift(job);
+  state.promptFilmstripHistoryLimit = PROMPT_FILMSTRIP_GENERATED_HISTORY_LIMIT; state.jobs.unshift(job);
   state.selectedPreviewKey = makeJobPreviewKey(job.id);
   recordJobQueued(job);
   renderAll();
@@ -16407,12 +16428,14 @@ function bindEvents() {
   refs.creationRepairFailedButton.addEventListener("click", () => {
     repairCreationItems({ scope: "incomplete" }).catch((error) => setCreationFeedback(error.message, "error"));
   });
-  refs.creationRecordRefreshButton.addEventListener("click", () => {
-    loadCreationSets().catch((error) => setCreationRecordFeedback(error.message, "error"));
-  });
+  refs.creationRecordRefreshButton.addEventListener("click", refreshCreationRecordSets);
+  refs.creationRecordRefreshMenuButton?.addEventListener("click", refreshCreationRecordSets);
   refs.creationRecordDeleteCurrentButton.addEventListener("click", () => requestCreationRecordDelete("current"));
+  refs.creationRecordDeleteCurrentMenuButton?.addEventListener("click", () => requestCreationRecordDelete("current"));
   refs.creationRecordDeleteSelectedButton.addEventListener("click", () => requestCreationRecordDelete("selected"));
+  refs.creationRecordDeleteSelectedMenuButton?.addEventListener("click", () => requestCreationRecordDelete("selected"));
   refs.creationRecordDeleteFilteredButton.addEventListener("click", () => requestCreationRecordDelete("filtered"));
+  refs.creationRecordDeleteFilteredMenuButton?.addEventListener("click", () => requestCreationRecordDelete("filtered"));
   refs.creationRecordDeleteForm.addEventListener("submit", (event) => {
     event.preventDefault();
     confirmCreationRecordDelete().catch((error) => setCreationRecordFeedback(error.message, "error"));
@@ -16444,6 +16467,7 @@ function bindEvents() {
     copyCreationRecordFullPaths().catch((error) => setCreationRecordFeedback(error.message, "error"));
   });
   refs.creationRecordRepairIncompleteButton.addEventListener("click", () => { repairCreationRecordIncompleteImages().catch((error) => setCreationRecordFeedback(error.message, "error")); });
+  refs.creationRecordRepairIncompleteMenuButton?.addEventListener("click", () => { repairCreationRecordIncompleteImages().catch((error) => setCreationRecordFeedback(error.message, "error")); });
   refs.creationRecordCopyPromptsButton.addEventListener("click", () => {
     copyCreationRecordPrompts().catch((error) => setCreationRecordFeedback(error.message, "error"));
   });
@@ -16454,12 +16478,16 @@ function bindEvents() {
   refs.creationRecordSearchInput.addEventListener("input", (event) => {
     state.creation.recordQuery = event.target.value;
     state.creation.recordDetailExpanded = false;
+    state.creation.recordListScrollTop = 0;
+    refs.creationRecordSetList.scrollTop = 0;
     renderCreationRecordView();
   });
   refs.creationRecordDateInput.addEventListener("input", (event) => {
     state.creation.recordDateFilter = normalizeCreationRecordDateFilter(event.target.value);
     if (state.creation.recordDateFilter) state.creation.recordTimeFilter = "all";
     state.creation.recordDetailExpanded = false;
+    state.creation.recordListScrollTop = 0;
+    refs.creationRecordSetList.scrollTop = 0;
     renderCreationRecordView();
   });
   refs.creationRecordResetFiltersButton.addEventListener("click", () => {
@@ -16467,6 +16495,8 @@ function bindEvents() {
     state.creation.recordTimeFilter = "all";
     state.creation.recordDateFilter = "";
     state.creation.recordDetailExpanded = false;
+    state.creation.recordListScrollTop = 0;
+    refs.creationRecordSetList.scrollTop = 0;
     setCreationRecordFeedback("");
     renderCreationRecordView();
     refs.creationRecordSearchInput.focus();
@@ -16478,6 +16508,7 @@ function bindEvents() {
     }
 
     selectCreationRecord(target.dataset.creationRecordSetId);
+    assetWorkspaceController.closeRecordPickers();
   });
   refs.creationRecordSetList.addEventListener("change", (event) => {
     const checkbox = event.target.closest("[data-creation-record-select-set-id]");
@@ -16491,6 +16522,11 @@ function bindEvents() {
     renderCreationRecordView();
     refs.creationRecordSetList.scrollTop = scrollTop;
     refs.creationRecordSetList.scrollLeft = scrollLeft;
+  });
+  refs.creationRecordLoadMoreButton?.addEventListener("click", () => {
+    const filterSignature = getCreationRecordListFilterSignature();
+    state.creation.recordListState = loadMoreCreationRecordListState(state.creation.recordListState, filterSignature);
+    renderCreationRecordView();
   });
   refs.creationRecordResultGrid.addEventListener("click", (event) => {
     const previewTarget = event.target.closest("[data-creation-record-preview-item-id]");
@@ -17202,6 +17238,7 @@ function bindEvents() {
   refs.refreshGalleryButton.addEventListener("click", () => {
     loadGallery().catch((error) => showError(error.message));
   });
+  refs.gallerySelectionModeButton.addEventListener("click", () => { if (state.galleryLoading || state.assetRecordDeletion.busy) return; state.gallerySelectionMode = !state.gallerySelectionMode; renderGalleryView(); });
   refs.galleryDeleteCurrentButton.addEventListener("click", () => requestAssetRecordDelete("gallery", "current"));
   refs.galleryDeleteSelectedButton.addEventListener("click", () => requestAssetRecordDelete("gallery", "selected"));
   refs.gallerySections.addEventListener("change", (event) => {

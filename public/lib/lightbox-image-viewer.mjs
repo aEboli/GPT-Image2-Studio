@@ -353,6 +353,14 @@ export function createLightboxImageViewer({ refs, state }) {
         syncMetrics({ preserveMode: true });
       }
     });
+    if (typeof ResizeObserver === "function" && refs.lightboxImageShell) {
+      const resizeObserver = new ResizeObserver(() => {
+        if (!refs.lightbox.classList.contains("hidden")) {
+          syncMetrics({ preserveMode: true });
+        }
+      });
+      resizeObserver.observe(refs.lightboxImageShell);
+    }
   }
 
   return {

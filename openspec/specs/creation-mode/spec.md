@@ -15,7 +15,35 @@ The system SHALL expose Creation Mode as a separate tab under the creation works
 - **THEN** the prompt-mode activity feed and default gallery-visible history are not updated as if the images were prompt-mode single-image jobs
 
 ### Requirement: Creation Mode generates configurable ecommerce sets
-The system SHALL generate one set for one product with quick presets of 4, 6, 8, 10, 12, 14, or 16 ecommerce marketing roles and SHALL allow the user to customize which of the 16 image roles are generated for the current set: hero, benefit, scene, multi-angle, atmosphere, product detail, brand story, size/capacity/fit, effect comparison, specification table, craft process, accessory/gift, series showcase, ingredient/material, after-sales, and usage suggestion. The system SHALL keep those role IDs stable while presenting conversion-oriented Chinese role labels: 首图成交主视觉, 核心信息融合图, 适用多场景图, 多角度产品展示图, 冲动下单氛围图, 产品细节特写图, 品牌质感/礼品价值图, 尺寸容量适配图, 功能效果渲染图, 参数规格图, 品质工艺证明图, 到手清单/配件图, 多款式/SKU选择图, 材质成分解析图, 痛点图, and 卖点图. The system SHALL also allow the user to choose an industry template for general ecommerce, apparel, beauty, food, consumer electronics, home/living products, or a searchable fourth-level ecommerce category template. The system SHALL support a set-level visual-language selector that defaults to `classic-commercial` and keeps the generated set visually consistent across lighting, tone, material treatment, realism level, and brand atmosphere. When the user uses a preset without custom role changes and no non-general industry template is selected, the first four roles SHALL remain 首图成交主视觉, 核心信息融合图, 适用多场景图, and 多角度产品展示图.
+The system SHALL generate one set for one product with quick presets of 4, 6, 8, 10, 12, 14, or 16 ecommerce marketing roles and SHALL allow the user to customize which of the 16 image roles are generated for the current set: hero, benefit, scene, multi-angle, atmosphere, product detail, brand story, size/capacity/fit, effect comparison, specification table, craft process, accessory/gift, series showcase, ingredient/material, after-sales, and usage suggestion. The system SHALL keep those role IDs stable while presenting conversion-oriented Chinese role labels: 首图成交主视觉, 目标人群共鸣图, 适用多场景图, 多角度产品展示图, 冲动下单氛围图, 产品细节特写图, 品牌质感/礼品价值图, 尺寸容量适配图, 功能效果渲染图, 参数规格图, 品质工艺证明图, 到手清单/配件图, 多款式/SKU选择图, 材质成分解析图, 痛点图, and 卖点图. The system SHALL also allow the user to choose an industry template for general ecommerce, apparel, beauty, food, consumer electronics, home/living products, or a searchable fourth-level ecommerce category template. The system SHALL support a set-level visual-language selector that defaults to `classic-commercial` and keeps the generated set visually consistent across lighting, tone, material treatment, realism level, and brand atmosphere. When the user uses a preset without custom role changes and no non-general industry template is selected, the first four roles SHALL remain 首图成交主视觉, 目标人群共鸣图, 适用多场景图, and 多角度产品展示图.
+
+#### Scenario: User starts a conversion-oriented creation set
+- **WHEN** the user submits product information and a target language in Creation Mode
+- **THEN** the first planned item remains `hero` / 首图成交主视觉 and the second remains `benefit` / 目标人群共鸣图
+- **AND** the hero prompt requests all reliable non-dimension product identity, description, selling-point, material, usage, scene, package, and trust facts that fit its bounded information hierarchy
+- **AND** newly authored hero canvas copy uses the selected target language while physical product and packaging text remains unchanged
+- **AND** the hero prompt retains 3–5 small circular scene frames around the dominant product
+
+#### Scenario: User selects the target-shopper resonance role
+- **WHEN** a preset or custom subset contains `benefit`
+- **THEN** the role is shown as 目标人群共鸣图 and its prompt depicts one recognizable target shopper, one concrete decision moment or pain context, and one emotionally credible reason to choose the product
+- **AND** the role does not become a second generic selling-point list, parameter table, or plain product-only card
+
+#### Scenario: User views a historical universal set with the former second selling-point label
+- **WHEN** a saved historical item uses the stable second-slot identity `universal:benefit-proof` or another compatible second-slot `benefit` identity
+- **THEN** the card and exported prompt heading are displayed as 目标人群共鸣图
+- **AND** the later `universal:selling-point-stack` item remains displayed as 卖点图
+- **AND** the stored manifest title, prompt, filename, and stable item ID are not rewritten
+
+#### Scenario: User generates a high-intent atmosphere image
+- **WHEN** the planned set includes `atmosphere` / 冲动下单氛围图
+- **THEN** the prompt places the exact product inside a specific decisive ownership or usage moment with a visible action, target-user cue, and purchase-trigger emotion
+- **AND** the prompt forbids a flat static display, empty decorative mood, or unrelated lifestyle scene
+
+#### Scenario: Platform policy is stricter than conversion guidance
+- **WHEN** a platform-native slot has a blocking no-text, white-background, transparent, or no-collage constraint
+- **THEN** the blocking platform policy remains authoritative
+- **AND** hero all-fact copy, circular scene frames, and scene stitching are omitted wherever they conflict with that policy
 
 #### Scenario: User starts a creation set
 - **WHEN** the user submits product information and a target language in Creation Mode
@@ -1180,55 +1208,54 @@ Creation Mode SHALL 将新计划和本地队列中的 SKU 项命名为 `SKU imag
 
 名称中的中文压缩 SHALL 只作用于计划项和队列项的用户可见名称，不得改变 SKU 图内提示词标签。单个复合颜色如 `深蓝色`、`玫瑰金色` 或 `米白色` SHALL 保持完整，不得因没有多个独立颜色而去掉末尾“色”。
 
-当没有可靠颜色标签时，系统 SHALL 保留现有的原始 SKU 标题、ID、参考文件名降级顺序，以避免猜测性名称。该名称变化 SHALL 不改变 SKU 项序号、排序、ID、`filenameToken`、生成提示词、Listing、导出字段或已持久化历史项。
+当没有可靠颜色标签时，系统 SHALL 使用 `SKU image {序号}`，MUST NOT 回退到原始 SKU 标题、ID、货号或参考文件名。新计划的 SKU `filenameToken` 和新生成图片的文件名短标识 SHALL 只使用稳定 SKU 序号和可选的可靠颜色 token，MUST NOT 包含原始 SKU 标题、ID、货号或参考文件名。该名称变化 SHALL 不改变 SKU 项序号、排序、ID、生成提示词、Listing、导出字段、原始参考文件名、参考索引、图片关联或已持久化历史项。
 
 #### Scenario: 单一 SKU 使用本地化颜色名称
 
 - **WHEN** 一个新计划的 SKU 主体提供可靠颜色标签 `brown black silver` 且目标语言为简体中文
 - **THEN** 该 SKU 项名称为 `SKU image 1 - 棕黑银色`
 - **AND** SKU 图内的颜色标签仍为 `棕色 黑色 银色`
+- **AND** `filenameToken` 不包含原始 SKU 标题、ID、货号或参考文件名
 
 #### Scenario: 分组 SKU 保留多个主体颜色顺序
 
 - **WHEN** 一个新计划或本地队列中的 SKU 主体按稳定顺序提供 `blue` 和 `gray` 两个完整主体颜色标签
 - **THEN** 该 SKU 项名称使用 `SKU image {序号} - blue / gray`
-- **AND** 系统不把两个标签去重、重排或合并为一个颜色词
+- **AND** `filenameToken` 只使用稳定序号和安全颜色 token
 
-#### Scenario: 无可靠颜色时不猜测
+#### Scenario: SKU 缺少可靠颜色名称
 
-- **WHEN** 一个 SKU 主体没有可靠的结构化、显式或可安全识别的颜色标签
-- **THEN** 该 SKU 项名称继续使用原始 SKU 标题、ID 或参考文件名的降级顺序
-- **AND** 系统不显示猜测性颜色名称
+- **WHEN** 一个 SKU 主体没有可靠的结构化、显式或可安全识别的颜色标签，且参考文件名为 `260526-SKU-151142-5714.png`
+- **THEN** 该 SKU 项名称为 `SKU image {序号}`
+- **AND** `filenameToken` 和新生成图片文件名均不包含 `260526-SKU-151142-5714`、SKU 标题、ID 或其他货号
+- **AND** 原始 SKU ID、参考文件名、参考索引和图片关联保持不变
 
-#### Scenario: 已保存的历史项保持不变
+#### Scenario: Historical saved plan keeps its name
 
-- **WHEN** 用户查看在本变更前已保存的套图记录
-- **THEN** 系统保留该记录中已经保存的 SKU 项名称
-- **AND** 不迁移其文件名、`filenameToken`、提示词、Listing、导出字段或下游数据
+- **WHEN** 一个历史记录已经保存了使用旧降级顺序生成的 SKU 项名称或 `filenameToken`
+- **THEN** 系统保留该记录中已经保存的值
+- **AND** 不迁移其文件名、提示词、Listing、导出字段或下游数据
 
-#### Scenario: 中文多颜色名称压缩显示
+#### Scenario: 中文多颜色显示名压缩且图内标签不变
 
 - **WHEN** 一个新计划的 SKU 主体提供可靠颜色标签 `red black blue` 且目标语言为简体中文
 - **THEN** 该 SKU 项名称为 `SKU image 1 - 红黑蓝色`
 - **AND** SKU 图内对应的颜色标签仍为 `红色 黑色 蓝色`
 
-#### Scenario: 英文名称保持原格式
+#### Scenario: 英文多颜色显示名保留空格
 
 - **WHEN** 一个新计划的 SKU 主体提供可靠颜色标签 `red black blue` 且目标语言为 English
 - **THEN** 该 SKU 项名称为 `SKU image 1 - red black blue`
-- **AND** 系统不删除英文颜色之间的空格
 
-#### Scenario: 分组主体边界保持不变
+#### Scenario: 中文分组 SKU 不跨主体压缩
 
 - **WHEN** 一个本地队列中的分组 SKU 按稳定顺序提供 `red` 和 `black` 两个完整主体颜色标签且目标语言为简体中文
 - **THEN** 该 SKU 项名称使用 `SKU image {序号} - 红色 / 黑色`
-- **AND** 系统不把两个主体合并成 `红黑色`
 
-#### Scenario: 单一复合颜色保持完整
+#### Scenario: 单个复合颜色保持完整
 
 - **WHEN** 一个 SKU 主体只有一个可靠复合颜色 `navy blue` 且目标语言为简体中文
 - **THEN** 该 SKU 项名称使用 `SKU image {序号} - 深蓝色`
-- **AND** 系统不把它压缩为 `深蓝`
 
 ### Requirement: 套图记录复用显式多选导出 Temu Excel
 
@@ -1468,3 +1495,25 @@ Temu Excel SHALL 使用独立按钮、表单、端点和文件名。现有当前
 - **THEN** 浏览器继续调用原有导出实现并生成原有格式
 - **AND** 当前勾选的 Temu 批次不改变该单套导出目标
 - **AND** 不要求 Cloudinary 配置或 Temu 模板
+
+### Requirement: Browser and queue preserve safe SKU filename tokens
+
+For each newly planned or locally queued SKU image, the system SHALL create a `filenameToken` from only the stable SKU sequence and an optional reliable normalized color label. Browser normalization SHALL preserve this token through generation and repair submissions. Local and Worker filename builders SHALL use the preserved token before any display title fallback. The token and new output filename MUST NOT contain the raw SKU title, SKU ID, product part number, or reference filename. Association metadata and generation prompts SHALL remain unchanged.
+
+#### Scenario: Queued SKU has a part-number filename and no reliable color
+
+- **WHEN** a newly queued SKU references `260526-SKU-151142-5714.png` and supplies no reliable color label
+- **THEN** its display title is `SKU image 1`
+- **AND** its `filenameToken` is `sku-1`
+- **AND** browser normalization preserves `sku-1` for the generation request
+
+#### Scenario: Queued SKU has a reliable color
+
+- **WHEN** a newly queued second SKU supplies the reliable color label `blue`
+- **THEN** its `filenameToken` is `sku-2-blue`
+- **AND** the token contains no raw SKU title, ID, or reference filename
+
+#### Scenario: Existing association metadata is retained
+
+- **WHEN** a safe filename token is generated for a SKU item
+- **THEN** the SKU ID, original reference filename, reference index, prompt, and image association remain available unchanged

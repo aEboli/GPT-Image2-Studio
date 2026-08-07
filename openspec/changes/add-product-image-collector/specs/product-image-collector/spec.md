@@ -415,7 +415,13 @@ The extension SHALL use Manifest V3 and SHALL declare HTTPS host permissions onl
 - **AND** no launcher DOM appears unless complete runtime validation identifies a supported consumer product-detail URL
 
 ### Requirement: Local application distributes a reviewable extension package
-The Local application SHALL generate a ZIP from version-controlled extension sources and the synchronized import-protocol module when the user requests the product-image collector package. The package SHALL include a valid manifest and Chinese installation instructions. Generated ZIP artifacts SHALL remain outside source control and desktop private-data directories.
+The Local application SHALL generate a ZIP from version-controlled extension sources and the synchronized import-protocol module when the user requests the product-image collector package. The package action SHALL be visible in the Creation tools menu only while the current page is Creation mode and SHALL remain hidden in every other view. The package SHALL include a valid manifest and Chinese installation instructions. Generated ZIP artifacts SHALL remain outside source control and desktop private-data directories.
+
+#### Scenario: User changes the current workbench page
+- **WHEN** the current page is Creation mode
+- **THEN** the Creation tools menu displays the Product Image Collector action
+- **AND WHEN** the user opens any other creation, asset, or configuration page
+- **THEN** the Product Image Collector action is hidden without changing the other tools
 
 #### Scenario: User requests the extension from the tools menu
 - **WHEN** the local user invokes the product-image collector menu action

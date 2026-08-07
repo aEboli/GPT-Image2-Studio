@@ -214,6 +214,13 @@ export const API_RUNTIME_CAPABILITIES = Object.freeze([
   },
   {
     method: "POST",
+    path: "/api/creation/sets/export-temu-excel/preflight",
+    local: API_RUNTIME_STATUS.SUPPORTED,
+    cloudflare: API_RUNTIME_STATUS.UNSUPPORTED,
+    reason: "Temu Excel preflight depends on local Creation manifests, template files, local output images, and remote image verification.",
+  },
+  {
+    method: "POST",
     path: "/api/creation/sets/open-folder",
     local: API_RUNTIME_STATUS.SUPPORTED,
     cloudflare: API_RUNTIME_STATUS.UNSUPPORTED,

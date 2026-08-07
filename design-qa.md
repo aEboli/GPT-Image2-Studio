@@ -41,6 +41,42 @@
 
 final result: passed
 
+## 套图记录双栏工作区恢复
+
+### Comparison Target
+
+- 异常截图：`artifacts/design-qa/creation-record-broken-reference.png`，表现为记录列表占满整个内容区，当前记录图片与 Listing 被挤出主工作面。
+- 修复截图：`artifacts/design-qa/creation-record-desktop-1728x947.png`；平板：`creation-record-tablet-800x1000.png`；手机折叠、展开、切换和 Listing：`creation-record-mobile-collapsed-390x844.png`、`creation-record-mobile-open-390x844.png`、`creation-record-mobile-selected-390x844.png`、`creation-record-mobile-listing-390x844.png`。
+- 合并对照：`artifacts/design-qa/creation-record-before-after-comparison.png`。源图与当前实现按原始宽高比归一化后放入同一画布，没有裁掉任一侧的页面结构。
+
+### Measured Evidence
+
+- 桌面 `1728×947`：套图记录工作区为 `1406.41×799px`，左栏固定 `340px`，右栏 `1066.41px`；两栏顶边一致且持续可见，文档水平溢出为 `0`，当前记录图片 `24/24` 加载成功，Listing 节点存在。
+- 桌面 `1536×1000` 交互复核：左栏滚动值在切换记录前后均为 `146.67px`；当前记录成功切换为“四节电动仿生鱼饵”，搜索、筛选、已加载记录和左栏位置没有被重置。右栏滚动后 Listing 内容进入视口并可读。
+- 平板 `800×1000`：根布局识别为 `tablet / portrait`；工作区为 `280px + 491.33px` 双栏，列表可滚动高度 `754px`、footer `40px`，图片 `24/24` 加载成功，文档水平溢出为 `0`。
+- 手机 `390×844`：初始选择器 `aria-expanded="false"`，列表与 footer 均为 `display: none`；展开后显示 `11` 行、`已显示 11 / 匹配 11`，列表高度 `405.11px` 且 footer 为 `display: flex`。选择第二条“电动仿生米诺鱼饵 F4J16”后选择器自动收起，右侧摘要、图片和 Listing 同步切换；Listing 实际滚入视口后中英文内容可读，文档水平溢出始终为 `0`。
+
+### Findings
+
+- 最终对照没有发现可执行的 P0、P1 或 P2 问题。
+- 桌面和宽屏恢复“左侧记录列表、右侧当前记录图片与 Listing”的常驻双栏；点击记录只更新右侧，不再进入互斥详情下钻，也不需要返回列表。
+- 实页验收发现平板竖屏的公共方向规则曾把套图记录重新压成单列；最终增加套图记录专用的平板竖屏双栏规则，并用静态回归测试锁定 `220–280px + 1fr`、单行网格和受控溢出。
+- 手机保留折叠选择器，展开列表不会替换下方详情；选择记录后自动收起，避免长列表持续占据首屏。长图片与 Listing 使用页面纵向滚动，没有制造独立横向滚动面。
+
+### Interaction and Console Checks
+
+- 桌面记录切换、平板双栏、手机折叠/展开/选择/自动收起及 Listing 阅读路径均由应用内浏览器在隔离预览 `http://127.0.0.1:8788/#creation-record` 实测。
+- 当前预览页控制台 `warning/error` 为 `0`；桌面、平板和手机均没有页面水平溢出。
+- 最终布局聚焦测试 `174/174` 通过；缓存版本已更新为 `20260807-creation-record-tablet-split-1`，浏览器确认加载该样式 URL。
+- 最终完整测试 `1622` 项：`1621` 通过、`1` 项因当前 Windows 权限不能创建测试符号链接而跳过、`0` 失败；`public/app.js` 语法检查通过。
+- Cloudflare Pages 构建、`91` 个 `public/lib` 模块镜像检查、`v0.2.5` 发布一致性检查、OpenSpec 全项目严格校验 `27/27`、`git diff --check` 和相关文件严格 UTF-8/替换字符扫描均通过；差异检查仅输出工作区既有的 LF/CRLF 提示。
+
+### Open Questions
+
+- 无阻塞项。Temu 实际导入、严格导出和外部平台人工校验仍属于活动变更中的独立任务，不影响本次展示方式恢复结论。
+
+final result: passed
+
 ## v1.1.29 Studio 与采集窗图片四边 1% 白边
 
 ### Comparison Target

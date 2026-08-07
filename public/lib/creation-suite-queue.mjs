@@ -225,9 +225,16 @@ function formatCreationQueueLabel(index) {
 
 function buildCreationQueuedSkuTitle(skuSubject = {}, index = 0, targetLanguage = {}) {
   const colorName = formatCreationSkuItemColorNames(skuSubject, targetLanguage);
-  const fallbackName = cleanQueueString(skuSubject.title || skuSubject.name || skuSubject.id || skuSubject.filenames?.[0]);
-  const title = colorName || fallbackName;
-  return title ? `SKU image ${index + 1} - ${title}` : `SKU image ${index + 1}`;
+  return colorName ? `SKU image ${index + 1} - ${colorName}` : `SKU image ${index + 1}`;
+}
+
+function buildCreationQueuedSkuFilenameToken(skuSubject = {}, index = 0, targetLanguage = {}) {
+  const colorToken = formatCreationSkuItemColorNames(skuSubject, targetLanguage)
+    .normalize("NFKD")
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
+  return colorToken ? `sku-${index + 1}-${colorToken}` : `sku-${index + 1}`;
 }
 
 function buildCreationQueuedSkuItems(skuSubjects = [], startIndex = 0, targetLanguage = {}) {
@@ -236,6 +243,7 @@ function buildCreationQueuedSkuItems(skuSubjects = [], startIndex = 0, targetLan
       itemId: `queued-sku-${index + 1}`,
       role: "sku",
       title: buildCreationQueuedSkuTitle(skuSubject, index, targetLanguage),
+      filenameToken: buildCreationQueuedSkuFilenameToken(skuSubject, index, targetLanguage),
       slotIndex: startIndex + index + 1,
       status: "queued",
       referenceImageNames: Array.isArray(skuSubject.filenames) ? skuSubject.filenames.map(cleanQueueString).filter(Boolean) : [],

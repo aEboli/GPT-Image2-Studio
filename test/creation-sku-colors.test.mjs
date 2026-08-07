@@ -65,6 +65,30 @@ test("SKU color normalization rejects ambiguous CJK substrings and strips conjun
   assert.deepEqual(normalizeCreationSkuColorLabels(["choose gold or rose gold"]), ["gold rose gold"]);
 });
 
+test("SKU color normalization accepts reliable Chinese colors before product-component nouns", () => {
+  assert.deepEqual(
+    normalizeCreationSkuColorLabels(["银灰、蓝色和多色鱼身"]),
+    ["银灰 蓝色"],
+  );
+  assert.deepEqual(
+    normalizeCreationSkuColorLabels(["棕色、金色鱼鳞纹理"]),
+    ["棕色 金色"],
+  );
+  assert.deepEqual(
+    normalizeCreationSkuColorLabels(["灰银色、蓝色、黄色及红色尾部配色"]),
+    ["灰银色 蓝色 黄色 红色"],
+  );
+});
+
+test("SKU color normalization preserves reliable silver-gray aliases as one compound color", () => {
+  assert.deepEqual(normalizeCreationSkuColorLabels(["银灰"]), ["银灰"]);
+  assert.deepEqual(normalizeCreationSkuColorLabels(["灰银色"]), ["灰银色"]);
+  assert.deepEqual(
+    getCreationSkuColorNames({ note: "保留的银灰、蓝色鱼身。" }, { value: "en" }),
+    ["silver gray", "blue"],
+  );
+});
+
 test("SKU item names compact only same-subject Chinese multi-color labels", () => {
   const multiColorSubject = { title: "red black blue" };
 

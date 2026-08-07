@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 
 const stylesPath = new URL("../public/styles.css", import.meta.url);
 const appPath = new URL("../public/app.js", import.meta.url);
+const creationRecordListViewPath = new URL("../lib/creation-record-list-view.mjs", import.meta.url);
 
 function readCssRule(styles, selector) {
   const escapedSelector = selector
@@ -29,20 +30,20 @@ test("timeline activity rows use distinct status and metadata colors", async () 
 });
 
 test("creation record colors its full date and time with the timeline time rule", async () => {
-  const [app, styles] = await Promise.all([
-    readFile(appPath, "utf8"),
+  const [creationRecordListView, styles] = await Promise.all([
+    readFile(creationRecordListViewPath, "utf8"),
     readFile(stylesPath, "utf8"),
   ]);
 
   assert.match(readCssRule(styles, ".creation-card-media span,\n.creation-record-meta"), /color:\s*var\(--muted\);/);
   assert.match(styles, /\.timeline-start-time,\s*\n\.creation-record-time\s*\{/);
-  assert.match(app, /const metaParts = \[platformLabel, `\$\{progress\.completed\}\/\$\{progress\.total\}`\]\.filter\(Boolean\);/);
-  assert.match(app, /const recordTimeText = formatTime\(set\.updatedAt \|\| set\.createdAt\);/);
-  assert.match(app, /meta\.textContent = metaParts\.join\(" · "\);/);
-  assert.match(app, /if \(recordTimeText\) \{/);
-  assert.match(app, /recordTime\.className = "creation-record-time";/);
-  assert.match(app, /recordTime\.textContent = recordTimeText;/);
-  assert.match(app, /meta\.append\(metaParts\.length \? " · " : "", recordTime\);/);
+  assert.match(creationRecordListView, /const metaParts = \[platformLabel, `\$\{Number\(progress\.completed\) \|\| 0\}\/\$\{Number\(progress\.total\) \|\| 0\}`\]\.filter\(Boolean\);/);
+  assert.match(creationRecordListView, /const recordTimeText = cleanString\(formatTime\?\.\(getCreationRecordListTimestamp\(set\)\)\);/);
+  assert.match(creationRecordListView, /meta\.textContent = metaParts\.join\(" · "\);/);
+  assert.match(creationRecordListView, /if \(recordTimeText\) \{/);
+  assert.match(creationRecordListView, /recordTime\.className = "creation-record-time";/);
+  assert.match(creationRecordListView, /recordTime\.textContent = recordTimeText;/);
+  assert.match(creationRecordListView, /meta\.append\(metaParts\.length \? " · " : "", recordTime\);/);
 });
 
 test("timeline renders ordered generation times without labels and keeps the legacy activity time fallback", async () => {

@@ -11,6 +11,8 @@ import {
   filterGalleryItems,
   filterGalleryItemsByWindow,
   getPromptGenerationGalleryItems,
+  getGalleryHistorySectionLayouts,
+  getGallerySectionLayout,
   getGalleryColumnCountForWidth,
   getGalleryLayoutModeForWidth,
   getRecentGalleryItems,
@@ -279,10 +281,10 @@ test("gallery organizer groups visible items into dated sections", () => {
   );
 });
 
-test("gallery organizer paginates waterfall history by five dated sections", () => {
+test("gallery organizer paginates waterfall history by five complete dated sections", () => {
   assert.equal(typeof galleryOrganizer.paginateGallerySections, "function");
 
-  const datedFixtures = Array.from({ length: 7 }, (_, index) => {
+  const datedFixtures = Array.from({ length: 12 }, (_, index) => {
     const day = 25 - index;
     return {
       filename: `history-${day}.jpeg`,
@@ -295,7 +297,7 @@ test("gallery organizer paginates waterfall history by five dated sections", () 
   const firstPage = galleryOrganizer.paginateGallerySections(sections, 0);
   assert.equal(firstPage.page, 0);
   assert.equal(firstPage.pageSize, 5);
-  assert.equal(firstPage.totalPages, 2);
+  assert.equal(firstPage.totalPages, 3);
   assert.equal(firstPage.hasPrevious, false);
   assert.equal(firstPage.hasNext, true);
   assert.deepEqual(
@@ -306,9 +308,58 @@ test("gallery organizer paginates waterfall history by five dated sections", () 
   const secondPage = galleryOrganizer.paginateGallerySections(sections, 1);
   assert.equal(secondPage.page, 1);
   assert.equal(secondPage.hasPrevious, true);
-  assert.equal(secondPage.hasNext, false);
+  assert.equal(secondPage.hasNext, true);
   assert.deepEqual(
     secondPage.sections.map((section) => section.key),
-    ["2026-04-20", "2026-04-19"],
+    ["2026-04-20", "2026-04-19", "2026-04-18", "2026-04-17", "2026-04-16"],
+  );
+
+  const finalPage = galleryOrganizer.paginateGallerySections(sections, 2);
+  assert.equal(finalPage.hasNext, false);
+  assert.deepEqual(finalPage.sections.map((section) => section.key), ["2026-04-15", "2026-04-14"]);
+});
+
+test("gallery organizer allocates three desktop rows to enlarge sparse recent dates", () => {
+  const layout = getGallerySectionLayout([
+    { key: "latest", items: Array.from({ length: 2 }, (_, index) => ({ filename: `latest-${index}.png` })) },
+    { key: "previous", items: Array.from({ length: 15 }, (_, index) => ({ filename: `previous-${index}.png` })) },
+  ]);
+
+  assert.deepEqual(layout, [
+    { key: "latest", rowCount: 1, columnCount: 4 },
+    { key: "previous", rowCount: 2, columnCount: 8 },
+  ]);
+});
+
+test("gallery organizer preserves two-date sizing across five-date page boundaries", () => {
+  const sections = [
+    { key: "day-1", items: Array.from({ length: 2 }, (_, index) => ({ filename: `day-1-${index}.png` })) },
+    { key: "day-2", items: Array.from({ length: 15 }, (_, index) => ({ filename: `day-2-${index}.png` })) },
+    { key: "day-3", items: [{ filename: "day-3-0.png" }] },
+    { key: "day-4", items: Array.from({ length: 12 }, (_, index) => ({ filename: `day-4-${index}.png` })) },
+    { key: "day-5", items: Array.from({ length: 9 }, (_, index) => ({ filename: `day-5-${index}.png` })) },
+    { key: "day-6", items: Array.from({ length: 3 }, (_, index) => ({ filename: `day-6-${index}.png` })) },
+  ];
+
+  assert.deepEqual(getGalleryHistorySectionLayouts(sections), [
+    { key: "day-1", rowCount: 1, columnCount: 4 },
+    { key: "day-2", rowCount: 2, columnCount: 8 },
+    { key: "day-3", rowCount: 1, columnCount: 4 },
+    { key: "day-4", rowCount: 2, columnCount: 6 },
+    { key: "day-5", rowCount: 2, columnCount: 5 },
+    { key: "day-6", rowCount: 1, columnCount: 4 },
+  ]);
+});
+
+test("gallery organizer preserves complete dates when three rows cannot contain them", () => {
+  assert.deepEqual(
+    getGallerySectionLayout([
+      { key: "latest", items: Array.from({ length: 40 }, (_, index) => ({ filename: `latest-${index}.png` })) },
+      { key: "previous", items: Array.from({ length: 40 }, (_, index) => ({ filename: `previous-${index}.png` })) },
+    ]),
+    [
+      { key: "latest", rowCount: 3, columnCount: 18 },
+      { key: "previous", rowCount: 3, columnCount: 18 },
+    ],
   );
 });

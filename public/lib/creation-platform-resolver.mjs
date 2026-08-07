@@ -510,10 +510,21 @@ function applyCategoryOverlays(slots, categorySignals) {
 }
 
 function applyReferenceCoverageOverlays(slots, referenceCoverage) {
-  return referenceCoverage.reduce(
-    (current, entry) => replaceWithRecommendation(current, REFERENCE_COVERAGE_OVERLAYS[entry.role], `reference:${entry.role}`),
-    slots,
-  );
+  return referenceCoverage.reduce((current, entry) => {
+    const recommendation = REFERENCE_COVERAGE_OVERLAYS[entry.role];
+    if (!recommendation) return current;
+
+    const recommendationRole = CREATION_PLATFORM_IMAGE_TYPE_REGISTRY[recommendation.imageType]?.role;
+    if (
+      recommendationRole &&
+      current.some((slot) => slot.role === recommendationRole) &&
+      !current.some((slot) => slot.imageType === recommendation.imageType)
+    ) {
+      return current;
+    }
+
+    return replaceWithRecommendation(current, recommendation, `reference:${entry.role}`);
+  }, slots);
 }
 
 function hasEvidenceForImageType(imageTypeValue, evidence) {
@@ -974,7 +985,14 @@ export function resolveCreationPlatformPlan(input = {}) {
   if (platform !== "universal") slots = applyEvidenceFallbacks(slots, evidence, warnings);
 
   const setOverrides = normalizeCreationPlatformSetOverrides(input.setOverrides || input.platformSetOverrides);
-  const itemOverrides = normalizeCreationPlatformItemOverrides(input.itemOverrides || input.platformItemOverrides);
+  let itemOverrides = normalizeCreationPlatformItemOverrides(input.itemOverrides || input.platformItemOverrides);
+  if (platform === "universal") {
+    itemOverrides = itemOverrides.map((override) =>
+      override.slotKey === "universal:benefit-proof"
+        ? { ...override, slotKey: "universal:target-shopper-resonance" }
+        : override,
+    );
+  }
   const selectedRoles = normalizeSelectedRoles(input.selectedRoles);
   slots = applySetOverrides(slots, setOverrides, { profile, warnings });
   slots = slots.map((slot, index) => selectedRoles[index] ? { ...slot, role: selectedRoles[index] } : slot);

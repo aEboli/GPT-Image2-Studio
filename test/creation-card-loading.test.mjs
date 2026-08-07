@@ -5,6 +5,7 @@ import {
   createCreationCardLoading,
   getCreationCardDomKey,
   renderCreationCardLoading,
+  syncCreationLoadingCard,
   syncCreationResultGrid,
   updateCreationCardLoading,
 } from "../lib/creation-card-loading.mjs";
@@ -207,6 +208,33 @@ test("creation card fallback DOM keys stay unique when titles repeat", () => {
     getCreationCardDomKey({ title: "Repeated" }, 0),
     getCreationCardDomKey({ title: "Repeated" }, 1),
   );
+});
+
+test("loading card refresh applies the legacy second-slot display title without mutating the item", () => {
+  const documentRef = createTestDocument();
+  const card = documentRef.createElement("article");
+  card.className = "creation-card";
+  card.classList = { toggle() {} };
+  const title = documentRef.createElement("strong");
+  title.dataset.creationCardTitle = "true";
+  const status = documentRef.createElement("span");
+  status.dataset.creationCardStatus = "true";
+  const media = documentRef.createElement("div");
+  media.classList = { add() {}, toggle() {} };
+  media.dataset.creationCardMedia = "true";
+  media.appendChild(createCreationCardLoading("queued", documentRef));
+  card.append(title, status, media);
+  const item = { itemId: "universal:benefit-proof", slotIndex: 2, role: "usage-suggestion", title: "卖点图", status: "queued" };
+
+  const result = syncCreationLoadingCard(card, item, 1, {
+    getFallbackTitle: () => "卖点图",
+    getStatusLabel: () => "排队中",
+    shouldShowLoading: () => true,
+  });
+
+  assert.equal(result, card);
+  assert.equal(title.textContent, "目标人群共鸣图");
+  assert.equal(item.title, "卖点图");
 });
 
 test("creation result grid removes an old keyed card when replacing it", () => {

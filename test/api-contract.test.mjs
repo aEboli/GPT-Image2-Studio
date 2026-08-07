@@ -41,6 +41,8 @@ test("API capability matrix documents local and Cloudflare runtime differences",
   assert.equal(isApiRouteSupported("cloudflare", "POST", "/api/creation/sets/delete"), true);
   assert.equal(isApiRouteSupported("local", "POST", "/api/creation/sets/export-temu-excel"), true);
   assert.equal(isApiRouteSupported("cloudflare", "POST", "/api/creation/sets/export-temu-excel"), false);
+  assert.equal(isApiRouteSupported("local", "POST", "/api/creation/sets/export-temu-excel/preflight"), true);
+  assert.equal(isApiRouteSupported("cloudflare", "POST", "/api/creation/sets/export-temu-excel/preflight"), false);
   assert.equal(isApiRouteSupported("local", "POST", "/api/article-illustration/sets/delete"), true);
   assert.equal(isApiRouteSupported("cloudflare", "POST", "/api/article-illustration/sets/delete"), false);
   assert.equal(isApiRouteSupported("local", "POST", "/api/portrait/sets/delete"), true);
@@ -148,6 +150,19 @@ test("Cloudflare Temu Excel export is explicitly unsupported", async () => {
   assert.equal(payload.ok, false);
   assert.equal(payload.code, "unsupported_runtime_capability");
   assert.equal(payload.path, "/api/creation/sets/export-temu-excel");
+
+  const preflightResponse = await worker.handleApiRequest(
+    new Request("https://studio.example/api/creation/sets/export-temu-excel/preflight", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ setIds: ["set-a"] }),
+    }),
+  );
+  const preflightPayload = await preflightResponse.json();
+  assert.equal(preflightResponse.status, 400);
+  assert.equal(preflightPayload.ok, false);
+  assert.equal(preflightPayload.code, "unsupported_runtime_capability");
+  assert.equal(preflightPayload.path, "/api/creation/sets/export-temu-excel/preflight");
 });
 
 test("article illustration routes expose an explicit Cloudflare capability contract", async () => {

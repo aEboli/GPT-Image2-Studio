@@ -515,12 +515,12 @@ Every newly generated Listing SHALL provide package and product physical dimensi
 
 ### Requirement: Listing drafts expose sourced or estimated weight fields
 
-Every newly generated or explicitly test-mocked Listing SHALL contain non-empty `packageWeight` and `productWeight` strings and matching Simplified Chinese fields under `zhDisplay`. Explicit package/gross/shipping weight evidence SHALL populate `packageWeight`; explicit product/net/item weight evidence SHALL populate `productWeight`. When the corresponding evidence is absent, the English field SHALL start with `Estimated:` and the Chinese field SHALL start with `预估：`. Weight fields SHALL follow the selected metric, imperial, or both unit mode and SHALL NOT be placed in the title.
+Every newly generated or explicitly test-mocked Listing SHALL contain non-empty `packageWeight` and `productWeight` strings and matching Simplified Chinese fields under `zhDisplay`. Explicit package/gross/shipping weight evidence SHALL populate `packageWeight`; explicit product/net/item weight evidence SHALL populate `productWeight`. When the corresponding evidence is absent, the system SHALL preserve a valid upstream numeric estimate when one is supplied; otherwise it SHALL generate a conservative product-aware numeric estimate derived from available category, construction/material, size, quantity, and package-context signals. The English field SHALL start with `Estimated:` and the Chinese field SHALL start with `预估：` for either estimated path. Weight fields SHALL follow the selected metric, imperial, or both unit mode and SHALL NOT be placed in the title.
 
 #### Scenario: Product weight is supplied and package weight is absent
 - **WHEN** source facts contain a product or net weight but no package, gross, packed, or shipping weight
 - **THEN** `productWeight` reproduces the supplied weight in the selected unit mode without an estimate marker
-- **AND** `packageWeight` contains a numeric conservative estimate marked `Estimated:`
+- **AND** `packageWeight` contains a numeric conservative product-aware estimate marked `Estimated:`
 - **AND** `zhDisplay.packageWeight` contains the same estimate marked `预估：`
 
 #### Scenario: Package and product weights are supplied
@@ -530,12 +530,17 @@ Every newly generated or explicitly test-mocked Listing SHALL contain non-empty 
 
 #### Scenario: Neither weight type is supplied
 - **WHEN** source facts provide no traceable weight value
-- **THEN** both weight fields contain conservative numeric estimates
+- **THEN** both weight fields contain numeric estimates derived from the available product category, construction/material, size, quantity, and packaging signals
+- **AND** the estimates are not required to equal one global constant across different product profiles
 - **AND** both English values use `Estimated:` and both Chinese values use `预估：`
+
+#### Scenario: Upstream supplies a valid estimated weight
+- **WHEN** the parsed Listing contains a numeric `Estimated:` or `预估：` weight and no corresponding explicit source evidence exists
+- **THEN** normalization preserves that estimate and does not replace it with the default baseline
 
 #### Scenario: Historical Listing predates weight fields
 - **WHEN** a completed stored Listing lacks one or more weight fields
-- **THEN** the read response fills the missing fields from set-level weight evidence or explicit estimates
+- **THEN** the read response fills the missing fields from set-level weight evidence or the same product-aware estimate function
 - **AND** the stored historical Listing is not rewritten automatically
 
 #### Scenario: Weight is copied or exported
@@ -585,3 +590,93 @@ Creation record details SHALL render non-empty Listing `warnings` and `missingIn
 - **WHEN** the user opens that Listing in Creation record details
 - **THEN** each non-empty warning and missing-information item is visible
 - **AND** the fields remain excluded when their arrays are empty
+
+### Requirement: Listing titles exclude internal part numbers
+
+Newly generated and regenerated Listing drafts SHALL exclude internal product part numbers, SKU part numbers, and reference-only identifiers from `title` and `zhDisplay.title`. The generation prompt SHALL prohibit these identifiers in both titles, and normalization SHALL deterministically remove candidates derived from structured product and SKU sources before the completed draft is returned. This cleanup SHALL NOT remove or rewrite SKU IDs, reference filenames, associations, non-title Listing fields, or stored historical drafts.
+
+#### Scenario: Product name contains an internal part number
+
+- **WHEN** the source product name is `电动仿生米诺鱼饵 F4J16` and a generated response includes `F4J16` in both titles
+- **THEN** the completed English `title` and Simplified Chinese `zhDisplay.title` do not contain `F4J16`
+- **AND** the remaining product identity is retained and normalized without stray separators
+
+#### Scenario: SKU metadata contains a reference-only identifier
+
+- **WHEN** a SKU subject supplies an internal ID or reference filename containing a part-number token
+- **THEN** the Listing prompt identifies that token as prohibited title content
+- **AND** post-response normalization removes the token from both titles if the model returns it
+- **AND** the SKU subject ID and reference filename remain available for internal association
+
+#### Scenario: Historical Listing is opened
+
+- **WHEN** a stored historical Listing title already contains an internal part number
+- **THEN** merely opening or exporting that historical record does not rewrite the stored draft
+
+#### Scenario: Part-number cleanup empties a generated title
+
+- **WHEN** a generated title contains only a structured part number, including a compound identifier such as `F4J-16`
+- **THEN** the system removes the complete identifier without leaving a numeric fragment
+- **AND** it repairs the empty title from a sanitized source product identity or `Product` / `商品`
+
+### Requirement: Short generated Listing titles reuse safe response content
+
+After a newly generated or regenerated Listing response has completed no-brand, unsupported-evidence, blocking-claim, and internal-part-number cleanup, the system SHALL extend an English title that remains below the resolved platform recommendation when same-language sanitized response content supplies distinct supported information. The extension SHALL extract title-appropriate keywords or short phrases from cleaned selling points, five bullets, pain points, description, backend search terms, and keyword buckets; SHALL omit generic structural field labels; SHALL allow a concise same-language lead label only when the label itself expresses a traceably supported product attribute; SHALL remove sentence punctuation; SHALL avoid copying an unbroken prose paragraph when a shorter sentence, clause, word, or phrase boundary is available; and SHALL avoid repeated title concepts. Appended English content SHALL preserve complete word boundaries, while Simplified Chinese content SHALL use cleaned `zhDisplay` text and Chinese punctuation or bounded phrase boundaries. The result SHALL obey the platform hard character and UTF-8 byte limits plus the universal field ceiling. A lack of safe extension content SHALL NOT fail, retry, or replace the accepted response. The Simplified Chinese reference title SHALL NOT use the evidence-rich 120-English-character target.
+
+#### Scenario: Safe response content can complete a short title
+
+- **WHEN** a model returns a usable title below the platform recommended minimum
+- **AND** cleaned selling points, bullets, pain points, description, or search fields contain distinct same-language supported product information
+- **THEN** the completed title appends enough non-duplicate safe keywords or short phrases to reach the applicable target when possible
+- **AND** the result does not exceed a platform character or UTF-8 byte hard limit
+
+#### Scenario: Prose fields are converted to title phrases
+
+- **WHEN** a completion source contains a traceably supported semantic lead label, a generic structural label, a long English sentence, or consecutive Chinese clauses without spaces
+- **THEN** the supported semantic lead label may remain eligible while the generic structural label and sentence punctuation are removed
+- **AND** a semantic lead label without traceable source support is omitted
+- **AND** the system does not copy the complete source paragraph into the title when a shorter boundary is available
+- **AND** an English phrase is not truncated inside a word
+
+#### Scenario: Evidence-rich English response is shorter than 120 characters
+
+- **WHEN** the source supplies at least six distinct Listing evidence aliases
+- **AND** the platform has no hard title limit below 120
+- **AND** the cleaned accepted response contains enough distinct English content
+- **THEN** the completed English title reaches at least 120 characters without another model request
+- **AND** its appended content contains no internal part number
+
+#### Scenario: Safe extension content is unavailable
+
+- **WHEN** a short accepted title has no distinct cleaned same-language response content that can extend it
+- **THEN** the system retains the shorter title as completed
+- **AND** it does not retry, invent filler, or fail the Listing
+
+#### Scenario: Low title limit takes precedence
+
+- **WHEN** the resolved platform hard title limit is below the general completeness target
+- **THEN** title completion stops at that hard limit
+- **AND** lower-priority candidate content is omitted
+
+### Requirement: Listing claim filtering separates ordinary attributes from qualification-sensitive performance terms
+
+The system SHALL treat sourced ordinary product attributes such as portable design and USB charging as usable Listing facts rather than configured blocking claims. These ordinary attributes SHALL still be removed from public English and Simplified Chinese Listing fields when they are absent from traceable source evidence. The evidence gate SHALL recognize configured conservative English and Simplified Chinese equivalents for these ordinary attributes. The system SHALL remove qualification-sensitive high-power, high-brightness, and waterproof wording and configured equivalents from every public V1 and V2 English and Simplified Chinese Listing field even when ordinary product text repeats that wording, because the system has no verified qualification-evidence object. Removing any such content SHALL NOT retry, reject, or replace an otherwise usable Listing response.
+
+#### Scenario: Sourced ordinary attributes remain usable
+
+- **WHEN** traceable English or Simplified Chinese source evidence supplies portable design or USB charging
+- **THEN** the corresponding configured English and Simplified Chinese ordinary attribute may remain in public Listing content
+- **AND** the attribute is not removed as a qualification-sensitive claim
+
+#### Scenario: Unsupplied ordinary attribute remains unsupported
+
+- **WHEN** a model response introduces portable design or USB charging without traceable source evidence
+- **THEN** the unsupported concrete attribute is removed from English and Simplified Chinese content by the factual evidence gate
+- **AND** it is not retained merely because the term is outside the qualification-sensitive list
+
+#### Scenario: Qualification-sensitive performance wording is removed
+
+- **WHEN** any public V1 or V2 Listing field contains high-power, high-brightness, waterproof, or a configured equivalent
+- **THEN** the system removes the complete matched wording from English and Simplified Chinese content
+- **AND** ordinary product text repeating the wording does not bypass the rule
+- **AND** the remaining usable response is returned without another model request

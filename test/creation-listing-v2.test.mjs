@@ -696,9 +696,9 @@ test("parsed V2 output that fails local validation is accepted after one request
   const policy = resolveCreationListingPolicy({ platform: "etsy" });
   const calls = [];
   const invalidOutput = makeV2Draft(policy, {
-    title: "FDA Certified Miracle Cure Box",
+    title: "Blue Storage Box",
     highlights: [],
-    description: "Guaranteed best seller with a lifetime warranty.",
+    description: "",
     status: "completed",
   });
   const fetchImpl = async (_url, init) => {
@@ -733,9 +733,169 @@ test("parsed V2 output that fails local validation is accepted after one request
     source,
   });
   assert.equal(draft.status, "completed");
-  assert.match(draft.title, /Miracle Cure Box/i);
+  assert.equal(draft.title, "Blue Storage Box");
+  assert.equal(draft.description, "");
   assert.equal(calls.length, 1);
   assert.equal(validation.ok, false);
+});
+
+test("parsed V2 output removes qualification-sensitive performance wording without retrying", async () => {
+  const policy = resolveCreationListingPolicy({ platform: "etsy" });
+  const baseline = makeV2Draft(policy);
+  const output = {
+    ...baseline,
+    title: "High-Power Waterproof Personal Blender",
+    sellingPoints: ["High-Brightness blender body."],
+    buyerObjections: ["Check the water-resistant housing."],
+    highlights: ["Ultra-Bright profile."],
+    description: "High power waterproof personal blender.",
+    searchTerms: ["high brightness blender", "water resistant blender"],
+    keywordBuckets: {
+      exact: ["waterproof blender"],
+      longTail: ["high power personal blender"],
+      traffic: [],
+      descriptive: [],
+    },
+    zhDisplay: {
+      ...baseline.zhDisplay,
+      title: "高功率防水便携榨汁杯",
+      sellingPoints: ["高亮机身。"],
+      buyerObjections: ["购买前核对耐水外壳。"],
+      highlights: ["超亮外观。"],
+      description: "高功率防水便携榨汁杯。",
+      searchTerms: ["高亮榨汁杯", "耐水榨汁杯"],
+      keywordBuckets: {
+        exact: ["防水榨汁杯"],
+        longTail: ["高功率便携榨汁杯"],
+        traffic: [],
+        descriptive: [],
+      },
+    },
+  };
+  const calls = [];
+  const source = {
+    setId: "set-v2-qualification-boundary",
+    forceV2: true,
+    schemaVersion: "2",
+    platformId: "etsy",
+    marketplace: "etsy",
+    language: "en-US",
+    listingPolicy: policy,
+    productName: "Personal Blender",
+    productDescription: "High-power, high-brightness, waterproof personal blender with a water-resistant body.",
+  };
+
+  const draft = await listingAgent.requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "test-model",
+    source,
+    fetchImpl: async (_url, init) => {
+      calls.push(JSON.parse(init.body));
+      return new Response(JSON.stringify({ output_text: JSON.stringify(output) }), { status: 200 });
+    },
+  });
+
+  const publicText = JSON.stringify({
+    title: draft.title,
+    sellingPoints: draft.sellingPoints,
+    buyerObjections: draft.buyerObjections,
+    highlights: draft.highlights,
+    description: draft.description,
+    searchTerms: draft.searchTerms,
+    keywordBuckets: draft.keywordBuckets,
+    zhDisplay: draft.zhDisplay,
+  });
+  assert.equal(calls.length, 1);
+  assert.doesNotMatch(publicText, /high[-\s]?(?:power|brightness)|ultra[-\s]?bright|waterproof|water[-\s]?resistant|高功率|高亮|超亮|防水|耐水/iu);
+  assert.match(calls[0].input, /ordinary supplied attributes.*portable design.*USB charging/is);
+  assert.match(calls[0].input, /qualification-sensitive.*high-power.*high-brightness.*waterproof/is);
+});
+
+test("V2 fact gate removes unsourced bilingual ordinary attributes from canonical fields", () => {
+  const sanitized = listingDraft.sanitizeCreationListingUnsupportedEvidenceTerms({
+    title: "Personal Blender",
+    sellingPoints: [],
+    buyerObjections: ["Portable Design"],
+    highlights: ["USB Charging"],
+    description: "Personal blender cup.",
+    searchTerms: ["portable design", "usb charging"],
+    keywordBuckets: {
+      exact: ["portable design"],
+      longTail: ["usb charging blender"],
+      traffic: [],
+      descriptive: [],
+    },
+    zhDisplay: {
+      title: "榨汁杯",
+      sellingPoints: [],
+      buyerObjections: ["便携设计"],
+      highlights: ["USB充电"],
+      description: "榨汁杯杯身。",
+      searchTerms: ["便携设计", "USB充电"],
+      keywordBuckets: {
+        exact: ["便携设计"],
+        longTail: ["USB充电榨汁杯"],
+        traffic: [],
+        descriptive: [],
+      },
+    },
+  }, {
+    productName: "Personal Blender",
+    productDescription: "Personal blender cup.",
+  });
+
+  assert.doesNotMatch(JSON.stringify(sanitized), /portable design|USB charging|便携设计|USB充电/iu);
+  assert.equal(sanitized.buyerObjections.length, sanitized.zhDisplay.buyerObjections.length);
+  assert.equal(sanitized.highlights.length, sanitized.zhDisplay.highlights.length);
+  assert.equal(sanitized.searchTerms.length, sanitized.zhDisplay.searchTerms.length);
+});
+
+test("V2 claim cleanup repairs bilingual required text emptied by qualification-sensitive wording", async () => {
+  const policy = resolveCreationListingPolicy({ platform: "etsy" });
+  const baseline = makeV2Draft(policy);
+  const { zhDisplay: baselineZhDisplay, ...baselineEnglish } = baseline;
+  const output = {
+    ...baselineEnglish,
+    title: "Waterproof",
+    sellingPoints: ["Portable personal blender body."],
+    description: "High-Power",
+    zh_display: {
+      ...baselineZhDisplay,
+      title: "防水",
+      selling_points: ["便携榨汁杯杯身。"],
+      sellingPoints: undefined,
+      description: "高功率",
+    },
+  };
+  let requestCount = 0;
+  const draft = await listingAgent.requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "test-model",
+    source: {
+      setId: "set-v2-required-text-repair",
+      forceV2: true,
+      schemaVersion: "2",
+      platformId: "etsy",
+      marketplace: "etsy",
+      language: "en-US",
+      listingPolicy: policy,
+      productName: "Portable Personal Blender",
+      productDescription: "Portable personal blender body.",
+    },
+    fetchImpl: async () => {
+      requestCount += 1;
+      return new Response(JSON.stringify({ output_text: JSON.stringify(output) }), { status: 200 });
+    },
+  });
+
+  assert.equal(requestCount, 1);
+  assert.match(draft.title, /Portable Personal Blender/i);
+  assert.match(draft.description, /Portable Personal Blender/i);
+  assert.match(draft.zhDisplay.title, /便携榨汁杯/u);
+  assert.match(draft.zhDisplay.description, /便携榨汁杯/u);
+  assert.doesNotMatch(JSON.stringify(draft), /high[-\s]?power|waterproof|高功率|防水/iu);
 });
 
 test("every platform rejects English and Chinese functional wording", () => {

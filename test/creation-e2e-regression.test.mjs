@@ -567,7 +567,7 @@ test("creation workflow reuses history, reuploads references, tweaks prompts, re
   assert.match(generatedSet.items[1].prompt, /lifestyle magazine editorial/);
   assert.ok(generatedSet.items[0].relativePath);
   assert.match(generatedSet.items[0].filename, /^1-\d{4}-首图成交主视觉-[a-z0-9]{4}\.png$/u);
-  assert.match(generatedSet.items[1].filename, /^2-\d{4}-核心信息融合图-[a-z0-9]{4}\.png$/u);
+  assert.match(generatedSet.items[1].filename, /^2-\d{4}-目标人群共鸣图-[a-z0-9]{4}\.png$/u);
   assert.match(generatedSet.items[2].filename, /^3-\d{4}-到手清单配件图-[a-z0-9]{4}\.png$/u);
   assert.match(generatedSet.items[3].filename, /^4-\d{4}-痛点图-[a-z0-9]{4}\.png$/u);
   assert.doesNotMatch(generatedSet.items.map((item) => item.filename).join("\n"), /\b(?:hero|benefit|accessory|gift|after|sales)\b/i);

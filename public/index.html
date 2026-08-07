@@ -68,7 +68,7 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Sora:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260804-prompt-reference-preview-2" />
+    <link rel="stylesheet" href="./styles.css?v=20260807-creation-conversion-viewer-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -123,7 +123,7 @@
                     <span class="mega-menu-title" data-ui-i18n="menuTools">工具</span>
                     <button class="mega-menu-action large" type="button" data-nav-action="prompt-agent" data-ui-i18n="promptAgent">图片转提示词</button>
                     <a class="mega-menu-link" href="#image-compress" data-ui-i18n="menuImageCompress">图片压缩</a>
-                    <div class="mega-menu-description-entry">
+                    <div class="mega-menu-description-entry" data-product-image-extension-menu-entry hidden>
                       <button
                         class="mega-menu-action"
                         type="button"
@@ -218,13 +218,19 @@
                     </div>
                     <div class="field-heading-actions">
                       <button
-                        class="icon-button field-clear-button"
+                        class="icon-button field-heading-icon-button field-clear-button"
                         id="clearReferenceButton"
                         type="button"
                         aria-label="清空参考图"
                         title="清空参考图"
                         data-tooltip="清空参考图"
-                      >×</button>
+                      >
+                        <svg class="field-clear-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                          <path d="M3 6h18" />
+                          <path d="M8 6V4h8v2" />
+                          <path d="m19 6-1 14H6L5 6" />
+                        </svg>
+                      </button>
                       <small id="referenceCount">0 / 15</small>
                     </div>
                   </summary>
@@ -295,15 +301,21 @@
                     </div>
                     <div class="field-heading-actions">
                       <button
-                        class="icon-button field-clear-button"
+                        class="icon-button field-heading-icon-button field-clear-button"
                         id="clearPromptButton"
                         type="button"
                         aria-label="清空提示词"
                         title="清空提示词"
                         data-tooltip="清空提示词"
-                      >×</button>
-                      <button class="icon-button" id="surprisePromptButton" type="button" title="提示词模板" aria-expanded="false" data-ui-i18n-title="promptTemplate">
-                        ✦
+                      >
+                        <svg class="field-clear-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                          <path d="M3 6h18" />
+                          <path d="M8 6V4h8v2" />
+                          <path d="m19 6-1 14H6L5 6" />
+                        </svg>
+                      </button>
+                      <button class="icon-button field-heading-icon-button" id="surprisePromptButton" type="button" title="提示词模板" aria-label="提示词模板" aria-expanded="false" data-ui-i18n-title="promptTemplate">
+                        <span class="prompt-template-icon" aria-hidden="true">⭐</span>
                       </button>
                     </div>
                   </div>
@@ -2211,6 +2223,7 @@
                 </div>
                 <div class="asset-head-actions">
                   <a class="toolbar-button asset-primary-action" href="#studio">前往提示词生图</a>
+                  <button class="toolbar-button gallery-selection-mode-button" id="gallerySelectionModeButton" type="button" aria-pressed="false">勾选图片</button>
                   <button class="header-button" id="refreshGalleryButton" type="button" aria-label="刷新瀑布画廊">刷新</button>
                   <button class="toolbar-button danger" id="galleryDeleteCurrentButton" type="button" disabled>删除当前</button>
                   <button class="toolbar-button danger" id="galleryDeleteSelectedButton" type="button" disabled>删除选中</button>
@@ -2239,7 +2252,7 @@
                   />
                 </label>
                 <div class="gallery-top-actions">
-                  <div class="gallery-column-switch" role="group" aria-label="画廊列数">
+                  <div class="gallery-column-switch hidden" id="galleryColumnSwitch" role="group" aria-label="搜索结果列数">
                     <span class="gallery-column-label">列</span>
                     <button
                       class="gallery-column-button"
@@ -2428,16 +2441,21 @@
               <div class="asset-title-row">
                 <div class="asset-title-block"><h2>套图记录 <span class="count-pill" id="creationRecordCount">0 套</span></h2></div>
                 <div class="asset-head-actions creation-record-actions">
-                  <button class="toolbar-button asset-primary-action" id="creationRecordRepairIncompleteButton" type="button" disabled>补齐未生成图像</button>
+                  <button class="toolbar-button asset-primary-action creation-record-desktop-action" id="creationRecordRepairIncompleteButton" type="button" disabled>补齐未生成图像</button>
                   <button class="toolbar-button asset-primary-action" id="creationRecordReuseButton" type="button" disabled>复用到当前套图</button>
                   <button class="toolbar-button asset-primary-action" id="creationRecordExportTemuButton" type="button" disabled>导出 Temu Excel</button>
-                  <button class="toolbar-button" id="creationRecordRefreshButton" type="button">刷新</button>
-                  <button class="toolbar-button danger" id="creationRecordDeleteCurrentButton" type="button" disabled>删除当前</button>
-                  <button class="toolbar-button danger" id="creationRecordDeleteSelectedButton" type="button" disabled>删除选中</button>
-                  <button class="toolbar-button danger" id="creationRecordDeleteFilteredButton" type="button" disabled>删除筛选结果</button>
+                  <button class="toolbar-button creation-record-desktop-action" id="creationRecordRefreshButton" type="button">刷新</button>
+                  <button class="toolbar-button danger creation-record-desktop-action" id="creationRecordDeleteCurrentButton" type="button" disabled>删除当前</button>
+                  <button class="toolbar-button danger creation-record-desktop-action" id="creationRecordDeleteSelectedButton" type="button" disabled>删除选中</button>
+                  <button class="toolbar-button danger creation-record-desktop-action" id="creationRecordDeleteFilteredButton" type="button" disabled>删除筛选结果</button>
                   <details class="asset-command-menu" data-asset-menu>
                     <summary aria-label="更多套图记录操作">更多</summary>
                     <div class="asset-command-popover">
+                      <div class="asset-command-group creation-record-mobile-actions" role="group" aria-label="记录操作">
+                        <span class="asset-command-label">记录</span>
+                        <button class="toolbar-button" id="creationRecordRepairIncompleteMenuButton" type="button" disabled>补齐未生成图像</button>
+                        <button class="toolbar-button" id="creationRecordRefreshMenuButton" type="button">刷新</button>
+                      </div>
                       <div class="asset-command-group" role="group" aria-label="文件">
                         <span class="asset-command-label">文件</span>
                         <button class="toolbar-button" id="creationRecordOpenFolderButton" type="button" disabled>打开文件夹</button>
@@ -2448,6 +2466,12 @@
                         <button class="toolbar-button" id="creationRecordCopyPromptsButton" type="button" disabled>复制提示词</button>
                         <button class="toolbar-button" id="creationRecordExportPromptsButton" type="button" disabled>导出提示词</button>
                         <button class="toolbar-button" id="creationRecordExportManifestButton" type="button" disabled>导出清单</button>
+                      </div>
+                      <div class="asset-command-group creation-record-mobile-actions" role="group" aria-label="删除">
+                        <span class="asset-command-label">删除</span>
+                        <button class="toolbar-button danger" id="creationRecordDeleteCurrentMenuButton" type="button" disabled>删除当前</button>
+                        <button class="toolbar-button danger" id="creationRecordDeleteSelectedMenuButton" type="button" disabled>删除选中</button>
+                        <button class="toolbar-button danger" id="creationRecordDeleteFilteredMenuButton" type="button" disabled>删除筛选结果</button>
                       </div>
                     </div>
                   </details>
@@ -2465,7 +2489,11 @@
             <div class="creation-record-browser">
               <div class="asset-record-picker" data-asset-record-picker>
                 <button class="asset-record-picker-trigger" type="button" aria-expanded="false" aria-controls="creationRecordSetList"><span>选择套图</span><strong id="creationRecordSelection">尚未选择</strong></button>
-                <div class="creation-set-list creation-record-list" id="creationRecordSetList" role="listbox" aria-label="套图记录"></div>
+                <div class="creation-set-list creation-record-list" id="creationRecordSetList" role="list" aria-label="套图记录"></div>
+                <div class="creation-record-list-footer">
+                  <span id="creationRecordListSummary" aria-live="polite">已显示 0 / 匹配 0</span>
+                  <button class="toolbar-button" id="creationRecordLoadMoreButton" type="button" hidden>加载更多</button>
+                </div>
               </div>
               <article class="creation-record-archive" aria-live="polite" tabindex="-1">
                 <div class="creation-record-detail" id="creationRecordArchiveDetail">
@@ -2596,18 +2624,55 @@
         <header class="creation-temu-export-head">
           <div>
             <span class="asset-eyebrow">Temu 快速上架</span>
-            <h2 id="creationRecordTemuExportTitle">导出 Temu Excel</h2>
-            <p id="creationRecordTemuExportDescription">已选择 <strong id="creationRecordTemuExportSelectedCount">0</strong> 套；缺失字段会留空并记录在导出问题工作表。</p>
+            <h2 id="creationRecordTemuExportTitle">Temu Excel 导出工作台</h2>
+            <p id="creationRecordTemuExportDescription">已选择 <strong id="creationRecordTemuExportSelectedCount">0</strong> 套</p>
           </div>
-          <button class="icon-button" id="creationRecordTemuExportCloseButton" type="button" aria-label="关闭 Temu Excel 导出" title="关闭">×</button>
+          <button class="toolbar-button" id="creationRecordTemuExportCloseButton" type="button">关闭</button>
         </header>
 
         <fieldset class="creation-temu-export-fields" id="creationRecordTemuExportFields">
-          <section class="creation-temu-export-section" aria-labelledby="creationRecordTemuDefaultsTitle">
+          <section class="creation-temu-export-section creation-temu-export-overview" aria-labelledby="creationRecordTemuOverviewTitle">
             <div class="creation-temu-export-section-head">
-              <h3 id="creationRecordTemuDefaultsTitle">批次默认值</h3>
-              <span>仅补齐记录中的空字段</span>
+              <div>
+                <h3 id="creationRecordTemuOverviewTitle">批次预检</h3>
+                <span id="creationRecordTemuPreflightState">等待预检</span>
+              </div>
+              <span id="creationRecordTemuTemplateName">标准 Temu 模板</span>
             </div>
+            <div class="creation-temu-export-stats" aria-label="批次统计">
+              <span><strong id="creationRecordTemuStatSetCount">0</strong><small>套图</small></span>
+              <span><strong id="creationRecordTemuStatSkuCount">0</strong><small>SKU</small></span>
+              <span><strong id="creationRecordTemuStatImageCount">0</strong><small>图片</small></span>
+              <span><strong id="creationRecordTemuStatPendingUploadCount">0</strong><small>待上传</small></span>
+              <span><strong id="creationRecordTemuStatUploadedCount">0</strong><small>本次上传</small></span>
+              <span><strong id="creationRecordTemuStatCacheReuseCount">0</strong><small>缓存</small></span>
+              <span data-tone="danger"><strong id="creationRecordTemuStatBlockerCount">0</strong><small>阻塞</small></span>
+              <span data-tone="warning"><strong id="creationRecordTemuStatWarningCount">0</strong><small>提醒</small></span>
+            </div>
+            <div class="creation-temu-export-readiness" id="creationRecordTemuStrictReason" data-state="pending">严格导出需先完成服务端预检</div>
+            <div class="creation-temu-export-problems" id="creationRecordTemuProblemPanel" hidden>
+              <section><h4>阻塞项</h4><ul id="creationRecordTemuBlockerList"></ul></section>
+              <section><h4>提醒</h4><ul id="creationRecordTemuWarningList"></ul></section>
+            </div>
+            <details class="creation-temu-export-records" id="creationRecordTemuRecordSummary">
+              <summary>逐套摘要</summary>
+              <div id="creationRecordTemuRecordList"></div>
+            </details>
+          </section>
+
+          <section class="creation-temu-export-section" aria-labelledby="creationRecordTemuModeTitle">
+            <div class="creation-temu-export-section-head">
+              <h3 id="creationRecordTemuModeTitle">导出模式</h3>
+              <span>严格导出会在生成前重新验证</span>
+            </div>
+            <div class="creation-temu-export-mode" role="radiogroup" aria-label="Temu Excel 导出模式">
+              <label><input type="radio" name="mode" value="draft" checked /><span><strong>待补全导出</strong><small>保留问题工作表</small></span></label>
+              <label><input id="creationRecordTemuStrictMode" type="radio" name="mode" value="strict" disabled /><span><strong>严格导出</strong><small>阻塞项为零</small></span></label>
+            </div>
+          </section>
+
+          <details class="creation-temu-export-section creation-temu-export-settings" open>
+            <summary id="creationRecordTemuDefaultsTitle">批次默认值</summary>
             <div class="creation-temu-export-grid">
               <label class="compact-field">
                 <span>第一变种属性名</span>
@@ -2642,13 +2707,10 @@
                 <input id="creationRecordTemuDefaultOriginCountry" name="defaultOriginCountry" type="text" maxlength="100" placeholder="例如：中国-广东省" />
               </label>
             </div>
-          </section>
+          </details>
 
-          <section class="creation-temu-export-section" aria-labelledby="creationRecordTemuCloudinaryTitle">
-            <div class="creation-temu-export-section-head">
-              <h3 id="creationRecordTemuCloudinaryTitle">Cloudinary 图片上传（可选）</h3>
-              <span>仅使用 unsigned upload preset，不需要 API Secret</span>
-            </div>
+          <details class="creation-temu-export-section creation-temu-export-settings">
+            <summary id="creationRecordTemuCloudinaryTitle">Cloudinary 图片上传</summary>
             <div class="creation-temu-export-grid creation-temu-export-cloudinary-grid">
               <label class="compact-field">
                 <span>Cloud name</span>
@@ -2659,14 +2721,15 @@
                 <input id="creationRecordTemuUploadPreset" name="uploadPreset" type="text" maxlength="128" pattern="[A-Za-z0-9_.-]+" autocomplete="off" placeholder="两项同时填写或留空" />
               </label>
             </div>
-          </section>
+          </details>
         </fieldset>
 
         <footer class="creation-temu-export-footer">
           <p class="prompt-agent-feedback" id="creationRecordTemuExportFeedback" aria-live="polite"></p>
           <div class="creation-temu-export-actions">
             <button class="toolbar-button" id="creationRecordTemuExportCancelButton" type="button">取消</button>
-            <button class="toolbar-button asset-primary-action" id="creationRecordTemuExportSubmitButton" type="submit">生成并下载 XLSX</button>
+            <button class="toolbar-button" id="creationRecordTemuPreflightButton" type="button">运行预检</button>
+            <button class="toolbar-button asset-primary-action" id="creationRecordTemuExportSubmitButton" type="submit">导出待补全 XLSX</button>
           </div>
         </footer>
       </form>
@@ -3202,6 +3265,6 @@
       </div>
     </aside>
 
-    <script type="module" src="./app.js?v=20260804-prompt-reference-preview-1"></script>
+    <script type="module" src="./app.js?v=20260807-creation-record-split-workspace-1"></script>
   </body>
 </html>

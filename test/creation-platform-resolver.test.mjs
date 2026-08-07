@@ -262,6 +262,21 @@ resolverTest("reference coverage replaces a lower-priority slot after category o
   assert.equal(new Set(plan.items.map((item) => item.imageType)).size, plan.items.length);
 });
 
+resolverTest("reference coverage reuses an existing marketing role instead of creating a duplicate selling-point slot", () => {
+  const plan = resolver.resolveCreationPlatformPlan({
+    platform: "universal",
+    evidence: { dimensions: true, materials: true, packageContents: true },
+    referenceCoverage: [
+      { role: "usage", filename: "usage.png", note: "Supplied operation and outcome evidence" },
+    ],
+  });
+
+  assert.equal(plan.items.filter((item) => item.role === "usage-suggestion").length, 1);
+  assert.equal(plan.items.find((item) => item.imageType === "target-shopper-resonance")?.role, "benefit");
+  assert.equal(plan.items.find((item) => item.imageType === "selling-point-stack")?.role, "usage-suggestion");
+  assert.equal(plan.items.some((item) => item.imageType === "usage-demo"), false);
+});
+
 resolverTest("evidence-dependent fallback is stable, safe, and non-duplicating", () => {
   const withoutMaterial = resolver.resolveCreationPlatformPlan({
     platform: "etsy",
@@ -356,7 +371,7 @@ resolverTest("set and item enablement or ordering overrides derive final carouse
     ],
   });
 
-  assert.deepEqual(plan.slots.slice(0, 4).map((item) => item.imageType), ["benefit-proof", "generic-hero", "scene-application", "multi-angle"]);
+  assert.deepEqual(plan.slots.slice(0, 4).map((item) => item.imageType), ["target-shopper-resonance", "generic-hero", "scene-application", "multi-angle"]);
   assert.equal(plan.slots.length, 18);
   assert.ok(plan.slots.slice(4).every((item) => item.enabled === false));
   assert.equal(plan.slots.find((item) => item.imageType === "scene-application").enabled, false);

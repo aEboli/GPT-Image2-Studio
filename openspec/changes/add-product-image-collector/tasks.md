@@ -571,3 +571,13 @@
   - Studio `1440×900` 下预览区约 `210.89px`、图片约 `206.67px`、四边约 `2.10–2.11px`；`390×844` 下图片占预览区约 `97.996%`、四边约 `1.53–1.54px`，候选区 `clientWidth = scrollWidth = 355px`。
   - 扩展 `900×900` 下媒体区约 `114.67px`、图片约 `112.36px`、四边约 `1.15px`；`480×844` 下图片占媒体区约 `97.996%`、四边约 `2.19–2.21px`，信息条与复选框均位于媒体区内、操作栏保持 24px，分组区 `clientWidth = scrollWidth = 469px`。
   - 四张验收图保存为 `artifacts/design-qa/product-image-inset-v1.1.29-studio-wide.png`、`product-image-inset-v1.1.29-studio-narrow.png`、`product-image-inset-v1.1.29-panel-wide.png` 和 `product-image-inset-v1.1.29-panel-narrow.png`；两处验收控制台 `warn/error` 为 0。
+
+## 49. 工具入口仅在套图模式显示
+
+- [x] 49.1 同步 proposal、design 和商品图采集增量规格，定义入口默认隐藏且只随 `creation` 视图显示。
+- [x] 49.2 增加入口静态隐藏、视图同步函数及统一页面切换调用的聚焦回归断言。
+- [x] 49.3 实现菜单入口可见性同步，保持下载、提示说明和其他工具不变。
+- [x] 49.4 运行聚焦测试、全量测试、OpenSpec 严格校验、差异与中文编码检查，并在本地页面切换中验证显示和隐藏。
+  - 聚焦测试 `1/1`、变更级和全项目 OpenSpec 严格校验 `26/26`、JavaScript 语法、差异空白及 7 个相关文件的严格 UTF-8/替换字符检查通过。
+  - 本地 `http://127.0.0.1:3600/` 实测：`#creation` 下入口移除 `hidden` 并可见；切到 `#portrait` 后入口立即恢复 `hidden`，同菜单的“图片转提示词”仍可见。
+  - 首轮全量测试中，本次新增辅助函数使已有应用壳正好超过行数预算；已将同一可见性逻辑压缩回统一页面切换函数并修复该回归。最终全量测试 `1601/1603` 通过、`1` 项失败、`1` 项跳过，唯一失败为 `timeline-activity-style.test.mjs` 套图记录旧代码形态断言，来自工作区现有改动且与本次入口逻辑无关。

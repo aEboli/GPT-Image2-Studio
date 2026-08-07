@@ -311,6 +311,7 @@ test("Creation browser normalization retains the effective platform plan contrac
     "skuImageCount",
     "infographicRebuildCount",
     "totalPlannedItemCount",
+    "temuExcelExportState",
     "effectivePlan",
   ]) {
     assert.match(setNormalizer, new RegExp(`\\b${field}:`), `missing set field ${field}`);

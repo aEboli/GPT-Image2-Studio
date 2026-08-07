@@ -7,6 +7,7 @@ const stylesPath = new URL("../public/styles.css", import.meta.url);
 const appPath = new URL("../public/app.js", import.meta.url);
 const controllerPath = new URL("../public/lib/asset-workspace.mjs", import.meta.url);
 const deleteControllerPath = new URL("../public/lib/asset-record-delete-controller.mjs", import.meta.url);
+const lightboxViewerPath = new URL("../public/lib/lightbox-image-viewer.mjs", import.meta.url);
 
 test("five asset views expose the same compact navigation contract", async () => {
   const html = await readFile(indexPath, "utf8");
@@ -74,6 +75,38 @@ test("all asset pages expose current and selected deletion without implicit filt
   assert.match(styles, /\.asset-record-delete-dialog\s*\{/);
 });
 
+test("waterfall gallery only renders image checkboxes in explicit checking mode", async () => {
+  const [html, app, styles] = await Promise.all([
+    readFile(indexPath, "utf8"),
+    readFile(appPath, "utf8"),
+    readFile(stylesPath, "utf8"),
+  ]);
+  assert.equal((html.match(/id="gallerySelectionModeButton"/g) || []).length, 1);
+  assert.match(html, /id="gallerySelectionModeButton"[^>]*aria-pressed="false"[^>]*>勾选图片<\/button>/);
+  assert.match(app, /gallerySelectionMode:\s*false/);
+  assert.match(app, /if \(state\.gallerySelectionMode\) \{ const selectLabel = document\.createElement\("label"\)/);
+  assert.match(app, /refs\.galleryDeleteSelectedButton\.disabled = deleteBlocked \|\| !state\.gallerySelectionMode \|\| checkedCount === 0/);
+  assert.match(app, /gallerySelectionModeButton\.setAttribute\("aria-pressed", String\(state\.gallerySelectionMode\)\)/);
+  assert.match(app, /state\.gallerySelectionMode = !state\.gallerySelectionMode; renderGalleryView\(\)/);
+  assert.match(styles, /\.gallery-selection-mode-button\[aria-pressed="true"\]\s*\{/);
+  assert.match(styles, /\.gallery-selection-mode-button:focus-visible\s*\{/);
+  assert.match(styles, /html\[data-ui-layout="mobile"\] \.gallery-tile-select\s*\{[\s\S]*?width:\s*44px;[\s\S]*?height:\s*44px;/);
+});
+
+test("waterfall gallery paginates ordinary history by five dates without changing two-date density groups", async () => {
+  const [html, app] = await Promise.all([readFile(indexPath, "utf8"), readFile(appPath, "utf8")]);
+  assert.match(html, /class="gallery-column-switch hidden" id="galleryColumnSwitch"[^>]*aria-label="搜索结果列数"/);
+  assert.match(app, /const shouldPaginateHistory = !filters\.query;/);
+  assert.match(app, /\? paginateGallerySections\(allSections, state\.galleryHistoryPage\)\s*: getSearchGalleryPagination\(allSections\)/);
+  assert.match(app, /shouldPaginateHistory && layoutMode === "desktop" \? getGalleryHistorySectionLayouts\(allSections\)/);
+  assert.match(app, /layoutMode === "mobile" \? 2 : layoutMode === "tablet" \? 4 : getGalleryColumnCount\(\)/);
+  assert.match(app, /galleryColumnSwitch\?\.classList\.toggle\("hidden", shouldPaginateHistory\)/);
+  assert.match(app, /if \(changed && state\.activeView === "gallery" && !state\.galleryLoading\) renderGalleryView\(\)/);
+  assert.match(app, /refs\.galleryView\.dataset\.galleryLayout = layoutMode;/);
+  assert.match(app, /sectionLayouts\.forEach\(\(layout, index\) => \{[\s\S]*createGallerySection\(sections\[index\], layout\.columnCount\)/);
+  assert.match(app, /每页显示 5 个日期[\s\S]*自动 \$\{layoutText\}，每 2 个日期最多 3 行/);
+});
+
 test("asset empty states distinguish no data, no results, loading, and failure", async () => {
   const [html, app] = await Promise.all([readFile(indexPath, "utf8"), readFile(appPath, "utf8")]);
   assert.match(html, /<strong>暂无图片<\/strong>[\s\S]*前往提示词生图/);
@@ -93,11 +126,12 @@ test("mobile assets avoid horizontal record rails and preserve allowed horizonta
 });
 
 test("lightbox prioritizes the image and exposes concise accessible controls", async () => {
-  const [html, styles, app, controller] = await Promise.all([
+  const [html, styles, app, controller, lightboxViewer] = await Promise.all([
     readFile(indexPath, "utf8"),
     readFile(stylesPath, "utf8"),
     readFile(appPath, "utf8"),
     readFile(controllerPath, "utf8"),
+    readFile(lightboxViewerPath, "utf8"),
   ]);
   assert.match(html, /aria-label="缩小图片" title="缩小图片"/);
   assert.match(html, /<div class="lightbox-meta">\s*<button class="toolbar-button lightbox-back-button" id="lightboxClose"[^>]*aria-label="返回图片列表"[^>]*>[\s\S]*?←[\s\S]*?返回[\s\S]*?<\/button>\s*<strong id="lightboxTitle"/);
@@ -109,11 +143,21 @@ test("lightbox prioritizes the image and exposes concise accessible controls", a
   assert.match(html, /class="detail-field hidden" role="tabpanel" data-lightbox-panel="prompt"[\s\S]*class="detail-field lightbox-params-field" role="tabpanel" data-lightbox-panel="params"/);
   assert.doesNotMatch(html, /lightboxInspectorToggle|lightbox-more-menu|lightbox-inspector-head/);
   assert.match(styles, /\.lightbox-fields,[\s\S]*\.lightbox-media-stage\.is-viewer-inspecting \.lightbox-fields\s*\{[^}]*grid-template-rows:\s*minmax\(0,\s*1fr\);/);
+  assert.match(styles, /\.lightbox-media-stage,[\s\S]*\.lightbox-media-stage\.is-viewer-inspecting\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\) minmax\(280px,\s*340px\);/);
   assert.match(styles, /\.lightbox-actions > \.toolbar-button\s*\{[^}]*display:\s*inline-flex;[^}]*align-items:\s*center;[^}]*justify-content:\s*center;[^}]*line-height:\s*1;/);
   assert.match(styles, /\.lightbox-back-button\s*\{[^}]*display:\s*inline-flex;[^}]*align-items:\s*center;/);
+  assert.match(styles, /\.lightbox :is\(\.toolbar-button, \.lightbox-inspector-tabs > button\):focus-visible\s*\{[^}]*outline:\s*2px solid var\(--asset-selected-border\);[^}]*outline-offset:\s*2px;/);
   assert.match(styles, /html\[data-ui-layout="mobile"\] \.lightbox-media-stage,[\s\S]*grid-template-rows:\s*52dvh auto;/);
   assert.match(styles, /html\[data-ui-layout="mobile"\] \.lightbox-image-shell,[\s\S]*height:\s*100%;/);
+  assert.match(styles, /html\[data-ui-layout="tablet"\] \.lightbox-media-stage,[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);[^}]*grid-template-rows:\s*minmax\(52dvh,\s*1fr\) minmax\(0,\s*40dvh\);/);
+  assert.match(styles, /html\[data-ui-layout="tablet"\] \.lightbox-image-shell,[\s\S]*grid-column:\s*1;[^}]*grid-row:\s*1;/);
+  assert.match(styles, /html\[data-ui-layout="tablet"\] \.lightbox-fields,[\s\S]*grid-column:\s*1;[^}]*grid-row:\s*2;[^}]*overflow:\s*hidden;/);
+  assert.match(styles, /html\[data-ui-layout="tablet"\] #lightboxInspectorBody,[\s\S]*overflow:\s*auto;[^}]*overscroll-behavior:\s*contain;/);
+  assert.match(styles, /html\[data-ui-layout="mobile"\] \.lightbox-fields,[\s\S]*grid-column:\s*1;[^}]*grid-row:\s*2;/);
+  assert.match(styles, /html\[data-ui-layout="mobile"\] #lightboxInspectorBody,[\s\S]*overflow:\s*auto;[^}]*overscroll-behavior:\s*contain;/);
+  assert.match(styles, /\.lightbox-prompt-field dd,[\s\S]*\.lightbox-file-list dd\s*\{[^}]*overflow-wrap:\s*anywhere;/);
   assert.match(app, /button\.setAttribute\("aria-label", `查看图片 \$\{filename\}`\)/);
   assert.match(app, /refs\.lightboxImage\.alt = fresh\.filename \? `图片详情 \$\{fresh\.filename\}` : "生成图片详情"/);
   assert.match(controller, /JSON\.parse\(source\)/);
+  assert.match(lightboxViewer, /new ResizeObserver\(\(\) => \{[\s\S]*syncMetrics\(\{ preserveMode: true \}\);[\s\S]*resizeObserver\.observe\(refs\.lightboxImageShell\);/);
 });

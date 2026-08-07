@@ -79,6 +79,7 @@ function makeSet(overrides = {}) {
 
 test("Temu export request normalizes IDs, defaults and unsigned Cloudinary settings", () => {
   const request = normalizeTemuExportRequest({
+    mode: "strict",
     setIds: [" creation-set-a ", "creation-set-a", "creation-set-b"],
     defaults: {
       variantAttributeName: "颜色",
@@ -97,6 +98,7 @@ test("Temu export request normalizes IDs, defaults and unsigned Cloudinary setti
   });
 
   assert.deepEqual(request.setIds, ["creation-set-a", "creation-set-b"]);
+  assert.equal(request.mode, "strict");
   assert.deepEqual(request.defaults, {
     variantAttributeName: "颜色",
     defaultPrice: 19.99,
@@ -111,6 +113,15 @@ test("Temu export request normalizes IDs, defaults and unsigned Cloudinary setti
     cloudName: "demo-cloud",
     uploadPreset: "temu_unsigned",
   });
+});
+
+test("Temu export request defaults to draft mode and rejects unknown modes", () => {
+  assert.equal(normalizeTemuExportRequest({ setIds: ["creation-set-a"] }).mode, "draft");
+  assert.equal(normalizeTemuExportRequest({ setIds: ["creation-set-a"], mode: "draft" }).mode, "draft");
+  assert.throws(
+    () => normalizeTemuExportRequest({ setIds: ["creation-set-a"], mode: "preview" }),
+    /strict|draft/u,
+  );
 });
 
 test("Temu export request rejects partial or sensitive Cloudinary settings and invalid ranges", () => {
@@ -242,6 +253,9 @@ test("public image URL classification rejects local and credential-bearing targe
     "https://192.168.1.2/a.png",
     "https://[::1]/a.png",
     "https://[fd00::1]/a.png",
+    "https://[::ffff:127.0.0.1]/a.png",
+    "https://[::ffff:10.0.0.1]/a.png",
+    "https://[::ffff:c0a8:0102]/a.png",
   ]) {
     assert.equal(isPublicHttpsImageUrl(value), false, value);
   }
@@ -417,6 +431,37 @@ test("Temu export plan expands each saved SKU in stable order without inventing 
   assert.deepEqual(TEMU_TEMPLATE_HEADERS.slice(0, 6), [
     "*产品标题", "*英文标题", "产品描述", "产品货号", "*变种属性名称一", "*变种属性值一",
   ]);
+});
+
+test("Temu export keeps hero material priority even when hero follows ten carousel candidates", () => {
+  const sharedItems = Array.from({ length: 10 }, (_, index) => ({
+    itemId: `scene-${index + 1}`,
+    slotIndex: index + 1,
+    role: "scene",
+    status: "completed",
+    filename: `scene-${index + 1}.png`,
+    relativePath: `sets/a/scene-${index + 1}.png`,
+  }));
+  const hero = {
+    itemId: "hero-after-ten",
+    slotIndex: 11,
+    role: "hero",
+    status: "completed",
+    filename: "hero-after-ten.png",
+    relativePath: "sets/a/hero-after-ten.png",
+  };
+  const plan = createTemuExportPlan({
+    sets: [makeSet({ items: [...sharedItems, hero] })],
+    defaults: {},
+  });
+
+  assert.equal(plan.rows[0].imageRefs.carousel.length, 10);
+  assert.deepEqual(
+    plan.rows[0].imageRefs.carousel.map((item) => item.itemId),
+    sharedItems.map((item) => item.itemId),
+  );
+  assert.equal(plan.rows[0].imageRefs.material.itemId, "hero-after-ten");
+  assert.ok(plan.imageRequirements.some((entry) => entry.itemKey.endsWith(":hero-after-ten")));
 });
 
 test("Temu export plan keeps multiple sets, product fields, and SKU facts independently ordered", () => {

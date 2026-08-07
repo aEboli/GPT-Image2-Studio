@@ -42,7 +42,7 @@ const PROFILE_CONTRACT = {
     sourceIds: ["internal-universal-baseline"],
     slots: [
       "generic-hero@1:1",
-      "benefit-proof@1:1",
+      "target-shopper-resonance@1:1",
       "scene-application@1:1",
       "multi-angle@1:1",
       "ownership-atmosphere@1:1",
@@ -376,6 +376,7 @@ const IMAGE_TYPE_CONTRACT = {
   "scene-application": ["scene", "multi-scenario-application", "concise", "authentic-use", "allow-supplied"],
   "ownership-atmosphere": ["atmosphere", "ownership-atmosphere", "concise", "authentic-lifestyle", "allow-supplied"],
   "use-style-story": ["brand-story", "multi-scene-use-style-story", "moderate", "multi-context", "allow-supplied"],
+  "target-shopper-resonance": ["benefit", "target-shopper-decision-moment", "concise", "authentic-use", "allow-supplied"],
   "benefit-proof": ["benefit", "product-with-evidence", "concise", "optional-context", "allow-supplied"],
   "info-benefit": ["benefit", "modular-information-hierarchy", "moderate", "neutral", "allow-supplied"],
   "value-bundle": ["accessory-gift", "bundle-quantity-groups", "factual-short", "studio-clean", "allow-supplied"],
@@ -490,6 +491,7 @@ policyTest("image-type catalog preserves the approved legacy roles and visual po
     assert.ok(VALID_LEGACY_ROLES.has(definition.role), `${imageType} has unsupported legacy role ${definition.role}`);
   }
   assert.equal(policies.CREATION_PLATFORM_IMAGE_TYPE_REGISTRY["comparison-proof"].imageTypeLabel, "功能效果渲染图");
+  assert.equal(policies.CREATION_PLATFORM_IMAGE_TYPE_REGISTRY["target-shopper-resonance"].imageTypeLabel, "目标人群共鸣图");
   for (const platformId of ["lazada", "coupang"]) {
     assert.doesNotMatch(policies.CREATION_PLATFORM_PROFILE_REGISTRY[platformId].promptInstruction, /comparison/i);
   }

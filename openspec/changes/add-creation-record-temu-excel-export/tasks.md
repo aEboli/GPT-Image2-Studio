@@ -60,3 +60,41 @@
   - 完整测试 `1569` 项（`1568` 通过、`1` 跳过、`0` 失败）；公共模块 `89` 个；OpenSpec 严格验证 `25/25` 通过；Pages 构建与差异检查通过。跳过项是当前 Windows 权限不允许创建测试符号链接。
 - [ ] 8.4 在真实本地应用用至少两套记录和多个 SKU 验证完整导出、无 Cloudinary 待补全导出、部分上传失败、缓存复用、问题 sheet、现有单套导出不回归和无 UI 重叠；不得把工作簿生成视为 Temu 实际导入验收。
 - [ ] 8.5 使用用户确认的 Temu 导入工具或卖家后台进行人工 dry-run/校验时，只记录平台真实返回的字段错误；不自动发布商品，不绕过登录、验证码或平台保护。
+
+## 9. 扩展规格与既有缺口修复
+
+- [x] 9.1 同步 proposal、design、增量 spec 与 tasks，明确桌面常驻双栏和左侧可扩展记录列表、服务端预检、严格/待补全双轨、远程图片失败关闭、导出状态和统一互斥边界，并通过 change strict validation。
+- [ ] 9.2 先增加 Creation store 回归测试，证明 set/SKU `temuExport` 事实和 `temuExcelExportState` 经过 save/read/merge 后保持，且状态写入不推进业务 `updatedAt`。
+- [ ] 9.3 先增加公网 URL 与图片映射回归测试，覆盖 IPv4-mapped IPv6 私网拒绝，以及 hero 位于第 10 张共享图之后时仍优先成为产品素材图。
+- [ ] 9.4 修复上述 store、URL 和素材图优先级缺口并同步 `lib` 与 `public/lib`。
+
+## 10. 预检与严格远程图片验证
+
+- [ ] 10.1 先增加预检纯函数测试，覆盖模板/set/SKU/图片/待上传/缓存/阻塞/提醒统计、逐记录摘要、敏感信息清理和稳定问题 code。
+- [ ] 10.2 先增加远程图片验证测试，覆盖 DNS 公网检查、IPv4-mapped IPv6、每次重定向复核、最多 3 次重定向、总超时、流式字节上限、非图片响应，以及 PNG/JPEG/WebP 尺寸解析。
+- [ ] 10.3 实现不依赖原生图像扩展的有界远程图片验证模块，并把结果展开到每个 SKU/模板图片字段。
+- [ ] 10.4 实现严格阻塞判定：必填字段、最终公网图片、SKU 预览图和产品素材图大于 800×800 正方形；提醒不得被错误提升为阻塞。
+
+## 11. Local API、状态与严格失败关闭
+
+- [ ] 11.1 在共享 API capability matrix 增加 `POST /api/creation/sets/export-temu-excel/preflight`，Local supported、Cloudflare unsupported，并补 Worker 不访问 R2/Cloudinary 的契约测试。
+- [ ] 11.2 实现预检端点，复用正式导出的 schema、manifest、模板、总量、路径、缓存、上传和远程验证阶段，返回有界 JSON 摘要而不生成工作簿。
+- [ ] 11.3 为正式端点增加 `mode`；省略为 `draft`，`strict` 在写工作簿前重新验证并以 `422 TEMU_STRICT_EXPORT_BLOCKED` 整批失败关闭。
+- [ ] 11.4 实现每 set 串行 `temuExcelExportState` merge；严格成功、待补全成功、并发修改和 `EXPORT_STATE_WRITE_FAILED` 均有 API 集成测试。
+- [ ] 11.5 补齐任务 6.1 的模板致命错误与 `IMAGE_CACHE_WRITE_FAILED` API 集成分支，并确认预检和正式端点在任何上传前执行模板/总量检查。
+
+## 12. 桌面双栏记录页与 Temu 导出工作台
+
+- [x] 12.1 先增加记录列表测试，覆盖超过 60 套时的“已显示 N / 匹配 M”和加载更多、创建时间一致性、普通列表语义、导出状态四态，桌面常驻双栏及点击记录后左侧列表、已加载行数、滚动和筛选保持不变，并覆盖移动端选择器默认折叠、展开可见和选择后自动收起。
+- [x] 12.2 将宽屏套图记录恢复为左侧可扩展记录列表、右侧当前记录图片和 Listing 的常驻双栏，点击左侧记录只更新右侧；移动端将两区上下堆叠，记录选择器默认折叠、可按需展开且选择后自动收起，并只保留复用、Temu 导出和更多，把刷新、补图及删除按层级收入菜单。
+- [ ] 12.3 将导出弹窗升级为工作台，展示模板、set、SKU、图片、待上传、缓存、阻塞、提醒和逐记录摘要，并实现预检过期规则。
+- [ ] 12.4 实现严格导出/待补全导出分段选择、严格按钮禁用原因、结构化阻塞列表、成功状态回写后的列表刷新及单一表单主体滚动。
+- [ ] 12.5 统一预检/导出 busy 与补图、Listing、刷新、删除的互斥；搜索、筛选、滚动、勾选以及切换或查看右侧当前记录内容保持可用。
+- [ ] 12.6 完成任务 7.4：用统一回归测试固定旧 TXT、manifest JSON 和 Listing JSON 的 enablement、目标记录、文件名、payload 与 Temu 勾选批次隔离。
+
+## 13. 完整验证与视觉验收
+
+- [ ] 13.1 运行新增失败测试并确认修复后通过，再运行 Temu、Creation store、Local API、API contract、Worker、列表/工作台和旧导出聚焦测试。
+- [ ] 13.2 运行完整 `npm test`、`npm run sync:public-lib -- --check`、`npm run check:release`、`npm run build:pages`、OpenSpec 全量 strict validation、`git diff --check` 及中文 UTF-8/替换字符扫描。
+- [ ] 13.3 在隔离端口和临时输出目录构造至少 75 套记录、两套多 SKU 完整记录及缺字段/无 Cloudinary/上传失败/缓存复用/严格失败场景，验证现有服务不受影响。
+- [x] 13.4 使用 in-app Browser 在 `1728×947` 与参考图同状态截图，并验证桌面、平板和 `390×844` 移动端无重叠、关键交互和控制台错误；把参考图与实现截图放入同一比较输入，迭代到根目录 `design-qa.md` 为 `final result: passed`。

@@ -332,7 +332,10 @@ test("Cloudflare creation listing route uses payload API settings outside mock m
   assert.equal(seenRequests[0].auth, "Bearer payload-key");
   assert.equal(seenRequests[0].body.model, "gpt-payload");
   assert.equal(seenRequests[0].body.reasoning.effort, "high");
-  assert.equal(body.listingDrafts[0].title, "1 Pack Blue Compact Travel Bottle");
+  assert.equal(
+    body.listingDrafts[0].title,
+    "1 Pack Blue Compact Travel Bottle Compact blue bottle with a stated one-pack quantity",
+  );
   assert.doesNotMatch(JSON.stringify(body), /payload-key/);
 });
 
@@ -1499,8 +1502,8 @@ test("Cloudflare creation SKU bundle generation only sends the selected SKU subj
   assert.match(inputText, /Uploaded reference count: 1\./);
   assert.doesNotMatch(inputText, /blue-lure\.png/);
   assert.doesNotMatch(inputText, /package\.png/);
-  assert.match(storedCreationFilenames, /silver-lure\.png/);
-  assert.doesNotMatch(storedCreationFilenames, /Silverlure/);
+  assert.match(storedCreationFilenames, /sku-1-silver/i);
+  assert.doesNotMatch(storedCreationFilenames, /silver-lure\.png|Silverlure/);
 });
 
 test("Cloudflare infographic rebuild sends one source image and honors four output controls", async () => {

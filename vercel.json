@@ -1,4 +1,6 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "npm ci --omit=dev",
   "functions": {
     "server.mjs": {
       "includeFiles": "node_modules/pptxgenjs/**",

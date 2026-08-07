@@ -240,6 +240,8 @@ test("creation suite queue appends SKU preview cards to queued sets", () => {
   assert.deepEqual(set.items.map((item) => item.role), ["hero", "scene", "sku", "sku"]);
   assert.equal(set.items[2].title, "SKU image 1 - red");
   assert.equal(set.items[3].title, "SKU image 2 - blue / gray");
+  assert.equal(set.items[2].filenameToken, "sku-1-red");
+  assert.equal(set.items[3].filenameToken, "sku-2-blue-gray");
   assert.equal(set.items[3].itemId, "queued-sku-2");
   assert.equal(set.items[3].status, "queued");
 });
@@ -284,6 +286,51 @@ test("creation suite queue compacts Chinese same-subject multi-color SKU titles"
 
   assert.equal(set.items[1].title, "SKU image 1 - 红黑蓝色");
   assert.deepEqual(set.items[1].skuSubject.colorNames, ["red black blue"]);
+});
+
+test("creation suite queue omits raw SKU identifiers from titles and filename tokens", () => {
+  const set = buildCreationQueuedSet({
+    buildCreationReferenceRolePayload: () => [{ filename: "260526-SKU-151142-5714.png", role: "product" }],
+    buildCreationSkuSubjectPayload: () => [{
+      id: "F4J16",
+      title: "SKU image 2 F4J16",
+      filenames: ["260526-SKU-151142-5714.png"],
+      referenceIndexes: [1],
+    }],
+    createdAt: "2026-08-06T08:00:00.000Z",
+    creationState: { generating: true },
+    formatCreationDimensionUnitModeLabel: (value) => value,
+    formatCreationVisualLanguageLabel: (value) => value,
+    getCreationCurrentSet: () => null,
+    getCreationLogoPayload: () => null,
+    getCreationPreviewSlots: () => [{ itemId: "hero", role: "hero", title: "Hero" }],
+    getCreationSelectedDimensionUnitMode: () => "both",
+    getCreationSelectedImageCount: () => 1,
+    getCreationSelectedIndustryTemplate: () => ({ value: "general", label: "General", categoryPath: "" }),
+    getCreationSelectedLanguage: () => ({ value: "en", label: "English" }),
+    getCreationSelectedPlatform: () => ({ value: "universal", label: "通用电商" }),
+    getCreationSelectedRoles: () => ["hero"],
+    getCreationSelectedScenario: () => ({ value: "standard", label: "Standard" }),
+    isCreationDraftSet: () => false,
+    normalizeCreationSkuBundleCountForPayload: Number,
+    normalizeCreationVisualLanguage: (value) => value || "classic-commercial",
+    normalizeSet,
+    productDescription: "Description",
+    productName: "Queued product",
+    refs: {
+      creationDimensionSpecsInput: { value: "" },
+      creationSkuBundleCountInput: { value: "1" },
+      creationVisualLanguageInput: { value: "classic-commercial" },
+    },
+    sellingPoints: [],
+  });
+
+  const skuItem = set.items.find((item) => item.role === "sku");
+  assert.equal(skuItem.title, "SKU image 1");
+  assert.equal(skuItem.filenameToken, "sku-1");
+  assert.equal(skuItem.skuSubject.id, "F4J16");
+  assert.deepEqual(skuItem.skuSubject.filenames, ["260526-SKU-151142-5714.png"]);
+  assert.deepEqual(skuItem.skuSubject.referenceIndexes, [1]);
 });
 
 test("creation suite queue defaults SKU rule to color-name labels when no getter is provided", () => {

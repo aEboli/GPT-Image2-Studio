@@ -4,12 +4,29 @@
 定义资产工作区各类记录的当前项删除、显式多选删除、应用内确认、原位状态更新、持久化边界，以及 Local 与 Cloudflare 运行时的 API 行为，确保删除能力一致且不会越界清理其他资产。
 ## Requirements
 ### Requirement: Asset pages expose current and explicit multi-selection deletion
-The system SHALL expose Delete current and Delete selected on Waterfall Gallery, Article Illustration records, Creation set records, Portrait records, and PPT records. A checked batch MUST remain independent from the single current item used by the page detail or preview, and only Creation records SHALL additionally expose Delete filtered.
+The system SHALL expose Delete current and Delete selected on Waterfall Gallery, Article Illustration records, Creation set records, Portrait records, and PPT records. Waterfall Gallery SHALL keep image selection controls hidden until the user explicitly enables image-checking mode, and Delete selected SHALL remain unavailable while that mode is disabled. A checked batch MUST remain independent from the single current item used by the page detail or preview, and only Creation records SHALL additionally expose Delete filtered.
 
 #### Scenario: User deletes the current asset record
 - **WHEN** the user activates Delete current on an asset page with a current item
 - **THEN** the deletion target contains exactly that current image, set, or deck record
 - **AND** no unchecked neighboring record is included
+
+#### Scenario: User opens Waterfall Gallery for browsing
+- **WHEN** the user opens or reloads Waterfall Gallery without enabling image-checking mode
+- **THEN** Gallery tiles do not render image-selection checkboxes or their overlay hit areas
+- **AND** clicking a tile continues to select the current image and open its viewer
+- **AND** Delete selected is unavailable
+
+#### Scenario: User enables image checking
+- **WHEN** the user activates the Gallery image-checking mode button
+- **THEN** every displayed Gallery tile exposes a keyboard-operable checkbox with its current checked state
+- **AND** checking an image does not change the current Gallery image or open the viewer
+
+#### Scenario: User disables image checking
+- **WHEN** the user deactivates Gallery image-checking mode after checking one or more images
+- **THEN** Gallery selection controls and their overlay hit areas are removed from the displayed tiles
+- **AND** the checked filename collection remains intact for the current page session
+- **AND** Delete selected becomes unavailable until image-checking mode is enabled again
 
 #### Scenario: User checks multiple records
 - **WHEN** the user checks two or more assets and activates Delete selected

@@ -4316,7 +4316,13 @@ export async function handleApiRequest(request, options = {}) {
     return unsupportedFeature(request, "Cloudflare 部署版不支持商品图代理或插件打包，请使用本地应用。");
   }
 
-  if (request.method === "POST" && url.pathname === "/api/creation/sets/export-temu-excel") {
+  if (
+    request.method === "POST" &&
+    [
+      "/api/creation/sets/export-temu-excel",
+      "/api/creation/sets/export-temu-excel/preflight",
+    ].includes(url.pathname)
+  ) {
     return unsupportedFeature(request);
   }
 

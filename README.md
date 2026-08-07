@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.5-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.6-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages%20Ready-f38020.svg)](https://pages.cloudflare.com/)
 [![Windows](https://img.shields.io/badge/Windows-Installer-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
@@ -11,16 +11,20 @@
 
 把提示词生图、参考图分析、图片编辑、电商套图、人物写真、文章插图、PPT 生成和素材管理集中到一个浏览器界面中。
 
-当前版本：`v0.2.5`
+当前版本：`v0.2.6`
 
 </div>
 
-## v0.2.5 更新说明
+## v0.2.6 更新说明
 
 - 套图记录支持勾选多套记录生成 Temu 标准 Excel：每个 SKU 独占一行，已存在的公网 HTTPS 图片会直接复用；本地图片可选择使用 Cloudinary unsigned upload 获取 `secure_url`。
 - 缺少 Listing、价格、尺寸、重量、库存、产地或可公开访问图片时，导出文件会保持对应单元格为空，并在“导出问题”工作表列出具体待补项，不会猜测或伪造商品事实。
 - 导出仅在本地 Node.js 或 Windows 桌面程序中可用；它不会登录、导入或发布到 Temu。上传前仍需人工核对工作簿与 Temu 的实际校验结果。
 - Creation 与 Listing 的兼容读取、SKU 颜色标签和套图生成规则得到完善，历史记录仍按既有字段来源和数据边界处理。
+- 套图记录页在桌面宽屏恢复为左侧可持续加载记录列表、右侧图片与 Listing 的双栏工作区；搜索、日期筛选、多选、加载更多和当前详情彼此保持独立，移动端改为可折叠的记录选择器。
+- Listing 生成进一步收紧证据边界，补齐可验证标题信息、商品/包装尺寸重量来源和历史记录兼容读取；买家可见标题与 SKU 图片文件名不会暴露内部货号或源文件编码。
+- 提示词模式支持分别清空参考图和提示词、从当前结果添加或拖入参考图，首次载入显示最近 10 张图片，当前会话生成后扩展到最近 50 张；图片详情参数页同时展示文件名与相对路径。
+- Vercel Serverless 使用生产依赖安装和标准请求处理入口，避免 Electron 依赖与本地监听回调阻塞云端函数；Cloudflare 继续明确标注本地文件能力边界。
 
 ## 重要说明
 
@@ -214,7 +218,7 @@ Windows 用户也可以双击 `launch-studio.cmd` 启动，使用 `stop-studio-s
 从包含桌面产物的 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
 
 ```text
-GPT-Image2-Studio-Desktop-Setup-v0.2.5-x64.exe
+GPT-Image2-Studio-Desktop-Setup-v0.2.6-x64.exe
 ```
 
 安装完成后通过桌面或开始菜单中的 `GPT-Image2-Studio` 启动。程序会在独立窗口中运行，内置服务使用动态回环端口，关闭窗口后不会遗留后台服务。无需另行安装 Node.js，完整说明见 [Windows 桌面程序文档](./docs/windows-desktop.md)。
@@ -233,7 +237,7 @@ cmd /c npm run desktop
 从 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
 
 ```text
-GPT-Image2-Studio-Setup-v0.2.5.exe
+GPT-Image2-Studio-Setup-v0.2.6.exe
 ```
 
 安装器默认写入：
@@ -368,7 +372,7 @@ Cloudflare 与本地能力有差异：云端不能打开本机目录、返回本
 
 ### Vercel
 
-仓库中的 `vercel.json` 为 `server.mjs` 配置了依赖包含范围和 `300` 秒函数时长。可通过 Vercel 导入仓库或 CLI 创建 Preview 部署：
+仓库中的 `vercel.json` 为 `server.mjs` 配置了依赖包含范围和 `300` 秒函数时长，并在云端安装时使用 `npm ci --omit=dev`，避免把仅供桌面开发的 Electron/Electron Builder 带入 Serverless Function。可通过 Vercel 导入仓库或 CLI 创建 Preview 部署：
 
 ```powershell
 vercel deploy
@@ -396,7 +400,7 @@ cmd /c npm run build:desktop
 产物路径：
 
 ```text
-artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.5-x64.exe
+artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.6-x64.exe
 artifacts/desktop/win-unpacked/GPT-Image2-Studio.exe
 ```
 
@@ -414,7 +418,7 @@ cmd /c npm run build:installer
 产物路径格式：
 
 ```text
-artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.5.exe
+artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.6.exe
 ```
 
 脚本使用系统 `iexpress.exe` 生成自解压安装包，并把当前 Node.js 运行时和依赖打入安装目录；启动后仍使用默认浏览器显示工作台。
@@ -623,7 +627,7 @@ cmd /c npm run build:installer
 ## 版本发布
 
 - 版本号以 `package.json` 和 `package-lock.json` 为准。
-- Git tag 使用 `v<version>`，例如 `v0.2.5`。
+- Git tag 使用 `v<version>`，例如 `v0.2.6`。
 - Release 标题建议使用 `GPT-Image2-Studio v<version>`。
 - Release 应至少附带变更说明、验证结果和对应的 Windows 桌面安装包；如仍分发兼容版，应明确区分两个文件的启动形态。
 - 正式发布提交与标签就绪后运行 `npm run check:release:strict`，确认工作树干净且标签与版本一致。

@@ -16,6 +16,7 @@ const browserConfigPath = new URL("../lib/browser-config.mjs", import.meta.url);
 const browserImageCachePath = new URL("../lib/browser-image-cache.mjs", import.meta.url);
 const configModelPickerPath = new URL("../lib/config-model-picker.mjs", import.meta.url);
 const creationListingViewPath = new URL("../lib/creation-listing-view.mjs", import.meta.url);
+const creationRecordListViewPath = new URL("../lib/creation-record-list-view.mjs", import.meta.url);
 const creationReferenceDragPath = new URL("../lib/creation-reference-drag.mjs", import.meta.url);
 const creationReferenceAnalysisViewPath = new URL("../lib/creation-reference-analysis-view.mjs", import.meta.url);
 const publicCreationReferenceCoveragePath = new URL("../public/lib/creation-reference-coverage.mjs", import.meta.url);
@@ -25,8 +26,8 @@ const publicConfigModelPickerPath = new URL("../public/lib/config-model-picker.m
 const publicCreationListingViewPath = new URL("../public/lib/creation-listing-view.mjs", import.meta.url);
 const generationClientPath = new URL("../lib/generation-client.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20260804-prompt-reference-preview-2";
-const appAssetVersion = "20260804-prompt-reference-preview-1";
+const stylesAssetVersion = "20260807-creation-conversion-viewer-1";
+const appAssetVersion = "20260807-creation-record-split-workspace-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
 const creationQueueModuleAssetVersion = "20260712-creation-queue-selection-isolation-1";
 const quickBlendModuleAssetVersion = "20260608-quick-blend-time-sort-1";
@@ -48,6 +49,7 @@ test("creation image count keeps role checkbox defaults synchronized", async () 
   assert.match(app, /function syncCreationSelectedRolesToPreset\(selectedRoles\) \{[\s\S]*isCreationZeroImageCountMode\(\)[\s\S]*state\.creationSelectedRoles = \[\]/);
   assert.match(app, /function getFiniteCreationImageCount\(value\) \{ return value !== undefined && value !== null && String\(value\)\.trim\(\) !== "" && Number\.isFinite\(Number\(value\)\)/);
   assert.match(app, /function normalizeCreationSetForView\(set = \{\}\) \{[\s\S]*resolveCreationPlanCounts\(\{ \.\.\.planSource, \.\.\.set, items \}\)/);
+  assert.match(app, /filenameToken: String\(item\.filenameToken \|\| item\.filename_token \|\| ""\)/);
 
   const applySetBody =
     app.match(/function applyCreationSetToForm\(set\) \{[\s\S]*?\r?\n\}\r?\n\r?\nfunction getCreationCurrentSet/)?.[0] || "";
@@ -392,6 +394,7 @@ test("lightbox detail image exposes PS-style zoom and pan viewer controls", asyn
   assert.match(styles, /#lightboxImage\s*\{[\s\S]*position:\s*absolute;[\s\S]*left:\s*50%;[\s\S]*top:\s*50%;/);
   assert.match(styles, /#lightboxImage\s*\{[\s\S]*object-fit:\s*contain;[\s\S]*transform:\s*translate\(-50%,\s*-50%\)\s*translate3d\(var\(--lightbox-pan-x,\s*0px\),\s*var\(--lightbox-pan-y,\s*0px\),\s*0\)\s*scale\(var\(--lightbox-scale,\s*1\)\);/);
   assert.doesNotMatch(lightboxImageRule, /transition:[\s\S]*transform/);
+  assert.match(styles, /grid-template-columns:[\s\S]*minmax\(280px,\s*340px\)/);
   assert.match(styles, /\.lightbox-fields\s*\{[\s\S]*display:\s*contents;/);
   assert.match(styles, /\.lightbox-image-shell\s*\{[\s\S]*grid-column:\s*2;[\s\S]*grid-row:\s*1;/);
   assert.match(styles, /\.lightbox-fields \.detail-field\s*\{[\s\S]*grid-row:\s*1;[\s\S]*grid-template-rows:\s*auto minmax\(0,\s*1fr\);/);
@@ -519,6 +522,7 @@ test("filmstrip limits visible running jobs to stable preview loading slots", as
       statusText: `job ${index + 1}`,
     })).reverse(),
     gallery: [],
+    promptFilmstripHistoryLimit: 10,
   };
   const getFilmstripItems = new Function(
     "state",
@@ -547,7 +551,7 @@ test("filmstrip limits visible running jobs to stable preview loading slots", as
   );
 });
 
-test("filmstrip keeps gallery thumbnails separate after limiting running placeholders", async () => {
+test("filmstrip keeps the 10 or 50 image history window separate from running placeholders", async () => {
   const app = await readFile(appPath, "utf8");
   const getFilmstripItemsRuntime = extractFunctionBefore(app, "getFilmstripItems", "getFilmstripPlaceholderState");
   const state = {
@@ -556,10 +560,12 @@ test("filmstrip keeps gallery thumbnails separate after limiting running placeho
       createdAt: "",
       statusText: `job ${index + 1}`,
     })).reverse(),
-    gallery: [
-      { filename: "latest.png", createdAt: "2026-06-13T00:00:10.000Z", size: "1024x1024" },
-      { filename: "older.png", createdAt: "2026-06-13T00:00:09.000Z", size: "1024x1024" },
-    ],
+    gallery: Array.from({ length: 55 }, (_, index) => ({
+      filename: `prompt-${String(index + 1).padStart(2, "0")}.png`,
+      createdAt: new Date(Date.UTC(2026, 5, 13, 0, 0, 55 - index)).toISOString(),
+      size: "1024x1024",
+    })),
+    promptFilmstripHistoryLimit: 10,
   };
   const getFilmstripItems = new Function(
     "state",
@@ -584,18 +590,16 @@ test("filmstrip keeps gallery thumbnails separate after limiting running placeho
 
   const entries = getFilmstripItems();
 
-  assert.deepEqual(entries.map((entry) => entry.key), [
-    "job:job-1",
-    "job:job-2",
-    "job:job-3",
-    "job:job-4",
-    "job:job-5",
-    "job:job-6",
-    "file:latest.png",
-    "file:older.png",
+  assert.deepEqual(entries.slice(0, 6).map((entry) => entry.key), [
+    "job:job-1", "job:job-2", "job:job-3", "job:job-4", "job:job-5", "job:job-6",
   ]);
   assert.equal(entries.filter((entry) => entry.key.startsWith("job:")).length, 6);
-  assert.equal(entries.filter((entry) => entry.key.startsWith("file:")).length, 2);
+  assert.equal(entries.filter((entry) => entry.key.startsWith("file:")).length, 10);
+
+  state.promptFilmstripHistoryLimit = 50;
+  const expandedEntries = getFilmstripItems();
+  assert.equal(expandedEntries.filter((entry) => entry.key.startsWith("job:")).length, 6);
+  assert.equal(expandedEntries.filter((entry) => entry.key.startsWith("file:")).length, 50);
 });
 
 test("filmstrip rendering reuses keyed thumbnail nodes instead of clearing the rail", async () => {
@@ -630,10 +634,16 @@ test("studio filmstrip shows a visible placeholder while prompt thumbnails load"
 
 test("studio prompt thumbnails exclude quick blend gallery items", async () => {
   const app = await readFile(appPath, "utf8");
+  const getFilmstripItemsBody = extractFunctionBefore(app, "getFilmstripItems", "getFilmstripPlaceholderState");
+  const startGenerationBody = extractFunctionBefore(app, "startGeneration", "isStartGenerationShortcut");
 
   assert.match(app, /getPromptGenerationGalleryItems/);
   assert.match(app, /const promptGalleryItems = getPromptGenerationGalleryItems\(state\.gallery\);/);
-  assert.match(app, /const recentGallery = getPromptGenerationGalleryItems\(state\.gallery\)\.slice\(0,\s*12\)/);
+  assert.match(app, /promptFilmstripHistoryLimit:\s*PROMPT_FILMSTRIP_INITIAL_HISTORY_LIMIT,/);
+  assert.match(getFilmstripItemsBody, /getPromptGenerationGalleryItems\(state\.gallery\)\.slice\(0,\s*state\.promptFilmstripHistoryLimit\)/);
+  assert.doesNotMatch(getFilmstripItemsBody, /\.slice\(0,\s*14\)/);
+  assert.match(startGenerationBody, /const job = createJob\(\);\s*state\.promptFilmstripHistoryLimit = PROMPT_FILMSTRIP_GENERATED_HISTORY_LIMIT; state\.jobs\.unshift\(job\);/);
+  assert.doesNotMatch(app, /localStorage\.(?:getItem|setItem)\([^)]*promptFilmstripHistoryLimit/i);
   assert.match(app, /refs\.recentEmpty\.classList\.toggle\("hidden",\s*promptGalleryItems\.length > 0\);/);
   assert.match(app, /getRecentGalleryItems\(promptGalleryItems\)/);
   assert.doesNotMatch(app, /getRecentGalleryItems\(state\.gallery\)/);
@@ -897,6 +907,18 @@ test("prompt studio exposes independent clear and reference-recycling controls",
 
   assert.match(html, /id="clearReferenceButton"[\s\S]*aria-label="清空参考图"/);
   assert.match(html, /id="clearPromptButton"[\s\S]*aria-label="清空提示词"/);
+  const clearButtonMarkup = [...html.matchAll(/<button\s+class="icon-button field-heading-icon-button field-clear-button"[\s\S]*?<\/button>/g)]
+    .map((match) => match[0]);
+  assert.equal(clearButtonMarkup.length, 2);
+  assert.equal((html.match(/class="field-clear-icon"/g) || []).length, 2);
+  assert.equal((html.match(/<path d="M3 6h18" \/>/g) || []).length, 2);
+  assert.equal((html.match(/<path d="M8 6V4h8v2" \/>/g) || []).length, 2);
+  assert.equal((html.match(/<path d="m19 6-1 14H6L5 6" \/>/g) || []).length, 2);
+  clearButtonMarkup.forEach((markup) => assert.doesNotMatch(markup, /×/));
+  assert.match(
+    html,
+    /id="surprisePromptButton"[\s\S]*aria-label="提示词模板"[\s\S]*<span class="prompt-template-icon" aria-hidden="true">⭐<\/span>/,
+  );
   assert.match(html, /id="previewAddReferenceButton"[\s\S]*>添加到参考图<\/button>/);
   assert.match(html, /id="previewAddReferenceButton"[\s\S]*data-tooltip="添加到参考图；也可拖动预览图片到参考图区域"/);
   assert.match(app, /function clearPromptInput\(\) \{[\s\S]*updatePromptCounter\(\);[\s\S]*updateGenerateButton\(\);/);
@@ -921,11 +943,19 @@ test("prompt studio exposes independent clear and reference-recycling controls",
     styles,
     /html:is\(\[data-ui-layout="tablet"\],\s*\[data-ui-layout="mobile"\]\) \.reference-field-group:has\(\.field-clear-button\[data-tooltip\]:focus-visible\)\s*\{[\s\S]*overflow:\s*visible;/,
   );
+  assert.match(styles, /\.field-heading-icon-button\s*\{[\s\S]*width:\s*24px;[\s\S]*height:\s*24px;[\s\S]*border-radius:\s*7px;/);
+  assert.match(styles, /\.field-clear-icon\s*\{[\s\S]*width:\s*14px;[\s\S]*fill:\s*none;[\s\S]*stroke:\s*currentColor;[\s\S]*stroke-width:\s*1\.8;[\s\S]*stroke-linecap:\s*round;/);
+  assert.match(styles, /#surprisePromptButton\s*\{[\s\S]*font-size:\s*13px;[\s\S]*line-height:\s*1;/);
+  assert.match(styles, /\.field-clear-button:focus-visible\s*\{[\s\S]*outline:\s*2px solid/);
+  assert.match(
+    styles,
+    /html:is\(\[data-ui-layout="stacked"\],\s*\[data-ui-layout="tablet"\],\s*\[data-ui-layout="mobile"\]\) \.field-heading-icon-button\s*\{[\s\S]*width:\s*44px;[\s\S]*height:\s*44px;/,
+  );
   assert.match(styles, /\.reference-grid\.dragover\s*\{/);
   assert.match(styles, /\.reference-preview-viewer \.reference-preview-backdrop\s*\{[\s\S]*background:\s*rgba\(0,\s*0,\s*0,\s*0\.24\);[\s\S]*backdrop-filter:\s*none;[\s\S]*-webkit-backdrop-filter:\s*none;/);
-  assert.match(styles, /\.lightbox-fields \.lightbox-params-field\s*\{[\s\S]*grid-template-rows:\s*auto minmax\(120px,\s*1fr\) auto;[\s\S]*overflow:\s*auto;/);
-  assert.match(styles, /\.lightbox-fields \.lightbox-params-field textarea\s*\{[\s\S]*height:\s*auto;[\s\S]*min-height:\s*120px;/);
-  assert.match(styles, /html:is\(\[data-ui-layout="tablet"\],\s*\[data-ui-layout="mobile"\]\) \.lightbox-fields \.lightbox-params-field\s*\{[\s\S]*minmax\(140px,\s*1fr\) auto;/);
+  assert.match(styles, /\.lightbox-fields \.lightbox-params-field\s*\{[\s\S]*grid-template-rows:\s*auto minmax\(96px,\s*1fr\) auto;[\s\S]*overflow:\s*auto;/);
+  assert.match(styles, /\.lightbox-fields \.lightbox-params-field textarea\s*\{[\s\S]*height:\s*auto;[\s\S]*min-height:\s*96px;/);
+  assert.match(styles, /html:is\(\[data-ui-layout="tablet"\],\s*\[data-ui-layout="mobile"\]\) \.lightbox-fields \.lightbox-params-field\s*\{[\s\S]*minmax\(112px,\s*1fr\) auto;/);
 });
 
 test("reference preview cards do not render uploaded filenames", async () => {
@@ -2514,6 +2544,10 @@ test("studio layout consumes density variables for wide-screen adaptation withou
   assert.match(styles, /\.studio-grid\s*\{[\s\S]*grid-template-columns:\s*var\(--studio-grid-left,\s*392px\)\s*minmax\(0,\s*1fr\);[\s\S]*gap:\s*var\(--studio-grid-gap,\s*14px\);/);
   assert.match(styles, /\.studio-panel,\s*[\r\n]+\s*\.drawer-panel,\s*[\r\n]+\s*\.lightbox-dialog\s*\{[\s\S]*padding:\s*var\(--panel-padding,\s*12px\);/);
   assert.match(styles, /\.settings-form\s*\{[\s\S]*gap:\s*calc\(var\(--field-gap,\s*6px\) \+ 6px\);/);
+  assert.match(
+    styles,
+    /\.settings-form\s*\{[\s\S]*min-width:\s*0;[\s\S]*overflow-x:\s*hidden;[\s\S]*overflow-y:\s*auto;/,
+  );
   assert.match(styles, /textarea,\s*[\r\n]+\s*input,\s*[\r\n]+\s*select\s*\{[\s\S]*padding:\s*var\(--input-padding-y,\s*10px\)\s*var\(--input-padding-x,\s*12px\);/);
   assert.match(styles, /textarea\s*\{[\s\S]*min-height:\s*var\(--textarea-min-height,\s*96px\);/);
   assert.match(styles, /\.ratio-chip\s*\{[\s\S]*min-height:\s*var\(--ratio-chip-height,\s*48px\);/);
@@ -3055,6 +3089,7 @@ test("config drawer can test the connection and reveal fetched models in a picke
   const app = await readFile(appPath, "utf8");
   const styles = await readFile(stylesPath, "utf8");
   const configModelPicker = await readFile(configModelPickerPath, "utf8");
+  const modelOptionsListRule = readCssRule(styles, ".model-options-list");
 
   assert.match(html, /id="testConnectionButton"[\s\S]*测试连接/);
   assert.match(html, /id="fetchModelsButton"[\s\S]*获取模型列表/);
@@ -3103,8 +3138,8 @@ test("config drawer can test the connection and reveal fetched models in a picke
   assert.match(styles, /\.model-picker-control\s*\{/);
   assert.match(styles, /\.model-picker-toggle\s*\{/);
   assert.match(styles, /\.model-options-list\s*\{/);
-  assert.match(styles, /\.model-options-list\s*\{[\s\S]*background:\s*var\(--bg-soft\);/);
-  assert.doesNotMatch(styles, /\.model-options-list\s*\{[\s\S]*--panel-strong/);
+  assert.match(modelOptionsListRule, /background:\s*var\(--bg-soft\);/);
+  assert.doesNotMatch(modelOptionsListRule, /--panel-strong/);
   assert.match(styles, /\.model-options-empty\s*\{/);
 });
 
@@ -3971,7 +4006,7 @@ test("creation mode has product references without a separate style-reference mo
   assert.doesNotMatch(app, /review-qa/);
   assert.match(app, /1-hero\|hero\|首图成交主视觉/);
   assert.match(app, /1-hero\|hero\|首图成交主视觉\|[^;]*小圆框/);
-  assert.match(app, /2-benefit\|benefit\|核心信息融合图/);
+  assert.match(app, /2-benefit\|benefit\|目标人群共鸣图/);
   assert.match(app, /3-scene\|scene\|适用多场景图/);
   assert.match(app, /4-multi-angle\|multi-angle\|多角度产品展示图/);
   assert.match(app, /5-atmosphere\|atmosphere\|冲动下单氛围图/);
@@ -3980,7 +4015,7 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(app, /7-brand-story\|brand-story\|品牌质感\/礼品价值图\|做成多场景用途与风格拼贴/);
   assert.match(app, /8-size-capacity-fit\|size-capacity-fit\|尺寸容量适配图/);
   assert.match(app, /9-effect-comparison\|effect-comparison\|功能效果渲染图/);
-  assert.match(app, /9-effect-comparison\|effect-comparison\|功能效果渲染图\|以一个清晰完整的商品主体为核心，围绕它展现所有已提供功能、机制、效果路径和渲染结果，不做前后或左右对比/);
+  assert.match(app, /9-effect-comparison\|effect-comparison\|功能效果渲染图\|以一个清晰完整的商品主体为核心覆盖所有可靠功能；同屏不清晰时使用连续无损场景拼接，不做对比或遗漏/);
   assert.match(app, /10-spec-table\|spec-table\|参数规格图/);
   assert.match(app, /11-craft-process\|craft-process\|品质工艺证明图/);
   assert.match(app, /12-accessory-gift\|accessory-gift\|到手清单\/配件图/);
@@ -4851,7 +4886,7 @@ test("asset record views include PPT records and Creation set records", async ()
   assert.match(app, /if \(window\.location\.hash === "#creation-record"\)/);
   assert.match(app, /function renderPptRecordView\(\) \{/);
   assert.match(app, /function renderCreationRecordView\(\) \{/);
-  assert.match(app, /function renderCreationRecordSetList\(\) \{/);
+  assert.match(app, /function renderCreationRecordSetList\(filteredSets = filterCreationRecordSets\(\)\) \{/);
   assert.match(app, /function filterCreationRecordSets\(\) \{/);
   assert.match(
     app,
@@ -4871,7 +4906,8 @@ test("asset record views include PPT records and Creation set records", async ()
   assert.match(app, /async function copyCreationRecordFullPaths\(\) \{/);
   assert.match(app, /async function openCreationRecordFolder\(\) \{/);
   assert.match(app, /creationRecordRepairIncompleteButton: document\.querySelector\("#creationRecordRepairIncompleteButton"\)/);
-  assert.match(app, /const recordIncompleteItems = getCreationIncompleteItems\(selectedSet\);[\s\S]*creationRecordRepairIncompleteButton\.disabled = state\.creation\.generating \|\| !canRepairCreationSet\(selectedSet\) \|\| recordIncompleteItems\.length === 0;/);
+  assert.match(app, /const repairBlocked = state\.creation\.generating \|\| state\.creation\.recordTemuExportBusy \|\| !canRepairCreationSet\(selectedSet\) \|\| recordIncompleteItems\.length === 0;/);
+  assert.match(app, /creationRecordRepairIncompleteButton\.disabled = repairBlocked;/);
   assert.match(app, /creationRecordRepairIncompleteButton\.textContent = getCreationRecordRepairButtonLabel\(recordIncompleteItems\);/);
   assert.match(app, /async function repairCreationRecordIncompleteImages\(\) \{/);
   assert.match(app, /const missingAssetCount = targetItems\.filter\(isCreationMissingAssetItem\)\.length;/);
@@ -5024,10 +5060,11 @@ test("creation records expose prompt exports", async () => {
 });
 
 test("creation records support current selected and filtered deletion with an app dialog", async () => {
-  const [html, app, styles] = await Promise.all([
+  const [html, app, styles, recordListView] = await Promise.all([
     readFile(indexPath, "utf8"),
     readFile(appPath, "utf8"),
     readFile(stylesPath, "utf8"),
+    readFile(creationRecordListViewPath, "utf8"),
   ]);
 
   assert.match(html, /id="creationRecordDeleteCurrentButton"[^>]*>删除当前<\/button>/);
@@ -5037,7 +5074,7 @@ test("creation records support current selected and filtered deletion with an ap
   assert.match(html, /id="creationRecordDeleteCancelButton"[^>]*>取消<\/button>/);
   assert.match(html, /id="creationRecordDeleteConfirmButton"[^>]*>确认删除<\/button>/);
   assert.match(app, /from "\/lib\/creation-record-delete\.mjs\?v=20260722-creation-record-delete-flow-1"/);
-  assert.match(app, /checkbox\.dataset\.creationRecordSelectSetId = set\.setId/);
+  assert.match(recordListView, /checkbox\.dataset\.creationRecordSelectSetId = setId;/);
   assert.match(app, /getCreationRecordDeleteTargets\(\{/);
   assert.match(app, /fetch\("\/api\/creation\/sets\/delete", \{/);
   assert.match(app, /method: "POST"/);
@@ -5048,11 +5085,56 @@ test("creation records support current selected and filtered deletion with an ap
   assert.notEqual(deleteFlowStart, -1);
   assert.notEqual(deleteFlowEnd, -1);
   assert.match(deleteFlow, /resolveCreationRecordSelectionAfterDelete\(/);
+  assert.match(deleteFlow, /if \(deletedIds\.has\(selectedSetIdBeforeDelete\)\) \{[\s\S]*recordDetailExpanded = false;/);
   assert.doesNotMatch(deleteFlow, /loadCreationSets\(\)/);
-  assert.match(app, /refs\.creationRecordRefreshButton\.addEventListener\("click",[\s\S]*?loadCreationSets\(\)/);
+  assert.match(app, /refs\.creationRecordRefreshButton\.addEventListener\("click", refreshCreationRecordSets\);/);
   assert.match(styles, /\.creation-record-list-item\s*\{/);
   assert.match(styles, /\.creation-record-select\s*\{/);
   assert.match(styles, /\.creation-record-delete-dialog\s*\{/);
+});
+
+test("creation records keep the desktop list and image Listing workspace visible together", async () => {
+  const [html, app, styles] = await Promise.all([
+    readFile(indexPath, "utf8"),
+    readFile(appPath, "utf8"),
+    readFile(stylesPath, "utf8"),
+  ]);
+
+  assert.match(
+    html,
+    /class="creation-record-browser">[\s\S]*class="asset-record-picker"[\s\S]*class="creation-record-archive"[^>]*>[\s\S]*id="creationRecordResultGrid"[\s\S]*id="creationRecordListingDrafts"/u,
+  );
+  assert.doesNotMatch(html, /id="creationRecordCloseDetailButton"|返回记录列表/u);
+  assert.doesNotMatch(app, /recordDetailOpen|recordPicker\.hidden|recordArchive\.hidden/u);
+  assert.match(app, /refs\.creationRecordResultGrid\.classList\.toggle\("hidden", !selectedSet\);/u);
+  assert.match(
+    styles,
+    /\.creation-record-browser\s*\{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-columns:\s*minmax\(280px,\s*340px\)\s+minmax\(0,\s*1fr\);/u,
+  );
+  assert.doesNotMatch(
+    styles,
+    /html:is\(\[data-ui-layout="tablet"\],\s*\[data-ui-layout="mobile"\]\) \.creation-record-browser\s*\{[^}]*display:\s*block;/u,
+  );
+  assert.match(
+    styles,
+    /html\[data-ui-layout="tablet"\]\[data-ui-orientation="portrait"\] \.creation-record-browser\s*\{[^}]*grid-template-columns:\s*minmax\(220px,\s*280px\)\s+minmax\(0,\s*1fr\);[^}]*grid-template-rows:\s*minmax\(0,\s*1fr\);[^}]*height:\s*100%;[^}]*overflow:\s*hidden;/u,
+  );
+  assert.match(
+    styles,
+    /html\[data-ui-layout="mobile"\] \.article-record-browser,\s*html\[data-ui-layout="mobile"\] \.creation-record-browser,[^{]*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*auto auto;[^}]*overflow:\s*visible;/u,
+  );
+  assert.match(
+    styles,
+    /html\[data-ui-layout="mobile"\] \.creation-record-browser \.creation-record-list-footer\s*\{[^}]*display:\s*none;/u,
+  );
+  assert.match(
+    styles,
+    /html\[data-ui-layout="mobile"\] \.creation-record-browser \.asset-record-picker\.is-open \.creation-record-list-footer\s*\{[^}]*display:\s*flex;/u,
+  );
+  assert.match(
+    app,
+    /selectCreationRecord\(target\.dataset\.creationRecordSetId\);\s*assetWorkspaceController\.closeRecordPickers\(\);/u,
+  );
 });
 
 test("creation records combine keyword and created-time filters across actions", async () => {
@@ -5070,7 +5152,9 @@ test("creation records combine keyword and created-time filters across actions",
   assert.match(app, /recordDateFilter:\s*""/);
   assert.match(app, /function getCreationRecordKeywordMatchedSets\(\) \{/);
   assert.match(app, /filterCreationRecordSetsByTime\(/);
-  assert.match(app, /const sets = filterCreationRecordSets\(\)\.slice\(0, 60\);/);
+  assert.match(app, /from "\/lib\/creation-record-list-model\.mjs(?:\?[^\"]+)?";/);
+  assert.match(app, /const listModel = buildCreationRecordListModel\(filteredSets, \{/);
+  assert.match(app, /refs\.creationRecordLoadMoreButton\?\.addEventListener\("click", \(\) => \{[\s\S]*loadMoreCreationRecordListState\([\s\S]*renderCreationRecordView\(\);[\s\S]*\}\);/);
   assert.match(app, /buildCreationRecordTimeFilterOptions\(/);
   assert.match(app, /const isActive = option\.value === filters\.window;/);
   assert.match(app, /button\.setAttribute\("aria-pressed", String\(isActive\)\)/);
@@ -5118,6 +5202,7 @@ test("creation mode exposes listing agent controls and record listing drafts", a
   const styles = await readFile(stylesPath, "utf8");
   const app = await readFile(appPath, "utf8");
   const listingView = await readFile(creationListingViewPath, "utf8");
+  const recordListView = await readFile(creationRecordListViewPath, "utf8");
 
   assert.match(html, /id="creationListingAgentEnabledInput"/);
   assert.match(html, /id="creationRecordGenerateListingsButton"/);
@@ -5143,14 +5228,14 @@ test("creation mode exposes listing agent controls and record listing drafts", a
   assert.match(app, /function getCreationInlineListingRefs\(\) \{/);
   assert.match(app, /createCreationListingController\(\{/);
   assert.match(app, /renderCurrentView: renderCreationView,/);
-  assert.match(app, /getCreationRecordListingMetaLabel\(set\)/);
+  assert.match(app, /getListingLabel: getCreationRecordListingMetaLabel,/);
+  assert.match(recordListView, /const listingLabel = cleanString\(getListingLabel\?\.\(set\)\);/);
   assert.match(app, /creationRecordArchiveDetail\.insertBefore\(refs\.creationRecordGenerateListingsButton, detailToggle\)/);
-  assert.match(app, /metaRow\.className = "creation-record-meta-row";/);
-  assert.match(app, /statusRow\.className = "creation-record-status-row";/);
-  assert.match(app, /listingBadge\.className = "creation-record-listing-badge";/);
-  assert.match(app, /button\.appendChild\(metaRow\);/);
-  assert.match(app, /statusRow\.appendChild\(status\);[\s\S]*statusRow\.appendChild\(listingBadge\);[\s\S]*button\.appendChild\(statusRow\);/);
-  assert.doesNotMatch(app, /metaRow\.appendChild\(listingBadge\);/);
+  assert.match(recordListView, /metaRow\.className = "creation-record-meta-row";/);
+  assert.match(recordListView, /statusRow\.className = "creation-record-status-row";/);
+  assert.match(recordListView, /listingBadge\.className = "creation-record-listing-badge";/);
+  assert.match(recordListView, /statusRow\.appendChild\(status\);[\s\S]*statusRow\.appendChild\(listingBadge\);[\s\S]*button\.append\(titleRow, metaRow, statusRow\);/);
+  assert.doesNotMatch(recordListView, /metaRow\.appendChild\(listingBadge\);/);
   assert.match(app, /fetchImpl: \(\.\.\.args\) => fetch\(\.\.\.args\),/);
   assert.match(app, /getRequestConfig: getBrowserPrivateConfigRequestPayload,/);
   assert.match(app, /creationListingController\.syncRecordControls\(selectedSet\);/);

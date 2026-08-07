@@ -11,6 +11,7 @@ test("Creation exposes clipboard batch import and the tools menu exposes the ext
 
   assert.match(html, /id="creationClipboardImportButton"[^>]*>[\s\S]*从剪贴板导入/);
   assert.match(html, /data-product-image-extension-action[^>]*>商品图采集插件/);
+  assert.match(html, /class="mega-menu-description-entry"[^>]*data-product-image-extension-menu-entry[^>]*hidden/);
   assert.match(html, /class="mega-menu-description-entry"[\s\S]*aria-describedby="productImageCollectorDescription"[\s\S]*id="productImageCollectorDescription"[^>]*role="tooltip"/);
   assert.match(html, /支持在 1688、Amazon、Temu、TikTok Shop、SHEIN 和大健云仓商品详情页采集主图、详情图与 SKU 图/);
   assert.match(html, /只在用户主动采集时读取受支持商品区域，不读取登录凭据/);
@@ -35,6 +36,7 @@ test("Creation exposes clipboard batch import and the tools menu exposes the ext
   assert.doesNotMatch(html, /product-image-import-viewer-head/);
   assert.match(app, /createProductImageImportController/);
   assert.match(app, /canHandlePaste:\s*\(\)\s*=>\s*state\.activeView\s*===\s*"creation"/);
+  assert.match(app, /async function setActiveView\(view\) \{[\s\S]*state\.activeView = view;[\s\S]*document\.querySelector\("\[data-product-image-extension-menu-entry\]"\)\.hidden = view !== "creation";/);
   assert.match(app, /productImageImportController\.bind\(\)/);
   const controller = await readFile(new URL("../lib/product-image-import-controller.mjs", import.meta.url), "utf8");
   assert.doesNotMatch(controller, /\.src\s*=\s*item\.url/);
