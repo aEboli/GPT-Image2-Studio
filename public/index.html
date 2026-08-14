@@ -68,7 +68,7 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Sora:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260807-creation-conversion-viewer-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260812-app-version-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -222,7 +222,6 @@
                         id="clearReferenceButton"
                         type="button"
                         aria-label="清空参考图"
-                        title="清空参考图"
                         data-tooltip="清空参考图"
                       >
                         <svg class="field-clear-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -305,7 +304,6 @@
                         id="clearPromptButton"
                         type="button"
                         aria-label="清空提示词"
-                        title="清空提示词"
                         data-tooltip="清空提示词"
                       >
                         <svg class="field-clear-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -314,7 +312,7 @@
                           <path d="m19 6-1 14H6L5 6" />
                         </svg>
                       </button>
-                      <button class="icon-button field-heading-icon-button" id="surprisePromptButton" type="button" title="提示词模板" aria-label="提示词模板" aria-expanded="false" data-ui-i18n-title="promptTemplate">
+                      <button class="icon-button field-heading-icon-button" id="surprisePromptButton" type="button" aria-label="提示词模板" aria-expanded="false" data-tooltip="提示词模板" data-ui-i18n-tooltip="promptTemplate">
                         <span class="prompt-template-icon" aria-hidden="true">⭐</span>
                       </button>
                     </div>
@@ -443,7 +441,7 @@
                       id="previewAddReferenceButton"
                       type="button"
                       aria-label="添加当前图片到参考图"
-                      title="添加到参考图；也可拖动预览图片到参考图区域"
+                      aria-disabled="true"
                       data-tooltip="添加到参考图；也可拖动预览图片到参考图区域"
                     >添加到参考图</button>
                     <a class="toolbar-button" id="previewDownloadButton" href="#" download data-ui-i18n="download">下载</a>
@@ -2595,6 +2593,8 @@
       </main>
     </div>
 
+    <small class="app-version" aria-label="当前版本 v0.2.7">v0.2.7</small>
+
     <dialog
       class="creation-record-delete-dialog"
       id="creationRecordDeleteDialog"
@@ -2805,12 +2805,12 @@
           <div class="product-image-import-viewer-stage" id="productImageImportViewerStage">
             <div class="product-image-import-viewer-frame"><img id="productImageImportViewerImage" alt="" decoding="async" draggable="false" /></div>
             <div class="product-image-import-viewer-toolbar" role="toolbar" aria-label="图片查看工具">
-              <button class="product-image-import-viewer-tool-button" id="productImageImportViewerFitButton" type="button" aria-label="全屏显示在弹窗内" title="全屏" data-tooltip="全屏"></button>
-              <button class="product-image-import-viewer-tool-button" id="productImageImportViewerRotateLeftButton" type="button" aria-label="向左旋转" title="向左旋转" data-tooltip="向左旋转"></button>
-              <button class="product-image-import-viewer-tool-button" id="productImageImportViewerRotateRightButton" type="button" aria-label="向右旋转" title="向右旋转" data-tooltip="向右旋转"></button>
-              <button class="product-image-import-viewer-tool-button" id="productImageImportViewerZoomInButton" type="button" aria-label="放大" title="放大" data-tooltip="放大"></button>
-              <button class="product-image-import-viewer-tool-button" id="productImageImportViewerZoomOutButton" type="button" aria-label="缩小" title="缩小" data-tooltip="缩小"></button>
-              <button class="product-image-import-viewer-tool-button" id="productImageImportViewerOriginalSizeButton" type="button" aria-label="恢复初始视图" title="恢复初始视图" data-tooltip="恢复初始视图"></button>
+              <button class="product-image-import-viewer-tool-button" id="productImageImportViewerFitButton" type="button" aria-label="全屏显示在弹窗内" data-tooltip="全屏"></button>
+              <button class="product-image-import-viewer-tool-button" id="productImageImportViewerRotateLeftButton" type="button" aria-label="向左旋转" data-tooltip="向左旋转"></button>
+              <button class="product-image-import-viewer-tool-button" id="productImageImportViewerRotateRightButton" type="button" aria-label="向右旋转" data-tooltip="向右旋转"></button>
+              <button class="product-image-import-viewer-tool-button" id="productImageImportViewerZoomInButton" type="button" aria-label="放大" data-tooltip="放大"></button>
+              <button class="product-image-import-viewer-tool-button" id="productImageImportViewerZoomOutButton" type="button" aria-label="缩小" data-tooltip="缩小"></button>
+              <button class="product-image-import-viewer-tool-button" id="productImageImportViewerOriginalSizeButton" type="button" aria-label="恢复初始视图" data-tooltip="恢复初始视图"></button>
               <output class="product-image-import-viewer-zoom-output" id="productImageImportViewerZoomLabel" aria-live="polite">100%</output>
             </div>
           </div>
@@ -3267,6 +3267,8 @@
       </div>
     </aside>
 
-    <script type="module" src="./app.js?v=20260807-creation-record-split-workspace-1"></script>
+    <div class="app-tooltip" id="appTooltip" role="tooltip" popover="manual"></div>
+
+    <script type="module" src="./app.js?v=20260812-top-layer-tooltips-3"></script>
   </body>
 </html>

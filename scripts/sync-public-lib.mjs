@@ -68,6 +68,7 @@ export const PUBLIC_LIB_SYNC_TARGETS = [
   "preview-keyboard-navigation.mjs",
   "preview-placeholder-state.mjs",
   "prompt-agent-display-name.mjs",
+  "prompt-agent-template-sync.mjs",
   "portrait-accessory-assets.mjs",
   "portrait-location-presets.mjs",
   "portrait-location-selector.mjs",

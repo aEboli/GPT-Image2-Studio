@@ -130,6 +130,80 @@ test("preview loading shell renders only motion nodes without visible copy", asy
   assert.equal(nodes.field.classList.contains("is-orbiting"), false);
 });
 
+test("prompt preview loading shell keeps liquid layers inside its decorative motion subtree", async () => {
+  const app = await readFile(appPath, "utf8");
+  const loadingShellRuntime = extractFunctionBefore(app, "createPreviewMotionNode", "renderPreviewPlaceholder");
+  const document = {
+    createElement: createTestElement,
+  };
+  const createNodes = new Function(
+    "document",
+    `${loadingShellRuntime}\nreturn createPreviewLoadingShellNodes("prompt");`,
+  );
+
+  const nodes = createNodes(document);
+  const motion = nodes.field.children[0];
+  const fill = motion.children[0].children[0];
+
+  assert.ok(nodes.shell.classList.contains("is-prompt-loading"));
+  assert.equal(nodes.includeFluidLayers, true);
+  assert.equal(motion.attributes.get("aria-hidden"), "true");
+  assert.deepEqual(
+    fill.children.map((child) => child.className),
+    [
+      "preview-loading-fluid-surface",
+      "preview-loading-fluid-stream",
+      "preview-loading-fluid-stream preview-loading-fluid-stream-phase",
+      "preview-loading-fluid-sediment",
+    ],
+  );
+});
+
+test("preview loading themes expose bounded stage-specific liquid physics", () => {
+  const uploading = getPreviewLoadingShellTheme({
+    stage: "uploading",
+    stageIndex: 0,
+    stageCount: 4,
+    activeJobCount: 1,
+    maxConcurrentTasks: 6,
+  });
+  const generating = getPreviewLoadingShellTheme({
+    stage: "generating",
+    stageIndex: 2,
+    stageCount: 4,
+    activeJobCount: 3,
+    maxConcurrentTasks: 6,
+  });
+  const saving = getPreviewLoadingShellTheme({
+    stage: "saving",
+    stageIndex: 3,
+    stageCount: 4,
+    activeJobCount: 3,
+    maxConcurrentTasks: 6,
+  });
+
+  for (const theme of [uploading, generating, saving]) {
+    assert.match(theme.gravity, /^0?\d\.\d{3}$|^1\.\d{3}$/);
+    assert.match(theme.viscosity, /^0?\d\.\d{3}$|^1\.\d{3}$/);
+    assert.match(theme.phaseViscosity, /^0?\d\.\d{3}$|^1\.\d{3}$/);
+    assert.match(theme.settleDistance, /^\d+px$/);
+    assert.match(theme.streamDistance, /^\d+px$/);
+    assert.match(theme.settleDuration, /^\d+ms$/);
+    assert.match(theme.flowDuration, /^\d+ms$/);
+    assert.match(theme.flowPhaseDelay, /^-\d+ms$/);
+    assert.match(theme.surfaceDuration, /^\d+ms$/);
+    assert.match(theme.sedimentDuration, /^\d+ms$/);
+  }
+
+  assert.ok(Number(generating.gravity) > Number(uploading.gravity));
+  assert.ok(Number(generating.viscosity) > Number(saving.viscosity));
+  assert.ok(Number(generating.phaseViscosity) > Number(saving.phaseViscosity));
+  assert.equal(
+    Number(generating.flowPhaseDelay.replace(/ms$/, "")),
+    -Math.round(Number(generating.flowDuration.replace(/ms$/, "")) / 2),
+  );
+});
+
 test("preview loading shell shows one centered orb per active job up to six", async () => {
   const app = await readFile(appPath, "utf8");
   const loadingShellRuntime = extractFunctionBefore(app, "createPreviewMotionNode", "renderPreviewPlaceholder");
@@ -183,6 +257,12 @@ test("preview loading shell shows one centered orb per active job up to six", as
     ["uploading", "connecting", "generating", "saving", "generating", "connecting"],
   );
   assert.equal(nodes.field.style.properties.get("--preview-loading-orb-count"), "6");
+  assert.match(nodes.field.children[2].style.properties.get("--loading-gravity"), /^1\.\d{3}$/);
+  assert.match(nodes.field.children[2].style.properties.get("--loading-viscosity"), /^0\.\d{3}$/);
+  assert.match(nodes.field.children[2].style.properties.get("--loading-phase-viscosity"), /^0\.\d{3}$/);
+  assert.match(nodes.field.children[2].style.properties.get("--loading-settle-distance"), /^\d+px$/);
+  assert.match(nodes.field.children[2].style.properties.get("--loading-flow-duration"), /^\d+ms$/);
+  assert.match(nodes.field.children[2].style.properties.get("--loading-flow-phase-delay"), /^-\d+ms$/);
 });
 
 test("preview loading shell preserves existing orb nodes when a new job appears", async () => {

@@ -69,6 +69,7 @@ import { buildCreationQueuedRepairFormData, buildCreationQueuedSet as buildCreat
 import { DEFAULT_PORTRAIT_ACCESSORY_ASSETS, PORTRAIT_ACCESSORY_ASSET_CATEGORIES, getPortraitAccessoryAssetFileDescriptor } from "/lib/portrait-accessory-assets.mjs?v=20260528-portrait-assets-sort-1";
 import { createDefaultPortraitLocationState, createPortraitLocationSelectorController } from "/lib/portrait-location-selector.mjs?v=20260527-portrait-location-1";
 import { getLegacyPromptAgentTemplatePrompt, getPromptAgentDisplayName, getPromptAgentTemplateDisplayName, isStructuredImagePromptJson } from "/lib/prompt-agent-display-name.mjs?v=20260726-prompt-name-1";
+import { mergePromptAgentHistoryTemplates } from "/lib/prompt-agent-template-sync.mjs?v=20260811-history-template-sync-1";
 const SURPRISE_PROMPTS = [
   { name: "清晨通勤", prompt: "生成一张清晨城市通勤生活照，年轻上班族手拿咖啡走出地铁站，晨光穿过街边树影，画面自然真实，轻微运动模糊，适合生活方式摄影。" },
   { name: "家庭早餐", prompt: "生成一张温暖家庭早餐场景，木质餐桌上有吐司、煎蛋、牛奶和水果，家人围坐聊天，窗外柔和日光洒入，构图干净，有真实居家氛围。" },
@@ -114,10 +115,11 @@ const REASONING_ESTIMATES = {
   high: "150s+",
   xhigh: "210s+",
 };
-const DEFAULT_LIMITS = { maxParallelTasksPerSession: 15, maxReferenceImages: 15, maxCreationReferenceImages: 15, maxPortraitPersonReferenceImages: 3, maxPortraitActionReferenceImages: 3, maxPortraitAccessoryReferenceImages: 9 }; const PROMPT_FILMSTRIP_INITIAL_HISTORY_LIMIT = 10; const PROMPT_FILMSTRIP_GENERATED_HISTORY_LIMIT = 50;
+const DEFAULT_LIMITS = { maxParallelTasksPerSession: 15, maxReferenceImages: 15, maxCreationReferenceImages: 15, maxPortraitPersonReferenceImages: 3, maxPortraitActionReferenceImages: 3, maxPortraitAccessoryReferenceImages: 9 }; const PROMPT_FILMSTRIP_INITIAL_HISTORY_LIMIT = 10; const PROMPT_FILMSTRIP_MAX_HISTORY_LIMIT = 50;
 const CREATION_IMAGE_COUNT_OPTIONS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
 const DEFAULT_PROMPT_ENHANCE_TEXT = ",sharp focus, macro details, rich textures, crisp edges, photorealistic texture, visible grain, detailed surface material, cinematic lighting"; function buildPromptModePrompt() { const prompt = refs.promptInput.value.trim(); if (!state.promptEnhanceEnabled) { return prompt; } const enhanceText = String(refs.promptEnhanceInput?.value || "").trim(); return enhanceText ? `${prompt}${enhanceText.startsWith(",") ? "" : "\n\n"}${enhanceText}` : prompt; } function syncPromptEnhanceMode() { refs.promptEnhanceToggle.classList.toggle("is-active", state.promptEnhanceEnabled); refs.promptEnhanceToggle.setAttribute("aria-checked", String(state.promptEnhanceEnabled)); refs.promptEnhanceToggle.querySelector("small").textContent = getUiLanguageText(state.promptEnhanceEnabled ? "promptEnhanceOn" : "promptEnhanceOff"); refs.promptEnhanceField.classList.toggle("hidden", !state.promptEnhanceEnabled); } function togglePromptEnhanceMode() { state.promptEnhanceEnabled = !state.promptEnhanceEnabled; syncPromptEnhanceMode(); if (state.promptEnhanceEnabled) { refs.promptEnhanceInput.focus(); } }
 const PROMPT_TEMPLATE_STORAGE_KEY = "image-studio-prompt-templates-v2";
+const PROMPT_TEMPLATE_DISMISSED_HISTORY_KEY = "image-studio-prompt-template-dismissed-history-v1";
 const DEFAULT_PROMPT_TEMPLATES = SURPRISE_PROMPTS.map((template, index) => ({
   id: `default-template-${index + 1}`,
   name: template.name,
@@ -360,6 +362,7 @@ const TOPBAR_REVEAL_CLASS = "topbar-reveal";
 const TOPBAR_SUPPRESSED_CLASS = "topbar-suppressed";
 const TOPBAR_REVEAL_EDGE_PX = 16;
 const WORKSPACE_BOTTOM_GAP_PX = 2;
+const APP_TOOLTIP_TRIGGER_SELECTOR = "[data-tooltip]";
 const PPT_SOURCE_MODES = new Set(["upload", "text", "topic"]);
 const CREATE_VIEW_IDS = new Set(["studio", "style-transfer", "reference-analysis", "image-decomposition", "image-edit", "quick-blend", "image-compress", "creation", "portrait", "article-illustration", "ppt"]);
 const ASSET_VIEW_IDS = new Set(["gallery", "article-record", "ppt-record", "creation-record", "portrait-record"]);
@@ -373,6 +376,8 @@ let galleryPanelHeightObserver = null;
 let galleryScrollSyncFrame = 0;
 let galleryScrollObserver = null;
 let generationTaskPollTimer = 0;
+let appTooltipTrigger = null;
+let appTooltipDescribedBy = "";
 let creationRecordRefreshPromise = null;
 let creationRecordDeleteRestoreFocus = null;
 let portraitRecordRefreshPromise = null;
@@ -500,7 +505,7 @@ const state = {
   galleryCurrentFilename: "",
   galleryDeleteFeedback: "",
   galleryLoading: true,
-  galleryLoadError: "", promptFilmstripHistoryLimit: PROMPT_FILMSTRIP_INITIAL_HISTORY_LIMIT,
+  galleryLoadError: "", promptFilmstripBaselineCaptured: false, promptFilmstripBaselineFilenames: [], promptFilmstripSessionJobIds: [], promptFilmstripSessionFilenames: [],
   galleryMetadataCache: {},
   galleryControls: { ...DEFAULT_GALLERY_CONTROLS },
   galleryHistoryPage: 0,
@@ -519,6 +524,7 @@ const state = {
   promptAgent: {
     file: null,
     history: [],
+    historyLoaded: false,
     previewUrl: "",
     result: null,
     running: false,
@@ -550,7 +556,7 @@ const state = {
       slideNumber: 0,
     },
   },
-  promptTemplates: [], promptEnhanceEnabled: false,
+  promptTemplates: [], promptTemplateDismissedHistoryIds: new Set(), promptEnhanceEnabled: false,
   reasoningEfforts: [...DEFAULT_REASONING_EFFORTS],
   referenceAnalysis: {
     files: [],
@@ -641,6 +647,7 @@ let referenceAnalysisRequestToken = 0;
 let referenceAnalysisAbortController = null;
 let creationPreviousPlatformValue = "universal";
 const refs = {
+  appTooltip: document.querySelector("#appTooltip"),
   apiKeyInput: document.querySelector("#apiKeyInput"),
   assetRecordDeleteCancelButton: document.querySelector("#assetRecordDeleteCancelButton"),
   assetRecordDeleteConfirmButton: document.querySelector("#assetRecordDeleteConfirmButton"),
@@ -1710,7 +1717,7 @@ function readUiTheme() { try { return normalizeUiTheme(window.localStorage.getIt
 function normalizeUiLanguage(language) { return language === "en" ? "en" : "zh-CN"; }
 function readUiLanguage() { try { return normalizeUiLanguage(window.localStorage.getItem(UI_LANGUAGE_STORAGE_KEY) || document.documentElement.lang); } catch { return normalizeUiLanguage(document.documentElement.lang); } }
 function getUiLanguageText(key) { return UI_LANGUAGE_TEXT[state.uiLanguage]?.[key] || UI_LANGUAGE_TEXT["zh-CN"][key] || ""; }
-function applyUiLanguageText() { document.querySelectorAll("[data-ui-i18n]").forEach((element) => { const text = getUiLanguageText(element.dataset.uiI18n); if (text) element.textContent = text; }); document.querySelectorAll("[data-ui-i18n-aria-label]").forEach((element) => { const text = getUiLanguageText(element.dataset.uiI18nAriaLabel); if (text) element.setAttribute("aria-label", text); }); document.querySelectorAll("[data-ui-i18n-placeholder]").forEach((element) => { const text = getUiLanguageText(element.dataset.uiI18nPlaceholder); if (text) element.setAttribute("placeholder", text); }); document.querySelectorAll("[data-ui-i18n-title]").forEach((element) => { const text = getUiLanguageText(element.dataset.uiI18nTitle); if (text) element.setAttribute("title", text); }); }
+function applyUiLanguageText() { document.querySelectorAll("[data-ui-i18n]").forEach((element) => { const text = getUiLanguageText(element.dataset.uiI18n); if (text) element.textContent = text; }); document.querySelectorAll("[data-ui-i18n-aria-label]").forEach((element) => { const text = getUiLanguageText(element.dataset.uiI18nAriaLabel); if (text) element.setAttribute("aria-label", text); }); document.querySelectorAll("[data-ui-i18n-placeholder]").forEach((element) => { const text = getUiLanguageText(element.dataset.uiI18nPlaceholder); if (text) element.setAttribute("placeholder", text); }); document.querySelectorAll("[data-ui-i18n-title]").forEach((element) => { const text = getUiLanguageText(element.dataset.uiI18nTitle); if (text && !element.matches(APP_TOOLTIP_TRIGGER_SELECTOR)) element.setAttribute("title", text); }); document.querySelectorAll("[data-ui-i18n-tooltip]").forEach((element) => { const text = getUiLanguageText(element.dataset.uiI18nTooltip); if (text) element.dataset.tooltip = text; }); }
 function getUiImageRouteLabel(imageRoute) { if (imageRoute === "b") return getUiLanguageText("modeDirect"); if (imageRoute === "c") return getUiLanguageText("modeProtocol"); return getUiLanguageText("modeRoute"); }
 function getUiImageRouteStatusText(label) { return state.uiLanguage === "en" ? `Current image request mode: ${label}` : `当前生图调用模式：${label}`; }
 function syncUiLanguage() { const normalized = normalizeUiLanguage(state.uiLanguage); state.uiLanguage = normalized; document.documentElement.lang = normalized; document.documentElement.dataset.uiLanguage = normalized; if (refs.uiLanguageInput) refs.uiLanguageInput.value = normalized; refs.uiLanguageOptions.forEach((button) => { const isActive = button.dataset.uiLanguageOption === normalized; button.classList.toggle("is-active", isActive); button.setAttribute("aria-pressed", String(isActive)); }); applyUiLanguageText(); configModelPicker.render(); rerenderUiLanguageSensitiveViews(); if (refs.themeNavAction) refs.themeNavAction.textContent = getUiLanguageText("themeMenu"); updateGenerationModeStatus(); syncThemeToggle(); }
@@ -2243,7 +2250,7 @@ function setPromptAgentOpen(open, { restoreFocus = true } = {}) {
       captureOverlayTrigger("prompt-agent");
     }
     renderPromptAgent();
-    loadPromptAgentHistory().catch((error) => setPromptAgentFeedback(error.message, "error"));
+    loadPromptAgentHistory({ force: true }).catch((error) => setPromptAgentFeedback(error.message, "error"));
     focusOverlayTarget(refs.promptAgentCloseButton);
   } else if (restoreFocus) {
     restoreOverlayTriggerFocus("prompt-agent");
@@ -2281,17 +2288,26 @@ function savePromptAgentResultAsTemplate(item) {
   if (!prompt) {
     return;
   }
-  const template = {
-    id: getPromptAgentTemplateId(item),
-    name: getPromptAgentDisplayName(item),
-    prompt,
-  };
-  state.promptTemplates = [
-    template,
-    ...state.promptTemplates.filter((entry) => entry.id !== template.id),
-  ];
+
+  const nextTemplates = mergePromptAgentHistoryTemplates({
+    history: [item],
+    templates: state.promptTemplates,
+    getTemplateId: getPromptAgentTemplateId,
+    getPrompt: getPromptAgentReusableText,
+    getName: getPromptAgentDisplayName,
+    skipItem: (historyItem) => state.promptTemplateDismissedHistoryIds.has(getPromptAgentTemplateId(historyItem)),
+  });
+  const template = nextTemplates.find((entry) => entry.id === getPromptAgentTemplateId(item));
+  if (!template) {
+    return;
+  }
+
+  const changed = nextTemplates.length !== state.promptTemplates.length;
+  state.promptTemplates = nextTemplates;
   state.selectedPromptTemplateId = template.id;
-  writePromptTemplates();
+  if (changed) {
+    writePromptTemplates();
+  }
   renderPromptTemplates();
 }
 function renderPromptAgentPreview() {
@@ -4468,7 +4484,24 @@ function restoreSettingsFormScrollTop(scrollTop) {
   restore();
   window.requestAnimationFrame(restore);
 }
+function syncPromptTemplateSettingsEdge() {
+  const rootStyle = document.documentElement.style;
+  const layoutMode = getCurrentStudioLayoutMode();
+  const isStudioLikeView =
+    state.activeView === "studio" || state.activeView === "style-transfer" || state.activeView === "image-decomposition" || state.activeView === "quick-blend";
+  if (!refs.settingsPanel || STACKED_STUDIO_LAYOUT_MODES.has(layoutMode) || !isStudioLikeView) {
+    rootStyle.removeProperty("--prompt-template-settings-edge");
+    return;
+  }
+  const settingsRect = refs.settingsPanel.getBoundingClientRect();
+  if (!Number.isFinite(settingsRect.right) || settingsRect.width <= 0) {
+    rootStyle.removeProperty("--prompt-template-settings-edge");
+    return;
+  }
+  rootStyle.setProperty("--prompt-template-settings-edge", `${Math.round(settingsRect.right)}px`);
+}
 function syncStudioHeight() {
+  syncPromptTemplateSettingsEdge();
   if (!refs.settingsPanel || !refs.previewPanel || !refs.viewRoot) {
     return;
   }
@@ -4525,11 +4558,13 @@ function scheduleGalleryPanelHeightSync() {
 }
 function bindStudioHeightSync() {
   window.addEventListener("resize", () => scheduleStudioHeightSync());
-  if (typeof ResizeObserver === "function" && refs.settingsPanel) {
+  if (typeof ResizeObserver === "function") {
     studioHeightObserver = new ResizeObserver(() => {
       scheduleStudioHeightSync();
     });
-    studioHeightObserver.observe(refs.settingsPanel);
+    if (refs.settingsPanel) {
+      studioHeightObserver.observe(refs.settingsPanel);
+    }
   }
 }
 function bindGalleryPanelHeightSync() {
@@ -5370,7 +5405,7 @@ function renderTimeline() {
   renderTimelineNewIndicator();
 }
 
-function createPreviewMotionNode(orbId = "") {
+function createPreviewMotionNode(orbId = "", includeFluidLayers = false) {
   const motion = document.createElement("div");
   motion.className = "preview-loading-motion is-entering";
   motion.setAttribute("aria-hidden", "true");
@@ -5379,6 +5414,7 @@ function createPreviewMotionNode(orbId = "") {
   fillShell.className = "preview-loading-fill-shell";
   const fill = document.createElement("span");
   fill.className = "preview-loading-fill";
+  if (includeFluidLayers) fill.append(...["preview-loading-fluid-surface", "preview-loading-fluid-stream", "preview-loading-fluid-stream preview-loading-fluid-stream-phase", "preview-loading-fluid-sediment"].map((className) => Object.assign(document.createElement("span"), { className })));
   fillShell.appendChild(fill);
   const ring = document.createElement("span");
   ring.className = "preview-loading-ring";
@@ -5390,18 +5426,15 @@ function createPreviewMotionNode(orbId = "") {
   motion.append(fillShell, ring);
   return motion;
 }
-
 function applyPreviewLoadingOrbState(orb, item, index, count, placeholderState = {}) {
   const renderState = getPreviewLoadingOrbRenderState(item, index, count, placeholderState);
   orb.dataset.stage = renderState.stage;
   orb.setAttribute("aria-label", renderState.ariaLabel);
   Object.entries({
-    "--loading-progress": renderState.progress, "--loading-ring-duration": renderState.ringDuration,
-    "--loading-counter-ring-duration": renderState.counterRingDuration, "--loading-fill-duration": renderState.fillDuration,
-    "--loading-float-duration": renderState.floatDuration, "--loading-motion-scale": renderState.motionScale,
-    "--preview-loading-orb-x": renderState.x, "--preview-loading-orb-y": renderState.y,
-    "--preview-loading-orb-enter-x": renderState.enterX, "--preview-loading-orb-enter-y": renderState.enterY,
-    "--preview-loading-orb-delay": renderState.delay,
+    "--loading-progress": renderState.progress, "--loading-ring-duration": renderState.ringDuration, "--loading-counter-ring-duration": renderState.counterRingDuration, "--loading-fill-duration": renderState.fillDuration,
+    "--loading-float-duration": renderState.floatDuration, "--loading-motion-scale": renderState.motionScale, "--loading-gravity": renderState.gravity, "--loading-viscosity": renderState.viscosity, "--loading-phase-viscosity": renderState.phaseViscosity, "--loading-settle-distance": renderState.settleDistance, "--loading-stream-distance": renderState.streamDistance,
+    "--loading-settle-duration": renderState.settleDuration, "--loading-flow-duration": renderState.flowDuration, "--loading-flow-phase-delay": renderState.flowPhaseDelay, "--loading-surface-duration": renderState.surfaceDuration, "--loading-sediment-duration": renderState.sedimentDuration,
+    "--preview-loading-orb-x": renderState.x, "--preview-loading-orb-y": renderState.y, "--preview-loading-orb-enter-x": renderState.enterX, "--preview-loading-orb-enter-y": renderState.enterY, "--preview-loading-orb-delay": renderState.delay,
   }).forEach(([name, value]) => orb.style.setProperty(name, value));
 }
 
@@ -5411,7 +5444,7 @@ function syncPreviewLoadingShellItems(nodes, placeholderState = {}) {
   const nextIds = new Set(nextItems.map((item) => item.id));
   nextItems.forEach((item, index) => {
     const existing = currentNodes.get(item.id);
-    const orb = existing || createPreviewMotionNode(item.id);
+    const orb = existing || createPreviewMotionNode(item.id, nodes.includeFluidLayers === true);
     orb.dataset.previewLoadingOrbId = item.id;
     applyPreviewLoadingOrbState(orb, item, index, Math.min(getPreviewLoadingOrbLimit(), placeholderState.activeJobCount || 1), placeholderState);
     orb.style.setProperty("--preview-loading-orb-index", String(index));
@@ -5428,17 +5461,19 @@ function syncPreviewLoadingShellItems(nodes, placeholderState = {}) {
   nodes.field.classList.toggle("is-orbiting", nextItems.length >= 2);
 }
 
-function createPreviewLoadingShellNodes() {
+function createPreviewLoadingShellNodes(variant = "") {
   const shell = document.createElement("div");
   shell.className = "preview-loading-shell";
+  const includeFluidLayers = variant === "prompt"; shell.className += includeFluidLayers ? " is-prompt-loading" : "";
   shell.setAttribute("role", "status");
   const field = document.createElement("div");
   field.className = "preview-loading-orb-field";
-  field.appendChild(createPreviewMotionNode("preview-loading-1"));
+  field.appendChild(createPreviewMotionNode("preview-loading-1", includeFluidLayers));
   shell.appendChild(field);
   return {
     shell,
     field,
+    includeFluidLayers,
     state: null,
   };
 }
@@ -5471,7 +5506,7 @@ function renderPreviewPlaceholder(placeholderState) {
       !previewLoadingShellNodes ||
       !shouldReusePreviewLoadingShell(previewLoadingShellNodes.state || {}, placeholderState)
     ) {
-      previewLoadingShellNodes = createPreviewLoadingShellNodes();
+      previewLoadingShellNodes = createPreviewLoadingShellNodes("prompt");
     }
 
     updatePreviewLoadingShell(previewLoadingShellNodes, placeholderState);
@@ -5528,7 +5563,7 @@ function renderPreview() {
     refs.previewDownloadButton.removeAttribute("href");
     refs.previewDownloadButton.removeAttribute("download");
     refs.previewDownloadButton.classList.add("disabled");
-    refs.previewAddReferenceButton.disabled = true;
+    refs.previewAddReferenceButton.setAttribute("aria-disabled", "true");
     refs.previewImage.draggable = false;
     refs.previewImage.removeAttribute("title");
     refs.previewImage.classList.remove("is-dragging");
@@ -5550,7 +5585,7 @@ function renderPreview() {
     refs.previewDownloadButton.removeAttribute("href");
     refs.previewDownloadButton.removeAttribute("download");
     refs.previewDownloadButton.classList.add("disabled");
-    refs.previewAddReferenceButton.disabled = true;
+    refs.previewAddReferenceButton.setAttribute("aria-disabled", "true");
     refs.previewImage.draggable = false;
     refs.previewImage.removeAttribute("title");
     refs.previewImage.classList.remove("is-dragging");
@@ -5583,11 +5618,46 @@ function renderPreview() {
   refs.previewDownloadButton.download = item.filename || "preview.png";
   refs.previewDownloadButton.classList.remove("disabled");
   const canAddPreviewReference = isPromptReferenceWorkflow() && Boolean(imageUrl);
-  refs.previewAddReferenceButton.disabled = !canAddPreviewReference;
+  refs.previewAddReferenceButton.setAttribute("aria-disabled", String(!canAddPreviewReference));
   refs.previewImage.draggable = canAddPreviewReference;
   refs.previewImage.title = canAddPreviewReference ? "拖动到参考图区域即可添加" : "";
   refs.previewLightboxButton.disabled = false;
   refs.previewDeleteButton.disabled = !item.filename;
+}
+
+function syncPromptFilmstripBaseline() {
+  const sessionFilenames = new Set(state.promptFilmstripSessionFilenames);
+  state.promptFilmstripBaselineFilenames = getPromptGenerationGalleryItems(state.gallery)
+    .map((item) => String(item?.filename || "").trim())
+    .filter((filename) => filename && !sessionFilenames.has(filename))
+    .slice(0, PROMPT_FILMSTRIP_INITIAL_HISTORY_LIMIT);
+  state.promptFilmstripBaselineCaptured = true;
+}
+
+function capturePromptFilmstripBaseline() {
+  if (!state.promptFilmstripBaselineCaptured) {
+    syncPromptFilmstripBaseline();
+  }
+}
+
+function registerPromptFilmstripSessionJob(job) {
+  const jobId = String(job?.id || "").trim();
+  if (jobId && !state.promptFilmstripSessionJobIds.includes(jobId)) {
+    state.promptFilmstripSessionJobIds.push(jobId);
+  }
+}
+
+function recordPromptFilmstripSessionResult(job, item) {
+  const jobId = String(job?.id || "").trim();
+  const filename = String(item?.filename || "").trim();
+  if (!jobId || !filename || !state.promptFilmstripSessionJobIds.includes(jobId)) {
+    return;
+  }
+
+  state.promptFilmstripSessionFilenames = [
+    filename,
+    ...state.promptFilmstripSessionFilenames.filter((candidate) => candidate !== filename),
+  ];
 }
 
 function getFilmstripItems() {
@@ -5596,7 +5666,14 @@ function getFilmstripItems() {
     item: job,
     label: formatFilmstripSizeLabel(job) || job.statusText || formatClock(job.createdAt),
   }));
-  const recentGallery = getPromptGenerationGalleryItems(state.gallery).slice(0, state.promptFilmstripHistoryLimit).map((item) => ({
+  const visibleFilenames = new Set([
+    ...state.promptFilmstripBaselineFilenames,
+    ...state.promptFilmstripSessionFilenames,
+  ]);
+  const recentGallery = getPromptGenerationGalleryItems(state.gallery)
+    .filter((item) => visibleFilenames.has(String(item?.filename || "").trim()))
+    .slice(0, PROMPT_FILMSTRIP_MAX_HISTORY_LIMIT)
+    .map((item) => ({
     key: makeGalleryPreviewKey(item.filename),
     item,
     label: formatFilmstripSizeLabel(item) || formatClock(item.createdAt),
@@ -6328,6 +6405,23 @@ function writePromptTemplates() {
   window.localStorage.setItem(PROMPT_TEMPLATE_STORAGE_KEY, JSON.stringify(state.promptTemplates));
 }
 
+function readDismissedPromptAgentTemplateIds() {
+  try {
+    const raw = window.localStorage.getItem(PROMPT_TEMPLATE_DISMISSED_HISTORY_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(parsed) ? parsed.map((id) => String(id || "").trim()).filter(Boolean) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function writeDismissedPromptAgentTemplateIds() {
+  window.localStorage.setItem(
+    PROMPT_TEMPLATE_DISMISSED_HISTORY_KEY,
+    JSON.stringify([...state.promptTemplateDismissedHistoryIds]),
+  );
+}
+
 function getSelectedPromptTemplate() {
   return state.promptTemplates.find((template) => template.id === state.selectedPromptTemplateId) || null;
 }
@@ -6355,46 +6449,73 @@ function renderPromptTemplates() {
     return;
   }
 
-  state.promptTemplates.forEach((template) => {
-    const row = document.createElement("div");
-    row.className = "prompt-template-item";
-    row.classList.toggle("active", template.id === state.selectedPromptTemplateId);
+  const appendPromptTemplateGroup = (templates, label) => {
+    if (templates.length === 0) {
+      return;
+    }
 
-    const titleButton = document.createElement("button");
-    titleButton.className = "prompt-template-title-button";
-    titleButton.type = "button";
-    titleButton.textContent = template.name;
-    titleButton.title = template.name;
-    titleButton.addEventListener("click", () => {
-      applyPromptTemplate(template.id);
-      setPromptTemplateFeedback("");
+    const group = document.createElement("section");
+    group.className = "prompt-template-group";
+    if (label) {
+      const head = document.createElement("div");
+      head.className = "prompt-template-group-head";
+      const title = document.createElement("span");
+      title.textContent = label;
+      const count = document.createElement("span");
+      count.className = "prompt-template-group-count";
+      count.textContent = `${templates.length} 条`;
+      head.append(title, count);
+      group.appendChild(head);
+    }
+
+    templates.forEach((template) => {
+      const row = document.createElement("div");
+      row.className = "prompt-template-item";
+      row.classList.toggle("active", template.id === state.selectedPromptTemplateId);
+
+      const titleButton = document.createElement("button");
+      titleButton.className = "prompt-template-title-button";
+      titleButton.type = "button";
+      titleButton.textContent = template.name;
+      titleButton.title = template.name;
+      titleButton.addEventListener("click", () => {
+        applyPromptTemplate(template.id);
+        setPromptTemplateFeedback("");
+      });
+      row.appendChild(titleButton);
+
+      const actions = document.createElement("div");
+      actions.className = "prompt-template-row-actions";
+
+      const editButton = document.createElement("button");
+      editButton.className = "mini-action";
+      editButton.type = "button";
+      editButton.textContent = "编辑";
+      editButton.addEventListener("click", () => {
+        editPromptTemplate(template.id);
+      });
+      actions.appendChild(editButton);
+
+      const deleteButton = document.createElement("button");
+      deleteButton.className = "mini-action danger";
+      deleteButton.type = "button";
+      deleteButton.textContent = "删除";
+      deleteButton.addEventListener("click", () => {
+        deletePromptTemplate(template.id);
+      });
+      actions.appendChild(deleteButton);
+
+      row.appendChild(actions);
+      group.appendChild(row);
     });
-    row.appendChild(titleButton);
 
-    const actions = document.createElement("div");
-    actions.className = "prompt-template-row-actions";
+    refs.promptTemplateList.appendChild(group);
+  };
 
-    const editButton = document.createElement("button");
-    editButton.className = "mini-action";
-    editButton.type = "button";
-    editButton.textContent = "编辑";
-    editButton.addEventListener("click", () => {
-      editPromptTemplate(template.id);
-    });
-    actions.appendChild(editButton);
-
-    const deleteButton = document.createElement("button");
-    deleteButton.className = "mini-action danger";
-    deleteButton.type = "button";
-    deleteButton.textContent = "删除";
-    deleteButton.addEventListener("click", () => {
-      deletePromptTemplate(template.id);
-    });
-    actions.appendChild(deleteButton);
-
-    row.appendChild(actions);
-    refs.promptTemplateList.appendChild(row);
-  });
+  const historyTemplates = state.promptTemplates.filter((template) => String(template.id || "").startsWith("prompt-agent-"));
+  const otherTemplates = state.promptTemplates.filter((template) => !String(template.id || "").startsWith("prompt-agent-"));
+  appendPromptTemplateGroup(historyTemplates, historyTemplates.length > 0 ? "长期保留" : "");
+  appendPromptTemplateGroup(otherTemplates, historyTemplates.length > 0 ? "其他模板" : "");
 }
 
 function resetPromptTemplateForm() {
@@ -6474,6 +6595,10 @@ function deletePromptTemplate(templateId = "") {
 
   state.promptTemplates = state.promptTemplates.filter((template) => template.id !== selected.id);
   writePromptTemplates();
+  if (String(selected.id || "").startsWith("prompt-agent-")) {
+    state.promptTemplateDismissedHistoryIds.add(selected.id);
+    writeDismissedPromptAgentTemplateIds();
+  }
   const next =
     state.selectedPromptTemplateId === selected.id
       ? state.promptTemplates[0] || null
@@ -6484,6 +6609,9 @@ function deletePromptTemplate(templateId = "") {
 }
 
 function setPromptTemplatePopoverOpen(open) {
+  if (open) {
+    syncPromptTemplateSettingsEdge();
+  }
   refs.promptTemplatePopover.classList.toggle("hidden", !open);
   refs.promptTemplatePopover.setAttribute("aria-hidden", open ? "false" : "true");
   refs.surprisePromptButton.setAttribute("aria-expanded", open ? "true" : "false");
@@ -6495,11 +6623,127 @@ function setPromptTemplatePopoverOpen(open) {
     }
     selectPromptTemplate(state.selectedPromptTemplateId);
     refs.promptTemplateTextInput.focus();
+    loadPromptAgentHistory().catch((error) => {
+      console.warn("load prompt agent history for templates failed", error);
+    });
   }
 }
 
 function selectRandomPrompt() {
   setPromptTemplatePopoverOpen(true);
+}
+
+function formatAppTooltipText(value) {
+  return String(value || "")
+    .trim()
+    .replace(/([。；])[^\S\r\n]*(?=\S)/gu, "$1\n");
+}
+
+function restoreAppTooltipDescription(trigger) {
+  if (!trigger) {
+    return;
+  }
+  if (appTooltipDescribedBy) {
+    trigger.setAttribute("aria-describedby", appTooltipDescribedBy);
+  } else {
+    trigger.removeAttribute("aria-describedby");
+  }
+}
+
+function hideAppTooltip() {
+  if (!refs.appTooltip) {
+    return;
+  }
+  restoreAppTooltipDescription(appTooltipTrigger);
+  appTooltipTrigger = null;
+  appTooltipDescribedBy = "";
+  refs.appTooltip.classList.remove("is-visible");
+  if (typeof refs.appTooltip.hidePopover === "function" && refs.appTooltip.matches(":popover-open")) {
+    refs.appTooltip.hidePopover();
+  }
+}
+
+function positionAppTooltip(trigger) {
+  const triggerRect = trigger.getBoundingClientRect();
+  const tooltipRect = refs.appTooltip.getBoundingClientRect();
+  const viewport = window.visualViewport;
+  const viewportLeft = viewport?.offsetLeft || 0;
+  const viewportTop = viewport?.offsetTop || 0;
+  const viewportWidth = viewport?.width || window.innerWidth;
+  const viewportHeight = viewport?.height || window.innerHeight;
+  const safeInset = 12;
+  const gap = 8;
+  const leftBoundary = viewportLeft + safeInset;
+  const rightBoundary = viewportLeft + viewportWidth - safeInset;
+  const topBoundary = viewportTop + safeInset;
+  const bottomBoundary = viewportTop + viewportHeight - safeInset;
+  const centeredLeft = triggerRect.left + triggerRect.width / 2 - tooltipRect.width / 2;
+  const left = Math.min(rightBoundary - tooltipRect.width, Math.max(leftBoundary, centeredLeft));
+  const topAbove = triggerRect.top - tooltipRect.height - gap;
+  const topBelow = triggerRect.bottom + gap;
+  const top = topAbove >= topBoundary
+    ? topAbove
+    : Math.min(bottomBoundary - tooltipRect.height, Math.max(topBoundary, topBelow));
+
+  refs.appTooltip.style.left = `${Math.round(left)}px`;
+  refs.appTooltip.style.top = `${Math.round(top)}px`;
+}
+
+function showAppTooltip(trigger) {
+  if (!refs.appTooltip || !trigger) {
+    return;
+  }
+  const text = formatAppTooltipText(trigger.dataset.tooltip);
+  if (!text) {
+    return;
+  }
+  if (appTooltipTrigger !== trigger) {
+    hideAppTooltip();
+    appTooltipTrigger = trigger;
+    appTooltipDescribedBy = trigger.getAttribute("aria-describedby") || "";
+  }
+  refs.appTooltip.textContent = text;
+  trigger.setAttribute("aria-describedby", [appTooltipDescribedBy, refs.appTooltip.id].filter(Boolean).join(" "));
+  if (typeof refs.appTooltip.showPopover === "function" && !refs.appTooltip.matches(":popover-open")) {
+    refs.appTooltip.showPopover();
+  }
+  refs.appTooltip.classList.add("is-visible");
+  positionAppTooltip(trigger);
+}
+
+function bindAppTooltips() {
+  if (!refs.appTooltip) {
+    return;
+  }
+  document.addEventListener("pointerover", (event) => {
+    const trigger = event.target.closest?.(APP_TOOLTIP_TRIGGER_SELECTOR);
+    if (!trigger || trigger.contains(event.relatedTarget)) {
+      return;
+    }
+    showAppTooltip(trigger);
+  });
+  document.addEventListener("pointerout", (event) => {
+    if (!appTooltipTrigger || appTooltipTrigger !== event.target.closest?.(APP_TOOLTIP_TRIGGER_SELECTOR) || appTooltipTrigger.contains(event.relatedTarget)) {
+      return;
+    }
+    hideAppTooltip();
+  });
+  document.addEventListener("focusin", (event) => {
+    const trigger = event.target.closest?.(APP_TOOLTIP_TRIGGER_SELECTOR);
+    if (trigger) {
+      showAppTooltip(trigger);
+    }
+  });
+  document.addEventListener("focusout", (event) => {
+    if (appTooltipTrigger && appTooltipTrigger === event.target.closest?.(APP_TOOLTIP_TRIGGER_SELECTOR)) {
+      hideAppTooltip();
+    }
+  });
+  document.addEventListener("pointerdown", hideAppTooltip, true);
+  document.addEventListener("scroll", hideAppTooltip, true);
+  window.addEventListener("resize", hideAppTooltip);
+  window.visualViewport?.addEventListener("resize", hideAppTooltip);
+  window.visualViewport?.addEventListener("scroll", hideAppTooltip);
 }
 
 function resetZoom() {
@@ -14910,6 +15154,7 @@ async function loadGallery() {
     );
     const hydratedGallery = hydrateGalleryItems(sortedItems);
     state.gallery = sortGalleryItemsByCreatedAtDesc(hydratedGallery.items);
+    capturePromptFilmstripBaseline();
     const availableFilenames = new Set(state.gallery.map((item) => item.filename));
     state.galleryCheckedFilenames = state.galleryCheckedFilenames.filter((filename) => availableFilenames.has(filename));
     if (!availableFilenames.has(state.galleryCurrentFilename)) state.galleryCurrentFilename = "";
@@ -15009,6 +15254,7 @@ function applyGenerationTaskSnapshots(tasks, { render = true } = {}) {
         }
       }
       upsertGalleryItem(task.item);
+      recordPromptFilmstripSessionResult(task, task.item);
       if (state.selectedPreviewKey === taskPreviewKey && task.item.filename) {
         state.selectedPreviewKey = makeGalleryPreviewKey(task.item.filename);
       }
@@ -15109,7 +15355,31 @@ function scheduleGenerationTaskPolling() {
   }, GENERATION_TASK_POLL_INTERVAL_MS);
 }
 
-async function loadPromptAgentHistory() {
+function syncPromptAgentHistoryToTemplates(history) {
+  const nextTemplates = mergePromptAgentHistoryTemplates({
+    history,
+    templates: state.promptTemplates,
+    getTemplateId: getPromptAgentTemplateId,
+    getPrompt: getPromptAgentReusableText,
+    getName: getPromptAgentDisplayName,
+    skipItem: (historyItem) => state.promptTemplateDismissedHistoryIds.has(getPromptAgentTemplateId(historyItem)),
+  });
+  if (nextTemplates.length === state.promptTemplates.length) {
+    return false;
+  }
+
+  state.promptTemplates = nextTemplates;
+  writePromptTemplates();
+  renderPromptTemplates();
+  return true;
+}
+
+async function loadPromptAgentHistory({ force = false } = {}) {
+  if (state.promptAgent.historyLoaded && !force) {
+    syncPromptAgentHistoryToTemplates(state.promptAgent.history);
+    return state.promptAgent.history;
+  }
+
   const response = await fetch("/api/prompt-agent/history");
   if (!response.ok) {
     throw new Error("读取图片提示词历史失败");
@@ -15117,7 +15387,10 @@ async function loadPromptAgentHistory() {
 
   const payload = await response.json();
   state.promptAgent.history = Array.isArray(payload) ? payload : [];
+  state.promptAgent.historyLoaded = true;
+  syncPromptAgentHistoryToTemplates(state.promptAgent.history);
   renderPromptAgent();
+  return state.promptAgent.history;
 }
 
 async function saveConfig(event) {
@@ -15815,6 +16088,7 @@ async function runGeneration(job) {
             setQuickBlendFeedback("快速溶图已生成。", "success");
           }
           upsertGalleryItem(payload.item);
+          recordPromptFilmstripSessionResult(job, payload.item);
           state.selectedPreviewKey = makeGalleryPreviewKey(payload.item.filename);
         }
         handleActivitySuccess(job.id, payload.item);
@@ -15972,7 +16246,7 @@ async function startGeneration(event) {
   await ensureReferenceGenerationFilesReady();
 
   const job = createJob();
-  state.promptFilmstripHistoryLimit = PROMPT_FILMSTRIP_GENERATED_HISTORY_LIMIT; state.jobs.unshift(job);
+  registerPromptFilmstripSessionJob(job); state.jobs.unshift(job);
   state.selectedPreviewKey = makeJobPreviewKey(job.id);
   recordJobQueued(job);
   renderAll();
@@ -16210,6 +16484,7 @@ function bindEvents() {
   bindGlobalNavEvents();
   bindTopbarRevealEvents();
   bindAdaptiveWorkbenchSections();
+  bindAppTooltips();
   assetWorkspaceController.bindEvents();
   assetRecordDeleteController.bindEvents();
   assetRecordTimeFilterController.bind();
@@ -17336,6 +17611,9 @@ function bindEvents() {
     clearHistory().catch((error) => showError(error.message));
   });
   refs.previewAddReferenceButton.addEventListener("click", () => {
+    if (refs.previewAddReferenceButton.getAttribute("aria-disabled") === "true") {
+      return;
+    }
     void addCurrentPreviewToReferences();
   });
   refs.previewLightboxButton.addEventListener("click", () => {
@@ -17556,6 +17834,7 @@ async function bootstrap() {
   state.activityFeed = readGenerationActivityFeed();
   state.galleryMetadataCache = readGalleryMetadataCache();
   state.promptTemplates = readPromptTemplates();
+  state.promptTemplateDismissedHistoryIds = readDismissedPromptAgentTemplateIds();
   state.selectedPromptTemplateId = state.promptTemplates[0]?.id || "";
   bindEvents();
   bindStudioDensitySync();

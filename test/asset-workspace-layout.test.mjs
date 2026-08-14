@@ -156,8 +156,14 @@ test("lightbox prioritizes the image and exposes concise accessible controls", a
   assert.match(styles, /html\[data-ui-layout="mobile"\] \.lightbox-fields,[\s\S]*grid-column:\s*1;[^}]*grid-row:\s*2;/);
   assert.match(styles, /html\[data-ui-layout="mobile"\] #lightboxInspectorBody,[\s\S]*overflow:\s*auto;[^}]*overscroll-behavior:\s*contain;/);
   assert.match(styles, /\.lightbox-prompt-field dd,[\s\S]*\.lightbox-file-list dd\s*\{[^}]*overflow-wrap:\s*anywhere;/);
+  assert.match(styles, /\.lightbox-dialog\s*\{[\s\S]*width:\s*min\(1440px,\s*calc\(100vw\s*-\s*32px\)\);[\s\S]*height:\s*min\(92dvh,\s*940px\);[\s\S]*grid-template-rows:\s*auto\s+minmax\(0,\s*1fr\);/);
+  assert.match(styles, /\.lightbox-media-stage,[\s\S]*height:\s*auto;/);
+  assert.match(styles, /\.lightbox-prompt-field dd,[\s\S]*white-space:\s*pre-line;/);
   assert.match(app, /button\.setAttribute\("aria-label", `查看图片 \$\{filename\}`\)/);
   assert.match(app, /refs\.lightboxImage\.alt = fresh\.filename \? `图片详情 \$\{fresh\.filename\}` : "生成图片详情"/);
   assert.match(controller, /JSON\.parse\(source\)/);
+  assert.match(controller, /export function getStructuredPromptFields\(value, path = ""\)/);
+  assert.match(controller, /Array\.isArray\(value\)[\s\S]*return formatted \? \[\{ label: path \|\| "内容", value: formatted \}\] : \[\];/);
   assert.match(lightboxViewer, /new ResizeObserver\(\(\) => \{[\s\S]*syncMetrics\(\{ preserveMode: true \}\);[\s\S]*resizeObserver\.observe\(refs\.lightboxImageShell\);/);
+  assert.doesNotMatch(lightboxViewer, /syncCompactStageHeight|--lightbox-media-height|preferredHeight/);
 });

@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.6-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.7-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages%20Ready-f38020.svg)](https://pages.cloudflare.com/)
 [![Windows](https://img.shields.io/badge/Windows-Installers-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
@@ -11,14 +11,18 @@
 
 Prompt-to-image, reference analysis, editing, ecommerce sets, portraits, article illustrations, PPT generation, and asset history in one browser-based workspace.
 
-Current version: `v0.2.6`
+Current version: `v0.2.7`
 
 [Chinese README](./README.zh-CN.md)
 
 </div>
 
-## What is included in v0.2.6
+## What is included in v0.2.7
 
+- A quiet lower-left workbench version label backed by the root package version, plus a maintained patch command that increments each main application update by exactly `0.0.1` and checks all current version facts for drift.
+- Prompt Kit now restores reusable long-term Prompt Agent history as stable local templates without overwriting edits or recreating templates the user dismissed. Its desktop placement stays beside the prompt controls, while hover and focus help remains above panels and dialogs.
+- Prompt-to-image keeps its initial ten-image history baseline and appends only successful results from the current page session, up to fifty visible thumbnails. The loading preview uses continuous, phase-aware liquid motion without presenting visual motion as generation progress.
+- Image inspection keeps a stable desktop frame across landscape, square, and portrait images. Structured prompt arrays are grouped under their shared field so repeatable details are easier to scan.
 - A persistent Creation record workspace with an independently scrollable record list and image/Listing detail pane on wide screens, plus a collapsible selector on small screens.
 - Temu-compatible Excel export for selected Creation records. Each SKU uses one row, existing public HTTPS images are reused, and local images can optionally be uploaded through a Cloudinary unsigned upload preset.
 - Explicit export preflight. Missing Listing fields, price, dimensions, weight, stock, origin, or public image URLs stay empty and are listed in an `Export issues` worksheet instead of being guessed.
@@ -158,7 +162,7 @@ On Windows, `launch-studio.cmd` starts the workbench and `stop-studio-services.c
 
 ### Windows desktop app (recommended)
 
-Download `GPT-Image2-Studio-Desktop-Setup-v0.2.6-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
+Download `GPT-Image2-Studio-Desktop-Setup-v0.2.7-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
 
 For desktop development, Electron 43 requires Node.js 22.12 or newer:
 
@@ -169,7 +173,7 @@ cmd /c npm run desktop
 
 ### Windows browser installer
 
-Download `GPT-Image2-Studio-Setup-v0.2.6.exe` for the compatibility flow. It includes `runtime\node.exe`, installs under `%LOCALAPPDATA%\GPT-Image2-Studio`, and opens the default browser. See [Windows installer documentation](./docs/windows-installer.md).
+Download `GPT-Image2-Studio-Setup-v0.2.7.exe` for the compatibility flow. It includes `runtime\node.exe`, installs under `%LOCALAPPDATA%\GPT-Image2-Studio`, and opens the default browser. See [Windows installer documentation](./docs/windows-installer.md).
 
 ## Configuration
 
@@ -311,7 +315,7 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 ## Releases
 
 - The source and lockfile versions are authoritative; tags use `v<version>`.
-- Current release notes: [v0.2.6](./docs/releases/v0.2.6.md).
+- Current release notes: [v0.2.7](./docs/releases/v0.2.7.md).
 - Windows packages are distributed through [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Check the release notes for hashes and signing status.
 - `npm run check:release:strict` requires a clean worktree and a matching tag on the current commit.
 

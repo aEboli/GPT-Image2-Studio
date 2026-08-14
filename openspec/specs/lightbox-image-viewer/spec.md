@@ -111,3 +111,66 @@ The system SHALL expose a visible Back command beside the lightbox title instead
 - **AND** the user presses Escape
 - **THEN** the lightbox closes
 - **AND** focus restoration behavior remains consistent with the existing overlay focus management
+
+### Requirement: 图片详情参数面板展示文件信息
+
+图片详情 SHALL 保留“提示词”和“参数”两个信息页签；参数页签 SHALL 在生成参数内容下方展示当前图片的文件名和相对路径，且不再提供独立“文件”页签。
+
+#### Scenario: 用户查看图片参数
+
+- **WHEN** 用户打开图片详情并选择“参数”
+- **THEN** 页面显示生成参数
+- **AND** 生成参数下方显示文件名和相对路径
+- **AND** 文件信息不会要求用户切换到另一个页签
+
+#### Scenario: 文件字段缺失
+
+- **WHEN** 当前图片没有文件名或相对路径
+- **THEN** 对应字段显示现有占位符 `--`
+- **AND** 参数文本仍可正常查看
+
+### Requirement: 图片详情媒体区保持稳定桌面外框
+
+图片详情 SHALL 在桌面布局保持图一对应的稳定外框尺寸，不得因当前图片的自然宽高比改变弹窗高度。桌面弹窗高度 SHALL 为 `min(92dvh, 940px)`，顶栏与媒体区 SHALL 使用固定的双行布局；图片 SHALL 在左侧媒体区内完整适配显示，右侧检查器 SHALL 保持紧凑列宽并独立滚动。tablet、stacked 和 mobile 的既有响应式覆盖继续生效。
+
+#### Scenario: 桌面打开不同宽高比的图片详情
+
+- **WHEN** 用户在桌面布局依次打开横向、方形或纵向图片
+- **THEN** 图片详情弹窗保持相同的桌面外框高度和双栏结构
+- **AND** 每张图片都在左侧媒体区内完整适配显示
+- **AND** 图片自然宽高比不会写入或改变弹窗的动态高度变量
+
+#### Scenario: 图片或窗口尺寸发生变化
+
+- **WHEN** 图片完成加载或用户调整窗口尺寸
+- **THEN** 媒体区在固定外框内重新计算适配缩放
+- **AND** 图片完整性、缩放状态和检查器独立滚动保持正确
+
+#### Scenario: 受限布局打开图片详情
+
+- **WHEN** 用户在 tablet、stacked 或 mobile 布局打开图片详情
+- **THEN** 既有堆叠高度、内部滚动和触控尺寸规则继续生效
+- **AND** 页面不产生水平溢出
+
+### Requirement: 结构化提示词按共同分节聚合
+
+图片详情的结构化提示词 SHALL 将数组值渲染为其共同父字段下的一个检查器字段，并按换行显示各个值；渲染字段 SHALL 不暴露数组的数字索引。原始提示词文本 SHALL 保持不变，以便复制和其他复用行为继续使用原文。
+
+#### Scenario: 分节包含多个数组值
+
+- **WHEN** 结构化提示词包含 `subject.appearance` 等数组字段
+- **THEN** 检查器显示一个 `subject.appearance` 字段
+- **AND** 该字段包含数组中的所有值
+- **AND** 检查器中不显示 `subject.appearance.1`、`.2` 或 `.3` 等索引字段
+
+#### Scenario: 数组包含嵌套对象
+
+- **WHEN** 结构化提示词数组中的元素包含对象字段
+- **THEN** 元素内容仍聚合在共同父字段下
+- **AND** 嵌套键和值以可读的换行文本保留
+
+#### Scenario: 复制结构化提示词
+
+- **WHEN** 用户点击图片详情中的“复制”
+- **THEN** 复制内容仍是图片记录保存的原始提示词文本
+- **AND** 检查器的聚合展示不会改变复制结果

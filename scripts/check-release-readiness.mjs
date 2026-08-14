@@ -74,6 +74,18 @@ export async function checkReleaseReadiness({ rootDir = projectRootDir, strict =
       /^`GPT-Image2-Studio-Desktop-Setup-(v[0-9A-Za-z.+-]+)-x64\.exe`\s+是/gmu,
     ),
     requireVersionFact(
+      join(rootDir, "docs", "windows-installer.md"),
+      "docs/windows-installer.md",
+      versionLabel,
+      /^`GPT-Image2-Studio-Setup-(v[0-9A-Za-z.+-]+)\.exe`\s+是/gmu,
+    ),
+    requireVersionFact(
+      join(rootDir, "public", "index.html"),
+      "public/index.html",
+      versionLabel,
+      /^\s*<small class="app-version" aria-label="当前版本 (v[0-9A-Za-z.+-]+)">\1<\/small>\s*$/gmu,
+    ),
+    requireVersionFact(
       join(rootDir, "docs", "releases", `${versionLabel}.md`),
       `docs/releases/${versionLabel}.md`,
       versionLabel,

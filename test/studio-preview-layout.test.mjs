@@ -26,8 +26,8 @@ const publicConfigModelPickerPath = new URL("../public/lib/config-model-picker.m
 const publicCreationListingViewPath = new URL("../public/lib/creation-listing-view.mjs", import.meta.url);
 const generationClientPath = new URL("../lib/generation-client.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20260807-creation-conversion-viewer-1";
-const appAssetVersion = "20260807-creation-record-split-workspace-1";
+const stylesAssetVersion = "20260812-app-version-1";
+const appAssetVersion = "20260812-top-layer-tooltips-3";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
 const creationQueueModuleAssetVersion = "20260712-creation-queue-selection-isolation-1";
 const quickBlendModuleAssetVersion = "20260608-quick-blend-time-sort-1";
@@ -522,7 +522,8 @@ test("filmstrip limits visible running jobs to stable preview loading slots", as
       statusText: `job ${index + 1}`,
     })).reverse(),
     gallery: [],
-    promptFilmstripHistoryLimit: 10,
+    promptFilmstripBaselineFilenames: [],
+    promptFilmstripSessionFilenames: [],
   };
   const getFilmstripItems = new Function(
     "state",
@@ -532,6 +533,7 @@ test("filmstrip limits visible running jobs to stable preview loading slots", as
     "formatClock",
     "getPromptGenerationGalleryItems",
     "getStablePreviewLoadingItems",
+    "PROMPT_FILMSTRIP_MAX_HISTORY_LIMIT",
     `${getFilmstripItemsRuntime}\nreturn getFilmstripItems;`,
   )(
     state,
@@ -541,6 +543,7 @@ test("filmstrip limits visible running jobs to stable preview loading slots", as
     () => "",
     () => [],
     (items) => [...items].reverse(),
+    50,
   );
 
   const entries = getFilmstripItems();
@@ -551,21 +554,31 @@ test("filmstrip limits visible running jobs to stable preview loading slots", as
   );
 });
 
-test("filmstrip keeps the 10 or 50 image history window separate from running placeholders", async () => {
+test("filmstrip keeps the initial baseline and current-session results within a 50-image window", async () => {
   const app = await readFile(appPath, "utf8");
   const getFilmstripItemsRuntime = extractFunctionBefore(app, "getFilmstripItems", "getFilmstripPlaceholderState");
+  const baselineFilenames = Array.from({ length: 10 }, (_, index) => `history-${String(index + 1).padStart(2, "0")}.png`);
+  const sessionFilenames = Array.from({ length: 60 }, (_, index) => `session-${String(index + 1).padStart(2, "0")}.png`);
   const state = {
     jobs: Array.from({ length: 7 }, (_, index) => ({
       id: `job-${index + 1}`,
       createdAt: "",
       statusText: `job ${index + 1}`,
     })).reverse(),
-    gallery: Array.from({ length: 55 }, (_, index) => ({
-      filename: `prompt-${String(index + 1).padStart(2, "0")}.png`,
-      createdAt: new Date(Date.UTC(2026, 5, 13, 0, 0, 55 - index)).toISOString(),
-      size: "1024x1024",
-    })),
-    promptFilmstripHistoryLimit: 10,
+    gallery: [
+      ...sessionFilenames.map((filename, index) => ({
+        filename,
+        createdAt: new Date(Date.UTC(2026, 5, 14, 0, 0, 0, 60000 - index)).toISOString(),
+        size: "1024x1024",
+      })),
+      ...Array.from({ length: 60 }, (_, index) => ({
+        filename: `history-${String(index + 1).padStart(2, "0")}.png`,
+        createdAt: new Date(Date.UTC(2026, 5, 13, 0, 0, 0, 60000 - index)).toISOString(),
+        size: "1024x1024",
+      })),
+    ],
+    promptFilmstripBaselineFilenames: baselineFilenames,
+    promptFilmstripSessionFilenames: [],
   };
   const getFilmstripItems = new Function(
     "state",
@@ -576,16 +589,18 @@ test("filmstrip keeps the 10 or 50 image history window separate from running pl
     "formatClock",
     "getPromptGenerationGalleryItems",
     "getStablePreviewLoadingItems",
+    "PROMPT_FILMSTRIP_MAX_HISTORY_LIMIT",
     `${getFilmstripItemsRuntime}\nreturn getFilmstripItems;`,
   )(
     state,
-    (items) => [...items],
+    (items) => [...items].sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt))),
     (id) => `job:${id}`,
     (filename) => `file:${filename}`,
     (item) => String(item?.size || ""),
     (value) => String(value || ""),
     (items) => items,
     (items) => [...items].reverse(),
+    50,
   );
 
   const entries = getFilmstripItems();
@@ -595,11 +610,73 @@ test("filmstrip keeps the 10 or 50 image history window separate from running pl
   ]);
   assert.equal(entries.filter((entry) => entry.key.startsWith("job:")).length, 6);
   assert.equal(entries.filter((entry) => entry.key.startsWith("file:")).length, 10);
+  assert.deepEqual(entries.filter((entry) => entry.key.startsWith("file:")).map((entry) => entry.item.filename), baselineFilenames);
 
-  state.promptFilmstripHistoryLimit = 50;
-  const expandedEntries = getFilmstripItems();
-  assert.equal(expandedEntries.filter((entry) => entry.key.startsWith("job:")).length, 6);
-  assert.equal(expandedEntries.filter((entry) => entry.key.startsWith("file:")).length, 50);
+  state.promptFilmstripSessionFilenames = sessionFilenames.slice(0, 5);
+  const fiveResultEntries = getFilmstripItems();
+  const fiveResultFilenames = fiveResultEntries.filter((entry) => entry.key.startsWith("file:")).map((entry) => entry.item.filename);
+  assert.equal(fiveResultEntries.filter((entry) => entry.key.startsWith("job:")).length, 6);
+  assert.equal(fiveResultFilenames.length, 15);
+  assert.deepEqual(fiveResultFilenames, [...sessionFilenames.slice(0, 5), ...baselineFilenames]);
+  assert.ok(!fiveResultFilenames.includes("history-11.png"));
+
+  state.promptFilmstripSessionFilenames = sessionFilenames;
+  const rolloverEntries = getFilmstripItems();
+  const rolloverFilenames = rolloverEntries.filter((entry) => entry.key.startsWith("file:")).map((entry) => entry.item.filename);
+  assert.equal(rolloverEntries.filter((entry) => entry.key.startsWith("job:")).length, 6);
+  assert.equal(rolloverFilenames.length, 50);
+  assert.deepEqual(rolloverFilenames, sessionFilenames.slice(0, 50));
+  assert.ok(!rolloverFilenames.some((filename) => filename.startsWith("history-")));
+});
+
+test("prompt filmstrip registers only current-session saved task results", async () => {
+  const app = await readFile(appPath, "utf8");
+  const helperStart = app.indexOf("function syncPromptFilmstripBaseline()");
+  const helperEnd = app.indexOf("function getFilmstripItems()", helperStart);
+  assert.ok(helperStart >= 0 && helperEnd > helperStart);
+  const helpersRuntime = app.slice(helperStart, helperEnd).trimEnd();
+  const history = Array.from({ length: 20 }, (_, index) => ({
+    filename: `history-${String(index + 1).padStart(2, "0")}.png`,
+    createdAt: new Date(Date.UTC(2026, 5, 13, 0, 0, 0, 20000 - index)).toISOString(),
+  }));
+  const state = {
+    gallery: history,
+    promptFilmstripBaselineCaptured: false,
+    promptFilmstripBaselineFilenames: [],
+    promptFilmstripSessionJobIds: [],
+    promptFilmstripSessionFilenames: [],
+  };
+  const helpers = new Function(
+    "state",
+    "getPromptGenerationGalleryItems",
+    "PROMPT_FILMSTRIP_INITIAL_HISTORY_LIMIT",
+    `${helpersRuntime}\nreturn { capturePromptFilmstripBaseline, registerPromptFilmstripSessionJob, recordPromptFilmstripSessionResult };`,
+  )(
+    state,
+    (items) => [...items].sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt))),
+    10,
+  );
+
+  helpers.capturePromptFilmstripBaseline();
+  assert.deepEqual(state.promptFilmstripBaselineFilenames, history.slice(0, 10).map((item) => item.filename));
+
+  const savedItem = {
+    filename: "session-01.png",
+    createdAt: new Date(Date.UTC(2026, 5, 14)).toISOString(),
+  };
+  state.gallery = [
+    savedItem,
+    ...state.gallery.filter((item) => item.filename !== "history-01.png"),
+  ];
+  helpers.registerPromptFilmstripSessionJob({ id: "prompt-job-1" });
+  helpers.recordPromptFilmstripSessionResult({ id: "other-job" }, savedItem);
+  assert.deepEqual(state.promptFilmstripSessionFilenames, []);
+
+  helpers.recordPromptFilmstripSessionResult({ id: "prompt-job-1" }, savedItem);
+  helpers.recordPromptFilmstripSessionResult({ id: "prompt-job-1" }, savedItem);
+  assert.deepEqual(state.promptFilmstripSessionFilenames, ["session-01.png"]);
+  assert.deepEqual(state.promptFilmstripBaselineFilenames, history.slice(0, 10).map((item) => item.filename));
+  assert.ok(!state.promptFilmstripBaselineFilenames.includes("history-11.png"));
 });
 
 test("filmstrip rendering reuses keyed thumbnail nodes instead of clearing the rail", async () => {
@@ -632,18 +709,28 @@ test("studio filmstrip shows a visible placeholder while prompt thumbnails load"
   assert.match(styles, /@keyframes filmstrip-placeholder-sweep/);
 });
 
-test("studio prompt thumbnails exclude quick blend gallery items", async () => {
+test("studio prompt filmstrip keeps its session boundary across direct and polled completion", async () => {
   const app = await readFile(appPath, "utf8");
   const getFilmstripItemsBody = extractFunctionBefore(app, "getFilmstripItems", "getFilmstripPlaceholderState");
   const startGenerationBody = extractFunctionBefore(app, "startGeneration", "isStartGenerationShortcut");
+  const loadGalleryBody = extractFunctionBefore(app, "loadGallery", "normalizeGenerationTaskSnapshot");
+  const applySnapshotsBody = extractFunctionBefore(app, "applyGenerationTaskSnapshots", "loadGenerationTasks");
+  const runGenerationBody = extractFunctionBefore(app, "runGeneration", "startGeneration");
 
   assert.match(app, /getPromptGenerationGalleryItems/);
   assert.match(app, /const promptGalleryItems = getPromptGenerationGalleryItems\(state\.gallery\);/);
-  assert.match(app, /promptFilmstripHistoryLimit:\s*PROMPT_FILMSTRIP_INITIAL_HISTORY_LIMIT,/);
-  assert.match(getFilmstripItemsBody, /getPromptGenerationGalleryItems\(state\.gallery\)\.slice\(0,\s*state\.promptFilmstripHistoryLimit\)/);
-  assert.doesNotMatch(getFilmstripItemsBody, /\.slice\(0,\s*14\)/);
-  assert.match(startGenerationBody, /const job = createJob\(\);\s*state\.promptFilmstripHistoryLimit = PROMPT_FILMSTRIP_GENERATED_HISTORY_LIMIT; state\.jobs\.unshift\(job\);/);
-  assert.doesNotMatch(app, /localStorage\.(?:getItem|setItem)\([^)]*promptFilmstripHistoryLimit/i);
+  assert.match(app, /promptFilmstripBaselineCaptured:\s*false,/);
+  assert.match(app, /promptFilmstripBaselineFilenames:\s*\[\],/);
+  assert.match(app, /promptFilmstripSessionJobIds:\s*\[\],/);
+  assert.match(app, /promptFilmstripSessionFilenames:\s*\[\],/);
+  assert.match(getFilmstripItemsBody, /const visibleFilenames = new Set\(\[[\s\S]*promptFilmstripBaselineFilenames[\s\S]*promptFilmstripSessionFilenames/);
+  assert.match(getFilmstripItemsBody, /\.filter\(\(item\) => visibleFilenames\.has\(String\(item\?\.filename \|\| ""\)\.trim\(\)\)\)[\s\S]*\.slice\(0, PROMPT_FILMSTRIP_MAX_HISTORY_LIMIT\)/);
+  assert.doesNotMatch(getFilmstripItemsBody, /promptFilmstripHistoryLimit/);
+  assert.match(startGenerationBody, /const job = createJob\(\);\s*registerPromptFilmstripSessionJob\(job\); state\.jobs\.unshift\(job\);/);
+  assert.match(loadGalleryBody, /state\.gallery = sortGalleryItemsByCreatedAtDesc\(hydratedGallery\.items\);\s*capturePromptFilmstripBaseline\(\);/);
+  assert.match(applySnapshotsBody, /upsertGalleryItem\(task\.item\);\s*recordPromptFilmstripSessionResult\(task, task\.item\);/);
+  assert.match(runGenerationBody, /GENERATION_STREAM_EVENTS\.SAVED[\s\S]*upsertGalleryItem\(payload\.item\);\s*recordPromptFilmstripSessionResult\(job, payload\.item\);/);
+  assert.doesNotMatch(app, /localStorage\.(?:getItem|setItem)\([^)]*promptFilmstrip(?:Baseline|Session)/i);
   assert.match(app, /refs\.recentEmpty\.classList\.toggle\("hidden",\s*promptGalleryItems\.length > 0\);/);
   assert.match(app, /getRecentGalleryItems\(promptGalleryItems\)/);
   assert.doesNotMatch(app, /getRecentGalleryItems\(state\.gallery\)/);
@@ -917,32 +1004,49 @@ test("prompt studio exposes independent clear and reference-recycling controls",
   clearButtonMarkup.forEach((markup) => assert.doesNotMatch(markup, /×/));
   assert.match(
     html,
-    /id="surprisePromptButton"[\s\S]*aria-label="提示词模板"[\s\S]*<span class="prompt-template-icon" aria-hidden="true">⭐<\/span>/,
+    /id="surprisePromptButton"[\s\S]*aria-label="提示词模板"[\s\S]*data-tooltip="提示词模板"[\s\S]*<span class="prompt-template-icon" aria-hidden="true">⭐<\/span>/,
   );
   assert.match(html, /id="previewAddReferenceButton"[\s\S]*>添加到参考图<\/button>/);
+  assert.match(html, /id="previewAddReferenceButton"[\s\S]*aria-disabled="true"/);
   assert.match(html, /id="previewAddReferenceButton"[\s\S]*data-tooltip="添加到参考图；也可拖动预览图片到参考图区域"/);
+  assert.doesNotMatch(html, /<[^>]*\btitle="[^"]*"[^>]*\bdata-tooltip="[^"]*"[^>]*>/);
+  assert.match(html, /id="appTooltip"[^>]*role="tooltip"[^>]*popover="manual"/);
   assert.match(app, /function clearPromptInput\(\) \{[\s\S]*updatePromptCounter\(\);[\s\S]*updateGenerateButton\(\);/);
   assert.match(app, /refs\.clearReferenceButton\.addEventListener\("click",[\s\S]*resetReferenceFiles\(\);/);
   assert.match(app, /async function addCurrentPreviewToReferences\(previewKey = state\.selectedPreviewKey\)/);
   assert.match(app, /new File\(\[blob\],[\s\S]*applyReferenceFiles\(\[file\], \{ feedback: true \}\);/);
   assert.match(app, /event\.dataTransfer\?\.setData\(PREVIEW_REFERENCE_DRAG_MIME, state\.selectedPreviewKey\)/);
   assert.match(app, /function handleReferenceDrop\(event\) \{[\s\S]*getPreviewReferenceDragKey\(event\.dataTransfer\)[\s\S]*addCurrentPreviewToReferences/);
-  assert.match(
-    styles,
-    /\.field-clear-button\[data-tooltip\]::after,[\s\S]*\.preview-add-reference-button\[data-tooltip\]::after\s*\{[\s\S]*width:\s*max-content;[\s\S]*max-width:\s*min\(280px,\s*calc\(100vw\s*-\s*32px\)\);[\s\S]*white-space:\s*normal;[\s\S]*overflow-wrap:\s*anywhere;/,
-  );
-  assert.match(
-    styles,
-    /\.preview-add-reference-button\[data-tooltip\]::after\s*\{[\s\S]*width:\s*min\(260px,\s*calc\(100vw\s*-\s*32px\)\);[\s\S]*min-width:\s*min\(200px,\s*calc\(100vw\s*-\s*32px\)\);/,
-  );
-  assert.match(
-    styles,
-    /#clearPromptButton\[data-tooltip\]::after\s*\{[\s\S]*top:\s*calc\(100%\s*\+\s*7px\);[\s\S]*bottom:\s*auto;/,
-  );
-  assert.match(
-    styles,
-    /html:is\(\[data-ui-layout="tablet"\],\s*\[data-ui-layout="mobile"\]\) \.reference-field-group:has\(\.field-clear-button\[data-tooltip\]:focus-visible\)\s*\{[\s\S]*overflow:\s*visible;/,
-  );
+  const tooltipRule = readCssRule(styles, ".app-tooltip");
+  assert.match(tooltipRule, /position:\s*fixed;/);
+  assert.match(tooltipRule, /z-index:\s*2147483647;/);
+  assert.match(tooltipRule, /max-width:\s*min\(280px,\s*calc\(100vw\s*-\s*24px\)\);/);
+  assert.match(tooltipRule, /pointer-events:\s*none;/);
+  assert.doesNotMatch(styles, /\[data-tooltip\]::after/);
+  assert.match(app, /appTooltip:\s*document\.querySelector\("#appTooltip"\),/);
+  assert.match(app, /const APP_TOOLTIP_TRIGGER_SELECTOR = "\[data-tooltip\]";/);
+  assert.match(app, /\[data-ui-i18n-title\][\s\S]*!element\.matches\(APP_TOOLTIP_TRIGGER_SELECTOR\)/);
+  assert.doesNotMatch(app, /appTooltipTitle/);
+  assert.match(app, /function bindAppTooltips\(\) \{/);
+  assert.match(app, /function formatAppTooltipText\(value\) \{[\s\S]*\.replace\(\/\(\[。；\]\)\[\^\\S\\r\\n\]\*\(\?=\\S\)\/gu, "\$1\\n"\);/);
+  assert.match(app, /const text = formatAppTooltipText\(trigger\.dataset\.tooltip\);/);
+  const formatAppTooltipTextSource = extractFunctionBefore(app, "formatAppTooltipText", "restoreAppTooltipDescription");
+  const formatAppTooltipText = new Function(`${formatAppTooltipTextSource}; return formatAppTooltipText;`)();
+  assert.equal(formatAppTooltipText("添加到参考图；也可拖动图片"), "添加到参考图；\n也可拖动图片");
+  assert.equal(formatAppTooltipText("第一句。第二句"), "第一句。\n第二句");
+  assert.equal(formatAppTooltipText("第一句； 第二句。第三句"), "第一句；\n第二句。\n第三句");
+  assert.equal(formatAppTooltipText("末尾标点。"), "末尾标点。");
+  assert.match(app, /document\.addEventListener\("pointerover",[\s\S]*showAppTooltip\(trigger\);/);
+  assert.match(app, /document\.addEventListener\("focusin",[\s\S]*showAppTooltip\(trigger\);/);
+  assert.match(app, /typeof refs\.appTooltip\.showPopover === "function"[\s\S]*refs\.appTooltip\.showPopover\(\);/);
+  assert.match(app, /Math\.min\(rightBoundary - tooltipRect\.width,\s*Math\.max\(leftBoundary,\s*centeredLeft\)\)/);
+  assert.match(app, /trigger\.setAttribute\("aria-describedby",[\s\S]*refs\.appTooltip\.id/);
+  assert.match(app, /refs\.appTooltip\.hidePopover\(\);/);
+  assert.match(tooltipRule, /white-space:\s*pre-line;/);
+  assert.match(styles, /\.preview-add-reference-button\[aria-disabled="true"\]\s*\{[\s\S]*cursor:\s*not-allowed;[\s\S]*opacity:\s*0\.46;/);
+  assert.doesNotMatch(app, /refs\.previewAddReferenceButton\.disabled\s*=/);
+  assert.match(app, /refs\.previewAddReferenceButton\.setAttribute\("aria-disabled",\s*String\(!canAddPreviewReference\)\);/);
+  assert.match(app, /refs\.previewAddReferenceButton\.getAttribute\("aria-disabled"\) === "true"[\s\S]*return;/);
   assert.match(styles, /\.field-heading-icon-button\s*\{[\s\S]*width:\s*24px;[\s\S]*height:\s*24px;[\s\S]*border-radius:\s*7px;/);
   assert.match(styles, /\.field-clear-icon\s*\{[\s\S]*width:\s*14px;[\s\S]*fill:\s*none;[\s\S]*stroke:\s*currentColor;[\s\S]*stroke-width:\s*1\.8;[\s\S]*stroke-linecap:\s*round;/);
   assert.match(styles, /#surprisePromptButton\s*\{[\s\S]*font-size:\s*13px;[\s\S]*line-height:\s*1;/);
@@ -950,6 +1054,10 @@ test("prompt studio exposes independent clear and reference-recycling controls",
   assert.match(
     styles,
     /html:is\(\[data-ui-layout="stacked"\],\s*\[data-ui-layout="tablet"\],\s*\[data-ui-layout="mobile"\]\) \.field-heading-icon-button\s*\{[\s\S]*width:\s*44px;[\s\S]*height:\s*44px;/,
+  );
+  assert.match(
+    styles,
+    /html:is\(\[data-ui-layout="mobile"\],\s*\[data-ui-layout="tablet"\]\) #surprisePromptButton\s*\{[\s\S]*margin-inline-end:\s*52px;/,
   );
   assert.match(styles, /\.reference-grid\.dragover\s*\{/);
   assert.match(styles, /\.reference-preview-viewer \.reference-preview-backdrop\s*\{[\s\S]*background:\s*rgba\(0,\s*0,\s*0,\s*0\.24\);[\s\S]*backdrop-filter:\s*none;[\s\S]*-webkit-backdrop-filter:\s*none;/);
@@ -1823,9 +1931,17 @@ test("generation loading shell renders textless progress rings", async () => {
   const app = await readFile(appPath, "utf8");
   const loadingStart = styles.indexOf(".preview-loading-shell");
   const loadingStyles = styles.slice(loadingStart, styles.indexOf(".preview-panel", loadingStart));
+  const liquidFlowStart = loadingStyles.indexOf("@keyframes preview-loading-liquid-flow");
+  const liquidFlowEnd = loadingStyles.indexOf("@keyframes preview-loading-liquid-sediment", liquidFlowStart);
+  const liquidFlowStyles = loadingStyles.slice(liquidFlowStart, liquidFlowEnd);
 
   assert.match(app, /"preview-loading-ring"/);
   assert.match(app, /"preview-loading-fill"/);
+  assert.match(app, /"preview-loading-fluid-surface"/);
+  assert.match(app, /"preview-loading-fluid-stream"/);
+  assert.match(app, /"preview-loading-fluid-stream preview-loading-fluid-stream-phase"/);
+  assert.match(app, /"preview-loading-fluid-sediment"/);
+  assert.match(app, /createPreviewLoadingShellNodes\("prompt"\)/);
   assert.doesNotMatch(app, /preview-loading-progress|preview-loading-signal|preview-loading-copy|preview-loading-status|preview-loading-step/);
   assert.match(
     loadingStyles,
@@ -1837,11 +1953,29 @@ test("generation loading shell renders textless progress rings", async () => {
   assert.match(loadingStyles, /\.preview-loading-motion\.is-entering\s*\{[\s\S]*animation:\s*preview-loading-orb-enter/);
   assert.match(loadingStyles, /\.preview-loading-orb-field\.is-orbiting\s*\{[\s\S]*animation:\s*preview-loading-orb-field-orbit/);
   assert.match(loadingStyles, /@keyframes preview-loading-orb-field-orbit[\s\S]*transform:\s*rotate\(-360deg\)/);
+  assert.match(loadingStyles, /\.preview-loading-shell\.is-prompt-loading \.preview-loading-orb-field\.is-orbiting\s*\{[\s\S]*animation:\s*preview-loading-orb-field-drift/);
+  assert.match(loadingStyles, /@keyframes preview-loading-orb-field-drift[\s\S]*transform:\s*translate3d\(0, -2px, 0\)/);
+  assert.match(loadingStyles, /\.preview-loading-shell\.is-prompt-loading \.preview-loading-fluid-surface/);
+  assert.match(loadingStyles, /\.preview-loading-shell\.is-prompt-loading \.preview-loading-fluid-stream/);
+  assert.match(loadingStyles, /\.preview-loading-shell\.is-prompt-loading \.preview-loading-fluid-stream-phase[\s\S]*animation-delay:\s*var\(--loading-flow-phase-delay/);
+  assert.match(loadingStyles, /\.preview-loading-shell\.is-prompt-loading \.preview-loading-fluid-sediment/);
+  assert.match(loadingStyles, /@keyframes preview-loading-liquid-settle[\s\S]*var\(--loading-settle-distance, 7px\)[\s\S]*scaleX\(1\.08\)/);
+  assert.match(liquidFlowStyles, /0%,\s*\n\s*100%[\s\S]*var\(--loading-stream-distance, 24px\)/);
+  assert.doesNotMatch(liquidFlowStyles, /opacity:\s*0/);
+  assert.match(loadingStyles, /@keyframes preview-loading-liquid-settle[\s\S]*0%,\s*\n\s*100%[\s\S]*background-position:\s*0 4%/);
   assert.match(loadingStyles, /@keyframes preview-loading-color-shift/);
   assert.doesNotMatch(loadingStyles, /preview-loading-morph|preview-loading-aura|filter:\s*blur|mix-blend-mode/);
   assert.match(
     loadingStyles,
     /@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*\.preview-loading-orb-field,[\s\S]*\.preview-loading-motion,[\s\S]*\.preview-loading-ring-line,[\s\S]*\.preview-loading-fill[\s\S]*animation:\s*none;/,
+  );
+  assert.match(
+    loadingStyles,
+    /@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*\.preview-loading-shell\.is-prompt-loading \.preview-loading-orb-field\.is-orbiting,[\s\S]*\.preview-loading-fluid-surface,[\s\S]*\.preview-loading-fluid-stream,[\s\S]*\.preview-loading-fluid-sediment[\s\S]*animation:\s*none !important;/,
+  );
+  assert.match(
+    styles,
+    /html\[data-ui-layout="mobile"\] \.preview-loading-shell\.is-prompt-loading span\s*\{\s*display:\s*block;/,
   );
 });
 
@@ -2163,6 +2297,35 @@ test("floating dialogs and popovers use theme-aware overlay surface tokens", asy
   assert.match(readCssRule(styles, ".ppt-edit-head"), /border-bottom:\s*1px solid var\(--overlay-border-muted/);
 });
 
+test("prompt template panel anchors beside the settings panel without covering it", async () => {
+  const styles = await readFile(stylesPath, "utf8");
+  const app = await readFile(appPath, "utf8");
+  const panelRule = readCssRule(styles, ".prompt-template-panel");
+
+  assert.match(panelRule, /left:\s*calc\(var\(--prompt-template-settings-edge,[\s\S]*\+\s*var\(--studio-grid-gap,\s*14px\)\);/);
+  assert.match(panelRule, /right:\s*auto;/);
+  assert.match(
+    panelRule,
+    /width:\s*min\(680px,\s*calc\(100vw\s*-\s*var\(--prompt-template-settings-edge,[\s\S]*-\s*var\(--studio-grid-gap,\s*14px\)\s*-\s*clamp\(12px,\s*2vw,\s*26px\)\)\);/,
+  );
+  const promptTemplateAnchorSync = extractFunctionBefore(app, "syncPromptTemplateSettingsEdge", "syncStudioHeight");
+  assert.match(promptTemplateAnchorSync, /refs\.settingsPanel\.getBoundingClientRect\(\)/);
+  assert.match(promptTemplateAnchorSync, /Math\.round\(settingsRect\.right\)/);
+  assert.match(promptTemplateAnchorSync, /setProperty\("--prompt-template-settings-edge",/);
+  assert.doesNotMatch(app, /--prompt-template-preview-anchor-left|canvasRect\.left\s*\+\s*canvasRect\.width\s*\/\s*2/);
+  assert.match(app, /studioHeightObserver\.observe\(refs\.settingsPanel\);/);
+  const promptTemplatePopoverOpen = extractFunctionBefore(app, "setPromptTemplatePopoverOpen", "selectRandomPrompt");
+  assert.match(promptTemplatePopoverOpen, /if \(open\) \{\s*syncPromptTemplateSettingsEdge\(\);\s*\}/);
+  assert.match(
+    styles,
+    /html\[data-ui-layout="tablet"\] \.prompt-template-panel,[\s\S]*html\[data-ui-layout="stacked"\] \.prompt-template-panel,[\s\S]*html\[data-ui-layout="mobile"\] \.prompt-template-panel\s*\{[\s\S]*right:\s*auto;[\s\S]*left:\s*10px;[\s\S]*width:\s*calc\(100vw\s*-\s*20px\);/,
+  );
+  assert.match(
+    styles,
+    /html\[data-ui-layout="tablet"\] \.prompt-template-body,[\s\S]*html\[data-ui-layout="stacked"\] \.prompt-template-body,[\s\S]*html\[data-ui-layout="mobile"\] \.prompt-template-body\s*\{[\s\S]*grid-template-columns:\s*1fr;/,
+  );
+});
+
 test("compact select controls use theme-aware form surfaces", async () => {
   const styles = await readFile(stylesPath, "utf8");
   const rootRule = readCssRule(styles, ":root");
@@ -2245,8 +2408,8 @@ test("prompt agent uses one structured JSON result for display, copy, mapping, a
   assert.match(app, /function getPromptAgentTemplateId\(item\) \{/);
   assert.match(app, /getPromptAgentDisplayName, getPromptAgentTemplateDisplayName, isStructuredImagePromptJson/);
   assert.match(app, /function getPromptAgentReusableText\(item\) \{[\s\S]*getPromptAgentJsonText\(item\)/);
-  assert.match(app, /function savePromptAgentResultAsTemplate\(item\) \{[\s\S]*const prompt = getPromptAgentReusableText\(item\);/);
-  assert.match(app, /id:\s*getPromptAgentTemplateId\(item\),[\s\S]*name:\s*getPromptAgentDisplayName\(item\),[\s\S]*prompt,/);
+  assert.match(app, /function savePromptAgentResultAsTemplate\(item\) \{[\s\S]*const prompt = getPromptAgentReusableText\(item\);[\s\S]*mergePromptAgentHistoryTemplates\(/);
+  assert.match(app, /getTemplateId: getPromptAgentTemplateId,[\s\S]*getPrompt: getPromptAgentReusableText,[\s\S]*getName: getPromptAgentDisplayName/);
   assert.match(app, /const resultText = getPromptAgentReusableText\(state\.promptAgent\.result\);[\s\S]*refs\.promptAgentResult\.value = resultText;/);
   assert.match(app, /function mapPromptAgentPrompt\(itemId\) \{[\s\S]*getPromptAgentReusableText\(item\)/);
   assert.match(html, /id="copyPromptAgentJsonButton"[\s\S]*复制 JSON/);
@@ -2254,9 +2417,33 @@ test("prompt agent uses one structured JSON result for display, copy, mapping, a
   assert.match(html, /id="promptAgentResultLabel">结构化反推 JSON/);
   assert.match(html, /<h2>图片转提示词<\/h2>[\s\S]*主体与景别详细、背景与视觉精简/);
   assert.match(app, /setPromptAgentFeedback\("已生成结构化反推 JSON。", "success"\);/);
-  assert.match(app, /state\.promptTemplates = \[[\s\S]*template,[\s\S]*\.\.\.state\.promptTemplates\.filter\(\(entry\) => entry\.id !== template\.id\),[\s\S]*\];/);
+  assert.match(app, /state\.promptTemplates = nextTemplates;/);
   assert.match(app, /writePromptTemplates\(\);[\s\S]*renderPromptTemplates\(\);/);
   assert.match(app, /savePromptAgentResultAsTemplate\(payload\.item\);/);
+});
+
+test("prompt agent history backfills missing Prompt Kit templates without replacing existing entries", async () => {
+  const app = await readFile(appPath, "utf8");
+
+  assert.match(app, /function syncPromptAgentHistoryToTemplates\(history\) \{[\s\S]*mergePromptAgentHistoryTemplates\(/);
+  assert.match(app, /state\.promptAgent\.historyLoaded && !force/);
+  assert.match(app, /state\.promptAgent\.historyLoaded = true;/);
+  assert.match(app, /loadPromptAgentHistory\(\)\.catch\(\(error\) => \{[\s\S]*load prompt agent history for templates failed/);
+  assert.match(app, /loadPromptAgentHistory\(\{ force: true \}\)/);
+  assert.match(app, /const changed = nextTemplates\.length !== state\.promptTemplates\.length;/);
+  assert.match(app, /const PROMPT_TEMPLATE_DISMISSED_HISTORY_KEY = "image-studio-prompt-template-dismissed-history-v1";/);
+  assert.match(app, /state\.promptTemplateDismissedHistoryIds\.add\(selected\.id\);/);
+  assert.match(app, /skipItem: \(historyItem\) => state\.promptTemplateDismissedHistoryIds\.has\(getPromptAgentTemplateId\(historyItem\)\)/);
+});
+
+test("Prompt Kit labels long-term history templates separately from other templates", async () => {
+  const app = await readFile(appPath, "utf8");
+  const styles = await readFile(stylesPath, "utf8");
+
+  assert.match(app, /const historyTemplates = state\.promptTemplates\.filter\(\(template\) => String\(template\.id \|\| ""\)\.startsWith\("prompt-agent-"\)\);/);
+  assert.match(app, /appendPromptTemplateGroup\(historyTemplates, historyTemplates\.length > 0 \? "长期保留" : ""\);/);
+  assert.match(app, /appendPromptTemplateGroup\(otherTemplates, historyTemplates\.length > 0 \? "其他模板" : ""\);/);
+  assert.match(styles, /\.prompt-template-group-head\s*\{/);
 });
 
 test("legacy image-to-prompt JSON templates normalize to their single prompt", async () => {
@@ -3908,8 +4095,10 @@ test("creation mode has product references without a separate style-reference mo
   assert.doesNotMatch(readCssRule(styles, ".creation-listing-toggle.is-prominent"), /grid-column|min-height/);
   const creationListingToggleTextRule = readCssRule(styles, ".creation-listing-toggle span");
   assert.match(creationListingToggleTextRule, /font-size:\s*clamp\(0\.72rem,\s*8\.5cqw,\s*var\(--type-body-size\)\);/);
-  assert.match(creationListingToggleTextRule, /white-space:\s*nowrap;/);
-  assert.match(creationListingToggleTextRule, /text-overflow:\s*clip;/);
+  assert.match(creationListingToggleTextRule, /overflow-wrap:\s*anywhere;/);
+  assert.match(creationListingToggleTextRule, /white-space:\s*normal;/);
+  assert.match(creationListingToggleTextRule, /line-height:\s*1\.35;/);
+  assert.doesNotMatch(creationListingToggleTextRule, /text-overflow:\s*clip|white-space:\s*nowrap/);
   assert.match(styles, /\.creation-sku-generation-rule-field\s*\{/);
   const creationOptionGridControlRule = readCssRule(styles, ".creation-option-grid .compact-field select");
   const creationOptionGridOptionRule = readCssRule(styles, ".creation-option-grid .compact-field select option");

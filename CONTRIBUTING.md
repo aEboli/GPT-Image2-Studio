@@ -44,6 +44,8 @@ git diff --check
 
 ## 发布
 
+准备新的主应用版本时，使用 `npm run release:patch -- --summary "本次更新摘要"` 将补丁位严格增加 `0.0.1`，并同步锁文件、页面版本、当前 README、Windows 文档和新版本说明。商品图采集扩展使用独立版本线，不随主应用自动升级。
+
 日常分支使用 `npm run check:release` 检查 `package.json`、锁文件、两份 README、Windows 文档和当前版本发布说明。创建正式发布提交与 `v<version>` 标签后，再运行：
 
 ```powershell

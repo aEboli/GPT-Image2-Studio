@@ -331,3 +331,44 @@ final result: implementation and live v1.1.27 blue-hour panel passed; installed 
 - 扩展与 Pages 构建成功；最终 ZIP 为 `artifacts/extensions/GPT-Image2-Studio-Product-Image-Collector-v1.1.28.zip`（70,078 字节，SHA-256 `6FF7B93D79F83381FE092C9E6E7B2151B6BF03E48780A477E780BAA75C00198E`）。`git diff --check` 无空白错误，31 个修改文件通过严格 UTF-8 与中文替换字符检查。
 
 final result: passed
+
+## Prompt Kit 紧贴参数区与顶层提示
+
+### Comparison Target
+
+- source visual truth: `C:/Users/AEboli/AppData/Local/Temp/codex-clipboard-605c27ed-94b3-47db-9af3-6afcfef09cae.png`（2045x1157，桌面 Prompt Kit 旧锚点）；辅助提示参考：`C:/Users/AEboli/AppData/Local/Temp/codex-clipboard-35d5cf72-06cb-45f6-9253-eb0708d11daf.png`（2045x1157）。
+- implementation screenshots: `artifacts/design-qa/prompt-template-settings-edge-desktop-2048x1157-final.png`、`prompt-template-settings-edge-narrow-1366x768-final.png`、`prompt-template-settings-edge-mobile-390x844-final.png` 与 `prompt-template-top-layer-tooltip-2048x1157-final.png`。
+- viewport and state: 本地隔离服务 `http://127.0.0.1:3642/#studio`；桌面 `2048x1157` 与 `1366x768` 均打开 Prompt Kit，移动 `390x844` 保持打开后的单列回退；提示截图为无预览时“添加到参考图”的悬浮状态。
+
+### Full-view and Focused Evidence
+
+- 全视图并排对照：`artifacts/design-qa/prompt-template-placement-full-comparison-2048x1157-final.png`。左侧用户参考的 Prompt Kit 从主预览中部起跳，参数区与面板之间存在大段无效空隙；右侧实现图把面板左缘放在参数面板右缘之后的工作台列间距处，参数设置、比例、思考等级、分辨率与输出格式没有被遮挡。
+- 焦点对照：`artifacts/design-qa/prompt-template-tooltip-focused-comparison-2048x1157-final.png` 与 `prompt-template-tooltip-focused-crop-comparison-2048x1157-final.png`。实现侧的完整两行说明位于结果工具栏上方，而不是受参数区裁剪；实际节点为 `body` 子节点 `#appTooltip[popover="manual"][role="tooltip"]`，打开时匹配 `:popover-open`，固定定位且 `z-index: 2147483647`。
+- 几何复核：在 `2048x1157` 中参数面板右缘为 `629.83px`，Prompt Kit 左缘为 `642.31px`，间距 `12.48px`；在 `1366x768` 中对应为 `326.74px`、`337.55px`、`10.81px`。两档均为 `horizontalOverflow = 0`。移动 `390x844` 中面板为 `left: 10px`、宽 `370px`、高 `828px`，单列主体宽约 `368.67px`，无横向溢出，关闭控件可达。
+
+### Required Fidelity Surfaces
+
+- fonts and typography: 保留现有 Studio 的紧凑 UI 字级、标题层级和中文正文；共享提示以 `white-space: pre-line` 呈现，`添加到参考图；也可拖动预览图片到参考图区域` 在分号后自然换行，末尾标点不增加空行。
+- spacing and layout rhythm: 桌面 Prompt Kit 维持原有 `680px` 宽度与面板内部双列密度，仅替换起点为参数面板真实右边界加列间距；窄桌面和移动回退保持视口内可滚动、单列可达。
+- colors and visual tokens: 面板、边框、阴影、已选项和危险操作继续使用既有深色主题 token；顶层提示沿用深色表面和高对比文本，没有引入新的品牌色或额外装饰。
+- image quality and asset fidelity: 对照和实现均使用真实 Studio 页面截图；没有替换、生成或伪造产品/界面图像资产。
+- copy and content: 模板入口补充“提示词模板”帮助文本；“添加到参考图”的完整说明保留两个操作路径，并以可读的两行显示。
+
+### Interaction and Console Checks
+
+- 模板面板：真实页面点击模板入口可打开；“关闭”使入口 `aria-expanded=false` 且面板命中区域收缩为零；点击“插入”后提示词输入框写入所选模板并更新为 `1596 字`，面板关闭。
+- 关键提示：模板入口、清空提示词和“添加到参考图”均通过鼠标悬浮进入同一个 `manual popover`；提示节点为 `BODY` 子节点，位于可视视口内。无预览时“添加到参考图”为 `aria-disabled="true"`、原生 `disabled=false`，仍可由键盘获得焦点并临时获得 `aria-describedby="appTooltip"`；焦点离开后恢复原 `title` 并移除描述关系。
+- 浏览器控制台：本地 Studio 标签 `warn/error` 为 `0`。
+
+### Comparison History
+
+1. 初始用户截图中的 P1：模板面板以主预览中线为锚点，参数区与面板之间形成明显空带，且面板过度占用右侧预览空间。
+2. 初始用户截图中的 P2：局部伪元素提示受控件所在区域和祖先裁剪限制，无法保证在弹层上方完整显示。
+3. 修复后改为读取 `.settings-panel` 的渲染右边界作为桌面锚点，并用共享 `manual popover` 将所有 `data-tooltip` 提示放入浏览器 top layer；同视口对照、桌面/窄桌面/移动几何、鼠标和键盘路径均无剩余 P0/P1/P2 问题。
+
+### Verification
+
+- 聚焦静态测试：`node --test ./test/studio-preview-layout.test.mjs` 已通过本功能相关断言，包括 Prompt Kit 右缘锚点、移动回退、顶层提示、中文标点换行与 `aria-disabled` 提示触发。
+- OpenSpec 增量已归档为 `openspec/changes/archive/2026-08-12-refine-prompt-template-placement-and-tooltips/`，增量需求已合并到 `openspec/specs/creation-mode/spec.md`。
+
+final result: passed

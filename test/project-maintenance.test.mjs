@@ -10,6 +10,7 @@ test("package scripts pin deterministic tests, OpenSpec, and release checks", as
   const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 
   assert.equal(packageJson.scripts.test, "node --test --test-concurrency=1 ./test/*.test.mjs");
+  assert.equal(packageJson.scripts["release:patch"], "node scripts/release-patch.mjs");
   assert.equal(packageJson.scripts["check:release"], "node scripts/check-release-readiness.mjs");
   assert.equal(packageJson.scripts["check:release:strict"], "node scripts/check-release-readiness.mjs --strict");
   assert.equal(packageJson.devDependencies["@fission-ai/openspec"], "1.6.0");
@@ -43,6 +44,7 @@ test("CI runs the maintained verification contract on Node 22", async () => {
 test("release readiness detects consistent and inconsistent version facts", async () => {
   const fixtureRoot = await mkdtemp(join(tmpdir(), "image-studio-release-check-"));
   await mkdir(join(fixtureRoot, "docs", "releases"), { recursive: true });
+  await mkdir(join(fixtureRoot, "public"), { recursive: true });
   await writeFile(join(fixtureRoot, "package.json"), '{"version":"1.2.3"}\n', "utf8");
   await writeFile(
     join(fixtureRoot, "package-lock.json"),
@@ -54,6 +56,16 @@ test("release readiness detects consistent and inconsistent version facts", asyn
   await writeFile(
     join(fixtureRoot, "docs", "windows-desktop.md"),
     "`GPT-Image2-Studio-Desktop-Setup-v1.2.3-x64.exe` 是桌面安装包。\n",
+    "utf8",
+  );
+  await writeFile(
+    join(fixtureRoot, "docs", "windows-installer.md"),
+    "`GPT-Image2-Studio-Setup-v1.2.3.exe` 是兼容安装包。\n",
+    "utf8",
+  );
+  await writeFile(
+    join(fixtureRoot, "public", "index.html"),
+    '<small class="app-version" aria-label="当前版本 v1.2.3">v1.2.3</small>\n',
     "utf8",
   );
   await writeFile(
@@ -82,6 +94,28 @@ test("release readiness detects consistent and inconsistent version facts", asyn
   await writeFile(
     join(fixtureRoot, "docs", "windows-desktop.md"),
     "`GPT-Image2-Studio-Desktop-Setup-v1.2.3-x64.exe` 是桌面安装包。\n",
+    "utf8",
+  );
+  await writeFile(
+    join(fixtureRoot, "docs", "windows-installer.md"),
+    "`GPT-Image2-Studio-Setup-v1.2.2.exe` 是兼容安装包。\n示例标签：v1.2.3\n",
+    "utf8",
+  );
+  await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /docs\/windows-installer\.md.*v1\.2\.3/);
+  await writeFile(
+    join(fixtureRoot, "docs", "windows-installer.md"),
+    "`GPT-Image2-Studio-Setup-v1.2.3.exe` 是兼容安装包。\n",
+    "utf8",
+  );
+  await writeFile(
+    join(fixtureRoot, "public", "index.html"),
+    '<small class="app-version" aria-label="当前版本 v1.2.2">v1.2.2</small>\n',
+    "utf8",
+  );
+  await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /public\/index\.html.*v1\.2\.3/);
+  await writeFile(
+    join(fixtureRoot, "public", "index.html"),
+    '<small class="app-version" aria-label="当前版本 v1.2.3">v1.2.3</small>\n',
     "utf8",
   );
   await writeFile(

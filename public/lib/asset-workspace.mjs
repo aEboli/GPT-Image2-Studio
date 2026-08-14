@@ -1,21 +1,48 @@
-function appendStructuredFields(container, value, path = "") {
-  if (value === null || value === undefined || value === "") return;
+function appendStructuredPath(path, key) {
+  return `${path}${path ? "." : ""}${key}`;
+}
+
+function formatStructuredPromptValue(value) {
+  if (value === null || value === undefined || value === "") return "";
   if (Array.isArray(value)) {
-    value.forEach((entry, index) => appendStructuredFields(container, entry, `${path}${path ? "." : ""}${index + 1}`));
-    return;
+    return value.map((entry) => formatStructuredPromptValue(entry)).filter(Boolean).join("\n");
   }
   if (typeof value === "object") {
-    Object.entries(value).forEach(([key, entry]) => appendStructuredFields(container, entry, `${path}${path ? "." : ""}${key}`));
-    return;
+    return Object.entries(value)
+      .map(([key, entry]) => {
+        const formatted = formatStructuredPromptValue(entry);
+        return formatted ? `${key}: ${formatted}` : "";
+      })
+      .filter(Boolean)
+      .join("\n");
   }
-  const row = document.createElement("dl");
-  row.className = "lightbox-prompt-field";
-  const term = document.createElement("dt");
-  term.textContent = path || "内容";
-  const description = document.createElement("dd");
-  description.textContent = String(value);
-  row.append(term, description);
-  container.appendChild(row);
+  return String(value).trim();
+}
+
+export function getStructuredPromptFields(value, path = "") {
+  if (value === null || value === undefined || value === "") return [];
+  if (Array.isArray(value)) {
+    const formatted = formatStructuredPromptValue(value);
+    return formatted ? [{ label: path || "内容", value: formatted }] : [];
+  }
+  if (typeof value === "object") {
+    return Object.entries(value).flatMap(([key, entry]) => getStructuredPromptFields(entry, appendStructuredPath(path, key)));
+  }
+  const formatted = formatStructuredPromptValue(value);
+  return formatted ? [{ label: path || "内容", value: formatted }] : [];
+}
+
+function appendStructuredFields(container, value, path = "") {
+  getStructuredPromptFields(value, path).forEach(({ label, value: fieldValue }) => {
+    const row = document.createElement("dl");
+    row.className = "lightbox-prompt-field";
+    const term = document.createElement("dt");
+    term.textContent = label;
+    const description = document.createElement("dd");
+    description.textContent = fieldValue;
+    row.append(term, description);
+    container.appendChild(row);
+  });
 }
 
 export function createAssetWorkspaceController({ refs, state }) {
