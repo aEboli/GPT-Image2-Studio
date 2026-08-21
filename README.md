@@ -176,7 +176,7 @@ cmd /c npm run desktop
 
 ### Windows browser installer
 
-Download `GPT-Image2-Studio-Setup-v0.2.8.exe` for the compatibility flow. It includes `runtime\node.exe`, installs under `%LOCALAPPDATA%\GPT-Image2-Studio`, and opens the default browser. See [Windows installer documentation](./docs/windows-installer.md).
+The legacy browser-installer flow remains documented for local builds, but the `v0.2.8` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
 
 ## Configuration
 

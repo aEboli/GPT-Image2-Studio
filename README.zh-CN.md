@@ -241,19 +241,7 @@ cmd /c npm run desktop
 
 ### 方式三：Windows 浏览器安装包（兼容旧版）
 
-从 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
-
-```text
-GPT-Image2-Studio-Setup-v0.2.8.exe
-```
-
-安装器默认写入：
-
-```text
-%LOCALAPPDATA%\GPT-Image2-Studio
-```
-
-安装包内置 `runtime\node.exe`，无需另行安装 Node.js。安装完成后可通过桌面或开始菜单中的 `GPT-Image2-Studio.cmd` 启动，并在默认浏览器中打开工作台。完整说明见 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
+旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.8` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
 
 ## 配置说明
 
