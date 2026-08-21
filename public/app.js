@@ -9,7 +9,7 @@ import { getPreviewLoadingOrbLimit, getPreviewLoadingOrbRenderState, getPreviewL
 import { createCreationCardLoading as createCreationCardLoadingShell, getCreationCardDomKey, syncCreationLoadingCard, syncCreationResultGrid as syncCreationResultGridShell } from "/lib/creation-card-loading.mjs";
 import { createCreationCardIdleRippleController } from "/lib/creation-card-idle-ripple.mjs?v=20260725-creation-card-idle-ripple-1";
 import { isGenerationRequestRetryMessage, } from "/lib/generation-request-retry.mjs";
-import { cancelQueuedGenerationJob, getQueuedGenerationJobCount, getRunningGenerationJobCount, isQueuedGenerationJob, selectNextQueuedGenerationJobsByMode } from "/lib/generation-queue.mjs?v=20260611-mode-route-queue-1";
+import { cancelQueuedGenerationJob, getGenerationJobMode, getGenerationJobQueueKey, getQueuedGenerationJobCount, getRunningGenerationJobCount, isQueuedGenerationJob, selectNextQueuedGenerationJobsByMode } from "/lib/generation-queue.mjs?v=20260821-prompt-global-queue-1";
 import { buildCanceledGenerationActivityDetail, buildGenerationTaskActivityDetail, buildGenerationTaskStatusText, formatGenerationActivityModeLabel, getGenerationActivityDisplayText, sanitizeGenerationActivityDetail, sortGenerationActivityFeed, upsertGenerationActivityEntry } from "/lib/generation-activity-feed.mjs?v=20260504-vercel-static-lib-1";
 import { GENERATION_STREAM_EVENTS, recordFinalImageChunk } from "/lib/generation-stream-protocol.mjs";
 import { filterLocallyTerminatedGenerationTaskSnapshots } from "/lib/generation-task-reconciler.mjs";
@@ -68,8 +68,9 @@ import { normalizeCreationModuleEnabled, resolveCreationPlanCounts } from "/lib/
 import { buildCreationQueuedRepairFormData, buildCreationQueuedSet as buildCreationQueuedSetFromState, createCreationQueueJob, getActiveCreationQueueJob as getActiveCreationQueueJobFromState, getCreationQueueJobs as getCreationQueueJobsFromState, getCreationRepairTargetSet as getCreationRepairTargetSetFromState, getPendingCreationQueueCount as getPendingCreationQueueCountFromState, getSelectedCreationQueueJob as getSelectedCreationQueueJobFromState, renderCreationQueueStrip as renderCreationQueueStripView, runCreationQueuedJob as runCreationQueuedJobFromQueue, scheduleCreationGenerationQueue as scheduleCreationGenerationQueueFromState, selectCreationQueueJob as selectCreationQueueJobInState, shouldSyncCreationQueueJobCurrentSet, syncActiveCreationQueueSet as syncActiveCreationQueueSetInState } from "/lib/creation-suite-queue.mjs?v=20260712-creation-queue-selection-isolation-1";
 import { DEFAULT_PORTRAIT_ACCESSORY_ASSETS, PORTRAIT_ACCESSORY_ASSET_CATEGORIES, getPortraitAccessoryAssetFileDescriptor } from "/lib/portrait-accessory-assets.mjs?v=20260528-portrait-assets-sort-1";
 import { createDefaultPortraitLocationState, createPortraitLocationSelectorController } from "/lib/portrait-location-selector.mjs?v=20260527-portrait-location-1";
-import { getLegacyPromptAgentTemplatePrompt, getPromptAgentDisplayName, getPromptAgentTemplateDisplayName, isStructuredImagePromptJson } from "/lib/prompt-agent-display-name.mjs?v=20260726-prompt-name-1";
-import { mergePromptAgentHistoryTemplates } from "/lib/prompt-agent-template-sync.mjs?v=20260811-history-template-sync-1";
+import { getLegacyPromptAgentTemplatePrompt, getPromptAgentDisplayName, getPromptAgentTemplateDisplayName, isStructuredImagePromptJson } from "/lib/prompt-agent-display-name.mjs?v=20260819-prompt-history-mode-1";
+import { mergePromptAgentHistoryTemplates } from "/lib/prompt-agent-template-sync.mjs?v=20260819-history-template-mode-1";
+import { MAX_PROMPT_PARALLEL_TASKS, MAX_PROMPT_QUEUE_SIZE } from "/lib/studio-constants.mjs?v=20260821-prompt-queue-cap-1";
 const SURPRISE_PROMPTS = [
   { name: "清晨通勤", prompt: "生成一张清晨城市通勤生活照，年轻上班族手拿咖啡走出地铁站，晨光穿过街边树影，画面自然真实，轻微运动模糊，适合生活方式摄影。" },
   { name: "家庭早餐", prompt: "生成一张温暖家庭早餐场景，木质餐桌上有吐司、煎蛋、牛奶和水果，家人围坐聊天，窗外柔和日光洒入，构图干净，有真实居家氛围。" },
@@ -115,7 +116,7 @@ const REASONING_ESTIMATES = {
   high: "150s+",
   xhigh: "210s+",
 };
-const DEFAULT_LIMITS = { maxParallelTasksPerSession: 15, maxReferenceImages: 15, maxCreationReferenceImages: 15, maxPortraitPersonReferenceImages: 3, maxPortraitActionReferenceImages: 3, maxPortraitAccessoryReferenceImages: 9 }; const PROMPT_FILMSTRIP_INITIAL_HISTORY_LIMIT = 10; const PROMPT_FILMSTRIP_MAX_HISTORY_LIMIT = 50;
+const DEFAULT_LIMITS = { maxParallelTasksPerSession: 15, maxReferenceImages: 15, maxCreationReferenceImages: 15, maxPortraitPersonReferenceImages: 3, maxPortraitActionReferenceImages: 3, maxPortraitAccessoryReferenceImages: 9 }; const PROMPT_FILMSTRIP_INITIAL_HISTORY_LIMIT = 10; const PROMPT_FILMSTRIP_MAX_HISTORY_LIMIT = 50; const PROMPT_FILMSTRIP_JOB_LIMIT = MAX_PROMPT_QUEUE_SIZE;
 const CREATION_IMAGE_COUNT_OPTIONS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
 const DEFAULT_PROMPT_ENHANCE_TEXT = ",sharp focus, macro details, rich textures, crisp edges, photorealistic texture, visible grain, detailed surface material, cinematic lighting"; function buildPromptModePrompt() { const prompt = refs.promptInput.value.trim(); if (!state.promptEnhanceEnabled) { return prompt; } const enhanceText = String(refs.promptEnhanceInput?.value || "").trim(); return enhanceText ? `${prompt}${enhanceText.startsWith(",") ? "" : "\n\n"}${enhanceText}` : prompt; } function syncPromptEnhanceMode() { refs.promptEnhanceToggle.classList.toggle("is-active", state.promptEnhanceEnabled); refs.promptEnhanceToggle.setAttribute("aria-checked", String(state.promptEnhanceEnabled)); refs.promptEnhanceToggle.querySelector("small").textContent = getUiLanguageText(state.promptEnhanceEnabled ? "promptEnhanceOn" : "promptEnhanceOff"); refs.promptEnhanceField.classList.toggle("hidden", !state.promptEnhanceEnabled); } function togglePromptEnhanceMode() { state.promptEnhanceEnabled = !state.promptEnhanceEnabled; syncPromptEnhanceMode(); if (state.promptEnhanceEnabled) { refs.promptEnhanceInput.focus(); } }
 const PROMPT_TEMPLATE_STORAGE_KEY = "image-studio-prompt-templates-v2";
@@ -2182,16 +2183,24 @@ function clearPromptInput() {
   updateGenerateButton();
   refs.promptInput.focus();
 }
-function getMaxQueuedJobCount() {
-  return Number.POSITIVE_INFINITY;
+function getMaxQueuedJobCount(mode = getCurrentGenerationQueueMode()) {
+  return mode === "prompt" ? MAX_PROMPT_QUEUE_SIZE : Number.POSITIVE_INFINITY;
 }
-function getMaxParallelJobCount() {
-  return state.limits.maxParallelTasksPerSession || DEFAULT_LIMITS.maxParallelTasksPerSession;
+function getMaxParallelJobCount(mode = getCurrentGenerationQueueMode()) {
+  return mode === "prompt" ? MAX_PROMPT_PARALLEL_TASKS : state.limits.maxParallelTasksPerSession || DEFAULT_LIMITS.maxParallelTasksPerSession;
+}
+function getMaxParallelJobCountForJob(job) {
+  return getMaxParallelJobCount(getGenerationJobMode(job));
+}
+function getGenerationJobSchedulingKey(job) {
+  return getGenerationJobMode(job) === "prompt" ? "prompt" : getGenerationJobQueueKey(job);
 }
 function getCurrentGenerationQueueMode() { return ["style-transfer", "reference-analysis", "image-decomposition", "image-edit", "quick-blend"].includes(state.activeView) ? state.activeView : state.activeView === "studio" && state.studioMode === "style-transfer" ? "style-transfer" : "prompt"; }
 function getCurrentGenerationQueueRoute() { return getSelectedImageRoute(); }
 function getQueuedJobCount(mode = getCurrentGenerationQueueMode(), route = getCurrentGenerationQueueRoute()) { return getQueuedGenerationJobCount(state.jobs, mode, route); }
 function getRunningJobCount(mode = getCurrentGenerationQueueMode(), route = getCurrentGenerationQueueRoute()) { return getRunningGenerationJobCount(state.jobs, mode, route); }
+function getCurrentGenerationQueueSize(mode = getCurrentGenerationQueueMode(), route = getCurrentGenerationQueueRoute()) { return getQueuedJobCount(mode, mode === "prompt" ? "" : route) + getRunningJobCount(mode, mode === "prompt" ? "" : route); }
+function hasReachedGenerationQueueLimit(mode = getCurrentGenerationQueueMode(), route = getCurrentGenerationQueueRoute()) { const limit = getMaxQueuedJobCount(mode); return Number.isFinite(limit) && getCurrentGenerationQueueSize(mode, route) >= limit; }
 function getTotalQueuedJobCount() { return getQueuedGenerationJobCount(state.jobs); }
 function getTotalRunningJobCount() { return getRunningGenerationJobCount(state.jobs); }
 function getCreationMaxReferenceImageCount() { return state.limits.maxCreationReferenceImages || DEFAULT_LIMITS.maxCreationReferenceImages || state.limits.maxReferenceImages || DEFAULT_LIMITS.maxReferenceImages; }
@@ -5661,7 +5670,7 @@ function recordPromptFilmstripSessionResult(job, item) {
 }
 
 function getFilmstripItems() {
-  const activeJobs = getStablePreviewLoadingItems(state.jobs).slice(0, 6).map((job) => ({
+  const activeJobs = getStablePreviewLoadingItems(state.jobs).slice(0, PROMPT_FILMSTRIP_JOB_LIMIT).map((job) => ({
     key: makeJobPreviewKey(job.id),
     item: job,
     label: formatFilmstripSizeLabel(job) || job.statusText || formatClock(job.createdAt),
@@ -15957,7 +15966,7 @@ async function copyPromptAgentJson(itemId) {
 }
 
 function scheduleGenerationQueue() {
-  const nextJobs = selectNextQueuedGenerationJobsByMode(state.jobs, getMaxParallelJobCount());
+  const nextJobs = selectNextQueuedGenerationJobsByMode(state.jobs, getMaxParallelJobCountForJob, getGenerationJobSchedulingKey);
   nextJobs.forEach((job) => {
     job.started = true;
     job.isRunning = true;
@@ -16240,6 +16249,11 @@ async function startGeneration(event) {
   if (!prompt) {
     showError("提示词不能为空。");
     refs.promptInput.focus();
+    return;
+  }
+
+  if (hasReachedGenerationQueueLimit("prompt", getCurrentGenerationQueueRoute())) {
+    showError(`提示词模式最多保留 ${MAX_PROMPT_QUEUE_SIZE} 个任务（含生成中和排队中），请等待已有任务完成后再提交。`);
     return;
   }
 

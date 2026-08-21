@@ -50,3 +50,15 @@ test("session task slot wait claims after a slot is released while still connect
   limiter.releaseSessionTaskSlot("session-a", "queued-task", "creation");
   assert.equal(limiter.getActiveTaskCount("session-a", "creation"), 0);
 });
+
+test("session task slot limiter resolves a limit per request scope", () => {
+  const limiter = createSessionTaskSlotLimiter({
+    maxParallelTasks: (requestScope) => requestScope === "prompt" ? 2 : 1,
+  });
+
+  assert.equal(limiter.claimSessionTaskSlot("session-a", "prompt-1", "prompt"), true);
+  assert.equal(limiter.claimSessionTaskSlot("session-a", "prompt-2", "prompt"), true);
+  assert.equal(limiter.claimSessionTaskSlot("session-a", "prompt-3", "prompt"), false);
+  assert.equal(limiter.claimSessionTaskSlot("session-a", "creation-1", "creation"), true);
+  assert.equal(limiter.claimSessionTaskSlot("session-a", "creation-2", "creation"), false);
+});

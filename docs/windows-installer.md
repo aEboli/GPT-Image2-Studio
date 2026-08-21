@@ -1,6 +1,6 @@
 # Windows 安装包说明
 
-`GPT-Image2-Studio-Setup-v0.2.7.exe` 是 Windows 自解压安装包，由系统自带 `iexpress.exe` 生成，用于 GitHub Release 分发。
+`GPT-Image2-Studio-Setup-v0.2.8.exe` 是 Windows 自解压安装包，由系统自带 `iexpress.exe` 生成，用于 GitHub Release 分发。
 
 这个兼容安装包启动后会在默认浏览器中打开工作台。需要独立窗口、任务栏身份和标准 NSIS 卸载体验时，请使用 [Windows 桌面程序](./windows-desktop.md)。
 
@@ -63,7 +63,6 @@ PPT、套图、写真和文章插图会在日期目录和 `Pictures\json\` 下�
 ```powershell
 cmd /c npm test
 cmd /c npm run sync:public-lib -- --check
-cmd /c npm run build:pages
 cmd /c npm run build:installer
 git diff --check
 ```

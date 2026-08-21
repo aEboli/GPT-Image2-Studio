@@ -290,15 +290,6 @@ The system SHALL remove brand names, trademarks, store names, seller names and p
 - **THEN** canonical platform ID and policy version may remain in non-content metadata
 - **AND** the platform name does not appear in any Listing content field or Chinese counterpart
 
-### Requirement: Local service and Cloudflare Worker share Listing semantics
-The local service and Cloudflare Worker SHALL use the same policy resolver, source builder, old-style schema, prompt builder, normalizer, sanitizer, acceptance checks, and explicit failure behavior.
-
-#### Scenario: Equivalent normalized inputs use different runtimes
-- **WHEN** local and Worker paths receive equivalent normalized Creation sets and configuration
-- **THEN** they resolve the same platform policy and old-style field contract
-- **AND** both return a completed draft only for accepted model output and otherwise return a non-success error without automatic fallback
-- **AND** neither runtime fetches platform rule URLs during generation
-
 ### Requirement: Platform V1 Listing titles communicate evidence-backed value
 
 The system SHALL preserve the existing platform V1 title prompt behavior and old-style bilingual field contract. The prompt SHALL ask the title and `zhDisplay.title` to place product identity early and include supplied evidence-backed value and decision attributes within platform limits. It SHALL prohibit unsupported ranking, certification, medical, price, guarantee, refund, compatibility, performance, comparison, padding, and invented facts. Before acceptance, the system SHALL remove unsupported low-risk title terms and every unsupported blocking-claim match. A supported exact-evidence match SHALL remain when its rule permits exact evidence. The system SHALL repair a title emptied by cleanup with safe product identity text and SHALL NOT reject an otherwise normalizable direct response solely because of a removed title claim or title length.

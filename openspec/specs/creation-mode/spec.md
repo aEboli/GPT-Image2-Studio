@@ -200,7 +200,7 @@ For ordinary Creation carousel and SKU items, the system SHALL apply the selecte
 
 The target language MUST NOT translate, transliterate, rewrite, correct, localize, redraw, replace, remove, cover, or restyle any existing content on a supplied physical product or packaging subject. Protected subject content SHALL include patterns, artwork, illustrations, symbols, Logo and brand marks, printed, engraved, embossed, or embroidered text, exact characters and spelling, writing system, original language, placement, orientation, proportions, and colors. Existing subject content in a different language SHALL remain visible in that original language and SHALL be an explicit exception to target-language-only rules for newly added text. Source-card overlays outside the physical subject, including badges, prices, captions, and watermarks, SHALL NOT become protected subject content solely because they are present in a reference image.
 
-Local generation, Worker generation, and repair SHALL enforce the same protection at runtime for current plans and historical frozen prompts. The dedicated `infographic-rebuild` item SHALL remain outside this ordinary-item rule and SHALL continue following its source-only target-language translation contract.
+Local generation and repair SHALL enforce the same protection at runtime for current plans and historical frozen prompts. The dedicated `infographic-rebuild` item SHALL remain outside this ordinary-item rule and SHALL continue following its source-only target-language translation contract.
 
 #### Scenario: User selects English target language
 - **WHEN** the user starts an ordinary Creation Mode set with English selected
@@ -218,7 +218,7 @@ Local generation, Worker generation, and repair SHALL enforce the same protectio
 - **AND** only new captions, callouts, labels, or marketing typography outside the package use the selected target language
 
 #### Scenario: Historical frozen prompt is generated or repaired
-- **WHEN** Local, Worker, or repair executes an ordinary saved item whose frozen prompt predates the subject-content protection rule
+- **WHEN** Local generation or repair executes an ordinary saved item whose frozen prompt predates the subject-content protection rule
 - **THEN** the runtime prompt adds the same subject-content protection and target-language scope without requiring replanning
 
 #### Scenario: Dedicated infographic rebuild translates source text
@@ -458,13 +458,13 @@ The system SHALL allow users to override platform-derived target language, defau
 #### Scenario: 平台决定套图数量上限
 - **WHEN** 当前平台 profile 只内置 6 个规范化轮播槽位
 - **THEN** 套图数量控件只提供不超过 6 的受支持选项
-- **AND** 浏览器、resolver、本地端点和 Worker 均不得把请求扩展为第 7 至 18 个通用或 `custom` 轮播项
+- **AND** 浏览器、resolver 和本地端点均不得把请求扩展为第 7 至 18 个通用或 `custom` 轮播项
 - **AND** SKU 图和信息图重构仍作为独立追加项，不占用该平台轮播上限
 
 #### Scenario: 通用电商保留 18 张原生套图
 - **WHEN** 用户选择通用电商且未主动减少套图数量
 - **THEN** 数量控件默认选择 18，并提供 0 至 18 的受支持选项
-- **AND** resolver、本地端点和 Worker 返回 18 个通用电商原生轮播项
+- **AND** resolver 和本地端点返回 18 个通用电商原生轮播项
 - **AND** 这些轮播项对应原有 18 个角色且不使用 `custom` 图片类型补足
 
 #### Scenario: 平台切换立即收紧数量
@@ -516,7 +516,7 @@ The system SHALL allow users to override platform-derived target language, defau
 - **AND** it preserves product information, category, dimensions, references, Logo, SKU, output format, and model/API configuration
 
 ### Requirement: Creation generation uses per-item effective parameters consistently
-The system SHALL include effective ratio, resolution tier, resolved size, and target language on each planned item. Local generation and Cloudflare Worker generation SHALL resolve and submit those values per item, and the same planning payload SHALL produce equivalent plans in both environments.
+The system SHALL include effective ratio, resolution tier, resolved size, and target language on each planned item. Local generation SHALL resolve and submit those values per item, and the same planning payload SHALL produce a deterministic effective plan.
 
 #### Scenario: One set uses mixed ratios
 - **WHEN** a platform plan contains square and portrait items
@@ -528,10 +528,6 @@ The system SHALL include effective ratio, resolution tier, resolved size, and ta
 - **THEN** the system selects the nearest supported size for the same aspect ratio
 - **AND** plan or generation feedback exposes the effective size
 - **AND** the effective size is stored on the item for later retry and review
-
-#### Scenario: Local and Worker planning stay equivalent
-- **WHEN** local and Cloudflare plan endpoints receive the same normalized Creation payload
-- **THEN** their platform ID, strategy version, ordered image types, legacy roles, effective per-item parameters, constraints, warnings, and prompts are deeply equivalent
 
 #### Scenario: One mixed-parameter item fails
 - **WHEN** one item in a platform-planned set fails while another item completes
@@ -746,11 +742,6 @@ The system SHALL present an application-modal confirmation before any Creation r
 - **THEN** all Creation record deletion commands are disabled
 - **AND** the browser does not start a competing delete request
 
-#### Scenario: Cloudflare receives a record deletion request
-- **WHEN** the Cloudflare runtime receives a valid Creation set deletion request but has no server-side Creation record store
-- **THEN** it returns an idempotent success for the submitted distinct set IDs
-- **AND** the browser removes matching current-session records without assuming local filesystem deletion
-
 ### Requirement: Creation set records can be filtered by creation time
 The system SHALL let users filter Creation set records by the manifest `createdAt` value using All, Today, Recent 7 days, Older, or one exact local calendar date. Time filtering SHALL combine with keyword search, and the record count, empty state, detail selection, visible list, and filtered deletion target SHALL derive from the same complete filtered collection before the visible list rendering limit is applied.
 
@@ -884,8 +875,8 @@ The system SHALL deterministically assign each planned item a `conversionIntent`
 - **THEN** the hero handles recognition and the primary motivation, benefit and scene items show outcomes and use relevance, detail and size items reduce evidence or fit uncertainty, and package and SKU items reduce completeness or choice uncertainty
 
 #### Scenario: Conversion intent is deterministic
-- **WHEN** Local and Worker resolve the same normalized platform, category, audience strategy, overrides, and product evidence
-- **THEN** they produce deeply equivalent effective audience strategies and per-item conversion intents in the same order
+- **WHEN** Local resolves a normalized platform, category, audience strategy, overrides, and product evidence
+- **THEN** it produces a deterministic effective audience strategy and per-item conversion intents in the same order
 
 ### Requirement: Evidence-bounded conversion prompts
 The system SHALL include the effective per-item conversion intent in eligible carousel and SKU prompts while limiting every product claim, proof, outcome, and reassurance to supplied product facts or reference evidence. Missing evidence MUST produce a conservative question or visual emphasis instead of an invented fact. Source-only `infographic-rebuild` prompts MUST NOT include audience or conversion guidance.
@@ -931,11 +922,11 @@ The system SHALL include original `audienceStrategy`, resolved `effectiveAudienc
 - **AND** an `infographic-rebuild` executes its canonical source-only prompt while retaining the saved compatible metadata and technical parameters
 
 ### Requirement: Generation submits and validates the frozen plan
-The browser SHALL submit the complete frozen `effectivePlan` for formal Creation generation. Local and Worker SHALL prefer a valid submitted snapshot over replanning, SHALL limit snapshot byte size and item count, SHALL normalize required fields, and SHALL recompute counts and validation from snapshot items without trusting client-supplied `canGenerate`, validation, or count fields.
+The browser SHALL submit the complete frozen `effectivePlan` for formal Creation generation. Local SHALL prefer a valid submitted snapshot over replanning, SHALL limit snapshot byte size and item count, SHALL normalize required fields, and SHALL recompute counts and validation from snapshot items without trusting client-supplied `canGenerate`, validation, or count fields.
 
 #### Scenario: Formal generation uses previewed items
 - **WHEN** a valid frozen plan is submitted after preview
-- **THEN** Local and Worker execute the submitted item order, eligible saved prompts, conversion intents, ratios, sizes, and languages without calling the current platform strategy to rebuild them
+- **THEN** Local executes the submitted item order, eligible saved prompts, conversion intents, ratios, sizes, and languages without calling the current platform strategy to rebuild them
 - **AND** any `infographic-rebuild` executes the canonical source-only reconstruction prompt instead of a decorated submitted prompt
 
 #### Scenario: Client cannot bypass hard-rule validation
@@ -944,22 +935,14 @@ The browser SHALL submit the complete frozen `effectivePlan` for formal Creation
 
 #### Scenario: Oversized or malformed snapshot is rejected
 - **WHEN** a submitted snapshot exceeds the allowed byte or item limit or lacks required item identifiers, prompts, or generation parameters
-- **THEN** Local and Worker reject the request with a compact validation error before image generation
+- **THEN** Local rejects the request with a compact validation error before image generation
 
 #### Scenario: Legacy request replans
 - **WHEN** an older client submits a generation request without `effectivePlan`
-- **THEN** Local and Worker continue to build and validate a plan from the legacy fields
+- **THEN** Local continues to build and validate a plan from the legacy fields
 
 ### Requirement: Runtime and metadata boundaries remain compatible
-The system SHALL keep Local and Worker plan/generation results equivalent for the same normalized payload and SHALL keep full audience structures inside the set-level effective plan rather than per-image R2 custom metadata. Old manifests without audience fields MUST remain readable and MUST NOT be rewritten solely to add fallback strategy fields.
-
-#### Scenario: Local and Worker remain equivalent
-- **WHEN** the same audience-aware preview or generation payload is processed in Local and Worker environments
-- **THEN** the effective audience strategy, per-item conversion intents, prompts, counts, validation, and generation parameters are deeply equivalent
-
-#### Scenario: R2 metadata stays bounded
-- **WHEN** Worker emits generated image metadata for an audience-aware suite
-- **THEN** the full audience strategy is not copied into each image's R2 custom metadata and the existing metadata size limit remains satisfied
+The system SHALL keep the full audience structure inside the set-level effective plan, and old manifests without audience fields MUST remain readable and MUST NOT be rewritten solely to add fallback strategy fields.
 
 #### Scenario: Legacy manifest remains readable
 - **WHEN** a Local manifest lacks `audienceStrategy`, `effectiveAudienceStrategy`, and `conversionIntent`
@@ -978,7 +961,7 @@ Requirements that normally execute a frozen or saved item prompt unchanged SHALL
 
 #### Scenario: Historical saved prompt contains suite decoration
 - **WHEN** a frozen plan or saved record contains an `infographic-rebuild` prompt with product, platform, language, visual-style, Logo, audience, conversion, or reference-note instructions
-- **THEN** Local generation, Worker generation, and Local repair execute the canonical source-only reconstruction prompt instead
+- **THEN** Local generation and Local repair execute the canonical source-only reconstruction prompt instead
 - **AND** they retain the item's saved model route, model, ratio, size, quality, format, reasoning, source identity, and compatible conversion metadata
 
 ### Requirement: Creation result cards expose orange hover feedback
@@ -1016,7 +999,7 @@ The system SHALL show an orange boundary highlight around both current and saved
 
 ### Requirement: 套图图片文件名以编号开头
 
-系统 SHALL 对本地服务与 Cloudflare Worker 新生成的套图图片使用 `编号-时间-图片类型-短标识.扩展名` 的文件名结构。编号 SHALL 位于四位时分时间之前，非套图模式的文件名结构 SHALL 保持不变。
+系统 SHALL 对本地服务新生成的套图图片使用 `编号-时间-图片类型-短标识.扩展名` 的文件名结构。编号 SHALL 位于四位时分时间之前，非套图模式的文件名结构 SHALL 保持不变。
 
 #### Scenario: 生成或修复一张套图图片
 
@@ -1159,7 +1142,7 @@ The system SHALL retain the existing Creation reference-analysis recommendation 
 #### Scenario: Platform planner and APIs remain compatible
 - **WHEN** a directly accepted platform is previewed or submitted for generation
 - **THEN** the browser uses the existing platform, override, preview, and generation API fields
-- **AND** Local and Worker use the existing platform resolver, Creation planner, validation, queue, and persistence behavior
+- **AND** Local uses the existing platform resolver, Creation planner, validation, queue, and persistence behavior
 
 ### Requirement: SKU color recognition is context-safe and target-localized
 The SKU color normalizer SHALL reject ambiguous token occurrences inside unrelated words or conjunction phrases and SHALL emit canonical color-only values. When one unit has multiple recognized colors, the planner SHALL localize every color into the selected supported target language before composing the exact visible label.
@@ -1467,9 +1450,9 @@ Temu 导出表单 SHALL 允许用户显式提供第一变种属性名、默认�
 - **THEN** 服务端在任何 Cloudinary 上传和工作簿写入前返回 `400` 或 `413`
 - **AND** 不产生部分工作簿或部分远端上传
 
-### Requirement: Temu Excel 导出具有明确的本地与 Cloudflare 能力边界
+### Requirement: Temu Excel 导出仅使用本地能力
 
-`POST /api/creation/sets/export-temu-excel` SHALL 在共享 API capability matrix 中标记为 Local supported、Cloudflare unsupported。Local SHALL 使用本地 Creation manifest、受控输出文件和可持久化 manifest 缓存生成 XLSX。Cloudflare SHALL 返回现有 `unsupported_runtime_capability` JSON，MUST NOT 从 R2 任务或浏览器临时状态伪造记录，MUST NOT 代表用户执行 Cloudinary 上传，并 MUST NOT 返回空的假工作簿。
+`POST /api/creation/sets/export-temu-excel` SHALL be a Local-only endpoint. Local SHALL 使用本地 Creation manifest、受控输出文件和可持久化 manifest 缓存生成 XLSX，并 MUST NOT 返回空的假工作簿。
 
 #### Scenario: 本地服务导出有效批次
 
@@ -1477,13 +1460,6 @@ Temu 导出表单 SHALL 允许用户显式提供第一变种属性名、默认�
 - **THEN** 它返回正确 XLSX MIME 和安全 attachment 文件名
 - **AND** 工作簿包含模板数据行和导出问题 sheet
 - **AND** 响应不被缓存
-
-#### Scenario: Cloudflare 收到导出请求
-
-- **WHEN** Cloudflare Worker 收到 `POST /api/creation/sets/export-temu-excel`
-- **THEN** 它返回 code 为 `unsupported_runtime_capability` 的结构化错误
-- **AND** 前端说明需要使用本地应用
-- **AND** Worker 不读取 R2、调用 Cloudinary 或返回 XLSX
 
 ### Requirement: 现有单套文本与 JSON 导出保持不变
 
@@ -1498,7 +1474,7 @@ Temu Excel SHALL 使用独立按钮、表单、端点和文件名。现有当前
 
 ### Requirement: Browser and queue preserve safe SKU filename tokens
 
-For each newly planned or locally queued SKU image, the system SHALL create a `filenameToken` from only the stable SKU sequence and an optional reliable normalized color label. Browser normalization SHALL preserve this token through generation and repair submissions. Local and Worker filename builders SHALL use the preserved token before any display title fallback. The token and new output filename MUST NOT contain the raw SKU title, SKU ID, product part number, or reference filename. Association metadata and generation prompts SHALL remain unchanged.
+For each newly planned or locally queued SKU image, the system SHALL create a `filenameToken` from only the stable SKU sequence and an optional reliable normalized color label. Browser normalization SHALL preserve this token through generation and repair submissions. Local filename builders SHALL use the preserved token before any display title fallback. The token and new output filename MUST NOT contain the raw SKU title, SKU ID, product part number, or reference filename. Association metadata and generation prompts SHALL remain unchanged.
 
 #### Scenario: Queued SKU has a part-number filename and no reliable color
 

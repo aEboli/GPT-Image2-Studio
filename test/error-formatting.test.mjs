@@ -8,7 +8,7 @@ test("formatHttpErrorMessage keeps upstream HTTP errors compact", () => {
     label: "图片分析请求失败",
     status: 524,
     body: JSON.stringify({
-      type: "https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-5xx-errors/error-524/",
+      type: "https://errors.example.test/upstream-timeout",
       title: "Error",
       status: 524,
       detail:
@@ -21,7 +21,7 @@ test("formatHttpErrorMessage keeps upstream HTTP errors compact", () => {
   });
 
   assert.equal(message, "图片分析请求失败：HTTP 524，错误码 524");
-  assert.doesNotMatch(message, /developers\\.cloudflare\\.com|origin_response_timeout|Proxy Read Timeout/);
+  assert.doesNotMatch(message, /errors\\.example\\.test|origin_response_timeout|Proxy Read Timeout/);
 });
 
 test("formatHttpErrorMessage extracts nested provider error codes with compact 4xx detail", () => {

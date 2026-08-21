@@ -11,7 +11,6 @@ const quickBlendViewPath = new URL("../lib/views/quick-blend-view.mjs", import.m
 const imageEditViewPath = new URL("../lib/views/image-edit-view.mjs", import.meta.url);
 const styleTransferPresetLightboxPath = new URL("../lib/style-transfer-preset-lightbox.mjs", import.meta.url);
 const serverPath = new URL("../server.mjs", import.meta.url);
-const workerPath = new URL("../cloudflare-pages-worker.mjs", import.meta.url);
 const browserConfigPath = new URL("../lib/browser-config.mjs", import.meta.url);
 const browserImageCachePath = new URL("../lib/browser-image-cache.mjs", import.meta.url);
 const configModelPickerPath = new URL("../lib/config-model-picker.mjs", import.meta.url);
@@ -26,7 +25,7 @@ const publicConfigModelPickerPath = new URL("../public/lib/config-model-picker.m
 const publicCreationListingViewPath = new URL("../public/lib/creation-listing-view.mjs", import.meta.url);
 const generationClientPath = new URL("../lib/generation-client.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20260812-app-version-1";
+const stylesAssetVersion = "20260821-asset-theme-1";
 const appAssetVersion = "20260812-top-layer-tooltips-3";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
 const creationQueueModuleAssetVersion = "20260712-creation-queue-selection-isolation-1";
@@ -512,11 +511,11 @@ test("filmstrip thumbnails stay square, fill the available rail, and keep labels
   assert.match(app, /label: formatFilmstripSizeLabel\(item\) \|\| formatClock\(item\.createdAt\)/);
 });
 
-test("filmstrip limits visible running jobs to stable preview loading slots", async () => {
+test("filmstrip keeps all prompt queue jobs within the fifteen-task window", async () => {
   const app = await readFile(appPath, "utf8");
   const getFilmstripItemsRuntime = extractFunctionBefore(app, "getFilmstripItems", "getFilmstripPlaceholderState");
   const state = {
-    jobs: Array.from({ length: 7 }, (_, index) => ({
+    jobs: Array.from({ length: 16 }, (_, index) => ({
       id: `job-${index + 1}`,
       createdAt: "",
       statusText: `job ${index + 1}`,
@@ -533,6 +532,7 @@ test("filmstrip limits visible running jobs to stable preview loading slots", as
     "formatClock",
     "getPromptGenerationGalleryItems",
     "getStablePreviewLoadingItems",
+    "PROMPT_FILMSTRIP_JOB_LIMIT",
     "PROMPT_FILMSTRIP_MAX_HISTORY_LIMIT",
     `${getFilmstripItemsRuntime}\nreturn getFilmstripItems;`,
   )(
@@ -543,6 +543,7 @@ test("filmstrip limits visible running jobs to stable preview loading slots", as
     () => "",
     () => [],
     (items) => [...items].reverse(),
+    15,
     50,
   );
 
@@ -550,7 +551,7 @@ test("filmstrip limits visible running jobs to stable preview loading slots", as
 
   assert.deepEqual(
     entries.map((entry) => entry.item.id),
-    ["job-1", "job-2", "job-3", "job-4", "job-5", "job-6"],
+    Array.from({ length: 15 }, (_, index) => `job-${index + 1}`),
   );
 });
 
@@ -560,7 +561,7 @@ test("filmstrip keeps the initial baseline and current-session results within a 
   const baselineFilenames = Array.from({ length: 10 }, (_, index) => `history-${String(index + 1).padStart(2, "0")}.png`);
   const sessionFilenames = Array.from({ length: 60 }, (_, index) => `session-${String(index + 1).padStart(2, "0")}.png`);
   const state = {
-    jobs: Array.from({ length: 7 }, (_, index) => ({
+    jobs: Array.from({ length: 16 }, (_, index) => ({
       id: `job-${index + 1}`,
       createdAt: "",
       statusText: `job ${index + 1}`,
@@ -589,6 +590,7 @@ test("filmstrip keeps the initial baseline and current-session results within a 
     "formatClock",
     "getPromptGenerationGalleryItems",
     "getStablePreviewLoadingItems",
+    "PROMPT_FILMSTRIP_JOB_LIMIT",
     "PROMPT_FILMSTRIP_MAX_HISTORY_LIMIT",
     `${getFilmstripItemsRuntime}\nreturn getFilmstripItems;`,
   )(
@@ -600,22 +602,21 @@ test("filmstrip keeps the initial baseline and current-session results within a 
     (value) => String(value || ""),
     (items) => items,
     (items) => [...items].reverse(),
+    15,
     50,
   );
 
   const entries = getFilmstripItems();
 
-  assert.deepEqual(entries.slice(0, 6).map((entry) => entry.key), [
-    "job:job-1", "job:job-2", "job:job-3", "job:job-4", "job:job-5", "job:job-6",
-  ]);
-  assert.equal(entries.filter((entry) => entry.key.startsWith("job:")).length, 6);
+  assert.deepEqual(entries.slice(0, 15).map((entry) => entry.key), Array.from({ length: 15 }, (_, index) => `job:job-${index + 1}`));
+  assert.equal(entries.filter((entry) => entry.key.startsWith("job:")).length, 15);
   assert.equal(entries.filter((entry) => entry.key.startsWith("file:")).length, 10);
   assert.deepEqual(entries.filter((entry) => entry.key.startsWith("file:")).map((entry) => entry.item.filename), baselineFilenames);
 
   state.promptFilmstripSessionFilenames = sessionFilenames.slice(0, 5);
   const fiveResultEntries = getFilmstripItems();
   const fiveResultFilenames = fiveResultEntries.filter((entry) => entry.key.startsWith("file:")).map((entry) => entry.item.filename);
-  assert.equal(fiveResultEntries.filter((entry) => entry.key.startsWith("job:")).length, 6);
+  assert.equal(fiveResultEntries.filter((entry) => entry.key.startsWith("job:")).length, 15);
   assert.equal(fiveResultFilenames.length, 15);
   assert.deepEqual(fiveResultFilenames, [...sessionFilenames.slice(0, 5), ...baselineFilenames]);
   assert.ok(!fiveResultFilenames.includes("history-11.png"));
@@ -623,7 +624,7 @@ test("filmstrip keeps the initial baseline and current-session results within a 
   state.promptFilmstripSessionFilenames = sessionFilenames;
   const rolloverEntries = getFilmstripItems();
   const rolloverFilenames = rolloverEntries.filter((entry) => entry.key.startsWith("file:")).map((entry) => entry.item.filename);
-  assert.equal(rolloverEntries.filter((entry) => entry.key.startsWith("job:")).length, 6);
+  assert.equal(rolloverEntries.filter((entry) => entry.key.startsWith("job:")).length, 15);
   assert.equal(rolloverFilenames.length, 50);
   assert.deepEqual(rolloverFilenames, sessionFilenames.slice(0, 50));
   assert.ok(!rolloverFilenames.some((filename) => filename.startsWith("history-")));
@@ -919,7 +920,6 @@ test("config drawer uses a quieter structured settings layout", async () => {
   assert.doesNotMatch(html, /config-drawer-summary/);
   assert.doesNotMatch(html, /选择当前生成请求的调用路径/);
   assert.doesNotMatch(html, /API Key 只保存在当前浏览器/);
-  assert.doesNotMatch(html, /Cloudflare 环境变量/);
   assert.match(html, /<div class="config-route-fields">[\s\S]*data-route-panel="a"[\s\S]*data-route-panel="b"[\s\S]*<\/div>/);
   assert.doesNotMatch(html, /config-preferences-card|configPreferencesTitle|<h3 id="configPreferencesTitle">偏好<\/h3>/);
   assert.match(
@@ -1809,7 +1809,6 @@ test("reference analysis generation applies selected output language", async () 
   const html = await readFile(indexPath, "utf8");
   const app = await readFile(appPath, "utf8");
   const server = await readFile(serverPath, "utf8");
-  const worker = await readFile(workerPath, "utf8");
 
   assert.match(
     html,
@@ -1830,10 +1829,6 @@ test("reference analysis generation applies selected output language", async () 
   );
   assert.match(
     server,
-    /appendReferenceAnalysisLanguageInstruction\(prompt,\s*targetLanguageInput,\s*targetLanguageLabelInput\)/,
-  );
-  assert.match(
-    worker,
     /appendReferenceAnalysisLanguageInstruction\(prompt,\s*targetLanguageInput,\s*targetLanguageLabelInput\)/,
   );
 });
@@ -3681,36 +3676,6 @@ test("studio caches generated browser images for persistent preview and download
   assert.match(app, /download\.addEventListener\("click", \(event\) => \{[\s\S]*downloadGalleryItem\(item, image\)/);
 });
 
-test("studio accepts server-stored Cloudflare image URLs before browser caching finishes", async () => {
-  const app = await readFile(appPath, "utf8");
-  const browserImageCache = await readFile(browserImageCachePath, "utf8");
-
-  assert.match(browserImageCache, /if \(isServerImageProxyUrl\(imageUrl\)\) \{/);
-  assert.match(app, /const serverImageUrl = getServerImageUrl\(item\);/);
-  assert.match(browserImageCache, /writeIndex\(\);[\s\S]*const dataUrl = hasDataUrl \? imageUrl : await fetchServerImageAsDataUrl\(imageUrl\);/);
-  assert.match(browserImageCache, /const fallbackImageUrl = isServerImageProxyUrl\(entry\.imageUrl\) \? entry\.imageUrl : "";/);
-  assert.match(
-    app,
-    /payload\.item = attachChunkedImageToSavedItem\(payload\.item, finalImageChunks, finalImageDataUrl \|\| job\.previewUrl\);/,
-  );
-  assert.match(app, /function applyServerImageToGalleryItem\(item\) \{/);
-  assert.match(app, /const browserImageUrl = isCacheableBrowserImageUrl\(current\.imageUrl\)[\s\S]*\? current\.imageUrl[\s\S]*: isCacheableBrowserImageUrl\(current\.thumbnailUrl\)[\s\S]*\? current\.thumbnailUrl[\s\S]*: "";/);
-  assert.match(app, /imageUrl: browserImageUrl \|\| serverImageUrl,/);
-  assert.match(app, /if \(eventName === GENERATION_STREAM_EVENTS\.SERVER_IMAGE\) \{[\s\S]*applyServerImageToGalleryItem\(payload\.item\);[\s\S]*renderAll\(\);[\s\S]*return;/);
-  assert.match(app, /upsertGalleryItem\(payload\.item\);/);
-});
-
-test("studio keeps queued Cloudflare jobs alive for task polling after the SSE response closes", async () => {
-  const app = await readFile(appPath, "utf8");
-
-  assert.match(app, /formData\.set\("background", "1"\);/);
-  assert.match(app, /let queuedForPolling = false;/);
-  assert.match(app, /if \(eventName === GENERATION_STREAM_EVENTS\.QUEUED\) \{/);
-  assert.match(app, /scheduleGenerationTaskPolling\(\);/);
-  assert.match(app, /currentJob\.isRunning = queuedForPolling;/);
-  assert.match(app, /生成连接已中断，未收到完成事件/);
-});
-
 test("task polling restarts preserved local queued jobs when remote snapshots omit them", async () => {
   const app = await readFile(appPath, "utf8");
   const applySnapshotsBody = extractFunctionBefore(app, "applyGenerationTaskSnapshots", "loadGenerationTasks");
@@ -3921,7 +3886,6 @@ test("creation mode has product references without a separate style-reference mo
   const styles = await readFile(stylesPath, "utf8");
   const app = await readFile(appPath, "utf8");
   const server = await readFile(serverPath, "utf8");
-  const worker = await readFile(workerPath, "utf8");
   const queueModule = await readFile(creationSuiteQueuePath, "utf8");
   const creationReferenceDrag = await readFile(creationReferenceDragPath, "utf8");
   const creationReferenceAnalysisView = await readFile(creationReferenceAnalysisViewPath, "utf8");
@@ -4151,7 +4115,6 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(app, /const maxReferenceImages = getCreationMaxProductReferenceImageCount\(\);/);
   assert.doesNotMatch(app, /creationStyleReference|styleReferenceImages/);
   assert.doesNotMatch(server, /styleReferenceImages|MAX_CREATION_STYLE_REFERENCE_IMAGES/);
-  assert.doesNotMatch(worker, /styleReferenceImages|MAX_CREATION_STYLE_REFERENCE_IMAGES/);
   assert.match(app, /creationIndustryTemplateBrowser:\s*\{/);
   assert.match(app, /creationReferenceAnalysis:\s*\{/);
   assert.match(app, /creationReferenceAnalyzeButton: document\.querySelector\("#creationReferenceAnalyzeButton"\)/);

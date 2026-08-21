@@ -86,3 +86,64 @@ test("generation queue starts queued prompt jobs independently per route", () =>
     ["route-b-older", "route-b-newer"],
   );
 });
+
+test("generation queue accepts a per-mode parallel limit", () => {
+  const promptRunningJobs = Array.from({ length: 5 }, (_, index) => ({
+    id: `prompt-running-${index}`,
+    mode: "prompt",
+    started: true,
+    isRunning: true,
+  }));
+  const creationRunningJobs = Array.from({ length: 14 }, (_, index) => ({
+    id: `creation-running-${index}`,
+    mode: "creation",
+    started: true,
+    isRunning: true,
+  }));
+  const jobs = [
+    { id: "prompt-newer", mode: "prompt", started: false, isRunning: false },
+    { id: "creation-newer", mode: "creation", started: false, isRunning: false },
+    ...promptRunningJobs,
+    ...creationRunningJobs,
+    { id: "creation-older", mode: "creation", started: false, isRunning: false },
+    { id: "prompt-older", mode: "prompt", started: false, isRunning: false },
+  ];
+
+  assert.deepEqual(
+    generationQueue.selectNextQueuedGenerationJobsByMode(
+      jobs,
+      (job) => job.mode === "prompt" ? 6 : 15,
+    ).map((job) => job.id),
+    ["prompt-older", "creation-older"],
+  );
+});
+
+test("generation queue can share one concurrency pool across prompt routes", () => {
+  const jobs = [
+    ...Array.from({ length: 5 }, (_, index) => ({
+      id: `prompt-a-running-${index}`,
+      mode: "prompt",
+      imageRoute: "a",
+      started: true,
+      isRunning: true,
+    })),
+    {
+      id: "prompt-b-running",
+      mode: "prompt",
+      imageRoute: "b",
+      started: true,
+      isRunning: true,
+    },
+    { id: "prompt-a-queued", mode: "prompt", imageRoute: "a", started: false, isRunning: false },
+    { id: "prompt-b-queued", mode: "prompt", imageRoute: "b", started: false, isRunning: false },
+  ];
+
+  assert.deepEqual(
+    generationQueue.selectNextQueuedGenerationJobsByMode(
+      jobs,
+      () => 6,
+      () => "prompt",
+    ),
+    [],
+  );
+});

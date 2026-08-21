@@ -2,7 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-import { handleApiRequest } from "../cloudflare-pages-worker.mjs";
 import { CREATION_PLATFORM_OPTIONS } from "../lib/creation-platform-policies.mjs";
 import { createCreationQueueJob } from "../lib/creation-suite-queue.mjs";
 import { createCreationListingController } from "../lib/creation-listing-view.mjs";
@@ -139,23 +138,6 @@ test("specific platform records use the existing Listing generation, copy, and e
   controller.exportListings();
   assert.match(copied, /Regenerated Etsy Draft/);
   assert.match(exported, /Regenerated Etsy Draft/);
-});
-
-test("Cloudflare Listing endpoint allows every Creation platform", async () => {
-  for (const set of [
-    { setId: "amazon-explicit", platform: "amazon", platformProvenance: "explicit", productName: "Travel Bottle", items: [] },
-    { setId: "universal-explicit", platform: "universal", platformProvenance: "explicit", productName: "Travel Bottle", items: [] },
-    { setId: "temu-explicit", platform: "temu", platformProvenance: "explicit", productName: "Travel Bottle", items: [] },
-    { setId: "etsy-explicit", platform: "etsy", platformProvenance: "explicit", productName: "Travel Bottle", items: [] },
-    { setId: "legacy", productName: "Travel Bottle", items: [] },
-  ]) {
-    const response = await handleApiRequest(new Request("https://studio.example/api/creation/listings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mock: true, set }),
-    }), { env: { IMAGE_STUDIO_MOCK_LISTING_AGENT: "1" } });
-    assert.equal(response.status, 200, `${set.setId} should be eligible`);
-  }
 });
 
 test("local Listing endpoint has no platform eligibility gate", async () => {

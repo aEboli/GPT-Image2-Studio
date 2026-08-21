@@ -2,20 +2,19 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.7-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.8-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
-[![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages%20Ready-f38020.svg)](https://pages.cloudflare.com/)
 [![Windows](https://img.shields.io/badge/Windows-Installer-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
 **本地优先的 AI 图像生成与视觉创作工作台**
 
 把提示词生图、参考图分析、图片编辑、电商套图、人物写真、文章插图、PPT 生成和素材管理集中到一个浏览器界面中。
 
-当前版本：`v0.2.7`
+当前版本：`v0.2.8`
 
 </div>
 
-## v0.2.7 更新说明
+## v0.2.8 更新说明
 
 - 工作台左下角新增当前版本号；主应用后续每次更新统一递增 `0.0.1`，并自动同步锁文件、页面和当前发行文档，商品图采集扩展仍使用独立版本线。
 - Prompt Kit 会将可复用的长期 Prompt Agent 历史补齐为稳定的本地模板，不覆盖用户已经编辑的模板，也不会重新创建用户主动删除的模板。桌面端面板贴近提示词参数列展开，悬浮和键盘焦点提示始终显示在面板与弹窗之上。
@@ -28,7 +27,10 @@
 - 套图记录页在桌面宽屏恢复为左侧可持续加载记录列表、右侧图片与 Listing 的双栏工作区；搜索、日期筛选、多选、加载更多和当前详情彼此保持独立，移动端改为可折叠的记录选择器。
 - Listing 生成进一步收紧证据边界，补齐可验证标题信息、商品/包装尺寸重量来源和历史记录兼容读取；买家可见标题与 SKU 图片文件名不会暴露内部货号或源文件编码。
 - 提示词模式支持分别清空参考图和提示词、从当前结果添加或拖入参考图，首次载入显示最近 10 张图片，当前会话仅随成功生成结果逐张扩展，历史缩略图最多保留 50 张且不回填更早历史；图片详情参数页同时展示文件名与相对路径。
-- Vercel Serverless 使用生产依赖安装和标准请求处理入口，避免 Electron 依赖与本地监听回调阻塞云端函数；Cloudflare 继续明确标注本地文件能力边界。
+- Vercel Serverless 使用生产依赖安装和标准请求处理入口，避免 Electron 依赖与本地监听回调阻塞云端函数；Vercel 使用临时文件系统，不提供本地持久化工作流。
+- Responses 流式连接中断后，主应用会按原始 response ID 查询并在限定次数内轮询最终结果，不会静默再次发起一次新的生图请求。
+- 提示词模式支持最多 15 个未完成任务，并在提示词相关路由之间共享 6 个并发槽位；主预览区域仍保持紧凑的视觉边界。
+- 已移除 Cloudflare Pages/Worker/R2/Queue 的当前部署路径和活动文档声明；当前继续维护本地 Node.js、Windows 桌面程序、Windows 浏览器安装包和 Vercel 运行方式。
 
 ## 重要说明
 
@@ -42,14 +44,13 @@
 
 GPT-Image2-Studio 面向个人创作者、电商运营、设计师和内容团队。它不是单一的生图表单，而是一套围绕参考素材、创作计划、生成队列、失败重试、历史记录和本地输出目录组织的工作台。
 
-项目提供四种主要运行形态：
+项目提供三种主要运行形态：
 
 | 运行方式 | 适合场景 | 数据特点 |
 | --- | --- | --- |
 | 本地 Node.js | 日常创作、完整本地工作流 | 配置、历史和输出默认保存在本机，功能最完整 |
 | Windows 桌面程序 | 需要独立窗口、任务栏和标准安装卸载的 Windows 用户 | Electron 内置运行时，动态回环端口，关窗即停止服务 |
 | Windows 浏览器安装包 | 需要保留旧版浏览器启动方式的 Windows 用户 | 内置 `node.exe`，安装后通过快捷方式打开默认浏览器 |
-| Cloudflare Pages / Worker | 多设备访问或云端托管 | 依赖 R2，异步队列可使用 Queue；部分本地文件能力不可用 |
 
 仓库还包含 `vercel.json`。Vercel 环境使用临时目录，不能当作本地持久化存储；部署前应在 Preview 环境验证长任务、SSE 和文件生命周期。
 
@@ -178,7 +179,7 @@ GPT-Image2-Studio 面向个人创作者、电商运营、设计师和内容团�
 | Logo 库 | 套图模式的 Logo 控件 | 上传、长期保存、选择和删除常用 Logo；可设置位置和背景策略，也可对最多 15 张上传图执行同一 Logo 批处理 |
 | 写真搭配库 | 写真模式 -> 服装道具配饰参考图 -> 搭配库 | 保存并复用服装、道具和配饰素材，将选中素材带入写真参考图与提示词摘要 |
 | PPT 单页编辑器 | PPT 生成结果或 PPT 记录中的页面编辑操作 | 对指定页填写修改要求并重新生成，保留演示文稿上下文；也可补齐缺失页面后重新导出 |
-| 打开输出目录 | 顶栏或资产菜单 -> 打开输出目录 | 本地 Node.js/Windows 运行时打开实际图片根目录；Cloudflare、Vercel 等云端环境不提供本机目录打开能力 |
+| 打开输出目录 | 顶栏或资产菜单 -> 打开输出目录 | 本地 Node.js/Windows 运行时打开实际图片根目录；Vercel 等云端环境不提供本机目录打开能力 |
 
 ### 商品图采集插件
 
@@ -222,12 +223,14 @@ Windows 用户也可以双击 `launch-studio.cmd` 启动，使用 `stop-studio-s
 从包含桌面产物的 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
 
 ```text
-GPT-Image2-Studio-Desktop-Setup-v0.2.7-x64.exe
+GPT-Image2-Studio-Desktop-Setup-v0.2.8-x64.exe
 ```
 
 安装完成后通过桌面或开始菜单中的 `GPT-Image2-Studio` 启动。程序会在独立窗口中运行，内置服务使用动态回环端口，关闭窗口后不会遗留后台服务。无需另行安装 Node.js，完整说明见 [Windows 桌面程序文档](./docs/windows-desktop.md)。
 
 源码目录也可直接启动桌面开发版：
+
+如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.8-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
 
 桌面开发使用 Electron `43`，要求 Node.js `22.12` 或更高版本；普通 `npm start` 服务仍支持 Node.js `20+`。
 
@@ -241,7 +244,7 @@ cmd /c npm run desktop
 从 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
 
 ```text
-GPT-Image2-Studio-Setup-v0.2.7.exe
+GPT-Image2-Studio-Setup-v0.2.8.exe
 ```
 
 安装器默认写入：
@@ -356,24 +359,6 @@ $env:IMAGE_STUDIO_DNS_FALLBACK_SERVERS="1.1.1.1,8.8.8.8"
 
 ## 部署方式
 
-### Cloudflare Pages / Worker
-
-构建静态资源和 Pages Worker：
-
-```powershell
-cmd /c npm ci
-cmd /c npm run build:pages
-```
-
-构建产物写入 `dist/`。部署前需要检查并配置：
-
-- `wrangler.jsonc`：Pages 输出目录和 `IMAGE_BUCKET` R2 绑定。
-- `wrangler.api.jsonc`：独立 API Worker、`IMAGE_BUCKET`、`GENERATION_QUEUE` 和路由；其中的示例路由必须替换为你自己的域名或删除。
-- Cloudflare Secret：API Key、Base URL 和模型配置，也可以由浏览器按用户保存私有配置。
-- `cloudflare-r2-lifecycle.json`：按你的数据保留策略配置 R2 生命周期。
-
-Cloudflare 与本地能力有差异：云端不能打开本机目录、返回本机绝对路径，也不能依赖本地文件完成套图/写真修复；服务端历史列表可能为空，浏览器缓存是云端记录的重要来源。
-
 ### Vercel
 
 仓库中的 `vercel.json` 为 `server.mjs` 配置了依赖包含范围和 `300` 秒函数时长，并在云端安装时使用 `npm ci --omit=dev`，避免把仅供桌面开发的 Electron/Electron Builder 带入 Serverless Function。可通过 Vercel 导入仓库或 CLI 创建 Preview 部署：
@@ -404,7 +389,8 @@ cmd /c npm run build:desktop
 产物路径：
 
 ```text
-artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.7-x64.exe
+artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.8-x64.exe
+artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.8-x64.zip
 artifacts/desktop/win-unpacked/GPT-Image2-Studio.exe
 ```
 
@@ -422,7 +408,7 @@ cmd /c npm run build:installer
 产物路径格式：
 
 ```text
-artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.7.exe
+artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.8.exe
 ```
 
 脚本使用系统 `iexpress.exe` 生成自解压安装包，并把当前 Node.js 运行时和依赖打入安装目录；启动后仍使用默认浏览器显示工作台。
@@ -566,18 +552,14 @@ GPT-Image2-Studio/
 |-- lib/                          # 服务端与前端共享逻辑
 |-- openspec/                     # 变更规格、设计和验收场景
 |-- public/                       # 浏览器界面、样式、模块与内置资产
-|-- scripts/                      # 同步、云端构建与安装包脚本
+|-- scripts/                      # 同步与安装包脚本
 |-- test/                         # Node.js 测试
-|-- cloudflare-pages-worker.mjs   # Cloudflare Pages / Worker API
-|-- cloudflare-r2-lifecycle.json  # R2 生命周期示例
 |-- generate-image.mjs            # 命令行单图生成入口
 |-- server.mjs                    # 本地 Node.js 服务入口
 |-- launch-studio.cmd             # Windows 快速启动器
 |-- launch-studio.ps1             # Windows PowerShell 启动器
 |-- stop-studio-services.cmd      # Windows 停止脚本
 |-- vercel.json                   # Vercel 函数配置
-|-- wrangler.jsonc                # Cloudflare Pages 配置
-|-- wrangler.api.jsonc            # Cloudflare API Worker 配置
 |-- package-lock.json
 `-- package.json
 ```
@@ -602,9 +584,6 @@ cmd /c npm run sync:public-lib
 # 运行测试
 cmd /c npm test
 
-# 构建 Cloudflare Pages
-cmd /c npm run build:pages
-
 # 检查版本与发布文档一致性
 cmd /c npm run check:release
 ```
@@ -615,7 +594,6 @@ cmd /c npm run check:release
 cmd /c npm test
 cmd /c npm run sync:public-lib -- --check
 cmd /c npm run check:release
-cmd /c npm run build:pages
 cmd /c npx --no-install openspec validate --all --strict
 git diff --check
 ```
@@ -631,7 +609,7 @@ cmd /c npm run build:installer
 ## 版本发布
 
 - 版本号以 `package.json` 和 `package-lock.json` 为准。
-- Git tag 使用 `v<version>`，例如 `v0.2.7`。
+- Git tag 使用 `v<version>`，例如 `v0.2.8`。
 - Release 标题建议使用 `GPT-Image2-Studio v<version>`。
-- Release 应至少附带变更说明、验证结果和对应的 Windows 桌面安装包；如仍分发兼容版，应明确区分两个文件的启动形态。
+- Release 应附带变更说明、验证结果、Windows 桌面安装包、免安装 ZIP；如仍分发兼容版，应明确区分三个文件的启动形态。
 - 正式发布提交与标签就绪后运行 `npm run check:release:strict`，确认工作树干净且标签与版本一致。

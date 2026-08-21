@@ -68,17 +68,17 @@ test("creation repair can select all incomplete or missing items", () => {
   );
 });
 
-test("creation repair treats Cloudflare-completed image URLs as complete for incomplete scope", () => {
+test("creation repair treats remote-completed image URLs as complete for incomplete scope", () => {
   const items = selectCreationRepairItems(
     {
       items: [
         {
-          itemId: "cloudflare-done",
+          itemId: "remote-done",
           status: "completed",
-          filename: "cloudflare-done.png",
+          filename: "remote-done.png",
           relativePath: "",
-          imageUrl: "https://images.example/cloudflare-done.png",
-          storageKey: "creation/cloudflare-done.png",
+          imageUrl: "https://images.example/remote-done.png",
+          storageKey: "creation/remote-done.png",
         },
         {
           itemId: "failed",

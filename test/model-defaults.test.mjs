@@ -4,7 +4,6 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { handleApiRequest } from "../cloudflare-pages-worker.mjs";
 import { normalizeBrowserPrivateConfig } from "../lib/browser-config.mjs";
 import { createConfigStore } from "../lib/config-store.mjs";
 import { generateCreationListingDrafts } from "../lib/creation-listing-agent.mjs";
@@ -46,17 +45,6 @@ test("local and browser configuration use shared defaults and preserve explicit 
   assert.equal(localOverride.directResponsesModel, "vendor-direct-model");
   assert.equal(browserOverride.responsesModel, "browser-route-model");
   assert.equal(browserOverride.directResponsesModel, "browser-direct-model");
-});
-
-test("Cloudflare public configuration exposes the shared model defaults", async () => {
-  const response = await handleApiRequest(new Request("https://studio.example/api/config"));
-  const config = await response.json();
-
-  assert.equal(response.status, 200);
-  assert.equal(config.responsesModel, DEFAULT_RESPONSES_MODEL);
-  assert.equal(config.directResponsesModel, DEFAULT_DIRECT_RESPONSES_MODEL);
-  assert.equal(config.directImageModel, DEFAULT_DIRECT_IMAGE_MODEL);
-  assert.equal(config.protocolImageModel, DEFAULT_PROTOCOL_IMAGE_MODEL);
 });
 
 test("Listing requests use the shared default only when no model is supplied", async () => {

@@ -1,6 +1,6 @@
 {
   "name": "gpt-image2-studio",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "private": true,
   "type": "module",
   "main": "desktop/main.mjs",
@@ -15,7 +15,6 @@
     "help": "node generate-image.mjs --help",
     "sync:public-lib": "node scripts/sync-public-lib.mjs",
     "build:extension": "node scripts/build-product-image-extension.mjs",
-    "build:pages": "node scripts/build-cloudflare-pages.mjs",
     "build:installer": "node scripts/build-windows-installer.mjs",
     "build:desktop": "electron-builder --win nsis --x64",
     "release:patch": "node scripts/release-patch.mjs",
@@ -35,7 +34,8 @@
   "devDependencies": {
     "@fission-ai/openspec": "1.6.0",
     "electron": "^43.2.0",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.15.3",
+    "parse5": "8.0.1"
   },
   "build": {
     "appId": "com.aeboli.gptimage2studio",

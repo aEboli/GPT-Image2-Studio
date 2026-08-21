@@ -1,9 +1,5 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
-
-import { handleApiRequest } from "../cloudflare-pages-worker.mjs";
 import {
   MAX_CREATION_EFFECTIVE_PLAN_BYTES,
   assertCreationPlanCanGenerate,
@@ -15,9 +11,6 @@ import {
   buildCreationItemGenerationPrompt,
   resolveCreationItemGenerationParameters,
 } from "../lib/creation-generation-parameters.mjs";
-
-const serverPath = fileURLToPath(new URL("../server.mjs", import.meta.url));
-const workerPath = fileURLToPath(new URL("../cloudflare-pages-worker.mjs", import.meta.url));
 
 function normalizedPlatformInput() {
   return {
@@ -42,14 +35,6 @@ function normalizedPlatformInput() {
     ]),
     infographicRebuildEnabled: "false",
   };
-}
-
-function toFormData(input) {
-  const formData = new FormData();
-  for (const [key, value] of Object.entries(input)) {
-    formData.set(key, value);
-  }
-  return formData;
 }
 
 test("mixed square and portrait items resolve independent effective request parameters", () => {
@@ -216,20 +201,6 @@ test("infographic rebuild prompt requires substantial visual redesign while lock
   assert.doesNotMatch(prompt, /extend only the existing background or margins/i);
 });
 
-test("local planner and Worker endpoint produce deeply equivalent plans for one normalized payload", async () => {
-  const input = normalizedPlatformInput();
-  const localPlan = buildCreationPlan(input);
-  const response = await handleApiRequest(
-    new Request("https://studio.example/api/creation/plan", { method: "POST", body: toFormData(input) }),
-  );
-  const payload = await response.json();
-
-  assert.equal(response.status, 200);
-  assert.deepEqual(payload.plan, localPlan);
-  assert.equal(payload.plan.effectiveAudienceStrategy.source, "user");
-  assert.ok(payload.plan.items.every((item) => item.conversionIntent?.conversionGoal));
-});
-
 test("creation planning keeps unsafe analysis personas and unsupported claims out of prompts", () => {
   const plan = buildCreationPlan({ productName: "Plain Bottle", platform: "amazon", audienceStrategy: { targetAudience: "Black buyers age 25-34", purchaseMotivations: ["FDA certified health effects", "$19.99 lowest price", "3x faster", "4.9/5 stars", "over 1 million sold", "销量第一"], purchaseObjections: ["patients with diabetes", "Chinese consumers"], desiredOutcome: "clinically proven treatment", evidenceBasis: [], confidence: "high", source: "analysis-suggestion" } });
   const promptText = plan.items.map((item) => item.prompt).join("\n");
@@ -309,32 +280,4 @@ test("submitted zero-carousel infographic rebuild stays source-only under strict
   assert.equal(submitted.items[0].imageType, "infographic-rebuild");
   assert.equal(submitted.items[0].prompt, buildCreationInfographicRebuildPrompt());
   assert.deepEqual(submitted.items[0].sourceInfographic, preview.items[0].sourceInfographic);
-});
-
-test("Local and Worker persist the outer server-validated Creation plan", async () => {
-  const [server, worker] = await Promise.all([readFile(serverPath, "utf8"), readFile(workerPath, "utf8")]);
-  for (const source of [server, worker]) {
-    assert.match(source, /effectivePlan:\s*plan,/);
-    assert.doesNotMatch(source, /effectivePlan:\s*plan\.effectivePlan\s*\|\|\s*plan/);
-  }
-});
-
-test("local and Worker Creation loops resolve and expose parameters inside each item callback", async () => {
-  const [server, worker] = await Promise.all([readFile(serverPath, "utf8"), readFile(workerPath, "utf8")]);
-  const local = server.match(/async function handleCreationGenerate[\s\S]*?\r?\n}\r?\n\r?\nasync function handleCreationLogoBatchGenerate/)?.[0] || "";
-  const cloud = worker.match(/async function runCreationGenerate[\s\S]*?\r?\n}\r?\n\r?\nasync function runCreationLogoBatchGenerate/)?.[0] || "";
-
-  for (const source of [local, cloud]) {
-    const callback = source.match(/runWithConcurrency\(plan\.items[\s\S]*?async \(item\) => \{[\s\S]*/)?.[0] || "";
-    assert.match(callback, /resolveCreationItemGenerationParameters\(item,/);
-    assert.match(callback, /buildCreationItemGenerationPrompt\(item\.prompt, itemGenerationParameters, item\)/);
-    assert.match(callback, /aspectRatio:\s*itemGenerationParameters\.ratioOption\.value/);
-    assert.match(callback, /size:\s*itemGenerationParameters\.finalSize/);
-    assert.match(callback, /targetLanguage:\s*itemGenerationParameters\.targetLanguage/);
-    assert.match(callback, /effectiveSize:\s*savedSize/);
-    assert.match(callback, /item_started[\s\S]*ratio:/);
-    assert.match(callback, /item_status[\s\S]*ratio:/);
-    assert.match(callback, /item_final_image[\s\S]*ratio:/);
-    assert.match(callback, /catch \(error\)[\s\S]*item_failed/);
-  }
 });

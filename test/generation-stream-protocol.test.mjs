@@ -104,17 +104,17 @@ test("generation stream delivery order keeps browser-first caching authoritative
   );
 });
 
-test("server, worker, and browser consume the shared generation stream protocol", async () => {
-  const [server, worker, app] = await Promise.all([
+test("server and browser consume the shared generation stream protocol", async () => {
+  const [server, app, protocol] = await Promise.all([
     readFile(new URL("../server.mjs", import.meta.url), "utf8"),
-    readFile(new URL("../cloudflare-pages-worker.mjs", import.meta.url), "utf8"),
     readFile(new URL("../public/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../lib/generation-stream-protocol.mjs", import.meta.url), "utf8"),
   ]);
 
   assert.match(server, /GENERATION_STREAM_EVENTS\.SAVED/);
   assert.match(server, /GENERATION_STREAM_EVENTS\.COMPLETE/);
-  assert.match(worker, /buildFinalImageChunkPayloads/);
-  assert.match(worker, /GENERATION_STREAM_EVENTS\.FINAL_IMAGE_CHUNK/);
+  assert.match(protocol, /buildFinalImageChunkPayloads/);
+  assert.match(protocol, /GENERATION_STREAM_EVENTS\.FINAL_IMAGE_CHUNK/);
   assert.match(app, /GENERATION_STREAM_EVENTS\.FINAL_IMAGE_CHUNK/);
   assert.match(app, /recordFinalImageChunk/);
 });

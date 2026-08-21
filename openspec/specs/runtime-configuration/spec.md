@@ -4,10 +4,10 @@
 TBD - created by archiving change harden-project-maintenance. Update Purpose after archive.
 ## Requirements
 ### Requirement: Runtime defaults use one model source
-The system SHALL resolve the default Responses model and direct text/vision model from one shared source, and both defaults SHALL be `gpt-5.4-mini` across local Node, browser-private configuration, and Cloudflare Worker runtimes.
+The system SHALL resolve the default Responses model and direct text/vision model from one shared source, and both defaults SHALL be `gpt-5.4-mini` across the local Node service and browser-private configuration.
 
 #### Scenario: A runtime starts without an explicit text model
-- **WHEN** local, browser, or Cloudflare configuration has no non-empty Responses or direct text/vision model
+- **WHEN** local or browser configuration has no non-empty Responses or direct text/vision model
 - **THEN** the effective model is `gpt-5.4-mini`
 - **AND** the runtime does not select a different fallback based only on its deployment type
 

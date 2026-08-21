@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -21,36 +21,38 @@ import { createPromptAgentStore } from "../lib/prompt-agent-store.mjs";
 import { MAX_CREATION_REFERENCE_IMAGES } from "../lib/studio-constants.mjs";
 
 const serverPath = new URL("../server.mjs", import.meta.url);
-const cloudflareWorkerPath = new URL("../cloudflare-pages-worker.mjs", import.meta.url);
 
 test("server runtimes default prompt-agent image analysis to medium reasoning effort", async () => {
   const server = await readFile(serverPath, "utf8");
-  const worker = await readFile(cloudflareWorkerPath, "utf8");
 
-  for (const source of [server, worker]) {
-    assert.match(source, /const PROMPT_AGENT_ANALYSIS_REASONING_EFFORT = "medium";/);
-    assert.match(
-      source,
-      /mode === REFERENCE_ORCHESTRATION_MODE[\s\S]*\? REFERENCE_ORCHESTRATION_REASONING_EFFORT[\s\S]*: PROMPT_AGENT_ANALYSIS_REASONING_EFFORT/,
-    );
-    assert.doesNotMatch(
-      source,
-      /mode === REFERENCE_ORCHESTRATION_MODE[\s\S]*\? REFERENCE_ORCHESTRATION_REASONING_EFFORT[\s\S]*: config\.defaults\?\.reasoningEffort \|\| DEFAULT_REASONING_EFFORT/,
-    );
-  }
+  assert.match(server, /const PROMPT_AGENT_ANALYSIS_REASONING_EFFORT = "medium";/);
+  assert.match(
+    server,
+    /mode === REFERENCE_ORCHESTRATION_MODE[\s\S]*\? REFERENCE_ORCHESTRATION_REASONING_EFFORT[\s\S]*: PROMPT_AGENT_ANALYSIS_REASONING_EFFORT/,
+  );
+  assert.doesNotMatch(
+    server,
+    /mode === REFERENCE_ORCHESTRATION_MODE[\s\S]*\? REFERENCE_ORCHESTRATION_REASONING_EFFORT[\s\S]*: config\.defaults\?\.reasoningEffort \|\| DEFAULT_REASONING_EFFORT/,
+  );
 });
 
 test("server runtimes keep reference orchestration analysis on low reasoning effort", async () => {
   const server = await readFile(serverPath, "utf8");
-  const worker = await readFile(cloudflareWorkerPath, "utf8");
 
-  for (const source of [server, worker]) {
-    assert.match(source, /const REFERENCE_ORCHESTRATION_REASONING_EFFORT = "low";/);
-    assert.match(
-      source,
-      /mode === REFERENCE_ORCHESTRATION_MODE[\s\S]*\? REFERENCE_ORCHESTRATION_REASONING_EFFORT[\s\S]*: PROMPT_AGENT_ANALYSIS_REASONING_EFFORT/,
-    );
-  }
+  assert.match(server, /const REFERENCE_ORCHESTRATION_REASONING_EFFORT = "low";/);
+  assert.match(
+    server,
+    /mode === REFERENCE_ORCHESTRATION_MODE[\s\S]*\? REFERENCE_ORCHESTRATION_REASONING_EFFORT[\s\S]*: PROMPT_AGENT_ANALYSIS_REASONING_EFFORT/,
+  );
+});
+
+test("server runtimes return a canonical prompt agent analysis mode", async () => {
+  const server = await readFile(serverPath, "utf8");
+
+  assert.match(
+    server,
+    /promptAgentStore\.append\(\{[\s\S]*?mode: mode \|\| "image-to-prompt",[\s\S]*?json,[\s\S]*?\}\);/,
+  );
 });
 
 test("prompt agent request can analyze portrait person reference images safely", () => {
@@ -1396,7 +1398,7 @@ test("prompt agent returns compact upstream HTTP errors", async () => {
         async fetchImpl() {
           return new Response(
             JSON.stringify({
-              type: "https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-5xx-errors/error-524/",
+              type: "https://example.test/errors/upstream-timeout",
               detail: "The origin web server did not respond within the timeout window.",
               error_code: 524,
             }),
@@ -1501,6 +1503,7 @@ test("prompt agent store keeps JSON analysis history across reads", async () => 
       id: "prompt-json-1",
       createdAt: "2026-04-28T08:00:00.000Z",
       filename: "sample.png",
+      mode: "image-to-prompt",
       json: {
         title: "产品图",
         prompt: "白底商业产品摄影，柔和棚拍光",
@@ -1516,6 +1519,50 @@ test("prompt agent store keeps JSON analysis history across reads", async () => 
     assert.equal(history.length, 1);
     assert.equal(history[0].json.prompt, "白底商业产品摄影，柔和棚拍光");
     assert.equal(history[0].filename, "sample.png");
+    assert.equal(history[0].mode, "image-to-prompt");
+  } finally {
+    await rm(rootDir, { recursive: true, force: true });
+  }
+});
+
+test("prompt agent store preserves missing legacy mode and normalizes explicit mode", async () => {
+  const rootDir = await mkdtemp(join(tmpdir(), "prompt-agent-store-mode-"));
+
+  try {
+    const store = createPromptAgentStore({ rootDir });
+    await store.append({ id: "seed", mode: "image-to-prompt", json: { prompt: "seed" } });
+    await writeFile(
+      store.historyPath,
+      `${JSON.stringify({
+        version: 1,
+        entries: [
+          {
+            id: "legacy-without-mode",
+            createdAt: "2026-04-27T08:00:00.000Z",
+            filename: "legacy.png",
+            json: { prompt: "旧版提示词", subject: "产品", scene: "影棚", lighting: "柔光" },
+          },
+        ],
+      }, null, 2)}\n`,
+      "utf8",
+    );
+
+    const [legacy] = await store.list();
+    assert.equal(Object.hasOwn(legacy, "mode"), false);
+
+    const appended = await store.append({
+      id: "current",
+      createdAt: "2026-04-28T08:00:00.000Z",
+      mode: "  image-to-prompt  ",
+      json: { prompt: "当前提示词" },
+    });
+    assert.equal(appended.mode, "image-to-prompt");
+
+    const persisted = JSON.parse(await readFile(store.historyPath, "utf8"));
+    const persistedLegacy = persisted.entries.find((entry) => entry.id === "legacy-without-mode");
+    const persistedCurrent = persisted.entries.find((entry) => entry.id === "current");
+    assert.equal(Object.hasOwn(persistedLegacy, "mode"), false);
+    assert.equal(persistedCurrent.mode, "image-to-prompt");
   } finally {
     await rm(rootDir, { recursive: true, force: true });
   }

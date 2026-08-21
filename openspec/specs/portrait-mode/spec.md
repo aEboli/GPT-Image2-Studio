@@ -118,12 +118,3 @@ The system SHALL allow local repair for incomplete portrait items and single-ite
 
 - **WHEN** a local portrait set has failed or missing items and the user reuploads reference images
 - **THEN** `/api/portrait/repair` regenerates only selected or incomplete items and updates the same manifest.
-
-### Requirement: Cloudflare unsupported actions return a stable contract
-
-The Cloudflare worker SHALL support portrait analysis, planning, and generation, and SHALL return an unsupported capability payload for local-only actions.
-
-#### Scenario: User calls a local-only portrait route on Cloudflare
-
-- **WHEN** the request targets `/api/portrait/repair`, `/api/portrait/sets/open-folder`, or `/api/portrait/sets/paths`
-- **THEN** the worker returns a JSON unsupported capability response instead of a missing route.

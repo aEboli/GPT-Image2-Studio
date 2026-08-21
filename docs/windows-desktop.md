@@ -1,13 +1,14 @@
 # Windows 桌面程序说明
 
-`GPT-Image2-Studio-Desktop-Setup-v0.2.7-x64.exe` 是使用 Electron 和 NSIS 构建的 Windows x64 桌面安装包。安装后会以独立应用窗口运行完整工作台，不需要单独安装 Node.js，也不会用浏览器标签页承载主界面。
+`GPT-Image2-Studio-Desktop-Setup-v0.2.8-x64.exe` 是使用 Electron 和 NSIS 构建的 Windows x64 桌面安装包。安装后会以独立应用窗口运行完整工作台，不需要单独安装 Node.js，也不会用浏览器标签页承载主界面。
 
 ## 与旧安装包的区别
 
 | 产物 | 启动界面 | 运行时 | 适用场景 |
 | --- | --- | --- | --- |
-| `GPT-Image2-Studio-Desktop-Setup-v0.2.7-x64.exe` | 独立桌面窗口 | Electron 内置 Node.js | 推荐给日常 Windows 桌面用户 |
-| `GPT-Image2-Studio-Setup-v0.2.7.exe` | 默认浏览器标签页 | 独立 `runtime\node.exe` | 保留兼容的旧启动方式 |
+| `GPT-Image2-Studio-Desktop-Setup-v0.2.8-x64.exe` | 独立桌面窗口 | Electron 内置 Node.js | 推荐给日常 Windows 桌面用户 |
+| `GPT-Image2-Studio-Portable-v0.2.8-x64.zip` | 解压后独立桌面窗口 | Electron 内置 Node.js | 不写入安装记录的便携运行 |
+| `GPT-Image2-Studio-Setup-v0.2.8.exe` | 默认浏览器标签页 | 独立 `runtime\node.exe` | 保留兼容的旧启动方式 |
 
 两种产物复用同一套工作台、API 和本地输出格式。桌面程序不会删除旧安装包或源码运行方式。
 
@@ -17,7 +18,7 @@
 2. 选择当前用户的安装目录。
 3. 通过桌面或开始菜单中的 `GPT-Image2-Studio` 快捷方式启动。
 
-桌面程序会在 `127.0.0.1` 的系统动态端口启动内置服务，并在服务就绪后显示工作台。重复启动只会恢复并聚焦已有窗口；关闭最后一个窗口会同时关闭本地服务，不会留下独立后台进程。
+桌面程序会在 `127.0.0.1` 的系统动态端口启动内置服务，并在服务就绪后显示工作台。重复启动只会恢复并聚焦已有窗口；关闭最后一个窗口会同时关闭本地服务，不会留下独立后台进程。便携版解压后直接运行同一个 `GPT-Image2-Studio.exe`，不会写入安装程序记录或创建卸载项。
 
 当前安装包未进行商业代码签名，Windows SmartScreen 可能显示“未知发布者”。发布者应同时提供安装包 SHA-256，用户应只使用可信发布来源的文件。
 
@@ -75,7 +76,13 @@ cmd /c npm run build:desktop
 冒烟测试会实际创建独立窗口、加载真实首页、保存 `artifacts/desktop-smoke.png`，然后自动退出。NSIS 产物路径为：
 
 ```text
-artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.7-x64.exe
+artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.8-x64.exe
+```
+
+便携压缩包由同一个 `win-unpacked` 目录的完整内容打包，解压后可直接运行压缩包根目录的 `GPT-Image2-Studio.exe`，不需要安装：
+
+```text
+artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.8-x64.zip
 ```
 
 未安装的可执行程序位于：
@@ -84,4 +91,4 @@ artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.7-x64.exe
 artifacts/desktop/win-unpacked/GPT-Image2-Studio.exe
 ```
 
-发布前还应运行完整项目测试、Cloudflare 构建、public/lib 同步检查、OpenSpec 严格校验，并实际启动 `win-unpacked` 程序确认窗口内容与退出清理。
+发布前还应运行完整项目测试、public/lib 同步检查、OpenSpec 严格校验，并实际启动 `win-unpacked` 程序确认窗口内容与退出清理。

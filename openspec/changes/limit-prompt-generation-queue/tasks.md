@@ -1,0 +1,22 @@
+## 1. 规格与失败基线
+
+- [x] 1.1 明确提示词模式 15 个未完成任务容量、6 个全局并发槽位和 Route A/B/C 共享边界。
+- [x] 1.2 明确胶片条最多显示 15 个任务卡片，且主预览最多 6 个 orb 是独立视觉边界。
+
+## 2. 队列与服务端实现
+
+- [x] 2.1 增加提示词模式容量/并发常量，并同步到浏览器公共模块。
+- [x] 2.2 让前端按提示词模式统一调度 6 个任务，保留其他模式的既有模式/路由调度键。
+- [x] 2.3 在提示词提交超过 15 个任务时拒绝新任务，并保留已有排队任务的取消和自动推进行为。
+- [x] 2.4 将提示词服务端请求归入共享 `prompt` 槽位并限制为 6，其他请求作用域保持原有行为。
+- [x] 2.5 将提示词胶片条任务卡片窗口扩展为 15，同时保持主预览加载 orb 上限为 6。
+
+## 3. 验证与交付
+
+- [x] 3.1 运行提示词队列、槽位、限制常量、胶片条和页面布局聚焦测试。
+- [x] 3.2 运行 `node scripts/sync-public-lib.mjs --check`、`git diff --check`、Node 语法检查和完整 `npm test`。
+  - `sync-public-lib --check` 检查 94 个公共模块；`git diff --check`、`node --check public/app.js`、`node --check server.mjs` 均通过；完整测试 `1593/1593` 通过。
+- [x] 3.3 运行当前 change 的 OpenSpec 严格校验，并记录工作区既有未归档 change 的边界。
+  - `openspec validate limit-prompt-generation-queue --strict --no-interactive` 通过；随后全项目 `openspec validate --all --strict --no-interactive` 也以 `30 passed, 0 failed` 通过。
+- [x] 3.4 启动本地服务进行连续 15 次提交和提示词队列的人工浏览器验收；跨 Route A/B/C 的共享槽位由自动化回归覆盖，未向真实上游发送请求。
+  - 本地 mock 服务在专用端口运行；临时延迟 `/api/generate` 后，连续提交 15 个任务显示 6 个“发送请求中”和 9 个“排队中”，计数为 `6 / 6`；第 16 个被拒绝；首批释放后队列自动推进为 6 个发送中、2 个排队中。

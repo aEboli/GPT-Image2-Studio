@@ -14,12 +14,12 @@ test("creation auto repair selects failed and pathless items only once after ful
     items: [
       { itemId: "done", status: "completed", filename: "done.png", relativePath: "creation/done.png" },
       {
-        itemId: "cloudflare-done",
+        itemId: "remote-done",
         status: "completed",
-        filename: "cloudflare-done.png",
+        filename: "remote-done.png",
         relativePath: "",
-        imageUrl: "https://images.example/cloudflare-done.png",
-        storageKey: "creation/cloudflare-done.png",
+        imageUrl: "https://images.example/remote-done.png",
+        storageKey: "creation/remote-done.png",
       },
       { itemId: "failed", status: "failed", filename: "", relativePath: "" },
       { itemId: "pathless", status: "completed", filename: "pathless.png", relativePath: "" },

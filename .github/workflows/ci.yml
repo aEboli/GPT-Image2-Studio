@@ -34,9 +34,6 @@ jobs:
       - name: Check release facts
         run: npm run check:release
 
-      - name: Build Cloudflare Pages bundle
-        run: npm run build:pages
-
       - name: Validate OpenSpec
         run: npx --no-install openspec validate --all --strict
 

@@ -1,7 +1,7 @@
 # asset-record-deletion Specification
 
 ## Purpose
-定义资产工作区各类记录的当前项删除、显式多选删除、应用内确认、原位状态更新、持久化边界，以及 Local 与 Cloudflare 运行时的 API 行为，确保删除能力一致且不会越界清理其他资产。
+定义资产工作区各类记录的当前项删除、显式多选删除、应用内确认、原位状态更新和 Local 持久化边界，确保删除能力一致且不会越界清理其他资产。
 ## Requirements
 ### Requirement: Asset pages expose current and explicit multi-selection deletion
 The system SHALL expose Delete current and Delete selected on Waterfall Gallery, Article Illustration records, Creation set records, Portrait records, and PPT records. Waterfall Gallery SHALL keep image selection controls hidden until the user explicitly enables image-checking mode, and Delete selected SHALL remain unavailable while that mode is disabled. A checked batch MUST remain independent from the single current item used by the page detail or preview, and only Creation records SHALL additionally expose Delete filtered.
@@ -113,20 +113,10 @@ The system SHALL apply permanent deletion according to the selected asset type a
 - **THEN** the store does not recursively delete that target
 - **AND** it reports the skipped or not-found target without affecting other records
 
-### Requirement: Asset deletion API behavior is explicit across runtimes
-The system SHALL document and route bounded batch deletion for Gallery output, Article sets, Portrait sets, Creation sets, and PPT records according to each runtime's persistence model.
+### Requirement: Asset deletion API behavior is explicit for the Local runtime
+The system SHALL document and route bounded batch deletion for Gallery output, Article sets, Portrait sets, Creation sets, and PPT records according to the Local persistence model.
 
 #### Scenario: Local runtime receives a valid batch
 - **WHEN** a supported Local deletion endpoint receives a valid identifier array
 - **THEN** it returns the distinct deleted identifiers, already-absent identifiers, and any skipped unsafe paths
 - **AND** its count matches the identifiers actually deleted
-
-#### Scenario: Cloud runtime owns no server-side records
-- **WHEN** Cloudflare receives a Gallery, Portrait, Creation, or PPT deletion batch but has no matching server-side record store
-- **THEN** it returns an idempotent success for the validated distinct identifiers
-- **AND** the browser can remove matching current-session or browser-cached state
-
-#### Scenario: Cloud runtime does not support Article records
-- **WHEN** Cloudflare receives an Article record deletion request
-- **THEN** it returns the shared unsupported-runtime capability response
-- **AND** the capability matrix marks that route unsupported on Cloudflare

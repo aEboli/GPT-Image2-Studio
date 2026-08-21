@@ -5,6 +5,8 @@ import { readFile } from "node:fs/promises";
 import {
   MAX_CREATION_REFERENCE_IMAGES,
   MAX_PARALLEL_TASKS_PER_SESSION,
+  MAX_PROMPT_PARALLEL_TASKS,
+  MAX_PROMPT_QUEUE_SIZE,
   MAX_PORTRAIT_ACCESSORY_REFERENCE_IMAGES,
   MAX_PORTRAIT_PERSON_REFERENCE_IMAGES,
   MAX_REFERENCE_IMAGES,
@@ -14,18 +16,21 @@ const appPath = new URL("../public/app.js", import.meta.url);
 const indexPath = new URL("../public/index.html", import.meta.url);
 const serverPath = new URL("../server.mjs", import.meta.url);
 
-test("studio task limits keep the local queue unbounded and cap generation at fifteen parallel tasks", async () => {
+test("prompt mode keeps fifteen tasks visible while limiting generation to six parallel tasks", async () => {
   assert.equal(MAX_PARALLEL_TASKS_PER_SESSION, 15);
+  assert.equal(MAX_PROMPT_PARALLEL_TASKS, 6);
+  assert.equal(MAX_PROMPT_QUEUE_SIZE, 15);
 
   const app = await readFile(appPath, "utf8");
   const index = await readFile(indexPath, "utf8");
 
   assert.doesNotMatch(app, /maxConcurrentTasksPerSession/);
   assert.match(app, /maxParallelTasksPerSession:\s*15/);
-  assert.match(index, /id="liveCount">0 \/ 15<\/span>/);
-  assert.match(app, /function getMaxQueuedJobCount\(\) \{\s*return Number\.POSITIVE_INFINITY;\s*\}/);
-  assert.doesNotMatch(app, /getQueuedJobCount\(\) >= getMaxQueuedJobCount\(\)/);
-  assert.doesNotMatch(app, /最多排队/);
+  assert.match(index, /id="liveCount">0 \/ 6<\/span>/);
+  assert.match(app, /function getMaxQueuedJobCount\(mode = getCurrentGenerationQueueMode\(\)\) \{[\s\S]*MAX_PROMPT_QUEUE_SIZE/);
+  assert.match(app, /function getMaxParallelJobCount\(mode = getCurrentGenerationQueueMode\(\)\) \{[\s\S]*MAX_PROMPT_PARALLEL_TASKS/);
+  assert.match(app, /selectNextQueuedGenerationJobsByMode\(state\.jobs, getMaxParallelJobCountForJob(?:, getGenerationJobSchedulingKey)?\)/);
+  assert.match(app, /提示词模式最多保留 \$\{MAX_PROMPT_QUEUE_SIZE\} 个任务/);
 });
 
 test("studio reference limits keep standard references and creation references at fifteen", async () => {
@@ -58,9 +63,12 @@ test("local server counts active generation slots per request mode", async () =>
     server.match(/async function handleArticleIllustrationGenerate[\s\S]*?\r?\n}\r?\n\r?\nasync function handleCreationSetsGet/)?.[0] || "";
 
   assert.match(server, /function getStudioGenerationRequestScope\(generationMode, imageRoute\) \{/);
+  assert.match(server, /if \(mode === "prompt"\) \{\s*return mode;/);
   assert.match(server, /function getGenerationTaskSlotScopeKey\(sessionId, requestScope\) \{/);
   assert.match(server, /function claimSessionTaskSlot\(sessionId, taskId, requestScope\) \{/);
   assert.match(server, /const sessionTaskSlotLimiter = createSessionTaskSlotLimiter\(/);
+  assert.match(server, /function getSessionTaskSlotLimit\(requestScope\) \{/);
+  assert.match(server, /MAX_PROMPT_PARALLEL_TASKS/);
   assert.match(server, /function isResponseWritable\(response\) \{/);
   assert.match(server, /async function waitForSessionTaskSlot\(sessionId, taskId, requestScope, options = \{\}\) \{/);
   assert.match(server, /async function waitForResponseSessionTaskSlot\(sessionId, taskId, requestScope, response\) \{/);

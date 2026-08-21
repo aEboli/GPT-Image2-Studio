@@ -2,22 +2,21 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.7-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.8-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
-[![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages%20Ready-f38020.svg)](https://pages.cloudflare.com/)
 [![Windows](https://img.shields.io/badge/Windows-Installers-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
 **A local-first AI image generation and visual production workbench**
 
 Prompt-to-image, reference analysis, editing, ecommerce sets, portraits, article illustrations, PPT generation, and asset history in one browser-based workspace.
 
-Current version: `v0.2.7`
+Current version: `v0.2.8`
 
 [Chinese README](./README.zh-CN.md)
 
 </div>
 
-## What is included in v0.2.7
+## What is included in v0.2.8
 
 - A quiet lower-left workbench version label backed by the root package version, plus a maintained patch command that increments each main application update by exactly `0.0.1` and checks all current version facts for drift.
 - Prompt Kit now restores reusable long-term Prompt Agent history as stable local templates without overwriting edits or recreating templates the user dismissed. Its desktop placement stays beside the prompt controls, while hover and focus help remains above panels and dialogs.
@@ -28,20 +27,22 @@ Current version: `v0.2.7`
 - Explicit export preflight. Missing Listing fields, price, dimensions, weight, stock, origin, or public image URLs stay empty and are listed in an `Export issues` worksheet instead of being guessed.
 - Evidence-aware Listing normalization, product/package measurement boundaries, safer buyer-facing titles, and SKU image names that do not expose internal part numbers or source filename codes.
 - Prompt/reference reuse improvements: independent clear actions, drag-and-drop reference images, recent-result reuse, and filename plus relative-path context in the image inspector.
-- A Vercel Serverless entry point that installs production dependencies and avoids Electron-only initialization in cloud functions. Cloudflare deployments continue to report unsupported local-file capabilities explicitly.
+- A Vercel Serverless entry point that installs production dependencies and avoids Electron-only initialization in cloud functions. Vercel deployments use temporary storage and do not provide the local filesystem workflow.
+- Interrupted Responses streams now recover the original upstream result by response ID and bounded polling; the local app does not silently issue a second generation request.
+- Prompt generation supports a fifteen-task pending window with six shared concurrent slots across the supported prompt routes, while keeping the preview surface compact.
+- The retired Cloudflare Pages/Worker/R2/Queue path and its active deployment claims have been removed; local Node.js, Windows desktop, Windows browser installer, and Vercel remain documented separately.
 
 ## Why this workbench
 
 GPT-Image2-Studio is designed for creators, ecommerce operators, designers, and content teams who need more than a single image prompt. It keeps references, plans, queued jobs, retries, generated assets, and request metadata together while preserving a local-first trust boundary.
 
-The same application can run in four ways:
+The same application can run in three ways:
 
 | Runtime | Best for | Data boundary |
 | --- | --- | --- |
 | Local Node.js service | Full daily workflow and development | Configuration, records, and outputs stay on the local machine by default |
 | Windows desktop app | A dedicated window, taskbar identity, and standard uninstall flow | Electron provides the runtime; closing the last window stops the local service |
 | Windows browser installer | The legacy browser-launch workflow | The installer includes `node.exe` and opens the default browser |
-| Cloudflare Pages / Worker | Hosted access across devices | R2 is required for durable assets; local-directory actions are unavailable |
 
 The repository also contains a Vercel configuration. Vercel functions use temporary storage, so Preview validation is required for long jobs, SSE, and file lifecycles before production deployment.
 
@@ -162,7 +163,9 @@ On Windows, `launch-studio.cmd` starts the workbench and `stop-studio-services.c
 
 ### Windows desktop app (recommended)
 
-Download `GPT-Image2-Studio-Desktop-Setup-v0.2.7-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
+Download `GPT-Image2-Studio-Desktop-Setup-v0.2.8-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
+
+For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.8-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
 
 For desktop development, Electron 43 requires Node.js 22.12 or newer:
 
@@ -173,7 +176,7 @@ cmd /c npm run desktop
 
 ### Windows browser installer
 
-Download `GPT-Image2-Studio-Setup-v0.2.7.exe` for the compatibility flow. It includes `runtime\node.exe`, installs under `%LOCALAPPDATA%\GPT-Image2-Studio`, and opens the default browser. See [Windows installer documentation](./docs/windows-installer.md).
+Download `GPT-Image2-Studio-Setup-v0.2.8.exe` for the compatibility flow. It includes `runtime\node.exe`, installs under `%LOCALAPPDATA%\GPT-Image2-Studio`, and opens the default browser. See [Windows installer documentation](./docs/windows-installer.md).
 
 ## Configuration
 
@@ -215,14 +218,6 @@ The Node service keeps the system `dns.lookup` path first. When system resolutio
 The default listener is `127.0.0.1`. Do not expose it directly to the public internet. Non-loopback requests require the startup token through HTTP Basic, `Authorization: Bearer <token>`, or `X-Image-Studio-Token: <token>`. A reverse proxy must terminate TLS, authenticate users, enforce request limits, and inject an explicit fixed token for each backend request. Read [SECURITY.md](./SECURITY.md) before enabling LAN or hosted access.
 
 ## Deployment and packaging
-
-### Cloudflare Pages / Worker
-
-```powershell
-cmd /c npm run build:pages
-```
-
-Configure the Pages project, API Worker, R2 bucket, and any Queue bindings from the checked-in `wrangler*.jsonc` files. Cloudflare cannot open a user's local output directory or recover local filesystem records; use R2-backed storage and verify runtime capability responses.
 
 ### Vercel
 
@@ -281,7 +276,6 @@ GPT-Image2-Studio/
 |-- test/                        # Node.js tests
 |-- server.mjs                   # Local Node.js service
 |-- generate-image.mjs           # CLI image-generation entry point
-|-- cloudflare-pages-worker.mjs  # Cloudflare Pages / Worker entry point
 |-- package.json
 `-- package-lock.json
 ```
@@ -294,7 +288,6 @@ cmd /c npm run desktop
 cmd /c npm run help
 cmd /c npm run sync:public-lib
 cmd /c npm test
-cmd /c npm run build:pages
 cmd /c npm run check:release
 ```
 
@@ -305,7 +298,6 @@ cmd /c npm ci
 cmd /c npm test
 cmd /c npm run sync:public-lib -- --check
 cmd /c npm run check:release
-cmd /c npm run build:pages
 cmd /c npx --no-install openspec validate --all --strict
 git diff --check
 ```
@@ -315,7 +307,7 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 ## Releases
 
 - The source and lockfile versions are authoritative; tags use `v<version>`.
-- Current release notes: [v0.2.7](./docs/releases/v0.2.7.md).
+- Current release notes: [v0.2.8](./docs/releases/v0.2.8.md).
 - Windows packages are distributed through [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Check the release notes for hashes and signing status.
 - `npm run check:release:strict` requires a clean worktree and a matching tag on the current commit.
 

@@ -29,6 +29,28 @@ test("creation record heading omits the redundant asset eyebrow", async () => {
   assert.doesNotMatch(creationRecordSection, /<span class="asset-eyebrow">资产<\/span>/);
 });
 
+test("asset workspace palette follows the creation theme tokens in both themes", async () => {
+  const styles = await readFile(stylesPath, "utf8");
+  const themeStart = styles.indexOf("/* Unified asset workspace */");
+  const themeEnd = styles.indexOf(".asset-workspace,", themeStart);
+  const assetTheme = styles.slice(themeStart, themeEnd);
+
+  assert.ok(themeStart >= 0 && themeEnd > themeStart);
+  for (const [assetToken, creationToken] of [
+    ["asset-surface", "panel"],
+    ["asset-surface-raised", "nav-tab-bg-hover"],
+    ["asset-surface-soft", "panel-soft"],
+    ["asset-border", "border"],
+    ["asset-border-strong", "border-strong"],
+    ["asset-selected", "active-tab-bg"],
+    ["asset-selected-border", "accent"],
+    ["asset-danger", "danger"],
+  ]) {
+    assert.match(assetTheme, new RegExp(`--${assetToken}:\\s*var\\(--${creationToken}\\);`));
+  }
+  assert.doesNotMatch(assetTheme, /#17191d|#202328|#1b1e22|#4a90e2|#0066cc/);
+});
+
 test("record commands are grouped and selection is exposed to assistive technology", async () => {
   const [html, app, controller] = await Promise.all([
     readFile(indexPath, "utf8"),

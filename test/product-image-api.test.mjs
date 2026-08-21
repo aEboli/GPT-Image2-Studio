@@ -16,7 +16,6 @@ after(async () => {
   await runtime.closeStudioServer();
   await rm(tempRoot, { recursive: true, force: true });
 });
-
 test("local collector package endpoint returns a valid attachment ZIP", async () => {
   const response = await fetch(`${runtime.studioServerUrl}/api/product-image-collector/package`);
   const bytes = await response.arrayBuffer();
@@ -28,7 +27,6 @@ test("local collector package endpoint returns a valid attachment ZIP", async ()
   assert.ok(zip.file("manifest.json"));
   assert.ok(zip.file("lib/product-image-import.mjs"));
 });
-
 test("local collector proxy rejects untrusted and oversized requests before fetching", async () => {
   const untrusted = await fetch(`${runtime.studioServerUrl}/api/product-image-collector/image`, {
     method: "POST",
@@ -53,20 +51,4 @@ test("local collector proxy rejects untrusted and oversized requests before fetc
   );
   assert.equal(untrustedPreview.status, 400);
   assert.match((await untrustedPreview.json()).message, /图片地址不受支持/);
-
-});
-
-test("Cloudflare collector endpoints return the structured unsupported contract", async () => {
-  const worker = await import("../cloudflare-pages-worker.mjs");
-  for (const [method, path] of [
-    ["POST", "/api/product-image-collector/image"],
-    ["GET", "/api/product-image-collector/image"],
-    ["GET", "/api/product-image-collector/package"],
-  ]) {
-    const response = await worker.handleApiRequest(new Request(`https://studio.example${path}`, { method }));
-    const payload = await response.json();
-    assert.equal(response.status, 400);
-    assert.equal(payload.code, "unsupported_runtime_capability");
-    assert.equal(payload.path, path);
-  }
 });

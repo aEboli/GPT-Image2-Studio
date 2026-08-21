@@ -87,9 +87,11 @@ export function selectNextQueuedGenerationJobs(jobs, availableSlots) {
   return queuedJobs.slice(Math.max(0, queuedJobs.length - slotCount)).reverse();
 }
 
-export function selectNextQueuedGenerationJobsByMode(jobs, maxParallelPerMode) {
-  const slotCount = Math.max(0, Math.floor(Number(maxParallelPerMode) || 0));
-  if (slotCount === 0) {
+export function selectNextQueuedGenerationJobsByMode(jobs, maxParallelPerMode, getQueueKey = getGenerationJobQueueKey) {
+  const fixedSlotCount = typeof maxParallelPerMode === "function"
+    ? null
+    : Math.max(0, Math.floor(Number(maxParallelPerMode) || 0));
+  if (fixedSlotCount === 0) {
     return [];
   }
 
@@ -100,7 +102,7 @@ export function selectNextQueuedGenerationJobsByMode(jobs, maxParallelPerMode) {
       return;
     }
 
-    const key = getGenerationJobQueueKey(job);
+    const key = getQueueKey(job);
     runningCountsByMode.set(key, (runningCountsByMode.get(key) || 0) + 1);
   });
 
@@ -108,7 +110,12 @@ export function selectNextQueuedGenerationJobsByMode(jobs, maxParallelPerMode) {
   const selectedJobs = [];
   const queuedJobsOldestFirst = jobList.filter(isQueuedGenerationJob).reverse();
   queuedJobsOldestFirst.forEach((job) => {
-    const key = getGenerationJobQueueKey(job);
+    const slotCount = fixedSlotCount ?? Math.max(0, Math.floor(Number(maxParallelPerMode(job)) || 0));
+    if (slotCount === 0) {
+      return;
+    }
+
+    const key = getQueueKey(job);
     const runningCount = runningCountsByMode.get(key) || 0;
     const selectedCount = selectedCountsByMode.get(key) || 0;
     if (runningCount + selectedCount >= slotCount) {

@@ -1,13 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
-
 import { applyCreationPlanOverrides, buildCreationPlan } from "../lib/creation-planner.mjs";
 import * as creationReferenceLabels from "../lib/creation-reference-labels.mjs";
 
-const serverPath = fileURLToPath(new URL("../server.mjs", import.meta.url));
-const workerPath = fileURLToPath(new URL("../cloudflare-pages-worker.mjs", import.meta.url));
 
 const FULL_EVIDENCE = Object.freeze({
   dimensions: true,
@@ -255,15 +250,6 @@ test("strict marketplace main images remove generic hero conflicts and external 
     creationReferenceLabels.appendCreationItemLogoReference(secondary, [{ filename: "product.png" }], { filename: "brand-mark.png" }),
     [{ filename: "product.png" }, { filename: "brand-mark.png" }],
   );
-});
-
-test("local and Worker generation assemble external Logo references per planned item", async () => {
-  const [server, worker] = await Promise.all([readFile(serverPath, "utf8"), readFile(workerPath, "utf8")]);
-
-  for (const source of [server, worker]) {
-    assert.match(source, /appendCreationItemLogoReference/);
-    assert.match(source, /appendCreationItemLogoReference\(\s*item,\s*itemReferenceImages,\s*logoImage\s*,?\s*\)/);
-  }
 });
 
 test("Xiaohongshu prompts forbid fabricated reviews and disguised UGC", () => {

@@ -86,6 +86,7 @@ import {
   DEFAULT_REASONING_EFFORT,
   MAX_CREATION_REFERENCE_IMAGES,
   MAX_PARALLEL_TASKS_PER_SESSION,
+  MAX_PROMPT_PARALLEL_TASKS,
   MAX_PORTRAIT_ACTION_REFERENCE_IMAGES,
   MAX_PORTRAIT_ACCESSORY_REFERENCE_IMAGES,
   MAX_PORTRAIT_PERSON_REFERENCE_IMAGES,
@@ -228,8 +229,13 @@ const PORTRAIT_REFERENCE_ANALYSIS_REASONING_EFFORT = "low";
 const PROMPT_AGENT_ANALYSIS_REASONING_EFFORT = "medium";
 const REFERENCE_ORCHESTRATION_REASONING_EFFORT = "low";
 const SESSION_TASK_SLOT_RETRY_DELAY_MS = 250;
+function getSessionTaskSlotLimit(requestScope) {
+  return String(requestScope || "").trim().split(":", 1)[0] === "prompt"
+    ? MAX_PROMPT_PARALLEL_TASKS
+    : MAX_PARALLEL_TASKS_PER_SESSION;
+}
 const sessionTaskSlotLimiter = createSessionTaskSlotLimiter({
-  maxParallelTasks: MAX_PARALLEL_TASKS_PER_SESSION,
+  maxParallelTasks: getSessionTaskSlotLimit,
   retryDelayMs: SESSION_TASK_SLOT_RETRY_DELAY_MS,
 });
 const PPT_SOURCE_EXTENSIONS = new Set([".pdf", ".docx", ".pptx", ".txt", ".md", ".csv"]);
@@ -330,6 +336,10 @@ function normalizeGenerationMode(value) {
 
 function getStudioGenerationRequestScope(generationMode, imageRoute) {
   const mode = generationMode || "prompt";
+  if (mode === "prompt") {
+    return mode;
+  }
+
   const route = String(imageRoute || "").trim().toLowerCase();
   return route === "a" || route === "b" || route === "c" ? `${mode}:${route}` : mode;
 }
@@ -1724,6 +1734,7 @@ async function handlePromptAgentAnalyze(request, response) {
     imageSize: images.reduce((total, image) => total + image.buffer.length, 0),
     responsesModel: textVisionConfig.responsesModel,
     reasoningEffort,
+    mode: mode || "image-to-prompt",
     json,
   });
 

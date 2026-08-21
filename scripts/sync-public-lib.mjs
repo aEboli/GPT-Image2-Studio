@@ -82,6 +82,7 @@ export const PUBLIC_LIB_SYNC_TARGETS = [
   "sse-writer.mjs",
   "sse-terminal-client.mjs",
   "studio-density.mjs",
+  "studio-constants.mjs",
   "studio-formatters.mjs",
   "style-transfer-preset-lightbox.mjs",
   "view-mode-loader.mjs",

@@ -15183,25 +15183,25 @@ html[data-ui-layout="mobile"] :is(.prompt-agent-body, .prompt-template-body, .pp
 
 /* Unified asset workspace */
 :root {
-  --asset-surface: #17191d;
-  --asset-surface-raised: #202328;
-  --asset-surface-soft: #1b1e22;
-  --asset-border: rgba(255, 255, 255, 0.11);
-  --asset-border-strong: rgba(255, 255, 255, 0.2);
-  --asset-selected: rgba(74, 144, 226, 0.16);
-  --asset-selected-border: #4a90e2;
-  --asset-danger: #ef6464;
+  --asset-surface: var(--panel);
+  --asset-surface-raised: var(--nav-tab-bg-hover);
+  --asset-surface-soft: var(--panel-soft);
+  --asset-border: var(--border);
+  --asset-border-strong: var(--border-strong);
+  --asset-selected: var(--active-tab-bg);
+  --asset-selected-border: var(--accent);
+  --asset-danger: var(--danger);
 }
 
 html[data-theme="light"] {
-  --asset-surface: #ffffff;
-  --asset-surface-raised: #f5f6f8;
-  --asset-surface-soft: #fafbfc;
-  --asset-border: rgba(22, 28, 36, 0.14);
-  --asset-border-strong: rgba(22, 28, 36, 0.24);
-  --asset-selected: rgba(0, 102, 204, 0.09);
-  --asset-selected-border: #0066cc;
-  --asset-danger: #c93636;
+  --asset-surface: var(--panel);
+  --asset-surface-raised: var(--nav-tab-bg-hover);
+  --asset-surface-soft: var(--panel-soft);
+  --asset-border: var(--border);
+  --asset-border-strong: var(--border-strong);
+  --asset-selected: var(--active-tab-bg);
+  --asset-selected-border: var(--accent);
+  --asset-danger: var(--danger);
 }
 
 .asset-workspace,
