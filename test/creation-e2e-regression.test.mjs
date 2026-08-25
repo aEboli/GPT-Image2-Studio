@@ -13,6 +13,7 @@ import { setTimeout as delay } from "node:timers/promises";
 
 import { validateCreationListingDraft } from "../lib/creation-listing-draft.mjs";
 import { buildCreationInfographicRebuildPrompt } from "../lib/creation-generation-parameters.mjs";
+import { FINAL_IMAGE_CHUNK_SIZE, recordFinalImageChunk } from "../lib/generation-stream-protocol.mjs";
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -275,6 +276,45 @@ function summarizeCreationEvents(events = []) {
     .filter((entry) => entry.eventName !== "item_partial_image" && entry.eventName !== "item_final_image");
 }
 
+function assertCreationFinalImagesArriveInChunks(events = []) {
+  const chunkEvents = events.filter((event) => event.eventName === "item_final_image_chunk");
+  const completionEvents = events.filter((event) => event.eventName === "item_final_image");
+  assert.ok(chunkEvents.length > 0, "expected chunked final image delivery");
+
+  for (const event of chunkEvents) {
+    assert.ok(event.payload.setId, "chunk payload must carry setId");
+    assert.ok(event.payload.itemId, "chunk payload must carry itemId");
+    assert.ok(Number.isInteger(event.payload.index), "chunk payload must carry an integer index");
+    assert.ok(Number.isInteger(event.payload.total) && event.payload.total > 0, "chunk payload must carry a total");
+    assert.ok(event.payload.chunk.length <= FINAL_IMAGE_CHUNK_SIZE, "chunk exceeds the protocol size cap");
+    assert.equal(event.payload.dataUrl, undefined, "chunk payload must not inline a full data URL");
+  }
+
+  for (const event of completionEvents) {
+    assert.equal(event.payload.dataUrl, undefined, "completion payload must not inline a full data URL");
+  }
+
+  // Feeding the wire payloads through the shared assembler must yield a decodable
+  // PNG for every item that reported completion.
+  const assembled = new Map();
+  for (const event of chunkEvents) {
+    recordFinalImageChunk(assembled, event.payload);
+  }
+
+  assert.ok(completionEvents.length > 0, "expected at least one item completion event");
+  for (const event of completionEvents) {
+    const dataUrl = assembled.get(`${event.payload.setId}::${event.payload.itemId}`)?.dataUrl;
+    assert.ok(dataUrl, `item ${event.payload.itemId} did not reassemble`);
+    const base64 = dataUrl.replace(/^data:[^;]+;base64,/, "");
+    assert.ok(base64.length > 0, `item ${event.payload.itemId} reassembled to empty bytes`);
+    assert.equal(
+      Buffer.from(base64, "base64").subarray(0, 8).toString("hex"),
+      "89504e470d0a1a0a",
+      `item ${event.payload.itemId} did not reassemble into a PNG`,
+    );
+  }
+}
+
 function summarizeCreationItems(set = {}) {
   return (set.items || []).map((item) => ({
     itemId: item.itemId,
@@ -300,6 +340,7 @@ test("logo batch validation errors do not create empty completed set records", a
       TMP: tempRoot,
       TEMP: tempRoot,
       IMAGE_STUDIO_MOCK_IMAGE_GENERATION: "1",
+      IMAGE_STUDIO_ENABLE_TEST_MOCKS: "1",
       IMAGE_STUDIO_OUTPUT_DIR: outputDir,
       IMAGE_STUDIO_LOCAL_DATA_DIR: localDataRootDir,
     },
@@ -339,6 +380,7 @@ test("local infographic rebuild generation and repair keep one source image and 
       TMP: tempRoot,
       TEMP: tempRoot,
       IMAGE_STUDIO_MOCK_IMAGE_GENERATION: "1",
+      IMAGE_STUDIO_ENABLE_TEST_MOCKS: "1",
       IMAGE_STUDIO_OUTPUT_DIR: outputDir,
       IMAGE_STUDIO_LOCAL_DATA_DIR: localDataRootDir,
     },
@@ -468,6 +510,7 @@ test("creation workflow reuses history, reuploads references, tweaks prompts, re
       TMP: tempRoot,
       TEMP: tempRoot,
       IMAGE_STUDIO_MOCK_IMAGE_GENERATION: "1",
+      IMAGE_STUDIO_ENABLE_TEST_MOCKS: "1",
       IMAGE_STUDIO_MOCK_LISTING_AGENT: "1",
       IMAGE_STUDIO_OUTPUT_DIR: outputDir,
       IMAGE_STUDIO_LOCAL_DATA_DIR: localDataRootDir,
@@ -540,6 +583,7 @@ test("creation workflow reuses history, reuploads references, tweaks prompts, re
     [],
     generateResult.text,
   );
+  assertCreationFinalImagesArriveInChunks(generateResult.events);
   const generatedSet = getCompleteSet(generateResult.events);
   assert.equal(generatedSet.status, "completed");
   assert.equal(generatedSet.industryTemplate, "beauty");

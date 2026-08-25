@@ -34,22 +34,39 @@ export function parseSseChunk(chunk) {
   };
 }
 
+export const TRUNCATED_SSE_STREAM_MESSAGE = "生成连接已中断，最终图未完整接收。请稍后重试，或降低分辨率。";
+
 export async function consumeSse(body, onEvent) {
   const reader = body.getReader();
   const decoder = new TextDecoder("utf-8");
   let buffer = "";
 
-  async function emitChunk(chunk) {
+  // A chunk that only exists because the stream ended mid-event is a truncated
+  // payload, not malformed protocol. Parsing it raises a raw JSON syntax error
+  // that says nothing about the dropped connection, so trailing data reports the
+  // interruption instead. Complete chunks keep surfacing real parse failures.
+  async function emitChunk(chunk, { isTrailing = false } = {}) {
     const parsed = parseSseChunk(chunk);
     if (!parsed.data || parsed.data === "[DONE]") return;
-    await onEvent(parsed.eventName, JSON.parse(parsed.data));
+
+    let payload;
+    try {
+      payload = JSON.parse(parsed.data);
+    } catch (error) {
+      if (isTrailing) {
+        throw new Error(TRUNCATED_SSE_STREAM_MESSAGE, { cause: error });
+      }
+      throw error;
+    }
+
+    await onEvent(parsed.eventName, payload);
   }
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) {
       buffer += decoder.decode();
-      if (buffer.trim()) await emitChunk(buffer);
+      if (buffer.trim()) await emitChunk(buffer, { isTrailing: true });
       break;
     }
 

@@ -12,6 +12,7 @@ import {
   recoverOriginalResponse,
   normalizeBaseUrl,
   requestDirectImageGeneration,
+  requestImageEdit,
   requestImageGeneration,
   requestModelProtocolImageGeneration,
 } from "../lib/responses-workflow.mjs";
@@ -246,6 +247,57 @@ test("requestDirectImageGeneration posts once to image generations and emits the
   });
 });
 
+test("direct image generation forwards an AbortSignal to the request and image URL fetch", async () => {
+  const controller = new AbortController();
+  const requests = [];
+
+  const result = await requestDirectImageGeneration({
+    baseUrl: "https://route-b.example.test/v1",
+    apiKey: "route-b-key",
+    prompt: "Return a remotely hosted image.",
+    size: "1024x1024",
+    quality: "high",
+    format: "png",
+    imageModel: "vendor-image-pro",
+    signal: controller.signal,
+    async fetchImpl(url, init) {
+      requests.push({ url, init });
+      if (init.method === "GET") {
+        return new Response(new Uint8Array([137, 80, 78, 71]), { status: 200 });
+      }
+      return new Response(JSON.stringify({ data: [{ url: "https://cdn.example.test/image.png" }] }), { status: 200 });
+    },
+  });
+
+  assert.equal(requests.length, 2);
+  assert.equal(requests[0].init.signal, controller.signal);
+  assert.equal(requests[1].init.signal, controller.signal);
+  assert.equal(result.finalImageBase64, "iVBORw==");
+});
+
+test("direct image generation aborts a hanging upstream request when timeoutMs is set", async () => {
+  let requestSignal;
+
+  await assert.rejects(
+    requestDirectImageGeneration({
+      baseUrl: "https://route-b.example.test/v1",
+      apiKey: "route-b-key",
+      prompt: "Hang until timeout.",
+      size: "1024x1024",
+      quality: "high",
+      imageModel: "vendor-image-pro",
+      timeoutMs: 10,
+      fetchImpl(_url, init) {
+        requestSignal = init.signal;
+        return new Promise(() => {});
+      },
+    }),
+    (error) => error?.name === "AbortError",
+  );
+
+  assert.equal(requestSignal?.aborted, true);
+});
+
 test("direct image generation keeps high-resolution direct requests on base64 responses", async () => {
   const requests = [];
 
@@ -408,6 +460,42 @@ test("model protocol image generation posts Gemini image models to image generat
   assert.equal(result.finalImageBase64, "Z2VtaW5pLXJlZg==");
   assert.equal(result.imageRoute, "c");
   assert.equal(result.protocol, "model-image-generations");
+});
+
+test("model protocol and image edit requests forward an AbortSignal", async () => {
+  const controller = new AbortController();
+  const protocolRequests = [];
+  const protocolResult = await requestModelProtocolImageGeneration({
+    baseUrl: "https://protocol.example.test/v1",
+    apiKey: "protocol-key",
+    prompt: "Create a protocol image.",
+    imageModel: "gemini-3.1-flash-image-preview",
+    signal: controller.signal,
+    fetchImpl(url, init) {
+      protocolRequests.push({ url, init });
+      return Promise.resolve(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: { data: "cHJvdG9jb2w=" } }] } }] }), { status: 200 }));
+    },
+  });
+
+  const editRequests = [];
+  const editResult = await requestImageEdit({
+    baseUrl: "https://edit.example.test/v1",
+    apiKey: "edit-key",
+    prompt: "Edit this image.",
+    sourceImage: { filename: "source.png", mimeType: "image/png", base64: "c291cmNl" },
+    size: "1024x1024",
+    quality: "high",
+    signal: controller.signal,
+    fetchImpl(url, init) {
+      editRequests.push({ url, init });
+      return Promise.resolve(new Response(JSON.stringify({ data: [{ b64_json: "ZWRpdA==" }] }), { status: 200 }));
+    },
+  });
+
+  assert.equal(protocolRequests[0].init.signal, controller.signal);
+  assert.equal(editRequests[0].init.signal, controller.signal);
+  assert.equal(protocolResult.finalImageBase64, "cHJvdG9jb2w=");
+  assert.equal(editResult.finalImageBase64, "ZWRpdA==");
 });
 
 test("model protocol image generation keeps chat completions fallback for non-Gemini models", async () => {
@@ -633,6 +721,163 @@ test("direct image generation submits reference image requests to image edits", 
   assert.equal(images[1].name, "package.jpg");
   assert.equal(result.finalImageBase64, "cmVmZXJlbmNlLWZpbmFs");
   assert.equal(result.endpointPath, "images/edits");
+  assert.equal(result.imageFieldFallbackUsed, false);
+});
+
+test("direct image edit retries with repeated singular image field when the upstream rejects image[]", async () => {
+  const requests = [];
+  const statusMessages = [];
+  const result = await requestDirectImageGeneration({
+    baseUrl: "https://relay.example.test/v1",
+    endpointPath: "images/generations",
+    apiKey: "relay-key",
+    prompt: "Create a creation set image.",
+    referenceImages: [
+      { filename: "product.png", mimeType: "image/png", base64: "cHJvZHVjdA==" },
+      { filename: "logo.png", mimeType: "image/png", base64: "bG9nbw==" },
+    ],
+    size: "1024x1024",
+    quality: "high",
+    format: "png",
+    imageModel: "gpt-image-2",
+    async onEvent(event) {
+      if (event.type === "status") {
+        statusMessages.push(event.message);
+      }
+    },
+    async fetchImpl(url, init) {
+      requests.push({ url, body: init.body });
+      if (requests.length === 1) {
+        return new Response(
+          JSON.stringify({ error: { code: "bad_request", message: "image file or image_url is required" } }),
+          { status: 400 },
+        );
+      }
+      return new Response(JSON.stringify({ data: [{ b64_json: "cmV0cmllZA==" }] }), { status: 200 });
+    },
+  });
+
+  assert.equal(requests.length, 2);
+  assert.equal(requests[0].url, "https://relay.example.test/v1/images/edits");
+  assert.equal(requests[1].url, "https://relay.example.test/v1/images/edits");
+  assert.equal(requests[0].body.getAll("image[]").length, 2);
+  assert.equal(requests[0].body.getAll("image").length, 0);
+  const retriedImages = requests[1].body.getAll("image");
+  assert.equal(retriedImages.length, 2);
+  assert.equal(retriedImages[0].name, "product.png");
+  assert.equal(retriedImages[1].name, "logo.png");
+  assert.equal(requests[1].body.getAll("image[]").length, 0);
+  assert.equal(requests[1].body.get("prompt"), requests[0].body.get("prompt"));
+  assert.equal(requests[1].body.get("model"), "gpt-image-2");
+  assert.equal(requests[1].body.get("size"), "1024x1024");
+  assert.equal(result.finalImageBase64, "cmV0cmllZA==");
+  assert.equal(result.imageFieldFallbackUsed, true);
+  assert.ok(statusMessages.some((message) => message.includes("image[]")));
+});
+
+test("direct image edit does not retry when a single reference image is rejected", async () => {
+  const requests = [];
+  await assert.rejects(
+    requestDirectImageGeneration({
+      baseUrl: "https://relay.example.test/v1",
+      endpointPath: "images/generations",
+      apiKey: "relay-key",
+      prompt: "Create one image.",
+      referenceImages: [{ filename: "product.png", mimeType: "image/png", base64: "cHJvZHVjdA==" }],
+      size: "1024x1024",
+      quality: "high",
+      format: "png",
+      imageModel: "gpt-image-2",
+      async fetchImpl(url, init) {
+        requests.push({ url, body: init.body });
+        return new Response(
+          JSON.stringify({ error: { code: "bad_request", message: "image file or image_url is required" } }),
+          { status: 400 },
+        );
+      },
+    }),
+    /image file or image_url is required/,
+  );
+
+  assert.equal(requests.length, 1);
+});
+
+test("direct image edit does not retry on unrelated upstream failures", async () => {
+  const requests = [];
+  await assert.rejects(
+    requestDirectImageGeneration({
+      baseUrl: "https://relay.example.test/v1",
+      endpointPath: "images/generations",
+      apiKey: "relay-key",
+      prompt: "Create a creation set image.",
+      referenceImages: [
+        { filename: "product.png", mimeType: "image/png", base64: "cHJvZHVjdA==" },
+        { filename: "logo.png", mimeType: "image/png", base64: "bG9nbw==" },
+      ],
+      size: "1024x1024",
+      quality: "high",
+      format: "png",
+      imageModel: "gpt-image-2",
+      async fetchImpl(url, init) {
+        requests.push({ url, body: init.body });
+        return new Response(JSON.stringify({ error: { message: "insufficient quota" } }), { status: 429 });
+      },
+    }),
+    /insufficient quota/,
+  );
+
+  assert.equal(requests.length, 1);
+});
+
+test("direct image generation ignores reference images that carry no bytes", async () => {
+  const requests = [];
+  const result = await requestDirectImageGeneration({
+    baseUrl: "https://relay.example.test/v1",
+    endpointPath: "images/generations",
+    apiKey: "relay-key",
+    prompt: "Create from an empty reference.",
+    referenceImages: [{ filename: "broken.png", mimeType: "image/png", base64: "" }],
+    size: "1024x1024",
+    quality: "high",
+    format: "png",
+    imageModel: "gpt-image-2",
+    async fetchImpl(url, init) {
+      requests.push({ url, body: init.body });
+      return new Response(JSON.stringify({ data: [{ b64_json: "Z2VuZXJhdGVk" }] }), { status: 200 });
+    },
+  });
+
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].url, "https://relay.example.test/v1/images/generations");
+  assert.equal(typeof requests[0].body, "string");
+  assert.equal(result.endpointPath, "images/generations");
+  assert.equal(result.finalImageBase64, "Z2VuZXJhdGVk");
+});
+
+test("direct image generation falls back to generations when an edit endpoint has no usable reference", async () => {
+  const requests = [];
+  const result = await requestDirectImageGeneration({
+    baseUrl: "https://relay.example.test/v1",
+    endpointPath: "images/edits",
+    apiKey: "relay-key",
+    prompt: "Create without a reference.",
+    referenceImages: [],
+    size: "1024x1024",
+    quality: "high",
+    format: "png",
+    imageModel: "gpt-image-2",
+    async fetchImpl(url, init) {
+      requests.push({ url, body: init.body });
+      return new Response(JSON.stringify({ data: [{ b64_json: "ZmFsbGJhY2s=" }] }), { status: 200 });
+    },
+  });
+
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].url, "https://relay.example.test/v1/images/generations");
+  assert.equal(typeof requests[0].body, "string");
+  assert.equal(JSON.parse(requests[0].body).prompt, "Create without a reference.");
+  assert.equal(result.endpointPath, "images/generations");
+  assert.equal(result.finalImageBase64, "ZmFsbGJhY2s=");
 });
 
 test("chat completions image request body omits image generations response_format", () => {
@@ -724,7 +969,7 @@ test("direct image generation can target chat completions and read image data fr
   assert.equal(result.finalImageBase64, "Y2hhdC1pbWFnZQ==");
 });
 
-test("direct image generation can target responses with the direct text and vision model", async () => {
+test("direct image generation can target responses with the direct image model", async () => {
   const requests = [];
   const result = await requestDirectImageGeneration({
     baseUrl: "https://direct.example.test/v1",
@@ -737,7 +982,7 @@ test("direct image generation can target responses with the direct text and visi
     quality: "high",
     format: "png",
     imageModel: "vendor-image-pro",
-    responsesModel: "vendor-vision-text",
+    responsesModel: "vendor-image-pro",
     reasoningEffort: "xhigh",
     async fetchImpl(url, init) {
       requests.push({ url, init, body: JSON.parse(init.body) });
@@ -753,18 +998,19 @@ test("direct image generation can target responses with the direct text and visi
   assert.equal(requests.length, 1);
   assert.equal(requests[0].url, "https://direct.example.test/v1/responses");
   assert.equal(requests[0].init.headers.Accept, "application/json");
-  assert.equal(requests[0].body.model, "vendor-vision-text");
+  assert.equal(requests[0].body.model, "vendor-image-pro");
   assert.equal(requests[0].body.reasoning.effort, "xhigh");
   assert.equal(requests[0].body.stream, false);
   assert.deepEqual(requests[0].body.tool_choice, { type: "image_generation" });
   assert.equal(requests[0].body.tools[0].type, "image_generation");
+  assert.equal(requests[0].body.tools[0].model, "vendor-image-pro");
   assert.equal("response_format" in requests[0].body, false);
   assert.deepEqual(
     requests[0].body.input[0].content.map((item) => item.type),
     ["input_text", "input_text", "input_image"],
   );
   assert.equal(result.finalImageBase64, "ZGlyZWN0LXJlc3BvbnNlcw==");
-  assert.equal(result.responsesModel, "vendor-vision-text");
+  assert.equal(result.responsesModel, "vendor-image-pro");
   assert.equal(result.endpointPath, "responses");
 });
 
@@ -867,6 +1113,113 @@ test("consumeResponsesSse emits partial and final events, and tolerates terminat
   assert.deepEqual(seenEvents, ["partial_image", "final_image", "complete"]);
   assert.equal(result.finalImageBase64, "ZmluYWw=");
   assert.equal(result.partialImages.length, 1);
+});
+
+test("consumeResponsesSse cancels a pending reader when its AbortSignal fires", async () => {
+  const controller = new AbortController();
+  let cancelled = false;
+  const fakeStream = {
+    getReader() {
+      return {
+        read() {
+          return new Promise(() => {});
+        },
+        cancel() {
+          cancelled = true;
+          return Promise.resolve();
+        },
+      };
+    },
+  };
+
+  const pending = consumeResponsesSse(fakeStream, { signal: controller.signal });
+  setTimeout(() => controller.abort(), 5);
+
+  await assert.rejects(pending, (error) => error?.name === "AbortError");
+  assert.equal(cancelled, true);
+});
+
+// Abandoning a stream without cancelling leaves the upstream socket open until the
+// provider closes it, which ties up connections under Creation's bounded concurrency.
+test("consumeResponsesSse releases the upstream body when it stops reading early", async () => {
+  const finalChunk = [
+    "event: response.output_item.done",
+    'data: {"item":{"type":"image_generation_call","result":"bGVhay1jaGVjaw=="}}',
+    "",
+    "",
+  ].join("\n");
+
+  const buildStream = (text) => {
+    const state = { cancelled: false };
+    state.stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(text));
+      },
+      cancel() {
+        state.cancelled = true;
+      },
+    });
+    return state;
+  };
+
+  const onEventRejection = buildStream(finalChunk);
+  await assert.rejects(
+    () => consumeResponsesSse(onEventRejection.stream, {
+      onEvent(event) {
+        if (event.type === "final_image") {
+          throw new Error("生成结果无效：图片数据损坏");
+        }
+      },
+    }),
+    /图片数据损坏/,
+  );
+  assert.equal(onEventRejection.cancelled, true);
+
+  const terminalError = buildStream([
+    "event: response.failed",
+    'data: {"type":"response.failed","response":{"error":{"message":"boom"}}}',
+    "",
+    "",
+  ].join("\n"));
+  await assert.rejects(() => consumeResponsesSse(terminalError.stream, { onEvent() {} }));
+  assert.equal(terminalError.cancelled, true);
+
+  const doneSentinel = buildStream([finalChunk, "data: [DONE]", "", ""].join("\n"));
+  const sentinelResult = await consumeResponsesSse(doneSentinel.stream, { onEvent() {} });
+  assert.equal(sentinelResult.finalImageBase64, "bGVhay1jaGVjaw==");
+  assert.equal(doneSentinel.cancelled, true);
+});
+
+test("consumeResponsesSse keeps retrying-upstream heartbeat state visible", async () => {
+  const controller = new AbortController();
+  const events = [];
+  const fakeStream = {
+    getReader() {
+      return {
+        read() {
+          return new Promise(() => {});
+        },
+        cancel() {
+          return Promise.resolve();
+        },
+      };
+    },
+  };
+
+  const pending = consumeResponsesSse(fakeStream, {
+    onEvent(event) {
+      events.push(event);
+    },
+    statusHeartbeatMs: 2,
+    statusHeartbeatStage: "retrying_upstream",
+    statusHeartbeatMessage: "重试中",
+    signal: controller.signal,
+  });
+  setTimeout(() => controller.abort(), 10);
+
+  await assert.rejects(pending, (error) => error?.name === "AbortError");
+  assert.ok(events.length > 0);
+  assert.ok(events.every((event) => event.stage === "retrying_upstream" && event.message === "重试中"));
 });
 
 test("consumeResponsesSse extracts image_generation.completed b64_json final images", async () => {
@@ -1146,6 +1499,46 @@ test("requestImageGeneration retrieves the original response after a partial str
   assert.ok(events.some((event) => event.type === "status" && event.stage === "recovered_original"));
 });
 
+test("requestImageGeneration propagates AbortSignal and does not recover or retry after stream cancellation", async () => {
+  const controller = new AbortController();
+  const requests = [];
+  let cancelled = false;
+  const pendingStream = {
+    getReader() {
+      return {
+        read() {
+          return new Promise(() => {});
+        },
+        cancel() {
+          cancelled = true;
+          return Promise.resolve();
+        },
+      };
+    },
+  };
+
+  const pending = requestImageGeneration({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    prompt: "Cancel this image.",
+    size: "1024x1024",
+    quality: "high",
+    responsesModel: "gpt-5.4",
+    signal: controller.signal,
+    async fetchImpl(url, init) {
+      requests.push({ url, init });
+      return { ok: true, status: 200, body: pendingStream };
+    },
+  });
+  setTimeout(() => controller.abort(), 5);
+
+  await assert.rejects(pending, (error) => error?.name === "AbortError");
+  assert.equal(cancelled, true);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].init.signal, controller.signal);
+  assert.equal(requests[0].init.method, "POST");
+});
+
 test("requestImageGeneration polls the original response with GET only", async () => {
   const requests = [];
   const events = [];
@@ -1194,11 +1587,139 @@ test("requestImageGeneration polls the original response with GET only", async (
   assert.ok(events.some((event) => event.type === "status" && event.stage === "waiting_original"));
 });
 
-test("requestImageGeneration never regenerates when the original response ID is missing", async () => {
+test("requestImageGeneration retries once with the frozen original input when the response ID is missing", async () => {
   const requests = [];
+  const events = [];
+  const timeline = [];
+  let postCount = 0;
   const noFinalStream = [
     "event: response.image_generation_call.partial_image",
     'data: {"partial_image_b64":"bm8taWQtcHJldmlldw=="}',
+    "",
+    "data: [DONE]",
+    "",
+  ].join("\n");
+  const finalStream = [
+    "event: response.output_item.done",
+    'data: {"item":{"type":"image_generation_call","result":"cmV0cnktZmluYWw="}}',
+    "",
+    "data: [DONE]",
+    "",
+  ].join("\n");
+
+  const result = await requestImageGeneration({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    prompt: "Retry this exact composed prompt",
+    referenceImages: [{ mimeType: "image/png", base64: "cmVmZXJlbmNl", filename: "reference.png" }],
+    referenceImageLabels: ["Reference image 1: preserve this source."],
+    size: "1536x1024",
+    quality: "medium",
+    format: "webp",
+    responsesModel: "gpt-5.4",
+    reasoningEffort: "high",
+    async fetchImpl(url, init) {
+      postCount += 1;
+      timeline.push(`post-${postCount}`);
+      requests.push({ url, method: init.method, rawBody: init.body, body: JSON.parse(init.body) });
+      return new Response(postCount === 1 ? noFinalStream : finalStream, {
+        status: 200,
+        headers: { "content-type": "text/event-stream" },
+      });
+    },
+    onEvent(event) {
+      events.push(event);
+      if (event.type === "status" && event.stage === "retrying_upstream" && event.message === "重试中") {
+        timeline.push("retry-status");
+      }
+    },
+  });
+
+  assert.equal(result.finalImageBase64, "cmV0cnktZmluYWw=");
+  assert.deepEqual(requests.map(({ method }) => method), ["POST", "POST"]);
+  assert.equal(requests[0].url, "https://example.test/v1/responses");
+  assert.equal(requests[1].url, requests[0].url);
+  assert.equal(requests[1].rawBody, requests[0].rawBody);
+  assert.deepEqual(requests[1].body, requests[0].body);
+  assert.equal(requests[0].body.model, "gpt-5.4");
+  assert.equal(requests[0].body.reasoning.effort, "high");
+  assert.equal(requests[0].body.tools[0].size, "1536x1024");
+  assert.equal(requests[0].body.tools[0].quality, "medium");
+  assert.equal(requests[0].body.tools[0].output_format, "webp");
+  assert.deepEqual(
+    requests[0].body.input[0].content.map(({ type, text, image_url: imageUrl }) => ({ type, text, imageUrl })),
+    [
+      { type: "input_text", text: "Retry this exact composed prompt", imageUrl: undefined },
+      { type: "input_text", text: "Reference image 1: preserve this source.", imageUrl: undefined },
+      { type: "input_image", text: undefined, imageUrl: "data:image/png;base64,cmVmZXJlbmNl" },
+    ],
+  );
+  assert.ok(events.some((event) => (
+    event.type === "status"
+    && event.stage === "retrying_upstream"
+    && event.message === "重试中"
+  )));
+  assert.ok(timeline.indexOf("retry-status") < timeline.indexOf("post-2"));
+});
+
+test("requestImageGeneration retries once after original response retrieval is unavailable", async () => {
+  const requests = [];
+  const events = [];
+  let postCount = 0;
+  const firstStream = [
+    "event: response.created",
+    'data: {"type":"response.created","response":{"id":"resp_unavailable","status":"in_progress"}}',
+    "",
+    "data: [DONE]",
+    "",
+  ].join("\n");
+  const finalStream = [
+    "event: response.output_item.done",
+    'data: {"item":{"type":"image_generation_call","result":"cmV0cnktYWZ0ZXItNDA0"}}',
+    "",
+    "data: [DONE]",
+    "",
+  ].join("\n");
+
+  const result = await requestImageGeneration({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    prompt: "Retry after retrieval is unavailable",
+    size: "1024x1024",
+    quality: "high",
+    responsesModel: "gpt-5.4",
+    responseRecoveryPollDelayMs: 0,
+    async fetchImpl(url, init) {
+      requests.push({ url, method: init.method });
+      if (init.method === "GET") {
+        return new Response("not retained", { status: 404 });
+      }
+      postCount += 1;
+      return new Response(postCount === 1 ? firstStream : finalStream, {
+        status: 200,
+        headers: { "content-type": "text/event-stream" },
+      });
+    },
+    onEvent(event) {
+      events.push(event);
+    },
+  });
+
+  assert.deepEqual(requests.map(({ method }) => method), ["POST", "GET", "POST"]);
+  assert.equal(result.finalImageBase64, "cmV0cnktYWZ0ZXItNDA0");
+  assert.ok(events.some((event) => (
+    event.type === "status"
+    && event.stage === "retrying_upstream"
+    && event.message === "重试中"
+  )));
+});
+
+test("requestImageGeneration stops after one unknown-result retry", async () => {
+  const requests = [];
+  const events = [];
+  const noFinalStream = [
+    "event: response.image_generation_call.partial_image",
+    'data: {"partial_image_b64":"c3RpbGwtdW5rbm93bg=="}',
     "",
     "data: [DONE]",
     "",
@@ -1208,19 +1729,81 @@ test("requestImageGeneration never regenerates when the original response ID is 
     () => requestImageGeneration({
       baseUrl: "https://example.test/v1",
       apiKey: "test-key",
-      prompt: "Do not duplicate this image",
+      prompt: "Stop after one retry",
       size: "1024x1024",
       quality: "high",
       responsesModel: "gpt-5.4",
       async fetchImpl(url, init) {
-        requests.push({ url, method: init.method, body: JSON.parse(init.body || "{}") });
+        requests.push({ url, method: init.method });
         return new Response(noFinalStream, { status: 200, headers: { "content-type": "text/event-stream" } });
       },
+      onEvent(event) {
+        events.push(event);
+      },
     }),
-    /原 Responses 任务结果未知，系统未自动重新生成/,
+    /原 Responses 任务结果未知，自动重试后仍未确认，请手动重试/,
   );
 
-  assert.deepEqual(requests.map(({ method }) => method), ["POST"]);
+  assert.deepEqual(requests.map(({ method }) => method), ["POST", "POST"]);
+  assert.ok(events.some((event) => (
+    event.type === "status"
+    && event.stage === "recovery_unavailable"
+    && event.message === "自动重试后仍无法确认最终结果，不再继续重试"
+  )));
+});
+
+test("requestImageGeneration stops when the automatic retry task explicitly fails", async () => {
+  const requests = [];
+  const events = [];
+  let postCount = 0;
+  const firstStream = [
+    "event: response.image_generation_call.partial_image",
+    'data: {"partial_image_b64":"Zmlyc3QtdW5rbm93bg=="}',
+    "",
+    "data: [DONE]",
+    "",
+  ].join("\n");
+  const retryStream = [
+    "event: response.created",
+    'data: {"type":"response.created","response":{"id":"resp_retry_failed","status":"in_progress"}}',
+    "",
+    "data: [DONE]",
+    "",
+  ].join("\n");
+
+  await assert.rejects(
+    () => requestImageGeneration({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      prompt: "Retry task can fail",
+      size: "1024x1024",
+      quality: "high",
+      responsesModel: "gpt-5.4",
+      responseRecoveryPollDelayMs: 0,
+      async fetchImpl(url, init) {
+        requests.push({ url, method: init.method });
+        if (init.method === "GET") {
+          return new Response(JSON.stringify({ id: "resp_retry_failed", status: "failed" }), { status: 200 });
+        }
+        postCount += 1;
+        return new Response(postCount === 1 ? firstStream : retryStream, {
+          status: 200,
+          headers: { "content-type": "text/event-stream" },
+        });
+      },
+      onEvent(event) {
+        events.push(event);
+      },
+    }),
+    /自动重试的 Responses 任务已失败，不再继续重试/,
+  );
+
+  assert.deepEqual(requests.map(({ method }) => method), ["POST", "POST", "GET"]);
+  assert.ok(events.some((event) => (
+    event.type === "status"
+    && event.stage === "original_failed"
+    && event.message === "自动重试任务已失败，不再继续重试"
+  )));
 });
 
 test("requestImageGeneration does not regenerate after an original response failure", async () => {
@@ -1253,6 +1836,146 @@ test("requestImageGeneration does not regenerate after an original response fail
   );
 
   assert.deepEqual(requests.map(({ method }) => method), ["POST", "GET"]);
+});
+
+// A retry re-POSTs a billable generation. When the provider still reports the
+// original task as in_progress, retrying duplicates live upstream work.
+test("requestImageGeneration does not regenerate while the original task is still in progress", async () => {
+  const requests = [];
+  const noFinalStream = [
+    "event: response.created",
+    'data: {"type":"response.created","response":{"id":"resp_running","status":"in_progress"}}',
+    "",
+    "data: [DONE]",
+    "",
+  ].join("\n");
+
+  await assert.rejects(
+    () => requestImageGeneration({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      prompt: "Do not duplicate a running original task",
+      size: "1024x1024",
+      quality: "high",
+      responsesModel: "gpt-5.4",
+      responseRecoveryMaxPolls: 2,
+      responseRecoveryPollDelayMs: 0,
+      async fetchImpl(url, init) {
+        requests.push({ method: init.method });
+        if (init.method === "POST") {
+          return new Response(noFinalStream, { status: 200, headers: { "content-type": "text/event-stream" } });
+        }
+        return new Response(JSON.stringify({ id: "resp_running", status: "in_progress" }), { status: 200 });
+      },
+    }),
+    (error) => {
+      assert.equal(error.originalResponseRecovery, "in_progress");
+      assert.equal(error.originalResponseRecoveryReason, "poll_timeout");
+      assert.equal(error.unknownResultRetryCount, 0);
+      return true;
+    },
+  );
+
+  assert.equal(requests.filter(({ method }) => method === "POST").length, 1);
+});
+
+test("requestImageGeneration does not regenerate when original response retrieval is unauthorized", async () => {
+  const requests = [];
+  const noFinalStream = [
+    "event: response.created",
+    'data: {"type":"response.created","response":{"id":"resp_auth","status":"in_progress"}}',
+    "",
+    "data: [DONE]",
+    "",
+  ].join("\n");
+
+  await assert.rejects(
+    () => requestImageGeneration({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      prompt: "Do not retry past an auth failure",
+      size: "1024x1024",
+      quality: "high",
+      responsesModel: "gpt-5.4",
+      responseRecoveryPollDelayMs: 0,
+      async fetchImpl(url, init) {
+        requests.push({ method: init.method });
+        if (init.method === "POST") {
+          return new Response(noFinalStream, { status: 200, headers: { "content-type": "text/event-stream" } });
+        }
+        return new Response("denied", { status: 401 });
+      },
+    }),
+    (error) => {
+      assert.equal(error.originalResponseRecovery, "auth_error");
+      return true;
+    },
+  );
+
+  assert.equal(requests.filter(({ method }) => method === "POST").length, 1);
+});
+
+// A success status with an unreadable body is ambiguous: the task may still be
+// running, so it must not be retried. An error status with an unreadable body
+// (a 404 HTML page) is a genuine "not retrievable" and stays retryable.
+test("requestImageGeneration distinguishes unreadable success bodies from unreadable error bodies", async () => {
+  const noFinalStream = [
+    "event: response.created",
+    'data: {"type":"response.created","response":{"id":"resp_body","status":"in_progress"}}',
+    "",
+    "data: [DONE]",
+    "",
+  ].join("\n");
+  const finalStream = [
+    "event: response.output_item.done",
+    'data: {"item":{"type":"image_generation_call","result":"cmV0cnktb2s="}}',
+    "",
+    "data: [DONE]",
+    "",
+  ].join("\n");
+
+  const buildOptions = (getResponse) => {
+    let postCount = 0;
+    const requests = [];
+    return {
+      requests,
+      options: {
+        baseUrl: "https://example.test/v1",
+        apiKey: "test-key",
+        prompt: "Classify unreadable recovery bodies",
+        size: "1024x1024",
+        quality: "high",
+        responsesModel: "gpt-5.4",
+        responseRecoveryPollDelayMs: 0,
+        async fetchImpl(url, init) {
+          requests.push({ method: init.method });
+          if (init.method === "GET") {
+            return getResponse();
+          }
+          postCount += 1;
+          return new Response(postCount === 1 ? noFinalStream : finalStream, {
+            status: 200,
+            headers: { "content-type": "text/event-stream" },
+          });
+        },
+      },
+    };
+  };
+
+  const unreadableSuccess = buildOptions(() => new Response("<html>gateway</html>", { status: 200 }));
+  await assert.rejects(
+    () => requestImageGeneration(unreadableSuccess.options),
+    (error) => {
+      assert.equal(error.originalResponseRecovery, "invalid_response");
+      return true;
+    },
+  );
+  assert.equal(unreadableSuccess.requests.filter(({ method }) => method === "POST").length, 1);
+
+  const unreadableNotFound = buildOptions(() => new Response("not retained", { status: 404 }));
+  const recovered = await requestImageGeneration(unreadableNotFound.options);
+  assert.equal(recovered.finalImageBase64, "cmV0cnktb2s=");
+  assert.equal(unreadableNotFound.requests.filter(({ method }) => method === "POST").length, 2);
 });
 
 test("requestImageGeneration emits keepalive status while waiting for upstream headers", async () => {

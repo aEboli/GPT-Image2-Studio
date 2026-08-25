@@ -57,7 +57,11 @@ import {
   toOutputFormatExtension,
   toOutputFormatMimeType,
 } from "./lib/output-format-options.mjs";
-import { GENERATION_STREAM_EVENTS } from "./lib/generation-stream-protocol.mjs";
+import {
+  CREATION_STREAM_EVENTS,
+  GENERATION_STREAM_EVENTS,
+  buildFinalImageChunkPayloads,
+} from "./lib/generation-stream-protocol.mjs";
 import { writeNodeSseEvent } from "./lib/sse-writer.mjs";
 import {
   createTimestampedFilename,
@@ -75,6 +79,10 @@ import { mergeRequestPrivateConfig } from "./lib/request-private-config.mjs";
 import { IMAGE_ROUTE_B, IMAGE_ROUTE_C, getSelectedImageGenerationConfig, getSelectedPromptAgentAnalysisConfig, getSelectedTextVisionConfig } from "./lib/image-route-config.mjs";
 import { fetchAvailableModels } from "./lib/model-list-client.mjs";
 import { createGenerationTaskStore } from "./lib/generation-task-store.mjs";
+import {
+  isInvalidGeneratedImageMetadata,
+  validateGeneratedImage,
+} from "./lib/generated-image-validation.mjs";
 import { createSessionTaskSlotLimiter } from "./lib/generation-task-slots.mjs";
 import { runWithConcurrency } from "./lib/limited-concurrency.mjs";
 import {
@@ -84,7 +92,10 @@ import {
 import { buildCreationGenerationSnapshot } from "./lib/creation-generation-snapshot.mjs";
 import {
   DEFAULT_REASONING_EFFORT,
+  CREATION_STATUS_HEARTBEAT_MS,
+  CREATION_UPSTREAM_TIMEOUT_MS as DEFAULT_CREATION_UPSTREAM_TIMEOUT_MS,
   MAX_CREATION_REFERENCE_IMAGES,
+  MAX_CREATION_PARALLEL_TASKS,
   MAX_PARALLEL_TASKS_PER_SESSION,
   MAX_PROMPT_PARALLEL_TASKS,
   MAX_PORTRAIT_ACTION_REFERENCE_IMAGES,
@@ -229,10 +240,21 @@ const PORTRAIT_REFERENCE_ANALYSIS_REASONING_EFFORT = "low";
 const PROMPT_AGENT_ANALYSIS_REASONING_EFFORT = "medium";
 const REFERENCE_ORCHESTRATION_REASONING_EFFORT = "low";
 const SESSION_TASK_SLOT_RETRY_DELAY_MS = 250;
+const CREATION_UPSTREAM_TIMEOUT_MS = (() => {
+  const configured = Number(process.env.IMAGE_STUDIO_CREATION_UPSTREAM_TIMEOUT_MS);
+  return Number.isFinite(configured) && configured >= 1000
+    ? Math.min(configured, 60 * 60 * 1000)
+    : DEFAULT_CREATION_UPSTREAM_TIMEOUT_MS;
+})();
 function getSessionTaskSlotLimit(requestScope) {
-  return String(requestScope || "").trim().split(":", 1)[0] === "prompt"
-    ? MAX_PROMPT_PARALLEL_TASKS
-    : MAX_PARALLEL_TASKS_PER_SESSION;
+  const scope = String(requestScope || "").trim().split(":", 1)[0];
+  if (scope === "prompt") {
+    return MAX_PROMPT_PARALLEL_TASKS;
+  }
+  if (scope === "creation") {
+    return MAX_CREATION_PARALLEL_TASKS;
+  }
+  return MAX_PARALLEL_TASKS_PER_SESSION;
 }
 const sessionTaskSlotLimiter = createSessionTaskSlotLimiter({
   maxParallelTasks: getSessionTaskSlotLimit,
@@ -247,9 +269,19 @@ const IMAGE_EDIT_MODE = "image-edit";
 const IMAGE_EDIT_ASSET_KIND = "image-edit";
 const MAX_LOCAL_MASK_FILE_BYTES = 50 * 1024 * 1024;
 const MAX_PRODUCT_IMAGE_PROXY_BODY_BYTES = 16 * 1024;
-const MOCK_IMAGE_GENERATION_ENABLED = process.env.IMAGE_STUDIO_MOCK_IMAGE_GENERATION === "1";
+const MOCK_IMAGE_GENERATION_REQUESTED = process.env.IMAGE_STUDIO_MOCK_IMAGE_GENERATION === "1";
+const MOCK_IMAGE_GENERATION_ENABLED =
+  MOCK_IMAGE_GENERATION_REQUESTED &&
+  process.env.IMAGE_STUDIO_ENABLE_TEST_MOCKS === "1" &&
+  Boolean(process.env.IMAGE_STUDIO_OUTPUT_DIR) &&
+  Boolean(process.env.IMAGE_STUDIO_LOCAL_DATA_DIR);
 const MOCK_IMAGE_BASE64 =
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==";
+  "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAADklEQVR4nGP4DwUMMAYAj4IP8TylVlEAAAAASUVORK5CYII=";
+if (MOCK_IMAGE_GENERATION_REQUESTED && !MOCK_IMAGE_GENERATION_ENABLED) {
+  console.warn(
+    "已忽略测试图片生成开关：仅同时设置 IMAGE_STUDIO_ENABLE_TEST_MOCKS=1、IMAGE_STUDIO_OUTPUT_DIR 和 IMAGE_STUDIO_LOCAL_DATA_DIR 时允许使用 mock。",
+  );
+}
 const GENERATION_MODES = new Set([
   "style-transfer",
   "reference-analysis",
@@ -369,6 +401,17 @@ function compactErrorMessage(message, fallbackLabel = "请求失败") {
 }
 
 async function requestStudioImageGeneration(options) {
+  const originalOnEvent = options.onEvent;
+  options = {
+    ...options,
+    async onEvent(event) {
+      if (event?.type === "final_image") {
+        decodeAndValidateGeneratedImage(event.base64, "上游生成结果");
+      }
+      await originalOnEvent?.(event);
+    },
+  };
+
   if (!MOCK_IMAGE_GENERATION_ENABLED) {
     if (options.imageRoute === IMAGE_ROUTE_C) {
       return requestModelProtocolImageGeneration(options);
@@ -382,12 +425,12 @@ async function requestStudioImageGeneration(options) {
     return requestImageGeneration(options);
   }
 
-  await options.onEvent?.({
+  await options.onEvent({
     type: "status",
     stage: "mock",
     message: "Using local mock image generation.",
   });
-  await options.onEvent?.({
+  await options.onEvent({
     type: "final_image",
     base64: MOCK_IMAGE_BASE64,
   });
@@ -404,6 +447,41 @@ async function requestStudioImageGeneration(options) {
   };
 }
 
+// Every generated image is validated twice: once when the workflow emits
+// final_image and again when the caller decodes it to save. Remembering the last
+// accepted payload keeps that second call from re-decoding and re-scanning a
+// multi-megabyte buffer. Keyed by exact base64, so a miss is only a lost
+// optimisation, never a wrong result.
+let lastValidatedGeneratedImage = null;
+
+function decodeAndValidateGeneratedImage(base64, context = "生成结果") {
+  const normalized = normalizeBase64(String(base64 || ""));
+  if (lastValidatedGeneratedImage?.base64 === normalized) {
+    return lastValidatedGeneratedImage.imageBuffer;
+  }
+
+  const imageBuffer = Buffer.from(normalized, "base64");
+
+  try {
+    validateGeneratedImage(imageBuffer);
+    lastValidatedGeneratedImage = { base64: normalized, imageBuffer };
+  } catch (error) {
+    const reason = String(error?.reason || error?.details?.reason || "invalid-image");
+    const reasonLabel = {
+      empty: "返回内容为空",
+      "unsupported-format": "不是受支持的 PNG 或 JPEG",
+      "malformed-image": "图片数据损坏",
+      "invalid-dimensions": "图片尺寸无效",
+      "too-small": "图片尺寸过小",
+    }[reason] || reason;
+    const actualSize = String(error?.details?.actualSize || "");
+    const sizeDetail = actualSize ? `，实际尺寸 ${actualSize}` : "";
+    throw new Error(`${context}无效：${reasonLabel}${sizeDetail}。已阻止保存，请重新生成。`, { cause: error });
+  }
+
+  return imageBuffer;
+}
+
 function isResponseWritable(response) {
   return Boolean(response) && !response.destroyed && !response.writableEnded;
 }
@@ -413,6 +491,93 @@ function writeSseEvent(response, type, payload) {
     return false;
   }
   return writeNodeSseEvent(response, type, payload);
+}
+
+// A full creation image is ~2 MB of base64 on one SSE line, which intermediaries
+// truncate and clients then fail to parse. Send bounded chunks the client can
+// reassemble, then a data-free completion event carrying the item metadata.
+function writeCreationItemFinalImage(response, { setId, itemId, base64, format, meta = {} }) {
+  const mimeType = toOutputFormatMimeType(format);
+  const chunkPayloads = buildFinalImageChunkPayloads({
+    setId,
+    itemId,
+    base64: normalizeBase64(base64),
+    mimeType,
+  });
+
+  for (const chunkPayload of chunkPayloads) {
+    if (!writeSseEvent(response, CREATION_STREAM_EVENTS.ITEM_FINAL_IMAGE_CHUNK, chunkPayload)) {
+      return false;
+    }
+  }
+
+  return writeSseEvent(response, CREATION_STREAM_EVENTS.ITEM_FINAL_IMAGE, {
+    setId,
+    itemId,
+    mimeType,
+    ...meta,
+  });
+}
+
+function createCreationRequestLifecycle(response) {
+  const controller = new AbortController();
+  let abortMessage = "";
+  const abort = (message) => {
+    if (controller.signal.aborted) {
+      return;
+    }
+    abortMessage = message;
+    controller.abort(new Error(message));
+  };
+  const timeout = setTimeout(
+    () => abort(`套图上游请求超时（${Math.round(CREATION_UPSTREAM_TIMEOUT_MS / 1000)} 秒），已释放任务槽位。`),
+    CREATION_UPSTREAM_TIMEOUT_MS,
+  );
+  const onResponseClose = () => {
+    if (!response.writableEnded && !response.writableFinished) {
+      abort("套图客户端连接已断开，已取消上游请求。");
+    }
+  };
+  response.once("close", onResponseClose);
+  // A worker only reaches this point after winning a session slot, so the client
+  // can disconnect between that wait and this listener. The close event has then
+  // already fired and would never fire again, leaving the item to run to its full
+  // timeout, so treat an already-closed response as an immediate abort.
+  if (!isResponseWritable(response)) {
+    abort("套图客户端连接已断开，已取消上游请求。");
+  }
+
+  return {
+    signal: controller.signal,
+    getError(error) {
+      // Only an abort-shaped failure carries the lifecycle reason. Substituting
+      // unconditionally would relabel an unrelated late error (an upstream HTTP
+      // 400 landing just as the timeout fires) as a timeout.
+      if (!abortMessage || error?.name !== "AbortError") {
+        return error;
+      }
+      return new Error(abortMessage, { cause: error });
+    },
+    dispose() {
+      clearTimeout(timeout);
+      response.removeListener("close", onResponseClose);
+    },
+  };
+}
+
+async function requestCreationStudioImageGeneration(response, options) {
+  const lifecycle = createCreationRequestLifecycle(response);
+  try {
+    return await requestStudioImageGeneration({
+      ...options,
+      signal: lifecycle.signal,
+      statusHeartbeatMs: CREATION_STATUS_HEARTBEAT_MS,
+    });
+  } catch (error) {
+    throw lifecycle.getError(error);
+  } finally {
+    lifecycle.dispose();
+  }
 }
 
 async function readJsonBody(request, { maxBytes = Number.POSITIVE_INFINITY } = {}) {
@@ -692,6 +857,14 @@ async function handleConfigPost(request, response) {
     endpointPath: payload.endpointPath,
     responsesModel: payload.responsesModel,
     imageRoute: payload.imageRoute,
+    directImageBaseUrl: payload.directImageBaseUrl,
+    directImageApiKey: payload.directImageApiKey,
+    directImageEndpointPath: payload.directImageEndpointPath,
+    directImageModel: payload.directImageModel,
+    directTextBaseUrl: payload.directTextBaseUrl,
+    directTextApiKey: payload.directTextApiKey,
+    directTextEndpointPath: payload.directTextEndpointPath,
+    directTextModel: payload.directTextModel,
     directBaseUrl: payload.directBaseUrl,
     directApiKey: payload.directApiKey,
     directEndpointPath: payload.directEndpointPath,
@@ -714,11 +887,16 @@ async function handleModelListPost(request, response) {
   try {
     const formData = await readFormDataBody(request);
     const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
-    const generationConfig = getSelectedImageGenerationConfig(config);
-    hasApiKey = Boolean(generationConfig.apiKey);
+    const modelTarget = String(formData.get("modelTarget") || formData.get("target") || "").trim().toLowerCase();
+    const modelConfig = modelTarget === "direct-responses"
+      ? getSelectedTextVisionConfig(config)
+      : modelTarget === "protocol"
+        ? getSelectedImageGenerationConfig({ ...config, imageRoute: IMAGE_ROUTE_C })
+        : getSelectedImageGenerationConfig(config);
+    hasApiKey = Boolean(modelConfig.apiKey);
     const models = await fetchAvailableModels({
-      baseUrl: generationConfig.baseUrl,
-      apiKey: generationConfig.apiKey,
+      baseUrl: modelConfig.baseUrl,
+      apiKey: modelConfig.apiKey,
       fetchImpl: fetch,
     });
     sendJson(response, 200, { ok: true, models });
@@ -731,10 +909,10 @@ async function handleModelListPost(request, response) {
 }
 
 async function handleGalleryGet(response) {
-  const items = await listGalleryItems({
+  const items = (await listGalleryItems({
     outputDir,
     publicBasePath: "/output",
-  });
+  })).filter((item) => !isInvalidGeneratedImageMetadata(item));
 
   sendJson(response, 200, items);
 }
@@ -1121,7 +1299,7 @@ async function generateAndSavePptSlide({
     outputDir,
     relativeDir: pptDeckRelativeDir,
     filename,
-    imageBuffer: Buffer.from(normalizeBase64(finalBase64), "base64"),
+    imageBuffer: decodeAndValidateGeneratedImage(finalBase64, "PPT 页面生成结果"),
     metadata: {
       prompt: slidePrompt.prompt,
       createdAt,
@@ -2681,7 +2859,7 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
           outputDir,
           relativeDir: articleRelativeDir,
           filename,
-          imageBuffer: Buffer.from(normalizeBase64(finalBase64), "base64"),
+          imageBuffer: decodeAndValidateGeneratedImage(finalBase64, "文章插图生成结果"),
           metadata: {
             prompt,
             createdAt,
@@ -3899,7 +4077,7 @@ async function handlePortraitGenerate(request, response) {
           outputDir,
           relativeDir: portraitRelativeDir,
           filename,
-          imageBuffer: Buffer.from(normalizeBase64(finalBase64), "base64"),
+          imageBuffer: decodeAndValidateGeneratedImage(finalBase64, "写真生成结果"),
           metadata: {
             prompt: item.prompt,
             createdAt,
@@ -4167,7 +4345,7 @@ async function handleCreationGenerate(request, response) {
     writeSseEvent(response, "set_started", { set: setManifest });
     writeSseEvent(response, "plan", { setId, items });
 
-    await runWithConcurrency(plan.items, MAX_PARALLEL_TASKS_PER_SESSION, async (item) => {
+    await runWithConcurrency(plan.items, MAX_CREATION_PARALLEL_TASKS, async (item) => {
       const taskId = `${setId}-${item.itemId}`;
       const generationStartedAt = new Date().toISOString();
       const generationStartedAtMs = Date.now();
@@ -4215,7 +4393,7 @@ async function handleCreationGenerate(request, response) {
           targetLanguage: itemGenerationParameters.targetLanguage,
         });
 
-        const generationResult = await requestStudioImageGeneration({
+        const generationResult = await requestCreationStudioImageGeneration(response, {
           baseUrl: generationConfig.baseUrl,
           apiKey: generationConfig.apiKey,
           prompt: finalPrompt,
@@ -4257,13 +4435,16 @@ async function handleCreationGenerate(request, response) {
 
             if (event.type === "final_image") {
               finalBase64 = event.base64;
-              writeSseEvent(response, "item_final_image", {
+              writeCreationItemFinalImage(response, {
                 setId,
                 itemId: item.itemId,
-                dataUrl: `data:${toOutputFormatMimeType(finalFormat)};base64,${normalizeBase64(event.base64)}`,
-                ratio: itemGenerationParameters.ratioOption.value,
-                effectiveSize: itemGenerationParameters.finalSize,
-                targetLanguage: itemGenerationParameters.targetLanguage,
+                base64: event.base64,
+                format: finalFormat,
+                meta: {
+                  ratio: itemGenerationParameters.ratioOption.value,
+                  effectiveSize: itemGenerationParameters.finalSize,
+                  targetLanguage: itemGenerationParameters.targetLanguage,
+                },
               });
             }
           },
@@ -4287,7 +4468,7 @@ async function handleCreationGenerate(request, response) {
           outputDir,
           relativeDir: creationRelativeDir,
           filename,
-          imageBuffer: Buffer.from(normalizeBase64(finalBase64), "base64"),
+          imageBuffer: decodeAndValidateGeneratedImage(finalBase64, "套图生成结果"),
           metadata: {
             prompt: finalPrompt,
             ...generationSnapshot,
@@ -4531,7 +4712,7 @@ async function handleCreationLogoBatchGenerate(request, response) {
     writeSseEvent(response, "set_started", { set: setManifest });
     writeSseEvent(response, "plan", { setId, items });
 
-    await runWithConcurrency(plan.items, MAX_PARALLEL_TASKS_PER_SESSION, async (item) => {
+    await runWithConcurrency(plan.items, MAX_CREATION_PARALLEL_TASKS, async (item) => {
       const sourceImage = sourceImages[item.sourceImageIndex] || sourceImages[(item.slotIndex || 1) - 1];
       const taskId = `${setId}-${item.itemId}`;
       const generationStartedAt = new Date().toISOString();
@@ -4552,7 +4733,7 @@ async function handleCreationLogoBatchGenerate(request, response) {
         writeSseEvent(response, "item_started", { setId, itemId: item.itemId, role: item.role });
 
         const finalPrompt = appendRatioHintToPrompt(item.prompt, ratioOption);
-        const generationResult = await requestStudioImageGeneration({
+        const generationResult = await requestCreationStudioImageGeneration(response, {
           baseUrl: generationConfig.baseUrl,
           apiKey: generationConfig.apiKey,
           prompt: finalPrompt,
@@ -4587,10 +4768,11 @@ async function handleCreationLogoBatchGenerate(request, response) {
 
             if (event.type === "final_image") {
               finalBase64 = event.base64;
-              writeSseEvent(response, "item_final_image", {
+              writeCreationItemFinalImage(response, {
                 setId,
                 itemId: item.itemId,
-                dataUrl: `data:${toOutputFormatMimeType(finalFormat)};base64,${normalizeBase64(event.base64)}`,
+                base64: event.base64,
+                format: finalFormat,
               });
             }
           },
@@ -4614,7 +4796,7 @@ async function handleCreationLogoBatchGenerate(request, response) {
           outputDir,
           relativeDir: creationRelativeDir,
           filename,
-          imageBuffer: Buffer.from(normalizeBase64(finalBase64), "base64"),
+          imageBuffer: decodeAndValidateGeneratedImage(finalBase64, "Logo 批量生成结果"),
           metadata: {
             prompt: item.prompt,
             createdAt,
@@ -4912,7 +5094,7 @@ async function handlePortraitRepair(request, response) {
           outputDir,
           relativeDir: portraitRelativeDir,
           filename,
-          imageBuffer: Buffer.from(normalizeBase64(finalBase64), "base64"),
+          imageBuffer: decodeAndValidateGeneratedImage(finalBase64, "写真修复结果"),
           metadata: {
             prompt: item.prompt,
             createdAt,
@@ -5140,7 +5322,7 @@ async function handleCreationRepair(request, response) {
       itemIds: repairItems.map((item) => item.itemId),
     });
 
-    await runWithConcurrency(repairItems, MAX_PARALLEL_TASKS_PER_SESSION, async (item) => {
+    await runWithConcurrency(repairItems, MAX_CREATION_PARALLEL_TASKS, async (item) => {
       const repairItem = item;
       const itemGenerationConfig = resolveCreationRepairGenerationConfig(repairItem, generationConfig);
       const itemFormat = normalizeOutputFormat(repairItem.format || finalFormat);
@@ -5188,7 +5370,7 @@ async function handleCreationRepair(request, response) {
         });
         writeSseEvent(response, "item_started", { setId, itemId: item.itemId, role: repairItem.role, ratio: itemGenerationParameters.ratioOption.value, effectiveSize: itemGenerationParameters.finalSize, targetLanguage: itemGenerationParameters.targetLanguage });
 
-        const generationResult = await requestStudioImageGeneration({
+        const generationResult = await requestCreationStudioImageGeneration(response, {
           baseUrl: itemGenerationConfig.baseUrl,
           apiKey: itemGenerationConfig.apiKey,
           prompt: finalPrompt,
@@ -5227,10 +5409,11 @@ async function handleCreationRepair(request, response) {
 
             if (event.type === "final_image") {
               finalBase64 = event.base64;
-              writeSseEvent(response, "item_final_image", {
+              writeCreationItemFinalImage(response, {
                 setId,
                 itemId: item.itemId,
-                dataUrl: `data:${toOutputFormatMimeType(itemFormat)};base64,${normalizeBase64(event.base64)}`,
+                base64: event.base64,
+                format: itemFormat,
               });
             }
           },
@@ -5254,7 +5437,7 @@ async function handleCreationRepair(request, response) {
           outputDir,
           relativeDir,
           filename,
-          imageBuffer: Buffer.from(normalizeBase64(finalBase64), "base64"),
+          imageBuffer: decodeAndValidateGeneratedImage(finalBase64, "套图修复结果"),
           metadata: {
             prompt: finalPrompt,
             ...generationSnapshot,
@@ -5941,7 +6124,7 @@ async function handleGenerate(request, response) {
       filenameKeyword: quickBlendFilenameToken,
       omitDatePrefix: isQuickBlend,
     });
-    const imageBuffer = Buffer.from(normalizeBase64(finalBase64), "base64");
+    const imageBuffer = decodeAndValidateGeneratedImage(finalBase64, "生成结果");
     const saved = await saveGeneratedAsset({
       outputDir,
       filename,

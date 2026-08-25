@@ -5,13 +5,14 @@ import { buildGalleryMetadataCacheEntry, collectGalleryMetadataRepairPatch, merg
 import { getDefaultGenerationSize, getGenerationSizeOptions, getModelProtocolImageSizeOptions, normalizeGenerationSize, normalizeModelProtocolImageSize } from "/lib/generation-size-options.mjs?v=20260614-image2-sizes-1";
 import { getOutputFormatOptions, normalizeOutputFormat, } from "/lib/output-format-options.mjs?v=20260504-vercel-static-lib-1";
 import { normalizeReferenceAnalysisLanguage, } from "/lib/reference-analysis-language.mjs?v=20260522-reference-language-1";
-import { getPreviewLoadingOrbLimit, getPreviewLoadingOrbRenderState, getPreviewLoadingShellItems, getPreviewLoadingShellTheme, shouldReusePreviewLoadingShell } from "/lib/preview-loading-shell.mjs";
+import { shouldReusePreviewLoadingShell } from "/lib/preview-loading-shell.mjs";
+import { createGenerationLoadingShell, updateGenerationLoadingShell, stopGenerationLoadingShell, stopGenerationLoadingShells } from "/lib/generation-loading.mjs";
 import { createCreationCardLoading as createCreationCardLoadingShell, getCreationCardDomKey, syncCreationLoadingCard, syncCreationResultGrid as syncCreationResultGridShell } from "/lib/creation-card-loading.mjs";
 import { createCreationCardIdleRippleController } from "/lib/creation-card-idle-ripple.mjs?v=20260725-creation-card-idle-ripple-1";
 import { isGenerationRequestRetryMessage, } from "/lib/generation-request-retry.mjs";
 import { cancelQueuedGenerationJob, getGenerationJobMode, getGenerationJobQueueKey, getQueuedGenerationJobCount, getRunningGenerationJobCount, isQueuedGenerationJob, selectNextQueuedGenerationJobsByMode } from "/lib/generation-queue.mjs?v=20260821-prompt-global-queue-1";
 import { buildCanceledGenerationActivityDetail, buildGenerationTaskActivityDetail, buildGenerationTaskStatusText, formatGenerationActivityModeLabel, getGenerationActivityDisplayText, sanitizeGenerationActivityDetail, sortGenerationActivityFeed, upsertGenerationActivityEntry } from "/lib/generation-activity-feed.mjs?v=20260504-vercel-static-lib-1";
-import { GENERATION_STREAM_EVENTS, recordFinalImageChunk } from "/lib/generation-stream-protocol.mjs";
+import { CREATION_STREAM_EVENTS, GENERATION_STREAM_EVENTS, clearFinalImageChunks, recordFinalImageChunk } from "/lib/generation-stream-protocol.mjs";
 import { filterLocallyTerminatedGenerationTaskSnapshots } from "/lib/generation-task-reconciler.mjs";
 import { readHttpResponseErrorMessage } from "/lib/http-response-error.mjs";
 import { consumeSseUntilTerminal } from "/lib/sse-terminal-client.mjs";
@@ -340,7 +341,26 @@ const UI_LANGUAGE_STORAGE_KEY = "image-studio-ui-language-v1";
 const UI_LANGUAGE_TEXT = {
   "zh-CN": { activityLog: "生成日志", baseUrl: "基础 URL", brandSubtitle: "AI 图像生成工作流", close: "关闭", config: "配置", configApi: "配置 API", configSaved: "配置已保存", configTitle: "连接配置", configUnsaved: "配置未保存", connectionBusy: "并发 {running}/{max} · 队列 {queued}", connectionOpen: "打开 API、LOG", connectionSection: "调用通道", connectionStatusEmpty: "待填写API、LOG", connectionStatusEntry: "API、LOG", delete: "删除", directEndpointSuffix: "直接调用模式请求协议后缀", directMode: "直接调用模式", download: "下载", endpointUrl: "接口地址", expandModels: "展开可用模型列表", fetchModels: "获取模型列表", fetchModelsLoading: "获取中...", fit: "适配", functionMenu: "功能菜单导航", fullUrl: "完整 URL", generate: "开始生成", generateTitle: "开始生成（Ctrl+Enter）", generationRouteLabel: "生图调用模式", globalNav: "全局导航", imageModel: "生图模型", keepSavedKey: "保持已保存 Key", languageEn: "English UI", languageSwitch: "切换界面语言", languageZh: "简体中文界面", menuArticleIllustration: "文章插图", menuArticleRecord: "文章插图记录", menuAssetTools: "资产工具", menuCreation: "套图模式", menuCreationRecord: "套图记录", menuCreateTools: "创作工具", menuGallery: "瀑布画廊", menuImageCompress: "图片压缩", menuImageDecomposition: "图片拆解", menuImageEdit: "图片编辑", menuPortrait: "写真模式", menuPortraitRecord: "写真记录", menuPpt: "PPT生成", menuPptRecord: "PPT记录", menuPromptStudio: "提示词生图", menuQuickBlend: "快速溶图", menuReferenceAnalysis: "融图分析", menuSectionAssets: "资产区", menuSectionCreate: "创作区", menuSectionSettings: "配置区", menuSettings: "设置", menuStyleTransfer: "风格迁移", menuTools: "工具", modeDirect: "直接调用模式", modeProtocol: "Gemini模型", modeRoute: "路由模式", modelFetchBusy: "正在获取模型列表...", modelFetchFailed: "获取模型列表失败。", modelFetchSuccess: "已获取 {count} 个可调用模型。", modelNoCallable: "未获取到可调用模型。", modelNoMatch: "没有匹配的模型", modelNoMatchWithQuery: "没有匹配的模型：{query}", modelTestBusy: "正在测试连接...", modelTestSuccess: "连接测试成功，获取到 {count} 个模型。", navAssets: "资产", navCreate: "创作", navSettings: "配置", notSaved: "未保存", openOutput: "打开输出目录", outputFormat: "输出格式", parameters: "参数设置", previewIdleDetail: "生成日志可在配置中查看，底部胶片条可快速切换查看。", previewIdleEyebrow: "Output Preview", previewIdleTitle: "生成结果会在这里实时更新。", previewWaiting: "等待生成", prompt: "提示词", promptAgent: "图片转提示词", promptCounterSuffix: "字", promptEnhance: "增强模式", promptEnhanceAria: "开启或关闭提示词增强模式", promptEnhanceField: "增强提示词", promptEnhanceOff: "关闭", promptEnhanceOn: "开启", promptPlaceholder: "写下你要生成的画面，也可以先上传参考图说明修改方向。", promptTemplate: "提示词模板", protocolHint: "Gemini 图像模型按 AGICTO 图像生成协议调用；基础 URL 通常填写到 /v1，实际请求为 /images/generations。", protocolImageModel: "图像模型", protocolMode: "Gemini模型", quality: "质量", "ratio.1:1": "电商主图、头像、社交媒体 · 方形 1:1", "ratio.1:2": "长海报 · 竖屏 1:2", "ratio.1:3": "超长竖版广告 · 竖屏 1:3", "ratio.2:1": "Banner横幅 · 横屏 2:1", "ratio.2:3": "竖版摄影 · 竖屏 2:3", "ratio.3:1": "超宽广告图 · 横屏 3:1", "ratio.3:2": "摄影风格 · 横屏 3:2", "ratio.3:4": "海报、人像 · 竖屏 3:4", "ratio.4:3": "PPT、网页配图 · 横屏 4:3", "ratio.4:5": "Instagram帖子 · 竖屏 4:5", "ratio.5:4": "商品展示 · 横屏 5:4", "ratio.9:16": "短视频封面、手机壁纸 · 竖屏 9:16", "ratio.9:21": "超长竖图 · 竖屏 9:21", "ratio.16:9": "横版封面、YouTube · 横屏 16:9", "ratio.21:9": "超宽横幅 · 横屏 21:9", ratioLandscape: "横向", ratioPortrait: "竖向", ratioSquare: "方形", reasoningEffort: "思考等级", reference: "参考图", referenceUploadAction: "上传参考图", referenceUploadTitle: "拖入图片或点击上传", responsesModel: "Responses 模型", routeEndpointSuffix: "路由模式请求协议后缀", routeMode: "路由模式", save: "保存", size: "分辨率", sizeAuto: "自动适配", sizeMax: "最大", testConnection: "测试连接", testConnectionLoading: "测试中...", themeDark: "深色主题", themeLight: "白色主题", themeMenu: "主题颜色", themeToDark: "切换到深色主题", themeToLight: "切换到白色主题", thumbnailEmpty: "暂无缩略图", thumbnailFailed: "缩略图加载失败", thumbnailLoading: "缩略图加载中", timelineNoErrors: "暂无错误", timelineWaitingResult: "等待生成结果", timelineWaitingTask: "等待任务开始", toolModel: "工具模型", toolModelAndQuality: "工具模型与质量", view: "查看", visionTextModel: "视觉/文本模型" },
   en: { activityLog: "Generation Log", baseUrl: "Base URL", brandSubtitle: "AI image workflow", close: "Close", config: "Settings", configApi: "Configure API", configSaved: "Config saved", configTitle: "Connection Settings", configUnsaved: "Config not saved", connectionBusy: "Concurrent {running}/{max} · Queue {queued}", connectionOpen: "open API and log", connectionSection: "Request Channel", connectionStatusEmpty: "API/Log missing", connectionStatusEntry: "API, Log", delete: "Delete", directEndpointSuffix: "Direct mode endpoint suffix", directMode: "Direct Mode", download: "Download", endpointUrl: "Endpoint", expandModels: "Show available models", fetchModels: "Fetch Models", fetchModelsLoading: "Fetching...", fit: "Fit", functionMenu: "Function menu", fullUrl: "Full URL", generate: "Generate", generateTitle: "Generate (Ctrl+Enter)", generationRouteLabel: "Image request mode", globalNav: "Global navigation", imageModel: "Image Model", keepSavedKey: "Keep saved key", languageEn: "English UI", languageSwitch: "Switch interface language", languageZh: "Simplified Chinese UI", menuArticleIllustration: "Article Illustration", menuArticleRecord: "Article Records", menuAssetTools: "Asset Tools", menuCreation: "Product Suite", menuCreationRecord: "Suite Records", menuCreateTools: "Creation Tools", menuGallery: "Gallery", menuImageCompress: "Image Compress", menuImageDecomposition: "Image Decomposition", menuImageEdit: "Image Edit", menuPortrait: "Portrait Mode", menuPortraitRecord: "Portrait Records", menuPpt: "PPT Generation", menuPptRecord: "PPT Records", menuPromptStudio: "Prompt to Image", menuQuickBlend: "Quick Blend", menuReferenceAnalysis: "Reference Analysis", menuSectionAssets: "Assets", menuSectionCreate: "Creation", menuSectionSettings: "Settings", menuSettings: "Settings", menuStyleTransfer: "Style Transfer", menuTools: "Tools", modeDirect: "Direct Mode", modeProtocol: "Gemini Model", modeRoute: "Route Mode", modelFetchBusy: "Fetching model list...", modelFetchFailed: "Failed to fetch model list.", modelFetchSuccess: "Fetched {count} callable models.", modelNoCallable: "No callable models found.", modelNoMatch: "No matching models", modelNoMatchWithQuery: "No matching models: {query}", modelTestBusy: "Testing connection...", modelTestSuccess: "Connection test succeeded. Found {count} models.", navAssets: "Assets", navCreate: "Create", navSettings: "Settings", notSaved: "Not saved", openOutput: "Open Output", outputFormat: "Output Format", parameters: "Parameters", previewIdleDetail: "Generation log is in Settings. Use the filmstrip below to switch results.", previewIdleEyebrow: "Output Preview", previewIdleTitle: "Generated results update here in real time.", previewWaiting: "Waiting", prompt: "Prompt", promptAgent: "Image to Prompt", promptCounterSuffix: "chars", promptEnhance: "Enhance Mode", promptEnhanceAria: "Toggle prompt enhancement mode", promptEnhanceField: "Enhancement Prompt", promptEnhanceOff: "Off", promptEnhanceOn: "On", promptPlaceholder: "Describe the image you want, or upload references first and describe the edit direction.", promptTemplate: "Prompt templates", protocolHint: "Gemini image models use the AGICTO image generation protocol. Base URL usually ends at /v1; requests go to /images/generations.", protocolImageModel: "Image Model", protocolMode: "Gemini Model", quality: "Quality", "ratio.1:1": "Ecommerce, Avatar, Social · Square 1:1", "ratio.1:2": "Long Poster · Portrait 1:2", "ratio.1:3": "Tall Ad · Portrait 1:3", "ratio.2:1": "Banner · Landscape 2:1", "ratio.2:3": "Vertical Photo · Portrait 2:3", "ratio.3:1": "Ultrawide Ad · Landscape 3:1", "ratio.3:2": "Photography · Landscape 3:2", "ratio.3:4": "Poster, Portrait · Portrait 3:4", "ratio.4:3": "PPT, Web Graphic · Landscape 4:3", "ratio.4:5": "Instagram Post · Portrait 4:5", "ratio.5:4": "Product Display · Landscape 5:4", "ratio.9:16": "Short Video Cover, Wallpaper · Portrait 9:16", "ratio.9:21": "Tall Scroll Image · Portrait 9:21", "ratio.16:9": "Cover, YouTube · Landscape 16:9", "ratio.21:9": "Ultrawide Banner · Landscape 21:9", ratioLandscape: "Landscape", ratioPortrait: "Portrait", ratioSquare: "Square", reasoningEffort: "Reasoning", reference: "Reference", referenceUploadAction: "Upload Reference", referenceUploadTitle: "Drop images or click to upload", responsesModel: "Responses Model", routeEndpointSuffix: "Route mode endpoint suffix", routeMode: "Route Mode", save: "Save", size: "Size", sizeAuto: "Auto", sizeMax: "Max", testConnection: "Test Connection", testConnectionLoading: "Testing...", themeDark: "Dark theme", themeLight: "Light theme", themeMenu: "Theme color", themeToDark: "Switch to dark theme", themeToLight: "Switch to light theme", thumbnailEmpty: "No thumbnails", thumbnailFailed: "Thumbnail load failed", thumbnailLoading: "Loading thumbnails", timelineNoErrors: "No errors", timelineWaitingResult: "Waiting for result", timelineWaitingTask: "Waiting for task", toolModel: "Tool Model", toolModelAndQuality: "Tool model and quality", view: "View", visionTextModel: "Vision/Text Model" },
-}; const CONNECTION_STATUS_ENTRY_LABEL = "API、LOG";
+};
+Object.assign(UI_LANGUAGE_TEXT["zh-CN"], {
+  directImageApi: "生图 API",
+  directImageApiKey: "生图 API Key",
+  directImageEndpointSuffix: "直接调用模式生图请求协议后缀",
+  directTextApi: "文本/视觉 API",
+  directTextApiKey: "文本/视觉 API Key",
+  directTextEndpointSuffix: "直接调用模式文本请求协议后缀",
+  visionTextModel: "文本/视觉模型",
+});
+Object.assign(UI_LANGUAGE_TEXT.en, {
+  directImageApi: "Image API",
+  directImageApiKey: "Image API key",
+  directImageEndpointSuffix: "Direct image endpoint suffix",
+  directTextApi: "Text/Vision API",
+  directTextApiKey: "Text/Vision API key",
+  directTextEndpointSuffix: "Direct text endpoint suffix",
+  visionTextModel: "Text/Vision Model",
+});
+const CONNECTION_STATUS_ENTRY_LABEL = "API、LOG";
 const CONNECTION_STATUS_EMPTY_LABEL = "待填写API、LOG";
 const PROMPT_ANALYSIS_IMAGE_MAX_EDGE = 1024;
 const PROMPT_ANALYSIS_IMAGE_COMPRESS_THRESHOLD_BYTES = 900 * 1024;
@@ -662,6 +682,9 @@ const refs = {
   directBaseUrlInput: document.querySelector("#directBaseUrlInput"),
   directBaseUrlFullToggle: document.querySelector("#directBaseUrlFullToggle"),
   directEndpointPathSelect: document.querySelector("#directEndpointPathSelect"),
+  directImageApiKeyInput: document.querySelector("#directApiKeyInput"),
+  directImageBaseUrlInput: document.querySelector("#directBaseUrlInput"),
+  directImageEndpointPathSelect: document.querySelector("#directEndpointPathSelect"),
   directFetchModelsButton: document.querySelector("#directFetchModelsButton"),
   directImageModelInput: document.querySelector("#directImageModelInput"),
   directModelOptionsList: document.querySelector("#directModelOptionsList"),
@@ -671,6 +694,11 @@ const refs = {
   directResponsesModelOptionsList: document.querySelector("#directResponsesModelOptionsList"),
   directResponsesModelPickerToggle: document.querySelector("#directResponsesModelPickerToggle"),
   directSavedKeyMask: document.querySelector("#directSavedKeyMask"),
+  directTextApiKeyInput: document.querySelector("#directTextApiKeyInput"),
+  directTextBaseUrlInput: document.querySelector("#directTextBaseUrlInput"),
+  directTextBaseUrlFullToggle: document.querySelector("#directTextBaseUrlFullToggle"),
+  directTextEndpointPathSelect: document.querySelector("#directTextEndpointPathSelect"),
+  directTextSavedKeyMask: document.querySelector("#directTextSavedKeyMask"),
   endpointPathSelect: document.querySelector("#endpointPathSelect"),
   imageRouteInputs: [...document.querySelectorAll('input[name="imageRoute"]')],
   protocolApiKeyInput: document.querySelector("#protocolApiKeyInput"),
@@ -1704,7 +1732,7 @@ function getUiRatioOrientationLabel(orientation) { return getUiLanguageText(orie
 function getUiRatioLabel(option) { return getUiLanguageText(`ratio.${option?.value}`) || option?.label || getUiRatioOrientationLabel(option?.orientation); }
 function getUiSizeLabel(option) { const label = option?.label || ""; if (option?.value === "auto") return getUiLanguageText("sizeAuto") || label; return label.replace(/^最大(?=\s|$)/, getUiLanguageText("sizeMax") || "最大"); }
 function getUiPreviewPlaceholderState(placeholderState) { if (!placeholderState || placeholderState.mode === "ready") return placeholderState; if (placeholderState.mode === "idle") return { ...placeholderState, eyebrow: getUiLanguageText("previewIdleEyebrow"), title: getUiLanguageText("previewIdleTitle"), detail: getUiLanguageText("previewIdleDetail") }; return { ...placeholderState, title: state.uiLanguage === "en" ? "Generation running" : placeholderState.title }; }
-function rerenderUiLanguageSensitiveViews() { updatePromptCounter(); syncPromptEnhanceMode(); updateGenerateButton(); syncConnectionState(); syncRatioOrientationSummary(); renderRatioGrid(); renderReferenceAnalysisRatioGrid(); renderReasoningOptions(); renderSizeOptions(); renderReferenceAnalysisSizeOptions(); syncEndpointFieldsFromFullUrlModes(); { const c = state.config || {}, s = state.uiLanguage === "en" ? "Saved" : "已保存"; if (refs.savedKeyMask) refs.savedKeyMask.textContent = c.apiKeyConfigured ? `${s} ${c.apiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存"; if (refs.directSavedKeyMask) refs.directSavedKeyMask.textContent = c.directApiKeyConfigured ? `${s} ${c.directApiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存"; if (refs.protocolSavedKeyMask) refs.protocolSavedKeyMask.textContent = c.protocolApiKeyConfigured ? `${s} ${c.protocolApiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存"; } renderPreview(); renderFilmstrip(); renderTimeline(); }
+function rerenderUiLanguageSensitiveViews() { updatePromptCounter(); syncPromptEnhanceMode(); updateGenerateButton(); syncConnectionState(); syncRatioOrientationSummary(); renderRatioGrid(); renderReferenceAnalysisRatioGrid(); renderReasoningOptions(); renderSizeOptions(); renderReferenceAnalysisSizeOptions(); syncEndpointFieldsFromFullUrlModes(); { const c = state.config || {}, s = state.uiLanguage === "en" ? "Saved" : "已保存"; if (refs.savedKeyMask) refs.savedKeyMask.textContent = c.apiKeyConfigured ? `${s} ${c.apiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存"; if (refs.directSavedKeyMask) refs.directSavedKeyMask.textContent = (c.directImageApiKeyConfigured || c.directApiKeyConfigured) ? `${s} ${c.directImageApiKeyMask || c.directApiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存"; if (refs.directTextSavedKeyMask) refs.directTextSavedKeyMask.textContent = c.directTextApiKeyConfigured ? `${s} ${c.directTextApiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存"; if (refs.protocolSavedKeyMask) refs.protocolSavedKeyMask.textContent = c.protocolApiKeyConfigured ? `${s} ${c.protocolApiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存"; } renderPreview(); renderFilmstrip(); renderTimeline(); }
 function syncRatioOrientationSummary() {
   if (!refs.ratioOrientationSummary) {
     return;
@@ -1851,6 +1879,7 @@ async function ensureActiveViewModule(view) {
         clearError,
         closeReferencePreview,
         compactErrorMessage,
+        createGenerationLoadingShell,
         createPreviewLoadingShellNodes,
         createReferenceAddCard,
         formatCanvasLabel,
@@ -1880,6 +1909,8 @@ async function ensureActiveViewModule(view) {
         setActiveView,
         showError,
         state,
+        stopGenerationLoadingShell,
+        stopGenerationLoadingShells,
         syncReferenceDropzoneCompact,
         setReferencePreviewNavigationContext,
         updatePreviewLoadingShell,
@@ -3207,6 +3238,7 @@ function setImageDecompositionGenerationPreviewKey(key) {
   renderImageDecompositionGenerationPreview();
 }
 function setImageDecompositionGenerationPlaceholderText(message, hidden = false) {
+  stopGenerationLoadingShell(imageDecompositionLoadingShellNodes?.loading);
   imageDecompositionLoadingShellNodes = null;
   refs.imageDecompositionGenerationPlaceholder.className = "image-decomposition-generation-placeholder preview-placeholder";
   refs.imageDecompositionGenerationPlaceholder.classList.toggle("hidden", hidden);
@@ -3246,13 +3278,10 @@ function renderImageDecompositionGenerationLoading(item) {
     "image-decomposition-generation-placeholder preview-placeholder preview-placeholder-loading";
   refs.imageDecompositionGenerationPlaceholder.classList.remove("hidden");
   if (
-    refs.imageDecompositionGenerationPlaceholder.firstChild !== imageDecompositionLoadingShellNodes.eyebrow ||
-    refs.imageDecompositionGenerationPlaceholder.lastChild !== imageDecompositionLoadingShellNodes.shell
+    refs.imageDecompositionGenerationPlaceholder.firstChild !== imageDecompositionLoadingShellNodes.shell ||
+    refs.imageDecompositionGenerationPlaceholder.childElementCount !== 1
   ) {
-    refs.imageDecompositionGenerationPlaceholder.replaceChildren(
-      imageDecompositionLoadingShellNodes.eyebrow,
-      imageDecompositionLoadingShellNodes.shell,
-    );
+    refs.imageDecompositionGenerationPlaceholder.replaceChildren(imageDecompositionLoadingShellNodes.shell);
   }
 }
 function openImageDecompositionGeneratedPreview() {
@@ -3310,6 +3339,7 @@ function renderImageDecompositionGenerationPreview() {
 }
 function renderImageDecompositionGenerationStrip() {
   const entries = getImageDecompositionGenerationPreviewEntries();
+  stopGenerationLoadingShells(refs.imageDecompositionGenerationStrip);
   refs.imageDecompositionGenerationStrip.replaceChildren();
   refs.imageDecompositionGenerationStrip.classList.toggle("hidden", entries.length === 0);
   refs.imageDecompositionThumbnailEmpty.classList.toggle("hidden", entries.length > 0);
@@ -3329,6 +3359,9 @@ function renderImageDecompositionGenerationStrip() {
       image.alt = getDisplayPrompt(item);
       image.loading = "lazy";
       button.appendChild(image);
+      } else if (item?.isRunning || (item?.started && !item?.filename)) {
+        const loading = createGenerationLoadingShell(document, { key, active: true });
+        button.appendChild(loading.shell);
       } else {
         const ghost = document.createElement("div");
         ghost.className = "filmstrip-ghost";
@@ -4099,6 +4132,7 @@ function setReferenceAnalysisGenerationPreviewKey(key) {
 }
 function renderReferenceAnalysisGenerationStrip() {
   const entries = getReferenceAnalysisGenerationPreviewEntries();
+  stopGenerationLoadingShells(refs.referenceAnalysisGenerationStrip);
   refs.referenceAnalysisGenerationStrip.replaceChildren();
   refs.referenceAnalysisGenerationStrip.classList.toggle("hidden", entries.length === 0);
   refs.referenceAnalysisThumbnailEmpty.classList.toggle("hidden", entries.length > 0);
@@ -4118,6 +4152,9 @@ function renderReferenceAnalysisGenerationStrip() {
       image.alt = getDisplayPrompt(item);
       image.loading = "lazy";
       button.appendChild(image);
+    } else if (item?.isRunning || (item?.started && !item?.filename)) {
+      const loading = createGenerationLoadingShell(document, { key, active: true });
+      button.appendChild(loading.shell);
     } else {
       const ghost = document.createElement("span");
       ghost.textContent = formatLoadingThumbnailStatusLabel(item, { idleLabel: "等待" });
@@ -4159,6 +4196,7 @@ async function preserveReferenceAnalysisGenerationItemForDelete(item) {
   storeReferenceAnalysisGenerationItem(item);
 }
 function setReferenceAnalysisGenerationPlaceholderText(message, hidden = false) {
+  stopGenerationLoadingShell(referenceAnalysisLoadingShellNodes?.loading);
   referenceAnalysisLoadingShellNodes = null;
   refs.referenceAnalysisGenerationPlaceholder.className = "reference-analysis-generation-placeholder";
   refs.referenceAnalysisGenerationPlaceholder.classList.toggle("hidden", hidden);
@@ -4189,13 +4227,10 @@ function renderReferenceAnalysisGenerationLoading(item) {
     "reference-analysis-generation-placeholder preview-placeholder preview-placeholder-loading";
   refs.referenceAnalysisGenerationPlaceholder.classList.remove("hidden");
   if (
-    refs.referenceAnalysisGenerationPlaceholder.firstChild !== referenceAnalysisLoadingShellNodes.eyebrow ||
-    refs.referenceAnalysisGenerationPlaceholder.lastChild !== referenceAnalysisLoadingShellNodes.shell
+    refs.referenceAnalysisGenerationPlaceholder.firstChild !== referenceAnalysisLoadingShellNodes.shell ||
+    refs.referenceAnalysisGenerationPlaceholder.childElementCount !== 1
   ) {
-    refs.referenceAnalysisGenerationPlaceholder.replaceChildren(
-      referenceAnalysisLoadingShellNodes.eyebrow,
-      referenceAnalysisLoadingShellNodes.shell,
-    );
+    refs.referenceAnalysisGenerationPlaceholder.replaceChildren(referenceAnalysisLoadingShellNodes.shell);
   }
 }
 function openReferenceAnalysisGeneratedPreview() {
@@ -4836,11 +4871,37 @@ function updateGenerationModeStatus() {
   refs.generationModeStatus.setAttribute("aria-label", statusText);
 }
 
-function getEndpointControls(imageRoute = "a") { return imageRoute === "b" ? { input: refs.directBaseUrlInput, select: refs.directEndpointPathSelect, toggle: refs.directBaseUrlFullToggle, defaultEndpointPath: API_ENDPOINT_IMAGE_GENERATIONS, fallbackBaseUrl: state.config?.directBaseUrl || state.config?.baseUrl || "https://api.openai.com/v1" } : { input: refs.baseUrlInput, select: refs.endpointPathSelect, toggle: refs.baseUrlFullToggle, defaultEndpointPath: API_ENDPOINT_RESPONSES, fallbackBaseUrl: state.config?.baseUrl || "https://api.openai.com/v1" }; }
+function getEndpointControls(imageRoute = "a") {
+  if (imageRoute === "b-text") {
+    return {
+      input: refs.directTextBaseUrlInput,
+      select: refs.directTextEndpointPathSelect,
+      toggle: refs.directTextBaseUrlFullToggle,
+      defaultEndpointPath: API_ENDPOINT_RESPONSES,
+       fallbackBaseUrl: state.config?.directTextBaseUrl || state.config?.directBaseUrl || state.config?.baseUrl || "https://api.openai.com/v1",
+    };
+  }
+  if (imageRoute === "b" || imageRoute === "b-image") {
+    return {
+      input: refs.directBaseUrlInput,
+      select: refs.directEndpointPathSelect,
+      toggle: refs.directBaseUrlFullToggle,
+      defaultEndpointPath: API_ENDPOINT_IMAGE_GENERATIONS,
+      fallbackBaseUrl: state.config?.directImageBaseUrl || state.config?.directBaseUrl || state.config?.baseUrl || "https://api.openai.com/v1",
+    };
+  }
+  return {
+    input: refs.baseUrlInput,
+    select: refs.endpointPathSelect,
+    toggle: refs.baseUrlFullToggle,
+    defaultEndpointPath: API_ENDPOINT_RESPONSES,
+    fallbackBaseUrl: state.config?.baseUrl || "https://api.openai.com/v1",
+  };
+}
 function isEndpointFullUrlMode(imageRoute = "a") { return getEndpointControls(imageRoute).toggle?.getAttribute("aria-pressed") === "true"; }
 function normalizeEndpointSelectValue(imageRoute = "a", endpointPath = "", fallbackEndpointPath = "") {
   const normalizedEndpointPath = normalizeApiEndpointPath(endpointPath, fallbackEndpointPath);
-  return imageRoute === "b" && normalizedEndpointPath === API_ENDPOINT_IMAGE_EDITS ? API_ENDPOINT_IMAGE_GENERATIONS : normalizedEndpointPath;
+  return (imageRoute === "b" || imageRoute === "b-image") && normalizedEndpointPath === API_ENDPOINT_IMAGE_EDITS ? API_ENDPOINT_IMAGE_GENERATIONS : normalizedEndpointPath;
 }
 function readEndpointFields(imageRoute = "a") {
   const controls = getEndpointControls(imageRoute);
@@ -4858,24 +4919,54 @@ function setEndpointSelectValue(select, endpointPath, fallbackEndpointPath, imag
 }
 function syncEndpointInputDisplay(imageRoute = "a", baseUrl = "", endpointPath = "") { const controls = getEndpointControls(imageRoute); const fullMode = isEndpointFullUrlMode(imageRoute); const normalizedEndpointPath = normalizeEndpointSelectValue(imageRoute, endpointPath, controls.defaultEndpointPath); setEndpointSelectValue(controls.select, normalizedEndpointPath, controls.defaultEndpointPath, imageRoute); if (controls.input) { controls.input.value = fullMode ? appendApiEndpointPath(baseUrl || controls.fallbackBaseUrl, normalizedEndpointPath) : baseUrl || controls.fallbackBaseUrl; controls.input.placeholder = fullMode ? appendApiEndpointPath("https://api.openai.com/v1", normalizedEndpointPath) : "https://api.openai.com/v1"; } if (controls.toggle) controls.toggle.textContent = fullMode ? getUiLanguageText("baseUrl") || "基础 URL" : getUiLanguageText("fullUrl") || "完整 URL"; }
 function toggleEndpointFullUrlMode(imageRoute = "a") { const controls = getEndpointControls(imageRoute); if (!controls.toggle) return; const endpoint = readEndpointFields(imageRoute); controls.toggle.setAttribute("aria-pressed", String(!isEndpointFullUrlMode(imageRoute))); syncEndpointInputDisplay(imageRoute, endpoint.baseUrl, endpoint.endpointPath); }
-function syncEndpointFieldsFromFullUrlModes() { ["a", "b"].forEach((imageRoute) => { const endpoint = readEndpointFields(imageRoute); syncEndpointInputDisplay(imageRoute, endpoint.baseUrl, endpoint.endpointPath); }); }
+function syncEndpointFieldsFromFullUrlModes() { ["a", "b", "b-text"].forEach((imageRoute) => { const endpoint = readEndpointFields(imageRoute); syncEndpointInputDisplay(imageRoute, endpoint.baseUrl, endpoint.endpointPath); }); }
 function getProtocolImageGenerationsUrlPreview(baseUrl = refs.protocolBaseUrlInput?.value || "") { const normalizedProtocolEndpoint = splitModelProtocolUrl(String(baseUrl || state.config?.protocolBaseUrl || "https://api.openai.com/v1").trim(), { fallbackBaseUrl: state.config?.protocolBaseUrl || "https://api.openai.com/v1" }); return appendApiEndpointPath(normalizedProtocolEndpoint.baseUrl, API_ENDPOINT_IMAGE_GENERATIONS); }
 function syncProtocolEndpointPreview() { if (refs.protocolEndpointPreview) refs.protocolEndpointPreview.textContent = getProtocolImageGenerationsUrlPreview(); }
 
 function getCurrentPrivateConfigRequestPayload() {
   const browserPayload = getBrowserPrivateConfigRequestPayload();
   const routeAEndpoint = readEndpointFields("a");
-  const routeBEndpoint = readEndpointFields("b");
-  return { imageRoute: getSelectedImageRoute(), baseUrl: routeAEndpoint.baseUrl || browserPayload.baseUrl || state.config?.baseUrl || "", endpointPath: routeAEndpoint.endpointPath || browserPayload.endpointPath || state.config?.endpointPath || API_ENDPOINT_RESPONSES, apiKey: refs.apiKeyInput.value.trim() || browserPayload.apiKey || "", responsesModel: refs.responsesModelInput.value.trim() || browserPayload.responsesModel || state.config?.responsesModel || DEFAULT_RESPONSES_MODEL, directBaseUrl: routeBEndpoint.baseUrl || browserPayload.directBaseUrl || state.config?.directBaseUrl || "", directEndpointPath: routeBEndpoint.endpointPath || browserPayload.directEndpointPath || state.config?.directEndpointPath || API_ENDPOINT_IMAGE_GENERATIONS, directApiKey: refs.directApiKeyInput.value.trim() || browserPayload.directApiKey || "", directImageModel: refs.directImageModelInput.value.trim() || browserPayload.directImageModel || state.config?.directImageModel || DEFAULT_DIRECT_IMAGE_MODEL, directResponsesModel: refs.directResponsesModelInput.value.trim() || browserPayload.directResponsesModel || state.config?.directResponsesModel || DEFAULT_DIRECT_RESPONSES_MODEL, protocolBaseUrl: refs.protocolBaseUrlInput.value.trim() || browserPayload.protocolBaseUrl || state.config?.protocolBaseUrl || "", protocolApiKey: refs.protocolApiKeyInput.value.trim() || browserPayload.protocolApiKey || "", protocolImageModel: refs.protocolImageModelInput.value.trim() || browserPayload.protocolImageModel || state.config?.protocolImageModel || DEFAULT_PROTOCOL_IMAGE_MODEL };
+  const directImageEndpoint = readEndpointFields("b");
+  const directTextEndpoint = readEndpointFields("b-text");
+  const directImageBaseUrl = directImageEndpoint.baseUrl || browserPayload.directImageBaseUrl || browserPayload.directBaseUrl || state.config?.directImageBaseUrl || state.config?.directBaseUrl || "";
+  const directTextBaseUrl = directTextEndpoint.baseUrl || browserPayload.directTextBaseUrl || browserPayload.directBaseUrl || state.config?.directTextBaseUrl || state.config?.directBaseUrl || "";
+  const directImageApiKey = refs.directImageApiKeyInput?.value.trim() || browserPayload.directImageApiKey || browserPayload.directApiKey || "";
+  const directTextApiKey = refs.directTextApiKeyInput?.value.trim() || browserPayload.directTextApiKey || browserPayload.directApiKey || "";
+  const directImageModel = refs.directImageModelInput.value.trim() || browserPayload.directImageModel || state.config?.directImageModel || DEFAULT_DIRECT_IMAGE_MODEL;
+  const directTextModel = refs.directResponsesModelInput.value.trim() || browserPayload.directTextModel || browserPayload.directResponsesModel || state.config?.directTextModel || state.config?.directResponsesModel || DEFAULT_DIRECT_RESPONSES_MODEL;
+  return {
+    imageRoute: getSelectedImageRoute(),
+    baseUrl: routeAEndpoint.baseUrl || browserPayload.baseUrl || state.config?.baseUrl || "",
+    endpointPath: routeAEndpoint.endpointPath || browserPayload.endpointPath || state.config?.endpointPath || API_ENDPOINT_RESPONSES,
+    apiKey: refs.apiKeyInput.value.trim() || browserPayload.apiKey || "",
+    responsesModel: refs.responsesModelInput.value.trim() || browserPayload.responsesModel || state.config?.responsesModel || DEFAULT_RESPONSES_MODEL,
+    directImageBaseUrl,
+    directImageEndpointPath: directImageEndpoint.endpointPath || browserPayload.directImageEndpointPath || browserPayload.directEndpointPath || state.config?.directImageEndpointPath || state.config?.directEndpointPath || API_ENDPOINT_IMAGE_GENERATIONS,
+    directImageApiKey,
+    directImageModel,
+    directTextBaseUrl,
+    directTextEndpointPath: directTextEndpoint.endpointPath || browserPayload.directTextEndpointPath || state.config?.directTextEndpointPath || browserPayload.directEndpointPath || state.config?.directEndpointPath || API_ENDPOINT_RESPONSES,
+    directTextApiKey,
+    directTextModel,
+    // Legacy aliases are emitted for older server/runtime versions.
+    directBaseUrl: directImageBaseUrl,
+    directEndpointPath: directImageEndpoint.endpointPath || API_ENDPOINT_IMAGE_GENERATIONS,
+    directApiKey: directImageApiKey,
+    directImageModel,
+    directResponsesModel: directTextModel,
+    protocolBaseUrl: refs.protocolBaseUrlInput.value.trim() || browserPayload.protocolBaseUrl || state.config?.protocolBaseUrl || "",
+    protocolApiKey: refs.protocolApiKeyInput.value.trim() || browserPayload.protocolApiKey || "",
+    protocolImageModel: refs.protocolImageModelInput.value.trim() || browserPayload.protocolImageModel || state.config?.protocolImageModel || DEFAULT_PROTOCOL_IMAGE_MODEL,
+  };
 }
 
 function appendCurrentConfigToFormData(formData) { appendBrowserConfigToFormData(formData, undefined, getCurrentPrivateConfigRequestPayload()); return formData; }
 
-function applyQueuedJobConfigSnapshot(job) { if (!job) return job; const { imageRoute, baseUrl, endpointPath, responsesModel, directBaseUrl, directEndpointPath, directImageModel, directResponsesModel, protocolBaseUrl, protocolImageModel } = getCurrentPrivateConfigRequestPayload(); Object.assign(job, { imageRoute, generationRoute: imageRoute, baseUrl, endpointPath, responsesModel, directBaseUrl, directEndpointPath, directImageModel, directResponsesModel, protocolBaseUrl, protocolImageModel }); return job; }
+function applyQueuedJobConfigSnapshot(job) { if (!job) return job; const payload = getCurrentPrivateConfigRequestPayload(); const { imageRoute, baseUrl, endpointPath, responsesModel, protocolBaseUrl, protocolImageModel } = payload; Object.assign(job, { imageRoute, generationRoute: imageRoute, baseUrl, endpointPath, responsesModel, directImageBaseUrl: payload.directImageBaseUrl, directImageEndpointPath: payload.directImageEndpointPath, directImageModel: payload.directImageModel, directTextBaseUrl: payload.directTextBaseUrl, directTextEndpointPath: payload.directTextEndpointPath, directTextModel: payload.directTextModel, directBaseUrl: payload.directBaseUrl, directEndpointPath: payload.directEndpointPath, directImageModel: payload.directImageModel, directResponsesModel: payload.directResponsesModel, protocolBaseUrl, protocolImageModel }); return job; }
 
 function appendJobConfigToFormData(formData, job) {
   const payload = getCurrentPrivateConfigRequestPayload();
-  ["baseUrl", "endpointPath", "responsesModel", "directBaseUrl", "directEndpointPath", "directImageModel", "directResponsesModel", "protocolBaseUrl", "protocolImageModel"].forEach((key) => { if (job?.[key]) payload[key] = job[key]; });
+  ["baseUrl", "endpointPath", "responsesModel", "directImageBaseUrl", "directImageEndpointPath", "directImageModel", "directTextBaseUrl", "directTextEndpointPath", "directTextModel", "directBaseUrl", "directEndpointPath", "directResponsesModel", "protocolBaseUrl", "protocolImageModel"].forEach((key) => { if (job?.[key]) payload[key] = job[key]; });
   payload.imageRoute = job?.imageRoute || job?.generationRoute || payload.imageRoute;
   appendBrowserConfigToFormData(formData, undefined, payload); return formData;
 }
@@ -4883,9 +4974,10 @@ function appendJobConfigToFormData(formData, job) {
 function syncConfigUi(config) {
   syncEndpointInputDisplay("a", config.baseUrl || "", config.endpointPath || API_ENDPOINT_RESPONSES);
   refs.responsesModelInput.value = config.responsesModel || DEFAULT_RESPONSES_MODEL;
-  syncEndpointInputDisplay("b", config.directBaseUrl || config.baseUrl || "", config.directEndpointPath || API_ENDPOINT_IMAGE_GENERATIONS);
+  syncEndpointInputDisplay("b", config.directImageBaseUrl || config.directBaseUrl || config.baseUrl || "", config.directImageEndpointPath || config.directEndpointPath || API_ENDPOINT_IMAGE_GENERATIONS);
   refs.directImageModelInput.value = config.directImageModel || DEFAULT_DIRECT_IMAGE_MODEL;
-  refs.directResponsesModelInput.value = config.directResponsesModel || DEFAULT_DIRECT_RESPONSES_MODEL;
+  syncEndpointInputDisplay("b-text", config.directTextBaseUrl || config.directBaseUrl || config.baseUrl || "", config.directTextEndpointPath || API_ENDPOINT_RESPONSES);
+  refs.directResponsesModelInput.value = config.directTextModel || config.directResponsesModel || DEFAULT_DIRECT_RESPONSES_MODEL;
   refs.protocolBaseUrlInput.value = config.protocolBaseUrl || config.baseUrl || "https://api.openai.com/v1";
   refs.protocolImageModelInput.value = config.protocolImageModel || DEFAULT_PROTOCOL_IMAGE_MODEL;
   syncProtocolEndpointPreview();
@@ -4895,9 +4987,10 @@ function syncConfigUi(config) {
   updateGenerationModeStatus();
   const savedKeyLabel = state.uiLanguage === "en" ? "Saved" : "已保存";
   refs.savedKeyMask.textContent = config.apiKeyConfigured ? `${savedKeyLabel} ${config.apiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存";
-  refs.directSavedKeyMask.textContent = config.directApiKeyConfigured ? `${savedKeyLabel} ${config.directApiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存";
+  refs.directSavedKeyMask.textContent = (config.directImageApiKeyConfigured || config.directApiKeyConfigured) ? `${savedKeyLabel} ${config.directImageApiKeyMask || config.directApiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存";
+  if (refs.directTextSavedKeyMask) refs.directTextSavedKeyMask.textContent = config.directTextApiKeyConfigured ? `${savedKeyLabel} ${config.directTextApiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存";
   if (refs.protocolSavedKeyMask) refs.protocolSavedKeyMask.textContent = config.protocolApiKeyConfigured ? `${savedKeyLabel} ${config.protocolApiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存";
-  const activeRouteConfigured = config.imageRoute === "c" ? config.protocolApiKeyConfigured : config.imageRoute === "b" ? config.directApiKeyConfigured : config.apiKeyConfigured;
+  const activeRouteConfigured = config.imageRoute === "c" ? config.protocolApiKeyConfigured : config.imageRoute === "b" ? (config.directImageApiKeyConfigured || config.directTextApiKeyConfigured || config.directApiKeyConfigured) : config.apiKeyConfigured;
   refs.configStatus.textContent = getUiLanguageText(activeRouteConfigured ? "configSaved" : "configUnsaved");
   configModelPicker.render();
   state.aspectRatios = config.aspectRatios || [];
@@ -5414,94 +5507,25 @@ function renderTimeline() {
   renderTimelineNewIndicator();
 }
 
-function createPreviewMotionNode(orbId = "", includeFluidLayers = false) {
-  const motion = document.createElement("div");
-  motion.className = "preview-loading-motion is-entering";
-  motion.setAttribute("aria-hidden", "true");
-  motion.dataset.previewLoadingOrbId = String(orbId || "");
-  const fillShell = document.createElement("span");
-  fillShell.className = "preview-loading-fill-shell";
-  const fill = document.createElement("span");
-  fill.className = "preview-loading-fill";
-  if (includeFluidLayers) fill.append(...["preview-loading-fluid-surface", "preview-loading-fluid-stream", "preview-loading-fluid-stream preview-loading-fluid-stream-phase", "preview-loading-fluid-sediment"].map((className) => Object.assign(document.createElement("span"), { className })));
-  fillShell.appendChild(fill);
-  const ring = document.createElement("span");
-  ring.className = "preview-loading-ring";
-  for (let index = 0; index < 4; index += 1) {
-    const line = document.createElement("span");
-    line.className = "preview-loading-ring-line";
-    ring.appendChild(line);
-  }
-  motion.append(fillShell, ring);
-  return motion;
-}
-function applyPreviewLoadingOrbState(orb, item, index, count, placeholderState = {}) {
-  const renderState = getPreviewLoadingOrbRenderState(item, index, count, placeholderState);
-  orb.dataset.stage = renderState.stage;
-  orb.setAttribute("aria-label", renderState.ariaLabel);
-  Object.entries({
-    "--loading-progress": renderState.progress, "--loading-ring-duration": renderState.ringDuration, "--loading-counter-ring-duration": renderState.counterRingDuration, "--loading-fill-duration": renderState.fillDuration,
-    "--loading-float-duration": renderState.floatDuration, "--loading-motion-scale": renderState.motionScale, "--loading-gravity": renderState.gravity, "--loading-viscosity": renderState.viscosity, "--loading-phase-viscosity": renderState.phaseViscosity, "--loading-settle-distance": renderState.settleDistance, "--loading-stream-distance": renderState.streamDistance,
-    "--loading-settle-duration": renderState.settleDuration, "--loading-flow-duration": renderState.flowDuration, "--loading-flow-phase-delay": renderState.flowPhaseDelay, "--loading-surface-duration": renderState.surfaceDuration, "--loading-sediment-duration": renderState.sedimentDuration,
-    "--preview-loading-orb-x": renderState.x, "--preview-loading-orb-y": renderState.y, "--preview-loading-orb-enter-x": renderState.enterX, "--preview-loading-orb-enter-y": renderState.enterY, "--preview-loading-orb-delay": renderState.delay,
-  }).forEach(([name, value]) => orb.style.setProperty(name, value));
-}
-
-function syncPreviewLoadingShellItems(nodes, placeholderState = {}) {
-  const currentNodes = new Map(Array.from(nodes.field.children).map((child) => [child.dataset.previewLoadingOrbId, child]));
-  const nextItems = getPreviewLoadingShellItems(placeholderState);
-  const nextIds = new Set(nextItems.map((item) => item.id));
-  nextItems.forEach((item, index) => {
-    const existing = currentNodes.get(item.id);
-    const orb = existing || createPreviewMotionNode(item.id, nodes.includeFluidLayers === true);
-    orb.dataset.previewLoadingOrbId = item.id;
-    applyPreviewLoadingOrbState(orb, item, index, Math.min(getPreviewLoadingOrbLimit(), placeholderState.activeJobCount || 1), placeholderState);
-    orb.style.setProperty("--preview-loading-orb-index", String(index));
-    if (!existing) {
-      orb.classList.add("is-entering");
-      nodes.field.appendChild(orb);
-    }
-  });
-
-  currentNodes.forEach((orb, id) => {
-    if (!nextIds.has(id)) orb.remove();
-  });
-  nodes.field.style.setProperty("--preview-loading-orb-count", String(nextItems.length));
-  nodes.field.classList.toggle("is-orbiting", nextItems.length >= 2);
-}
-
 function createPreviewLoadingShellNodes(variant = "") {
-  const shell = document.createElement("div");
-  shell.className = "preview-loading-shell";
-  const includeFluidLayers = variant === "prompt"; shell.className += includeFluidLayers ? " is-prompt-loading" : "";
-  shell.setAttribute("role", "status");
-  const field = document.createElement("div");
-  field.className = "preview-loading-orb-field";
-  field.appendChild(createPreviewMotionNode("preview-loading-1", includeFluidLayers));
-  shell.appendChild(field);
-  return {
-    shell,
-    field,
-    includeFluidLayers,
-    state: null,
-  };
+  const loading = createGenerationLoadingShell(document, { active: false });
+  loading.shell.classList.add("preview-loading-shell");
+  return { shell: loading.shell, loading, state: null };
 }
 
 function updatePreviewLoadingShell(nodes, placeholderState) {
-  const theme = getPreviewLoadingShellTheme(placeholderState);
-  nodes.shell.dataset.stage = theme.stage;
-  nodes.shell.dataset.jobs = String(placeholderState.activeJobCount);
+  nodes.shell.dataset.stage = String(placeholderState.stage || "generating");
+  nodes.shell.dataset.jobs = String(placeholderState.activeJobCount || 1);
   nodes.shell.setAttribute("aria-label", placeholderState.statusText || placeholderState.title || "Generation running");
-  nodes.shell.style.setProperty("--loading-progress", theme.progress);
-  nodes.shell.style.setProperty("--loading-ring-duration", theme.ringDuration);
-  nodes.shell.style.setProperty("--loading-counter-ring-duration", theme.counterRingDuration);
-  nodes.shell.style.setProperty("--loading-fill-duration", theme.fillDuration);
-  nodes.shell.style.setProperty("--loading-float-duration", theme.floatDuration);
-  nodes.shell.style.setProperty("--loading-motion-scale", theme.motionScale);
-  syncPreviewLoadingShellItems(nodes, placeholderState);
+  updateGenerationLoadingShell(nodes.loading, {
+    key: placeholderState.loadingKey || placeholderState.itemId || "",
+    label: "生图生成中",
+    active: true,
+  });
   nodes.state = {
     mode: placeholderState.mode,
     stage: placeholderState.stage,
+    loadingKey: placeholderState.loadingKey || placeholderState.itemId || "",
   };
 }
 
@@ -5530,6 +5554,7 @@ function renderPreviewPlaceholder(placeholderState) {
     return;
   }
 
+  stopGenerationLoadingShell(previewLoadingShellNodes?.loading);
   previewLoadingShellNodes = null;
   refs.previewPlaceholder.replaceChildren();
 
@@ -5761,12 +5786,16 @@ function createFilmstripEntry(key) {
   return shell;
 }
 
-function syncFilmstripMedia(button, item) {
+function syncFilmstripMedia(button, item, key = "") {
   const imageUrl = getImageUrl(item);
   const existingImage = button.querySelector("img");
   const existingGhost = button.querySelector(".filmstrip-ghost");
+  const existingLoading = button.querySelector(".generation-loading-shell");
 
   if (imageUrl) {
+    stopGenerationLoadingShell(existingLoading?.__generationLoadingNodes);
+    existingLoading?.remove();
+    existingGhost?.remove();
     const image = existingImage || document.createElement("img");
     if (image.getAttribute("src") !== imageUrl) {
       image.src = imageUrl;
@@ -5779,6 +5808,21 @@ function syncFilmstripMedia(button, item) {
     }
     return;
   }
+
+  const isGenerating = Boolean(item?.isRunning || item?.started || ["queued", "uploading", "connecting", "generating", "saving"].includes(item?.statusStage || item?.stage || item?.status));
+  if (isGenerating) {
+    existingImage?.remove();
+    existingGhost?.remove();
+    const loading = existingLoading || createGenerationLoadingShell(document, { key, active: true }).shell;
+    if (!existingLoading) {
+      button.insertBefore(loading, button.firstChild);
+    }
+    return;
+  }
+
+  stopGenerationLoadingShell(existingLoading?.__generationLoadingNodes);
+  existingLoading?.remove();
+  existingImage?.remove();
 
   const ghost = existingGhost || document.createElement("div");
   ghost.className = "filmstrip-ghost";
@@ -5817,7 +5861,7 @@ function syncFilmstripCancelButton(shell, key, item) {
 function syncFilmstripEntry(shell, { key, item, label }) {
   const button = shell.querySelector(".filmstrip-item");
   button.classList.toggle("active", key === state.selectedPreviewKey);
-  syncFilmstripMedia(button, item);
+  syncFilmstripMedia(button, item, key);
 
   let caption = button.querySelector("[data-filmstrip-label]");
   if (!caption) {
@@ -8811,6 +8855,7 @@ function createArticleStoryboardCard(item) {
   card.appendChild(head);
 
   const imageUrl = item.imageUrl || item.thumbnailUrl;
+  const isGenerating = ["queued", "generating", "reference_generating"].includes(String(item.status || ""));
   const media = document.createElement(imageUrl ? "button" : "div");
   media.className = "article-card-image";
   if (imageUrl) {
@@ -8825,6 +8870,11 @@ function createArticleStoryboardCard(item) {
     img.src = imageUrl;
     img.alt = item.title || "文章插图";
     media.appendChild(img);
+  } else if (isGenerating) {
+    const loading = createGenerationLoadingShell(document, { key: item.itemId, active: true });
+    media.classList.add("is-loading");
+    media.setAttribute("aria-busy", "true");
+    media.appendChild(loading.shell);
   } else {
     const placeholder = document.createElement("span");
     placeholder.className = "article-card-image-placeholder";
@@ -8903,6 +8953,7 @@ function createArticleRecordCard(item, setId = "") {
   card.appendChild(head);
 
   const imageUrl = item.imageUrl || item.thumbnailUrl;
+  const isGenerating = ["queued", "generating", "reference_generating"].includes(String(item.status || ""));
   const media = document.createElement(imageUrl ? "button" : "div");
   media.className = "article-card-image";
   if (imageUrl) {
@@ -8918,6 +8969,11 @@ function createArticleRecordCard(item, setId = "") {
     img.src = imageUrl;
     img.alt = item.title || "文章插图";
     media.appendChild(img);
+  } else if (isGenerating) {
+    const loading = createGenerationLoadingShell(document, { key: item.itemId, active: true });
+    media.classList.add("is-loading");
+    media.setAttribute("aria-busy", "true");
+    media.appendChild(loading.shell);
   } else {
     const placeholder = document.createElement("span");
     placeholder.className = "article-card-image-placeholder";
@@ -8994,6 +9050,7 @@ function renderArticleIllustrationView() {
     refs.articleIllustrationStyleBibleInput.value = currentSet.styleBible || "";
   }
 
+  stopGenerationLoadingShells(refs.articleIllustrationReferenceList);
   refs.articleIllustrationReferenceList.replaceChildren();
   referenceItems.forEach((item) => {
     refs.articleIllustrationReferenceList.appendChild(createArticleStoryboardCard(item));
@@ -9005,6 +9062,7 @@ function renderArticleIllustrationView() {
     refs.articleIllustrationReferenceList.appendChild(empty);
   }
 
+  stopGenerationLoadingShells(refs.articleIllustrationStoryboardList);
   refs.articleIllustrationStoryboardList.replaceChildren();
   if (storyboardItems.length === 0) {
     const empty = document.createElement("article");
@@ -9413,6 +9471,7 @@ function renderArticleRecordDetail(set) {
   }
   const columnCount = getArticleRecordColumnCount();
   refs.articleRecordDetail.dataset.recordColumns = String(columnCount);
+  stopGenerationLoadingShells(refs.articleRecordDetail);
   refs.articleRecordDetail.replaceChildren();
   if (!set) {
     const empty = document.createElement("div");
@@ -10231,9 +10290,9 @@ function shouldHideCreationCardDetails(item = {}, showRecordActions = false) {
   return true;
 }
 
-function createCreationCardLoading(status = "generating", sequenceIndex = 0) {
+function createCreationCardLoading(status = "generating", sequenceIndex = 0, key = "") {
   const isQueued = status === "queued";
-  return createCreationCardLoadingShell(isQueued ? "queued" : "generating", null, { sequenceIndex });
+  return createCreationCardLoadingShell(isQueued ? "queued" : "generating", null, { sequenceIndex, key });
 }
 
 function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
@@ -10288,7 +10347,7 @@ function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
   if (isLoadingCard) {
     media.classList.add("is-loading");
     media.setAttribute("aria-busy", "true");
-    media.appendChild(createCreationCardLoading(item.status, fallbackIndex));
+    media.appendChild(createCreationCardLoading(item.status, fallbackIndex, item.itemId));
   } else if (imageUrl) {
     const image = document.createElement("img");
     image.loading = "lazy";
@@ -12596,6 +12655,15 @@ function buildCreationRepairFormData({ itemId = "", scope = "incomplete", set = 
   return formData;
 }
 
+// Chunk assembly lives on the per-stream context so concurrent items in one set
+// accumulate independently and nothing leaks into the next set.
+function getCreationFinalImageChunks(context = {}) {
+  if (!context.finalImageChunks) {
+    context.finalImageChunks = new Map();
+  }
+  return context.finalImageChunks;
+}
+
 async function handleCreationStreamEvent(eventName, payload = {}, context = {}) {
   if (eventName === "repair_started") {
     upsertCreationSetForStream(payload.set, context);
@@ -12657,11 +12725,27 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
     return;
   }
 
-  if (eventName === "item_final_image") {
+  if (eventName === CREATION_STREAM_EVENTS.ITEM_FINAL_IMAGE_CHUNK) {
+    const dataUrl = recordFinalImageChunk(getCreationFinalImageChunks(context), payload);
+    if (dataUrl) {
+      updateCreationStreamItem(payload.itemId, {
+        status: "generating",
+        imageUrl: dataUrl,
+        thumbnailUrl: dataUrl,
+        updatedAt: nowIso(),
+      }, context);
+      renderCreationView();
+    }
+    return;
+  }
+
+  if (eventName === CREATION_STREAM_EVENTS.ITEM_FINAL_IMAGE) {
+    // Chunks arrive before this event and already carry the image. A legacy server
+    // that still inlines dataUrl keeps working; a chunk-only payload just refreshes
+    // the item's metadata without clearing an assembled preview.
     updateCreationStreamItem(payload.itemId, {
       status: "generating",
-      imageUrl: payload.dataUrl,
-      thumbnailUrl: payload.dataUrl,
+      ...(payload.dataUrl ? { imageUrl: payload.dataUrl, thumbnailUrl: payload.dataUrl } : {}),
       updatedAt: nowIso(),
     }, context);
     renderCreationView();
@@ -12754,10 +12838,19 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
 }
 
 async function runCreationStream(response, context = {}) {
-  await consumeSse(response.body, async (eventName, payload) => {
-    await handleCreationStreamEvent(eventName, payload, context);
-    await context.onEventHandled?.(eventName, payload);
-  });
+  try {
+    return await consumeSseUntilTerminal({
+      stream: response.body,
+      consumeSse,
+      onEvent: async (eventName, payload) => {
+        await handleCreationStreamEvent(eventName, payload, context);
+        await context.onEventHandled?.(eventName, payload);
+      },
+      missingTerminalMessage: "套图生成连接已中断，未收到完成事件。",
+    });
+  } finally {
+    clearFinalImageChunks(getCreationFinalImageChunks(context));
+  }
 }
 
 async function runCreationQueuedRepairRequest(queueJob, { itemId = "", scope = "incomplete", set } = {}) {
@@ -13785,22 +13878,8 @@ function formatPortraitStyleSummary(set = {}) {
     .join("、") || "商务形象";
 }
 
-function createPortraitCardLoading() {
-  const loading = document.createElement("div");
-  loading.className = "creation-card-loading portrait-card-loading";
-  const motion = document.createElement("div");
-  motion.className = "creation-card-loading-motion";
-  motion.setAttribute("aria-hidden", "true");
-  for (let index = 0; index < 3; index += 1) {
-    motion.appendChild(document.createElement("span"));
-  }
-  const label = document.createElement("strong");
-  label.textContent = "生成中";
-  const detail = document.createElement("span");
-  detail.className = "creation-card-loading-detail";
-  detail.textContent = "正在生成写真图";
-  loading.append(motion, label, detail);
-  return loading;
+function createPortraitCardLoading(itemId = "") {
+  return createCreationCardLoadingShell("generating", null, { key: itemId });
 }
 
 function createPortraitCard(item = {}, fallbackIndex = 0, options = {}) {
@@ -13834,7 +13913,7 @@ function createPortraitCard(item = {}, fallbackIndex = 0, options = {}) {
   if (isLoadingCard) {
     media.classList.add("is-loading");
     media.setAttribute("aria-busy", "true");
-    media.appendChild(createPortraitCardLoading());
+    media.appendChild(createPortraitCardLoading(item.itemId));
   } else if (imageUrl) {
     const image = document.createElement("img");
     image.loading = "lazy";
@@ -14541,6 +14620,11 @@ function createPptSlideCard(slide) {
     image.src = imageUrl;
     image.alt = slide.title || `第 ${slide.slideNumber} 页`;
     thumb.appendChild(image);
+  } else if (state.ppt.generating && !slide.errorMessage) {
+    const loading = createGenerationLoadingShell(document, { key: `ppt-${slide.slideNumber}`, active: true });
+    thumb.classList.add("is-loading");
+    thumb.setAttribute("aria-busy", "true");
+    thumb.appendChild(loading.shell);
   } else {
     thumb.textContent = slide.errorMessage || slide.statusText || "等待生成";
   }
@@ -14588,6 +14672,7 @@ function createPptSlideCard(slide) {
 }
 
 function renderPptSlides() {
+  stopGenerationLoadingShells(refs.pptSlideList);
   refs.pptSlideList.innerHTML = "";
   getPptRenderableSlides().forEach((slide) => {
     refs.pptSlideList.appendChild(createPptSlideCard(slide));
@@ -15413,6 +15498,7 @@ async function saveConfig(event) {
   state.config = toPublicBrowserConfig(browserConfig, state.config || {});
   refs.apiKeyInput.value = "";
   refs.directApiKeyInput.value = "";
+  if (refs.directTextApiKeyInput) refs.directTextApiKeyInput.value = "";
   refs.protocolApiKeyInput.value = "";
   configModelPicker.setFeedback("配置已保存到当前浏览器。", "success");
   syncConfigUi(state.config);
@@ -16558,6 +16644,7 @@ function bindEvents() {
   refs.protocolImageModelInput?.addEventListener("input", syncProtocolEndpointPreview);
   refs.baseUrlFullToggle?.addEventListener("click", () => toggleEndpointFullUrlMode("a"));
   refs.directBaseUrlFullToggle?.addEventListener("click", () => toggleEndpointFullUrlMode("b"));
+  refs.directTextBaseUrlFullToggle?.addEventListener("click", () => toggleEndpointFullUrlMode("b-text"));
   refs.endpointPathSelect?.addEventListener("change", () => {
     const endpoint = readEndpointFields("a");
     syncEndpointInputDisplay("a", endpoint.baseUrl, refs.endpointPathSelect.value || endpoint.endpointPath);
@@ -16565,6 +16652,10 @@ function bindEvents() {
   refs.directEndpointPathSelect?.addEventListener("change", () => {
     const endpoint = readEndpointFields("b");
     syncEndpointInputDisplay("b", endpoint.baseUrl, refs.directEndpointPathSelect.value || endpoint.endpointPath);
+  });
+  refs.directTextEndpointPathSelect?.addEventListener("change", () => {
+    const endpoint = readEndpointFields("b-text");
+    syncEndpointInputDisplay("b-text", endpoint.baseUrl, refs.directTextEndpointPathSelect.value || endpoint.endpointPath);
   });
   configModelPicker.bindEvents();
   refs.generateForm.addEventListener("submit", startGeneration);

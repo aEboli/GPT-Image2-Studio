@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 import {
+  CREATION_STREAM_EVENTS,
   FINAL_IMAGE_CHUNK_SIZE,
   GENERATION_STREAM_EVENTS,
   assertGenerationStreamDeliveryOrder,
   buildFinalImageChunkPayloads,
+  clearFinalImageChunks,
   recordFinalImageChunk,
 } from "../lib/generation-stream-protocol.mjs";
 
@@ -59,6 +61,74 @@ test("final image chunks are generated and reassembled through the shared protoc
   assert.equal(recordFinalImageChunk(chunks, payloads[1]), "");
   assert.equal(recordFinalImageChunk(chunks, payloads[0]), "");
   assert.equal(recordFinalImageChunk(chunks, payloads[2]), "data:image/png;base64,abcdef");
+});
+
+test("creation stream protocol exposes item-scoped final image events", () => {
+  assert.equal(CREATION_STREAM_EVENTS.ITEM_FINAL_IMAGE, "item_final_image");
+  assert.equal(CREATION_STREAM_EVENTS.ITEM_FINAL_IMAGE_CHUNK, "item_final_image_chunk");
+});
+
+test("creation final image chunks assemble per set item without a filename", () => {
+  const payloads = buildFinalImageChunkPayloads({
+    setId: "set-1",
+    itemId: "item-1",
+    base64: "abcdef",
+    format: "png",
+    chunkSize: 2,
+  });
+
+  assert.equal(payloads.length, 3);
+  assert.deepEqual(payloads[0], {
+    setId: "set-1",
+    itemId: "item-1",
+    index: 0,
+    total: 3,
+    mimeType: "image/png",
+    chunk: "ab",
+  });
+  assert.ok(payloads.every((payload) => !("filename" in payload)));
+
+  const chunks = new Map();
+  assert.equal(recordFinalImageChunk(chunks, payloads[2]), "");
+  assert.equal(recordFinalImageChunk(chunks, payloads[0]), "");
+  assert.equal(recordFinalImageChunk(chunks, payloads[1]), "data:image/png;base64,abcdef");
+});
+
+test("creation final image chunks from concurrent items do not mix", () => {
+  const first = buildFinalImageChunkPayloads({ setId: "set-1", itemId: "item-1", base64: "aabb", chunkSize: 2 });
+  const second = buildFinalImageChunkPayloads({ setId: "set-1", itemId: "item-2", base64: "ccdd", chunkSize: 2 });
+  const chunks = new Map();
+
+  // Interleave the two items the way concurrent generation delivers them.
+  assert.equal(recordFinalImageChunk(chunks, first[0]), "");
+  assert.equal(recordFinalImageChunk(chunks, second[0]), "");
+  assert.equal(recordFinalImageChunk(chunks, first[1]), "data:image/png;base64,aabb");
+  assert.equal(recordFinalImageChunk(chunks, second[1]), "data:image/png;base64,ccdd");
+  assert.equal(chunks.size, 2);
+});
+
+test("creation chunk assembly ignores payloads with no usable identity", () => {
+  assert.deepEqual(buildFinalImageChunkPayloads({ setId: "set-1", base64: "abcd" }), []);
+  assert.deepEqual(buildFinalImageChunkPayloads({ itemId: "item-1", base64: "abcd" }), []);
+  assert.deepEqual(buildFinalImageChunkPayloads({ setId: "set-1", itemId: "item-1", base64: "" }), []);
+  assert.equal(recordFinalImageChunk(new Map(), { setId: "set-1", index: 0, total: 1, chunk: "ab" }), "");
+});
+
+test("clearFinalImageChunks drops one set without touching other keys", () => {
+  const chunks = new Map();
+  recordFinalImageChunk(chunks, { setId: "set-1", itemId: "item-1", index: 0, total: 2, chunk: "aa" });
+  recordFinalImageChunk(chunks, { setId: "set-2", itemId: "item-1", index: 0, total: 2, chunk: "bb" });
+  recordFinalImageChunk(chunks, { filename: "prompt.png", index: 0, total: 2, chunk: "cc" });
+  assert.equal(chunks.size, 3);
+
+  clearFinalImageChunks(chunks, { setId: "set-1" });
+  assert.equal(chunks.size, 2);
+  assert.ok(!chunks.has("set-1::item-1"));
+  assert.ok(chunks.has("set-2::item-1"));
+  assert.ok(chunks.has("prompt.png"));
+
+  clearFinalImageChunks(chunks);
+  assert.equal(chunks.size, 0);
 });
 
 test("generation stream delivery order keeps browser-first caching authoritative", () => {
