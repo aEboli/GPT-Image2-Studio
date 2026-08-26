@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.8-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.10-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installers-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,13 +10,30 @@
 
 Prompt-to-image, reference analysis, editing, ecommerce sets, portraits, article illustrations, PPT generation, and asset history in one browser-based workspace.
 
-Current version: `v0.2.9`
+Current version: `v0.2.10`
 
 [Chinese README](./README.zh-CN.md)
 
 </div>
 
-## What is included in v0.2.8
+## What is included in v0.2.10
+
+- Documentation-only release. It aligns the README version facts with the shipped version: badge, this section, desktop installer and portable ZIP filenames, release-notes link, and build-output paths.
+
+### Added in v0.2.9
+
+- Every generation entry point shares one circular liquid loading indicator: prompt-to-image, style transfer, ecommerce sets, portraits, article illustrations, PPT pages, image decomposition, blend analysis, image editing, and quick blend.
+- The indicator renders as real liquid. A crest and a counter-ripple travel horizontally, bubbles rise inside, and the level fills continuously between percentages instead of stepping.
+- Percentages advance in bands. At `20%` and below each `1%` takes `800ms`; above `20%` every additional `10%` band adds `1500ms` per `1%` (`2300ms` for `21%-30%`, `12800ms` for `91%-99%`), capped at `99%` until the full image is available.
+- A queued state was added. Tasks waiting to start show neither a percentage nor a timer; they use still water with a slow breathing ripple and a queued label, then switch to the generating state from `0%`.
+- Adjacent queue and filmstrip entries with identical placeholders now have a visible separator.
+- Under `prefers-reduced-motion: reduce`, breathing, crest travel, bubbles, and waiting ripples stop while level and percentage text still track progress.
+- Ecommerce set final images are delivered in chunks, failure and malformed-response recovery paths were tightened, and a generated-image validation module was added.
+- Multi-reference edits on the direct route no longer misalign reference relationships.
+- Prompt-to-image queues bound their capacity and enqueue locally instead of rejecting once concurrency is reached.
+- Retried prompt attempts keep their earlier preview cards instead of overwriting them.
+
+### Earlier in v0.2.8
 
 - A quiet lower-left workbench version label backed by the root package version, plus a maintained patch command that increments each main application update by exactly `0.0.1` and checks all current version facts for drift.
 - Prompt Kit now restores reusable long-term Prompt Agent history as stable local templates without overwriting edits or recreating templates the user dismissed. Its desktop placement stays beside the prompt controls, while hover and focus help remains above panels and dialogs.
@@ -163,9 +180,9 @@ On Windows, `launch-studio.cmd` starts the workbench and `stop-studio-services.c
 
 ### Windows desktop app (recommended)
 
-Download `GPT-Image2-Studio-Desktop-Setup-v0.2.8-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
+Download `GPT-Image2-Studio-Desktop-Setup-v0.2.10-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
 
-For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.8-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
+For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.10-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
 
 For desktop development, Electron 43 requires Node.js 22.12 or newer:
 
@@ -176,7 +193,7 @@ cmd /c npm run desktop
 
 ### Windows browser installer
 
-The legacy browser-installer flow remains documented for local builds, but the `v0.2.8` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
+The legacy browser-installer flow remains documented for local builds, but the `v0.2.10` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
 
 ## Configuration
 
@@ -325,7 +342,7 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 ## Releases
 
 - The source and lockfile versions are authoritative; tags use `v<version>`.
-- Current release notes: [v0.2.8](./docs/releases/v0.2.8.md).
+- Current release notes: [v0.2.10](./docs/releases/v0.2.10.md).
 - Windows packages are distributed through [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Check the release notes for hashes and signing status.
 - `npm run check:release:strict` requires a clean worktree and a matching tag on the current commit.
 

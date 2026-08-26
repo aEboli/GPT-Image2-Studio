@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.8-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.10-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installer-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,11 +10,28 @@
 
 把提示词生图、参考图分析、图片编辑、电商套图、人物写真、文章插图、PPT 生成和素材管理集中到一个浏览器界面中。
 
-当前版本：`v0.2.9`
+当前版本：`v0.2.10`
 
 </div>
 
-## v0.2.8 更新说明
+## v0.2.10 更新说明
+
+- 纯文档更新：把 README 中滞留的 v0.2.8 版本事实对齐到当前版本，包括徽章、本章节、桌面安装包与免安装 ZIP 文件名、发行说明链接和构建产物路径。
+
+### v0.2.9 新增
+
+- 所有生图入口使用同一个圆形水滴加载组件：提示词生图、风格迁移、电商套图、写真、文章插图、PPT 页面、图片拆解、融图分析、图片编辑和快速溶图。
+- 水滴按真实液体呈现：液面波峰叠加反向涟漪持续横向流动，液体内有上升气泡，液位在两次百分比之间连续上涨而不是逐格跳变。
+- 百分比分段推进：`20%` 及以内每 `1%` 间隔 `800ms`；超过 `20%` 后每跨一个 `10%` 区间，单次 `1%` 的间隔再增加 `1500ms`（`21%–30%` 为 `2300ms`，`91%–99%` 为 `12800ms`），封顶 `99%` 直到完整图片可用。
+- 新增排队等待态：排队中尚未开始生成的任务不显示也不推进百分比、不安排计时器，改用静水加缓慢呼吸涟漪，标签显示“排队等待中”；任务真正开始生成后切换为生成态并从 `0%` 起算。
+- 队列条带与缩略图条带中占位一致的相邻条目增加可见分隔。
+- `prefers-reduced-motion: reduce` 下停用呼吸、波峰流动、气泡和等待涟漪动画，液位与百分比文本仍随进度更新。
+- 套图最终图分块投递，失败与异常响应的恢复路径收紧，并新增生成图校验模块。
+- 修复直连路线的多参考图编辑，参考图关系不再在多图场景下错位。
+- 提示词生图队列增加容量限制，超出并发时进入本地队列而不是直接拒绝。
+- 提示词多次尝试的预览卡组在重试后保留历史尝试，不再被覆盖。
+
+### v0.2.8 更新
 
 - 工作台左下角新增当前版本号；主应用后续每次更新统一递增 `0.0.1`，并自动同步锁文件、页面和当前发行文档，商品图采集扩展仍使用独立版本线。
 - Prompt Kit 会将可复用的长期 Prompt Agent 历史补齐为稳定的本地模板，不覆盖用户已经编辑的模板，也不会重新创建用户主动删除的模板。桌面端面板贴近提示词参数列展开，悬浮和键盘焦点提示始终显示在面板与弹窗之上。
@@ -223,14 +240,14 @@ Windows 用户也可以双击 `launch-studio.cmd` 启动，使用 `stop-studio-s
 从包含桌面产物的 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
 
 ```text
-GPT-Image2-Studio-Desktop-Setup-v0.2.8-x64.exe
+GPT-Image2-Studio-Desktop-Setup-v0.2.10-x64.exe
 ```
 
 安装完成后通过桌面或开始菜单中的 `GPT-Image2-Studio` 启动。程序会在独立窗口中运行，内置服务使用动态回环端口，关闭窗口后不会遗留后台服务。无需另行安装 Node.js，完整说明见 [Windows 桌面程序文档](./docs/windows-desktop.md)。
 
 源码目录也可直接启动桌面开发版：
 
-如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.8-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
+如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.10-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
 
 桌面开发使用 Electron `43`，要求 Node.js `22.12` 或更高版本；普通 `npm start` 服务仍支持 Node.js `20+`。
 
@@ -241,7 +258,7 @@ cmd /c npm run desktop
 
 ### 方式三：Windows 浏览器安装包（兼容旧版）
 
-旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.8` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
+旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.10` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
 
 ## 配置说明
 
@@ -394,8 +411,8 @@ cmd /c npm run build:desktop
 产物路径：
 
 ```text
-artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.8-x64.exe
-artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.8-x64.zip
+artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.10-x64.exe
+artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.10-x64.zip
 artifacts/desktop/win-unpacked/GPT-Image2-Studio.exe
 ```
 
@@ -413,7 +430,7 @@ cmd /c npm run build:installer
 产物路径格式：
 
 ```text
-artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.8.exe
+artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.10.exe
 ```
 
 脚本使用系统 `iexpress.exe` 生成自解压安装包，并把当前 Node.js 运行时和依赖打入安装目录；启动后仍使用默认浏览器显示工作台。
@@ -614,7 +631,7 @@ cmd /c npm run build:installer
 ## 版本发布
 
 - 版本号以 `package.json` 和 `package-lock.json` 为准。
-- Git tag 使用 `v<version>`，例如 `v0.2.8`。
+- Git tag 使用 `v<version>`，例如 `v0.2.10`。
 - Release 标题建议使用 `GPT-Image2-Studio v<version>`。
 - Release 应附带变更说明、验证结果、Windows 桌面安装包、免安装 ZIP；如仍分发兼容版，应明确区分三个文件的启动形态。
 - 正式发布提交与标签就绪后运行 `npm run check:release:strict`，确认工作树干净且标签与版本一致。
