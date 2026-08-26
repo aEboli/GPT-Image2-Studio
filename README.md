@@ -10,7 +10,7 @@
 
 Prompt-to-image, reference analysis, editing, ecommerce sets, portraits, article illustrations, PPT generation, and asset history in one browser-based workspace.
 
-Current version: `v0.2.8`
+Current version: `v0.2.9`
 
 [Chinese README](./README.zh-CN.md)
 

@@ -1,6 +1,6 @@
 # Windows 桌面程序说明
 
-`GPT-Image2-Studio-Desktop-Setup-v0.2.8-x64.exe` 是使用 Electron 和 NSIS 构建的 Windows x64 桌面安装包。安装后会以独立应用窗口运行完整工作台，不需要单独安装 Node.js，也不会用浏览器标签页承载主界面。
+`GPT-Image2-Studio-Desktop-Setup-v0.2.9-x64.exe` 是使用 Electron 和 NSIS 构建的 Windows x64 桌面安装包。安装后会以独立应用窗口运行完整工作台，不需要单独安装 Node.js，也不会用浏览器标签页承载主界面。
 
 ## 与旧安装包的区别
 
