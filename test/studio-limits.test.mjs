@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 import {
+  CREATION_UPSTREAM_TIMEOUT_MS,
   MAX_CREATION_REFERENCE_IMAGES,
+  MAX_CREATION_PARALLEL_TASKS,
   MAX_PARALLEL_TASKS_PER_SESSION,
   MAX_PROMPT_PARALLEL_TASKS,
   MAX_PROMPT_QUEUE_SIZE,
@@ -16,9 +18,9 @@ const appPath = new URL("../public/app.js", import.meta.url);
 const indexPath = new URL("../public/index.html", import.meta.url);
 const serverPath = new URL("../server.mjs", import.meta.url);
 
-test("prompt mode keeps fifteen tasks visible while limiting generation to six parallel tasks", async () => {
+test("prompt mode keeps fifteen tasks visible while limiting generation to ten parallel tasks", async () => {
   assert.equal(MAX_PARALLEL_TASKS_PER_SESSION, 15);
-  assert.equal(MAX_PROMPT_PARALLEL_TASKS, 6);
+  assert.equal(MAX_PROMPT_PARALLEL_TASKS, 10);
   assert.equal(MAX_PROMPT_QUEUE_SIZE, 15);
 
   const app = await readFile(appPath, "utf8");
@@ -26,11 +28,22 @@ test("prompt mode keeps fifteen tasks visible while limiting generation to six p
 
   assert.doesNotMatch(app, /maxConcurrentTasksPerSession/);
   assert.match(app, /maxParallelTasksPerSession:\s*15/);
-  assert.match(index, /id="liveCount">0 \/ 6<\/span>/);
+  assert.match(index, /id="liveCount">0 \/ 10<\/span>/);
   assert.match(app, /function getMaxQueuedJobCount\(mode = getCurrentGenerationQueueMode\(\)\) \{[\s\S]*MAX_PROMPT_QUEUE_SIZE/);
   assert.match(app, /function getMaxParallelJobCount\(mode = getCurrentGenerationQueueMode\(\)\) \{[\s\S]*MAX_PROMPT_PARALLEL_TASKS/);
   assert.match(app, /selectNextQueuedGenerationJobsByMode\(state\.jobs, getMaxParallelJobCountForJob(?:, getGenerationJobSchedulingKey)?\)/);
   assert.match(app, /提示词模式最多保留 \$\{MAX_PROMPT_QUEUE_SIZE\} 个任务/);
+});
+
+test("creation mode has an independent ten-task parallel limit", async () => {
+  assert.equal(MAX_CREATION_PARALLEL_TASKS, 10);
+  assert.equal(CREATION_UPSTREAM_TIMEOUT_MS, 15 * 60 * 1000);
+  assert.equal(MAX_PROMPT_PARALLEL_TASKS, 10);
+
+  const server = await readFile(serverPath, "utf8");
+  assert.match(server, /if \(scope === "creation"\) \{\s*return MAX_CREATION_PARALLEL_TASKS;/);
+  assert.match(server, /runWithConcurrency\(plan\.items, MAX_CREATION_PARALLEL_TASKS,/);
+  assert.match(server, /runWithConcurrency\(repairItems, MAX_CREATION_PARALLEL_TASKS,/);
 });
 
 test("studio reference limits keep standard references and creation references at fifteen", async () => {

@@ -117,6 +117,8 @@ async function startDesktopApplication() {
   process.env.HOST = "127.0.0.1";
   process.env.PORT = "0";
   process.env.IMAGE_STUDIO_LOCAL_DATA_DIR = app.getPath("userData");
+  // Never inherit the test-only mock image generator into the desktop app.
+  delete process.env.IMAGE_STUDIO_MOCK_IMAGE_GENERATION;
   studioRuntime = await import("../server.mjs");
   await createMainWindow(studioRuntime.studioServerUrl);
 }

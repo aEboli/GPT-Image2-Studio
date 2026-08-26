@@ -165,8 +165,55 @@ export function createConfigModelPickerController({
       directResponsesModel:
         getInputValue(refs.directResponsesModelInput) ||
         browserPayload.directResponsesModel ||
+        browserPayload.directTextModel ||
+        state.config?.directResponsesModel ||
+        state.config?.directTextModel ||
+        DEFAULT_DIRECT_RESPONSES_MODEL,
+      directTextModel:
+        getInputValue(refs.directResponsesModelInput) ||
+        browserPayload.directTextModel ||
+        browserPayload.directResponsesModel ||
+        state.config?.directTextModel ||
         state.config?.directResponsesModel ||
         DEFAULT_DIRECT_RESPONSES_MODEL,
+      directImageBaseUrl:
+        getInputValue(refs.directImageBaseUrlInput) ||
+        browserPayload.directImageBaseUrl ||
+        state.config?.directImageBaseUrl ||
+        browserPayload.directBaseUrl ||
+        state.config?.directBaseUrl ||
+        "",
+      directImageApiKey:
+        getInputValue(refs.directImageApiKeyInput) ||
+        browserPayload.directImageApiKey ||
+        state.config?.directImageApiKey ||
+        browserPayload.directApiKey ||
+        "",
+      directImageEndpointPath:
+        getInputValue(refs.directImageEndpointPathSelect) ||
+        browserPayload.directImageEndpointPath ||
+        state.config?.directImageEndpointPath ||
+        browserPayload.directEndpointPath ||
+        state.config?.directEndpointPath ||
+        "images/generations",
+      directTextBaseUrl:
+        getInputValue(refs.directTextBaseUrlInput) ||
+        browserPayload.directTextBaseUrl ||
+        state.config?.directTextBaseUrl ||
+        browserPayload.directBaseUrl ||
+        state.config?.directBaseUrl ||
+        "",
+      directTextApiKey:
+        getInputValue(refs.directTextApiKeyInput) ||
+        browserPayload.directTextApiKey ||
+        state.config?.directTextApiKey ||
+        browserPayload.directApiKey ||
+        "",
+      directTextEndpointPath:
+        getInputValue(refs.directTextEndpointPathSelect) ||
+        browserPayload.directTextEndpointPath ||
+        state.config?.directTextEndpointPath ||
+        "responses",
       protocolBaseUrl:
         getInputValue(refs.protocolBaseUrlInput) ||
         browserPayload.protocolBaseUrl ||
@@ -184,6 +231,7 @@ export function createConfigModelPickerController({
   function buildModelsFormData(target = getTargetForSelectedRoute()) {
     const payload = getRequestPayloadFromForm(target);
     const formData = new FormDataCtor();
+    formData.set("modelTarget", normalizeTarget(target));
     formData.set("imageRoute", payload.imageRoute);
     formData.set("baseUrl", payload.baseUrl);
     formData.set("endpointPath", payload.endpointPath);
@@ -194,6 +242,13 @@ export function createConfigModelPickerController({
     formData.set("directApiKey", payload.directApiKey);
     formData.set("directImageModel", payload.directImageModel);
     formData.set("directResponsesModel", payload.directResponsesModel);
+    formData.set("directImageBaseUrl", payload.directImageBaseUrl);
+    formData.set("directImageApiKey", payload.directImageApiKey);
+    formData.set("directImageEndpointPath", payload.directImageEndpointPath);
+    formData.set("directTextBaseUrl", payload.directTextBaseUrl);
+    formData.set("directTextApiKey", payload.directTextApiKey);
+    formData.set("directTextEndpointPath", payload.directTextEndpointPath);
+    formData.set("directTextModel", payload.directTextModel);
     formData.set("protocolBaseUrl", payload.protocolBaseUrl);
     formData.set("protocolApiKey", payload.protocolApiKey);
     formData.set("protocolImageModel", payload.protocolImageModel);

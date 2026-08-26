@@ -244,11 +244,11 @@ test("strict remote image validation parses PNG, JPEG, and common WebP dimension
   }
 });
 
-test("batch validation deduplicates URLs and hard-caps injected concurrency at four", async () => {
+test("batch validation deduplicates URLs and hard-caps injected concurrency at ten", async () => {
   let fetchCount = 0;
   let active = 0;
   let maxActive = 0;
-  const entries = Array.from({ length: 7 }, (_, index) => ({
+  const entries = Array.from({ length: 13 }, (_, index) => ({
     key: `image-${index}`,
     path: `sets.0.images.${index}`,
     url: `https://images.example.test/${index < 2 ? "shared" : index}.png`,
@@ -268,12 +268,12 @@ test("batch validation deduplicates URLs and hard-caps injected concurrency at f
   });
 
   assert.equal(report.valid, true);
-  assert.equal(report.imageCount, 7);
-  assert.equal(report.uniqueUrlCount, 6);
-  assert.equal(report.verifiedUrlCount, 6);
-  assert.equal(fetchCount, 6);
-  assert.equal(maxActive, 4);
-  assert.equal(report.results.size, 7);
+  assert.equal(report.imageCount, 13);
+  assert.equal(report.uniqueUrlCount, 12);
+  assert.equal(report.verifiedUrlCount, 12);
+  assert.equal(fetchCount, 12);
+  assert.equal(maxActive, 10);
+  assert.equal(report.results.size, 13);
   assert.equal(report.results.get("image-0").url, report.results.get("image-1").url);
 });
 

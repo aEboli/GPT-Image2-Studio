@@ -149,6 +149,7 @@ test("local background generate releases request connections and completes throu
       TMP: tempRoot,
       TEMP: tempRoot,
       IMAGE_STUDIO_MOCK_IMAGE_GENERATION: "1",
+      IMAGE_STUDIO_ENABLE_TEST_MOCKS: "1",
       IMAGE_STUDIO_OUTPUT_DIR: join(tempRoot, "output"),
       IMAGE_STUDIO_LOCAL_DATA_DIR: join(tempRoot, "local-data"),
     },

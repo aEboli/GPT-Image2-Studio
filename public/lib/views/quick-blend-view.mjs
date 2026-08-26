@@ -3,7 +3,7 @@ import { sortGalleryItemsByCreatedAtDesc } from "../gallery-organizer.mjs";
 import { getDefaultGenerationSize, normalizeGenerationSize } from "../generation-size-options.mjs";
 import { DEFAULT_RESPONSES_MODEL } from "../model-defaults.mjs";
 import { normalizeOutputFormat } from "../output-format-options.mjs";
-import { formatLoadingThumbnailStatusLabel, getPreviewPlaceholderState } from "../preview-placeholder-state.mjs";
+import { getPreviewPlaceholderState } from "../preview-placeholder-state.mjs";
 import { shouldReusePreviewLoadingShell } from "../preview-loading-shell.mjs";
 import { createViewRendererController } from "./view-renderer.mjs";
 
@@ -82,6 +82,7 @@ export function createQuickBlendController(options = {}) {
     clearError = () => {},
     closeReferencePreview = () => {},
     compactErrorMessage = (message, fallback) => String(message || fallback || ""),
+    createGenerationLoadingShell,
     createPreviewLoadingShellNodes,
     createReferenceAddCard,
     DEFAULT_QUICK_BLEND_RATIO = DEFAULT_QUICK_BLEND_RATIO_VALUE,
@@ -111,6 +112,8 @@ export function createQuickBlendController(options = {}) {
     setActiveView = () => {},
     setReferencePreviewNavigationContext = () => {},
     showError = () => {},
+    stopGenerationLoadingShells = () => {},
+    stopGenerationLoadingShell = () => {},
     syncReferenceDropzoneCompact = () => {},
     updatePreviewLoadingShell,
   } = options;
@@ -872,8 +875,9 @@ function setQuickBlendGenerationPreviewKey(key) {
   renderQuickBlendGenerationPreview();
 }
 
-function setQuickBlendGenerationPlaceholderText(message, hidden = false) {
-  quickBlendLoadingShellNodes = null;
+  function setQuickBlendGenerationPlaceholderText(message, hidden = false) {
+    stopGenerationLoadingShell(quickBlendLoadingShellNodes?.loading);
+    quickBlendLoadingShellNodes = null;
   refs.quickBlendGenerationEmpty.className = "quick-blend-generation-empty preview-placeholder";
   refs.quickBlendGenerationEmpty.classList.toggle("hidden", hidden);
   refs.quickBlendGenerationEmpty.replaceChildren();
@@ -916,14 +920,11 @@ function renderQuickBlendGenerationLoading(item) {
   refs.quickBlendGenerationEmpty.className = "quick-blend-generation-empty preview-placeholder preview-placeholder-loading";
   refs.quickBlendGenerationEmpty.classList.remove("hidden");
 
-  if (
-    refs.quickBlendGenerationEmpty.firstChild !== quickBlendLoadingShellNodes.eyebrow ||
-    refs.quickBlendGenerationEmpty.lastChild !== quickBlendLoadingShellNodes.shell
-  ) {
-    refs.quickBlendGenerationEmpty.replaceChildren(
-      quickBlendLoadingShellNodes.eyebrow,
-      quickBlendLoadingShellNodes.shell,
-    );
+    if (
+      refs.quickBlendGenerationEmpty.firstChild !== quickBlendLoadingShellNodes.shell ||
+      refs.quickBlendGenerationEmpty.childElementCount !== 1
+    ) {
+      refs.quickBlendGenerationEmpty.replaceChildren(quickBlendLoadingShellNodes.shell);
   }
 }
 
@@ -988,9 +989,10 @@ function renderQuickBlendGenerationPreview() {
   renderQuickBlendGenerationStrip();
 }
 
-function renderQuickBlendGenerationStrip() {
-  const entries = getQuickBlendGenerationEntries();
-  refs.quickBlendGenerationStrip.replaceChildren();
+  function renderQuickBlendGenerationStrip() {
+    const entries = getQuickBlendGenerationEntries();
+    stopGenerationLoadingShells(refs.quickBlendGenerationStrip);
+    refs.quickBlendGenerationStrip.replaceChildren();
   refs.quickBlendGenerationStrip.classList.toggle("hidden", entries.length === 0);
   refs.quickBlendThumbnailEmpty.classList.toggle("hidden", entries.length > 0);
 
@@ -1011,22 +1013,14 @@ function renderQuickBlendGenerationStrip() {
       image.alt = getDisplayPrompt(item) || "快速溶图结果";
       image.loading = "lazy";
       button.appendChild(image);
-    } else {
-      const ghost = document.createElement("div");
-      ghost.className = "filmstrip-ghost";
-      if (item?.isRunning || item?.started) {
-        const loader = document.createElement("div");
-        loader.className = "quick-blend-thumb-loader";
-        loader.setAttribute("aria-hidden", "true");
-        const label = document.createElement("span");
-        label.textContent = formatLoadingThumbnailStatusLabel(item);
-        loader.appendChild(label);
-        ghost.appendChild(loader);
-        ghost.setAttribute("aria-label", label.textContent);
+      } else if (item?.isRunning || (item?.started && !item?.filename)) {
+        const loading = createGenerationLoadingShell(document, { key, active: true });
+        button.appendChild(loading.shell);
       } else {
+        const ghost = document.createElement("div");
+        ghost.className = "filmstrip-ghost";
         ghost.textContent = "等待";
-      }
-      button.appendChild(ghost);
+        button.appendChild(ghost);
     }
 
     const caption = document.createElement("span");

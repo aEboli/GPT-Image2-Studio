@@ -22,7 +22,7 @@ namespace GPTImage2Studio.ProductImageClipboardHost
         private const int MaxRequestBytes = 4 * 1024 * 1024;
         private const int MaxResponseBytes = 1024 * 1024;
         private const int MaxItemCount = 1000;
-        private const int MaxConcurrency = 8;
+        private const int MaxConcurrency = 10;
         private const int MaxRedirects = 5;
         private const long MaxImageBytes = 20L * 1024 * 1024;
         private const long MaxBatchBytes = 512L * 1024 * 1024;

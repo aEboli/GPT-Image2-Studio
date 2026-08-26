@@ -42,7 +42,13 @@ const PREVIEW_LOADING_STAGE_PHYSICS = {
 };
 
 export function shouldReusePreviewLoadingShell(previousState = {}, nextState = {}) {
-  return previousState.mode === "loading" && nextState.mode === "loading";
+  if (previousState.mode !== "loading" || nextState.mode !== "loading") {
+    return false;
+  }
+  if (previousState.loadingKey && nextState.loadingKey && previousState.loadingKey !== nextState.loadingKey) {
+    return false;
+  }
+  return true;
 }
 
 export function getPreviewLoadingShellTheme(placeholderState = {}) {

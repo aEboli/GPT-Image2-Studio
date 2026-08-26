@@ -12,6 +12,8 @@ import { once } from "node:events";
 import { setTimeout as delay } from "node:timers/promises";
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const validPngBase64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAADklEQVR4nGP4DwUMMAYAj4IP8TylVlEAAAAASUVORK5CYII=";
 
 async function getFreePort() {
   const server = createTcpServer();
@@ -121,7 +123,7 @@ async function createUpstreamEditServer(options = {}) {
   const requests = [];
   const upstreamResponses = Array.isArray(options.responses) && options.responses.length > 0
     ? options.responses
-    : [{ base64: "ZWRpdC1zZXJ2ZXItZmluYWw=" }];
+    : [{ base64: validPngBase64 }];
   const server = createHttpServer(async (request, response) => {
     const chunks = [];
     for await (const chunk of request) {
@@ -143,7 +145,7 @@ async function createUpstreamEditServer(options = {}) {
     const configuredResponse = upstreamResponses[Math.min(requests.length - 1, upstreamResponses.length - 1)];
     const status = Number(configuredResponse.status || 200);
     const payload = configuredResponse.payload || {
-      data: [{ b64_json: configuredResponse.base64 || "ZWRpdC1zZXJ2ZXItZmluYWw=" }],
+      data: [{ b64_json: configuredResponse.base64 || validPngBase64 }],
     };
     response.writeHead(status, { "Content-Type": "application/json" });
     response.end(JSON.stringify(payload));
@@ -413,6 +415,32 @@ test("local direct generation with one reference uses image edits and the image 
   ), JSON.stringify(metadata, null, 2));
 });
 
+test("local generation rejects a 1x1 upstream image before publishing or saving it", async (t) => {
+  const upstream = await createUpstreamEditServer({
+    responses: [{
+      base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==",
+    }],
+  });
+  const { baseUrl, outputDir } = await startLocalStudioServer(t, {
+    upstream,
+    tempPrefix: "image-edit-invalid-result-",
+  });
+
+  const response = await fetch(`${baseUrl}/api/generate`, {
+    method: "POST",
+    body: makeImageEditForm({ baseUrl: upstream.baseUrl }),
+  });
+  const events = parseSseEvents(await response.text());
+  const error = events.find((event) => event.eventName === "error");
+
+  assert.equal(response.status, 200);
+  assert.equal(upstream.requests.length, 1);
+  assert.ok(error, "expected invalid generated image error");
+  assert.match(error.payload.message, /图片尺寸过小.*实际尺寸 1x1/);
+  assert.equal(events.some((event) => event.eventName === "saved"), false);
+  assert.deepEqual(await findJsonFiles(join(outputDir, "json")), []);
+});
+
 test("local generate rejects invalid local-mask requests before upstream edits", async (t) => {
   const cases = [
     {
@@ -515,6 +543,7 @@ test("local generate rejects image edit without a source image", async (t) => {
       TMP: tempRoot,
       TEMP: tempRoot,
       IMAGE_STUDIO_MOCK_IMAGE_GENERATION: "1",
+      IMAGE_STUDIO_ENABLE_TEST_MOCKS: "1",
       IMAGE_STUDIO_OUTPUT_DIR: join(tempRoot, "output"),
       IMAGE_STUDIO_LOCAL_DATA_DIR: join(tempRoot, "local-data"),
     },
@@ -554,6 +583,7 @@ test("local generate rejects image edit with multiple source images", async (t) 
       TMP: tempRoot,
       TEMP: tempRoot,
       IMAGE_STUDIO_MOCK_IMAGE_GENERATION: "1",
+      IMAGE_STUDIO_ENABLE_TEST_MOCKS: "1",
       IMAGE_STUDIO_OUTPUT_DIR: join(tempRoot, "output"),
       IMAGE_STUDIO_LOCAL_DATA_DIR: join(tempRoot, "local-data"),
     },
@@ -598,6 +628,7 @@ test("local generate rejects image edit without an edit instruction", async (t) 
       TMP: tempRoot,
       TEMP: tempRoot,
       IMAGE_STUDIO_MOCK_IMAGE_GENERATION: "1",
+      IMAGE_STUDIO_ENABLE_TEST_MOCKS: "1",
       IMAGE_STUDIO_OUTPUT_DIR: join(tempRoot, "output"),
       IMAGE_STUDIO_LOCAL_DATA_DIR: join(tempRoot, "local-data"),
     },
@@ -687,12 +718,10 @@ test("local generate executes merge local-mask image edit and saves metadata", a
 
 test("local generate executes sequential local-mask image edit in region order", async (t) => {
   const regions = makeLocalMaskRegions();
-  const firstOutput = Buffer.from("region-one-output").toString("base64");
-  const finalOutput = Buffer.from("region-two-final").toString("base64");
   const upstream = await createUpstreamEditServer({
     responses: [
-      { base64: firstOutput },
-      { base64: finalOutput },
+      { base64: validPngBase64 },
+      { base64: validPngBase64 },
     ],
   });
   const { baseUrl, outputDir } = await startLocalStudioServer(t, {
@@ -725,7 +754,8 @@ test("local generate executes sequential local-mask image edit in region order",
   assert.match(upstream.requests[0].body, /Region 1 of 2/);
   assert.match(upstream.requests[0].body, /Replace the cup with glossy red ceramic\./);
 
-  assert.match(upstream.requests[1].body, /region-one-output/);
+  assert.match(upstream.requests[1].body, /name="image"; filename="local-mask-region-1-output\.png"/);
+  assert.match(upstream.requests[1].body, /Content-Type: image\/png/);
   assert.match(upstream.requests[1].body, /name="mask"; filename="region-2-mask\.png"/);
   assert.match(upstream.requests[1].body, /Region 2 of 2/);
   assert.match(upstream.requests[1].body, /Remove the bright reflection from the table\./);
@@ -746,12 +776,11 @@ test("local generate executes sequential local-mask image edit in region order",
 
 test("local generate reuses sequential JPG outputs with matching filename and mime type", async (t) => {
   const regions = makeLocalMaskRegions();
-  const firstOutput = Buffer.from("region-one-jpg-output").toString("base64");
-  const finalOutput = Buffer.from("region-two-jpg-final").toString("base64");
+  const validJpegBase64 = (await readFile(join(rootDir, "docs", "images", "gallery.jpg"))).toString("base64");
   const upstream = await createUpstreamEditServer({
     responses: [
-      { base64: firstOutput },
-      { base64: finalOutput },
+      { base64: validJpegBase64 },
+      { base64: validJpegBase64 },
     ],
   });
   const { baseUrl } = await startLocalStudioServer(t, {
@@ -787,7 +816,7 @@ test("local generate reports sequential local-mask intermediate failure without 
   const regions = makeLocalMaskRegions();
   const upstream = await createUpstreamEditServer({
     responses: [
-      { base64: Buffer.from("region-one-output").toString("base64") },
+      { base64: validPngBase64 },
       {
         status: 500,
         payload: { error: { message: "region two failed upstream" } },

@@ -25,8 +25,8 @@ const publicConfigModelPickerPath = new URL("../public/lib/config-model-picker.m
 const publicCreationListingViewPath = new URL("../public/lib/creation-listing-view.mjs", import.meta.url);
 const generationClientPath = new URL("../lib/generation-client.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20260821-asset-theme-1";
-const appAssetVersion = "20260812-top-layer-tooltips-3";
+const stylesAssetVersion = "20260825-attempt-preview-deck-1";
+const appAssetVersion = "20260825-attempt-preview-deck-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
 const creationQueueModuleAssetVersion = "20260712-creation-queue-selection-isolation-1";
 const quickBlendModuleAssetVersion = "20260608-quick-blend-time-sort-1";
@@ -528,10 +528,12 @@ test("filmstrip keeps all prompt queue jobs within the fifteen-task window", asy
     "state",
     "sortGalleryItemsByCreatedAtDesc",
     "makeJobPreviewKey",
+    "makeGalleryPreviewKey",
     "formatFilmstripSizeLabel",
     "formatClock",
     "getPromptGenerationGalleryItems",
     "getStablePreviewLoadingItems",
+    "getTerminalPromptAttemptDecks",
     "PROMPT_FILMSTRIP_JOB_LIMIT",
     "PROMPT_FILMSTRIP_MAX_HISTORY_LIMIT",
     `${getFilmstripItemsRuntime}\nreturn getFilmstripItems;`,
@@ -539,10 +541,12 @@ test("filmstrip keeps all prompt queue jobs within the fifteen-task window", asy
     state,
     (items) => [...items],
     (id) => `job:${id}`,
+    (filename) => `file:${filename}`,
     () => "",
     () => "",
     () => [],
     (items) => [...items].reverse(),
+    () => [],
     15,
     50,
   );
@@ -590,6 +594,7 @@ test("filmstrip keeps the initial baseline and current-session results within a 
     "formatClock",
     "getPromptGenerationGalleryItems",
     "getStablePreviewLoadingItems",
+    "getTerminalPromptAttemptDecks",
     "PROMPT_FILMSTRIP_JOB_LIMIT",
     "PROMPT_FILMSTRIP_MAX_HISTORY_LIMIT",
     `${getFilmstripItemsRuntime}\nreturn getFilmstripItems;`,
@@ -602,6 +607,7 @@ test("filmstrip keeps the initial baseline and current-session results within a 
     (value) => String(value || ""),
     (items) => items,
     (items) => [...items].reverse(),
+    () => [],
     15,
     50,
   );
@@ -1419,12 +1425,10 @@ test("quick blend mode implements upload pairing queue preview and cleanup contr
   assert.match(styles, /\.quick-blend-pair-row\s*\{[\s\S]*min-height:\s*34px;[\s\S]*font-size:\s*0\.82rem;/);
   assert.match(styles, /\.quick-blend-generation-canvas\.has-image\s*\{[\s\S]*cursor:\s*zoom-in;/);
   assert.match(styles, /\.quick-blend-generation-thumb\.is-running\s*\{/);
-  assert.match(styles, /\.quick-blend-thumb-loader\s*\{[\s\S]*background:[\s\S]*radial-gradient/);
-  assert.match(styles, /\.quick-blend-thumb-loader::before\s*\{[\s\S]*animation:\s*quick-blend-thumb-ring/);
-  assert.match(styles, /\.quick-blend-thumb-loader::after\s*\{[\s\S]*animation:\s*quick-blend-thumb-scan/);
-  assert.match(styles, /\.quick-blend-thumb-loader\s*span\s*\{[\s\S]*z-index:\s*1;/);
-  assert.match(styles, /@keyframes quick-blend-thumb-ring\s*\{/);
-  assert.match(styles, /@keyframes quick-blend-thumb-scan\s*\{/);
+  assert.match(styles, /\.quick-blend-generation-thumb\.is-running\s*\{/);
+  assert.match(styles, /\.filmstrip \.generation-loading-shell\s*\{/);
+  assert.match(styles, /\.filmstrip \.generation-loading-drop\s*\{/);
+  assert.doesNotMatch(styles, /quick-blend-thumb-loader|quick-blend-thumb-ring|quick-blend-thumb-scan/);
 
   assert.match(quickBlendView, /function createQuickBlendItem\(group, file\) \{/);
   assert.match(quickBlendView, /function renderQuickBlendFeedback\(message = "", kind = ""\) \{/);
@@ -1464,7 +1468,8 @@ test("quick blend mode implements upload pairing queue preview and cleanup contr
   assert.match(quickBlendView, /function getQuickBlendGenerationEntries\(\) \{/);
   assert.match(quickBlendView, /function renderQuickBlendGenerationPreview\(\) \{/);
   assert.match(quickBlendView, /function openQuickBlendGeneratedPreview\(\) \{/);
-  assert.match(quickBlendView, /loader\.className = "quick-blend-thumb-loader";[\s\S]*loader\.setAttribute\("aria-hidden", "true"\);[\s\S]*label\.textContent = formatLoadingThumbnailStatusLabel\(item\);/);
+  assert.match(quickBlendView, /createGenerationLoadingShell\(document, \{ key, active: true \}\)/);
+  assert.doesNotMatch(quickBlendView, /quick-blend-thumb-loader|formatLoadingThumbnailStatusLabel/);
   assert.match(app, /if \(canceledJob\.mode === "quick-blend"\) \{[\s\S]*removeQuickBlendGenerationKey\(makeJobPreviewKey\(canceledJob\.id\)\);/);
   assert.match(app, /if \(task\.mode === "quick-blend"\) \{[\s\S]*task\.item\.mode = "quick-blend";[\s\S]*storeQuickBlendGenerationItem\(task\.item\);[\s\S]*replaceQuickBlendGenerationKey\(taskPreviewKey, makeGalleryPreviewKey\(task\.item\.filename\)\);/);
   assert.match(app, /function setQuickBlendFeedback\(message = "", kind = ""\) \{[\s\S]*state\.quickBlend\.feedback = message;[\s\S]*state\.quickBlend\.feedbackKind = kind;/);
@@ -1921,57 +1926,21 @@ test("studio rendering preserves the settings form scroll position during genera
   assert.match(app, /function syncStudioHeight\(\) \{[\s\S]*const settingsScrollTop = getSettingsFormScrollTop\(\);[\s\S]*restoreSettingsFormScrollTop\(settingsScrollTop\);[\s\S]*\}/);
 });
 
-test("generation loading shell renders textless progress rings", async () => {
+test("generation loading shell renders one shared percentage drop", async () => {
   const styles = await readFile(stylesPath, "utf8");
   const app = await readFile(appPath, "utf8");
-  const loadingStart = styles.indexOf(".preview-loading-shell");
-  const loadingStyles = styles.slice(loadingStart, styles.indexOf(".preview-panel", loadingStart));
-  const liquidFlowStart = loadingStyles.indexOf("@keyframes preview-loading-liquid-flow");
-  const liquidFlowEnd = loadingStyles.indexOf("@keyframes preview-loading-liquid-sediment", liquidFlowStart);
-  const liquidFlowStyles = loadingStyles.slice(liquidFlowStart, liquidFlowEnd);
-
-  assert.match(app, /"preview-loading-ring"/);
-  assert.match(app, /"preview-loading-fill"/);
-  assert.match(app, /"preview-loading-fluid-surface"/);
-  assert.match(app, /"preview-loading-fluid-stream"/);
-  assert.match(app, /"preview-loading-fluid-stream preview-loading-fluid-stream-phase"/);
-  assert.match(app, /"preview-loading-fluid-sediment"/);
-  assert.match(app, /createPreviewLoadingShellNodes\("prompt"\)/);
-  assert.doesNotMatch(app, /preview-loading-progress|preview-loading-signal|preview-loading-copy|preview-loading-status|preview-loading-step/);
-  assert.match(
-    loadingStyles,
-    /\.preview-loading-fill\s*\{[\s\S]*transform:\s*scaleY\(var\(--loading-progress,\s*0\.25\)\);[\s\S]*transform-origin:\s*center bottom;/,
-  );
-  assert.match(loadingStyles, /\.preview-loading-ring-line\s*\{[\s\S]*animation:\s*preview-loading-ring-spin/);
-  assert.match(loadingStyles, /\.preview-loading-ring-line:nth-child\(2\)\s*\{[\s\S]*animation-direction:\s*reverse/);
-  assert.match(loadingStyles, /\.preview-loading-motion\s*>\s*\*\s*\{[\s\S]*animation:\s*preview-loading-float/);
-  assert.match(loadingStyles, /\.preview-loading-motion\.is-entering\s*\{[\s\S]*animation:\s*preview-loading-orb-enter/);
-  assert.match(loadingStyles, /\.preview-loading-orb-field\.is-orbiting\s*\{[\s\S]*animation:\s*preview-loading-orb-field-orbit/);
-  assert.match(loadingStyles, /@keyframes preview-loading-orb-field-orbit[\s\S]*transform:\s*rotate\(-360deg\)/);
-  assert.match(loadingStyles, /\.preview-loading-shell\.is-prompt-loading \.preview-loading-orb-field\.is-orbiting\s*\{[\s\S]*animation:\s*preview-loading-orb-field-drift/);
-  assert.match(loadingStyles, /@keyframes preview-loading-orb-field-drift[\s\S]*transform:\s*translate3d\(0, -2px, 0\)/);
-  assert.match(loadingStyles, /\.preview-loading-shell\.is-prompt-loading \.preview-loading-fluid-surface/);
-  assert.match(loadingStyles, /\.preview-loading-shell\.is-prompt-loading \.preview-loading-fluid-stream/);
-  assert.match(loadingStyles, /\.preview-loading-shell\.is-prompt-loading \.preview-loading-fluid-stream-phase[\s\S]*animation-delay:\s*var\(--loading-flow-phase-delay/);
-  assert.match(loadingStyles, /\.preview-loading-shell\.is-prompt-loading \.preview-loading-fluid-sediment/);
-  assert.match(loadingStyles, /@keyframes preview-loading-liquid-settle[\s\S]*var\(--loading-settle-distance, 7px\)[\s\S]*scaleX\(1\.08\)/);
-  assert.match(liquidFlowStyles, /0%,\s*\n\s*100%[\s\S]*var\(--loading-stream-distance, 24px\)/);
-  assert.doesNotMatch(liquidFlowStyles, /opacity:\s*0/);
-  assert.match(loadingStyles, /@keyframes preview-loading-liquid-settle[\s\S]*0%,\s*\n\s*100%[\s\S]*background-position:\s*0 4%/);
-  assert.match(loadingStyles, /@keyframes preview-loading-color-shift/);
-  assert.doesNotMatch(loadingStyles, /preview-loading-morph|preview-loading-aura|filter:\s*blur|mix-blend-mode/);
-  assert.match(
-    loadingStyles,
-    /@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*\.preview-loading-orb-field,[\s\S]*\.preview-loading-motion,[\s\S]*\.preview-loading-ring-line,[\s\S]*\.preview-loading-fill[\s\S]*animation:\s*none;/,
-  );
-  assert.match(
-    loadingStyles,
-    /@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*\.preview-loading-shell\.is-prompt-loading \.preview-loading-orb-field\.is-orbiting,[\s\S]*\.preview-loading-fluid-surface,[\s\S]*\.preview-loading-fluid-stream,[\s\S]*\.preview-loading-fluid-sediment[\s\S]*animation:\s*none !important;/,
-  );
-  assert.match(
-    styles,
-    /html\[data-ui-layout="mobile"\] \.preview-loading-shell\.is-prompt-loading span\s*\{\s*display:\s*block;/,
-  );
+  assert.match(app, /createGenerationLoadingShell\(document, \{ active: false \}\)/);
+  assert.match(app, /updateGenerationLoadingShell\(nodes\.loading,[\s\S]*active: true/);
+  assert.match(styles, /\.generation-loading-shell\s*\{/);
+  assert.match(styles, /\.generation-loading-drop\s*\{[\s\S]*linear-gradient/);
+  assert.match(styles, /\.generation-loading-drop::after\s*\{[\s\S]*height:\s*var\(--generation-loading-progress\)/);
+  assert.match(styles, /@keyframes generation-loading-water-flow/);
+  assert.doesNotMatch(styles, /conic-gradient/);
+  assert.match(styles, /\.generation-loading-percent\s*\{/);
+  assert.match(styles, /@keyframes generation-loading-breathe/);
+  assert.match(styles, /@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*\.generation-loading-drop[\s\S]*animation:\s*none;/);
+  assert.doesNotMatch(app, /createPreviewMotionNode|preview-loading-orb-field|preview-loading-fluid/);
+  assert.doesNotMatch(styles, /preview-loading-orb-field|preview-loading-fluid|preview-loading-ring-line|preview-loading-fill\s*\{/);
 });
 
 test("studio panels start without redundant title blocks and merge parameters under ratio controls", async () => {
@@ -3203,8 +3172,10 @@ test("studio stores API settings in the browser and sends them with cloud genera
   assert.match(browserConfig, /formData\.set\("protocolApiKey", config\.protocolApiKey\);/);
   assert.match(browserConfig, /formData\.set\("protocolImageModel", config\.protocolImageModel\);/);
   assert.match(app, /directResponsesModelInput:\s*document\.querySelector\("#directResponsesModelInput"\),/);
-  assert.match(app, /directResponsesModel:\s*refs\.directResponsesModelInput\.value\.trim\(\) \|\| browserPayload\.directResponsesModel/);
-  assert.match(app, /refs\.directResponsesModelInput\.value = config\.directResponsesModel \|\| DEFAULT_DIRECT_RESPONSES_MODEL;/);
+  assert.match(app, /const directTextModel = refs\.directResponsesModelInput\.value\.trim\(\) \|\| browserPayload\.directTextModel \|\| browserPayload\.directResponsesModel/);
+  assert.match(app, /\bdirectTextModel,\s*\/\/ Legacy aliases/);
+  assert.match(app, /directResponsesModel:\s*directTextModel/);
+  assert.match(app, /refs\.directResponsesModelInput\.value = config\.directTextModel \|\| config\.directResponsesModel \|\| DEFAULT_DIRECT_RESPONSES_MODEL;/);
   assert.match(app, /protocolBaseUrlInput:\s*document\.querySelector\("#protocolBaseUrlInput"\),/);
   assert.match(app, /protocolApiKeyInput:\s*document\.querySelector\("#protocolApiKeyInput"\),/);
   assert.match(app, /protocolImageModelInput:\s*document\.querySelector\("#protocolImageModelInput"\),/);
@@ -3437,6 +3408,7 @@ test("direct mode fetch models uses direct API settings and direct model picker"
   assert.equal(capturedBodies[0].get("directApiKey"), "direct-key");
   assert.equal(capturedBodies[0].get("directImageModel"), "gpt-image-2");
   assert.equal(capturedBodies[0].get("directResponsesModel"), "gpt-5.5");
+  assert.equal(capturedBodies[0].get("directTextModel"), "gpt-5.5");
   assert.equal(refs.directModelOptionsList.hidden, false);
   assert.equal(refs.modelOptionsList.hidden, true);
   assert.equal(refs.directResponsesModelOptionsList.hidden, true);
@@ -4749,12 +4721,12 @@ test("creation generation cards replace plan details with loading animation", as
   assert.match(app, /if \(getImageUrl\(item\)\) \{\s*return false;\s*\}/);
   assert.doesNotMatch(app, /state\.creation\.generationScope === "full"[\s\S]*return status !== "failed";/);
   assert.match(app, /function shouldHideCreationCardDetails\(item = \{\}, showRecordActions = false\) \{/);
-  assert.match(app, /function createCreationCardLoading\(status = "generating", sequenceIndex = 0\) \{/);
+  assert.match(app, /function createCreationCardLoading\(status = "generating", sequenceIndex = 0, key = ""\) \{/);
   assert.match(app, /const isQueued = status === "queued";/);
-  assert.match(app, /createCreationCardLoadingShell\(isQueued \? "queued" : "generating",\s*null,\s*\{ sequenceIndex \}\)/);
+  assert.match(app, /createCreationCardLoadingShell\(isQueued \? "queued" : "generating",\s*null,\s*\{ sequenceIndex, key \}\)/);
   assert.match(app, /card\.classList\.toggle\("is-generating", isLoadingCard\);/);
   assert.match(app, /status\.textContent = getCreationItemStatusLabel\(item\);/);
-  assert.match(app, /media\.classList\.add\("is-loading"\);[\s\S]*media\.appendChild\(createCreationCardLoading\(item\.status,\s*fallbackIndex\)\);/);
+  assert.match(app, /media\.classList\.add\("is-loading"\);[\s\S]*media\.appendChild\(createCreationCardLoading\(item\.status,\s*fallbackIndex,\s*item\.itemId\)\);/);
   assert.match(app, /const shouldRenderPath = !imageUrl && !showRecordActions && !hideGenerationDetails;/);
   assert.match(app, /if \(shouldRenderPath\) \{/);
   assert.match(app, /if \(showActions && !hideGenerationDetails\) \{/);
@@ -4769,10 +4741,8 @@ test("creation generation cards replace plan details with loading animation", as
   assert.match(styles, /\.creation-card-media\.is-loading\s*\{/);
   assert.match(styles, /\.creation-card-media\.is-loading\s*\{[\s\S]*width:\s*min\(100%,\s*220px\);/);
   assert.match(styles, /\.creation-card-loading\s*\{[\s\S]*min-height:\s*132px;[\s\S]*padding:\s*12px;/);
-  assert.match(styles, /\.creation-card-loading-sketch-ring\s*\{[\s\S]*place-items:\s*center;/);
-  assert.match(styles, /\.creation-card-loading-order\s*\{[\s\S]*position:\s*relative;[\s\S]*z-index:\s*2;/);
-  assert.match(styles, /\.creation-card-loading-sketch-line\s*\{[\s\S]*animation:\s*creation-card-loading-sketch-spin/);
-  assert.match(styles, /@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*\.creation-card-loading-sketch-line[\s\S]*animation:\s*none;/);
+  assert.match(styles, /\.creation-card-loading \.generation-loading-drop\s*\{/);
+  assert.doesNotMatch(styles, /creation-card-loading-sketch|creation-card-loading-waiting|creation-card-loading-steps/);
 });
 
 test("creation result grid keeps running card loading DOM stable across rerenders", async () => {
@@ -4784,28 +4754,17 @@ test("creation result grid keeps running card loading DOM stable across rerender
   assert.match(app, /function syncCreationResultGrid\(items = \[\], \{ showActions = true \} = \{\}\) \{/);
   assert.match(app, /syncCreationResultGridShell\(\{/);
   assert.match(app, /syncCreationLoadingCard\(card,\s*item,\s*index/);
-  assert.match(app, /createCreationCardLoadingShell\([^,]+,\s*null,\s*\{ sequenceIndex \}\)/);
+  assert.match(app, /createCreationCardLoadingShell\([^,]+,\s*null,\s*\{ sequenceIndex, key \}\)/);
   assert.match(app, /syncCreationResultGrid\(items, \{ showActions: showCreationResultActions \}\);/);
   const renderCreationViewBody = extractFunctionBefore(app, "renderCreationView", "getCreationPlanPreviewImageCount");
   assert.doesNotMatch(renderCreationViewBody, /refs\.creationResultGrid\.innerHTML = "";/);
   assert.match(loadingModule, /export function getCreationCardDomKey\(item = \{\}, fallbackIndex = 0\) \{/);
   assert.match(loadingModule, /export function syncCreationResultGrid\(\{/);
   assert.match(loadingModule, /\.querySelectorAll\("\.creation-card\[data-creation-card-key\]"\)/);
-  assert.match(loadingModule, /updateCreationCardLoading\(loadingShell,\s*item\.status,\s*\{ sequenceIndex: fallbackIndex \}\)/);
+  assert.match(loadingModule, /updateCreationCardLoading\(loadingShell,\s*item\.status,\s*\{ key \}\)/);
 
-  assert.match(styles, /\.creation-card-loading-sketch-ring\s*\{/);
-  assert.match(styles, /\.creation-card-loading-sketch-line\s*\{[\s\S]*border-radius:\s*46%\s+54%\s+48%\s+52%/);
-  assert.match(styles, /\.creation-card-loading-sketch-line:nth-child\(2\)\s*\{[\s\S]*animation-duration:\s*2100ms/);
-  assert.match(styles, /\.creation-card-loading-sketch-line:nth-child\(4\)\s*\{[\s\S]*animation-direction:\s*reverse/);
-  assert.doesNotMatch(styles, /\.creation-card-loading-progress\s*\{/);
-  assert.doesNotMatch(styles, /\.creation-card-loading-signal\s*\{/);
-  assert.doesNotMatch(styles, /\.creation-card-loading-orbit\s*\{/);
-  assert.doesNotMatch(styles, /content:\s*attr\(data-creation-card-loading-sequence-step\)/);
-  assert.match(styles, /\.creation-card-loading-step\.is-active\s*\{/);
-  assert.match(
-    styles,
-    /@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*\.creation-card-loading-sketch-line[\s\S]*animation:\s*none;/,
-  );
+  assert.match(styles, /\.creation-card-loading \.generation-loading-drop\s*\{/);
+  assert.doesNotMatch(styles, /creation-card-loading-sketch|creation-card-loading-waiting|creation-card-loading-steps|creation-card-loading-progress|creation-card-loading-signal/);
 });
 
 test("creation single-item repair keeps other action buttons available while one item runs", async () => {
@@ -4915,11 +4874,10 @@ test("recognition and analysis busy states expose motion hooks", async () => {
   assert.match(styles, /\.inline-busy-motion span\s*\{[\s\S]*animation:\s*inline-busy-pulse/);
   assert.match(styles, /\.generate-button\.is-loading,\s*\.creation-record-actions \.toolbar-button\.is-loading,\s*\.reference-analysis-button\.is-loading,\s*#pptAnalyzeButton\.is-loading/);
   assert.match(styles, /\.creation-record-actions \.toolbar-button\.is-loading::before/);
-  assert.match(styles, /\.creation-card-media\.is-waiting::before\s*\{/);
-  assert.match(styles, /@keyframes creation-card-waiting-pulse/);
+  assert.match(styles, /\.creation-card-media\.is-waiting\s+span\s*\{/);
+  assert.doesNotMatch(styles, /\.creation-card-media\.is-waiting::before|@keyframes creation-card-waiting-pulse/);
   assert.doesNotMatch(styles, /\.creation-card-media\.is-waiting::after/);
-  assert.doesNotMatch(styles, /creation-card-waiting-sweep/);
-  assert.match(styles, /@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*\.inline-busy-motion span,[\s\S]*\.creation-card-media\.is-waiting::before[\s\S]*animation:\s*none;/);
+  assert.doesNotMatch(styles, /creation-card-waiting-sweep|\.creation-card-media\.is-waiting::before/);
 });
 
 test("creation results do not expose a prompt editor or micro-adjust action", async () => {

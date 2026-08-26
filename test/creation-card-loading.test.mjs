@@ -5,6 +5,7 @@ import {
   createCreationCardLoading,
   getCreationCardDomKey,
   renderCreationCardLoading,
+  stopCreationCardLoading,
   syncCreationLoadingCard,
   syncCreationResultGrid,
   updateCreationCardLoading,
@@ -38,9 +39,32 @@ function createTestElement(tagName = "div", ownerDocument = null) {
     children: [],
     dataset: {},
     attributes: new Map(),
+    style: {
+      properties: new Map(),
+      setProperty(name, value) {
+        element.style.properties.set(name, String(value));
+      },
+    },
     className: "",
     textContent: "",
     parentElement: null,
+    classList: {
+      add(...names) {
+        const current = new Set(String(element.className || "").split(/\s+/).filter(Boolean));
+        names.forEach((name) => current.add(String(name)));
+        element.className = [...current].join(" ");
+      },
+      remove(...names) {
+        const removeSet = new Set(names.map(String));
+        element.className = String(element.className || "")
+          .split(/\s+/)
+          .filter((name) => name && !removeSet.has(name))
+          .join(" ");
+      },
+      contains(name) {
+        return String(element.className || "").split(/\s+/).includes(String(name));
+      },
+    },
     append(...nodes) {
       nodes.forEach((node) => element.appendChild(node));
     },
@@ -126,20 +150,21 @@ function collectTextContent(element) {
   return [element.textContent || "", ...element.children.map((child) => collectTextContent(child))].join("");
 }
 
-test("creation card loading shell updates status without rendering loading copy", () => {
+test("creation card loading shell uses one shared drop and updates status", () => {
   const documentRef = createTestDocument();
   const shell = createCreationCardLoading("queued", documentRef);
-  const motion = shell.querySelector(".creation-card-loading-motion");
-  const sketch = shell.querySelector(".creation-card-loading-sketch-ring");
+  const drop = shell.querySelector(".generation-loading-drop");
+  const percent = shell.querySelector(".generation-loading-percent");
 
   updateCreationCardLoading(shell, "generating");
 
   assert.equal(shell.dataset.creationCardLoadingStatus, "generating");
-  assert.equal(shell.querySelector(".creation-card-loading-motion"), motion);
-  assert.equal(shell.querySelector(".creation-card-loading-sketch-ring"), sketch);
-  assert.equal(shell.querySelector("[data-creation-card-loading-label]"), null);
-  assert.equal(shell.querySelector("[data-creation-card-loading-detail]"), null);
-  assert.doesNotMatch(collectTextContent(shell), /生成中|正在生成|第\s*1\s*张/);
+  assert.equal(shell.querySelector(".generation-loading-drop"), drop);
+  assert.equal(shell.querySelector(".generation-loading-percent"), percent);
+  assert.equal(percent.textContent, "0%");
+  assert.equal(shell.querySelector(".creation-card-loading-sketch-ring"), null);
+  assert.equal(shell.querySelector(".creation-card-loading-steps"), null);
+  stopCreationCardLoading(shell);
 });
 
 test("creation card loading renderer reuses the host child across rerenders", () => {
@@ -147,59 +172,68 @@ test("creation card loading renderer reuses the host child across rerenders", ()
   const host = documentRef.createElement("div");
 
   const first = renderCreationCardLoading(host, "queued", documentRef);
-  const firstMotion = first.querySelector(".creation-card-loading-motion");
+  const firstDrop = first.querySelector(".generation-loading-drop");
   const second = renderCreationCardLoading(host, "generating", documentRef);
 
   assert.equal(second, first);
   assert.equal(host.children.length, 1);
-  assert.equal(second.querySelector(".creation-card-loading-motion"), firstMotion);
+  assert.equal(second.querySelector(".generation-loading-drop"), firstDrop);
   assert.equal(second.dataset.creationCardLoadingStatus, "generating");
+  stopCreationCardLoading(second);
 });
 
-test("creation card loading shell exposes a centered order inside hand-drawn ring loading", () => {
+test("creation card loading shell exposes a bounded percentage", () => {
   const documentRef = createTestDocument();
-  const shell = createCreationCardLoading("generating", documentRef, { sequenceIndex: 2 });
-  const order = shell.querySelector("[data-creation-card-loading-order-label]");
+  const shell = createCreationCardLoading("generating", documentRef, { key: "item-3" });
+  const percent = shell.querySelector(".generation-loading-percent");
 
-  assert.equal(shell.dataset.creationCardLoadingOrder, "3");
-  assert.equal(order.textContent, "03");
-  assert.equal(order.parentElement, shell.querySelector(".creation-card-loading-sketch-ring"));
-  assert.equal(shell.querySelectorAll(".creation-card-loading-sequence-dot").length, 0);
-  assert.equal(shell.querySelectorAll(".creation-card-loading-sketch-line").length, 4);
-  assert.equal(shell.querySelector(".creation-card-loading-track"), null);
-  assert.equal(shell.querySelector(".creation-card-loading-progress"), null);
-  assert.equal(shell.querySelector(".creation-card-loading-signal"), null);
-  assert.equal(shell.querySelector("[data-creation-card-loading-detail]"), null);
-  assert.doesNotMatch(collectTextContent(shell), /生成中|正在生成|第\s*3\s*张/);
+  assert.equal(shell.querySelectorAll(".generation-loading-drop").length, 1);
+  assert.equal(percent.textContent, "0%");
+  assert.equal(shell.getAttribute("aria-valuemin"), "0");
+  assert.equal(shell.getAttribute("aria-valuemax"), "99");
+  assert.equal(shell.getAttribute("aria-valuenow"), "0");
+  assert.equal(shell.querySelector(".creation-card-loading-sketch-line"), null);
+  stopCreationCardLoading(shell);
 });
 
-test("queued creation card loading uses a separate floating waiting mark", () => {
+test("queued and generating creation card loading share the same drop", () => {
   const documentRef = createTestDocument();
-  const shell = createCreationCardLoading("queued", documentRef, { sequenceIndex: 15 });
-  const waitingMark = shell.querySelector(".creation-card-loading-waiting-mark");
+  const shell = createCreationCardLoading("queued", documentRef, { key: "item-4" });
+  const drop = shell.querySelector(".generation-loading-drop");
 
   assert.equal(shell.dataset.creationCardLoadingStatus, "queued");
-  assert.ok(waitingMark);
-  assert.equal(waitingMark.getAttribute("aria-hidden"), "true");
-  assert.equal(shell.querySelectorAll(".creation-card-loading-waiting-line").length, 3);
-  assert.equal(shell.querySelector("[data-creation-card-loading-label]"), null);
-  assert.equal(shell.querySelector("[data-creation-card-loading-detail]"), null);
-  assert.doesNotMatch(collectTextContent(shell), /排队中|等待并发槽位|第\s*16\s*张/);
+  updateCreationCardLoading(shell, "generating", { key: "item-4" });
+  assert.equal(shell.querySelector(".generation-loading-drop"), drop);
+  assert.equal(shell.querySelector(".creation-card-loading-waiting-mark"), null);
+  stopCreationCardLoading(shell);
 });
 
-test("creation card loading shell advances order without replacing hand-drawn ring nodes", () => {
+test("creation card loading shell can be stopped without leaving a timer", () => {
   const documentRef = createTestDocument();
-  const shell = createCreationCardLoading("queued", documentRef, { sequenceIndex: 0 });
-  const motion = shell.querySelector(".creation-card-loading-motion");
-  const sketch = shell.querySelector(".creation-card-loading-sketch-ring");
-  const line = shell.querySelector(".creation-card-loading-sketch-line");
+  const shell = createCreationCardLoading("generating", documentRef, { key: "item-5" });
+  const nodes = shell.__generationLoadingNodes;
+  assert.ok(nodes.timer !== null);
+  stopCreationCardLoading(shell);
+  assert.equal(nodes.timer, null);
+  assert.equal(nodes.active, false);
+});
 
-  updateCreationCardLoading(shell, "generating", { sequenceIndex: 3 });
+test("queued creation card loading waits without advancing a percentage", () => {
+  const documentRef = createTestDocument();
+  const shell = createCreationCardLoading("queued", documentRef, { key: "item-6" });
+  const nodes = shell.__generationLoadingNodes;
 
-  assert.equal(shell.querySelector(".creation-card-loading-motion"), motion);
-  assert.equal(shell.querySelector(".creation-card-loading-sketch-ring"), sketch);
-  assert.equal(shell.querySelector(".creation-card-loading-sketch-line"), line);
-  assert.equal(shell.dataset.creationCardLoadingOrder, "4");
+  assert.equal(shell.dataset.generationLoadingMode, "waiting");
+  assert.equal(nodes.timer, null);
+  assert.equal(shell.querySelector(".generation-loading-percent").textContent, "");
+  assert.equal(shell.querySelector(".generation-loading-label").textContent, "排队等待中");
+
+  updateCreationCardLoading(shell, "generating", { key: "item-6" });
+  assert.equal(shell.dataset.generationLoadingMode, "generating");
+  assert.ok(nodes.timer !== null);
+  assert.equal(shell.querySelector(".generation-loading-percent").textContent, "0%");
+  assert.equal(shell.querySelector(".generation-loading-label").textContent, "生图生成中");
+  stopCreationCardLoading(shell);
 });
 
 test("creation card fallback DOM keys stay unique when titles repeat", () => {

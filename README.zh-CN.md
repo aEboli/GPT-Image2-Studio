@@ -28,8 +28,8 @@
 - Listing 生成进一步收紧证据边界，补齐可验证标题信息、商品/包装尺寸重量来源和历史记录兼容读取；买家可见标题与 SKU 图片文件名不会暴露内部货号或源文件编码。
 - 提示词模式支持分别清空参考图和提示词、从当前结果添加或拖入参考图，首次载入显示最近 10 张图片，当前会话仅随成功生成结果逐张扩展，历史缩略图最多保留 50 张且不回填更早历史；图片详情参数页同时展示文件名与相对路径。
 - Vercel Serverless 使用生产依赖安装和标准请求处理入口，避免 Electron 依赖与本地监听回调阻塞云端函数；Vercel 使用临时文件系统，不提供本地持久化工作流。
-- Responses 流式连接中断后，主应用会按原始 response ID 查询并在限定次数内轮询最终结果，不会静默再次发起一次新的生图请求。
-- 提示词模式支持最多 15 个未完成任务，并在提示词相关路由之间共享 6 个并发槽位；主预览区域仍保持紧凑的视觉边界。
+- Responses 流式连接中断后，主应用会先按原始 response ID 限次回查；仍无法确认最终结果时，会复用当前任务的原输入自动重试一次，并显示“重试中”，重试耗尽后不会继续发送第三次请求。
+- 提示词模式支持最多 15 个未完成任务，并在提示词相关路由之间共享 10 个并发槽位；主预览区域仍保持紧凑的视觉边界。
 - 已移除 Cloudflare Pages/Worker/R2/Queue 的当前部署路径和活动文档声明；当前继续维护本地 Node.js、Windows 桌面程序、Windows 浏览器安装包和 Vercel 运行方式。
 
 ## 重要说明
@@ -247,7 +247,9 @@ cmd /c npm run desktop
 
 ### 在界面中配置 API
 
-首次启动后打开顶部的“配置”，按服务提供方填写：
+首次启动后打开顶部的“配置”，按服务提供方填写。**直接调用模式**会把配置分成两组：生图 API 和文本/视觉 API。两组分别填写自己的 Base URL、API Key、接口后缀和模型；生图组只负责图片生成/编辑，文本/视觉组负责提示词、参考图、Listing 等分析调用。API Key 只保存在本地私有配置中，公共配置接口只返回是否已配置和脱敏掩码。两个“获取模型列表”和“测试连接”操作也会按当前组使用对应 API。
+
+已存在的配置仍兼容 `directBaseUrl`、`directApiKey`、`directEndpointPath`、`directImageModel`、`directResponsesModel`。新填写的用途专属字段按组独立优先；API Key 留空表示保留之前保存的私有 Key，不会清除它。
 
 | 配置项 | 说明 |
 | --- | --- |
@@ -256,6 +258,8 @@ cmd /c npm run desktop
 | 接口后缀 | 常见值为 `responses`、`images/generations`、`images/edits` 或 `chat/completions` |
 | 模型 | 按当前通道选择 Responses 模型、直接图片模型或兼容协议模型 |
 | 调用通道 | 路由模式、直接调用模式或“Gemini模型”模式 |
+| 直接调用 - 生图 API | 独立填写 Base URL、API Key、接口后缀和生图模型 |
+| 直接调用 - 文本/视觉 API | 独立填写 Base URL、API Key、接口后缀和文本/视觉模型 |
 
 如果供应商提供完整 URL，例如：
 
@@ -280,6 +284,14 @@ Base URL: https://vendor.example/openai/v1
 OPENAI_API_KEY=<your-api-key>
 OPENAI_BASE_URL=https://api.openai.com/v1
 RESPONSES_MODEL=gpt-5.4-mini
+DIRECT_IMAGE_BASE_URL=https://api.openai.com/v1
+DIRECT_IMAGE_API_KEY=
+DIRECT_IMAGE_ENDPOINT_PATH=images/generations
+DIRECT_IMAGE_MODEL=gpt-image-2
+DIRECT_TEXT_BASE_URL=https://api.openai.com/v1
+DIRECT_TEXT_API_KEY=
+DIRECT_TEXT_ENDPOINT_PATH=responses
+DIRECT_TEXT_MODEL=gpt-5.4-mini
 
 HOST=
 IMAGE_STUDIO_REQUEST_TOKEN=
@@ -294,6 +306,9 @@ IMAGE_STUDIO_DNS_FALLBACK_SERVERS=
 | `OPENAI_API_KEY` | 默认 API Key |
 | `OPENAI_BASE_URL` | 默认 API Base URL |
 | `RESPONSES_MODEL` | 默认 Responses 模型，未配置时为 `gpt-5.4-mini`；应以实际服务支持的模型为准 |
+| `DIRECT_IMAGE_BASE_URL` / `DIRECT_IMAGE_API_KEY` / `DIRECT_IMAGE_ENDPOINT_PATH` / `DIRECT_IMAGE_MODEL` | 直接调用模式的生图 API 配置；分别对应地址、密钥、接口后缀和生图模型 |
+| `DIRECT_TEXT_BASE_URL` / `DIRECT_TEXT_API_KEY` / `DIRECT_TEXT_ENDPOINT_PATH` / `DIRECT_TEXT_MODEL` | 直接调用模式的文本/视觉 API 配置；分别对应地址、密钥、接口后缀和文本/视觉模型 |
+| `DIRECT_BASE_URL` / `DIRECT_API_KEY` / `DIRECT_ENDPOINT_PATH` / `DIRECT_RESPONSES_MODEL` | 旧版直接调用变量，仅用于兼容回退；新配置请使用上面两组变量 |
 | `PORT` | 本地服务端口，默认 `3600` |
 | `HOST` | 监听地址；留空时为 `127.0.0.1` |
 | `IMAGE_STUDIO_OUTPUT_DIR` | 自定义生成文件根目录 |
@@ -302,6 +317,8 @@ IMAGE_STUDIO_DNS_FALLBACK_SERVERS=
 | `IMAGE_STUDIO_ALLOW_INSECURE_REMOTE_HTTP` | 设为 `1` 时显式允许非回环地址直接使用未加密 HTTP；默认拒绝 |
 | `IMAGE_STUDIO_DISABLE_DNS_FALLBACK` | 设为 `1` 时禁用 Node DNS fallback |
 | `IMAGE_STUDIO_DNS_FALLBACK_SERVERS` | 自定义 fallback DNS，支持逗号、分号或空白分隔 |
+| `IMAGE_STUDIO_CREATION_UPSTREAM_TIMEOUT_MS` | 套图单项上游请求的最长时间，默认 `900000`（15 分钟）；有效范围为 1 秒到 1 小时，超出会被收敛到边界 |
+| `IMAGE_STUDIO_ENABLE_TEST_MOCKS` | 仅测试用途。必须与 `IMAGE_STUDIO_MOCK_IMAGE_GENERATION=1`、`IMAGE_STUDIO_OUTPUT_DIR` 和 `IMAGE_STUDIO_LOCAL_DATA_DIR` 同时设置，才会启用本地假图生成；缺一即忽略并打印告警 |
 
 真实 `.env` 已被 `.gitignore` 排除，但仅创建该文件不会让本地服务自动读取它。云端部署请使用平台 Secret 或环境变量，不要把密钥写入仓库。
 

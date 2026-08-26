@@ -1,160 +1,54 @@
+import {
+  createGenerationLoadingShell,
+  updateGenerationLoadingShell,
+  stopGenerationLoadingShell,
+  GENERATION_LOADING_GENERATING_MODE,
+  GENERATION_LOADING_WAITING_MODE,
+} from "./generation-loading.mjs";
 import { getCreationItemDisplayTitle } from "./creation-item-display.mjs";
-
-const CREATION_CARD_LOADING_COPY = {
-  queued: {
-    label: "排队中",
-    detail: "等待并发槽位，提交后将自动接续",
-    steps: ["已提交", "排队", "生成"],
-    activeStep: 1,
-  },
-  generating: {
-    label: "生成中",
-    detail: "正在生成套图图片",
-    steps: ["已提交", "处理中", "保存"],
-    activeStep: 2,
-  },
-};
-const CREATION_CARD_LOADING_SEQUENCE_STEPS = 4;
-
-function getLoadingCopy(status = "generating") {
-  return CREATION_CARD_LOADING_COPY[status === "queued" ? "queued" : "generating"];
-}
 
 function getDocumentRef(documentRef = null) {
   return documentRef || globalThis.document;
 }
 
-function setDataAttribute(element, name, value) {
-  if (element?.dataset) {
-    element.dataset[name] = String(value);
-  }
+function getLoadingNodes(loading) {
+  return loading?.__generationLoadingNodes || null;
 }
 
-function setStyleProperty(element, name, value) {
-  element?.style?.setProperty?.(name, value);
-}
-
-function normalizeSequenceIndex(value = 0) {
-  const index = Number.parseInt(value, 10);
-  return Number.isFinite(index) && index > 0 ? index : 0;
-}
-
-function getSequenceMeta(options = {}) {
-  const sequenceIndex = normalizeSequenceIndex(options.sequenceIndex);
-  const order = sequenceIndex + 1;
-  return {
-    delayMs: (sequenceIndex % CREATION_CARD_LOADING_SEQUENCE_STEPS) * 180,
-    order,
-    orderLabel: String(order).padStart(2, "0"),
-    phase: (sequenceIndex % CREATION_CARD_LOADING_SEQUENCE_STEPS) + 1,
-    sequenceIndex,
-  };
-}
-
-function applySequenceMeta(loading, meta) {
-  setDataAttribute(loading, "creationCardLoadingOrder", meta.order);
-  setDataAttribute(loading, "creationCardLoadingPhase", meta.phase);
-  setStyleProperty(loading, "--creation-card-loading-delay", `${meta.delayMs}ms`);
-}
-
-function createStep(documentRef, label, index, activeStep) {
-  const step = documentRef.createElement("i");
-  step.className = `creation-card-loading-step${index < activeStep ? " is-done" : ""}${
-    index === activeStep ? " is-active" : ""
-  }`;
-  step.setAttribute("aria-label", label);
-  return step;
-}
-
-function updateStep(element, label, index, activeStep) {
-  element.className = `creation-card-loading-step${index < activeStep ? " is-done" : ""}${
-    index === activeStep ? " is-active" : ""
-  }`;
-  element.setAttribute("aria-label", label);
-}
-
-function syncStepList(steps, copy) {
-  if (!steps) {
-    return;
-  }
-  while (steps.children.length < copy.steps.length) {
-    steps.appendChild(createStep(steps.ownerDocument || getDocumentRef(), "", steps.children.length, copy.activeStep));
-  }
-  while (steps.children.length > copy.steps.length) {
-    steps.children[steps.children.length - 1]?.remove?.();
-  }
-  [...steps.children].forEach((step, index) => updateStep(step, copy.steps[index] || "", index, copy.activeStep));
+function getCreationCardLoadingMode(status) {
+  return String(status || "") === "queued" ? GENERATION_LOADING_WAITING_MODE : GENERATION_LOADING_GENERATING_MODE;
 }
 
 export function createCreationCardLoading(status = "generating", documentRef = null, options = {}) {
-  const doc = getDocumentRef(documentRef);
-  const loading = doc.createElement("div");
-  loading.className = "creation-card-loading";
-  setDataAttribute(loading, "creationCardLoadingStatus", status === "queued" ? "queued" : "generating");
-
-  const motion = doc.createElement("div");
-  motion.className = "creation-card-loading-motion creation-card-loading-process";
-  motion.setAttribute("aria-hidden", "true");
-
-  const order = doc.createElement("b");
-  order.className = "creation-card-loading-order";
-  setDataAttribute(order, "creationCardLoadingOrderLabel", "true");
-
-  const sketchRing = doc.createElement("div");
-  sketchRing.className = "creation-card-loading-sketch-ring";
-  for (let index = 0; index < 4; index += 1) {
-    const line = doc.createElement("span");
-    line.className = "creation-card-loading-sketch-line";
-    sketchRing.appendChild(line);
-  }
-  sketchRing.appendChild(order);
-
-  const steps = doc.createElement("div");
-  steps.className = "creation-card-loading-steps";
-
-  const waitingMark = doc.createElement("div");
-  waitingMark.className = "creation-card-loading-waiting-mark";
-  waitingMark.setAttribute("aria-hidden", "true");
-  for (let index = 0; index < 3; index += 1) {
-    const line = doc.createElement("span");
-    line.className = "creation-card-loading-waiting-line";
-    waitingMark.appendChild(line);
-  }
-
-  motion.append(sketchRing, steps, waitingMark);
-
-  loading.append(motion);
-  updateCreationCardLoading(loading, status, options);
-  return loading;
+  const nodes = createGenerationLoadingShell(getDocumentRef(documentRef), {
+    key: options.key || options.itemId || "",
+    active: true,
+    mode: getCreationCardLoadingMode(status),
+  });
+  nodes.shell.classList.add("creation-card-loading");
+  nodes.shell.dataset.creationCardLoadingStatus = status === "queued" ? "queued" : "generating";
+  updateCreationCardLoading(nodes.shell, status, options);
+  return nodes.shell;
 }
 
 export function updateCreationCardLoading(loading, status = "generating", options = {}) {
-  if (!loading) {
-    return null;
+  const nodes = getLoadingNodes(loading);
+  if (!loading || !nodes) {
+    return loading || null;
   }
-
   const normalizedStatus = status === "queued" ? "queued" : "generating";
-  const copy = getLoadingCopy(normalizedStatus);
-  const sequenceMeta = getSequenceMeta(options);
-  setDataAttribute(loading, "creationCardLoadingStatus", normalizedStatus);
-  applySequenceMeta(loading, sequenceMeta);
-
-  const motion = loading.querySelector?.(".creation-card-loading-motion");
-  if (motion) {
-    motion.className = `creation-card-loading-motion creation-card-loading-${
-      normalizedStatus === "queued" ? "waiting" : "process"
-    }`;
-  }
-
-  const order = loading.querySelector?.("[data-creation-card-loading-order-label]");
-  if (order) {
-    order.textContent = sequenceMeta.orderLabel;
-  }
-
-  const steps = loading.querySelector?.(".creation-card-loading-steps");
-  syncStepList(steps, copy);
-
+  loading.dataset.creationCardLoadingStatus = normalizedStatus;
+  updateGenerationLoadingShell(nodes, {
+    key: options.key || options.itemId || "",
+    active: true,
+    mode: getCreationCardLoadingMode(status),
+  });
   return loading;
+}
+
+export function stopCreationCardLoading(loading) {
+  stopGenerationLoadingShell(getLoadingNodes(loading));
+  return loading || null;
 }
 
 export function renderCreationCardLoading(host, status = "generating", documentRef = null, options = {}) {
@@ -216,10 +110,11 @@ export function syncCreationLoadingCard(
     media.classList.add("is-loading");
     media.setAttribute("aria-busy", "true");
     const loadingShell = media.querySelector(".creation-card-loading");
+    const key = getCreationCardDomKey(item, fallbackIndex);
     if (loadingShell) {
-      updateCreationCardLoading(loadingShell, item.status, { sequenceIndex: fallbackIndex });
+      updateCreationCardLoading(loadingShell, item.status, { key });
     } else {
-      renderCreationCardLoading(media, item.status, null, { sequenceIndex: fallbackIndex });
+      renderCreationCardLoading(media, item.status, null, { key });
     }
   }
 
@@ -266,6 +161,7 @@ export function syncCreationResultGrid({
 
   [...grid.querySelectorAll(".creation-card[data-creation-card-key]")].forEach((card) => {
     if (!renderedKeys.has(card.dataset.creationCardKey)) {
+      stopCreationCardLoading(card.querySelector(".creation-card-loading"));
       card.remove();
     }
   });

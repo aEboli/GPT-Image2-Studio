@@ -81,11 +81,18 @@ test("browser config module normalizes private config without requiring window g
     apiKey: "sk-browser-secret",
     endpointPath: "responses",
     responsesModel: "gpt-5.5",
-    directBaseUrl: "https://direct.example.test/v1/chat/completions",
-    directEndpointPath: "chat/completions",
-    directApiKey: "sk-direct-secret",
+    directImageBaseUrl: "https://image-direct.example.test/v1/images/generations",
+    directImageApiKey: "sk-image-secret",
+    directImageEndpointPath: "images/generations",
     directImageModel: "custom-image-model",
-    directResponsesModel: "custom-vision-text-model",
+    directTextBaseUrl: "https://text-direct.example.test/v1/chat/completions",
+    directTextApiKey: "sk-text-secret",
+    directTextEndpointPath: "chat/completions",
+    directTextModel: "custom-text-model",
+    directBaseUrl: "https://image-direct.example.test/v1/images/generations",
+    directEndpointPath: "images/generations",
+    directApiKey: "sk-image-secret",
+    directResponsesModel: "custom-text-model",
     protocolBaseUrl: "https://protocol.example.test/v1/chat/completions",
     protocolApiKey: "sk-protocol-secret",
     protocolImageModel: "custom-protocol-image-model",
@@ -99,11 +106,18 @@ test("browser config module normalizes private config without requiring window g
     apiKey: "sk-browser-secret",
     endpointPath: "responses",
     responsesModel: "gpt-5.5",
-    directBaseUrl: "https://direct.example.test/v1",
-    directApiKey: "sk-direct-secret",
-    directEndpointPath: "chat/completions",
+    directImageBaseUrl: "https://image-direct.example.test/v1",
+    directImageApiKey: "sk-image-secret",
+    directImageEndpointPath: "images/generations",
     directImageModel: "custom-image-model",
-    directResponsesModel: "custom-vision-text-model",
+    directTextBaseUrl: "https://text-direct.example.test/v1",
+    directTextApiKey: "sk-text-secret",
+    directTextEndpointPath: "chat/completions",
+    directTextModel: "custom-text-model",
+    directBaseUrl: "https://image-direct.example.test/v1",
+    directApiKey: "sk-image-secret",
+    directEndpointPath: "images/generations",
+    directResponsesModel: "custom-text-model",
     protocolBaseUrl: "https://protocol.example.test/v1",
     protocolApiKey: "sk-protocol-secret",
     protocolImageModel: "custom-protocol-image-model",
@@ -112,9 +126,16 @@ test("browser config module normalizes private config without requiring window g
   assert.equal(publicConfig.apiKeyConfigured, true);
   assert.equal(publicConfig.apiKeyMask, "sk-b***cret");
   assert.equal(publicConfig.directApiKeyConfigured, true);
-  assert.equal(publicConfig.directApiKeyMask, "sk-d***cret");
+  assert.equal(publicConfig.directApiKeyMask, "sk-i***cret");
+  assert.equal(publicConfig.directImageApiKeyConfigured, true);
+  assert.equal(publicConfig.directImageApiKeyMask, "sk-i***cret");
+  assert.equal(publicConfig.directTextApiKeyConfigured, true);
+  assert.equal(publicConfig.directTextApiKeyMask, "sk-t***cret");
+  assert.equal(publicConfig.directImageBaseUrl, "https://image-direct.example.test/v1");
+  assert.equal(publicConfig.directTextBaseUrl, "https://text-direct.example.test/v1");
+  assert.equal(publicConfig.directTextModel, "custom-text-model");
   assert.equal(publicConfig.directImageModel, "custom-image-model");
-  assert.equal(publicConfig.directResponsesModel, "custom-vision-text-model");
+  assert.equal(publicConfig.directResponsesModel, "custom-text-model");
   assert.equal(publicConfig.protocolApiKeyConfigured, true);
   assert.equal(publicConfig.protocolApiKeyMask, "sk-p***cret");
   assert.equal(publicConfig.protocolImageModel, "custom-protocol-image-model");
@@ -124,11 +145,18 @@ test("browser config module normalizes private config without requiring window g
   assert.equal(formData.get("endpointPath"), "responses");
   assert.equal(formData.get("apiKey"), "sk-browser-secret");
   assert.equal(formData.get("responsesModel"), "gpt-5.5");
-  assert.equal(formData.get("directBaseUrl"), "https://direct.example.test/v1");
-  assert.equal(formData.get("directEndpointPath"), "chat/completions");
-  assert.equal(formData.get("directApiKey"), "sk-direct-secret");
+  assert.equal(formData.get("directImageBaseUrl"), "https://image-direct.example.test/v1");
+  assert.equal(formData.get("directImageApiKey"), "sk-image-secret");
+  assert.equal(formData.get("directImageEndpointPath"), "images/generations");
+  assert.equal(formData.get("directTextBaseUrl"), "https://text-direct.example.test/v1");
+  assert.equal(formData.get("directTextApiKey"), "sk-text-secret");
+  assert.equal(formData.get("directTextEndpointPath"), "chat/completions");
+  assert.equal(formData.get("directTextModel"), "custom-text-model");
+  assert.equal(formData.get("directBaseUrl"), "https://image-direct.example.test/v1");
+  assert.equal(formData.get("directEndpointPath"), "images/generations");
+  assert.equal(formData.get("directApiKey"), "sk-image-secret");
   assert.equal(formData.get("directImageModel"), "custom-image-model");
-  assert.equal(formData.get("directResponsesModel"), "custom-vision-text-model");
+  assert.equal(formData.get("directResponsesModel"), "custom-text-model");
   assert.equal(formData.get("protocolBaseUrl"), "https://protocol.example.test/v1");
   assert.equal(formData.get("protocolApiKey"), "sk-protocol-secret");
   assert.equal(formData.get("protocolImageModel"), "custom-protocol-image-model");
@@ -309,12 +337,14 @@ test("config drawer shows image route settings as exclusive mode tabs", async ()
   );
   assert.match(
     html,
-    /data-route-panel="b"[\s\S]*接口地址[\s\S]*API Key[\s\S]*生图模型[\s\S]*id="directFetchModelsButton"[\s\S]*获取模型列表[\s\S]*视觉\/文本模型[\s\S]*id="directResponsesFetchModelsButton"[\s\S]*获取模型列表/,
+    /data-route-panel="b"[\s\S]*生图 API[\s\S]*生图 API Key[\s\S]*生图模型[\s\S]*id="directFetchModelsButton"[\s\S]*获取模型列表[\s\S]*文本\/视觉 API[\s\S]*文本\/视觉 API Key[\s\S]*文本\/视觉模型[\s\S]*id="directResponsesFetchModelsButton"[\s\S]*获取模型列表/,
   );
   assert.match(html, /id="endpointPathSelect"[\s\S]*value="responses"[\s\S]*responses/);
   assert.match(html, /id="directEndpointPathSelect"[\s\S]*value="images\/generations"[\s\S]*value="responses"[\s\S]*value="chat\/completions"/);
+  assert.match(html, /id="directTextEndpointPathSelect"[\s\S]*value="responses"[\s\S]*value="chat\/completions"/);
   assert.match(html, /id="baseUrlFullToggle"[\s\S]*完整 URL/);
   assert.match(html, /id="directBaseUrlFullToggle"[\s\S]*完整 URL/);
+  assert.match(html, /id="directTextBaseUrlFullToggle"[\s\S]*完整 URL/);
   assert.doesNotMatch(html, /线路A|线路B/);
   assert.match(styles, /\.route-config-panel\s*\{[\s\S]*display:\s*grid;/);
   assert.match(styles, /\.endpoint-address-control\s*\{/);

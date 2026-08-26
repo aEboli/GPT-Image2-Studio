@@ -1,470 +1,349 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import { readFile } from "node:fs/promises";
+
 import {
-  getPreviewLoadingOrbLimit,
-  getPreviewLoadingOrbRenderState,
-  getPreviewLoadingShellItems,
-  getPreviewLoadingShellTheme,
-} from "../lib/preview-loading-shell.mjs";
-import { getPreviewPlaceholderState } from "../lib/preview-placeholder-state.mjs";
+  createGenerationLoadingShell,
+  getGenerationLoadingInterval,
+  getGenerationLoadingProgress,
+  stopGenerationLoadingShell,
+  updateGenerationLoadingShell,
+} from "../lib/generation-loading.mjs";
+import { shouldReusePreviewLoadingShell } from "../lib/preview-loading-shell.mjs";
+import { getPreviewPlaceholderState, isWaitingPreviewItem } from "../lib/preview-placeholder-state.mjs";
 
-const appPath = new URL("../public/app.js", import.meta.url);
-
-function extractFunctionBefore(source, functionName, nextFunctionName) {
-  const start = source.indexOf(`function ${functionName}`);
-  const end = source.indexOf(`function ${nextFunctionName}`, start + 1);
-  assert.notEqual(start, -1, `${functionName} should exist`);
-  assert.notEqual(end, -1, `${nextFunctionName} should follow ${functionName}`);
-  return source.slice(start, end).trimEnd();
-}
-
-function createTestElement(tagName = "div") {
+function createTestElement(tagName = "div", ownerDocument = null) {
   const element = {
     tagName: String(tagName).toUpperCase(),
+    ownerDocument,
     children: [],
     className: "",
     dataset: {},
+    attributes: new Map(),
+    textContent: "",
+    parentElement: null,
     style: {
       properties: new Map(),
       setProperty(name, value) {
         element.style.properties.set(name, String(value));
       },
     },
-    attributes: new Map(),
     classList: {
       add(...names) {
         const current = new Set(String(element.className || "").split(/\s+/).filter(Boolean));
         names.forEach((name) => current.add(String(name)));
-        element.className = Array.from(current).join(" ");
-      },
-      remove(...names) {
-        const removeSet = new Set(names.map(String));
-        element.className = String(element.className || "")
-          .split(/\s+/)
-          .filter((name) => name && !removeSet.has(name))
-          .join(" ");
+        element.className = [...current].join(" ");
       },
       contains(name) {
         return String(element.className || "").split(/\s+/).includes(String(name));
       },
-      toggle(name, force) {
-        const shouldAdd = force === undefined ? !element.classList.contains(name) : Boolean(force);
-        if (shouldAdd) {
-          element.classList.add(name);
-        } else {
-          element.classList.remove(name);
-        }
-        return shouldAdd;
-      },
-    },
-    appendChild(child) {
-      if (child.parentNode && child.parentNode !== element) {
-        child.parentNode.removeChild(child);
-      }
-      child.parentNode = element;
-      element.children.push(child);
-      return child;
     },
     append(...nodes) {
       nodes.forEach((node) => element.appendChild(node));
     },
-    removeChild(child) {
-      element.children = element.children.filter((node) => node !== child);
-      child.parentNode = null;
-      return child;
-    },
-    remove() {
-      if (element.parentNode) {
-        element.parentNode.removeChild(element);
-      }
+    appendChild(node) {
+      node.parentElement = element;
+      element.children.push(node);
+      return node;
     },
     setAttribute(name, value) {
       element.attributes.set(name, String(value));
+    },
+    getAttribute(name) {
+      return element.attributes.get(name) || "";
+    },
+    querySelector(selector) {
+      return element.querySelectorAll(selector)[0] || null;
+    },
+    querySelectorAll(selector) {
+      const className = selector.startsWith(".") ? selector.slice(1) : "";
+      const matches = [];
+      const stack = [...element.children];
+      while (stack.length > 0) {
+        const node = stack.shift();
+        if (className && String(node.className || "").split(/\s+/).includes(className)) {
+          matches.push(node);
+        }
+        stack.unshift(...node.children);
+      }
+      return matches;
     },
   };
   return element;
 }
 
-function parsePixelValue(value) {
-  return Number.parseFloat(String(value || "0").replace(/px$/, ""));
+function createTestDocument() {
+  const documentRef = createTestElement("#document");
+  documentRef.createElement = (tagName) => createTestElement(tagName, documentRef);
+  documentRef.ownerDocument = documentRef;
+  return documentRef;
 }
 
-function getPointDistance(left, right) {
-  return Math.hypot(parsePixelValue(left.x) - parsePixelValue(right.x), parsePixelValue(left.y) - parsePixelValue(right.y));
+function installScheduler() {
+  const originalSetTimeout = globalThis.setTimeout;
+  const originalClearTimeout = globalThis.clearTimeout;
+  const pending = new Map();
+  const delays = [];
+  let nextId = 1;
+  globalThis.setTimeout = (callback, delay) => {
+    const id = nextId++;
+    pending.set(id, callback);
+    delays.push(Number(delay));
+    return id;
+  };
+  globalThis.clearTimeout = (id) => {
+    pending.delete(id);
+  };
+  return {
+    pending,
+    delays,
+    runNext() {
+      const entry = pending.entries().next().value;
+      if (!entry) {
+        return false;
+      }
+      pending.delete(entry[0]);
+      entry[1]();
+      return true;
+    },
+    restore() {
+      globalThis.setTimeout = originalSetTimeout;
+      globalThis.clearTimeout = originalClearTimeout;
+    },
+  };
 }
 
-test("preview loading shell can be created before any preview item exists", async () => {
-  const app = await readFile(appPath, "utf8");
-  const loadingShellRuntime = extractFunctionBefore(app, "createPreviewMotionNode", "renderPreviewPlaceholder");
-  const document = {
-    createElement: createTestElement,
-  };
-  const createNodes = new Function(
-    "document",
-    `${loadingShellRuntime}\nreturn createPreviewLoadingShellNodes();`,
-  );
-
-  assert.doesNotThrow(() => createNodes(document));
-});
-
-test("preview loading shell renders only motion nodes without visible copy", async () => {
-  const app = await readFile(appPath, "utf8");
-  const loadingShellRuntime = extractFunctionBefore(app, "createPreviewMotionNode", "renderPreviewPlaceholder");
-  const document = {
-    createElement: createTestElement,
-  };
-  const createNodes = new Function(
-    "document",
-    `${loadingShellRuntime}\nreturn createPreviewLoadingShellNodes();`,
-  );
-
-  const nodes = createNodes(document);
-
-  assert.equal(nodes.eyebrow, undefined);
-  assert.equal(nodes.title, undefined);
-  assert.equal(nodes.shell.children.length, 1);
-  assert.equal(nodes.shell.children[0].className, "preview-loading-orb-field");
-  assert.equal(nodes.shell.children[0].children.length, 1);
-  assert.match(nodes.shell.children[0].children[0].className, /preview-loading-motion/);
-  assert.equal(nodes.field.classList.contains("is-orbiting"), false);
-});
-
-test("prompt preview loading shell keeps liquid layers inside its decorative motion subtree", async () => {
-  const app = await readFile(appPath, "utf8");
-  const loadingShellRuntime = extractFunctionBefore(app, "createPreviewMotionNode", "renderPreviewPlaceholder");
-  const document = {
-    createElement: createTestElement,
-  };
-  const createNodes = new Function(
-    "document",
-    `${loadingShellRuntime}\nreturn createPreviewLoadingShellNodes("prompt");`,
-  );
-
-  const nodes = createNodes(document);
-  const motion = nodes.field.children[0];
-  const fill = motion.children[0].children[0];
-
-  assert.ok(nodes.shell.classList.contains("is-prompt-loading"));
-  assert.equal(nodes.includeFluidLayers, true);
-  assert.equal(motion.attributes.get("aria-hidden"), "true");
-  assert.deepEqual(
-    fill.children.map((child) => child.className),
-    [
-      "preview-loading-fluid-surface",
-      "preview-loading-fluid-stream",
-      "preview-loading-fluid-stream preview-loading-fluid-stream-phase",
-      "preview-loading-fluid-sediment",
-    ],
-  );
-});
-
-test("preview loading themes expose bounded stage-specific liquid physics", () => {
-  const uploading = getPreviewLoadingShellTheme({
-    stage: "uploading",
-    stageIndex: 0,
-    stageCount: 4,
-    activeJobCount: 1,
-    maxConcurrentTasks: 6,
-  });
-  const generating = getPreviewLoadingShellTheme({
-    stage: "generating",
-    stageIndex: 2,
-    stageCount: 4,
-    activeJobCount: 3,
-    maxConcurrentTasks: 6,
-  });
-  const saving = getPreviewLoadingShellTheme({
-    stage: "saving",
-    stageIndex: 3,
-    stageCount: 4,
-    activeJobCount: 3,
-    maxConcurrentTasks: 6,
-  });
-
-  for (const theme of [uploading, generating, saving]) {
-    assert.match(theme.gravity, /^0?\d\.\d{3}$|^1\.\d{3}$/);
-    assert.match(theme.viscosity, /^0?\d\.\d{3}$|^1\.\d{3}$/);
-    assert.match(theme.phaseViscosity, /^0?\d\.\d{3}$|^1\.\d{3}$/);
-    assert.match(theme.settleDistance, /^\d+px$/);
-    assert.match(theme.streamDistance, /^\d+px$/);
-    assert.match(theme.settleDuration, /^\d+ms$/);
-    assert.match(theme.flowDuration, /^\d+ms$/);
-    assert.match(theme.flowPhaseDelay, /^-\d+ms$/);
-    assert.match(theme.surfaceDuration, /^\d+ms$/);
-    assert.match(theme.sedimentDuration, /^\d+ms$/);
+test("preview loading uses one shared drop with an accessible percentage", () => {
+  const documentRef = createTestDocument();
+  const scheduler = installScheduler();
+  try {
+    const nodes = createGenerationLoadingShell(documentRef, { key: "job-1", active: true });
+    assert.equal(nodes.shell.querySelectorAll(".generation-loading-drop").length, 1);
+    assert.equal(nodes.shell.querySelectorAll(".generation-loading-percent").length, 1);
+    assert.equal(nodes.percent.textContent, "0%");
+    assert.equal(nodes.shell.getAttribute("aria-valuemin"), "0");
+    assert.equal(nodes.shell.getAttribute("aria-valuemax"), "99");
+    assert.equal(nodes.shell.getAttribute("aria-valuenow"), "0");
+    assert.equal(scheduler.delays[0], 800);
+    stopGenerationLoadingShell(nodes);
+  } finally {
+    scheduler.restore();
   }
-
-  assert.ok(Number(generating.gravity) > Number(uploading.gravity));
-  assert.ok(Number(generating.viscosity) > Number(saving.viscosity));
-  assert.ok(Number(generating.phaseViscosity) > Number(saving.phaseViscosity));
-  assert.equal(
-    Number(generating.flowPhaseDelay.replace(/ms$/, "")),
-    -Math.round(Number(generating.flowDuration.replace(/ms$/, "")) / 2),
-  );
 });
 
-test("preview loading shell shows one centered orb per active job up to six", async () => {
-  const app = await readFile(appPath, "utf8");
-  const loadingShellRuntime = extractFunctionBefore(app, "createPreviewMotionNode", "renderPreviewPlaceholder");
-  const document = {
-    createElement: createTestElement,
-  };
-  const createRuntime = new Function(
-    "document",
-    "getPreviewLoadingOrbLimit",
-    "getPreviewLoadingShellItems",
-    "getPreviewLoadingOrbRenderState",
-    "getPreviewLoadingShellTheme",
-    `${loadingShellRuntime}\nreturn { createPreviewLoadingShellNodes, updatePreviewLoadingShell };`,
-  );
-  const runtime = createRuntime(
-    document,
-    getPreviewLoadingOrbLimit,
-    getPreviewLoadingShellItems,
-    getPreviewLoadingOrbRenderState,
-    getPreviewLoadingShellTheme,
-  );
-  const nodes = runtime.createPreviewLoadingShellNodes();
-
-  runtime.updatePreviewLoadingShell(nodes, {
-    mode: "loading",
-    stage: "generating",
-    stageIndex: 2,
-    stageCount: 4,
-    activeJobCount: 7,
-    maxConcurrentTasks: 7,
-    statusText: "7 jobs running",
-    loadingItems: [
-      { id: "job-1", statusStage: "uploading" },
-      { id: "job-2", statusStage: "connecting" },
-      { id: "job-3", statusStage: "generating" },
-      { id: "job-4", statusStage: "saving" },
-      { id: "job-5", statusStage: "generating" },
-      { id: "job-6", statusStage: "connecting" },
-      { id: "job-7", statusStage: "uploading" },
-    ],
-  });
-
-  assert.equal(nodes.field.children.length, 6);
-  assert.ok(nodes.field.classList.contains("is-orbiting"));
-  assert.deepEqual(
-    nodes.field.children.map((child) => child.dataset.previewLoadingOrbId),
-    ["job-1", "job-2", "job-3", "job-4", "job-5", "job-6"],
-  );
-  assert.deepEqual(
-    nodes.field.children.map((child) => child.dataset.stage),
-    ["uploading", "connecting", "generating", "saving", "generating", "connecting"],
-  );
-  assert.equal(nodes.field.style.properties.get("--preview-loading-orb-count"), "6");
-  assert.match(nodes.field.children[2].style.properties.get("--loading-gravity"), /^1\.\d{3}$/);
-  assert.match(nodes.field.children[2].style.properties.get("--loading-viscosity"), /^0\.\d{3}$/);
-  assert.match(nodes.field.children[2].style.properties.get("--loading-phase-viscosity"), /^0\.\d{3}$/);
-  assert.match(nodes.field.children[2].style.properties.get("--loading-settle-distance"), /^\d+px$/);
-  assert.match(nodes.field.children[2].style.properties.get("--loading-flow-duration"), /^\d+ms$/);
-  assert.match(nodes.field.children[2].style.properties.get("--loading-flow-phase-delay"), /^-\d+ms$/);
-});
-
-test("preview loading shell preserves existing orb nodes when a new job appears", async () => {
-  const app = await readFile(appPath, "utf8");
-  const loadingShellRuntime = extractFunctionBefore(app, "createPreviewMotionNode", "renderPreviewPlaceholder");
-  const document = {
-    createElement: createTestElement,
-  };
-  const createRuntime = new Function(
-    "document",
-    "getPreviewLoadingOrbLimit",
-    "getPreviewLoadingShellItems",
-    "getPreviewLoadingOrbRenderState",
-    "getPreviewLoadingShellTheme",
-    `${loadingShellRuntime}\nreturn { createPreviewLoadingShellNodes, updatePreviewLoadingShell };`,
-  );
-  const runtime = createRuntime(
-    document,
-    getPreviewLoadingOrbLimit,
-    getPreviewLoadingShellItems,
-    getPreviewLoadingOrbRenderState,
-    getPreviewLoadingShellTheme,
-  );
-  const nodes = runtime.createPreviewLoadingShellNodes();
-  const baseState = {
-    mode: "loading",
-    stage: "generating",
-    stageIndex: 2,
-    stageCount: 4,
-    activeJobCount: 2,
-    maxConcurrentTasks: 6,
-    loadingItems: [
-      { id: "job-a", statusStage: "connecting" },
-      { id: "job-b", statusStage: "generating" },
-    ],
-  };
-
-  runtime.updatePreviewLoadingShell(nodes, baseState);
-  const firstOrb = nodes.field.children[0];
-  const secondOrb = nodes.field.children[1];
-  assert.ok(nodes.field.classList.contains("is-orbiting"));
-
-  runtime.updatePreviewLoadingShell(nodes, {
-    ...baseState,
-    activeJobCount: 3,
-    loadingItems: [
-      { id: "job-a", statusStage: "generating" },
-      { id: "job-b", statusStage: "saving" },
-      { id: "job-c", statusStage: "uploading" },
-    ],
-  });
-
-  assert.equal(nodes.field.children.length, 3);
-  assert.equal(nodes.field.children[0], firstOrb);
-  assert.equal(nodes.field.children[1], secondOrb);
-  assert.equal(nodes.field.children[2].dataset.previewLoadingOrbId, "job-c");
-  assert.ok(nodes.field.children[2].classList.contains("is-entering"));
-  assert.ok(nodes.field.classList.contains("is-orbiting"));
-});
-
-test("preview loading shell spaces six visible orbs with collision-safe gaps", () => {
-  const placeholderState = {
-    mode: "loading",
-    stage: "generating",
-    stageIndex: 2,
-    stageCount: 4,
-    activeJobCount: 6,
-    maxConcurrentTasks: 6,
-    loadingItems: Array.from({ length: 6 }, (_, index) => ({
-      id: `job-${index + 1}`,
-      statusStage: "generating",
-    })),
-  };
-  const items = getPreviewLoadingShellItems(placeholderState);
-  const states = items.map((item, index) => getPreviewLoadingOrbRenderState(item, index, items.length, placeholderState));
-
-  for (let leftIndex = 0; leftIndex < states.length; leftIndex += 1) {
-    for (let rightIndex = leftIndex + 1; rightIndex < states.length; rightIndex += 1) {
-      assert.ok(
-        getPointDistance(states[leftIndex], states[rightIndex]) >= 112,
-        `orbs ${leftIndex + 1} and ${rightIndex + 1} should not overlap`,
-      );
+test("preview loading advances one percent every 800 milliseconds below 20 percent", () => {
+  const documentRef = createTestDocument();
+  const scheduler = installScheduler();
+  try {
+    const nodes = createGenerationLoadingShell(documentRef, { key: "job-2", active: true });
+    for (let step = 1; step <= 20; step += 1) {
+      assert.equal(scheduler.runNext(), true);
+      assert.equal(getGenerationLoadingProgress(nodes), step);
     }
+    assert.equal(nodes.percent.textContent, "20%");
+    assert.equal(scheduler.delays.slice(0, 20).every((delay) => delay === 800), true);
+    stopGenerationLoadingShell(nodes);
+  } finally {
+    scheduler.restore();
   }
 });
 
-test("preview loading shell holds the first six orbs until a visible job completes", async () => {
-  const app = await readFile(appPath, "utf8");
-  const loadingShellRuntime = extractFunctionBefore(app, "createPreviewMotionNode", "renderPreviewPlaceholder");
-  const document = {
-    createElement: createTestElement,
-  };
-  const createRuntime = new Function(
-    "document",
-    "getPreviewLoadingOrbLimit",
-    "getPreviewLoadingShellItems",
-    "getPreviewLoadingOrbRenderState",
-    "getPreviewLoadingShellTheme",
-    `${loadingShellRuntime}\nreturn { createPreviewLoadingShellNodes, updatePreviewLoadingShell };`,
-  );
-  const runtime = createRuntime(
-    document,
-    getPreviewLoadingOrbLimit,
-    getPreviewLoadingShellItems,
-    getPreviewLoadingOrbRenderState,
-    getPreviewLoadingShellTheme,
-  );
-  const nodes = runtime.createPreviewLoadingShellNodes();
-  const baseItems = Array.from({ length: 6 }, (_, index) => ({
-    id: `job-${index + 1}`,
-    statusStage: "generating",
-  }));
-  const baseState = {
-    mode: "loading",
-    stage: "generating",
-    stageIndex: 2,
-    stageCount: 4,
-    activeJobCount: 6,
-    maxConcurrentTasks: 7,
-    loadingItems: baseItems,
-  };
-
-  runtime.updatePreviewLoadingShell(nodes, baseState);
-  const visibleNodes = [...nodes.field.children];
-
-  runtime.updatePreviewLoadingShell(nodes, {
-    ...baseState,
-    activeJobCount: 7,
-    loadingItems: [...baseItems, { id: "job-7", statusStage: "uploading" }],
-  });
-
-  assert.deepEqual([...nodes.field.children], visibleNodes);
-  assert.deepEqual(
-    nodes.field.children.map((child) => child.dataset.previewLoadingOrbId),
-    ["job-1", "job-2", "job-3", "job-4", "job-5", "job-6"],
-  );
-
-  runtime.updatePreviewLoadingShell(nodes, {
-    ...baseState,
-    activeJobCount: 6,
-    loadingItems: [...baseItems.slice(1), { id: "job-7", statusStage: "uploading" }],
-  });
-
-  assert.deepEqual(
-    nodes.field.children.map((child) => child.dataset.previewLoadingOrbId),
-    ["job-2", "job-3", "job-4", "job-5", "job-6", "job-7"],
-  );
-  assert.equal(nodes.field.children[5].dataset.previewLoadingOrbId, "job-7");
-  assert.ok(nodes.field.children[5].classList.contains("is-entering"));
+test("preview loading slows by 1500ms per additional 10 percent band", () => {
+  assert.equal(getGenerationLoadingInterval(0), 800);
+  assert.equal(getGenerationLoadingInterval(18), 800);
+  assert.equal(getGenerationLoadingInterval(19), 800);
+  assert.equal(getGenerationLoadingInterval(20), 2300);
+  assert.equal(getGenerationLoadingInterval(29), 2300);
+  assert.equal(getGenerationLoadingInterval(30), 3800);
+  assert.equal(getGenerationLoadingInterval(39), 3800);
+  assert.equal(getGenerationLoadingInterval(40), 5300);
+  assert.equal(getGenerationLoadingInterval(89), 11300);
+  assert.equal(getGenerationLoadingInterval(90), 12800);
+  assert.equal(getGenerationLoadingInterval(98), 12800);
 });
 
-test("preview loading placeholder keeps older visible jobs when the queue stores newest first", () => {
-  const runningItems = Array.from({ length: 7 }, (_, index) => ({
-    id: `job-${index + 1}`,
-    createdAt: `2026-06-13T00:00:0${index}.000Z`,
-    statusStage: "generating",
-  })).reverse();
-
-  const state = getPreviewPlaceholderState({
-    item: runningItems[0],
-    runningCount: runningItems.length,
-    runningItems,
-    maxConcurrentTasks: 7,
-  });
-
-  assert.deepEqual(
-    state.loadingItems.map((item) => item.id),
-    ["job-1", "job-2", "job-3", "job-4", "job-5", "job-6"],
-  );
-});
-
-test("preview loading placeholder keeps stable slots when newest-first jobs share timestamps", () => {
-  const cases = [
-    {
-      name: "missing timestamps",
-      runningItems: Array.from({ length: 7 }, (_, index) => ({
-        id: `job-${index + 1}`,
-        statusStage: "generating",
-      })).reverse(),
-    },
-    {
-      name: "matching timestamps",
-      runningItems: Array.from({ length: 7 }, (_, index) => ({
-        id: `job-${index + 1}`,
-        createdAt: "2026-06-13T00:00:00.000Z",
-        statusStage: "generating",
-      })).reverse(),
-    },
-  ];
-
-  for (const { name, runningItems } of cases) {
-    const state = getPreviewPlaceholderState({
-      item: runningItems[0],
-      runningCount: runningItems.length,
-      runningItems,
-      maxConcurrentTasks: 7,
-    });
-
-    assert.deepEqual(
-      state.loadingItems.map((item) => item.id),
-      ["job-1", "job-2", "job-3", "job-4", "job-5", "job-6"],
-      name,
-    );
+test("preview loading exposes the tick duration for a continuous water rise", () => {
+  const documentRef = createTestDocument();
+  const scheduler = installScheduler();
+  try {
+    const nodes = createGenerationLoadingShell(documentRef, { key: "job-rise", active: true });
+    assert.equal(nodes.shell.style.properties.get("--generation-loading-rise-duration"), "800ms");
+    nodes.progress = 25;
+    updateGenerationLoadingShell(nodes, { key: "job-rise", active: true });
+    assert.equal(nodes.shell.style.properties.get("--generation-loading-rise-duration"), "2300ms");
+    stopGenerationLoadingShell(nodes);
+  } finally {
+    scheduler.restore();
   }
+});
+
+test("preview loading renders a wave layer inside the water drop", () => {
+  const documentRef = createTestDocument();
+  const scheduler = installScheduler();
+  try {
+    const nodes = createGenerationLoadingShell(documentRef, { key: "job-wave", active: true });
+    assert.equal(nodes.shell.querySelectorAll(".generation-loading-wave").length, 1);
+    assert.equal(nodes.wave.parentElement, nodes.drop);
+    assert.equal(nodes.wave.getAttribute("aria-hidden"), "true");
+    stopGenerationLoadingShell(nodes);
+  } finally {
+    scheduler.restore();
+  }
+});
+
+test("preview and thumbnail loading shells share progress for the same key", () => {
+  const documentRef = createTestDocument();
+  const scheduler = installScheduler();
+  try {
+    const preview = createGenerationLoadingShell(documentRef, { key: "job-shared", active: true });
+    const thumbnail = createGenerationLoadingShell(documentRef, { key: "job-shared", active: true });
+    assert.equal(scheduler.delays.length, 1);
+    assert.equal(scheduler.runNext(), true);
+    assert.equal(getGenerationLoadingProgress(preview), 1);
+    assert.equal(getGenerationLoadingProgress(thumbnail), 1);
+    assert.equal(preview.percent.textContent, thumbnail.percent.textContent);
+    stopGenerationLoadingShell(preview);
+    assert.equal(scheduler.pending.size, 1);
+    stopGenerationLoadingShell(thumbnail);
+    assert.equal(scheduler.pending.size, 0);
+  } finally {
+    scheduler.restore();
+  }
+});
+
+test("preview loading caps at 99 percent and stops scheduling", () => {
+  const documentRef = createTestDocument();
+  const scheduler = installScheduler();
+  try {
+    const nodes = createGenerationLoadingShell(documentRef, { key: "job-3", active: true });
+    nodes.progress = 98;
+    updateGenerationLoadingShell(nodes, { key: "job-3", active: true });
+    assert.equal(scheduler.runNext(), true);
+    assert.equal(getGenerationLoadingProgress(nodes), 99);
+    assert.equal(nodes.percent.textContent, "99%");
+    assert.equal(nodes.timer, null);
+    assert.equal(scheduler.pending.size, 0);
+  } finally {
+    scheduler.restore();
+  }
+});
+
+test("preview loading resets when the generation key changes and stops cleanly", () => {
+  const documentRef = createTestDocument();
+  const scheduler = installScheduler();
+  try {
+    const nodes = createGenerationLoadingShell(documentRef, { key: "job-a", active: true });
+    scheduler.runNext();
+    updateGenerationLoadingShell(nodes, { key: "job-b", active: true });
+    assert.equal(getGenerationLoadingProgress(nodes), 0);
+    assert.equal(nodes.shell.dataset.generationLoadingKey, "job-b");
+    stopGenerationLoadingShell(nodes);
+    assert.equal(nodes.timer, null);
+    assert.equal(nodes.active, false);
+    assert.equal(scheduler.pending.size, 0);
+  } finally {
+    scheduler.restore();
+  }
+});
+
+test("waiting loading shells never schedule a percentage tick", () => {
+  const documentRef = createTestDocument();
+  const scheduler = installScheduler();
+  try {
+    const nodes = createGenerationLoadingShell(documentRef, { key: "job-wait", active: true, mode: "waiting" });
+    assert.equal(nodes.shell.dataset.generationLoadingMode, "waiting");
+    assert.equal(nodes.timer, null);
+    assert.equal(scheduler.pending.size, 0);
+    assert.equal(nodes.percent.textContent, "");
+    assert.equal(nodes.status.textContent, "排队等待中");
+    assert.equal(nodes.shell.getAttribute("aria-label"), "排队等待中");
+    stopGenerationLoadingShell(nodes);
+  } finally {
+    scheduler.restore();
+  }
+});
+
+test("waiting shells start from zero once the task begins generating", () => {
+  const documentRef = createTestDocument();
+  const scheduler = installScheduler();
+  try {
+    const nodes = createGenerationLoadingShell(documentRef, { key: "job-wait-2", active: true, mode: "waiting" });
+    updateGenerationLoadingShell(nodes, { key: "job-wait-2", active: true, mode: "generating" });
+    assert.equal(nodes.shell.dataset.generationLoadingMode, "generating");
+    assert.equal(getGenerationLoadingProgress(nodes), 0);
+    assert.equal(nodes.status.textContent, "生图生成中");
+    assert.equal(scheduler.runNext(), true);
+    assert.equal(getGenerationLoadingProgress(nodes), 1);
+    stopGenerationLoadingShell(nodes);
+  } finally {
+    scheduler.restore();
+  }
+});
+
+test("a generating shell switched back to waiting stops ticking and clears the percentage", () => {
+  const documentRef = createTestDocument();
+  const scheduler = installScheduler();
+  try {
+    const nodes = createGenerationLoadingShell(documentRef, { key: "job-wait-3", active: true });
+    assert.equal(scheduler.runNext(), true);
+    assert.equal(getGenerationLoadingProgress(nodes), 1);
+    updateGenerationLoadingShell(nodes, { key: "job-wait-3", active: true, mode: "waiting" });
+    assert.equal(nodes.timer, null);
+    assert.equal(scheduler.pending.size, 0);
+    assert.equal(getGenerationLoadingProgress(nodes), 0);
+    assert.equal(nodes.percent.textContent, "");
+    stopGenerationLoadingShell(nodes);
+  } finally {
+    scheduler.restore();
+  }
+});
+
+test("queued prompt items are reported as waiting previews", () => {
+  assert.equal(isWaitingPreviewItem({ statusStage: "queued" }), true);
+  assert.equal(isWaitingPreviewItem({ statusStage: "queued", started: true }), false);
+  assert.equal(isWaitingPreviewItem({ statusStage: "queued", isRunning: true }), false);
+  assert.equal(isWaitingPreviewItem({ statusStage: "generating" }), false);
+  assert.equal(isWaitingPreviewItem({}), false);
+  assert.equal(getPreviewPlaceholderState({ item: { id: "job-q", statusStage: "queued" } }).waiting, true);
+  assert.equal(getPreviewPlaceholderState({ item: { id: "job-g", statusStage: "generating" } }).waiting, false);
+});
+
+test("queue and thumbnail strips separate adjacent same-footprint entries", async () => {
+  const styles = await readFile(new URL("../public/styles.css", import.meta.url), "utf8");
+  assert.match(styles, /\.creation-queue-item \+ \.creation-queue-item::before\s*\{[\s\S]*background:/);
+  assert.match(styles, /\.filmstrip-entry \+ \.filmstrip-entry::before\s*\{[\s\S]*background:/);
+  assert.match(styles, /\.generation-loading-shell\[data-generation-loading-mode="waiting"\]/);
+  assert.match(styles, /@keyframes generation-loading-waiting-pulse/);
+});
+
+test("preview loading shell reuse is limited to the same active generation", () => {
+  assert.equal(shouldReusePreviewLoadingShell({ mode: "loading", loadingKey: "same" }, { mode: "loading", loadingKey: "same" }), true);
+  assert.equal(shouldReusePreviewLoadingShell({ mode: "loading", loadingKey: "old" }, { mode: "loading", loadingKey: "new" }), false);
+  assert.equal(shouldReusePreviewLoadingShell({ mode: "ready" }, { mode: "loading" }), false);
+});
+
+test("preview placeholder exposes a stable loading key", () => {
+  const state = getPreviewPlaceholderState({ item: { id: "job-42", statusStage: "generating" } });
+  assert.equal(state.mode, "loading");
+  assert.equal(state.loadingKey, "job-42");
+});
+
+test("app and stylesheet no longer contain the removed multi-layer generation animations", async () => {
+  const [app, styles] = await Promise.all([
+    readFile(new URL("../public/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/styles.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(app, /createGenerationLoadingShell\(document/);
+  assert.doesNotMatch(app, /createPreviewMotionNode|preview-loading-orb-field|quick-blend-thumb-loader/);
+  assert.match(styles, /\.generation-loading-drop\s*\{/);
+  assert.match(styles, /@keyframes generation-loading-breathe/);
+  assert.match(styles, /\.generation-loading-wave\s*\{[\s\S]*bottom:\s*calc\(var\(--generation-loading-progress\)/);
+  assert.match(styles, /@keyframes generation-loading-wave-drift/);
+  assert.match(styles, /@keyframes generation-loading-water-bubbles/);
+  assert.match(styles, /@property --generation-loading-progress\s*\{[\s\S]*syntax:\s*"<percentage>"/);
+  assert.match(
+    styles,
+    /\.generation-loading-shell\s*\{[\s\S]*transition:\s*--generation-loading-progress var\(--generation-loading-rise-duration,\s*800ms\) linear/,
+  );
+  assert.doesNotMatch(styles, /preview-loading-orb-field|preview-loading-fluid|creation-card-loading-sketch|quick-blend-thumb-loader|image-edit-spin|image-decomposition-spin/);
 });

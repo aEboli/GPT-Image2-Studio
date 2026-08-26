@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { createServer as createHttpServer } from "node:http";
 import { createServer as createTcpServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -125,12 +126,138 @@ test("static revalidation treats a stale etag as modified even when last-modifie
   await staleEtagResponse.arrayBuffer();
 });
 
+test("gallery API excludes historical generated images whose actual size is 1x1", async (t) => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "invalid-gallery-result-"));
+  const outputDir = join(tempRoot, "output");
+  const localDataRootDir = join(tempRoot, "local-data");
+  const { saveGeneratedAsset } = await import(galleryStorePath);
+  await saveGeneratedAsset({
+    outputDir,
+    filename: "historical-white-result.png",
+    imageBuffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==",
+      "base64",
+    ),
+    metadata: {
+      createdAt: "2026-08-21T11:07:36.000Z",
+      size: "1024x1024",
+      format: "png",
+    },
+  });
+
+  const port = await getFreePort();
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const server = spawn(process.execPath, ["server.mjs"], {
+    cwd: rootDir,
+    env: {
+      ...process.env,
+      PORT: String(port),
+      VERCEL: "1",
+      TMP: tempRoot,
+      TEMP: tempRoot,
+      IMAGE_STUDIO_OUTPUT_DIR: outputDir,
+      IMAGE_STUDIO_LOCAL_DATA_DIR: localDataRootDir,
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const diagnostics = collectDiagnostics(server);
+  t.after(async () => {
+    await stopServer(server);
+    await rm(tempRoot, { recursive: true, force: true });
+  });
+  await waitForServer(baseUrl, server, diagnostics);
+
+  const response = await fetch(`${baseUrl}/api/gallery`);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), []);
+});
+
 test("local model list route returns structured errors for malformed request bodies", async () => {
   const server = await readFile(serverPath, "utf8");
   const handler = server.match(/async function handleModelListPost\(request, response\) \{[\s\S]*?\r?\n}\r?\n\r?\nasync function handleGalleryGet/)?.[0] || "";
   assert.match(handler, /try\s*\{\s*const formData = await readFormDataBody\(request\);/);
   assert.match(handler, /sendJson\(response,\s*hasApiKey\s*\?\s*502\s*:\s*400/);
   assert.doesNotMatch(handler, /const formData = await readFormDataBody\(request\);\s*const config = mergeRequestPrivateConfig[\s\S]*?try\s*\{/);
+});
+
+test("model list route uses independent direct image and text provider settings", async (t) => {
+  const upstreamRequests = [];
+  const upstream = createHttpServer((request, response) => {
+    upstreamRequests.push({
+      pathname: new URL(request.url || "/", "http://localhost").pathname,
+      authorization: request.headers.authorization || "",
+    });
+    response.writeHead(200, { "Content-Type": "application/json" });
+    response.end(JSON.stringify({ data: [{ id: request.url?.includes("/image/") ? "image-model" : "text-model" }] }));
+  });
+  await new Promise((resolveListen, rejectListen) => {
+    upstream.once("error", rejectListen);
+    upstream.listen(0, "127.0.0.1", resolveListen);
+  });
+  const upstreamAddress = upstream.address();
+  const upstreamBaseUrl = `http://127.0.0.1:${upstreamAddress.port}`;
+
+  const tempRoot = await mkdtemp(join(tmpdir(), "direct-model-list-routing-"));
+  const outputDir = join(tempRoot, "output");
+  const localDataRootDir = join(tempRoot, "local-data");
+  const port = await getFreePort();
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const server = spawn(process.execPath, ["server.mjs"], {
+    cwd: rootDir,
+    env: {
+      ...process.env,
+      PORT: String(port),
+      VERCEL: "1",
+      TMP: tempRoot,
+      TEMP: tempRoot,
+      IMAGE_STUDIO_OUTPUT_DIR: outputDir,
+      IMAGE_STUDIO_LOCAL_DATA_DIR: localDataRootDir,
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const diagnostics = collectDiagnostics(server);
+  t.after(async () => {
+    await stopServer(server);
+    await rm(tempRoot, { recursive: true, force: true });
+    await new Promise((resolveClose, rejectClose) => {
+      upstream.close((error) => (error ? rejectClose(error) : resolveClose()));
+    });
+  });
+  await waitForServer(baseUrl, server, diagnostics);
+
+  const buildRequest = (modelTarget) => {
+    const formData = new FormData();
+    formData.set("modelTarget", modelTarget);
+    formData.set("imageRoute", "b");
+    formData.set("directImageBaseUrl", `${upstreamBaseUrl}/image/v1`);
+    formData.set("directImageApiKey", "synthetic-image-key");
+    formData.set("directImageEndpointPath", "images/generations");
+    formData.set("directImageModel", "image-model");
+    formData.set("directTextBaseUrl", `${upstreamBaseUrl}/text/v1`);
+    formData.set("directTextApiKey", "synthetic-text-key");
+    formData.set("directTextEndpointPath", "responses");
+    formData.set("directTextModel", "text-model");
+    return formData;
+  };
+
+  const imageResponse = await fetch(`${baseUrl}/api/models`, {
+    method: "POST",
+    body: buildRequest("direct"),
+  });
+  assert.equal(imageResponse.status, 200);
+  assert.deepEqual(await imageResponse.json(), { ok: true, models: ["image-model"] });
+
+  const textResponse = await fetch(`${baseUrl}/api/models`, {
+    method: "POST",
+    body: buildRequest("direct-responses"),
+  });
+  assert.equal(textResponse.status, 200);
+  assert.deepEqual(await textResponse.json(), { ok: true, models: ["text-model"] });
+
+  assert.deepEqual(upstreamRequests, [
+    { pathname: "/image/v1/models", authorization: "Bearer synthetic-image-key" },
+    { pathname: "/text/v1/models", authorization: "Bearer synthetic-text-key" },
+  ]);
 });
 
 test("creation listing uses an independent medium reasoning default", async () => {
@@ -192,7 +319,12 @@ test("local server has an isolated mock image path for creation regression tests
   assert.match(server, /process\.env\.IMAGE_STUDIO_OUTPUT_DIR/);
   assert.match(server, /process\.env\.IMAGE_STUDIO_LOCAL_DATA_DIR/);
   assert.match(server, /process\.env\.IMAGE_STUDIO_MOCK_IMAGE_GENERATION === "1"/);
+  assert.match(server, /process\.env\.IMAGE_STUDIO_ENABLE_TEST_MOCKS === "1"/);
   assert.match(server, /async function requestStudioImageGeneration/);
+  assert.match(server, /decodeAndValidateGeneratedImage\(event\.base64, "上游生成结果"\)/);
+  assert.match(server, /decodeAndValidateGeneratedImage\(finalBase64/);
+  assert.match(server, /\.filter\(\(item\) => !isInvalidGeneratedImageMetadata\(item\)\)/);
+  assert.doesNotMatch(server, /imageBuffer:\s*Buffer\.from\(normalizeBase64\(finalBase64\)/);
   assert.match(server, /type:\s*"final_image"/);
   assert.match(server, /finalImageBase64:\s*MOCK_IMAGE_BASE64/);
 });
@@ -304,10 +436,31 @@ test("local creation reference uploads use the dedicated twelve-image limit", as
 test("local creation batch generation runs items with the configured parallel limit", async () => {
   const server = await readFile(serverPath, "utf8");
   const generateHandler = server.match(/async function handleCreationGenerate[\s\S]*?\r?\n}\r?\n\r?\nasync function handleCreationRepair/)?.[0] || "";
+  const logoBatchHandler = server.match(/async function handleCreationLogoBatchGenerate[\s\S]*?\r?\n}\r?\n\r?\nasync function handleCreationRepair/)?.[0] || "";
   const repairHandler = server.match(/async function handleCreationRepair[\s\S]*?\r?\n}\r?\n\r?\nasync function handleGenerate/)?.[0] || "";
   assert.match(server, /runWithConcurrency/);
-  assert.match(generateHandler, /await runWithConcurrency\(\s*plan\.items,\s*MAX_PARALLEL_TASKS_PER_SESSION,/);
-  assert.match(repairHandler, /await runWithConcurrency\(\s*repairItems,\s*MAX_PARALLEL_TASKS_PER_SESSION,/);
+  assert.match(generateHandler, /await runWithConcurrency\(\s*plan\.items,\s*MAX_CREATION_PARALLEL_TASKS,/);
+  assert.match(logoBatchHandler, /await runWithConcurrency\(\s*plan\.items,\s*MAX_CREATION_PARALLEL_TASKS,/);
+  assert.match(repairHandler, /await runWithConcurrency\(\s*repairItems,\s*MAX_CREATION_PARALLEL_TASKS,/);
+});
+
+test("local creation generation cancels bounded upstream work when the SSE lifecycle ends", async () => {
+  const server = await readFile(serverPath, "utf8");
+  assert.match(server, /const CREATION_UPSTREAM_TIMEOUT_MS = \(\(\) =>/);
+  assert.match(server, /function createCreationRequestLifecycle\(response\) \{/);
+  assert.match(server, /套图上游请求超时/);
+  assert.match(server, /套图客户端连接已断开，已取消上游请求/);
+  assert.match(server, /!response\.writableEnded && !response\.writableFinished/);
+  assert.match(server, /statusHeartbeatMs: CREATION_STATUS_HEARTBEAT_MS/);
+  assert.match(server, /signal: lifecycle\.signal/);
+  assert.match(server, /async function requestCreationStudioImageGeneration\(response, options\)/);
+  assert.match(server, /requestCreationStudioImageGeneration\(response, \{/);
+  // A worker attaches its close listener only after winning a session slot, so an
+  // already-closed response must abort immediately instead of waiting for a close
+  // event that has already fired.
+  assert.match(server, /if \(!isResponseWritable\(response\)\) \{\s*abort\("套图客户端连接已断开，已取消上游请求。"\);/);
+  // Only abort-shaped errors may be relabelled with the lifecycle reason.
+  assert.match(server, /if \(!abortMessage \|\| error\?\.name !== "AbortError"\) \{/);
 });
 
 test("local generation requests wait for a session slot instead of failing at the parallel cap", async () => {

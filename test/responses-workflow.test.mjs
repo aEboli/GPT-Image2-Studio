@@ -9,6 +9,7 @@ import {
   createResponsesRequestBody,
   createChatCompletionsImageRequestBody,
   formatStatusHeartbeatMessage,
+  isMissingMultipartImageFieldError,
   recoverOriginalResponse,
   normalizeBaseUrl,
   requestDirectImageGeneration,
@@ -827,6 +828,202 @@ test("direct image edit does not retry on unrelated upstream failures", async ()
   );
 
   assert.equal(requests.length, 1);
+});
+
+test("direct image edit walks the fallback ladder when the relay rejects every multi-image shape", async () => {
+  const requests = [];
+  const statusMessages = [];
+  const result = await requestDirectImageGeneration({
+    baseUrl: "https://relay.example.test/v1",
+    endpointPath: "images/generations",
+    apiKey: "relay-key",
+    prompt: "Create a creation set image.",
+    referenceImageLabels: [
+      "Creation reference image 1 of 3: product body.",
+      "Creation reference image 2 of 3: package style.",
+      "Creation reference image 3 of 3: logo.",
+    ],
+    referenceImages: [
+      { filename: "product.png", mimeType: "image/png", base64: "cHJvZHVjdA==" },
+      { filename: "package.jpg", mimeType: "image/jpeg", base64: "cGFja2FnZQ==" },
+      { filename: "logo.png", mimeType: "image/png", base64: "bG9nbw==" },
+    ],
+    size: "1024x1024",
+    quality: "high",
+    format: "png",
+    imageModel: "gpt-image-2",
+    async onEvent(event) {
+      if (event.type === "status") {
+        statusMessages.push(event.message);
+      }
+    },
+    async fetchImpl(url, init) {
+      requests.push({ url, body: init.body });
+      if (requests.length <= 2) {
+        // The observed relay signals this refusal with HTTP 200 and an error body.
+        return new Response(
+          JSON.stringify({ error: { code: "bad_request", message: "image file or image_url is required" } }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({ data: [{ b64_json: "cmVkdWNlZA==" }] }), { status: 200 });
+    },
+  });
+
+  assert.equal(requests.length, 3);
+  assert.equal(requests[0].body.getAll("image[]").length, 3);
+  assert.equal(requests[1].body.getAll("image").length, 3);
+  const reducedImages = requests[2].body.getAll("image");
+  assert.equal(reducedImages.length, 1);
+  assert.equal(reducedImages[0].name, "product.png");
+  assert.equal(requests[2].body.getAll("image[]").length, 0);
+
+  const reducedPrompt = requests[2].body.get("prompt");
+  assert.match(reducedPrompt, /^Create a creation set image\./);
+  assert.match(reducedPrompt, /Creation reference image 1 of 3: product body\./);
+  assert.doesNotMatch(reducedPrompt, /package style/);
+  assert.doesNotMatch(reducedPrompt, /3 of 3: logo/);
+  assert.match(reducedPrompt, /only reference image 1 of 3 could be uploaded/i);
+  assert.match(reducedPrompt, /2 additional reference image\(s\) were not sent/i);
+
+  assert.equal(result.finalImageBase64, "cmVkdWNlZA==");
+  assert.equal(result.imageFieldFallbackUsed, true);
+  assert.equal(result.referenceImageReductionUsed, true);
+  assert.equal(result.uploadedReferenceImageCount, 1);
+  assert.ok(statusMessages.some((message) => message.includes("只接受单张参考图")));
+});
+
+test("direct image generation treats an HTTP 200 error body as a failure", async () => {
+  const requests = [];
+  await assert.rejects(
+    requestDirectImageGeneration({
+      baseUrl: "https://relay.example.test/v1",
+      endpointPath: "images/generations",
+      apiKey: "relay-key",
+      prompt: "Create one image.",
+      size: "1024x1024",
+      quality: "high",
+      format: "png",
+      imageModel: "gpt-image-2",
+      async fetchImpl(url, init) {
+        requests.push({ url, body: init.body });
+        return new Response(
+          JSON.stringify({ error: { code: "upstream_error", message: "The image generation request failed." } }),
+          { status: 200 },
+        );
+      },
+    }),
+    /upstream_error The image generation request failed\./,
+  );
+
+  assert.equal(requests.length, 1);
+});
+
+test("direct image edit stops the ladder when a later attempt fails for an unrelated reason", async () => {
+  const requests = [];
+  await assert.rejects(
+    requestDirectImageGeneration({
+      baseUrl: "https://relay.example.test/v1",
+      endpointPath: "images/generations",
+      apiKey: "relay-key",
+      prompt: "Create a creation set image.",
+      referenceImages: [
+        { filename: "product.png", mimeType: "image/png", base64: "cHJvZHVjdA==" },
+        { filename: "logo.png", mimeType: "image/png", base64: "bG9nbw==" },
+      ],
+      size: "1024x1024",
+      quality: "high",
+      format: "png",
+      imageModel: "gpt-image-2",
+      async fetchImpl(url, init) {
+        requests.push({ url, body: init.body });
+        if (requests.length === 1) {
+          return new Response(
+            JSON.stringify({ error: { code: "bad_request", message: "image file or image_url is required" } }),
+            { status: 200 },
+          );
+        }
+        return new Response(JSON.stringify({ error: { message: "insufficient quota" } }), { status: 429 });
+      },
+    }),
+    /insufficient quota/,
+  );
+
+  assert.equal(requests.length, 2);
+});
+
+test("direct image edit sends only labels for references it uploads", async () => {
+  const requests = [];
+  const result = await requestDirectImageGeneration({
+    baseUrl: "https://relay.example.test/v1",
+    endpointPath: "images/generations",
+    apiKey: "relay-key",
+    prompt: "Create from mixed references.",
+    referenceImageLabels: [
+      "Reference image 1: usable product.",
+      "Reference image 2: broken upload.",
+      "Reference image 3: usable package.",
+    ],
+    referenceImages: [
+      { filename: "product.png", mimeType: "image/png", base64: "cHJvZHVjdA==" },
+      { filename: "broken.png", mimeType: "image/png", base64: "" },
+      { filename: "package.jpg", mimeType: "image/jpeg", base64: "cGFja2FnZQ==" },
+    ],
+    size: "1024x1024",
+    quality: "high",
+    format: "png",
+    imageModel: "gpt-image-2",
+    async fetchImpl(url, init) {
+      requests.push({ url, body: init.body });
+      return new Response(JSON.stringify({ data: [{ b64_json: "bWl4ZWQ=" }] }), { status: 200 });
+    },
+  });
+
+  assert.equal(requests.length, 1);
+  const uploaded = requests[0].body.getAll("image[]");
+  assert.equal(uploaded.length, 2);
+  assert.equal(uploaded[0].name, "product.png");
+  assert.equal(uploaded[1].name, "package.jpg");
+
+  const prompt = requests[0].body.get("prompt");
+  assert.match(prompt, /Reference image 1: usable product\./);
+  assert.match(prompt, /Reference image 3: usable package\./);
+  assert.doesNotMatch(prompt, /broken upload/);
+  assert.equal(result.uploadedReferenceImageCount, 2);
+  assert.equal(result.referenceImageReductionUsed, false);
+});
+
+test("isMissingMultipartImageFieldError classifies a 200 response carrying an error payload", () => {
+  assert.equal(
+    isMissingMultipartImageFieldError({
+      status: 200,
+      body: '{"error":{"message":"image file or image_url is required"}}',
+      hasErrorPayload: true,
+    }),
+    true,
+  );
+  assert.equal(
+    isMissingMultipartImageFieldError({
+      status: 200,
+      body: '{"error":{"message":"image file or image_url is required"}}',
+    }),
+    false,
+  );
+  assert.equal(
+    isMissingMultipartImageFieldError({
+      status: 200,
+      body: '{"error":{"message":"insufficient quota"}}',
+      hasErrorPayload: true,
+    }),
+    false,
+  );
+  assert.equal(
+    isMissingMultipartImageFieldError({
+      status: 400,
+      body: "image file or image_url is required",
+    }),
+    true,
+  );
 });
 
 test("direct image generation ignores reference images that carry no bytes", async () => {

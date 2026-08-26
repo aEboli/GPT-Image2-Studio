@@ -1630,7 +1630,7 @@ For each newly planned or locally queued SKU image, the system SHALL create a `f
 
 #### Scenario: 运行中任务独立计数
 
-- **WHEN** 当前页面正在运行最多 6 个提示词生成任务
+- **WHEN** 当前页面正在运行最多 10 个提示词生成任务
 - **THEN** 运行中任务占位显示在历史缩略图之外
 - **AND** 占位不减少最多 50 张历史缩略图的展示数量
 

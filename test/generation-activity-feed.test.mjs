@@ -132,6 +132,14 @@ test("generation task status copy distinguishes queue heartbeat retry recovery a
   assert.equal(
     buildGenerationTaskStatusText({
       status: "running",
+      statusStage: "retrying_upstream",
+      statusText: "重试中",
+    }),
+    "上游重试：重试中",
+  );
+  assert.equal(
+    buildGenerationTaskStatusText({
+      status: "running",
       statusStage: "missing_final_recovery",
       statusText: "流式响应未返回最终图，正在兜底获取结果",
     }),

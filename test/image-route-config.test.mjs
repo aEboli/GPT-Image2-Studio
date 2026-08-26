@@ -355,73 +355,74 @@ test("image route config accepts routeB responsesModel as direct text and vision
   assert.equal(config.directResponsesModel, "vendor-vision-text");
 });
 
-test("selected text and vision config uses direct API settings in direct mode", () => {
+test("selected image and text/vision configs use their own direct API settings", () => {
   const config = {
     imageRoute: "b",
     baseUrl: "https://route-a.example.test/v1",
     apiKey: "route-a-key",
     responsesModel: "gpt-5.4",
-    directBaseUrl: "https://direct.example.test/v1",
-    directEndpointPath: "chat/completions",
-    directApiKey: "direct-key",
+    directImageBaseUrl: "https://image.example.test/v1",
+    directImageEndpointPath: "responses",
+    directImageApiKey: "image-key",
     directImageModel: "vendor-image-pro",
-    directResponsesModel: "vendor-vision-text",
+    directTextBaseUrl: "https://text.example.test/v1",
+    directTextEndpointPath: "chat/completions",
+    directTextApiKey: "text-key",
+    directTextModel: "vendor-vision-text",
   };
 
   assert.deepEqual(getSelectedTextVisionConfig(config), {
     imageRoute: "b",
-    baseUrl: "https://direct.example.test/v1",
+    baseUrl: "https://text.example.test/v1",
     endpointPath: "chat/completions",
-    apiKey: "direct-key",
+    apiKey: "text-key",
     responsesModel: "vendor-vision-text",
   });
   assert.deepEqual(getSelectedImageGenerationConfig(config), {
     imageRoute: "b",
-    baseUrl: "https://direct.example.test/v1",
-    apiKey: "direct-key",
-    responsesModel: "gpt-5.4",
-    imageModel: "vendor-image-pro",
-    endpointPath: "chat/completions",
-  });
-});
-
-test("selected direct image generation config uses direct responses model for responses protocol", () => {
-  const config = {
-    imageRoute: "b",
-    responsesModel: "route-a-model",
-    directBaseUrl: "https://direct.example.test/v1",
-    directEndpointPath: "responses",
-    directApiKey: "direct-key",
-    directImageModel: "vendor-image-pro",
-    directResponsesModel: "vendor-vision-text",
-  };
-
-  assert.deepEqual(getSelectedImageGenerationConfig(config), {
-    imageRoute: "b",
-    baseUrl: "https://direct.example.test/v1",
-    apiKey: "direct-key",
-    responsesModel: "vendor-vision-text",
+    baseUrl: "https://image.example.test/v1",
+    apiKey: "image-key",
+    responsesModel: "vendor-image-pro",
     imageModel: "vendor-image-pro",
     endpointPath: "responses",
   });
 });
 
-test("selected direct image generation config keeps route A responses model for image protocol", () => {
+test("selected direct responses image generation uses the image model", () => {
   const config = {
     imageRoute: "b",
-    responsesModel: "route-a-model",
-    directBaseUrl: "https://direct.example.test/v1",
-    directEndpointPath: "images/generations",
-    directApiKey: "direct-key",
+    directImageBaseUrl: "https://image.example.test/v1",
+    directImageEndpointPath: "responses",
+    directImageApiKey: "image-key",
     directImageModel: "vendor-image-pro",
-    directResponsesModel: "vendor-vision-text",
+    directTextModel: "vendor-vision-text",
   };
 
   assert.deepEqual(getSelectedImageGenerationConfig(config), {
     imageRoute: "b",
-    baseUrl: "https://direct.example.test/v1",
-    apiKey: "direct-key",
-    responsesModel: "route-a-model",
+    baseUrl: "https://image.example.test/v1",
+    apiKey: "image-key",
+    responsesModel: "vendor-image-pro",
+    imageModel: "vendor-image-pro",
+    endpointPath: "responses",
+  });
+});
+
+test("selected direct image generation config uses the image model for image protocol", () => {
+  const config = {
+    imageRoute: "b",
+    directImageBaseUrl: "https://image.example.test/v1",
+    directImageEndpointPath: "images/generations",
+    directImageApiKey: "image-key",
+    directImageModel: "vendor-image-pro",
+    directTextModel: "vendor-vision-text",
+  };
+
+  assert.deepEqual(getSelectedImageGenerationConfig(config), {
+    imageRoute: "b",
+    baseUrl: "https://image.example.test/v1",
+    apiKey: "image-key",
+    responsesModel: "vendor-image-pro",
     imageModel: "vendor-image-pro",
     endpointPath: "images/generations",
   });

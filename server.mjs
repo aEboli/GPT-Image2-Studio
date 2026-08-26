@@ -64,6 +64,7 @@ import {
 } from "./lib/generation-stream-protocol.mjs";
 import { writeNodeSseEvent } from "./lib/sse-writer.mjs";
 import {
+  PARTIAL_PREVIEW_ORIGIN,
   createTimestampedFilename,
   buildPublicAssetUrl,
   deleteGeneratedAsset,
@@ -269,6 +270,9 @@ const IMAGE_EDIT_MODE = "image-edit";
 const IMAGE_EDIT_ASSET_KIND = "image-edit";
 const MAX_LOCAL_MASK_FILE_BYTES = 50 * 1024 * 1024;
 const MAX_PRODUCT_IMAGE_PROXY_BODY_BYTES = 16 * 1024;
+// A base64 preview plus its parameter snapshot; generous enough for a 4K PNG
+// preview but bounded so a request cannot exhaust memory.
+const MAX_PROMPT_PREVIEW_SAVE_BODY_BYTES = 32 * 1024 * 1024;
 const MOCK_IMAGE_GENERATION_REQUESTED = process.env.IMAGE_STUDIO_MOCK_IMAGE_GENERATION === "1";
 const MOCK_IMAGE_GENERATION_ENABLED =
   MOCK_IMAGE_GENERATION_REQUESTED &&
@@ -1036,6 +1040,88 @@ async function handleGalleryMetadataRepair(request, response) {
 
     throw error;
   }
+}
+
+// Saves an unfinished prompt-mode attempt preview as a real gallery asset. No
+// upstream call happens here, so this deliberately skips the generation config
+// validation, queue and billing path that /api/generate goes through.
+async function handlePromptPreviewSave(request, response) {
+  let payload;
+  try {
+    payload = await readJsonBody(request, { maxBytes: MAX_PROMPT_PREVIEW_SAVE_BODY_BYTES });
+  } catch (error) {
+    const statusCode = error?.code === "PAYLOAD_TOO_LARGE" ? 413 : 400;
+    return sendJson(response, statusCode, {
+      ok: false,
+      message: statusCode === 413
+        ? "预览另存请求体超过允许大小。"
+        : "预览另存请求必须是有效 JSON。",
+    });
+  }
+
+  const base64 = normalizeBase64(String(payload.imageBase64 || ""));
+  if (!base64) {
+    return sendJson(response, 400, {
+      ok: false,
+      message: "预览另存请求缺少图片数据。",
+    });
+  }
+
+  let imageBuffer;
+  try {
+    imageBuffer = decodeAndValidateGeneratedImage(base64, "中途预览");
+  } catch (error) {
+    return sendJson(response, 400, {
+      ok: false,
+      message: error instanceof Error ? error.message : "中途预览无效，已阻止保存。",
+    });
+  }
+
+  const format = normalizeOutputFormat(payload.format || "png");
+  const prompt = String(payload.prompt || "").trim();
+  const createdAt = new Date().toISOString();
+  const ratioOption = resolveAspectRatioOption(String(payload.ratio || "").trim() || undefined);
+  // Filename is derived server-side; anything the client sent is ignored so a
+  // crafted name cannot escape the output directory.
+  const filename = createTimestampedFilename({
+    format,
+    prompt,
+    createdAt,
+    filenameKeyword: "partial-preview",
+  });
+
+  const saved = await saveGeneratedAsset({
+    outputDir,
+    filename,
+    imageBuffer,
+    metadata: {
+      prompt,
+      createdAt,
+      previewOrigin: PARTIAL_PREVIEW_ORIGIN,
+      baseUrl: String(payload.baseUrl || ""),
+      responsesModel: String(payload.responsesModel || ""),
+      imageRoute: String(payload.imageRoute || ""),
+      imageModel: String(payload.imageModel || ""),
+      ratio: ratioOption.value,
+      ratioLabel: ratioOption.label,
+      size: String(payload.size || ""),
+      quality: String(payload.quality || ""),
+      format,
+      reasoningEffort: String(payload.reasoningEffort || ""),
+    },
+  });
+
+  const items = await listGalleryItems({
+    outputDir,
+    publicBasePath: "/output",
+  });
+  const item = items.find((entry) => entry.filename === saved.filename) || null;
+
+  return sendJson(response, 200, {
+    ok: true,
+    item,
+    filename: saved.filename,
+  });
 }
 
 function getReadableUploadFiles(files) {
@@ -6437,6 +6523,10 @@ async function routeRequest(request, response) {
 
   if (request.method === "POST" && url.pathname === "/api/gallery/metadata") {
     return handleGalleryMetadataRepair(request, response);
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/prompt-preview/save") {
+    return handlePromptPreviewSave(request, response);
   }
 
   if (request.method === "POST" && url.pathname === "/api/generate") {

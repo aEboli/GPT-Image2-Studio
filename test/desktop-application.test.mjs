@@ -136,6 +136,7 @@ test("desktop main process fixes single-instance, sandbox, navigation, data, and
   assert.match(source, /process\.env\.HOST\s*=\s*"127\.0\.0\.1"/);
   assert.match(source, /process\.env\.PORT\s*=\s*"0"/);
   assert.match(source, /IMAGE_STUDIO_LOCAL_DATA_DIR/);
+  assert.match(source, /delete process\.env\.IMAGE_STUDIO_MOCK_IMAGE_GENERATION/);
   assert.match(source, /closeStudioServer/);
 });
 

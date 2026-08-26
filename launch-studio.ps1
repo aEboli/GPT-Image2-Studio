@@ -5,6 +5,10 @@ param(
 
 $resolvedRoot = [System.IO.Path]::GetFullPath($Root)
 
+# The mock image generator is test-only. Do not let a stale parent-process
+# variable turn a normal desktop launch into a white 1x1 image producer.
+Remove-Item Env:IMAGE_STUDIO_MOCK_IMAGE_GENERATION -ErrorAction SilentlyContinue
+
 function Get-StudioPortListener {
   param([int]$TargetPort)
 
@@ -44,7 +48,7 @@ $targetPort = Find-StudioPort -StartPort $Port
 $listener = Get-StudioPortListener -TargetPort $targetPort
 
 if (-not $listener) {
-  $command = "set PORT=$targetPort&& node server.mjs"
+  $command = "set IMAGE_STUDIO_MOCK_IMAGE_GENERATION=&& set PORT=$targetPort&& node server.mjs"
   Start-Process -FilePath "cmd.exe" -WorkingDirectory $resolvedRoot -ArgumentList "/k", $command | Out-Null
 
   $deadline = (Get-Date).AddSeconds(20)

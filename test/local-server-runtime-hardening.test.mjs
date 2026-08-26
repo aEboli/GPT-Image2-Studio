@@ -150,6 +150,7 @@ async function startServer(t) {
     TMP: tempRoot,
     TEMP: tempRoot,
     IMAGE_STUDIO_MOCK_IMAGE_GENERATION: "1",
+    IMAGE_STUDIO_ENABLE_TEST_MOCKS: "1",
     IMAGE_STUDIO_OUTPUT_DIR: outputDir,
     IMAGE_STUDIO_LOCAL_DATA_DIR: join(tempRoot, "local-data"),
     IMAGE_STUDIO_REQUEST_TOKEN: "runtime-test-token",

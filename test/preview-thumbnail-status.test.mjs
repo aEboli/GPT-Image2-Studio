@@ -14,6 +14,7 @@ test("loading thumbnail status labels use short stage copy", () => {
   assert.equal(formatLoadingThumbnailStatusLabel({ statusStage: "connecting", isRunning: true }), "连接中");
   assert.equal(formatLoadingThumbnailStatusLabel({ statusStage: "generating", isRunning: true }), "生成中");
   assert.equal(formatLoadingThumbnailStatusLabel({ statusStage: "waiting_final", isRunning: true }), "获取中");
+  assert.equal(formatLoadingThumbnailStatusLabel({ statusStage: "retrying_upstream", isRunning: true }), "重试中");
   assert.equal(formatLoadingThumbnailStatusLabel({ statusStage: "saving", isRunning: true }), "保存中");
 });
 
@@ -37,17 +38,16 @@ test("loading thumbnail status labels derive short copy from detailed status tex
   assert.equal(formatLoadingThumbnailStatusLabel({ started: false }, { idleLabel: "等待" }), "等待");
 });
 
-test("generation thumbnail renderers use the shared loading status label", async () => {
+test("generation thumbnail renderers use the shared loading shell", async () => {
   const [app, imageEditView, quickBlendView] = await Promise.all([
     readFile(appPath, "utf8"),
     readFile(imageEditViewPath, "utf8"),
     readFile(quickBlendViewPath, "utf8"),
   ]);
 
-  assert.match(app, /formatLoadingThumbnailStatusLabel/);
-  assert.match(app, /ghost\.textContent = formatLoadingThumbnailStatusLabel\(item\);/);
-  assert.match(app, /ghost\.textContent = formatLoadingThumbnailStatusLabel\(item,\s*\{\s*idleLabel:\s*"等待"\s*\}\);/);
-  assert.match(imageEditView, /formatLoadingThumbnailStatusLabel/);
-  assert.match(quickBlendView, /formatLoadingThumbnailStatusLabel/);
-  assert.match(quickBlendView, /label\.textContent = formatLoadingThumbnailStatusLabel\(item\);/);
+  assert.match(app, /createGenerationLoadingShell\(document, \{ key, active: true \}\)/);
+  assert.match(app, /createGenerationLoadingShell\(document, \{ key, active: true, mode \}\)\.shell/);
+  assert.match(app, /isWaitingPreviewItem\(item\) \? GENERATION_LOADING_WAITING_MODE : GENERATION_LOADING_GENERATING_MODE/);
+  assert.match(imageEditView, /createGenerationLoadingShell\(document, \{ key, active: true \}\)/);
+  assert.match(quickBlendView, /createGenerationLoadingShell\(document, \{ key, active: true \}\)/);
 });

@@ -68,7 +68,7 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Sora:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260821-asset-theme-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260825-attempt-preview-deck-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -3070,9 +3070,9 @@
                 <div class="route-config-panel" data-route-panel="b">
                   <div class="field endpoint-field">
                     <div class="field-heading inline endpoint-heading">
-                      <label for="directBaseUrlInput" data-ui-i18n="endpointUrl">接口地址</label>
+                      <label for="directBaseUrlInput" data-ui-i18n="directImageApi">生图 API</label>
                       <div class="endpoint-toolbar">
-                        <select class="endpoint-suffix-select" id="directEndpointPathSelect" name="directEndpointPath" aria-label="直接调用模式请求协议后缀" data-ui-i18n-aria-label="directEndpointSuffix">
+                        <select class="endpoint-suffix-select" id="directEndpointPathSelect" name="directImageEndpointPath" aria-label="直接调用模式生图请求协议后缀" data-ui-i18n-aria-label="directImageEndpointSuffix">
                           <option value="images/generations">images/generations</option>
                           <option value="responses">responses</option>
                           <option value="chat/completions">chat/completions</option>
@@ -3081,16 +3081,16 @@
                       </div>
                     </div>
                     <div class="endpoint-address-control">
-                      <input id="directBaseUrlInput" name="directBaseUrl" type="url" placeholder="https://api.openai.com/v1" required />
+                      <input id="directBaseUrlInput" name="directImageBaseUrl" type="url" placeholder="https://api.openai.com/v1" required />
                     </div>
                   </div>
 
                   <label class="field">
                     <div class="field-heading inline">
-                      <span>API Key</span>
+                      <span data-ui-i18n="directImageApiKey">生图 API Key</span>
                       <small id="directSavedKeyMask" data-ui-i18n="notSaved">未保存</small>
                     </div>
-                    <input id="directApiKeyInput" name="directApiKey" type="password" placeholder="保持已保存 Key" data-ui-i18n-placeholder="keepSavedKey" />
+                    <input id="directApiKeyInput" name="directImageApiKey" type="password" placeholder="保持已保存 Key" data-ui-i18n-placeholder="keepSavedKey" />
                   </label>
 
                   <div class="field model-field">
@@ -3105,13 +3105,37 @@
                     </div>
                   </div>
 
+                  <div class="field endpoint-field direct-text-endpoint-field">
+                    <div class="field-heading inline endpoint-heading">
+                      <label for="directTextBaseUrlInput" data-ui-i18n="directTextApi">文本/视觉 API</label>
+                      <div class="endpoint-toolbar">
+                        <select class="endpoint-suffix-select" id="directTextEndpointPathSelect" name="directTextEndpointPath" aria-label="直接调用模式文本请求协议后缀" data-ui-i18n-aria-label="directTextEndpointSuffix">
+                          <option value="responses">responses</option>
+                          <option value="chat/completions">chat/completions</option>
+                        </select>
+                        <button class="inline-button endpoint-full-toggle" id="directTextBaseUrlFullToggle" type="button" aria-pressed="false" data-ui-i18n="fullUrl">完整 URL</button>
+                      </div>
+                    </div>
+                    <div class="endpoint-address-control">
+                      <input id="directTextBaseUrlInput" name="directTextBaseUrl" type="url" placeholder="https://api.openai.com/v1" required />
+                    </div>
+                  </div>
+
+                  <label class="field">
+                    <div class="field-heading inline">
+                      <span data-ui-i18n="directTextApiKey">文本/视觉 API Key</span>
+                      <small id="directTextSavedKeyMask" data-ui-i18n="notSaved">未保存</small>
+                    </div>
+                    <input id="directTextApiKeyInput" name="directTextApiKey" type="password" placeholder="保持已保存 Key" data-ui-i18n-placeholder="keepSavedKey" />
+                  </label>
+
                   <div class="field model-field">
                     <div class="field-heading inline">
-                      <label for="directResponsesModelInput" data-ui-i18n="visionTextModel">视觉/文本模型</label>
+                      <label for="directResponsesModelInput" data-ui-i18n="visionTextModel">文本/视觉模型</label>
                       <button class="inline-button" id="directResponsesFetchModelsButton" type="button" data-ui-i18n="fetchModels">获取模型列表</button>
                     </div>
                     <div class="model-picker-control">
-                      <input id="directResponsesModelInput" name="directResponsesModel" type="text" placeholder="gpt-5.4-mini" autocomplete="off" aria-controls="directResponsesModelOptionsList" />
+                      <input id="directResponsesModelInput" name="directTextModel" type="text" placeholder="gpt-5.4-mini" autocomplete="off" aria-controls="directResponsesModelOptionsList" />
                       <button class="model-picker-toggle" id="directResponsesModelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="directResponsesModelOptionsList" data-ui-i18n-aria-label="expandModels" hidden></button>
                       <div class="model-options-list" id="directResponsesModelOptionsList" role="listbox" hidden></div>
                     </div>
@@ -3163,7 +3187,7 @@
               <div>
                 <h2 data-ui-i18n="activityLog">生成日志</h2>
               </div>
-              <span class="count-pill small" id="liveCount">0 / 6</span>
+              <span class="count-pill small" id="liveCount">0 / 10</span>
             </div>
 
             <div class="error-banner hidden" id="errorBanner" role="alert" aria-live="assertive"></div>
@@ -3269,6 +3293,6 @@
 
     <div class="app-tooltip" id="appTooltip" role="tooltip" popover="manual"></div>
 
-    <script type="module" src="./app.js?v=20260812-top-layer-tooltips-3"></script>
+    <script type="module" src="./app.js?v=20260825-attempt-preview-deck-1"></script>
   </body>
 </html>

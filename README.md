@@ -28,8 +28,8 @@ Current version: `v0.2.8`
 - Evidence-aware Listing normalization, product/package measurement boundaries, safer buyer-facing titles, and SKU image names that do not expose internal part numbers or source filename codes.
 - Prompt/reference reuse improvements: independent clear actions, drag-and-drop reference images, recent-result reuse, and filename plus relative-path context in the image inspector.
 - A Vercel Serverless entry point that installs production dependencies and avoids Electron-only initialization in cloud functions. Vercel deployments use temporary storage and do not provide the local filesystem workflow.
-- Interrupted Responses streams now recover the original upstream result by response ID and bounded polling; the local app does not silently issue a second generation request.
-- Prompt generation supports a fifteen-task pending window with six shared concurrent slots across the supported prompt routes, while keeping the preview surface compact.
+- Interrupted Responses streams first recover the original upstream result by response ID and bounded polling. If the final result still cannot be confirmed, the local app reuses the current task's original input for one automatic retry, displays `重试中` (`Retrying`), and never sends a third generation request after that retry is exhausted.
+- Prompt generation supports a fifteen-task pending window with ten shared concurrent slots across the supported prompt routes, while keeping the preview surface compact.
 - The retired Cloudflare Pages/Worker/R2/Queue path and its active deployment claims have been removed; local Node.js, Windows desktop, Windows browser installer, and Vercel remain documented separately.
 
 ## Why this workbench
@@ -182,7 +182,9 @@ The legacy browser-installer flow remains documented for local builds, but the `
 
 ### Configure in the UI
 
-Open **Configuration** and choose the route mode, direct-call mode, or Gemini model channel. Set the base URL, endpoint suffix, API key, text/vision model, image model, aspect ratio, requested size, and output format. Use **Test connection** before a long generation job. Gateway behavior varies, so a successful connection test is not proof that every editing, reference, or maximum-size request is supported.
+Open **Configuration** and choose the route mode, direct-call mode, or Gemini model channel. In **direct-call mode**, fill the image-generation provider and the text/vision provider separately. Each group has its own Base URL, API key, endpoint suffix, and model; the image group is used for generation/editing, while the text/vision group is used for analysis and other model calls. API keys are kept in local private storage and public configuration responses expose only configured status and a mask. Use **Test connection** or the matching **Fetch Models** button before a long generation job. Gateway behavior varies, so a successful connection test is not proof that every editing, reference, or maximum-size request is supported.
+
+Existing installations using `directBaseUrl`, `directApiKey`, `directEndpointPath`, `directImageModel`, and `directResponsesModel` continue to work as a bounded compatibility fallback. New channel-specific values take precedence independently, and a blank key input keeps the previously saved private key.
 
 Common endpoint suffixes:
 
@@ -193,6 +195,14 @@ Common endpoint suffixes:
 | `images/generations` | Direct image generation |
 | `images/edits` | Image editing requests |
 
+Direct-call environment variables are split by purpose:
+
+| Variables | Purpose |
+| --- | --- |
+| `DIRECT_IMAGE_BASE_URL`, `DIRECT_IMAGE_API_KEY`, `DIRECT_IMAGE_ENDPOINT_PATH`, `DIRECT_IMAGE_MODEL` | Direct image-generation and editing channel |
+| `DIRECT_TEXT_BASE_URL`, `DIRECT_TEXT_API_KEY`, `DIRECT_TEXT_ENDPOINT_PATH`, `DIRECT_TEXT_MODEL` | Direct text/vision analysis channel |
+| `DIRECT_BASE_URL`, `DIRECT_API_KEY`, `DIRECT_ENDPOINT_PATH`, `DIRECT_RESPONSES_MODEL` | Legacy fallback accepted for existing configurations |
+
 ### Environment variables
 
 Copy `.env.example` for a local starting point. Important variables include:
@@ -201,6 +211,14 @@ Copy `.env.example` for a local starting point. Important variables include:
 OPENAI_API_KEY=your_api_key_here
 OPENAI_BASE_URL=https://api.openai.com/v1
 RESPONSES_MODEL=gpt-5.4-mini
+DIRECT_IMAGE_BASE_URL=https://api.openai.com/v1
+DIRECT_IMAGE_API_KEY=
+DIRECT_IMAGE_ENDPOINT_PATH=images/generations
+DIRECT_IMAGE_MODEL=gpt-image-2
+DIRECT_TEXT_BASE_URL=https://api.openai.com/v1
+DIRECT_TEXT_API_KEY=
+DIRECT_TEXT_ENDPOINT_PATH=responses
+DIRECT_TEXT_MODEL=gpt-5.4-mini
 HOST=
 PORT=3600
 IMAGE_STUDIO_OUTPUT_DIR=

@@ -1,18 +1,33 @@
 import { buildParameterText, formatImageModelLabel, formatRecentOutputMeta } from "/lib/studio-formatters.mjs";
-import { formatLoadingThumbnailStatusLabel, getPreviewPlaceholderState, getStablePreviewLoadingItems } from "/lib/preview-placeholder-state.mjs?v=20260618-thumbnail-status-1";
+import { formatLoadingThumbnailStatusLabel, getPreviewPlaceholderState, getStablePreviewLoadingItems, isWaitingPreviewItem } from "/lib/preview-placeholder-state.mjs?v=20260826-waiting-loading-1";
 import { buildGalleryReferenceFilterOptions, buildGallerySections, buildGallerySizeFilterOptions, buildGalleryTimeFilterOptions, distributeGalleryItemsIntoColumns, filterGalleryItems, getGalleryHistorySectionLayouts, getGalleryLayoutModeForWidth, getPromptGenerationGalleryItems, getRecentGalleryItems, normalizeGalleryFilters, paginateGallerySections, sortGalleryItemsByCreatedAtDesc } from "/lib/gallery-organizer.mjs?v=20260806-gallery-five-date-page-1";
 import { buildGalleryMetadataCacheEntry, collectGalleryMetadataRepairPatch, mergeGalleryItemWithCachedMetadata, pruneGalleryMetadataCache } from "/lib/gallery-metadata-recovery.mjs";
 import { getDefaultGenerationSize, getGenerationSizeOptions, getModelProtocolImageSizeOptions, normalizeGenerationSize, normalizeModelProtocolImageSize } from "/lib/generation-size-options.mjs?v=20260614-image2-sizes-1";
 import { getOutputFormatOptions, normalizeOutputFormat, } from "/lib/output-format-options.mjs?v=20260504-vercel-static-lib-1";
 import { normalizeReferenceAnalysisLanguage, } from "/lib/reference-analysis-language.mjs?v=20260522-reference-language-1";
 import { shouldReusePreviewLoadingShell } from "/lib/preview-loading-shell.mjs";
-import { createGenerationLoadingShell, updateGenerationLoadingShell, stopGenerationLoadingShell, stopGenerationLoadingShells } from "/lib/generation-loading.mjs";
+import { createGenerationLoadingShell, updateGenerationLoadingShell, stopGenerationLoadingShell, stopGenerationLoadingShells, GENERATION_LOADING_GENERATING_MODE, GENERATION_LOADING_WAITING_MODE } from "/lib/generation-loading.mjs";
 import { createCreationCardLoading as createCreationCardLoadingShell, getCreationCardDomKey, syncCreationLoadingCard, syncCreationResultGrid as syncCreationResultGridShell } from "/lib/creation-card-loading.mjs";
 import { createCreationCardIdleRippleController } from "/lib/creation-card-idle-ripple.mjs?v=20260725-creation-card-idle-ripple-1";
 import { isGenerationRequestRetryMessage, } from "/lib/generation-request-retry.mjs";
 import { cancelQueuedGenerationJob, getGenerationJobMode, getGenerationJobQueueKey, getQueuedGenerationJobCount, getRunningGenerationJobCount, isQueuedGenerationJob, selectNextQueuedGenerationJobsByMode } from "/lib/generation-queue.mjs?v=20260821-prompt-global-queue-1";
 import { buildCanceledGenerationActivityDetail, buildGenerationTaskActivityDetail, buildGenerationTaskStatusText, formatGenerationActivityModeLabel, getGenerationActivityDisplayText, sanitizeGenerationActivityDetail, sortGenerationActivityFeed, upsertGenerationActivityEntry } from "/lib/generation-activity-feed.mjs?v=20260504-vercel-static-lib-1";
 import { CREATION_STREAM_EVENTS, GENERATION_STREAM_EVENTS, clearFinalImageChunks, recordFinalImageChunk } from "/lib/generation-stream-protocol.mjs";
+import {
+  PROMPT_ATTEMPT_KIND,
+  PROMPT_ATTEMPT_STATUS,
+  completePromptAttemptDeck,
+  createPromptAttemptDeckStore,
+  failPromptAttemptDeck,
+  getPromptAttemptCards,
+  getPromptAttemptDeck,
+  getTerminalPromptAttemptDecks,
+  markPromptAttemptSaved,
+  recordPromptAttemptImage,
+  rekeyPromptAttemptDeck,
+  removePromptAttemptDeck,
+  startPromptAttemptRetry,
+} from "/lib/prompt-attempt-deck.mjs";
 import { filterLocallyTerminatedGenerationTaskSnapshots } from "/lib/generation-task-reconciler.mjs";
 import { readHttpResponseErrorMessage } from "/lib/http-response-error.mjs";
 import { consumeSseUntilTerminal } from "/lib/sse-terminal-client.mjs";
@@ -533,6 +548,11 @@ const state = {
   galleryColumnPreset: DEFAULT_GALLERY_COLUMN_PRESET,
   generationTasks: [],
   locallyTerminatedGenerationTaskIds: new Set(),
+  // Keyed by preview key, not stored on jobs: removeJob() has to drop failed jobs
+  // from state.jobs, which queue concurrency and cancellation both read.
+  promptAttemptDecks: createPromptAttemptDeckStore(),
+  expandedPromptDeckKey: "",
+  selectedPromptAttempt: null,
   jobs: [],
   lightboxItem: null,
   lightboxNavigation: {
@@ -5081,8 +5101,11 @@ function ensureSelectedPreview() {
   state.selectedPreviewKey = "";
 }
 
-function setSelectedPreviewKey(key) {
+function setSelectedPreviewKey(key, { attemptIndex = -1 } = {}) {
   state.selectedPreviewKey = key || "";
+  // Picking a specific attempt card pins the main preview to that image; any
+  // other selection clears the pin so it never leaks onto another item.
+  state.selectedPromptAttempt = Number(attemptIndex) >= 0 ? { deckKey: key, attemptIndex: Number(attemptIndex) } : null;
   state.zoom = 1;
   renderStudio();
 }
@@ -5103,8 +5126,34 @@ function getSelectedGalleryItem() {
   return state.gallery.find((item) => item.filename === state.selectedPreviewKey.slice(5)) || null;
 }
 
+function getSelectedFailedDeckItem() {
+  const key = state.selectedPreviewKey;
+  if (!key || getPromptDeckCardsForKey(key).length === 0) {
+    return null;
+  }
+  return getFilmstripItems().find((entry) => entry.key === key)?.item || null;
+}
+
 function getCurrentPreviewItem() {
-  return getSelectedJob() || getSelectedGalleryItem() || null;
+  const item = getSelectedJob() || getSelectedGalleryItem() || getSelectedFailedDeckItem() || null;
+  const pinned = state.selectedPromptAttempt;
+  if (!item || !pinned || pinned.deckKey !== state.selectedPreviewKey) {
+    return item;
+  }
+
+  const previewUrl = getPromptDeckAttemptPreviewUrl(pinned.deckKey, pinned.attemptIndex);
+  if (!previewUrl) {
+    return item;
+  }
+
+  const card = getPromptDeckCardsForKey(pinned.deckKey).find((entry) => entry.attemptIndex === pinned.attemptIndex);
+  return {
+    ...item,
+    imageUrl: previewUrl,
+    thumbnailUrl: previewUrl,
+    previewUrl,
+    unfinishedAttemptPreview: card?.status !== PROMPT_ATTEMPT_STATUS.COMPLETED,
+  };
 }
 
 function openLightbox(item, navigation = null) {
@@ -5270,10 +5319,10 @@ function handleActivitySuccess(jobId, item) {
   recordJobTaskActivity(jobId, { title: GENERATION_TASK_STATUS_LABELS.completed, detail: "图像已成功生成", imageUrl: getImageUrl(item), paramsText: buildGenerationActivityRelayText(item), status: "done", generationStartedAt: item?.generationStartedAt, generationCompletedAt: item?.generationCompletedAt });
 }
 
-function handleActivityFailure(jobId, message) {
+function handleActivityFailure(jobId, message, imageUrl = "") {
   const detail = compactErrorMessage(message, "生成请求失败");
   recordJobTaskActivity(jobId, {
-    title: GENERATION_TASK_STATUS_LABELS.error, detail: buildGenerationTaskActivityDetail({ status: "error", statusStage: "error", statusText: detail, errorMessage: detail }), status: "error",
+    title: GENERATION_TASK_STATUS_LABELS.error, detail: buildGenerationTaskActivityDetail({ status: "error", statusStage: "error", statusText: detail, errorMessage: detail }), status: "error", imageUrl,
   });
 }
 
@@ -5513,14 +5562,22 @@ function createPreviewLoadingShellNodes(variant = "") {
   return { shell: loading.shell, loading, state: null };
 }
 
+function normalizePreviewGenerationLoadingKey(value) {
+  const key = String(value || "").trim();
+  if (!key || key.startsWith("job:") || key.startsWith("file:")) {
+    return key;
+  }
+  return makeJobPreviewKey(key);
+}
+
 function updatePreviewLoadingShell(nodes, placeholderState) {
   nodes.shell.dataset.stage = String(placeholderState.stage || "generating");
   nodes.shell.dataset.jobs = String(placeholderState.activeJobCount || 1);
   nodes.shell.setAttribute("aria-label", placeholderState.statusText || placeholderState.title || "Generation running");
   updateGenerationLoadingShell(nodes.loading, {
-    key: placeholderState.loadingKey || placeholderState.itemId || "",
-    label: "生图生成中",
+    key: normalizePreviewGenerationLoadingKey(placeholderState.loadingKey || placeholderState.itemId || ""),
     active: true,
+    mode: placeholderState.waiting ? GENERATION_LOADING_WAITING_MODE : GENERATION_LOADING_GENERATING_MODE,
   });
   nodes.state = {
     mode: placeholderState.mode,
@@ -5681,6 +5738,18 @@ function registerPromptFilmstripSessionJob(job) {
   }
 }
 
+function recordPromptFilmstripSessionFilename(filename) {
+  const normalized = String(filename || "").trim();
+  if (!normalized) {
+    return;
+  }
+
+  state.promptFilmstripSessionFilenames = [
+    normalized,
+    ...state.promptFilmstripSessionFilenames.filter((candidate) => candidate !== normalized),
+  ];
+}
+
 function recordPromptFilmstripSessionResult(job, item) {
   const jobId = String(job?.id || "").trim();
   const filename = String(item?.filename || "").trim();
@@ -5688,10 +5757,7 @@ function recordPromptFilmstripSessionResult(job, item) {
     return;
   }
 
-  state.promptFilmstripSessionFilenames = [
-    filename,
-    ...state.promptFilmstripSessionFilenames.filter((candidate) => candidate !== filename),
-  ];
+  recordPromptFilmstripSessionFilename(filename);
 }
 
 function getFilmstripItems() {
@@ -5712,7 +5778,31 @@ function getFilmstripItems() {
     item,
     label: formatFilmstripSizeLabel(item) || formatClock(item.createdAt),
   }));
-  return [...activeJobs, ...recentGallery];
+  // Failed jobs leave state.jobs, so their preserved attempt cards would vanish
+  // with them. Surface those decks as their own entries instead.
+  const activeKeys = new Set(activeJobs.map((entry) => entry.key));
+  const galleryKeys = new Set(recentGallery.map((entry) => entry.key));
+  const failedDecks = getTerminalPromptAttemptDecks(state.promptAttemptDecks)
+    .filter((deck) => !activeKeys.has(deck.deckKey) && !galleryKeys.has(deck.deckKey))
+    .map((deck) => {
+      const cards = deck.attempts.filter((attempt) => attempt.previewUrl);
+      const lastCard = cards[cards.length - 1];
+      return {
+        key: deck.deckKey,
+        item: {
+          id: deck.deckKey,
+          previewUrl: lastCard.previewUrl,
+          imageUrl: lastCard.previewUrl,
+          thumbnailUrl: lastCard.previewUrl,
+          createdAt: deck.updatedAt,
+          status: "failed",
+          statusText: "未完成",
+          unfinishedAttemptPreview: true,
+        },
+        label: "未完成",
+      };
+    });
+  return [...activeJobs, ...failedDecks, ...recentGallery];
 } function getCurrentPreviewNavigationItems() {
   return getFilmstripItems().map((entry) => entry.item).filter((item) => item && getImageUrl(item));
 }
@@ -5813,10 +5903,12 @@ function syncFilmstripMedia(button, item, key = "") {
   if (isGenerating) {
     existingImage?.remove();
     existingGhost?.remove();
-    const loading = existingLoading || createGenerationLoadingShell(document, { key, active: true }).shell;
-    if (!existingLoading) {
-      button.insertBefore(loading, button.firstChild);
+    const mode = isWaitingPreviewItem(item) ? GENERATION_LOADING_WAITING_MODE : GENERATION_LOADING_GENERATING_MODE;
+    if (existingLoading) {
+      updateGenerationLoadingShell(existingLoading.__generationLoadingNodes, { key, active: true, mode });
+      return;
     }
+    button.insertBefore(createGenerationLoadingShell(document, { key, active: true, mode }).shell, button.firstChild);
     return;
   }
 
@@ -5872,11 +5964,106 @@ function syncFilmstripEntry(shell, { key, item, label }) {
   caption.textContent = label;
 
   syncFilmstripCancelButton(shell, key, item);
+  syncFilmstripDeck(shell, key);
+}
+
+function syncFilmstripDeck(shell, key) {
+  const cards = getPromptDeckCardsForKey(key);
+  const existingBadge = shell.querySelector(".filmstrip-deck-badge");
+  const existingTray = shell.querySelector(".filmstrip-deck-tray");
+
+  // One card is the ordinary case and must look exactly as before.
+  if (cards.length < 2) {
+    existingBadge?.remove();
+    existingTray?.remove();
+    shell.classList.remove("has-deck");
+    return;
+  }
+
+  shell.classList.add("has-deck");
+  const expanded = state.expandedPromptDeckKey === key;
+  const trayId = `filmstrip-deck-tray-${key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+
+  const badge = existingBadge || document.createElement("button");
+  if (!existingBadge) {
+    badge.type = "button";
+    badge.className = "filmstrip-deck-badge";
+    badge.addEventListener("click", (event) => {
+      event.stopPropagation();
+      togglePromptDeckExpanded(key);
+    });
+    shell.appendChild(badge);
+  }
+  badge.textContent = `${cards.length}`;
+  badge.title = expanded ? "收起生成尝试" : `展开 ${cards.length} 次生成尝试`;
+  badge.setAttribute("aria-label", badge.title);
+  badge.setAttribute("aria-expanded", String(expanded));
+  badge.setAttribute("aria-controls", trayId);
+
+  if (!expanded) {
+    existingTray?.remove();
+    return;
+  }
+
+  const tray = existingTray || document.createElement("div");
+  if (!existingTray) {
+    tray.className = "filmstrip-deck-tray";
+    tray.id = trayId;
+    shell.appendChild(tray);
+  }
+  tray.replaceChildren(...cards.map((card) => createDeckCardNode(key, card)));
+}
+
+function createDeckCardNode(deckKey, card) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "filmstrip-deck-card";
+  wrapper.dataset.attemptStatus = card.status;
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "filmstrip-deck-card-button";
+  const attemptLabel = `尝试 ${card.attemptIndex + 1}`;
+  const unfinished = card.status !== PROMPT_ATTEMPT_STATUS.COMPLETED;
+  button.setAttribute("aria-label", unfinished ? `${attemptLabel}（未完成）` : attemptLabel);
+  button.addEventListener("click", () => {
+    setSelectedPreviewKey(deckKey, { attemptIndex: card.attemptIndex });
+  });
+
+  const image = document.createElement("img");
+  image.src = card.previewUrl;
+  image.alt = unfinished ? `${attemptLabel} 未完成预览` : `${attemptLabel} 最终结果`;
+  image.loading = "lazy";
+  button.appendChild(image);
+
+  const caption = document.createElement("span");
+  caption.className = "filmstrip-deck-card-label";
+  caption.textContent = unfinished ? `${attemptLabel} · 未完成` : attemptLabel;
+  button.appendChild(caption);
+  wrapper.appendChild(button);
+
+  if (unfinished) {
+    const saveButton = document.createElement("button");
+    saveButton.type = "button";
+    saveButton.className = "filmstrip-deck-save";
+    const alreadySaved = Boolean(card.savedFilename);
+    saveButton.textContent = alreadySaved ? "已另存" : "另存";
+    saveButton.disabled = alreadySaved;
+    saveButton.title = alreadySaved ? "该预览已另存为正式图片" : "把这张未完成预览另存为正式图片";
+    saveButton.setAttribute("aria-label", saveButton.title);
+    saveButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      void savePromptAttemptPreview(deckKey, card.attemptIndex);
+    });
+    wrapper.appendChild(saveButton);
+  }
+
+  return wrapper;
 }
 
 function renderFilmstrip() {
   const entries = getFilmstripItems();
   if (entries.length === 0) {
+    stopGenerationLoadingShells(refs.filmstrip);
     renderFilmstripPlaceholder();
     return;
   }
@@ -5887,6 +6074,12 @@ function renderFilmstrip() {
       entry,
     ]),
   );
+  const nextKeys = new Set(entries.map((entry) => entry.key));
+  existingEntries.forEach((shell, key) => {
+    if (!nextKeys.has(key)) {
+      stopGenerationLoadingShells(shell);
+    }
+  });
   const fragment = document.createDocumentFragment();
 
   entries.forEach((entry) => {
@@ -15182,6 +15375,108 @@ function removeJob(jobId) {
   state.jobs = state.jobs.filter((job) => job.id !== jobId);
 }
 
+function recordPromptDeckImage(job, previewUrl, kind) {
+  if (!isPromptDeckJob(job) || !previewUrl) {
+    return;
+  }
+  recordPromptAttemptImage(state.promptAttemptDecks, {
+    deckKey: makeJobPreviewKey(job.id),
+    previewUrl,
+    kind,
+    updatedAt: nowIso(),
+  });
+}
+
+// Decks render in the prompt filmstrip slot. These four modes drive their own
+// dedicated preview surfaces, so they keep the existing single-preview behavior.
+const DECK_EXCLUDED_JOB_MODES = new Set(["reference-analysis", "image-decomposition", "image-edit", "quick-blend"]);
+
+function isPromptDeckJob(job) {
+  return Boolean(job) && !DECK_EXCLUDED_JOB_MODES.has(String(job.mode || ""));
+}
+
+function sealPromptDeckOnFailure(job, message) {
+  if (!isPromptDeckJob(job)) {
+    return;
+  }
+  failPromptAttemptDeck(state.promptAttemptDecks, {
+    deckKey: makeJobPreviewKey(job.id),
+    errorMessage: compactErrorMessage(message, "生成请求失败"),
+    updatedAt: nowIso(),
+  });
+}
+
+function getPromptDeckLastPreviewUrl(job) {
+  if (!isPromptDeckJob(job)) {
+    return "";
+  }
+  const cards = getPromptAttemptCards(state.promptAttemptDecks, makeJobPreviewKey(job.id));
+  return cards.length > 0 ? cards[cards.length - 1].previewUrl : "";
+}
+
+function getPromptDeckCardsForKey(previewKey) {
+  return getPromptAttemptCards(state.promptAttemptDecks, previewKey);
+}
+
+function togglePromptDeckExpanded(previewKey) {
+  state.expandedPromptDeckKey = state.expandedPromptDeckKey === previewKey ? "" : previewKey;
+  renderFilmstrip();
+}
+
+function getPromptDeckAttemptPreviewUrl(previewKey, attemptIndex) {
+  return (
+    getPromptDeckCardsForKey(previewKey).find((card) => card.attemptIndex === Number(attemptIndex))?.previewUrl || ""
+  );
+}
+
+async function savePromptAttemptPreview(deckKey, attemptIndex) {
+  const card = getPromptDeckCardsForKey(deckKey).find((entry) => entry.attemptIndex === Number(attemptIndex));
+  if (!card || card.savedFilename) {
+    return;
+  }
+
+  const match = /^data:([^;]+);base64,(.*)$/i.exec(card.previewUrl || "");
+  if (!match) {
+    showError("这张未完成预览没有可保存的图片数据。");
+    return;
+  }
+
+  const job = state.jobs.find((entry) => makeJobPreviewKey(entry.id) === deckKey) || null;
+  try {
+    const response = await fetch("/api/prompt-preview/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        imageBase64: match[2],
+        format: normalizeOutputFormat(job?.format || match[1].split("/")[1] || "png"),
+        prompt: job?.prompt || "",
+        ratio: job?.ratio || "",
+        size: job?.size || "",
+        quality: job?.quality || "",
+        baseUrl: job?.baseUrl || "",
+        responsesModel: job?.responsesModel || "",
+        imageRoute: job?.imageRoute || "",
+        imageModel: job?.imageModel || "",
+        reasoningEffort: job?.reasoningEffort || "",
+      }),
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.ok) {
+      throw new Error(compactErrorMessage(payload.message, "另存未完成预览失败。"));
+    }
+
+    markPromptAttemptSaved(state.promptAttemptDecks, { deckKey, attemptIndex, filename: payload.filename });
+    if (payload.item) {
+      upsertGalleryItem(payload.item);
+      recordPromptFilmstripSessionFilename(payload.item.filename);
+    }
+    renderAll();
+  } catch (error) {
+    showError(error instanceof Error ? error.message : String(error));
+  }
+}
+
 function cancelQueuedJob(jobId) {
   const { jobs, canceledJob } = cancelQueuedGenerationJob(state.jobs, jobId);
   if (!canceledJob) {
@@ -16090,6 +16385,16 @@ async function runGeneration(job) {
     await consumeSse(response.body, async (eventName, payload) => {
       if (eventName === GENERATION_STREAM_EVENTS.STATUS) {
         const statusText = buildGenerationTaskStatusText({ status: "running", statusStage: payload.stage, statusText: payload.message });
+        // The upstream auto-retry re-POSTs a whole new generation. Seal the
+        // attempt on screen so its image becomes its own card instead of being
+        // silently overwritten by the new attempt's partials.
+        if (payload.stage === "retrying_upstream" && isPromptDeckJob(job)) {
+          startPromptAttemptRetry(state.promptAttemptDecks, {
+            deckKey: makeJobPreviewKey(job.id),
+            errorMessage: "上游未确认结果，已自动重试",
+            updatedAt: nowIso(),
+          });
+        }
         updateJob(job.id, {
           statusStage: payload.stage,
           statusText,
@@ -16109,6 +16414,7 @@ async function runGeneration(job) {
       }
 
       if (eventName === GENERATION_STREAM_EVENTS.PARTIAL_IMAGE) {
+        recordPromptDeckImage(job, payload.dataUrl, PROMPT_ATTEMPT_KIND.PARTIAL);
         updateJob(job.id, {
           previewUrl: payload.dataUrl,
           statusText: "已收到中途预览",
@@ -16120,6 +16426,7 @@ async function runGeneration(job) {
 
       if (eventName === GENERATION_STREAM_EVENTS.FINAL_IMAGE) {
         finalImageDataUrl = isCacheableBrowserImageUrl(payload.dataUrl) ? payload.dataUrl : "";
+        recordPromptDeckImage(job, payload.dataUrl, PROMPT_ATTEMPT_KIND.FINAL);
         updateJob(job.id, {
           previewUrl: payload.dataUrl,
           statusText: "已拿到最终图像，正在写入本地",
@@ -16133,6 +16440,7 @@ async function runGeneration(job) {
         const dataUrl = recordFinalImageChunk(finalImageChunks, payload);
         if (dataUrl) {
           finalImageDataUrl = dataUrl;
+          recordPromptDeckImage(job, dataUrl, PROMPT_ATTEMPT_KIND.FINAL);
         }
         updateJob(job.id, {
           previewUrl: dataUrl || job.previewUrl,
@@ -16184,6 +16492,28 @@ async function runGeneration(job) {
           }
           upsertGalleryItem(payload.item);
           recordPromptFilmstripSessionResult(job, payload.item);
+          // Re-key job: -> file: so the gallery thumbnail keeps earlier failed
+          // attempts reachable once the job leaves state.jobs.
+          if (isPromptDeckJob(job)) {
+            const deckKey = makeJobPreviewKey(job.id);
+            completePromptAttemptDeck(state.promptAttemptDecks, {
+              deckKey,
+              previewUrl: finalImageDataUrl || job.previewUrl || getImageUrl(payload.item),
+              updatedAt: nowIso(),
+            });
+            const galleryKey = makeGalleryPreviewKey(payload.item.filename);
+            rekeyPromptAttemptDeck(state.promptAttemptDecks, { fromKey: deckKey, toKey: galleryKey, updatedAt: nowIso() });
+            if (state.expandedPromptDeckKey === deckKey) {
+              state.expandedPromptDeckKey = galleryKey;
+            }
+            // A single completed card carries no history worth expanding.
+            if (getPromptAttemptCards(state.promptAttemptDecks, galleryKey).length < 2) {
+              removePromptAttemptDeck(state.promptAttemptDecks, galleryKey);
+              if (state.expandedPromptDeckKey === galleryKey) {
+                state.expandedPromptDeckKey = "";
+              }
+            }
+          }
           state.selectedPreviewKey = makeGalleryPreviewKey(payload.item.filename);
         }
         handleActivitySuccess(job.id, payload.item);
@@ -16222,7 +16552,8 @@ async function runGeneration(job) {
       if (eventName === GENERATION_STREAM_EVENTS.ERROR) {
         terminalEventReceived = true;
         const message = compactErrorMessage(payload.message, "生成请求失败");
-        handleActivityFailure(job.id, message);
+        sealPromptDeckOnFailure(job, message);
+        handleActivityFailure(job.id, message, getPromptDeckLastPreviewUrl(job));
         showError(message);
         if (job.mode === "reference-analysis") {
           removeReferenceAnalysisGenerationKey(makeJobPreviewKey(job.id));
@@ -16245,7 +16576,8 @@ async function runGeneration(job) {
     });
     if (!terminalEventReceived && !queuedForPolling) {
       const message = "生成连接已中断，未收到完成事件。请稍后重试，或降低分辨率。";
-      handleActivityFailure(job.id, message);
+      sealPromptDeckOnFailure(job, message);
+      handleActivityFailure(job.id, message, getPromptDeckLastPreviewUrl(job));
       showError(message);
       if (job.mode === "reference-analysis") {
         removeReferenceAnalysisGenerationKey(makeJobPreviewKey(job.id));
@@ -16270,7 +16602,8 @@ async function runGeneration(job) {
       return;
     }
     const message = error instanceof Error ? error.message : String(error);
-    handleActivityFailure(job.id, message);
+    sealPromptDeckOnFailure(job, message);
+    handleActivityFailure(job.id, message, getPromptDeckLastPreviewUrl(job));
     showError(message);
     if (job.mode === "reference-analysis") {
       removeReferenceAnalysisGenerationKey(makeJobPreviewKey(job.id));
