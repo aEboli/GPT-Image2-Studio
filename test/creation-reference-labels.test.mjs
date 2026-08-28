@@ -2,7 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  appendCreationItemLogoReference,
   buildCreationGenerationReferenceImageLabels,
   buildCreationItemReferenceImages,
   buildCreationReferenceImageLabels,
@@ -143,12 +142,10 @@ test("creation infographic rebuild fails closed when its source image is missing
   );
 });
 
-test("creation infographic rebuild adds neither logo references nor reference labels", () => {
+test("creation infographic rebuild adds no reference labels", () => {
   const item = { role: "infographic-rebuild", logoPolicy: "allow-supplied" };
   const sourceImages = [{ filename: "source-infographic.png" }];
-  const logoImage = { filename: "brand-mark.png" };
 
-  assert.deepEqual(appendCreationItemLogoReference(item, sourceImages, logoImage), sourceImages);
   assert.deepEqual(
     buildCreationGenerationReferenceImageLabels(
       sourceImages,
@@ -188,7 +185,7 @@ test("creation SKU item reference images keep package-list content text-only and
   );
 });
 
-test("creation non-SKU item reference images keep the full uploaded set", () => {
+test("creation non-SKU item reference images fall back to the subject anchor without role metadata", () => {
   const item = {
     role: "hero",
   };
@@ -197,7 +194,7 @@ test("creation non-SKU item reference images keep the full uploaded set", () => 
     { filename: "silver-lure.png" },
   ];
 
-  assert.deepEqual(buildCreationItemReferenceImages(item, images), images);
+  assert.deepEqual(buildCreationItemReferenceImages(item, images), [images[0]]);
 });
 
 test("creation hero item reference images keep the primary product instead of every product variant", () => {
@@ -365,7 +362,7 @@ test("creation package references stay scoped to the package image role", () => 
   );
   assert.deepEqual(
     buildCreationItemReferenceImages({ role: "effect-comparison" }, images, roles).map((image) => image.filename),
-    ["lure-main.png", "lure-alt.png", "joint-detail.png"],
+    ["lure-main.png", "joint-detail.png"],
   );
   assert.deepEqual(
     buildCreationItemReferenceImages({ role: "after-sales" }, images, roles).map((image) => image.filename),
@@ -403,7 +400,7 @@ test("creation dimensions item keeps the dimensions reference image", () => {
 
   assert.deepEqual(
     buildCreationItemReferenceImages({ role: "size-capacity-fit" }, images, roles).map((image) => image.filename),
-    ["lure-main.png", "lure-size-card.png", "joint-detail.png"],
+    ["lure-main.png", "lure-size-card.png"],
   );
 });
 
@@ -435,19 +432,19 @@ test("creation expanded suite roles keep the selected reference subject as the s
   );
   assert.deepEqual(
     buildCreationItemReferenceImages({ role: "spec-table" }, images, roles).map((image) => image.filename),
-    ["orange-reference-subject.png", "mesh-detail.png", "size-card.png"],
+    ["orange-reference-subject.png", "size-card.png"],
   );
   assert.deepEqual(
     buildCreationItemReferenceImages({ role: "size-capacity-fit" }, images, roles).map((image) => image.filename),
-    ["orange-reference-subject.png", "mesh-detail.png", "size-card.png"],
+    ["orange-reference-subject.png", "size-card.png"],
   );
   assert.deepEqual(
     buildCreationItemReferenceImages({ role: "usage-suggestion" }, images, roles).map((image) => image.filename),
-    ["orange-reference-subject.png", "mesh-detail.png", "trail-scene.png", "usage-guide.png"],
+    ["orange-reference-subject.png", "trail-scene.png", "usage-guide.png"],
   );
   assert.deepEqual(
     buildCreationItemReferenceImages({ role: "after-sales" }, images, roles).map((image) => image.filename),
-    ["orange-reference-subject.png", "mesh-detail.png", "usage-guide.png"],
+    ["orange-reference-subject.png", "usage-guide.png"],
   );
   assert.deepEqual(
     buildCreationItemReferenceImages({ role: "brand-story" }, images, roles).map((image) => image.filename),
@@ -463,7 +460,7 @@ test("creation expanded suite roles keep the selected reference subject as the s
   );
   assert.deepEqual(
     buildCreationItemReferenceImages({ role: "multi-angle" }, images, roles).map((image) => image.filename),
-    ["orange-reference-subject.png", "blue-backpack.png", "black-backpack.png", "mesh-detail.png"],
+    ["orange-reference-subject.png", "mesh-detail.png"],
   );
   assert.deepEqual(
     buildCreationItemReferenceImages({ role: "atmosphere" }, images, roles).map((image) => image.filename),

@@ -85,6 +85,9 @@ import {
   isInvalidGeneratedImageMetadata,
   validateGeneratedImage,
 } from "./lib/generated-image-validation.mjs";
+import { resolveGenerationConcurrencyForLimit } from "./lib/generation-concurrency.mjs";
+import { resolveGenerationStartDelayMs } from "./lib/generation-start-delay.mjs";
+import { createInRunRetryLedger, getRequeueNotice } from "./lib/generation-item-retry.mjs";
 import { createSessionTaskSlotLimiter } from "./lib/generation-task-slots.mjs";
 import { runWithConcurrency } from "./lib/limited-concurrency.mjs";
 import {
@@ -141,7 +144,6 @@ import {
 import { normalizePptMotionOptions } from "./lib/ppt-motion-presets.mjs";
 import { migrateOutputDirectoryMonths } from "./lib/output-directory-migration.mjs";
 import {
-  appendCreationItemLogoReference,
   buildCreationGenerationReferenceImageLabels,
   buildCreationItemReferenceImages,
 } from "./lib/creation-reference-labels.mjs";
@@ -558,7 +560,27 @@ function createCreationItemPartialImageWriter(response) {
   };
 }
 
+// Every in-flight item adds its own `close` listener to the one shared SSE response,
+// so a fan-out wider than Node's default 10 listeners per event trips the
+// MaxListenersExceededWarning even though each listener is removed on dispose. Raise the
+// ceiling to the widest fan-out a single stream can reach plus headroom for the
+// framework's own listeners, and never lower a ceiling that is already higher (0 means
+// unlimited).
+const MAX_SSE_CLOSE_LISTENERS = MAX_CREATION_PARALLEL_TASKS + 10;
+
+function ensureSseListenerCapacity(response) {
+  if (typeof response?.setMaxListeners !== "function" || typeof response.getMaxListeners !== "function") {
+    return;
+  }
+  const current = response.getMaxListeners();
+  if (current === 0 || current >= MAX_SSE_CLOSE_LISTENERS) {
+    return;
+  }
+  response.setMaxListeners(MAX_SSE_CLOSE_LISTENERS);
+}
+
 function createCreationRequestLifecycle(response) {
+  ensureSseListenerCapacity(response);
   const controller = new AbortController();
   let abortMessage = "";
   const abort = (message) => {
@@ -636,14 +658,10 @@ function supportsCreationReferenceFileIds(generationConfig = {}) {
 // rewrite looks the identifier up under that same target.
 async function createCreationReferenceUploadRegistry({
   referenceImages = [],
-  logoImage = null,
   generationConfigs = [],
 } = {}) {
   const registry = createCreationReferenceRegistry();
   registry.registerAll(referenceImages);
-  if (logoImage) {
-    registry.register(logoImage);
-  }
 
   // Keyed by target rather than by config object: the repair path builds a fresh config
   // object per item, so identity would never match while the target is the same.
@@ -901,14 +919,56 @@ async function waitForSessionTaskSlot(sessionId, taskId, requestScope, options =
   return sessionTaskSlotLimiter.waitForSessionTaskSlot(sessionId, taskId, requestScope, options);
 }
 
-async function waitForResponseSessionTaskSlot(sessionId, taskId, requestScope, response) {
+async function waitForResponseSessionTaskSlot(sessionId, taskId, requestScope, response, options = {}) {
   return waitForSessionTaskSlot(sessionId, taskId, requestScope, {
     isActive: () => isResponseWritable(response),
+    // A fan-out wider than this scope's startup slot limit needs the same
+    // ceiling here, or its extra workers never get a slot.
+    ...(options.maxParallelTasks ? { maxParallelTasks: options.maxParallelTasks } : {}),
   });
 }
 
 function releaseSessionTaskSlot(sessionId, taskId, requestScope) {
   sessionTaskSlotLimiter.releaseSessionTaskSlot(sessionId, taskId, requestScope);
+}
+
+// Pushes a failed set item back onto the tail of the live task queue so it retries
+// as soon as any concurrency slot frees up, instead of waiting for the whole first
+// pass to finish. Returns the claimed attempt number, or 0 when the item must be
+// treated as failed.
+function requeueFailedSetItem({ response, controls, retryLedger, item }) {
+  if (typeof controls?.enqueue !== "function" || !retryLedger || !isResponseWritable(response)) {
+    return 0;
+  }
+
+  if (!retryLedger.canRequeue(item?.itemId)) {
+    return 0;
+  }
+
+  const attempt = retryLedger.claimRetry(item?.itemId);
+  if (!attempt || !controls.enqueue(item)) {
+    return 0;
+  }
+
+  return attempt;
+}
+
+// Shapes the SSE event for a failed attempt: a requeued item reports as still
+// pending so the card shows a retry instead of flashing a terminal failure.
+function buildSetItemFailureEvent({ message, requeueAttempt, retryLedger }) {
+  if (!requeueAttempt) {
+    return { eventName: "item_failed", extra: {} };
+  }
+
+  const maxRetries = retryLedger?.maxRetries ?? 0;
+  return {
+    eventName: "item_requeued",
+    extra: {
+      attempt: requeueAttempt,
+      maxRetries,
+      notice: getRequeueNotice({ message, attempt: requeueAttempt, maxRetries }),
+    },
+  };
 }
 
 function normalizeReasoningEffort(value, fallback = DEFAULT_REASONING_EFFORT) {
@@ -1289,10 +1349,6 @@ function buildCreationLogoOptionsFromFormData(formData, logoImage = null) {
     placement: formData.get("logoPlacement") || submittedLogo.placement,
     background: formData.get("logoBackground") || submittedLogo.background,
   });
-}
-
-function appendCreationLogoReference(referenceImages = [], logoImage = null) {
-  return logoImage ? [...referenceImages, logoImage] : referenceImages;
 }
 
 function normalizePptRelativePath(relativePath) {
@@ -3995,7 +4051,6 @@ async function handleCreationPlan(request, response) {
       skuSubjects: formData.get("skuSubjects"),
       skuBundleCount: formData.get("skuBundleCount"),
       skuGenerationRule: formData.get("skuGenerationRule"),
-      logoOptions: buildCreationLogoOptionsFromFormData(formData),
     });
     plan = applyCreationPlanOverrides(plan, formData.get("planOverrides"));
 
@@ -4069,6 +4124,8 @@ async function handlePortraitGenerate(request, response) {
 
     const clientSessionId = getClientSessionId(request, formData);
     const generationRequestScope = "portrait";
+    const generationStartDelayMs = resolveGenerationStartDelayMs(formData, config);
+    const generationConcurrency = resolveGenerationConcurrencyForLimit(formData, config);
     const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || plan.ratio || "4:5"));
     const requestedSizeInput = String(formData.get("size") || plan.size || "auto").trim().toLowerCase();
     const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
@@ -4108,15 +4165,17 @@ async function handlePortraitGenerate(request, response) {
     writeSseEvent(response, "set_started", { set: setManifest });
     writeSseEvent(response, "plan", { setId, items });
 
-    await runWithConcurrency(plan.items, MAX_PARALLEL_TASKS_PER_SESSION, async (item) => {
-      const taskId = `${setId}-${item.itemId}`;
+    const retryLedger = createInRunRetryLedger();
+
+    await runWithConcurrency(plan.items, generationConcurrency, async (item, index, controls) => {
+      const taskId = retryLedger.getTaskId(`${setId}-${item.itemId}`, item.itemId);
       const generationStartedAt = new Date().toISOString();
       const generationStartedAtMs = Date.now();
       let finalBase64 = "";
       let slotClaimed = false;
 
       try {
-        await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response);
+        await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response, { maxParallelTasks: generationConcurrency });
         slotClaimed = true;
         items = updatePortraitItems(items, item.itemId, {
           status: "generating",
@@ -4257,10 +4316,13 @@ async function handlePortraitGenerate(request, response) {
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        items = updatePortraitItems(items, item.itemId, {
-          status: "failed",
-          error: message,
-        });
+        const requeueAttempt = requeueFailedSetItem({ response, controls, retryLedger, item });
+        const failureEvent = buildSetItemFailureEvent({ message, requeueAttempt, retryLedger });
+        items = updatePortraitItems(
+          items,
+          item.itemId,
+          requeueAttempt ? { status: "queued", error: "" } : { status: "failed", error: message },
+        );
         setManifest = await portraitSetStore.saveManifest(
           buildPortraitSetManifest({
             setId,
@@ -4273,10 +4335,11 @@ async function handlePortraitGenerate(request, response) {
             referenceImageNames,
           }),
         );
-        writeSseEvent(response, "item_failed", {
+        writeSseEvent(response, failureEvent.eventName, {
           setId,
           itemId: item.itemId,
           message,
+          ...failureEvent.extra,
           set: setManifest,
         });
       } finally {
@@ -4284,7 +4347,7 @@ async function handlePortraitGenerate(request, response) {
           releaseSessionTaskSlot(clientSessionId, taskId, generationRequestScope);
         }
       }
-    });
+    }, { startDelayMs: generationStartDelayMs });
 
     const finalSet = await portraitSetStore.saveManifest(
       buildPortraitSetManifest({
@@ -4337,7 +4400,6 @@ async function handleCreationGenerate(request, response) {
   let creationRelativeDir = "";
   let createdAt = new Date().toISOString();
   let referenceImages = [];
-  let logoImage = null;
   let referenceImageNames = [];
   let referenceImageRoles = [];
 
@@ -4349,7 +4411,6 @@ async function handleCreationGenerate(request, response) {
       ...formData.getAll("referenceImages"),
       ...formData.getAll("referenceImage"),
     ]);
-    logoImage = await readCreationLogoImage(formData);
     if (referenceImages.length > MAX_CREATION_REFERENCE_IMAGES) {
       throw new Error(`参考图最多支持 ${MAX_CREATION_REFERENCE_IMAGES} 张。`);
     }
@@ -4387,7 +4448,6 @@ async function handleCreationGenerate(request, response) {
       skuSubjects: formData.get("skuSubjects"),
       skuBundleCount: formData.get("skuBundleCount"),
       skuGenerationRule: formData.get("skuGenerationRule"),
-      logoOptions: buildCreationLogoOptionsFromFormData(formData, logoImage),
     });
     assertCreationPlanCanGenerate(plan);
 
@@ -4402,6 +4462,8 @@ async function handleCreationGenerate(request, response) {
 
     const clientSessionId = getClientSessionId(request, formData);
     const generationRequestScope = "creation";
+    const generationStartDelayMs = resolveGenerationStartDelayMs(formData, config);
+    const generationConcurrency = resolveGenerationConcurrencyForLimit(formData, config);
     const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || "1:1"));
     const requestedSizeInput = String(formData.get("size") || "auto").trim().toLowerCase();
     const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
@@ -4459,13 +4521,14 @@ async function handleCreationGenerate(request, response) {
 
     const referenceUploads = await createCreationReferenceUploadRegistry({
       referenceImages,
-      logoImage,
       generationConfigs: [generationConfig],
     });
     const referenceUploadTargetKey = referenceUploads.getTargetKey(generationConfig);
 
-    await runWithConcurrency(plan.items, MAX_CREATION_PARALLEL_TASKS, async (item) => {
-      const taskId = `${setId}-${item.itemId}`;
+    const retryLedger = createInRunRetryLedger();
+
+    await runWithConcurrency(plan.items, generationConcurrency, async (item, index, controls) => {
+      const taskId = retryLedger.getTaskId(`${setId}-${item.itemId}`, item.itemId);
       const generationStartedAt = new Date().toISOString();
       const generationStartedAtMs = Date.now();
       const itemGenerationParameters = resolveCreationItemGenerationParameters(item, {
@@ -4479,13 +4542,13 @@ async function handleCreationGenerate(request, response) {
       let slotClaimed = false;
 
       try {
-        await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response);
+        await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response, { maxParallelTasks: generationConcurrency });
         slotClaimed = true;
         const finalPrompt = buildCreationItemGenerationPrompt(item.prompt, itemGenerationParameters, item);
         const itemReferenceImages = buildCreationItemReferenceImages(item, referenceImages, referenceImageRoles);
-        const itemGenerationReferenceImagesWithLogo = applyReferenceFileIds(
+        const itemGenerationReferenceImages = applyReferenceFileIds(
           referenceUploads.registry,
-          appendCreationItemLogoReference(item, itemReferenceImages, logoImage),
+          itemReferenceImages,
           referenceUploadTargetKey,
         );
         const generationSnapshot = buildCreationGenerationSnapshot({
@@ -4495,7 +4558,7 @@ async function handleCreationGenerate(request, response) {
           format: finalFormat,
           quality: finalQuality,
           reasoningEffort,
-          referenceImages: itemGenerationReferenceImagesWithLogo,
+          referenceImages: itemGenerationReferenceImages,
         });
         items = updateCreationItems(items, item.itemId, {
           ...generationSnapshot,
@@ -4516,7 +4579,7 @@ async function handleCreationGenerate(request, response) {
           baseUrl: generationConfig.baseUrl,
           apiKey: generationConfig.apiKey,
           prompt: finalPrompt,
-          referenceImages: itemGenerationReferenceImagesWithLogo,
+          referenceImages: itemGenerationReferenceImages,
           referenceImageLabels: buildCreationGenerationReferenceImageLabels(
             itemReferenceImages,
             referenceImageRoles,
@@ -4672,10 +4735,13 @@ async function handleCreationGenerate(request, response) {
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        items = updateCreationItems(items, item.itemId, {
-          status: "failed",
-          error: message,
-        });
+        const requeueAttempt = requeueFailedSetItem({ response, controls, retryLedger, item });
+        const failureEvent = buildSetItemFailureEvent({ message, requeueAttempt, retryLedger });
+        items = updateCreationItems(
+          items,
+          item.itemId,
+          requeueAttempt ? { status: "queued", error: "" } : { status: "failed", error: message },
+        );
         setManifest = await creationSetStore.saveManifest(
           buildCreationSetManifest({
             setId,
@@ -4688,10 +4754,11 @@ async function handleCreationGenerate(request, response) {
             referenceImageNames,
           }),
         );
-        writeSseEvent(response, "item_failed", {
+        writeSseEvent(response, failureEvent.eventName, {
           setId,
           itemId: item.itemId,
           message,
+          ...failureEvent.extra,
           set: setManifest,
         });
       } finally {
@@ -4699,7 +4766,7 @@ async function handleCreationGenerate(request, response) {
           releaseSessionTaskSlot(clientSessionId, taskId, generationRequestScope);
         }
       }
-    });
+    }, { startDelayMs: generationStartDelayMs });
 
     const finalSet = await creationSetStore.saveManifest(
       buildCreationSetManifest({
@@ -4796,6 +4863,8 @@ async function handleCreationLogoBatchGenerate(request, response) {
 
     const clientSessionId = getClientSessionId(request, formData);
     const generationRequestScope = "creation";
+    const generationStartDelayMs = resolveGenerationStartDelayMs(formData, config);
+    const generationConcurrency = resolveGenerationConcurrencyForLimit(formData, config);
     const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || "1:1"));
     const requestedSizeInput = String(formData.get("size") || "auto").trim().toLowerCase();
     const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
@@ -4835,9 +4904,11 @@ async function handleCreationLogoBatchGenerate(request, response) {
     writeSseEvent(response, "set_started", { set: setManifest });
     writeSseEvent(response, "plan", { setId, items });
 
-    await runWithConcurrency(plan.items, MAX_CREATION_PARALLEL_TASKS, async (item) => {
+    const retryLedger = createInRunRetryLedger();
+
+    await runWithConcurrency(plan.items, generationConcurrency, async (item, index, controls) => {
       const sourceImage = sourceImages[item.sourceImageIndex] || sourceImages[(item.slotIndex || 1) - 1];
-      const taskId = `${setId}-${item.itemId}`;
+      const taskId = retryLedger.getTaskId(`${setId}-${item.itemId}`, item.itemId);
       const generationStartedAt = new Date().toISOString();
       const generationStartedAtMs = Date.now();
       let finalBase64 = "";
@@ -4847,7 +4918,7 @@ async function handleCreationLogoBatchGenerate(request, response) {
         if (!sourceImage) {
           throw new Error("找不到对应的上传源图。");
         }
-        await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response);
+        await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response, { maxParallelTasks: generationConcurrency });
         slotClaimed = true;
         items = updateCreationItems(items, item.itemId, {
           status: "generating",
@@ -4991,10 +5062,13 @@ async function handleCreationLogoBatchGenerate(request, response) {
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        items = updateCreationItems(items, item.itemId, {
-          status: "failed",
-          error: message,
-        });
+        const requeueAttempt = requeueFailedSetItem({ response, controls, retryLedger, item });
+        const failureEvent = buildSetItemFailureEvent({ message, requeueAttempt, retryLedger });
+        items = updateCreationItems(
+          items,
+          item.itemId,
+          requeueAttempt ? { status: "queued", error: "" } : { status: "failed", error: message },
+        );
         setManifest = await creationSetStore.saveManifest(
           buildCreationSetManifest({
             setId,
@@ -5007,10 +5081,11 @@ async function handleCreationLogoBatchGenerate(request, response) {
             referenceImageNames,
           }),
         );
-        writeSseEvent(response, "item_failed", {
+        writeSseEvent(response, failureEvent.eventName, {
           setId,
           itemId: item.itemId,
           message,
+          ...failureEvent.extra,
           set: setManifest,
         });
       } finally {
@@ -5018,7 +5093,7 @@ async function handleCreationLogoBatchGenerate(request, response) {
           releaseSessionTaskSlot(clientSessionId, taskId, generationRequestScope);
         }
       }
-    });
+    }, { startDelayMs: generationStartDelayMs });
 
     const finalSet = await creationSetStore.saveManifest(
       buildCreationSetManifest({
@@ -5123,6 +5198,8 @@ async function handlePortraitRepair(request, response) {
 
     const clientSessionId = getClientSessionId(request, formData);
     const generationRequestScope = "portrait";
+    const generationStartDelayMs = resolveGenerationStartDelayMs(formData, config);
+    const generationConcurrency = resolveGenerationConcurrencyForLimit(formData, config);
     const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || setManifest.ratio || "4:5"));
     const requestedSizeInput = String(formData.get("size") || setManifest.size || "auto").trim().toLowerCase();
     const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
@@ -5140,15 +5217,17 @@ async function handlePortraitRepair(request, response) {
 
     writeSseEvent(response, "repair_started", { setId, itemIds: repairItems.map((item) => item.itemId) });
 
-    await runWithConcurrency(repairItems, MAX_PARALLEL_TASKS_PER_SESSION, async (item) => {
-      const taskId = `${setId}-${item.itemId}-repair`;
+    const retryLedger = createInRunRetryLedger();
+
+    await runWithConcurrency(repairItems, generationConcurrency, async (item, index, controls) => {
+      const taskId = retryLedger.getTaskId(`${setId}-${item.itemId}-repair`, item.itemId);
       const generationStartedAt = new Date().toISOString();
       const generationStartedAtMs = Date.now();
       let finalBase64 = "";
       let slotClaimed = false;
 
       try {
-        await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response);
+        await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response, { maxParallelTasks: generationConcurrency });
         slotClaimed = true;
         items = updatePortraitItems(items, item.itemId, {
           ...item,
@@ -5285,10 +5364,11 @@ async function handlePortraitRepair(request, response) {
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        const requeueAttempt = requeueFailedSetItem({ response, controls, retryLedger, item });
+        const failureEvent = buildSetItemFailureEvent({ message, requeueAttempt, retryLedger });
         items = updatePortraitItems(items, item.itemId, {
           ...item,
-          status: "failed",
-          error: message,
+          ...(requeueAttempt ? { status: "queued", error: "" } : { status: "failed", error: message }),
         });
         setManifest = await portraitSetStore.saveManifest({
           ...setManifest,
@@ -5297,13 +5377,19 @@ async function handlePortraitRepair(request, response) {
           relativeDir: portraitRelativeDir,
           items,
         });
-        writeSseEvent(response, "item_failed", { setId, itemId: item.itemId, message, set: setManifest });
+        writeSseEvent(response, failureEvent.eventName, {
+          setId,
+          itemId: item.itemId,
+          message,
+          ...failureEvent.extra,
+          set: setManifest,
+        });
       } finally {
         if (slotClaimed) {
           releaseSessionTaskSlot(clientSessionId, taskId, generationRequestScope);
         }
       }
-    });
+    }, { startDelayMs: generationStartDelayMs });
 
     const finalSet = await portraitSetStore.saveManifest({
       ...setManifest,
@@ -5351,7 +5437,6 @@ async function handleCreationRepair(request, response) {
       ...formData.getAll("referenceImages"),
       ...formData.getAll("referenceImage"),
     ]);
-    const logoImage = await readCreationLogoImage(formData);
     if (referenceImages.length > MAX_CREATION_REFERENCE_IMAGES) {
       throw new Error(`参考图最多支持 ${MAX_CREATION_REFERENCE_IMAGES} 张。`);
     }
@@ -5406,6 +5491,8 @@ async function handleCreationRepair(request, response) {
 
     const clientSessionId = getClientSessionId(request, formData);
     const generationRequestScope = "creation";
+    const generationStartDelayMs = resolveGenerationStartDelayMs(formData, config);
+    const generationConcurrency = resolveGenerationConcurrencyForLimit(formData, config);
     const fallbackRatio = String(formData.get("ratio") || "1:1");
     const fallbackSize = String(formData.get("size") || "auto").trim();
     const finalQuality = config.defaults?.quality || "high";
@@ -5453,20 +5540,21 @@ async function handleCreationRepair(request, response) {
     // upstream up front and upload once per target instead of once per item.
     const referenceUploads = await createCreationReferenceUploadRegistry({
       referenceImages,
-      logoImage,
       generationConfigs: repairItems.map((repairItem) =>
         resolveCreationRepairGenerationConfig(repairItem, generationConfig),
       ),
     });
 
-    await runWithConcurrency(repairItems, MAX_CREATION_PARALLEL_TASKS, async (item) => {
+    const retryLedger = createInRunRetryLedger();
+
+    await runWithConcurrency(repairItems, generationConcurrency, async (item, index, controls) => {
       const repairItem = item;
       const itemGenerationConfig = resolveCreationRepairGenerationConfig(repairItem, generationConfig);
       const referenceUploadTargetKey = referenceUploads.getTargetKey(itemGenerationConfig);
       const itemFormat = normalizeOutputFormat(repairItem.format || finalFormat);
       const itemQuality = String(repairItem.quality || finalQuality);
       const itemReasoningEffort = normalizeReasoningEffort(repairItem.reasoningEffort || reasoningEffort);
-      const taskId = `${setId}-repair-${item.itemId}`;
+      const taskId = retryLedger.getTaskId(`${setId}-repair-${item.itemId}`, item.itemId);
       const generationStartedAt = new Date().toISOString();
       const generationStartedAtMs = Date.now();
       const itemGenerationParameters = resolveCreationItemGenerationParameters(repairItem, {
@@ -5480,13 +5568,13 @@ async function handleCreationRepair(request, response) {
       let slotClaimed = false;
 
       try {
-        await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response);
+        await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response, { maxParallelTasks: generationConcurrency });
         slotClaimed = true;
         const finalPrompt = buildCreationItemGenerationPrompt(repairItem.prompt, itemGenerationParameters, repairItem);
         const itemReferenceImages = buildCreationItemReferenceImages(repairItem, referenceImages, referenceImageRoles);
-        const itemGenerationReferenceImagesWithLogo = applyReferenceFileIds(
+        const itemGenerationReferenceImages = applyReferenceFileIds(
           referenceUploads.registry,
-          appendCreationItemLogoReference(repairItem, itemReferenceImages, logoImage),
+          itemReferenceImages,
           referenceUploadTargetKey,
         );
         const generationSnapshot = buildCreationGenerationSnapshot({
@@ -5496,7 +5584,7 @@ async function handleCreationRepair(request, response) {
           format: itemFormat,
           quality: itemQuality,
           reasoningEffort: itemReasoningEffort,
-          referenceImages: itemGenerationReferenceImagesWithLogo,
+          referenceImages: itemGenerationReferenceImages,
         });
         items = updateCreationItems(items, item.itemId, {
           ...generationSnapshot,
@@ -5512,7 +5600,7 @@ async function handleCreationRepair(request, response) {
           baseUrl: itemGenerationConfig.baseUrl,
           apiKey: itemGenerationConfig.apiKey,
           prompt: finalPrompt,
-          referenceImages: itemGenerationReferenceImagesWithLogo,
+          referenceImages: itemGenerationReferenceImages,
           referenceImageLabels: buildCreationGenerationReferenceImageLabels(
             itemReferenceImages,
             referenceImageRoles,
@@ -5664,10 +5752,13 @@ async function handleCreationRepair(request, response) {
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        items = updateCreationItems(items, item.itemId, {
-          status: "failed",
-          error: message,
-        });
+        const requeueAttempt = requeueFailedSetItem({ response, controls, retryLedger, item });
+        const failureEvent = buildSetItemFailureEvent({ message, requeueAttempt, retryLedger });
+        items = updateCreationItems(
+          items,
+          item.itemId,
+          requeueAttempt ? { status: "queued", error: "" } : { status: "failed", error: message },
+        );
         setManifest = await creationSetStore.saveManifest(
           buildCreationSetManifest({
             setId,
@@ -5680,10 +5771,11 @@ async function handleCreationRepair(request, response) {
             referenceImageNames,
           }),
         );
-        writeSseEvent(response, "item_failed", {
+        writeSseEvent(response, failureEvent.eventName, {
           setId,
           itemId: item.itemId,
           message,
+          ...failureEvent.extra,
           set: setManifest,
         });
       } finally {
@@ -5691,7 +5783,7 @@ async function handleCreationRepair(request, response) {
           releaseSessionTaskSlot(clientSessionId, taskId, generationRequestScope);
         }
       }
-    });
+    }, { startDelayMs: generationStartDelayMs });
 
     const finalSet = await creationSetStore.saveManifest(
       buildCreationSetManifest({

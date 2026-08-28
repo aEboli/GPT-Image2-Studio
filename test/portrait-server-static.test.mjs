@@ -70,6 +70,28 @@ test("portrait runtime keeps person references separate from styling accessory r
   assert.match(repairHandler, /referenceImageLabels/);
 });
 
+test("portrait failures requeue to the live queue tail instead of waiting for the whole pass", async () => {
+  const server = await readFile(serverPath, "utf8");
+  const generateHandler =
+    server.match(/async function handlePortraitGenerate[\s\S]*?\r?\n}\r?\n\r?\nasync function handleCreationGenerate/)?.[0] || "";
+  const repairHandler =
+    server.match(/async function handlePortraitRepair[\s\S]*?\r?\n}\r?\n\r?\nasync function handleCreationRepair/)?.[0] || "";
+
+  assert.ok(generateHandler, "handlePortraitGenerate slice must not be empty");
+  assert.ok(repairHandler, "handlePortraitRepair slice must not be empty");
+
+  for (const handler of [generateHandler, repairHandler]) {
+    assert.match(handler, /const retryLedger = createInRunRetryLedger\(\);/);
+    // The worker needs the third argument to reach the live queue.
+    assert.match(handler, /async \(item, index, controls\) => \{/);
+    assert.match(handler, /retryLedger\.getTaskId\(/);
+    assert.match(handler, /const requeueAttempt = requeueFailedSetItem\(\{ response, controls, retryLedger, item \}\);/);
+    assert.match(handler, /const failureEvent = buildSetItemFailureEvent\(\{ message, requeueAttempt, retryLedger \}\);/);
+    assert.match(handler, /status: "queued", error: ""/);
+    assert.match(handler, /writeSseEvent\(response, failureEvent\.eventName, \{/);
+  }
+});
+
 test("portrait runtime labels clothing references as mandatory wardrobe authorities", async () => {
   const server = await readFile(serverPath, "utf8");
 

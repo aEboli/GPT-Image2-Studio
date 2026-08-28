@@ -1,4 +1,12 @@
 import {
+  GENERATION_CONCURRENCY_FIELD,
+  normalizeGenerationConcurrency,
+} from "./generation-concurrency.mjs";
+import {
+  GENERATION_START_DELAY_FIELD,
+  normalizeGenerationStartDelayMs,
+} from "./generation-start-delay.mjs";
+import {
   DEFAULT_DIRECT_IMAGE_MODEL,
   DEFAULT_DIRECT_RESPONSES_MODEL,
   DEFAULT_PROTOCOL_IMAGE_MODEL,
@@ -69,6 +77,8 @@ export function normalizeBrowserPrivateConfig(source = {}, { preserveRootBaseUrl
     protocolBaseUrl: routeConfig.protocolBaseUrl || DEFAULT_BROWSER_BASE_URL,
     protocolApiKey: routeConfig.protocolApiKey,
     protocolImageModel: routeConfig.protocolImageModel || DEFAULT_PROTOCOL_IMAGE_MODEL,
+    [GENERATION_START_DELAY_FIELD]: normalizeGenerationStartDelayMs(source?.[GENERATION_START_DELAY_FIELD]),
+    [GENERATION_CONCURRENCY_FIELD]: normalizeGenerationConcurrency(source?.[GENERATION_CONCURRENCY_FIELD]),
   };
 }
 
@@ -126,6 +136,11 @@ export function toPublicBrowserConfig(privateConfig, baseConfig = {}) {
     protocolApiKeyConfigured,
     protocolApiKeyMask: normalized.protocolApiKey ? maskBrowserApiKey(normalized.protocolApiKey) : baseConfig.protocolApiKeyMask,
     protocolImageModel: normalized.protocolImageModel,
+    defaults: {
+      ...(baseConfig.defaults || {}),
+      [GENERATION_START_DELAY_FIELD]: normalized[GENERATION_START_DELAY_FIELD],
+      [GENERATION_CONCURRENCY_FIELD]: normalized[GENERATION_CONCURRENCY_FIELD],
+    },
   };
 }
 
@@ -163,6 +178,15 @@ export function saveBrowserPrivateConfig(payload, storage = getLocalStorage()) {
       protocolBaseUrl: payload.protocolBaseUrl || current.protocolBaseUrl,
       protocolApiKey: payload.protocolApiKey ? payload.protocolApiKey : current.protocolApiKey,
       protocolImageModel: payload.protocolImageModel || current.protocolImageModel,
+      // A saved 0 is meaningful, so only an absent field falls back to current.
+      [GENERATION_START_DELAY_FIELD]:
+        payload[GENERATION_START_DELAY_FIELD] === undefined || String(payload[GENERATION_START_DELAY_FIELD]).trim() === ""
+          ? current[GENERATION_START_DELAY_FIELD]
+          : payload[GENERATION_START_DELAY_FIELD],
+      [GENERATION_CONCURRENCY_FIELD]:
+        payload[GENERATION_CONCURRENCY_FIELD] === undefined || String(payload[GENERATION_CONCURRENCY_FIELD]).trim() === ""
+          ? current[GENERATION_CONCURRENCY_FIELD]
+          : payload[GENERATION_CONCURRENCY_FIELD],
     },
     {
       preserveRootBaseUrls: {
@@ -243,6 +267,8 @@ export function appendBrowserConfigToFormData(formData, readConfig = readBrowser
   formData.set("protocolBaseUrl", config.protocolBaseUrl);
   formData.set("protocolApiKey", config.protocolApiKey);
   formData.set("protocolImageModel", config.protocolImageModel);
+  formData.set(GENERATION_START_DELAY_FIELD, String(config[GENERATION_START_DELAY_FIELD]));
+  formData.set(GENERATION_CONCURRENCY_FIELD, String(config[GENERATION_CONCURRENCY_FIELD]));
   return formData;
 }
 
@@ -271,6 +297,8 @@ export function getBrowserPrivateConfigRequestPayload(readConfig = readBrowserPr
         protocolBaseUrl: browserConfig.protocolBaseUrl,
         protocolApiKey: browserConfig.protocolApiKey,
         protocolImageModel: browserConfig.protocolImageModel,
+        [GENERATION_START_DELAY_FIELD]: browserConfig[GENERATION_START_DELAY_FIELD],
+        [GENERATION_CONCURRENCY_FIELD]: browserConfig[GENERATION_CONCURRENCY_FIELD],
       }
     : {};
 }

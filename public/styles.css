@@ -11238,9 +11238,66 @@ html[data-ui-layout="mobile"] .portrait-accessory-asset-panel {
 }
 
 .config-card-head,
-.config-connection-card {
+.config-connection-card,
+.config-scheduling-card {
   display: grid;
   gap: 10px;
+}
+
+.config-scheduling-lock {
+  color: var(--muted);
+}
+
+.config-scheduling-card .field:has(input:disabled) {
+  opacity: 0.6;
+}
+
+.config-scheduling-card input:disabled {
+  cursor: not-allowed;
+}
+
+/* The scheduling explanations are long, so they hover off the title instead of
+   sitting permanently under each field. */
+.scheduling-hint-anchor {
+  position: relative;
+}
+
+.scheduling-hint-trigger {
+  cursor: help;
+  text-decoration: underline dotted currentcolor;
+  text-underline-offset: 3px;
+}
+
+.scheduling-hint-tooltip {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 6px);
+  left: 0;
+  width: min(360px, calc(100vw - 48px));
+  padding: 10px 12px;
+  border: 1px solid var(--flyout-border);
+  border-radius: 8px;
+  background: var(--flyout-bg);
+  color: var(--flyout-text);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.24);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease,
+    visibility 140ms ease;
+}
+
+.scheduling-hint-trigger:is(:hover, :focus-visible) ~ .scheduling-hint-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
 }
 
 .config-card-head {

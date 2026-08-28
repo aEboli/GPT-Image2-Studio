@@ -371,11 +371,14 @@ test("local creation generation labels uploaded reference image order", async ()
 
 test("local creation generation has no removed style-reference request path", async () => {
   const server = await readFile(serverPath, "utf8");
-  const generateHandler = server.match(/async function handleCreationGenerate[\s\S]*?\r?\n}\r?\n\r?\nasync function handleCreationRepair/)?.[0] || "";
+  // handleCreationLogoBatchGenerate sits between the two handlers and legitimately keeps its own
+  // logo plumbing, so this slice must stop at it rather than run through to handleCreationRepair.
+  const generateHandler = server.match(/async function handleCreationGenerate[\s\S]*?\r?\n}\r?\n\r?\nasync function handleCreationLogoBatchGenerate/)?.[0] || "";
   const repairHandler = server.match(/async function handleCreationRepair[\s\S]*?\r?\n}\r?\n\r?\nasync function handleGenerate/)?.[0] || "";
   assert.doesNotMatch(server, /MAX_CREATION_STYLE_REFERENCE_IMAGES|styleReferenceImages|appendCreationStyleReferences/);
-  assert.match(generateHandler, /appendCreationItemLogoReference\(\s*item,\s*itemReferenceImages,\s*logoImage/);
-  assert.match(repairHandler, /appendCreationItemLogoReference\(\s*repairItem,\s*itemReferenceImages,\s*logoImage/);
+  assert.doesNotMatch(server, /appendCreationItemLogoReference|appendCreationLogoReference/);
+  assert.doesNotMatch(generateHandler, /logoImage/);
+  assert.doesNotMatch(repairHandler, /logoImage/);
   assert.match(generateHandler, /buildCreationItemGenerationPrompt\(item\.prompt,\s*itemGenerationParameters,\s*item\)/);
   assert.match(repairHandler, /buildCreationItemGenerationPrompt\(repairItem\.prompt,\s*itemGenerationParameters,\s*repairItem\)/);
 });
@@ -439,9 +442,54 @@ test("local creation batch generation runs items with the configured parallel li
   const logoBatchHandler = server.match(/async function handleCreationLogoBatchGenerate[\s\S]*?\r?\n}\r?\n\r?\nasync function handleCreationRepair/)?.[0] || "";
   const repairHandler = server.match(/async function handleCreationRepair[\s\S]*?\r?\n}\r?\n\r?\nasync function handleGenerate/)?.[0] || "";
   assert.match(server, /runWithConcurrency/);
-  assert.match(generateHandler, /await runWithConcurrency\(\s*plan\.items,\s*MAX_CREATION_PARALLEL_TASKS,/);
-  assert.match(logoBatchHandler, /await runWithConcurrency\(\s*plan\.items,\s*MAX_CREATION_PARALLEL_TASKS,/);
-  assert.match(repairHandler, /await runWithConcurrency\(\s*repairItems,\s*MAX_CREATION_PARALLEL_TASKS,/);
+  // The fan-out limit now comes from the configurable generation concurrency,
+  // whose default equals the creation limit these handlers used to hard-code.
+  [generateHandler, logoBatchHandler, repairHandler].forEach((handler) => {
+    assert.match(handler, /const generationConcurrency = resolveGenerationConcurrencyForLimit\(formData, config\);/);
+    assert.match(handler, /maxParallelTasks: generationConcurrency/);
+  });
+  assert.match(generateHandler, /await runWithConcurrency\(\s*plan\.items,\s*generationConcurrency,/);
+  assert.match(logoBatchHandler, /await runWithConcurrency\(\s*plan\.items,\s*generationConcurrency,/);
+  assert.match(repairHandler, /await runWithConcurrency\(\s*repairItems,\s*generationConcurrency,/);
+});
+
+test("local creation failures requeue to the live queue tail instead of waiting for the whole pass", async () => {
+  const server = await readFile(serverPath, "utf8");
+  // Slice each handler exactly: handleCreationGenerate is followed by the Logo batch
+  // handler, so a lazy match up to handleCreationRepair would swallow both.
+  const generateHandler = server.match(/async function handleCreationGenerate[\s\S]*?\r?\n}\r?\n\r?\nasync function handleCreationLogoBatchGenerate/)?.[0] || "";
+  const logoBatchHandler = server.match(/async function handleCreationLogoBatchGenerate[\s\S]*?\r?\n}\r?\n\r?\nasync function handlePortraitRepair/)?.[0] || "";
+  const repairHandler = server.match(/async function handleCreationRepair[\s\S]*?\r?\n}\r?\n\r?\nasync function handleGenerate/)?.[0] || "";
+
+  assert.ok(generateHandler, "handleCreationGenerate slice must not be empty");
+  assert.ok(logoBatchHandler, "handleCreationLogoBatchGenerate slice must not be empty");
+  assert.ok(repairHandler, "handleCreationRepair slice must not be empty");
+
+  assert.match(server, /import \{ createInRunRetryLedger, getRequeueNotice \} from "\.\/lib\/generation-item-retry\.mjs";/);
+  assert.match(server, /function requeueFailedSetItem\(\{ response, controls, retryLedger, item \}\) \{/);
+  // A requeue must never outlive the client stream, and must respect the ledger.
+  assert.match(server, /if \(typeof controls\?\.enqueue !== "function" \|\| !retryLedger \|\| !isResponseWritable\(response\)\) \{/);
+  assert.match(server, /if \(!retryLedger\.canRequeue\(item\?\.itemId\)\) \{/);
+
+  for (const handler of [generateHandler, logoBatchHandler, repairHandler]) {
+    assert.match(handler, /const retryLedger = createInRunRetryLedger\(\);/);
+    // The worker needs the third argument to reach the live queue.
+    assert.match(handler, /async \(item, index, controls\) => \{/);
+    assert.match(handler, /retryLedger\.getTaskId\(/);
+    assert.match(handler, /const requeueAttempt = requeueFailedSetItem\(\{ response, controls, retryLedger, item \}\);/);
+    // A requeued item goes back to queued with its previous error cleared, so the
+    // card shows a retry rather than a terminal failure.
+    assert.match(handler, /requeueAttempt \? \{ status: "queued", error: "" \} : \{ status: "failed", error: message \}/);
+    assert.match(handler, /writeSseEvent\(response, failureEvent\.eventName, \{/);
+  }
+});
+
+test("a requeued creation item reports as pending rather than failed", async () => {
+  const server = await readFile(serverPath, "utf8");
+  assert.match(server, /function buildSetItemFailureEvent\(\{ message, requeueAttempt, retryLedger \}\) \{/);
+  assert.match(server, /return \{ eventName: "item_failed", extra: \{\} \};/);
+  assert.match(server, /eventName: "item_requeued",/);
+  assert.match(server, /notice: getRequeueNotice\(\{ message, attempt: requeueAttempt, maxRetries \}\),/);
 });
 
 test("local creation generation cancels bounded upstream work when the SSE lifecycle ends", async () => {
@@ -471,9 +519,12 @@ test("local generation requests wait for a session slot instead of failing at th
   assert.match(server, /const SESSION_TASK_SLOT_RETRY_DELAY_MS = \d+;/);
   assert.match(server, /createSessionTaskSlotLimiter\(/);
   assert.match(server, /async function waitForSessionTaskSlot\(sessionId, taskId, requestScope, options = \{\}\) \{/);
-  assert.match(server, /async function waitForResponseSessionTaskSlot\(sessionId, taskId, requestScope, response\) \{/);
+  assert.match(server, /async function waitForResponseSessionTaskSlot\(sessionId, taskId, requestScope, response, options = \{\}\) \{/);
   assert.match(server, /isActive: \(\) => isResponseWritable\(response\)/);
+  // Serial paths still claim a slot without a ceiling override; the bounded
+  // fan-outs pass the configured concurrency so a widened run gets slots.
   assert.match(server, /await waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response\);/);
+  assert.match(server, /await waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response, \{ maxParallelTasks: generationConcurrency \}\);/);
   assert.doesNotMatch(server, /if \(!claimSessionTaskSlot\(clientSessionId, taskId, generationRequestScope\)\) \{\s*throw new Error/);
 });
 

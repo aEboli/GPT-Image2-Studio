@@ -6,6 +6,7 @@ import {
   CREATION_UPSTREAM_TIMEOUT_MS,
   MAX_CREATION_REFERENCE_IMAGES,
   MAX_CREATION_PARALLEL_TASKS,
+  MAX_GENERATION_CONCURRENCY,
   MAX_PARALLEL_TASKS_PER_SESSION,
   MAX_PROMPT_PARALLEL_TASKS,
   MAX_PROMPT_QUEUE_SIZE,
@@ -13,6 +14,7 @@ import {
   MAX_PORTRAIT_PERSON_REFERENCE_IMAGES,
   MAX_REFERENCE_IMAGES,
 } from "../lib/studio-constants.mjs";
+import { resolveGenerationConcurrencyForLimit } from "../lib/generation-concurrency.mjs";
 
 const appPath = new URL("../public/app.js", import.meta.url);
 const indexPath = new URL("../public/index.html", import.meta.url);
@@ -43,12 +45,17 @@ test("creation mode has an independent twenty-task parallel limit shared with re
 
   const server = await readFile(serverPath, "utf8");
   assert.match(server, /if \(scope === "creation"\) \{\s*return MAX_CREATION_PARALLEL_TASKS;/);
-  assert.match(server, /runWithConcurrency\(plan\.items, MAX_CREATION_PARALLEL_TASKS,/);
-  assert.match(server, /runWithConcurrency\(repairItems, MAX_CREATION_PARALLEL_TASKS,/);
+  // The fan-out limit is now the configurable generation concurrency. Its
+  // default equals this creation limit, so an untouched control keeps the
+  // twenty-task behaviour this test guards.
+  assert.match(server, /runWithConcurrency\(plan\.items, generationConcurrency,/);
+  assert.match(server, /runWithConcurrency\(repairItems, generationConcurrency,/);
+  assert.equal(resolveGenerationConcurrencyForLimit({}, {}), MAX_CREATION_PARALLEL_TASKS);
 
-  // The bounded-concurrency helper must not clamp the creation limit back down.
+  // The bounded-concurrency helper must not clamp a raised limit back down.
   const limitedConcurrency = await readFile(limitedConcurrencyPath, "utf8");
-  assert.match(limitedConcurrency, /const MAX_CONCURRENT_WORKERS = 20;/);
+  assert.match(limitedConcurrency, /const MAX_CONCURRENT_WORKERS = MAX_GENERATION_CONCURRENCY;/);
+  assert.ok(MAX_GENERATION_CONCURRENCY >= MAX_CREATION_PARALLEL_TASKS);
 
   // The browser reserves creation queue slots against the server's creation limit, not
   // the general per-session limit.
@@ -135,7 +142,7 @@ test("local server counts active generation slots per request mode", async () =>
   assert.match(server, /MAX_PROMPT_PARALLEL_TASKS/);
   assert.match(server, /function isResponseWritable\(response\) \{/);
   assert.match(server, /async function waitForSessionTaskSlot\(sessionId, taskId, requestScope, options = \{\}\) \{/);
-  assert.match(server, /async function waitForResponseSessionTaskSlot\(sessionId, taskId, requestScope, response\) \{/);
+  assert.match(server, /async function waitForResponseSessionTaskSlot\(sessionId, taskId, requestScope, response, options = \{\}\) \{/);
   assert.match(server, /function releaseSessionTaskSlot\(sessionId, taskId, requestScope\) \{/);
   assert.match(server, /isActive: \(\) => isResponseWritable\(response\)/);
   assert.doesNotMatch(server, /const activeTasksBySessionScope = new Map\(\);/);
@@ -145,12 +152,14 @@ test("local server counts active generation slots per request mode", async () =>
   assert.match(generateHandler, /waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response\)/);
   assert.match(generateHandler, /releaseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope\)/);
 
+  // The bounded fan-outs claim their slot with the configured concurrency as the
+  // ceiling, so a run wider than the scope default still gets slots.
   assert.match(creationGenerateHandler, /const generationRequestScope = "creation";/);
-  assert.match(creationGenerateHandler, /waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response\)/);
+  assert.match(creationGenerateHandler, /waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response, \{ maxParallelTasks: generationConcurrency \}\)/);
   assert.match(creationGenerateHandler, /releaseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope\)/);
 
   assert.match(creationRepairHandler, /const generationRequestScope = "creation";/);
-  assert.match(creationRepairHandler, /waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response\)/);
+  assert.match(creationRepairHandler, /waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response, \{ maxParallelTasks: generationConcurrency \}\)/);
   assert.match(creationRepairHandler, /releaseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope\)/);
 
   assert.match(articleGenerateHandler, /const generationRequestScope = "article-illustration";/);

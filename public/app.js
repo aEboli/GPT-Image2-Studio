@@ -81,6 +81,7 @@ import { applyCreationReferenceAnalysisProductNameValue, buildCreationReferenceA
 import { createCreationListingController, getCreationRecordListingMetaLabel, getCreationListingSearchValues, normalizeCreationListingDraftForView, renderCreationListingDrafts } from "/lib/creation-listing-view.mjs";
 import { getCreationItemDisplayTitle } from "/lib/creation-item-display.mjs";
 import { getCreationAutoRepairNotice, getCreationCompletionFeedback, getCreationIncompleteItems, shouldAutoRepairCreationSet } from "/lib/creation-auto-repair.mjs";
+import { getRequeueNotice } from "/lib/generation-item-retry.mjs";
 import { canRepairCreationItem as canRepairCreationItemFromQueue, getCreationRepairButtonText as getCreationRepairButtonTextFromQueue, isCreationItemRepairActive as isCreationItemRepairActiveInQueue, queueCreationItemRepair as queueCreationItemRepairInState, removeQueuedCreationItemRepair, shiftNextQueuedCreationItemRepair } from "/lib/creation-item-repair-queue.mjs";
 import { cloneCreationPlanValue, createCreationPlanPreviewRequestCoordinator, createCreationPlatformPayloadSnapshot, deepFreezeCreationPlanValue, formatCreationPlanWarning, getCreationCompatibleImageTypeState, getCreationEditablePlanDisplayCounts, getCreationSetPlanSource, getVisibleCreationPlanWarnings, mergeCreationPlatformSetParameters, resolveCreationDisplayedPlanContext, resolveCreationPlatformImageCountState, resolveCreationSelectedRolesSubmission, shouldDisableCreationGenerateButton, updateCreationPlatformItemOverride } from "/lib/creation-browser-plan-state.mjs";
 import { normalizeCreationModuleEnabled, resolveCreationPlanCounts } from "/lib/creation-plan-counts.mjs";
@@ -89,7 +90,9 @@ import { DEFAULT_PORTRAIT_ACCESSORY_ASSETS, PORTRAIT_ACCESSORY_ASSET_CATEGORIES,
 import { createDefaultPortraitLocationState, createPortraitLocationSelectorController } from "/lib/portrait-location-selector.mjs?v=20260527-portrait-location-1";
 import { getLegacyPromptAgentTemplatePrompt, getPromptAgentDisplayName, getPromptAgentTemplateDisplayName, isStructuredImagePromptJson } from "/lib/prompt-agent-display-name.mjs?v=20260819-prompt-history-mode-1";
 import { mergePromptAgentHistoryTemplates } from "/lib/prompt-agent-template-sync.mjs?v=20260819-history-template-mode-1";
-import { MAX_CREATION_PARALLEL_TASKS, MAX_PROMPT_PARALLEL_TASKS, MAX_PROMPT_QUEUE_SIZE } from "/lib/studio-constants.mjs?v=20260828-creation-parallel-20-1";
+import { DEFAULT_GENERATION_CONCURRENCY, DEFAULT_GENERATION_START_DELAY_MS, MAX_CREATION_PARALLEL_TASKS, MAX_PROMPT_PARALLEL_TASKS, MAX_PROMPT_QUEUE_SIZE } from "/lib/studio-constants.mjs?v=20260828-generation-concurrency-1";
+import { GENERATION_START_DELAY_FIELD, normalizeGenerationStartDelayMs } from "/lib/generation-start-delay.mjs?v=20260828-generation-start-delay-1";
+import { GENERATION_CONCURRENCY_FIELD, normalizeGenerationConcurrency } from "/lib/generation-concurrency.mjs?v=20260828-generation-concurrency-1";
 const SURPRISE_PROMPTS = [
   { name: "清晨通勤", prompt: "生成一张清晨城市通勤生活照，年轻上班族手拿咖啡走出地铁站，晨光穿过街边树影，画面自然真实，轻微运动模糊，适合生活方式摄影。" },
   { name: "家庭早餐", prompt: "生成一张温暖家庭早餐场景，木质餐桌上有吐司、煎蛋、牛奶和水果，家人围坐聊天，窗外柔和日光洒入，构图干净，有真实居家氛围。" },
@@ -358,8 +361,8 @@ const GENERATION_LOG_STORAGE_KEY = "image-studio-generation-activity-v2";
 const THEME_STORAGE_KEY = "image-studio-ui-theme-v1";
 const UI_LANGUAGE_STORAGE_KEY = "image-studio-ui-language-v1";
 const UI_LANGUAGE_TEXT = {
-  "zh-CN": { activityLog: "生成日志", activityLogAllPanels: "全部板块", activityLogPanels: "生成日志板块", baseUrl: "基础 URL", brandSubtitle: "AI 图像生成工作流", close: "关闭", config: "配置", configApi: "配置 API", configSaved: "配置已保存", configTitle: "连接配置", configUnsaved: "配置未保存", connectionBusy: "并发 {running}/{max} · 队列 {queued}", connectionOpen: "打开 API、LOG", connectionSection: "调用通道", connectionStatusEmpty: "待填写API、LOG", connectionStatusEntry: "API、LOG", delete: "删除", directEndpointSuffix: "直接调用模式请求协议后缀", directMode: "直接调用模式", download: "下载", endpointUrl: "接口地址", expandModels: "展开可用模型列表", fetchModels: "获取模型列表", fetchModelsLoading: "获取中...", fit: "适配", functionMenu: "功能菜单导航", fullUrl: "完整 URL", generate: "开始生成", generateTitle: "开始生成（Ctrl+Enter）", generationRouteLabel: "生图调用模式", globalNav: "全局导航", imageModel: "生图模型", keepSavedKey: "保持已保存 Key", languageEn: "English UI", languageSwitch: "切换界面语言", languageZh: "简体中文界面", menuArticleIllustration: "文章插图", menuArticleRecord: "文章插图记录", menuAssetTools: "资产工具", menuCreation: "套图模式", menuCreationRecord: "套图记录", menuCreateTools: "创作工具", menuGallery: "瀑布画廊", menuImageCompress: "图片压缩", menuImageDecomposition: "图片拆解", menuImageEdit: "图片编辑", menuPortrait: "写真模式", menuPortraitRecord: "写真记录", menuPpt: "PPT生成", menuPptRecord: "PPT记录", menuPromptStudio: "提示词生图", menuQuickBlend: "快速溶图", menuReferenceAnalysis: "融图分析", menuSectionAssets: "资产区", menuSectionCreate: "创作区", menuSectionSettings: "配置区", menuSettings: "设置", menuStyleTransfer: "风格迁移", menuTools: "工具", modeDirect: "直接调用模式", modeProtocol: "Gemini模型", modeRoute: "路由模式", modelFetchBusy: "正在获取模型列表...", modelFetchFailed: "获取模型列表失败。", modelFetchSuccess: "已获取 {count} 个可调用模型。", modelNoCallable: "未获取到可调用模型。", modelNoMatch: "没有匹配的模型", modelNoMatchWithQuery: "没有匹配的模型：{query}", modelTestBusy: "正在测试连接...", modelTestSuccess: "连接测试成功，获取到 {count} 个模型。", navAssets: "资产", navCreate: "创作", navSettings: "配置", notSaved: "未保存", openOutput: "打开输出目录", outputFormat: "输出格式", parameters: "参数设置", previewIdleDetail: "生成日志可在配置中查看，底部胶片条可快速切换查看。", previewIdleEyebrow: "Output Preview", previewIdleTitle: "生成结果会在这里实时更新。", previewWaiting: "等待生成", prompt: "提示词", promptAgent: "图片转提示词", promptCounterSuffix: "字", promptEnhance: "增强模式", promptEnhanceAria: "开启或关闭提示词增强模式", promptEnhanceField: "增强提示词", promptEnhanceOff: "关闭", promptEnhanceOn: "开启", promptPlaceholder: "写下你要生成的画面，也可以先上传参考图说明修改方向。", promptTemplate: "提示词模板", protocolHint: "Gemini 图像模型按 AGICTO 图像生成协议调用；基础 URL 通常填写到 /v1，实际请求为 /images/generations。", protocolImageModel: "图像模型", protocolMode: "Gemini模型", quality: "质量", "ratio.1:1": "电商主图、头像、社交媒体 · 方形 1:1", "ratio.1:2": "长海报 · 竖屏 1:2", "ratio.1:3": "超长竖版广告 · 竖屏 1:3", "ratio.2:1": "Banner横幅 · 横屏 2:1", "ratio.2:3": "竖版摄影 · 竖屏 2:3", "ratio.3:1": "超宽广告图 · 横屏 3:1", "ratio.3:2": "摄影风格 · 横屏 3:2", "ratio.3:4": "海报、人像 · 竖屏 3:4", "ratio.4:3": "PPT、网页配图 · 横屏 4:3", "ratio.4:5": "Instagram帖子 · 竖屏 4:5", "ratio.5:4": "商品展示 · 横屏 5:4", "ratio.9:16": "短视频封面、手机壁纸 · 竖屏 9:16", "ratio.9:21": "超长竖图 · 竖屏 9:21", "ratio.16:9": "横版封面、YouTube · 横屏 16:9", "ratio.21:9": "超宽横幅 · 横屏 21:9", ratioLandscape: "横向", ratioPortrait: "竖向", ratioSquare: "方形", reasoningEffort: "思考等级", reference: "参考图", referenceUploadAction: "上传参考图", referenceUploadTitle: "拖入图片或点击上传", responsesModel: "Responses 模型", routeEndpointSuffix: "路由模式请求协议后缀", routeMode: "路由模式", save: "保存", size: "分辨率", sizeAuto: "自动适配", sizeMax: "最大", testConnection: "测试连接", testConnectionLoading: "测试中...", themeDark: "深色主题", themeLight: "白色主题", themeMenu: "主题颜色", themeToDark: "切换到深色主题", themeToLight: "切换到白色主题", thumbnailEmpty: "暂无缩略图", thumbnailFailed: "缩略图加载失败", thumbnailLoading: "缩略图加载中", timelineNoErrors: "暂无错误", timelineWaitingResult: "等待生成结果", timelineWaitingTask: "等待任务开始", toolModel: "工具模型", toolModelAndQuality: "工具模型与质量", view: "查看", visionTextModel: "视觉/文本模型" },
-  en: { activityLog: "Generation Log", activityLogAllPanels: "All Panels", activityLogPanels: "Generation log panels", baseUrl: "Base URL", brandSubtitle: "AI image workflow", close: "Close", config: "Settings", configApi: "Configure API", configSaved: "Config saved", configTitle: "Connection Settings", configUnsaved: "Config not saved", connectionBusy: "Concurrent {running}/{max} · Queue {queued}", connectionOpen: "open API and log", connectionSection: "Request Channel", connectionStatusEmpty: "API/Log missing", connectionStatusEntry: "API, Log", delete: "Delete", directEndpointSuffix: "Direct mode endpoint suffix", directMode: "Direct Mode", download: "Download", endpointUrl: "Endpoint", expandModels: "Show available models", fetchModels: "Fetch Models", fetchModelsLoading: "Fetching...", fit: "Fit", functionMenu: "Function menu", fullUrl: "Full URL", generate: "Generate", generateTitle: "Generate (Ctrl+Enter)", generationRouteLabel: "Image request mode", globalNav: "Global navigation", imageModel: "Image Model", keepSavedKey: "Keep saved key", languageEn: "English UI", languageSwitch: "Switch interface language", languageZh: "Simplified Chinese UI", menuArticleIllustration: "Article Illustration", menuArticleRecord: "Article Records", menuAssetTools: "Asset Tools", menuCreation: "Product Suite", menuCreationRecord: "Suite Records", menuCreateTools: "Creation Tools", menuGallery: "Gallery", menuImageCompress: "Image Compress", menuImageDecomposition: "Image Decomposition", menuImageEdit: "Image Edit", menuPortrait: "Portrait Mode", menuPortraitRecord: "Portrait Records", menuPpt: "PPT Generation", menuPptRecord: "PPT Records", menuPromptStudio: "Prompt to Image", menuQuickBlend: "Quick Blend", menuReferenceAnalysis: "Reference Analysis", menuSectionAssets: "Assets", menuSectionCreate: "Creation", menuSectionSettings: "Settings", menuSettings: "Settings", menuStyleTransfer: "Style Transfer", menuTools: "Tools", modeDirect: "Direct Mode", modeProtocol: "Gemini Model", modeRoute: "Route Mode", modelFetchBusy: "Fetching model list...", modelFetchFailed: "Failed to fetch model list.", modelFetchSuccess: "Fetched {count} callable models.", modelNoCallable: "No callable models found.", modelNoMatch: "No matching models", modelNoMatchWithQuery: "No matching models: {query}", modelTestBusy: "Testing connection...", modelTestSuccess: "Connection test succeeded. Found {count} models.", navAssets: "Assets", navCreate: "Create", navSettings: "Settings", notSaved: "Not saved", openOutput: "Open Output", outputFormat: "Output Format", parameters: "Parameters", previewIdleDetail: "Generation log is in Settings. Use the filmstrip below to switch results.", previewIdleEyebrow: "Output Preview", previewIdleTitle: "Generated results update here in real time.", previewWaiting: "Waiting", prompt: "Prompt", promptAgent: "Image to Prompt", promptCounterSuffix: "chars", promptEnhance: "Enhance Mode", promptEnhanceAria: "Toggle prompt enhancement mode", promptEnhanceField: "Enhancement Prompt", promptEnhanceOff: "Off", promptEnhanceOn: "On", promptPlaceholder: "Describe the image you want, or upload references first and describe the edit direction.", promptTemplate: "Prompt templates", protocolHint: "Gemini image models use the AGICTO image generation protocol. Base URL usually ends at /v1; requests go to /images/generations.", protocolImageModel: "Image Model", protocolMode: "Gemini Model", quality: "Quality", "ratio.1:1": "Ecommerce, Avatar, Social · Square 1:1", "ratio.1:2": "Long Poster · Portrait 1:2", "ratio.1:3": "Tall Ad · Portrait 1:3", "ratio.2:1": "Banner · Landscape 2:1", "ratio.2:3": "Vertical Photo · Portrait 2:3", "ratio.3:1": "Ultrawide Ad · Landscape 3:1", "ratio.3:2": "Photography · Landscape 3:2", "ratio.3:4": "Poster, Portrait · Portrait 3:4", "ratio.4:3": "PPT, Web Graphic · Landscape 4:3", "ratio.4:5": "Instagram Post · Portrait 4:5", "ratio.5:4": "Product Display · Landscape 5:4", "ratio.9:16": "Short Video Cover, Wallpaper · Portrait 9:16", "ratio.9:21": "Tall Scroll Image · Portrait 9:21", "ratio.16:9": "Cover, YouTube · Landscape 16:9", "ratio.21:9": "Ultrawide Banner · Landscape 21:9", ratioLandscape: "Landscape", ratioPortrait: "Portrait", ratioSquare: "Square", reasoningEffort: "Reasoning", reference: "Reference", referenceUploadAction: "Upload Reference", referenceUploadTitle: "Drop images or click to upload", responsesModel: "Responses Model", routeEndpointSuffix: "Route mode endpoint suffix", routeMode: "Route Mode", save: "Save", size: "Size", sizeAuto: "Auto", sizeMax: "Max", testConnection: "Test Connection", testConnectionLoading: "Testing...", themeDark: "Dark theme", themeLight: "Light theme", themeMenu: "Theme color", themeToDark: "Switch to dark theme", themeToLight: "Switch to light theme", thumbnailEmpty: "No thumbnails", thumbnailFailed: "Thumbnail load failed", thumbnailLoading: "Loading thumbnails", timelineNoErrors: "No errors", timelineWaitingResult: "Waiting for result", timelineWaitingTask: "Waiting for task", toolModel: "Tool Model", toolModelAndQuality: "Tool model and quality", view: "View", visionTextModel: "Vision/Text Model" },
+  "zh-CN": { activityLog: "生成日志", activityLogAllPanels: "全部板块", activityLogPanels: "生成日志板块", baseUrl: "基础 URL", brandSubtitle: "AI 图像生成工作流", close: "关闭", config: "配置", configApi: "配置 API", configSaved: "配置已保存", configTitle: "连接配置", configUnsaved: "配置未保存", connectionBusy: "并发 {running}/{max} · 队列 {queued}", connectionOpen: "打开 API、LOG", connectionSection: "调用通道", connectionStatusEmpty: "待填写API、LOG", connectionStatusEntry: "API、LOG", delete: "删除", directEndpointSuffix: "直接调用模式请求协议后缀", directMode: "直接调用模式", download: "下载", endpointUrl: "接口地址", expandModels: "展开可用模型列表", fetchModels: "获取模型列表", fetchModelsLoading: "获取中...", fit: "适配", functionMenu: "功能菜单导航", fullUrl: "完整 URL", generate: "开始生成", generateTitle: "开始生成（Ctrl+Enter）", generationRouteLabel: "生图调用模式", globalNav: "全局导航", imageModel: "生图模型", keepSavedKey: "保持已保存 Key", languageEn: "English UI", languageSwitch: "切换界面语言", languageZh: "简体中文界面", menuArticleIllustration: "文章插图", menuArticleRecord: "文章插图记录", menuAssetTools: "资产工具", menuCreation: "套图模式", menuCreationRecord: "套图记录", menuCreateTools: "创作工具", menuGallery: "瀑布画廊", menuImageCompress: "图片压缩", menuImageDecomposition: "图片拆解", menuImageEdit: "图片编辑", menuPortrait: "写真模式", menuPortraitRecord: "写真记录", menuPpt: "PPT生成", menuPptRecord: "PPT记录", menuPromptStudio: "提示词生图", menuQuickBlend: "快速溶图", menuReferenceAnalysis: "融图分析", menuSectionAssets: "资产区", menuSectionCreate: "创作区", menuSectionSettings: "配置区", menuSettings: "设置", menuStyleTransfer: "风格迁移", menuTools: "工具", modeDirect: "直接调用模式", modeProtocol: "Gemini模型", modeRoute: "路由模式", modelFetchBusy: "正在获取模型列表...", modelFetchFailed: "获取模型列表失败。", modelFetchSuccess: "已获取 {count} 个可调用模型。", modelNoCallable: "未获取到可调用模型。", modelNoMatch: "没有匹配的模型", modelNoMatchWithQuery: "没有匹配的模型：{query}", modelTestBusy: "正在测试连接...", modelTestSuccess: "连接测试成功，获取到 {count} 个模型。", navAssets: "资产", navCreate: "创作", navSettings: "配置", notSaved: "未保存", openOutput: "打开输出目录", outputFormat: "输出格式", parameters: "参数设置", previewIdleDetail: "生成日志可在配置中查看，底部胶片条可快速切换查看。", previewIdleEyebrow: "Output Preview", previewIdleTitle: "生成结果会在这里实时更新。", previewWaiting: "等待生成", prompt: "提示词", promptAgent: "图片转提示词", promptCounterSuffix: "字", promptEnhance: "增强模式", promptEnhanceAria: "开启或关闭提示词增强模式", promptEnhanceField: "增强提示词", promptEnhanceOff: "关闭", promptEnhanceOn: "开启", promptPlaceholder: "写下你要生成的画面，也可以先上传参考图说明修改方向。", promptTemplate: "提示词模板", protocolHint: "Gemini 图像模型按 AGICTO 图像生成协议调用；基础 URL 通常填写到 /v1，实际请求为 /images/generations。", protocolImageModel: "图像模型", protocolMode: "Gemini模型", quality: "质量", "ratio.1:1": "电商主图、头像、社交媒体 · 方形 1:1", "ratio.1:2": "长海报 · 竖屏 1:2", "ratio.1:3": "超长竖版广告 · 竖屏 1:3", "ratio.2:1": "Banner横幅 · 横屏 2:1", "ratio.2:3": "竖版摄影 · 竖屏 2:3", "ratio.3:1": "超宽广告图 · 横屏 3:1", "ratio.3:2": "摄影风格 · 横屏 3:2", "ratio.3:4": "海报、人像 · 竖屏 3:4", "ratio.4:3": "PPT、网页配图 · 横屏 4:3", "ratio.4:5": "Instagram帖子 · 竖屏 4:5", "ratio.5:4": "商品展示 · 横屏 5:4", "ratio.9:16": "短视频封面、手机壁纸 · 竖屏 9:16", "ratio.9:21": "超长竖图 · 竖屏 9:21", "ratio.16:9": "横版封面、YouTube · 横屏 16:9", "ratio.21:9": "超宽横幅 · 横屏 21:9", ratioLandscape: "横向", ratioPortrait: "竖向", ratioSquare: "方形", reasoningEffort: "思考等级", reference: "参考图", referenceUploadAction: "上传参考图", referenceUploadTitle: "拖入图片或点击上传", responsesModel: "Responses 模型", routeEndpointSuffix: "路由模式请求协议后缀", routeMode: "路由模式", save: "保存", schedulingSection: "生成调度", schedulingLockNote: "有生图任务正在进行或排队，暂时不能修改生成调度参数。任务全部结束后会自动恢复。", concurrencyLabel: "请求并发数量", concurrencyUnit: "个", concurrencyHint: "批量生成时同时在跑的请求数量，默认 20 个，范围 1 到 60。调低可以减轻上游压力、降低限流和超时概率，但整批更慢；调高更快，但上游更容易限流。注意它会被「任务提交间隔」掩盖：间隔比单张耗时还长时，并发数再大也不会重叠。", size: "分辨率", startDelayHint: "批量生成时相邻两张之间的提交间隔，默认 800 毫秒，最大 10000 毫秒。填 0 表示不排队、按并发数量尽快提交；间隔越大越不容易触发上游限流，但最后一张开始得越晚。间隔比单张耗时还长时，会让并发数量失去意义。", startDelayLabel: "任务提交间隔", startDelayUnit: "毫秒", sizeAuto: "自动适配", sizeMax: "最大", testConnection: "测试连接", testConnectionLoading: "测试中...", themeDark: "深色主题", themeLight: "白色主题", themeMenu: "主题颜色", themeToDark: "切换到深色主题", themeToLight: "切换到白色主题", thumbnailEmpty: "暂无缩略图", thumbnailFailed: "缩略图加载失败", thumbnailLoading: "缩略图加载中", timelineNoErrors: "暂无错误", timelineWaitingResult: "等待生成结果", timelineWaitingTask: "等待任务开始", toolModel: "工具模型", toolModelAndQuality: "工具模型与质量", view: "查看", visionTextModel: "视觉/文本模型" },
+  en: { activityLog: "Generation Log", activityLogAllPanels: "All Panels", activityLogPanels: "Generation log panels", baseUrl: "Base URL", brandSubtitle: "AI image workflow", close: "Close", config: "Settings", configApi: "Configure API", configSaved: "Config saved", configTitle: "Connection Settings", configUnsaved: "Config not saved", connectionBusy: "Concurrent {running}/{max} · Queue {queued}", connectionOpen: "open API and log", connectionSection: "Request Channel", connectionStatusEmpty: "API/Log missing", connectionStatusEntry: "API, Log", delete: "Delete", directEndpointSuffix: "Direct mode endpoint suffix", directMode: "Direct Mode", download: "Download", endpointUrl: "Endpoint", expandModels: "Show available models", fetchModels: "Fetch Models", fetchModelsLoading: "Fetching...", fit: "Fit", functionMenu: "Function menu", fullUrl: "Full URL", generate: "Generate", generateTitle: "Generate (Ctrl+Enter)", generationRouteLabel: "Image request mode", globalNav: "Global navigation", imageModel: "Image Model", keepSavedKey: "Keep saved key", languageEn: "English UI", languageSwitch: "Switch interface language", languageZh: "Simplified Chinese UI", menuArticleIllustration: "Article Illustration", menuArticleRecord: "Article Records", menuAssetTools: "Asset Tools", menuCreation: "Product Suite", menuCreationRecord: "Suite Records", menuCreateTools: "Creation Tools", menuGallery: "Gallery", menuImageCompress: "Image Compress", menuImageDecomposition: "Image Decomposition", menuImageEdit: "Image Edit", menuPortrait: "Portrait Mode", menuPortraitRecord: "Portrait Records", menuPpt: "PPT Generation", menuPptRecord: "PPT Records", menuPromptStudio: "Prompt to Image", menuQuickBlend: "Quick Blend", menuReferenceAnalysis: "Reference Analysis", menuSectionAssets: "Assets", menuSectionCreate: "Creation", menuSectionSettings: "Settings", menuSettings: "Settings", menuStyleTransfer: "Style Transfer", menuTools: "Tools", modeDirect: "Direct Mode", modeProtocol: "Gemini Model", modeRoute: "Route Mode", modelFetchBusy: "Fetching model list...", modelFetchFailed: "Failed to fetch model list.", modelFetchSuccess: "Fetched {count} callable models.", modelNoCallable: "No callable models found.", modelNoMatch: "No matching models", modelNoMatchWithQuery: "No matching models: {query}", modelTestBusy: "Testing connection...", modelTestSuccess: "Connection test succeeded. Found {count} models.", navAssets: "Assets", navCreate: "Create", navSettings: "Settings", notSaved: "Not saved", openOutput: "Open Output", outputFormat: "Output Format", parameters: "Parameters", previewIdleDetail: "Generation log is in Settings. Use the filmstrip below to switch results.", previewIdleEyebrow: "Output Preview", previewIdleTitle: "Generated results update here in real time.", previewWaiting: "Waiting", prompt: "Prompt", promptAgent: "Image to Prompt", promptCounterSuffix: "chars", promptEnhance: "Enhance Mode", promptEnhanceAria: "Toggle prompt enhancement mode", promptEnhanceField: "Enhancement Prompt", promptEnhanceOff: "Off", promptEnhanceOn: "On", promptPlaceholder: "Describe the image you want, or upload references first and describe the edit direction.", promptTemplate: "Prompt templates", protocolHint: "Gemini image models use the AGICTO image generation protocol. Base URL usually ends at /v1; requests go to /images/generations.", protocolImageModel: "Image Model", protocolMode: "Gemini Model", quality: "Quality", "ratio.1:1": "Ecommerce, Avatar, Social · Square 1:1", "ratio.1:2": "Long Poster · Portrait 1:2", "ratio.1:3": "Tall Ad · Portrait 1:3", "ratio.2:1": "Banner · Landscape 2:1", "ratio.2:3": "Vertical Photo · Portrait 2:3", "ratio.3:1": "Ultrawide Ad · Landscape 3:1", "ratio.3:2": "Photography · Landscape 3:2", "ratio.3:4": "Poster, Portrait · Portrait 3:4", "ratio.4:3": "PPT, Web Graphic · Landscape 4:3", "ratio.4:5": "Instagram Post · Portrait 4:5", "ratio.5:4": "Product Display · Landscape 5:4", "ratio.9:16": "Short Video Cover, Wallpaper · Portrait 9:16", "ratio.9:21": "Tall Scroll Image · Portrait 9:21", "ratio.16:9": "Cover, YouTube · Landscape 16:9", "ratio.21:9": "Ultrawide Banner · Landscape 21:9", ratioLandscape: "Landscape", ratioPortrait: "Portrait", ratioSquare: "Square", reasoningEffort: "Reasoning", reference: "Reference", referenceUploadAction: "Upload Reference", referenceUploadTitle: "Drop images or click to upload", responsesModel: "Responses Model", routeEndpointSuffix: "Route mode endpoint suffix", routeMode: "Route Mode", save: "Save", schedulingSection: "Generation Scheduling", schedulingLockNote: "Generation tasks are running or queued, so the scheduling parameters cannot be changed right now. They unlock automatically once every task finishes.", concurrencyLabel: "Request Concurrency", concurrencyUnit: "requests", concurrencyHint: "How many generation requests run at once in a batch. Default 20, range 1 to 60. Lowering it eases pressure on the upstream and reduces rate limiting and timeouts at the cost of a slower batch; raising it is faster but hits rate limits sooner. Note the task submit interval can mask it: if the interval is longer than one image takes, a larger concurrency never overlaps.", size: "Size", startDelayHint: "Interval between two submissions in a batch. Default 800 ms, max 10000 ms. Use 0 to submit as fast as the configured concurrency allows; a larger interval is gentler on a rate-limited upstream but starts the last image later. An interval longer than one image takes makes the concurrency setting meaningless.", startDelayLabel: "Task Submit Interval", startDelayUnit: "ms", sizeAuto: "Auto", sizeMax: "Max", testConnection: "Test Connection", testConnectionLoading: "Testing...", themeDark: "Dark theme", themeLight: "Light theme", themeMenu: "Theme color", themeToDark: "Switch to dark theme", themeToLight: "Switch to light theme", thumbnailEmpty: "No thumbnails", thumbnailFailed: "Thumbnail load failed", thumbnailLoading: "Loading thumbnails", timelineNoErrors: "No errors", timelineWaitingResult: "Waiting for result", timelineWaitingTask: "Waiting for task", toolModel: "Tool Model", toolModelAndQuality: "Tool model and quality", view: "View", visionTextModel: "Vision/Text Model" },
 };
 Object.assign(UI_LANGUAGE_TEXT["zh-CN"], {
   directImageApi: "生图 API",
@@ -744,6 +747,9 @@ const refs = {
   configForm: document.querySelector("#configForm"),
   configGenerationLogPanel: document.querySelector("#configGenerationLogPanel"),
   configStatus: document.querySelector("#configStatus"),
+  generationStartDelayInput: document.querySelector("#generationStartDelayInput"),
+  generationConcurrencyInput: document.querySelector("#generationConcurrencyInput"),
+  generationSchedulingLockNote: document.querySelector("#generationSchedulingLockNote"),
   fetchModelsButton: document.querySelector("#fetchModelsButton"),
   connectionLabel: document.querySelector("#connectionLabel"),
   connectionStatus: document.querySelector("#connectionStatus"),
@@ -2039,6 +2045,9 @@ function setDrawerOpen(open) {
     if (!wasOpen) {
       captureOverlayTrigger("config");
     }
+    // The drawer can be opened after a generation already started, so reflect
+    // the lock on open instead of only when generation state changes.
+    syncGenerationSchedulingLock();
     focusOverlayTarget(refs.closeConfigButton);
   } else {
     restoreOverlayTriggerFocus("config");
@@ -2313,6 +2322,48 @@ function updateGenerateButton() {
   const idleLabel = state.studioMode === "style-transfer" ? getUiLanguageText("menuStyleTransfer") || "风格迁移" : getUiLanguageText("generate") || "开始生成";
   refs.generateButton.textContent = preparingReference ? state.uiLanguage === "en" ? "Processing references..." : "处理参考图..." : queuedCount > 0 ? state.uiLanguage === "en" ? `Queue ${queuedCount}` : `队列 ${queuedCount}` : idleLabel;
   refs.liveCount.textContent = `${runningCount} / ${maxParallelCount}`;
+  syncGenerationSchedulingLock();
+}
+
+// True while any panel could still launch a generation request. Queued prompt
+// jobs count: they read the scheduling parameters at launch, so letting the
+// values change mid-queue would split one batch across two schedules.
+function hasPendingGenerationWork() {
+  return (
+    getTotalRunningJobCount() > 0
+    || getTotalQueuedJobCount() > 0
+    || Boolean(state.creation?.generating)
+    || Boolean(state.portrait?.generating)
+    || Boolean(state.articleIllustration?.generating)
+    || Boolean(state.articleIllustration?.referenceGenerating)
+    || Boolean(state.ppt?.generating)
+  );
+}
+
+// Locking reverts the controls to the saved values so an edit typed just before
+// a generation started cannot be written by a later save.
+function syncGenerationSchedulingLock() {
+  const locked = hasPendingGenerationWork();
+  const inputs = [refs.generationConcurrencyInput, refs.generationStartDelayInput].filter(Boolean);
+  const becameLocked = locked && inputs.some((input) => !input.disabled);
+
+  inputs.forEach((input) => {
+    input.disabled = locked;
+  });
+  refs.generationSchedulingLockNote?.classList.toggle("hidden", !locked);
+
+  if (becameLocked && state.config) {
+    if (refs.generationConcurrencyInput) {
+      refs.generationConcurrencyInput.value = String(
+        normalizeGenerationConcurrency(state.config.defaults?.[GENERATION_CONCURRENCY_FIELD], DEFAULT_GENERATION_CONCURRENCY),
+      );
+    }
+    if (refs.generationStartDelayInput) {
+      refs.generationStartDelayInput.value = String(
+        normalizeGenerationStartDelayMs(state.config.defaults?.[GENERATION_START_DELAY_FIELD], DEFAULT_GENERATION_START_DELAY_MS),
+      );
+    }
+  }
 }
 function setPromptAgentFeedback(message, kind = "") {
   refs.promptAgentFeedback.textContent =
@@ -5000,7 +5051,39 @@ function getCurrentPrivateConfigRequestPayload() {
     protocolBaseUrl: refs.protocolBaseUrlInput.value.trim() || browserPayload.protocolBaseUrl || state.config?.protocolBaseUrl || "",
     protocolApiKey: refs.protocolApiKeyInput.value.trim() || browserPayload.protocolApiKey || "",
     protocolImageModel: refs.protocolImageModelInput.value.trim() || browserPayload.protocolImageModel || state.config?.protocolImageModel || DEFAULT_PROTOCOL_IMAGE_MODEL,
+    [GENERATION_START_DELAY_FIELD]: getConfiguredGenerationStartDelayMs(browserPayload),
+    [GENERATION_CONCURRENCY_FIELD]: getConfiguredGenerationConcurrency(browserPayload),
   };
+}
+
+// A blank input means "use the saved value"; an explicit 0 is a real choice and
+// must survive, so the empty check cannot be a falsy check.
+function getConfiguredGenerationStartDelayMs(browserPayload = {}) {
+  const fallback = normalizeGenerationStartDelayMs(
+    browserPayload[GENERATION_START_DELAY_FIELD] ?? state.config?.defaults?.[GENERATION_START_DELAY_FIELD],
+  );
+  // While generation is in flight the control is locked, so the saved value is
+  // authoritative and the field is ignored entirely.
+  if (hasPendingGenerationWork()) {
+    return fallback;
+  }
+
+  return normalizeGenerationStartDelayMs(refs.generationStartDelayInput?.value, fallback);
+}
+
+// A blank input means "use the saved value"; out-of-range input is clamped here
+// so it never fails native form validation and blocks saving other fields.
+function getConfiguredGenerationConcurrency(browserPayload = {}) {
+  const fallback = normalizeGenerationConcurrency(
+    browserPayload[GENERATION_CONCURRENCY_FIELD] ?? state.config?.defaults?.[GENERATION_CONCURRENCY_FIELD],
+  );
+  // While generation is in flight the control is locked, so the saved value is
+  // authoritative and the field is ignored entirely.
+  if (hasPendingGenerationWork()) {
+    return fallback;
+  }
+
+  return normalizeGenerationConcurrency(refs.generationConcurrencyInput?.value, fallback);
 }
 
 function appendCurrentConfigToFormData(formData) { appendBrowserConfigToFormData(formData, undefined, getCurrentPrivateConfigRequestPayload()); return formData; }
@@ -5023,6 +5106,16 @@ function syncConfigUi(config) {
   refs.directResponsesModelInput.value = config.directTextModel || config.directResponsesModel || DEFAULT_DIRECT_RESPONSES_MODEL;
   refs.protocolBaseUrlInput.value = config.protocolBaseUrl || config.baseUrl || "https://api.openai.com/v1";
   refs.protocolImageModelInput.value = config.protocolImageModel || DEFAULT_PROTOCOL_IMAGE_MODEL;
+  if (refs.generationStartDelayInput) {
+    refs.generationStartDelayInput.value = String(
+      normalizeGenerationStartDelayMs(config.defaults?.[GENERATION_START_DELAY_FIELD], DEFAULT_GENERATION_START_DELAY_MS),
+    );
+  }
+  if (refs.generationConcurrencyInput) {
+    refs.generationConcurrencyInput.value = String(
+      normalizeGenerationConcurrency(config.defaults?.[GENERATION_CONCURRENCY_FIELD], DEFAULT_GENERATION_CONCURRENCY),
+    );
+  }
   syncProtocolEndpointPreview();
   refs.imageRouteInputs.forEach((input) => {
     input.checked = input.value === (config.imageRoute === "c" ? "c" : config.imageRoute === "b" ? "b" : "a");
@@ -9331,6 +9424,7 @@ function createArticleRecordCard(item, setId = "") {
 }
 
 function renderArticleIllustrationView() {
+  syncGenerationSchedulingLock();
   if (!refs.articleIllustrationStoryboardList) {
     return;
   }
@@ -12783,6 +12877,7 @@ function renderCreationPlatformPlan() {
 }
 
 function renderCreationView() {
+  syncGenerationSchedulingLock();
   if (!refs.creationResultGrid) {
     return;
   }
@@ -12881,7 +12976,6 @@ function buildCreationPlanPreviewFormData() {
   formData.set("skuSubjects", JSON.stringify(buildCreationSkuSubjectPayload()));
   formData.set("skuBundleCount", refs.creationSkuBundleCountInput?.value || "1");
   formData.set("skuGenerationRule", getCreationSelectedSkuGenerationRule().value);
-  formData.set("logoOptions", JSON.stringify(getCreationLogoPayload()));
   const audienceStrategy = effectivePlan?.audienceStrategy || (
     state.creationReferenceAnalysis.applied && !state.creationReferenceAnalysis.dirty
       ? state.creationReferenceAnalysis.result?.audienceStrategy
@@ -12942,10 +13036,6 @@ function buildCreationFormData() {
       formData.append("referenceImages", file);
     }
   });
-  const logoFile = getCreationLogoGenerationFile();
-  if (logoFile) {
-    formData.append("logoImage", logoFile);
-  }
   appendCurrentConfigToFormData(formData);
 
   return formData;
@@ -12978,7 +13068,7 @@ function buildCreationLogoBatchFormData() {
   return formData;
 }
 
-function applyCreationRepairTargetFormFields(formData, set = {}) { Object.entries({ productName: set.productName || "", productDescription: set.productDescription || "", sellingPoints: Array.isArray(set.sellingPoints) ? set.sellingPoints.join("\n") : String(set.sellingPoints || ""), dimensionSpecs: set.dimensionSpecs || "", dimensionUnitMode: set.dimensionUnitMode || "both", targetLanguage: set.targetLanguage || "en", platform: set.platform || "universal", scenario: set.scenario || "standard", visualLanguage: set.visualLanguage || "classic-commercial", industryTemplate: set.industryTemplate || "general", selectedRoles: JSON.stringify(Array.isArray(set.selectedRoles) ? set.selectedRoles : []), skuGenerationEnabled: String(set.skuGenerationEnabled !== false), infographicRebuildEnabled: String(set.infographicRebuildEnabled === true), skuSubjects: JSON.stringify(Array.isArray(set.skuSubjects) ? set.skuSubjects : []), skuBundleCount: String(set.skuBundleCount || 1), skuGenerationRule: set.skuGenerationRule || DEFAULT_CREATION_SKU_GENERATION_RULE, logoOptions: JSON.stringify(set.logo || null) }).forEach(([key, value]) => formData.set(key, value)); }
+function applyCreationRepairTargetFormFields(formData, set = {}) { Object.entries({ productName: set.productName || "", productDescription: set.productDescription || "", sellingPoints: Array.isArray(set.sellingPoints) ? set.sellingPoints.join("\n") : String(set.sellingPoints || ""), dimensionSpecs: set.dimensionSpecs || "", dimensionUnitMode: set.dimensionUnitMode || "both", targetLanguage: set.targetLanguage || "en", platform: set.platform || "universal", scenario: set.scenario || "standard", visualLanguage: set.visualLanguage || "classic-commercial", industryTemplate: set.industryTemplate || "general", selectedRoles: JSON.stringify(Array.isArray(set.selectedRoles) ? set.selectedRoles : []), skuGenerationEnabled: String(set.skuGenerationEnabled !== false), infographicRebuildEnabled: String(set.infographicRebuildEnabled === true), skuSubjects: JSON.stringify(Array.isArray(set.skuSubjects) ? set.skuSubjects : []), skuBundleCount: String(set.skuBundleCount || 1), skuGenerationRule: set.skuGenerationRule || DEFAULT_CREATION_SKU_GENERATION_RULE }).forEach(([key, value]) => formData.set(key, value)); }
 
 function shouldUseCreationRepairDraftFiles(set = {}) {
   const setId = String(set.setId || "");
@@ -13009,9 +13099,6 @@ function buildCreationRepairFormData({ itemId = "", scope = "incomplete", set = 
       const file = getCreationReferenceGenerationFile(item);
       if (file) formData.append("referenceImages", file);
     });
-    formData.set("logoOptions", JSON.stringify(getCreationLogoPayload()));
-    const logoFile = getCreationLogoGenerationFile();
-    if (logoFile) formData.append("logoImage", logoFile);
   }
   appendCurrentConfigToFormData(formData);
 
@@ -13237,6 +13324,34 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
       status: "done",
       detail: "图像已成功生成",
       imageUrl: getImageUrl(payload.item),
+      set: payload.set,
+      context,
+    });
+    renderCreationView();
+    return;
+  }
+
+  if (eventName === "item_requeued") {
+    if (payload.set) {
+      upsertCreationSetForStream(payload.set, context);
+    } else if (payload.itemId) {
+      updateCreationStreamItem(payload.itemId, {
+        status: "queued",
+        error: "",
+        updatedAt: nowIso(),
+      }, context);
+    }
+    const requeueNotice = payload.notice || getRequeueNotice({
+      message: payload.message,
+      attempt: payload.attempt,
+      maxRetries: payload.maxRetries,
+    });
+    setCreationFeedback(requeueNotice, "busy");
+    recordCreationLogEvent({
+      setId: payload.setId || payload.set?.setId,
+      itemId: payload.itemId,
+      status: "pending",
+      detail: buildGenerationTaskActivityDetail({ statusStage: "queued", statusText: requeueNotice }),
       set: payload.set,
       context,
     });
@@ -14464,6 +14579,7 @@ function createPortraitCard(item = {}, fallbackIndex = 0, options = {}) {
 }
 
 function renderPortraitView() {
+  syncGenerationSchedulingLock();
   if (!refs.portraitResultGrid) {
     return;
   }
@@ -14609,6 +14725,17 @@ function handlePortraitStreamEvent(eventName, payload = {}) {
     }
     setPortraitFeedback("已生成一张写真图。", "success");
     recordPortraitLogEvent({ setId: payload.setId || payload.set?.setId, itemId: payload.item?.itemId || payload.itemId, status: "done", detail: "图像已成功生成", imageUrl: getImageUrl(payload.item), set: payload.set });
+    renderPortraitView(); return;
+  }
+  if (eventName === "item_requeued") {
+    if (payload.set) {
+      upsertPortraitSet(payload.set);
+    } else if (payload.itemId) {
+      updatePortraitCurrentItem(payload.itemId, { status: "queued", error: "", updatedAt: nowIso() });
+    }
+    const portraitRequeueNotice = payload.notice || getRequeueNotice({ message: payload.message, attempt: payload.attempt, maxRetries: payload.maxRetries });
+    setPortraitFeedback(portraitRequeueNotice, "busy");
+    recordPortraitLogEvent({ setId: payload.setId || payload.set?.setId, itemId: payload.itemId, status: "pending", detail: buildGenerationTaskActivityDetail({ statusStage: "queued", statusText: portraitRequeueNotice }), set: payload.set });
     renderPortraitView(); return;
   }
   if (eventName === "item_failed") {
@@ -15482,6 +15609,7 @@ function renderPptRecordView() {
 }
 
 function renderPptView() {
+  syncGenerationSchedulingLock();
   setPptSourceMode(state.ppt.sourceMode);
   renderPptFiles();
   pptAnalysis.render();
@@ -16103,6 +16231,14 @@ async function saveConfig(event) {
 
   syncEndpointFieldsFromFullUrlModes();
   const payload = getCurrentPrivateConfigRequestPayload();
+  // Submitting with Enter can skip the field's change event, so clamp here too
+  // and reflect the stored value back into the control.
+  if (refs.generationStartDelayInput) {
+    refs.generationStartDelayInput.value = String(payload[GENERATION_START_DELAY_FIELD]);
+  }
+  if (refs.generationConcurrencyInput) {
+    refs.generationConcurrencyInput.value = String(payload[GENERATION_CONCURRENCY_FIELD]);
+  }
 
   const browserConfig = saveBrowserPrivateConfig(payload);
   state.config = toPublicBrowserConfig(browserConfig, state.config || {});
@@ -17277,6 +17413,18 @@ function bindEvents() {
   });
   refs.configForm.addEventListener("submit", (event) => {
     saveConfig(event).catch((error) => showError(error.message));
+  });
+  // Clamp in place on commit so an out-of-range delay never fails native form
+  // validation and blocks saving the rest of the configuration.
+  refs.generationStartDelayInput?.addEventListener("change", () => {
+    refs.generationStartDelayInput.value = String(
+      normalizeGenerationStartDelayMs(refs.generationStartDelayInput.value, DEFAULT_GENERATION_START_DELAY_MS),
+    );
+  });
+  refs.generationConcurrencyInput?.addEventListener("change", () => {
+    refs.generationConcurrencyInput.value = String(
+      normalizeGenerationConcurrency(refs.generationConcurrencyInput.value, DEFAULT_GENERATION_CONCURRENCY),
+    );
   });
   refs.imageRouteInputs.forEach((input) => input.addEventListener("change", () => {
     updateGenerationModeStatus();

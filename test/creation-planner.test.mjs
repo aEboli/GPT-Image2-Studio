@@ -1474,7 +1474,7 @@ test("creation planner normalizes optional logo placement and background handlin
   assert.equal(defaultLogo.placementLabel, "左上");
 });
 
-test("creation planner injects optional logo guidance into every generated item", () => {
+test("creation planner never injects logo placement guidance into suite items", () => {
   const plan = buildCreationPlan({
     productName: "AeroPress Clear",
     productDescription: "Transparent portable coffee brewer",
@@ -1488,12 +1488,12 @@ test("creation planner injects optional logo guidance into every generated item"
     },
   });
 
+  // Suite mode no longer accepts an uploaded Logo. The normalized payload stays readable for
+  // saved records, but no item prompt may ask the model to place a logo it never receives.
   assert.equal(plan.logo?.filename, "brand-mark.png");
-  assert.equal(plan.logo?.placement, "bottom-left");
-  assert.equal(plan.logo?.background, "transparent");
-  assert.ok(plan.items.every((item) => item.prompt.includes("brand-mark.png")));
-  assert.ok(plan.items.every((item) => item.prompt.includes("bottom-left")));
-  assert.ok(plan.items.every((item) => item.prompt.includes("transparent logo")));
+  assert.ok(plan.items.every((item) => !item.prompt.includes("brand-mark.png")));
+  assert.ok(plan.items.every((item) => !item.prompt.includes("transparent logo")));
+  assert.ok(plan.items.every((item) => !/place it at the/i.test(item.prompt)));
 });
 
 test("creation planner expands ecommerce scenario sets to eight images", () => {
@@ -1602,7 +1602,7 @@ test("creation planner appends distinct SKU images after twelve carousel roles",
   assert.ok(skuItems.every((item) => item.prompt.includes("SKU product image")));
   assert.ok(skuItems.every((item) => item.prompt.includes("Replace the uploaded plain photo background")));
   assert.ok(skuItems.every((item) => item.prompt.includes("kept exactly as supplied in shape, proportions, colors, materials, markings, logos, identifiers, and hardware")));
-  assert.ok(skuItems.every((item) => item.prompt.includes("brand-logo.png")));
+  assert.ok(skuItems.every((item) => !item.prompt.includes("brand-logo.png")));
   assert.match(skuItems[0].prompt, /blue-white-bg\.png/);
   assert.match(skuItems[1].prompt, /green-white-bg\.png/);
   assert.match(skuItems[2].prompt, /red-white-bg\.png/);
