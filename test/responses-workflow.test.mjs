@@ -1914,13 +1914,7 @@ test("requestImageGeneration retries once after original response retrieval is u
 test("requestImageGeneration stops after one unknown-result retry", async () => {
   const requests = [];
   const events = [];
-  const noFinalStream = [
-    "event: response.image_generation_call.partial_image",
-    'data: {"partial_image_b64":"c3RpbGwtdW5rbm93bg=="}',
-    "",
-    "data: [DONE]",
-    "",
-  ].join("\n");
+  const noFinalStream = ["data: [DONE]", ""].join("\n");
 
   await assert.rejects(
     () => requestImageGeneration({
@@ -1947,6 +1941,35 @@ test("requestImageGeneration stops after one unknown-result retry", async () => 
     && event.stage === "recovery_unavailable"
     && event.message === "自动重试后仍无法确认最终结果，不再继续重试"
   )));
+});
+
+test("requestImageGeneration retries once before falling back to a partial image", async () => {
+  const requests = [];
+  const partialOnlyStream = [
+    "event: response.image_generation_call.partial_image",
+    'data: {"partial_image_b64":"c3RpbGwtdW5rbm93bg=="}',
+    "",
+    "data: [DONE]",
+    "",
+  ].join("\n");
+
+  const result = await requestImageGeneration({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    prompt: "Retry once then keep the partial",
+    size: "1024x1024",
+    quality: "high",
+    responsesModel: "gpt-5.4",
+    async fetchImpl(url, init) {
+      requests.push({ url, method: init.method });
+      return new Response(partialOnlyStream, { status: 200, headers: { "content-type": "text/event-stream" } });
+    },
+    onEvent() {},
+  });
+
+  assert.deepEqual(requests.map(({ method }) => method), ["POST", "POST"]);
+  assert.equal(result.finalImageBase64, "c3RpbGwtdW5rbm93bg==");
+  assert.equal(result.partialImageFallbackUsed, true);
 });
 
 test("requestImageGeneration stops when the automatic retry task explicitly fails", async () => {
@@ -2481,4 +2504,277 @@ test("requestImageGeneration does not retry an invalid custom image size", async
   }), /生成请求失败：HTTP 400/);
 
   assert.deepEqual(requests, ["1536x864"]);
+});
+
+test("complete waits for the image when the tool announces completion early", async () => {
+  // Measured against a live proxy: image_generation_call.completed at 28s carrying no
+  // image, the bytes arriving at 190s on output_item.done. Completing at the
+  // announcement stopped the client timer early and claimed done with nothing sent.
+  const events = [];
+  const stream = [
+    "event: response.image_generation_call.completed",
+    'data: {"type":"response.image_generation_call.completed","item_id":"ig_1","output_index":0}',
+    "",
+    "event: response.output_item.done",
+    'data: {"type":"response.output_item.done","item":{"id":"ig_1","type":"image_generation_call","status":"completed","result":"bGF0ZS1pbWFnZQ=="}}',
+    "",
+    "event: response.completed",
+    'data: {"type":"response.completed","response":{"id":"resp_late","status":"completed","output":[]}}',
+    "",
+  ].join("\n");
+
+  const result = await consumeResponsesSse(
+    new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(stream));
+        controller.close();
+      },
+    }),
+    {
+      onEvent(event) {
+        events.push(event.type);
+      },
+    },
+  );
+
+  assert.equal(result.finalImageBase64, "bGF0ZS1pbWFnZQ==");
+  // The image must be delivered before anything claims completion.
+  assert.deepEqual(events, ["final_image", "complete"]);
+});
+
+test("a tool completion that already carries the image still completes at once", async () => {
+  const events = [];
+  const stream = [
+    "event: response.image_generation_call.completed",
+    'data: {"type":"response.image_generation_call.completed","result":"aW5saW5lLWltYWdl"}',
+    "",
+  ].join("\n");
+
+  await consumeResponsesSse(
+    new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(stream));
+        controller.close();
+      },
+    }),
+    {
+      onEvent(event) {
+        events.push(event.type);
+      },
+    },
+  );
+
+  assert.deepEqual(events, ["final_image", "complete"]);
+});
+
+test("a stream that ends with response.completed and no image still completes", async () => {
+  const events = [];
+  const stream = [
+    "event: response.completed",
+    'data: {"type":"response.completed","response":{"id":"resp_empty","status":"completed","output":[]}}',
+    "",
+  ].join("\n");
+
+  const result = await consumeResponsesSse(
+    new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(stream));
+        controller.close();
+      },
+    }),
+    {
+      onEvent(event) {
+        events.push(event.type);
+      },
+    },
+  );
+
+  assert.equal(result.responseCompleted, true);
+  assert.equal(result.finalImageBase64, "");
+  assert.deepEqual(events, ["complete"]);
+});
+
+test("consumeResponsesSse reports a truncated tail as an interruption instead of a parse error", async () => {
+  const truncatedTail = [
+    "event: response.created",
+    'data: {"type":"response.created","response":{"id":"resp_trunc","status":"in_progress"}}',
+    "",
+    "event: response.image_generation_call.partial_image",
+    `data: {"partial_image_b64":"${"A".repeat(120)}`,
+  ].join("\n");
+
+  const result = await consumeResponsesSse(
+    new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(truncatedTail));
+        controller.close();
+      },
+    }),
+    { onEvent() {} },
+  );
+
+  assert.equal(result.streamInterrupted, true);
+  assert.equal(result.finalImageBase64, "");
+  assert.equal(result.responseId, "resp_trunc");
+  assert.ok(!/Unterminated string in JSON/.test(result.streamErrorMessage || ""));
+});
+
+test("consumeResponsesSse keeps a final image received before a truncated tail", async () => {
+  const finalThenTruncated = [
+    "event: response.image_generation_call.completed",
+    'data: {"type":"response.image_generation_call.completed","result":"ZmluYWwtYmVmb3JlLXRhaWw="}',
+    "",
+    "event: response.output_text.delta",
+    `data: {"delta":"${"B".repeat(80)}`,
+  ].join("\n");
+
+  const result = await consumeResponsesSse(
+    new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(finalThenTruncated));
+        controller.close();
+      },
+    }),
+    { onEvent() {} },
+  );
+
+  assert.equal(result.finalImageBase64, "ZmluYWwtYmVmb3JlLXRhaWw=");
+  assert.equal(result.streamInterrupted, undefined);
+});
+
+test("consumeResponsesSse still throws on a complete but malformed event", async () => {
+  const malformedComplete = ["event: response.created", "data: {not json}", "", ""].join("\n");
+
+  await assert.rejects(
+    () => consumeResponsesSse(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(malformedComplete));
+          controller.close();
+        },
+      }),
+      { onEvent() {} },
+    ),
+    (error) => error instanceof SyntaxError,
+  );
+});
+
+test("requestImageGeneration runs the recovery ladder after a truncated tail", async () => {
+  const requests = [];
+  const events = [];
+  const truncatedTail = [
+    "event: response.created",
+    'data: {"type":"response.created","response":{"id":"resp_ladder","status":"in_progress"}}',
+    "",
+    "event: response.image_generation_call.partial_image",
+    `data: {"partial_image_b64":"${"A".repeat(120)}`,
+  ].join("\n");
+
+  const result = await requestImageGeneration({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    prompt: "Truncated tail keeps the ladder",
+    size: "1024x1024",
+    quality: "high",
+    responsesModel: "gpt-5.4",
+    responseRecoveryMaxPolls: 1,
+    responseRecoveryPollDelayMs: 0,
+    async fetchImpl(url, init) {
+      requests.push({ url, method: init.method });
+      if (init.method === "GET") {
+        return new Response(
+          JSON.stringify({ status: "completed", output: [{ type: "image_generation_call", result: "cmVjb3ZlcmVkLWFmdGVyLXRhaWw=" }] }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      return new Response(truncatedTail, { status: 200, headers: { "content-type": "text/event-stream" } });
+    },
+    onEvent(event) {
+      events.push(event);
+    },
+  });
+
+  assert.deepEqual(requests.map(({ method }) => method), ["POST", "GET"]);
+  assert.equal(result.finalImageBase64, "cmVjb3ZlcmVkLWFmdGVyLXRhaWw=");
+  assert.ok(events.some((event) => event.type === "status" && event.stage === "recovering_original"));
+  assert.equal(events.some((event) => /Unterminated string in JSON/.test(event.message || "")), false);
+});
+
+test("requestImageGeneration falls back to the last partial image when the result stays unknown", async () => {
+  const events = [];
+  const noFinalStream = [
+    "event: response.created",
+    'data: {"type":"response.created","response":{"id":"resp_partial_fallback","status":"in_progress"}}',
+    "",
+    "event: response.image_generation_call.partial_image",
+    'data: {"partial_image_b64":"Zmlyc3QtcGFydGlhbA=="}',
+    "",
+    "event: response.image_generation_call.partial_image",
+    'data: {"partial_image_b64":"bGFzdC1wYXJ0aWFs"}',
+    "",
+    "data: [DONE]",
+    "",
+  ].join("\n");
+
+  const result = await requestImageGeneration({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    prompt: "Unknown result keeps the partial",
+    size: "1024x1024",
+    quality: "high",
+    responsesModel: "gpt-5.4",
+    responseRecoveryMaxPolls: 1,
+    responseRecoveryPollDelayMs: 0,
+    async fetchImpl(_url, init) {
+      if (init.method === "GET") {
+        return new Response(JSON.stringify({ status: "unknown" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return new Response(noFinalStream, { status: 200, headers: { "content-type": "text/event-stream" } });
+    },
+    onEvent(event) {
+      events.push(event);
+    },
+  });
+
+  assert.equal(result.finalImageBase64, "bGFzdC1wYXJ0aWFs");
+  assert.equal(result.partialImageFallbackUsed, true);
+  assert.ok(events.some((event) => event.type === "status" && event.stage === "partial_image_fallback"));
+  assert.ok(events.some((event) => event.type === "final_image" && event.base64 === "bGFzdC1wYXJ0aWFs"));
+});
+
+test("requestImageGeneration still fails when the result is unknown and no partial arrived", async () => {
+  const noImageStream = [
+    "event: response.created",
+    'data: {"type":"response.created","response":{"id":"resp_no_partial","status":"in_progress"}}',
+    "",
+    "data: [DONE]",
+    "",
+  ].join("\n");
+
+  await assert.rejects(
+    () => requestImageGeneration({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      prompt: "No partial means no fallback",
+      size: "1024x1024",
+      quality: "high",
+      responsesModel: "gpt-5.4",
+      responseRecoveryMaxPolls: 1,
+      responseRecoveryPollDelayMs: 0,
+      async fetchImpl(_url, init) {
+        if (init.method === "GET") {
+          return new Response(JSON.stringify({ status: "unknown" }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        return new Response(noImageStream, { status: 200, headers: { "content-type": "text/event-stream" } });
+      },
+      onEvent() {},
+    }),
+    /原 Responses 任务结果未知，自动重试后仍未确认，请手动重试/,
+  );
 });

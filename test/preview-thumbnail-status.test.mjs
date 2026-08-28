@@ -45,9 +45,10 @@ test("generation thumbnail renderers use the shared loading shell", async () => 
     readFile(quickBlendViewPath, "utf8"),
   ]);
 
-  assert.match(app, /createGenerationLoadingShell\(document, \{ key, active: true \}\)/);
-  assert.match(app, /createGenerationLoadingShell\(document, \{ key, active: true, mode \}\)\.shell/);
+  // 每个缩略图入口都要把真实阶段透传给共享加载壳，颜色才能对应当前请求阶段。
+  assert.match(app, /createGenerationLoadingShell\(document, \{ key, active: true, stage: getGenerationLoadingItemStage\(item\) \}\)/);
+  assert.match(app, /createGenerationLoadingShell\(document, \{ key, active: true, mode, stage: getGenerationLoadingItemStage\(item\) \}\)\.shell/);
   assert.match(app, /isWaitingPreviewItem\(item\) \? GENERATION_LOADING_WAITING_MODE : GENERATION_LOADING_GENERATING_MODE/);
-  assert.match(imageEditView, /createGenerationLoadingShell\(document, \{ key, active: true \}\)/);
-  assert.match(quickBlendView, /createGenerationLoadingShell\(document, \{ key, active: true \}\)/);
+  assert.match(imageEditView, /createGenerationLoadingShell\(document, \{ key, active: true, stage: getGenerationLoadingItemStage\(item\) \}\)/);
+  assert.match(quickBlendView, /createGenerationLoadingShell\(document, \{ key, active: true, stage: getGenerationLoadingItemStage\(item\) \}\)/);
 });

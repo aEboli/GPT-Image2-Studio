@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 const stylesPath = new URL("../public/styles.css", import.meta.url);
 const appPath = new URL("../public/app.js", import.meta.url);
 const creationRecordListViewPath = new URL("../lib/creation-record-list-view.mjs", import.meta.url);
+const generationLogPanelPath = new URL("../lib/generation-log-panel.mjs", import.meta.url);
 
 function readCssRule(styles, selector) {
   const escapedSelector = selector
@@ -53,10 +54,15 @@ test("timeline renders ordered generation times without labels and keeps the leg
   assert.match(app, /generationCompletedAt:\s*String\(entry\?\.generationCompletedAt \|\| ""\)/);
   assert.match(app, /generationStartedAt:\s*task\?\.generationStartedAt \|\| task\?\.item\?\.generationStartedAt \|\| ""/);
   assert.match(app, /generationCompletedAt:\s*task\?\.generationCompletedAt \|\| task\?\.item\?\.generationCompletedAt \|\| ""/);
-  assert.match(app, /const timelineTimes = item\.generationStartedAt \|\| item\.generationCompletedAt[\s\S]*\? \[item\.generationStartedAt, item\.generationCompletedAt\]\.filter\(Boolean\)[\s\S]*: \[item\.at\]\.filter\(Boolean\)/);
-  assert.match(app, /className = "timeline-start-time"/);
-  assert.match(app, /time\.textContent = formatClock\(timelineAt\)/);
+  // Time rendering moved into the shared log panel module so the drawer and the
+  // per-panel embedded logs stay identical; the clock formatter is injected.
+  const logPanel = await readFile(generationLogPanelPath, "utf8");
+  assert.match(logPanel, /const times = entry\.generationStartedAt \|\| entry\.generationCompletedAt[\s\S]*\? \[entry\.generationStartedAt, entry\.generationCompletedAt\]\.filter\(Boolean\)[\s\S]*: \[entry\.at\]\.filter\(Boolean\)/);
+  assert.match(logPanel, /"timeline-start-time"/);
+  assert.match(logPanel, /createElement\(documentRef, "time", "", formatTime\(value\)\)/);
+  assert.match(app, /formatTime: formatClock,/);
   assert.doesNotMatch(app, /开始生图时间|Generation started|结束生图时间|Generation completed/);
+  assert.doesNotMatch(logPanel, /开始生图时间|Generation started|结束生图时间|Generation completed/);
 });
 
 test("timeline status dot is vertically centered in its current row", async () => {

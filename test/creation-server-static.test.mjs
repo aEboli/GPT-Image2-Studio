@@ -446,7 +446,10 @@ test("local creation batch generation runs items with the configured parallel li
 
 test("local creation generation cancels bounded upstream work when the SSE lifecycle ends", async () => {
   const server = await readFile(serverPath, "utf8");
-  assert.match(server, /const CREATION_UPSTREAM_TIMEOUT_MS = \(\(\) =>/);
+  // The effective deadline now comes from lib/upstream-stream-fetch.mjs so the socket
+  // body timeout derives from the same value; assert the wiring, not the old IIFE shape.
+  assert.match(server, /const CREATION_UPSTREAM_TIMEOUT_MS = resolveCreationUpstreamTimeoutMs\(\);/);
+  assert.match(server, /resolveCreationUpstreamTimeoutMs[^}]*\} from "\.\/lib\/upstream-stream-fetch\.mjs";/);
   assert.match(server, /function createCreationRequestLifecycle\(response\) \{/);
   assert.match(server, /套图上游请求超时/);
   assert.match(server, /套图客户端连接已断开，已取消上游请求/);

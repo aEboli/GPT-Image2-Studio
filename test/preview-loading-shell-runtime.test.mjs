@@ -6,6 +6,9 @@ import {
   createGenerationLoadingShell,
   getGenerationLoadingInterval,
   getGenerationLoadingProgress,
+  getGenerationLoadingItemStage,
+  getGenerationLoadingShellFamily,
+  getGenerationLoadingStageFamily,
   stopGenerationLoadingShell,
   updateGenerationLoadingShell,
 } from "../lib/generation-loading.mjs";
@@ -177,6 +180,109 @@ test("preview loading exposes the tick duration for a continuous water rise", ()
   }
 });
 
+test("stage color families follow the real request stages", () => {
+  assert.equal(getGenerationLoadingStageFamily("queued"), "queued");
+  assert.equal(getGenerationLoadingStageFamily("uploading"), "uploading");
+  assert.equal(getGenerationLoadingStageFamily("connecting"), "connecting");
+  assert.equal(getGenerationLoadingStageFamily("generating"), "generating");
+  assert.equal(getGenerationLoadingStageFamily("reference_generating"), "generating");
+  assert.equal(getGenerationLoadingStageFamily("saving"), "saving");
+  ["waiting_upstream", "waiting_final", "retrying_upstream", "recovering_original"].forEach((stage) => {
+    assert.equal(getGenerationLoadingStageFamily(stage), "recovering");
+  });
+  ["error", "failed", "original_failed"].forEach((stage) => {
+    assert.equal(getGenerationLoadingStageFamily(stage), "failed");
+  });
+});
+
+test("unknown stages fall back without guessing a later stage", () => {
+  assert.equal(getGenerationLoadingStageFamily(""), "generating");
+  assert.equal(getGenerationLoadingStageFamily("nonsense"), "generating");
+  assert.equal(getGenerationLoadingStageFamily("", "waiting"), "queued");
+  assert.equal(getGenerationLoadingStageFamily("nonsense", "waiting"), "queued");
+});
+
+test("item stage is read from the usual status fields", () => {
+  assert.equal(getGenerationLoadingItemStage({ statusStage: "saving" }), "saving");
+  assert.equal(getGenerationLoadingItemStage({ stage: "connecting" }), "connecting");
+  assert.equal(getGenerationLoadingItemStage({ status: "queued" }), "queued");
+  assert.equal(getGenerationLoadingItemStage({ statusStage: "saving", status: "queued" }), "saving");
+  assert.equal(getGenerationLoadingItemStage(null), "");
+});
+
+test("loading shells expose the stage and its color family on the dataset", () => {
+  const documentRef = createTestDocument();
+  const scheduler = installScheduler();
+  try {
+    const nodes = createGenerationLoadingShell(documentRef, { key: "job-stage", active: true, stage: "connecting" });
+    assert.equal(nodes.shell.dataset.generationLoadingStage, "connecting");
+    assert.equal(nodes.shell.dataset.generationLoadingFamily, "connecting");
+    assert.equal(getGenerationLoadingShellFamily(nodes), "connecting");
+
+    updateGenerationLoadingShell(nodes, { key: "job-stage", active: true, stage: "generating" });
+    assert.equal(nodes.shell.dataset.generationLoadingFamily, "generating");
+
+    updateGenerationLoadingShell(nodes, { key: "job-stage", active: true, stage: "retrying_upstream" });
+    assert.equal(nodes.shell.dataset.generationLoadingFamily, "recovering");
+
+    updateGenerationLoadingShell(nodes, { key: "job-stage", active: true, stage: "saving" });
+    assert.equal(nodes.shell.dataset.generationLoadingFamily, "saving");
+    stopGenerationLoadingShell(nodes);
+  } finally {
+    scheduler.restore();
+  }
+});
+
+test("a re-render without a stage keeps the last known stage", () => {
+  const documentRef = createTestDocument();
+  const scheduler = installScheduler();
+  try {
+    const nodes = createGenerationLoadingShell(documentRef, { key: "job-keep", active: true, stage: "saving" });
+    updateGenerationLoadingShell(nodes, { key: "job-keep", active: true });
+    assert.equal(nodes.shell.dataset.generationLoadingStage, "saving");
+    assert.equal(nodes.shell.dataset.generationLoadingFamily, "saving");
+    stopGenerationLoadingShell(nodes);
+  } finally {
+    scheduler.restore();
+  }
+});
+
+test("stylesheet derives water color from stage hue and progress depth", async () => {
+  const styles = await readFile(new URL("../public/styles.css", import.meta.url), "utf8");
+  assert.match(styles, /@property --generation-loading-hue\s*\{[\s\S]*syntax:\s*"<number>"/);
+  assert.match(styles, /@property --generation-loading-sat\s*\{[\s\S]*syntax:\s*"<percentage>"/);
+  // 深浅由百分比推导，所以同一阶段内也能看出推进。
+  assert.match(
+    styles,
+    /--generation-loading-fluid:\s*hsl\([\s\S]*var\(--generation-loading-hue\)[\s\S]*calc\([\s\S]*var\(--generation-loading-progress\)/,
+  );
+  assert.match(styles, /--generation-loading-hue 900ms ease-in-out/);
+  // 浅色主题必须用亮度偏移而不是固定值，否则会盖掉各阶段按感知亮度做的校准。
+  assert.match(
+    styles,
+    /html\[data-theme="light"\] \.generation-loading-shell\s*\{[^}]*--generation-loading-light-shift:/,
+  );
+  assert.doesNotMatch(
+    styles,
+    /html\[data-theme="light"\] \.generation-loading-shell\s*\{[^}]*--generation-loading-light-base:/,
+  );
+  ["queued", "uploading", "connecting", "generating", "recovering", "saving", "failed"].forEach((family) => {
+    assert.match(
+      styles,
+      new RegExp(
+        `\\.generation-loading-shell\\[data-generation-loading-family="${family}"\\]\\s*\\{[\\s\\S]*?--generation-loading-hue:`,
+      ),
+    );
+  });
+  assert.match(styles, /\.generation-loading-drop::after\s*\{[\s\S]*var\(--generation-loading-fluid\)/);
+  assert.match(styles, /\.generation-loading-wave\s*\{[\s\S]*var\(--generation-loading-fluid\)/);
+  // 等待态不再自带取色，避免覆盖阶段色相族。
+  assert.doesNotMatch(
+    styles,
+    /\[data-generation-loading-mode="waiting"\] \.generation-loading-wave \{[\s\S]*?background-image:/,
+  );
+});
+
 test("preview loading renders a wave layer inside the water drop", () => {
   const documentRef = createTestDocument();
   const scheduler = installScheduler();
@@ -346,4 +452,99 @@ test("app and stylesheet no longer contain the removed multi-layer generation an
     /\.generation-loading-shell\s*\{[\s\S]*transition:\s*--generation-loading-progress var\(--generation-loading-rise-duration,\s*800ms\) linear/,
   );
   assert.doesNotMatch(styles, /preview-loading-orb-field|preview-loading-fluid|creation-card-loading-sketch|quick-blend-thumb-loader|image-edit-spin|image-decomposition-spin/);
+});
+
+// A stage that reaches the shell without a family silently renders the ordinary
+// `generating` hue, which misreports what the pipeline is doing. Read the stages back
+// out of the workflow so a newly added one cannot slip through unmapped.
+test("every stage the workflow emits has an explicit colour family", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const { GENERATION_LOADING_STAGE_FAMILIES } = await import("../lib/generation-loading.mjs");
+  const workflow = await readFile(new URL("../lib/responses-workflow.mjs", import.meta.url), "utf8");
+
+  const emitted = new Set();
+  for (const match of workflow.matchAll(/stage:s*"([a-z_]+)"/g)) {
+    emitted.add(match[1]);
+  }
+  for (const match of workflow.matchAll(/"(original_failed|recovery_unavailable)"/g)) {
+    emitted.add(match[1]);
+  }
+
+  assert.ok(emitted.size > 0, "expected to find emitted stages");
+  const unmapped = [...emitted].filter((stage) => !GENERATION_LOADING_STAGE_FAMILIES[stage]).sort();
+  assert.deepEqual(unmapped, [], `unmapped stages: ${unmapped.join(", ")}`);
+});
+
+test("loading shell keeps the realtime log line opt-in", async () => {
+  const { getGenerationLoadingLogText } = await import("../lib/generation-loading.mjs");
+  const documentRef = createTestDocument();
+  const scheduler = installScheduler();
+  try {
+    const quiet = createGenerationLoadingShell(documentRef, { key: "job-quiet", active: true });
+    assert.equal(quiet.shell.querySelectorAll(".generation-loading-log").length, 1);
+    assert.equal(quiet.log.hidden, true);
+    assert.equal(quiet.log.textContent, "");
+    assert.equal(quiet.shell.dataset.generationLoadingLog, "off");
+    assert.equal(getGenerationLoadingLogText(quiet), "");
+
+    updateGenerationLoadingShell(quiet, { key: "job-quiet", active: true, logText: "上游重试：正在重试 1/2" });
+    assert.equal(quiet.log.hidden, true, "log stays hidden until the call site opts in");
+
+    const loud = createGenerationLoadingShell(documentRef, {
+      key: "job-loud",
+      active: true,
+      showLog: true,
+      logText: "上游重试：正在重试 1/2",
+    });
+    assert.equal(loud.log.hidden, false);
+    assert.equal(loud.log.textContent, "上游重试：正在重试 1/2");
+    assert.equal(loud.shell.dataset.generationLoadingLog, "on");
+    assert.equal(getGenerationLoadingLogText(loud), "上游重试：正在重试 1/2");
+    assert.equal(loud.percent.textContent, "0%");
+
+    updateGenerationLoadingShell(loud, { key: "job-loud", active: true });
+    assert.equal(loud.log.textContent, "上游重试：正在重试 1/2", "omitted logText keeps the last text");
+
+    updateGenerationLoadingShell(loud, { key: "job-loud", active: true, logText: "" });
+    assert.equal(loud.log.hidden, true, "empty text takes no space");
+    assert.equal(loud.shell.dataset.generationLoadingLog, "off");
+  } finally {
+    scheduler.restore();
+  }
+});
+
+test("loading shell log line does not disturb progress, stage, or waiting semantics", () => {
+  const documentRef = createTestDocument();
+  const scheduler = installScheduler();
+  try {
+    const nodes = createGenerationLoadingShell(documentRef, {
+      key: "job-1",
+      active: true,
+      stage: "generating",
+      showLog: true,
+      logText: "正在生成图片",
+    });
+    assert.equal(scheduler.delays[0], 800);
+    scheduler.runNext();
+    assert.equal(getGenerationLoadingProgress(nodes), 1);
+    assert.equal(nodes.percent.textContent, "1%");
+    assert.equal(getGenerationLoadingShellFamily(nodes), "generating");
+    assert.equal(nodes.log.textContent, "正在生成图片");
+
+    updateGenerationLoadingShell(nodes, { key: "job-1", active: true, mode: "waiting", logText: "排队中：等待资源分配" });
+    assert.equal(nodes.percent.textContent, "");
+    assert.equal(nodes.log.textContent, "排队中：等待资源分配");
+    assert.equal(nodes.log.hidden, false);
+  } finally {
+    scheduler.restore();
+  }
+});
+
+test("loading shell log line wraps to show the full progress text", async () => {
+  const styles = await readFile(new URL("../public/styles.css", import.meta.url), "utf8");
+  assert.match(styles, /\.generation-loading-log\s*\{[\s\S]*white-space:\s*normal/);
+  assert.match(styles, /\.generation-loading-log\s*\{[\s\S]*overflow-wrap:\s*anywhere/);
+  assert.doesNotMatch(styles, /\.generation-loading-log\s*\{[^}]*text-overflow:\s*ellipsis/);
+  assert.doesNotMatch(styles, /\.generation-loading-log\s*\{[^}]*white-space:\s*nowrap/);
+  assert.match(styles, /\.generation-loading-log\[hidden\]\s*\{[\s\S]*display:\s*none/);
 });

@@ -153,10 +153,12 @@ test("三条失败收尾路径都封存卡组并把预览带进活动记录", as
   const sealCalls = [...app.matchAll(/^\s+sealPromptDeckOnFailure\(job, message\);$/gm)];
   assert.equal(sealCalls.length, 3, "error、流中断与异常三条路径都应封存卡组");
 
-  const failureCalls = [...app.matchAll(/handleActivityFailure\(job\.id, message, getPromptDeckLastPreviewUrl\(job\)\)/g)];
+  const failureCalls = [...app.matchAll(/handleActivityFailure\(job, message, getPromptDeckLastPreviewUrl\(job\)\)/g)];
   assert.equal(failureCalls.length, 3, "三条路径都应把最后一张预览带进活动记录");
 
-  assert.match(app, /function handleActivityFailure\(jobId, message, imageUrl = ""\)/);
+  // 失败时任务可能已从 state.jobs 移除，所以传整个 job 而不是 id，中转地址才能解析出来。
+  assert.match(app, /function handleActivityFailure\(job, message, imageUrl = ""\)/);
+  assert.match(app, /relayUrl: typeof job === "string" \? "" : resolveGenerationRelayUrl\(job \|\| \{\}\),/);
 });
 
 test("上游重试状态触发尝试封存", async () => {

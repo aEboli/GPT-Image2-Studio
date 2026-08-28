@@ -38,7 +38,7 @@ const PROFILE_CONTRACT = {
     label: "通用电商",
     evidenceLevel: "baseline",
     targetLanguage: "en",
-    resolutionTier: "1.5K",
+    resolutionTier: "1K",
     sourceIds: ["internal-universal-baseline"],
     slots: [
       "generic-hero@1:1",
@@ -65,7 +65,7 @@ const PROFILE_CONTRACT = {
     label: "Amazon",
     evidenceLevel: "A",
     targetLanguage: "en",
-    resolutionTier: "2K",
+    resolutionTier: "1K",
     sourceIds: ["amazon-g1881"],
     slots: [
       "amazon-main@1:1",
@@ -81,7 +81,7 @@ const PROFILE_CONTRACT = {
     label: "淘宝/天猫",
     evidenceLevel: "A",
     targetLanguage: "zh-CN",
-    resolutionTier: "2K",
+    resolutionTier: "1K",
     sourceIds: ["taobao-uploadspecs"],
     slots: [
       "taobao-white-main@1:1",
@@ -98,7 +98,7 @@ const PROFILE_CONTRACT = {
     label: "京东",
     evidenceLevel: "B",
     targetLanguage: "zh-CN",
-    resolutionTier: "2K",
+    resolutionTier: "1K",
     sourceIds: ["jd-main-image-rules"],
     slots: [
       "clean-catalog-main@1:1",
@@ -115,7 +115,7 @@ const PROFILE_CONTRACT = {
     label: "拼多多",
     evidenceLevel: "C",
     targetLanguage: "zh-CN",
-    resolutionTier: "1.5K",
+    resolutionTier: "1K",
     sourceIds: ["pdd-conservative-guidance"],
     slots: [
       "clean-catalog-main@1:1",
@@ -132,7 +132,7 @@ const PROFILE_CONTRACT = {
     label: "抖音电商",
     evidenceLevel: "C",
     targetLanguage: "zh-CN",
-    resolutionTier: "1.5K",
+    resolutionTier: "1K",
     sourceIds: ["douyin-conservative-guidance"],
     slots: [
       "clean-catalog-main@1:1",
@@ -147,7 +147,7 @@ const PROFILE_CONTRACT = {
     label: "小红书电商",
     evidenceLevel: "B",
     targetLanguage: "zh-CN",
-    resolutionTier: "1.5K",
+    resolutionTier: "1K",
     sourceIds: ["xiaohongshu-explore-observation"],
     slots: [
       "xhs-feed-cover@3:4",
@@ -162,7 +162,7 @@ const PROFILE_CONTRACT = {
     label: "Temu",
     evidenceLevel: "B",
     targetLanguage: "en",
-    resolutionTier: "1.5K",
+    resolutionTier: "1K",
     sourceIds: ["temu-marketplace-observation"],
     slots: [
       "clean-catalog-main@1:1",
@@ -179,7 +179,7 @@ const PROFILE_CONTRACT = {
     label: "TikTok Shop",
     evidenceLevel: "A",
     targetLanguage: "en",
-    resolutionTier: "1.5K",
+    resolutionTier: "1K",
     sourceIds: ["tiktok-shop-481891871868714"],
     slots: [
       "tiktok-shop-main@1:1",
@@ -194,7 +194,7 @@ const PROFILE_CONTRACT = {
     label: "Shopee",
     evidenceLevel: "A",
     targetLanguage: "en",
-    resolutionTier: "1.5K",
+    resolutionTier: "1K",
     sourceIds: ["shopee-seller-education-2989"],
     slots: [
       "clean-catalog-main@1:1",
@@ -212,7 +212,7 @@ const PROFILE_CONTRACT = {
     label: "Lazada",
     evidenceLevel: "C",
     targetLanguage: "en",
-    resolutionTier: "1.5K",
+    resolutionTier: "1K",
     sourceIds: ["lazada-conservative-guidance"],
     slots: [
       "clean-catalog-main@1:1",
@@ -229,7 +229,7 @@ const PROFILE_CONTRACT = {
     label: "Etsy",
     evidenceLevel: "A",
     targetLanguage: "en",
-    resolutionTier: "2K",
+    resolutionTier: "1K",
     sourceIds: ["etsy-image-requirements"],
     slots: [
       "lifestyle-first@4:3",
@@ -246,7 +246,7 @@ const PROFILE_CONTRACT = {
     label: "eBay",
     evidenceLevel: "A",
     targetLanguage: "en",
-    resolutionTier: "2K",
+    resolutionTier: "1K",
     sourceIds: ["ebay-photo-tips"],
     slots: [
       "clean-catalog-main@1:1",
@@ -263,7 +263,7 @@ const PROFILE_CONTRACT = {
     label: "Walmart",
     evidenceLevel: "A",
     targetLanguage: "en",
-    resolutionTier: "max",
+    resolutionTier: "1K",
     sourceIds: ["walmart-image-guide"],
     slots: [
       "walmart-main@1:1",
@@ -278,7 +278,7 @@ const PROFILE_CONTRACT = {
     label: "Shopify/DTC",
     evidenceLevel: "A",
     targetLanguage: "en",
-    resolutionTier: "2K",
+    resolutionTier: "1K",
     sourceIds: ["shopify-product-media"],
     slots: [
       "brand-hero@1:1",
@@ -295,7 +295,7 @@ const PROFILE_CONTRACT = {
     label: "AliExpress",
     evidenceLevel: "C",
     targetLanguage: "en",
-    resolutionTier: "1.5K",
+    resolutionTier: "1K",
     sourceIds: ["aliexpress-conservative-guidance"],
     slots: [
       "clean-catalog-main@1:1",
@@ -312,7 +312,7 @@ const PROFILE_CONTRACT = {
     label: "Rakuten",
     evidenceLevel: "C",
     targetLanguage: "ja",
-    resolutionTier: "2K",
+    resolutionTier: "1K",
     sourceIds: ["rakuten-conservative-guidance"],
     slots: [
       "clean-catalog-main@1:1",
@@ -329,7 +329,7 @@ const PROFILE_CONTRACT = {
     label: "Coupang",
     evidenceLevel: "C",
     targetLanguage: "ko",
-    resolutionTier: "2K",
+    resolutionTier: "1K",
     sourceIds: ["coupang-conservative-guidance"],
     slots: [
       "clean-catalog-main@1:1",
@@ -346,7 +346,7 @@ const PROFILE_CONTRACT = {
     label: "Mercado Libre",
     evidenceLevel: "C",
     targetLanguage: "es",
-    resolutionTier: "1.5K",
+    resolutionTier: "1K",
     sourceIds: ["mercado-libre-conservative-guidance"],
     slots: [
       "clean-catalog-main@1:1",
@@ -451,7 +451,7 @@ policyTest("policy registry exposes the versioned browser-safe contract", () => 
   assert.equal(policies.CREATION_PLATFORM_POLICY_VERSION, "2026-07-18.2");
   assert.equal(policies.CREATION_PLATFORM_POLICY_VERIFIED_AT, "2026-07-11");
   assert.deepEqual(policies.CREATION_PLATFORM_EVIDENCE_LEVELS, ["baseline", "A", "B", "C"]);
-  assert.deepEqual(policies.CREATION_PLATFORM_RESOLUTION_TIERS, ["1.5K", "2K", "max"]);
+  assert.deepEqual(policies.CREATION_PLATFORM_RESOLUTION_TIERS, ["1K", "1.5K", "2K", "max"]);
 
   for (const exportName of [
     "CREATION_PLATFORM_SOURCE_REGISTRY",

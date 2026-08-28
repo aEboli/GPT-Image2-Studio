@@ -89,6 +89,7 @@ export function createImageEditController(options = {}) {
     formatFilmstripSizeLabel = (item) => String(item?.size || ""),
     formatTime = formatClock,
     getDisplayPrompt = (item) => String(item?.prompt || ""),
+    getGenerationLoadingItemStage = (item) => String(item?.statusStage || item?.stage || item?.status || "").trim(),
     getMaxParallelJobCount = () => 1,
     getQueuedJobCount = () => 0,
     getRatioOption,
@@ -1466,7 +1467,7 @@ export function createImageEditController(options = {}) {
         image.loading = "lazy";
         button.appendChild(image);
       } else if (item?.isRunning || (item?.started && !item?.filename)) {
-        const loading = createGenerationLoadingShell(document, { key, active: true });
+        const loading = createGenerationLoadingShell(document, { key, active: true, stage: getGenerationLoadingItemStage(item) });
         button.appendChild(loading.shell);
       } else {
         const ghost = document.createElement("div");

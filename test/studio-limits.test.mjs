@@ -16,6 +16,7 @@ import {
 
 const appPath = new URL("../public/app.js", import.meta.url);
 const indexPath = new URL("../public/index.html", import.meta.url);
+const limitedConcurrencyPath = new URL("../lib/limited-concurrency.mjs", import.meta.url);
 const serverPath = new URL("../server.mjs", import.meta.url);
 
 test("prompt mode keeps fifteen tasks visible while limiting generation to ten parallel tasks", async () => {
@@ -35,15 +36,65 @@ test("prompt mode keeps fifteen tasks visible while limiting generation to ten p
   assert.match(app, /提示词模式最多保留 \$\{MAX_PROMPT_QUEUE_SIZE\} 个任务/);
 });
 
-test("creation mode has an independent ten-task parallel limit", async () => {
-  assert.equal(MAX_CREATION_PARALLEL_TASKS, 10);
-  assert.equal(CREATION_UPSTREAM_TIMEOUT_MS, 15 * 60 * 1000);
+test("creation mode has an independent twenty-task parallel limit shared with repair", async () => {
+  assert.equal(MAX_CREATION_PARALLEL_TASKS, 20);
+  assert.equal(CREATION_UPSTREAM_TIMEOUT_MS, 20 * 60 * 1000);
   assert.equal(MAX_PROMPT_PARALLEL_TASKS, 10);
 
   const server = await readFile(serverPath, "utf8");
   assert.match(server, /if \(scope === "creation"\) \{\s*return MAX_CREATION_PARALLEL_TASKS;/);
   assert.match(server, /runWithConcurrency\(plan\.items, MAX_CREATION_PARALLEL_TASKS,/);
   assert.match(server, /runWithConcurrency\(repairItems, MAX_CREATION_PARALLEL_TASKS,/);
+
+  // The bounded-concurrency helper must not clamp the creation limit back down.
+  const limitedConcurrency = await readFile(limitedConcurrencyPath, "utf8");
+  assert.match(limitedConcurrency, /const MAX_CONCURRENT_WORKERS = 20;/);
+
+  // The browser reserves creation queue slots against the server's creation limit, not
+  // the general per-session limit.
+  const app = await readFile(appPath, "utf8");
+  assert.match(app, /function getCreationMaxParallelTaskCount\(\) \{\s*return MAX_CREATION_PARALLEL_TASKS;/);
+  assert.match(app, /getMaxParallelTasks: getCreationMaxParallelTaskCount/);
+});
+
+test("creation generation and repair both reuse one reference upload registry", async () => {
+  const server = await readFile(serverPath, "utf8");
+
+  // Uploading is limited to the one route whose image input accepts a file identifier.
+  assert.match(
+    server,
+    /function supportsCreationReferenceFileIds\(generationConfig = \{\}\) \{[\s\S]*?IMAGE_ROUTE_A[\s\S]*?API_ENDPOINT_RESPONSES/,
+  );
+
+  const creationGenerateHandler =
+    server.match(/async function handleCreationGenerate[\s\S]*?\r?\n}\r?\n\r?\nasync function handleCreationRepair/)?.[0] || "";
+  const creationRepairHandler =
+    server.match(/async function handleCreationRepair[\s\S]*?\r?\n}\r?\n\r?\nasync function handleGenerate/)?.[0] || "";
+
+  assert.notEqual(creationGenerateHandler, "");
+  assert.notEqual(creationRepairHandler, "");
+
+  // Both handlers build the registry once, outside the per-item fan-out.
+  for (const handler of [creationGenerateHandler, creationRepairHandler]) {
+    assert.match(handler, /await createCreationReferenceUploadRegistry\(\{/);
+    assert.match(handler, /applyReferenceFileIds\(\s*referenceUploads\.registry,/);
+    assert.match(handler, /referenceUploadTargetKey/);
+  }
+
+  // The repair pass can span several saved upstreams, so it collects every item's config.
+  assert.match(
+    creationRepairHandler,
+    /generationConfigs: repairItems\.map\(\(repairItem\) =>\s*resolveCreationRepairGenerationConfig\(repairItem, generationConfig\),/,
+  );
+  // The registry must be built before the fan-out, never per item.
+  assert.ok(
+    creationGenerateHandler.indexOf("createCreationReferenceUploadRegistry") <
+      creationGenerateHandler.indexOf("runWithConcurrency"),
+  );
+  assert.ok(
+    creationRepairHandler.indexOf("createCreationReferenceUploadRegistry") <
+      creationRepairHandler.indexOf("runWithConcurrency"),
+  );
 });
 
 test("studio reference limits keep standard references and creation references at fifteen", async () => {

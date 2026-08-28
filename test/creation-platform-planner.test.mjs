@@ -66,7 +66,7 @@ const PLATFORM_CASES = Object.freeze([
     imageTypes: ["amazon-main", "benefit-proof", "lifestyle-first", "multi-angle", "detail-macro", "dimension-fit", "in-box"],
     roles: ["hero", "benefit", "atmosphere", "multi-angle", "product-detail", "size-capacity-fit", "accessory-gift"],
     ratios: ["1:1", "1:1", "1:1", "1:1", "1:1", "1:1", "1:1"],
-    resolutionTier: "2K",
+    resolutionTier: "1K",
     targetLanguage: "en",
   },
   {
@@ -74,7 +74,7 @@ const PLATFORM_CASES = Object.freeze([
     imageTypes: ["taobao-white-main", "transparent-cutout", "lifestyle-first", "info-benefit", "detail-macro", "dimension-fit", "variant-comparison", "long-detail"],
     roles: ["hero", "product-detail", "atmosphere", "benefit", "product-detail", "size-capacity-fit", "series-showcase", "brand-story"],
     ratios: ["1:1", "1:1", "1:1", "1:1", "1:1", "1:1", "1:1", "2:3"],
-    resolutionTier: "2K",
+    resolutionTier: "1K",
     targetLanguage: "zh-CN",
   },
   {
@@ -82,7 +82,7 @@ const PLATFORM_CASES = Object.freeze([
     imageTypes: ["xhs-feed-cover", "lifestyle-first", "usage-demo", "detail-macro", "scale-proof", "clean-product-proof"],
     roles: ["hero", "atmosphere", "usage-suggestion", "product-detail", "size-capacity-fit", "multi-angle"],
     ratios: ["3:4", "3:4", "3:4", "3:4", "3:4", "1:1"],
-    resolutionTier: "1.5K",
+    resolutionTier: "1K",
     targetLanguage: "zh-CN",
   },
   {
@@ -90,7 +90,7 @@ const PLATFORM_CASES = Object.freeze([
     imageTypes: ["lifestyle-first", "clean-product-proof", "craft-proof", "detail-macro", "scale-proof", "variant-comparison", "gift-packaging", "usage-demo"],
     roles: ["atmosphere", "multi-angle", "craft-process", "product-detail", "size-capacity-fit", "series-showcase", "accessory-gift", "usage-suggestion"],
     ratios: ["4:3", "4:3", "4:3", "4:3", "4:3", "4:3", "4:3", "4:3"],
-    resolutionTier: "2K",
+    resolutionTier: "1K",
     targetLanguage: "en",
   },
   {
@@ -98,7 +98,7 @@ const PLATFORM_CASES = Object.freeze([
     imageTypes: ["clean-catalog-main", "multi-angle", "label-detail", "condition-proof", "scale-proof", "in-box", "usage-demo", "defect-disclosure"],
     roles: ["hero", "multi-angle", "product-detail", "product-detail", "size-capacity-fit", "accessory-gift", "usage-suggestion", "product-detail"],
     ratios: ["1:1", "1:1", "1:1", "1:1", "1:1", "1:1", "1:1", "1:1"],
-    resolutionTier: "2K",
+    resolutionTier: "1K",
     targetLanguage: "en",
   },
   {
@@ -106,7 +106,7 @@ const PLATFORM_CASES = Object.freeze([
     imageTypes: ["walmart-main", "multi-angle", "benefit-proof", "lifestyle-first", "dimension-fit", "in-box"],
     roles: ["hero", "multi-angle", "benefit", "atmosphere", "size-capacity-fit", "accessory-gift"],
     ratios: ["1:1", "1:1", "1:1", "1:1", "1:1", "1:1"],
-    resolutionTier: "max",
+    resolutionTier: "1K",
     targetLanguage: "en",
   },
   {
@@ -114,7 +114,7 @@ const PLATFORM_CASES = Object.freeze([
     imageTypes: ["clean-catalog-main", "value-bundle", "benefit-proof", "variant-comparison", "lifestyle-first", "dimension-fit", "detail-macro", "in-box"],
     roles: ["hero", "accessory-gift", "benefit", "series-showcase", "atmosphere", "size-capacity-fit", "product-detail", "accessory-gift"],
     ratios: ["1:1", "1:1", "1:1", "1:1", "1:1", "1:1", "1:1", "1:1"],
-    resolutionTier: "1.5K",
+    resolutionTier: "1K",
     targetLanguage: "zh-CN",
     warningCode: "advisory-platform-profile",
   },

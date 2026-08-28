@@ -496,10 +496,6 @@ textarea::-webkit-scrollbar-corner {
   white-space: nowrap;
 }
 
-html[data-ui-density="wide"] .app-shell {
-  width: calc(100vw - 20px);
-}
-
 .topbar {
   position: relative;
   z-index: 30;
@@ -8154,9 +8150,40 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
   initial-value: 0%;
 }
 
+/* 色相与饱和度注册为可插值类型，阶段切换时颜色平滑过一遍色轮而不是硬切。
+   水体最终颜色由「阶段色相」与「百分比深浅」两个维度合成。 */
+@property --generation-loading-hue {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 265;
+}
+
+@property --generation-loading-sat {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 78%;
+}
+
 .generation-loading-shell {
   --generation-loading-progress: 0%;
-  transition: --generation-loading-progress var(--generation-loading-rise-duration, 800ms) linear;
+  --generation-loading-hue: 265;
+  --generation-loading-sat: 78%;
+  --generation-loading-light-base: 74%;
+  --generation-loading-light-span: 0.2;
+  /* 主题整体偏移，与各阶段自己的起始亮度叠加，避免主题规则盖掉阶段调校。 */
+  --generation-loading-light-shift: 0%;
+  /* 百分比越高液体越深，所以同一阶段内也能看出推进。 */
+  --generation-loading-fluid: hsl(
+    var(--generation-loading-hue) var(--generation-loading-sat)
+      calc(
+        var(--generation-loading-light-base) + var(--generation-loading-light-shift) -
+          var(--generation-loading-progress) * var(--generation-loading-light-span)
+      )
+  );
+  transition:
+    --generation-loading-progress var(--generation-loading-rise-duration, 800ms) linear,
+    --generation-loading-hue 900ms ease-in-out,
+    --generation-loading-sat 900ms ease-in-out;
   width: 100%;
   min-height: 180px;
   display: grid;
@@ -8169,6 +8196,61 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
   text-align: center;
 }
 
+/* 色相族对应真实请求阶段：排队灰蓝 → 准备青 → 连接蓝 → 生成紫 → 取回/重试琥珀
+   → 写入绿，失败红。色相只表达当前阶段，深浅仍由百分比决定。 */
+.generation-loading-shell[data-generation-loading-family="queued"] {
+  --generation-loading-hue: 215;
+  --generation-loading-sat: 14%;
+}
+
+/* 各族起始亮度按实测感知亮度校准：青与绿本身偏亮要压，紫与红偏暗要提，
+   目标是七个阶段一眼看过去亮度接近，没有哪个阶段特别刺眼或特别发闷。 */
+.generation-loading-shell[data-generation-loading-family="uploading"] {
+  --generation-loading-hue: 188;
+  --generation-loading-sat: 76%;
+  --generation-loading-light-base: 65%;
+}
+
+.generation-loading-shell[data-generation-loading-family="connecting"] {
+  --generation-loading-hue: 211;
+  --generation-loading-sat: 82%;
+}
+
+.generation-loading-shell[data-generation-loading-family="generating"] {
+  --generation-loading-hue: 265;
+  --generation-loading-sat: 80%;
+  --generation-loading-light-base: 83%;
+}
+
+.generation-loading-shell[data-generation-loading-family="recovering"] {
+  --generation-loading-hue: 38;
+  --generation-loading-sat: 74%;
+  --generation-loading-light-base: 62%;
+}
+
+.generation-loading-shell[data-generation-loading-family="saving"] {
+  --generation-loading-hue: 150;
+  --generation-loading-sat: 68%;
+  --generation-loading-light-base: 63%;
+}
+
+.generation-loading-shell[data-generation-loading-family="failed"] {
+  --generation-loading-hue: 5;
+  --generation-loading-sat: 70%;
+  --generation-loading-light-base: 78%;
+}
+
+/* 浅色主题整体下移亮度并压缩深浅跨度，保证水体与白底的对比度；
+   用偏移而不是固定值，各阶段的亮度校准在两种主题下都生效。 */
+html[data-theme="light"] .generation-loading-shell {
+  --generation-loading-light-shift: -16%;
+  --generation-loading-light-span: 0.14;
+}
+
+html[data-theme="light"] .generation-loading-shell[data-generation-loading-family="queued"] {
+  --generation-loading-sat: 12%;
+}
+
 .generation-loading-drop {
   position: relative;
   width: clamp(72px, 14vw, 112px);
@@ -8176,13 +8258,13 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
   overflow: hidden;
   border-radius: 50%;
   isolation: isolate;
-  border: 1px solid color-mix(in srgb, var(--accent) 40%, rgba(255, 255, 255, 0.28));
+  border: 1px solid color-mix(in srgb, var(--generation-loading-fluid) 40%, rgba(255, 255, 255, 0.28));
   background:
     radial-gradient(circle at 32% 24%, rgba(255, 255, 255, 0.34), transparent 19%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.015));
   box-shadow:
     0 14px 30px rgba(0, 0, 0, 0.2),
-    0 0 26px color-mix(in srgb, var(--accent) 24%, transparent),
+    0 0 26px color-mix(in srgb, var(--generation-loading-fluid) 24%, transparent),
     inset 0 0 0 6px rgba(255, 255, 255, 0.05);
   --generation-loading-wave-height: 8px;
   --generation-loading-ripple-height: 4.5px;
@@ -8198,7 +8280,11 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
   inset: auto 0 0;
   height: var(--generation-loading-progress);
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--accent) 80%, #ffffff), color-mix(in srgb, var(--accent) 64%, #0f172a));
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--generation-loading-fluid) 80%, #ffffff),
+      color-mix(in srgb, var(--generation-loading-fluid) 64%, #0f172a)
+    );
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.42),
     inset 0 12px 20px rgba(255, 255, 255, 0.09);
@@ -8238,7 +8324,7 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
   background-image: linear-gradient(
     180deg,
     transparent 50%,
-    color-mix(in srgb, var(--accent) 80%, #ffffff) 50%
+    color-mix(in srgb, var(--generation-loading-fluid) 80%, #ffffff) 50%
   );
   animation: generation-loading-water-flow 5200ms ease-in-out infinite;
 }
@@ -8256,12 +8342,12 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
   z-index: 2;
   background-image: radial-gradient(
     circle var(--generation-loading-wave-height, 8px) at 50% 100%,
-    color-mix(in srgb, var(--accent) 84%, #ffffff) 90%,
+    color-mix(in srgb, var(--generation-loading-fluid) 84%, #ffffff) 90%,
     transparent 100%
   );
   background-size: calc(var(--generation-loading-wave-height, 8px) * 2) 100%;
   --generation-loading-wave-shift: calc(var(--generation-loading-wave-height, 8px) * 2);
-  filter: drop-shadow(0 -1px 3px color-mix(in srgb, var(--accent) 44%, transparent));
+  filter: drop-shadow(0 -1px 3px color-mix(in srgb, var(--generation-loading-fluid) 44%, transparent));
   animation: generation-loading-wave-drift 3200ms linear infinite;
 }
 
@@ -8269,7 +8355,7 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
   z-index: 1;
   background-image: radial-gradient(
     circle var(--generation-loading-ripple-height, 4.5px) at 50% 100%,
-    color-mix(in srgb, var(--accent) 96%, #ffffff) 84%,
+    color-mix(in srgb, var(--generation-loading-fluid) 96%, #ffffff) 84%,
     transparent 100%
   );
   background-size: calc(var(--generation-loading-ripple-height, 4.5px) * 2) 100%;
@@ -8300,8 +8386,8 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
   animation: generation-loading-waiting-pulse 2600ms ease-in-out infinite;
 }
 
+/* 等待态只调静态液位、节奏与气泡强度；颜色交给排队色相族，避免两套取色互相覆盖。 */
 .generation-loading-shell[data-generation-loading-mode="waiting"] .generation-loading-drop::after {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--muted) 52%, #ffffff), color-mix(in srgb, var(--muted) 46%, #0f172a));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
@@ -8311,26 +8397,15 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
 }
 
 .generation-loading-shell[data-generation-loading-mode="waiting"] .generation-loading-wave {
-  background-image: linear-gradient(180deg, transparent 50%, color-mix(in srgb, var(--muted) 52%, #ffffff) 50%);
   animation-duration: 7200ms;
 }
 
 .generation-loading-shell[data-generation-loading-mode="waiting"] .generation-loading-wave::before {
-  background-image: radial-gradient(
-    circle var(--generation-loading-wave-height, 8px) at 50% 100%,
-    color-mix(in srgb, var(--muted) 56%, #ffffff) 90%,
-    transparent 100%
-  );
   filter: none;
   animation-duration: 5200ms;
 }
 
 .generation-loading-shell[data-generation-loading-mode="waiting"] .generation-loading-wave::after {
-  background-image: radial-gradient(
-    circle var(--generation-loading-ripple-height, 4.5px) at 50% 100%,
-    color-mix(in srgb, var(--muted) 64%, #ffffff) 84%,
-    transparent 100%
-  );
   animation-duration: 3600ms;
 }
 
@@ -8343,6 +8418,30 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
   color: var(--muted);
   font-size: var(--type-subtitle-size);
   line-height: 1.35;
+}
+
+/* 实时进度完整显示：允许换行，不截断，长状态文案也能读全。 */
+.generation-loading-log {
+  max-width: 22em;
+  width: 100%;
+  color: rgba(171, 184, 218, 0.82);
+  font-size: calc(var(--type-subtitle-size) * 0.94);
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.generation-loading-log[hidden] {
+  display: none;
+}
+
+html[data-theme="light"] .generation-loading-log {
+  color: rgba(29, 29, 31, 0.62);
+}
+
+.creation-card-loading .generation-loading-log {
+  font-size: calc(var(--type-subtitle-size) * 0.86);
 }
 
 .preview-loading-shell {
@@ -9080,6 +9179,106 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
 
 .timeline-start-time time {
   color: inherit;
+}
+
+/* 配置区日志面板顶部的板块切换：各板块日志靠它彼此隔开，日志本身只有这一个位置。 */
+.generation-log-channel-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.generation-log-channel-tab {
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  background: color-mix(in srgb, var(--control-bg) 46%, transparent);
+  color: var(--muted);
+  font-size: var(--type-subtitle-size);
+  line-height: 1.2;
+}
+
+.generation-log-channel-tab:hover {
+  border-color: var(--border-strong);
+  background: var(--control-bg-hover);
+  color: var(--text);
+}
+
+.generation-log-channel-tab.is-active {
+  border-color: color-mix(in srgb, var(--accent) 56%, transparent);
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.generation-log-channel-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.timeline-channel {
+  display: inline;
+  margin-left: 8px;
+  color: rgba(132, 202, 255, 0.72);
+  font-weight: 600;
+}
+
+.timeline-group-toggle {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+
+.timeline-group-caret {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.timeline-group-toggle:hover .timeline-summary {
+  text-decoration: underline;
+}
+
+.timeline-group-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.timeline-group-summary {
+  display: inline;
+  margin-left: 8px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.timeline-item-group .timeline-summary {
+  font-weight: 700;
+}
+
+.timeline-item-child {
+  padding-left: 18px;
+}
+
+.timeline-item-child .timeline-dot {
+  width: 12px;
+  height: 12px;
+}
+
+.timeline-item-child .timeline-summary {
+  font-weight: 600;
+}
+
+.timeline-item-empty .timeline-summary {
+  color: var(--muted);
+  font-weight: 600;
 }
 
 .ghost-link {

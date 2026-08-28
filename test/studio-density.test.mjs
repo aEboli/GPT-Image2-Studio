@@ -23,7 +23,7 @@ test("studio density scales regular desktop UI variables to ninety percent of th
 
   assert.equal(settings.mode, "regular");
   assert.equal(settings.variables["--ui-root-font-size"], "14.08px");
-  assert.equal(settings.variables["--app-shell-max-width"], "1478.13px");
+  assert.equal(settings.variables["--app-shell-max-width"], "1720px");
   assert.equal(settings.variables["--view-tab-height"], "35.19px");
   assert.equal(settings.variables["--generate-button-height"], "36.95px");
 });
@@ -44,7 +44,7 @@ test("studio density switches to wide mode on 2560x1348 desktops without changin
   });
 
   assert.equal(settings.mode, "wide");
-  assert.equal(settings.variables["--app-shell-max-width"], "1935.65px");
+  assert.equal(settings.variables["--app-shell-max-width"], "2560px");
   assert.equal(settings.variables["--studio-grid-left"], "344.9px");
   assert.equal(settings.variables["--studio-grid-right"], "288.59px");
   assert.equal(settings.variables["--view-root-offset"], "10.56px");
@@ -302,4 +302,35 @@ test("studio density lets viewport width limit the app shell after zooming out",
 
   assert.equal(settings.zoomOutCompensation, 1.33);
   assert.equal(settings.variables["--app-shell-max-width"], "2560px");
+});
+
+test("studio density never leaves horizontal gutters at unzoomed desktop resolutions", () => {
+  const viewports = [
+    [1536, 774],
+    [1600, 810],
+    [1680, 960],
+    [1920, 990],
+    [1920, 1110],
+    [2048, 1190],
+    [2560, 1350],
+    [2560, 1510],
+    [3440, 1350],
+    [3840, 2070],
+  ];
+
+  for (const [width, height] of viewports) {
+    const settings = getStudioDensitySettings({
+      width,
+      height,
+      outerWidth: width,
+      devicePixelRatio: 1,
+      visualScale: 1,
+    });
+    const shellMaxWidth = Number.parseFloat(settings.variables["--app-shell-max-width"]);
+
+    assert.ok(
+      shellMaxWidth >= width,
+      `${width}x${height} (${settings.mode}) capped the shell at ${shellMaxWidth}px`,
+    );
+  }
 });

@@ -334,7 +334,7 @@ IMAGE_STUDIO_DNS_FALLBACK_SERVERS=
 | `IMAGE_STUDIO_ALLOW_INSECURE_REMOTE_HTTP` | 设为 `1` 时显式允许非回环地址直接使用未加密 HTTP；默认拒绝 |
 | `IMAGE_STUDIO_DISABLE_DNS_FALLBACK` | 设为 `1` 时禁用 Node DNS fallback |
 | `IMAGE_STUDIO_DNS_FALLBACK_SERVERS` | 自定义 fallback DNS，支持逗号、分号或空白分隔 |
-| `IMAGE_STUDIO_CREATION_UPSTREAM_TIMEOUT_MS` | 套图单项上游请求的最长时间，默认 `900000`（15 分钟）；有效范围为 1 秒到 1 小时，超出会被收敛到边界 |
+| `IMAGE_STUDIO_CREATION_UPSTREAM_TIMEOUT_MS` | 套图单项上游请求的最长时间，默认 `1200000`（20 分钟）；有效范围为 1 秒到 1 小时，超出会被收敛到边界 |
 | `IMAGE_STUDIO_ENABLE_TEST_MOCKS` | 仅测试用途。必须与 `IMAGE_STUDIO_MOCK_IMAGE_GENERATION=1`、`IMAGE_STUDIO_OUTPUT_DIR` 和 `IMAGE_STUDIO_LOCAL_DATA_DIR` 同时设置，才会启用本地假图生成；缺一即忽略并打印告警 |
 
 真实 `.env` 已被 `.gitignore` 排除，但仅创建该文件不会让本地服务自动读取它。云端部署请使用平台 Secret 或环境变量，不要把密钥写入仓库。

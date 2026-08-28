@@ -6,13 +6,16 @@ import { getDefaultGenerationSize, getGenerationSizeOptions, getModelProtocolIma
 import { getOutputFormatOptions, normalizeOutputFormat, } from "/lib/output-format-options.mjs?v=20260504-vercel-static-lib-1";
 import { normalizeReferenceAnalysisLanguage, } from "/lib/reference-analysis-language.mjs?v=20260522-reference-language-1";
 import { shouldReusePreviewLoadingShell } from "/lib/preview-loading-shell.mjs";
-import { createGenerationLoadingShell, updateGenerationLoadingShell, stopGenerationLoadingShell, stopGenerationLoadingShells, GENERATION_LOADING_GENERATING_MODE, GENERATION_LOADING_WAITING_MODE } from "/lib/generation-loading.mjs";
+import { createGenerationLoadingShell, updateGenerationLoadingShell, stopGenerationLoadingShell, stopGenerationLoadingShells, getGenerationLoadingItemStage, GENERATION_LOADING_GENERATING_MODE, GENERATION_LOADING_WAITING_MODE } from "/lib/generation-loading.mjs";
 import { createCreationCardLoading as createCreationCardLoadingShell, getCreationCardDomKey, syncCreationLoadingCard, syncCreationResultGrid as syncCreationResultGridShell } from "/lib/creation-card-loading.mjs";
 import { createCreationCardIdleRippleController } from "/lib/creation-card-idle-ripple.mjs?v=20260725-creation-card-idle-ripple-1";
 import { isGenerationRequestRetryMessage, } from "/lib/generation-request-retry.mjs";
 import { cancelQueuedGenerationJob, getGenerationJobMode, getGenerationJobQueueKey, getQueuedGenerationJobCount, getRunningGenerationJobCount, isQueuedGenerationJob, selectNextQueuedGenerationJobsByMode } from "/lib/generation-queue.mjs?v=20260821-prompt-global-queue-1";
-import { buildCanceledGenerationActivityDetail, buildGenerationTaskActivityDetail, buildGenerationTaskStatusText, formatGenerationActivityModeLabel, getGenerationActivityDisplayText, sanitizeGenerationActivityDetail, sortGenerationActivityFeed, upsertGenerationActivityEntry } from "/lib/generation-activity-feed.mjs?v=20260504-vercel-static-lib-1";
-import { CREATION_STREAM_EVENTS, GENERATION_STREAM_EVENTS, clearFinalImageChunks, recordFinalImageChunk } from "/lib/generation-stream-protocol.mjs";
+import { buildCanceledGenerationActivityDetail, buildGenerationTaskActivityDetail, buildGenerationTaskStatusText, formatGenerationActivityModeLabel, getGenerationActivityDisplayText, sanitizeGenerationActivityDetail } from "/lib/generation-activity-feed.mjs?v=20260504-vercel-static-lib-1";
+import { GENERATION_LOG_ALL_CHANNELS, GENERATION_LOG_CHANNELS, createGenerationLogStore, getGenerationLogAllEntries, getGenerationLogChannelEntries, getGenerationLogChannelLabel, normalizeGenerationLogChannel, normalizeGenerationLogRelayUrl, parseGenerationLogStore, serializeGenerationLogStore, upsertGenerationLogEntry, upsertGenerationLogGroupEntry } from "/lib/generation-log-store.mjs?v=20260828-generation-log-partition-1";
+import { readGenerationLogChannelTabValue, readGenerationLogGroupToggleId, renderGenerationLogChannelTabs, renderGenerationLogRows, toggleGenerationLogGroup } from "/lib/generation-log-panel.mjs?v=20260828-generation-log-partition-1";
+import { CREATION_STREAM_EVENTS, GENERATION_STREAM_EVENTS, clearFinalImageChunks, recordFinalImageChunk, recordPartialImageChunk } from "/lib/generation-stream-protocol.mjs";
+import { mergeCreationSetPreviews } from "/lib/creation-preview-retention.mjs";
 import {
   PROMPT_ATTEMPT_KIND,
   PROMPT_ATTEMPT_STATUS,
@@ -86,7 +89,7 @@ import { DEFAULT_PORTRAIT_ACCESSORY_ASSETS, PORTRAIT_ACCESSORY_ASSET_CATEGORIES,
 import { createDefaultPortraitLocationState, createPortraitLocationSelectorController } from "/lib/portrait-location-selector.mjs?v=20260527-portrait-location-1";
 import { getLegacyPromptAgentTemplatePrompt, getPromptAgentDisplayName, getPromptAgentTemplateDisplayName, isStructuredImagePromptJson } from "/lib/prompt-agent-display-name.mjs?v=20260819-prompt-history-mode-1";
 import { mergePromptAgentHistoryTemplates } from "/lib/prompt-agent-template-sync.mjs?v=20260819-history-template-mode-1";
-import { MAX_PROMPT_PARALLEL_TASKS, MAX_PROMPT_QUEUE_SIZE } from "/lib/studio-constants.mjs?v=20260821-prompt-queue-cap-1";
+import { MAX_CREATION_PARALLEL_TASKS, MAX_PROMPT_PARALLEL_TASKS, MAX_PROMPT_QUEUE_SIZE } from "/lib/studio-constants.mjs?v=20260828-creation-parallel-20-1";
 const SURPRISE_PROMPTS = [
   { name: "清晨通勤", prompt: "生成一张清晨城市通勤生活照，年轻上班族手拿咖啡走出地铁站，晨光穿过街边树影，画面自然真实，轻微运动模糊，适合生活方式摄影。" },
   { name: "家庭早餐", prompt: "生成一张温暖家庭早餐场景，木质餐桌上有吐司、煎蛋、牛奶和水果，家人围坐聊天，窗外柔和日光洒入，构图干净，有真实居家氛围。" },
@@ -351,11 +354,12 @@ const STYLE_TRANSFER_PRESETS = [
 ];
 const GALLERY_METADATA_CACHE_KEY = "image-studio-gallery-metadata-cache-v2";
 const GENERATION_ACTIVITY_STORAGE_KEY = "image-studio-generation-activity-v1";
+const GENERATION_LOG_STORAGE_KEY = "image-studio-generation-activity-v2";
 const THEME_STORAGE_KEY = "image-studio-ui-theme-v1";
 const UI_LANGUAGE_STORAGE_KEY = "image-studio-ui-language-v1";
 const UI_LANGUAGE_TEXT = {
-  "zh-CN": { activityLog: "生成日志", baseUrl: "基础 URL", brandSubtitle: "AI 图像生成工作流", close: "关闭", config: "配置", configApi: "配置 API", configSaved: "配置已保存", configTitle: "连接配置", configUnsaved: "配置未保存", connectionBusy: "并发 {running}/{max} · 队列 {queued}", connectionOpen: "打开 API、LOG", connectionSection: "调用通道", connectionStatusEmpty: "待填写API、LOG", connectionStatusEntry: "API、LOG", delete: "删除", directEndpointSuffix: "直接调用模式请求协议后缀", directMode: "直接调用模式", download: "下载", endpointUrl: "接口地址", expandModels: "展开可用模型列表", fetchModels: "获取模型列表", fetchModelsLoading: "获取中...", fit: "适配", functionMenu: "功能菜单导航", fullUrl: "完整 URL", generate: "开始生成", generateTitle: "开始生成（Ctrl+Enter）", generationRouteLabel: "生图调用模式", globalNav: "全局导航", imageModel: "生图模型", keepSavedKey: "保持已保存 Key", languageEn: "English UI", languageSwitch: "切换界面语言", languageZh: "简体中文界面", menuArticleIllustration: "文章插图", menuArticleRecord: "文章插图记录", menuAssetTools: "资产工具", menuCreation: "套图模式", menuCreationRecord: "套图记录", menuCreateTools: "创作工具", menuGallery: "瀑布画廊", menuImageCompress: "图片压缩", menuImageDecomposition: "图片拆解", menuImageEdit: "图片编辑", menuPortrait: "写真模式", menuPortraitRecord: "写真记录", menuPpt: "PPT生成", menuPptRecord: "PPT记录", menuPromptStudio: "提示词生图", menuQuickBlend: "快速溶图", menuReferenceAnalysis: "融图分析", menuSectionAssets: "资产区", menuSectionCreate: "创作区", menuSectionSettings: "配置区", menuSettings: "设置", menuStyleTransfer: "风格迁移", menuTools: "工具", modeDirect: "直接调用模式", modeProtocol: "Gemini模型", modeRoute: "路由模式", modelFetchBusy: "正在获取模型列表...", modelFetchFailed: "获取模型列表失败。", modelFetchSuccess: "已获取 {count} 个可调用模型。", modelNoCallable: "未获取到可调用模型。", modelNoMatch: "没有匹配的模型", modelNoMatchWithQuery: "没有匹配的模型：{query}", modelTestBusy: "正在测试连接...", modelTestSuccess: "连接测试成功，获取到 {count} 个模型。", navAssets: "资产", navCreate: "创作", navSettings: "配置", notSaved: "未保存", openOutput: "打开输出目录", outputFormat: "输出格式", parameters: "参数设置", previewIdleDetail: "生成日志可在配置中查看，底部胶片条可快速切换查看。", previewIdleEyebrow: "Output Preview", previewIdleTitle: "生成结果会在这里实时更新。", previewWaiting: "等待生成", prompt: "提示词", promptAgent: "图片转提示词", promptCounterSuffix: "字", promptEnhance: "增强模式", promptEnhanceAria: "开启或关闭提示词增强模式", promptEnhanceField: "增强提示词", promptEnhanceOff: "关闭", promptEnhanceOn: "开启", promptPlaceholder: "写下你要生成的画面，也可以先上传参考图说明修改方向。", promptTemplate: "提示词模板", protocolHint: "Gemini 图像模型按 AGICTO 图像生成协议调用；基础 URL 通常填写到 /v1，实际请求为 /images/generations。", protocolImageModel: "图像模型", protocolMode: "Gemini模型", quality: "质量", "ratio.1:1": "电商主图、头像、社交媒体 · 方形 1:1", "ratio.1:2": "长海报 · 竖屏 1:2", "ratio.1:3": "超长竖版广告 · 竖屏 1:3", "ratio.2:1": "Banner横幅 · 横屏 2:1", "ratio.2:3": "竖版摄影 · 竖屏 2:3", "ratio.3:1": "超宽广告图 · 横屏 3:1", "ratio.3:2": "摄影风格 · 横屏 3:2", "ratio.3:4": "海报、人像 · 竖屏 3:4", "ratio.4:3": "PPT、网页配图 · 横屏 4:3", "ratio.4:5": "Instagram帖子 · 竖屏 4:5", "ratio.5:4": "商品展示 · 横屏 5:4", "ratio.9:16": "短视频封面、手机壁纸 · 竖屏 9:16", "ratio.9:21": "超长竖图 · 竖屏 9:21", "ratio.16:9": "横版封面、YouTube · 横屏 16:9", "ratio.21:9": "超宽横幅 · 横屏 21:9", ratioLandscape: "横向", ratioPortrait: "竖向", ratioSquare: "方形", reasoningEffort: "思考等级", reference: "参考图", referenceUploadAction: "上传参考图", referenceUploadTitle: "拖入图片或点击上传", responsesModel: "Responses 模型", routeEndpointSuffix: "路由模式请求协议后缀", routeMode: "路由模式", save: "保存", size: "分辨率", sizeAuto: "自动适配", sizeMax: "最大", testConnection: "测试连接", testConnectionLoading: "测试中...", themeDark: "深色主题", themeLight: "白色主题", themeMenu: "主题颜色", themeToDark: "切换到深色主题", themeToLight: "切换到白色主题", thumbnailEmpty: "暂无缩略图", thumbnailFailed: "缩略图加载失败", thumbnailLoading: "缩略图加载中", timelineNoErrors: "暂无错误", timelineWaitingResult: "等待生成结果", timelineWaitingTask: "等待任务开始", toolModel: "工具模型", toolModelAndQuality: "工具模型与质量", view: "查看", visionTextModel: "视觉/文本模型" },
-  en: { activityLog: "Generation Log", baseUrl: "Base URL", brandSubtitle: "AI image workflow", close: "Close", config: "Settings", configApi: "Configure API", configSaved: "Config saved", configTitle: "Connection Settings", configUnsaved: "Config not saved", connectionBusy: "Concurrent {running}/{max} · Queue {queued}", connectionOpen: "open API and log", connectionSection: "Request Channel", connectionStatusEmpty: "API/Log missing", connectionStatusEntry: "API, Log", delete: "Delete", directEndpointSuffix: "Direct mode endpoint suffix", directMode: "Direct Mode", download: "Download", endpointUrl: "Endpoint", expandModels: "Show available models", fetchModels: "Fetch Models", fetchModelsLoading: "Fetching...", fit: "Fit", functionMenu: "Function menu", fullUrl: "Full URL", generate: "Generate", generateTitle: "Generate (Ctrl+Enter)", generationRouteLabel: "Image request mode", globalNav: "Global navigation", imageModel: "Image Model", keepSavedKey: "Keep saved key", languageEn: "English UI", languageSwitch: "Switch interface language", languageZh: "Simplified Chinese UI", menuArticleIllustration: "Article Illustration", menuArticleRecord: "Article Records", menuAssetTools: "Asset Tools", menuCreation: "Product Suite", menuCreationRecord: "Suite Records", menuCreateTools: "Creation Tools", menuGallery: "Gallery", menuImageCompress: "Image Compress", menuImageDecomposition: "Image Decomposition", menuImageEdit: "Image Edit", menuPortrait: "Portrait Mode", menuPortraitRecord: "Portrait Records", menuPpt: "PPT Generation", menuPptRecord: "PPT Records", menuPromptStudio: "Prompt to Image", menuQuickBlend: "Quick Blend", menuReferenceAnalysis: "Reference Analysis", menuSectionAssets: "Assets", menuSectionCreate: "Creation", menuSectionSettings: "Settings", menuSettings: "Settings", menuStyleTransfer: "Style Transfer", menuTools: "Tools", modeDirect: "Direct Mode", modeProtocol: "Gemini Model", modeRoute: "Route Mode", modelFetchBusy: "Fetching model list...", modelFetchFailed: "Failed to fetch model list.", modelFetchSuccess: "Fetched {count} callable models.", modelNoCallable: "No callable models found.", modelNoMatch: "No matching models", modelNoMatchWithQuery: "No matching models: {query}", modelTestBusy: "Testing connection...", modelTestSuccess: "Connection test succeeded. Found {count} models.", navAssets: "Assets", navCreate: "Create", navSettings: "Settings", notSaved: "Not saved", openOutput: "Open Output", outputFormat: "Output Format", parameters: "Parameters", previewIdleDetail: "Generation log is in Settings. Use the filmstrip below to switch results.", previewIdleEyebrow: "Output Preview", previewIdleTitle: "Generated results update here in real time.", previewWaiting: "Waiting", prompt: "Prompt", promptAgent: "Image to Prompt", promptCounterSuffix: "chars", promptEnhance: "Enhance Mode", promptEnhanceAria: "Toggle prompt enhancement mode", promptEnhanceField: "Enhancement Prompt", promptEnhanceOff: "Off", promptEnhanceOn: "On", promptPlaceholder: "Describe the image you want, or upload references first and describe the edit direction.", promptTemplate: "Prompt templates", protocolHint: "Gemini image models use the AGICTO image generation protocol. Base URL usually ends at /v1; requests go to /images/generations.", protocolImageModel: "Image Model", protocolMode: "Gemini Model", quality: "Quality", "ratio.1:1": "Ecommerce, Avatar, Social · Square 1:1", "ratio.1:2": "Long Poster · Portrait 1:2", "ratio.1:3": "Tall Ad · Portrait 1:3", "ratio.2:1": "Banner · Landscape 2:1", "ratio.2:3": "Vertical Photo · Portrait 2:3", "ratio.3:1": "Ultrawide Ad · Landscape 3:1", "ratio.3:2": "Photography · Landscape 3:2", "ratio.3:4": "Poster, Portrait · Portrait 3:4", "ratio.4:3": "PPT, Web Graphic · Landscape 4:3", "ratio.4:5": "Instagram Post · Portrait 4:5", "ratio.5:4": "Product Display · Landscape 5:4", "ratio.9:16": "Short Video Cover, Wallpaper · Portrait 9:16", "ratio.9:21": "Tall Scroll Image · Portrait 9:21", "ratio.16:9": "Cover, YouTube · Landscape 16:9", "ratio.21:9": "Ultrawide Banner · Landscape 21:9", ratioLandscape: "Landscape", ratioPortrait: "Portrait", ratioSquare: "Square", reasoningEffort: "Reasoning", reference: "Reference", referenceUploadAction: "Upload Reference", referenceUploadTitle: "Drop images or click to upload", responsesModel: "Responses Model", routeEndpointSuffix: "Route mode endpoint suffix", routeMode: "Route Mode", save: "Save", size: "Size", sizeAuto: "Auto", sizeMax: "Max", testConnection: "Test Connection", testConnectionLoading: "Testing...", themeDark: "Dark theme", themeLight: "Light theme", themeMenu: "Theme color", themeToDark: "Switch to dark theme", themeToLight: "Switch to light theme", thumbnailEmpty: "No thumbnails", thumbnailFailed: "Thumbnail load failed", thumbnailLoading: "Loading thumbnails", timelineNoErrors: "No errors", timelineWaitingResult: "Waiting for result", timelineWaitingTask: "Waiting for task", toolModel: "Tool Model", toolModelAndQuality: "Tool model and quality", view: "View", visionTextModel: "Vision/Text Model" },
+  "zh-CN": { activityLog: "生成日志", activityLogAllPanels: "全部板块", activityLogPanels: "生成日志板块", baseUrl: "基础 URL", brandSubtitle: "AI 图像生成工作流", close: "关闭", config: "配置", configApi: "配置 API", configSaved: "配置已保存", configTitle: "连接配置", configUnsaved: "配置未保存", connectionBusy: "并发 {running}/{max} · 队列 {queued}", connectionOpen: "打开 API、LOG", connectionSection: "调用通道", connectionStatusEmpty: "待填写API、LOG", connectionStatusEntry: "API、LOG", delete: "删除", directEndpointSuffix: "直接调用模式请求协议后缀", directMode: "直接调用模式", download: "下载", endpointUrl: "接口地址", expandModels: "展开可用模型列表", fetchModels: "获取模型列表", fetchModelsLoading: "获取中...", fit: "适配", functionMenu: "功能菜单导航", fullUrl: "完整 URL", generate: "开始生成", generateTitle: "开始生成（Ctrl+Enter）", generationRouteLabel: "生图调用模式", globalNav: "全局导航", imageModel: "生图模型", keepSavedKey: "保持已保存 Key", languageEn: "English UI", languageSwitch: "切换界面语言", languageZh: "简体中文界面", menuArticleIllustration: "文章插图", menuArticleRecord: "文章插图记录", menuAssetTools: "资产工具", menuCreation: "套图模式", menuCreationRecord: "套图记录", menuCreateTools: "创作工具", menuGallery: "瀑布画廊", menuImageCompress: "图片压缩", menuImageDecomposition: "图片拆解", menuImageEdit: "图片编辑", menuPortrait: "写真模式", menuPortraitRecord: "写真记录", menuPpt: "PPT生成", menuPptRecord: "PPT记录", menuPromptStudio: "提示词生图", menuQuickBlend: "快速溶图", menuReferenceAnalysis: "融图分析", menuSectionAssets: "资产区", menuSectionCreate: "创作区", menuSectionSettings: "配置区", menuSettings: "设置", menuStyleTransfer: "风格迁移", menuTools: "工具", modeDirect: "直接调用模式", modeProtocol: "Gemini模型", modeRoute: "路由模式", modelFetchBusy: "正在获取模型列表...", modelFetchFailed: "获取模型列表失败。", modelFetchSuccess: "已获取 {count} 个可调用模型。", modelNoCallable: "未获取到可调用模型。", modelNoMatch: "没有匹配的模型", modelNoMatchWithQuery: "没有匹配的模型：{query}", modelTestBusy: "正在测试连接...", modelTestSuccess: "连接测试成功，获取到 {count} 个模型。", navAssets: "资产", navCreate: "创作", navSettings: "配置", notSaved: "未保存", openOutput: "打开输出目录", outputFormat: "输出格式", parameters: "参数设置", previewIdleDetail: "生成日志可在配置中查看，底部胶片条可快速切换查看。", previewIdleEyebrow: "Output Preview", previewIdleTitle: "生成结果会在这里实时更新。", previewWaiting: "等待生成", prompt: "提示词", promptAgent: "图片转提示词", promptCounterSuffix: "字", promptEnhance: "增强模式", promptEnhanceAria: "开启或关闭提示词增强模式", promptEnhanceField: "增强提示词", promptEnhanceOff: "关闭", promptEnhanceOn: "开启", promptPlaceholder: "写下你要生成的画面，也可以先上传参考图说明修改方向。", promptTemplate: "提示词模板", protocolHint: "Gemini 图像模型按 AGICTO 图像生成协议调用；基础 URL 通常填写到 /v1，实际请求为 /images/generations。", protocolImageModel: "图像模型", protocolMode: "Gemini模型", quality: "质量", "ratio.1:1": "电商主图、头像、社交媒体 · 方形 1:1", "ratio.1:2": "长海报 · 竖屏 1:2", "ratio.1:3": "超长竖版广告 · 竖屏 1:3", "ratio.2:1": "Banner横幅 · 横屏 2:1", "ratio.2:3": "竖版摄影 · 竖屏 2:3", "ratio.3:1": "超宽广告图 · 横屏 3:1", "ratio.3:2": "摄影风格 · 横屏 3:2", "ratio.3:4": "海报、人像 · 竖屏 3:4", "ratio.4:3": "PPT、网页配图 · 横屏 4:3", "ratio.4:5": "Instagram帖子 · 竖屏 4:5", "ratio.5:4": "商品展示 · 横屏 5:4", "ratio.9:16": "短视频封面、手机壁纸 · 竖屏 9:16", "ratio.9:21": "超长竖图 · 竖屏 9:21", "ratio.16:9": "横版封面、YouTube · 横屏 16:9", "ratio.21:9": "超宽横幅 · 横屏 21:9", ratioLandscape: "横向", ratioPortrait: "竖向", ratioSquare: "方形", reasoningEffort: "思考等级", reference: "参考图", referenceUploadAction: "上传参考图", referenceUploadTitle: "拖入图片或点击上传", responsesModel: "Responses 模型", routeEndpointSuffix: "路由模式请求协议后缀", routeMode: "路由模式", save: "保存", size: "分辨率", sizeAuto: "自动适配", sizeMax: "最大", testConnection: "测试连接", testConnectionLoading: "测试中...", themeDark: "深色主题", themeLight: "白色主题", themeMenu: "主题颜色", themeToDark: "切换到深色主题", themeToLight: "切换到白色主题", thumbnailEmpty: "暂无缩略图", thumbnailFailed: "缩略图加载失败", thumbnailLoading: "缩略图加载中", timelineNoErrors: "暂无错误", timelineWaitingResult: "等待生成结果", timelineWaitingTask: "等待任务开始", toolModel: "工具模型", toolModelAndQuality: "工具模型与质量", view: "查看", visionTextModel: "视觉/文本模型" },
+  en: { activityLog: "Generation Log", activityLogAllPanels: "All Panels", activityLogPanels: "Generation log panels", baseUrl: "Base URL", brandSubtitle: "AI image workflow", close: "Close", config: "Settings", configApi: "Configure API", configSaved: "Config saved", configTitle: "Connection Settings", configUnsaved: "Config not saved", connectionBusy: "Concurrent {running}/{max} · Queue {queued}", connectionOpen: "open API and log", connectionSection: "Request Channel", connectionStatusEmpty: "API/Log missing", connectionStatusEntry: "API, Log", delete: "Delete", directEndpointSuffix: "Direct mode endpoint suffix", directMode: "Direct Mode", download: "Download", endpointUrl: "Endpoint", expandModels: "Show available models", fetchModels: "Fetch Models", fetchModelsLoading: "Fetching...", fit: "Fit", functionMenu: "Function menu", fullUrl: "Full URL", generate: "Generate", generateTitle: "Generate (Ctrl+Enter)", generationRouteLabel: "Image request mode", globalNav: "Global navigation", imageModel: "Image Model", keepSavedKey: "Keep saved key", languageEn: "English UI", languageSwitch: "Switch interface language", languageZh: "Simplified Chinese UI", menuArticleIllustration: "Article Illustration", menuArticleRecord: "Article Records", menuAssetTools: "Asset Tools", menuCreation: "Product Suite", menuCreationRecord: "Suite Records", menuCreateTools: "Creation Tools", menuGallery: "Gallery", menuImageCompress: "Image Compress", menuImageDecomposition: "Image Decomposition", menuImageEdit: "Image Edit", menuPortrait: "Portrait Mode", menuPortraitRecord: "Portrait Records", menuPpt: "PPT Generation", menuPptRecord: "PPT Records", menuPromptStudio: "Prompt to Image", menuQuickBlend: "Quick Blend", menuReferenceAnalysis: "Reference Analysis", menuSectionAssets: "Assets", menuSectionCreate: "Creation", menuSectionSettings: "Settings", menuSettings: "Settings", menuStyleTransfer: "Style Transfer", menuTools: "Tools", modeDirect: "Direct Mode", modeProtocol: "Gemini Model", modeRoute: "Route Mode", modelFetchBusy: "Fetching model list...", modelFetchFailed: "Failed to fetch model list.", modelFetchSuccess: "Fetched {count} callable models.", modelNoCallable: "No callable models found.", modelNoMatch: "No matching models", modelNoMatchWithQuery: "No matching models: {query}", modelTestBusy: "Testing connection...", modelTestSuccess: "Connection test succeeded. Found {count} models.", navAssets: "Assets", navCreate: "Create", navSettings: "Settings", notSaved: "Not saved", openOutput: "Open Output", outputFormat: "Output Format", parameters: "Parameters", previewIdleDetail: "Generation log is in Settings. Use the filmstrip below to switch results.", previewIdleEyebrow: "Output Preview", previewIdleTitle: "Generated results update here in real time.", previewWaiting: "Waiting", prompt: "Prompt", promptAgent: "Image to Prompt", promptCounterSuffix: "chars", promptEnhance: "Enhance Mode", promptEnhanceAria: "Toggle prompt enhancement mode", promptEnhanceField: "Enhancement Prompt", promptEnhanceOff: "Off", promptEnhanceOn: "On", promptPlaceholder: "Describe the image you want, or upload references first and describe the edit direction.", promptTemplate: "Prompt templates", protocolHint: "Gemini image models use the AGICTO image generation protocol. Base URL usually ends at /v1; requests go to /images/generations.", protocolImageModel: "Image Model", protocolMode: "Gemini Model", quality: "Quality", "ratio.1:1": "Ecommerce, Avatar, Social · Square 1:1", "ratio.1:2": "Long Poster · Portrait 1:2", "ratio.1:3": "Tall Ad · Portrait 1:3", "ratio.2:1": "Banner · Landscape 2:1", "ratio.2:3": "Vertical Photo · Portrait 2:3", "ratio.3:1": "Ultrawide Ad · Landscape 3:1", "ratio.3:2": "Photography · Landscape 3:2", "ratio.3:4": "Poster, Portrait · Portrait 3:4", "ratio.4:3": "PPT, Web Graphic · Landscape 4:3", "ratio.4:5": "Instagram Post · Portrait 4:5", "ratio.5:4": "Product Display · Landscape 5:4", "ratio.9:16": "Short Video Cover, Wallpaper · Portrait 9:16", "ratio.9:21": "Tall Scroll Image · Portrait 9:21", "ratio.16:9": "Cover, YouTube · Landscape 16:9", "ratio.21:9": "Ultrawide Banner · Landscape 21:9", ratioLandscape: "Landscape", ratioPortrait: "Portrait", ratioSquare: "Square", reasoningEffort: "Reasoning", reference: "Reference", referenceUploadAction: "Upload Reference", referenceUploadTitle: "Drop images or click to upload", responsesModel: "Responses Model", routeEndpointSuffix: "Route mode endpoint suffix", routeMode: "Route Mode", save: "Save", size: "Size", sizeAuto: "Auto", sizeMax: "Max", testConnection: "Test Connection", testConnectionLoading: "Testing...", themeDark: "Dark theme", themeLight: "Light theme", themeMenu: "Theme color", themeToDark: "Switch to dark theme", themeToLight: "Switch to light theme", thumbnailEmpty: "No thumbnails", thumbnailFailed: "Thumbnail load failed", thumbnailLoading: "Loading thumbnails", timelineNoErrors: "No errors", timelineWaitingResult: "Waiting for result", timelineWaitingTask: "Waiting for task", toolModel: "Tool Model", toolModelAndQuality: "Tool model and quality", view: "View", visionTextModel: "Vision/Text Model" },
 };
 Object.assign(UI_LANGUAGE_TEXT["zh-CN"], {
   directImageApi: "生图 API",
@@ -433,7 +437,10 @@ const state = {
   assetRecordDeletion: { busy: false, request: null },
   assetLoading: { article: false, creation: false, portrait: false, ppt: false },
   assetLoadErrors: { article: "", creation: "", portrait: "", ppt: "" },
-  activityFeed: [],
+  generationLog: createGenerationLogStore(),
+  generationLogExpandedGroups: new Set(),
+  /* 空串表示跟随当前板块；用户点过切换后存具体 channel 或 "all"。 */
+  generationLogChannel: "",
   aspectRatios: [],
   clientSessionId: "",
   config: null,
@@ -1193,6 +1200,7 @@ const refs = {
   themeToggleLabel: document.querySelector("#themeToggleLabel"),
   topbar: document.querySelector(".topbar"),
   topbarRevealButton: document.querySelector("#topbarRevealButton"),
+  timelineChannelTabs: document.querySelector("#timelineChannelTabs"),
   timelineList: document.querySelector("#timelineList"),
   timelineNewCount: document.querySelector("#timelineNewCount"),
   timelineNewIndicator: document.querySelector("#timelineNewIndicator"),
@@ -1535,7 +1543,17 @@ function formatCompactRatioLabel(ratio) {
     .replace(/\s*[：:]\s*/g, ":");
   return /^\d+:\d+$/.test(normalized) ? normalized : "";
 }
-function getGenerationActivityRelayText(value) { const match = String(value || "").split(/\r?\n/).map((line) => line.trim()).map((line) => line.match(/^(URL|中转)[：:](.*)$/)).find(Boolean); return match ? `URL：${match[2].trim()}` : ""; } function buildGenerationActivityRelayText(item = {}) { const route = String(item?.imageRoute || item?.generationRoute || "").toLowerCase(); const relayUrl = String(item?.baseUrl || (route === "c" ? item?.protocolBaseUrl || state.config?.protocolBaseUrl : route === "b" ? state.config?.directBaseUrl : state.config?.baseUrl) || state.config?.baseUrl || "").trim(); return relayUrl ? `URL：${relayUrl}` : ""; }
+/* 中转地址在入队时就按当前路由解析一次并存进条目，失败路径拿不到 item 也能显示 URL。 */
+function resolveGenerationRelayUrl(source = {}) {
+  const route = String(source?.imageRoute || source?.generationRoute || getSelectedImageRoute() || "").toLowerCase();
+  const routeBaseUrl = route === "c"
+    ? source?.protocolBaseUrl || state.config?.protocolBaseUrl
+    : route === "b"
+      ? source?.directImageBaseUrl || source?.directBaseUrl || state.config?.directImageBaseUrl || state.config?.directBaseUrl
+      : source?.baseUrl || state.config?.baseUrl;
+  return normalizeGenerationLogRelayUrl(routeBaseUrl || state.config?.baseUrl || "");
+}
+function buildGenerationActivityRelayUrl(item = {}) { return normalizeGenerationLogRelayUrl(item?.baseUrl || "") || resolveGenerationRelayUrl(item); }
 function formatFilmstripSizeLabel(item) {
   return formatCompactSizeLabel(item?.size);
 }
@@ -1558,7 +1576,7 @@ function normalizeActivityEntry(entry) {
     detail,
     ratio: formatCompactRatioLabel(entry?.ratio),
     size: formatCompactSizeLabel(entry?.size),
-    modeLabel: String(entry?.modeLabel || "").trim(), imageUrl: String(entry?.imageUrl || "").trim(), paramsText: getGenerationActivityRelayText(entry?.paramsText),
+    modeLabel: String(entry?.modeLabel || "").trim(), imageUrl: String(entry?.imageUrl || "").trim(), relayUrl: normalizeGenerationLogRelayUrl(entry?.relayUrl || entry?.paramsText),
     status: ["active", "done", "error", "pending"].includes(entry?.status) ? entry.status : "active",
     at: String(entry?.at || ""),
     generationStartedAt: String(entry?.generationStartedAt || ""),
@@ -1581,21 +1599,19 @@ function normalizePersistedActivityEntry(entry) {
   }
   return normalized;
 }
-function readGenerationActivityFeed() {
+function readGenerationLogStore() {
   try {
-    const raw = window.localStorage.getItem(GENERATION_ACTIVITY_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    const entries = Array.isArray(parsed) ? parsed.map(normalizePersistedActivityEntry).filter(Boolean) : [];
-    return sortGenerationActivityFeed(entries).slice(0, 12);
+    const raw = window.localStorage.getItem(GENERATION_LOG_STORAGE_KEY) || window.localStorage.getItem(GENERATION_ACTIVITY_STORAGE_KEY);
+    return parseGenerationLogStore(raw, { normalizeRow: normalizePersistedActivityEntry });
   } catch (_error) {
-    return [];
+    return createGenerationLogStore();
   }
 }
-function writeGenerationActivityFeed() {
+function writeGenerationLogStore() {
   try {
-    window.localStorage.setItem(GENERATION_ACTIVITY_STORAGE_KEY, JSON.stringify(state.activityFeed.slice(0, 12)));
+    window.localStorage.setItem(GENERATION_LOG_STORAGE_KEY, JSON.stringify(serializeGenerationLogStore(state.generationLog)));
   } catch (_error) {
-    // Ignore storage quota or privacy-mode failures; the in-memory feed still works.
+    // Ignore storage quota or privacy-mode failures; the in-memory log still works.
   }
 }
 function readGalleryMetadataCache() {
@@ -1907,6 +1923,7 @@ async function ensureActiveViewModule(view) {
         formatFilmstripSizeLabel,
         formatTime,
         getDisplayPrompt,
+        getGenerationLoadingItemStage,
         getGenerationReferenceFile,
         getMaxParallelJobCount,
         getMaxQueuedJobCount,
@@ -2242,6 +2259,12 @@ function getMaxParallelJobCount(mode = getCurrentGenerationQueueMode()) {
 }
 function getMaxParallelJobCountForJob(job) {
   return getMaxParallelJobCount(getGenerationJobMode(job));
+}
+// The creation queue reserves item slots against the server's own creation limit.
+// Reading the general per-session limit here let the browser start a suite whose
+// items could only sit in the server slot-wait loop.
+function getCreationMaxParallelTaskCount() {
+  return MAX_CREATION_PARALLEL_TASKS;
 }
 function getGenerationJobSchedulingKey(job) {
   return getGenerationJobMode(job) === "prompt" ? "prompt" : getGenerationJobQueueKey(job);
@@ -3380,7 +3403,7 @@ function renderImageDecompositionGenerationStrip() {
       image.loading = "lazy";
       button.appendChild(image);
       } else if (item?.isRunning || (item?.started && !item?.filename)) {
-        const loading = createGenerationLoadingShell(document, { key, active: true });
+        const loading = createGenerationLoadingShell(document, { key, active: true, stage: getGenerationLoadingItemStage(item) });
         button.appendChild(loading.shell);
       } else {
         const ghost = document.createElement("div");
@@ -4173,7 +4196,7 @@ function renderReferenceAnalysisGenerationStrip() {
       image.loading = "lazy";
       button.appendChild(image);
     } else if (item?.isRunning || (item?.started && !item?.filename)) {
-      const loading = createGenerationLoadingShell(document, { key, active: true });
+      const loading = createGenerationLoadingShell(document, { key, active: true, stage: getGenerationLoadingItemStage(item) });
       button.appendChild(loading.shell);
     } else {
       const ghost = document.createElement("span");
@@ -5262,17 +5285,77 @@ function getJobActivityRatio(jobId) {
   return state.jobs.find((job) => job.id === jobId)?.ratio || "";
 }
 
-function recordActivity({ key, title, detail, ratio, size, modeLabel, imageUrl, paramsText, status, at, generationStartedAt, generationCompletedAt }) {
-  const nextAt = at || nowIso();
-  const nextRatio = formatCompactRatioLabel(ratio);
-  const nextSize = formatCompactSizeLabel(size);
-  const existing = state.activityFeed.find((item) => item.key === key);
-  state.activityFeed = upsertGenerationActivityEntry(state.activityFeed, {
-    key, title, detail: sanitizeGenerationActivityDetail(detail), ratio: nextRatio || existing?.ratio || "", size: nextSize || existing?.size || "", modeLabel: modeLabel || existing?.modeLabel || "",
-    imageUrl: imageUrl || existing?.imageUrl || "", paramsText: getGenerationActivityRelayText(paramsText || existing?.paramsText),
-    status, at: nextAt, generationStartedAt: generationStartedAt || existing?.generationStartedAt || "", generationCompletedAt: generationCompletedAt || existing?.generationCompletedAt || "",
+function getJobLogChannel(jobOrId) {
+  const job = typeof jobOrId === "string" ? state.jobs.find((entry) => entry.id === jobOrId) : jobOrId;
+  return normalizeGenerationLogChannel(getGenerationJobMode(job));
+}
+
+/* 日志只存在于配置区那一个面板。板块之间靠面板顶部的板块切换保持独立：
+   默认跟随当前所在板块，用户显式点过某个板块后以那次选择为准。 */
+function getActiveViewLogChannel() {
+  if (state.activeView === "studio") {
+    return normalizeGenerationLogChannel(getCurrentGenerationQueueMode());
+  }
+  return GENERATION_LOG_CHANNELS.includes(state.activeView) ? state.activeView : "";
+}
+
+function getResolvedGenerationLogChannel() {
+  const picked = String(state.generationLogChannel || "").trim();
+  if (picked === GENERATION_LOG_ALL_CHANNELS || GENERATION_LOG_CHANNELS.includes(picked)) {
+    return picked;
+  }
+  return getActiveViewLogChannel() || GENERATION_LOG_ALL_CHANNELS;
+}
+
+function getGenerationLogTabChannels(activeChannel) {
+  /* 只列出有条目的板块，外加当前板块本身，这样刚进入的空板块也能看到自己的空态。 */
+  const withEntries = GENERATION_LOG_CHANNELS.filter((channel) => getGenerationLogChannelEntries(state.generationLog, channel).length > 0);
+  const scoped = activeChannel === GENERATION_LOG_ALL_CHANNELS ? withEntries : [...new Set([...withEntries, activeChannel])];
+  return [GENERATION_LOG_ALL_CHANNELS, ...GENERATION_LOG_CHANNELS.filter((channel) => scoped.includes(channel))];
+}
+
+function handleGenerationLogChannelPick(event) {
+  const channel = readGenerationLogChannelTabValue(event.target);
+  if (!channel) {
+    return;
+  }
+  state.generationLogChannel = channel;
+  renderTimeline();
+}
+
+function handleGenerationLogGroupToggle(event) {
+  const groupId = readGenerationLogGroupToggleId(event.target);
+  if (!groupId) {
+    return;
+  }
+  state.generationLogExpandedGroups = toggleGenerationLogGroup(state.generationLogExpandedGroups, groupId);
+  renderTimeline();
+}
+
+function recordActivity({ channel, key, title, detail, ratio, size, modeLabel, imageUrl, relayUrl, status, at, generationStartedAt, generationCompletedAt }) {
+  state.generationLog = upsertGenerationLogEntry(state.generationLog, {
+    channel: normalizeGenerationLogChannel(channel), key, title, detail: sanitizeGenerationActivityDetail(detail),
+    ratio: formatCompactRatioLabel(ratio), size: formatCompactSizeLabel(size), modeLabel, imageUrl,
+    relayUrl: normalizeGenerationLogRelayUrl(relayUrl),
+    status, at: at || nowIso(), generationStartedAt, generationCompletedAt,
   });
-  writeGenerationActivityFeed();
+  writeGenerationLogStore();
+  renderTimeline();
+}
+
+/* 批量板块一个批次一条组行：子条目按图写入，组行汇总由子条目实时推导。 */
+function recordGroupActivity({ channel, groupId, groupLabel, groupUnit, groupItemId, totalCount, title, detail, status, ratio, size, modeLabel, imageUrl, relayUrl, at, generationStartedAt, generationCompletedAt }) {
+  if (!String(groupId || "").trim()) {
+    return;
+  }
+  state.generationLog = upsertGenerationLogGroupEntry(state.generationLog, {
+    channel: normalizeGenerationLogChannel(channel), groupId, groupLabel, groupUnit, groupItemId, totalCount,
+    title, detail: sanitizeGenerationActivityDetail(detail), status, ratio: formatCompactRatioLabel(ratio), size: formatCompactSizeLabel(size),
+    modeLabel, imageUrl, relayUrl: normalizeGenerationLogRelayUrl(relayUrl),
+    at: at || nowIso(), generationStartedAt, generationCompletedAt,
+  });
+  writeGenerationLogStore();
+  renderTimeline();
 }
 
 async function copyLightboxPrompt() {
@@ -5292,15 +5375,17 @@ async function copyLightboxPrompt() {
 function recordJobQueued(job) {
   applyQueuedJobConfigSnapshot(job);
   recordActivity({
+    channel: getJobLogChannel(job),
     key: `${job.id}:task`, title: GENERATION_TASK_STATUS_LABELS.running,
     detail: buildGenerationTaskActivityDetail({ statusStage: "queued", statusText: "等待资源分配" }),
-    ratio: job.ratio, size: job.size, modeLabel: formatGenerationActivityModeLabel(job.imageRoute || getSelectedImageRoute()), status: "active", at: job.createdAt,
+    ratio: job.ratio, size: job.size, modeLabel: formatGenerationActivityModeLabel(job.imageRoute || getSelectedImageRoute()),
+    relayUrl: resolveGenerationRelayUrl(job), status: "active", at: job.createdAt,
   });
 }
 
-function recordJobTaskActivity(jobId, { title = GENERATION_TASK_STATUS_LABELS.running, detail, imageUrl, paramsText, status = "active", generationStartedAt, generationCompletedAt }) {
+function recordJobTaskActivity(jobId, { title = GENERATION_TASK_STATUS_LABELS.running, detail, imageUrl, relayUrl, status = "active", generationStartedAt, generationCompletedAt }) {
   const job = state.jobs.find((entry) => entry.id === jobId);
-  recordActivity({ key: `${jobId}:task`, title, detail, ratio: getJobActivityRatio(jobId), size: getJobActivitySize(jobId), imageUrl, paramsText, status, at: nowIso(), generationStartedAt: generationStartedAt || job?.generationStartedAt || job?.item?.generationStartedAt || "", generationCompletedAt: generationCompletedAt || job?.generationCompletedAt || job?.item?.generationCompletedAt || "" });
+  recordActivity({ channel: getJobLogChannel(job || jobId), key: `${jobId}:task`, title, detail, ratio: getJobActivityRatio(jobId), size: getJobActivitySize(jobId), imageUrl, relayUrl: relayUrl || (job ? resolveGenerationRelayUrl(job) : ""), status, at: nowIso(), generationStartedAt: generationStartedAt || job?.generationStartedAt || job?.item?.generationStartedAt || "", generationCompletedAt: generationCompletedAt || job?.generationCompletedAt || job?.item?.generationCompletedAt || "" });
 }
 
 function handleActivityStatus(jobId, stage, message) {
@@ -5316,23 +5401,28 @@ function handleActivityFinal(jobId) {
 }
 
 function handleActivitySuccess(jobId, item) {
-  recordJobTaskActivity(jobId, { title: GENERATION_TASK_STATUS_LABELS.completed, detail: "图像已成功生成", imageUrl: getImageUrl(item), paramsText: buildGenerationActivityRelayText(item), status: "done", generationStartedAt: item?.generationStartedAt, generationCompletedAt: item?.generationCompletedAt });
+  recordJobTaskActivity(jobId, { title: GENERATION_TASK_STATUS_LABELS.completed, detail: "图像已成功生成", imageUrl: getImageUrl(item), relayUrl: buildGenerationActivityRelayUrl(item), status: "done", generationStartedAt: item?.generationStartedAt, generationCompletedAt: item?.generationCompletedAt });
 }
 
-function handleActivityFailure(jobId, message, imageUrl = "") {
+/* 失败时任务可能已从 state.jobs 移除，所以中转地址直接从调用点的 job 解析。 */
+function handleActivityFailure(job, message, imageUrl = "") {
   const detail = compactErrorMessage(message, "生成请求失败");
+  const jobId = typeof job === "string" ? job : job?.id;
   recordJobTaskActivity(jobId, {
     title: GENERATION_TASK_STATUS_LABELS.error, detail: buildGenerationTaskActivityDetail({ status: "error", statusStage: "error", statusText: detail, errorMessage: detail }), status: "error", imageUrl,
+    relayUrl: typeof job === "string" ? "" : resolveGenerationRelayUrl(job || {}),
   });
 }
 
 function handleActivityCanceled(job) {
   recordActivity({
+    channel: getJobLogChannel(job),
     key: `${job.id}:task`,
     title: "已取消",
     detail: buildCanceledGenerationActivityDetail(job),
     ratio: job.ratio,
     size: job.size,
+    relayUrl: resolveGenerationRelayUrl(job),
     status: "pending",
     at: nowIso(),
   });
@@ -5352,7 +5442,8 @@ function recordGenerationTaskActivity(task) {
     detail,
     ratio: formatCompactRatioLabel(task?.ratio),
     size: formatCompactSizeLabel(task?.size),
-    modeLabel: formatGenerationActivityModeLabel(task?.imageRoute), imageUrl: getImageUrl(task?.item), paramsText: task?.item ? buildGenerationActivityRelayText(task.item) : "",
+    channel: getJobLogChannel(task?.id),
+    modeLabel: formatGenerationActivityModeLabel(task?.imageRoute), imageUrl: getImageUrl(task?.item), relayUrl: task?.item ? buildGenerationActivityRelayUrl(task.item) : resolveGenerationRelayUrl(task),
     status: GENERATION_TASK_TIMELINE_STATUS[status],
     at: task.updatedAt || task.createdAt,
     generationStartedAt: task?.generationStartedAt || task?.item?.generationStartedAt || "",
@@ -5360,9 +5451,17 @@ function recordGenerationTaskActivity(task) {
   });
 }
 
-function getTimelineItems() {
-  if (state.activityFeed.length > 0) {
-    return state.activityFeed;
+function getTimelineItems(channel = GENERATION_LOG_ALL_CHANNELS) {
+  const entries = channel === GENERATION_LOG_ALL_CHANNELS
+    ? getGenerationLogAllEntries(state.generationLog)
+    : getGenerationLogChannelEntries(state.generationLog, channel);
+  if (entries.length > 0) {
+    return entries;
+  }
+
+  /* 某个板块还没有条目时给空态，不要拿别的板块或当前预览来填。 */
+  if (channel !== GENERATION_LOG_ALL_CHANNELS) {
+    return [];
   }
 
   const current = getCurrentPreviewItem();
@@ -5370,11 +5469,12 @@ function getTimelineItems() {
     return [
       {
         key: "complete:fallback",
+        channel: normalizeGenerationLogChannel(current.mode),
         title: GENERATION_TASK_STATUS_LABELS.completed,
         detail: "图像已成功生成",
         ratio: current.ratio || current.json?.aspect_ratio,
         size: current.size,
-        imageUrl: getImageUrl(current), modeLabel: formatGenerationActivityModeLabel(current.imageRoute || current.generationRoute), paramsText: buildGenerationActivityRelayText(current),
+        imageUrl: getImageUrl(current), modeLabel: formatGenerationActivityModeLabel(current.imageRoute || current.generationRoute), relayUrl: buildGenerationActivityRelayUrl(current),
         status: "done",
         at: current.createdAt,
         generationStartedAt: current.generationStartedAt || "",
@@ -5413,7 +5513,9 @@ function isTimelineAtTop() {
 }
 
 function getTimelineItemSignature(item) {
-  return [item.key, item.title, item.detail, item.modeLabel || "", item.imageUrl || "", item.paramsText || "", item.ratio || "", item.size || "", item.status, item.at || "", item.generationStartedAt || "", item.generationCompletedAt || ""].join("\u001f");
+  /* 组行的签名要带上子条目状态，否则批次内某张图翻转状态不会计入未读。 */
+  const childSignature = (Array.isArray(item.children) ? item.children : []).map((child) => `${child.key}:${child.status}:${child.detail || ""}`).join(",");
+  return [item.key, item.channel || "", item.title, item.detail, item.modeLabel || "", item.imageUrl || "", item.relayUrl || "", item.ratio || "", item.size || "", item.status, item.at || "", item.generationStartedAt || "", item.generationCompletedAt || "", childSignature].join("\u001f");
 }
 
 function countTimelineChanges(items) {
@@ -5483,65 +5585,24 @@ function scrollTimelineToNewest() {
 }
 
 function renderTimeline() {
-  const items = getTimelineItems();
+  const channel = getResolvedGenerationLogChannel();
+  const items = getTimelineItems(channel);
   const isAtTop = isTimelineAtTop();
   const previousScrollTop = refs.timelineList.scrollTop;
   const scrollAnchor = isAtTop ? null : getTimelineScrollAnchor();
   const changedCount = countTimelineChanges(items);
 
-  refs.timelineList.innerHTML = "";
-
-  items.forEach((item) => {
-    const row = document.createElement("li");
-    row.className = `timeline-item ${item.status}`;
-    row.dataset.timelineKey = item.key;
-
-    const dot = document.createElement("span");
-    dot.className = "timeline-dot";
-    row.appendChild(dot);
-
-    const copy = document.createElement("div");
-    copy.className = "timeline-copy";
-
-    const displayText = getGenerationActivityDisplayText(item.detail);
-    const main = document.createElement("span");
-    main.className = "timeline-main";
-    main.appendChild(Object.assign(document.createElement("span"), { className: "timeline-summary", textContent: displayText.summary || item.title || "" }));
-    if (item.paramsText) { row.classList.add("has-relay"); main.appendChild(Object.assign(document.createElement("span"), { className: "timeline-relay", textContent: item.paramsText })); }
-    copy.appendChild(main);
-    if (item.imageUrl) { row.classList.add("has-url"); copy.appendChild(Object.assign(document.createElement("a"), { className: "timeline-url", href: item.imageUrl, target: "_blank", rel: "noopener noreferrer", textContent: item.imageUrl })); }
-    if (displayText.detail) { row.classList.add("has-detail"); copy.appendChild(Object.assign(document.createElement("p"), { className: "timeline-detail", textContent: displayText.detail })); }
-    row.appendChild(copy);
-    const meta = document.createElement("span");
-    meta.className = "timeline-meta";
-    if (item.modeLabel) {
-      meta.appendChild(Object.assign(document.createElement("span"), { className: "timeline-mode", textContent: item.modeLabel }));
-    }
-
-    const compactRatio = formatCompactRatioLabel(item.ratio);
-    const compactSize = formatCompactSizeLabel(item.size);
-    const ratioSize = document.createElement("span");
-    ratioSize.className = "timeline-ratio-size";
-    ratioSize.textContent = [compactRatio, compactSize ? `(${compactSize})` : ""].filter(Boolean).join(" ");
-    if (ratioSize.textContent) {
-      meta.appendChild(ratioSize);
-    }
-
-    const timelineTimes = item.generationStartedAt || item.generationCompletedAt
-      ? [item.generationStartedAt, item.generationCompletedAt].filter(Boolean)
-      : [item.at].filter(Boolean);
-    timelineTimes.forEach((timelineAt) => {
-      const timelineTime = document.createElement("span");
-      timelineTime.className = "timeline-start-time";
-      const time = document.createElement("time");
-      time.dateTime = timelineAt;
-      time.textContent = formatClock(timelineAt);
-      timelineTime.appendChild(time);
-      meta.appendChild(timelineTime);
-    });
-    row.appendChild(meta);
-
-    refs.timelineList.appendChild(row);
+  renderGenerationLogChannelTabs(refs.timelineChannelTabs, {
+    channels: getGenerationLogTabChannels(channel),
+    activeChannel: channel,
+    getChannelLabel: getGenerationLogChannelLabel,
+    allLabel: getUiLanguageText("activityLogAllPanels") || "全部板块",
+  });
+  renderGenerationLogRows(refs.timelineList, {
+    entries: items,
+    channel,
+    expandedGroupIds: state.generationLogExpandedGroups,
+    formatTime: formatClock,
   });
 
   if (isAtTop) {
@@ -5578,6 +5639,10 @@ function updatePreviewLoadingShell(nodes, placeholderState) {
     key: normalizePreviewGenerationLoadingKey(placeholderState.loadingKey || placeholderState.itemId || ""),
     active: true,
     mode: placeholderState.waiting ? GENERATION_LOADING_WAITING_MODE : GENERATION_LOADING_GENERATING_MODE,
+    stage: placeholderState.waiting ? "queued" : placeholderState.stage || "",
+    /* 主预览空间足够，直接显示该任务的最新状态文本。 */
+    showLog: true,
+    logText: placeholderState.statusText || "",
   });
   nodes.state = {
     mode: placeholderState.mode,
@@ -5905,10 +5970,10 @@ function syncFilmstripMedia(button, item, key = "") {
     existingGhost?.remove();
     const mode = isWaitingPreviewItem(item) ? GENERATION_LOADING_WAITING_MODE : GENERATION_LOADING_GENERATING_MODE;
     if (existingLoading) {
-      updateGenerationLoadingShell(existingLoading.__generationLoadingNodes, { key, active: true, mode });
+      updateGenerationLoadingShell(existingLoading.__generationLoadingNodes, { key, active: true, mode, stage: getGenerationLoadingItemStage(item) });
       return;
     }
-    button.insertBefore(createGenerationLoadingShell(document, { key, active: true, mode }).shell, button.firstChild);
+    button.insertBefore(createGenerationLoadingShell(document, { key, active: true, mode, stage: getGenerationLoadingItemStage(item) }).shell, button.firstChild);
     return;
   }
 
@@ -7477,6 +7542,27 @@ async function requestPptCompletionStream(slideNumbers) {
   return response;
 }
 
+/* PPT 以 deckId 为批次、页码为子条目，单位是「页」而不是「张」。 */
+function recordPptLogEvent({ slideNumber, slideTitle, status, detail, imageUrl } = {}) {
+  const deckId = String(state.ppt.deckId || "").trim();
+  const normalizedSlideNumber = Number(slideNumber) || 0;
+  if (!deckId || !normalizedSlideNumber) {
+    return;
+  }
+  recordBatchLogEvent({
+    channel: "ppt",
+    groupId: deckId,
+    groupLabel: `PPT · ${state.ppt.outline?.title || "未命名演示"}`,
+    groupUnit: "页",
+    totalCount: Array.isArray(state.ppt.outline?.slides) ? state.ppt.outline.slides.length : state.ppt.slides.length,
+    itemId: `slide-${normalizedSlideNumber}`,
+    itemTitle: slideTitle || `第 ${normalizedSlideNumber} 页`,
+    status,
+    detail,
+    imageUrl,
+  });
+}
+
 function handlePptStreamEvent(eventName, payload) {
   if (eventName === "status") {
     state.ppt.statusText = payload.message || state.ppt.statusText;
@@ -7488,6 +7574,14 @@ function handlePptStreamEvent(eventName, payload) {
     state.ppt.deckId = payload.deckId || state.ppt.deckId;
     state.ppt.outline = payload.outline || state.ppt.outline;
     state.ppt.statusText = "正在逐页生成图片";
+    (Array.isArray(payload.outline?.slides) ? payload.outline.slides : []).forEach((slide, index) => {
+      recordPptLogEvent({
+        slideNumber: Number(slide.slideNumber) || index + 1,
+        slideTitle: slide.title,
+        status: "pending",
+        detail: buildGenerationTaskActivityDetail({ statusStage: "queued", statusText: "等待后台生成" }),
+      });
+    });
     renderPptView();
     return;
   }
@@ -7500,6 +7594,7 @@ function handlePptStreamEvent(eventName, payload) {
       title: payload.title || `第 ${payload.slideNumber} 页`,
       statusText: "生成中",
     });
+    recordPptLogEvent({ slideNumber: payload.slideNumber, slideTitle: payload.title, status: "active", detail: "正在生成图片" });
     renderPptView();
     return;
   }
@@ -7517,6 +7612,13 @@ function handlePptStreamEvent(eventName, payload) {
   if (eventName === "slide_saved") {
     upsertPptSlide(payload.slide);
     state.ppt.statusText = "页面已保存";
+    recordPptLogEvent({
+      slideNumber: payload.slide?.slideNumber || payload.slideNumber || state.ppt.currentSlideNumber,
+      slideTitle: payload.slide?.title,
+      status: "done",
+      detail: "图像已成功生成",
+      imageUrl: payload.slide?.imageUrl || "",
+    });
     renderPptView();
     return;
   }
@@ -7524,6 +7626,12 @@ function handlePptStreamEvent(eventName, payload) {
   if (eventName === "slide_failed") {
     markPptSlideFailed(payload.slideNumber || state.ppt.currentSlideNumber, payload.message);
     state.ppt.statusText = "部分页面生成失败";
+    const pptFailureDetail = compactErrorMessage(payload.message, "生成请求失败");
+    recordPptLogEvent({
+      slideNumber: payload.slideNumber || state.ppt.currentSlideNumber,
+      status: "error",
+      detail: buildGenerationTaskActivityDetail({ status: "error", statusStage: "error", statusText: pptFailureDetail, errorMessage: pptFailureDetail }),
+    });
     renderPptView();
     return;
   }
@@ -7683,7 +7791,7 @@ const CREATION_PLATFORM_EVIDENCE_FIELDS = [
   "skuVariants",
 ];
 const FALLBACK_CREATION_PLATFORM_OPTIONS = [
-  { value: "universal", label: "通用电商", defaultRatio: "1:1", recommendedImageCount: 18, resolutionTier: "1.5K", targetLanguage: "en", promptInstruction: "Use a platform-neutral ecommerce gallery strategy." },
+  { value: "universal", label: "通用电商", defaultRatio: "1:1", recommendedImageCount: 18, resolutionTier: "1K", targetLanguage: "en", promptInstruction: "Use a platform-neutral ecommerce gallery strategy." },
 ];
 const CREATION_DIMENSION_UNIT_MODE_LABELS = { metric: "公制", imperial: "英制", both: "公制和英制" };
 const DEFAULT_CREATION_SKU_GENERATION_RULE = "color-name-under-subject";
@@ -8595,7 +8703,16 @@ function getCreationStatusLabel(status) {
 }
 
 function getCreationItemStatusLabel(item = {}) {
-  return getCreationStatusLabel(item.status);
+  const base = getCreationStatusLabel(item.status);
+  // A fallback image was never confirmed by the upstream, and a retained preview is
+  // an image from an earlier attempt. Both are in the output, so both say so.
+  if (item.partialImageFallback === true) {
+    return `${base}（中途预览，未完全渲染）`;
+  }
+  if (item.previewRetained === true) {
+    return `${base}（保留中途预览）`;
+  }
+  return base;
 }
 
 function getCreationSellingPoints(value) {
@@ -9064,7 +9181,7 @@ function createArticleStoryboardCard(item) {
     img.alt = item.title || "文章插图";
     media.appendChild(img);
   } else if (isGenerating) {
-    const loading = createGenerationLoadingShell(document, { key: item.itemId, active: true });
+    const loading = createGenerationLoadingShell(document, { key: item.itemId, active: true, stage: getGenerationLoadingItemStage(item), showLog: true, logText: item.statusText || "" });
     media.classList.add("is-loading");
     media.setAttribute("aria-busy", "true");
     media.appendChild(loading.shell);
@@ -9163,7 +9280,7 @@ function createArticleRecordCard(item, setId = "") {
     img.alt = item.title || "文章插图";
     media.appendChild(img);
   } else if (isGenerating) {
-    const loading = createGenerationLoadingShell(document, { key: item.itemId, active: true });
+    const loading = createGenerationLoadingShell(document, { key: item.itemId, active: true, stage: getGenerationLoadingItemStage(item), showLog: true, logText: item.statusText || "" });
     media.classList.add("is-loading");
     media.setAttribute("aria-busy", "true");
     media.appendChild(loading.shell);
@@ -9307,18 +9424,37 @@ function buildArticleIllustrationGenerateFormData({ itemIds = [], regenerate = f
   return formData;
 }
 
+function recordArticleIllustrationLogEvent({ setId, itemId, itemTitle, status, detail, imageUrl, set = null } = {}) {
+  const currentSet = set || getArticleCurrentSet();
+  recordBatchLogEvent({
+    channel: "article-illustration",
+    groupId: setId || currentSet?.setId,
+    groupLabel: `文章插图 · ${currentSet?.title || currentSet?.articleTitle || "未命名文章"}`,
+    set: currentSet,
+    itemId,
+    itemTitle: itemTitle || itemId || "插图",
+    status,
+    detail,
+    imageUrl,
+  });
+}
+
 function handleArticleIllustrationStreamEvent(eventName, payload = {}) {
   if (eventName === "references_started" || eventName === "set_started") {
     if (payload.set) {
       upsertArticleSet(payload.set);
     }
     setArticleIllustrationFeedback(eventName === "references_started" ? "正在生成重点参考图..." : "正在生成文章插图...", "busy");
+    (Array.isArray(payload.set?.items) ? payload.set.items : []).forEach((item) => {
+      recordArticleIllustrationLogEvent({ setId: payload.set?.setId, itemId: item.itemId, itemTitle: item.title, status: "pending", detail: buildGenerationTaskActivityDetail({ statusStage: "queued", statusText: "等待后台生成" }), set: payload.set });
+    });
     return;
   }
 
   if (eventName === "item_started") {
     updateArticleCurrentItem(payload.itemId, { status: "generating", error: "" });
     setArticleIllustrationFeedback(`正在生成：${payload.title || payload.itemId}`, "busy");
+    recordArticleIllustrationLogEvent({ setId: payload.setId, itemId: payload.itemId, itemTitle: payload.title, status: "active", detail: "正在生成图片" });
     renderArticleIllustrationView();
     return;
   }
@@ -9340,6 +9476,7 @@ function handleArticleIllustrationStreamEvent(eventName, payload = {}) {
       updateArticleCurrentItem(payload.item.itemId, payload.item);
     }
     setArticleIllustrationFeedback("已保存一张文章插图。", "success");
+    recordArticleIllustrationLogEvent({ setId: payload.setId || payload.set?.setId, itemId: payload.item?.itemId || payload.itemId, itemTitle: payload.item?.title, status: "done", detail: "图像已成功生成", imageUrl: getImageUrl(payload.item), set: payload.set });
     renderArticleIllustrationView();
     return;
   }
@@ -9351,6 +9488,8 @@ function handleArticleIllustrationStreamEvent(eventName, payload = {}) {
       updateArticleCurrentItem(payload.itemId, { status: "failed", error: payload.message || "" });
     }
     setArticleIllustrationFeedback(payload.message || "文章插图生成失败。", "error");
+    const articleFailureDetail = compactErrorMessage(payload.message, "生成请求失败");
+    recordArticleIllustrationLogEvent({ setId: payload.setId || payload.set?.setId, itemId: payload.itemId, status: "error", detail: buildGenerationTaskActivityDetail({ status: "error", statusStage: "error", statusText: articleFailureDetail, errorMessage: articleFailureDetail }), set: payload.set });
     renderArticleIllustrationView();
     return;
   }
@@ -9806,6 +9945,10 @@ function normalizeCreationItemForView(item = {}, fallbackIndex = 0) {
     imageUrl,
     thumbnailUrl: String(item.thumbnailUrl || imageUrl),
     error: String(item.error || ""),
+    // This normalizer is an allowlist, so both provenance flags must be listed or a
+    // round-trip through it silently drops them.
+    partialImageFallback: item.partialImageFallback === true || item.partial_image_fallback === true,
+    previewRetained: item.previewRetained === true,
     generationStartedAt: String(item.generationStartedAt || ""),
     generationCompletedAt: String(item.generationCompletedAt || ""),
     generationDurationMs: String(item.generationDurationMs || ""),
@@ -10402,7 +10545,11 @@ function updateCreationCurrentItem(itemId, patch = {}) {
 }
 
 function upsertCreationSetForStream(set, { queueJob } = {}) {
-  const normalized = normalizeCreationSetForView(set);
+  // The manifest never carries mid-generation previews, so replacing the local set
+  // with it wholesale would drop an image the user already watched appear. Carry
+  // previews forward for items the manifest has no stored asset for.
+  const previousSet = queueJob?.set || getCreationCurrentSet();
+  const normalized = normalizeCreationSetForView(mergeCreationSetPreviews(set, previousSet));
   if (!normalized.setId) {
     return null;
   }
@@ -10483,9 +10630,31 @@ function shouldHideCreationCardDetails(item = {}, showRecordActions = false) {
   return true;
 }
 
-function createCreationCardLoading(status = "generating", sequenceIndex = 0, key = "") {
+function createCreationCardLoading(status = "generating", sequenceIndex = 0, key = "", logText = "") {
   const isQueued = status === "queued";
-  return createCreationCardLoadingShell(isQueued ? "queued" : "generating", null, { sequenceIndex, key });
+  return createCreationCardLoadingShell(isQueued ? "queued" : "generating", null, { sequenceIndex, key, logText });
+}
+
+/* 卡片上的实时日志取该项在日志里的最新明细：视图项经过白名单归一化，
+   不带 statusText，所以只有日志里存着这一行的真实状态。 */
+function getGenerationLogItemDetail(channel, itemId) {
+  const normalizedItemId = String(itemId || "").trim();
+  if (!normalizedItemId) {
+    return "";
+  }
+
+  const child = getGenerationLogChannelEntries(state.generationLog, channel)
+    .filter((row) => row?.kind === "group")
+    .flatMap((row) => (Array.isArray(row.children) ? row.children : []))
+    .findLast((entry) => String(entry?.groupItemId || "") === normalizedItemId);
+  return String(child?.detail || "").trim();
+}
+
+function getCreationCardLogText(item = {}, channel = "creation") {
+  if (item.status === "failed") {
+    return compactErrorMessage(item.error, "生成请求失败");
+  }
+  return getGenerationLogItemDetail(channel, item.itemId) || String(getCreationItemStatusLabel(item) || "").trim();
 }
 
 function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
@@ -10540,7 +10709,7 @@ function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
   if (isLoadingCard) {
     media.classList.add("is-loading");
     media.setAttribute("aria-busy", "true");
-    media.appendChild(createCreationCardLoading(item.status, fallbackIndex, item.itemId));
+    media.appendChild(createCreationCardLoading(item.status, fallbackIndex, item.itemId, getCreationCardLogText(item)));
   } else if (imageUrl) {
     const image = document.createElement("img");
     image.loading = "lazy";
@@ -10602,6 +10771,7 @@ function syncCreationResultGrid(items = [], { showActions = true } = {}) {
       getFallbackTitle: (slotIndex) => CREATION_PREVIEW_SLOTS[slotIndex]?.title || "",
       getImageUrl,
       getStatusLabel: getCreationItemStatusLabel,
+      getLogText: getCreationCardLogText,
       shouldShowLoading: (entry) => shouldShowCreationCardLoading(entry, false),
     }),
   });
@@ -12857,6 +13027,78 @@ function getCreationFinalImageChunks(context = {}) {
   return context.finalImageChunks;
 }
 
+// Previews assemble in their own store: they share the set::item key with the final
+// image but are replaced repeatedly, so mixing the two would let a preview chunk
+// land in the final image's slot.
+function getCreationPartialImageChunks(context = {}) {
+  if (!context.partialImageChunks) {
+    context.partialImageChunks = new Map();
+  }
+  return context.partialImageChunks;
+}
+
+/* 批量板块日志：一个批次 id 一条组行，补齐与单项重试沿用原 id，写回同一组而不新开顶层行。 */
+function recordBatchLogEvent({ channel, groupId, groupLabel, groupUnit, set = null, itemId, itemTitle, status, detail, imageUrl, at, totalCount } = {}) {
+  const normalizedGroupId = String(groupId || set?.setId || "").trim();
+  if (!normalizedGroupId) {
+    return;
+  }
+
+  const items = Array.isArray(set?.items) ? set.items : [];
+  const item = items.find((entry) => entry.itemId === itemId) || null;
+  recordGroupActivity({
+    channel,
+    groupId: normalizedGroupId,
+    groupLabel,
+    groupUnit,
+    totalCount: totalCount ?? (getFiniteCreationImageCount(set?.imageCount) ?? items.length),
+    groupItemId: itemId || "",
+    title: itemTitle || itemId || "生成项",
+    detail,
+    status,
+    ratio: item?.ratio || set?.ratio || "",
+    size: item?.size || set?.size || "",
+    modeLabel: formatGenerationActivityModeLabel(set?.imageRoute || getSelectedImageRoute()),
+    imageUrl,
+    relayUrl: resolveGenerationRelayUrl(set || {}),
+    at,
+  });
+}
+
+function recordCreationLogEvent({ setId, itemId, status, detail, title, imageUrl, at, set = null, context = {} } = {}) {
+  const currentSet = set || getCreationStreamCurrentSet(context) || getCreationCurrentSet();
+  const items = Array.isArray(currentSet?.items) ? currentSet.items : [];
+  const item = items.find((entry) => entry.itemId === itemId) || null;
+  recordBatchLogEvent({
+    channel: "creation",
+    groupId: setId || currentSet?.setId,
+    groupLabel: `套图 · ${currentSet?.productName || "未命名商品"}`,
+    set: currentSet,
+    itemId,
+    itemTitle: title || getCreationItemDisplayTitle(item || {}, itemId || "套图项"),
+    status,
+    detail,
+    imageUrl,
+    at,
+  });
+}
+
+function recordPortraitLogEvent({ setId, itemId, status, detail, imageUrl, at, set = null } = {}) {
+  const currentSet = set || getPortraitCurrentSet();
+  recordBatchLogEvent({
+    channel: "portrait",
+    groupId: setId || currentSet?.setId,
+    groupLabel: `写真 · ${getPortraitSetDisplayTitle(currentSet || {}) || "未命名写真"}`,
+    set: currentSet,
+    itemId,
+    itemTitle: itemId || "写真图",
+    status,
+    detail,
+    imageUrl,
+    at,
+  });
+}
+
 async function handleCreationStreamEvent(eventName, payload = {}, context = {}) {
   if (eventName === "repair_started") {
     upsertCreationSetForStream(payload.set, context);
@@ -12868,6 +13110,16 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
   if (eventName === "set_started") {
     upsertCreationSetForStream(payload.set, context);
     setCreationFeedback(`套图任务已创建，正在生成 ${getFiniteCreationImageCount(payload.set?.imageCount) ?? getCreationSelectedImageCount()} 张营销图。`, "busy");
+    (Array.isArray(payload.set?.items) ? payload.set.items : []).forEach((item) => {
+      recordCreationLogEvent({
+        setId: payload.set?.setId,
+        itemId: item.itemId,
+        status: "pending",
+        detail: buildGenerationTaskActivityDetail({ statusStage: "queued", statusText: "等待后台生成" }),
+        set: payload.set,
+        context,
+      });
+    });
     renderCreationView();
     return;
   }
@@ -12891,6 +13143,7 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
       updatedAt: nowIso(),
     }, context);
     setCreationFeedback(`正在生成 ${payload.role || payload.itemId}。`, "busy");
+    recordCreationLogEvent({ setId: payload.setId, itemId: payload.itemId, status: "active", detail: "正在生成图片", context });
     renderCreationView();
     return;
   }
@@ -12903,6 +13156,13 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
     if (payload.message) {
       setCreationFeedback(payload.message, "busy");
     }
+    recordCreationLogEvent({
+      setId: payload.setId,
+      itemId: payload.itemId,
+      status: "active",
+      detail: buildGenerationTaskActivityDetail({ statusStage: payload.stage, statusText: payload.message, fallback: "正在生成图片" }),
+      context,
+    });
     renderCreationView();
     return;
   }
@@ -12915,6 +13175,20 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
       updatedAt: nowIso(),
     }, context);
     renderCreationView();
+    return;
+  }
+
+  if (eventName === CREATION_STREAM_EVENTS.ITEM_PARTIAL_IMAGE_CHUNK) {
+    const dataUrl = recordPartialImageChunk(getCreationPartialImageChunks(context), payload);
+    if (dataUrl) {
+      updateCreationStreamItem(payload.itemId, {
+        status: "generating",
+        imageUrl: dataUrl,
+        thumbnailUrl: dataUrl,
+        updatedAt: nowIso(),
+      }, context);
+      renderCreationView();
+    }
     return;
   }
 
@@ -12939,6 +13213,7 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
     updateCreationStreamItem(payload.itemId, {
       status: "generating",
       ...(payload.dataUrl ? { imageUrl: payload.dataUrl, thumbnailUrl: payload.dataUrl } : {}),
+      ...(payload.partialImageFallback ? { partialImageFallback: true } : {}),
       updatedAt: nowIso(),
     }, context);
     renderCreationView();
@@ -12956,6 +13231,15 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
       }, context);
     }
     setCreationFeedback("已生成一张套图。", "success");
+    recordCreationLogEvent({
+      setId: payload.setId || payload.set?.setId,
+      itemId: payload.item?.itemId || payload.itemId,
+      status: "done",
+      detail: "图像已成功生成",
+      imageUrl: getImageUrl(payload.item),
+      set: payload.set,
+      context,
+    });
     renderCreationView();
     return;
   }
@@ -12976,6 +13260,15 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
     } else {
       setCreationFeedback(payload.message || "套图生成失败。", "error");
     }
+    const failureDetail = compactErrorMessage(payload.message, "生成请求失败");
+    recordCreationLogEvent({
+      setId: payload.setId || payload.set?.setId,
+      itemId: payload.itemId,
+      status: "error",
+      detail: buildGenerationTaskActivityDetail({ status: "error", statusStage: "error", statusText: failureDetail, errorMessage: failureDetail }),
+      set: payload.set,
+      context,
+    });
     renderCreationView();
     return;
   }
@@ -13043,6 +13336,7 @@ async function runCreationStream(response, context = {}) {
     });
   } finally {
     clearFinalImageChunks(getCreationFinalImageChunks(context));
+    clearFinalImageChunks(getCreationPartialImageChunks(context));
   }
 }
 
@@ -13343,7 +13637,7 @@ function enqueueCreationGeneration({ formData, set }) {
 }
 
 function getCreationQueueContext() {
-  return { creationState: state.creation, compactErrorMessage, getMaxParallelTasks: getMaxParallelJobCount, loadCreationSets, normalizeSet: normalizeCreationSetForView, nowIso, render: renderCreationView, runAutoRepairIfNeeded: runCreationQueuedAutoRepairIfNeeded, runCreationStream, setFeedback: setCreationFeedback, showError };
+  return { creationState: state.creation, compactErrorMessage, getMaxParallelTasks: getCreationMaxParallelTaskCount, loadCreationSets, normalizeSet: normalizeCreationSetForView, nowIso, render: renderCreationView, runAutoRepairIfNeeded: runCreationQueuedAutoRepairIfNeeded, runCreationStream, setFeedback: setCreationFeedback, showError };
 }
 
 async function runCreationQueuedJob(job) { await runCreationQueuedJobFromQueue(job, getCreationQueueContext()); }
@@ -13431,6 +13725,14 @@ async function repairCreationItems({ itemId = "", scope = "incomplete" } = {}) {
   state.creation.currentSet = normalizeCreationSetForView(currentSet);
   syncActiveCreationQueueSet(state.creation.currentSet);
   targetItems.forEach((item) => updateCreationCurrentItem(item.itemId, { status: "generating", error: "", updatedAt: nowIso() }));
+  /* 补齐与单图重试沿用原 setId，因此写回原批次组行而不新开顶层行。 */
+  targetItems.forEach((item) => recordCreationLogEvent({
+    setId: currentSet.setId,
+    itemId: item.itemId,
+    status: "active",
+    detail: itemId ? "正在重生成单张套图" : "正在补齐未完成项",
+    set: currentSet,
+  }));
   setCreationFeedback(itemId ? "正在重生成单张套图..." : "正在补齐未完成项...", "busy");
   renderCreationView();
 
@@ -14071,8 +14373,8 @@ function formatPortraitStyleSummary(set = {}) {
     .join("、") || "商务形象";
 }
 
-function createPortraitCardLoading(itemId = "") {
-  return createCreationCardLoadingShell("generating", null, { key: itemId });
+function createPortraitCardLoading(itemId = "", logText = "") {
+  return createCreationCardLoadingShell("generating", null, { key: itemId, logText });
 }
 
 function createPortraitCard(item = {}, fallbackIndex = 0, options = {}) {
@@ -14106,7 +14408,7 @@ function createPortraitCard(item = {}, fallbackIndex = 0, options = {}) {
   if (isLoadingCard) {
     media.classList.add("is-loading");
     media.setAttribute("aria-busy", "true");
-    media.appendChild(createPortraitCardLoading(item.itemId));
+    media.appendChild(createPortraitCardLoading(item.itemId, getCreationCardLogText(item, "portrait")));
   } else if (imageUrl) {
     const image = document.createElement("img");
     image.loading = "lazy";
@@ -14271,7 +14573,11 @@ async function previewPortraitPlan() {
 
 function handlePortraitStreamEvent(eventName, payload = {}) {
   if (eventName === "set_started") {
-    upsertPortraitSet(payload.set); setPortraitFeedback(`写真任务已创建，正在生成 ${payload.set?.imageCount || refs.portraitImageCountInput?.value || 12} 张图片。`, "busy"); renderPortraitView(); return;
+    upsertPortraitSet(payload.set); setPortraitFeedback(`写真任务已创建，正在生成 ${payload.set?.imageCount || refs.portraitImageCountInput?.value || 12} 张图片。`, "busy");
+    (Array.isArray(payload.set?.items) ? payload.set.items : []).forEach((item) => {
+      recordPortraitLogEvent({ setId: payload.set?.setId, itemId: item.itemId, status: "pending", detail: buildGenerationTaskActivityDetail({ statusStage: "queued", statusText: "等待后台生成" }), set: payload.set });
+    });
+    renderPortraitView(); return;
   }
   if (eventName === "repair_started") {
     const count = Array.isArray(payload.itemIds) ? payload.itemIds.length : 0; setPortraitFeedback(count > 0 ? `正在重试 ${count} 张写真...` : "正在重试写真失败项...", "busy"); renderPortraitView(); return;
@@ -14283,10 +14589,14 @@ function handlePortraitStreamEvent(eventName, payload = {}) {
     renderPortraitView(); return;
   }
   if (eventName === "item_started") {
-    updatePortraitCurrentItem(payload.itemId, { status: "generating", updatedAt: nowIso() }); setPortraitFeedback(`正在生成 ${payload.itemId || "写真图"}...`, "busy"); renderPortraitView(); return;
+    updatePortraitCurrentItem(payload.itemId, { status: "generating", updatedAt: nowIso() }); setPortraitFeedback(`正在生成 ${payload.itemId || "写真图"}...`, "busy");
+    recordPortraitLogEvent({ setId: payload.setId, itemId: payload.itemId, status: "active", detail: "正在生成图片" });
+    renderPortraitView(); return;
   }
   if (eventName === "item_status") {
-    updatePortraitCurrentItem(payload.itemId, { status: "generating", updatedAt: nowIso() }); if (payload.message) setPortraitFeedback(payload.message, "busy"); renderPortraitView(); return;
+    updatePortraitCurrentItem(payload.itemId, { status: "generating", updatedAt: nowIso() }); if (payload.message) setPortraitFeedback(payload.message, "busy");
+    recordPortraitLogEvent({ setId: payload.setId, itemId: payload.itemId, status: "active", detail: buildGenerationTaskActivityDetail({ statusStage: payload.stage, statusText: payload.message, fallback: "正在生成图片" }) });
+    renderPortraitView(); return;
   }
   if (eventName === "item_partial_image" || eventName === "item_final_image") {
     updatePortraitCurrentItem(payload.itemId, { status: "generating", imageUrl: payload.dataUrl, thumbnailUrl: payload.dataUrl, updatedAt: nowIso() }); renderPortraitView(); return;
@@ -14297,7 +14607,9 @@ function handlePortraitStreamEvent(eventName, payload = {}) {
     } else if (payload.item) {
       updatePortraitCurrentItem(payload.item.itemId, { ...payload.item, status: "completed", updatedAt: nowIso() });
     }
-    setPortraitFeedback("已生成一张写真图。", "success"); renderPortraitView(); return;
+    setPortraitFeedback("已生成一张写真图。", "success");
+    recordPortraitLogEvent({ setId: payload.setId || payload.set?.setId, itemId: payload.item?.itemId || payload.itemId, status: "done", detail: "图像已成功生成", imageUrl: getImageUrl(payload.item), set: payload.set });
+    renderPortraitView(); return;
   }
   if (eventName === "item_failed") {
     if (payload.set) {
@@ -14305,7 +14617,10 @@ function handlePortraitStreamEvent(eventName, payload = {}) {
     } else if (payload.itemId) {
       updatePortraitCurrentItem(payload.itemId, { status: "failed", error: payload.message || "", updatedAt: nowIso() });
     }
-    setPortraitFeedback(payload.message || "写真图生成失败。", "error"); renderPortraitView(); return;
+    setPortraitFeedback(payload.message || "写真图生成失败。", "error");
+    const portraitFailureDetail = compactErrorMessage(payload.message, "生成请求失败");
+    recordPortraitLogEvent({ setId: payload.setId || payload.set?.setId, itemId: payload.itemId, status: "error", detail: buildGenerationTaskActivityDetail({ status: "error", statusStage: "error", statusText: portraitFailureDetail, errorMessage: portraitFailureDetail }), set: payload.set });
+    renderPortraitView(); return;
   }
   if (eventName === "complete") {
     if (payload.set) upsertPortraitSet(payload.set);
@@ -14814,7 +15129,7 @@ function createPptSlideCard(slide) {
     image.alt = slide.title || `第 ${slide.slideNumber} 页`;
     thumb.appendChild(image);
   } else if (state.ppt.generating && !slide.errorMessage) {
-    const loading = createGenerationLoadingShell(document, { key: `ppt-${slide.slideNumber}`, active: true });
+    const loading = createGenerationLoadingShell(document, { key: `ppt-${slide.slideNumber}`, active: true, showLog: true, logText: slide.statusText || "" });
     thumb.classList.add("is-loading");
     thumb.setAttribute("aria-busy", "true");
     thumb.appendChild(loading.shell);
@@ -16553,7 +16868,7 @@ async function runGeneration(job) {
         terminalEventReceived = true;
         const message = compactErrorMessage(payload.message, "生成请求失败");
         sealPromptDeckOnFailure(job, message);
-        handleActivityFailure(job.id, message, getPromptDeckLastPreviewUrl(job));
+        handleActivityFailure(job, message, getPromptDeckLastPreviewUrl(job));
         showError(message);
         if (job.mode === "reference-analysis") {
           removeReferenceAnalysisGenerationKey(makeJobPreviewKey(job.id));
@@ -16577,7 +16892,7 @@ async function runGeneration(job) {
     if (!terminalEventReceived && !queuedForPolling) {
       const message = "生成连接已中断，未收到完成事件。请稍后重试，或降低分辨率。";
       sealPromptDeckOnFailure(job, message);
-      handleActivityFailure(job.id, message, getPromptDeckLastPreviewUrl(job));
+      handleActivityFailure(job, message, getPromptDeckLastPreviewUrl(job));
       showError(message);
       if (job.mode === "reference-analysis") {
         removeReferenceAnalysisGenerationKey(makeJobPreviewKey(job.id));
@@ -16603,7 +16918,7 @@ async function runGeneration(job) {
     }
     const message = error instanceof Error ? error.message : String(error);
     sealPromptDeckOnFailure(job, message);
-    handleActivityFailure(job.id, message, getPromptDeckLastPreviewUrl(job));
+    handleActivityFailure(job, message, getPromptDeckLastPreviewUrl(job));
     showError(message);
     if (job.mode === "reference-analysis") {
       removeReferenceAnalysisGenerationKey(makeJobPreviewKey(job.id));
@@ -17768,6 +18083,9 @@ function bindEvents() {
   refs.pptEditCanvas.addEventListener("pointercancel", endPptEditStroke);
   refs.timelineNewIndicator.addEventListener("click", scrollTimelineToNewest);
   refs.timelineList.addEventListener("scroll", handleTimelineScroll, { passive: true });
+  /* 折叠按钮与板块切换都是重渲染出来的新节点，所以用委托监听。 */
+  refs.timelineList.addEventListener("click", handleGenerationLogGroupToggle);
+  refs.timelineChannelTabs?.addEventListener("click", handleGenerationLogChannelPick);
   refs.surprisePromptButton.addEventListener("click", selectRandomPrompt);
   refs.closePromptTemplateButton.addEventListener("click", () => setPromptTemplatePopoverOpen(false));
   refs.promptTemplateForm.addEventListener("submit", savePromptTemplate);
@@ -18269,7 +18587,7 @@ async function bootstrap() {
   syncUiLanguage();
   state.uiTheme = readUiTheme();
   setUiTheme(state.uiTheme);
-  state.activityFeed = readGenerationActivityFeed();
+  state.generationLog = readGenerationLogStore();
   state.galleryMetadataCache = readGalleryMetadataCache();
   state.promptTemplates = readPromptTemplates();
   state.promptTemplateDismissedHistoryIds = readDismissedPromptAgentTemplateIds();

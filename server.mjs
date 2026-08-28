@@ -76,8 +76,9 @@ import {
   saveGeneratedAsset,
 } from "./lib/gallery-store.mjs";
 import { normalizeBase64, requestDirectImageGeneration, requestImageEdit, requestImageGeneration, requestModelProtocolImageGeneration } from "./lib/responses-workflow.mjs";
+import { resolveCreationUpstreamTimeoutMs, upstreamStreamFetch, warmUpstreamStreamDispatcher } from "./lib/upstream-stream-fetch.mjs";
 import { mergeRequestPrivateConfig } from "./lib/request-private-config.mjs";
-import { IMAGE_ROUTE_B, IMAGE_ROUTE_C, getSelectedImageGenerationConfig, getSelectedPromptAgentAnalysisConfig, getSelectedTextVisionConfig } from "./lib/image-route-config.mjs";
+import { API_ENDPOINT_RESPONSES, IMAGE_ROUTE_A, IMAGE_ROUTE_B, IMAGE_ROUTE_C, getSelectedImageGenerationConfig, getSelectedPromptAgentAnalysisConfig, getSelectedTextVisionConfig, normalizeApiEndpointPath } from "./lib/image-route-config.mjs";
 import { fetchAvailableModels } from "./lib/model-list-client.mjs";
 import { createGenerationTaskStore } from "./lib/generation-task-store.mjs";
 import {
@@ -94,7 +95,6 @@ import { buildCreationGenerationSnapshot } from "./lib/creation-generation-snaps
 import {
   DEFAULT_REASONING_EFFORT,
   CREATION_STATUS_HEARTBEAT_MS,
-  CREATION_UPSTREAM_TIMEOUT_MS as DEFAULT_CREATION_UPSTREAM_TIMEOUT_MS,
   MAX_CREATION_REFERENCE_IMAGES,
   MAX_CREATION_PARALLEL_TASKS,
   MAX_PARALLEL_TASKS_PER_SESSION,
@@ -145,6 +145,12 @@ import {
   buildCreationGenerationReferenceImageLabels,
   buildCreationItemReferenceImages,
 } from "./lib/creation-reference-labels.mjs";
+import {
+  applyReferenceFileIds,
+  buildReferenceUploadTargetKey,
+  createCreationReferenceRegistry,
+  prepareReferenceUploads,
+} from "./lib/creation-reference-upload-cache.mjs";
 import {
   applyCreationPlanOverrides,
   assertCreationPlanCanGenerate,
@@ -241,12 +247,9 @@ const PORTRAIT_REFERENCE_ANALYSIS_REASONING_EFFORT = "low";
 const PROMPT_AGENT_ANALYSIS_REASONING_EFFORT = "medium";
 const REFERENCE_ORCHESTRATION_REASONING_EFFORT = "low";
 const SESSION_TASK_SLOT_RETRY_DELAY_MS = 250;
-const CREATION_UPSTREAM_TIMEOUT_MS = (() => {
-  const configured = Number(process.env.IMAGE_STUDIO_CREATION_UPSTREAM_TIMEOUT_MS);
-  return Number.isFinite(configured) && configured >= 1000
-    ? Math.min(configured, 60 * 60 * 1000)
-    : DEFAULT_CREATION_UPSTREAM_TIMEOUT_MS;
-})();
+// Shared with lib/upstream-stream-fetch.mjs so the socket body timeout is always
+// derived from the SAME effective deadline this abort uses.
+const CREATION_UPSTREAM_TIMEOUT_MS = resolveCreationUpstreamTimeoutMs();
 function getSessionTaskSlotLimit(requestScope) {
   const scope = String(requestScope || "").trim().split(":", 1)[0];
   if (scope === "prompt") {
@@ -500,7 +503,7 @@ function writeSseEvent(response, type, payload) {
 // A full creation image is ~2 MB of base64 on one SSE line, which intermediaries
 // truncate and clients then fail to parse. Send bounded chunks the client can
 // reassemble, then a data-free completion event carrying the item metadata.
-function writeCreationItemFinalImage(response, { setId, itemId, base64, format, meta = {} }) {
+function writeCreationItemFinalImage(response, { setId, itemId, base64, format, partialImageFallback = false, meta = {} }) {
   const mimeType = toOutputFormatMimeType(format);
   const chunkPayloads = buildFinalImageChunkPayloads({
     setId,
@@ -519,8 +522,40 @@ function writeCreationItemFinalImage(response, { setId, itemId, base64, format, 
     setId,
     itemId,
     mimeType,
+    // The upstream never confirmed this image; it is the last mid-generation preview
+    // promoted to a result. The card marks it so the output stays traceable.
+    ...(partialImageFallback ? { partialImageFallback: true } : {}),
     ...meta,
   });
+}
+
+// Mid-generation previews are the same ~2 MB single-line hazard as the final image.
+// One writer per request tracks a per-item sequence so the client can tell a newer
+// preview from a straggling chunk of the previous one.
+function createCreationItemPartialImageWriter(response) {
+  const sequenceByItem = new Map();
+
+  return function writeCreationItemPartialImage({ setId, itemId, dataUrl, format }) {
+    const key = `${setId}::${itemId}`;
+    const sequence = sequenceByItem.get(key) ?? 0;
+    sequenceByItem.set(key, sequence + 1);
+
+    const chunkPayloads = buildFinalImageChunkPayloads({
+      setId,
+      itemId,
+      sequence,
+      base64: normalizeBase64(dataUrl),
+      mimeType: toOutputFormatMimeType(format),
+    });
+
+    for (const chunkPayload of chunkPayloads) {
+      if (!writeSseEvent(response, CREATION_STREAM_EVENTS.ITEM_PARTIAL_IMAGE_CHUNK, chunkPayload)) {
+        return false;
+      }
+    }
+
+    return true;
+  };
 }
 
 function createCreationRequestLifecycle(response) {
@@ -582,6 +617,67 @@ async function requestCreationStudioImageGeneration(response, options) {
   } finally {
     lifecycle.dispose();
   }
+}
+
+// Only the Responses route accepts `file_id` image input. Route A can also be pointed at
+// `chat/completions`, whose image content block has no `file_id` form, so the endpoint has
+// to match too. The direct and model-protocol routes keep sending inline bytes, so
+// uploading for them would add a round trip and save nothing.
+function supportsCreationReferenceFileIds(generationConfig = {}) {
+  return (
+    generationConfig.imageRoute === IMAGE_ROUTE_A &&
+    normalizeApiEndpointPath(generationConfig.endpointPath, API_ENDPOINT_RESPONSES) === API_ENDPOINT_RESPONSES
+  );
+}
+
+// One suite request registers its reference bytes once, then trades them for upstream file
+// identifiers where the route supports it. Repair items can each carry their own saved
+// baseUrl and route, so uploads are prepared per distinct upstream target and the per-item
+// rewrite looks the identifier up under that same target.
+async function createCreationReferenceUploadRegistry({
+  referenceImages = [],
+  logoImage = null,
+  generationConfigs = [],
+} = {}) {
+  const registry = createCreationReferenceRegistry();
+  registry.registerAll(referenceImages);
+  if (logoImage) {
+    registry.register(logoImage);
+  }
+
+  // Keyed by target rather than by config object: the repair path builds a fresh config
+  // object per item, so identity would never match while the target is the same.
+  const preparedTargetKeys = new Set();
+  if (registry.size === 0) {
+    return { registry, getTargetKey: () => "" };
+  }
+
+  for (const generationConfig of generationConfigs) {
+    if (!generationConfig || !supportsCreationReferenceFileIds(generationConfig)) {
+      continue;
+    }
+    const targetKey = buildReferenceUploadTargetKey(generationConfig);
+    if (!targetKey || preparedTargetKeys.has(targetKey)) {
+      continue;
+    }
+    preparedTargetKeys.add(targetKey);
+    await prepareReferenceUploads(registry, {
+      baseUrl: generationConfig.baseUrl,
+      apiKey: generationConfig.apiKey,
+      fetchImpl: upstreamStreamFetch,
+    });
+  }
+
+  return {
+    registry,
+    getTargetKey(generationConfig) {
+      if (!generationConfig || !supportsCreationReferenceFileIds(generationConfig)) {
+        return "";
+      }
+      const targetKey = buildReferenceUploadTargetKey(generationConfig);
+      return targetKey && preparedTargetKeys.has(targetKey) ? targetKey : "";
+    },
+  };
 }
 
 async function readJsonBody(request, { maxBytes = Number.POSITIVE_INFINITY } = {}) {
@@ -2799,140 +2895,69 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
           ratioOption,
         );
         async function handleGenerationEvent(event, { statusPrefix = "", emitFinalImage = true } = {}) {
-      if (event.type === "status") {
-        const message = statusPrefix ? `${statusPrefix}: ${event.message}` : event.message;
-        generationTaskStore.updateTask(clientSessionId, taskId, {
-          status: "running",
-          statusStage: event.stage,
-          statusText: message,
-        });
-        writeSseEvent(response, "status", {
-          stage: event.stage,
-          message,
-        });
-        return;
-      }
-
-      if (event.type === "partial_image") {
-        generationTaskStore.updateTask(clientSessionId, taskId, {
-          status: "running",
-          statusStage: "generating",
-          statusText: "已收到中途预览",
-        });
-        writeSseEvent(response, "partial_image", {
-          dataUrl: event.dataUrl,
-        });
-        return;
-      }
-
-      if (event.type === "final_image") {
-        finalBase64 = event.base64;
-        if (!emitFinalImage) {
-          return;
-        }
-        generationTaskStore.updateTask(clientSessionId, taskId, {
-          status: "running",
-          statusStage: "saving",
-          statusText: "已拿到最终图像，正在写入本地",
-        });
-        writeSseEvent(response, "final_image", {
-          dataUrl: `data:${toOutputFormatMimeType(finalFormat)};base64,${normalizeBase64(event.base64)}`,
-        });
-      }
-    }
-
-    const sharedGenerationOptions = {
-      baseUrl: generationConfig.baseUrl,
-      apiKey: generationConfig.apiKey,
-      size: finalSize,
-      aspectRatio: ratioOption.value,
-      quality: finalQuality,
-      format: toApiOutputFormat(finalFormat),
-      responsesModel: generationConfig.responsesModel,
-      imageRoute: generationConfig.imageRoute,
-      imageModel: generationConfig.imageModel,
-      endpointPath: generationResult.endpointPath || generationConfig.endpointPath,
-      generationMode,
-      reasoningEffort,
-    };
-    let generationResult;
-
-    if (isLocalMaskImageEdit && executionStrategy === "sequential") {
-      let currentSourceImage = referenceImages[0];
-      const totalRegions = regionInstructions.length;
-
-      for (const [index, region] of regionInstructions.entries()) {
-        const stepNumber = index + 1;
-        const statusPrefix = `Region ${stepNumber}/${totalRegions}`;
-        let stepFinalBase64 = "";
-
-        try {
-          const stepResult = await requestStudioImageGeneration({
-            ...sharedGenerationOptions,
-            prompt: appendRatioHintToPrompt(buildLocalMaskRegionPrompt(region, { total: totalRegions }), ratioOption),
-            sourceImage: currentSourceImage,
-            mask: localMasks[index],
-            referenceImages: [currentSourceImage],
-            referenceImageLabels: [],
-            async onEvent(event) {
-              if (event.type === "final_image") {
-                stepFinalBase64 = event.base64;
-                if (stepNumber === totalRegions) {
-                  await handleGenerationEvent(event);
-                  return;
-                }
-                generationTaskStore.updateTask(clientSessionId, taskId, {
-                  status: "running",
-                  statusStage: "generating",
-                  statusText: `${statusPrefix}: completed. Preparing next region.`,
-                });
-                writeSseEvent(response, "status", {
-                  stage: "generating",
-                  message: `${statusPrefix}: completed. Preparing next region.`,
-                });
-                return;
-              }
-
-              await handleGenerationEvent(event, { statusPrefix });
-            },
-          });
-          generationResult = stepResult;
-          stepFinalBase64 = stepFinalBase64 || stepResult.finalImageBase64 || "";
-          if (!stepFinalBase64) {
-            throw new Error("Image edit response ended without a final image.");
+          if (event.type === "status") {
+            const message = statusPrefix ? `${statusPrefix}: ${event.message}` : event.message;
+            generationTaskStore.updateTask(clientSessionId, taskId, {
+              status: "running",
+              statusStage: event.stage,
+              statusText: message,
+            });
+            writeSseEvent(response, "status", {
+              stage: event.stage,
+              message,
+            });
+            return;
           }
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          throw new Error(`Region ${region.index} of ${totalRegions} failed: ${message}`);
+
+          if (event.type === "partial_image") {
+            generationTaskStore.updateTask(clientSessionId, taskId, {
+              status: "running",
+              statusStage: "generating",
+              statusText: "已收到中途预览",
+            });
+            writeSseEvent(response, "partial_image", {
+              dataUrl: event.dataUrl,
+            });
+            return;
+          }
+
+          if (event.type === "final_image") {
+            finalBase64 = event.base64;
+            if (!emitFinalImage) {
+              return;
+            }
+            generationTaskStore.updateTask(clientSessionId, taskId, {
+              status: "running",
+              statusStage: "saving",
+              statusText: "已拿到最终图像，正在写入本地",
+            });
+            writeSseEvent(response, "final_image", {
+              dataUrl: `data:${toOutputFormatMimeType(finalFormat)};base64,${normalizeBase64(event.base64)}`,
+            });
+          }
         }
 
-        if (stepNumber < totalRegions) {
-          const normalizedStepBase64 = normalizeBase64(stepFinalBase64);
-          const intermediateFormatExtension = toOutputFormatExtension(finalFormat);
-          currentSourceImage = {
-            filename: `local-mask-region-${region.index}-output.${intermediateFormatExtension}`,
-            mimeType: toOutputFormatMimeType(finalFormat),
-            buffer: Buffer.from(normalizedStepBase64, "base64"),
-            base64: normalizedStepBase64,
-          };
-        }
-      }
-    } else {
-      generationResult = await requestStudioImageGeneration({
-        ...sharedGenerationOptions,
-        prompt: finalPrompt,
-        sourceImage: isImageEdit ? referenceImages[0] : null,
-        mask: isLocalMaskImageEdit ? localMask : null,
-        referenceImages,
-        referenceImageLabels: getStyleTransferReferenceImageLabels(generationMode, styleTransferStylePreset, referenceImages, {
-          quickBlendGroups: quickBlendReferenceGroups,
-        }),
-        async onEvent(event) {
-          await handleGenerationEvent(event);
-        },
-      });
-    }
-    const generationCompletedAt = new Date().toISOString();
+        const generationResult = await requestStudioImageGeneration({
+          baseUrl: generationConfig.baseUrl,
+          apiKey: generationConfig.apiKey,
+          prompt,
+          referenceImages,
+          referenceImageLabels: [],
+          size: finalSize,
+          aspectRatio: ratioOption.value,
+          quality: finalQuality,
+          format: toApiOutputFormat(finalFormat),
+          responsesModel: generationConfig.responsesModel,
+          imageRoute: generationConfig.imageRoute,
+          imageModel: generationConfig.imageModel,
+          endpointPath: generationConfig.endpointPath,
+          reasoningEffort,
+          async onEvent(event) {
+            await handleGenerationEvent(event);
+          },
+        });
+
+        const generationCompletedAt = new Date().toISOString();
         const generationDurationMs = Math.max(0, Date.now() - generationStartedAtMs);
         const savedSize = generationResult.effectiveSize || finalSize;
         const filename = buildArticleImageFilename({
@@ -4299,6 +4324,7 @@ async function handlePortraitGenerate(request, response) {
 }
 
 async function handleCreationGenerate(request, response) {
+  const writeCreationItemPartialImage = createCreationItemPartialImageWriter(response);
   response.writeHead(200, {
     "Cache-Control": "no-cache, no-transform",
     Connection: "keep-alive",
@@ -4431,6 +4457,13 @@ async function handleCreationGenerate(request, response) {
     writeSseEvent(response, "set_started", { set: setManifest });
     writeSseEvent(response, "plan", { setId, items });
 
+    const referenceUploads = await createCreationReferenceUploadRegistry({
+      referenceImages,
+      logoImage,
+      generationConfigs: [generationConfig],
+    });
+    const referenceUploadTargetKey = referenceUploads.getTargetKey(generationConfig);
+
     await runWithConcurrency(plan.items, MAX_CREATION_PARALLEL_TASKS, async (item) => {
       const taskId = `${setId}-${item.itemId}`;
       const generationStartedAt = new Date().toISOString();
@@ -4450,10 +4483,10 @@ async function handleCreationGenerate(request, response) {
         slotClaimed = true;
         const finalPrompt = buildCreationItemGenerationPrompt(item.prompt, itemGenerationParameters, item);
         const itemReferenceImages = buildCreationItemReferenceImages(item, referenceImages, referenceImageRoles);
-        const itemGenerationReferenceImagesWithLogo = appendCreationItemLogoReference(
-          item,
-          itemReferenceImages,
-          logoImage,
+        const itemGenerationReferenceImagesWithLogo = applyReferenceFileIds(
+          referenceUploads.registry,
+          appendCreationItemLogoReference(item, itemReferenceImages, logoImage),
+          referenceUploadTargetKey,
         );
         const generationSnapshot = buildCreationGenerationSnapshot({
           generationPrompt: finalPrompt,
@@ -4512,10 +4545,11 @@ async function handleCreationGenerate(request, response) {
             }
 
             if (event.type === "partial_image") {
-              writeSseEvent(response, "item_partial_image", {
+              writeCreationItemPartialImage({
                 setId,
                 itemId: item.itemId,
                 dataUrl: event.dataUrl,
+                format: finalFormat,
               });
             }
 
@@ -4525,6 +4559,7 @@ async function handleCreationGenerate(request, response) {
                 setId,
                 itemId: item.itemId,
                 base64: event.base64,
+                partialImageFallback: event.partialImageFallback === true,
                 format: finalFormat,
                 meta: {
                   ratio: itemGenerationParameters.ratioOption.value,
@@ -4556,6 +4591,7 @@ async function handleCreationGenerate(request, response) {
           filename,
           imageBuffer: decodeAndValidateGeneratedImage(finalBase64, "套图生成结果"),
           metadata: {
+            partialImageFallback: generationResult.partialImageFallbackUsed === true,
             prompt: finalPrompt,
             ...generationSnapshot,
             createdAt,
@@ -4704,6 +4740,7 @@ async function handleCreationGenerate(request, response) {
 }
 
 async function handleCreationLogoBatchGenerate(request, response) {
+  const writeCreationItemPartialImage = createCreationItemPartialImageWriter(response);
   response.writeHead(200, {
     "Cache-Control": "no-cache, no-transform",
     Connection: "keep-alive",
@@ -4845,10 +4882,11 @@ async function handleCreationLogoBatchGenerate(request, response) {
             }
 
             if (event.type === "partial_image") {
-              writeSseEvent(response, "item_partial_image", {
+              writeCreationItemPartialImage({
                 setId,
                 itemId: item.itemId,
                 dataUrl: event.dataUrl,
+                format: finalFormat,
               });
             }
 
@@ -4858,6 +4896,7 @@ async function handleCreationLogoBatchGenerate(request, response) {
                 setId,
                 itemId: item.itemId,
                 base64: event.base64,
+                partialImageFallback: event.partialImageFallback === true,
                 format: finalFormat,
               });
             }
@@ -4884,6 +4923,7 @@ async function handleCreationLogoBatchGenerate(request, response) {
           filename,
           imageBuffer: decodeAndValidateGeneratedImage(finalBase64, "Logo 批量生成结果"),
           metadata: {
+            partialImageFallback: generationResult.partialImageFallbackUsed === true,
             prompt: item.prompt,
             createdAt,
             baseUrl: generationConfig.baseUrl,
@@ -5284,6 +5324,7 @@ async function handlePortraitRepair(request, response) {
 }
 
 async function handleCreationRepair(request, response) {
+  const writeCreationItemPartialImage = createCreationItemPartialImageWriter(response);
   response.writeHead(200, {
     "Cache-Control": "no-cache, no-transform",
     Connection: "keep-alive",
@@ -5408,9 +5449,20 @@ async function handleCreationRepair(request, response) {
       itemIds: repairItems.map((item) => item.itemId),
     });
 
+    // Repair items can carry their own saved route and baseUrl, so collect every distinct
+    // upstream up front and upload once per target instead of once per item.
+    const referenceUploads = await createCreationReferenceUploadRegistry({
+      referenceImages,
+      logoImage,
+      generationConfigs: repairItems.map((repairItem) =>
+        resolveCreationRepairGenerationConfig(repairItem, generationConfig),
+      ),
+    });
+
     await runWithConcurrency(repairItems, MAX_CREATION_PARALLEL_TASKS, async (item) => {
       const repairItem = item;
       const itemGenerationConfig = resolveCreationRepairGenerationConfig(repairItem, generationConfig);
+      const referenceUploadTargetKey = referenceUploads.getTargetKey(itemGenerationConfig);
       const itemFormat = normalizeOutputFormat(repairItem.format || finalFormat);
       const itemQuality = String(repairItem.quality || finalQuality);
       const itemReasoningEffort = normalizeReasoningEffort(repairItem.reasoningEffort || reasoningEffort);
@@ -5432,10 +5484,10 @@ async function handleCreationRepair(request, response) {
         slotClaimed = true;
         const finalPrompt = buildCreationItemGenerationPrompt(repairItem.prompt, itemGenerationParameters, repairItem);
         const itemReferenceImages = buildCreationItemReferenceImages(repairItem, referenceImages, referenceImageRoles);
-        const itemGenerationReferenceImagesWithLogo = appendCreationItemLogoReference(
-          repairItem,
-          itemReferenceImages,
-          logoImage,
+        const itemGenerationReferenceImagesWithLogo = applyReferenceFileIds(
+          referenceUploads.registry,
+          appendCreationItemLogoReference(repairItem, itemReferenceImages, logoImage),
+          referenceUploadTargetKey,
         );
         const generationSnapshot = buildCreationGenerationSnapshot({
           generationPrompt: finalPrompt,
@@ -5486,10 +5538,11 @@ async function handleCreationRepair(request, response) {
             }
 
             if (event.type === "partial_image") {
-              writeSseEvent(response, "item_partial_image", {
+              writeCreationItemPartialImage({
                 setId,
                 itemId: item.itemId,
                 dataUrl: event.dataUrl,
+                format: finalFormat,
               });
             }
 
@@ -5499,6 +5552,7 @@ async function handleCreationRepair(request, response) {
                 setId,
                 itemId: item.itemId,
                 base64: event.base64,
+                partialImageFallback: event.partialImageFallback === true,
                 format: itemFormat,
               });
             }
@@ -5525,6 +5579,7 @@ async function handleCreationRepair(request, response) {
           filename,
           imageBuffer: decodeAndValidateGeneratedImage(finalBase64, "套图修复结果"),
           metadata: {
+            partialImageFallback: generationResult.partialImageFallbackUsed === true,
             prompt: finalPrompt,
             ...generationSnapshot,
             createdAt: generationCompletedAt,
@@ -6631,6 +6686,10 @@ async function routeRequest(request, response) {
 
 await mkdir(outputDir, { recursive: true });
 await migrateOutputDirectoryMonths({ outputDir });
+
+// Create undici's global dispatcher symbol before the first upstream request, so the
+// raised body timeout applies to request #1 instead of silently falling back.
+await warmUpstreamStreamDispatcher();
 
 async function handleIncomingRequest(request, response) {
   try {

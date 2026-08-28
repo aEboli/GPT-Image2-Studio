@@ -24,6 +24,8 @@ const creationSuiteQueuePath = new URL("../lib/creation-suite-queue.mjs", import
 const publicConfigModelPickerPath = new URL("../public/lib/config-model-picker.mjs", import.meta.url);
 const publicCreationListingViewPath = new URL("../public/lib/creation-listing-view.mjs", import.meta.url);
 const generationClientPath = new URL("../lib/generation-client.mjs", import.meta.url);
+const generationLogPanelPath = new URL("../lib/generation-log-panel.mjs", import.meta.url);
+const generationLogStorePath = new URL("../lib/generation-log-store.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
 const stylesAssetVersion = "20260825-attempt-preview-deck-1";
 const appAssetVersion = "20260825-attempt-preview-deck-1";
@@ -823,25 +825,32 @@ test("generation activity moves into settings while studio workspace reflows to 
   assert.match(app, /function formatCompactRatioLabel\(ratio\) \{[\s\S]*return \/\^\\d\+:\\d\+\$\/\.test\(normalized\) \? normalized : "";/);
   assert.match(app, /formatGenerationActivityModeLabel/);
   assert.doesNotMatch(app, /title\.textContent = item\.title;[\s\S]*copy\.appendChild\(title\);/);
-  assert.match(app, /const displayText = getGenerationActivityDisplayText\(item\.detail\);/);
-  assert.match(app, /const main = document\.createElement\("span"\);[\s\S]*main\.className = "timeline-main";[\s\S]*className: "timeline-summary", textContent: displayText\.summary \|\| item\.title \|\| ""/);
-  assert.match(app, /if \(item\.imageUrl\) \{[\s\S]*row\.classList\.add\("has-url"\);[\s\S]*className: "timeline-url", href: item\.imageUrl, target: "_blank", rel: "noopener noreferrer", textContent: item\.imageUrl[\s\S]*\}/);
-  assert.match(app, /if \(displayText\.detail\) \{[\s\S]*className: "timeline-detail", textContent: displayText\.detail[\s\S]*\}/);
-  assert.match(app, /if \(item\.paramsText\) \{[\s\S]*row\.classList\.add\("has-relay"\);[\s\S]*className: "timeline-relay", textContent: item\.paramsText[\s\S]*\}/);
-  assert.doesNotMatch(app, /className: "timeline-params"|document\.createElement\("pre"\)/);
-  assert.match(app, /const meta = document\.createElement\("span"\);[\s\S]*meta\.className = "timeline-meta";[\s\S]*className: "timeline-mode", textContent: item\.modeLabel[\s\S]*const compactRatio = formatCompactRatioLabel\(item\.ratio\);[\s\S]*const compactSize = formatCompactSizeLabel\(item\.size\);[\s\S]*const ratioSize = document\.createElement\("span"\);[\s\S]*ratioSize\.className = "timeline-ratio-size";[\s\S]*ratioSize\.textContent = \[compactRatio, compactSize \? `\(\$\{compactSize\}\)` : ""\]\.filter\(Boolean\)\.join\(" "\);[\s\S]*meta\.appendChild\(ratioSize\);[\s\S]*const timelineTimes = item\.generationStartedAt \|\| item\.generationCompletedAt[\s\S]*\[item\.generationStartedAt, item\.generationCompletedAt\][\s\S]*\[item\.at\][\s\S]*timelineTimes\.forEach\(\(timelineAt\)[\s\S]*timelineTime\.className = "timeline-start-time";[\s\S]*time\.textContent = formatClock\(timelineAt\);[\s\S]*meta\.appendChild\(timelineTime\);[\s\S]*row\.appendChild\(meta\);/);
-  assert.doesNotMatch(app, /className = "timeline-ratio"|className = "timeline-resolution"/);
-  assert.match(app, /function getGenerationActivityRelayText\(value\) \{[\s\S]*match\(\s*\/\^\(URL\|中转\)\[：:\]\(.*\)\$\//);
-  assert.match(app, /function getGenerationActivityRelayText\(value\) \{[\s\S]*return match \? `URL：\$\{match\[2\]\.trim\(\)\}` : "";/);
-  assert.match(app, /function buildGenerationActivityRelayText\(item = \{\}\) \{[\s\S]*return relayUrl \? `URL：\$\{relayUrl\}` : "";/);
-  assert.doesNotMatch(app, /return relayUrl \? `中转/);
-  assert.match(app, /imageUrl: getImageUrl\(current\), modeLabel: formatGenerationActivityModeLabel\(current\.imageRoute \|\| current\.generationRoute\), paramsText: buildGenerationActivityRelayText\(current\),/);
+  // Row building lives in the shared log panel module; the settings log panel is the
+  // only place the log renders, scoped to the board picked by the channel tabs.
+  const logPanel = await readFile(generationLogPanelPath, "utf8");
+  assert.match(app, /renderGenerationLogRows\(refs\.timelineList, \{[\s\S]*entries: items,[\s\S]*channel,[\s\S]*formatTime: formatClock,/);
+  assert.match(logPanel, /const displayText = getGenerationActivityDisplayText\(entry\.detail\);/);
+  assert.match(logPanel, /"timeline-summary", displayText\.summary \|\| cleanText\(entry\.title\)/);
+  assert.match(logPanel, /row\.classList\.add\("has-url"\);[\s\S]*"timeline-url", cleanText\(entry\.imageUrl\)[\s\S]*link\.target = "_blank";[\s\S]*link\.rel = "noopener noreferrer";/);
+  assert.match(logPanel, /if \(displayText\.detail\) \{[\s\S]*row\.classList\.add\("has-detail"\);[\s\S]*"timeline-detail", displayText\.detail/);
+  assert.match(logPanel, /if \(appendRelay\(documentRef, main, entry\.relayUrl\)\) \{[\s\S]*row\.classList\.add\("has-relay"\);/);
+  assert.match(logPanel, /"timeline-relay", relayText/);
+  assert.doesNotMatch(logPanel, /className: "timeline-params"|createElement\(documentRef, "pre"/);
+  assert.match(logPanel, /"timeline-meta"\);[\s\S]*"timeline-mode", cleanText\(entry\.modeLabel\)[\s\S]*cleanText\(entry\.ratio\), cleanText\(entry\.size\) \? `\(\$\{cleanText\(entry\.size\)\}\)` : ""[\s\S]*"timeline-ratio-size", ratioSize[\s\S]*entry\.generationStartedAt \|\| entry\.generationCompletedAt[\s\S]*\[entry\.generationStartedAt, entry\.generationCompletedAt\][\s\S]*\[entry\.at\][\s\S]*"timeline-start-time"[\s\S]*formatTime\(value\)/);
+  assert.doesNotMatch(logPanel, /className = "timeline-ratio"|className = "timeline-resolution"/);
+  // The relay URL is stored bare and only gains its `URL：` prefix at render time,
+  // so success and failure rows cannot end up with different formats.
+  const logStore = await readFile(generationLogStorePath, "utf8");
+  assert.match(logStore, /export function normalizeGenerationLogRelayUrl\(value\) \{[\s\S]*match\(\/\^\(\?:URL\|中转\)\\s\*\[：:\]\\s\*\(\.\+\)\$\//);
+  assert.match(logStore, /export function formatGenerationLogRelayText\(relayUrl\) \{[\s\S]*return normalized \? `URL：\$\{normalized\}` : "";/);
+  assert.doesNotMatch(logStore, /return relayUrl \? `中转/);
+  assert.match(app, /function buildGenerationActivityRelayUrl\(item = \{\}\) \{[\s\S]*resolveGenerationRelayUrl\(item\);/);
+  assert.match(app, /imageUrl: getImageUrl\(current\), modeLabel: formatGenerationActivityModeLabel\(current\.imageRoute \|\| current\.generationRoute\), relayUrl: buildGenerationActivityRelayUrl\(current\),/);
   assert.match(app, /modeLabel: formatGenerationActivityModeLabel\(task\?\.imageRoute\),/);
   assert.match(app, /imageUrl: getImageUrl\(task\?\.item\),/);
-  assert.match(app, /paramsText: task\?\.item \? buildGenerationActivityRelayText\(task\.item\) : "",/);
-  assert.match(app, /paramsText: getGenerationActivityRelayText\(entry\?\.paramsText\),/);
-  assert.match(app, /paramsText: getGenerationActivityRelayText\(paramsText \|\| existing\?\.paramsText\),/);
-  assert.match(app, /paramsText: buildGenerationActivityRelayText\(item\)/);
+  assert.match(app, /relayUrl: task\?\.item \? buildGenerationActivityRelayUrl\(task\.item\) : resolveGenerationRelayUrl\(task\),/);
+  assert.match(app, /relayUrl: normalizeGenerationLogRelayUrl\(entry\?\.relayUrl \|\| entry\?\.paramsText\),/);
+  assert.match(app, /relayUrl: buildGenerationActivityRelayUrl\(item\)/);
   assert.doesNotMatch(app, /paramsText: buildParameterText/);
   assert.match(app, /ratio: formatCompactRatioLabel\(task\?\.ratio\),/);
   assert.match(app, /size: formatCompactSizeLabel\(task\?\.size\),/);
@@ -866,10 +875,15 @@ test("live feed shows a floating unread indicator without forcing scroll to newe
 test("live feed keeps existing task order stable while activity text changes", async () => {
   const app = await readFile(appPath, "utf8");
 
-  assert.match(app, /upsertGenerationActivityEntry/);
-  assert.match(app, /orderAt:\s*String\(entry\?\.orderAt \|\| entry\?\.at \|\| ""\)/);
-  assert.match(app, /state\.activityFeed = upsertGenerationActivityEntry\(state\.activityFeed,/);
-  assert.doesNotMatch(app, /state\.activityFeed\.sort\(\(left, right\) => String\(right\.at\)/);
+  const logStore = await readFile(generationLogStorePath, "utf8");
+
+  assert.match(app, /upsertGenerationLogEntry/);
+  assert.match(app, /state\.generationLog = upsertGenerationLogEntry\(state\.generationLog,/);
+  // An entry keeps the order slot it was first written with, so later status text
+  // updates cannot reshuffle rows the user is already reading.
+  assert.match(logStore, /orderAt: cleanText\(existing\?\.orderAt\) \|\| cleanText\(existing\?\.at\) \|\| cleanText\(entry\?\.orderAt\) \|\| at,/);
+  assert.match(logStore, /orderAt: cleanText\(existing\?\.orderAt\) \|\| cleanText\(existing\?\.at\) \|\| cleanText\(group\?\.orderAt\) \|\| at,/);
+  assert.doesNotMatch(app, /state\.activityFeed/);
 });
 
 test("generation status and activity copy share queue heartbeat retry recovery labels", async () => {
@@ -1468,7 +1482,7 @@ test("quick blend mode implements upload pairing queue preview and cleanup contr
   assert.match(quickBlendView, /function getQuickBlendGenerationEntries\(\) \{/);
   assert.match(quickBlendView, /function renderQuickBlendGenerationPreview\(\) \{/);
   assert.match(quickBlendView, /function openQuickBlendGeneratedPreview\(\) \{/);
-  assert.match(quickBlendView, /createGenerationLoadingShell\(document, \{ key, active: true \}\)/);
+  assert.match(quickBlendView, /createGenerationLoadingShell\(document, \{ key, active: true, stage: getGenerationLoadingItemStage\(item\) \}\)/);
   assert.doesNotMatch(quickBlendView, /quick-blend-thumb-loader|formatLoadingThumbnailStatusLabel/);
   assert.match(app, /if \(canceledJob\.mode === "quick-blend"\) \{[\s\S]*removeQuickBlendGenerationKey\(makeJobPreviewKey\(canceledJob\.id\)\);/);
   assert.match(app, /if \(task\.mode === "quick-blend"\) \{[\s\S]*task\.item\.mode = "quick-blend";[\s\S]*storeQuickBlendGenerationItem\(task\.item\);[\s\S]*replaceQuickBlendGenerationKey\(taskPreviewKey, makeGalleryPreviewKey\(task\.item\.filename\)\);/);
@@ -2719,16 +2733,40 @@ test("studio layout consumes density variables for wide-screen adaptation withou
   assert.match(styles, /html\[data-ui-layout="narrow-desktop"\] \.studio-grid\s*\{/);
 });
 
-test("wide density keeps the desktop app shell flush without a viewport breakpoint jump", async () => {
+test("every density keeps the desktop app shell flush without a viewport breakpoint jump", async () => {
   const styles = await readFile(stylesPath, "utf8");
   const app = await readFile(appPath, "utf8");
 
   assert.match(
     styles,
-    /html\[data-ui-density="wide"\] \.app-shell\s*\{[\s\S]*width:\s*calc\(100vw - 20px\);/,
+    /\.app-shell\s*\{\s*width:\s*min\(var\(--app-shell-max-width,\s*1680px\),\s*calc\(100vw - 20px\)\);/,
   );
+  assert.doesNotMatch(styles, /html\[data-ui-density="wide"\] \.app-shell\s*\{/);
   assert.match(app, /document\.documentElement\.dataset\.uiDensity = settings\.mode;/);
   assert.doesNotMatch(styles, /@media \(min-width:\s*2200px\)[\s\S]*?\.app-shell/);
+});
+
+test("the app shell and the fixed desktop topbar resolve to the same width at every density", async () => {
+  const { getStudioDensitySettings } = await import("../lib/studio-density.mjs");
+  const shellWidthRule = /width:\s*min\(var\(--app-shell-max-width,\s*1680px\),\s*calc\(100vw - 20px\)\)/g;
+  const styles = await readFile(stylesPath, "utf8");
+
+  // .app-shell and the fixed desktop .topbar must share one width formula, so a
+  // wider shell can never leave the topbar stranded mid-viewport.
+  assert.equal([...styles.matchAll(shellWidthRule)].length, 2);
+
+  for (const [width, height] of [[1440, 810], [1680, 960], [1920, 990], [2560, 1350], [3840, 2070]]) {
+    const settings = getStudioDensitySettings({
+      width,
+      height,
+      outerWidth: width,
+      devicePixelRatio: 1,
+      visualScale: 1,
+    });
+    const shellMaxWidth = Number.parseFloat(settings.variables["--app-shell-max-width"]);
+
+    assert.equal(Math.min(shellMaxWidth, width - 20), width - 20, `${width}x${height}`);
+  }
 });
 
 test("image upload zones collapse into compact thumbnail grids after files are present", async () => {
@@ -3687,8 +3725,10 @@ test("studio marks persisted active generation records as interrupted on reload"
   assert.match(app, /if \(normalized\.status === "active"\) \{/);
   assert.match(app, /title: GENERATION_TASK_STATUS_LABELS\.error,/);
   assert.match(app, /detail: "上次页面关闭前生成未完成，请重新生成",/);
-  assert.match(app, /const entries = Array\.isArray\(parsed\) \? parsed\.map\(normalizePersistedActivityEntry\)\.filter\(Boolean\) : \[\];/);
-  assert.match(app, /return sortGenerationActivityFeed\(entries\)\.slice\(0, 12\);/);
+  // The persisted-row normalizer is handed to the store so it applies to both
+  // top-level rows and batch children when the log is read back.
+  assert.match(app, /return parseGenerationLogStore\(raw, \{ normalizeRow: normalizePersistedActivityEntry \}\);/);
+  assert.match(app, /window\.localStorage\.getItem\(GENERATION_LOG_STORAGE_KEY\) \|\| window\.localStorage\.getItem\(GENERATION_ACTIVITY_STORAGE_KEY\)/);
 });
 
 test("studio keeps local port retry exhaustion out of the visible error feed", async () => {
@@ -4721,12 +4761,12 @@ test("creation generation cards replace plan details with loading animation", as
   assert.match(app, /if \(getImageUrl\(item\)\) \{\s*return false;\s*\}/);
   assert.doesNotMatch(app, /state\.creation\.generationScope === "full"[\s\S]*return status !== "failed";/);
   assert.match(app, /function shouldHideCreationCardDetails\(item = \{\}, showRecordActions = false\) \{/);
-  assert.match(app, /function createCreationCardLoading\(status = "generating", sequenceIndex = 0, key = ""\) \{/);
+  assert.match(app, /function createCreationCardLoading\(status = "generating", sequenceIndex = 0, key = "", logText = ""\) \{/);
   assert.match(app, /const isQueued = status === "queued";/);
-  assert.match(app, /createCreationCardLoadingShell\(isQueued \? "queued" : "generating",\s*null,\s*\{ sequenceIndex, key \}\)/);
+  assert.match(app, /createCreationCardLoadingShell\(isQueued \? "queued" : "generating",\s*null,\s*\{ sequenceIndex, key, logText \}\)/);
   assert.match(app, /card\.classList\.toggle\("is-generating", isLoadingCard\);/);
   assert.match(app, /status\.textContent = getCreationItemStatusLabel\(item\);/);
-  assert.match(app, /media\.classList\.add\("is-loading"\);[\s\S]*media\.appendChild\(createCreationCardLoading\(item\.status,\s*fallbackIndex,\s*item\.itemId\)\);/);
+  assert.match(app, /media\.classList\.add\("is-loading"\);[\s\S]*media\.appendChild\(createCreationCardLoading\(item\.status,\s*fallbackIndex,\s*item\.itemId,\s*getCreationCardLogText\(item\)\)\);/);
   assert.match(app, /const shouldRenderPath = !imageUrl && !showRecordActions && !hideGenerationDetails;/);
   assert.match(app, /if \(shouldRenderPath\) \{/);
   assert.match(app, /if \(showActions && !hideGenerationDetails\) \{/);
@@ -4754,14 +4794,14 @@ test("creation result grid keeps running card loading DOM stable across rerender
   assert.match(app, /function syncCreationResultGrid\(items = \[\], \{ showActions = true \} = \{\}\) \{/);
   assert.match(app, /syncCreationResultGridShell\(\{/);
   assert.match(app, /syncCreationLoadingCard\(card,\s*item,\s*index/);
-  assert.match(app, /createCreationCardLoadingShell\([^,]+,\s*null,\s*\{ sequenceIndex, key \}\)/);
+  assert.match(app, /createCreationCardLoadingShell\([^,]+,\s*null,\s*\{ sequenceIndex, key, logText \}\)/);
   assert.match(app, /syncCreationResultGrid\(items, \{ showActions: showCreationResultActions \}\);/);
   const renderCreationViewBody = extractFunctionBefore(app, "renderCreationView", "getCreationPlanPreviewImageCount");
   assert.doesNotMatch(renderCreationViewBody, /refs\.creationResultGrid\.innerHTML = "";/);
   assert.match(loadingModule, /export function getCreationCardDomKey\(item = \{\}, fallbackIndex = 0\) \{/);
   assert.match(loadingModule, /export function syncCreationResultGrid\(\{/);
   assert.match(loadingModule, /\.querySelectorAll\("\.creation-card\[data-creation-card-key\]"\)/);
-  assert.match(loadingModule, /updateCreationCardLoading\(loadingShell,\s*item\.status,\s*\{ key \}\)/);
+  assert.match(loadingModule, /updateCreationCardLoading\(loadingShell,\s*item\.status,\s*\{ key, logText \}\)/);
 
   assert.match(styles, /\.creation-card-loading \.generation-loading-drop\s*\{/);
   assert.doesNotMatch(styles, /creation-card-loading-sketch|creation-card-loading-waiting|creation-card-loading-steps|creation-card-loading-progress|creation-card-loading-signal/);

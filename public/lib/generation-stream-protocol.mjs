@@ -19,6 +19,7 @@ export const FINAL_IMAGE_CHUNK_SIZE = 48 * 1024;
 export const CREATION_STREAM_EVENTS = Object.freeze({
   ITEM_FINAL_IMAGE: "item_final_image",
   ITEM_FINAL_IMAGE_CHUNK: "item_final_image_chunk",
+  ITEM_PARTIAL_IMAGE_CHUNK: "item_partial_image_chunk",
 });
 
 function normalizeBase64Data(value) {
@@ -44,6 +45,7 @@ export function buildFinalImageChunkPayloads({
   setId,
   itemId,
   base64,
+  sequence,
   format = "png",
   mimeType = toOutputFormatMimeType(format),
   chunkSize = FINAL_IMAGE_CHUNK_SIZE,
@@ -61,16 +63,64 @@ export function buildFinalImageChunkPayloads({
     return [];
   }
 
+  const normalizedSequence = Number.isFinite(Number(sequence)) ? Math.floor(Number(sequence)) : null;
   const total = Math.max(1, Math.ceil(normalizedBase64.length / normalizedChunkSize));
   return Array.from({ length: total }, (_, index) => ({
     ...(normalizedFilename ? { filename: normalizedFilename } : {}),
     ...(normalizedSetId ? { setId: normalizedSetId } : {}),
     ...(normalizedItemId ? { itemId: normalizedItemId } : {}),
+    ...(normalizedSequence === null ? {} : { sequence: normalizedSequence }),
     index,
     total,
     mimeType,
     chunk: normalizedBase64.slice(index * normalizedChunkSize, (index + 1) * normalizedChunkSize),
   }));
+}
+
+// A creation item emits several progressively sharper previews, so unlike a final
+// image the assembly slot is reused. `sequence` orders them: a newer sequence
+// discards the older half-assembled preview, and a stale straggler is ignored.
+// This bounds memory to one in-flight preview per item.
+export function recordPartialImageChunk(partialImageChunks, payload = {}) {
+  const key = buildFinalImageChunkKey(payload);
+  const index = Number(payload.index);
+  const total = Number(payload.total);
+  const sequence = Number.isFinite(Number(payload.sequence)) ? Math.floor(Number(payload.sequence)) : 0;
+  const chunk = String(payload.chunk || "");
+  const mimeType = String(payload.mimeType || "image/png");
+
+  if (!key || !Number.isInteger(index) || !Number.isInteger(total) || total <= 0 || index < 0 || index >= total || !chunk) {
+    return "";
+  }
+
+  let existing = partialImageChunks.get(key);
+  if (existing && existing.sequence !== sequence) {
+    if (sequence < existing.sequence) {
+      return "";
+    }
+    existing = null;
+  }
+
+  const entry = existing || {
+    chunks: new Array(total).fill(""),
+    received: 0,
+    total,
+    sequence,
+    mimeType,
+    dataUrl: "",
+  };
+
+  if (!entry.chunks[index]) {
+    entry.chunks[index] = chunk;
+    entry.received += 1;
+  }
+
+  if (entry.received === entry.total && !entry.dataUrl) {
+    entry.dataUrl = `data:${entry.mimeType};base64,${entry.chunks.join("")}`;
+  }
+
+  partialImageChunks.set(key, entry);
+  return entry.dataUrl;
 }
 
 export function recordFinalImageChunk(finalImageChunks, payload = {}) {

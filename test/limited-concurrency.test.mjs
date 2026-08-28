@@ -56,8 +56,8 @@ test("limited concurrency staggers task starts before filling the configured lim
   assert.deepEqual(await runPromise, ["A", "B", "C"]);
 });
 
-test("limited concurrency caps worker starts at fifteen active tasks", async () => {
-  const items = Array.from({ length: 17 }, (_, index) => index + 1);
+test("limited concurrency caps worker starts at twenty active tasks", async () => {
+  const items = Array.from({ length: 22 }, (_, index) => index + 1);
   const started = [];
   const releaseCallbacks = [];
   let activeCount = 0;
@@ -76,18 +76,18 @@ test("limited concurrency caps worker starts at fifteen active tasks", async () 
     return item;
   });
 
-  await waitForStartCount(started, 15, 5_000);
-  assert.deepEqual(started, items.slice(0, 15));
+  await waitForStartCount(started, 20, 8_000);
+  assert.deepEqual(started, items.slice(0, 20));
 
   await wait(300);
-  assert.equal(started.length, 15);
+  assert.equal(started.length, 20);
 
   releaseCallbacks.shift()();
-  await waitForStartCount(started, 16);
-  assert.equal(maxActiveCount, 15);
+  await waitForStartCount(started, 21);
+  assert.equal(maxActiveCount, 20);
 
   releaseStartedTasks(releaseCallbacks);
-  await waitForStartCount(started, 17);
+  await waitForStartCount(started, 22);
   releaseStartedTasks(releaseCallbacks);
   assert.deepEqual(await runPromise, items);
 });
