@@ -4,12 +4,49 @@ import test from "node:test";
 import {
   createCreationCardLoading,
   getCreationCardDomKey,
+  getCreationCardLoadingKey,
   renderCreationCardLoading,
   stopCreationCardLoading,
   syncCreationLoadingCard,
   syncCreationResultGrid,
   updateCreationCardLoading,
 } from "../lib/creation-card-loading.mjs";
+
+/* 进度靠 setTimeout 递增，测试要能手动推进这些 tick 才能观察到跨队列的进度残留。 */
+function withFakeTimers(run) {
+  const originalSetTimeout = globalThis.setTimeout;
+  const originalClearTimeout = globalThis.clearTimeout;
+  const timers = new Map();
+  let nextTimerId = 1;
+
+  globalThis.setTimeout = (callback) => {
+    const timerId = nextTimerId;
+    nextTimerId += 1;
+    timers.set(timerId, callback);
+    return timerId;
+  };
+  globalThis.clearTimeout = (timerId) => {
+    timers.delete(timerId);
+  };
+
+  const flush = (times = 1) => {
+    for (let index = 0; index < times; index += 1) {
+      const entry = timers.entries().next().value;
+      if (!entry) {
+        return;
+      }
+      timers.delete(entry[0]);
+      entry[1]();
+    }
+  };
+
+  try {
+    run({ flush });
+  } finally {
+    globalThis.setTimeout = originalSetTimeout;
+    globalThis.clearTimeout = originalClearTimeout;
+  }
+}
 
 function toDatasetKey(name) {
   return String(name || "").replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
@@ -292,4 +329,100 @@ test("creation result grid removes an old keyed card when replacing it", () => {
 
   assert.deepEqual(grid.children, [replacementCard]);
   assert.equal(oldCard.parentElement, null);
+});
+
+test("creation card loading keys are namespaced per run scope", () => {
+  assert.equal(getCreationCardLoadingKey({ itemId: "1-main" }, 0, "creation-queue-1"), "creation-queue-1::1-main");
+  assert.notEqual(
+    getCreationCardLoadingKey({ itemId: "1-main" }, 0, "creation-queue-1"),
+    getCreationCardLoadingKey({ itemId: "1-main" }, 0, "creation-queue-2"),
+  );
+  assert.equal(getCreationCardLoadingKey({ itemId: "1-main" }, 0), "1-main");
+});
+
+test("replacing a finished loading card releases its shared progress source", () => {
+  withFakeTimers(({ flush }) => {
+    const documentRef = createTestDocument();
+    const grid = documentRef.createElement("div");
+    const loadingKey = getCreationCardLoadingKey({ itemId: "1-main" }, 0, "creation-queue-release");
+
+    const loadingCard = documentRef.createElement("article");
+    loadingCard.className = "creation-card";
+    loadingCard.dataset.creationCardKey = "1-main";
+    const loadingShell = createCreationCardLoading("generating", documentRef, { key: loadingKey });
+    loadingCard.appendChild(loadingShell);
+    grid.appendChild(loadingCard);
+
+    flush(3);
+    const loadingNodes = loadingShell.__generationLoadingNodes;
+    assert.equal(loadingNodes.progress, 3);
+
+    const completedCard = documentRef.createElement("article");
+    completedCard.className = "creation-card";
+    completedCard.dataset.creationCardKey = "1-main";
+    syncCreationResultGrid({
+      grid,
+      items: [{ itemId: "1-main", status: "completed" }],
+      createCard: () => completedCard,
+      syncCard: () => null,
+    });
+
+    assert.equal(loadingNodes.active, false);
+    assert.equal(loadingNodes.timer, null);
+
+    const reusedShell = createCreationCardLoading("generating", documentRef, { key: loadingKey });
+    assert.equal(reusedShell.__generationLoadingNodes.progress, 0);
+    assert.equal(reusedShell.querySelector(".generation-loading-percent").textContent, "0%");
+    stopCreationCardLoading(reusedShell);
+  });
+});
+
+test("a second queue starts from zero for an item id the first queue already advanced", () => {
+  withFakeTimers(({ flush }) => {
+    const documentRef = createTestDocument();
+    const firstQueueShell = createCreationCardLoading("generating", documentRef, {
+      key: getCreationCardLoadingKey({ itemId: "1-main" }, 0, "creation-queue-first"),
+    });
+
+    flush(4);
+    assert.equal(firstQueueShell.__generationLoadingNodes.progress, 4);
+
+    const secondQueueShell = createCreationCardLoading("generating", documentRef, {
+      key: getCreationCardLoadingKey({ itemId: "1-main" }, 0, "creation-queue-second"),
+    });
+
+    assert.equal(secondQueueShell.__generationLoadingNodes.progress, 0);
+    assert.equal(secondQueueShell.querySelector(".generation-loading-percent").textContent, "0%");
+    stopCreationCardLoading(firstQueueShell);
+    stopCreationCardLoading(secondQueueShell);
+  });
+});
+
+test("loading card refresh keeps the scoped progress key and its progress", () => {
+  withFakeTimers(({ flush }) => {
+    const documentRef = createTestDocument();
+    const card = documentRef.createElement("article");
+    card.className = "creation-card";
+    card.classList = { toggle() {} };
+    const media = documentRef.createElement("div");
+    media.classList = { add() {}, toggle() {} };
+    media.dataset.creationCardMedia = "true";
+    const shell = createCreationCardLoading("generating", documentRef, {
+      key: getCreationCardLoadingKey({ itemId: "1-main" }, 0, "creation-queue-refresh"),
+    });
+    media.appendChild(shell);
+    card.append(media);
+
+    flush(2);
+    assert.equal(shell.__generationLoadingNodes.progress, 2);
+
+    syncCreationLoadingCard(card, { itemId: "1-main", status: "generating" }, 0, {
+      keyScope: "creation-queue-refresh",
+      shouldShowLoading: () => true,
+    });
+
+    assert.equal(shell.dataset.generationLoadingKey, "creation-queue-refresh::1-main");
+    assert.equal(shell.__generationLoadingNodes.progress, 2);
+    stopCreationCardLoading(shell);
+  });
 });

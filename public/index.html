@@ -68,7 +68,7 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Sora:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260825-attempt-preview-deck-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260829-filmstrip-selection-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -3186,18 +3186,18 @@
                 <div class="field-heading inline scheduling-hint-anchor">
                   <span class="scheduling-hint-trigger" tabindex="0" aria-describedby="generationConcurrencyHint" data-ui-i18n="concurrencyLabel">请求并发数量</span>
                   <small data-ui-i18n="concurrencyUnit">个</small>
-                  <span class="scheduling-hint-tooltip" id="generationConcurrencyHint" role="tooltip" data-ui-i18n="concurrencyHint">批量生成时同时在跑的请求数量，默认 20 个，范围 1 到 60。调低可以减轻上游压力、降低限流和超时概率，但整批更慢；调高更快，但上游更容易限流。注意它会被「任务提交间隔」掩盖：间隔比单张耗时还长时，并发数再大也不会重叠。</span>
+                  <span class="scheduling-hint-tooltip" id="generationConcurrencyHint" role="tooltip" data-ui-i18n="concurrencyHint">批量生成时同一会话内同时在跑的请求总数，默认 20 个，范围 1 到 50。调低可以减轻上游压力、降低限流和超时概率，但整批更慢；调高更快，但上游更容易限流。</span>
                 </div>
-                <input id="generationConcurrencyInput" name="generationConcurrency" type="number" step="any" inputmode="numeric" placeholder="20" data-min-concurrency="1" data-max-concurrency="60" />
+                <input id="generationConcurrencyInput" name="generationConcurrency" type="number" step="any" inputmode="numeric" placeholder="20" data-min-concurrency="1" data-max-concurrency="50" />
               </label>
 
               <label class="field">
                 <div class="field-heading inline scheduling-hint-anchor">
                   <span class="scheduling-hint-trigger" tabindex="0" aria-describedby="generationStartDelayHint" data-ui-i18n="startDelayLabel">任务提交间隔</span>
                   <small data-ui-i18n="startDelayUnit">毫秒</small>
-                  <span class="scheduling-hint-tooltip" id="generationStartDelayHint" role="tooltip" data-ui-i18n="startDelayHint">批量生成时相邻两张之间的提交间隔，默认 800 毫秒，最大 10000 毫秒。填 0 表示不排队、按并发数量尽快提交；间隔越大越不容易触发上游限流，但最后一张开始得越晚。间隔比单张耗时还长时，会让并发数量失去意义。</span>
+                  <span class="scheduling-hint-tooltip" id="generationStartDelayHint" role="tooltip" data-ui-i18n="startDelayHint">同一会话内相邻两个上游请求的提交间隔，默认 1000 毫秒，范围 200 到 5000 毫秒。间隔越大越不容易触发上游限流，但最后一张开始得越晚。</span>
                 </div>
-                <input id="generationStartDelayInput" name="generationStartDelayMs" type="number" step="any" inputmode="numeric" placeholder="800" data-min-delay-ms="0" data-max-delay-ms="10000" />
+                <input id="generationStartDelayInput" name="generationStartDelayMs" type="number" step="any" inputmode="numeric" placeholder="1000" data-min-delay-ms="200" data-max-delay-ms="5000" />
               </label>
             </section>
 
@@ -3320,6 +3320,6 @@
 
     <div class="app-tooltip" id="appTooltip" role="tooltip" popover="manual"></div>
 
-    <script type="module" src="./app.js?v=20260825-attempt-preview-deck-1"></script>
+    <script type="module" src="./app.js?v=20260829-generation-schedule-1"></script>
   </body>
 </html>

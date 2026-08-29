@@ -40,7 +40,7 @@ function createMemoryStorage(initial = {}) {
 test("generation concurrency defaults to 20 and clamps to its bounds", () => {
   assert.equal(DEFAULT_GENERATION_CONCURRENCY, 20);
   assert.equal(MIN_GENERATION_CONCURRENCY, 1);
-  assert.equal(MAX_GENERATION_CONCURRENCY, 60);
+  assert.equal(MAX_GENERATION_CONCURRENCY, 50);
 
   assert.equal(normalizeGenerationConcurrency(undefined), 20);
   assert.equal(normalizeGenerationConcurrency(null), 20);
@@ -52,8 +52,8 @@ test("generation concurrency defaults to 20 and clamps to its bounds", () => {
   assert.equal(normalizeGenerationConcurrency(0), 1);
   assert.equal(normalizeGenerationConcurrency(-5), 1);
   assert.equal(normalizeGenerationConcurrency(1), 1);
-  assert.equal(normalizeGenerationConcurrency(999), 60);
-  assert.equal(normalizeGenerationConcurrency(60), 60);
+  assert.equal(normalizeGenerationConcurrency(999), 50);
+  assert.equal(normalizeGenerationConcurrency(50), 50);
   assert.equal(normalizeGenerationConcurrency(30), 30);
   assert.equal(normalizeGenerationConcurrency("3.4"), 3);
   assert.equal(normalizeGenerationConcurrency("3.6"), 4);
@@ -83,7 +83,7 @@ test("the configured concurrency is one uniform knob with no per-path ceiling", 
   // on one panel is exactly the confusion this control has to avoid.
   assert.equal(resolveGenerationConcurrencyForLimit({ [GENERATION_CONCURRENCY_FIELD]: 3 }, {}), 3);
   assert.equal(resolveGenerationConcurrencyForLimit({ [GENERATION_CONCURRENCY_FIELD]: 30 }, {}), 30);
-  assert.equal(resolveGenerationConcurrencyForLimit({ [GENERATION_CONCURRENCY_FIELD]: 60 }, {}), 60);
+  assert.equal(resolveGenerationConcurrencyForLimit({ [GENERATION_CONCURRENCY_FIELD]: 50 }, {}), 50);
 
   // The old per-path constants are no longer ceilings; a value above them wins.
   assert.ok(30 > MAX_PARALLEL_TASKS_PER_SESSION);
@@ -100,34 +100,27 @@ test("the configured concurrency is one uniform knob with no per-path ceiling", 
   );
 });
 
-test("the session task slot limiter accepts a per-request ceiling", async () => {
-  // Without this override a fan-out wider than the scope's startup limit would
-  // leave its extra workers spinning in the slot-wait loop instead of running.
+test("the session task slot limiter binds a scope ceiling until every active task releases", async () => {
+  // The first active request establishes the session/scope total. A later request
+  // cannot silently expand that bucket while the earlier fan-out is still live.
   const limiter = createSessionTaskSlotLimiter({ maxParallelTasks: () => 15, retryDelayMs: 1 });
 
-  for (let i = 0; i < 15; i += 1) {
-    assert.equal(limiter.claimSessionTaskSlot("s1", `task-${i}`, "portrait"), true);
-  }
-  // The scope default is exhausted at 15.
-  assert.equal(limiter.claimSessionTaskSlot("s1", "task-15", "portrait"), false);
-  // A raised per-request ceiling admits more.
-  assert.equal(
-    limiter.claimSessionTaskSlot("s1", "task-15", "portrait", { maxParallelTasks: 30 }),
-    true,
-  );
-  assert.equal(limiter.getActiveTaskCount("s1", "portrait"), 16);
-
-  // A lower override really shrinks the shared bucket. Taking the larger of the
-  // two would let two overlapping fan-outs in one scope reach the old default.
-  const shrink = createSessionTaskSlotLimiter({ maxParallelTasks: () => 15, retryDelayMs: 1 });
   for (let i = 0; i < 3; i += 1) {
-    assert.equal(shrink.claimSessionTaskSlot("s2", `t-${i}`, "portrait", { maxParallelTasks: 3 }), true);
+    assert.equal(limiter.claimSessionTaskSlot("s1", `task-${i}`, "portrait", { maxParallelTasks: 3 }), true);
   }
-  assert.equal(shrink.claimSessionTaskSlot("s2", "t-3", "portrait", { maxParallelTasks: 3 }), false);
-  assert.equal(shrink.getActiveTaskCount("s2", "portrait"), 3);
+  assert.equal(limiter.getActiveTaskLimit("s1", "portrait"), 3);
+  assert.equal(limiter.claimSessionTaskSlot("s1", "task-3", "portrait", { maxParallelTasks: 30 }), false);
+  assert.equal(limiter.getActiveTaskCount("s1", "portrait"), 3);
 
-  // A request that passes no override still gets its scope default.
-  assert.equal(shrink.claimSessionTaskSlot("s2", "t-3", "portrait"), true);
+  for (let i = 0; i < 3; i += 1) {
+    limiter.releaseSessionTaskSlot("s1", `task-${i}`, "portrait");
+  }
+  assert.equal(limiter.getActiveTaskCount("s1", "portrait"), 0);
+  assert.equal(limiter.getActiveTaskLimit("s1", "portrait"), 0);
+
+  // Once idle, a new run is allowed to bind a new configured total.
+  assert.equal(limiter.claimSessionTaskSlot("s1", "new-task-0", "portrait", { maxParallelTasks: 30 }), true);
+  assert.equal(limiter.getActiveTaskLimit("s1", "portrait"), 30);
 });
 
 test("bounded concurrency runs at most the configured number of workers at once", async () => {
@@ -140,7 +133,7 @@ test("bounded concurrency runs at most the configured number of workers at once"
     peak = Math.max(peak, active);
     await new Promise((resolve) => { setTimeout(resolve, 5); });
     active -= 1;
-  }, { startDelayMs: 0 });
+  });
 
   assert.equal(peak, 3, `expected at most 3 in flight, saw ${peak}`);
 });
@@ -160,7 +153,7 @@ test("the shared hard cap reuses the configurable maximum", async () => {
     peak = Math.max(peak, active);
     await new Promise((resolve) => { setTimeout(resolve, 1); });
     active -= 1;
-  }, { startDelayMs: 0 });
+  });
   assert.equal(peak, MAX_GENERATION_CONCURRENCY);
 });
 
@@ -176,7 +169,7 @@ test("config store persists and normalizes the generation concurrency", async ()
   assert.equal((await store.readPublicConfig()).defaults[GENERATION_CONCURRENCY_FIELD], 5);
 
   const clamped = await store.saveConfig({ defaults: { [GENERATION_CONCURRENCY_FIELD]: 999 } });
-  assert.equal(clamped.defaults[GENERATION_CONCURRENCY_FIELD], 60);
+  assert.equal(clamped.defaults[GENERATION_CONCURRENCY_FIELD], 50);
 
   const raised = await store.saveConfig({ defaults: { [GENERATION_CONCURRENCY_FIELD]: 40 } });
   assert.equal(raised.defaults[GENERATION_CONCURRENCY_FIELD], 40);
@@ -244,11 +237,11 @@ test("the concurrency control sits in the scheduling card above the generation l
   assert.doesNotMatch(html, /id="generationConcurrencyInput"[^>]*\smax="/);
   assert.doesNotMatch(html, /id="generationConcurrencyInput"[^>]*\smin="/);
   assert.match(html, /id="generationConcurrencyInput"[^>]*data-min-concurrency="1"/);
-  assert.match(html, /id="generationConcurrencyInput"[^>]*data-max-concurrency="60"/);
+  assert.match(html, /id="generationConcurrencyInput"[^>]*data-max-concurrency="50"/);
   // The explanation hovers off the title instead of sitting under the field, so
   // the label carries the description reference and the hint is a tooltip.
   assert.match(html, /aria-describedby="generationConcurrencyHint"[^>]*data-ui-i18n="concurrencyLabel"/);
-  assert.match(html, /class="scheduling-hint-tooltip" id="generationConcurrencyHint" role="tooltip"[^>]*>[^<]*默认 20 个，范围 1 到 60/);
+  assert.match(html, /class="scheduling-hint-tooltip" id="generationConcurrencyHint" role="tooltip"[^>]*>[^<]*默认 20 个，范围 1 到 50/);
   assert.doesNotMatch(html, /class="field-hint" id="generationConcurrencyHint"/);
 });
 
@@ -417,7 +410,7 @@ test("the SSE response raises its listener ceiling before the fan-out attaches c
 
   // Derived from the widest fan-out, so raising MAX_CREATION_PARALLEL_TASKS cannot
   // leave the ceiling behind and re-introduce the warning.
-  assert.match(server, /const MAX_SSE_CLOSE_LISTENERS = MAX_CREATION_PARALLEL_TASKS \+ 10;/);
+  assert.match(server, /const MAX_SSE_CLOSE_LISTENERS = MAX_GENERATION_CONCURRENCY \+ 10;/);
   assert.doesNotMatch(server, /MAX_SSE_CLOSE_LISTENERS = \d+;/);
   // The capacity has to be raised before the per-item listener is attached.
   assert.match(
@@ -433,7 +426,7 @@ test("the raised listener ceiling silences the warning for the widest fan-out", 
   const { Socket } = await import("node:net");
 
   const widestFanOut = Math.max(MAX_CREATION_PARALLEL_TASKS, MAX_PARALLEL_TASKS_PER_SESSION);
-  const ceiling = MAX_CREATION_PARALLEL_TASKS + 10;
+  const ceiling = MAX_GENERATION_CONCURRENCY + 10;
   assert.ok(ceiling > widestFanOut, "the ceiling must clear the widest fan-out");
 
   const warnings = [];

@@ -10,6 +10,7 @@ import {
   getGenerationLoadingShellFamily,
   getGenerationLoadingStageFamily,
   stopGenerationLoadingShell,
+  stopGenerationLoadingShells,
   updateGenerationLoadingShell,
 } from "../lib/generation-loading.mjs";
 import { shouldReusePreviewLoadingShell } from "../lib/preview-loading-shell.mjs";
@@ -547,4 +548,58 @@ test("loading shell log line wraps to show the full progress text", async () => 
   assert.doesNotMatch(styles, /\.generation-loading-log\s*\{[^}]*text-overflow:\s*ellipsis/);
   assert.doesNotMatch(styles, /\.generation-loading-log\s*\{[^}]*white-space:\s*nowrap/);
   assert.match(styles, /\.generation-loading-log\[hidden\]\s*\{[\s\S]*display:\s*none/);
+});
+
+/* 写真模式每次渲染都重建整个结果网格，所以“先建新卡片再停旧动画”这个顺序
+   同时决定了运行内进度会不会被清零、以及运行结束后进度源会不会残留到 99%。 */
+test("rebuilding a grid before stopping the old shells keeps the run progress", () => {
+  const documentRef = createTestDocument();
+  const scheduler = installScheduler();
+  try {
+    const grid = documentRef.createElement("div");
+    const previousShell = createGenerationLoadingShell(documentRef, { key: "001-headshot", active: true });
+    grid.appendChild(previousShell.shell);
+
+    scheduler.runNext();
+    scheduler.runNext();
+    assert.equal(getGenerationLoadingProgress(previousShell), 2);
+
+    const rebuiltShell = createGenerationLoadingShell(documentRef, { key: "001-headshot", active: true });
+    stopGenerationLoadingShells(grid);
+
+    assert.equal(getGenerationLoadingProgress(rebuiltShell), 2);
+    assert.equal(previousShell.active, false);
+    assert.ok(scheduler.runNext());
+    assert.equal(getGenerationLoadingProgress(rebuiltShell), 3);
+    stopGenerationLoadingShell(rebuiltShell);
+  } finally {
+    scheduler.restore();
+  }
+});
+
+test("a finished run leaves no shared progress for the next run to inherit", () => {
+  const documentRef = createTestDocument();
+  const scheduler = installScheduler();
+  try {
+    const grid = documentRef.createElement("div");
+    const firstRunShell = createGenerationLoadingShell(documentRef, { key: "002-halfbody", active: true });
+    grid.appendChild(firstRunShell.shell);
+
+    scheduler.runNext();
+    scheduler.runNext();
+    scheduler.runNext();
+    assert.equal(getGenerationLoadingProgress(firstRunShell), 3);
+
+    /* 出图后重建的卡片不再有加载动画，停掉旧动画就该把进度源一起回收。 */
+    stopGenerationLoadingShells(grid);
+    assert.equal(firstRunShell.active, false);
+    assert.equal(scheduler.pending.size, 0);
+
+    const secondRunShell = createGenerationLoadingShell(documentRef, { key: "002-halfbody", active: true });
+    assert.equal(getGenerationLoadingProgress(secondRunShell), 0);
+    assert.equal(secondRunShell.percent.textContent, "0%");
+    stopGenerationLoadingShell(secondRunShell);
+  } finally {
+    scheduler.restore();
+  }
 });

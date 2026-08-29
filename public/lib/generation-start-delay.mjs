@@ -7,8 +7,10 @@ import {
 export const GENERATION_START_DELAY_FIELD = "generationStartDelayMs";
 
 // An empty, absent, or unparsable value falls back to the default; a parsable
-// out-of-range value is clamped to the nearest bound. Never throws, because a
-// bad tuning value must not fail a generation request.
+// out-of-range value is clamped to the nearest bound. Zero and negatives clamp UP
+// to the minimum rather than disabling the gate — an unthrottled fan-out is the
+// failure mode this control exists to prevent. Never throws, because a bad tuning
+// value must not fail a generation request.
 export function normalizeGenerationStartDelayMs(value, fallback = DEFAULT_GENERATION_START_DELAY_MS) {
   const normalizedFallback = Number.isFinite(Number(fallback))
     ? Math.min(Math.max(Math.round(Number(fallback)), MIN_GENERATION_START_DELAY_MS), MAX_GENERATION_START_DELAY_MS)

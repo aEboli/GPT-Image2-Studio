@@ -10,6 +10,7 @@ import {
 import { getOutputFormatOptions, normalizeOutputFormat } from "../output-format-options.mjs";
 import { formatLoadingThumbnailStatusLabel, getPreviewPlaceholderState } from "../preview-placeholder-state.mjs";
 import { shouldReusePreviewLoadingShell } from "../preview-loading-shell.mjs";
+import { createFilmstripRevealTracker, renderFilmstripPreservingSelection, syncFilmstripSelectedMarker } from "../filmstrip-selection.mjs";
 import { createViewRendererController } from "./view-renderer.mjs";
 
 const DEFAULT_IMAGE_EDIT_RATIO = "1:1";
@@ -76,6 +77,8 @@ export function createImageEditController(options = {}) {
   if (!hasImageEditContext({ refs, state })) {
     return null;
   }
+
+  const imageEditFilmstripRevealTracker = createFilmstripRevealTracker();
 
   const {
     buildReferenceFingerprint,
@@ -1443,6 +1446,16 @@ export function createImageEditController(options = {}) {
   }
 
   function renderImageEditGenerationStrip() {
+    renderFilmstripPreservingSelection({
+      strip: refs.imageEditGenerationStrip,
+      selectedKey: state.imageEdit.previewKey,
+      getEntryKey: (entry) => entry.dataset?.imageEditGenerationEntryKey || "",
+      tracker: imageEditFilmstripRevealTracker,
+      render: renderImageEditGenerationStripEntries,
+    });
+  }
+
+  function renderImageEditGenerationStripEntries() {
     const entries = getImageEditGenerationEntries();
     stopGenerationLoadingShells(refs.imageEditGenerationStrip);
     refs.imageEditGenerationStrip.replaceChildren();
@@ -1450,13 +1463,15 @@ export function createImageEditController(options = {}) {
     refs.imageEditThumbnailEmpty.classList.toggle("hidden", entries.length > 0);
 
     entries.forEach(({ key, item }, index) => {
+      const isSelected = key === state.imageEdit.previewKey;
       const button = document.createElement("button");
       button.type = "button";
       button.className = "filmstrip-item image-edit-generation-thumb";
       button.dataset.imageEditGenerationKey = key;
-      button.setAttribute("aria-pressed", String(key === state.imageEdit.previewKey));
+      button.setAttribute("aria-pressed", String(isSelected));
+      button.setAttribute("aria-current", isSelected ? "true" : "false");
       button.title = `切换到第 ${index + 1} 张图片编辑结果`;
-      button.classList.toggle("active", key === state.imageEdit.previewKey);
+      button.classList.toggle("active", isSelected);
       button.classList.toggle("is-running", Boolean(item?.isRunning || (item?.started && !item?.filename)));
 
       const imageUrl = getImageUrl(item);
@@ -1482,7 +1497,9 @@ export function createImageEditController(options = {}) {
 
       const shell = document.createElement("div");
       shell.className = "filmstrip-entry";
+      shell.dataset.imageEditGenerationEntryKey = key;
       shell.appendChild(button);
+      syncFilmstripSelectedMarker(shell, isSelected, { documentRef: document });
       refs.imageEditGenerationStrip.appendChild(shell);
     });
   }

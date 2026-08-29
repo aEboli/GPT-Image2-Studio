@@ -8,6 +8,7 @@ import {
   createGeminiImageGenerationRequestBody,
   createResponsesRequestBody,
   createChatCompletionsImageRequestBody,
+  formatFetchFailureDetail,
   formatStatusHeartbeatMessage,
   isMissingMultipartImageFieldError,
   recoverOriginalResponse,
@@ -2374,6 +2375,301 @@ test("requestImageGeneration does not retry an explicit upstream failed event", 
   assert.deepEqual(requests, [{ stream: true, size: "1024x1024" }]);
 });
 
+test("requestImageGeneration recovers a transient 402 failure by polling the original response", async () => {
+  const requests = [];
+  const events = [];
+  const stream = [
+    "event: response.created",
+    'data: {"type":"response.created","response":{"id":"resp_capacity","status":"in_progress"}}',
+    "",
+    "event: response.failed",
+    'data: {"type":"response.failed","response":{"id":"resp_capacity","status":"failed","error":{"code":"rate_limit_exceeded","status":402,"message":"HTTP 402 capacity temporarily unavailable"}}}',
+    "",
+    "data: [DONE]",
+    "",
+  ].join("\n");
+
+  const result = await requestImageGeneration({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    prompt: "Recover the capacity-limited image",
+    size: "1024x1024",
+    quality: "high",
+    responsesModel: "gpt-5.4",
+    responseRecoveryPollDelayMs: 0,
+    async fetchImpl(url, init) {
+      requests.push({ url, method: init.method });
+      if (init.method === "GET") {
+        return new Response(
+          JSON.stringify({
+            id: "resp_capacity",
+            status: "completed",
+            output: [{ type: "image_generation_call", result: "Y2FwYWNpdHktZmluYWw=" }],
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response(stream, {
+        status: 200,
+        headers: { "content-type": "text/event-stream" },
+      });
+    },
+    onEvent(event) {
+      events.push(event);
+    },
+  });
+
+  assert.deepEqual(requests.map(({ method }) => method), ["POST", "GET"]);
+  assert.equal(requests.filter(({ method }) => method === "POST").length, 1);
+  assert.equal(result.finalImageBase64, "Y2FwYWNpdHktZmluYWw=");
+  assert.equal(result.recoveredOriginal, true);
+  assert.ok(events.some((event) => event.type === "status" && event.stage === "recovering_original"));
+});
+
+test("requestImageGeneration recovers a generic SSE error carrying an explicit original response ID", async () => {
+  const requests = [];
+  const stream = [
+    "event: error",
+    'data: {"response_id":"resp_generic_capacity","error":{"code":"insufficient_quota","status":402,"message":"Model capacity is temporarily unavailable."}}',
+    "",
+    "data: [DONE]",
+    "",
+  ].join("\n");
+
+  const result = await requestImageGeneration({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    prompt: "Recover the generic relay capacity error",
+    size: "1024x1024",
+    quality: "high",
+    responsesModel: "gpt-5.4",
+    responseRecoveryPollDelayMs: 0,
+    async fetchImpl(_url, init) {
+      requests.push({ method: init.method });
+      if (init.method === "GET") {
+        return new Response(
+          JSON.stringify({
+            id: "resp_generic_capacity",
+            status: "completed",
+            output: [{ type: "image_generation_call", result: "Z2VuZXJpYy1jYXBhY2l0eS1maW5hbA==" }],
+          }),
+          { status: 200 },
+        );
+      }
+
+      return new Response(stream, { status: 200, headers: { "content-type": "text/event-stream" } });
+    },
+  });
+
+  assert.deepEqual(requests.map(({ method }) => method), ["POST", "GET"]);
+  assert.equal(result.finalImageBase64, "Z2VuZXJpYy1jYXBhY2l0eS1maW5hbA==");
+  assert.equal(result.recoveredOriginal, true);
+});
+
+test("requestImageGeneration recovers an HTTP 402 capacity response when the task ID is present", async () => {
+  const requests = [];
+
+  const result = await requestImageGeneration({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    prompt: "Recover an HTTP capacity response",
+    size: "1024x1024",
+    quality: "high",
+    responsesModel: "gpt-5.4",
+    responseRecoveryPollDelayMs: 0,
+    async fetchImpl(url, init) {
+      requests.push({ url, method: init.method });
+      if (init.method === "GET") {
+        return new Response(
+          JSON.stringify({
+            id: "resp_http_capacity",
+            status: "completed",
+            output: [{ type: "image_generation_call", result: "aHR0cC1jYXBhY2l0eS1maW5hbA==" }],
+          }),
+          { status: 200 },
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          id: "resp_http_capacity",
+          response: { id: "resp_http_capacity" },
+          error: {
+            code: "insufficient_quota",
+            message: "Model capacity is temporarily unavailable.",
+          },
+        }),
+        { status: 402, headers: { "content-type": "application/json" } },
+      );
+    },
+  });
+
+  assert.deepEqual(requests.map(({ method }) => method), ["POST", "GET"]);
+  assert.equal(requests.filter(({ method }) => method === "POST").length, 1);
+  assert.equal(requests.filter(({ method }) => method === "GET").length, 1);
+  assert.equal(result.finalImageBase64, "aHR0cC1jYXBhY2l0eS1maW5hbA==");
+  assert.equal(result.recoveredOriginal, true);
+});
+
+test("requestImageGeneration keeps an HTTP 402 quota error when no task ID is returned", async () => {
+  const requests = [];
+
+  await assert.rejects(
+    () => requestImageGeneration({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      prompt: "Do not retry an unidentified capacity response",
+      size: "1024x1024",
+      quality: "high",
+      responsesModel: "gpt-5.4",
+      async fetchImpl(_url, init) {
+        requests.push({ method: init.method });
+        return new Response(
+          JSON.stringify({
+            error: {
+              code: "insufficient_quota",
+              message: "Model capacity is temporarily unavailable.",
+            },
+          }),
+          { status: 402, headers: { "content-type": "application/json" } },
+        );
+      },
+    }),
+    /生成请求失败：HTTP 402，错误码 insufficient_quota，Model capacity is temporarily unavailable\./,
+  );
+
+  assert.deepEqual(requests, [{ method: "POST" }]);
+});
+
+test("requestImageGeneration keeps a billed HTTP 402 error with a task ID out of original-task recovery", async () => {
+  const requests = [];
+
+  await assert.rejects(
+    () => requestImageGeneration({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      prompt: "Do not poll a billed error",
+      size: "1024x1024",
+      quality: "high",
+      responsesModel: "gpt-5.4",
+      async fetchImpl(_url, init) {
+        requests.push({ method: init.method });
+        return new Response(
+          JSON.stringify({
+            id: "resp_billing_error",
+            error: {
+              code: "rate_limit_exceeded",
+              message: "Your account balance is exhausted; update billing.",
+            },
+          }),
+          { status: 402, headers: { "content-type": "application/json" } },
+        );
+      },
+    }),
+    /生成请求失败：HTTP 402，错误码 rate_limit_exceeded，Your account balance is exhausted; update billing\./,
+  );
+
+  assert.deepEqual(requests, [{ method: "POST" }]);
+});
+
+test("requestImageGeneration keeps an authentication error with a task ID out of original-task recovery", async () => {
+  const requests = [];
+
+  await assert.rejects(
+    () => requestImageGeneration({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      prompt: "Do not poll an authentication error",
+      size: "1024x1024",
+      quality: "high",
+      responsesModel: "gpt-5.4",
+      async fetchImpl(_url, init) {
+        requests.push({ method: init.method });
+        return new Response(
+          JSON.stringify({
+            id: "resp_auth_error",
+            error: {
+              code: "rate_limit_exceeded",
+              message: "Invalid API key.",
+            },
+          }),
+          { status: 401, headers: { "content-type": "application/json" } },
+        );
+      },
+    }),
+    /生成请求失败：HTTP 401，错误码 rate_limit_exceeded，Invalid API key\./,
+  );
+
+  assert.deepEqual(requests, [{ method: "POST" }]);
+});
+
+test("requestImageGeneration does not re-POST after a failed response with an ID", async () => {
+  const requests = [];
+  const stream = [
+    "event: response.created",
+    'data: {"type":"response.created","response":{"id":"resp_rejected","status":"in_progress"}}',
+    "",
+    "event: response.failed",
+    'data: {"type":"response.failed","response":{"id":"resp_rejected","status":"failed","error":{"code":"invalid_request_error","message":"prompt rejected"}}}',
+    "",
+    "data: [DONE]",
+    "",
+  ].join("\n");
+
+  await assert.rejects(
+    () => requestImageGeneration({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      prompt: "Do not re-submit a rejected image",
+      size: "1024x1024",
+      quality: "high",
+      responsesModel: "gpt-5.4",
+      async fetchImpl(url, init) {
+        requests.push({ url, method: init.method });
+        return new Response(stream, {
+          status: 200,
+          headers: { "content-type": "text/event-stream" },
+        });
+      },
+    }),
+    /上游生成失败：invalid_request_error prompt rejected/,
+  );
+
+  assert.equal(requests.filter(({ method }) => method === "POST").length, 1);
+});
+
+test("requestImageGeneration keeps the existing error for a failed response without an ID", async () => {
+  const requests = [];
+  const stream = [
+    "event: response.failed",
+    'data: {"type":"response.failed","response":{"status":"failed","error":{"code":"rate_limit_exceeded","message":"Too many image requests"}}}',
+    "",
+    "data: [DONE]",
+    "",
+  ].join("\n");
+
+  await assert.rejects(
+    () => requestImageGeneration({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      prompt: "Keep the existing failed response error",
+      size: "1024x1024",
+      quality: "high",
+      responsesModel: "gpt-5.4",
+      async fetchImpl(_url, init) {
+        requests.push({ method: init.method });
+        return new Response(stream, {
+          status: 200,
+          headers: { "content-type": "text/event-stream" },
+        });
+      },
+    }),
+    /上游生成失败：rate_limit_exceeded Too many image requests/,
+  );
+
+  assert.deepEqual(requests, [{ method: "POST" }]);
+});
+
 test("requestImageGeneration keeps a final image that arrives before a terminal failed event", async () => {
   const requests = [];
   const events = [];
@@ -2777,4 +3073,152 @@ test("requestImageGeneration still fails when the result is unknown and no parti
     }),
     /原 Responses 任务结果未知，自动重试后仍未确认，请手动重试/,
   );
+});
+
+test("formatFetchFailureDetail unwraps the cause hidden behind a bare fetch failed", () => {
+  const cause = new Error("read ECONNRESET");
+  cause.code = "ECONNRESET";
+  const error = new TypeError("fetch failed", { cause });
+
+  assert.equal(formatFetchFailureDetail(error), "fetch failed（read ECONNRESET）");
+});
+
+test("formatFetchFailureDetail keeps a code the message never spells out", () => {
+  const cause = new Error("Connect Timeout Error");
+  cause.code = "UND_ERR_CONNECT_TIMEOUT";
+  const error = new TypeError("fetch failed", { cause });
+
+  assert.equal(
+    formatFetchFailureDetail(error),
+    "fetch failed（UND_ERR_CONNECT_TIMEOUT: Connect Timeout Error）",
+  );
+});
+
+test("formatFetchFailureDetail reads undici's per-address AggregateError entries", () => {
+  const aggregate = new AggregateError([
+    Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:443"), { code: "ECONNREFUSED" }),
+    Object.assign(new Error("connect ECONNREFUSED ::1:443"), { code: "ECONNREFUSED" }),
+  ]);
+  aggregate.code = "ECONNREFUSED";
+  aggregate.message = "";
+  const error = new TypeError("fetch failed", { cause: aggregate });
+
+  assert.equal(
+    formatFetchFailureDetail(error),
+    "fetch failed（connect ECONNREFUSED 127.0.0.1:443；connect ECONNREFUSED ::1:443）",
+  );
+});
+
+test("formatFetchFailureDetail walks a nested chain and drops repeated labels", () => {
+  const root = new Error("write EPIPE");
+  const middle = new Error("socket hang up", { cause: root });
+  middle.code = "UND_ERR_SOCKET";
+  const error = new TypeError("fetch failed", { cause: middle });
+
+  assert.equal(
+    formatFetchFailureDetail(error),
+    "fetch failed（UND_ERR_SOCKET: socket hang up；write EPIPE）",
+  );
+});
+
+test("formatFetchFailureDetail survives cycles, depth and unusable input", () => {
+  const first = new Error("first");
+  const second = new Error("second", { cause: first });
+  first.cause = second;
+  assert.equal(formatFetchFailureDetail(second), "second（first）");
+
+  let deepest = new Error("level-0");
+  for (let level = 1; level <= 10; level += 1) {
+    deepest = new Error(`level-${level}`, { cause: deepest });
+  }
+  const deepDetail = formatFetchFailureDetail(deepest);
+  assert.match(deepDetail, /^level-10（/);
+  assert.ok(!deepDetail.includes("level-0"), "must stop before the whole chain");
+
+  assert.equal(formatFetchFailureDetail("  plain string  "), "plain string");
+  assert.equal(formatFetchFailureDetail(new Error("")), "");
+  for (const value of [undefined, null, ""]) {
+    assert.equal(formatFetchFailureDetail(value), "");
+  }
+});
+
+test("formatFetchFailureDetail caps a runaway detail", () => {
+  const error = new TypeError("fetch failed", { cause: new Error("x".repeat(600)) });
+  const detail = formatFetchFailureDetail(error);
+
+  assert.ok(detail.length <= 300, `detail must stay bounded, got ${detail.length}`);
+  assert.ok(detail.endsWith("…"));
+});
+
+test("a failed stream connection reports the transport cause, not just fetch failed", async () => {
+  await assert.rejects(
+    () => requestImageGeneration({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      prompt: "Connection dies before any header",
+      size: "1024x1024",
+      quality: "high",
+      responsesModel: "gpt-5.4",
+      async fetchImpl() {
+        const cause = new Error("read ECONNRESET");
+        cause.code = "ECONNRESET";
+        throw new TypeError("fetch failed", { cause });
+      },
+      onEvent() {},
+    }),
+    (error) => {
+      assert.equal(
+        error.message,
+        "流式连接失败，原任务状态未知；系统未自动重新生成。 fetch failed（read ECONNRESET）",
+      );
+      return true;
+    },
+  );
+});
+
+test("a failed recovery lookup names the hop and keeps the transport cause", async () => {
+  const createdOnlyStream = [
+    "event: response.created",
+    'data: {"id":"resp_recovery_conn"}',
+    "",
+    "data: [DONE]",
+    "",
+  ].join("\n");
+  const methods = [];
+
+  await assert.rejects(
+    () => requestImageGeneration({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      prompt: "Recovery GET cannot connect",
+      size: "1024x1024",
+      quality: "high",
+      responsesModel: "gpt-5.4",
+      responseRecoveryMaxPolls: 1,
+      responseRecoveryPollDelayMs: 0,
+      async fetchImpl(_url, init) {
+        methods.push(init.method);
+        if (init.method === "GET") {
+          const cause = new Error("socket hang up");
+          cause.code = "UND_ERR_SOCKET";
+          throw new TypeError("fetch failed", { cause });
+        }
+        return new Response(createdOnlyStream, {
+          status: 200,
+          headers: { "content-type": "text/event-stream" },
+        });
+      },
+      onEvent() {},
+    }),
+    (error) => {
+      assert.match(error.message, /原 Responses 任务结果未知，自动重试后仍未确认，请手动重试。/);
+      assert.match(
+        error.message,
+        /原 Responses 任务回查连接失败：fetch failed（UND_ERR_SOCKET: socket hang up）/,
+      );
+      return true;
+    },
+  );
+
+  assert.deepEqual(methods, ["POST", "GET", "POST", "GET"]);
 });

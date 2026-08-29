@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   CREATION_AUTO_REPAIR_MAX_ATTEMPTS,
+  getCreationAutoRepairableItems,
   getCreationCompletionFeedback,
   getCreationFatalUpstreamError,
   getCreationIncompleteItems,
@@ -29,6 +30,7 @@ test("creation auto repair selects failed and pathless items only once after ful
 
   assert.equal(CREATION_AUTO_REPAIR_MAX_ATTEMPTS, 1);
   assert.deepEqual(getCreationIncompleteItems(set).map((item) => item.itemId), ["failed", "pathless"]);
+  assert.deepEqual(getCreationAutoRepairableItems(set).map((item) => item.itemId), ["failed", "pathless"]);
   assert.equal(
     shouldAutoRepairCreationSet({
       set,
@@ -84,25 +86,54 @@ test("creation auto repair short-circuits on an account-level upstream error", (
   );
 });
 
-test("creation auto repair still runs for transient and per-item failures", () => {
+test("creation auto repair reserves one later attempt for transient 402 and 429 failures", () => {
   const set = {
     items: [
       { itemId: "done", status: "completed", filename: "done.png", relativePath: "creation/done.png" },
+      {
+        itemId: "capacity-limited",
+        status: "failed",
+        filename: "",
+        relativePath: "",
+        generationAttemptCount: 1,
+        error: "生成请求失败：HTTP 402，错误码 insufficient_quota，Model capacity is temporarily unavailable.",
+      },
       {
         itemId: "rate-limited",
         status: "failed",
         filename: "",
         relativePath: "",
+        generationAttemptCount: 1,
         error: "生成请求失败：HTTP 429，错误码 rate_limit_exceeded，Rate limit reached.",
       },
-      { itemId: "no-final", status: "failed", filename: "", relativePath: "", error: "上游响应结束，但没有拿到最终图。" },
+      {
+        itemId: "exhausted",
+        status: "failed",
+        filename: "",
+        relativePath: "",
+        generationAttemptCount: 2,
+        error: "生成请求失败：HTTP 402，错误码 insufficient_quota，Model capacity is temporarily unavailable.",
+      },
     ],
   };
 
   assert.equal(getCreationFatalUpstreamError(set), "");
+  assert.deepEqual(
+    getCreationAutoRepairableItems(set).map((item) => item.itemId),
+    ["capacity-limited", "rate-limited"],
+  );
   assert.equal(
     shouldAutoRepairCreationSet({ set, generationScope: "full", autoRepairAttemptCount: 0, canRepair: true }),
     true,
+  );
+  assert.equal(
+    shouldAutoRepairCreationSet({
+      set: { items: [set.items.find((item) => item.itemId === "exhausted")] },
+      generationScope: "full",
+      autoRepairAttemptCount: 0,
+      canRepair: true,
+    }),
+    false,
   );
 });
 

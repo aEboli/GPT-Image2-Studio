@@ -453,10 +453,8 @@ test("local creation batch generation runs items with the configured parallel li
   assert.match(repairHandler, /await runWithConcurrency\(\s*repairItems,\s*generationConcurrency,/);
 });
 
-test("local creation failures requeue to the live queue tail instead of waiting for the whole pass", async () => {
+test("creation generation avoids same-pass retries, filters automatic repairs, and gates upstream launches", async () => {
   const server = await readFile(serverPath, "utf8");
-  // Slice each handler exactly: handleCreationGenerate is followed by the Logo batch
-  // handler, so a lazy match up to handleCreationRepair would swallow both.
   const generateHandler = server.match(/async function handleCreationGenerate[\s\S]*?\r?\n}\r?\n\r?\nasync function handleCreationLogoBatchGenerate/)?.[0] || "";
   const logoBatchHandler = server.match(/async function handleCreationLogoBatchGenerate[\s\S]*?\r?\n}\r?\n\r?\nasync function handlePortraitRepair/)?.[0] || "";
   const repairHandler = server.match(/async function handleCreationRepair[\s\S]*?\r?\n}\r?\n\r?\nasync function handleGenerate/)?.[0] || "";
@@ -464,27 +462,40 @@ test("local creation failures requeue to the live queue tail instead of waiting 
   assert.ok(generateHandler, "handleCreationGenerate slice must not be empty");
   assert.ok(logoBatchHandler, "handleCreationLogoBatchGenerate slice must not be empty");
   assert.ok(repairHandler, "handleCreationRepair slice must not be empty");
-
-  assert.match(server, /import \{ createInRunRetryLedger, getRequeueNotice \} from "\.\/lib\/generation-item-retry\.mjs";/);
-  assert.match(server, /function requeueFailedSetItem\(\{ response, controls, retryLedger, item, message \}\) \{/);
-  // A requeue must never outlive the client stream, and must respect the ledger.
-  assert.match(server, /if \(typeof controls\?\.enqueue !== "function" \|\| !retryLedger \|\| !isResponseWritable\(response\)\) \{/);
-  assert.match(server, /if \(!retryLedger\.canRequeue\(item\?\.itemId\)\) \{/);
+  assert.equal([...server.matchAll(/generationLaunchGates\.acquireScope\(/g)].length, 5);
+  assert.equal([...server.matchAll(/generationLaunchGates\.releaseScope\(generationLaunchScope\);/g)].length, 5);
 
   for (const handler of [generateHandler, logoBatchHandler, repairHandler]) {
-    assert.match(handler, /const retryLedger = createInRunRetryLedger\(\);/);
-    // The worker needs the third argument to reach the live queue.
+    assert.match(handler, /const retryLedger = createInRunRetryLedger\(\{ maxRetries: 0 \}\);/);
+    assert.match(
+      handler,
+      /const generationLaunchScope = generationLaunchGates\.acquireScope\(\s*clientSessionId,\s*generationRequestScope,\s*generationStartDelayMs,\s*\);/,
+    );
     assert.match(handler, /async \(item, index, controls\) => \{/);
     assert.match(handler, /retryLedger\.getTaskId\(/);
-    assert.match(handler, /const requeueAttempt = requeueFailedSetItem\(\{ response, controls, retryLedger, item, message \}\);/);
-    // A requeued item goes back to queued with its previous error cleared, so the
-    // card shows a retry rather than a terminal failure.
-    assert.match(handler, /requeueAttempt \? \{ status: "queued", error: "" \} : \{ status: "failed", error: message \}/);
-    assert.match(handler, /writeSseEvent\(response, failureEvent\.eventName, \{/);
+    assert.match(
+      handler,
+      /await waitForResponseGenerationLaunchTurn\(\s*clientSessionId,\s*generationRequestScope,\s*response,\s*generationStartDelayMs,\s*controls,\s*\);[\s\S]*?await requestCreationStudioImageGeneration\(response, \{/,
+    );
   }
+
+  assert.match(generateHandler, /generationAttemptCount: 0,/);
+  assert.match(generateHandler, /const generationAttemptCount = reserveCreationGenerationAttempt\(items, item\.itemId\);/);
+  assert.match(logoBatchHandler, /generationAttemptCount: 0,/);
+  assert.match(logoBatchHandler, /const generationAttemptCount = reserveCreationGenerationAttempt\(items, item\.itemId\);/);
+  assert.match(repairHandler, /const automaticRepair = isAutomaticCreationRepair\(formData\);/);
+  assert.match(
+    repairHandler,
+    /if \(automaticRepair\) \{\s*repairItems = repairItems\.filter\(\(item\) =>\s*canStartCreationGenerationAttempt\(items, item\.itemId, \{ autoRepair: true \}\),\s*\);\s*\}/,
+  );
+  assert.match(
+    repairHandler,
+    /if \(!canStartCreationGenerationAttempt\(items, item\.itemId, \{ autoRepair: automaticRepair \}\)\) \{\s*throw new Error\("该套图项已达到自动生成次数上限。"\);\s*\}/,
+  );
+  assert.match(repairHandler, /const generationAttemptCount = reserveCreationGenerationAttempt\(items, item\.itemId\);/);
 });
 
-test("a requeued creation item reports as pending rather than failed", async () => {
+test("a legacy in-run requeue reports as pending rather than failed", async () => {
   const server = await readFile(serverPath, "utf8");
   assert.match(server, /function buildSetItemFailureEvent\(\{ message, requeueAttempt, retryLedger \}\) \{/);
   assert.match(server, /return \{ eventName: "item_failed", extra: \{\} \};/);
@@ -497,6 +508,14 @@ test("local creation generation cancels bounded upstream work when the SSE lifec
   // The effective deadline now comes from lib/upstream-stream-fetch.mjs so the socket
   // body timeout derives from the same value; assert the wiring, not the old IIFE shape.
   assert.match(server, /const CREATION_UPSTREAM_TIMEOUT_MS = resolveCreationUpstreamTimeoutMs\(\);/);
+  // A known Responses task must stay owned by this creation lifecycle while the
+  // relay is temporarily unavailable, rather than falling through to an automatic
+  // repair POST after the workflow's short generic recovery window.
+  assert.match(server, /const CREATION_ORIGINAL_RESPONSE_RECOVERY_POLL_DELAY_MS = 5_000;/);
+  assert.match(
+    server,
+    /const CREATION_ORIGINAL_RESPONSE_RECOVERY_MAX_POLLS = Math\.max\(\s*1,\s*Math\.ceil\(CREATION_UPSTREAM_TIMEOUT_MS \/ CREATION_ORIGINAL_RESPONSE_RECOVERY_POLL_DELAY_MS\),\s*\);/,
+  );
   assert.match(server, /resolveCreationUpstreamTimeoutMs[^}]*\} from "\.\/lib\/upstream-stream-fetch\.mjs";/);
   assert.match(server, /function createCreationRequestLifecycle\(response\) \{/);
   assert.match(server, /套图上游请求超时/);
@@ -506,6 +525,14 @@ test("local creation generation cancels bounded upstream work when the SSE lifec
   assert.match(server, /signal: lifecycle\.signal/);
   assert.match(server, /async function requestCreationStudioImageGeneration\(response, options\)/);
   assert.match(server, /requestCreationStudioImageGeneration\(response, \{/);
+  assert.match(
+    server,
+    /responseRecoveryMaxPolls:\s*options\.responseRecoveryMaxPolls \?\? CREATION_ORIGINAL_RESPONSE_RECOVERY_MAX_POLLS,/,
+  );
+  assert.match(
+    server,
+    /responseRecoveryPollDelayMs:\s*options\.responseRecoveryPollDelayMs \?\? CREATION_ORIGINAL_RESPONSE_RECOVERY_POLL_DELAY_MS,/,
+  );
   // A worker attaches its close listener only after winning a session slot, so an
   // already-closed response must abort immediately instead of waiting for a close
   // event that has already fired.

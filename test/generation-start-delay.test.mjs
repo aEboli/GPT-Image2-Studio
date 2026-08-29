@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { performance } from "node:perf_hooks";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -19,7 +18,6 @@ import {
   normalizeGenerationStartDelayMs,
   resolveGenerationStartDelayMs,
 } from "../lib/generation-start-delay.mjs";
-import { runWithConcurrency } from "../lib/limited-concurrency.mjs";
 import {
   DEFAULT_GENERATION_START_DELAY_MS,
   MAX_GENERATION_START_DELAY_MS,
@@ -34,23 +32,23 @@ function createMemoryStorage(initial = {}) {
   };
 }
 
-test("generation start delay defaults to 800ms and clamps to its bounds", () => {
-  assert.equal(DEFAULT_GENERATION_START_DELAY_MS, 800);
-  assert.equal(MIN_GENERATION_START_DELAY_MS, 0);
-  assert.equal(MAX_GENERATION_START_DELAY_MS, 10_000);
+test("generation start delay defaults to 1000ms and clamps to its bounds", () => {
+  assert.equal(DEFAULT_GENERATION_START_DELAY_MS, 1_000);
+  assert.equal(MIN_GENERATION_START_DELAY_MS, 200);
+  assert.equal(MAX_GENERATION_START_DELAY_MS, 5_000);
 
-  assert.equal(normalizeGenerationStartDelayMs(undefined), 800);
-  assert.equal(normalizeGenerationStartDelayMs(null), 800);
-  assert.equal(normalizeGenerationStartDelayMs(""), 800);
-  assert.equal(normalizeGenerationStartDelayMs("   "), 800);
-  assert.equal(normalizeGenerationStartDelayMs("not-a-number"), 800);
+  assert.equal(normalizeGenerationStartDelayMs(undefined), 1_000);
+  assert.equal(normalizeGenerationStartDelayMs(null), 1_000);
+  assert.equal(normalizeGenerationStartDelayMs(""), 1_000);
+  assert.equal(normalizeGenerationStartDelayMs("   "), 1_000);
+  assert.equal(normalizeGenerationStartDelayMs("not-a-number"), 1_000);
 
-  // Zero is a real choice, not an absent value.
-  assert.equal(normalizeGenerationStartDelayMs(0), 0);
-  assert.equal(normalizeGenerationStartDelayMs("0"), 0);
+  // The floor deliberately keeps a throttle enabled even when a request sends 0.
+  assert.equal(normalizeGenerationStartDelayMs(0), 200);
+  assert.equal(normalizeGenerationStartDelayMs("0"), 200);
 
-  assert.equal(normalizeGenerationStartDelayMs(-1), 0);
-  assert.equal(normalizeGenerationStartDelayMs(20_000), 10_000);
+  assert.equal(normalizeGenerationStartDelayMs(-1), 200);
+  assert.equal(normalizeGenerationStartDelayMs(20_000), 5_000);
   assert.equal(normalizeGenerationStartDelayMs("450.6"), 451);
   assert.equal(normalizeGenerationStartDelayMs("1200"), 1200);
 });
@@ -59,47 +57,20 @@ test("generation start delay resolves the request value over the saved default",
   const savedConfig = { defaults: { [GENERATION_START_DELAY_FIELD]: 300 } };
 
   assert.equal(resolveGenerationStartDelayMs({ [GENERATION_START_DELAY_FIELD]: "1200" }, savedConfig), 1200);
-  assert.equal(resolveGenerationStartDelayMs({ [GENERATION_START_DELAY_FIELD]: "0" }, savedConfig), 0);
+  assert.equal(resolveGenerationStartDelayMs({ [GENERATION_START_DELAY_FIELD]: "0" }, savedConfig), 200);
   assert.equal(resolveGenerationStartDelayMs({}, savedConfig), 300);
   assert.equal(resolveGenerationStartDelayMs({ [GENERATION_START_DELAY_FIELD]: "" }, savedConfig), 300);
-  assert.equal(resolveGenerationStartDelayMs({}, {}), 800);
+  assert.equal(resolveGenerationStartDelayMs({}, {}), 1_000);
 
   const formData = new FormData();
   formData.set(GENERATION_START_DELAY_FIELD, "1500");
   assert.equal(resolveGenerationStartDelayMs(formData, savedConfig), 1500);
 });
 
-test("bounded concurrency honours the configured start delay", async () => {
-  const zeroDelayStarts = [];
-  const zeroDelayStart = performance.now();
-  await runWithConcurrency([1, 2, 3, 4], 4, async () => {
-    zeroDelayStarts.push(performance.now() - zeroDelayStart);
-  }, { startDelayMs: 0 });
-  assert.equal(zeroDelayStarts.length, 4);
-  // With no launch gate every worker starts in the same tick window.
-  assert.ok(zeroDelayStarts[3] < 200, `expected an immediate fourth start, got ${zeroDelayStarts[3]}ms`);
-
-  const spacedStarts = [];
-  const spacedStart = performance.now();
-  await runWithConcurrency([1, 2, 3], 3, async () => {
-    spacedStarts.push(performance.now() - spacedStart);
-  }, { startDelayMs: 300 });
-  assert.equal(spacedStarts.length, 3);
-  assert.ok(spacedStarts[1] - spacedStarts[0] >= 250, `expected a ~300ms gap, got ${spacedStarts[1] - spacedStarts[0]}ms`);
-  assert.ok(spacedStarts[2] - spacedStarts[1] >= 250, `expected a ~300ms gap, got ${spacedStarts[2] - spacedStarts[1]}ms`);
-});
-
-test("bounded concurrency falls back to the default delay without an option", async () => {
+test("bounded concurrency leaves upstream pacing to the shared server launch gate", async () => {
   const source = await readFile(new URL("../lib/limited-concurrency.mjs", import.meta.url), "utf8");
-  assert.match(source, /normalizeGenerationStartDelayMs\(startDelayMs\)/);
-  assert.doesNotMatch(source, /const WORKER_START_DELAY_MS/);
-
-  const starts = [];
-  const startedAt = performance.now();
-  await runWithConcurrency([1, 2], 2, async () => {
-    starts.push(performance.now() - startedAt);
-  });
-  assert.ok(starts[1] - starts[0] >= 700, `expected the 800ms default, got ${starts[1] - starts[0]}ms`);
+  assert.doesNotMatch(source, /\bstartDelayMs\b/);
+  assert.doesNotMatch(source, /GenerationLaunchGate|generation-launch-gate/);
 });
 
 test("config store persists and normalizes the generation start delay", async () => {
@@ -107,25 +78,25 @@ test("config store persists and normalizes the generation start delay", async ()
   const store = createConfigStore({ rootDir });
 
   const initial = await store.readPublicConfig();
-  assert.equal(initial.defaults[GENERATION_START_DELAY_FIELD], 800);
+  assert.equal(initial.defaults[GENERATION_START_DELAY_FIELD], 1_000);
 
   const saved = await store.saveConfig({ defaults: { [GENERATION_START_DELAY_FIELD]: 1500 } });
   assert.equal(saved.defaults[GENERATION_START_DELAY_FIELD], 1500);
   assert.equal((await store.readPublicConfig()).defaults[GENERATION_START_DELAY_FIELD], 1500);
 
   const zeroed = await store.saveConfig({ defaults: { [GENERATION_START_DELAY_FIELD]: 0 } });
-  assert.equal(zeroed.defaults[GENERATION_START_DELAY_FIELD], 0);
+  assert.equal(zeroed.defaults[GENERATION_START_DELAY_FIELD], 200);
 
   const clamped = await store.saveConfig({ defaults: { [GENERATION_START_DELAY_FIELD]: 999_999 } });
-  assert.equal(clamped.defaults[GENERATION_START_DELAY_FIELD], 10_000);
+  assert.equal(clamped.defaults[GENERATION_START_DELAY_FIELD], 5_000);
 
   const junk = await store.saveConfig({ defaults: { [GENERATION_START_DELAY_FIELD]: "abc" } });
-  assert.equal(junk.defaults[GENERATION_START_DELAY_FIELD], 800);
+  assert.equal(junk.defaults[GENERATION_START_DELAY_FIELD], 1_000);
 });
 
 test("browser config round-trips the generation start delay", () => {
-  assert.equal(normalizeBrowserPrivateConfig({})[GENERATION_START_DELAY_FIELD], 800);
-  assert.equal(normalizeBrowserPrivateConfig({ [GENERATION_START_DELAY_FIELD]: 0 })[GENERATION_START_DELAY_FIELD], 0);
+  assert.equal(normalizeBrowserPrivateConfig({})[GENERATION_START_DELAY_FIELD], 1_000);
+  assert.equal(normalizeBrowserPrivateConfig({ [GENERATION_START_DELAY_FIELD]: 0 })[GENERATION_START_DELAY_FIELD], 200);
 
   const storage = createMemoryStorage();
   const saved = saveBrowserPrivateConfig({ [GENERATION_START_DELAY_FIELD]: 1500 }, storage);
@@ -134,17 +105,17 @@ test("browser config round-trips the generation start delay", () => {
 
   // An absent field keeps the stored value instead of resetting to the default.
   assert.equal(saveBrowserPrivateConfig({}, storage)[GENERATION_START_DELAY_FIELD], 1500);
-  // An explicit zero overwrites it.
-  assert.equal(saveBrowserPrivateConfig({ [GENERATION_START_DELAY_FIELD]: 0 }, storage)[GENERATION_START_DELAY_FIELD], 0);
+  // An explicit zero is normalized to the enabled throttle floor.
+  assert.equal(saveBrowserPrivateConfig({ [GENERATION_START_DELAY_FIELD]: 0 }, storage)[GENERATION_START_DELAY_FIELD], 200);
 
   const publicConfig = toPublicBrowserConfig(readBrowserPrivateConfig(storage), {});
-  assert.equal(publicConfig.defaults[GENERATION_START_DELAY_FIELD], 0);
+  assert.equal(publicConfig.defaults[GENERATION_START_DELAY_FIELD], 200);
 
   const payload = getBrowserPrivateConfigRequestPayload(() => readBrowserPrivateConfig(storage));
-  assert.equal(payload[GENERATION_START_DELAY_FIELD], 0);
+  assert.equal(payload[GENERATION_START_DELAY_FIELD], 200);
 
   const formData = appendBrowserConfigToFormData(new FormData(), () => readBrowserPrivateConfig(storage));
-  assert.equal(formData.get(GENERATION_START_DELAY_FIELD), "0");
+  assert.equal(formData.get(GENERATION_START_DELAY_FIELD), "200");
 });
 
 test("the start delay control sits in the config form above the generation log panel", async () => {
@@ -170,7 +141,7 @@ test("the start delay control sits in the config form above the generation log p
   assert.match(html, /<small data-ui-i18n="startDelayUnit">毫秒<\/small>/);
   assert.match(
     html,
-    /<input id="generationStartDelayInput" name="generationStartDelayMs" type="number" step="any"[^>]*placeholder="800"/,
+    /<input id="generationStartDelayInput" name="generationStartDelayMs" type="number" step="any"[^>]*placeholder="1000"/,
   );
   // Native min/max/step would fail form validation and silently block saving
   // every other config field: step="100" rejects 850, min="0" rejects a typed
@@ -178,12 +149,12 @@ test("the start delay control sits in the config form above the generation log p
   assert.doesNotMatch(html, /id="generationStartDelayInput"[^>]*\smax="/);
   assert.doesNotMatch(html, /id="generationStartDelayInput"[^>]*\smin="/);
   assert.doesNotMatch(html, /id="generationStartDelayInput"[^>]*step="100"/);
-  assert.match(html, /id="generationStartDelayInput"[^>]*data-min-delay-ms="0"/);
-  assert.match(html, /id="generationStartDelayInput"[^>]*data-max-delay-ms="10000"/);
+  assert.match(html, /id="generationStartDelayInput"[^>]*data-min-delay-ms="200"/);
+  assert.match(html, /id="generationStartDelayInput"[^>]*data-max-delay-ms="5000"/);
   // The description moved onto the hover trigger with the hint, so the input no
   // longer carries aria-describedby.
   assert.match(html, /aria-describedby="generationStartDelayHint"[^>]*data-ui-i18n="startDelayLabel"/);
-  assert.match(html, /id="generationStartDelayHint" role="tooltip"[^>]*data-ui-i18n="startDelayHint"[^>]*>[^<]*800 毫秒，最大 10000 毫秒/);
+  assert.match(html, /id="generationStartDelayHint" role="tooltip"[^>]*data-ui-i18n="startDelayHint"[^>]*>[^<]*1000 毫秒，范围 200 到 5000 毫秒/);
 });
 
 test("the browser reads the start delay control into the request payload", async () => {
@@ -201,16 +172,28 @@ test("the browser reads the start delay control into the request payload", async
   assert.match(app, /startDelayLabel: "Task Submit Interval"/);
 });
 
-test("every server concurrency fan-out passes the resolved start delay", async () => {
+test("every server fan-out waits for a shared launch turn after its slot and before the upstream call", async () => {
   const server = await readFile(new URL("../server.mjs", import.meta.url), "utf8");
 
   const scopeDeclarations = server.match(/const generationStartDelayMs = resolveGenerationStartDelayMs\(formData, config\);/g) || [];
-  const callSites = server.match(/\}, \{ startDelayMs: generationStartDelayMs \}\);/g) || [];
-  const fanOutCalls = server.match(/await runWithConcurrency\(/g) || [];
+  const fanOutSections = server.split("await runWithConcurrency(").slice(1);
 
-  assert.equal(fanOutCalls.length, 5, "creation generate/repair/logo-batch and portrait generate/repair fan out");
-  assert.equal(callSites.length, 5, "every fan-out must receive the configured delay");
-  assert.equal(scopeDeclarations.length, 5);
+  assert.equal(fanOutSections.length, 5, "creation generate/repair/logo-batch and portrait generate/repair fan out");
+  assert.equal(scopeDeclarations.length, 5, "every fan-out resolves the configured delay once");
+  assert.doesNotMatch(server, /\bstartDelayMs\b/, "runWithConcurrency must not own launch pacing");
+
+  fanOutSections.forEach((section, index) => {
+    const slotIndex = section.indexOf("await waitForResponseSessionTaskSlot(");
+    const launchTurnIndex = section.indexOf("await waitForResponseGenerationLaunchTurn(");
+    const portraitRequestIndex = section.indexOf("await requestStudioImageGeneration(");
+    const creationRequestIndex = section.indexOf("await requestCreationStudioImageGeneration(");
+    const upstreamRequestIndex = [portraitRequestIndex, creationRequestIndex].filter((value) => value >= 0).sort((a, b) => a - b)[0];
+
+    assert.ok(slotIndex >= 0, `fan-out ${index + 1} must claim a session slot`);
+    assert.ok(launchTurnIndex > slotIndex, `fan-out ${index + 1} must wait for the launch turn after claiming its slot`);
+    assert.ok(upstreamRequestIndex > launchTurnIndex, `fan-out ${index + 1} must wait for the launch turn before calling upstream`);
+    assert.match(section.slice(launchTurnIndex, upstreamRequestIndex), /generationStartDelayMs/);
+  });
 });
 
 test("browser and server keep the delay out of masked credential surfaces", () => {

@@ -77,6 +77,14 @@ export function getCreationCardDomKey(item = {}, fallbackIndex = 0) {
   return `${fallbackLabel}-${fallbackIndex}`;
 }
 
+/* 加载动画的进度源按 key 共享，而套图的 itemId 在每个队列里都是同一套值。
+   不带上本次运行的作用域，队列二的卡片会直接接上队列一残留的进度并显示 99%。 */
+export function getCreationCardLoadingKey(item = {}, fallbackIndex = 0, keyScope = "") {
+  const domKey = getCreationCardDomKey(item, fallbackIndex);
+  const scope = String(keyScope || "").trim();
+  return scope ? `${scope}::${domKey}` : domKey;
+}
+
 export function syncCreationLoadingCard(
   card,
   item = {},
@@ -84,6 +92,7 @@ export function syncCreationLoadingCard(
   {
     isSkuStart = false,
     isInfographicRebuildStart = false,
+    keyScope = "",
     getFallbackTitle = () => "",
     getImageUrl = () => "",
     getStatusLabel = () => "",
@@ -117,7 +126,7 @@ export function syncCreationLoadingCard(
     media.classList.add("is-loading");
     media.setAttribute("aria-busy", "true");
     const loadingShell = media.querySelector(".creation-card-loading");
-    const key = getCreationCardDomKey(item, fallbackIndex);
+    const key = getCreationCardLoadingKey(item, fallbackIndex, keyScope);
     const logText = getLogText(item);
     if (loadingShell) {
       updateCreationCardLoading(loadingShell, item.status, { key, logText });
@@ -163,6 +172,10 @@ export function syncCreationResultGrid({
       grid.insertBefore(card, currentCard);
     }
     if (existingCard && existingCard !== card) {
+      /* 被替换掉的卡片必须先停掉自己的加载动画：它的进度源是按 key 共享的，
+         只把节点从 DOM 里摘掉会留下一个脱离文档却继续跑到 99% 的常驻进度源。
+         停在替换之后，本次运行内重建卡片仍能接上原进度。 */
+      stopCreationCardLoading(existingCard.querySelector?.(".creation-card-loading"));
       existingCard.remove();
     }
   });

@@ -6327,8 +6327,9 @@ textarea {
 }
 
 .reference-analysis-generation-placeholder.preview-placeholder-loading {
-  width: min(100%, 460px);
-  max-width: calc(100% - 24px);
+  width: 100%;
+  height: 100%;
+  max-width: none;
   gap: 6px;
   font-weight: 400;
 }
@@ -6389,11 +6390,23 @@ textarea {
   outline: none;
 }
 
+/* Same selected-state contrast as the other rails, kept in this rail's own green
+   palette rather than forced onto the shared accent. */
 .reference-analysis-generation-thumb.active {
-  border-color: rgba(112, 226, 162, 0.62);
+  border-color: rgba(112, 226, 162, 0.82);
   box-shadow:
-    0 0 0 2px rgba(112, 226, 162, 0.12),
-    0 10px 24px rgba(36, 120, 74, 0.18);
+    0 0 0 2px rgba(112, 226, 162, 0.52),
+    0 6px 14px rgba(36, 120, 74, 0.26);
+}
+
+.reference-analysis-generation-thumb .filmstrip-selected-marker {
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background: rgb(112, 226, 162);
+  color: #0d2a1c;
+  box-shadow: 0 6px 14px rgba(36, 120, 74, 0.42);
 }
 
 .reference-analysis-generation-thumb.is-running {
@@ -8121,9 +8134,20 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
   max-width: 480px;
 }
 
+/* 生成中的占位不再是画布里一个居中的窄框：撑满整块画布，动画才能覆盖整个图片板块。
+   非生成态的占位文案仍走 .preview-placeholder 的 480px 限宽，排版不受影响。 */
 .preview-placeholder-loading {
-  width: min(100%, 560px);
-  max-width: 560px;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  align-self: stretch;
+  justify-self: stretch;
+  border-radius: inherit;
+}
+
+/* 画布内边距在生成期间去掉：留着的话动画会缩进一圈，看起来仍像个居中的小方块。 */
+.preview-canvas:has(> .preview-placeholder-loading) {
+  padding: 0;
 }
 
 .preview-placeholder p {
@@ -8172,6 +8196,10 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
   --generation-loading-light-span: 0.2;
   /* 主题整体偏移，与各阶段自己的起始亮度叠加，避免主题规则盖掉阶段调校。 */
   --generation-loading-light-shift: 0%;
+  /* 满幅铺开后液体面积成倍变大，用透明度压住整体亮度，中间文字才读得清。 */
+  --generation-loading-fill-opacity: 0.46;
+  --generation-loading-aurora-opacity: 0.5;
+  --generation-loading-scrim: rgba(8, 11, 22, 0.42);
   /* 百分比越高液体越深，所以同一阶段内也能看出推进。 */
   --generation-loading-fluid: hsl(
     var(--generation-loading-hue) var(--generation-loading-sat)
@@ -8184,8 +8212,17 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
     --generation-loading-progress var(--generation-loading-rise-duration, 800ms) linear,
     --generation-loading-hue 900ms ease-in-out,
     --generation-loading-sat 900ms ease-in-out;
+  /* 动画铺满宿主而不是画一个固定尺寸的圆：宿主多大动画就多大，
+     提示词模式的大生图板块得到大动画，套图模式每张卡的小占位得到刚好填满自己的小动画。
+     container-type 只约束行内轴，块轴仍随内容增长，所以没有确定高度的宿主不会塌成 0。 */
+  position: relative;
+  isolation: isolate;
+  container-type: inline-size;
+  overflow: hidden;
   width: 100%;
+  height: 100%;
   min-height: 180px;
+  border-radius: inherit;
   display: grid;
   justify-items: center;
   align-content: center;
@@ -8245,31 +8282,36 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
 html[data-theme="light"] .generation-loading-shell {
   --generation-loading-light-shift: -16%;
   --generation-loading-light-span: 0.14;
+  /* 浅色主题下压暗层要反过来提亮，否则满幅上色会把深色文字吃掉。 */
+  --generation-loading-fill-opacity: 0.34;
+  --generation-loading-aurora-opacity: 0.38;
+  --generation-loading-scrim: rgba(255, 255, 255, 0.56);
 }
 
 html[data-theme="light"] .generation-loading-shell[data-generation-loading-family="queued"] {
   --generation-loading-sat: 12%;
 }
 
+/* 液体层铺满整个宿主，不再是居中的固定圆：inset 让它跟着占位框走，
+   水位、波高、气泡都用容器单位（cqi）换算，所以同一套规则在大板块和小卡片上都成比例。 */
 .generation-loading-drop {
-  position: relative;
-  width: clamp(72px, 14vw, 112px);
-  aspect-ratio: 1;
+  position: absolute;
+  z-index: 0;
+  inset: 0;
   overflow: hidden;
-  border-radius: 50%;
+  border-radius: inherit;
   isolation: isolate;
-  border: 1px solid color-mix(in srgb, var(--generation-loading-fluid) 40%, rgba(255, 255, 255, 0.28));
+  pointer-events: none;
   background:
-    radial-gradient(circle at 32% 24%, rgba(255, 255, 255, 0.34), transparent 19%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.015));
+    radial-gradient(circle at 32% 24%, rgba(255, 255, 255, 0.16), transparent 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.012));
   box-shadow:
-    0 14px 30px rgba(0, 0, 0, 0.2),
-    0 0 26px color-mix(in srgb, var(--generation-loading-fluid) 24%, transparent),
-    inset 0 0 0 6px rgba(255, 255, 255, 0.05);
-  --generation-loading-wave-height: 8px;
-  --generation-loading-ripple-height: 4.5px;
-  --generation-loading-bubble-size: 3px;
-  --generation-loading-bubble-tile: 26px;
+    inset 0 0 0 1px color-mix(in srgb, var(--generation-loading-fluid) 18%, transparent),
+    inset 0 0 calc(18px + 6cqi) color-mix(in srgb, var(--generation-loading-fluid) 14%, transparent);
+  --generation-loading-wave-height: clamp(5px, 2.4cqi, 22px);
+  --generation-loading-ripple-height: clamp(3px, 1.4cqi, 13px);
+  --generation-loading-bubble-size: clamp(1.8px, 0.9cqi, 8px);
+  --generation-loading-bubble-tile: clamp(14px, 7cqi, 64px);
   animation: generation-loading-breathe 4200ms ease-in-out infinite;
 }
 
@@ -8279,6 +8321,7 @@ html[data-theme="light"] .generation-loading-shell[data-generation-loading-famil
   z-index: 1;
   inset: auto 0 0;
   height: var(--generation-loading-progress);
+  opacity: var(--generation-loading-fill-opacity, 0.46);
   background:
     linear-gradient(
       180deg,
@@ -8364,6 +8407,58 @@ html[data-theme="light"] .generation-loading-shell[data-generation-loading-famil
   animation: generation-loading-wave-drift 2100ms linear infinite reverse;
 }
 
+/* 满幅的环境光雾：几团柔光缓慢横移与缩放，让整块占位在生成期间一直有呼吸感。
+   它只表达"正在生成"，进度仍然只由水位表达，所以尺寸变化不会误读成进度变化。 */
+.generation-loading-shell::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -22%;
+  opacity: var(--generation-loading-aurora-opacity, 0.5);
+  background:
+    radial-gradient(
+      closest-side circle at 26% 30%,
+      color-mix(in srgb, var(--generation-loading-fluid) 52%, transparent),
+      transparent 100%
+    ),
+    radial-gradient(
+      closest-side circle at 74% 24%,
+      color-mix(in srgb, hsl(calc(var(--generation-loading-hue) + 34) var(--generation-loading-sat) 72%) 40%, transparent),
+      transparent 100%
+    ),
+    radial-gradient(
+      closest-side circle at 58% 78%,
+      color-mix(in srgb, hsl(calc(var(--generation-loading-hue) - 30) var(--generation-loading-sat) 68%) 34%, transparent),
+      transparent 100%
+    );
+  background-size: 78% 78%, 66% 66%, 84% 84%;
+  background-repeat: no-repeat;
+  background-position: 12% 18%, 76% 8%, 46% 74%;
+  animation: generation-loading-aurora-drift 9200ms ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* 中间文字压在光雾与水体之上：满幅上色后没有这层压暗，浅色主题下百分比会糊在背景里。 */
+.generation-loading-shell::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  background: radial-gradient(
+    ellipse calc(38% + 12cqi) calc(30% + 10cqi) at 50% 50%,
+    var(--generation-loading-scrim),
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+.generation-loading-percent,
+.generation-loading-label,
+.generation-loading-log {
+  position: relative;
+  z-index: 2;
+}
+
 .generation-loading-percent {
   min-width: 4ch;
   color: var(--text);
@@ -8389,6 +8484,12 @@ html[data-theme="light"] .generation-loading-shell[data-generation-loading-famil
 /* 等待态只调静态液位、节奏与气泡强度；颜色交给排队色相族，避免两套取色互相覆盖。 */
 .generation-loading-shell[data-generation-loading-mode="waiting"] .generation-loading-drop::after {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* 排队时把满幅光雾压暗放慢：等待和真正在生成必须一眼能分出来。 */
+.generation-loading-shell[data-generation-loading-mode="waiting"]::before {
+  --generation-loading-aurora-opacity: 0.24;
+  animation-duration: 16000ms;
 }
 
 .generation-loading-shell[data-generation-loading-mode="waiting"] .generation-loading-drop::before {
@@ -8448,17 +8549,18 @@ html[data-theme="light"] .generation-loading-log {
   min-height: clamp(220px, 30vw, 340px);
 }
 
+/* 各宿主不再规定动画尺寸——尺寸一律由宿主占位框决定。这里只按占位大小调水纹密度：
+   小框用小系数免得几条波纹就把框占满，大框放开系数免得水面看起来是一条直线。 */
 .creation-card-loading {
   min-height: 132px;
   padding: 12px;
 }
 
 .creation-card-loading .generation-loading-drop {
-  width: clamp(58px, 30%, 84px);
-  --generation-loading-wave-height: 6px;
-  --generation-loading-ripple-height: 3.5px;
-  --generation-loading-bubble-size: 2.4px;
-  --generation-loading-bubble-tile: 20px;
+  --generation-loading-wave-height: clamp(5px, 3cqi, 14px);
+  --generation-loading-ripple-height: clamp(3px, 1.8cqi, 8px);
+  --generation-loading-bubble-size: clamp(1.8px, 1.1cqi, 5px);
+  --generation-loading-bubble-tile: clamp(14px, 9cqi, 34px);
 }
 
 .creation-card-loading .generation-loading-label {
@@ -8474,26 +8576,27 @@ html[data-theme="light"] .generation-loading-log {
 
 .article-card-image .generation-loading-drop,
 .ppt-slide-thumb .generation-loading-drop {
-  width: clamp(52px, 38%, 86px);
-  --generation-loading-wave-height: 6px;
-  --generation-loading-ripple-height: 3.5px;
-  --generation-loading-bubble-size: 2.4px;
-  --generation-loading-bubble-tile: 20px;
+  --generation-loading-wave-height: clamp(5px, 2.6cqi, 14px);
+  --generation-loading-ripple-height: clamp(3px, 1.6cqi, 8px);
+  --generation-loading-bubble-size: clamp(1.8px, 1cqi, 5px);
+  --generation-loading-bubble-tile: clamp(14px, 8cqi, 34px);
 }
 
 .filmstrip .generation-loading-shell {
   min-height: 0;
-  height: 100%;
+  /* 胶片条的图与占位都是 84px 见方，动画铺满这一格而不是整条 92px 网格轨。 */
+  width: 84px;
+  height: 84px;
   gap: 4px;
   padding: 4px;
+  border-radius: 10px;
 }
 
 .filmstrip .generation-loading-drop {
-  width: clamp(32px, 60%, 56px);
-  --generation-loading-wave-height: 4px;
-  --generation-loading-ripple-height: 2.5px;
-  --generation-loading-bubble-size: 1.8px;
-  --generation-loading-bubble-tile: 14px;
+  --generation-loading-wave-height: clamp(4px, 4cqi, 9px);
+  --generation-loading-ripple-height: clamp(2.5px, 2.4cqi, 6px);
+  --generation-loading-bubble-size: clamp(1.6px, 1.6cqi, 4px);
+  --generation-loading-bubble-tile: clamp(12px, 14cqi, 22px);
 }
 
 .filmstrip .generation-loading-percent {
@@ -8504,35 +8607,45 @@ html[data-theme="light"] .generation-loading-log {
   display: none;
 }
 
+/* 满幅层只能改透明度：缩放会让边缘露出占位底色，动画就不再是"填满"了。 */
 @keyframes generation-loading-breathe {
   0%,
   100% {
-    opacity: 0.94;
-    transform: scale(0.994);
+    opacity: 0.92;
   }
 
   50% {
     opacity: 1;
-    transform: scale(1);
+  }
+}
+
+/* 光雾整体位移小于自身外扩量（inset -22%），所以移到任何一帧都不会露出边缘。 */
+@keyframes generation-loading-aurora-drift {
+  0%,
+  100% {
+    background-position: 12% 18%, 76% 8%, 46% 74%;
+    background-size: 78% 78%, 66% 66%, 84% 84%;
+  }
+
+  33% {
+    background-position: 30% 8%, 58% 28%, 26% 66%;
+    background-size: 88% 88%, 74% 74%, 74% 74%;
+  }
+
+  66% {
+    background-position: 4% 34%, 84% 20%, 62% 84%;
+    background-size: 70% 70%, 82% 82%, 92% 92%;
   }
 }
 
 @keyframes generation-loading-waiting-pulse {
   0%,
   100% {
-    opacity: 0.68;
-    box-shadow:
-      0 10px 22px rgba(0, 0, 0, 0.18),
-      0 0 0 0 color-mix(in srgb, var(--muted) 26%, transparent),
-      inset 0 0 0 6px rgba(255, 255, 255, 0.04);
+    opacity: 0.52;
   }
 
   50% {
-    opacity: 0.94;
-    box-shadow:
-      0 10px 22px rgba(0, 0, 0, 0.18),
-      0 0 0 7px color-mix(in srgb, var(--muted) 6%, transparent),
-      inset 0 0 0 6px rgba(255, 255, 255, 0.04);
+    opacity: 0.88;
   }
 }
 
@@ -8576,6 +8689,8 @@ html[data-theme="light"] .generation-loading-log {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .generation-loading-shell::before,
+  .generation-loading-shell[data-generation-loading-mode="waiting"]::before,
   .generation-loading-drop,
   .generation-loading-drop::before,
   .generation-loading-wave,
@@ -8761,10 +8876,52 @@ html[data-theme="light"] .generation-loading-log {
   text-align: center;
 }
 
+/* Every rail can scroll past its visible width, so the current thumbnail needs a
+   ring that reads at a glance instead of one faint border among many. */
 .filmstrip-item.active img,
 .filmstrip-item.active .filmstrip-ghost {
-  border-color: rgba(141, 156, 255, 0.56);
-  box-shadow: 0 0 0 2px rgba(111, 124, 255, 0.16);
+  border-color: color-mix(in srgb, var(--accent) 82%, transparent);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--accent) 52%, transparent),
+    0 6px 14px color-mix(in srgb, #000 26%, transparent);
+}
+
+.filmstrip-item.active span {
+  color: color-mix(in srgb, var(--accent) 72%, var(--text));
+  font-weight: 600;
+}
+
+.filmstrip-selected-marker {
+  position: absolute;
+  top: 3px;
+  left: 7px;
+  z-index: 2;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, #ffffff 34%, transparent);
+  border-radius: 999px;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: var(--type-subtitle-size);
+  line-height: 1;
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--accent) 42%, transparent);
+  pointer-events: none;
+}
+
+html[data-ui-layout="tablet"] .filmstrip-selected-marker {
+  top: 2px;
+  left: 5px;
+  width: 18px;
+  height: 18px;
+}
+
+html[data-ui-layout="mobile"] .filmstrip-selected-marker {
+  top: 2px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
 }
 
 .filmstrip-cancel {

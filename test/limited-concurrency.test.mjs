@@ -1,11 +1,8 @@
 import assert from "node:assert/strict";
-import { performance } from "node:perf_hooks";
 import test from "node:test";
 
 import { runWithConcurrency } from "../lib/limited-concurrency.mjs";
 import { MAX_GENERATION_CONCURRENCY } from "../lib/studio-constants.mjs";
-
-const START_SPACING_TOLERANCE_MS = 700;
 
 function wait(milliseconds) {
   return new Promise((resolve) => {
@@ -27,30 +24,24 @@ function releaseStartedTasks(releaseCallbacks) {
   }
 }
 
-test("limited concurrency staggers task starts before filling the configured limit", async () => {
+test("limited concurrency fills the configured worker limit without owning upstream pacing", async () => {
   const started = [];
-  const startTimes = [];
   const releaseByItem = new Map();
 
   const runPromise = runWithConcurrency(["a", "b", "c"], 2, async (item) => {
     started.push(item);
-    startTimes.push(performance.now());
     await new Promise((resolve) => {
       releaseByItem.set(item, resolve);
     });
     return item.toUpperCase();
   });
 
-  await waitForStartCount(started, 1);
-  assert.deepEqual(started, ["a"]);
-
   await waitForStartCount(started, 2);
-  assert.ok(startTimes[1] - startTimes[0] >= START_SPACING_TOLERANCE_MS);
+  assert.deepEqual(started, ["a", "b"]);
 
   releaseByItem.get("a")();
   await waitForStartCount(started, 3);
   assert.deepEqual(started, ["a", "b", "c"]);
-  assert.ok(startTimes[2] - startTimes[1] >= START_SPACING_TOLERANCE_MS);
 
   releaseByItem.get("b")();
   releaseByItem.get("c")();
@@ -66,7 +57,7 @@ test("limited concurrency runs items enqueued during the run", async () => {
       assert.equal(controls.enqueue("a-retry"), true);
     }
     return item.toUpperCase();
-  }, { startDelayMs: 0 });
+  });
 
   assert.deepEqual(started, ["a", "b", "a-retry"]);
   assert.deepEqual(results, ["A", "B", "A-RETRY"]);
@@ -81,7 +72,7 @@ test("an item enqueued at the tail runs after every already queued item", async 
       controls.enqueue(6);
     }
     return item;
-  }, { startDelayMs: 0 });
+  });
 
   assert.deepEqual(started, [1, 2, 3, 4, 5, 6]);
 });
@@ -95,7 +86,7 @@ test("the last running worker still picks up its own enqueued retry", async () =
       assert.equal(controls.enqueue("only-retry"), true);
     }
     return item;
-  }, { startDelayMs: 0 });
+  });
 
   assert.deepEqual(started, ["only", "only-retry"]);
 });
@@ -106,7 +97,7 @@ test("enqueue is refused once the run has drained", async () => {
   await runWithConcurrency(["a"], 1, async (item, index, controls) => {
     escapedControls = controls;
     return item;
-  }, { startDelayMs: 0 });
+  });
 
   assert.equal(escapedControls.enqueue("late"), false);
 });
@@ -118,7 +109,7 @@ test("enqueue is refused after a worker throws and the run unwinds", async () =>
     runWithConcurrency(["a"], 1, async (item, index, controls) => {
       escapedControls = controls;
       throw new Error("boom");
-    }, { startDelayMs: 0 }),
+    }),
     /boom/,
   );
 
@@ -142,7 +133,7 @@ test("aborting the fan-out stops further upstream work but still visits each ite
       controls.abortRemaining("生成请求失败：HTTP 402，错误码 insufficient_quota");
     }
     return item;
-  }, { startDelayMs: 0 });
+  });
 
   assert.deepEqual(visited, [1, 2, 3, 4, 5]);
   // 1 and 2 were already in flight; nothing after the abort reached upstream.
@@ -161,7 +152,7 @@ test("the first abort reason wins and repeat aborts are idempotent", async () =>
     }
     reasons.push(controls.getAbortReason());
     return item;
-  }, { startDelayMs: 0 });
+  });
 
   assert.deepEqual(reasons, ["first reason", "first reason", "first reason"]);
 });
@@ -175,16 +166,14 @@ test("an aborted fan-out refuses requeues", async () => {
     // Requeueing into a queue that will never send anything upstream is pointless.
     assert.equal(controls.enqueue("a-retry"), false);
     return item;
-  }, { startDelayMs: 0 });
+  });
 
   assert.deepEqual(started, ["a"]);
 });
 
-test("an aborted fan-out stops waiting out the submit interval", async () => {
+test("an aborted fan-out drains without a worker-level submit interval", async () => {
   const started = [];
-  const startDelayMs = 800;
   const itemCount = 6;
-  const startedAt = performance.now();
 
   await runWithConcurrency(Array.from({ length: itemCount }, (_, index) => index + 1), 1, async (item, index, controls) => {
     started.push(item);
@@ -192,15 +181,9 @@ test("an aborted fan-out stops waiting out the submit interval", async () => {
       controls.abortRemaining("fatal");
     }
     return item;
-  }, { startDelayMs });
+  });
 
-  const elapsed = performance.now() - startedAt;
   assert.equal(started.length, itemCount);
-  // Without the skip these five remaining items would each wait out 800ms.
-  assert.ok(
-    elapsed < startDelayMs * 2,
-    `aborted items must not each wait a submit interval, took ${Math.round(elapsed)}ms`,
-  );
 });
 
 test("limited concurrency does not mutate the caller's item list", async () => {
@@ -211,7 +194,7 @@ test("limited concurrency does not mutate the caller's item list", async () => {
       controls.enqueue("a-retry");
     }
     return item;
-  }, { startDelayMs: 0 });
+  });
 
   assert.deepEqual(items, ["a"]);
 });
@@ -238,7 +221,7 @@ test("limited concurrency caps worker starts at the shared concurrency maximum",
       });
     });
     return item;
-  }, { startDelayMs: 0 });
+  });
 
   await waitForStartCount(started, cap, 25_000);
   assert.deepEqual(started, items.slice(0, cap));

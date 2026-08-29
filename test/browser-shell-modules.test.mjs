@@ -121,7 +121,7 @@ test("browser config module normalizes private config without requiring window g
     protocolBaseUrl: "https://protocol.example.test/v1",
     protocolApiKey: "sk-protocol-secret",
     protocolImageModel: "custom-protocol-image-model",
-    generationStartDelayMs: 800,
+    generationStartDelayMs: 1000,
     generationConcurrency: 20,
   });
   assert.equal(publicConfig.imageRoute, "b");

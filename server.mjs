@@ -89,6 +89,7 @@ import { resolveGenerationConcurrencyForLimit } from "./lib/generation-concurren
 import { resolveGenerationStartDelayMs } from "./lib/generation-start-delay.mjs";
 import { createInRunRetryLedger, getRequeueNotice } from "./lib/generation-item-retry.mjs";
 import { createSessionTaskSlotLimiter } from "./lib/generation-task-slots.mjs";
+import { createGenerationLaunchGateRegistry } from "./lib/generation-launch-gate.mjs";
 import { runWithConcurrency } from "./lib/limited-concurrency.mjs";
 import { getFatalUpstreamAbortMessage, isFatalUpstreamError } from "./lib/upstream-fatal-error.mjs";
 import {
@@ -99,6 +100,8 @@ import { buildCreationGenerationSnapshot } from "./lib/creation-generation-snaps
 import {
   DEFAULT_REASONING_EFFORT,
   CREATION_STATUS_HEARTBEAT_MS,
+  MAX_ITEM_UPSTREAM_ATTEMPTS,
+  MAX_GENERATION_CONCURRENCY,
   MAX_CREATION_REFERENCE_IMAGES,
   MAX_CREATION_PARALLEL_TASKS,
   MAX_PARALLEL_TASKS_PER_SESSION,
@@ -253,6 +256,15 @@ const SESSION_TASK_SLOT_RETRY_DELAY_MS = 250;
 // Shared with lib/upstream-stream-fetch.mjs so the socket body timeout is always
 // derived from the SAME effective deadline this abort uses.
 const CREATION_UPSTREAM_TIMEOUT_MS = resolveCreationUpstreamTimeoutMs();
+// A relay can acknowledge a Responses task and then close its stream with a
+// temporary 402. Keep polling that known task for the rest of the creation
+// lifecycle instead of releasing the slot after the workflow's short generic
+// recovery window and letting automatic repair submit a duplicate POST.
+const CREATION_ORIGINAL_RESPONSE_RECOVERY_POLL_DELAY_MS = 5_000;
+const CREATION_ORIGINAL_RESPONSE_RECOVERY_MAX_POLLS = Math.max(
+  1,
+  Math.ceil(CREATION_UPSTREAM_TIMEOUT_MS / CREATION_ORIGINAL_RESPONSE_RECOVERY_POLL_DELAY_MS),
+);
 function getSessionTaskSlotLimit(requestScope) {
   const scope = String(requestScope || "").trim().split(":", 1)[0];
   if (scope === "prompt") {
@@ -267,6 +279,11 @@ const sessionTaskSlotLimiter = createSessionTaskSlotLimiter({
   maxParallelTasks: getSessionTaskSlotLimit,
   retryDelayMs: SESSION_TASK_SLOT_RETRY_DELAY_MS,
 });
+// Scoped exactly like the slot limiter above, so the concurrency ceiling and the
+// submit interval both mean "per session, per scope". A per-request gate would let
+// N concurrent fan-outs each pace on their own timer, and the upstream would see
+// roughly `interval / N` — measured at 458ms for two fan-outs configured at 1000ms.
+const generationLaunchGates = createGenerationLaunchGateRegistry();
 const PPT_SOURCE_EXTENSIONS = new Set([".pdf", ".docx", ".pptx", ".txt", ".md", ".csv"]);
 const ARTICLE_SOURCE_EXTENSIONS = new Set([".txt", ".md", ".csv", ".json"]);
 const PPT_SLIDE_SIZE = "2048x1152";
@@ -567,7 +584,7 @@ function createCreationItemPartialImageWriter(response) {
 // ceiling to the widest fan-out a single stream can reach plus headroom for the
 // framework's own listeners, and never lower a ceiling that is already higher (0 means
 // unlimited).
-const MAX_SSE_CLOSE_LISTENERS = MAX_CREATION_PARALLEL_TASKS + 10;
+const MAX_SSE_CLOSE_LISTENERS = MAX_GENERATION_CONCURRENCY + 10;
 
 function ensureSseListenerCapacity(response) {
   if (typeof response?.setMaxListeners !== "function" || typeof response.getMaxListeners !== "function") {
@@ -634,6 +651,10 @@ async function requestCreationStudioImageGeneration(response, options) {
       ...options,
       signal: lifecycle.signal,
       statusHeartbeatMs: CREATION_STATUS_HEARTBEAT_MS,
+      responseRecoveryMaxPolls:
+        options.responseRecoveryMaxPolls ?? CREATION_ORIGINAL_RESPONSE_RECOVERY_MAX_POLLS,
+      responseRecoveryPollDelayMs:
+        options.responseRecoveryPollDelayMs ?? CREATION_ORIGINAL_RESPONSE_RECOVERY_POLL_DELAY_MS,
     });
   } catch (error) {
     throw lifecycle.getError(error);
@@ -955,10 +976,30 @@ function releaseSessionTaskSlot(sessionId, taskId, requestScope) {
   sessionTaskSlotLimiter.releaseSessionTaskSlot(sessionId, taskId, requestScope);
 }
 
-// Pushes a failed set item back onto the tail of the live task queue so it retries
-// as soon as any concurrency slot frees up, instead of waiting for the whole first
-// pass to finish. Returns the claimed attempt number, or 0 when the item must be
-// treated as failed.
+// Wait only after this worker has claimed its shared session slot and immediately
+// before it calls the upstream. Pacing workers before their slot wait lets them
+// pre-consume permits, then bunch together when slots later free.
+async function waitForResponseGenerationLaunchTurn(
+  clientSessionId,
+  requestScope,
+  response,
+  intervalMs,
+  controls,
+) {
+  throwIfFanOutAborted(controls);
+  const granted = await generationLaunchGates.waitForTurn(clientSessionId, requestScope, intervalMs, {
+    isActive: () => isResponseWritable(response) && !readFanOutAbortReason(controls),
+  });
+  if (!granted) {
+    throwIfFanOutAborted(controls);
+    throw new Error("Generation request disconnected; launch wait cancelled.");
+  }
+  throwIfFanOutAborted(controls);
+}
+
+// Pushes a failed set item back onto the tail of the live task queue. Only callers
+// that explicitly opt in use this legacy in-run retry; Creation uses one initial
+// attempt plus one later automatic repair pass instead of retrying a 402 at once.
 function requeueFailedSetItem({ response, controls, retryLedger, item, message }) {
   // An account-level upstream failure will reject every sibling the same way, so
   // it stops the whole fan-out instead of buying a retry that cannot succeed.
@@ -981,6 +1022,27 @@ function requeueFailedSetItem({ response, controls, retryLedger, item, message }
   }
 
   return attempt;
+}
+
+function getCreationItemGenerationAttemptCount(item = {}) {
+  return Math.max(0, Math.floor(Number(item?.generationAttemptCount) || 0));
+}
+
+function isAutomaticCreationRepair(formData) {
+  return ["1", "true", "yes"].includes(String(formData?.get?.("autoRepair") || "").trim().toLowerCase());
+}
+
+function canStartCreationGenerationAttempt(items, itemId, { autoRepair = false } = {}) {
+  if (!autoRepair) {
+    return true;
+  }
+  const item = Array.isArray(items) ? items.find((entry) => entry.itemId === itemId) : null;
+  return getCreationItemGenerationAttemptCount(item) < MAX_ITEM_UPSTREAM_ATTEMPTS;
+}
+
+function reserveCreationGenerationAttempt(items, itemId) {
+  const item = Array.isArray(items) ? items.find((entry) => entry.itemId === itemId) : null;
+  return getCreationItemGenerationAttemptCount(item) + 1;
 }
 
 // Called at the top of every fan-out worker. Throwing here routes an aborted item
@@ -4210,8 +4272,14 @@ async function handlePortraitGenerate(request, response) {
     writeSseEvent(response, "plan", { setId, items });
 
     const retryLedger = createInRunRetryLedger();
+    const generationLaunchScope = generationLaunchGates.acquireScope(
+      clientSessionId,
+      generationRequestScope,
+      generationStartDelayMs,
+    );
 
-    await runWithConcurrency(plan.items, generationConcurrency, async (item, index, controls) => {
+    try {
+      await runWithConcurrency(plan.items, generationConcurrency, async (item, index, controls) => {
       const taskId = retryLedger.getTaskId(`${setId}-${item.itemId}`, item.itemId);
       const generationStartedAt = new Date().toISOString();
       const generationStartedAtMs = Date.now();
@@ -4229,6 +4297,13 @@ async function handlePortraitGenerate(request, response) {
         writeSseEvent(response, "item_started", { setId, itemId: item.itemId, shotType: item.shotType });
 
         const finalPrompt = appendRatioHintToPrompt(item.prompt, ratioOption);
+        await waitForResponseGenerationLaunchTurn(
+          clientSessionId,
+          generationRequestScope,
+          response,
+          generationStartDelayMs,
+          controls,
+        );
         const generationResult = await requestStudioImageGeneration({
           baseUrl: generationConfig.baseUrl,
           apiKey: generationConfig.apiKey,
@@ -4392,7 +4467,10 @@ async function handlePortraitGenerate(request, response) {
           releaseSessionTaskSlot(clientSessionId, taskId, generationRequestScope);
         }
       }
-    }, { startDelayMs: generationStartDelayMs });
+      });
+    } finally {
+      generationLaunchGates.releaseScope(generationLaunchScope);
+    }
 
     const finalSet = await portraitSetStore.saveManifest(
       buildPortraitSetManifest({
@@ -4546,6 +4624,7 @@ async function handleCreationGenerate(request, response) {
       imageUrl: "",
       thumbnailUrl: "",
       error: "",
+      generationAttemptCount: 0,
       };
     });
 
@@ -4570,9 +4649,17 @@ async function handleCreationGenerate(request, response) {
     });
     const referenceUploadTargetKey = referenceUploads.getTargetKey(generationConfig);
 
-    const retryLedger = createInRunRetryLedger();
+    // A capacity error gets one later automatic repair pass. Retrying it at the
+    // tail of this same saturated run only multiplies requests in the same window.
+    const retryLedger = createInRunRetryLedger({ maxRetries: 0 });
+    const generationLaunchScope = generationLaunchGates.acquireScope(
+      clientSessionId,
+      generationRequestScope,
+      generationStartDelayMs,
+    );
 
-    await runWithConcurrency(plan.items, generationConcurrency, async (item, index, controls) => {
+    try {
+      await runWithConcurrency(plan.items, generationConcurrency, async (item, index, controls) => {
       const taskId = retryLedger.getTaskId(`${setId}-${item.itemId}`, item.itemId);
       const generationStartedAt = new Date().toISOString();
       const generationStartedAtMs = Date.now();
@@ -4620,6 +4707,28 @@ async function handleCreationGenerate(request, response) {
           effectiveSize: itemGenerationParameters.finalSize,
           targetLanguage: itemGenerationParameters.targetLanguage,
         });
+
+        await waitForResponseGenerationLaunchTurn(
+          clientSessionId,
+          generationRequestScope,
+          response,
+          generationStartDelayMs,
+          controls,
+        );
+        const generationAttemptCount = reserveCreationGenerationAttempt(items, item.itemId);
+        items = updateCreationItems(items, item.itemId, { generationAttemptCount });
+        setManifest = await creationSetStore.saveManifest(
+          buildCreationSetManifest({
+            setId,
+            plan,
+            createdAt,
+            updatedAt: new Date().toISOString(),
+            status: getCreationSetStatus(items),
+            relativeDir: creationRelativeDir,
+            items,
+            referenceImageNames,
+          }),
+        );
 
         const generationResult = await requestCreationStudioImageGeneration(response, {
           baseUrl: generationConfig.baseUrl,
@@ -4812,7 +4921,10 @@ async function handleCreationGenerate(request, response) {
           releaseSessionTaskSlot(clientSessionId, taskId, generationRequestScope);
         }
       }
-    }, { startDelayMs: generationStartDelayMs });
+      });
+    } finally {
+      generationLaunchGates.releaseScope(generationLaunchScope);
+    }
 
     const finalSet = await creationSetStore.saveManifest(
       buildCreationSetManifest({
@@ -4933,6 +5045,7 @@ async function handleCreationLogoBatchGenerate(request, response) {
       imageUrl: "",
       thumbnailUrl: "",
       error: "",
+      generationAttemptCount: 0,
     }));
 
     let setManifest = await creationSetStore.saveManifest(
@@ -4950,9 +5063,15 @@ async function handleCreationLogoBatchGenerate(request, response) {
     writeSseEvent(response, "set_started", { set: setManifest });
     writeSseEvent(response, "plan", { setId, items });
 
-    const retryLedger = createInRunRetryLedger();
+    const retryLedger = createInRunRetryLedger({ maxRetries: 0 });
+    const generationLaunchScope = generationLaunchGates.acquireScope(
+      clientSessionId,
+      generationRequestScope,
+      generationStartDelayMs,
+    );
 
-    await runWithConcurrency(plan.items, generationConcurrency, async (item, index, controls) => {
+    try {
+      await runWithConcurrency(plan.items, generationConcurrency, async (item, index, controls) => {
       const sourceImage = sourceImages[item.sourceImageIndex] || sourceImages[(item.slotIndex || 1) - 1];
       const taskId = retryLedger.getTaskId(`${setId}-${item.itemId}`, item.itemId);
       const generationStartedAt = new Date().toISOString();
@@ -4974,6 +5093,27 @@ async function handleCreationLogoBatchGenerate(request, response) {
         writeSseEvent(response, "item_started", { setId, itemId: item.itemId, role: item.role });
 
         const finalPrompt = appendRatioHintToPrompt(item.prompt, ratioOption);
+        await waitForResponseGenerationLaunchTurn(
+          clientSessionId,
+          generationRequestScope,
+          response,
+          generationStartDelayMs,
+          controls,
+        );
+        const generationAttemptCount = reserveCreationGenerationAttempt(items, item.itemId);
+        items = updateCreationItems(items, item.itemId, { generationAttemptCount });
+        setManifest = await creationSetStore.saveManifest(
+          buildCreationSetManifest({
+            setId,
+            plan,
+            createdAt,
+            updatedAt: new Date().toISOString(),
+            status: getCreationSetStatus(items),
+            relativeDir: creationRelativeDir,
+            items,
+            referenceImageNames,
+          }),
+        );
         const generationResult = await requestCreationStudioImageGeneration(response, {
           baseUrl: generationConfig.baseUrl,
           apiKey: generationConfig.apiKey,
@@ -5140,7 +5280,10 @@ async function handleCreationLogoBatchGenerate(request, response) {
           releaseSessionTaskSlot(clientSessionId, taskId, generationRequestScope);
         }
       }
-    }, { startDelayMs: generationStartDelayMs });
+      });
+    } finally {
+      generationLaunchGates.releaseScope(generationLaunchScope);
+    }
 
     const finalSet = await creationSetStore.saveManifest(
       buildCreationSetManifest({
@@ -5265,8 +5408,14 @@ async function handlePortraitRepair(request, response) {
     writeSseEvent(response, "repair_started", { setId, itemIds: repairItems.map((item) => item.itemId) });
 
     const retryLedger = createInRunRetryLedger();
+    const generationLaunchScope = generationLaunchGates.acquireScope(
+      clientSessionId,
+      generationRequestScope,
+      generationStartDelayMs,
+    );
 
-    await runWithConcurrency(repairItems, generationConcurrency, async (item, index, controls) => {
+    try {
+      await runWithConcurrency(repairItems, generationConcurrency, async (item, index, controls) => {
       const taskId = retryLedger.getTaskId(`${setId}-${item.itemId}-repair`, item.itemId);
       const generationStartedAt = new Date().toISOString();
       const generationStartedAtMs = Date.now();
@@ -5286,6 +5435,13 @@ async function handlePortraitRepair(request, response) {
         writeSseEvent(response, "item_started", { setId, itemId: item.itemId, shotType: item.shotType });
 
         const finalPrompt = appendRatioHintToPrompt(item.prompt, ratioOption);
+        await waitForResponseGenerationLaunchTurn(
+          clientSessionId,
+          generationRequestScope,
+          response,
+          generationStartDelayMs,
+          controls,
+        );
         const generationResult = await requestStudioImageGeneration({
           baseUrl: generationConfig.baseUrl,
           apiKey: generationConfig.apiKey,
@@ -5437,7 +5593,10 @@ async function handlePortraitRepair(request, response) {
           releaseSessionTaskSlot(clientSessionId, taskId, generationRequestScope);
         }
       }
-    }, { startDelayMs: generationStartDelayMs });
+      });
+    } finally {
+      generationLaunchGates.releaseScope(generationLaunchScope);
+    }
 
     const finalSet = await portraitSetStore.saveManifest({
       ...setManifest,
@@ -5512,6 +5671,7 @@ async function handleCreationRepair(request, response) {
     const repairItemId = formData.get("itemId");
     const promptOverride = formData.get("promptOverride");
     const marketingCopyOverride = formData.get("marketingCopyOverride");
+    const automaticRepair = isAutomaticCreationRepair(formData);
     let repairItems = hydrateCreationRepairSkuSubjects(
       selectCreationRepairItems(existingSet, {
         itemId: repairItemId,
@@ -5519,10 +5679,13 @@ async function handleCreationRepair(request, response) {
       }),
       existingSet,
     );
+    if (automaticRepair) {
+      repairItems = repairItems.filter((item) =>
+        canStartCreationGenerationAttempt(items, item.itemId, { autoRepair: true }),
+      );
+    }
     if (repairItems.length === 0) {
-      writeSseEvent(response, "error", {
-        message: "没有需要补图或重生成的套图项。",
-      });
+      writeSseEvent(response, "complete", { set: existingSet });
       return;
     }
 
@@ -5593,9 +5756,15 @@ async function handleCreationRepair(request, response) {
       ),
     });
 
-    const retryLedger = createInRunRetryLedger();
+    const retryLedger = createInRunRetryLedger({ maxRetries: 0 });
+    const generationLaunchScope = generationLaunchGates.acquireScope(
+      clientSessionId,
+      generationRequestScope,
+      generationStartDelayMs,
+    );
 
-    await runWithConcurrency(repairItems, generationConcurrency, async (item, index, controls) => {
+    try {
+      await runWithConcurrency(repairItems, generationConcurrency, async (item, index, controls) => {
       const repairItem = item;
       const itemGenerationConfig = resolveCreationRepairGenerationConfig(repairItem, generationConfig);
       const referenceUploadTargetKey = referenceUploads.getTargetKey(itemGenerationConfig);
@@ -5644,6 +5813,31 @@ async function handleCreationRepair(request, response) {
           error: "",
         });
         writeSseEvent(response, "item_started", { setId, itemId: item.itemId, role: repairItem.role, ratio: itemGenerationParameters.ratioOption.value, effectiveSize: itemGenerationParameters.finalSize, targetLanguage: itemGenerationParameters.targetLanguage });
+
+        await waitForResponseGenerationLaunchTurn(
+          clientSessionId,
+          generationRequestScope,
+          response,
+          generationStartDelayMs,
+          controls,
+        );
+        if (!canStartCreationGenerationAttempt(items, item.itemId, { autoRepair: automaticRepair })) {
+          throw new Error("该套图项已达到自动生成次数上限。");
+        }
+        const generationAttemptCount = reserveCreationGenerationAttempt(items, item.itemId);
+        items = updateCreationItems(items, item.itemId, { generationAttemptCount });
+        setManifest = await creationSetStore.saveManifest(
+          buildCreationSetManifest({
+            setId,
+            plan: repairPlan,
+            createdAt: existingSet.createdAt,
+            updatedAt: new Date().toISOString(),
+            status: getCreationSetStatus(items),
+            relativeDir,
+            items,
+            referenceImageNames,
+          }),
+        );
 
         const generationResult = await requestCreationStudioImageGeneration(response, {
           baseUrl: itemGenerationConfig.baseUrl,
@@ -5832,7 +6026,10 @@ async function handleCreationRepair(request, response) {
           releaseSessionTaskSlot(clientSessionId, taskId, generationRequestScope);
         }
       }
-    }, { startDelayMs: generationStartDelayMs });
+      });
+    } finally {
+      generationLaunchGates.releaseScope(generationLaunchScope);
+    }
 
     const finalSet = await creationSetStore.saveManifest(
       buildCreationSetManifest({

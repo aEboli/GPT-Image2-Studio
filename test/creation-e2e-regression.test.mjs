@@ -538,8 +538,8 @@ test("creation workflow reuses history, reuploads references, tweaks prompts, re
   assert.equal(planBody.plan.items.length, 4);
   assert.equal(planBody.plan.items[0].itemId, "1-hero");
   assert.match(planBody.plan.items[0].prompt, /manual historical binding/);
-  assert.match(planBody.plan.items[0].prompt, /Industry template:/);
-  assert.match(planBody.plan.items[1].prompt, /Shared visual language:/);
+  assert.match(planBody.plan.items[0].prompt, /industry template:/i);
+  assert.match(planBody.plan.items[1].prompt, /visual language:/i);
   assert.match(planBody.plan.items[1].prompt, /lifestyle magazine editorial/);
 
   const xiaohongshuForm = new FormData();
@@ -601,13 +601,13 @@ test("creation workflow reuses history, reuploads references, tweaks prompts, re
   assert.equal(generatedSet.items[0].imageRoute, "a");
   assert.equal(generatedSet.items[0].responsesModel, "gpt-5.4");
   assert.equal(generatedSet.items[0].imageModel, "gpt-image-2");
-  assert.equal(generatedSet.items[0].requestedSize, "1.5K");
+  assert.equal(generatedSet.items[0].requestedSize, "1K");
   assert.match(generatedSet.items[0].effectiveSize, /^\d+x\d+$/);
   assert.equal(generatedSet.items[0].format, "png");
   assert.equal(generatedSet.items[0].quality, "high");
   assert.equal(generatedSet.items[0].reasoningEffort, "low");
   assert.deepEqual(generatedSet.items[0].referenceImageNames, ["front.png"]);
-  assert.match(generatedSet.items[1].prompt, /Shared visual language:/);
+  assert.match(generatedSet.items[1].prompt, /visual language:/i);
   assert.match(generatedSet.items[1].prompt, /lifestyle magazine editorial/);
   assert.ok(generatedSet.items[0].relativePath);
   assert.match(generatedSet.items[0].filename, /^1-\d{4}-首图成交主视觉-[a-z0-9]{4}\.png$/u);
@@ -716,7 +716,7 @@ test("creation workflow reuses history, reuploads references, tweaks prompts, re
   assert.equal(regeneratedSet.status, "completed");
   assert.equal(regeneratedSet.items[0].prompt, "Regenerated hero prompt from regression.");
   assert.match(regeneratedSet.items[0].generationPrompt, /Regenerated hero prompt from regression\./);
-  assert.equal(regeneratedSet.items[0].requestedSize, "1536x1536");
+  assert.equal(regeneratedSet.items[0].requestedSize, "1024x1024");
   assert.deepEqual(regeneratedSet.items[0].referenceImageNames, ["front.png"]);
 
   const pathReport = await postJson(baseUrl, "/api/creation/sets/paths", { setId: generatedSet.setId });

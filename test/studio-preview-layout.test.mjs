@@ -7,6 +7,7 @@ const stylesPath = new URL("../public/styles.css", import.meta.url);
 const appPath = new URL("../public/app.js", import.meta.url);
 const publicLightboxViewerPath = new URL("../public/lib/lightbox-image-viewer.mjs", import.meta.url);
 const previewKeyboardNavigationPath = new URL("../lib/preview-keyboard-navigation.mjs", import.meta.url);
+const filmstripSelectionPath = new URL("../lib/filmstrip-selection.mjs", import.meta.url);
 const quickBlendViewPath = new URL("../lib/views/quick-blend-view.mjs", import.meta.url);
 const imageEditViewPath = new URL("../lib/views/image-edit-view.mjs", import.meta.url);
 const styleTransferPresetLightboxPath = new URL("../lib/style-transfer-preset-lightbox.mjs", import.meta.url);
@@ -27,10 +28,10 @@ const generationClientPath = new URL("../lib/generation-client.mjs", import.meta
 const generationLogPanelPath = new URL("../lib/generation-log-panel.mjs", import.meta.url);
 const generationLogStorePath = new URL("../lib/generation-log-store.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20260825-attempt-preview-deck-1";
-const appAssetVersion = "20260825-attempt-preview-deck-1";
+const stylesAssetVersion = "20260829-filmstrip-selection-1";
+const appAssetVersion = "20260829-generation-schedule-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
-const creationQueueModuleAssetVersion = "20260712-creation-queue-selection-isolation-1";
+const creationQueueModuleAssetVersion = "20260829-generation-schedule-1";
 const quickBlendModuleAssetVersion = "20260608-quick-blend-time-sort-1";
 
 test("static assets use the current cache-busting version", async () => {
@@ -697,6 +698,92 @@ test("filmstrip rendering reuses keyed thumbnail nodes instead of clearing the r
   assert.match(app, /refs\.filmstrip\.replaceChildren\(fragment\);/);
   assert.match(app, /if \(image\.getAttribute\("src"\) !== imageUrl\) \{[\s\S]*image\.src = imageUrl;[\s\S]*\}/);
   assert.doesNotMatch(app, /refs\.filmstrip\.innerHTML = "";/);
+});
+
+test("shared filmstrip helper captures scroll before the render mutates nodes", async () => {
+  const module = await readFile(filmstripSelectionPath, "utf8");
+  const start = module.indexOf("export function renderFilmstripPreservingSelection");
+  assert.notEqual(start, -1, "renderFilmstripPreservingSelection should be exported");
+  const body = module.slice(start);
+
+  // Taking the render as a callback is what makes the ordering unskippable: a
+  // caller cannot read scrollLeft after its own first node mutation.
+  const captureIndex = body.indexOf("const previousScrollLeft = strip.scrollLeft;");
+  const restoreIndex = body.indexOf("strip.scrollLeft = previousScrollLeft;");
+  assert.notEqual(captureIndex, -1, "the helper should capture scrollLeft");
+  assert.notEqual(restoreIndex, -1, "the helper should restore scrollLeft");
+
+  // Anchor on the guarded render, not "the next render() after the capture":
+  // searching forward from the capture still matches when the capture sits after
+  // the mutating render, which is exactly the ordering bug this guards.
+  const orderedRenderIndex = body.search(/render\(\);\r?\n\s*strip\.scrollLeft = previousScrollLeft;/);
+  assert.notEqual(orderedRenderIndex, -1, "render() must be immediately followed by the scrollLeft restore");
+  assert.ok(captureIndex < orderedRenderIndex, "scrollLeft must be captured before render() mutates nodes");
+  assert.ok(orderedRenderIndex < restoreIndex, "scrollLeft must be restored after render() reattaches nodes");
+  assert.match(body, /revealFilmstripSelection\(\{ strip, selectedKey, getEntryKey, tracker \}\)/);
+});
+
+test("shared filmstrip helper only scrolls a rail when its selection changes", async () => {
+  const module = await readFile(filmstripSelectionPath, "utf8");
+  const start = module.indexOf("export function revealFilmstripSelection");
+  const end = module.indexOf("export function renderFilmstripPreservingSelection");
+  assert.ok(start !== -1 && end > start, "revealFilmstripSelection should precede the render helper");
+  const body = module.slice(start, end);
+
+  assert.match(body, /if \(tracker\.key === normalizedKey\) \{[\s\S]*return "skipped";[\s\S]*\}/);
+  assert.match(body, /tracker\.key = normalizedKey;/);
+  // "nearest" keeps an already-visible thumbnail exactly where it is.
+  assert.match(body, /scrollIntoView\(\{ block: "nearest", inline: "nearest" \}\)/);
+  // One tracker per rail, so no rail can suppress another rail's reveal.
+  assert.match(module, /export function createFilmstripRevealTracker\(\) \{[\s\S]*return \{ key: "" \};/);
+});
+
+test("every generation rail marks the currently viewed thumbnail", async () => {
+  const app = await readFile(appPath, "utf8");
+  const module = await readFile(filmstripSelectionPath, "utf8");
+  const imageEditView = await readFile(imageEditViewPath, "utf8");
+  const quickBlendView = await readFile(quickBlendViewPath, "utf8");
+
+  const markerBody = module.slice(module.indexOf("export function syncFilmstripSelectedMarker"));
+  assert.match(markerBody, /marker\.className = FILMSTRIP_SELECTED_MARKER_CLASS;/);
+  assert.match(markerBody, /if \(!isSelected\) \{[\s\S]*existingMarker\?\.remove\(\);[\s\S]*return null;[\s\S]*\}/);
+  assert.match(markerBody, /marker\.setAttribute\("aria-hidden", "true"\);/);
+
+  // All five rails: prompt, image-decomposition, reference-analysis in app.js,
+  // plus image-edit and quick-blend in their own view modules.
+  const railSources = [
+    ["app.js", app, 3],
+    ["image-edit-view.mjs", imageEditView, 1],
+    ["quick-blend-view.mjs", quickBlendView, 1],
+  ];
+  railSources.forEach(([label, source, expectedRails]) => {
+    const renderCalls = source.match(/renderFilmstripPreservingSelection\(\{/g) || [];
+    const markerCalls = source.match(/syncFilmstripSelectedMarker\(/g) || [];
+    assert.equal(renderCalls.length, expectedRails, `${label} should wire ${expectedRails} rail(s) through the shared helper`);
+    // One call per rail plus the import binding in the view modules.
+    assert.ok(markerCalls.length >= expectedRails, `${label} should mark the selected tile on every rail`);
+    assert.match(source, /aria-current", isSelected \? "true" : "false"/);
+    assert.match(source, /createFilmstripRevealTracker\(\)/);
+  });
+});
+
+test("filmstrip selected-state styling is shared across rails", async () => {
+  const styles = await readFile(stylesPath, "utf8");
+
+  // Unscoped so every rail gets the same ring, not just the prompt one.
+  assert.match(styles, /\n\.filmstrip-item\.active img,\s*[\r\n]+\.filmstrip-item\.active \.filmstrip-ghost\s*\{[\s\S]*border-color:\s*color-mix\(in srgb, var\(--accent\) 82%, transparent\);/);
+  assert.match(styles, /\n\.filmstrip-item\.active span\s*\{[\s\S]*font-weight:\s*600;/);
+  assert.doesNotMatch(styles, /#filmstrip \.filmstrip-item\.active/);
+
+  assert.match(styles, /\.filmstrip-selected-marker\s*\{[\s\S]*position:\s*absolute;[\s\S]*top:\s*3px;[\s\S]*left:\s*7px;[\s\S]*pointer-events:\s*none;/);
+  assert.match(styles, /html\[data-ui-layout="mobile"\] \.filmstrip-selected-marker\s*\{[\s\S]*width:\s*16px;/);
+  // Top-right belongs to the queue cancel button, bottom-right to the deck badge.
+  assert.match(styles, /\.filmstrip-cancel\s*\{[\s\S]*right:\s*7px;/);
+  assert.match(styles, /\.filmstrip-deck-badge\s*\{[\s\S]*right:\s*7px;/);
+
+  // The reference-analysis rail keeps its own green palette at the same contrast.
+  assert.match(styles, /\.reference-analysis-generation-thumb\.active\s*\{[\s\S]*border-color:\s*rgba\(112, 226, 162, 0\.82\);/);
+  assert.match(styles, /\.reference-analysis-generation-thumb \.filmstrip-selected-marker\s*\{[\s\S]*background:\s*rgb\(112, 226, 162\);/);
 });
 
 test("studio filmstrip shows a visible placeholder while prompt thumbnails load", async () => {
@@ -2526,7 +2613,8 @@ test("reference orchestration analysis is a separate studio mode outside prompt 
   assert.match(styles, /\.reference-analysis-generation-placeholder\.preview-placeholder-loading\s*\{/);
   assert.match(styles, /\.reference-analysis-generation-strip\s*\{[\s\S]*grid-auto-flow:\s*column;[\s\S]*overflow-x:\s*auto;/);
   assert.match(styles, /\.reference-analysis-generation-thumb\s*\{[\s\S]*width:\s*72px;[\s\S]*aspect-ratio:\s*1\s*\/\s*1;/);
-  assert.match(styles, /\.reference-analysis-generation-thumb\.active\s*\{[\s\S]*border-color:\s*rgba\(112, 226, 162, 0\.62\);/);
+  // Raised from 0.62 so this rail's selected contrast matches the shared rails.
+  assert.match(styles, /\.reference-analysis-generation-thumb\.active\s*\{[\s\S]*border-color:\s*rgba\(112, 226, 162, 0\.82\);/);
   assert.match(styles, /\.reference-analysis-generation-thumb\.is-running\s*\{[\s\S]*border-color:\s*rgba\(112, 226, 162, 0\.42\);/);
   assert.match(styles, /\.reference-analysis-auto-collapse\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) 52px;[\s\S]*text-align:\s*left;/);
   assert.match(styles, /\.reference-analysis-switch-track\s*\{[\s\S]*width:\s*52px;[\s\S]*height:\s*30px;/);
@@ -4766,7 +4854,7 @@ test("creation generation cards replace plan details with loading animation", as
   assert.match(app, /createCreationCardLoadingShell\(isQueued \? "queued" : "generating",\s*null,\s*\{ sequenceIndex, key, logText \}\)/);
   assert.match(app, /card\.classList\.toggle\("is-generating", isLoadingCard\);/);
   assert.match(app, /status\.textContent = getCreationItemStatusLabel\(item\);/);
-  assert.match(app, /media\.classList\.add\("is-loading"\);[\s\S]*media\.appendChild\(createCreationCardLoading\(item\.status,\s*fallbackIndex,\s*item\.itemId,\s*getCreationCardLogText\(item\)\)\);/);
+  assert.match(app, /media\.classList\.add\("is-loading"\);[\s\S]*media\.appendChild\(createCreationCardLoading\(\s*item\.status,\s*fallbackIndex,\s*getCreationCardLoadingKey\(item, fallbackIndex, options\.keyScope\),\s*getCreationCardLogText\(item\),\s*\)\);/);
   assert.match(app, /const shouldRenderPath = !imageUrl && !showRecordActions && !hideGenerationDetails;/);
   assert.match(app, /if \(shouldRenderPath\) \{/);
   assert.match(app, /if \(showActions && !hideGenerationDetails\) \{/);
@@ -4791,11 +4879,11 @@ test("creation result grid keeps running card loading DOM stable across rerender
   const loadingModule = await readFile(creationCardLoadingPath, "utf8");
 
   assert.match(app, /from "\/lib\/creation-card-loading\.mjs"/);
-  assert.match(app, /function syncCreationResultGrid\(items = \[\], \{ showActions = true \} = \{\}\) \{/);
+  assert.match(app, /function syncCreationResultGrid\(items = \[\], \{ showActions = true, keyScope = "" \} = \{\}\) \{/);
   assert.match(app, /syncCreationResultGridShell\(\{/);
   assert.match(app, /syncCreationLoadingCard\(card,\s*item,\s*index/);
   assert.match(app, /createCreationCardLoadingShell\([^,]+,\s*null,\s*\{ sequenceIndex, key, logText \}\)/);
-  assert.match(app, /syncCreationResultGrid\(items, \{ showActions: showCreationResultActions \}\);/);
+  assert.match(app, /syncCreationResultGrid\(items, \{ showActions: showCreationResultActions, keyScope: loadingKeyScope \}\);/);
   const renderCreationViewBody = extractFunctionBefore(app, "renderCreationView", "getCreationPlanPreviewImageCount");
   assert.doesNotMatch(renderCreationViewBody, /refs\.creationResultGrid\.innerHTML = "";/);
   assert.match(loadingModule, /export function getCreationCardDomKey\(item = \{\}, fallbackIndex = 0\) \{/);
@@ -4875,13 +4963,21 @@ test("creation generation can enqueue another suite while one is running", async
   assert.match(queueModule, /export function buildCreationQueuedRepairFormData\(job = \{\}/);
   assert.match(queueModule, /export async function runCreationQueuedJob\(job, context = \{\}\) \{/);
   assert.match(queueModule, /export function scheduleCreationGenerationQueue\(context = \{\}\) \{/);
-  assert.match(queueModule, /getRunningCreationQueueReservedItemCount\(creationState\)/);
-  assert.match(queueModule, /runningSuiteCount < maxActiveSuites/);
+  assert.match(
+    queueModule,
+    /if \(getRunningCreationQueueJobs\(creationState\)\.length > 0\) \{\s*render\(\);\s*return;/,
+  );
+  assert.match(queueModule, /const nextJob = getCreationQueueJobs\(creationState\)\.find\(\(job\) => job\.status === "queued"\);/);
+  assert.match(queueModule, /void runCreationQueuedJob\(nextJob, context\);/);
+  assert.match(queueModule, /creationState\.schedulingSnapshot/);
+  const schedulerBody = queueModule.match(/export function scheduleCreationGenerationQueue\(context = \{\}\) \{[\s\S]*?\n\}/)?.[0] || "";
+  assert.notEqual(schedulerBody, "", "the queue scheduler must remain directly inspectable");
+  assert.doesNotMatch(schedulerBody, /getRunningCreationQueueReservedItemCount|runningSuiteCount|maxActiveSuites/);
   assert.match(app, /function upsertCreationSetForStream\(set, \{ queueJob \} = \{\}\) \{/);
   assert.match(app, /function updateCreationStreamItem\(itemId, patch = \{\}, context = \{\}\) \{/);
   assert.match(app, /async function handleCreationStreamEvent\(eventName, payload = \{\}, context = \{\}\) \{/);
   assert.match(app, /await handleCreationStreamEvent\(eventName, payload, context\);/);
-  assert.match(app, /body: buildCreationQueuedRepairFormData\(queueJob, \{ scope: "incomplete", set: currentSet \}\)/);
+  assert.match(app, /buildCreationQueuedRepairFormData\(queueJob, \{ scope: "incomplete", set: currentSet, autoRepair: true \}\)/);
   assert.match(app, /setCreationFeedback\(`已加入队列 · 第 \$\{getPendingCreationQueueCount\(\)\} 位`, "busy"\);/);
   assert.match(app, /refs\.creationGenerateButton\.textContent = [\s\S]*\? "加入队列"[\s\S]*: "生成套图";/);
   assert.match(app, /refs\.creationGenerateButton\.disabled = shouldDisableCreationGenerateButton\(\{ planning: state\.creation\.planning, preparingReferences, effectivePlan: state\.creation\.effectivePlan \}\);/);
@@ -4980,8 +5076,8 @@ test("creation mode uploads prepared reference images for generation and repair"
   assert.match(app, /async function ensureCreationReferenceGenerationFilesReady\(\) \{/);
   assert.match(app, /startCreationGeneration[\s\S]*await ensureCreationReferenceGenerationFilesReady\(\);[\s\S]*const generationFormData = buildCreationFormData\(\);/);
   assert.match(app, /function getCreationQueueJobForSet\(set = \{\}\) \{/);
-  assert.match(app, /async function runCreationQueuedRepairRequest\(queueJob, \{ itemId = "", scope = "incomplete", set \} = \{\}\) \{/);
-  assert.match(app, /async function runCreationRepairRequest[\s\S]*queueJob = getCreationQueueJobForSet\(currentSet\);[\s\S]*await runCreationQueuedRepairRequest\(queueJob, \{ itemId, scope, set: currentSet \}\);[\s\S]*return;/);
+  assert.match(app, /async function runCreationQueuedRepairRequest\(queueJob, \{ itemId = "", scope = "incomplete", set, autoRepair = false \} = \{\}\) \{/);
+  assert.match(app, /async function runCreationRepairRequest[\s\S]*queueJob = getCreationQueueJobForSet\(currentSet\);[\s\S]*await runCreationQueuedRepairRequest\(queueJob, \{ itemId, scope, set: currentSet, autoRepair \}\);[\s\S]*return;/);
   assert.match(app, /async function runCreationRepairRequest[\s\S]*shouldUseCreationRepairDraftFiles\(currentSet\)[\s\S]*await ensureCreationReferenceGenerationFilesReady\(\);[\s\S]*body: buildCreationRepairFormData/);
   assert.match(app, /repairCreationItems[\s\S]*const currentSet = getCreationRepairTargetSet\(\);[\s\S]*await runCreationRepairRequest\(\{ itemId, scope, set: currentSet \}\);/);
   assert.match(
@@ -4997,14 +5093,14 @@ test("creation mode auto-repairs incomplete first-pass sets once through the rep
   const repairItemsHandler =
     app.match(/async function repairCreationItems[\s\S]*?\r?\n}\r?\n\r?\nfunction normalizePortraitItemForView/)?.[0] || "";
 
-  assert.match(app, /from "\/lib\/creation-auto-repair\.mjs"/);
+  assert.match(app, /from "\/lib\/creation-auto-repair\.mjs(?:\?[^\"]*)?"/);
   assert.match(app, /getCreationRepairTargetSet as getCreationRepairTargetSetFromState/);
   assert.match(app, /function getCreationRepairTargetSet\(\) \{ return getCreationRepairTargetSetFromState\(state\.creation, getCreationCurrentSet\(\), normalizeCreationSetForView\); \}/);
   assert.match(app, /autoRepairAttemptCount:\s*0/);
-  assert.match(app, /async function runCreationRepairRequest\(\{ itemId = "", scope = "incomplete", set = getCreationRepairTargetSet\(\), streamContext = null \} = \{\}\) \{/);
+  assert.match(app, /async function runCreationRepairRequest\(\{ itemId = "", scope = "incomplete", set = getCreationRepairTargetSet\(\), streamContext = null, autoRepair = false \} = \{\}\) \{/);
   assert.match(app, /repairCreationItems[\s\S]*await runCreationRepairRequest\(\{ itemId, scope, set: currentSet \}\);/);
   assert.match(app, /await runCreationAutoRepairIfNeeded\(payload\.set\)/);
-  assert.match(app, /await runCreationRepairRequest\(\{ scope: "incomplete", set: currentSet \}\);/);
+  assert.match(app, /await runCreationRepairRequest\(\{ scope: "incomplete", set: currentSet, autoRepair: true \}\);/);
   assert.match(app, /getCreationAutoRepairNotice/);
   assert.doesNotMatch(repairItemsHandler, /fetch\("\/api\/creation\/repair"/);
 });

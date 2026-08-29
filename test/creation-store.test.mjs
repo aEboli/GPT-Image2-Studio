@@ -249,6 +249,7 @@ test("creation store preserves item generation telemetry", () => {
           generationStartedAt: "2026-05-05T09:00:01.000Z",
           generationCompletedAt: "2026-05-05T09:00:31.000Z",
           generationDurationMs: 30000,
+          generationAttemptCount: 2,
           size: "1024x1024",
           format: "jpg",
         },
@@ -260,8 +261,39 @@ test("creation store preserves item generation telemetry", () => {
   assert.equal(manifest.items[0].generationStartedAt, "2026-05-05T09:00:01.000Z");
   assert.equal(manifest.items[0].generationCompletedAt, "2026-05-05T09:00:31.000Z");
   assert.equal(manifest.items[0].generationDurationMs, 30000);
+  assert.equal(manifest.items[0].generationAttemptCount, 2);
   assert.equal(manifest.items[0].size, "1024x1024");
   assert.equal(manifest.items[0].format, "jpg");
+});
+
+test("creation store persists finite per-item upstream attempt counts", async () => {
+  const outputDir = await mkdtemp(join(tmpdir(), "creation-store-attempt-count-"));
+  const store = createCreationSetStore({ outputDir, publicBasePath: "/output" });
+  const manifest = {
+    setId: "creation-set-attempt-count",
+    productName: "Attempt budget product",
+    status: "partial_failed",
+    items: [
+      { itemId: "exhausted", slotIndex: 1, status: "failed", generationAttemptCount: 2 },
+      { itemId: "fractional", slotIndex: 2, status: "failed", generationAttemptCount: "1.9" },
+      { itemId: "negative", slotIndex: 3, status: "failed", generationAttemptCount: -1 },
+      { itemId: "invalid", slotIndex: 4, status: "failed", generationAttemptCount: "not-a-number" },
+      { itemId: "infinite", slotIndex: 5, status: "failed", generationAttemptCount: Infinity },
+    ],
+  };
+
+  const saved = await store.saveManifest(manifest);
+  const raw = JSON.parse(await readFile(store.manifestPath(manifest.setId), "utf8"));
+  const restored = await store.readManifest(manifest.setId);
+
+  for (const candidate of [saved, raw, restored]) {
+    assert.deepEqual(
+      candidate.items.map((item) => item.generationAttemptCount),
+      [2, 1, 0, 0, 0],
+    );
+  }
+
+  await rm(outputDir, { recursive: true, force: true });
 });
 
 test("creation store preserves infographic rebuild setting and source metadata", () => {

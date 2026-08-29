@@ -33,7 +33,7 @@ test("config store returns empty public config before any save", async () => {
     quality: "high",
     format: "png",
     reasoningEffort: "xhigh",
-    generationStartDelayMs: 800,
+    generationStartDelayMs: 1000,
     generationConcurrency: 20,
   });
   assert.deepEqual(config.limits, {
@@ -270,7 +270,7 @@ test("config store persists private config and only exposes masked api key publi
     quality: "medium",
     format: "png",
     reasoningEffort: "medium",
-    generationStartDelayMs: 800,
+    generationStartDelayMs: 1000,
     generationConcurrency: 20,
   });
 

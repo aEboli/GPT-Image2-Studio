@@ -1228,25 +1228,71 @@ test("creation suite queue schedules queued sets serially", async () => {
   assert.equal(creationState.selectedQueueId, "creation-queue-1");
 });
 
-test("creation suite queue starts the next suite when a running suite frees item capacity", async () => {
+test("creation suite queue keeps one scheduling snapshot for an active batch", () => {
   const creationState = {
-    activeQueueId: "queue-a",
+    activeQueueId: "",
+    currentSet: null,
+    generating: false,
+    generationScope: "",
+    queue: [],
+    selectedQueueId: "",
+  };
+  const firstFormData = new FormData();
+  firstFormData.set("generationConcurrency", "03");
+  firstFormData.set("generationStartDelayMs", "0750");
+
+  createCreationQueueJob({
+    creationState,
+    formData: firstFormData,
+    idFactory: (prefix) => `${prefix}-1`,
+    normalizeSet,
+    nowIso: () => "2026-05-26T08:00:00.000Z",
+    set: { setId: "set-a", items: [{ itemId: "a", status: "queued" }] },
+  });
+
+  assert.deepEqual(creationState.schedulingSnapshot, {
+    generationConcurrency: "03",
+    generationStartDelayMs: "0750",
+  });
+
+  const secondFormData = new FormData();
+  secondFormData.set("generationConcurrency", "9");
+  secondFormData.set("generationStartDelayMs", "100");
+  createCreationQueueJob({
+    creationState,
+    formData: secondFormData,
+    idFactory: (prefix) => `${prefix}-2`,
+    normalizeSet,
+    nowIso: () => "2026-05-26T08:01:00.000Z",
+    set: { setId: "set-b", items: [{ itemId: "b", status: "queued" }] },
+  });
+
+  assert.equal(secondFormData.get("generationConcurrency"), "03");
+  assert.equal(secondFormData.get("generationStartDelayMs"), "0750");
+
+  creationState.queue.forEach((job) => {
+    job.status = "completed";
+  });
+  scheduleCreationGenerationQueue({ creationState, render: () => {} });
+  assert.equal(creationState.schedulingSnapshot, undefined);
+});
+
+test("creation suite queue waits for automatic repair before starting the next suite", async () => {
+  const creationState = {
+    activeQueueId: "",
     autoRepairAttemptCount: 0,
     currentSet: null,
-    generating: true,
-    generationScope: "full",
+    generating: false,
+    generationScope: "",
     queue: [
       {
         id: "queue-a",
-        status: "running",
+        status: "queued",
         formData: "first-body",
         set: {
           setId: "set-a",
           productName: "A",
-          items: [
-            { itemId: "a-1", status: "completed" },
-            ...Array.from({ length: 17 }, (_, index) => ({ itemId: `a-${index + 2}`, status: "generating" })),
-          ],
+          items: Array.from({ length: 18 }, (_, index) => ({ itemId: `a-${index + 1}`, status: "queued" })),
         },
       },
       {
@@ -1262,27 +1308,50 @@ test("creation suite queue starts the next suite when a running suite frees item
     ],
     selectedQueueId: "queue-a",
   };
-  const streamOptions = [];
+  let releaseFirstRepair;
+  let markFirstRepairStarted;
+  const firstRepairDone = new Promise((resolve) => {
+    releaseFirstRepair = resolve;
+  });
+  const firstRepairStarted = new Promise((resolve) => {
+    markFirstRepairStarted = resolve;
+  });
+  const streamBodies = [];
 
   scheduleCreationGenerationQueue({
     creationState,
     compactErrorMessage: (message) => message,
     fetchImpl: async (url, options) => {
       assert.equal(url, "/api/creation/generate");
-      assert.equal(options.body, "second-body");
+      assert.ok(["first-body", "second-body"].includes(options.body));
       return { ok: true, body: options.body };
     },
-    getMaxParallelTasks: () => 18,
     loadCreationSets: async () => {},
     normalizeSet,
     nowIso: () => "2026-05-26T08:00:00.000Z",
     render: () => {},
-    runCreationStream: async (_response, options) => {
-      streamOptions.push(options);
+    runAutoRepairIfNeeded: async (job) => {
+      if (job.id !== "queue-a") {
+        return false;
+      }
+      markFirstRepairStarted();
+      await firstRepairDone;
+      job.set = normalizeSet({
+        ...job.set,
+        status: "completed",
+        items: job.set.items.map((item) => ({ ...item, status: "completed" })),
+      });
+      return true;
+    },
+    runCreationStream: async (response, options) => {
+      streamBodies.push(response.body);
       options.queueJob.set = normalizeSet({
         ...options.queueJob.set,
         status: "completed",
-        items: options.queueJob.set.items.map((item) => ({ ...item, status: "completed" })),
+        items: options.queueJob.set.items.map((item, index) => ({
+          ...item,
+          status: response.body === "first-body" && index === 0 ? "failed" : "completed",
+        })),
       });
       await options.onEventHandled("complete", { set: options.queueJob.set });
     },
@@ -1290,12 +1359,15 @@ test("creation suite queue starts the next suite when a running suite frees item
     showError: () => {},
   });
 
-  await waitFor(() => creationState.queue[1].status === "completed", "second suite to run after capacity opens");
+  await firstRepairStarted;
   assert.equal(creationState.queue[0].status, "running");
-  assert.equal(creationState.queue[1].status, "completed");
-  assert.equal(streamOptions.length, 1);
-  assert.equal(streamOptions[0].queueJob.id, "queue-b");
-  assert.equal(typeof streamOptions[0].onEventHandled, "function");
+  assert.equal(creationState.queue[1].status, "queued");
+  assert.deepEqual(streamBodies, ["first-body"]);
+  assert.ok(creationState.queue[0].set.items.every((item) => item.status === "completed" || item.status === "failed"));
+
+  releaseFirstRepair();
+  await waitFor(() => creationState.queue[1].status === "completed", "second suite to run after automatic repair finishes");
+  assert.deepEqual(streamBodies, ["first-body", "second-body"]);
 });
 
 // A genuine balance failure. A relay's "capacity temporarily unavailable" 402 is
@@ -1448,4 +1520,20 @@ test("creation suite queued repair form data keeps the queued suite reference fi
   assert.equal(repairData.get("scope"), "incomplete");
   assert.equal(repairData.get("productName"), "Queued product");
   assert.deepEqual(repairData.getAll("referenceImages").map((file) => file.name), ["queue-a.png"]);
+  assert.equal(repairData.get("autoRepair"), null);
+});
+
+test("creation suite queued automatic repair marks its request separately from manual repair", () => {
+  const source = new FormData();
+  source.set("generationConcurrency", "3");
+  source.set("generationStartDelayMs", "750");
+
+  const repairData = buildCreationQueuedRepairFormData(
+    { formData: source, set: { setId: "set-a" } },
+    { autoRepair: true, scope: "incomplete", set: { setId: "set-a" } },
+  );
+
+  assert.equal(repairData.get("autoRepair"), "1");
+  assert.equal(repairData.get("generationConcurrency"), "3");
+  assert.equal(repairData.get("generationStartDelayMs"), "750");
 });

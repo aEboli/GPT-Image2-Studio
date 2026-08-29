@@ -310,6 +310,19 @@ test("portrait workbench exposes failed item retry controls without prompt tunin
   assert.match(app, /refs\.portraitRepairFailedButton\.addEventListener\("click"/);
 });
 
+test("portrait result grid rebuild releases the shared loading progress sources", async () => {
+  const app = await readFile(appPath, "utf8");
+  const renderPortraitViewBody = app.match(/function renderPortraitView\(\) \{[\s\S]*?\n\}/)?.[0] || "";
+
+  /* 清空网格前必须先建好新卡片再停旧动画：反序会把运行内进度清零，
+     只清空不停动画则会留下跑到 99% 的常驻进度源被下一轮继承。 */
+  assert.doesNotMatch(renderPortraitViewBody, /refs\.portraitResultGrid\.innerHTML = "";/);
+  assert.match(
+    renderPortraitViewBody,
+    /const nextCards = items\.map\(\(item, index\) => createPortraitCard\(item, index\)\);[\s\S]*stopGenerationLoadingShells\(refs\.portraitResultGrid\);[\s\S]*refs\.portraitResultGrid\.replaceChildren\(\.\.\.nextCards\);/,
+  );
+});
+
 test("portrait lazy view modules delegate to portrait renderers", async () => {
   const app = await readFile(appPath, "utf8");
   const referenceAnalysis = await readFile(referenceAnalysisPath, "utf8");

@@ -48,6 +48,7 @@ export const PUBLIC_LIB_SYNC_TARGETS = [
   "creation-temu-export-ui.mjs",
   "creation-sku-colors.mjs",
   "creation-sku-subjects.mjs",
+  "filmstrip-selection.mjs",
   "gallery-metadata-recovery.mjs",
   "gallery-organizer.mjs",
   "generation-activity-feed.mjs",
