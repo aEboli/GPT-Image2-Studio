@@ -920,13 +920,35 @@ async function waitForSessionTaskSlot(sessionId, taskId, requestScope, options =
   return sessionTaskSlotLimiter.waitForSessionTaskSlot(sessionId, taskId, requestScope, options);
 }
 
+// `controls` is optional but every set-based fan-out passes it. The abort has to
+// be re-checked AFTER the slot is granted, not only before the wait: a worker can
+// sit in the 250ms slot poll for a long time, and an abort raised meanwhile would
+// otherwise let it claim a slot and fire the very upstream request the abort
+// exists to prevent. The slot is released here, because the caller only sets its
+// `slotClaimed` flag on the line after this call returns.
 async function waitForResponseSessionTaskSlot(sessionId, taskId, requestScope, response, options = {}) {
-  return waitForSessionTaskSlot(sessionId, taskId, requestScope, {
-    isActive: () => isResponseWritable(response),
+  const { controls } = options;
+  throwIfFanOutAborted(controls);
+
+  await waitForSessionTaskSlot(sessionId, taskId, requestScope, {
+    // Stops the poll early on an abort too, so aborted workers do not keep
+    // contending for slots with the items still legitimately in flight.
+    isActive: () => isResponseWritable(response) && !readFanOutAbortReason(controls),
     // A fan-out wider than this scope's startup slot limit needs the same
     // ceiling here, or its extra workers never get a slot.
     ...(options.maxParallelTasks ? { maxParallelTasks: options.maxParallelTasks } : {}),
+  }).catch((error) => {
+    // An abort that ended the poll must report as an abort, not as a disconnect.
+    throwIfFanOutAborted(controls);
+    throw error;
   });
+
+  if (readFanOutAbortReason(controls)) {
+    releaseSessionTaskSlot(sessionId, taskId, requestScope);
+    throwIfFanOutAborted(controls);
+  }
+
+  return true;
 }
 
 function releaseSessionTaskSlot(sessionId, taskId, requestScope) {
@@ -964,8 +986,12 @@ function requeueFailedSetItem({ response, controls, retryLedger, item, message }
 // Called at the top of every fan-out worker. Throwing here routes an aborted item
 // through that path's existing failure reporting — the same manifest write and the
 // same `item_failed` event — without spending an upstream request or a task slot.
+function readFanOutAbortReason(controls) {
+  return typeof controls?.getAbortReason === "function" ? controls.getAbortReason() : "";
+}
+
 function throwIfFanOutAborted(controls) {
-  const reason = typeof controls?.getAbortReason === "function" ? controls.getAbortReason() : "";
+  const reason = readFanOutAbortReason(controls);
   if (reason) {
     throw new Error(getFatalUpstreamAbortMessage(reason));
   }
@@ -4194,7 +4220,7 @@ async function handlePortraitGenerate(request, response) {
 
       try {
         throwIfFanOutAborted(controls);
-        await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response, { maxParallelTasks: generationConcurrency });
+        await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response, { maxParallelTasks: generationConcurrency, controls });
         slotClaimed = true;
         items = updatePortraitItems(items, item.itemId, {
           status: "generating",
@@ -4562,7 +4588,7 @@ async function handleCreationGenerate(request, response) {
 
       try {
         throwIfFanOutAborted(controls);
-        await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response, { maxParallelTasks: generationConcurrency });
+        await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response, { maxParallelTasks: generationConcurrency, controls });
         slotClaimed = true;
         const finalPrompt = buildCreationItemGenerationPrompt(item.prompt, itemGenerationParameters, item);
         const itemReferenceImages = buildCreationItemReferenceImages(item, referenceImages, referenceImageRoles);
@@ -4939,7 +4965,7 @@ async function handleCreationLogoBatchGenerate(request, response) {
         if (!sourceImage) {
           throw new Error("找不到对应的上传源图。");
         }
-        await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response, { maxParallelTasks: generationConcurrency });
+        await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response, { maxParallelTasks: generationConcurrency, controls });
         slotClaimed = true;
         items = updateCreationItems(items, item.itemId, {
           status: "generating",
@@ -5249,7 +5275,7 @@ async function handlePortraitRepair(request, response) {
 
       try {
         throwIfFanOutAborted(controls);
-        await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response, { maxParallelTasks: generationConcurrency });
+        await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response, { maxParallelTasks: generationConcurrency, controls });
         slotClaimed = true;
         items = updatePortraitItems(items, item.itemId, {
           ...item,
@@ -5591,7 +5617,7 @@ async function handleCreationRepair(request, response) {
 
       try {
         throwIfFanOutAborted(controls);
-        await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response, { maxParallelTasks: generationConcurrency });
+        await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response, { maxParallelTasks: generationConcurrency, controls });
         slotClaimed = true;
         const finalPrompt = buildCreationItemGenerationPrompt(repairItem.prompt, itemGenerationParameters, repairItem);
         const itemReferenceImages = buildCreationItemReferenceImages(repairItem, referenceImages, referenceImageRoles);

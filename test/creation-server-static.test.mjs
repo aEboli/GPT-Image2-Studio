@@ -524,7 +524,7 @@ test("local generation requests wait for a session slot instead of failing at th
   // Serial paths still claim a slot without a ceiling override; the bounded
   // fan-outs pass the configured concurrency so a widened run gets slots.
   assert.match(server, /await waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response\);/);
-  assert.match(server, /await waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response, \{ maxParallelTasks: generationConcurrency \}\);/);
+  assert.match(server, /await waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response, \{ maxParallelTasks: generationConcurrency, controls \}\);/);
   assert.doesNotMatch(server, /if \(!claimSessionTaskSlot\(clientSessionId, taskId, generationRequestScope\)\) \{\s*throw new Error/);
 });
 

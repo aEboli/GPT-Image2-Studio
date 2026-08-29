@@ -156,11 +156,11 @@ test("local server counts active generation slots per request mode", async () =>
   // The bounded fan-outs claim their slot with the configured concurrency as the
   // ceiling, so a run wider than the scope default still gets slots.
   assert.match(creationGenerateHandler, /const generationRequestScope = "creation";/);
-  assert.match(creationGenerateHandler, /waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response, \{ maxParallelTasks: generationConcurrency \}\)/);
+  assert.match(creationGenerateHandler, /waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response, \{ maxParallelTasks: generationConcurrency, controls \}\)/);
   assert.match(creationGenerateHandler, /releaseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope\)/);
 
   assert.match(creationRepairHandler, /const generationRequestScope = "creation";/);
-  assert.match(creationRepairHandler, /waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response, \{ maxParallelTasks: generationConcurrency \}\)/);
+  assert.match(creationRepairHandler, /waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response, \{ maxParallelTasks: generationConcurrency, controls \}\)/);
   assert.match(creationRepairHandler, /releaseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope\)/);
 
   assert.match(articleGenerateHandler, /const generationRequestScope = "article-illustration";/);

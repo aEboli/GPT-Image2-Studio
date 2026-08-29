@@ -308,17 +308,28 @@ test("every server fan-out stops on an account-level upstream error", async () =
   const server = await readFile(new URL("../server.mjs", import.meta.url), "utf8");
 
   // A path that skips the guard would keep sending doomed requests after the
-  // batch has already been aborted.
-  const abortGuards = server.match(/^\s*throwIfFanOutAborted\(controls\);$/gm) || [];
-  assert.equal(abortGuards.length, 5, "every fan-out worker must check the abort before doing work");
-
-  // The guard has to run before the slot claim and before any upstream call, or
-  // an aborted item would still occupy a session slot.
-  // The repo is CRLF, so a bare \n never matches here.
+  // batch has already been aborted. The repo is CRLF, so a bare \n never matches.
   const guardedWorkers = server.match(
     /try \{\r?\n\s*throwIfFanOutAborted\(controls\);\r?\n/g,
   ) || [];
   assert.equal(guardedWorkers.length, 5, "the guard must be the first statement in each worker try block");
+
+  // The slot helper must receive `controls` from every fan-out, because the abort
+  // is re-checked inside it AFTER the slot is granted. Without that, a worker
+  // that sat in the 250ms slot poll while the abort was raised would claim a slot
+  // and fire the request the abort exists to prevent.
+  const slotWaitsWithControls = server.match(
+    /await waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response, \{ maxParallelTasks: generationConcurrency, controls \}\);/g,
+  ) || [];
+  assert.equal(slotWaitsWithControls.length, 5, "every fan-out must pass controls to the slot wait");
+
+  // The post-claim re-check must release the slot before throwing: the caller
+  // only sets its `slotClaimed` flag on the line after the wait returns, so its
+  // own finally block cannot release it.
+  assert.match(
+    server,
+    /if \(readFanOutAbortReason\(controls\)\) \{\s*releaseSessionTaskSlot\(sessionId, taskId, requestScope\);\s*throwIfFanOutAborted\(controls\);/,
+  );
 
   // Without the message the classifier has nothing to judge, so every failure
   // would buy a retry again. The helper's own declaration shares this shape, so
