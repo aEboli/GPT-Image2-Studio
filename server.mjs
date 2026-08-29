@@ -90,6 +90,7 @@ import { resolveGenerationStartDelayMs } from "./lib/generation-start-delay.mjs"
 import { createInRunRetryLedger, getRequeueNotice } from "./lib/generation-item-retry.mjs";
 import { createSessionTaskSlotLimiter } from "./lib/generation-task-slots.mjs";
 import { runWithConcurrency } from "./lib/limited-concurrency.mjs";
+import { getFatalUpstreamAbortMessage, isFatalUpstreamError } from "./lib/upstream-fatal-error.mjs";
 import {
   buildCreationItemGenerationPrompt,
   resolveCreationItemGenerationParameters,
@@ -936,7 +937,14 @@ function releaseSessionTaskSlot(sessionId, taskId, requestScope) {
 // as soon as any concurrency slot frees up, instead of waiting for the whole first
 // pass to finish. Returns the claimed attempt number, or 0 when the item must be
 // treated as failed.
-function requeueFailedSetItem({ response, controls, retryLedger, item }) {
+function requeueFailedSetItem({ response, controls, retryLedger, item, message }) {
+  // An account-level upstream failure will reject every sibling the same way, so
+  // it stops the whole fan-out instead of buying a retry that cannot succeed.
+  if (isFatalUpstreamError(message)) {
+    controls?.abortRemaining?.(message);
+    return 0;
+  }
+
   if (typeof controls?.enqueue !== "function" || !retryLedger || !isResponseWritable(response)) {
     return 0;
   }
@@ -951,6 +959,16 @@ function requeueFailedSetItem({ response, controls, retryLedger, item }) {
   }
 
   return attempt;
+}
+
+// Called at the top of every fan-out worker. Throwing here routes an aborted item
+// through that path's existing failure reporting — the same manifest write and the
+// same `item_failed` event — without spending an upstream request or a task slot.
+function throwIfFanOutAborted(controls) {
+  const reason = typeof controls?.getAbortReason === "function" ? controls.getAbortReason() : "";
+  if (reason) {
+    throw new Error(getFatalUpstreamAbortMessage(reason));
+  }
 }
 
 // Shapes the SSE event for a failed attempt: a requeued item reports as still
@@ -4175,6 +4193,7 @@ async function handlePortraitGenerate(request, response) {
       let slotClaimed = false;
 
       try {
+        throwIfFanOutAborted(controls);
         await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response, { maxParallelTasks: generationConcurrency });
         slotClaimed = true;
         items = updatePortraitItems(items, item.itemId, {
@@ -4316,7 +4335,7 @@ async function handlePortraitGenerate(request, response) {
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        const requeueAttempt = requeueFailedSetItem({ response, controls, retryLedger, item });
+        const requeueAttempt = requeueFailedSetItem({ response, controls, retryLedger, item, message });
         const failureEvent = buildSetItemFailureEvent({ message, requeueAttempt, retryLedger });
         items = updatePortraitItems(
           items,
@@ -4542,6 +4561,7 @@ async function handleCreationGenerate(request, response) {
       let slotClaimed = false;
 
       try {
+        throwIfFanOutAborted(controls);
         await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response, { maxParallelTasks: generationConcurrency });
         slotClaimed = true;
         const finalPrompt = buildCreationItemGenerationPrompt(item.prompt, itemGenerationParameters, item);
@@ -4735,7 +4755,7 @@ async function handleCreationGenerate(request, response) {
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        const requeueAttempt = requeueFailedSetItem({ response, controls, retryLedger, item });
+        const requeueAttempt = requeueFailedSetItem({ response, controls, retryLedger, item, message });
         const failureEvent = buildSetItemFailureEvent({ message, requeueAttempt, retryLedger });
         items = updateCreationItems(
           items,
@@ -4915,6 +4935,7 @@ async function handleCreationLogoBatchGenerate(request, response) {
       let slotClaimed = false;
 
       try {
+        throwIfFanOutAborted(controls);
         if (!sourceImage) {
           throw new Error("找不到对应的上传源图。");
         }
@@ -5062,7 +5083,7 @@ async function handleCreationLogoBatchGenerate(request, response) {
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        const requeueAttempt = requeueFailedSetItem({ response, controls, retryLedger, item });
+        const requeueAttempt = requeueFailedSetItem({ response, controls, retryLedger, item, message });
         const failureEvent = buildSetItemFailureEvent({ message, requeueAttempt, retryLedger });
         items = updateCreationItems(
           items,
@@ -5227,6 +5248,7 @@ async function handlePortraitRepair(request, response) {
       let slotClaimed = false;
 
       try {
+        throwIfFanOutAborted(controls);
         await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response, { maxParallelTasks: generationConcurrency });
         slotClaimed = true;
         items = updatePortraitItems(items, item.itemId, {
@@ -5364,7 +5386,7 @@ async function handlePortraitRepair(request, response) {
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        const requeueAttempt = requeueFailedSetItem({ response, controls, retryLedger, item });
+        const requeueAttempt = requeueFailedSetItem({ response, controls, retryLedger, item, message });
         const failureEvent = buildSetItemFailureEvent({ message, requeueAttempt, retryLedger });
         items = updatePortraitItems(items, item.itemId, {
           ...item,
@@ -5568,6 +5590,7 @@ async function handleCreationRepair(request, response) {
       let slotClaimed = false;
 
       try {
+        throwIfFanOutAborted(controls);
         await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response, { maxParallelTasks: generationConcurrency });
         slotClaimed = true;
         const finalPrompt = buildCreationItemGenerationPrompt(repairItem.prompt, itemGenerationParameters, repairItem);
@@ -5752,7 +5775,7 @@ async function handleCreationRepair(request, response) {
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        const requeueAttempt = requeueFailedSetItem({ response, controls, retryLedger, item });
+        const requeueAttempt = requeueFailedSetItem({ response, controls, retryLedger, item, message });
         const failureEvent = buildSetItemFailureEvent({ message, requeueAttempt, retryLedger });
         items = updateCreationItems(
           items,

@@ -466,7 +466,7 @@ test("local creation failures requeue to the live queue tail instead of waiting 
   assert.ok(repairHandler, "handleCreationRepair slice must not be empty");
 
   assert.match(server, /import \{ createInRunRetryLedger, getRequeueNotice \} from "\.\/lib\/generation-item-retry\.mjs";/);
-  assert.match(server, /function requeueFailedSetItem\(\{ response, controls, retryLedger, item \}\) \{/);
+  assert.match(server, /function requeueFailedSetItem\(\{ response, controls, retryLedger, item, message \}\) \{/);
   // A requeue must never outlive the client stream, and must respect the ledger.
   assert.match(server, /if \(typeof controls\?\.enqueue !== "function" \|\| !retryLedger \|\| !isResponseWritable\(response\)\) \{/);
   assert.match(server, /if \(!retryLedger\.canRequeue\(item\?\.itemId\)\) \{/);
@@ -476,7 +476,7 @@ test("local creation failures requeue to the live queue tail instead of waiting 
     // The worker needs the third argument to reach the live queue.
     assert.match(handler, /async \(item, index, controls\) => \{/);
     assert.match(handler, /retryLedger\.getTaskId\(/);
-    assert.match(handler, /const requeueAttempt = requeueFailedSetItem\(\{ response, controls, retryLedger, item \}\);/);
+    assert.match(handler, /const requeueAttempt = requeueFailedSetItem\(\{ response, controls, retryLedger, item, message \}\);/);
     // A requeued item goes back to queued with its previous error cleared, so the
     // card shows a retry rather than a terminal failure.
     assert.match(handler, /requeueAttempt \? \{ status: "queued", error: "" \} : \{ status: "failed", error: message \}/);

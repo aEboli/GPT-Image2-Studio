@@ -117,11 +117,17 @@ test("the session task slot limiter accepts a per-request ceiling", async () => 
   );
   assert.equal(limiter.getActiveTaskCount("s1", "portrait"), 16);
 
-  // A lower override never shrinks below the scope default.
+  // A lower override really shrinks the shared bucket. Taking the larger of the
+  // two would let two overlapping fan-outs in one scope reach the old default.
   const shrink = createSessionTaskSlotLimiter({ maxParallelTasks: () => 15, retryDelayMs: 1 });
-  for (let i = 0; i < 15; i += 1) {
+  for (let i = 0; i < 3; i += 1) {
     assert.equal(shrink.claimSessionTaskSlot("s2", `t-${i}`, "portrait", { maxParallelTasks: 3 }), true);
   }
+  assert.equal(shrink.claimSessionTaskSlot("s2", "t-3", "portrait", { maxParallelTasks: 3 }), false);
+  assert.equal(shrink.getActiveTaskCount("s2", "portrait"), 3);
+
+  // A request that passes no override still gets its scope default.
+  assert.equal(shrink.claimSessionTaskSlot("s2", "t-3", "portrait"), true);
 });
 
 test("bounded concurrency runs at most the configured number of workers at once", async () => {
@@ -296,6 +302,32 @@ test("every server concurrency fan-out resolves the configured concurrency", asy
 
   // A bare constant as the limit would ignore the control entirely.
   assert.doesNotMatch(server, /await runWithConcurrency\([^,]+, MAX_[A-Z_]+,/);
+});
+
+test("every server fan-out stops on an account-level upstream error", async () => {
+  const server = await readFile(new URL("../server.mjs", import.meta.url), "utf8");
+
+  // A path that skips the guard would keep sending doomed requests after the
+  // batch has already been aborted.
+  const abortGuards = server.match(/^\s*throwIfFanOutAborted\(controls\);$/gm) || [];
+  assert.equal(abortGuards.length, 5, "every fan-out worker must check the abort before doing work");
+
+  // The guard has to run before the slot claim and before any upstream call, or
+  // an aborted item would still occupy a session slot.
+  const guardedWorkers = server.match(
+    /try \{\n\s*throwIfFanOutAborted\(controls\);\n/g,
+  ) || [];
+  assert.equal(guardedWorkers.length, 5, "the guard must be the first statement in each worker try block");
+
+  // Without the message the classifier has nothing to judge, so every failure
+  // would buy a retry again. The helper's own declaration shares this shape, so
+  // only the call sites are counted.
+  const requeueCalls = server.match(
+    /= requeueFailedSetItem\(\{ response, controls, retryLedger, item, message \}\)/g,
+  ) || [];
+  assert.equal(requeueCalls.length, 5, "every fan-out must hand the failure message to the requeue decision");
+
+  assert.match(server, /if \(isFatalUpstreamError\(message\)\) \{\s*controls\?\.abortRemaining\?\.\(message\);\s*return 0;/);
 });
 
 test("the scheduling controls lock while generation work is pending", async () => {

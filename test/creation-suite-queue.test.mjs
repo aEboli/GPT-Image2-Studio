@@ -1298,6 +1298,132 @@ test("creation suite queue starts the next suite when a running suite frees item
   assert.equal(typeof streamOptions[0].onEventHandled, "function");
 });
 
+const QUOTA_ERROR = "生成请求失败：HTTP 402，错误码 insufficient_quota，Model capacity is temporarily unavailable.";
+
+function createQuotaQueueFixture() {
+  const runningJob = {
+    id: "queue-running",
+    status: "queued",
+    formData: "running-body",
+    set: { setId: "set-running", items: [{ itemId: "hero", status: "queued" }] },
+  };
+  const pendingJobs = [1, 2, 3].map((index) => ({
+    id: `queue-pending-${index}`,
+    status: "queued",
+    formData: `pending-body-${index}`,
+    set: {
+      setId: `set-pending-${index}`,
+      items: [
+        { itemId: `p${index}-a`, status: "queued" },
+        { itemId: `p${index}-b`, status: "completed" },
+      ],
+    },
+  }));
+
+  return {
+    runningJob,
+    pendingJobs,
+    creationState: {
+      activeQueueId: "",
+      currentSet: runningJob.set,
+      generating: false,
+      generationScope: "",
+      queue: [runningJob, ...pendingJobs],
+      selectedQueueId: runningJob.id,
+    },
+  };
+}
+
+function createQuotaJobContext(creationState, { itemError, terminalEvent, feedback, errors, startedStreams }) {
+  return {
+    creationState,
+    compactErrorMessage: (message) => message,
+    fetchImpl: async () => ({ ok: true, body: {} }),
+    // A lowered concurrency is irrelevant here; the point is that no further
+    // suite is started at all once the account wall is hit.
+    getMaxParallelTasks: () => 18,
+    loadCreationSets: async () => {},
+    normalizeSet,
+    nowIso: () => "2026-08-29T08:00:00.000Z",
+    render: () => {},
+    runAutoRepairIfNeeded: async () => false,
+    runCreationStream: async (_response, context) => {
+      startedStreams.push(context.queueJob.id);
+      context.queueJob.set = normalizeSet({
+        ...context.queueJob.set,
+        status: "failed",
+        items: context.queueJob.set.items.map((item) => ({ ...item, status: "failed", error: itemError })),
+      });
+      await context.onEventHandled(terminalEvent, { set: context.queueJob.set });
+    },
+    setFeedback: (message) => feedback.push(message),
+    showError: (message) => errors.push(message),
+  };
+}
+
+test("an account-level upstream error fails the suites still queued", async () => {
+  const { runningJob, pendingJobs, creationState } = createQuotaQueueFixture();
+  const feedback = [];
+  const errors = [];
+  const startedStreams = [];
+
+  await runCreationQueuedJob(
+    runningJob,
+    createQuotaJobContext(creationState, {
+      itemError: QUOTA_ERROR,
+      terminalEvent: "complete",
+      feedback,
+      errors,
+      startedStreams,
+    }),
+  );
+
+  assert.equal(runningJob.status, "failed");
+  // The upstream reason surfaces instead of the generic "still incomplete" notice.
+  assert.equal(errors.at(-1), QUOTA_ERROR);
+
+  for (const job of pendingJobs) {
+    assert.equal(job.status, "failed", `${job.id} must not stay queued`);
+    assert.equal(job.set.items[0].status, "failed");
+    assert.equal(job.set.items[0].error, QUOTA_ERROR);
+    // An already completed item keeps its result.
+    assert.equal(job.set.items[1].status, "completed");
+    assert.equal(job.set.items[1].error, undefined);
+  }
+
+  // Only the running suite ever reached the network; the scheduler found no
+  // queued job left to start.
+  assert.deepEqual(startedStreams, ["queue-running"]);
+  assert.equal(getPendingCreationQueueCount(creationState), 0);
+  assert.equal(creationState.generating, false);
+});
+
+test("a non-account-level failure leaves the queued suites running", async () => {
+  const { runningJob, pendingJobs, creationState } = createQuotaQueueFixture();
+  const feedback = [];
+  const errors = [];
+  const startedStreams = [];
+
+  await runCreationQueuedJob(
+    runningJob,
+    createQuotaJobContext(creationState, {
+      itemError: "生成请求失败：HTTP 429，错误码 rate_limit_exceeded，Rate limit reached.",
+      terminalEvent: "complete",
+      feedback,
+      errors,
+      startedStreams,
+    }),
+  );
+
+  assert.equal(runningJob.status, "failed");
+  // Transient failures must not take the rest of the queue down with them.
+  await waitFor(
+    () => pendingJobs.every((job) => job.status !== "queued"),
+    "queued suites to keep being started after a transient failure",
+  );
+  assert.ok(startedStreams.length > 1, "the scheduler must keep starting queued suites");
+});
+
 test("creation suite queued repair form data keeps the queued suite reference files", () => {
   const source = new FormData();
   source.set("productName", "Queued product");

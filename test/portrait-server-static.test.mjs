@@ -85,7 +85,7 @@ test("portrait failures requeue to the live queue tail instead of waiting for th
     // The worker needs the third argument to reach the live queue.
     assert.match(handler, /async \(item, index, controls\) => \{/);
     assert.match(handler, /retryLedger\.getTaskId\(/);
-    assert.match(handler, /const requeueAttempt = requeueFailedSetItem\(\{ response, controls, retryLedger, item \}\);/);
+    assert.match(handler, /const requeueAttempt = requeueFailedSetItem\(\{ response, controls, retryLedger, item, message \}\);/);
     assert.match(handler, /const failureEvent = buildSetItemFailureEvent\(\{ message, requeueAttempt, retryLedger \}\);/);
     assert.match(handler, /status: "queued", error: ""/);
     assert.match(handler, /writeSseEvent\(response, failureEvent\.eventName, \{/);

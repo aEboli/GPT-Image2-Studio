@@ -125,6 +125,84 @@ test("enqueue is refused after a worker throws and the run unwinds", async () =>
   assert.equal(escapedControls.enqueue("late"), false);
 });
 
+test("aborting the fan-out stops further upstream work but still visits each item", async () => {
+  const upstreamCalls = [];
+  const visited = [];
+
+  // Every remaining item still runs its worker once, so each can report its own
+  // failure through the caller's existing path; none of them calls upstream.
+  await runWithConcurrency([1, 2, 3, 4, 5], 2, async (item, index, controls) => {
+    visited.push(item);
+    if (controls.getAbortReason()) {
+      return `skipped-${item}`;
+    }
+
+    upstreamCalls.push(item);
+    if (item === 2) {
+      controls.abortRemaining("生成请求失败：HTTP 402，错误码 insufficient_quota");
+    }
+    return item;
+  }, { startDelayMs: 0 });
+
+  assert.deepEqual(visited, [1, 2, 3, 4, 5]);
+  // 1 and 2 were already in flight; nothing after the abort reached upstream.
+  assert.deepEqual(upstreamCalls, [1, 2]);
+});
+
+test("the first abort reason wins and repeat aborts are idempotent", async () => {
+  const reasons = [];
+
+  await runWithConcurrency([1, 2, 3], 3, async (item, index, controls) => {
+    if (item === 1) {
+      controls.abortRemaining("first reason");
+      controls.abortRemaining("second reason");
+      // A blank reason must not clear an established one.
+      controls.abortRemaining("");
+    }
+    reasons.push(controls.getAbortReason());
+    return item;
+  }, { startDelayMs: 0 });
+
+  assert.deepEqual(reasons, ["first reason", "first reason", "first reason"]);
+});
+
+test("an aborted fan-out refuses requeues", async () => {
+  const started = [];
+
+  await runWithConcurrency(["a"], 2, async (item, index, controls) => {
+    started.push(item);
+    controls.abortRemaining("fatal");
+    // Requeueing into a queue that will never send anything upstream is pointless.
+    assert.equal(controls.enqueue("a-retry"), false);
+    return item;
+  }, { startDelayMs: 0 });
+
+  assert.deepEqual(started, ["a"]);
+});
+
+test("an aborted fan-out stops waiting out the submit interval", async () => {
+  const started = [];
+  const startDelayMs = 800;
+  const itemCount = 6;
+  const startedAt = performance.now();
+
+  await runWithConcurrency(Array.from({ length: itemCount }, (_, index) => index + 1), 1, async (item, index, controls) => {
+    started.push(item);
+    if (item === 1) {
+      controls.abortRemaining("fatal");
+    }
+    return item;
+  }, { startDelayMs });
+
+  const elapsed = performance.now() - startedAt;
+  assert.equal(started.length, itemCount);
+  // Without the skip these five remaining items would each wait out 800ms.
+  assert.ok(
+    elapsed < startDelayMs * 2,
+    `aborted items must not each wait a submit interval, took ${Math.round(elapsed)}ms`,
+  );
+});
+
 test("limited concurrency does not mutate the caller's item list", async () => {
   const items = ["a"];
 

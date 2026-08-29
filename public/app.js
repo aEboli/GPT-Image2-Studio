@@ -90,7 +90,7 @@ import { DEFAULT_PORTRAIT_ACCESSORY_ASSETS, PORTRAIT_ACCESSORY_ASSET_CATEGORIES,
 import { createDefaultPortraitLocationState, createPortraitLocationSelectorController } from "/lib/portrait-location-selector.mjs?v=20260527-portrait-location-1";
 import { getLegacyPromptAgentTemplatePrompt, getPromptAgentDisplayName, getPromptAgentTemplateDisplayName, isStructuredImagePromptJson } from "/lib/prompt-agent-display-name.mjs?v=20260819-prompt-history-mode-1";
 import { mergePromptAgentHistoryTemplates } from "/lib/prompt-agent-template-sync.mjs?v=20260819-history-template-mode-1";
-import { DEFAULT_GENERATION_CONCURRENCY, DEFAULT_GENERATION_START_DELAY_MS, MAX_CREATION_PARALLEL_TASKS, MAX_PROMPT_PARALLEL_TASKS, MAX_PROMPT_QUEUE_SIZE } from "/lib/studio-constants.mjs?v=20260828-generation-concurrency-1";
+import { DEFAULT_GENERATION_CONCURRENCY, DEFAULT_GENERATION_START_DELAY_MS, MAX_PROMPT_PARALLEL_TASKS, MAX_PROMPT_QUEUE_SIZE } from "/lib/studio-constants.mjs?v=20260828-generation-concurrency-1";
 import { GENERATION_START_DELAY_FIELD, normalizeGenerationStartDelayMs } from "/lib/generation-start-delay.mjs?v=20260828-generation-start-delay-1";
 import { GENERATION_CONCURRENCY_FIELD, normalizeGenerationConcurrency } from "/lib/generation-concurrency.mjs?v=20260828-generation-concurrency-1";
 const SURPRISE_PROMPTS = [
@@ -2269,11 +2269,12 @@ function getMaxParallelJobCount(mode = getCurrentGenerationQueueMode()) {
 function getMaxParallelJobCountForJob(job) {
   return getMaxParallelJobCount(getGenerationJobMode(job));
 }
-// The creation queue reserves item slots against the server's own creation limit.
-// Reading the general per-session limit here let the browser start a suite whose
-// items could only sit in the server slot-wait loop.
+// The creation queue reserves item slots against the same configurable request
+// concurrency the server fans out with. Reading a hardcoded limit here let the
+// browser start a second suite the server had no slots for, so a lowered
+// concurrency never bound how much work was in flight across suites.
 function getCreationMaxParallelTaskCount() {
-  return MAX_CREATION_PARALLEL_TASKS;
+  return getConfiguredGenerationConcurrency();
 }
 function getGenerationJobSchedulingKey(job) {
   return getGenerationJobMode(job) === "prompt" ? "prompt" : getGenerationJobQueueKey(job);

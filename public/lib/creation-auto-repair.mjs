@@ -1,3 +1,5 @@
+import { isFatalUpstreamError } from "./upstream-fatal-error.mjs";
+
 export const CREATION_AUTO_REPAIR_MAX_ATTEMPTS = 1;
 
 function hasCompletedCreationAsset(item = {}) {
@@ -13,6 +15,20 @@ export function getCreationIncompleteItems(set = {}) {
   return items.filter((item) => isReconciledMissingAsset(item) || item.status !== "completed" || !item.filename || !hasCompletedCreationAsset(item));
 }
 
+// The first account-level error among the items auto-repair would retry. Quota,
+// key and billing failures reject every request the same way, so another pass
+// only burns more upstream calls and leaves the user with the same set.
+export function getCreationFatalUpstreamError(set = {}) {
+  for (const item of getCreationIncompleteItems(set)) {
+    const message = String(item?.error || "").trim();
+    if (message && isFatalUpstreamError(message)) {
+      return message;
+    }
+  }
+
+  return "";
+}
+
 export function shouldAutoRepairCreationSet({
   set,
   generationScope = "",
@@ -26,7 +42,8 @@ export function shouldAutoRepairCreationSet({
     canRepair &&
     autoRepairAttemptCount < maxAttempts &&
     incompleteItems.length > 0 &&
-    !incompleteItems.some(isReconciledMissingAsset)
+    !incompleteItems.some(isReconciledMissingAsset) &&
+    !getCreationFatalUpstreamError(set)
   );
 }
 

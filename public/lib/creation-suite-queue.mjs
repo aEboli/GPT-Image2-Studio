@@ -1,4 +1,6 @@
+import { getCreationFatalUpstreamError } from "./creation-auto-repair.mjs";
 import { formatCreationSkuItemColorNames } from "./creation-sku-colors.mjs";
+import { isFatalUpstreamError } from "./upstream-fatal-error.mjs";
 
 export function getCreationQueueJobs(creationState = {}) {
   return Array.isArray(creationState.queue) ? creationState.queue : [];
@@ -329,6 +331,49 @@ function isCreationQueueSetCompleted(set = {}) {
   return items.length > 0 && items.every((item) => cleanQueueString(item.status).toLowerCase() === "completed");
 }
 
+// Reads an account-level reason out of a stream event. This has to be checked on
+// every event, not just the terminal one: each `item_failed` frees reserved item
+// capacity, so waiting for the run to end would let the scheduler start the very
+// suites that must not run.
+function getCreationStreamFatalUpstreamError(payload = {}) {
+  const message = cleanQueueString(payload.message);
+  if (message && isFatalUpstreamError(message)) {
+    return message;
+  }
+
+  return payload.set ? getCreationFatalUpstreamError(payload.set) : "";
+}
+
+// An account-level upstream failure rejects every request the same way, so the
+// suites still waiting in the queue would each burn a full wave of doomed calls.
+// They fail now and carry the same reason, which also stops the scheduler: it
+// only ever picks up jobs still in `queued`.
+export function failPendingCreationQueueJobs(creationState = {}, message, { normalizeSet, nowIso } = {}) {
+  const reason = cleanQueueString(message);
+  if (!reason) {
+    return 0;
+  }
+
+  const pendingJobs = getCreationQueueJobs(creationState).filter((job) => job.status === "queued");
+  for (const job of pendingJobs) {
+    const items = Array.isArray(job.set?.items) ? job.set.items : [];
+    const failedSet = {
+      ...job.set,
+      status: "failed",
+      updatedAt: typeof nowIso === "function" ? nowIso() : new Date().toISOString(),
+      items: items.map((item) => (
+        cleanQueueString(item.status).toLowerCase() === "completed"
+          ? item
+          : { ...item, status: "failed", error: reason }
+      )),
+    };
+    job.status = "failed";
+    job.set = typeof normalizeSet === "function" ? normalizeSet(failedSet) : failedSet;
+  }
+
+  return pendingJobs.length;
+}
+
 export function buildCreationQueuedSet({
   buildCreationReferenceRolePayload,
   buildCreationSkuSubjectPayload,
@@ -633,6 +678,10 @@ export async function runCreationQueuedJob(job, context = {}) {
           terminalEvent = eventName;
           terminalMessage = cleanQueueString(payload.message);
         }
+        const fatalUpstreamError = getCreationStreamFatalUpstreamError(payload);
+        if (fatalUpstreamError) {
+          failPendingCreationQueueJobs(creationState, fatalUpstreamError, { normalizeSet, nowIso });
+        }
         scheduleCreationGenerationQueue(context);
       },
     });
@@ -648,7 +697,10 @@ export async function runCreationQueuedJob(job, context = {}) {
       await loadCreationSets();
     }
     if (!isCreationQueueSetCompleted(job.set)) {
-      throw new Error("套图生成结束后仍有未完成项");
+      // Report the upstream reason rather than the generic notice: an account-level
+      // failure is what the user has to act on, and the generic text reads as if
+      // the suite merely needs another repair pass.
+      throw new Error(getCreationFatalUpstreamError(job.set) || "套图生成结束后仍有未完成项");
     }
     job.status = "completed";
     job.set = normalizeSet({
@@ -674,6 +726,9 @@ export async function runCreationQueuedJob(job, context = {}) {
       creationState.currentSet = job.set;
     }
     syncActiveCreationQueueSet(creationState, job.set, normalizeSet);
+    if (isFatalUpstreamError(message)) {
+      failPendingCreationQueueJobs(creationState, message, { normalizeSet, nowIso });
+    }
     setFeedback(message, "error");
     showError(message);
   } finally {

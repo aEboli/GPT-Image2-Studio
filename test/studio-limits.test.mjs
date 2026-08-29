@@ -57,10 +57,11 @@ test("creation mode has an independent twenty-task parallel limit shared with re
   assert.match(limitedConcurrency, /const MAX_CONCURRENT_WORKERS = MAX_GENERATION_CONCURRENCY;/);
   assert.ok(MAX_GENERATION_CONCURRENCY >= MAX_CREATION_PARALLEL_TASKS);
 
-  // The browser reserves creation queue slots against the server's creation limit, not
-  // the general per-session limit.
+  // The browser reserves creation queue slots against the same configurable
+  // concurrency the server fans out with, so a lowered value also caps how many
+  // suites run at once.
   const app = await readFile(appPath, "utf8");
-  assert.match(app, /function getCreationMaxParallelTaskCount\(\) \{\s*return MAX_CREATION_PARALLEL_TASKS;/);
+  assert.match(app, /function getCreationMaxParallelTaskCount\(\) \{\s*return getConfiguredGenerationConcurrency\(\);/);
   assert.match(app, /getMaxParallelTasks: getCreationMaxParallelTaskCount/);
 });
 
