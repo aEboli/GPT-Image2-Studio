@@ -13,6 +13,7 @@ import { registerHeartbeatMorphEngine } from "/lib/heartbeat-morph-icon.mjs";
 import { createMorph as createHeartbeatMorph } from "/lib/vendor/morphicons/dom.js";
 import { beatCreationCardHeartbeat, createCreationCardLoading as createCreationCardLoadingShell, getCreationCardDomKey, getCreationCardLoadingKey, syncCreationLoadingCard, syncCreationResultGrid as syncCreationResultGridShell } from "/lib/creation-card-loading.mjs";
 import { createCreationCardIdleRippleController } from "/lib/creation-card-idle-ripple.mjs?v=20260725-creation-card-idle-ripple-1";
+import { createDisabledShakeController } from "/lib/disabled-shake.mjs";
 import { createFilmstripRevealTracker, renderFilmstripPreservingSelection, syncFilmstripSelectedMarker } from "/lib/filmstrip-selection.mjs?v=20260829-filmstrip-selection-1";
 import { isGenerationRequestRetryMessage, } from "/lib/generation-request-retry.mjs";
 import { cancelQueuedGenerationJob, getGenerationJobMode, getGenerationJobQueueKey, getQueuedGenerationJobCount, getRunningGenerationJobCount, isQueuedGenerationJob, selectNextQueuedGenerationJobsByMode } from "/lib/generation-queue.mjs?v=20260821-prompt-global-queue-1";
@@ -1244,6 +1245,7 @@ const assetRecordTimeFilterController = createAssetRecordTimeFilterController({
 const lightboxViewerController = createLightboxImageViewer({ refs, state });
 const assetWorkspaceController = createAssetWorkspaceController({ refs, state });
 const creationCardIdleRippleController = createCreationCardIdleRippleController();
+const disabledShakeController = createDisabledShakeController();
 const previewKeyboardNavigation = createPreviewKeyboardNavigationController({
   refs,
   state,
@@ -17458,6 +17460,7 @@ function bindEvents() {
   assetRecordDeleteController.bindEvents();
   assetRecordTimeFilterController.bind();
   creationCardIdleRippleController.bind();
+  disabledShakeController.bind();
   document.addEventListener("paste", handlePromptAgentImagePaste); document.addEventListener("paste", handleCreationReferenceImagePaste);
 
   refs.viewTabs.forEach((button) => {

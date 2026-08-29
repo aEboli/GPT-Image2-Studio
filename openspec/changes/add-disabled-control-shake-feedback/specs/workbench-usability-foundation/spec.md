@@ -1,0 +1,42 @@
+## ADDED Requirements
+
+### Requirement: 点击禁用控件给出横向抖动反馈
+
+工作台 SHALL 在用户按下任一禁用控件时，对该控件本身播放一次横向抖动动画。抖动 SHALL 只使用横向 `transform` 位移，时长 SHALL 为 `200` 毫秒，SHALL 在结束时精确回到原位，且 SHALL NOT 改变控件尺寸、外边距、内边距或所在布局。抖动 SHALL NOT 改变控件的可用性判定，也 SHALL NOT 触发该控件原本被禁止的动作。
+
+禁用控件 SHALL 至少覆盖原生 `disabled` 控件、`aria-disabled="true"` 控件，以及仓库用于禁用态的 `.disabled` / `.is-disabled` 类名控件。容器型元素（`fieldset`、滚动条轨道）SHALL NOT 因其后代被点击而整体抖动。
+
+#### Scenario: 原生禁用按钮被按下
+
+- **WHEN** 用户在一个 `disabled` 按钮上按下主键
+- **THEN** 该按钮播放一次横向抖动
+- **AND** 按钮不派发 `click`，其原本动作不被执行
+
+#### Scenario: 带 pointer-events none 的禁用控件被按下
+
+- **GIVEN** 某禁用样式声明了 `pointer-events: none`，控件本身收不到任何指针事件，事件目标是它的祖先
+- **WHEN** 用户在该控件所占矩形内按下主键
+- **THEN** 该控件本身播放一次横向抖动
+- **AND** 抖动作用于该控件，而不是收到事件的祖先容器
+
+#### Scenario: 连续点击可以重放
+
+- **WHEN** 用户在同一禁用控件上连续按下两次，且第二次发生在上一次抖动结束之前
+- **THEN** 抖动从头重新播放
+- **AND** 动画结束后状态类被清除，控件不残留位移
+
+#### Scenario: 可用控件与空白处不抖动
+
+- **WHEN** 用户按下一个可用控件，或按在任何禁用控件矩形之外
+- **THEN** 没有任何元素播放抖动
+
+#### Scenario: 非主键按下不触发
+
+- **WHEN** 用户以右键或中键在禁用控件上按下
+- **THEN** 没有抖动播放
+
+#### Scenario: 降低动态效果时关闭抖动
+
+- **WHEN** 系统设置为 `prefers-reduced-motion: reduce` 且用户按下禁用控件
+- **THEN** 不播放抖动动画
+- **AND** 禁用控件的静态表现（不透明度、光标）保持不变

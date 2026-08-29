@@ -822,6 +822,58 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .view-tab.act
   transform: translateY(-1px);
 }
 
+/* 点击禁用控件时的一次性横向抖动反馈，由 lib/disabled-shake.mjs 加类触发。
+   波形按参考录屏实测复刻：纯横向位移、200ms、6 次反向、逐次衰减并精确回到原位；
+   幅度按本应用控件尺寸取 8px，组件可用 --control-disabled-shake-distance 覆盖。 */
+.is-disabled-shaking {
+  --control-disabled-shake-distance: 8px;
+  animation: control-disabled-shake 200ms ease-out;
+}
+
+@keyframes control-disabled-shake {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+
+  12% {
+    transform: translate3d(calc(var(--control-disabled-shake-distance) * -1), 0, 0);
+  }
+
+  25% {
+    transform: translate3d(var(--control-disabled-shake-distance), 0, 0);
+  }
+
+  38% {
+    transform: translate3d(calc(var(--control-disabled-shake-distance) * -0.78), 0, 0);
+  }
+
+  50% {
+    transform: translate3d(calc(var(--control-disabled-shake-distance) * 0.68), 0, 0);
+  }
+
+  63% {
+    transform: translate3d(calc(var(--control-disabled-shake-distance) * -0.5), 0, 0);
+  }
+
+  75% {
+    transform: translate3d(calc(var(--control-disabled-shake-distance) * 0.34), 0, 0);
+  }
+
+  88% {
+    transform: translate3d(calc(var(--control-disabled-shake-distance) * -0.18), 0, 0);
+  }
+
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-disabled-shaking {
+    animation: none;
+  }
+}
+
 .view-tab {
   display: grid;
   align-content: center;

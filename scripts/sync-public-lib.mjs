@@ -56,6 +56,7 @@ export const PUBLIC_LIB_SYNC_TARGETS = [
   "creation-plan-counts.mjs",
   "creation-suite-queue.mjs",
   "creation-temu-export-ui.mjs",
+  "disabled-shake.mjs",
   "creation-sku-colors.mjs",
   "creation-sku-subjects.mjs",
   "filmstrip-selection.mjs",
