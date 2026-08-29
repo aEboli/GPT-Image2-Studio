@@ -8309,7 +8309,6 @@ html[data-theme="light"] .generation-loading-shell[data-generation-loading-famil
     inset 0 0 0 1px color-mix(in srgb, var(--generation-loading-fluid) 18%, transparent),
     inset 0 0 calc(18px + 6cqi) color-mix(in srgb, var(--generation-loading-fluid) 14%, transparent);
   --generation-loading-wave-height: clamp(5px, 2.4cqi, 22px);
-  --generation-loading-ripple-height: clamp(3px, 1.4cqi, 13px);
   --generation-loading-bubble-size: clamp(1.8px, 0.9cqi, 8px);
   --generation-loading-bubble-tile: clamp(14px, 7cqi, 64px);
   animation: generation-loading-breathe 4200ms ease-in-out infinite;
@@ -8364,18 +8363,24 @@ html[data-theme="light"] .generation-loading-shell[data-generation-loading-famil
   margin: 0;
 }
 
+/* 液面是一条柔和的高光带，不是平铺的半圆，也不左右漂移。
+   平铺图案会给视线一排可对齐的参照物，液位每上升一点都被读成"跳了一格"；
+   换成纯纵向渐变后没有任何可对齐的重复单元，上升就是连续的。 */
 .generation-loading-wave {
   position: absolute;
   z-index: 3;
-  left: -15%;
-  width: 130%;
+  left: 0;
+  width: 100%;
   bottom: calc(var(--generation-loading-progress) - var(--generation-loading-wave-height, 8px));
   height: calc(var(--generation-loading-wave-height, 8px) * 2);
   pointer-events: none;
   background-image: linear-gradient(
     180deg,
-    transparent 50%,
-    color-mix(in srgb, var(--generation-loading-fluid) 80%, #ffffff) 50%
+    transparent 0%,
+    color-mix(in srgb, var(--generation-loading-fluid) 26%, transparent) 34%,
+    color-mix(in srgb, var(--generation-loading-fluid) 94%, #ffffff) 50%,
+    color-mix(in srgb, var(--generation-loading-fluid) 66%, transparent) 66%,
+    transparent 100%
   );
   animation: generation-loading-water-flow 5200ms ease-in-out infinite;
 }
@@ -8384,35 +8389,37 @@ html[data-theme="light"] .generation-loading-shell[data-generation-loading-famil
 .generation-loading-wave::after {
   content: "";
   position: absolute;
-  inset: 0 0 50%;
-  background-repeat: repeat-x;
-  background-position: 0 0;
+  /* 不再平铺：没有 repeat-x，就没有半圆阵列，也没有横向可位移的图案。 */
+  background-repeat: no-repeat;
+  pointer-events: none;
 }
 
+/* 液面之上的一层柔光，让水面看起来是湿的而不是一条硬边。 */
 .generation-loading-wave::before {
   z-index: 2;
-  background-image: radial-gradient(
-    circle var(--generation-loading-wave-height, 8px) at 50% 100%,
-    color-mix(in srgb, var(--generation-loading-fluid) 84%, #ffffff) 90%,
-    transparent 100%
+  inset: -140% 0 40%;
+  background-image: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb, var(--generation-loading-fluid) 30%, transparent) 100%
   );
-  background-size: calc(var(--generation-loading-wave-height, 8px) * 2) 100%;
-  --generation-loading-wave-shift: calc(var(--generation-loading-wave-height, 8px) * 2);
-  filter: drop-shadow(0 -1px 3px color-mix(in srgb, var(--generation-loading-fluid) 44%, transparent));
-  animation: generation-loading-wave-drift 3200ms linear infinite;
 }
 
+/* 水体内部持续向上流动的柔光：像水龙头放水，即使高百分比区间液位几乎不动，
+   画面也一直有自然的向上流动感，而不是静止后突然跳一格。 */
 .generation-loading-wave::after {
   z-index: 1;
-  background-image: radial-gradient(
-    circle var(--generation-loading-ripple-height, 4.5px) at 50% 100%,
-    color-mix(in srgb, var(--generation-loading-fluid) 96%, #ffffff) 84%,
+  inset: auto 0 -1200%;
+  height: 1200%;
+  background-image: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb, var(--generation-loading-fluid) 42%, #ffffff) 46%,
     transparent 100%
   );
-  background-size: calc(var(--generation-loading-ripple-height, 4.5px) * 2) 100%;
-  --generation-loading-wave-shift: calc(var(--generation-loading-ripple-height, 4.5px) * 2);
-  opacity: 0.72;
-  animation: generation-loading-wave-drift 2100ms linear infinite reverse;
+  background-size: 100% 26%;
+  background-position: 0 100%;
+  animation: generation-loading-wave-drift 4200ms linear infinite;
 }
 
 /* 满幅的环境光雾：几团柔光缓慢横移与缩放，让整块占位在生成期间一直有呼吸感。
@@ -8462,6 +8469,7 @@ html[data-theme="light"] .generation-loading-shell[data-generation-loading-famil
   pointer-events: none;
 }
 
+.generation-loading-heartbeat,
 .generation-loading-percent,
 .generation-loading-label,
 .generation-loading-log {
@@ -8469,13 +8477,53 @@ html[data-theme="light"] .generation-loading-shell[data-generation-loading-famil
   z-index: 2;
 }
 
+/* 心跳图标：随宿主尺寸成比例，和满幅动画同一套换算口径。
+   它是绝对定位动画层之外的普通网格子项，所以不参与满幅几何。 */
+/* 图标要在满幅上色之上立得住：描边取接近纯白，再叠一层同色族外发光把它从水体里托出来。
+   之前用 fluid 混白 72%，和身后的水体同色系、亮度也接近，所以看不清。 */
+.generation-loading-heartbeat {
+  width: clamp(20px, 9cqi, 46px);
+  height: clamp(20px, 9cqi, 46px);
+  margin: 0;
+  stroke-width: 2;
+  color: color-mix(in srgb, #ffffff 88%, var(--generation-loading-fluid));
+  filter:
+    drop-shadow(0 0 10px color-mix(in srgb, var(--generation-loading-fluid) 78%, transparent))
+    drop-shadow(0 1px 2px rgba(4, 7, 14, 0.72));
+  overflow: visible;
+}
+
+.generation-loading-heartbeat[hidden] {
+  display: none;
+}
+
+/* 浅色主题反过来压深描边，并把外发光换成白色，才能在浅色水体上读得出来。 */
+html[data-theme="light"] .generation-loading-heartbeat {
+  color: color-mix(in srgb, var(--generation-loading-fluid) 58%, #0b1020);
+  filter:
+    drop-shadow(0 0 8px rgba(255, 255, 255, 0.9))
+    drop-shadow(0 1px 2px rgba(15, 23, 42, 0.24));
+}
+
+/* 百分比与标签压在满幅水体之上，只靠 --text / --muted 会糊进背景，
+   所以这里把亮度拉到接近纯白并加一层暗描边阴影拉开层次。 */
 .generation-loading-percent {
   min-width: 4ch;
-  color: var(--text);
+  color: color-mix(in srgb, #ffffff 92%, var(--generation-loading-fluid));
   font-size: var(--type-small-title-size);
   font-variant-numeric: tabular-nums;
   font-weight: 800;
   line-height: 1;
+  text-shadow:
+    0 1px 2px rgba(4, 7, 14, 0.72),
+    0 0 12px color-mix(in srgb, var(--generation-loading-fluid) 52%, transparent);
+}
+
+html[data-theme="light"] .generation-loading-percent {
+  color: #0b1020;
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.86),
+    0 0 10px rgba(255, 255, 255, 0.72);
 }
 
 .generation-loading-shell[data-generation-loading-mode="waiting"] {
@@ -8507,40 +8555,53 @@ html[data-theme="light"] .generation-loading-shell[data-generation-loading-famil
   opacity: 0.35;
 }
 
+/* 等待态一切都更慢：液面呼吸放缓，水体内部的上行柔光也放缓。
+   原来这里把 ::after 调到 3600ms 比生成态更快，方向是反的；
+   ::before 的 filter / animation 覆盖在液面改成纯渐变后已无对应物，一并去掉。 */
 .generation-loading-shell[data-generation-loading-mode="waiting"] .generation-loading-wave {
   animation-duration: 7200ms;
 }
 
-.generation-loading-shell[data-generation-loading-mode="waiting"] .generation-loading-wave::before {
-  filter: none;
-  animation-duration: 5200ms;
-}
-
 .generation-loading-shell[data-generation-loading-mode="waiting"] .generation-loading-wave::after {
-  animation-duration: 3600ms;
+  animation-duration: 9000ms;
+  opacity: 0.6;
 }
 
+/* 等待态是灰蓝色族、水位很低，文字压不住背景就更该提亮，
+   只比生成态稍弱一点以示区别，而不是直接退回 --muted。 */
 .generation-loading-shell[data-generation-loading-mode="waiting"] .generation-loading-label {
-  color: var(--muted);
+  color: rgba(255, 255, 255, 0.82);
+}
+
+html[data-theme="light"] .generation-loading-shell[data-generation-loading-mode="waiting"] .generation-loading-label {
+  color: rgba(11, 16, 32, 0.78);
 }
 
 .generation-loading-label {
   max-width: 18em;
-  color: var(--muted);
+  color: rgba(255, 255, 255, 0.94);
   font-size: var(--type-subtitle-size);
+  font-weight: 600;
   line-height: 1.35;
+  text-shadow: 0 1px 2px rgba(4, 7, 14, 0.66);
+}
+
+html[data-theme="light"] .generation-loading-label {
+  color: rgba(11, 16, 32, 0.9);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 /* 实时进度完整显示：允许换行，不截断，长状态文案也能读全。 */
 .generation-loading-log {
   max-width: 22em;
   width: 100%;
-  color: rgba(171, 184, 218, 0.82);
+  color: rgba(255, 255, 255, 0.86);
   font-size: calc(var(--type-subtitle-size) * 0.94);
   line-height: 1.35;
   white-space: normal;
   overflow-wrap: anywhere;
   text-align: center;
+  text-shadow: 0 1px 2px rgba(4, 7, 14, 0.6);
 }
 
 .generation-loading-log[hidden] {
@@ -8548,7 +8609,8 @@ html[data-theme="light"] .generation-loading-shell[data-generation-loading-famil
 }
 
 html[data-theme="light"] .generation-loading-log {
-  color: rgba(29, 29, 31, 0.62);
+  color: rgba(11, 16, 32, 0.82);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.78);
 }
 
 .creation-card-loading .generation-loading-log {
@@ -8568,7 +8630,6 @@ html[data-theme="light"] .generation-loading-log {
 
 .creation-card-loading .generation-loading-drop {
   --generation-loading-wave-height: clamp(5px, 3cqi, 14px);
-  --generation-loading-ripple-height: clamp(3px, 1.8cqi, 8px);
   --generation-loading-bubble-size: clamp(1.8px, 1.1cqi, 5px);
   --generation-loading-bubble-tile: clamp(14px, 9cqi, 34px);
 }
@@ -8587,7 +8648,6 @@ html[data-theme="light"] .generation-loading-log {
 .article-card-image .generation-loading-drop,
 .ppt-slide-thumb .generation-loading-drop {
   --generation-loading-wave-height: clamp(5px, 2.6cqi, 14px);
-  --generation-loading-ripple-height: clamp(3px, 1.6cqi, 8px);
   --generation-loading-bubble-size: clamp(1.8px, 1cqi, 5px);
   --generation-loading-bubble-tile: clamp(14px, 8cqi, 34px);
 }
@@ -8604,7 +8664,6 @@ html[data-theme="light"] .generation-loading-log {
 
 .filmstrip .generation-loading-drop {
   --generation-loading-wave-height: clamp(4px, 4cqi, 9px);
-  --generation-loading-ripple-height: clamp(2.5px, 2.4cqi, 6px);
   --generation-loading-bubble-size: clamp(1.6px, 1.6cqi, 4px);
   --generation-loading-bubble-tile: clamp(12px, 14cqi, 22px);
 }
@@ -8659,24 +8718,29 @@ html[data-theme="light"] .generation-loading-log {
   }
 }
 
+/* 液面只做纵向的张力呼吸：厚度与亮度轻微起伏。
+   原来的 translateX + rotate 会让整条水面左右摇摆，那不是水位上涨该有的样子。 */
 @keyframes generation-loading-water-flow {
   0%,
   100% {
-    transform: translateX(-3%) rotate(-0.8deg);
+    opacity: 0.88;
+    transform: scaleY(0.92);
   }
 
   50% {
-    transform: translateX(3%) rotate(0.8deg);
+    opacity: 1;
+    transform: scaleY(1.08);
   }
 }
 
+/* 水体内部的柔光自下而上流过，纯纵向，没有横向位移。 */
 @keyframes generation-loading-wave-drift {
   from {
-    background-position-x: 0;
+    background-position: 0 100%;
   }
 
   to {
-    background-position-x: var(--generation-loading-wave-shift, 24px);
+    background-position: 0 -26%;
   }
 }
 

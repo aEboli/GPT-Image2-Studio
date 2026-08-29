@@ -28,8 +28,8 @@ const generationClientPath = new URL("../lib/generation-client.mjs", import.meta
 const generationLogPanelPath = new URL("../lib/generation-log-panel.mjs", import.meta.url);
 const generationLogStorePath = new URL("../lib/generation-log-store.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20260829-generation-loading-fill-1";
-const appAssetVersion = "20260829-generation-schedule-1";
+const stylesAssetVersion = "20260829-smooth-water-rise-1";
+const appAssetVersion = "20260829-smooth-water-rise-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
 const creationQueueModuleAssetVersion = "20260829-generation-schedule-1";
 const quickBlendModuleAssetVersion = "20260608-quick-blend-time-sort-1";
@@ -2109,6 +2109,81 @@ test("generation loading animation fills its host image slot at any size", async
     styles,
     /@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?\.generation-loading-shell::before,[\s\S]*?animation:\s*none;/,
   );
+});
+
+/* 水位要像水龙头放水一样连续上涨：液面不能是一排平铺的半圆，也不能左右晃动。
+   平铺图案会给视线一排可对齐的参照物，液位每上升一点都被读成「跳了一格」。 */
+test("the water surface rises smoothly without tiling or sideways motion", async () => {
+  const styles = await readFile(stylesPath, "utf8");
+
+  const waveRule = styles.match(/\n\.generation-loading-wave \{[\s\S]*?\n\}/)?.[0] || "";
+  assert.notEqual(waveRule, "", "液面必须有样式规则");
+  // 液面横向铺满液体层，不再左右各超出 15% 靠裁剪遮掉
+  assert.match(waveRule, /left:\s*0;/);
+  assert.match(waveRule, /width:\s*100%;/);
+  // 水位仍然由进度驱动
+  assert.match(waveRule, /bottom:\s*calc\(var\(--generation-loading-progress\)/);
+  // 只有纵向渐变，没有 radial 半圆
+  assert.match(waveRule, /background-image:\s*linear-gradient\(\s*\n?\s*180deg/);
+  assert.doesNotMatch(waveRule, /radial-gradient/);
+
+  // 两层伪元素都不再平铺，也就没有可横向位移的重复单元
+  const sharedRule = styles.match(/\.generation-loading-wave::before,\s*\n\.generation-loading-wave::after \{[\s\S]*?\n\}/)?.[0] || "";
+  assert.match(sharedRule, /background-repeat:\s*no-repeat;/);
+  /* 匹配声明而不是裸词：注释里出现「没有 repeat-x」不该让断言失败。 */
+  assert.doesNotMatch(sharedRule, /background-repeat:[^;]*repeat-x/);
+
+  const beforeRule = styles.match(/\n\.generation-loading-wave::before \{[\s\S]*?\n\}/)?.[0] || "";
+  const afterRule = styles.match(/\n\.generation-loading-wave::after \{[\s\S]*?\n\}/)?.[0] || "";
+  assert.doesNotMatch(beforeRule, /radial-gradient/, "液面柔光不能再用半圆");
+  assert.doesNotMatch(afterRule, /radial-gradient/, "水体柔光不能再用半圆");
+
+  // 液面呼吸只改厚度与亮度，不做横向位移或旋转
+  const flowKeyframes = styles.match(/@keyframes generation-loading-water-flow \{[\s\S]*?\n\}/)?.[0] || "";
+  assert.notEqual(flowKeyframes, "");
+  assert.doesNotMatch(flowKeyframes, /translateX|rotate/);
+  assert.match(flowKeyframes, /scaleY/);
+
+  // 水体内部柔光自下而上流过，纯纵向
+  const driftKeyframes = styles.match(/@keyframes generation-loading-wave-drift \{[\s\S]*?\n\}/)?.[0] || "";
+  assert.notEqual(driftKeyframes, "");
+  assert.doesNotMatch(driftKeyframes, /background-position-x|translateX/);
+  assert.match(driftKeyframes, /background-position:\s*0 /);
+});
+
+/* 满幅上色之后，沿用 --text / --muted 的文字会糊进水体里。 */
+test("the centered text and heartbeat icon stay legible over the fill", async () => {
+  const styles = await readFile(stylesPath, "utf8");
+
+  const percentRule = styles.match(/\n\.generation-loading-percent \{[\s\S]*?\n\}/)?.[0] || "";
+  assert.match(percentRule, /color:\s*color-mix\(in srgb, #ffffff/, "百分比要提到接近纯白");
+  assert.match(percentRule, /text-shadow:/, "需要暗描边把文字从水体里拉开");
+
+  const labelRule = styles.match(/\n\.generation-loading-label \{[\s\S]*?\n\}/)?.[0] || "";
+  assert.match(labelRule, /color:\s*rgba\(255, 255, 255/, "标签不能再用 --muted");
+  assert.match(labelRule, /text-shadow:/);
+
+  const iconRule = styles.match(/\n\.generation-loading-heartbeat \{[\s\S]*?\n\}/)?.[0] || "";
+  assert.match(iconRule, /color:\s*color-mix\(in srgb, #ffffff/, "图标描边要接近纯白");
+  assert.match(iconRule, /drop-shadow/, "需要外发光把图标从同色系水体里托出来");
+
+  // 两种主题都要各自处理，浅色下要反过来压深
+  for (const selector of [
+    "\\.generation-loading-percent",
+    "\\.generation-loading-label",
+    "\\.generation-loading-heartbeat",
+    "\\.generation-loading-log",
+  ]) {
+    assert.match(
+      styles,
+      new RegExp(`html\\[data-theme="light"\\] ${selector}\\s*\\{`),
+      `${selector} 必须有浅色主题覆盖`,
+    );
+  }
+
+  // 等待态也不能退回 --muted
+  const waitingLabel = styles.match(/\.generation-loading-shell\[data-generation-loading-mode="waiting"\] \.generation-loading-label \{[\s\S]*?\n\}/)?.[0] || "";
+  assert.doesNotMatch(waitingLabel, /var\(--muted\)/);
 });
 
 test("studio panels start without redundant title blocks and merge parameters under ratio controls", async () => {

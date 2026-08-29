@@ -46,6 +46,47 @@ TBD - created by archiving change unify-generation-loading-animation. Update Pur
 - **THEN** 百分比、状态标签与日志仍居中显示且字号排版不变
 - **AND** 文字层压在动画层之上并保持可读对比度
 
+#### Scenario: Text and icon stay legible over the coloured fill
+
+- **WHEN** 水位涨到文字与图标的正后方
+- **THEN** 百分比、状态标签、日志与心跳图标相对其正后方底色的对比度不低于 4.5:1
+- **AND** 深色与浅色主题各自处理，SHALL NOT 沿用会糊进水体的 `--muted` 级灰度
+
+### Requirement: Heartbeat is shown as a morphing icon
+
+上游心跳 SHALL 以一个变形图标呈现：每收到一次 heartbeat，图标 SHALL 变形切换一次，一次切换即代表一次心跳唤起。
+图标池 SHALL 为 20 个同描边风格的图标（含星、月、日、心），切换 SHALL 随机且 SHALL NOT 连续两次选中同一图标——
+连选同一个会让界面看不出变化，那一次心跳就无从感知。图标 SHALL 只由心跳事件驱动，SHALL NOT 自带轮换定时器。
+图标 SHALL 只出现在能显示状态文本的宿主中，等待态 SHALL NOT 显示。心跳文本 SHALL 保留，图标是它的视觉回执而非替代。
+
+#### Scenario: Each heartbeat switches the icon
+
+- **WHEN** 上游在同一任务上连续推来多次 heartbeat 状态
+- **THEN** 图标每次都变形到一个不同的图标
+- **AND** 相邻两次心跳不会显示同一个图标
+
+#### Scenario: Only real heartbeats advance the icon
+
+- **WHEN** 到达的状态是 `正在生成图片`、`排队中`、`上游重试` 等非心跳文本
+- **THEN** 图标保持当前形状不变
+
+#### Scenario: Icon is absent where the status text is
+
+- **WHEN** 加载组件渲染在不显示状态文本的小占位（胶片条缩略图等）或处于等待态
+- **THEN** 不显示心跳图标
+- **AND** 百分比与既有排版不受影响
+
+#### Scenario: Heartbeat text is kept
+
+- **WHEN** 心跳图标显示
+- **THEN** 「上游服务仍在处理，请保持页面打开」这类提示文本仍然显示
+- **AND** 图标不进入无障碍朗读，避免与状态文本重复播报
+
+#### Scenario: Missing morph engine degrades instead of disappearing
+
+- **WHEN** 变形引擎未能加载或构造失败
+- **THEN** 图标仍然按心跳切换形状，只是不做补间动画
+
 ### Requirement: Estimated progress timing and cap
 
 加载组件 SHALL 从 `0%` 开始，每次更新只增加 `1%`。`20%` 及以内的每次 `1%` 间隔 SHALL 为 `800ms`；超过 `20%` 后每跨越一个 `10%` 区间，单次 `1%` 的间隔 SHALL 再增加 `1500ms`。组件 SHALL 停在 `99%` 直到完整图片可用。
@@ -69,24 +110,29 @@ TBD - created by archiving change unify-generation-loading-animation. Update Pur
 
 ### Requirement: Liquid water appearance
 
-动画层内部 SHALL 表现为真实液体：液面 SHALL 由持续横向流动的波峰与叠加涟漪构成，液体内部 SHALL 有上升气泡，液位 SHALL 在两次百分比更新之间连续上升而不是逐格跳变。低动态偏好下 SHALL 停用这些动画并保留可读的液位与百分比。
+动画层内部 SHALL 表现为像水龙头放水一样持续上涨的水体：液位 SHALL 在两次百分比更新之间连续上升而不是逐格跳变，
+液面 SHALL 是一条柔和的液面高光，SHALL NOT 由平铺的半圆阵列构成，也 SHALL NOT 做横向漂移或整体左右摇摆——
+平铺图案会给视线一排可对齐的参照物，使连续上升被读成逐格跳变。液体内部 SHALL 有上升气泡与自下而上流过的柔光，
+使高百分比区间液位几乎不动时画面仍有自然的向上流动感。低动态偏好下 SHALL 停用这些动画并保留可读的液位与百分比。
 
-#### Scenario: Water surface stays in motion
+#### Scenario: Water surface stays smooth and level
 
 - **WHEN** 生图任务处于运行状态
-- **THEN** 动画层内出现一个位于液面的 `.generation-loading-wave` 层，其波峰与涟漪持续横向流动
-- **AND** 液体区域出现持续上升的气泡
+- **THEN** 动画层内出现一个位于液面的 `.generation-loading-wave` 层，表现为一条柔和的高光带
+- **AND** 液面不出现半圆阵列，也不做横向位移或旋转
+- **AND** 液体区域出现持续上升的气泡与自下而上的柔光
 
 #### Scenario: Water level rises continuously
 
 - **WHEN** 估算百分比从 `n%` 更新到 `n+1%`
-- **THEN** 液面在本次 tick 间隔内线性上升到新液位
-- **AND** 波峰层与液体同步上升
+- **THEN** 液面在本次 tick 间隔内线性上升到新液位，期间不出现静止后突然跳变
+- **AND** 单次过渡时长等于到下一次 tick 的时间，液位因此始终在移动
+- **AND** 液面高光与液体同步上升
 
 #### Scenario: Reduced motion is preferred
 
 - **WHEN** 用户开启 `prefers-reduced-motion: reduce`
-- **THEN** 呼吸、波峰流动、液面晃动和气泡动画停用
+- **THEN** 呼吸、光雾漂移、液面呼吸、水体柔光与气泡动画全部停用
 - **AND** 液位高度与百分比文本仍随进度更新
 
 ### Requirement: Queued tasks wait instead of showing progress

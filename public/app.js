@@ -6,13 +6,17 @@ import { getDefaultGenerationSize, getGenerationSizeOptions, getModelProtocolIma
 import { getOutputFormatOptions, normalizeOutputFormat, } from "/lib/output-format-options.mjs?v=20260504-vercel-static-lib-1";
 import { normalizeReferenceAnalysisLanguage, } from "/lib/reference-analysis-language.mjs?v=20260522-reference-language-1";
 import { shouldReusePreviewLoadingShell } from "/lib/preview-loading-shell.mjs";
-import { createGenerationLoadingShell, updateGenerationLoadingShell, stopGenerationLoadingShell, stopGenerationLoadingShells, getGenerationLoadingItemStage, GENERATION_LOADING_GENERATING_MODE, GENERATION_LOADING_WAITING_MODE } from "/lib/generation-loading.mjs";
+import { createGenerationLoadingShell, updateGenerationLoadingShell, stopGenerationLoadingShell, stopGenerationLoadingShells, getGenerationLoadingItemStage, beatGenerationLoadingHeartbeat, GENERATION_LOADING_GENERATING_MODE, GENERATION_LOADING_WAITING_MODE } from "/lib/generation-loading.mjs";
+import { registerHeartbeatMorphEngine } from "/lib/heartbeat-morph-icon.mjs";
+/* morphicons 的浏览器产物只存在于 public/lib/vendor/（public/ 拿不到 node_modules），
+   同步与版本校验由 scripts/sync-public-lib.mjs 负责。 */
+import { createMorph as createHeartbeatMorph } from "/lib/vendor/morphicons/dom.js";
 import { createCreationCardLoading as createCreationCardLoadingShell, getCreationCardDomKey, getCreationCardLoadingKey, syncCreationLoadingCard, syncCreationResultGrid as syncCreationResultGridShell } from "/lib/creation-card-loading.mjs";
 import { createCreationCardIdleRippleController } from "/lib/creation-card-idle-ripple.mjs?v=20260725-creation-card-idle-ripple-1";
 import { createFilmstripRevealTracker, renderFilmstripPreservingSelection, syncFilmstripSelectedMarker } from "/lib/filmstrip-selection.mjs?v=20260829-filmstrip-selection-1";
 import { isGenerationRequestRetryMessage, } from "/lib/generation-request-retry.mjs";
 import { cancelQueuedGenerationJob, getGenerationJobMode, getGenerationJobQueueKey, getQueuedGenerationJobCount, getRunningGenerationJobCount, isQueuedGenerationJob, selectNextQueuedGenerationJobsByMode } from "/lib/generation-queue.mjs?v=20260821-prompt-global-queue-1";
-import { buildCanceledGenerationActivityDetail, buildGenerationTaskActivityDetail, buildGenerationTaskStatusText, formatGenerationActivityModeLabel, getGenerationActivityDisplayText, sanitizeGenerationActivityDetail } from "/lib/generation-activity-feed.mjs?v=20260504-vercel-static-lib-1";
+import { buildCanceledGenerationActivityDetail, buildGenerationTaskActivityDetail, buildGenerationTaskStatusText, formatGenerationActivityModeLabel, getGenerationActivityDisplayText, hasHeartbeatPrefix, sanitizeGenerationActivityDetail } from "/lib/generation-activity-feed.mjs?v=20260829-heartbeat-morph-1";
 import { GENERATION_LOG_ALL_CHANNELS, GENERATION_LOG_CHANNELS, createGenerationLogStore, getGenerationLogAllEntries, getGenerationLogChannelEntries, getGenerationLogChannelLabel, normalizeGenerationLogChannel, normalizeGenerationLogRelayUrl, parseGenerationLogStore, serializeGenerationLogStore, upsertGenerationLogEntry, upsertGenerationLogGroupEntry } from "/lib/generation-log-store.mjs?v=20260828-generation-log-partition-1";
 import { readGenerationLogChannelTabValue, readGenerationLogGroupToggleId, renderGenerationLogChannelTabs, renderGenerationLogRows, toggleGenerationLogGroup } from "/lib/generation-log-panel.mjs?v=20260828-generation-log-partition-1";
 import { CREATION_STREAM_EVENTS, GENERATION_STREAM_EVENTS, clearFinalImageChunks, recordFinalImageChunk, recordPartialImageChunk } from "/lib/generation-stream-protocol.mjs";
@@ -427,6 +431,9 @@ let creationRecordDeleteRestoreFocus = null;
 let portraitRecordRefreshPromise = null;
 let promptCopyFeedbackTimer = 0;
 let previewLoadingShellNodes = null;
+/* 变形引擎注册一次即可，之后所有加载外壳共用；放在模块顶层而不是 bootstrap 里，
+   是因为外壳可能在 bootstrap 完成前就被首次渲染。 */
+registerHeartbeatMorphEngine(createHeartbeatMorph);
 let referenceAnalysisLoadingShellNodes = null;
 let imageDecompositionLoadingShellNodes = null;
 let quickBlendLoadingShellNodes = null;
@@ -16914,6 +16921,11 @@ async function runGeneration(job) {
           statusText,
         });
         handleActivityStatus(job.id, payload.stage, statusText);
+        /* 一次切换等于一次心跳唤起：只有真的收到上游 heartbeat 才推进图标。
+           这里按「事件到达」判断，因为 15 秒推来的文本每次完全一样，比文本变化可靠。 */
+        if (hasHeartbeatPrefix(statusText)) {
+          beatGenerationLoadingHeartbeat(previewLoadingShellNodes?.loading);
+        }
         if (job.mode === "image-decomposition") {
           setImageDecompositionFeedback(statusText || "图片拆解生成中...", "busy");
         }

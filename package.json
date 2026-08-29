@@ -29,12 +29,14 @@
   "dependencies": {
     "exceljs": "4.4.0",
     "jszip": "^3.10.1",
+    "morphicons": "1.7.1",
     "pptxgenjs": "^4.0.1"
   },
   "devDependencies": {
     "@fission-ai/openspec": "1.6.0",
     "electron": "^43.2.0",
     "electron-builder": "^26.15.3",
+    "lucide-static": "1.37.0",
     "parse5": "8.0.1"
   },
   "build": {

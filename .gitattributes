@@ -1,3 +1,7 @@
 * text=auto
 *.cmd text eol=crlf
 *.ps1 text eol=crlf
+
+# vendor 目录是第三方构建产物的逐字节副本，由 scripts/sync-public-lib.mjs 从 node_modules 拷来
+# 并逐字节校验。若参与行尾归一化，checkout 后会被改写成 CRLF 而与锁定版本不再一致。
+public/lib/vendor/** -text

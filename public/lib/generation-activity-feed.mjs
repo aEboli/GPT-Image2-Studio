@@ -21,7 +21,9 @@ function hasDetailPrefix(value, prefix) {
   return cleanActivityDetail(value).startsWith(`${prefix}：`);
 }
 
-function hasHeartbeatPrefix(value) {
+/* 导出给心跳图标用：上游心跳每 15 秒推来的文本完全相同，
+   浏览器只能靠「事件到达」而不是「文本变化」判断又跳了一次。 */
+export function hasHeartbeatPrefix(value) {
   return /^heartbeat(?:（[^）]+）)?：/.test(cleanActivityDetail(value));
 }
 

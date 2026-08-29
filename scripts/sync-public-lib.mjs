@@ -6,6 +6,16 @@ const scriptsDir = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(scriptsDir, "..");
 const sourceDir = join(rootDir, "lib");
 const publicLibDir = join(rootDir, "public", "lib");
+const nodeModulesDir = join(rootDir, "node_modules");
+
+/* public/ 是直接发给浏览器、并被打包进 Electron 的目录，拿不到 node_modules，
+   所以浏览器要用的第三方产物必须落一份到 public/lib/vendor/。
+   走同一个 --check 校验，vendor 副本就不会悄悄偏离已锁定的依赖版本。 */
+export const PUBLIC_VENDOR_SYNC_TARGETS = [
+  { from: "morphicons/dist/dom.js", to: "vendor/morphicons/dom.js" },
+  { from: "morphicons/dist/normalize-CYnN3Npw.js", to: "vendor/morphicons/normalize-CYnN3Npw.js" },
+  { from: "morphicons/dist/spring-CFHloqPP.js", to: "vendor/morphicons/spring-CFHloqPP.js" },
+];
 
 export const PUBLIC_LIB_SYNC_TARGETS = [
   "asset-workspace.mjs",
@@ -62,6 +72,8 @@ export const PUBLIC_LIB_SYNC_TARGETS = [
   "generation-request-retry.mjs",
   "generation-size-options.mjs",
   "generation-start-delay.mjs",
+  "heartbeat-morph-icon.mjs",
+  "heartbeat-morph-icon-paths.mjs",
   "generation-stream-protocol.mjs",
   "generation-task-reconciler.mjs",
   "http-response-error.mjs",
@@ -140,6 +152,33 @@ async function copySynced(relativePath) {
   await copyFile(join(sourceDir, relativePath), targetPath);
 }
 
+async function assertVendorSynced({ from, to }) {
+  const [source, target] = await Promise.all([
+    readFile(join(nodeModulesDir, from)),
+    readFile(join(publicLibDir, to)),
+  ]);
+  if (!source.equals(target)) {
+    throw new Error(`public/lib/${to} is out of sync with node_modules/${from}`);
+  }
+}
+
+async function copyVendorSynced({ from, to }) {
+  const targetPath = join(publicLibDir, to);
+  await mkdir(dirname(targetPath), { recursive: true });
+  await copyFile(join(nodeModulesDir, from), targetPath);
+}
+
+export async function syncPublicVendor({ check = false } = {}) {
+  for (const target of PUBLIC_VENDOR_SYNC_TARGETS) {
+    if (check) {
+      await assertVendorSynced(target);
+    } else {
+      await copyVendorSynced(target);
+    }
+  }
+  return PUBLIC_VENDOR_SYNC_TARGETS.map((target) => target.to);
+}
+
 export async function syncPublicLib({ check = false } = {}) {
   const files = (await Promise.all(PUBLIC_LIB_SYNC_TARGETS.map(collectFiles))).flat();
   for (const relativePath of files) {
@@ -149,6 +188,7 @@ export async function syncPublicLib({ check = false } = {}) {
       await copySynced(relativePath);
     }
   }
+  await syncPublicVendor({ check });
   return files;
 }
 
