@@ -509,7 +509,8 @@ test("filmstrip thumbnails stay square, fill the available rail, and keep labels
   assert.match(styles, /\.filmstrip-item\s*\{[\s\S]*justify-items:\s*center;/);
   assert.match(styles, /\.filmstrip-item span\s*\{[\s\S]*font-size:\s*var\(--type-subtitle-size\);[\s\S]*line-height:\s*14px;[\s\S]*white-space:\s*nowrap;/);
   assert.match(styles, /\.filmstrip-item img\s*\{[\s\S]*object-fit:\s*cover;/);
-  assert.match(app, /function formatFilmstripSizeLabel\(item\) \{[\s\S]*return formatCompactSizeLabel\(item\?\.size\);/);
+  // 缩略图标签显示成品图真实尺寸，所以走 resolveDisplayImageSize 而不是直接读 size。
+  assert.match(app, /function formatFilmstripSizeLabel\(item\) \{[\s\S]*return formatCompactSizeLabel\(resolveDisplayImageSize\(item\)\);/);
   assert.match(app, /label: formatFilmstripSizeLabel\(job\) \|\| job\.statusText \|\| formatClock\(job\.createdAt\)/);
   assert.match(app, /label: formatFilmstripSizeLabel\(item\) \|\| formatClock\(item\.createdAt\)/);
 });

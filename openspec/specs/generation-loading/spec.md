@@ -58,8 +58,14 @@ TBD - created by archiving change unify-generation-loading-animation. Update Pur
 图标池 SHALL 为 20 个同描边风格的图标（含星、月、日、心），切换 SHALL 随机且 SHALL NOT 连续两次选中同一图标——
 连选同一个会让界面看不出变化，那一次心跳就无从感知。图标 SHALL 只由心跳事件驱动，SHALL NOT 自带轮换定时器。
 图标 SHALL 只出现在能显示状态文本的宿主中，等待态 SHALL NOT 显示。
-图标 SHALL 取代心跳文本本身：心跳类状态文本 SHALL NOT 再打印到日志行，因为图标已经表达了同一件事；
+图标 SHALL 取代心跳文本本身，且该取代 SHALL 覆盖全部展示位：加载组件日志行、生成日志时间线的明细行、
+以及各板块的反馈条，SHALL NOT 再打印心跳文本，因为图标已经表达了同一件事。
+生成日志时间线 SHALL 保留该行的摘要与该行本身（任务仍需看得出在运行），只清除重复的心跳明细。
+反馈条 SHALL NOT 被心跳文本覆盖，以免每 15 秒把真正带信息的阶段文本顶掉。
 其余状态文本（`正在生成图片`、`正在保存到本地图片目录` 等）SHALL 照旧显示。
+
+批量板块（套图、写真等）的每一项 SHALL 各自拥有加载壳，收到心跳的那一项 SHALL 变形自己的图标，
+同批次的其它项 SHALL NOT 被带动——否则无法分辨是哪一项还活着。
 
 #### Scenario: Each heartbeat switches the icon
 
@@ -83,6 +89,23 @@ TBD - created by archiving change unify-generation-loading-animation. Update Pur
 - **WHEN** 到达的状态文本是 `heartbeat（15 秒）：上游服务仍在处理，请保持页面打开` 这类心跳文本
 - **THEN** 日志行不显示该文本
 - **AND** 心跳图标仍然显示并按本次心跳变形
+
+#### Scenario: The generation log timeline drops the repeated heartbeat detail
+
+- **WHEN** 生成日志时间线里某一项的明细是 `heartbeat（15 秒）：仍在等待最终图，请保持页面打开`
+- **THEN** 该行保留摘要 `图片生成中`，不显示心跳明细行
+- **AND** 非心跳明细（`上游重试：第 2 次`、`缺最终图补救：…` 等）照旧显示
+
+#### Scenario: The heartbeat never overwrites a feedback banner
+
+- **WHEN** 心跳状态到达套图、图片拆解、图片编辑或快速溶图板块
+- **THEN** 反馈条保留上一条真正带信息的阶段文本，不被心跳文本覆盖
+
+#### Scenario: In a batch, only the item that received the heartbeat morphs
+
+- **WHEN** 套图批量生成中，上游对其中一项推来心跳
+- **THEN** 只有该项的卡片图标变形
+- **AND** 同批次其它项的图标保持不变
 
 #### Scenario: Other status text still shows
 

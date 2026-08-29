@@ -48,3 +48,21 @@ The system SHALL expose one exported registry of browser-served shared-module sy
 - **WHEN** the public-library synchronization check runs
 - **THEN** it checks every module declared in the exported synchronization target registry
 - **AND** it reports drift when a declared browser copy does not match its source module
+
+### Requirement: Displayed resolution is the produced image's own pixel size
+
+界面上单值展示的「分辨率」SHALL 是成品图文件量出来的真实像素尺寸，而不是请求档位。
+该规则 SHALL 覆盖主预览元信息、胶片条标题、瀑布画廊卡片、最近输出列表，以及各模式的元信息条。
+请求档位与实际尺寸经常不同——请求 2048×2048 实际出 1254×1254 是常见情况，套图模式下档位还会被平台档案改写，
+所以拿请求值当分辨率显示是错的。历史条目没有实测尺寸时 SHALL 退回请求值，SHALL NOT 显示空白。
+
+参数复盘面板不受此约束：它 SHALL 继续同时列出「请求分辨率」与「实际生成分辨率」两项，因为那里的用途正是对照两者。
+
+#### Scenario: Requested and produced sizes differ
+- **WHEN** 一张图请求 2048×2048，落盘文件实测为 1254×1254
+- **THEN** 主预览、胶片条、画廊卡片与最近输出都显示 1254×1254
+- **AND** 参数复盘面板分别显示「请求分辨率：2048x2048」与「实际生成分辨率：1254x1254」
+
+#### Scenario: A legacy entry was never measured
+- **WHEN** 历史条目只有请求档位、没有实测尺寸
+- **THEN** 显示该请求档位，不显示空白

@@ -1,4 +1,5 @@
 import {
+  beatGenerationLoadingHeartbeat,
   createGenerationLoadingShell,
   updateGenerationLoadingShell,
   stopGenerationLoadingShell,
@@ -55,6 +56,22 @@ export function updateCreationCardLoading(loading, status = "generating", option
 export function stopCreationCardLoading(loading) {
   stopGenerationLoadingShell(getLoadingNodes(loading));
   return loading || null;
+}
+
+/* 套图卡片的心跳回执：批量生成里每一项都有自己的加载壳，
+   所以心跳要落到收到心跳的那一项上，而不是像主预览那样只有一个壳。
+   grid 传 null 时退化成空操作，调用点不必先判空。 */
+export function beatCreationCardHeartbeat(grid, itemId) {
+  const normalizedItemId = String(itemId || "").trim();
+  if (!grid?.querySelectorAll || !normalizedItemId) {
+    return "";
+  }
+
+  /* 按 dataset 扫描而不是拼选择器：itemId 进选择器需要转义，
+     而 CSS.escape 在 Node 测试环境里并不存在。套图一次最多十来张卡，扫描代价可忽略。 */
+  const card = [...grid.querySelectorAll(".creation-card[data-creation-card-key]")]
+    .find((entry) => String(entry.dataset?.creationCardKey || "") === normalizedItemId);
+  return beatGenerationLoadingHeartbeat(getLoadingNodes(card?.querySelector?.(".creation-card-loading")));
 }
 
 export function renderCreationCardLoading(host, status = "generating", documentRef = null, options = {}) {

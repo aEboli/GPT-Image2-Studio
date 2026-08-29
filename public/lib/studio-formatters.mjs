@@ -121,7 +121,15 @@ export function buildParameterText(item = {}, fallbackConfig = {}, options = {})
   return lines.join("\n");
 }
 
+/* 界面上的「分辨率」一律指成品图的真实像素尺寸，也就是从落盘文件里量出来的 actualSize。
+   size 是请求档位（套图模式下还会被平台档案改写），两者经常不同：请求 2048² 实际出 1254² 时
+   显示 2048² 是错的。老条目没有 actualSize，退回 size 以免显示空白。
+   参数复盘面板另当别论——那里要同时列出请求值与实际值，不走这里。 */
+export function resolveDisplayImageSize(item = {}) {
+  return String(item.actualSize || item.size || "").trim();
+}
+
 export function formatRecentOutputMeta(item = {}) {
-  const size = item.size || "未记录";
+  const size = resolveDisplayImageSize(item) || "未记录";
   return `${size} | ${formatImageModelLabel(item.imageModel)}`;
 }

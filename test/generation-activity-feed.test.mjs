@@ -129,6 +129,32 @@ test("generation activity display text splits event details from status summary"
   });
 });
 
+/* 心跳每 15 秒推来同一句话，日志行原地更新。摘要保留（任务仍看得出在跑），
+   明细清空，改由变形图标做回执，否则同一件事在同一行里反复写。 */
+test("heartbeat rows keep the summary but drop the repeated detail line", () => {
+  assert.deepEqual(getGenerationActivityDisplayText("heartbeat（15 秒）：仍在等待最终图，请保持页面打开"), {
+    summary: "图片生成中",
+    detail: "",
+  });
+  assert.deepEqual(getGenerationActivityDisplayText("heartbeat（59 秒）：上游服务仍在处理，请保持页面打开"), {
+    summary: "图片生成中",
+    detail: "",
+  });
+  assert.deepEqual(getGenerationActivityDisplayText("heartbeat：上游服务仍在处理"), {
+    summary: "图片生成中",
+    detail: "",
+  });
+  // 非心跳的阶段文本是用户唯一的进度来源，明细必须照旧显示
+  assert.deepEqual(getGenerationActivityDisplayText("上游重试：第 2 次"), {
+    summary: "图片生成中",
+    detail: "第 2 次",
+  });
+  assert.deepEqual(getGenerationActivityDisplayText("缺最终图补救：未收到最终图，正在兜底获取结果"), {
+    summary: "图片生成中",
+    detail: "未收到最终图，正在兜底获取结果",
+  });
+});
+
 test("generation activity mode label distinguishes route and direct calls", () => {
   assert.equal(formatGenerationActivityModeLabel("a"), "路由模式");
   assert.equal(formatGenerationActivityModeLabel("b"), "直接调用模式");

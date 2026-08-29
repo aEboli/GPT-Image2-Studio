@@ -51,7 +51,8 @@ test("image decomposition mode is exposed as an independent Create view", async 
   assert.match(app, /function createImageDecompositionJob\(\)/);
   assert.match(app, /featureCardsEnabled:\s*refs\.imageDecompositionFeatureCardsInput\.value === "on"/);
   assert.match(app, /setImageDecompositionFeedback\("图片拆解任务已提交，正在生成\.\.\.", "busy"\);/);
-  assert.match(app, /if \(job\.mode === "image-decomposition"\) \{[\s\S]*setImageDecompositionFeedback\(statusText \|\| "图片拆解生成中\.\.\.", "busy"\);/);
+  // 心跳文本已由变形图标取代，所以反馈条收到的是滤过心跳的 feedbackText 而不是原始 statusText。
+  assert.match(app, /if \(job\.mode === "image-decomposition"\) \{[\s\S]*setImageDecompositionFeedback\(feedbackText \|\| "图片拆解生成中\.\.\.", "busy"\);/);
   assert.match(app, /if \(job\.mode === "image-decomposition"\) \{[\s\S]*removeImageDecompositionGenerationKey\(makeJobPreviewKey\(job\.id\)\);[\s\S]*setImageDecompositionFeedback\(message, "error"\);/);
   assert.match(app, /refs\.imageDecompositionGenerationLightboxButton\.addEventListener\("click", openImageDecompositionGeneratedPreview\);/);
   assert.match(app, /formData\.set\("mode", "image-decomposition"\);/);

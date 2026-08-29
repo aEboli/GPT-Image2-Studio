@@ -1,4 +1,4 @@
-import { buildParameterText, formatImageModelLabel, formatRecentOutputMeta } from "/lib/studio-formatters.mjs";
+import { buildParameterText, formatImageModelLabel, formatRecentOutputMeta, resolveDisplayImageSize } from "/lib/studio-formatters.mjs";
 import { formatLoadingThumbnailStatusLabel, getPreviewPlaceholderState, getStablePreviewLoadingItems, isWaitingPreviewItem } from "/lib/preview-placeholder-state.mjs?v=20260826-waiting-loading-1";
 import { buildGalleryReferenceFilterOptions, buildGallerySections, buildGallerySizeFilterOptions, buildGalleryTimeFilterOptions, distributeGalleryItemsIntoColumns, filterGalleryItems, getGalleryHistorySectionLayouts, getGalleryLayoutModeForWidth, getPromptGenerationGalleryItems, getRecentGalleryItems, normalizeGalleryFilters, paginateGallerySections, sortGalleryItemsByCreatedAtDesc } from "/lib/gallery-organizer.mjs?v=20260806-gallery-five-date-page-1";
 import { buildGalleryMetadataCacheEntry, collectGalleryMetadataRepairPatch, mergeGalleryItemWithCachedMetadata, pruneGalleryMetadataCache } from "/lib/gallery-metadata-recovery.mjs";
@@ -11,7 +11,7 @@ import { registerHeartbeatMorphEngine } from "/lib/heartbeat-morph-icon.mjs";
 /* morphicons 的浏览器产物只存在于 public/lib/vendor/（public/ 拿不到 node_modules），
    同步与版本校验由 scripts/sync-public-lib.mjs 负责。 */
 import { createMorph as createHeartbeatMorph } from "/lib/vendor/morphicons/dom.js";
-import { createCreationCardLoading as createCreationCardLoadingShell, getCreationCardDomKey, getCreationCardLoadingKey, syncCreationLoadingCard, syncCreationResultGrid as syncCreationResultGridShell } from "/lib/creation-card-loading.mjs";
+import { beatCreationCardHeartbeat, createCreationCardLoading as createCreationCardLoadingShell, getCreationCardDomKey, getCreationCardLoadingKey, syncCreationLoadingCard, syncCreationResultGrid as syncCreationResultGridShell } from "/lib/creation-card-loading.mjs";
 import { createCreationCardIdleRippleController } from "/lib/creation-card-idle-ripple.mjs?v=20260725-creation-card-idle-ripple-1";
 import { createFilmstripRevealTracker, renderFilmstripPreservingSelection, syncFilmstripSelectedMarker } from "/lib/filmstrip-selection.mjs?v=20260829-filmstrip-selection-1";
 import { isGenerationRequestRetryMessage, } from "/lib/generation-request-retry.mjs";
@@ -1574,7 +1574,7 @@ function resolveGenerationRelayUrl(source = {}) {
 }
 function buildGenerationActivityRelayUrl(item = {}) { return normalizeGenerationLogRelayUrl(item?.baseUrl || "") || resolveGenerationRelayUrl(item); }
 function formatFilmstripSizeLabel(item) {
-  return formatCompactSizeLabel(item?.size);
+  return formatCompactSizeLabel(resolveDisplayImageSize(item));
 }
 function normalizeGenerationTaskStatus(status) {
   return status === "completed" || status === "error" ? status : "running";
@@ -3441,7 +3441,7 @@ function renderImageDecompositionGenerationPreview() {
     refs.imageDecompositionGenerationLightboxButton.disabled = true;
   }
   refs.imageDecompositionGenerationMeta.textContent = item
-    ? [formatTime(item.createdAt), formatCanvasLabel(item.size), item.statusText || ""].filter(Boolean).join(" · ")
+    ? [formatTime(item.createdAt), formatCanvasLabel(resolveDisplayImageSize(item)), item.statusText || ""].filter(Boolean).join(" · ")
     : "等待生成";
   renderImageDecompositionGenerationStrip();
 }
@@ -4414,7 +4414,7 @@ function renderReferenceAnalysisGenerationPreview() {
     refs.referenceAnalysisGenerationDownloadButton.setAttribute("aria-disabled", "true");
   }
   refs.referenceAnalysisGenerationMeta.textContent = item
-    ? [formatTime(item.createdAt), formatCanvasLabel(item.size), item.statusText || ""].filter(Boolean).join(" · ")
+    ? [formatTime(item.createdAt), formatCanvasLabel(resolveDisplayImageSize(item)), item.statusText || ""].filter(Boolean).join(" · ")
     : "等待生成";
   renderReferenceAnalysisGenerationStrip();
 }
@@ -5866,7 +5866,7 @@ function renderPreview() {
   refs.previewModel.textContent = formatImageModelLabel(item.imageModel);
   refs.previewTime.textContent = formatTime(item.createdAt);
   refs.previewId.textContent = `ID: ${getDisplayId(item)}`;
-  refs.previewSize.textContent = formatCanvasLabel(item.size);
+  refs.previewSize.textContent = formatCanvasLabel(resolveDisplayImageSize(item));
 
   if (placeholderState.mode === "loading") {
     refs.previewPlaceholder.classList.remove("hidden");
@@ -6411,7 +6411,7 @@ function createGalleryTile(item) {
   const name = document.createElement("strong");
   name.textContent = filename;
   const meta = document.createElement("span");
-  meta.textContent = [item?.size || item?.dimensions, formatClock(item?.createdAt)].filter(Boolean).join(" · ");
+  meta.textContent = [resolveDisplayImageSize(item) || item?.dimensions, formatClock(item?.createdAt)].filter(Boolean).join(" · ");
   overlay.append(name, meta);
   button.appendChild(overlay);
 
@@ -13308,7 +13308,9 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
       status: "generating",
       updatedAt: nowIso(),
     }, context);
-    if (payload.message) {
+    /* 心跳不进反馈条：上游每 15 秒推来的文本完全相同，写进去会把
+       「正在生成第 N 张」这类真正有信息的状态顶掉，只剩一句反复刷新的等待提示。 */
+    if (payload.message && !hasHeartbeatPrefix(payload.message)) {
       setCreationFeedback(payload.message, "busy");
     }
     recordCreationLogEvent({
@@ -13319,6 +13321,11 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
       context,
     });
     renderCreationView();
+    /* 心跳的回执是图标变形，不是文字。必须放在 renderCreationView 之后：
+       卡片可能刚被这次渲染建出来，先变形会落在一个还不存在的壳上。 */
+    if (hasHeartbeatPrefix(payload.message)) {
+      beatCreationCardHeartbeat(refs.creationResultGrid, payload.itemId);
+    }
     return;
   }
 
@@ -16926,14 +16933,17 @@ async function runGeneration(job) {
         if (hasHeartbeatPrefix(statusText)) {
           beatGenerationLoadingHeartbeat(previewLoadingShellNodes?.loading);
         }
+        /* 心跳同样不进这三个反馈条：变形图标已经是回执，
+           把每 15 秒重复的同一句话写进反馈条只会顶掉真正的阶段文本。 */
+        const feedbackText = hasHeartbeatPrefix(statusText) ? "" : statusText;
         if (job.mode === "image-decomposition") {
-          setImageDecompositionFeedback(statusText || "图片拆解生成中...", "busy");
+          setImageDecompositionFeedback(feedbackText || "图片拆解生成中...", "busy");
         }
         if (job.mode === "image-edit") {
-          setImageEditFeedback(statusText || "图片编辑生成中...", "busy");
+          setImageEditFeedback(feedbackText || "图片编辑生成中...", "busy");
         }
         if (job.mode === "quick-blend") {
-          setQuickBlendFeedback(statusText || "快速溶图生成中...", "busy");
+          setQuickBlendFeedback(feedbackText || "快速溶图生成中...", "busy");
         }
         renderAll();
         return;

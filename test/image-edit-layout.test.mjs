@@ -55,7 +55,8 @@ test("image edit mode is exposed as an independent Create view", async () => {
   assert.match(app, /function appendImageEditReferencesToFormData\(formData, job\)/);
   assert.match(app, /formData\.set\("mode", "image-edit"\);/);
   assert.match(app, /if \(job\.mode === "image-edit"\) \{[\s\S]*appendImageEditReferencesToFormData\(formData, job\);/);
-  assert.match(app, /if \(job\.mode === "image-edit"\) \{[\s\S]*setImageEditFeedback\(statusText \|\| "图片编辑生成中\.\.\.", "busy"\);/);
+  // 心跳文本已由变形图标取代，所以反馈条收到的是滤过心跳的 feedbackText 而不是原始 statusText。
+  assert.match(app, /if \(job\.mode === "image-edit"\) \{[\s\S]*setImageEditFeedback\(feedbackText \|\| "图片编辑生成中\.\.\.", "busy"\);/);
   assert.match(app, /if \(job\.mode === "image-edit"\) \{[\s\S]*removeImageEditGenerationKey\(makeJobPreviewKey\(job\.id\)\);[\s\S]*setImageEditFeedback\(message, "error"\);/);
   assert.match(app, /preserveImageEditGenerationItemForDelete\(item\)/);
 
