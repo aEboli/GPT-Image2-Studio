@@ -5,19 +5,46 @@ TBD - created by archiving change unify-generation-loading-animation. Update Pur
 ## Requirements
 ### Requirement: Unified generation loading indicator
 
-所有图片生成入口在没有完整结果时 SHALL 使用同一加载组件，组件 SHALL 只显示一个圆形水滴、百分比和可选的生成状态标签。
+所有图片生成入口在没有完整结果时 SHALL 使用同一加载组件，组件 SHALL 只显示一个铺满图片占位框的动画层、百分比和可选的生成状态标签。
 
 #### Scenario: Prompt generation is running
 
 - **WHEN** 提示词生图或风格迁移任务处于运行状态且没有完整图片
 - **THEN** 预览区域显示一个 `.generation-loading-drop` 和一个百分比文本
-- **AND** 不显示旧的 orb、环形 spinner、扫描线或步骤条；液面只作为圆形水滴内部的单一底部填充层，并不恢复旧的多节点 fluid 动画
+- **AND** 不显示旧的 orb、环形 spinner、扫描线或步骤条；液面只作为动画层内部的单一底部填充层，并不恢复旧的多节点 fluid 动画
 
 #### Scenario: Specialized generation is running
 
 - **WHEN** 套图、写真、文章插图、PPT 页面、图片拆解、融图分析、图片编辑或快速溶图任务处于运行状态且没有完整图片
 - **THEN** 对应主预览、卡片或缩略图使用同一共享加载组件
 - **AND** 不创建该入口专属的生图动画 DOM
+
+### Requirement: Loading animation fills its host image slot
+
+加载动画 SHALL 铺满承载它的图片占位框，尺寸 SHALL 由宿主决定而不是由动画自身写死：大生图板块 SHALL 得到大动画，逐项占位 SHALL 各自得到刚好填满自己占位的小动画。水纹与气泡尺度 SHALL 随宿主尺寸成比例换算。百分比、状态标签与实时日志 SHALL 保持居中且 SHALL NOT 随宿主尺寸改变自身排版。
+
+#### Scenario: Large preview panel gets a large animation
+
+- **WHEN** 提示词模式主预览处于生成中
+- **THEN** 动画层铺满整个图片画布，四边与占位框对齐且无留边
+- **AND** 画布在生成期间不因内边距把动画缩进一圈
+
+#### Scenario: Per-item placeholders each fill their own slot
+
+- **WHEN** 套图模式多张卡片同时生成
+- **THEN** 每张卡的动画分别铺满自己的 `.creation-card-media` 占位框，彼此按卡片间距隔开
+- **AND** 相邻卡片的动画不连成一片
+
+#### Scenario: Water detail scales with the host
+
+- **WHEN** 同一动画分别渲染在大预览板块与胶片条缩略图中
+- **THEN** 波高、涟漪与气泡尺度按宿主尺寸成比例缩放，而不是两处使用同一绝对厚度
+
+#### Scenario: Centered text stays unchanged
+
+- **WHEN** 动画从小占位切换到大板块
+- **THEN** 百分比、状态标签与日志仍居中显示且字号排版不变
+- **AND** 文字层压在动画层之上并保持可读对比度
 
 ### Requirement: Estimated progress timing and cap
 
@@ -42,12 +69,12 @@ TBD - created by archiving change unify-generation-loading-animation. Update Pur
 
 ### Requirement: Liquid water appearance
 
-水滴内部 SHALL 表现为真实液体：液面 SHALL 由持续横向流动的波峰与叠加涟漪构成，液体内部 SHALL 有上升气泡，液位 SHALL 在两次百分比更新之间连续上升而不是逐格跳变。低动态偏好下 SHALL 停用这些动画并保留可读的液位与百分比。
+动画层内部 SHALL 表现为真实液体：液面 SHALL 由持续横向流动的波峰与叠加涟漪构成，液体内部 SHALL 有上升气泡，液位 SHALL 在两次百分比更新之间连续上升而不是逐格跳变。低动态偏好下 SHALL 停用这些动画并保留可读的液位与百分比。
 
 #### Scenario: Water surface stays in motion
 
 - **WHEN** 生图任务处于运行状态
-- **THEN** 水滴内出现一个位于液面的 `.generation-loading-wave` 层，其波峰与涟漪持续横向流动
+- **THEN** 动画层内出现一个位于液面的 `.generation-loading-wave` 层，其波峰与涟漪持续横向流动
 - **AND** 液体区域出现持续上升的气泡
 
 #### Scenario: Water level rises continuously
@@ -133,7 +160,7 @@ TBD - created by archiving change unify-generation-loading-animation. Update Pur
 
 ### Requirement: Stage-based water color
 
-加载组件 SHALL 按当前阶段区分水体颜色，阶段 SHALL 由模式和百分比推导：排队等待为 `waiting`，`0%–20%` 为 `warmup`，`21%–50%` 为 `drafting`，`51%–80%` 为 `rendering`，`81%–99%` 为 `finishing`。组件 SHALL 在 DOM 上暴露 `data-generation-loading-stage`，水体的液体填充、波峰、涟漪、水滴边框与外发光 SHALL 由同一个阶段颜色变量取色。颜色 SHALL 只表达阶段，SHALL NOT 改变百分比时序、`99%` 上限或等待态语义。
+加载组件 SHALL 按当前阶段区分水体颜色，阶段 SHALL 由模式和百分比推导：排队等待为 `waiting`，`0%–20%` 为 `warmup`，`21%–50%` 为 `drafting`，`51%–80%` 为 `rendering`，`81%–99%` 为 `finishing`。组件 SHALL 在 DOM 上暴露 `data-generation-loading-stage`，水体的液体填充、波峰、涟漪与环境光雾 SHALL 由同一个阶段颜色变量取色。颜色 SHALL 只表达阶段，SHALL NOT 改变百分比时序、`99%` 上限或等待态语义。
 
 #### Scenario: Stage advances with the percentage bands
 
@@ -167,7 +194,7 @@ TBD - created by archiving change unify-generation-loading-animation. Update Pur
 
 ### Requirement: Stage hue and progress depth
 
-加载组件 SHALL 用两个维度合成水体颜色：色相 SHALL 由真实请求阶段决定，深浅 SHALL 由当前百分比决定。色相族 SHALL 取自既有 `statusStage`，SHALL NOT 引入不对应真实阶段的自造阶段名。组件 SHALL 暴露 `data-generation-loading-stage` 与 `data-generation-loading-family`，水体的液体填充、波峰、涟漪、水滴边框与外发光 SHALL 由同一个合成颜色取色。颜色 SHALL NOT 改变百分比时序、`99%` 上限或等待态语义。
+加载组件 SHALL 用两个维度合成水体颜色：色相 SHALL 由真实请求阶段决定，深浅 SHALL 由当前百分比决定。色相族 SHALL 取自既有 `statusStage`，SHALL NOT 引入不对应真实阶段的自造阶段名。组件 SHALL 暴露 `data-generation-loading-stage` 与 `data-generation-loading-family`，水体的液体填充、波峰、涟漪与环境光雾 SHALL 由同一个合成颜色取色。颜色 SHALL NOT 改变百分比时序、`99%` 上限或等待态语义。
 
 #### Scenario: Hue follows the real request stage
 

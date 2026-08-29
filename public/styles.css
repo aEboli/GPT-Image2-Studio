@@ -8356,6 +8356,14 @@ html[data-theme="light"] .generation-loading-shell[data-generation-loading-famil
   pointer-events: none;
 }
 
+/* 液体层与水面都是 span，宿主给字幕写的 `.filmstrip-item span { margin-top: 4px }` 这类规则
+   比单类选择器更specific，会命中它们；绝对定位下这条外边距会把满幅层真的顶下来留出一条空边。
+   带上 shell 前缀提高优先级，满幅几何才不依赖各宿主是否恰好没写 span 规则。 */
+.generation-loading-shell .generation-loading-drop,
+.generation-loading-shell .generation-loading-wave {
+  margin: 0;
+}
+
 .generation-loading-wave {
   position: absolute;
   z-index: 3;
@@ -8413,7 +8421,9 @@ html[data-theme="light"] .generation-loading-shell[data-generation-loading-famil
   content: "";
   position: absolute;
   z-index: -1;
-  inset: -22%;
+  /* 光团本身是 closest-side 的径向渐变、边缘自然淡出，不需要靠负 inset 把硬边藏到框外，
+     铺满即可——负 inset 会让 shell 产生可滚动溢出。 */
+  inset: 0;
   opacity: var(--generation-loading-aurora-opacity, 0.5);
   background:
     radial-gradient(

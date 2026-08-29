@@ -28,7 +28,7 @@ const generationClientPath = new URL("../lib/generation-client.mjs", import.meta
 const generationLogPanelPath = new URL("../lib/generation-log-panel.mjs", import.meta.url);
 const generationLogStorePath = new URL("../lib/generation-log-store.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20260829-filmstrip-selection-1";
+const stylesAssetVersion = "20260829-generation-loading-fill-1";
 const appAssetVersion = "20260829-generation-schedule-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
 const creationQueueModuleAssetVersion = "20260829-generation-schedule-1";
@@ -2042,6 +2042,73 @@ test("generation loading shell renders one shared percentage drop", async () => 
   assert.match(styles, /@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*\.generation-loading-drop[\s\S]*animation:\s*none;/);
   assert.doesNotMatch(app, /createPreviewMotionNode|preview-loading-orb-field|preview-loading-fluid/);
   assert.doesNotMatch(styles, /preview-loading-orb-field|preview-loading-fluid|preview-loading-ring-line|preview-loading-fill\s*\{/);
+});
+
+// 生成动画必须铺满自己所在的图片占位框，而不是画一个固定尺寸的居中圆：
+// 提示词模式的大板块得到大动画，套图模式每张卡的小占位得到刚好填满自己的小动画。
+// 这些断言锁的是「尺寸由宿主决定」这件事，任何把固定 px 尺寸写回动画层的改动都会在这里失败。
+test("generation loading animation fills its host image slot at any size", async () => {
+  const styles = await readFile(stylesPath, "utf8");
+
+  /* 换行锚定：不加的话 `.reference-analysis-generation-placeholder .generation-loading-shell` 的尾部也会命中。 */
+  const shellRule = styles.match(/\n\.generation-loading-shell\s*\{[\s\S]*?\n\}/)?.[0] || "";
+  assert.match(shellRule, /position:\s*relative;/);
+  assert.match(shellRule, /container-type:\s*inline-size;/);
+  assert.match(shellRule, /overflow:\s*hidden;/);
+  assert.match(shellRule, /width:\s*100%;/);
+  assert.match(shellRule, /height:\s*100%;/);
+
+  // 液体层铺满宿主：绝对定位 + inset:0，不再有固定宽度与圆形裁切。
+  const dropRule = styles.match(/\n\.generation-loading-drop\s*\{[\s\S]*?\n\}/)?.[0] || "";
+  assert.match(dropRule, /position:\s*absolute;/);
+  assert.match(dropRule, /inset:\s*0;/);
+  assert.doesNotMatch(dropRule, /aspect-ratio/);
+  assert.doesNotMatch(dropRule, /border-radius:\s*50%/);
+  assert.doesNotMatch(dropRule, /width:\s*clamp\(/);
+
+  // 波高与气泡按容器尺寸换算，所以大板块与小卡片的水纹是成比例的而不是同一个绝对厚度。
+  assert.match(dropRule, /--generation-loading-wave-height:\s*clamp\([^;]*cqi/);
+  assert.match(dropRule, /--generation-loading-bubble-tile:\s*clamp\([^;]*cqi/);
+
+  // 满幅层是 span，会被宿主给字幕写的 span 规则命中；外边距不归零就会顶出一条空边。
+  assert.match(
+    styles,
+    /\.generation-loading-shell \.generation-loading-drop,\s*\n\.generation-loading-shell \.generation-loading-wave\s*\{[\s\S]*?margin:\s*0;/,
+  );
+
+  // 环境光雾与压暗层铺满，中间文字压在它们之上，文字自身不参与尺寸变化。
+  assert.match(styles, /\.generation-loading-shell::before\s*\{[\s\S]*?inset:\s*0;/);
+  assert.match(styles, /\.generation-loading-shell::after\s*\{[\s\S]*?inset:\s*0;/);
+  assert.match(
+    styles,
+    /\.generation-loading-percent,\s*\n\.generation-loading-label,\s*\n\.generation-loading-log\s*\{[\s\S]*?z-index:\s*2;/,
+  );
+  assert.match(styles, /@keyframes generation-loading-aurora-drift/);
+  /* 满幅层只能改透明度：缩放会让边缘露出占位底色，动画就不再是铺满的。
+     先把关键帧块整段切出来再断言——直接对整份样式表用 doesNotMatch 会一路匹配到文件后面的 transform。 */
+  const breatheBlock = styles.match(/@keyframes generation-loading-breathe\s*\{[\s\S]*?\n\}/)?.[0] || "";
+  assert.notEqual(breatheBlock, "", "呼吸关键帧应保留");
+  assert.doesNotMatch(breatheBlock, /transform:/);
+
+  // 各宿主只调水纹密度，不再规定动画尺寸。
+  ["\\.creation-card-loading", "\\.filmstrip", "\\.article-card-image"].forEach((host) => {
+    const rule = styles.match(new RegExp(`${host} \\.generation-loading-drop[\\s\\S]*?\\n\\}`))?.[0] || "";
+    assert.notEqual(rule, "", `${host} 的水纹规则应保留`);
+    assert.doesNotMatch(rule, /width:/);
+  });
+
+  // 生成中的占位撑满画布，画布内边距同时归零，动画才真的覆盖整个图片板块。
+  const loadingPlaceholderRule = styles.match(/\.preview-placeholder-loading\s*\{[\s\S]*?\n\}/)?.[0] || "";
+  assert.match(loadingPlaceholderRule, /width:\s*100%;/);
+  assert.match(loadingPlaceholderRule, /height:\s*100%;/);
+  assert.match(loadingPlaceholderRule, /max-width:\s*none;/);
+  assert.match(styles, /\.preview-canvas:has\(>\s*\.preview-placeholder-loading\)\s*\{[\s\S]*?padding:\s*0;/);
+
+  // 减少动态效果时，新增的光雾层也必须停下来。
+  assert.match(
+    styles,
+    /@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?\.generation-loading-shell::before,[\s\S]*?animation:\s*none;/,
+  );
 });
 
 test("studio panels start without redundant title blocks and merge parameters under ratio controls", async () => {
