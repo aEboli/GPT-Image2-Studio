@@ -177,6 +177,6 @@ test("browser shell wires the controller and exposes a layout-neutral reduced-mo
   assert.match(styles, /@keyframes\s+creation-card-idle-ripple\s*\{[\s\S]*inset:\s*-2px;[\s\S]*inset:\s*-12px;/);
   assert.match(styles, /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*\.creation-card\.is-idle-rippling::after\s*\{[\s\S]*content:\s*none;/);
   assert.doesNotMatch(styles.match(/\.creation-card\.is-idle-rippling::after\s*\{[\s\S]*?\}/)?.[0] || "", /\b(?:width|height|margin|padding):/);
-  assert.match(index, /styles\.css\?v=20260829-smooth-water-rise-1/);
-  assert.match(index, /app\.js\?v=20260829-smooth-water-rise-1/);
+  assert.match(index, /styles\.css\?v=20260829-heartbeat-text-off-1/);
+  assert.match(index, /app\.js\?v=20260829-heartbeat-text-off-1/);
 });

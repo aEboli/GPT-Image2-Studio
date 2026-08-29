@@ -19,6 +19,7 @@ import {
   getGenerationLoadingHeartbeatBeats,
   getGenerationLoadingHeartbeatIcon,
   stopGenerationLoadingShell,
+  updateGenerationLoadingShell,
 } from "../lib/generation-loading.mjs";
 import { PUBLIC_LIB_SYNC_TARGETS, PUBLIC_VENDOR_SYNC_TARGETS } from "../scripts/sync-public-lib.mjs";
 
@@ -179,6 +180,34 @@ test("the loading shell shows the heartbeat icon only where the log line fits", 
   stopGenerationLoadingShell(withLog);
   stopGenerationLoadingShell(withoutLog);
   stopGenerationLoadingShell(waiting);
+});
+
+/* 图标就是「上游还活着」的回执，再把心跳原文打出来是同一件事说两遍。
+   但只能滤掉心跳这一类，其余状态文本仍然是用户唯一的进度信息来源。 */
+test("heartbeat text is replaced by the icon while other status text still shows", () => {
+  const nodes = createGenerationLoadingShell(createTestDocument(), {
+    key: "job-log",
+    active: true,
+    stage: "generating",
+    showLog: true,
+    logText: "heartbeat（15 秒）：上游服务仍在处理，请保持页面打开",
+  });
+
+  assert.equal(nodes.log.textContent, "", "心跳文本不应打印到日志行");
+  assert.equal(nodes.log.hidden, true);
+  assert.equal(nodes.shell.dataset.generationLoadingLog, "off");
+  // 判定要用 showLog 而不是文本是否为空，否则滤掉心跳文本后图标会一起消失
+  assert.equal(nodes.heartbeat.svg.hidden, false, "滤掉文本后图标仍要显示");
+  assert.equal(nodes.shell.dataset.generationLoadingHeartbeat, "on");
+
+  updateGenerationLoadingShell(nodes, { key: "job-log", active: true, stage: "saving", logText: "正在保存到本地图片目录" });
+  assert.equal(nodes.log.textContent, "正在保存到本地图片目录", "非心跳状态必须照旧显示");
+  assert.equal(nodes.log.hidden, false);
+
+  updateGenerationLoadingShell(nodes, { key: "job-log", active: true, stage: "generating", logText: "heartbeat：上游服务仍在处理" });
+  assert.equal(nodes.log.hidden, true, "不带秒数的心跳文本同样要滤掉");
+
+  stopGenerationLoadingShell(nodes);
 });
 
 test("the icon sits in the text stack, never inside the full-bleed fill layer", () => {

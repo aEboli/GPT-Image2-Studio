@@ -57,7 +57,9 @@ TBD - created by archiving change unify-generation-loading-animation. Update Pur
 上游心跳 SHALL 以一个变形图标呈现：每收到一次 heartbeat，图标 SHALL 变形切换一次，一次切换即代表一次心跳唤起。
 图标池 SHALL 为 20 个同描边风格的图标（含星、月、日、心），切换 SHALL 随机且 SHALL NOT 连续两次选中同一图标——
 连选同一个会让界面看不出变化，那一次心跳就无从感知。图标 SHALL 只由心跳事件驱动，SHALL NOT 自带轮换定时器。
-图标 SHALL 只出现在能显示状态文本的宿主中，等待态 SHALL NOT 显示。心跳文本 SHALL 保留，图标是它的视觉回执而非替代。
+图标 SHALL 只出现在能显示状态文本的宿主中，等待态 SHALL NOT 显示。
+图标 SHALL 取代心跳文本本身：心跳类状态文本 SHALL NOT 再打印到日志行，因为图标已经表达了同一件事；
+其余状态文本（`正在生成图片`、`正在保存到本地图片目录` 等）SHALL 照旧显示。
 
 #### Scenario: Each heartbeat switches the icon
 
@@ -76,11 +78,17 @@ TBD - created by archiving change unify-generation-loading-animation. Update Pur
 - **THEN** 不显示心跳图标
 - **AND** 百分比与既有排版不受影响
 
-#### Scenario: Heartbeat text is kept
+#### Scenario: Heartbeat text is replaced by the icon
 
-- **WHEN** 心跳图标显示
-- **THEN** 「上游服务仍在处理，请保持页面打开」这类提示文本仍然显示
-- **AND** 图标不进入无障碍朗读，避免与状态文本重复播报
+- **WHEN** 到达的状态文本是 `heartbeat（15 秒）：上游服务仍在处理，请保持页面打开` 这类心跳文本
+- **THEN** 日志行不显示该文本
+- **AND** 心跳图标仍然显示并按本次心跳变形
+
+#### Scenario: Other status text still shows
+
+- **WHEN** 到达的状态文本是 `正在保存到本地图片目录` 这类非心跳文本
+- **THEN** 日志行照旧显示该文本
+- **AND** 图标保持当前形状不变
 
 #### Scenario: Missing morph engine degrades instead of disappearing
 
