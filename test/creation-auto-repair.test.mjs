@@ -54,7 +54,9 @@ test("creation auto repair selects failed and pathless items only once after ful
 });
 
 test("creation auto repair short-circuits on an account-level upstream error", () => {
-  const quotaError = "生成请求失败：HTTP 402，错误码 insufficient_quota，Model capacity is temporarily unavailable.";
+  // A genuine balance failure, not a relay's "no capacity right now" 402: the
+  // latter is vetoed by the classifier and keeps its repair pass.
+  const quotaError = "生成请求失败：HTTP 402，错误码 insufficient_quota，You exceeded your current quota, please check your plan and billing details.";
   const set = {
     items: [
       { itemId: "done", status: "completed", filename: "done.png", relativePath: "creation/done.png" },

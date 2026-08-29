@@ -314,8 +314,9 @@ test("every server fan-out stops on an account-level upstream error", async () =
 
   // The guard has to run before the slot claim and before any upstream call, or
   // an aborted item would still occupy a session slot.
+  // The repo is CRLF, so a bare \n never matches here.
   const guardedWorkers = server.match(
-    /try \{\n\s*throwIfFanOutAborted\(controls\);\n/g,
+    /try \{\r?\n\s*throwIfFanOutAborted\(controls\);\r?\n/g,
   ) || [];
   assert.equal(guardedWorkers.length, 5, "the guard must be the first statement in each worker try block");
 

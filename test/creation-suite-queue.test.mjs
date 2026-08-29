@@ -1298,7 +1298,10 @@ test("creation suite queue starts the next suite when a running suite frees item
   assert.equal(typeof streamOptions[0].onEventHandled, "function");
 });
 
-const QUOTA_ERROR = "生成请求失败：HTTP 402，错误码 insufficient_quota，Model capacity is temporarily unavailable.";
+// A genuine balance failure. A relay's "capacity temporarily unavailable" 402 is
+// vetoed by the classifier and must not take the queue down, which the sibling
+// transient test below covers.
+const QUOTA_ERROR = "生成请求失败：HTTP 402，错误码 insufficient_quota，You exceeded your current quota, please check your plan and billing details.";
 
 function createQuotaQueueFixture() {
   const runningJob = {

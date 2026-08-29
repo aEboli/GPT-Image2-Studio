@@ -2,14 +2,23 @@
 
 ### Requirement: 账号级上游错误的判定口径
 
-系统 SHALL 提供统一的账号级上游错误判定，供服务端扇出与浏览器侧队列共用。判定 SHALL 从已格式化的上游错误文案中解析 HTTP 状态码与上游错误码。`HTTP 401`、`HTTP 402` SHALL 判定为账号级；下列上游错误码 SHALL 判定为账号级，与 HTTP 状态码无关：`insufficient_quota`、`invalid_api_key`、`invalid_authentication`、`account_deactivated`、`billing_hard_limit_reached`、`billing_not_active`、`quota_exceeded`。
+系统 SHALL 提供统一的账号级上游错误判定，供服务端扇出与浏览器侧队列共用。判定 SHALL 从已格式化的上游错误文案中解析 HTTP 状态码、上游错误码与详情文本。`HTTP 401`、`HTTP 402` SHALL 判定为账号级；下列上游错误码 SHALL 判定为账号级，与 HTTP 状态码无关：`insufficient_quota`、`invalid_api_key`、`invalid_authentication`、`account_deactivated`、`billing_hard_limit_reached`、`billing_not_active`、`quota_exceeded`。
+
+详情文本中的暂时性表述 SHALL 一票否决上述状态码与错误码判定：当文案包含 `temporarily`、`temporary`、`capacity`、`try again`、`retry`、`overloaded`、`busy`、`no available channel`、`暂时`、`稍后`、`重试`、`容量` 等暂时性标记之一时，该错误 SHALL NOT 判定为账号级。中转站普遍复用 `insufficient_quota` 与 `402` 承载"模型池暂时没容量"，详情文本比状态码和错误码更具体；误判导致整批熔断，比多花几次上游调用糟糕得多。
 
 `HTTP 403`、`HTTP 429`、`HTTP 5xx`、连接类错误、内容审核拒绝以及不含可识别状态码与错误码的文案 SHALL NOT 判定为账号级。判定 SHALL NOT 抛错，非字符串、空值与任意文案 SHALL 收敛为"非账号级"。
 
 #### Scenario: 额度耗尽判定为账号级
 
-- **WHEN** 上游返回 `HTTP 402` 且错误码为 `insufficient_quota`
+- **WHEN** 上游返回 `HTTP 402` 且错误码为 `insufficient_quota`，详情为 `You exceeded your current quota, please check your plan and billing details.`
 - **THEN** 该错误判定为账号级
+
+#### Scenario: 暂时性容量不足不判定为账号级
+
+- **WHEN** 上游返回 `HTTP 402` 且错误码为 `insufficient_quota`，但详情为 `Model capacity is temporarily unavailable.`
+- **THEN** 该错误 SHALL NOT 判定为账号级
+- **AND** 本批其余条目继续生成
+- **AND** 该条目保留既有的 in-run 重试与自动补图语义
 
 #### Scenario: 限流与服务端错误不判定为账号级
 
