@@ -120,6 +120,41 @@ test("desktop URL policy only allows the exact Studio origin and explicit projec
   assert.equal(isAllowedExternalUrl("powershell:Write-Host%20unsafe"), false);
 });
 
+test("desktop URL policy allows only the image hosting console upload settings page", async () => {
+  const { isAllowedExternalUrl } = await import("../desktop/url-policy.mjs");
+
+  assert.equal(isAllowedExternalUrl("https://console.cloudinary.com/settings/upload"), true);
+  assert.equal(
+    isAllowedExternalUrl("https://console.cloudinary.com/settings/upload?tab=presets#add"),
+    true,
+  );
+
+  assert.equal(isAllowedExternalUrl("http://console.cloudinary.com/settings/upload"), false);
+  assert.equal(isAllowedExternalUrl("https://console.cloudinary.com/settings"), false);
+  assert.equal(isAllowedExternalUrl("https://console.cloudinary.com/settings/upload/"), false);
+  assert.equal(isAllowedExternalUrl("https://console.cloudinary.com/settings/account"), false);
+  assert.equal(isAllowedExternalUrl("https://console.cloudinary.com/"), false);
+  assert.equal(
+    isAllowedExternalUrl("https://console.cloudinary.com:8443/settings/upload"),
+    false,
+  );
+  assert.equal(
+    isAllowedExternalUrl("https://user:pass@console.cloudinary.com/settings/upload"),
+    false,
+  );
+  assert.equal(isAllowedExternalUrl("https://cloudinary.com/settings/upload"), false);
+  assert.equal(
+    isAllowedExternalUrl("https://console.cloudinary.com.evil.example/settings/upload"),
+    false,
+  );
+  assert.equal(isAllowedExternalUrl("https://evil.example/settings/upload"), false);
+
+  // The workbench "view public link" action opens arbitrary image URLs through this same
+  // whitelist. Allowing the console page must not widen it into a general image-host pass.
+  assert.equal(isAllowedExternalUrl("https://res.cloudinary.com/demo/image/upload/a.jpg"), false);
+  assert.equal(isAllowedExternalUrl("https://example.com/public/sku.png"), false);
+});
+
 test("desktop main process fixes single-instance, sandbox, navigation, data, and shutdown contracts", async () => {
   const source = await readFile(desktopMainPath, "utf8");
 

@@ -45,6 +45,7 @@ import { buildStyleTransferPresetComparisonItem } from "/lib/style-transfer-pres
 import { buildCreationRecordLightboxItem, normalizeCreationGenerationSnapshotForView } from "/lib/creation-record-lightbox.mjs";
 import { buildCreationRecordDeleteConfirmation, getCreationRecordDeleteTargets, normalizeCreationRecordDeleteSetIds, resolveCreationRecordSelectionAfterDelete } from "/lib/creation-record-delete.mjs?v=20260722-creation-record-delete-flow-1";
 import { createCreationTemuExportController } from "/lib/creation-temu-export-ui.mjs";
+import { createTemuWorkbenchLauncher } from "/lib/temu-workbench-launcher.mjs";
 import { createAssetRecordDeleteController } from "/lib/asset-record-delete-controller.mjs?v=20260722-asset-record-delete-1";
 import { createAssetRecordTimeFilterController, getArticleRecordSearchText, getPortraitRecordSearchText } from "/lib/asset-record-time-filter-controller.mjs?v=20260724-asset-record-time-filter-controller-1";
 import { buildCreationRecordTimeFilterOptions, filterCreationRecordSetsByTime, formatCreationRecordTimeFilterLabel, hasActiveCreationRecordTimeFilter, normalizeCreationRecordDateFilter, normalizeCreationRecordTimeFilter } from "/lib/creation-record-filter.mjs?v=20260722-creation-record-time-filter-1";
@@ -396,6 +397,12 @@ const PROMPT_ANALYSIS_IMAGE_JPEG_QUALITY = 0.82;
 const GENERATION_REFERENCE_IMAGE_MAX_EDGE = 1024;
 const GENERATION_REFERENCE_IMAGE_COMPRESS_THRESHOLD_BYTES = 900 * 1024;
 const GENERATION_REFERENCE_IMAGE_JPEG_QUALITY = 0.82;
+const CREATION_PRIMARY_SUBJECT_IMAGE_MAX_EDGE = 2048;
+const CREATION_PRIMARY_SUBJECT_IMAGE_JPEG_QUALITY = 0.9;
+// 服务端按 MAX_CREATION_ITEM_REFERENCE_BYTES = 6 MiB 计算单项参考图字节预算，主体锚点也计入其中。
+// 这里必须严格小于那个预算，否则一张接近上限的主体图会吃掉整项额度，支撑参考图全部被跳过。
+// 取一半即为锚点保留 3 MiB、为支撑候选留下 3 MiB 剩余名额。
+const CREATION_PRIMARY_SUBJECT_IMAGE_MAX_BYTES = 3 * 1024 * 1024;
 const PREVIEW_REFERENCE_DRAG_MIME = "application/x-gpt-image2-preview";
 const GENERATION_TASK_POLL_INTERVAL_MS = 10000;
 const GENERATION_TASK_STATUS_LABELS = { running: "生成中", completed: "生成完成", error: "错误" };
@@ -1392,12 +1399,35 @@ async function preparePromptAnalysisImageFile(file) {
     }
   }
 }
-async function prepareGenerationReferenceImageFile(file) {
+function getGenerationReferenceImageCompressionProfile({ primarySubject = false } = {}) {
+  if (primarySubject) {
+    return {
+      key: "creation-primary-subject",
+      maxEdge: CREATION_PRIMARY_SUBJECT_IMAGE_MAX_EDGE,
+      jpegQuality: CREATION_PRIMARY_SUBJECT_IMAGE_JPEG_QUALITY,
+      maxBytes: CREATION_PRIMARY_SUBJECT_IMAGE_MAX_BYTES,
+      preserveWithinBounds: true,
+      thresholdBytes: 0,
+    };
+  }
+  return {
+    key: "reference",
+    maxEdge: GENERATION_REFERENCE_IMAGE_MAX_EDGE,
+    jpegQuality: GENERATION_REFERENCE_IMAGE_JPEG_QUALITY,
+    maxBytes: CREATION_PRIMARY_SUBJECT_IMAGE_MAX_BYTES,
+    preserveWithinBounds: false,
+    thresholdBytes: GENERATION_REFERENCE_IMAGE_COMPRESS_THRESHOLD_BYTES,
+  };
+}
+async function prepareGenerationReferenceImageFile(
+  file,
+  profile = getGenerationReferenceImageCompressionProfile(),
+) {
   if (
     !file ||
     typeof file !== "object" ||
     !String(file.type || "").startsWith("image/") ||
-    Number(file.size || 0) <= GENERATION_REFERENCE_IMAGE_COMPRESS_THRESHOLD_BYTES ||
+    (profile.thresholdBytes > 0 && Number(file.size || 0) <= profile.thresholdBytes) ||
     typeof createImageBitmap !== "function"
   ) {
     return file;
@@ -1406,27 +1436,50 @@ async function prepareGenerationReferenceImageFile(file) {
   try {
     bitmap = await createImageBitmap(file);
     const maxEdge = Math.max(bitmap.width, bitmap.height);
-    const scale = Math.min(1, GENERATION_REFERENCE_IMAGE_MAX_EDGE / maxEdge);
-    const width = Math.max(1, Math.round(bitmap.width * scale));
-    const height = Math.max(1, Math.round(bitmap.height * scale));
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const context = canvas.getContext("2d");
-    if (!context) {
+    if (
+      profile.preserveWithinBounds &&
+      maxEdge <= profile.maxEdge &&
+      (!profile.maxBytes || Number(file.size || 0) <= profile.maxBytes)
+    ) {
       return file;
     }
-    context.imageSmoothingEnabled = true;
-    context.imageSmoothingQuality = "high";
-    context.fillStyle = "#ffffff";
-    context.fillRect(0, 0, width, height);
-    context.drawImage(bitmap, 0, 0, width, height);
-    const blob = await canvasToBlob(
-      canvas,
-      "image/jpeg",
-      GENERATION_REFERENCE_IMAGE_JPEG_QUALITY,
-    );
-    if (!blob || blob.size <= 0 || blob.size >= file.size) {
+    const needsResize = profile.maxEdge > 0 && maxEdge > profile.maxEdge;
+    const needsByteLimit = profile.maxBytes > 0 && Number(file.size || 0) > profile.maxBytes;
+    let scale = Math.min(1, profile.maxEdge / maxEdge);
+    let jpegQuality = profile.jpegQuality;
+    let blob = null;
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const width = Math.max(1, Math.round(bitmap.width * scale));
+      const height = Math.max(1, Math.round(bitmap.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d");
+      if (!context) {
+        return file;
+      }
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = "high";
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, width, height);
+      context.drawImage(bitmap, 0, 0, width, height);
+      blob = await canvasToBlob(canvas, "image/jpeg", jpegQuality);
+      if (!blob || blob.size <= 0 || !profile.maxBytes || blob.size <= profile.maxBytes) {
+        break;
+      }
+      const nextScale = scale * Math.max(0.5, Math.min(0.9, Math.sqrt(profile.maxBytes / blob.size) * 0.96));
+      if (nextScale < scale) {
+        scale = nextScale;
+      } else {
+        jpegQuality = Math.max(0.7, jpegQuality - 0.05);
+      }
+    }
+    if (
+      !blob ||
+      blob.size <= 0 ||
+      (profile.maxBytes && blob.size > profile.maxBytes) ||
+      (blob.size >= file.size && !needsResize && !needsByteLimit)
+    ) {
       return file;
     }
     return new File([blob], makeGenerationReferenceImageName(file.name), {
@@ -2583,12 +2636,35 @@ function revokeReferencePreview(item) {
 function getGenerationReferenceFile(item) {
   return item?.generationFile || item?.file;
 }
+function isCreationPrimarySubjectReference(item, referenceFiles = state.creationReferenceFiles) {
+  const items = Array.isArray(referenceFiles) ? referenceFiles.filter(Boolean) : [];
+  const primary =
+    items.find((entry) => entry?.role === "reference-product") ||
+    items.find((entry) => isCreationSubjectReferenceRole(entry?.role || "product")) ||
+    items[0] ||
+    null;
+  return Boolean(
+    primary &&
+      (primary === item || (primary.id && item?.id && primary.id === item.id)),
+  );
+}
+function getCreationReferenceGenerationCompressionProfile(
+  item,
+  referenceFiles = state.creationReferenceFiles,
+) {
+  return getGenerationReferenceImageCompressionProfile({
+    primarySubject: isCreationPrimarySubjectReference(item, referenceFiles),
+  });
+}
+function syncCreationReferenceGenerationCompressionProfiles() {
+  state.creationReferenceFiles.forEach((item) => {
+    const profile = getCreationReferenceGenerationCompressionProfile(item);
+    if (item.generationCompressionProfile !== profile.key) {
+      startCreationReferenceGenerationCompression(item, profile);
+    }
+  });
+}
 function getCreationReferenceGenerationFile(item) {
-  const infographicRebuildEnabled =
-    isCreationInfographicRebuildRequired() || refs.creationInfographicRebuildEnabledInput?.checked === true;
-  if (infographicRebuildEnabled && item?.file && !isCreationSubjectReferenceRole(item?.role || "product")) {
-    return item.file;
-  }
   return item?.generationFile || item?.file;
 }
 function getCreationLogoBatchSourceGenerationFile(item) {
@@ -2641,7 +2717,7 @@ function hasPendingCreationLogoBatchGenerationFiles() {
 function hasPendingCreationBranchGenerationFiles() {
   return isCreationLogoBatchBranch()
     ? hasPendingCreationLogoBatchGenerationFiles() || hasPendingCreationLogoGenerationFile()
-    : hasPendingCreationReferenceGenerationFiles() || hasPendingCreationLogoGenerationFile();
+    : hasPendingCreationReferenceGenerationFiles();
 }
 function hasPendingReferenceAnalysisGenerationFiles() {
   return state.referenceAnalysis.files.some((item) => item.generationFilePromise);
@@ -2758,29 +2834,68 @@ function startStyleTransferGenerationCompression(item) {
   updateGenerateButton();
   return item.generationFilePromise;
 }
-function startCreationReferenceGenerationCompression(item) {
-  if (!item?.file) {
+function updateCreationReferenceGenerationCompressionState(referenceId, revision, profileKey, patch = {}) {
+  let updated = false;
+  const next = state.creationReferenceFiles.map((entry) => {
+    if (
+      entry.id !== referenceId ||
+      entry.generationCompressionRevision !== revision ||
+      entry.generationCompressionProfile !== profileKey
+    ) {
+      return entry;
+    }
+    updated = true;
+    return { ...entry, ...patch };
+  });
+  if (updated) {
+    state.creationReferenceFiles = next;
+  }
+  return updated;
+}
+function startCreationReferenceGenerationCompression(
+  item,
+  profile = getCreationReferenceGenerationCompressionProfile(item),
+) {
+  if (!item?.file || !item.id) {
     return null;
   }
-  item.generationFile = item.file;
-  item.generationCompressed = false;
-  item.generationFilePromise = prepareGenerationReferenceImageFile(item.file)
+  const referenceId = item.id;
+  const sourceFile = item.file;
+  const revision = Number(item.generationCompressionRevision || 0) + 1;
+  const profileKey = profile.key;
+  const updateCurrentItem = (patch) =>
+    updateCreationReferenceGenerationCompressionState(referenceId, revision, profileKey, patch);
+  let generationFilePromise = prepareGenerationReferenceImageFile(sourceFile, profile)
     .then((preparedFile) => {
-      item.generationFile = preparedFile || item.file;
-      item.generationCompressed = Boolean(preparedFile && preparedFile !== item.file);
-      return item.generationFile;
+      const generationFile = preparedFile || sourceFile;
+      updateCurrentItem({
+        generationFile,
+        generationCompressed: Boolean(preparedFile && preparedFile !== sourceFile),
+      });
+      return generationFile;
     })
     .catch(() => {
-      item.generationFile = item.file;
-      item.generationCompressed = false;
-      return item.file;
-    })
-    .finally(() => {
-      item.generationFilePromise = null;
-      renderCreationView();
+      updateCurrentItem({ generationFile: sourceFile, generationCompressed: false });
+      return sourceFile;
     });
+  generationFilePromise = generationFilePromise.finally(() => {
+    updateCurrentItem({ generationFilePromise: null });
+    renderCreationView();
+  });
+
+  const initialState = {
+    generationFile: sourceFile,
+    generationCompressed: false,
+    generationCompressionProfile: profileKey,
+    generationCompressionRevision: revision,
+    generationFilePromise,
+  };
+  Object.assign(item, initialState);
+  state.creationReferenceFiles = state.creationReferenceFiles.map((entry) =>
+    entry.id === referenceId ? { ...entry, ...initialState } : entry,
+  );
   renderCreationView();
-  return item.generationFilePromise;
+  return generationFilePromise;
 }
 function startCreationLogoGenerationCompression(item = state.creationLogo) {
   if (!item?.file) {
@@ -2860,15 +2975,18 @@ async function ensureReferenceGenerationFilesReady() {
   }
 }
 async function ensureCreationReferenceGenerationFilesReady() {
-  const pending = [
-    ...state.creationReferenceFiles.map((item) => item.generationFilePromise),
-    state.creationLogo?.generationFilePromise,
-  ].filter(Boolean);
-  if (pending.length === 0) {
-    return;
-  }
   try {
-    await Promise.allSettled(pending);
+    for (;;) {
+      // Role changes, reordering, and restored bindings can start a newer compression task
+      // while the previous snapshot is still settling. Re-sync after every batch so the
+      // generation request never captures a stale uncompressed subject.
+      syncCreationReferenceGenerationCompressionProfiles();
+      const pending = state.creationReferenceFiles.map((item) => item.generationFilePromise).filter(Boolean);
+      if (pending.length === 0) {
+        break;
+      }
+      await Promise.allSettled(pending);
+    }
   } finally {
     renderCreationView();
   }
@@ -10379,6 +10497,7 @@ function bindCreationReferenceToRestoreEntry(referenceId, restoreEntryId) {
       note: nextRestoreEntry.note || "",
     };
   });
+  syncCreationReferenceGenerationCompressionProfiles();
   syncCreationReferenceRestoreQueueBindings();
   markCreationReferenceAnalysisDirty();
   renderCreationReferenceGrid();
@@ -11227,6 +11346,12 @@ const creationRecordTemuExportController = createCreationTemuExportController({
   setRecordFeedback: setCreationRecordFeedback,
   renderRecordView: renderCreationRecordView,
   compactErrorMessage,
+  // 点击「导出 Temu Excel」改为打开上品工作台覆盖层；批量导出成为覆盖层内第二个标签。
+  openWorkbench: (setIds) => temuWorkbenchLauncher.open(setIds),
+});
+
+const temuWorkbenchLauncher = createTemuWorkbenchLauncher({
+  openExportDialog: () => creationRecordTemuExportController.openExportDialog(),
 });
 async function fetchCreationRecordPathReport(set) {
   if (!set?.setId) {
@@ -11733,6 +11858,7 @@ function removeCreationReferenceFile(referenceId) {
   }
   revokeReferencePreview(target);
   state.creationReferenceFiles = state.creationReferenceFiles.filter((item) => item.id !== referenceId);
+  syncCreationReferenceGenerationCompressionProfiles();
   markCreationReferenceRestoreEntryMissing(target?.restoreEntryId);
   markCreationReferenceAnalysisDirty();
   if (state.creationReferenceFiles.length === 0) {
@@ -11831,6 +11957,7 @@ function updateCreationReferenceRole(referenceId, role) {
         ? { ...item, role: item.role === "reference-product" ? "product" : item.role }
         : item;
   });
+  syncCreationReferenceGenerationCompressionProfiles();
   markCreationReferenceAnalysisDirty({ invalidateCategorySuggestion: false });
   resetCreationDraftPreview();
   renderCreationReferenceGrid();
@@ -11840,6 +11967,7 @@ function reorderCreationReferenceFile(referenceId, beforeReferenceId) {
   const next = reorderCreationReferenceFiles(state.creationReferenceFiles, referenceId, beforeReferenceId);
   if (!next) return false;
   state.creationReferenceFiles = next;
+  syncCreationReferenceGenerationCompressionProfiles();
   markCreationReferenceAnalysisDirty({ invalidateCategorySuggestion: false }); resetCreationDraftPreview(); renderCreationReferenceGrid(); renderCreationView();
   return true;
 }
@@ -12089,13 +12217,14 @@ function applyCreationReferenceFiles(fileList) {
       generationFile: file,
       generationFilePromise: null,
       generationCompressed: false,
+      generationCompressionProfile: "",
+      generationCompressionRevision: 0,
       previewUrl: URL.createObjectURL(file),
       role: restoreEntry?.role || "product",
       note: restoreEntry?.note || "",
       restoreEntryId: restoreEntry?.id || "",
       restoredFromRecordFilename: restoreEntry?.filename || "",
     };
-    startCreationReferenceGenerationCompression(referenceItem);
     next.push(referenceItem);
     importedCount += 1;
     if (restoreEntry) {
@@ -12114,6 +12243,7 @@ function applyCreationReferenceFiles(fileList) {
   }
 
   state.creationReferenceFiles = next;
+  syncCreationReferenceGenerationCompressionProfiles();
   state.creationReferenceRestoreQueue = restoreQueue;
   markCreationReferenceAnalysisDirty();
   if (refs.creationReferenceInput) {
@@ -12546,6 +12676,7 @@ function applyCreationReferenceAnalysisRecommendations() {
       subjectUnitCount: recommendation.subjectUnitCount || 0,
     };
   });
+  syncCreationReferenceGenerationCompressionProfiles();
   state.creationReferenceAnalysis.applied = true;
   state.creationReferenceAnalysis.collapsed = true;
   const productNameApplied = applyCreationReferenceAnalysisProductNameSuggestion(analysis);

@@ -145,11 +145,15 @@ test("routine plan adjustments stay hidden while actionable warnings are dedupli
 test("direct generation refreshes a dirty plan before freezing the queued request", async () => {
   const app = await readApp();
   const startGeneration = getFunctionSource(app, "startCreationGeneration", "normalizePortraitItemForView");
+  const branchPreparation = getFunctionSource(app, "hasPendingCreationBranchGenerationFiles", "hasPendingReferenceAnalysisGenerationFiles");
+  const referencePreparation = getFunctionSource(app, "ensureCreationReferenceGenerationFilesReady", "ensureCreationLogoBatchGenerationFilesReady");
 
   assert.match(startGeneration, /await waitForPendingCreationPlanPreview\(\)/);
   assert.match(startGeneration, /state\.creation\.planDirty[\s\S]*await requestCreationPlanPreview\(\)/);
   assert.match(startGeneration, /getFrozenCreationEffectivePlan\(\)[\s\S]*canGenerate === false[\s\S]*return/);
   assert.match(startGeneration, /await ensureCreationReferenceGenerationFilesReady\(\)/);
+  assert.doesNotMatch(branchPreparation, /hasPendingCreationReferenceGenerationFiles\(\) \|\| hasPendingCreationLogoGenerationFile\(\)/);
+  assert.doesNotMatch(referencePreparation, /state\.creationLogo/);
 });
 
 test("compatible image types follow the enabled carousel slots in the frozen effective plan", async () => {

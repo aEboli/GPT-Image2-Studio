@@ -191,6 +191,7 @@ import { resolveTemuImageRequirements } from "./lib/creation-temu-images.mjs";
 import { buildCreationTemuPreflightSummary } from "./lib/creation-temu-preflight.mjs";
 import { verifyCreationTemuRemoteImages } from "./lib/creation-temu-remote-images.mjs";
 import { buildTemuWorkbookBuffer, verifyTemuTemplate } from "./lib/creation-temu-workbook.mjs";
+import { createTemuWorkbenchRoutes, matchesTemuWorkbenchPath } from "./lib/temu-server/routes.mjs";
 import { normalizeAssetRecordDeleteIds } from "./lib/asset-record-delete.mjs";
 import { resolveCreationPlanCounts } from "./lib/creation-plan-counts.mjs";
 import {
@@ -233,6 +234,22 @@ const pptDeckStore = createPptDeckStore({ outputDir, publicBasePath: "/output" }
 const creationSetStore = createCreationSetStore({ outputDir, publicBasePath: "/output" });
 const portraitSetStore = createPortraitSetStore({ outputDir, publicBasePath: "/output" });
 const articleIllustrationSetStore = createArticleIllustrationSetStore({ outputDir, publicBasePath: "/output" });
+// Temu 上品工作台的 /api/temu/* 处理器。协作者全部注入，因此该模块不认识 server.mjs。
+// resolveSafeFile / serveFile / readJsonBody 是函数声明，会提升，故此处可先引用。
+// isServerlessRuntime 必须传函数形式：它是 listen 之后才赋值的 let，传布尔会永久冻结为 false。
+//
+// 位置说明：刻意不放在 routeRequest 正前方。test/studio-limits.test.mjs 用
+// /async function handleGenerate[\s\S]*?\r?\n}\r?\n\r?\nasync function routeRequest/
+// 切取处理器函数体，任何插在 `}` 与 `async function routeRequest` 之间的声明都会让
+// 该切片变成空串，使多条断言以 actual:'' 的形式失败。
+const temuWorkbenchRoutes = createTemuWorkbenchRoutes({
+  listManifests: () => creationSetStore.listManifests(),
+  outputDir,
+  resolveSafeFile,
+  serveFile,
+  readJsonBody,
+  isServerlessRuntime: () => isServerlessRuntime,
+});
 const port = Number(process.env.PORT || 3600);
 const explicitHost = String(process.env.HOST || "").trim();
 const serverHost = explicitHost || "127.0.0.1";
@@ -341,6 +358,7 @@ function buildPortraitReferenceImageLabels(personReferenceImages = [], actionRef
 const MIME_TYPES = {
   ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",
+  ".ico": "image/x-icon",
   ".jpeg": "image/jpeg",
   ".jpg": "image/jpeg",
   ".js": "text/javascript; charset=utf-8",
@@ -674,6 +692,37 @@ function supportsCreationReferenceFileIds(generationConfig = {}) {
   );
 }
 
+// The suite accepts up to fifteen uploaded references, but each item sends only the
+// information-rich subset selected by the shared creation scheduler.  Build the union
+// once before preparing the upload registry so a Responses run does not pre-upload files
+// that no item will ever attach.  Selection errors are intentionally ignored here: the
+// worker invokes the same selector again and must retain the existing per-item failure
+// semantics (for example, an infographic whose exact source is missing).
+function collectCreationReferenceImagesForUpload(items = [], referenceImages = [], referenceImageRoles = []) {
+  const normalizedItems = Array.isArray(items) ? items : [];
+  const normalizedImages = Array.isArray(referenceImages) ? referenceImages.filter(Boolean) : [];
+  const selectedImages = [];
+  const selectedImageObjects = new Set();
+
+  for (const item of normalizedItems) {
+    let itemReferenceImages;
+    try {
+      itemReferenceImages = buildCreationItemReferenceImages(item, normalizedImages, referenceImageRoles);
+    } catch {
+      continue;
+    }
+    for (const image of Array.isArray(itemReferenceImages) ? itemReferenceImages : []) {
+      if (!image || selectedImageObjects.has(image)) {
+        continue;
+      }
+      selectedImageObjects.add(image);
+      selectedImages.push(image);
+    }
+  }
+
+  return selectedImages;
+}
+
 // One suite request registers its reference bytes once, then trades them for upstream file
 // identifiers where the route supports it. Repair items can each carry their own saved
 // baseUrl and route, so uploads are prepared per distinct upstream target and the per-item
@@ -838,7 +887,16 @@ async function serveFile(request, response, filePath) {
 }
 
 function resolveSafeFile(baseDir, requestPath) {
-  const decoded = decodeURIComponent(requestPath);
+  // 畸形的百分号转义（如 /%zz）会让 decodeURIComponent 抛 URIError。
+  // 不捕获的话该异常一路冒到顶层，变成 500；按解析失败处理即可，
+  // 由调用方既有的 `if (!target)` 分支返回拒绝响应。
+  let decoded;
+  try {
+    decoded = decodeURIComponent(requestPath);
+  } catch {
+    return null;
+  }
+
   const target = resolve(baseDir, `.${decoded}`);
   const normalizedBase = resolve(baseDir);
   const backToBase = relative(normalizedBase, target);
@@ -1404,6 +1462,9 @@ async function toReferenceImages(files) {
       const buffer = Buffer.from(await file.arrayBuffer());
       return {
         filename: file.name || `reference-image-${index + 1}`,
+        // Keep the original upload position because browser-side generation compression can
+        // rename a file and per-item scheduling can return a trimmed/reordered subset.
+        referenceIndex: index + 1,
         mimeType: file.type || "application/octet-stream",
         buffer,
         base64: buffer.toString("base64"),
@@ -4643,8 +4704,13 @@ async function handleCreationGenerate(request, response) {
     writeSseEvent(response, "set_started", { set: setManifest });
     writeSseEvent(response, "plan", { setId, items });
 
-    const referenceUploads = await createCreationReferenceUploadRegistry({
+    const referenceUploadImages = collectCreationReferenceImagesForUpload(
+      plan.items,
       referenceImages,
+      referenceImageRoles,
+    );
+    const referenceUploads = await createCreationReferenceUploadRegistry({
+      referenceImages: referenceUploadImages,
       generationConfigs: [generationConfig],
     });
     const referenceUploadTargetKey = referenceUploads.getTargetKey(generationConfig);
@@ -5749,8 +5815,13 @@ async function handleCreationRepair(request, response) {
 
     // Repair items can carry their own saved route and baseUrl, so collect every distinct
     // upstream up front and upload once per target instead of once per item.
-    const referenceUploads = await createCreationReferenceUploadRegistry({
+    const referenceUploadImages = collectCreationReferenceImagesForUpload(
+      repairItems,
       referenceImages,
+      referenceImageRoles,
+    );
+    const referenceUploads = await createCreationReferenceUploadRegistry({
+      referenceImages: referenceUploadImages,
       generationConfigs: repairItems.map((repairItem) =>
         resolveCreationRepairGenerationConfig(repairItem, generationConfig),
       ),
@@ -6826,6 +6897,12 @@ async function routeRequest(request, response) {
     return handleCreationSetsTemuExcelPreflight(request, response);
   }
 
+  // Temu 上品工作台。位于 API 等值段内、先于 /output/ 前缀分支，因此不会被静态兜底遮蔽。
+  // 全部路由都在 /api/ 前缀之下，非 GET 才会被跨站请求检查覆盖。
+  if (matchesTemuWorkbenchPath(url.pathname)) {
+    return temuWorkbenchRoutes.handleRequest(request, response, url);
+  }
+
   if (request.method === "GET" && url.pathname === "/api/portrait/sets") {
     return handlePortraitSetsGet(response);
   }
@@ -6985,6 +7062,30 @@ async function routeRequest(request, response) {
 
   if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
     return serveFile(request, response, join(publicDir, "index.html"));
+  }
+
+  // Temu 上品工作台子文档。必须放在下面那条宽 GET 兜底之前：
+  // 兜底在 resolveSafeFile 返回 null 时会直接 403 返回，且一旦
+  // public/temu/ 出现同名目录就会完全遮蔽后置分支。
+  //
+  // 裸路径 /temu 必须 301 到 /temu/，不能直接返回同一份文档：
+  // 子文档的资源引用在 /temu 下会解析到应用根目录，从而静默加载
+  // 主应用的 styles.css 与 app.js，而响应主体看起来完全正常。
+  if (request.method === "GET" && url.pathname === "/temu") {
+    response.writeHead(301, { Location: "/temu/" });
+    return response.end();
+  }
+
+  if (request.method === "GET" && (url.pathname === "/temu/" || url.pathname === "/temu/index.html")) {
+    try {
+      return await serveFile(request, response, join(publicDir, "temu", "index.html"));
+    } catch (error) {
+      if (error && typeof error === "object" && error.code === "ENOENT") {
+        return sendText(response, 404, "Not found");
+      }
+
+      throw error;
+    }
   }
 
   if (request.method === "GET") {

@@ -103,6 +103,14 @@ test("creation generation and repair both reuse one reference upload registry", 
     creationRepairHandler.indexOf("createCreationReferenceUploadRegistry") <
       creationRepairHandler.indexOf("runWithConcurrency"),
   );
+
+  // The registry receives the union selected by the same per-item scheduler instead
+  // of eagerly pre-uploading every file accepted by the fifteen-image form limit.
+  assert.match(server, /function collectCreationReferenceImagesForUpload\(/);
+  for (const handler of [creationGenerateHandler, creationRepairHandler]) {
+    assert.match(handler, /collectCreationReferenceImagesForUpload\(/);
+    assert.match(handler, /referenceImages:\s*referenceUploadImages/);
+  }
 });
 
 test("studio reference limits keep standard references and creation references at fifteen", async () => {

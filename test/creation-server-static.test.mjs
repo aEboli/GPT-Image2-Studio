@@ -343,6 +343,7 @@ test("creation logo batch uses each uploaded image with the shared logo referenc
 
 test("local creation generation accepts references image count, marketing scenario, and industry template", async () => {
   const server = await readFile(serverPath, "utf8");
+  const planHandler = server.match(/async function handleCreationPlan[\s\S]*?\r?\n}\r?\n\r?\nasync function handleCreationGenerate/)?.[0] || "";
   assert.match(server, /formData\.get\("imageCount"\)/);
   assert.match(server, /formData\.get\("scenario"\)/);
   assert.match(server, /formData\.get\("industryTemplate"\)/);
@@ -358,6 +359,7 @@ test("local creation generation accepts references image count, marketing scenar
   assert.match(server, /referenceImages,/);
   assert.match(server, /formData\.getAll\("logoImage"\)/);
   assert.match(server, /logoOptions:/);
+  assert.doesNotMatch(planHandler, /logoImage|logoOptions/);
   assert.doesNotMatch(server, /handleCreationGenerate[\s\S]*referenceImages:\s*\[\]/);
 });
 
@@ -369,6 +371,22 @@ test("local creation generation labels uploaded reference image order", async ()
   assert.match(server, /skuGenerationRule:\s*formData\.get\("skuGenerationRule"\)/);
 });
 
+test("creation uploads retain the original reference index through compression and scheduling", async () => {
+  const server = await readFile(serverPath, "utf8");
+  const toReferenceImages =
+    server.match(/async function toReferenceImages\(files\) \{[\s\S]*?\r?\n}\r?\n\r?\nfunction validateLocalMaskUploadFiles/)?.[0] || "";
+  const generateHandler =
+    server.match(/async function handleCreationGenerate[\s\S]*?\r?\n}\r?\n\r?\nasync function handleCreationLogoBatchGenerate/)?.[0] || "";
+  const repairHandler =
+    server.match(/async function handleCreationRepair[\s\S]*?\r?\n}\r?\n\r?\nasync function handleGenerate/)?.[0] || "";
+
+  assert.match(toReferenceImages, /referenceIndex:\s*index \+ 1/);
+  for (const handler of [generateHandler, repairHandler]) {
+    assert.match(handler, /buildCreationItemReferenceImages\([^,]+,\s*referenceImages,\s*referenceImageRoles\)/);
+    assert.match(handler, /buildCreationGenerationReferenceImageLabels\(\s*itemReferenceImages,\s*referenceImageRoles,/);
+  }
+});
+
 test("local creation generation has no removed style-reference request path", async () => {
   const server = await readFile(serverPath, "utf8");
   // handleCreationLogoBatchGenerate sits between the two handlers and legitimately keeps its own
@@ -377,8 +395,8 @@ test("local creation generation has no removed style-reference request path", as
   const repairHandler = server.match(/async function handleCreationRepair[\s\S]*?\r?\n}\r?\n\r?\nasync function handleGenerate/)?.[0] || "";
   assert.doesNotMatch(server, /MAX_CREATION_STYLE_REFERENCE_IMAGES|styleReferenceImages|appendCreationStyleReferences/);
   assert.doesNotMatch(server, /appendCreationItemLogoReference|appendCreationLogoReference/);
-  assert.doesNotMatch(generateHandler, /logoImage/);
-  assert.doesNotMatch(repairHandler, /logoImage/);
+  assert.doesNotMatch(generateHandler, /logoImage|logoOptions/);
+  assert.doesNotMatch(repairHandler, /logoImage|logoOptions/);
   assert.match(generateHandler, /buildCreationItemGenerationPrompt\(item\.prompt,\s*itemGenerationParameters,\s*item\)/);
   assert.match(repairHandler, /buildCreationItemGenerationPrompt\(repairItem\.prompt,\s*itemGenerationParameters,\s*repairItem\)/);
 });

@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
+import { MAX_CREATION_ITEM_REFERENCE_BYTES } from "../lib/creation-reference-labels.mjs";
+
 const indexPath = new URL("../public/index.html", import.meta.url);
 const stylesPath = new URL("../public/styles.css", import.meta.url);
 const appPath = new URL("../public/app.js", import.meta.url);
@@ -28,8 +30,8 @@ const generationClientPath = new URL("../lib/generation-client.mjs", import.meta
 const generationLogPanelPath = new URL("../lib/generation-log-panel.mjs", import.meta.url);
 const generationLogStorePath = new URL("../lib/generation-log-store.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20260830-disabled-shake-1";
-const appAssetVersion = "20260830-disabled-shake-1";
+const stylesAssetVersion = "20260830-temu-workbench-1";
+const appAssetVersion = "20260830-temu-workbench-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
 const creationQueueModuleAssetVersion = "20260829-generation-schedule-1";
 const quickBlendModuleAssetVersion = "20260608-quick-blend-time-sort-1";
@@ -1336,7 +1338,8 @@ test("reference images are compressed before generation uploads", async () => {
 
   assert.match(app, /const GENERATION_REFERENCE_IMAGE_COMPRESS_THRESHOLD_BYTES = 900 \* 1024;/);
   assert.match(app, /const GENERATION_REFERENCE_IMAGE_MAX_EDGE = 1024;/);
-  assert.match(app, /async function prepareGenerationReferenceImageFile\(file\) \{/);
+  assert.match(app, /function getGenerationReferenceImageCompressionProfile\(\{ primarySubject = false \} = \{\}\) \{/);
+  assert.match(app, /async function prepareGenerationReferenceImageFile\(\s*file,\s*profile = getGenerationReferenceImageCompressionProfile\(\),\s*\) \{/);
   assert.match(app, /new File\(\[blob\], makeGenerationReferenceImageName\(file\.name\)/);
   assert.match(app, /function startReferenceGenerationCompression\(item\) \{/);
   assert.match(app, /item\.generationFilePromise = prepareGenerationReferenceImageFile\(item\.file\)/);
@@ -5211,12 +5214,31 @@ test("creation reference reuploads can be manually bound to a saved reference", 
 test("creation mode uploads prepared reference images for generation and repair", async () => {
   const app = await readFile(appPath, "utf8");
 
-  assert.match(app, /function getCreationReferenceGenerationFile\(item\) \{/);
+  assert.match(app, /function isCreationPrimarySubjectReference\(item, referenceFiles = state\.creationReferenceFiles\) \{/);
+  assert.match(app, /const CREATION_PRIMARY_SUBJECT_IMAGE_MAX_EDGE = 2048;/);
+  assert.match(app, /const CREATION_PRIMARY_SUBJECT_IMAGE_JPEG_QUALITY = 0\.9;/);
+  // 主体锚点的字节上限必须严格小于服务端单项预算，否则一张接近上限的主体图会吃掉整项额度。
+  assert.match(app, /const CREATION_PRIMARY_SUBJECT_IMAGE_MAX_BYTES = 3 \* 1024 \* 1024;/);
+  const primarySubjectMaxBytes = Number(
+    app.match(/const CREATION_PRIMARY_SUBJECT_IMAGE_MAX_BYTES = (\d+) \* 1024 \* 1024;/)?.[1],
+  ) * 1024 * 1024;
+  assert.ok(primarySubjectMaxBytes < MAX_CREATION_ITEM_REFERENCE_BYTES);
+  assert.ok(MAX_CREATION_ITEM_REFERENCE_BYTES - primarySubjectMaxBytes >= 1024 * 1024);
+  assert.match(app, /function getCreationReferenceGenerationCompressionProfile\(/);
   assert.match(
     app,
-    /function getCreationReferenceGenerationFile\(item\) \{[\s\S]*infographicRebuildEnabled[\s\S]*!isCreationSubjectReferenceRole\(item\?\.role \|\| "product"\)[\s\S]*return item\.file;/,
+    /key: "reference",[\s\S]*?maxBytes: CREATION_PRIMARY_SUBJECT_IMAGE_MAX_BYTES,/,
   );
-  assert.match(app, /async function ensureCreationReferenceGenerationFilesReady\(\) \{/);
+  assert.match(app, /function syncCreationReferenceGenerationCompressionProfiles\(\) \{/);
+  assert.match(app, /function updateCreationReferenceGenerationCompressionState\(referenceId, revision, profileKey, patch = \{\}\) \{/);
+  assert.match(app, /generationCompressionRevision/);
+  assert.match(app, /function getCreationReferenceGenerationFile\(item\) \{/);
+  assert.doesNotMatch(
+    app,
+    /function getCreationReferenceGenerationFile\(item\) \{[\s\S]*isCreationPrimarySubjectReference\(item\)[\s\S]*return item\.file;/,
+  );
+  assert.match(app, /function getCreationReferenceGenerationFile\(item\) \{\s*return item\?\.generationFile \|\| item\?\.file;/);
+  assert.match(app, /async function ensureCreationReferenceGenerationFilesReady\(\) \{[\s\S]*syncCreationReferenceGenerationCompressionProfiles\(\);/);
   assert.match(app, /startCreationGeneration[\s\S]*await ensureCreationReferenceGenerationFilesReady\(\);[\s\S]*const generationFormData = buildCreationFormData\(\);/);
   assert.match(app, /function getCreationQueueJobForSet\(set = \{\}\) \{/);
   assert.match(app, /async function runCreationQueuedRepairRequest\(queueJob, \{ itemId = "", scope = "incomplete", set, autoRepair = false \} = \{\}\) \{/);

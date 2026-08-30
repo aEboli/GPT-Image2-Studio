@@ -112,6 +112,7 @@ test("ordinary runtime prompts protect subject graphics, original text, and lang
   const currentPrompt = buildCreationItemGenerationPrompt(currentItem.prompt, currentParameters, currentItem);
 
   assert.equal([...currentPrompt.matchAll(/SUBJECT CONTENT LOCK:/g)].length, 1);
+  assert.equal([...currentPrompt.matchAll(/SUBJECT IDENTITY LOCK:/g)].length, 1);
 
   const noTextItem = { ...historicalItem, textPolicy: "none" };
   const noTextPrompt = buildCreationItemGenerationPrompt(
@@ -120,7 +121,45 @@ test("ordinary runtime prompts protect subject graphics, original text, and lang
     noTextItem,
   );
   assert.match(noTextPrompt, /SUBJECT CONTENT LOCK:/);
+  assert.match(noTextPrompt, /SUBJECT IDENTITY LOCK:/);
   assert.doesNotMatch(noTextPrompt, /Newly added marketing copy target language:/i);
+});
+
+test("runtime subject locks are independently completed without duplicating explicit locks", () => {
+  const parameters = resolveCreationItemGenerationParameters(
+    { ratio: "1:1", resolutionTier: "1K", targetLanguage: "en" },
+    { imageRoute: "a" },
+  );
+  const count = (prompt, pattern) => [...prompt.matchAll(pattern)].length;
+
+  const contentOnly = buildCreationItemGenerationPrompt(
+    "Create a product image.\nSUBJECT CONTENT LOCK: frozen content guidance.",
+    parameters,
+  );
+  assert.equal(count(contentOnly, /SUBJECT CONTENT LOCK:/g), 1);
+  assert.equal(count(contentOnly, /SUBJECT IDENTITY LOCK:/g), 1);
+
+  const identityOnly = buildCreationItemGenerationPrompt(
+    "Create a product image.\nSUBJECT IDENTITY LOCK: frozen identity guidance.",
+    parameters,
+  );
+  assert.equal(count(identityOnly, /SUBJECT CONTENT LOCK:/g), 1);
+  assert.equal(count(identityOnly, /SUBJECT IDENTITY LOCK:/g), 1);
+
+  const both = buildCreationItemGenerationPrompt(
+    "Create a product image.\nSUBJECT IDENTITY LOCK: frozen identity guidance.\nSUBJECT CONTENT LOCK: frozen content guidance.",
+    parameters,
+  );
+  assert.equal(count(both, /SUBJECT CONTENT LOCK:/g), 1);
+  assert.equal(count(both, /SUBJECT IDENTITY LOCK:/g), 1);
+
+  const legacyContent = buildCreationItemGenerationPrompt(
+    "Create a product image.\nSubject content: keep the package artwork unchanged.",
+    parameters,
+  );
+  assert.equal(count(legacyContent, /SUBJECT CONTENT LOCK:/g), 1);
+  assert.equal(count(legacyContent, /SUBJECT IDENTITY LOCK:/g), 1);
+  assert.match(legacyContent, /Subject content: keep the package artwork unchanged\./);
 });
 
 test("infographic rebuild runtime prompt honors only the four selected output controls", () => {
@@ -153,6 +192,7 @@ test("infographic rebuild runtime prompt honors only the four selected output co
   assert.match(prompt, /aspect ratio:\s*4:5/i);
   assert.doesNotMatch(prompt, /OTHER_FROZEN_PROMPT_SENTINEL/);
   assert.doesNotMatch(prompt, /SUBJECT CONTENT LOCK:/);
+  assert.doesNotMatch(prompt, /SUBJECT IDENTITY LOCK:/);
   assert.deepEqual(
     {
       ratio: parameters.ratioOption.value,

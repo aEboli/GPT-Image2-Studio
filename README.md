@@ -77,7 +77,7 @@ The repository also contains a Vercel configuration. Vercel functions use tempor
 
 ### Commerce and content workflows
 
-- **Ecommerce sets** with platform, category, product facts, audience, SKU, language, logo, carousel roles, frozen plans, retries, and Listing drafts. Nineteen platform profiles are included; the generic baseline keeps 18 native carousel slots.
+- **Ecommerce sets** with platform, category, product facts, audience, SKU, language, carousel roles, frozen plans, retries, and Listing drafts. A separate logo-batch branch adds one uploaded Logo to up to 15 source images. Nineteen platform profiles are included; the generic baseline keeps 18 native carousel slots.
 - **Portrait mode** for consistent people, actions, clothing, props, locations, framing, and 1-100 image batches.
 - **Article illustration mode** for text packages, style bibles, character and scene references, reading-order storyboards, and final illustrations.
 - **PPT generation** from PDF, DOCX, PPTX, TXT, Markdown, CSV, pasted text, or a topic; supports 1-20 pages, page repair, image-based PPTX, and editable reconstruction.
@@ -136,7 +136,7 @@ These screenshots come from isolated browser sessions of the current workbench. 
 | Image decomposition | One product/device/package image and a decomposition brief | Callout or infographic-style PNG/JPG and saved analysis |
 | Image editing | Source image, whole-image instruction, or local masks | Edited PNG/JPG, region retry, and lightbox review |
 | Quick blend | Indexed A/B groups, optional C/D groups, layout settings | One independent generation task per matched group |
-| Ecommerce set | Product facts, references, platform, category, SKU, logo | Frozen carousel plan, generated set, Listing draft, and record |
+| Ecommerce set | Product facts, references, platform, category, SKU | Frozen carousel plan, generated set, Listing draft, and record; separate logo-batch processing for uploaded source images |
 | Portraits | Person/action/clothing references, location, style, framing, count | A consistent 1-100 image series and retryable record |
 | Article illustrations | Text package or pasted article, style and content type | Style bible, reference cards, storyboard, and PNG illustrations |
 | PPT | Documents, text, or topic; 1-20 pages | Page PNGs, image-based PPTX, or editable reconstructed PPTX |
@@ -146,6 +146,19 @@ These screenshots come from isolated browser sessions of the current workbench. 
 Select one or more Creation records and choose **Export Temu Excel**. The exporter uses the versioned template shipped in the repository, writes one row per SKU, reuses public HTTPS image URLs, and can convert local images through a Cloudinary unsigned upload (`cloudName` plus `uploadPreset`). It never asks for or stores a Cloudinary API key, API secret, signature, Authorization header, or browser cookie.
 
 This is a local Node.js / Windows desktop capability. It does not log in to Temu, import the workbook, solve verification challenges, or publish a product. Missing product facts or public images remain blank and are reported in the `Export issues` sheet. Review the workbook and Temu's current validation results before uploading.
+
+### Temu listing workbench
+
+**Export Temu Excel** opens the built-in Temu listing workbench as a full-screen overlay. There is no second service to start and no second port to manage. The workbench opens pre-selected with the Creation records you ticked, and lets you fill in the 51 template columns by hand per product, maintain the two-variant SKU matrix, override price, dimensions, weight and stock per SKU, manage carousel and packaging images, and export the workbook directly.
+
+The overlay has two sibling tabs:
+
+- **Listing workbench** — the default tab, for manual per-field editing and export. Its workbook keeps the template's original two sheets.
+- **Batch quick export** — the existing batch flow. Preflight, strict versus fill-in export modes, the batch defaults form, and per-record export state write-back all behave exactly as before, and its workbook still carries the `Export issues` sheet.
+
+Closing the overlay only hides it: in-progress drafts, scroll position, and not-yet-uploaded local image previews survive, so reopening resumes where you left off. Workbench drafts live in the current browser; use the workbench's own draft backup export/restore to move them across browsers or reinstalls.
+
+The workbench only reads existing Creation records. It never starts a generation job, logs in to a store, or publishes a product. SKU images must be square and larger than 800 pixels on both sides, carousel images are capped at 10 and packaging images at 6, and every template image field must be a public HTTPS URL verified by the local server.
 
 ## Product image collector extension
 

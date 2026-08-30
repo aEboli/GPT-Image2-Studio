@@ -436,6 +436,97 @@ test("Temu export frontend keeps the record refresh binding and HTML form contra
   assert.doesNotMatch(app, /apiSecret|authorization|cookie/iu);
 });
 
+test("注入 openWorkbench 后，点击导出按钮打开工作台而不再直接开批量对话框", () => {
+  const dom = createTemuExportDom({});
+  const state = {
+    creation: {
+      sets: [{ setId: "set-a" }, { setId: "set-b" }],
+      recordCheckedSetIds: ["set-a", "set-b"],
+      recordTemuExportBusy: false,
+    },
+  };
+  const openedWith = [];
+  const controller = createCreationTemuExportController({
+    state,
+    getCurrentSetIds: () => state.creation.sets.map((set) => set.setId),
+    setRecordFeedback: () => {},
+    renderRecordView: () => {},
+    documentRef: dom.documentRef,
+    windowRef: createBrowserWindow(),
+    openWorkbench: (setIds) => openedWith.push(setIds),
+  });
+
+  controller.open();
+
+  // 去向是工作台，且带上当前勾选的 setIds。
+  assert.equal(openedWith.length, 1);
+  assert.deepEqual(openedWith[0], ["set-a", "set-b"]);
+  // 关键：不再直接打开批量导出对话框。
+  assert.equal(dom.controls.creationRecordTemuExportDialog.open, false);
+
+  // 第二个标签仍能显式打开批量对话框。
+  controller.openExportDialog();
+  assert.equal(dom.controls.creationRecordTemuExportDialog.open, true);
+  assert.equal(openedWith.length, 1);
+});
+
+test("注入 openWorkbench 后，三条守卫仍先拦截且不打开工作台", () => {
+  const dom = createTemuExportDom({});
+  const state = {
+    creation: { sets: [{ setId: "set-a" }], recordCheckedSetIds: [], recordTemuExportBusy: false },
+  };
+  const openedWith = [];
+  const feedback = [];
+  const controller = createCreationTemuExportController({
+    state,
+    getCurrentSetIds: () => state.creation.sets.map((set) => set.setId),
+    setRecordFeedback: (...args) => feedback.push(args),
+    renderRecordView: () => {},
+    documentRef: dom.documentRef,
+    windowRef: createBrowserWindow(),
+    openWorkbench: (setIds) => openedWith.push(setIds),
+  });
+
+  // 零勾选：不打开工作台，提示文案保持原文。
+  controller.open();
+  assert.equal(openedWith.length, 0);
+  assert.equal(feedback.at(-1)?.[0], "请先勾选需要导出的套图记录。");
+
+  // 记录变更中：同样不打开工作台，提示文案保持原文。
+  state.creation.recordCheckedSetIds = ["set-a"];
+  const busyController = createCreationTemuExportController({
+    state,
+    getCurrentSetIds: () => state.creation.sets.map((set) => set.setId),
+    isMutationBusy: () => true,
+    setRecordFeedback: (...args) => feedback.push(args),
+    renderRecordView: () => {},
+    documentRef: dom.documentRef,
+    windowRef: createBrowserWindow(),
+    openWorkbench: (setIds) => openedWith.push(setIds),
+  });
+  busyController.open();
+  assert.equal(openedWith.length, 0);
+  assert.equal(feedback.at(-1)?.[0], "当前记录正在生成、刷新或删除，请完成后再打开 Temu 导出。");
+});
+
+test("不注入 openWorkbench 时退回原行为，直接打开批量导出对话框", () => {
+  const dom = createTemuExportDom({});
+  const state = {
+    creation: { sets: [{ setId: "set-a" }], recordCheckedSetIds: ["set-a"], recordTemuExportBusy: false },
+  };
+  const controller = createCreationTemuExportController({
+    state,
+    getCurrentSetIds: () => state.creation.sets.map((set) => set.setId),
+    setRecordFeedback: () => {},
+    renderRecordView: () => {},
+    documentRef: dom.documentRef,
+    windowRef: createBrowserWindow(),
+  });
+
+  controller.open();
+  assert.equal(dom.controls.creationRecordTemuExportDialog.open, true);
+});
+
 test("Temu export filename keeps only a safe XLSX attachment name", () => {
   assert.equal(getTemuExportFilename("attachment; filename*=UTF-8''temu-import.xlsx"), "temu-import.xlsx");
   assert.equal(getTemuExportFilename('attachment; filename="bad<name>.xlsx"'), "badname.xlsx");

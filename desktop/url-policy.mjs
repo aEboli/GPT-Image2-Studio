@@ -1,5 +1,7 @@
 const PROJECT_REPOSITORY_ORIGIN = "https://github.com";
 const PROJECT_REPOSITORY_PATH = "/aEboli/GPT-Image2-Studio";
+const IMAGE_HOSTING_CONSOLE_ORIGIN = "https://console.cloudinary.com";
+const IMAGE_HOSTING_CONSOLE_PATH = "/settings/upload";
 
 function parseUrl(value) {
   try {
@@ -30,13 +32,20 @@ export function isAllowedExternalUrl(targetUrl) {
   if (!target) {
     return false;
   }
+  if (target.protocol !== "https:" || target.username || target.password) {
+    return false;
+  }
 
-  return (
-    target.protocol === "https:" &&
-    target.origin === PROJECT_REPOSITORY_ORIGIN &&
-    !target.username &&
-    !target.password &&
-    (target.pathname === PROJECT_REPOSITORY_PATH ||
-      target.pathname.startsWith(`${PROJECT_REPOSITORY_PATH}/`))
-  );
+  if (target.origin === PROJECT_REPOSITORY_ORIGIN) {
+    return (
+      target.pathname === PROJECT_REPOSITORY_PATH ||
+      target.pathname.startsWith(`${PROJECT_REPOSITORY_PATH}/`)
+    );
+  }
+
+  if (target.origin === IMAGE_HOSTING_CONSOLE_ORIGIN) {
+    return target.pathname === IMAGE_HOSTING_CONSOLE_PATH;
+  }
+
+  return false;
 }

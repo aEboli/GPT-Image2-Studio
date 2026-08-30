@@ -107,6 +107,8 @@ export const PUBLIC_LIB_SYNC_TARGETS = [
   "studio-constants.mjs",
   "studio-formatters.mjs",
   "style-transfer-preset-lightbox.mjs",
+  "temu",
+  "temu-workbench-launcher.mjs",
   "upstream-fatal-error.mjs",
   "view-mode-loader.mjs",
   "views",

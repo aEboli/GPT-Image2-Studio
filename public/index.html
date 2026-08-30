@@ -68,7 +68,7 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Sora:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260830-disabled-shake-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260830-temu-workbench-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -2735,6 +2735,35 @@
       </form>
     </dialog>
 
+    <!--
+      Temu 上品工作台覆盖层。刻意置于 #creationRecordTemuExportDialog 之外：
+      嵌在那个 <form> 内会让工作台与批量表单共享同一个 form，一次误触回车即触发批量导出提交。
+      标记必须静态存在 —— refs.viewPanels 是顶层一次性 querySelectorAll，后插入的节点永不被切换。
+    -->
+    <div class="temu-workbench-layer" id="temuWorkbenchLayer" hidden>
+      <div class="temu-workbench-chrome">
+        <div class="temu-workbench-tabs" role="tablist" aria-label="Temu 上品工作台">
+          <button
+            class="temu-workbench-tab"
+            id="temuWorkbenchTabWorkbench"
+            type="button"
+            role="tab"
+            aria-selected="true"
+          >上品工作台</button>
+          <button
+            class="temu-workbench-tab"
+            id="temuWorkbenchTabBatch"
+            type="button"
+            role="tab"
+            aria-selected="false"
+          >批量快速导出</button>
+        </div>
+        <button class="toolbar-button" id="temuWorkbenchCloseButton" type="button">关闭</button>
+      </div>
+      <!-- 不加 sandbox：同源 iframe 的 POST 会带 Origin 头，缺 allow-same-origin 时 Origin 变 null 直接 403。 -->
+      <iframe class="temu-workbench-frame" id="temuWorkbenchFrame" title="Temu 上品工作台"></iframe>
+    </div>
+
     <dialog
       class="creation-record-delete-dialog asset-record-delete-dialog"
       id="assetRecordDeleteDialog"
@@ -3320,6 +3349,6 @@
 
     <div class="app-tooltip" id="appTooltip" role="tooltip" popover="manual"></div>
 
-    <script type="module" src="./app.js?v=20260830-disabled-shake-1"></script>
+    <script type="module" src="./app.js?v=20260830-temu-workbench-1"></script>
   </body>
 </html>

@@ -2549,6 +2549,17 @@ test("creation planner does not create SKU images for accessory or package refer
   assert.doesNotMatch(plan.items[2].prompt, /hooks\.png/);
 });
 
+test("creation planner preserves SKU source indexes after style references are filtered", () => {
+  const referenceImageRoles = [
+    { index: 1, filename: "lighting-style.png", role: "style" },
+    { index: 2, filename: "subject-anchor.png", role: "reference-product" },
+  ];
+
+  const subjects = normalizeCreationSkuSubjects("", referenceImageRoles);
+
+  assert.deepEqual(subjects.map((subject) => subject.referenceIndexes), [[2]]);
+});
+
 test("creation planner keeps product SKU subjects when notes describe usage context", () => {
   const referenceImageRoles = [
     {

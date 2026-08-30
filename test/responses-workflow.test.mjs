@@ -18,6 +18,7 @@ import {
   requestImageGeneration,
   requestModelProtocolImageGeneration,
 } from "../lib/responses-workflow.mjs";
+import { buildCreationReferenceImageLabels } from "../lib/creation-reference-labels.mjs";
 
 test("buildResponsesInput returns structured content for prompt-only generation", () => {
   const input = buildResponsesInput({
@@ -147,6 +148,39 @@ test("buildResponsesInput can label reference images before each image", () => {
       image_url: "data:image/jpeg;base64,c3R5bGU=",
     },
   ]);
+});
+
+test("Responses input keeps the creation subject lock adjacent to its reordered reference image", () => {
+  const referenceImages = [
+    { filename: "anchor-reference.jpg", referenceIndex: 2, mimeType: "image/jpeg", base64: "YW5jaG9y" },
+    { filename: "detail-reference.jpg", referenceIndex: 3, mimeType: "image/jpeg", base64: "ZGV0YWls" },
+  ];
+  const referenceImageLabels = buildCreationReferenceImageLabels(referenceImages, [
+    { index: 1, filename: "discarded-scene.png", role: "scene", rolePromptLabel: "scene" },
+    { index: 2, filename: "anchor.png", role: "reference-product", rolePromptLabel: "reference subject" },
+    { index: 3, filename: "detail.png", role: "material", rolePromptLabel: "material detail" },
+  ]);
+
+  const input = buildResponsesInput({
+    prompt: "Generate a suite image.",
+    referenceImages,
+    referenceImageLabels,
+  });
+  const content = input[0].content;
+
+  assert.deepEqual(content.map((part) => part.type), [
+    "input_text",
+    "input_text",
+    "input_image",
+    "input_text",
+    "input_image",
+  ]);
+  assert.match(content[1].text, /Role: reference subject\./);
+  assert.match(content[1].text, /Primary subject anchor:/);
+  assert.equal(content[2].image_url, "data:image/jpeg;base64,YW5jaG9y");
+  assert.match(content[3].text, /Role: material detail\./);
+  assert.match(content[3].text, /supporting reference after the primary subject anchor/i);
+  assert.equal(content[4].image_url, "data:image/jpeg;base64,ZGV0YWls");
 });
 
 test("createResponsesRequestBody keeps gpt-5.4 on the outer model and passes reasoning effort", () => {

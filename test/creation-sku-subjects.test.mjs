@@ -76,6 +76,18 @@ test("creation SKU payload treats reference subjects as product subjects", () =>
   ]);
 });
 
+test("creation SKU payload preserves explicit reference indexes after filtering style roles", () => {
+  const subjects = buildCreationSkuSubjectsForPayload({
+    referenceRoles: [
+      { index: 1, filename: "lighting-style.png", role: "style" },
+      { index: 2, filename: "subject-anchor.png", role: "reference-product" },
+      { index: 3, filename: "material-detail.png", role: "material" },
+    ],
+  });
+
+  assert.deepEqual(subjects.map((subject) => subject.referenceIndexes), [[2]]);
+});
+
 test("creation SKU payload does not append covered product references when analysis already matches by index", () => {
   const subjects = buildCreationSkuSubjectsForPayload({
     analysis: {

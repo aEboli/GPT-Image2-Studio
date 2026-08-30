@@ -284,6 +284,24 @@ test("stylesheet derives water color from stage hue and progress depth", async (
   );
 });
 
+test("loading surface avoids a bright moving divider and keeps status text crisp", async () => {
+  const styles = await readFile(new URL("../public/styles.css", import.meta.url), "utf8");
+  const fillRule = styles.match(/\.generation-loading-drop::after\s*\{[\s\S]*?\n\}/)?.[0] || "";
+  const waveRule = styles.match(/\n\.generation-loading-wave \{[\s\S]*?\n\}/)?.[0] || "";
+  const waveAfterRule =
+    styles.match(/\n\.generation-loading-wave::after\s*\{\s*z-index:\s*1;[\s\S]*?\n\}/)?.[0] || "";
+  const shellRule = styles.match(/\n\.generation-loading-shell\s*\{[\s\S]*?\n\}/)?.[0] || "";
+
+  assert.match(fillRule, /mask-image:\s*linear-gradient\(180deg, transparent 0%, #000 18%, #000 100%\)/);
+  assert.doesNotMatch(fillRule, /inset 0 1px 0 rgba\(255, 255, 255/);
+  assert.match(waveRule, /opacity:\s*0;/);
+  assert.match(waveRule, /animation:\s*none;/);
+  assert.doesNotMatch(waveRule, /#ffffff/);
+  assert.match(waveAfterRule, /animation:\s*none;/);
+  assert.match(shellRule, /font-family:\s*"IBM Plex Sans", "Noto Sans SC", "Microsoft YaHei", sans-serif;/);
+  assert.match(styles, /\.generation-loading-heartbeat\s*\{[\s\S]*stroke-width:\s*2\.25;/);
+});
+
 test("preview loading renders a wave layer inside the water drop", () => {
   const documentRef = createTestDocument();
   const scheduler = installScheduler();

@@ -5,7 +5,10 @@ import {
   buildCreationGenerationReferenceImageLabels,
   buildCreationItemReferenceImages,
   buildCreationReferenceImageLabels,
+  MAX_CREATION_ITEM_REFERENCE_BYTES,
+  MAX_CREATION_ITEM_REFERENCE_IMAGES,
 } from "../lib/creation-reference-labels.mjs";
+import { normalizeCreationCoverageFields } from "../lib/creation-reference-coverage.mjs";
 
 test("creation reference labels state uploaded count, file list, image order, and roles", () => {
   const labels = buildCreationReferenceImageLabels(
@@ -111,6 +114,22 @@ test("creation infographic rebuild resolves compressed source renames by stable 
   assert.deepEqual(buildCreationItemReferenceImages(item, images).map((image) => image.filename), [
     "compressed-size-card.webp",
   ]);
+});
+
+test("creation infographic rebuild prefers stable source index when filenames repeat", () => {
+  const item = {
+    role: "infographic-rebuild",
+    sourceInfographic: {
+      filename: "same-name.png",
+      index: 2,
+    },
+  };
+  const images = [
+    { filename: "same-name.png", referenceIndex: 1, marker: "wrong" },
+    { filename: "same-name.png", referenceIndex: 2, marker: "source" },
+  ];
+
+  assert.equal(buildCreationItemReferenceImages(item, images)[0].marker, "source");
 });
 
 test("creation infographic rebuild accepts historical itemKind-only records", () => {
@@ -470,4 +489,280 @@ test("creation expanded suite roles keep the selected reference subject as the s
     buildCreationItemReferenceImages({ role: "product-detail" }, images, roles).map((image) => image.filename),
     ["orange-reference-subject.png", "mesh-detail.png"],
   );
+});
+
+test("creation reference scheduling admits several relevant small references without a per-role cap", () => {
+  const images = [
+    { filename: "product.png", byteLength: 400_000 },
+    { filename: "detail-front.png", byteLength: 300_000 },
+    { filename: "detail-side.png", byteLength: 300_000 },
+    { filename: "detail-closeup.png", byteLength: 300_000 },
+    { filename: "scene.png", byteLength: 300_000 },
+  ];
+  const roles = [
+    { filename: "product.png", role: "product" },
+    { filename: "detail-front.png", role: "material" },
+    { filename: "detail-side.png", role: "material" },
+    { filename: "detail-closeup.png", role: "material" },
+    { filename: "scene.png", role: "scene" },
+  ];
+
+  const selected = buildCreationItemReferenceImages({ role: "product-detail" }, images, roles);
+  assert.equal(selected.length, 4);
+  assert.deepEqual(selected.map((image) => image.filename), [
+    "product.png",
+    "detail-front.png",
+    "detail-side.png",
+    "detail-closeup.png",
+  ]);
+  assert.ok(selected.length > 3);
+  assert.ok(selected.length <= MAX_CREATION_ITEM_REFERENCE_IMAGES);
+});
+
+test("creation reference scheduling keeps distinct uploads with the same filename", () => {
+  const images = [
+    { filename: "product.png", byteLength: 400_000 },
+    { filename: "detail.png", byteLength: 300_000, view: "front" },
+    { filename: "detail.png", byteLength: 300_000, view: "back" },
+  ];
+  const roles = [
+    { filename: "product.png", role: "product" },
+    { index: 2, role: "material" },
+    { index: 3, role: "material" },
+  ];
+
+  const selected = buildCreationItemReferenceImages({ role: "product-detail" }, images, roles);
+  assert.equal(selected.length, 3);
+  assert.equal(selected[1], images[1]);
+  assert.equal(selected[2], images[2]);
+});
+
+test("creation reference scheduling honors indexed roles for distinct uploads with the same filename", () => {
+  const images = [
+    { filename: "product.png", byteLength: 400_000 },
+    { filename: "reference.png", byteLength: 300_000, view: "material" },
+    { filename: "reference.png", byteLength: 300_000, view: "scene" },
+  ];
+  const roles = [
+    { filename: "product.png", index: 1, role: "product" },
+    { filename: "reference.png", index: 2, role: "material" },
+    { filename: "reference.png", index: 3, role: "scene" },
+  ];
+
+  const selected = buildCreationItemReferenceImages({ role: "product-detail" }, images, roles);
+  assert.deepEqual(selected, [images[0], images[1]]);
+});
+
+test("creation reference labels retain each selected image role after the scheduler removes other uploads", () => {
+  const images = [
+    { filename: "product.png" },
+    { filename: "package.png" },
+    { filename: "detail.png" },
+  ];
+  const roles = [
+    { filename: "product.png", index: 1, role: "product", rolePromptLabel: "product subject" },
+    { filename: "package.png", index: 2, role: "package", rolePromptLabel: "package details" },
+    { filename: "detail.png", index: 3, role: "material", rolePromptLabel: "material detail" },
+  ];
+  const selected = buildCreationItemReferenceImages({ role: "product-detail" }, images, roles);
+  const labels = buildCreationReferenceImageLabels(selected, roles);
+
+  assert.equal(selected.length, 2);
+  assert.match(labels[1], /Role: material detail\./);
+  assert.doesNotMatch(labels[1], /package details/);
+});
+
+test("creation reference labels keep roles after compression renames and subset reordering", () => {
+  const selected = [
+    { filename: "anchor-reference.jpg", referenceIndex: 2 },
+    { filename: "detail-reference.jpg", referenceIndex: 3 },
+  ];
+  const roles = [
+    { index: 1, filename: "unrelated.png", role: "scene" },
+    { index: 2, filename: "anchor.png", role: "reference-product", rolePromptLabel: "reference subject" },
+    { index: 3, filename: "detail.png", role: "material", rolePromptLabel: "material detail" },
+  ];
+
+  const labels = buildCreationReferenceImageLabels(selected, roles);
+  assert.match(labels[0], /Role: reference subject\./);
+  assert.match(labels[0], /Primary subject anchor:/);
+  assert.match(labels[1], /Role: material detail\./);
+  assert.match(labels[1], /supporting reference after the primary subject anchor/i);
+  assert.doesNotMatch(labels[0], /Role: scene\./);
+  assert.doesNotMatch(labels[1], /Role: reference subject\./);
+});
+
+test("creation reference labels do not promote a later product view to another identity authority", () => {
+  const labels = buildCreationReferenceImageLabels(
+    [
+      { filename: "anchor-reference.jpg", referenceIndex: 2 },
+      { filename: "alternate-reference.jpg", referenceIndex: 3 },
+    ],
+    [
+      { index: 2, filename: "anchor.png", role: "reference-product", rolePromptLabel: "reference subject" },
+      { index: 3, filename: "alternate.png", role: "product", rolePromptLabel: "product subject" },
+    ],
+  );
+
+  assert.match(labels[0], /Product identity authority:/);
+  assert.match(labels[1], /Supporting product reference:/);
+  assert.doesNotMatch(labels[1], /Product identity authority:/);
+});
+
+test("creation reference scheduling uses stable indexes for reordered coverage and SKU sources", () => {
+  const images = [
+    { filename: "anchor-reference.jpg", referenceIndex: 2 },
+    { filename: "detail-reference.jpg", referenceIndex: 3 },
+  ];
+  const roles = [
+    { index: 1, filename: "discarded-scene.png", role: "scene" },
+    { index: 2, filename: "anchor.png", role: "reference-product" },
+    { index: 3, filename: "detail.png", role: "material" },
+  ];
+
+  const coverageSelection = buildCreationItemReferenceImages(
+    {
+      role: "scene",
+      coverageSources: [{ index: 3, filename: "detail.png", role: "material" }],
+    },
+    images,
+    roles,
+  );
+  const skuSelection = buildCreationItemReferenceImages(
+    {
+      role: "sku",
+      skuSubject: { referenceIndexes: [2], filenames: ["anchor.png"] },
+      skuSupportingReferenceRoles: ["material"],
+    },
+    images,
+    roles,
+  );
+
+  assert.deepEqual(coverageSelection, images);
+  assert.deepEqual(skuSelection, images);
+});
+
+test("creation coverage normalization retains reference indexes from browser payloads", () => {
+  const normalized = normalizeCreationCoverageFields({
+    coverageSources: [
+      {
+        reference_index: 3,
+        filename: "detail.png",
+        role: "material",
+        note: "Preserve the material detail.",
+      },
+    ],
+  });
+
+  assert.deepEqual(normalized.coverageSources, [
+    {
+      index: 3,
+      filename: "detail.png",
+      role: "material",
+      roleLabel: "",
+      rolePromptLabel: "",
+      note: "Preserve the material detail.",
+    },
+  ]);
+});
+
+test("creation reference scheduling enforces the eight-image hard cap", () => {
+  const images = [
+    { filename: "product.png", byteLength: 200_000 },
+    ...Array.from({ length: 14 }, (_, index) => ({
+      filename: `detail-${index + 1}.png`,
+      byteLength: 200_000,
+    })),
+  ];
+  const roles = images.map((image, index) => ({
+    filename: image.filename,
+    role: index === 0 ? "product" : "material",
+  }));
+
+  const selected = buildCreationItemReferenceImages({ role: "product-detail" }, images, roles);
+  assert.equal(selected.length, MAX_CREATION_ITEM_REFERENCE_IMAGES);
+  assert.deepEqual(selected.map((image) => image.filename), images.slice(0, MAX_CREATION_ITEM_REFERENCE_IMAGES).map((image) => image.filename));
+});
+
+test("creation reference scheduling stops on the shared byte budget while keeping the anchor", () => {
+  const images = [
+    { filename: "product.png", byteLength: 1_000_000 },
+    { filename: "detail-1.png", byteLength: 2_000_000 },
+    { filename: "detail-2.png", byteLength: 2_000_000 },
+    { filename: "detail-3.png", byteLength: 2_000_000 },
+  ];
+  const roles = images.map((image, index) => ({
+    filename: image.filename,
+    role: index === 0 ? "product" : "material",
+  }));
+
+  const selected = buildCreationItemReferenceImages({ role: "product-detail" }, images, roles);
+  assert.deepEqual(selected.map((image) => image.filename), ["product.png", "detail-1.png", "detail-2.png"]);
+  assert.ok(selected.reduce((total, image) => total + image.byteLength, 0) <= MAX_CREATION_ITEM_REFERENCE_BYTES);
+  assert.notEqual(selected.length, images.length);
+});
+
+test("creation reference scheduling keeps an oversized subject anchor", () => {
+  const images = [
+    { filename: "product.png", byteLength: MAX_CREATION_ITEM_REFERENCE_BYTES + 1 },
+    { filename: "detail.png", byteLength: 200_000 },
+  ];
+  const roles = [
+    { filename: "product.png", role: "product" },
+    { filename: "detail.png", role: "material" },
+  ];
+
+  const selected = buildCreationItemReferenceImages({ role: "product-detail" }, images, roles);
+  assert.deepEqual(selected, [images[0]]);
+});
+
+// 浏览器端主体锚点的压缩上限必须为支撑候选留出剩余字节额度。若两者相等，一张压到上限的主体图
+// 会独占整项预算，使 coverage 来源和支撑参考图全部被字节检查跳过，等于静默关闭智能调度。
+test("a primary subject compressed to the browser ceiling still leaves room for supporting references", () => {
+  const browserPrimarySubjectMaxBytes = 3 * 1024 * 1024;
+  assert.ok(browserPrimarySubjectMaxBytes < MAX_CREATION_ITEM_REFERENCE_BYTES);
+
+  const images = [
+    { filename: "product.png", byteLength: browserPrimarySubjectMaxBytes },
+    { filename: "size-card.png", byteLength: 400_000 },
+    { filename: "detail.png", byteLength: 400_000 },
+  ];
+  const roles = [
+    { filename: "product.png", role: "product" },
+    { filename: "size-card.png", role: "dimensions" },
+    { filename: "detail.png", role: "material" },
+  ];
+  const item = {
+    role: "effect-comparison",
+    coverageSources: [{ filename: "size-card.png", role: "dimensions" }],
+  };
+
+  const selected = buildCreationItemReferenceImages(item, images, roles);
+  assert.deepEqual(selected.map((image) => image.filename), ["product.png", "size-card.png", "detail.png"]);
+  assert.ok(
+    selected.reduce((total, image) => total + image.byteLength, 0) <= MAX_CREATION_ITEM_REFERENCE_BYTES,
+  );
+});
+
+test("coverage metadata that does not match an uploaded file never falls back to all references", () => {
+  const images = [
+    { filename: "product.png" },
+    { filename: "unrelated-detail.png" },
+    { filename: "unrelated-scene.png" },
+  ];
+  const roles = [
+    { filename: "product.png", role: "product" },
+    { filename: "unrelated-detail.png", role: "material" },
+    { filename: "unrelated-scene.png", role: "scene" },
+  ];
+
+  const selected = buildCreationItemReferenceImages(
+    {
+      role: "size-capacity-fit",
+      coverageSources: [{ filename: "missing-size-card.png", role: "dimensions" }],
+    },
+    images,
+    roles,
+  );
+  assert.deepEqual(selected.map((image) => image.filename), ["product.png"]);
 });

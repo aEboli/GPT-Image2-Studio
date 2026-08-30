@@ -8249,7 +8249,7 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
   /* 主题整体偏移，与各阶段自己的起始亮度叠加，避免主题规则盖掉阶段调校。 */
   --generation-loading-light-shift: 0%;
   /* 满幅铺开后液体面积成倍变大，用透明度压住整体亮度，中间文字才读得清。 */
-  --generation-loading-fill-opacity: 0.46;
+  --generation-loading-fill-opacity: 0.34;
   --generation-loading-aurora-opacity: 0.5;
   --generation-loading-scrim: rgba(8, 11, 22, 0.42);
   /* 百分比越高液体越深，所以同一阶段内也能看出推进。 */
@@ -8282,6 +8282,9 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
   padding: 16px;
   box-sizing: border-box;
   color: var(--text);
+  font-family: "IBM Plex Sans", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
   text-align: center;
 }
 
@@ -8335,7 +8338,7 @@ html[data-theme="light"] .generation-loading-shell {
   --generation-loading-light-shift: -16%;
   --generation-loading-light-span: 0.14;
   /* 浅色主题下压暗层要反过来提亮，否则满幅上色会把深色文字吃掉。 */
-  --generation-loading-fill-opacity: 0.34;
+  --generation-loading-fill-opacity: 0.28;
   --generation-loading-aurora-opacity: 0.38;
   --generation-loading-scrim: rgba(255, 255, 255, 0.56);
 }
@@ -8372,16 +8375,17 @@ html[data-theme="light"] .generation-loading-shell[data-generation-loading-famil
   z-index: 1;
   inset: auto 0 0;
   height: var(--generation-loading-progress);
-  opacity: var(--generation-loading-fill-opacity, 0.46);
+  opacity: var(--generation-loading-fill-opacity, 0.34);
   background:
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--generation-loading-fluid) 80%, #ffffff),
+      color-mix(in srgb, var(--generation-loading-fluid) 38%, transparent),
+      color-mix(in srgb, var(--generation-loading-fluid) 64%, #0f172a) 28%,
       color-mix(in srgb, var(--generation-loading-fluid) 64%, #0f172a)
     );
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.42),
-    inset 0 12px 20px rgba(255, 255, 255, 0.09);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 18%, #000 100%);
+  mask-image: linear-gradient(180deg, transparent 0%, #000 18%, #000 100%);
+  box-shadow: inset 0 12px 20px rgba(255, 255, 255, 0.035);
   pointer-events: none;
 }
 
@@ -8415,9 +8419,8 @@ html[data-theme="light"] .generation-loading-shell[data-generation-loading-famil
   margin: 0;
 }
 
-/* 液面是一条柔和的高光带，不是平铺的半圆，也不左右漂移。
-   平铺图案会给视线一排可对齐的参照物，液位每上升一点都被读成"跳了一格"；
-   换成纯纵向渐变后没有任何可对齐的重复单元，上升就是连续的。 */
+/* 保留液面节点以维持统一加载层 DOM，但不再绘制独立的横向高光带。
+   原高光会在大预览中形成明显白条；水体的气泡、环境光与渐隐填充仍负责表达生成状态。 */
 .generation-loading-wave {
   position: absolute;
   z-index: 3;
@@ -8425,16 +8428,17 @@ html[data-theme="light"] .generation-loading-shell[data-generation-loading-famil
   width: 100%;
   bottom: calc(var(--generation-loading-progress) - var(--generation-loading-wave-height, 8px));
   height: calc(var(--generation-loading-wave-height, 8px) * 2);
+  opacity: 0;
   pointer-events: none;
   background-image: linear-gradient(
     180deg,
     transparent 0%,
-    color-mix(in srgb, var(--generation-loading-fluid) 26%, transparent) 34%,
-    color-mix(in srgb, var(--generation-loading-fluid) 94%, #ffffff) 50%,
-    color-mix(in srgb, var(--generation-loading-fluid) 66%, transparent) 66%,
+    color-mix(in srgb, var(--generation-loading-fluid) 24%, transparent) 34%,
+    color-mix(in srgb, var(--generation-loading-fluid) 48%, transparent) 50%,
+    color-mix(in srgb, var(--generation-loading-fluid) 30%, transparent) 66%,
     transparent 100%
   );
-  animation: generation-loading-water-flow 5200ms ease-in-out infinite;
+  animation: none;
 }
 
 .generation-loading-wave::before,
@@ -8457,8 +8461,7 @@ html[data-theme="light"] .generation-loading-shell[data-generation-loading-famil
   );
 }
 
-/* 水体内部持续向上流动的柔光：像水龙头放水，即使高百分比区间液位几乎不动，
-   画面也一直有自然的向上流动感，而不是静止后突然跳一格。 */
+/* 保留内部柔光的几何规则以兼容现有节点，但关闭绘制与动画；当前动态感交给环境光雾和气泡。 */
 .generation-loading-wave::after {
   z-index: 1;
   inset: auto 0 -1200%;
@@ -8466,12 +8469,12 @@ html[data-theme="light"] .generation-loading-shell[data-generation-loading-famil
   background-image: linear-gradient(
     180deg,
     transparent 0%,
-    color-mix(in srgb, var(--generation-loading-fluid) 42%, #ffffff) 46%,
+    color-mix(in srgb, var(--generation-loading-fluid) 30%, transparent) 46%,
     transparent 100%
   );
   background-size: 100% 26%;
   background-position: 0 100%;
-  animation: generation-loading-wave-drift 4200ms linear infinite;
+  animation: none;
 }
 
 /* 满幅的环境光雾：几团柔光缓慢横移与缩放，让整块占位在生成期间一直有呼吸感。
@@ -8537,10 +8540,13 @@ html[data-theme="light"] .generation-loading-shell[data-generation-loading-famil
   width: clamp(20px, 9cqi, 46px);
   height: clamp(20px, 9cqi, 46px);
   margin: 0;
-  stroke-width: 2;
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  shape-rendering: geometricPrecision;
   color: color-mix(in srgb, #ffffff 88%, var(--generation-loading-fluid));
   filter:
-    drop-shadow(0 0 10px color-mix(in srgb, var(--generation-loading-fluid) 78%, transparent))
+    drop-shadow(0 0 5px color-mix(in srgb, var(--generation-loading-fluid) 48%, transparent))
     drop-shadow(0 1px 2px rgba(4, 7, 14, 0.72));
   overflow: visible;
 }
@@ -8561,10 +8567,11 @@ html[data-theme="light"] .generation-loading-heartbeat {
    所以这里把亮度拉到接近纯白并加一层暗描边阴影拉开层次。 */
 .generation-loading-percent {
   min-width: 4ch;
+  font-family: "Sora", "IBM Plex Sans", "Noto Sans SC", "Microsoft YaHei", sans-serif;
   color: color-mix(in srgb, #ffffff 92%, var(--generation-loading-fluid));
-  font-size: var(--type-small-title-size);
+  font-size: clamp(0.9rem, 1.25cqi, 1.08rem);
   font-variant-numeric: tabular-nums;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1;
   text-shadow:
     0 1px 2px rgba(4, 7, 14, 0.72),
@@ -8593,7 +8600,7 @@ html[data-theme="light"] .generation-loading-percent {
 
 /* 等待态只调静态液位、节奏与气泡强度；颜色交给排队色相族，避免两套取色互相覆盖。 */
 .generation-loading-shell[data-generation-loading-mode="waiting"] .generation-loading-drop::after {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  box-shadow: inset 0 12px 20px rgba(255, 255, 255, 0.025);
 }
 
 /* 排队时把满幅光雾压暗放慢：等待和真正在生成必须一眼能分出来。 */
@@ -8607,9 +8614,7 @@ html[data-theme="light"] .generation-loading-percent {
   opacity: 0.35;
 }
 
-/* 等待态一切都更慢：液面呼吸放缓，水体内部的上行柔光也放缓。
-   原来这里把 ::after 调到 3600ms 比生成态更快，方向是反的；
-   ::before 的 filter / animation 覆盖在液面改成纯渐变后已无对应物，一并去掉。 */
+/* 等待态保留原有时序钩子，实际视觉由更慢的水位呼吸和环境光雾表达。 */
 .generation-loading-shell[data-generation-loading-mode="waiting"] .generation-loading-wave {
   animation-duration: 7200ms;
 }
@@ -8631,9 +8636,11 @@ html[data-theme="light"] .generation-loading-shell[data-generation-loading-mode=
 
 .generation-loading-label {
   max-width: 18em;
+  font-family: "IBM Plex Sans", "Noto Sans SC", "Microsoft YaHei", sans-serif;
   color: rgba(255, 255, 255, 0.94);
-  font-size: var(--type-subtitle-size);
+  font-size: clamp(0.8rem, 1.1cqi, 0.96rem);
   font-weight: 600;
+  letter-spacing: 0;
   line-height: 1.35;
   text-shadow: 0 1px 2px rgba(4, 7, 14, 0.66);
 }
@@ -8647,8 +8654,11 @@ html[data-theme="light"] .generation-loading-label {
 .generation-loading-log {
   max-width: 22em;
   width: 100%;
+  font-family: "IBM Plex Sans", "Noto Sans SC", "Microsoft YaHei", sans-serif;
   color: rgba(255, 255, 255, 0.86);
-  font-size: calc(var(--type-subtitle-size) * 0.94);
+  font-size: clamp(0.76rem, 1cqi, 0.9rem);
+  font-weight: 500;
+  letter-spacing: 0;
   line-height: 1.35;
   white-space: normal;
   overflow-wrap: anywhere;
@@ -17422,4 +17432,63 @@ html[data-ui-layout="mobile"] .creation-record-browser .asset-record-picker.is-o
   .creation-record-list-item .creation-record {
     transition: none;
   }
+}
+
+/* Temu 上品工作台覆盖层。铺满视口而不是装进模态 dialog：
+   子文档自带的图片灯箱按 100vw/100dvh 铺满，受宽高上限约束后无法真正全屏。 */
+.temu-workbench-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface, #0f1115);
+}
+
+/* 宿主的 span/按钮外边距规则优先级高于单类选择器，会吃掉 inset:0 图层顶部一条，
+   因此在图层内显式归零。 */
+.temu-workbench-layer span,
+.temu-workbench-layer button {
+  margin-top: 0;
+}
+
+.temu-workbench-chrome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: 0 0 auto;
+  min-height: 48px;
+  padding-inline: 14px;
+  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+}
+
+.temu-workbench-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.temu-workbench-tab {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font: inherit;
+  color: var(--text-muted, rgba(255, 255, 255, 0.66));
+  background: transparent;
+  cursor: pointer;
+}
+
+.temu-workbench-tab[aria-selected="true"] {
+  color: var(--text, #f5f6f8);
+  border-color: var(--border, rgba(255, 255, 255, 0.18));
+  background: var(--surface-raised, rgba(255, 255, 255, 0.08));
+}
+
+.temu-workbench-frame {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  border: 0;
+  display: block;
 }

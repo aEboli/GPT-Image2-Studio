@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#0a0c11">
+  <title>TEMU 本地上品台</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/temu/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark"><i data-lucide="package-open"></i></span>
+      <div>
+        <strong>TEMU 本地上品台</strong>
+        <span id="saveStatus">草稿已保存</span>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button class="secondary-button studio-import-button" id="studioImportButton" type="button" title="从 Studio 导入" aria-label="从 Studio 导入">
+        <i data-lucide="panels-top-left"></i><span>从 Studio 导入</span>
+      </button>
+      <button class="icon-button" id="settingsButton" type="button" title="图片上传设置" aria-label="图片上传设置">
+        <i data-lucide="settings-2"></i>
+      </button>
+      <button class="secondary-button" id="validateButton" type="button" title="检查" aria-label="检查">
+        <i data-lucide="list-checks"></i><span>检查</span>
+      </button>
+      <button class="icon-button" id="backupButton" type="button" title="导出草稿备份" aria-label="导出草稿备份">
+        <i data-lucide="download"></i>
+      </button>
+      <button class="icon-button" id="restoreButton" type="button" title="恢复草稿备份" aria-label="恢复草稿备份">
+        <i data-lucide="archive-restore"></i>
+      </button>
+      <button class="icon-button" id="resetCurrentProductButton" type="button" title="恢复当前商品默认页面" aria-label="恢复当前商品默认页面">
+        <i data-lucide="rotate-ccw"></i>
+      </button>
+      <button class="primary-button" id="exportButton" type="button" title="导出 Excel" aria-label="导出 Excel" disabled>
+        <i data-lucide="download"></i><span>导出 Excel</span><b id="exportSelectionCount">1</b>
+      </button>
+    </div>
+  </header>
+
+  <div class="app-shell">
+    <aside class="product-rail" aria-labelledby="productRailTitle">
+      <div class="product-rail-heading">
+        <div><strong id="productRailTitle">商品列表</strong><span id="productTotalCount">1 个商品</span></div>
+        <button class="icon-button" id="addProductButton" type="button" title="添加商品" aria-label="添加商品"><i data-lucide="plus"></i></button>
+      </div>
+      <div class="product-list-tools">
+        <label class="product-search" for="productSearchInput">
+          <i data-lucide="search"></i>
+          <input id="productSearchInput" type="search" placeholder="搜索标题、货号或 SKU" autocomplete="off">
+        </label>
+        <div class="product-filter-row">
+          <label class="visually-hidden" for="productStatusFilter">筛选商品状态</label>
+          <select id="productStatusFilter" aria-label="筛选商品状态">
+            <option value="">全部状态</option>
+            <option value="incomplete">待完善</option>
+            <option value="unexported">未导出</option>
+            <option value="exported">已导出</option>
+          </select>
+          <span id="productVisibleCount">显示 1</span>
+        </div>
+      </div>
+      <div class="product-selection-toolbar">
+        <label class="product-select-all"><input id="selectAllProducts" type="checkbox"><span>全选</span><b id="selectedProductCount">已选 1</b></label>
+        <label class="visually-hidden" for="productSelectionPreset">批量选择商品</label>
+        <select id="productSelectionPreset" aria-label="批量选择商品">
+          <option value="">选择范围</option>
+          <option value="all">全部商品</option>
+          <option value="exported">之前已导出</option>
+          <option value="unexported">之前未导出</option>
+          <option value="none">清空选择</option>
+        </select>
+      </div>
+      <div class="product-list" id="productList" role="list" aria-label="商品草稿列表"></div>
+      <div class="product-rail-footer">
+        <span class="app-version" id="appVersion" aria-label="应用版本未知">v--</span>
+        <button class="icon-button" id="deleteSelectedProductsButton" type="button" title="删除已勾选商品" aria-label="删除已勾选商品"><i data-lucide="trash-2"></i></button>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <section class="view" id="section-product" data-view="product">
+        <div class="view-heading">
+          <h1>商品信息</h1>
+        </div>
+        <div class="section-body">
+          <div class="field-grid one-column">
+            <label class="field"><span>产品标题 <em>*</em></span><input data-field="product.title" autocomplete="off"></label>
+            <label class="field"><span>英文标题 <em>*</em></span><input data-field="product.englishTitle" autocomplete="off"></label>
+          </div>
+          <div class="field-grid two-columns compact-top">
+            <label class="field"><span>产品货号</span><input data-field="product.productCode" autocomplete="off"></label>
+            <div class="field"><span>产地</span><div class="origin-selects"><select id="originCountry" aria-label="产地国家"></select><select id="originProvince" aria-label="产地省份"></select></div></div>
+          </div>
+          <div class="field-grid one-column compact-top">
+            <label class="field"><span>站外产品链接</span><input type="url" data-field="product.externalProductUrl"></label>
+          </div>
+          <div class="field-grid two-columns compact-top">
+            <label class="field"><span>识别码类型</span><select data-field="product.identifierType"><option value=""></option><option>UPC</option><option>EAN</option><option>ISBN</option></select></label>
+            <label class="field"><span>识别码</span><input data-field="product.identifier"></label>
+            <label class="field full"><span>来源 URL</span><textarea rows="2" data-array-field="product.sourceUrls"></textarea></label>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="section-images" data-view="images">
+        <div class="view-heading">
+          <h1>产品图片</h1>
+          <span class="status-chip" id="uploadModeChip">手工 URL</span>
+        </div>
+        <div class="section-body">
+          <div class="form-section image-section">
+            <div class="section-line"><h2>产品轮播图</h2><span id="carouselCount">0 / 10</span></div>
+            <div class="asset-actions">
+              <button class="secondary-button" id="pickCarouselButton" type="button"><i data-lucide="image-plus"></i><span>选择图片</span></button>
+              <div class="url-add"><input id="carouselUrl" type="url" placeholder="https://"><button class="icon-button" id="addCarouselUrl" type="button" title="添加并检查 URL" aria-label="添加并检查 URL"><i data-lucide="plus"></i></button></div>
+            </div>
+            <input id="carouselFiles" type="file" accept="image/*" multiple hidden>
+            <input id="carouselAddFiles" type="file" accept="image/*" multiple hidden>
+            <div class="asset-grid" id="carouselGrid"></div>
+          </div>
+
+          <div class="form-section image-section">
+            <div class="section-line"><h2>产品素材图</h2><span>第一张轮播图</span></div>
+            <div class="product-material-image" id="productMaterialImage"></div>
+          </div>
+
+          <div class="form-section image-section">
+            <div class="section-line"><h2>外包装图片</h2><span id="packagingCount">0 / 6</span></div>
+            <div class="asset-actions">
+              <button class="secondary-button" id="pickPackagingButton" type="button"><i data-lucide="image-plus"></i><span>选择图片</span></button>
+              <div class="url-add"><input id="packagingUrl" type="url" placeholder="https://"><button class="icon-button" id="addPackagingUrl" type="button" title="添加并检查 URL" aria-label="添加并检查 URL"><i data-lucide="plus"></i></button></div>
+            </div>
+            <input id="packagingFiles" type="file" accept="image/*" multiple hidden>
+            <div class="asset-grid" id="packagingGrid"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="section-skus" data-view="skus">
+        <div class="view-heading">
+          <h1>变种信息</h1>
+        </div>
+        <div class="section-body table-section-body">
+          <div class="sku-bulk-toolbar">
+            <div class="bulk-heading"><i data-lucide="rows-3"></i><span>批量填写</span></div>
+            <label><span>申报价</span><input type="number" min="0" step="0.01" data-bulk-sku-field="declaredPrice"></label>
+            <div class="bulk-dimensions"><span>尺寸 cm</span><div>
+              <input aria-label="批量长度 cm" title="长 cm" placeholder="长" type="number" min="0" step="0.01" data-bulk-sku-field="length">
+              <input aria-label="批量宽度 cm" title="宽 cm" placeholder="宽" type="number" min="0" step="0.01" data-bulk-sku-field="width">
+              <input aria-label="批量高度 cm" title="高 cm" placeholder="高" type="number" min="0" step="0.01" data-bulk-sku-field="height">
+            </div></div>
+            <label><span>重量 g</span><input type="number" min="0" step="0.01" data-bulk-sku-field="weight"></label>
+            <label><span>库存</span><input type="number" min="0" step="1" data-bulk-sku-field="inventory"></label>
+            <button class="secondary-button" id="applySkuBulkButton" type="button"><i data-lucide="copy-check"></i><span>应用到全部 SKU</span></button>
+          </div>
+          <div class="table-wrap">
+            <table class="sku-table">
+              <thead><tr>
+                <th>SKU 图</th>
+                <th><label class="visually-hidden" for="skuVariantName1">第一变种属性</label><select id="skuVariantName1" data-variant-attribute-name="name1" aria-label="第一变种属性"></select></th>
+                <th><label class="visually-hidden" for="skuVariantName2">第二变种属性</label><select id="skuVariantName2" data-variant-attribute-name="name2" aria-label="第二变种属性"></select></th>
+                <th>SKU 货号</th><th>申报价</th><th>尺寸（cm）</th><th>重量（g）</th><th>库存</th>
+              </tr></thead>
+              <tbody id="skuTableBody"></tbody>
+            </table>
+          </div>
+          <input id="skuFileInput" type="file" accept="image/*" hidden>
+        </div>
+      </section>
+
+      <section class="view" id="section-description" data-view="description">
+        <div class="view-heading">
+          <h1>产品描述</h1>
+        </div>
+        <div class="section-body">
+          <div class="description-editor">
+            <div class="description-image-panel">
+              <div class="description-image-heading"><span>描述主图</span><small>第一张轮播图</small></div>
+              <div class="description-main-image" id="descriptionMainImage"></div>
+            </div>
+            <label class="field field-textarea description-copy"><span>产品描述 <small id="descriptionCount">0 / 500</small></span><textarea rows="10" maxlength="500" data-field="product.description"></textarea></label>
+          </div>
+          <div class="field-grid two-columns compact-top">
+            <label class="field"><span>产品视频 URL</span><input type="url" data-field="product.productVideoUrl"></label>
+            <label class="field"><span>描述视频 URL</span><input type="url" data-field="product.descriptionVideoUrl"></label>
+            <label class="field"><span>产品说明书 PDF</span><input type="url" data-field="product.manualUrl"></label>
+            <label class="field"><span>说明书语种</span><input data-array-field="product.manualLanguages"></label>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="section-shipping" data-view="shipping">
+        <div class="view-heading">
+          <h1>价格与运输</h1>
+          <button class="secondary-button" id="applyShippingToAllButton" type="button" title="应用全部产品" aria-label="应用全部产品"><i data-lucide="copy-check"></i><span>应用全部产品</span></button>
+        </div>
+        <div class="section-body">
+          <div class="field-grid two-columns">
+            <label class="field"><span>建议售价 USD</span><input type="number" min="0" step="0.01" data-field="product.suggestedPrice"></label>
+            <div class="field freight-template-field">
+              <span>运费模板 <em>*</em></span>
+              <div class="freight-template-editor">
+                <select id="freightTemplateId" data-field="product.freightTemplateId" required></select>
+                <button class="icon-button" id="addFreightTemplateButton" type="button" title="添加运费模板" aria-label="添加运费模板"><i data-lucide="plus"></i></button>
+              </div>
+            </div>
+            <div class="field"><span>发货时效</span><div class="segmented-control" role="radiogroup" aria-label="发货时效">
+              <label><input type="radio" name="leadTime" value="1" data-field="product.leadTime"><span>1 天</span></label>
+              <label><input type="radio" name="leadTime" value="2" data-field="product.leadTime"><span>2 天</span></label>
+              <label><input type="radio" name="leadTime" value="7" data-field="product.leadTime"><span>7 天</span></label>
+              <label><input type="radio" name="leadTime" value="9" data-field="product.leadTime"><span>9 天</span></label>
+            </div></div>
+          </div>
+          <div class="freight-template-records" id="freightTemplateRecords" aria-label="已保存的运费模板"></div>
+          <div class="estimate-provenance" id="studioEstimateNotice" hidden><i data-lucide="triangle-alert"></i><span id="studioEstimateNoticeText"></span></div>
+        </div>
+      </section>
+
+      <section class="view" id="section-compliance" data-view="compliance">
+        <div class="view-heading">
+          <h1>包装与合规</h1>
+        </div>
+        <div class="section-body">
+          <div class="form-section">
+            <h2>外包装</h2>
+            <div class="field-grid two-columns">
+              <label class="field"><span>外包装形状</span><select data-field="product.packagingShape"><option value=""></option><option>不规则</option><option>长方体</option><option>圆柱体</option></select></label>
+              <label class="field"><span>外包装类型</span><select data-field="product.packagingType"><option value=""></option><option>硬包装</option><option>软包装+硬物</option><option>软包装+软物</option></select></label>
+              <label class="field"><span>是否定制品</span><select data-field="product.customProduct"><option value=""></option><option>是</option><option>否</option></select></label>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h2>SKU 分类与净含量</h2>
+            <div class="field-grid two-columns">
+              <label class="field"><span>SKU 分类类型</span><select data-field="product.skuCategoryType"><option value=""></option><option>单品</option><option>同款多件</option><option>混合套装</option></select></label>
+              <label class="field"><span>SKU 分类数量</span><input type="number" min="0" step="1" data-field="product.skuCategoryQuantity"></label>
+              <label class="field"><span>SKU 分类单位</span><select data-field="product.skuCategoryUnit"><option value=""></option><option>件</option><option>双</option><option>包</option></select></label>
+              <label class="field"><span>是否独立包装</span><select data-field="product.independentPackaging"><option value=""></option><option>是</option><option>否</option></select></label>
+              <label class="field"><span>单品净含量</span><input type="number" min="0" data-field="product.netContent"></label>
+              <label class="field"><span>单品净含量单位</span><select id="netContentUnit" data-field="product.netContentUnit"></select></label>
+              <label class="field"><span>内计共含件数</span><input type="number" min="0" step="1" data-field="product.piecesInside"></label>
+              <label class="field"><span>是否同品</span><select data-field="product.sameProduct"><option value=""></option><option>同品不同规</option><option>不同品</option></select></label>
+              <label class="field"><span>总净含量</span><input type="number" min="0" data-field="product.totalNetContent"></label>
+              <label class="field"><span>总净含量单位</span><select id="totalNetContentUnit" data-field="product.totalNetContentUnit"></select></label>
+            </div>
+            <div class="field-grid two-columns compact-top">
+              <label class="field"><span>包装清单</span><textarea rows="3" data-array-field="product.packageList"></textarea></label>
+              <label class="field"><span>包装清单数量</span><textarea rows="3" data-array-field="product.packageQuantities"></textarea></label>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h2>敏感属性</h2>
+            <div class="field-grid two-columns">
+              <label class="field"><span>是否敏感属性</span><select data-field="product.sensitive"><option value=""></option><option>是</option><option>否</option></select></label>
+              <div class="field"><span>敏感属性值</span><div class="check-row" id="sensitiveOptions"></div></div>
+              <label class="field"><span>储电容量 WH</span><input type="number" min="0" data-field="product.batteryCapacity"></label>
+              <label class="field"><span>刀具长度 CM</span><input type="number" min="0" data-field="product.knifeLength"></label>
+              <label class="field"><span>刀刃角度</span><input type="number" min="1" max="360" data-field="product.bladeAngle"></label>
+              <label class="field"><span>液体容量 ML</span><input type="number" min="1" max="500" data-field="product.liquidCapacity"></label>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <aside class="right-rail">
+      <nav class="side-nav" aria-label="工作区页内导航">
+        <div class="rail-title">填写目录</div>
+        <a class="nav-item is-active" href="#section-product" data-view-button="product" aria-current="location"><i data-lucide="clipboard-pen-line"></i><span>商品信息</span></a>
+        <a class="nav-item" href="#section-images" data-view-button="images"><i data-lucide="images"></i><span>产品图片</span><b id="navImageCount">0</b></a>
+        <a class="nav-item" href="#section-skus" data-view-button="skus"><i data-lucide="table-properties"></i><span>变种信息</span><b id="navSkuCount">0</b></a>
+        <a class="nav-item" href="#section-description" data-view-button="description"><i data-lucide="file-text"></i><span>产品描述</span></a>
+        <a class="nav-item" href="#section-shipping" data-view-button="shipping"><i data-lucide="truck"></i><span>价格与运输</span></a>
+        <a class="nav-item" href="#section-compliance" data-view-button="compliance"><i data-lucide="shield-check"></i><span>包装与合规</span></a>
+      </nav>
+
+      <section class="summary-rail">
+        <div class="summary-head"><span>当前商品检查</span><b id="validationBadge">未完成</b></div>
+        <dl class="metrics">
+          <div><dt>模板</dt><dd id="templateMetric">检查中</dd></div>
+          <div><dt>SKU</dt><dd id="skuMetric">0</dd></div>
+          <div><dt>轮播图</dt><dd id="carouselMetric">0</dd></div>
+          <div><dt>SKU 图</dt><dd id="skuImageMetric">0 / 0</dd></div>
+        </dl>
+        <div class="issue-block">
+          <div class="issue-title"><span>阻塞项</span><b id="errorCount">0</b></div>
+          <ul id="errorList" class="issue-list"></ul>
+        </div>
+        <div class="issue-block warnings">
+          <div class="issue-title"><span>提醒</span><b id="warningCount">0</b></div>
+          <ul id="warningList" class="issue-list"></ul>
+        </div>
+      </section>
+    </aside>
+  </div>
+  <input id="restoreBackupFile" type="file" accept="application/json,.json" hidden>
+
+  <div class="sku-image-context-menu" id="skuImageContextMenu" role="menu" aria-label="快速修改 SKU 图片" hidden>
+    <div class="sku-image-context-heading"><span>快速修改 SKU 图</span><small id="skuImageContextLabel"></small></div>
+    <button type="button" role="menuitem" data-sku-image-command="view-url"><i data-lucide="external-link"></i><span>查看链接</span><i data-lucide="arrow-up-right"></i></button>
+    <button type="button" role="menuitem" data-sku-image-command="edit-url"><i data-lucide="pencil"></i><span>编辑链接</span></button>
+    <button type="button" role="menuitem" data-sku-image-command="carousel"><i data-lucide="images"></i><span>从轮播图选择</span><i data-lucide="chevron-right"></i></button>
+    <button type="button" role="menuitem" data-sku-image-command="upload"><i data-lucide="folder-up"></i><span>本地上传</span></button>
+  </div>
+
+  <div class="sku-image-source-menu" id="skuImageSourceMenu" role="menu" aria-label="选择 SKU 图片来源" hidden>
+    <div class="sku-image-context-heading"><span>选择 SKU 图</span><small id="skuImageSourceLabel"></small></div>
+    <button type="button" role="menuitem" data-sku-image-source-command="carousel"><i data-lucide="images"></i><span>从轮播图选择</span><i data-lucide="chevron-right"></i></button>
+    <button type="button" role="menuitem" data-sku-image-source-command="upload"><i data-lucide="folder-up"></i><span>本地上传</span></button>
+  </div>
+
+  <dialog class="sku-image-url-dialog" id="skuImageUrlDialog">
+    <form method="dialog" class="dialog-content" id="skuImageUrlForm">
+      <div class="dialog-heading">
+        <div><span class="eyebrow">SKU 图片</span><h2>编辑链接</h2><small id="skuImageUrlEditorLabel"></small></div>
+        <button class="icon-button" value="cancel" title="关闭" aria-label="关闭"><i data-lucide="x"></i></button>
+      </div>
+      <label class="field"><span>公网图片 URL</span><input id="skuImageUrlInput" type="url" inputmode="url" autocomplete="url" placeholder="https://"></label>
+      <small class="sku-image-url-hint">保存后会重新检查图片尺寸和公网可访问状态。</small>
+      <div class="dialog-actions">
+        <button class="secondary-button" value="cancel">取消</button>
+        <button class="primary-button" id="saveSkuImageUrlButton" type="button"><i data-lucide="check"></i><span>保存链接</span></button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="sku-carousel-picker-dialog" id="skuCarouselPickerDialog">
+    <form method="dialog" class="dialog-content sku-carousel-picker-content">
+      <div class="dialog-heading">
+        <div><span class="eyebrow">快速修改 SKU 图</span><h2>选择轮播图</h2><small id="skuCarouselPickerLabel"></small></div>
+        <button class="icon-button" value="cancel" title="关闭" aria-label="关闭"><i data-lucide="x"></i></button>
+      </div>
+      <div class="sku-carousel-picker-grid" id="skuCarouselPickerGrid"></div>
+    </form>
+  </dialog>
+
+  <dialog class="carousel-add-dialog" id="carouselAddDialog">
+    <form method="dialog" class="dialog-content carousel-add-content">
+      <div class="dialog-heading">
+        <div><span class="eyebrow">产品轮播图</span><h2>添加轮播图</h2><small id="carouselAddDialogHint">勾选原轮播图后点击确认添加；本地图片会立即添加</small></div>
+        <div class="carousel-add-heading-actions">
+          <button class="primary-button carousel-add-confirm-button" id="carouselAddConfirmButton" type="button" disabled aria-label="确认添加轮播图"><i data-lucide="check"></i><span>确认添加</span><b id="carouselAddSelectionCount" aria-live="polite">0</b></button>
+          <button class="icon-button" value="cancel" title="关闭" aria-label="关闭"><i data-lucide="x"></i></button>
+        </div>
+      </div>
+      <div class="carousel-add-toolbar">
+        <button class="secondary-button" id="carouselAddUploadButton" type="button"><i data-lucide="folder-up"></i><span>本地上传</span></button>
+        <button class="secondary-button" id="carouselAddRetryButton" type="button" hidden><i data-lucide="refresh-cw"></i><span>重试读取原图</span></button>
+        <span class="status-chip" id="carouselAddRemaining">还可添加 0 张</span>
+      </div>
+      <section class="carousel-add-source" aria-labelledby="carouselAddSourceHeading">
+        <div class="carousel-add-source-heading"><h3 id="carouselAddSourceHeading">原轮播图</h3><span id="carouselAddSourceCount"></span></div>
+        <div class="carousel-add-grid" id="carouselAddGrid" aria-live="polite"></div>
+      </section>
+    </form>
+  </dialog>
+
+  <dialog class="studio-dialog" id="studioDialog">
+    <form method="dialog" class="dialog-content studio-dialog-content" id="studioForm">
+      <div class="dialog-heading">
+        <div><span class="eyebrow">Image Studio</span><h2>导入创作记录</h2></div>
+        <button class="icon-button" value="cancel" title="关闭" aria-label="关闭" data-studio-dialog-close><i data-lucide="x"></i></button>
+      </div>
+      <div class="studio-connection" id="studioConnectionStatus">
+        <span class="studio-status-dot" aria-hidden="true"></span>
+        <span id="studioConnectionText">尚未读取套图记录</span>
+        <button class="icon-button" id="studioRefreshButton" type="button" title="刷新创作记录" aria-label="刷新创作记录"><i data-lucide="refresh-cw"></i></button>
+      </div>
+      <div class="studio-dialog-scroll">
+        <div class="studio-layout">
+          <div class="studio-record-panel">
+            <div class="studio-bulk-toolbar">
+              <label><input id="studioSelectAllRecords" type="checkbox"><span>全选显示</span></label>
+              <strong id="studioSelectedCount">已选 0 / 0</strong>
+              <button class="icon-button" id="studioClearSelection" type="button" title="清空导入选择" aria-label="清空导入选择"><i data-lucide="x"></i></button>
+            </div>
+            <div class="studio-record-filters" aria-label="筛选创作记录">
+              <label class="visually-hidden" for="studioListingFilter">筛选 Listing</label>
+              <select id="studioListingFilter" aria-label="筛选 Listing">
+                <option value="">全部 Listing</option>
+                <option value="present">有 Listing</option>
+                <option value="missing">无 Listing</option>
+              </select>
+              <label class="visually-hidden" for="studioEstimateFilter">筛选预估</label>
+              <select id="studioEstimateFilter" aria-label="筛选预估">
+                <option value="">全部预估</option>
+                <option value="present">有预估</option>
+                <option value="missing">无预估</option>
+              </select>
+            </div>
+            <div class="studio-record-list" id="studioRecordList" role="list" aria-label="Studio 创作记录"></div>
+          </div>
+          <section class="studio-selection" id="studioSelection" aria-live="polite"></section>
+        </div>
+      </div>
+      <div class="studio-import-progress" id="studioImportProgress" role="status" hidden>
+        <div><span id="studioImportProgressText"></span><span class="studio-progress-track"><span id="studioImportProgressFill"></span></span></div>
+      </div>
+      <div class="dialog-actions">
+        <button class="secondary-button" value="cancel" data-studio-dialog-close>取消</button>
+        <button class="primary-button" id="studioConfirmButton" type="button" title="确认导入" aria-label="确认导入" disabled><i data-lucide="download"></i><span>确认导入</span></button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="settingsDialog">
+    <form method="dialog" class="dialog-content" id="settingsForm">
+      <div class="dialog-heading">
+        <div><span class="eyebrow">图片托管</span><h2>Cloudinary 设置</h2></div>
+        <button class="icon-button" value="cancel" title="关闭" aria-label="关闭"><i data-lucide="x"></i></button>
+      </div>
+      <div class="cloudinary-official-help">
+        <a id="cloudinaryOfficialLink" class="cloudinary-official-link" href="https://console.cloudinary.com/settings/upload" target="_blank" rel="noopener noreferrer" aria-describedby="cloudinaryConfigTooltip">
+          <i data-lucide="external-link"></i><span>Cloudinary 官方访问地址</span>
+          <span class="visually-hidden">（在新标签页打开）</span>
+        </a>
+        <div id="cloudinaryConfigTooltip" class="cloudinary-config-tooltip" role="tooltip">
+          <strong>配置方法</strong>
+          <ol>
+            <li><b>Cloud name</b><span>登录后，在 Product Environment Credentials 中复制 Cloud name。</span></li>
+            <li><b>Unsigned upload preset</b><span>进入 Upload Presets，新建 preset，将 Signing Mode 设为 Unsigned，保存后复制名称。</span></li>
+          </ol>
+        </div>
+      </div>
+      <label class="field"><span>Cloud name</span><input id="cloudNameInput" autocomplete="off"></label>
+      <label class="field"><span>Unsigned upload preset</span><input id="uploadPresetInput" autocomplete="off"></label>
+      <div class="security-note"><i data-lucide="shield"></i><span>仅保存非秘密配置，不要填写 API Secret。</span></div>
+      <div class="dialog-actions">
+        <button class="secondary-button" value="cancel">取消</button>
+        <button class="primary-button" id="saveSettingsButton" value="default">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="image-lightbox" id="imageLightbox" aria-label="图片放大查看">
+    <div class="image-lightbox-stage" id="imageLightboxStage">
+      <img id="imageLightboxImage" alt="图片预览" draggable="false">
+      <div class="image-lightbox-toolbar" role="toolbar" aria-label="图片查看工具">
+        <button class="icon-button" id="imageLightboxZoomOut" type="button" title="缩小" aria-label="缩小"><i data-lucide="zoom-out"></i></button>
+        <button class="icon-button" id="imageLightboxReset" type="button" title="重置" aria-label="重置图片位置和缩放"><i data-lucide="rotate-ccw"></i></button>
+        <button class="icon-button" id="imageLightboxZoomIn" type="button" title="放大" aria-label="放大"><i data-lucide="zoom-in"></i></button>
+        <button class="icon-button" id="imageLightboxClose" type="button" title="关闭" aria-label="关闭"><i data-lucide="x"></i></button>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="/lib/temu/lucide-shim.mjs"></script>
+  <script type="module" src="/temu/app.js"></script>
+</body>
+</html>

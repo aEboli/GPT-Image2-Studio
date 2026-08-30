@@ -231,25 +231,16 @@ test("strict marketplace main images remove generic hero conflicts and external 
     logoOptions: { enabled: true, filename: "brand-mark.png", placement: "top-left", background: "transparent" },
   });
   const main = plan.items[0];
-  const secondary = plan.items[1];
 
   assert.equal(main.imageType, "amazon-main");
   assert.equal(main.logoPolicy, "forbid-overlay");
   assert.equal(main.textPolicy, "none");
   assert.equal(main.composition, "centered-white-85-percent");
-  assert.match(main.prompt, /Do not add visible marketing copy, badges, watermarks, collage panels, or scene insets/i);
-  assert.match(main.prompt, /Preserve branding or identifiers already printed on the supplied product/i);
-  assert.match(main.prompt, /Do not attach the user's uploaded external Logo/i);
+  assert.match(main.prompt, /Keep the frame to the product itself: no added marketing copy, badges, collage panels, or scene insets/i);
+  assert.match(main.prompt, /Branding stays limited to the identifiers already printed on the supplied product/i);
+  assert.doesNotMatch(main.prompt, /uploaded external Logo/i);
   assert.doesNotMatch(main.prompt, /Add 3-5 small circular scene frames/i);
-  assert.equal(typeof creationReferenceLabels.appendCreationItemLogoReference, "function");
-  assert.deepEqual(
-    creationReferenceLabels.appendCreationItemLogoReference(main, [{ filename: "product.png" }], { filename: "brand-mark.png" }),
-    [{ filename: "product.png" }],
-  );
-  assert.deepEqual(
-    creationReferenceLabels.appendCreationItemLogoReference(secondary, [{ filename: "product.png" }], { filename: "brand-mark.png" }),
-    [{ filename: "product.png" }, { filename: "brand-mark.png" }],
-  );
+  assert.equal(creationReferenceLabels.appendCreationItemLogoReference, undefined);
 });
 
 test("Xiaohongshu prompts forbid fabricated reviews and disguised UGC", () => {
