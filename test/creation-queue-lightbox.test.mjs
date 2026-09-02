@@ -16,11 +16,25 @@ test("creation queue result thumbnails resolve images from the displayed queue s
     app,
     /function renderCreationView\(\) \{[\s\S]*const selectedQueueJob = logoBatchBranch \? null : getSelectedCreationQueueJob\(\);[\s\S]*const currentSet = getCreationDisplayedSet\(\);[\s\S]*const showCreationResultActions = !selectedQueueJob;/,
   );
-  assert.match(app, /const loadingKeyScope = selectedQueueJob\?\.id \|\| currentSet\?\.setId \|\| "";/);
-  assert.match(app, /syncCreationResultGrid\(items, \{ showActions: showCreationResultActions, keyScope: loadingKeyScope \}\);/);
   assert.match(
     app,
-    /function syncCreationResultGrid\(items = \[\], \{ showActions = true, keyScope = "" \} = \{\}\) \{[\s\S]*getItemOptions: \(item, _index, \{ firstSkuItem, firstInfographicRebuildItem \}\) => \(\{[\s\S]*showActions,[\s\S]*keyScope,[\s\S]*isSkuStart: item === firstSkuItem,/,
+    /const loadingKeyScope =\s*state\.creation\.generationScope === "logo-batch" && state\.creation\.logoBatchLoadingKey\s*\? state\.creation\.logoBatchLoadingKey\s*:\s*selectedQueueJob\?\.id \|\| currentSet\?\.setId \|\| "";/,
+  );
+  assert.match(
+    app,
+    /syncCreationResultGrid\(items, \{[\s\S]*showActions: showCreationResultActions,[\s\S]*keyScope: loadingKeyScope,[\s\S]*logGroupId: currentSet\?\.setId \|\| "",[\s\S]*\}\);/,
+  );
+  assert.match(
+    app,
+    /function syncCreationResultGrid\(items = \[\], \{ showActions = true, keyScope = "", logGroupId = "" \} = \{\}\) \{[\s\S]*getItemOptions: \(item, _index, \{ firstSkuItem, firstInfographicRebuildItem \}\) => \(\{[\s\S]*showActions,[\s\S]*keyScope,[\s\S]*logGroupId,[\s\S]*isSkuStart: item === firstSkuItem,/,
+  );
+  assert.match(
+    app,
+    /getLogText: \(entry\) => getCreationCardLogText\(entry, "creation", options\.logGroupId\),/,
+  );
+  assert.match(
+    app,
+    /shouldRetainLoadingSource: \(\{ existingCard \}\) => \{[\s\S]*return Boolean\(keyScope && loadingKey && !loadingKey\.startsWith\(`\$\{keyScope\}::`\)\);/,
   );
   assert.match(
     app,

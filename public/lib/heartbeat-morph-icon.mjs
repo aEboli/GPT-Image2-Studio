@@ -10,6 +10,12 @@ function getDocumentRef(documentRef = null) {
   return documentRef || globalThis.document;
 }
 
+function getRandomIndex(random, total) {
+  const value = Number(random());
+  const safeValue = Number.isFinite(value) ? Math.min(Math.max(value, 0), 0.999999) : 0;
+  return Math.floor(safeValue * total);
+}
+
 /* 变形引擎一次性注册：createGenerationLoadingShell 有十来个调用点，
    逐个透传 createMorph 会把无关代码全改一遍。morphicons 的产物只存在于
    public/lib/vendor/，而本模块要逐字节同步到 public/lib/ 且需在 Node 测试里可导入，
@@ -37,25 +43,26 @@ export function pickNextHeartbeatMorphIndex(currentIndex, random = Math.random) 
     return 0;
   }
 
-  const value = Number(random());
-  const safeValue = Number.isFinite(value) ? Math.min(Math.max(value, 0), 0.999999) : 0;
   if (!Number.isInteger(currentIndex) || currentIndex < 0 || currentIndex >= total) {
-    return Math.floor(safeValue * total);
+    return getRandomIndex(random, total);
   }
 
   /* 在「除当前项以外的 total-1 项」里均匀抽取，再映射回完整下标，
      这样每个候选概率相同，不会因为跳过当前项而让某一项偏多。 */
-  const offset = Math.floor(safeValue * (total - 1));
+  const offset = getRandomIndex(random, total - 1);
   return offset >= currentIndex ? offset + 1 : offset;
 }
 
 export function createHeartbeatMorphIcon(
   documentRef = null,
-  { createMorph = null, random = Math.random, startIndex = 0, reducedMotion = "user" } = {},
+  { createMorph = null, random = Math.random, startIndex = null, reducedMotion = "user" } = {},
 ) {
   const documentValue = getDocumentRef(documentRef);
   const total = HEARTBEAT_MORPH_ICON_ENTRIES.length;
-  const initialIndex = Number.isInteger(startIndex) && startIndex >= 0 && startIndex < total ? startIndex : 0;
+  const randomSource = typeof random === "function" ? random : Math.random;
+  const initialIndex = Number.isInteger(startIndex) && startIndex >= 0 && startIndex < total
+    ? startIndex
+    : getRandomIndex(randomSource, total);
   const [initialName, initialPath] = HEARTBEAT_MORPH_ICON_ENTRIES[initialIndex];
 
   const svg = documentValue.createElementNS
@@ -95,7 +102,7 @@ export function createHeartbeatMorphIcon(
     index: initialIndex,
     name: initialName,
     beats: 0,
-    random: typeof random === "function" ? random : Math.random,
+    random: randomSource,
   };
   svg.dataset && (svg.dataset.heartbeatIcon = initialName);
   return nodes;

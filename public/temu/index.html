@@ -145,6 +145,7 @@
       <section class="view" id="section-skus" data-view="skus">
         <div class="view-heading">
           <h1>变种信息</h1>
+          <button class="secondary-button" id="addSkuVariantButton" type="button" title="新增变种" aria-label="新增变种"><i data-lucide="plus"></i><span>新增变种</span></button>
         </div>
         <div class="section-body table-section-body">
           <div class="sku-bulk-toolbar">
@@ -425,8 +426,9 @@
         <div id="cloudinaryConfigTooltip" class="cloudinary-config-tooltip" role="tooltip">
           <strong>配置方法</strong>
           <ol>
-            <li><b>Cloud name</b><span>登录后，在 Product Environment Credentials 中复制 Cloud name。</span></li>
-            <li><b>Unsigned upload preset</b><span>进入 Upload Presets，新建 preset，将 Signing Mode 设为 Unsigned，保存后复制名称。</span></li>
+            <li><b>Cloud name</b><span>本账户填写 <code>qbasvuby</code>；也可登录后，在 Product Environment Credentials 中复制 Cloud name。</span></li>
+            <li><b>Unsigned upload preset</b><span>本账户填写 <code>temu_listing_unsigned</code>；进入 Upload Presets 可确认其 Signing Mode 为 Unsigned。</span></li>
+            <li><b>注意</b><span>两项必须同时填写或同时留空；不要填写 API Key 或 API Secret。</span></li>
           </ol>
         </div>
       </div>

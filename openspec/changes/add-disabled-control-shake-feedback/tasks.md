@@ -25,3 +25,13 @@
 - [x] 4.3 用 `Emulation.setEmulatedMedia` 模拟 `prefers-reduced-motion: reduce`，确认 `getAnimations()` 为空。
 - [x] 4.4 同步资源版本号到 `20260830-disabled-shake-1`，并更新钉住它的三个测试文件。
 - [x] 4.5 跑通受影响测试与 `openspec validate --strict`。
+
+## 5. 禁用原因播报
+
+- [x] 5.1 在 `lib/creation-temu-export-ui.mjs` 把守卫原因抽成 `getOpenBlockReason()`；主入口只保留忙碌原因，批量快速导出继续保留“请先勾选需要导出的套图记录。”原因，`passesOpenGuards` 改为调用它。
+- [x] 5.2 同文件新增捕获阶段 `pointerdown` 探针 `handleDisabledExportPress`：复用 `resolveDisabledShakeTarget()` 判定命中，仅在按钮禁用且原因非空时写入 `#creationRecordActionFeedback`，绝不调用 `open()`。
+- [x] 5.3 `syncControls` 在按钮恢复可用时撤回该提示，且仅在反馈区仍显示那句话时清空。
+- [x] 5.4 执行 `node scripts/sync-public-lib.mjs` 同步 `public/lib` 镜像。
+- [x] 5.5 扩充 `test/creation-temu-frontend.test.mjs`：替身支持 document 级监听与 `#creationRecordActionFeedback`，覆盖忙碌原因、非主键、命中他控件、撤回、不覆盖更新反馈，以及零勾选时入口保持可用的组合。
+- [x] 5.6 用真实页面确认：零勾选时“temuexcel导出工作台”保持可用并直接打开工作台；生成、刷新或删除期间按下禁用入口仍显示既有忙碌原因。
+- [x] 5.7 跑通受影响测试与 `npx openspec validate --all --strict`（50 项全通过）。

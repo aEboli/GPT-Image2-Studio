@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 const serverPath = new URL("../server.mjs", import.meta.url);
 const galleryStorePath = new URL("../lib/gallery-store.mjs", import.meta.url);
 const creationStorePath = new URL("../lib/creation-store.mjs", import.meta.url);
+const studioConstantsPath = new URL("../lib/studio-constants.mjs", import.meta.url);
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 async function getFreePort() {
@@ -511,6 +512,14 @@ test("creation generation avoids same-pass retries, filters automatic repairs, a
     /if \(!canStartCreationGenerationAttempt\(items, item\.itemId, \{ autoRepair: automaticRepair \}\)\) \{\s*throw new Error\("该套图项已达到自动生成次数上限。"\);\s*\}/,
   );
   assert.match(repairHandler, /const generationAttemptCount = reserveCreationGenerationAttempt\(items, item\.itemId\);/);
+  assert.match(generateHandler, /onResponseId:\s*\(\) =>\s*persistCreationOriginalResponsePending\(/);
+  assert.match(logoBatchHandler, /onResponseId:\s*\(\) =>\s*persistCreationOriginalResponsePending\(/);
+  assert.match(repairHandler, /onResponseId:\s*\(\) =>\s*persistCreationOriginalResponsePending\(/);
+  assert.match(server, /function getCreationOriginalResponsePendingPatch\(\)/);
+  assert.match(server, /originalResponseAutoRetryBlocked: true/);
+  assert.match(generateHandler, /\.\.\.clearCreationOriginalResponseRecoveryPatch\(\)/);
+  assert.match(logoBatchHandler, /\.\.\.clearCreationOriginalResponseRecoveryPatch\(\)/);
+  assert.match(repairHandler, /\.\.\.clearCreationOriginalResponseRecoveryPatch\(\)/);
 });
 
 test("a legacy in-run requeue reports as pending rather than failed", async () => {
@@ -521,28 +530,43 @@ test("a legacy in-run requeue reports as pending rather than failed", async () =
   assert.match(server, /notice: getRequeueNotice\(\{ message, attempt: requeueAttempt, maxRetries \}\),/);
 });
 
-test("local creation generation cancels bounded upstream work when the SSE lifecycle ends", async () => {
+test("local creation generation recovers known Responses tasks after its stream deadline without lowering concurrency", async () => {
   const server = await readFile(serverPath, "utf8");
+  const studioConstants = await readFile(studioConstantsPath, "utf8");
+  const generateHandler = server.match(/async function handleCreationGenerate[\s\S]*?\r?\n}\r?\n\r?\nasync function handleCreationLogoBatchGenerate/)?.[0] || "";
+  const logoBatchHandler = server.match(/async function handleCreationLogoBatchGenerate[\s\S]*?\r?\n}\r?\n\r?\nasync function handlePortraitRepair/)?.[0] || "";
+  const repairHandler = server.match(/async function handleCreationRepair[\s\S]*?\r?\n}\r?\n\r?\nasync function handleGenerate/)?.[0] || "";
   // The effective deadline now comes from lib/upstream-stream-fetch.mjs so the socket
   // body timeout derives from the same value; assert the wiring, not the old IIFE shape.
   assert.match(server, /const CREATION_UPSTREAM_TIMEOUT_MS = resolveCreationUpstreamTimeoutMs\(\);/);
-  // A known Responses task must stay owned by this creation lifecycle while the
-  // relay is temporarily unavailable, rather than falling through to an automatic
-  // repair POST after the workflow's short generic recovery window.
+  // The stream deadline and original-task recovery window are intentionally
+  // independent: a timed-out stream gets two minutes of GET-only recovery.
+  assert.match(server, /const CREATION_ORIGINAL_RESPONSE_RECOVERY_TIMEOUT_MS = 120_000;/);
   assert.match(server, /const CREATION_ORIGINAL_RESPONSE_RECOVERY_POLL_DELAY_MS = 5_000;/);
   assert.match(
     server,
-    /const CREATION_ORIGINAL_RESPONSE_RECOVERY_MAX_POLLS = Math\.max\(\s*1,\s*Math\.ceil\(CREATION_UPSTREAM_TIMEOUT_MS \/ CREATION_ORIGINAL_RESPONSE_RECOVERY_POLL_DELAY_MS\),\s*\);/,
+    /const CREATION_ORIGINAL_RESPONSE_RECOVERY_MAX_POLLS = Math\.max\(\s*1,\s*Math\.ceil\(CREATION_ORIGINAL_RESPONSE_RECOVERY_TIMEOUT_MS \/ CREATION_ORIGINAL_RESPONSE_RECOVERY_POLL_DELAY_MS\),\s*\);/,
   );
+  assert.doesNotMatch(server, /Math\.ceil\(CREATION_UPSTREAM_TIMEOUT_MS \/ CREATION_ORIGINAL_RESPONSE_RECOVERY_POLL_DELAY_MS\)/);
   assert.match(server, /resolveCreationUpstreamTimeoutMs[^}]*\} from "\.\/lib\/upstream-stream-fetch\.mjs";/);
   assert.match(server, /function createCreationRequestLifecycle\(response\) \{/);
-  assert.match(server, /套图上游请求超时/);
+  assert.match(server, /const streamController = new AbortController\(\);/);
+  assert.match(server, /const recoveryController = new AbortController\(\);/);
+  assert.match(server, /套图流等待已到期限/);
+  assert.match(server, /正在回查原任务/);
+  assert.match(server, /abortStream\(deadlineMessage, "CREATION_STREAM_DEADLINE"\);/);
   assert.match(server, /套图客户端连接已断开，已取消上游请求/);
+  assert.match(server, /abortStream\(message, "CREATION_CLIENT_CLOSED"\);/);
+  assert.match(server, /abortRecovery\(message, "CREATION_CLIENT_CLOSED"\);/);
   assert.match(server, /!response\.writableEnded && !response\.writableFinished/);
   assert.match(server, /statusHeartbeatMs: CREATION_STATUS_HEARTBEAT_MS/);
-  assert.match(server, /signal: lifecycle\.signal/);
+  assert.match(server, /streamSignal: streamController\.signal,/);
+  assert.match(server, /recoverySignal: recoveryController\.signal,/);
+  assert.match(server, /isStreamDeadlineAbort\(error\) \{\s*return error\?\.name === "AbortError" && getAbortCode\(error\) === "CREATION_STREAM_DEADLINE";/);
   assert.match(server, /async function requestCreationStudioImageGeneration\(response, options\)/);
   assert.match(server, /requestCreationStudioImageGeneration\(response, \{/);
+  assert.match(server, /signal: lifecycle\.streamSignal,/);
+  assert.doesNotMatch(server, /signal: lifecycle\.signal,/);
   assert.match(
     server,
     /responseRecoveryMaxPolls:\s*options\.responseRecoveryMaxPolls \?\? CREATION_ORIGINAL_RESPONSE_RECOVERY_MAX_POLLS,/,
@@ -551,12 +575,24 @@ test("local creation generation cancels bounded upstream work when the SSE lifec
     server,
     /responseRecoveryPollDelayMs:\s*options\.responseRecoveryPollDelayMs \?\? CREATION_ORIGINAL_RESPONSE_RECOVERY_POLL_DELAY_MS,/,
   );
+  assert.match(server, /originalResponseRecoverySignal: lifecycle\.recoverySignal,/);
+  assert.match(server, /originalResponseRecoveryTimeoutMs: CREATION_ORIGINAL_RESPONSE_RECOVERY_TIMEOUT_MS,/);
+  assert.match(server, /recoverOriginalOnAbort: lifecycle\.isStreamDeadlineAbort,/);
+  assert.match(server, /allowUnknownResultRetry: false,/);
   // A worker attaches its close listener only after winning a session slot, so an
   // already-closed response must abort immediately instead of waiting for a close
   // event that has already fired.
-  assert.match(server, /if \(!isResponseWritable\(response\)\) \{\s*abort\("套图客户端连接已断开，已取消上游请求。"\);/);
+  assert.match(server, /if \(!isResponseWritable\(response\)\) \{\s*abortForClientClose\(\);/);
   // Only abort-shaped errors may be relabelled with the lifecycle reason.
-  assert.match(server, /if \(!abortMessage \|\| error\?\.name !== "AbortError"\) \{/);
+  assert.match(server, /if \(!abortCode \|\| error\?\.name !== "AbortError"\) \{/);
+  // Timeout recovery keeps the configured 20-way creation fan-out and its session
+  // cap intact; it may hold a worker longer, but must not silently lower concurrency.
+  assert.match(studioConstants, /export const MAX_CREATION_PARALLEL_TASKS = 20;/);
+  assert.match(studioConstants, /export const DEFAULT_GENERATION_CONCURRENCY = 20;/);
+  assert.match(server, /if \(scope === "creation"\) \{\s*return MAX_CREATION_PARALLEL_TASKS;/);
+  assert.match(generateHandler, /const generationConcurrency = resolveGenerationConcurrencyForLimit\(formData, config\);/);
+  assert.match(generateHandler, /await runWithConcurrency\(plan\.items, generationConcurrency,/);
+  assert.match(generateHandler, /maxParallelTasks: generationConcurrency/);
 });
 
 test("local generation requests wait for a session slot instead of failing at the parallel cap", async () => {

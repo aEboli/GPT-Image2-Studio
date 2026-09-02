@@ -231,8 +231,8 @@ test("portrait accessory asset library inserts real image assets into accessory 
   assert.match(styles, /\.portrait-accessory-head\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\) auto;/);
   assert.match(styles, /\.portrait-accessory-title\s*\{[\s\S]*display:\s*grid;/);
   assert.match(styles, /\.portrait-accessory-head-actions\s*\{[\s\S]*justify-self:\s*end;/);
-  assert.match(styles, /\.portrait-accessory-asset-button\s*\{[\s\S]*font-family:\s*"Sora",\s*"Microsoft YaHei",\s*sans-serif;[\s\S]*background:/);
-  assert.match(styles, /\.portrait-accessory-asset-panel\s*\{[\s\S]*font-family:\s*"IBM Plex Sans",\s*"Microsoft YaHei",\s*sans-serif;[\s\S]*background:/);
+  assert.match(styles, /\.portrait-accessory-asset-button\s*\{[\s\S]*font-family:\s*var\(--font-ui\);[\s\S]*background:/);
+  assert.match(styles, /\.portrait-accessory-asset-panel\s*\{[\s\S]*font-family:\s*var\(--font-ui\);[\s\S]*background:/);
   assert.match(
     styles,
     /:root\s*\{[\s\S]*--portrait-accessory-asset-panel-bg:\s*linear-gradient\(180deg,\s*rgba\(21,\s*28,\s*48,\s*0\.98\),\s*rgba\(13,\s*18,\s*31,\s*0\.98\)\)/,
@@ -319,7 +319,7 @@ test("portrait result grid rebuild releases the shared loading progress sources"
   assert.doesNotMatch(renderPortraitViewBody, /refs\.portraitResultGrid\.innerHTML = "";/);
   assert.match(
     renderPortraitViewBody,
-    /const nextCards = items\.map\(\(item, index\) => createPortraitCard\(item, index\)\);[\s\S]*stopGenerationLoadingShells\(refs\.portraitResultGrid\);[\s\S]*refs\.portraitResultGrid\.replaceChildren\(\.\.\.nextCards\);/,
+    /const nextCards = items\.map\(\(item, index\) => createPortraitCard\(item, index, \{\s*logGroupId: currentSet\?\.setId \|\| "",\s*\}\)\);[\s\S]*stopGenerationLoadingShells\(refs\.portraitResultGrid\);[\s\S]*refs\.portraitResultGrid\.replaceChildren\(\.\.\.nextCards\);/,
   );
 });
 

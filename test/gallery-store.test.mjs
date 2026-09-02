@@ -290,11 +290,11 @@ test("gallery store writes images into dated folders and persists searchable met
   assert.equal(items.length, 2);
   assert.equal(items[0].filename, "newer.png");
   assert.equal(items[0].prompt, "newer prompt");
-  assert.match(items[0].thumbnailUrl, /^\/output\/2026-04\/04-22\/2026-04-22-prompt\/newer\.png\?/);
+  assert.match(items[0].thumbnailUrl, /^\/api\/gallery\/thumbnail\?path=2026-04%2F04-22%2F2026-04-22-prompt%2Fnewer\.png&v=/);
   assert.equal(items[0].hasReferenceImage, true);
   assert.deepEqual(items[0].referenceImageNames, ["reference-a.png", "reference-b.png"]);
   assert.equal(items[0].absolutePath, join(outputDir, "2026-04", "04-22", "2026-04-22-prompt", "newer.png"));
-  assert.equal(items[0].imageUrl, items[0].thumbnailUrl);
+  assert.notEqual(items[0].imageUrl, items[0].thumbnailUrl);
   assert.equal(items[0].baseUrl, "https://api.openai.com/v1");
   assert.equal(items[0].imageRoute, "b");
   assert.equal(items[0].responsesModel, "gpt-5.4");

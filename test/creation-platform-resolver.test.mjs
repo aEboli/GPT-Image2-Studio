@@ -476,8 +476,9 @@ resolverTest("explicit Amazon image-count 18 is capped without custom slots", ()
   assert.ok(plan.warnings.some((warning) => warning.code === "image-count-extension-limited"));
 });
 
-resolverTest("applied reference roles rebuild coverage and evidence for material package and dimensions", () => {
+resolverTest("applied reference roles rebuild coverage and evidence for feature material package and dimensions", () => {
   const signals = resolver.buildCreationReferencePlanningSignals([
+    { filename: "feature.jpg", role: "feature", note: "功能卖点" },
     { filename: "material.jpg", role: "material", note: "结构细节" },
     { filename: "package.jpg", role: "package", note: "包装清单" },
     { filename: "dimensions.jpg", role: "dimensions", note: "尺寸规格" },
@@ -488,7 +489,7 @@ resolverTest("applied reference roles rebuild coverage and evidence for material
     dimensions: false,
   });
 
-  assert.deepEqual(signals.referenceCoverage.map((entry) => entry.role), ["material", "package", "dimensions"]);
+  assert.deepEqual(signals.referenceCoverage.map((entry) => entry.role), ["feature", "material", "package", "dimensions"]);
   assert.equal(signals.evidence.performance, true);
   assert.equal(signals.evidence.materials, true);
   assert.equal(signals.evidence.packageContents, true);
@@ -502,6 +503,7 @@ resolverTest("applied reference roles rebuild coverage and evidence for material
       evidence: signals.evidence,
     });
     assert.ok(plan.items.some((item) => item.imageType === "material-proof"), platform);
+    assert.ok(plan.items.some((item) => item.imageType === "comparison-proof"), platform);
     assert.ok(plan.items.some((item) => item.imageType === "in-box"), platform);
     assert.ok(plan.items.some((item) => item.imageType === "dimension-fit"), platform);
   }

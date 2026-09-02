@@ -83,10 +83,20 @@ test("card log text reads the log store because view items drop statusText", asy
   const bodyEnd = normalizer.search(/\r?\n\}\r?\n/);
   assert.ok(bodyEnd > 0, "expected to find the end of normalizeCreationItemForView");
   assert.doesNotMatch(normalizer.slice(0, bodyEnd), /statusText/, "view items intentionally omit statusText");
-  assert.match(app, /function getGenerationLogItemDetail\(channel, itemId\) \{[\s\S]*getGenerationLogChannelEntries\(state\.generationLog, channel\)/);
-  assert.match(app, /findLast\(\(entry\) => String\(entry\?\.groupItemId \|\| ""\) === normalizedItemId\)/);
-  assert.match(app, /function getCreationCardLogText\(item = \{\}, channel = "creation"\) \{[\s\S]*getGenerationLogItemDetail\(channel, item\.itemId\)/);
-  assert.match(app, /getCreationCardLogText\(item, "portrait"\)/);
+  assert.match(app, /getGenerationLogGroupItemDetail/);
+  assert.match(
+    app,
+    /function getGenerationLogItemDetail\(channel, itemId, groupId = ""\) \{\s*return getGenerationLogGroupItemDetail\(state\.generationLog, channel, groupId, itemId\);\s*\}/,
+  );
+  assert.match(
+    app,
+    /function getCreationCardLogText\(item = \{\}, channel = "creation", groupId = ""\) \{[\s\S]*getGenerationLogItemDetail\(channel, item\.itemId, groupId\)/,
+  );
+  assert.match(app, /getCreationCardLogText\(item, "portrait", options\.logGroupId\)/);
+  assert.match(
+    app,
+    /function renderPortraitView\(\) \{[\s\S]*createPortraitCard\(item, index, \{\s*logGroupId: currentSet\?\.setId \|\| "",\s*\}\)/,
+  );
 });
 
 test("failure log entries resolve their relay url from the job rather than a lookup", async () => {

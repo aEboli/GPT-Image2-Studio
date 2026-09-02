@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.10-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.11-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installers-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,17 +10,29 @@
 
 Prompt-to-image, reference analysis, editing, ecommerce sets, portraits, article illustrations, PPT generation, and asset history in one browser-based workspace.
 
-Current version: `v0.2.10`
+Current version: `v0.2.11`
 
 [Chinese README](./README.zh-CN.md)
 
 </div>
 
-## What is included in v0.2.10
+## What is included in v0.2.11
+
+- The Temu workbench entry is now a direct entry. The Creation records toolbar button reads `temuexcel导出工作台`, no longer requires ticking any record, and is no longer disabled by an empty selection. Ticked records never trigger an automatic import dialog; use the workbench's own **Import from Studio** action instead.
+- The workbench variant section gained an **Add variant** action. Each use appends exactly one editable SKU row that inherits the product-level declared price, dimensions, weight, and stock, without rebuilding the two-variant cartesian matrix or rewriting existing rows.
+- Batch quick export moved into the workbench's **Batch quick export** tab.
+- The local gallery loads server-generated WebP thumbnails (512px longest edge) instead of full-size originals.
+- The main generation preview and the image lightbox reveal a finished image only after the browser has decoded it, fading in from a slight blur. Re-rendering the same image URL keeps it sharp instead of replaying the reveal. Image editing and quick blend share the same behavior.
+- The workbench no longer requests `fonts.googleapis.com` or `fonts.gstatic.com`. The interface uses a local system font stack, so the first paint depends on no third-party font host.
+- The Windows launcher collects the local TCP listener snapshot once per launch attempt, reuses an occupied port only after the Studio health endpoint succeeds, and otherwise picks the first available candidate port.
+- An ecommerce set item that reaches the local stream deadline now aborts only the stream read and keeps polling the original upstream task for up to 120 seconds, so background repair no longer resubmits a task that is still running. Late stream events and stale manifests no longer overwrite an image that was already saved.
+- Reference images separate functional-claim evidence from material and structure detail, and dimension facts for multi-colour, multi-size, or multi-unit variants bind to their own variant group instead of collapsing into one global summary.
+
+### Earlier in v0.2.10
 
 - Documentation-only release. It aligns the README version facts with the shipped version: badge, this section, desktop installer and portable ZIP filenames, release-notes link, and build-output paths.
 
-### Added in v0.2.9
+### Earlier in v0.2.9
 
 - Every generation entry point shares one circular liquid loading indicator: prompt-to-image, style transfer, ecommerce sets, portraits, article illustrations, PPT pages, image decomposition, blend analysis, image editing, and quick blend.
 - The indicator renders as real liquid. A crest and a counter-ripple travel horizontally, bubbles rise inside, and the level fills continuously between percentages instead of stepping.
@@ -143,13 +155,13 @@ These screenshots come from isolated browser sessions of the current workbench. 
 
 ## Temu Excel export
 
-Select one or more Creation records and choose **Export Temu Excel**. The exporter uses the versioned template shipped in the repository, writes one row per SKU, reuses public HTTPS image URLs, and can convert local images through a Cloudinary unsigned upload (`cloudName` plus `uploadPreset`). It never asks for or stores a Cloudinary API key, API secret, signature, Authorization header, or browser cookie.
+Select one or more Creation records, open **temuexcel导出工作台**, and switch to **Batch quick export**. The exporter uses the versioned template shipped in the repository, writes one row per SKU, reuses public HTTPS image URLs, and can convert local images through a Cloudinary unsigned upload (`cloudName` plus `uploadPreset`). It never asks for or stores a Cloudinary API key, API secret, signature, Authorization header, or browser cookie.
 
 This is a local Node.js / Windows desktop capability. It does not log in to Temu, import the workbook, solve verification challenges, or publish a product. Missing product facts or public images remain blank and are reported in the `Export issues` sheet. Review the workbook and Temu's current validation results before uploading.
 
 ### Temu listing workbench
 
-**Export Temu Excel** opens the built-in Temu listing workbench as a full-screen overlay. There is no second service to start and no second port to manage. The workbench opens pre-selected with the Creation records you ticked, and lets you fill in the 51 template columns by hand per product, maintain the two-variant SKU matrix, override price, dimensions, weight and stock per SKU, manage carousel and packaging images, and export the workbook directly.
+**temuexcel导出工作台** opens the built-in Temu listing workbench as a full-screen overlay. No record selection is required, and selected Creation records never trigger an automatic import. There is no second service to start and no second port to manage. The workbench opens on its main editing interface; use its explicit **Import from Studio** action when you want to bring in existing Creation records. It lets you fill in the 51 template columns by hand per product, maintain the two-variant SKU matrix, override price, dimensions, weight and stock per SKU, manage carousel and packaging images, and export the workbook directly.
 
 The overlay has two sibling tabs:
 
@@ -193,9 +205,9 @@ On Windows, `launch-studio.cmd` starts the workbench and `stop-studio-services.c
 
 ### Windows desktop app (recommended)
 
-Download `GPT-Image2-Studio-Desktop-Setup-v0.2.10-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
+Download `GPT-Image2-Studio-Desktop-Setup-v0.2.11-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
 
-For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.10-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
+For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.11-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
 
 For desktop development, Electron 43 requires Node.js 22.12 or newer:
 
@@ -206,7 +218,7 @@ cmd /c npm run desktop
 
 ### Windows browser installer
 
-The legacy browser-installer flow remains documented for local builds, but the `v0.2.10` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
+The legacy browser-installer flow remains documented for local builds, but the `v0.2.11` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
 
 ## Configuration
 
@@ -355,7 +367,7 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 ## Releases
 
 - The source and lockfile versions are authoritative; tags use `v<version>`.
-- Current release notes: [v0.2.10](./docs/releases/v0.2.10.md).
+- Current release notes: [v0.2.11](./docs/releases/v0.2.11.md).
 - Windows packages are distributed through [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Check the release notes for hashes and signing status.
 - `npm run check:release:strict` requires a clean worktree and a matching tag on the current commit.
 

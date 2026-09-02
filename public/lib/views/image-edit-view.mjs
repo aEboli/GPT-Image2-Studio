@@ -11,6 +11,7 @@ import { getOutputFormatOptions, normalizeOutputFormat } from "../output-format-
 import { formatLoadingThumbnailStatusLabel, getPreviewPlaceholderState } from "../preview-placeholder-state.mjs";
 import { shouldReusePreviewLoadingShell } from "../preview-loading-shell.mjs";
 import { createFilmstripRevealTracker, renderFilmstripPreservingSelection, syncFilmstripSelectedMarker } from "../filmstrip-selection.mjs";
+import { clearImageReveal, setImageRevealSource } from "../image-reveal.mjs";
 import { createViewRendererController } from "./view-renderer.mjs";
 
 const DEFAULT_IMAGE_EDIT_RATIO = "1:1";
@@ -1369,7 +1370,9 @@ export function createImageEditController(options = {}) {
       !imageEditLoadingShellNodes ||
       !shouldReusePreviewLoadingShell(imageEditLoadingShellNodes.state || {}, placeholderState)
     ) {
+      const previousLoadingShellNodes = imageEditLoadingShellNodes;
       imageEditLoadingShellNodes = createPreviewLoadingShellNodes();
+      stopGenerationLoadingShell(previousLoadingShellNodes?.loading, { retainSource: true });
     }
 
     updatePreviewLoadingShell(imageEditLoadingShellNodes, placeholderState);
@@ -1420,17 +1423,18 @@ export function createImageEditController(options = {}) {
     }
 
     if (imageUrl) {
-      refs.imageEditGenerationImage.src = imageUrl;
-      refs.imageEditGenerationImage.alt = getDisplayPrompt(item) || "图片编辑生成结果";
-      refs.imageEditGenerationImage.classList.add("is-mounted", "is-visible");
+      setImageRevealSource(refs.imageEditGenerationImage, imageUrl, {
+        alt: getDisplayPrompt(item) || "图片编辑生成结果",
+        decoding: "async",
+        loading: "eager",
+      });
       refs.imageEditGenerationDownloadButton.href = imageUrl;
       refs.imageEditGenerationDownloadButton.download = item.filename || "image-edit.png";
       refs.imageEditGenerationDownloadButton.classList.remove("disabled");
       refs.imageEditGenerationDownloadButton.setAttribute("aria-disabled", "false");
       refs.imageEditGenerationLightboxButton.disabled = false;
     } else {
-      refs.imageEditGenerationImage.removeAttribute("src");
-      refs.imageEditGenerationImage.classList.remove("is-mounted", "is-visible");
+      clearImageReveal(refs.imageEditGenerationImage);
       refs.imageEditGenerationDownloadButton.href = "#";
       refs.imageEditGenerationDownloadButton.removeAttribute("download");
       refs.imageEditGenerationDownloadButton.classList.add("disabled");
@@ -1457,12 +1461,7 @@ export function createImageEditController(options = {}) {
 
   function renderImageEditGenerationStripEntries() {
     const entries = getImageEditGenerationEntries();
-    stopGenerationLoadingShells(refs.imageEditGenerationStrip);
-    refs.imageEditGenerationStrip.replaceChildren();
-    refs.imageEditGenerationStrip.classList.toggle("hidden", entries.length === 0);
-    refs.imageEditThumbnailEmpty.classList.toggle("hidden", entries.length > 0);
-
-    entries.forEach(({ key, item }, index) => {
+    const nextEntries = entries.map(({ key, item }, index) => {
       const isSelected = key === state.imageEdit.previewKey;
       const button = document.createElement("button");
       button.type = "button";
@@ -1500,8 +1499,12 @@ export function createImageEditController(options = {}) {
       shell.dataset.imageEditGenerationEntryKey = key;
       shell.appendChild(button);
       syncFilmstripSelectedMarker(shell, isSelected, { documentRef: document });
-      refs.imageEditGenerationStrip.appendChild(shell);
+      return shell;
     });
+    stopGenerationLoadingShells(refs.imageEditGenerationStrip);
+    refs.imageEditGenerationStrip.replaceChildren(...nextEntries);
+    refs.imageEditGenerationStrip.classList.toggle("hidden", entries.length === 0);
+    refs.imageEditThumbnailEmpty.classList.toggle("hidden", entries.length > 0);
   }
 
   async function preserveImageEditGenerationItemForDelete(item) {

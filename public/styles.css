@@ -1,5 +1,6 @@
 :root {
   color-scheme: dark;
+  --font-ui: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
   --bg: #090d18;
   --bg-soft: #11172a;
   --panel: rgba(18, 25, 47, 0.88);
@@ -166,7 +167,7 @@ body {
     linear-gradient(180deg, #08101d 0%, #090d18 100%);
   color: var(--text);
   font-size: var(--ui-root-font-size, 16px);
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--font-ui);
 }
 
 html.lightbox-open {
@@ -484,7 +485,7 @@ textarea::-webkit-scrollbar-corner {
   max-width: calc(100vw - 24px);
   overflow: hidden;
   color: color-mix(in srgb, var(--muted) 72%, transparent);
-  font-family: "Sora", sans-serif;
+  font-family: var(--font-ui);
   font-size: 10px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -730,7 +731,7 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .view-tab.act
 
 .brand-copy h1 {
   margin: 0;
-  font-family: "Sora", sans-serif;
+  font-family: var(--font-ui);
   font-size: var(--type-title-size);
   letter-spacing: 0;
 }
@@ -2266,13 +2267,26 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .generation-m
 }
 
 .creation-reference-analyze-spinner {
+  position: relative;
   flex: 0 0 auto;
-  width: 14px;
+  width: 18px;
   height: 14px;
-  border: 2px solid color-mix(in srgb, var(--accent) 24%, transparent);
-  border-top-color: color-mix(in srgb, var(--accent) 88%, var(--text));
+  overflow: hidden;
   border-radius: 999px;
-  animation: creation-reference-analyze-spin 1800ms linear infinite;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.creation-reference-analyze-spinner::before {
+  content: "";
+  position: absolute;
+  inset: -90% -60%;
+  background:
+    radial-gradient(ellipse at 28% 50%, color-mix(in srgb, var(--accent) 72%, #ffffff) 0%, transparent 42%),
+    radial-gradient(ellipse at 72% 50%, color-mix(in srgb, var(--success) 48%, transparent) 0%, transparent 38%);
+  filter: blur(3px);
+  opacity: 0.38;
+  transform: translate3d(-10%, -6%, 0) scale(0.96);
+  animation: workbench-busy-aurora-drift 3200ms cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
 }
 
 .creation-reference-analysis-actions .reference-analysis-button:hover,
@@ -2372,14 +2386,8 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .generation-m
   display: none;
 }
 
-@keyframes creation-reference-analyze-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .creation-reference-analyze-spinner {
+  .creation-reference-analyze-spinner::before {
     animation: none;
   }
 }
@@ -2987,15 +2995,6 @@ ul.creation-plan-message {
   background:
     linear-gradient(135deg, rgba(112, 226, 162, 0.12), transparent 45%),
     linear-gradient(180deg, rgba(145, 159, 255, 0.12), rgba(255, 255, 255, 0.025));
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .inline-busy-motion span,
-  .generate-button.is-loading::before,
-  .reference-analysis-button.is-loading::before,
-  #pptAnalyzeButton.is-loading::before {
-    animation: none;
-  }
 }
 
 .creation-card-loading {
@@ -4255,7 +4254,7 @@ html[data-ui-layout="mobile"] .creation-listing-workspace-bar .asset-listing-act
   background:
     linear-gradient(135deg, #fff0c9 0%, #f7c56d 54%, #a86a38 100%);
   color: #221827;
-  font-family: "Sora", "Microsoft YaHei", sans-serif;
+  font-family: var(--font-ui);
   font-size: var(--type-body-size);
   font-weight: 800;
   box-shadow:
@@ -5234,7 +5233,7 @@ html[data-ui-layout="mobile"] .creation-listing-workspace-bar .asset-listing-act
 .panel-title h2,
 .drawer-head h2 {
   margin: 0;
-  font-family: "Sora", sans-serif;
+  font-family: var(--font-ui);
   font-size: var(--type-title-size);
   letter-spacing: 0;
 }
@@ -5511,7 +5510,7 @@ textarea {
 }
 
 .ratio-chip strong {
-  font-family: "Sora", sans-serif;
+  font-family: var(--font-ui);
   font-size: var(--type-small-title-size);
   line-height: 1;
 }
@@ -8212,22 +8211,20 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
 
 .preview-placeholder h3 {
   margin: 0;
-  font-family: "Sora", sans-serif;
+  font-family: var(--font-ui);
   font-size: var(--type-title-size);
   line-height: 1.15;
 }
 
-/* Registered so the water level interpolates natively: a plain custom property is not
-   animatable, so a transition on the var()-derived height restarts every tick and the
-   level falls permanently behind the percentage. */
+/* Registered so stage colour and progress depth interpolate instead of stepping at
+   each percentage update. */
 @property --generation-loading-progress {
   syntax: "<percentage>";
   inherits: true;
   initial-value: 0%;
 }
 
-/* 色相与饱和度注册为可插值类型，阶段切换时颜色平滑过一遍色轮而不是硬切。
-   水体最终颜色由「阶段色相」与「百分比深浅」两个维度合成。 */
+/* 色相与饱和度注册为可插值类型，阶段切换时背景颜色平滑过一遍色轮而不是硬切。 */
 @property --generation-loading-hue {
   syntax: "<number>";
   inherits: true;
@@ -8248,11 +8245,9 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
   --generation-loading-light-span: 0.2;
   /* 主题整体偏移，与各阶段自己的起始亮度叠加，避免主题规则盖掉阶段调校。 */
   --generation-loading-light-shift: 0%;
-  /* 满幅铺开后液体面积成倍变大，用透明度压住整体亮度，中间文字才读得清。 */
-  --generation-loading-fill-opacity: 0.34;
-  --generation-loading-aurora-opacity: 0.5;
+  --generation-loading-aurora-opacity: 0.58;
   --generation-loading-scrim: rgba(8, 11, 22, 0.42);
-  /* 百分比越高液体越深，所以同一阶段内也能看出推进。 */
+  /* 百分比越高背景色越深，所以同一阶段内也能看出推进。 */
   --generation-loading-fluid: hsl(
     var(--generation-loading-hue) var(--generation-loading-sat)
       calc(
@@ -8264,9 +8259,7 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
     --generation-loading-progress var(--generation-loading-rise-duration, 800ms) linear,
     --generation-loading-hue 900ms ease-in-out,
     --generation-loading-sat 900ms ease-in-out;
-  /* 动画铺满宿主而不是画一个固定尺寸的圆：宿主多大动画就多大，
-     提示词模式的大生图板块得到大动画，套图模式每张卡的小占位得到刚好填满自己的小动画。
-     container-type 只约束行内轴，块轴仍随内容增长，所以没有确定高度的宿主不会塌成 0。 */
+  /* 背景随宿主铺满；容器单位仍用于中心内容与遮罩的稳定比例。 */
   position: relative;
   isolation: isolate;
   container-type: inline-size;
@@ -8282,7 +8275,7 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
   padding: 16px;
   box-sizing: border-box;
   color: var(--text);
-  font-family: "IBM Plex Sans", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  font-family: var(--font-ui);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   text-align: center;
@@ -8332,13 +8325,12 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
   --generation-loading-light-base: 78%;
 }
 
-/* 浅色主题整体下移亮度并压缩深浅跨度，保证水体与白底的对比度；
+/* 浅色主题整体下移亮度并压缩深浅跨度，保证背景与白底的对比度；
    用偏移而不是固定值，各阶段的亮度校准在两种主题下都生效。 */
 html[data-theme="light"] .generation-loading-shell {
   --generation-loading-light-shift: -16%;
   --generation-loading-light-span: 0.14;
-  /* 浅色主题下压暗层要反过来提亮，否则满幅上色会把深色文字吃掉。 */
-  --generation-loading-fill-opacity: 0.28;
+  /* 浅色主题下压暗层要反过来提亮，否则背景会把深色文字吃掉。 */
   --generation-loading-aurora-opacity: 0.38;
   --generation-loading-scrim: rgba(255, 255, 255, 0.56);
 }
@@ -8347,170 +8339,28 @@ html[data-theme="light"] .generation-loading-shell[data-generation-loading-famil
   --generation-loading-sat: 12%;
 }
 
-/* 液体层铺满整个宿主，不再是居中的固定圆：inset 让它跟着占位框走，
-   水位、波高、气泡都用容器单位（cqi）换算，所以同一套规则在大板块和小卡片上都成比例。 */
-.generation-loading-drop {
-  position: absolute;
-  z-index: 0;
-  inset: 0;
-  overflow: hidden;
-  border-radius: inherit;
-  isolation: isolate;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 32% 24%, rgba(255, 255, 255, 0.16), transparent 42%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.012));
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--generation-loading-fluid) 18%, transparent),
-    inset 0 0 calc(18px + 6cqi) color-mix(in srgb, var(--generation-loading-fluid) 14%, transparent);
-  --generation-loading-wave-height: clamp(5px, 2.4cqi, 22px);
-  --generation-loading-bubble-size: clamp(1.8px, 0.9cqi, 8px);
-  --generation-loading-bubble-tile: clamp(14px, 7cqi, 64px);
-  animation: generation-loading-breathe 4200ms ease-in-out infinite;
-}
-
-.generation-loading-drop::after {
-  content: "";
-  position: absolute;
-  z-index: 1;
-  inset: auto 0 0;
-  height: var(--generation-loading-progress);
-  opacity: var(--generation-loading-fill-opacity, 0.34);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--generation-loading-fluid) 38%, transparent),
-      color-mix(in srgb, var(--generation-loading-fluid) 64%, #0f172a) 28%,
-      color-mix(in srgb, var(--generation-loading-fluid) 64%, #0f172a)
-    );
-  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 18%, #000 100%);
-  mask-image: linear-gradient(180deg, transparent 0%, #000 18%, #000 100%);
-  box-shadow: inset 0 12px 20px rgba(255, 255, 255, 0.035);
-  pointer-events: none;
-}
-
-.generation-loading-drop::before {
-  content: "";
-  position: absolute;
-  z-index: 2;
-  inset: auto 0 0;
-  height: var(--generation-loading-progress);
-  background-image:
-    radial-gradient(circle at 30% 16%, rgba(255, 255, 255, 0.26), transparent 34%),
-    radial-gradient(circle var(--generation-loading-bubble-size, 3px) at 24% 96%, rgba(255, 255, 255, 0.46), transparent 100%),
-    radial-gradient(circle calc(var(--generation-loading-bubble-size, 3px) * 0.7) at 63% 58%, rgba(255, 255, 255, 0.4), transparent 100%),
-    radial-gradient(circle calc(var(--generation-loading-bubble-size, 3px) * 0.52) at 80% 28%, rgba(255, 255, 255, 0.34), transparent 100%);
-  background-repeat: no-repeat, repeat-y, repeat-y, repeat-y;
-  background-size:
-    150% 62%,
-    100% var(--generation-loading-bubble-tile, 26px),
-    100% calc(var(--generation-loading-bubble-tile, 26px) * 1.4),
-    100% calc(var(--generation-loading-bubble-tile, 26px) * 0.75);
-  background-position: 18% 0, 0 0, 0 0, 0 0;
-  animation: generation-loading-water-bubbles 6400ms linear infinite;
-  pointer-events: none;
-}
-
-/* 液体层与水面都是 span，宿主给字幕写的 `.filmstrip-item span { margin-top: 4px }` 这类规则
-   比单类选择器更specific，会命中它们；绝对定位下这条外边距会把满幅层真的顶下来留出一条空边。
-   带上 shell 前缀提高优先级，满幅几何才不依赖各宿主是否恰好没写 span 规则。 */
-.generation-loading-shell .generation-loading-drop,
-.generation-loading-shell .generation-loading-wave {
-  margin: 0;
-}
-
-/* 保留液面节点以维持统一加载层 DOM，但不再绘制独立的横向高光带。
-   原高光会在大预览中形成明显白条；水体的气泡、环境光与渐隐填充仍负责表达生成状态。 */
-.generation-loading-wave {
-  position: absolute;
-  z-index: 3;
-  left: 0;
-  width: 100%;
-  bottom: calc(var(--generation-loading-progress) - var(--generation-loading-wave-height, 8px));
-  height: calc(var(--generation-loading-wave-height, 8px) * 2);
-  opacity: 0;
-  pointer-events: none;
-  background-image: linear-gradient(
-    180deg,
-    transparent 0%,
-    color-mix(in srgb, var(--generation-loading-fluid) 24%, transparent) 34%,
-    color-mix(in srgb, var(--generation-loading-fluid) 48%, transparent) 50%,
-    color-mix(in srgb, var(--generation-loading-fluid) 30%, transparent) 66%,
-    transparent 100%
-  );
-  animation: none;
-}
-
-.generation-loading-wave::before,
-.generation-loading-wave::after {
-  content: "";
-  position: absolute;
-  /* 不再平铺：没有 repeat-x，就没有半圆阵列，也没有横向可位移的图案。 */
-  background-repeat: no-repeat;
-  pointer-events: none;
-}
-
-/* 液面之上的一层柔光，让水面看起来是湿的而不是一条硬边。 */
-.generation-loading-wave::before {
-  z-index: 2;
-  inset: -140% 0 40%;
-  background-image: linear-gradient(
-    180deg,
-    transparent 0%,
-    color-mix(in srgb, var(--generation-loading-fluid) 30%, transparent) 100%
-  );
-}
-
-/* 保留内部柔光的几何规则以兼容现有节点，但关闭绘制与动画；当前动态感交给环境光雾和气泡。 */
-.generation-loading-wave::after {
-  z-index: 1;
-  inset: auto 0 -1200%;
-  height: 1200%;
-  background-image: linear-gradient(
-    180deg,
-    transparent 0%,
-    color-mix(in srgb, var(--generation-loading-fluid) 30%, transparent) 46%,
-    transparent 100%
-  );
-  background-size: 100% 26%;
-  background-position: 0 100%;
-  animation: none;
-}
-
-/* 满幅的环境光雾：几团柔光缓慢横移与缩放，让整块占位在生成期间一直有呼吸感。
-   它只表达"正在生成"，进度仍然只由水位表达，所以尺寸变化不会误读成进度变化。 */
+/* 满幅模糊背景只表达正在生成；百分比仍由中心文本表达，避免把动效误读为进度。 */
 .generation-loading-shell::before {
   content: "";
   position: absolute;
-  z-index: -1;
-  /* 光团本身是 closest-side 的径向渐变、边缘自然淡出，不需要靠负 inset 把硬边藏到框外，
-     铺满即可——负 inset 会让 shell 产生可滚动溢出。 */
-  inset: 0;
-  opacity: var(--generation-loading-aurora-opacity, 0.5);
+  z-index: 0;
+  inset: -22%;
+  opacity: var(--generation-loading-aurora-opacity, 0.58);
   background:
-    radial-gradient(
-      closest-side circle at 26% 30%,
-      color-mix(in srgb, var(--generation-loading-fluid) 52%, transparent),
-      transparent 100%
-    ),
-    radial-gradient(
-      closest-side circle at 74% 24%,
-      color-mix(in srgb, hsl(calc(var(--generation-loading-hue) + 34) var(--generation-loading-sat) 72%) 40%, transparent),
-      transparent 100%
-    ),
-    radial-gradient(
-      closest-side circle at 58% 78%,
-      color-mix(in srgb, hsl(calc(var(--generation-loading-hue) - 30) var(--generation-loading-sat) 68%) 34%, transparent),
-      transparent 100%
-    );
-  background-size: 78% 78%, 66% 66%, 84% 84%;
+    linear-gradient(118deg, transparent 12%, color-mix(in srgb, var(--generation-loading-fluid) 54%, transparent) 43%, transparent 74%),
+    linear-gradient(236deg, transparent 20%, color-mix(in srgb, hsl(calc(var(--generation-loading-hue) + 28) var(--generation-loading-sat) 70%) 38%, transparent) 51%, transparent 80%),
+    linear-gradient(180deg, color-mix(in srgb, var(--generation-loading-fluid) 18%, transparent), transparent 68%);
+  background-size: 148% 132%, 132% 148%, 120% 120%;
   background-repeat: no-repeat;
-  background-position: 12% 18%, 76% 8%, 46% 74%;
-  animation: generation-loading-aurora-drift 9200ms ease-in-out infinite;
+  background-position: 4% 8%, 92% 88%, 50% 50%;
+  filter: blur(clamp(18px, 3.2cqi, 48px)) saturate(1.12);
+  transform: translate3d(-2%, -1%, 0) scale(1.04);
+  will-change: transform, opacity;
+  animation: generation-loading-aurora-drift 14000ms cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
   pointer-events: none;
 }
 
-/* 中间文字压在光雾与水体之上：满幅上色后没有这层压暗，浅色主题下百分比会糊在背景里。 */
+/* 中间文字压在模糊背景之上：没有这层压暗时，浅色主题下百分比会糊进背景里。 */
 .generation-loading-shell::after {
   content: "";
   position: absolute;
@@ -8532,10 +8382,8 @@ html[data-theme="light"] .generation-loading-shell[data-generation-loading-famil
   z-index: 2;
 }
 
-/* 心跳图标：随宿主尺寸成比例，和满幅动画同一套换算口径。
-   它是绝对定位动画层之外的普通网格子项，所以不参与满幅几何。 */
-/* 图标要在满幅上色之上立得住：描边取接近纯白，再叠一层同色族外发光把它从水体里托出来。
-   之前用 fluid 混白 72%，和身后的水体同色系、亮度也接近，所以看不清。 */
+/* 心跳图标随宿主尺寸成比例，是模糊背景之上的普通网格子项。 */
+/* 描边取接近纯白，再叠同色族外发光把它从背景里托出来。 */
 .generation-loading-heartbeat {
   width: clamp(20px, 9cqi, 46px);
   height: clamp(20px, 9cqi, 46px);
@@ -8555,7 +8403,7 @@ html[data-theme="light"] .generation-loading-shell[data-generation-loading-famil
   display: none;
 }
 
-/* 浅色主题反过来压深描边，并把外发光换成白色，才能在浅色水体上读得出来。 */
+/* 浅色主题反过来压深描边，并把外发光换成白色，才能在浅色背景上读得出来。 */
 html[data-theme="light"] .generation-loading-heartbeat {
   color: color-mix(in srgb, var(--generation-loading-fluid) 58%, #0b1020);
   filter:
@@ -8563,11 +8411,11 @@ html[data-theme="light"] .generation-loading-heartbeat {
     drop-shadow(0 1px 2px rgba(15, 23, 42, 0.24));
 }
 
-/* 百分比与标签压在满幅水体之上，只靠 --text / --muted 会糊进背景，
+/* 百分比与标签压在满幅背景之上，只靠 --text / --muted 会糊进背景，
    所以这里把亮度拉到接近纯白并加一层暗描边阴影拉开层次。 */
 .generation-loading-percent {
   min-width: 4ch;
-  font-family: "Sora", "IBM Plex Sans", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  font-family: var(--font-ui);
   color: color-mix(in srgb, #ffffff 92%, var(--generation-loading-fluid));
   font-size: clamp(0.9rem, 1.25cqi, 1.08rem);
   font-variant-numeric: tabular-nums;
@@ -8593,38 +8441,13 @@ html[data-theme="light"] .generation-loading-percent {
   display: none;
 }
 
-.generation-loading-shell[data-generation-loading-mode="waiting"] .generation-loading-drop {
-  --generation-loading-progress: 16%;
-  animation: generation-loading-waiting-pulse 2600ms ease-in-out infinite;
-}
-
-/* 等待态只调静态液位、节奏与气泡强度；颜色交给排队色相族，避免两套取色互相覆盖。 */
-.generation-loading-shell[data-generation-loading-mode="waiting"] .generation-loading-drop::after {
-  box-shadow: inset 0 12px 20px rgba(255, 255, 255, 0.025);
-}
-
-/* 排队时把满幅光雾压暗放慢：等待和真正在生成必须一眼能分出来。 */
+/* 排队时把满幅模糊背景压暗放慢：等待和真正在生成必须一眼能分出来。 */
 .generation-loading-shell[data-generation-loading-mode="waiting"]::before {
-  --generation-loading-aurora-opacity: 0.24;
-  animation-duration: 16000ms;
+  --generation-loading-aurora-opacity: 0.26;
+  animation-duration: 18000ms;
 }
 
-.generation-loading-shell[data-generation-loading-mode="waiting"] .generation-loading-drop::before {
-  animation: none;
-  opacity: 0.35;
-}
-
-/* 等待态保留原有时序钩子，实际视觉由更慢的水位呼吸和环境光雾表达。 */
-.generation-loading-shell[data-generation-loading-mode="waiting"] .generation-loading-wave {
-  animation-duration: 7200ms;
-}
-
-.generation-loading-shell[data-generation-loading-mode="waiting"] .generation-loading-wave::after {
-  animation-duration: 9000ms;
-  opacity: 0.6;
-}
-
-/* 等待态是灰蓝色族、水位很低，文字压不住背景就更该提亮，
+/* 等待态是灰蓝色族，文字压不住背景就更该提亮，
    只比生成态稍弱一点以示区别，而不是直接退回 --muted。 */
 .generation-loading-shell[data-generation-loading-mode="waiting"] .generation-loading-label {
   color: rgba(255, 255, 255, 0.82);
@@ -8636,7 +8459,7 @@ html[data-theme="light"] .generation-loading-shell[data-generation-loading-mode=
 
 .generation-loading-label {
   max-width: 18em;
-  font-family: "IBM Plex Sans", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  font-family: var(--font-ui);
   color: rgba(255, 255, 255, 0.94);
   font-size: clamp(0.8rem, 1.1cqi, 0.96rem);
   font-weight: 600;
@@ -8654,7 +8477,7 @@ html[data-theme="light"] .generation-loading-label {
 .generation-loading-log {
   max-width: 22em;
   width: 100%;
-  font-family: "IBM Plex Sans", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  font-family: var(--font-ui);
   color: rgba(255, 255, 255, 0.86);
   font-size: clamp(0.76rem, 1cqi, 0.9rem);
   font-weight: 500;
@@ -8683,17 +8506,10 @@ html[data-theme="light"] .generation-loading-log {
   min-height: clamp(220px, 30vw, 340px);
 }
 
-/* 各宿主不再规定动画尺寸——尺寸一律由宿主占位框决定。这里只按占位大小调水纹密度：
-   小框用小系数免得几条波纹就把框占满，大框放开系数免得水面看起来是一条直线。 */
+/* 各宿主不再规定动画尺寸——尺寸一律由宿主占位框决定。 */
 .creation-card-loading {
   min-height: 132px;
   padding: 12px;
-}
-
-.creation-card-loading .generation-loading-drop {
-  --generation-loading-wave-height: clamp(5px, 3cqi, 14px);
-  --generation-loading-bubble-size: clamp(1.8px, 1.1cqi, 5px);
-  --generation-loading-bubble-tile: clamp(14px, 9cqi, 34px);
 }
 
 .creation-card-loading .generation-loading-label {
@@ -8707,13 +8523,6 @@ html[data-theme="light"] .generation-loading-log {
   padding: 8px;
 }
 
-.article-card-image .generation-loading-drop,
-.ppt-slide-thumb .generation-loading-drop {
-  --generation-loading-wave-height: clamp(5px, 2.6cqi, 14px);
-  --generation-loading-bubble-size: clamp(1.8px, 1cqi, 5px);
-  --generation-loading-bubble-tile: clamp(14px, 8cqi, 34px);
-}
-
 .filmstrip .generation-loading-shell {
   min-height: 0;
   /* 胶片条的图与占位都是 84px 见方，动画铺满这一格而不是整条 92px 网格轨。 */
@@ -8724,12 +8533,6 @@ html[data-theme="light"] .generation-loading-log {
   border-radius: 10px;
 }
 
-.filmstrip .generation-loading-drop {
-  --generation-loading-wave-height: clamp(4px, 4cqi, 9px);
-  --generation-loading-bubble-size: clamp(1.6px, 1.6cqi, 4px);
-  --generation-loading-bubble-tile: clamp(12px, 14cqi, 22px);
-}
-
 .filmstrip .generation-loading-percent {
   font-size: var(--type-caption-size);
 }
@@ -8738,101 +8541,27 @@ html[data-theme="light"] .generation-loading-log {
   display: none;
 }
 
-/* 满幅层只能改透明度：缩放会让边缘露出占位底色，动画就不再是"填满"了。 */
-@keyframes generation-loading-breathe {
-  0%,
-  100% {
-    opacity: 0.92;
-  }
-
-  50% {
-    opacity: 1;
-  }
-}
-
-/* 光雾整体位移小于自身外扩量（inset -22%），所以移到任何一帧都不会露出边缘。 */
+/* 背景外扩后再缓慢平移与缩放，任一帧都不会露出宿主底色。 */
 @keyframes generation-loading-aurora-drift {
-  0%,
-  100% {
-    background-position: 12% 18%, 76% 8%, 46% 74%;
-    background-size: 78% 78%, 66% 66%, 84% 84%;
-  }
-
-  33% {
-    background-position: 30% 8%, 58% 28%, 26% 66%;
-    background-size: 88% 88%, 74% 74%, 74% 74%;
-  }
-
-  66% {
-    background-position: 4% 34%, 84% 20%, 62% 84%;
-    background-size: 70% 70%, 82% 82%, 92% 92%;
-  }
-}
-
-@keyframes generation-loading-waiting-pulse {
-  0%,
-  100% {
-    opacity: 0.52;
+  0% {
+    opacity: 0.62;
+    transform: translate3d(-4%, -2%, 0) scale(1.04);
   }
 
   50% {
-    opacity: 0.88;
+    opacity: 0.82;
+    transform: translate3d(3%, -5%, 0) scale(1.11);
   }
-}
 
-/* 液面只做纵向的张力呼吸：厚度与亮度轻微起伏。
-   原来的 translateX + rotate 会让整条水面左右摇摆，那不是水位上涨该有的样子。 */
-@keyframes generation-loading-water-flow {
-  0%,
   100% {
-    opacity: 0.88;
-    transform: scaleY(0.92);
-  }
-
-  50% {
-    opacity: 1;
-    transform: scaleY(1.08);
-  }
-}
-
-/* 水体内部的柔光自下而上流过，纯纵向，没有横向位移。 */
-@keyframes generation-loading-wave-drift {
-  from {
-    background-position: 0 100%;
-  }
-
-  to {
-    background-position: 0 -26%;
-  }
-}
-
-@keyframes generation-loading-water-bubbles {
-  from {
-    background-position:
-      18% 0,
-      0 0,
-      12% 0,
-      -8% 0;
-  }
-
-  to {
-    background-position:
-      18% 0,
-      0 calc(var(--generation-loading-bubble-tile, 26px) * -1),
-      12% calc(var(--generation-loading-bubble-tile, 26px) * -1.4),
-      -8% calc(var(--generation-loading-bubble-tile, 26px) * -0.75);
+    opacity: 0.68;
+    transform: translate3d(5%, 3%, 0) scale(1.07);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .generation-loading-shell::before,
-  .generation-loading-shell[data-generation-loading-mode="waiting"]::before,
-  .generation-loading-drop,
-  .generation-loading-drop::before,
-  .generation-loading-wave,
-  .generation-loading-wave::before,
-  .generation-loading-wave::after,
-  .generation-loading-shell[data-generation-loading-mode="waiting"] .generation-loading-drop {
+  .generation-loading-shell[data-generation-loading-mode="waiting"]::before {
     animation: none;
   }
 }
@@ -8980,11 +8709,21 @@ html[data-theme="light"] .generation-loading-log {
 
 .filmstrip-placeholder-ghost.is-loading::before {
   position: absolute;
-  inset: 0;
+  inset: -64% -42%;
   content: "";
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
-  transform: translateX(-100%);
-  animation: filmstrip-placeholder-sweep 1400ms ease-in-out infinite;
+  background:
+    radial-gradient(ellipse at 28% 46%, color-mix(in srgb, var(--accent) 44%, transparent) 0%, transparent 42%),
+    radial-gradient(ellipse at 72% 56%, color-mix(in srgb, var(--success) 30%, transparent) 0%, transparent 44%);
+  filter: blur(9px);
+  opacity: 0.36;
+  transform: translate3d(-10%, -6%, 0) scale(0.96);
+  animation: workbench-busy-aurora-drift 3400ms cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .filmstrip-placeholder-ghost.is-loading::before {
+    animation: none;
+  }
 }
 
 .filmstrip-placeholder-label {
@@ -9185,16 +8924,6 @@ html[data-ui-layout="mobile"] .filmstrip-selected-marker {
 
 .filmstrip-deck-save:disabled {
   opacity: 0.6;
-}
-
-@keyframes filmstrip-placeholder-sweep {
-  0% {
-    transform: translateX(-100%);
-  }
-
-  100% {
-    transform: translateX(100%);
-  }
 }
 
 .side-column {
@@ -10565,7 +10294,7 @@ html[data-theme="light"] .lightbox-fields .detail-field {
 .prompt-agent-head h2,
 .prompt-agent-history-head h3 {
   margin: 0;
-  font-family: "Sora", sans-serif;
+  font-family: var(--font-ui);
 }
 
 .prompt-agent-body {
@@ -10693,22 +10422,20 @@ html[data-theme="light"] .lightbox-fields .detail-field {
 
 .prompt-agent-scan-line {
   position: absolute;
-  left: -18%;
-  right: -18%;
-  top: -24%;
-  z-index: 4;
-  height: 28%;
+  inset: -34%;
+  z-index: 1;
   background:
-    linear-gradient(180deg, transparent, rgba(112, 226, 162, 0.45), transparent),
-    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.42), transparent);
+    radial-gradient(ellipse at 28% 38%, rgba(112, 226, 162, 0.34) 0%, transparent 42%),
+    radial-gradient(ellipse at 74% 62%, rgba(255, 255, 255, 0.2) 0%, transparent 44%);
   opacity: 0;
   pointer-events: none;
-  transform: translateY(-40%) rotate(-10deg);
+  transform: translate3d(-10%, -6%, 0) scale(0.96);
 }
 
 .prompt-agent-preview.is-analyzing .prompt-agent-scan-line {
-  opacity: 1;
-  animation: prompt-agent-scan 1600ms cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  filter: blur(12px);
+  opacity: 0.42;
+  animation: workbench-busy-aurora-drift 3600ms cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
 }
 
 .prompt-agent-preview div,
@@ -10775,18 +10502,22 @@ html[data-theme="light"] .lightbox-fields .detail-field {
 .prompt-agent-analysis-motion span::before {
   content: "";
   position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(112, 226, 162, 0.62), transparent);
-  transform: translateX(-100%);
-  animation: prompt-agent-flow 1300ms cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  inset: -88% -42%;
+  background:
+    radial-gradient(ellipse at 30% 48%, rgba(112, 226, 162, 0.48) 0%, transparent 42%),
+    radial-gradient(ellipse at 72% 52%, rgba(145, 159, 255, 0.26) 0%, transparent 44%);
+  filter: blur(7px);
+  opacity: 0.36;
+  transform: translate3d(-10%, -6%, 0) scale(0.96);
+  animation: workbench-busy-aurora-drift 3000ms cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
 }
 
 .prompt-agent-analysis-motion span:nth-child(2)::before {
-  animation-delay: 130ms;
+  animation-delay: -720ms;
 }
 
 .prompt-agent-analysis-motion span:nth-child(3)::before {
-  animation-delay: 260ms;
+  animation-delay: -1440ms;
 }
 
 .prompt-agent-feedback[data-state="error"] {
@@ -10987,26 +10718,6 @@ html[data-theme="light"] .lightbox-fields .detail-field {
   border-radius: 14px;
   object-fit: scale-down;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
-}
-
-@keyframes prompt-agent-scan {
-  0% {
-    transform: translateY(-60%) rotate(-10deg);
-  }
-
-  100% {
-    transform: translateY(430%) rotate(-10deg);
-  }
-}
-
-@keyframes prompt-agent-flow {
-  0% {
-    transform: translateX(-100%);
-  }
-
-  100% {
-    transform: translateX(100%);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -11317,7 +11028,7 @@ html[data-theme="light"] .lightbox-fields .detail-field {
   border-radius: 16px;
   background: var(--portrait-accessory-asset-panel-bg);
   color: var(--text);
-  font-family: "IBM Plex Sans", "Microsoft YaHei", sans-serif;
+  font-family: var(--font-ui);
   box-shadow: var(--portrait-accessory-asset-shadow);
   backdrop-filter: blur(18px) saturate(114%);
 }
@@ -11335,7 +11046,7 @@ html[data-theme="light"] .lightbox-fields .detail-field {
 .portrait-accessory-asset-head h2 {
   margin: 4px 0 0;
   color: var(--text);
-  font-family: "Sora", "Microsoft YaHei", sans-serif;
+  font-family: var(--font-ui);
   font-size: var(--type-title-size);
   font-weight: 800;
 }
@@ -11524,7 +11235,7 @@ html[data-ui-layout="mobile"] .portrait-accessory-asset-panel {
 
 .config-card h3 {
   margin: 0;
-  font-family: "Sora", "Microsoft YaHei", sans-serif;
+  font-family: var(--font-ui);
   font-size: var(--type-small-title-size);
   font-weight: 700;
   letter-spacing: 0;
@@ -12000,6 +11711,7 @@ html[data-ui-layout="mobile"] .portrait-accessory-asset-panel {
 .reference-analysis-button.is-loading,
 #pptAnalyzeButton.is-loading {
   position: relative;
+  isolation: isolate;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -12013,40 +11725,55 @@ html[data-ui-layout="mobile"] .portrait-accessory-asset-panel {
 #pptAnalyzeButton.is-loading::before {
   content: "";
   position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
-  opacity: 0.68;
+  z-index: -1;
+  inset: -88% -30%;
+  background:
+    radial-gradient(ellipse at 28% 46%, rgba(255, 255, 255, 0.26) 0%, transparent 42%),
+    radial-gradient(ellipse at 72% 54%, color-mix(in srgb, var(--accent) 42%, transparent) 0%, transparent 44%);
+  filter: blur(10px);
+  opacity: 0.36;
   pointer-events: none;
-  transform: translateX(-120%);
-  animation: inline-busy-sweep 1400ms cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  transform: translate3d(-10%, -6%, 0) scale(0.96);
+  animation: workbench-busy-aurora-drift 3600ms cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
 }
 
 .inline-busy-motion {
   position: relative;
   z-index: 1;
   display: inline-grid;
-  grid-template-columns: repeat(3, 4px);
+  grid-template-columns: repeat(3, 5px);
   align-items: center;
-  gap: 3px;
+  gap: 2px;
   flex: 0 0 auto;
+  overflow: hidden;
 }
 
 .inline-busy-motion span {
-  width: 4px;
-  height: 4px;
+  position: relative;
+  width: 5px;
+  height: 5px;
+  overflow: hidden;
   border-radius: 999px;
-  background: currentColor;
-  opacity: 0.42;
-  transform: scale(0.72);
-  animation: inline-busy-pulse 820ms ease-in-out infinite;
 }
 
-.inline-busy-motion span:nth-child(2) {
-  animation-delay: 110ms;
+.inline-busy-motion span::before {
+  content: "";
+  position: absolute;
+  inset: -80%;
+  border-radius: inherit;
+  background: color-mix(in srgb, currentColor 74%, transparent);
+  filter: blur(0.65px);
+  opacity: 0.36;
+  transform: translate3d(-10%, -6%, 0) scale(0.96);
+  animation: workbench-busy-aurora-drift 2400ms cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
 }
 
-.inline-busy-motion span:nth-child(3) {
-  animation-delay: 220ms;
+.inline-busy-motion span:nth-child(2)::before {
+  animation-delay: -800ms;
+}
+
+.inline-busy-motion span:nth-child(3)::before {
+  animation-delay: -1600ms;
 }
 
 .creation-listing-generate-label {
@@ -12054,26 +11781,30 @@ html[data-ui-layout="mobile"] .portrait-accessory-asset-panel {
   z-index: 1;
 }
 
-@keyframes inline-busy-sweep {
+@keyframes workbench-busy-aurora-drift {
   0% {
-    transform: translateX(-120%);
-  }
-
-  100% {
-    transform: translateX(120%);
-  }
-}
-
-@keyframes inline-busy-pulse {
-  0%,
-  100% {
-    opacity: 0.38;
-    transform: scale(0.72);
+    opacity: 0.32;
+    transform: translate3d(-10%, -6%, 0) scale(0.96);
   }
 
   50% {
-    opacity: 1;
-    transform: scale(1);
+    opacity: 0.56;
+    transform: translate3d(4%, -10%, 0) scale(1.08);
+  }
+
+  100% {
+    opacity: 0.4;
+    transform: translate3d(10%, 6%, 0) scale(1.02);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inline-busy-motion span::before,
+  .generate-button.is-loading::before,
+  .creation-record-actions .toolbar-button.is-loading::before,
+  .reference-analysis-button.is-loading::before,
+  #pptAnalyzeButton.is-loading::before {
+    animation: none;
   }
 }
 
@@ -17491,4 +17222,72 @@ html[data-ui-layout="mobile"] .creation-record-browser .asset-record-picker.is-o
   min-height: 0;
   border: 0;
   display: block;
+}
+
+/* 图片完成解码后再从柔焦状态显现；使用独立 scale，保留预览和灯箱各自的 transform。 */
+#previewImage.image-reveal,
+.reference-analysis-generation-canvas img.image-reveal,
+.image-decomposition-generation-canvas img.image-reveal,
+.image-edit-generation-canvas img.image-reveal,
+.quick-blend-generation img.image-reveal,
+#lightboxImage.image-reveal {
+  transition:
+    opacity 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    scale 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+#previewImage.image-reveal.is-image-reveal-pending,
+.reference-analysis-generation-canvas img.image-reveal.is-image-reveal-pending,
+.image-decomposition-generation-canvas img.image-reveal.is-image-reveal-pending,
+.image-edit-generation-canvas img.image-reveal.is-image-reveal-pending,
+.quick-blend-generation img.image-reveal.is-image-reveal-pending,
+#lightboxImage.image-reveal.is-image-reveal-pending {
+  opacity: 0;
+  filter: blur(10px);
+  scale: 1.03;
+}
+
+#previewImage.image-reveal.is-image-revealed,
+.reference-analysis-generation-canvas img.image-reveal.is-image-revealed,
+.image-decomposition-generation-canvas img.image-reveal.is-image-revealed,
+.image-edit-generation-canvas img.image-reveal.is-image-revealed,
+.quick-blend-generation img.image-reveal.is-image-revealed,
+#lightboxImage.image-reveal.is-image-revealed {
+  opacity: 1;
+  filter: blur(0);
+  scale: 1;
+}
+
+#previewImage.image-reveal.is-image-revealed[draggable="true"].is-dragging {
+  opacity: 0.66;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #previewImage.image-reveal,
+  .reference-analysis-generation-canvas img.image-reveal,
+  .image-decomposition-generation-canvas img.image-reveal,
+  .image-edit-generation-canvas img.image-reveal,
+  .quick-blend-generation img.image-reveal,
+  #lightboxImage.image-reveal {
+    filter: none;
+    scale: 1;
+    transition: none;
+  }
+
+  #previewImage.image-reveal.is-image-reveal-pending,
+  .reference-analysis-generation-canvas img.image-reveal.is-image-reveal-pending,
+  .image-decomposition-generation-canvas img.image-reveal.is-image-reveal-pending,
+  .image-edit-generation-canvas img.image-reveal.is-image-reveal-pending,
+  .quick-blend-generation img.image-reveal.is-image-reveal-pending,
+  #lightboxImage.image-reveal.is-image-reveal-pending,
+  #previewImage.image-reveal.is-image-revealed,
+  .reference-analysis-generation-canvas img.image-reveal.is-image-revealed,
+  .image-decomposition-generation-canvas img.image-reveal.is-image-revealed,
+  .image-edit-generation-canvas img.image-reveal.is-image-revealed,
+  .quick-blend-generation img.image-reveal.is-image-revealed,
+  #lightboxImage.image-reveal.is-image-revealed {
+    filter: none;
+    scale: 1;
+  }
 }

@@ -16,14 +16,26 @@ export function isServerImageProxyUrl(url) {
     return false;
   }
 
-  if (raw.startsWith("/api/images/")) {
+  if (
+    raw.startsWith("/api/images/") ||
+    raw === "/api/gallery/thumbnail" ||
+    raw.startsWith("/api/gallery/thumbnail?") ||
+    raw.startsWith("/output/")
+  ) {
     return true;
   }
 
   try {
     const origin = globalThis.window?.location?.origin || "http://localhost";
     const parsed = new URL(raw, origin);
-    return parsed.origin === origin && parsed.pathname.startsWith("/api/images/");
+    return (
+      parsed.origin === origin &&
+      (
+        parsed.pathname.startsWith("/api/images/") ||
+        parsed.pathname === "/api/gallery/thumbnail" ||
+        parsed.pathname.startsWith("/output/")
+      )
+    );
   } catch (_error) {
     return false;
   }
@@ -51,6 +63,10 @@ export function getServerThumbnailUrl(item = {}) {
 
 export function getImageUrl(item) {
   return item?.imageUrl || item?.thumbnailUrl || item?.previewUrl || item?.serverImageUrl || item?.serverThumbnailUrl || "";
+}
+
+export function getThumbnailUrl(item) {
+  return item?.serverThumbnailUrl || item?.thumbnailUrl || item?.serverImageUrl || item?.imageUrl || item?.previewUrl || "";
 }
 
 export function readBlobAsDataUrl(blob) {
@@ -248,8 +264,12 @@ export async function cacheBrowserGalleryItem(item) {
   }
 }
 
-export async function readBrowserCachedGalleryItems() {
+export async function readBrowserCachedGalleryItems({ restoreImageData = false } = {}) {
   const entries = readBrowserImageCacheIndex();
+  if (!restoreImageData) {
+    return entries;
+  }
+
   const restoredItems = [];
   const missingFilenames = new Set();
 
@@ -335,7 +355,7 @@ export function mergeServerAndBrowserGalleryItems(serverItems, browserItems) {
       ...cachedItem,
       ...item,
       imageUrl: cachedImageUrl || item.imageUrl || cachedItem?.imageUrl || "",
-      thumbnailUrl: cachedThumbnailUrl || item.thumbnailUrl || cachedItem?.thumbnailUrl || cachedImageUrl || "",
+      thumbnailUrl: item.thumbnailUrl || cachedThumbnailUrl || cachedItem?.thumbnailUrl || cachedImageUrl || "",
     });
   }
 

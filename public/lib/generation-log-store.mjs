@@ -240,6 +240,27 @@ export function getGenerationLogChannelEntries(store, channel) {
   return sortByOrderDesc(getChannelRows(store, normalizedChannel)).map((row) => ({ ...row, channel: normalizedChannel }));
 }
 
+// Batch items reuse their item IDs across separate runs. Resolve the containing
+// group first so a later queue never renders a previous queue's status text.
+export function getGenerationLogGroupItemDetail(store, channel, groupId = "", itemId = "") {
+  const normalizedItemId = cleanText(itemId);
+  if (!normalizedItemId) {
+    return "";
+  }
+
+  const normalizedGroupId = cleanText(groupId);
+  if (!normalizedGroupId) {
+    return "";
+  }
+
+  const group = getGenerationLogChannelEntries(store, channel)
+    .find((row) => row?.kind === "group" && cleanText(row?.groupId) === normalizedGroupId);
+  const child = Array.isArray(group?.children)
+    ? group.children.find((entry) => cleanText(entry?.groupItemId) === normalizedItemId)
+    : null;
+  return cleanText(child?.detail);
+}
+
 export function getGenerationLogAllEntries(store) {
   const rows = GENERATION_LOG_CHANNELS.flatMap((channel) => getGenerationLogChannelEntries(store, channel));
   return sortByOrderDesc(rows).slice(0, GENERATION_LOG_CHANNEL_LIMIT * GENERATION_LOG_CHANNELS.length);

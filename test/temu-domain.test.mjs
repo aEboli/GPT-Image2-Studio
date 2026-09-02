@@ -6,6 +6,7 @@ import {
   PRODUCT_DESCRIPTION_MAX_LENGTH,
   TEMPLATE_HEADERS,
   VARIANT_ATTRIBUTE_OPTIONS,
+  addSkuVariant,
   availableVariantAttributeOptions,
   applySkuBulkFields,
   createDefaultDraft,
@@ -15,6 +16,7 @@ import {
   normalizeAsset,
   normalizeDraft,
   reorderCarouselAsset,
+  skuKey,
   truncateProductDescription,
   updateSkuVariantAttributeName,
   updateSkuVariantValue,
@@ -222,6 +224,149 @@ test("双变种生成四个 SKU 并保留同键编辑", () => {
   assert.equal(expanded.find((sku) => sku.variant1Value === "红" && sku.variant2Value === "S").skuCode, "CUSTOM-RED-S");
 });
 
+test("新增变种只追加 SKU 行并继承商品默认值", () => {
+  const draft = createDefaultDraft();
+  Object.assign(draft.product, {
+    declaredPrice: "12.5",
+    length: "20",
+    width: "15",
+    height: "8",
+    weight: "380",
+    inventory: "50",
+  });
+  draft.variants = { name1: "颜色", values1: ["红色"], name2: "", values2: [] };
+  draft.skus = [{
+    key: skuKey("红色"),
+    variant1Value: "红色",
+    variant2Value: "",
+    skuCode: "sku-1",
+    declaredPrice: "9.9",
+    length: "18",
+    width: "12",
+    height: "5",
+    weight: "145",
+    inventory: "100",
+    image: { id: "kept-image", url: "https://example.com/red.jpg", status: "verified", width: 1200, height: 1200 },
+    source: "kept",
+  }, {
+    key: skuKey("黑色"),
+    variant1Value: "黑色",
+    variant2Value: "",
+    skuCode: "SKU-2",
+    image: { id: "kept-image-2", url: "https://example.com/black.jpg", status: "verified" },
+  }];
+  const original = structuredClone(draft);
+
+  const result = addSkuVariant(draft, " 蓝色 ", "ignored in single variant");
+
+  assert.deepEqual({ added: result.added, reason: result.reason }, { added: true, reason: "" });
+  assert.equal(result.draft.skus.length, 3);
+  assert.equal(result.draft.skus[0], draft.skus[0]);
+  assert.equal(result.draft.skus[0].image, draft.skus[0].image);
+  assert.deepEqual(result.draft.skus.slice(0, 2), original.skus);
+  assert.deepEqual(result.draft.variants, original.variants);
+  assert.deepEqual(draft, original);
+  assert.deepEqual(result.draft.skus[2], {
+    key: skuKey("蓝色"),
+    variant1Value: "蓝色",
+    variant2Value: "",
+    skuCode: "SKU-3",
+    declaredPrice: "12.5",
+    length: "20",
+    width: "15",
+    height: "8",
+    weight: "380",
+    inventory: "50",
+    image: normalizeAsset(),
+  });
+  assert.match(result.draft.skus[2].skuCode, /^[\x00-\x7F]+$/);
+});
+
+test("新增双变种拒绝空值和重复组合", () => {
+  const draft = createDefaultDraft();
+  draft.variants = { name1: "颜色", values1: ["红色"], name2: "型号", values2: ["S"] };
+  draft.skus = [{
+    key: skuKey("红色", "S"),
+    variant1Value: "红色",
+    variant2Value: "S",
+    skuCode: "SKU-1",
+    image: normalizeAsset(),
+  }];
+  const original = structuredClone(draft);
+
+  const missingFirst = addSkuVariant(draft, "  ", "M");
+  assert.deepEqual({ draft: missingFirst.draft, added: missingFirst.added, reason: missingFirst.reason }, {
+    draft,
+    added: false,
+    reason: "missing_variant1",
+  });
+
+  const missingSecond = addSkuVariant(draft, "蓝色", "  ");
+  assert.equal(missingSecond.draft, draft);
+  assert.deepEqual({ added: missingSecond.added, reason: missingSecond.reason }, { added: false, reason: "missing_variant2" });
+
+  const duplicate = addSkuVariant(draft, " 红色 ", " S ");
+  assert.equal(duplicate.draft, draft);
+  assert.deepEqual({ added: duplicate.added, reason: duplicate.reason }, { added: false, reason: "duplicate" });
+  assert.deepEqual(draft, original);
+
+  const added = addSkuVariant(draft, "蓝色", " M ");
+  assert.deepEqual({ added: added.added, reason: added.reason }, { added: true, reason: "" });
+  assert.equal(added.draft.skus.length, 2);
+  assert.deepEqual(added.draft.skus[1], {
+    key: skuKey("蓝色", "M"),
+    variant1Value: "蓝色",
+    variant2Value: "M",
+    skuCode: "SKU-2",
+    declaredPrice: "",
+    length: "",
+    width: "",
+    height: "",
+    weight: "",
+    inventory: "100",
+    image: normalizeAsset(),
+  });
+  assert.deepEqual(added.draft.variants, original.variants);
+});
+
+test("新增变种以当前 SKU 值去重并避开陈旧 key", () => {
+  const draft = createDefaultDraft();
+  draft.skus = [{
+    key: skuKey("白色"),
+    variant1Value: "红色",
+    variant2Value: "陈旧第二变种值",
+    skuCode: "SKU-1",
+    image: normalizeAsset(),
+  }];
+
+  const duplicate = addSkuVariant(draft, "红色");
+  assert.equal(duplicate.draft, draft);
+  assert.deepEqual({ added: duplicate.added, reason: duplicate.reason }, { added: false, reason: "duplicate" });
+
+  const added = addSkuVariant(draft, "白色");
+  assert.equal(added.added, true);
+  assert.equal(added.draft.skus.length, 2);
+  assert.equal(added.draft.skus[1].key, `${skuKey("白色")}#2`);
+  assert.notEqual(added.draft.skus[1].key, draft.skus[0].key);
+});
+
+test("新增变种不设置每商品 20 SKU 上限", () => {
+  const draft = createDefaultDraft();
+  draft.skus = Array.from({ length: 20 }, (_, index) => ({
+    key: skuKey(`颜色${index + 1}`),
+    variant1Value: `颜色${index + 1}`,
+    variant2Value: "",
+    skuCode: `SKU-${index + 1}`,
+    image: normalizeAsset(),
+  }));
+
+  const result = addSkuVariant(draft, "颜色21");
+
+  assert.deepEqual({ added: result.added, reason: result.reason }, { added: true, reason: "" });
+  assert.equal(result.draft.skus.length, 21);
+  assert.equal(result.draft.skus[20].skuCode, "SKU-21");
+});
+
 test("行内变种值更新只修改目标 SKU 的值文本", () => {
   const draft = createDefaultDraft();
   draft.variants = { name1: "颜色", values1: ["白色", "蓝色"], name2: "型号", values2: ["A", "B"] };
@@ -307,6 +452,26 @@ test("变种值校验读取 SKU 行而非旧变种值数组", () => {
   draft.skus[0].variant1Value = "白色";
   draft.skus[0].variant2Value = "";
   assert.ok(validateDraft(draft).errors.some((error) => error.path === "skus.0.variant2Value"));
+});
+
+test("变种组合重复时阻止校验通过", () => {
+  const draft = createValidDraft();
+  const duplicateIndex = draft.skus.length;
+  draft.skus.push({
+    ...structuredClone(draft.skus[0]),
+    key: skuKey("白色"),
+    variant1Value: "白色",
+    skuCode: "SKU-2",
+  });
+
+  const result = validateDraft(draft);
+
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some((error) => (
+    error.path === `skus.${duplicateIndex}.variant1Value`
+    && error.code === "duplicate_variant"
+    && error.message.includes("第 1 行")
+  )));
 });
 
 test("批量 SKU 字段同时更新全部行和后续继承默认值", () => {

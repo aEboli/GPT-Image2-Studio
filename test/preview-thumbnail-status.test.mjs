@@ -52,3 +52,71 @@ test("generation thumbnail renderers use the shared loading shell", async () => 
   assert.match(imageEditView, /createGenerationLoadingShell\(document, \{ key, active: true, stage: getGenerationLoadingItemStage\(item\) \}\)/);
   assert.match(quickBlendView, /createGenerationLoadingShell\(document, \{ key, active: true, stage: getGenerationLoadingItemStage\(item\) \}\)/);
 });
+
+test("loading rails build replacements before releasing their shared loading sources", async () => {
+  const [app, imageEditView, quickBlendView] = await Promise.all([
+    readFile(appPath, "utf8"),
+    readFile(imageEditViewPath, "utf8"),
+    readFile(quickBlendViewPath, "utf8"),
+  ]);
+
+  const rendererCases = [
+    [
+      app,
+      "renderImageDecompositionGenerationStripEntries",
+      "preserveImageDecompositionGenerationItemForDelete",
+      "refs.imageDecompositionGenerationStrip",
+    ],
+    [
+      app,
+      "renderReferenceAnalysisGenerationStripEntries",
+      "preserveReferenceAnalysisGenerationItemForDelete",
+      "refs.referenceAnalysisGenerationStrip",
+    ],
+    [
+      imageEditView,
+      "renderImageEditGenerationStripEntries",
+      "preserveImageEditGenerationItemForDelete",
+      "refs.imageEditGenerationStrip",
+    ],
+    [
+      quickBlendView,
+      "renderQuickBlendGenerationStripEntries",
+      "preserveQuickBlendGenerationItemForDelete",
+      "refs.quickBlendGenerationStrip",
+    ],
+  ];
+
+  for (const [source, functionName, nextFunctionName, strip] of rendererCases) {
+    const start = source.indexOf(`function ${functionName}`);
+    const end = source.indexOf(`function ${nextFunctionName}`, start + 1);
+    assert.notEqual(start, -1, `${functionName} should exist`);
+    assert.notEqual(end, -1, `${nextFunctionName} should follow ${functionName}`);
+    const body = source.slice(start, end);
+    const escapedStrip = strip.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    assert.match(
+      body,
+      new RegExp(
+        `const nextEntries = entries\\.map\\([\\s\\S]*stopGenerationLoadingShells\\(${escapedStrip}\\);[\\s\\S]*${escapedStrip}\\.replaceChildren\\(\\.\\.\\.nextEntries\\);`,
+      ),
+      `${functionName} must attach replacements before stopping the old shells`,
+    );
+  }
+
+  const articleStart = app.indexOf("function renderArticleIllustrationView");
+  const articleEnd = app.indexOf("function buildArticleIllustrationPlanFormData", articleStart + 1);
+  const articleBody = app.slice(articleStart, articleEnd);
+  assert.match(
+    articleBody,
+    /const referenceCards = referenceItems\.map\([\s\S]*const storyboardCards = storyboardItems\.map\([\s\S]*stopGenerationLoadingShells\(refs\.articleIllustrationReferenceList\);/,
+  );
+
+  const pptStart = app.indexOf("function renderPptSlides");
+  const pptEnd = app.indexOf("function getPptDeckPageCount", pptStart + 1);
+  const pptBody = app.slice(pptStart, pptEnd);
+  assert.match(
+    pptBody,
+    /const cards = getPptRenderableSlides\(\)\.map\([\s\S]*stopGenerationLoadingShells\(refs\.pptSlideList\);[\s\S]*refs\.pptSlideList\.replaceChildren\(\.\.\.cards\);/,
+  );
+});

@@ -1,6 +1,6 @@
 {
   "name": "gpt-image2-studio",
-  "version": "0.2.10",
+  "version": "0.2.11",
   "private": true,
   "type": "module",
   "main": "desktop/main.mjs",
@@ -27,7 +27,9 @@
     "node": ">=20"
   },
   "dependencies": {
+    "@jsquash/webp": "1.5.0",
     "exceljs": "4.4.0",
+    "jimp": "1.6.1",
     "jszip": "^3.10.1",
     "morphicons": "1.7.1",
     "pptxgenjs": "^4.0.1"

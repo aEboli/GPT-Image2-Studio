@@ -423,6 +423,28 @@ test("creation dimensions item keeps the dimensions reference image", () => {
   );
 });
 
+test("creation feature references feed functional and benefit image roles", () => {
+  const images = [
+    { filename: "lure-main.png" },
+    { filename: "feature-card.png" },
+    { filename: "material-detail.png" },
+  ];
+  const roles = [
+    { filename: "lure-main.png", role: "product" },
+    { filename: "feature-card.png", role: "feature" },
+    { filename: "material-detail.png", role: "material" },
+  ];
+
+  assert.deepEqual(
+    buildCreationItemReferenceImages({ role: "effect-comparison" }, images, roles).map((image) => image.filename),
+    ["lure-main.png", "feature-card.png", "material-detail.png"],
+  );
+  assert.deepEqual(
+    buildCreationItemReferenceImages({ role: "usage-suggestion" }, images, roles).map((image) => image.filename),
+    ["lure-main.png", "feature-card.png"],
+  );
+});
+
 test("creation expanded suite roles keep the selected reference subject as the subject anchor", () => {
   const images = [
     { filename: "blue-backpack.png" },

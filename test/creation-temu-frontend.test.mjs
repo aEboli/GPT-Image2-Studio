@@ -94,12 +94,14 @@ function createTemuExportDom({ values = {} } = {}) {
     creationRecordTemuStatCacheReuseCount: createElement(),
     creationRecordTemuStatBlockerCount: createElement(),
     creationRecordTemuStatWarningCount: createElement(),
+    creationRecordActionFeedback: createElement(),
     creationRecordSearchInput: createElement(),
     creationRecordSetList: createElement(),
     creationRecordTemuExportSelectedCount: createElement(),
     creationRecordTemuExportSubmitButton: createElement(),
   };
   const downloads = [];
+  const documentListeners = new Map();
   const documentRef = {
     activeElement: createElement(),
     body: { appendChild: (element) => downloads.push(element) },
@@ -115,6 +117,16 @@ function createTemuExportDom({ values = {} } = {}) {
       const id = selector.slice(1);
       return controls[id] || null;
     },
+    addEventListener(type, handler) {
+      const handlers = documentListeners.get(type) || [];
+      handlers.push(handler);
+      documentListeners.set(type, handlers);
+    },
+    /* 事件对象原样透传：这些用例要自己伪造「被改指向祖先」的 target，
+       不能像 createElement.dispatch 那样注入 target: this。 */
+    dispatch(type, event = {}) {
+      for (const handler of documentListeners.get(type) || []) handler(event);
+    },
   };
   return { controls, documentRef, downloads, fields, modeControl };
 }
@@ -127,6 +139,16 @@ class FakeFormData {
   get(name) {
     return this.fields.namedItem(name)?.value || "";
   }
+}
+
+/* 模拟真实浏览器里按下禁用的「temuexcel导出工作台」：该按钮的禁用样式声明了
+   pointer-events: none，事件会改指向祖先容器，所以这里只交出祖先，
+   让模块自己靠矩形命中测试找回按钮。 */
+function pressDisabledExportButton(dom, { button = 0, clientX = 10, clientY = 10 } = {}) {
+  const exportButton = dom.controls.creationRecordExportTemuButton;
+  exportButton.getBoundingClientRect = () => ({ left: 0, top: 0, right: 100, bottom: 30, width: 100, height: 30 });
+  const origin = { closest: () => null, querySelectorAll: () => [exportButton] };
+  dom.documentRef.dispatch("pointerdown", { target: origin, button, clientX, clientY });
 }
 
 function createBrowserWindow() {
@@ -202,7 +224,7 @@ test("Temu export controller filters stale selections, sends only approved field
   assert.deepEqual(controller.getCheckedSetIds(), ["set-a", "set-b"]);
   controller.syncControls(false, 2);
   assert.equal(dom.controls.creationRecordExportTemuButton.disabled, false);
-  assert.equal(dom.controls.creationRecordExportTemuButton.textContent, "导出 Temu Excel (2)");
+  assert.equal(dom.controls.creationRecordExportTemuButton.textContent, "temuexcel导出工作台");
   controller.syncControls(true, 2);
   assert.equal(dom.controls.creationRecordExportTemuButton.disabled, true);
   controller.syncControls(false, 2);
@@ -421,10 +443,15 @@ test("Temu export frontend keeps the record refresh binding and HTML form contra
   assert.match(app, /from "\/lib\/creation-record-list-model\.mjs(?:\?[^"]+)?"/u);
   assert.match(app, /creationRecordTemuExportController\.syncControls\(temuStartBlocked, checkedCount\)/u);
   assert.doesNotMatch(app, /filterCreationRecordSets\(\)\.slice\(0, 60\)/u);
-  assert.match(await readFile(new URL("../lib/creation-temu-export-ui.mjs", import.meta.url), "utf8"), /renderRecordViewPreservingListScroll/u);
+  const libSource = await readFile(new URL("../lib/creation-temu-export-ui.mjs", import.meta.url), "utf8");
+  assert.match(libSource, /renderRecordViewPreservingListScroll/u);
+  assert.match(libSource, /import \{ resolveDisabledShakeTarget \} from "\.\/disabled-shake\.mjs";/u);
+  // 捕获阶段这一位行为测试观察不到（替身直接向 document 派发，冒泡监听也会通过），只能钉源码。
+  assert.match(libSource, /documentRef\.addEventListener\?\.\("pointerdown", handleDisabledExportPress, true\);/u);
   assert.match(app, /creationRecordRefreshButton\.addEventListener\("click", refreshCreationRecordSets\)/u);
   assert.match(app, /\.finally\(\(\) => \{\s*creationRecordRefreshPromise = null;\s*renderCreationRecordView\(\);\s*\}\)/u);
   assert.match(html, /id="creationRecordExportTemuButton"/u);
+  assert.match(html, /id="creationRecordExportTemuButton"[^>]*>temuexcel导出工作台</u);
   assert.match(html, /id="creationRecordTemuExportDialog"/u);
   assert.match(html, /id="creationRecordTemuPreflightButton"/u);
   assert.match(html, /id="creationRecordTemuStrictMode"/u);
@@ -436,7 +463,7 @@ test("Temu export frontend keeps the record refresh binding and HTML form contra
   assert.doesNotMatch(app, /apiSecret|authorization|cookie/iu);
 });
 
-test("注入 openWorkbench 后，点击导出按钮打开工作台而不再直接开批量对话框", () => {
+test("注入 openWorkbench 后，入口忽略已勾选记录并直接打开工作台", () => {
   const dom = createTemuExportDom({});
   const state = {
     creation: {
@@ -458,9 +485,12 @@ test("注入 openWorkbench 后，点击导出按钮打开工作台而不再直�
 
   controller.open();
 
-  // 去向是工作台，且带上当前勾选的 setIds。
+  controller.syncControls(false, 2);
+  assert.equal(dom.controls.creationRecordExportTemuButton.textContent, "temuexcel导出工作台");
+
+  // 即使已经勾选记录，也不能自动打开 Studio 导入界面。
   assert.equal(openedWith.length, 1);
-  assert.deepEqual(openedWith[0], ["set-a", "set-b"]);
+  assert.deepEqual(openedWith[0], []);
   // 关键：不再直接打开批量导出对话框。
   assert.equal(dom.controls.creationRecordTemuExportDialog.open, false);
 
@@ -470,7 +500,7 @@ test("注入 openWorkbench 后，点击导出按钮打开工作台而不再直�
   assert.equal(openedWith.length, 1);
 });
 
-test("注入 openWorkbench 后，三条守卫仍先拦截且不打开工作台", () => {
+test("注入 openWorkbench 后，零勾选可直接打开，批量标签仍要求勾选，忙碌状态仍会拦截", () => {
   const dom = createTemuExportDom({});
   const state = {
     creation: { sets: [{ setId: "set-a" }], recordCheckedSetIds: [], recordTemuExportBusy: false },
@@ -487,13 +517,21 @@ test("注入 openWorkbench 后，三条守卫仍先拦截且不打开工作台",
     openWorkbench: (setIds) => openedWith.push(setIds),
   });
 
-  // 零勾选：不打开工作台，提示文案保持原文。
+  controller.syncControls(false, 0);
+  assert.equal(dom.controls.creationRecordExportTemuButton.disabled, false);
+
+  // 零勾选直接进入工作台，不发送任何预选记录。
   controller.open();
-  assert.equal(openedWith.length, 0);
+  assert.equal(openedWith.length, 1);
+  assert.deepEqual(openedWith[0], []);
+  assert.equal(feedback.length, 0);
+
+  // 只有覆盖层内的批量快速导出仍要求显式勾选。
+  controller.openExportDialog();
+  assert.equal(dom.controls.creationRecordTemuExportDialog.open, false);
   assert.equal(feedback.at(-1)?.[0], "请先勾选需要导出的套图记录。");
 
   // 记录变更中：同样不打开工作台，提示文案保持原文。
-  state.creation.recordCheckedSetIds = ["set-a"];
   const busyController = createCreationTemuExportController({
     state,
     getCurrentSetIds: () => state.creation.sets.map((set) => set.setId),
@@ -504,8 +542,10 @@ test("注入 openWorkbench 后，三条守卫仍先拦截且不打开工作台",
     windowRef: createBrowserWindow(),
     openWorkbench: (setIds) => openedWith.push(setIds),
   });
+  busyController.syncControls(false, 0);
+  assert.equal(dom.controls.creationRecordExportTemuButton.disabled, true);
   busyController.open();
-  assert.equal(openedWith.length, 0);
+  assert.equal(openedWith.length, 1);
   assert.equal(feedback.at(-1)?.[0], "当前记录正在生成、刷新或删除，请完成后再打开 Temu 导出。");
 });
 
@@ -525,6 +565,150 @@ test("不注入 openWorkbench 时退回原行为，直接打开批量导出对�
 
   controller.open();
   assert.equal(dom.controls.creationRecordTemuExportDialog.open, true);
+});
+
+/* 反馈区替身按 public/app.js 的 setCreationRecordFeedback 逐行写法实现，
+   撤回时的「反馈区仍显示那句话」读回判定才是真的被跑到。 */
+function createRecordFeedbackHarness(dom) {
+  const node = dom.controls.creationRecordActionFeedback;
+  return {
+    node,
+    setRecordFeedback: (message = "", kind = "") => {
+      node.textContent = message || "";
+      node.dataset.state = kind || "";
+    },
+  };
+}
+
+test("工作台入口无需勾选记录，零勾选时不再播报旧的选择提示", () => {
+  const dom = createTemuExportDom({});
+  const feedback = createRecordFeedbackHarness(dom);
+  const state = {
+    creation: { sets: [{ setId: "set-a" }], recordCheckedSetIds: [], recordTemuExportBusy: false },
+  };
+  const controller = createCreationTemuExportController({
+    state,
+    getCurrentSetIds: () => state.creation.sets.map((set) => set.setId),
+    setRecordFeedback: feedback.setRecordFeedback,
+    renderRecordView: () => {},
+    documentRef: dom.documentRef,
+    windowRef: createBrowserWindow(),
+    openWorkbench: () => {
+      throw new Error("禁用按钮不得触发导出");
+    },
+  });
+
+  controller.syncControls(false, 0);
+  assert.equal(dom.controls.creationRecordExportTemuButton.disabled, false);
+  assert.equal(dom.controls.creationRecordExportTemuButton.textContent, "temuexcel导出工作台");
+
+  pressDisabledExportButton(dom);
+  assert.equal(feedback.node.textContent, "");
+  assert.equal(feedback.node.dataset.state || "", "");
+
+  state.creation.recordCheckedSetIds = ["set-a"];
+  controller.syncControls(false, 1);
+  assert.equal(dom.controls.creationRecordExportTemuButton.disabled, false);
+  assert.equal(feedback.node.textContent, "");
+  assert.equal(feedback.node.dataset.state || "", "");
+});
+
+test("记录变更中按下禁用按钮播报忙碌原因；非主键与命中其它控件都保持沉默", () => {
+  const dom = createTemuExportDom({});
+  const feedback = createRecordFeedbackHarness(dom);
+  const state = {
+    creation: { sets: [{ setId: "set-a" }], recordCheckedSetIds: ["set-a"], recordTemuExportBusy: false },
+  };
+  const controller = createCreationTemuExportController({
+    state,
+    getCurrentSetIds: () => state.creation.sets.map((set) => set.setId),
+    isMutationBusy: () => true,
+    setRecordFeedback: feedback.setRecordFeedback,
+    renderRecordView: () => {},
+    documentRef: dom.documentRef,
+    windowRef: createBrowserWindow(),
+    openWorkbench: () => {
+      throw new Error("禁用按钮不得触发导出");
+    },
+  });
+
+  controller.syncControls(false, 1);
+  assert.equal(dom.controls.creationRecordExportTemuButton.disabled, true);
+
+  pressDisabledExportButton(dom, { button: 2 });
+  assert.equal(feedback.node.textContent, "", "非主键按下不播报");
+
+  dom.documentRef.dispatch("pointerdown", {
+    target: { closest: () => null, querySelectorAll: () => [] },
+    button: 0,
+    clientX: 10,
+    clientY: 10,
+  });
+  assert.equal(feedback.node.textContent, "", "命中不到导出按钮时不播报");
+
+  pressDisabledExportButton(dom);
+  assert.equal(feedback.node.textContent, "当前记录正在生成、刷新或删除，请完成后再打开 Temu 导出。");
+});
+
+test("撤回禁用原因不会覆盖之后写入的新反馈", () => {
+  const dom = createTemuExportDom({});
+  const feedback = createRecordFeedbackHarness(dom);
+  let mutationBusy = true;
+  const state = {
+    creation: { sets: [{ setId: "set-a" }], recordCheckedSetIds: [], recordTemuExportBusy: false },
+  };
+  const controller = createCreationTemuExportController({
+    state,
+    getCurrentSetIds: () => state.creation.sets.map((set) => set.setId),
+    isMutationBusy: () => mutationBusy,
+    setRecordFeedback: feedback.setRecordFeedback,
+    renderRecordView: () => {},
+    documentRef: dom.documentRef,
+    windowRef: createBrowserWindow(),
+  });
+
+  controller.syncControls(false, 0);
+  assert.equal(dom.controls.creationRecordExportTemuButton.disabled, true);
+  pressDisabledExportButton(dom);
+  assert.equal(feedback.node.textContent, "当前记录正在生成、刷新或删除，请完成后再打开 Temu 导出。");
+
+  feedback.setRecordFeedback("已删除 1 套记录。", "success");
+  mutationBusy = false;
+  controller.syncControls(false, 0);
+  assert.equal(feedback.node.textContent, "已删除 1 套记录。");
+  assert.equal(feedback.node.dataset.state, "success");
+});
+
+test("按钮禁用时必定给得出原因：四种组合逐一按下", () => {
+  const dom = createTemuExportDom({});
+  const feedback = createRecordFeedbackHarness(dom);
+  let mutationBusy = false;
+  const state = {
+    creation: { sets: [{ setId: "set-a" }], recordCheckedSetIds: [], recordTemuExportBusy: false },
+  };
+  const controller = createCreationTemuExportController({
+    state,
+    getCurrentSetIds: () => state.creation.sets.map((set) => set.setId),
+    isMutationBusy: () => mutationBusy,
+    setRecordFeedback: feedback.setRecordFeedback,
+    renderRecordView: () => {},
+    documentRef: dom.documentRef,
+    windowRef: createBrowserWindow(),
+    openWorkbench: () => {},
+  });
+
+  for (const busy of [false, true]) {
+    for (const checked of [[], ["set-a"]]) {
+      mutationBusy = busy;
+      state.creation.recordCheckedSetIds = checked;
+      feedback.node.textContent = "";
+      controller.syncControls(false, checked.length);
+      pressDisabledExportButton(dom);
+      const { disabled } = dom.controls.creationRecordExportTemuButton;
+      assert.equal(disabled, busy);
+      assert.equal(Boolean(feedback.node.textContent), disabled, "禁用必有原因，可用必不播报");
+    }
+  }
 });
 
 test("Temu export filename keeps only a safe XLSX attachment name", () => {

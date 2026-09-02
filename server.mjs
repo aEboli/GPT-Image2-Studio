@@ -75,6 +75,11 @@ import {
   repairGeneratedAssetMetadata,
   saveGeneratedAsset,
 } from "./lib/gallery-store.mjs";
+import {
+  buildGalleryThumbnailUrl,
+  resolveGalleryImageAsset,
+  scheduleGalleryThumbnail,
+} from "./lib/gallery-thumbnail.mjs";
 import { normalizeBase64, requestDirectImageGeneration, requestImageEdit, requestImageGeneration, requestModelProtocolImageGeneration } from "./lib/responses-workflow.mjs";
 import { resolveCreationUpstreamTimeoutMs, upstreamStreamFetch, warmUpstreamStreamDispatcher } from "./lib/upstream-stream-fetch.mjs";
 import { mergeRequestPrivateConfig } from "./lib/request-private-config.mjs";
@@ -273,14 +278,14 @@ const SESSION_TASK_SLOT_RETRY_DELAY_MS = 250;
 // Shared with lib/upstream-stream-fetch.mjs so the socket body timeout is always
 // derived from the SAME effective deadline this abort uses.
 const CREATION_UPSTREAM_TIMEOUT_MS = resolveCreationUpstreamTimeoutMs();
-// A relay can acknowledge a Responses task and then close its stream with a
-// temporary 402. Keep polling that known task for the rest of the creation
-// lifecycle instead of releasing the slot after the workflow's short generic
-// recovery window and letting automatic repair submit a duplicate POST.
+// A stream deadline only ends the local stream read. Keep the creation slot while
+// the known task receives a short, GET-only recovery window so an active upstream
+// task cannot be duplicated by the later automatic repair pass.
+const CREATION_ORIGINAL_RESPONSE_RECOVERY_TIMEOUT_MS = 120_000;
 const CREATION_ORIGINAL_RESPONSE_RECOVERY_POLL_DELAY_MS = 5_000;
 const CREATION_ORIGINAL_RESPONSE_RECOVERY_MAX_POLLS = Math.max(
   1,
-  Math.ceil(CREATION_UPSTREAM_TIMEOUT_MS / CREATION_ORIGINAL_RESPONSE_RECOVERY_POLL_DELAY_MS),
+  Math.ceil(CREATION_ORIGINAL_RESPONSE_RECOVERY_TIMEOUT_MS / CREATION_ORIGINAL_RESPONSE_RECOVERY_POLL_DELAY_MS),
 );
 function getSessionTaskSlotLimit(requestScope) {
   const scope = String(requestScope || "").trim().split(":", 1)[0];
@@ -617,22 +622,39 @@ function ensureSseListenerCapacity(response) {
 
 function createCreationRequestLifecycle(response) {
   ensureSseListenerCapacity(response);
-  const controller = new AbortController();
-  let abortMessage = "";
-  const abort = (message) => {
-    if (controller.signal.aborted) {
+  const streamController = new AbortController();
+  const recoveryController = new AbortController();
+  const createLifecycleAbortReason = (message, code) => {
+    const error = new Error(message);
+    error.code = code;
+    return error;
+  };
+  const abortStream = (message, code) => {
+    if (streamController.signal.aborted) {
       return;
     }
-    abortMessage = message;
-    controller.abort(new Error(message));
+    streamController.abort(createLifecycleAbortReason(message, code));
   };
-  const timeout = setTimeout(
-    () => abort(`套图上游请求超时（${Math.round(CREATION_UPSTREAM_TIMEOUT_MS / 1000)} 秒），已释放任务槽位。`),
-    CREATION_UPSTREAM_TIMEOUT_MS,
-  );
+  const abortRecovery = (message, code) => {
+    if (recoveryController.signal.aborted) {
+      return;
+    }
+    recoveryController.abort(createLifecycleAbortReason(message, code));
+  };
+  const abortForClientClose = () => {
+    const message = "套图客户端连接已断开，已取消上游请求。";
+    abortStream(message, "CREATION_CLIENT_CLOSED");
+    abortRecovery(message, "CREATION_CLIENT_CLOSED");
+  };
+  const getAbortCode = (error) =>
+    String(error?.abortCode || error?.code || error?.cause?.code || "").trim();
+  const deadlineMessage = `套图流等待已到期限（${Math.round(CREATION_UPSTREAM_TIMEOUT_MS / 1000)} 秒），正在回查原任务。`;
+  const timeout = setTimeout(() => {
+    abortStream(deadlineMessage, "CREATION_STREAM_DEADLINE");
+  }, CREATION_UPSTREAM_TIMEOUT_MS);
   const onResponseClose = () => {
     if (!response.writableEnded && !response.writableFinished) {
-      abort("套图客户端连接已断开，已取消上游请求。");
+      abortForClientClose();
     }
   };
   response.once("close", onResponseClose);
@@ -641,19 +663,34 @@ function createCreationRequestLifecycle(response) {
   // already fired and would never fire again, leaving the item to run to its full
   // timeout, so treat an already-closed response as an immediate abort.
   if (!isResponseWritable(response)) {
-    abort("套图客户端连接已断开，已取消上游请求。");
+    abortForClientClose();
   }
 
   return {
-    signal: controller.signal,
+    streamSignal: streamController.signal,
+    recoverySignal: recoveryController.signal,
+    isStreamDeadlineAbort(error) {
+      return error?.name === "AbortError" && getAbortCode(error) === "CREATION_STREAM_DEADLINE";
+    },
     getError(error) {
       // Only an abort-shaped failure carries the lifecycle reason. Substituting
       // unconditionally would relabel an unrelated late error (an upstream HTTP
       // 400 landing just as the timeout fires) as a timeout.
-      if (!abortMessage || error?.name !== "AbortError") {
+      const abortCode = getAbortCode(error);
+      if (!abortCode || error?.name !== "AbortError") {
         return error;
       }
-      return new Error(abortMessage, { cause: error });
+      const message = abortCode === "CREATION_STREAM_DEADLINE"
+        ? deadlineMessage
+        : "套图客户端连接已断开，已取消上游请求。";
+      const lifecycleError = new Error(message, { cause: error });
+      if (abortCode === "CREATION_STREAM_DEADLINE") {
+        lifecycleError.creationStreamDeadlineExceeded = true;
+        lifecycleError.originalResponseRecovery = "unavailable";
+        lifecycleError.originalResponseRecoveryReason = "missing_response_id";
+        lifecycleError.originalResponseAutoRetryBlocked = true;
+      }
+      return lifecycleError;
     },
     dispose() {
       clearTimeout(timeout);
@@ -667,12 +704,16 @@ async function requestCreationStudioImageGeneration(response, options) {
   try {
     return await requestStudioImageGeneration({
       ...options,
-      signal: lifecycle.signal,
+      signal: lifecycle.streamSignal,
       statusHeartbeatMs: CREATION_STATUS_HEARTBEAT_MS,
       responseRecoveryMaxPolls:
         options.responseRecoveryMaxPolls ?? CREATION_ORIGINAL_RESPONSE_RECOVERY_MAX_POLLS,
       responseRecoveryPollDelayMs:
         options.responseRecoveryPollDelayMs ?? CREATION_ORIGINAL_RESPONSE_RECOVERY_POLL_DELAY_MS,
+      originalResponseRecoverySignal: lifecycle.recoverySignal,
+      originalResponseRecoveryTimeoutMs: CREATION_ORIGINAL_RESPONSE_RECOVERY_TIMEOUT_MS,
+      recoverOriginalOnAbort: lifecycle.isStreamDeadlineAbort,
+      allowUnknownResultRetry: false,
     });
   } catch (error) {
     throw lifecycle.getError(error);
@@ -1095,7 +1136,73 @@ function canStartCreationGenerationAttempt(items, itemId, { autoRepair = false }
     return true;
   }
   const item = Array.isArray(items) ? items.find((entry) => entry.itemId === itemId) : null;
-  return getCreationItemGenerationAttemptCount(item) < MAX_ITEM_UPSTREAM_ATTEMPTS;
+  return (
+    getCreationItemGenerationAttemptCount(item) < MAX_ITEM_UPSTREAM_ATTEMPTS &&
+    item?.originalResponseAutoRetryBlocked !== true
+  );
+}
+
+function getCreationOriginalResponseFailurePatch(error) {
+  if (error?.originalResponseAutoRetryBlocked !== true) {
+    return {};
+  }
+
+  return {
+    originalResponseRecovery: String(error.originalResponseRecovery || "unavailable"),
+    originalResponseRecoveryReason: String(error.originalResponseRecoveryReason || ""),
+    originalResponseStatus: String(error.originalResponseStatus || ""),
+    originalResponseCheckedAt: new Date().toISOString(),
+    originalResponseAutoRetryBlocked: true,
+  };
+}
+
+function getCreationOriginalResponsePendingPatch() {
+  return {
+    originalResponseRecovery: "pending",
+    originalResponseRecoveryReason: "response_id_received",
+    originalResponseStatus: "in_progress",
+    originalResponseCheckedAt: new Date().toISOString(),
+    originalResponseAutoRetryBlocked: true,
+  };
+}
+
+async function persistCreationOriginalResponsePending({
+  setId,
+  plan,
+  createdAt,
+  relativeDir,
+  referenceImageNames = [],
+  itemId,
+  getItems,
+  setItems,
+  setManifest,
+}) {
+  const nextItems = updateCreationItems(getItems(), itemId, getCreationOriginalResponsePendingPatch());
+  setItems(nextItems);
+  const nextManifest = await creationSetStore.saveManifest(
+    buildCreationSetManifest({
+      setId,
+      plan,
+      createdAt,
+      updatedAt: new Date().toISOString(),
+      status: getCreationSetStatus(nextItems),
+      relativeDir,
+      items: nextItems,
+      referenceImageNames,
+    }),
+  );
+  setManifest(nextManifest);
+  return nextManifest;
+}
+
+function clearCreationOriginalResponseRecoveryPatch() {
+  return {
+    originalResponseRecovery: "",
+    originalResponseRecoveryReason: "",
+    originalResponseStatus: "",
+    originalResponseCheckedAt: "",
+    originalResponseAutoRetryBlocked: false,
+  };
 }
 
 function reserveCreationGenerationAttempt(items, itemId) {
@@ -1239,6 +1346,31 @@ async function handleGalleryGet(response) {
   })).filter((item) => !isInvalidGeneratedImageMetadata(item));
 
   sendJson(response, 200, items);
+}
+
+async function handleGalleryThumbnailGet(request, response, url) {
+  const asset = resolveGalleryImageAsset({
+    outputDir,
+    relativeImagePath: url.searchParams.get("path") || "",
+  });
+  if (!asset) {
+    return sendText(response, 404, "Not found");
+  }
+
+  const thumbnail = await scheduleGalleryThumbnail({
+    outputDir,
+    relativeImagePath: asset.relativeImagePath,
+  });
+  const target = thumbnail?.thumbnailPath || asset.sourcePath;
+
+  try {
+    return await serveFile(request, response, target);
+  } catch (error) {
+    if (error && typeof error === "object" && error.code === "ENOENT") {
+      return sendText(response, 404, "Not found");
+    }
+    throw error;
+  }
 }
 
 async function handleGenerationTasksGet(request, response, url) {
@@ -2369,15 +2501,16 @@ function buildSavedItem({
   generationCompletedAt,
   generationDurationMs,
 }) {
-  const imageUrl = buildPublicAssetUrl("/output", relativePath || filename, createdAt);
+  const resolvedRelativePath = relativePath || filename;
+  const imageUrl = buildPublicAssetUrl("/output", resolvedRelativePath, createdAt);
 
   return {
     id: `${filename.replace(/\.[^.]+$/, "")}-${createdAt}`,
     filename,
     absolutePath,
-    relativePath: relativePath || filename,
+    relativePath: resolvedRelativePath,
     imageUrl,
-    thumbnailUrl: imageUrl,
+    thumbnailUrl: buildGalleryThumbnailUrl(resolvedRelativePath, createdAt),
     createdAt,
     prompt,
     baseUrl,
@@ -2466,6 +2599,7 @@ function buildCreationSetManifest({
     productDescription: plan.productDescription,
     sellingPoints: plan.sellingPoints,
     dimensionSpecs: plan.dimensionSpecs,
+    dimensionSpecGroups: plan.dimensionSpecGroups || [],
     dimensionUnitMode: plan.dimensionUnitMode,
     dimensionUnitModeLabel: plan.dimensionUnitModeLabel,
     targetLanguage: plan.targetLanguage,
@@ -4815,6 +4949,22 @@ async function handleCreationGenerate(request, response) {
           imageModel: generationConfig.imageModel,
           endpointPath: generationConfig.endpointPath,
           reasoningEffort,
+          onResponseId: () =>
+            persistCreationOriginalResponsePending({
+              setId,
+              plan,
+              createdAt,
+              relativeDir: creationRelativeDir,
+              referenceImageNames,
+              itemId: item.itemId,
+              getItems: () => items,
+              setItems: (nextItems) => {
+                items = nextItems;
+              },
+              setManifest: (nextManifest) => {
+                setManifest = nextManifest;
+              },
+            }),
           async onEvent(event) {
             if (event.type === "status") {
               writeSseEvent(response, "item_status", {
@@ -4918,6 +5068,7 @@ async function handleCreationGenerate(request, response) {
 
         items = updateCreationItems(items, item.itemId, {
           ...generationSnapshot,
+          ...clearCreationOriginalResponseRecoveryPatch(),
           status: "completed",
           missingAsset: false,
           filename,
@@ -4956,12 +5107,15 @@ async function handleCreationGenerate(request, response) {
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        const originalResponseFailurePatch = getCreationOriginalResponseFailurePatch(error);
         const requeueAttempt = requeueFailedSetItem({ response, controls, retryLedger, item, message });
         const failureEvent = buildSetItemFailureEvent({ message, requeueAttempt, retryLedger });
         items = updateCreationItems(
           items,
           item.itemId,
-          requeueAttempt ? { status: "queued", error: "" } : { status: "failed", error: message },
+          requeueAttempt
+            ? { status: "queued", error: "" }
+            : { status: "failed", error: message, ...originalResponseFailurePatch },
         );
         setManifest = await creationSetStore.saveManifest(
           buildCreationSetManifest({
@@ -5195,6 +5349,22 @@ async function handleCreationLogoBatchGenerate(request, response) {
           imageModel: generationConfig.imageModel,
           endpointPath: generationConfig.endpointPath,
           reasoningEffort,
+          onResponseId: () =>
+            persistCreationOriginalResponsePending({
+              setId,
+              plan,
+              createdAt,
+              relativeDir: creationRelativeDir,
+              referenceImageNames,
+              itemId: item.itemId,
+              getItems: () => items,
+              setItems: (nextItems) => {
+                items = nextItems;
+              },
+              setManifest: (nextManifest) => {
+                setManifest = nextManifest;
+              },
+            }),
           async onEvent(event) {
             if (event.type === "status") {
               writeSseEvent(response, "item_status", {
@@ -5286,6 +5456,7 @@ async function handleCreationLogoBatchGenerate(request, response) {
         const imageUrl = buildPublicAssetUrl("/output", saved.relativePath, saved.createdAt);
 
         items = updateCreationItems(items, item.itemId, {
+          ...clearCreationOriginalResponseRecoveryPatch(),
           status: "completed",
           filename,
           relativePath: saved.relativePath,
@@ -5315,12 +5486,15 @@ async function handleCreationLogoBatchGenerate(request, response) {
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        const originalResponseFailurePatch = getCreationOriginalResponseFailurePatch(error);
         const requeueAttempt = requeueFailedSetItem({ response, controls, retryLedger, item, message });
         const failureEvent = buildSetItemFailureEvent({ message, requeueAttempt, retryLedger });
         items = updateCreationItems(
           items,
           item.itemId,
-          requeueAttempt ? { status: "queued", error: "" } : { status: "failed", error: message },
+          requeueAttempt
+            ? { status: "queued", error: "" }
+            : { status: "failed", error: message, ...originalResponseFailurePatch },
         );
         setManifest = await creationSetStore.saveManifest(
           buildCreationSetManifest({
@@ -5792,6 +5966,7 @@ async function handleCreationRepair(request, response) {
           marketingCopy: item.marketingCopy,
           status: "queued",
           error: "",
+          ...(!automaticRepair ? clearCreationOriginalResponseRecoveryPatch() : {}),
         }),
       items,
     );
@@ -5929,6 +6104,22 @@ async function handleCreationRepair(request, response) {
           imageModel: itemGenerationConfig.imageModel,
           endpointPath: itemGenerationConfig.endpointPath,
           reasoningEffort: itemReasoningEffort,
+          onResponseId: () =>
+            persistCreationOriginalResponsePending({
+              setId,
+              plan: repairPlan,
+              createdAt: existingSet.createdAt,
+              relativeDir,
+              referenceImageNames,
+              itemId: item.itemId,
+              getItems: () => items,
+              setItems: (nextItems) => {
+                items = nextItems;
+              },
+              setManifest: (nextManifest) => {
+                setManifest = nextManifest;
+              },
+            }),
           async onEvent(event) {
             if (event.type === "status") {
               writeSseEvent(response, "item_status", {
@@ -6025,6 +6216,7 @@ async function handleCreationRepair(request, response) {
 
         items = updateCreationItems(items, item.itemId, {
           ...generationSnapshot,
+          ...clearCreationOriginalResponseRecoveryPatch(),
           prompt: repairItem.prompt,
           marketingCopy: repairItem.marketingCopy,
           status: "completed",
@@ -6066,12 +6258,15 @@ async function handleCreationRepair(request, response) {
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        const originalResponseFailurePatch = getCreationOriginalResponseFailurePatch(error);
         const requeueAttempt = requeueFailedSetItem({ response, controls, retryLedger, item, message });
         const failureEvent = buildSetItemFailureEvent({ message, requeueAttempt, retryLedger });
         items = updateCreationItems(
           items,
           item.itemId,
-          requeueAttempt ? { status: "queued", error: "" } : { status: "failed", error: message },
+          requeueAttempt
+            ? { status: "queued", error: "" }
+            : { status: "failed", error: message, ...originalResponseFailurePatch },
         );
         setManifest = await creationSetStore.saveManifest(
           buildCreationSetManifest({
@@ -6871,6 +7066,10 @@ async function routeRequest(request, response) {
 
   if (request.method === "GET" && url.pathname === "/api/gallery") {
     return handleGalleryGet(response);
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/gallery/thumbnail") {
+    return handleGalleryThumbnailGet(request, response, url);
   }
 
   if (request.method === "GET" && url.pathname === "/api/ppt/decks") {

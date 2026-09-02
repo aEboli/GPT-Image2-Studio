@@ -18,6 +18,7 @@ import {
   normalizeCreationVisualLanguage,
   normalizeCreationLogoOptions,
   normalizeCreationDimensionUnitMode,
+  normalizeCreationDimensionGroups,
   normalizeCreationReferenceAnalysis,
   normalizeCreationImageCount,
   normalizeCreationIndustryTemplate,
@@ -2697,6 +2698,85 @@ test("creation planner converts compact metric weight specs in selected unit mod
   assert.match(plan.items[0].prompt, /Length 13cm \(5\.12 in\) \/ Weight 35g \(1\.23 oz\)/);
 });
 
+test("creation planner keeps explicitly labeled slash-separated measurements", () => {
+  const plan = buildCreationPlan({
+    productName: "Labeled dimensions",
+    productDescription: "A product with length and width",
+    sellingPoints: "accurate fit",
+    targetLanguage: "en",
+    selectedRoles: ["size-capacity-fit"],
+    dimensionSpecs: "Length 10cm / Width 5cm",
+    dimensionUnitMode: "metric",
+  });
+
+  assert.equal(plan.dimensionSpecs, "Length 10cm\nWidth 5cm");
+  assert.match(plan.items[0].prompt, /Length 10cm \/ Width 5cm/);
+});
+
+test("creation planner treats metric and imperial copies as one labeled dimension", () => {
+  assert.equal(
+    formatCreationDimensionSpecsForMode("Length 22 cm / 8.7 in Width 11 cm / 4.3 in", "both"),
+    "Length 22 cm (8.66 in) Width 11 cm (4.33 in)",
+  );
+  assert.equal(
+    formatCreationDimensionSpecsForMode("Length 22 cm (8.7 in)", "metric"),
+    "Length 22 cm",
+  );
+  assert.equal(
+    formatCreationDimensionSpecsForMode("Length 22 cm (8.7 in)", "imperial"),
+    "Length 8.66 in",
+  );
+});
+
+test("creation planner preserves non-equivalent slash and parenthetical measurements", () => {
+  assert.equal(
+    formatCreationDimensionSpecsForMode("Length 10 cm / 20 cm", "both"),
+    "Length 10 cm (3.94 in) / 20 cm (7.87 in)",
+  );
+  assert.match(
+    formatCreationDimensionSpecsForMode("Length 10 cm (adjustable to 20 cm)", "both"),
+    /10 cm \(3\.94 in\).*20 cm \(7\.87 in\)/,
+  );
+  assert.equal(
+    formatCreationDimensionSpecsForMode("Length 10 cm / 10 in", "both"),
+    "Length 10 cm (3.94 in) / 25.4 cm (10 in)",
+  );
+  assert.equal(
+    formatCreationDimensionSpecsForMode("Length 10 cm / 3.94 in", "both"),
+    "Length 10 cm (3.94 in)",
+  );
+});
+
+test("creation planner normalizes keyed dimension groups with nested descriptors", () => {
+  assert.deepEqual(
+    normalizeCreationDimensionGroups({
+      "Black L": { Length: "24 cm", Width: "12 cm" },
+      "Blue XL": {
+        specs: { Height: "30 cm", Weight: "0.8 kg" },
+        filenames: ["blue-xl.png"],
+      },
+    }),
+    [
+      {
+        id: "Black L",
+        label: "Black L",
+        referenceIndexes: [],
+        filenames: [],
+        specs: ["Length: 24 cm", "Width: 12 cm"],
+        note: "",
+      },
+      {
+        id: "Blue XL",
+        label: "Blue XL",
+        referenceIndexes: [],
+        filenames: ["blue-xl.png"],
+        specs: ["Height: 30 cm", "Weight: 0.8 kg"],
+        note: "",
+      },
+    ],
+  );
+});
+
 test("creation planner applies selected unit mode to dimensions recognized from reference notes", () => {
   const plan = buildCreationPlan({
     productName: "Jointed fishing lure",
@@ -2727,6 +2807,297 @@ test("creation planner applies selected unit mode to dimensions recognized from 
     heroPrompt,
     /130mm|35g|5\.12 in|1\.23 oz|Set-level dimension|Dimension specifications recognized/,
   );
+});
+
+test("creation planner keeps grouped variant dimensions bound to their SKU references", () => {
+  const plan = buildCreationPlan({
+    productName: "Multi-size glove",
+    productDescription: "Protective glove with red and blue size variants",
+    sellingPoints: "durable fit",
+    targetLanguage: "en",
+    selectedRoles: ["size-capacity-fit"],
+    skuGenerationRule: "dimensions",
+    dimensionUnitMode: "metric",
+    referenceImageRoles: [
+      {
+        index: 1,
+        filename: "size-chart.png",
+        role: "dimensions",
+        dimension_groups: [
+          {
+            id: "red-s",
+            label: "Red S",
+            reference_indexes: [2],
+            specs: ["Length 12 cm", "Width 5 cm"],
+          },
+          {
+            id: "blue-l",
+            label: "Blue L",
+            reference_indexes: [3],
+            specs: ["Length 18 cm", "Width 7 cm"],
+          },
+        ],
+      },
+      { index: 2, filename: "red-s.png", role: "product", note: "Red S glove." },
+      { index: 3, filename: "blue-l.png", role: "product", note: "Blue L glove." },
+      { index: 4, filename: "unbound.png", role: "product", note: "Unbound glove." },
+    ],
+    skuSubjects: [
+      { id: "red-s", title: "Red S", reference_indexes: [2], filenames: ["red-s.png"] },
+      { id: "blue-l", title: "Blue L", reference_indexes: [3], filenames: ["blue-l.png"] },
+      { id: "unbound", title: "Unbound", reference_indexes: [4], filenames: ["unbound.png"] },
+    ],
+  });
+
+  assert.deepEqual(
+    plan.dimensionSpecGroups.map((group) => [group.label, group.referenceIndexes, group.filenames]),
+    [
+      ["Red S", [2], []],
+      ["Blue L", [3], []],
+    ],
+  );
+
+  const dimensionsPrompt = plan.items.find((item) => item.role === "size-capacity-fit").prompt;
+  assert.match(dimensionsPrompt, /Red S: Length 12 cm \/ Width 5 cm/);
+  assert.match(dimensionsPrompt, /Blue L: Length 18 cm \/ Width 7 cm/);
+  assert.match(dimensionsPrompt, /every bound variant or size group as its own clearly separated product\/card or row/i);
+  assert.match(dimensionsPrompt, /Do not combine, cross-pair, or reuse values from another group/i);
+
+  const skuItems = plan.items.filter((item) => item.role === "sku");
+  const redPrompt = skuItems.find((item) => item.skuSubject.id === "red-s").prompt;
+  const bluePrompt = skuItems.find((item) => item.skuSubject.id === "blue-l").prompt;
+  const unboundPrompt = skuItems.find((item) => item.skuSubject.id === "unbound").prompt;
+  assert.match(redPrompt, /Dimension\/specification content to keep accurate when useful: Red S: Length 12 cm/);
+  assert.doesNotMatch(redPrompt, /Blue L: Length 18 cm|Width 7 cm/);
+  assert.match(bluePrompt, /Dimension\/specification content to keep accurate when useful: Blue L: Length 18 cm/);
+  assert.doesNotMatch(bluePrompt, /Red S: Length 12 cm|Width 5 cm/);
+  assert.doesNotMatch(unboundPrompt, /Dimension\/specification content to keep accurate when useful:/);
+  assert.match(unboundPrompt, /when no matching group is supplied, omit variant-specific dimensions/i);
+});
+
+test("creation planner matches grouped dimensions by filenames without leaking the dimension-card source", () => {
+  const plan = buildCreationPlan({
+    productName: "Variant backpack",
+    productDescription: "Backpack in two sizes",
+    sellingPoints: "adjustable fit",
+    targetLanguage: "en",
+    selectedRoles: ["size-capacity-fit"],
+    skuGenerationRule: "dimensions",
+    dimensionUnitMode: "metric",
+    referenceImageRoles: [
+      {
+        index: 5,
+        filename: "backpack-size-card.png",
+        role: "dimensions",
+        dimensionGroups: [
+          { label: "Small", filenames: ["backpack-small.png"], dimensionSpecs: ["Height 40 cm", "Width 28 cm"] },
+          { label: "Large", filenames: ["backpack-large.png"], dimensionSpecs: ["Height 52 cm", "Width 34 cm"] },
+        ],
+      },
+      { index: 6, filename: "backpack-small.png", role: "product", note: "Small backpack." },
+      { index: 7, filename: "backpack-large.png", role: "product", note: "Large backpack." },
+    ],
+    skuSubjects: [
+      { id: "small", title: "Small", filenames: ["backpack-small.png"] },
+      { id: "large", title: "Large", filenames: ["backpack-large.png"] },
+    ],
+  });
+
+  assert.deepEqual(
+    plan.dimensionSpecGroups.map((group) => [group.label, group.referenceIndexes, group.filenames]),
+    [
+      ["Small", [], ["backpack-small.png"]],
+      ["Large", [], ["backpack-large.png"]],
+    ],
+  );
+  const skuItems = plan.items.filter((item) => item.role === "sku");
+  assert.match(skuItems.find((item) => item.skuSubject.id === "small").prompt, /Small: Height 40 cm/);
+  assert.doesNotMatch(skuItems.find((item) => item.skuSubject.id === "small").prompt, /Large: Height 52 cm/);
+  assert.match(skuItems.find((item) => item.skuSubject.id === "large").prompt, /Large: Height 52 cm/);
+  assert.doesNotMatch(skuItems.find((item) => item.skuSubject.id === "large").prompt, /Small: Height 40 cm/);
+});
+
+test("creation planner leaves unbound multi-variant dimension groups out of SKU prompts", () => {
+  const plan = buildCreationPlan({
+    productName: "Unbound size variants",
+    productDescription: "A product with multiple sizes",
+    sellingPoints: "reliable fit",
+    targetLanguage: "en",
+    selectedRoles: ["size-capacity-fit"],
+    skuGenerationRule: "dimensions",
+    dimensionUnitMode: "metric",
+    referenceImageRoles: [
+      {
+        index: 1,
+        filename: "unbound-size-card.png",
+        role: "dimensions",
+        dimensionGroups: [
+          { label: "Small", specs: ["Length 10 cm"] },
+          { label: "Large", specs: ["Length 20 cm"] },
+        ],
+      },
+      { index: 2, filename: "small.png", role: "product", note: "Small variant." },
+    ],
+    skuSubjects: [
+      {
+        id: "small",
+        title: "Small",
+        filenames: ["small.png", "unbound-size-card.png"],
+        reference_indexes: [1, 2],
+      },
+    ],
+  });
+
+  assert.deepEqual(plan.dimensionSpecGroups.map((group) => group.referenceIndexes), [[], []]);
+  const skuPrompt = plan.items.find((item) => item.role === "sku").prompt;
+  assert.doesNotMatch(skuPrompt, /Dimension\/specification content to keep accurate when useful:/);
+  assert.match(skuPrompt, /when no matching group is supplied, omit variant-specific dimensions/i);
+});
+
+test("creation planner preserves grouped SKU dimensions when flat plan dimensions are submitted again", () => {
+  const input = {
+    productName: "Multi-size glove",
+    productDescription: "Protective glove with small and large variants",
+    sellingPoints: "durable fit",
+    targetLanguage: "en",
+    selectedRoles: ["size-capacity-fit"],
+    skuGenerationRule: "dimensions",
+    dimensionUnitMode: "metric",
+    referenceImageRoles: [
+      {
+        index: 1,
+        filename: "size-chart.png",
+        role: "dimensions",
+        dimension_groups: [
+          { label: "Small", reference_indexes: [2], specs: ["Length 22 cm", "Width 11 cm"] },
+          { label: "Large", reference_indexes: [3], specs: ["Length 24 cm", "Width 12 cm"] },
+        ],
+      },
+      { index: 2, filename: "small.png", role: "product", note: "Small glove." },
+      { index: 3, filename: "large.png", role: "product", note: "Large glove." },
+    ],
+    skuSubjects: [
+      { id: "small", title: "Small", reference_indexes: [2], filenames: ["small.png"] },
+      { id: "large", title: "Large", reference_indexes: [3], filenames: ["large.png"] },
+    ],
+  };
+  const firstPlan = buildCreationPlan(input);
+  const restoredPlan = buildCreationPlan({ ...input, dimensionSpecs: firstPlan.dimensionSpecs });
+
+  assert.deepEqual(restoredPlan.dimensionSpecGroups.map((group) => group.label), ["Small", "Large"]);
+  const skuItems = restoredPlan.items.filter((item) => item.role === "sku");
+  const smallPrompt = skuItems.find((item) => item.skuSubject.id === "small").prompt;
+  const largePrompt = skuItems.find((item) => item.skuSubject.id === "large").prompt;
+  assert.match(smallPrompt, /Small: Length 22 cm \/ Width 11 cm/);
+  assert.doesNotMatch(smallPrompt, /Large: Length 24 cm|Width 12 cm/);
+  assert.match(largePrompt, /Large: Length 24 cm \/ Width 12 cm/);
+  assert.doesNotMatch(largePrompt, /Small: Length 22 cm|Width 11 cm/);
+});
+
+test("creation planner accepts dimensions attached directly to a SKU subject when no reference groups exist", () => {
+  const plan = buildCreationPlan({
+    productName: "Subject dimension group",
+    productDescription: "One variant with explicit dimensions",
+    sellingPoints: "accurate fit",
+    targetLanguage: "en",
+    selectedRoles: ["hero"],
+    skuGenerationRule: "dimensions",
+    dimensionUnitMode: "both",
+    referenceImageRoles: [{ index: 1, filename: "variant.png", role: "product", note: "Variant product." }],
+    skuSubjects: [
+      {
+        id: "variant",
+        title: "Variant",
+        filenames: ["variant.png"],
+        dimensionGroups: [{ label: "Variant", specs: ["Length 10 cm", "Width 4 cm"] }],
+      },
+    ],
+  });
+
+  const skuPrompt = plan.items.find((item) => item.role === "sku").prompt;
+  assert.match(skuPrompt, /Dimension\/specification content to keep accurate when useful: Variant: Length 10 cm/);
+  assert.match(skuPrompt, /Width 4 cm/);
+});
+
+test("creation planner keeps a legacy flat reference dimension note for one SKU", () => {
+  const plan = buildCreationPlan({
+    productName: "Single-size glove",
+    productDescription: "One black heated glove size",
+    sellingPoints: "warm and comfortable",
+    targetLanguage: "en",
+    selectedRoles: ["hero"],
+    skuGenerationRule: "dimensions",
+    dimensionUnitMode: "both",
+    referenceImageRoles: [
+      { index: 1, filename: "black-glove.png", role: "product", note: "Black glove subject." },
+      {
+        index: 2,
+        filename: "size-card.png",
+        role: "dimensions",
+        note: "Length 22 cm / 8.7 in Width 11 cm / 4.3 in",
+      },
+    ],
+    skuSubjects: [{ id: "black", title: "Black glove", reference_indexes: [1], filenames: ["black-glove.png"] }],
+  });
+
+  const skuPrompt = plan.items.find((item) => item.role === "sku").prompt;
+  assert.match(skuPrompt, /Dimension\/specification content to keep accurate when useful:/);
+  assert.match(skuPrompt, /Length 22 cm \(8\.66 in\)/);
+  assert.match(skuPrompt, /Width 11 cm \(4\.33 in\)/);
+});
+
+test("creation planner does not copy flat dimension input into multiple SKU prompts", () => {
+  const plan = buildCreationPlan({
+    productName: "Multi-size glove",
+    productDescription: "Black small and black large heated gloves",
+    sellingPoints: "warm and comfortable",
+    targetLanguage: "en",
+    selectedRoles: ["hero"],
+    skuGenerationRule: "dimensions",
+    dimensionSpecs: "Length 22 cm / Width 11 cm / Length 24 cm / Width 12 cm",
+    dimensionUnitMode: "metric",
+    referenceImageRoles: [
+      { index: 1, filename: "small.png", role: "product", note: "Small glove." },
+      { index: 2, filename: "large.png", role: "product", note: "Large glove." },
+    ],
+    skuSubjects: [
+      { id: "small", title: "Small", reference_indexes: [1], filenames: ["small.png"] },
+      { id: "large", title: "Large", reference_indexes: [2], filenames: ["large.png"] },
+    ],
+  });
+
+  const skuPrompts = plan.items.filter((item) => item.role === "sku").map((item) => item.prompt);
+  assert.ok(skuPrompts.every((prompt) => !/Dimension\/specification content to keep accurate when useful:/.test(prompt)));
+  assert.ok(skuPrompts.every((prompt) => /when no matching group is supplied, omit variant-specific dimensions/i.test(prompt)));
+});
+
+test("creation planner does not mistake a legacy dimension-card fallback for a multi-SKU binding", () => {
+  const plan = buildCreationPlan({
+    productName: "Multi-size glove",
+    productDescription: "Black small and black large heated gloves",
+    sellingPoints: "warm and comfortable",
+    targetLanguage: "en",
+    selectedRoles: ["hero"],
+    skuGenerationRule: "dimensions",
+    dimensionUnitMode: "both",
+    referenceImageRoles: [
+      { index: 1, filename: "small.png", role: "product", note: "Small glove." },
+      { index: 2, filename: "large.png", role: "product", note: "Large glove." },
+      {
+        index: 3,
+        filename: "size-card.png",
+        role: "dimensions",
+        note: "Length 22 cm / 8.7 in Width 11 cm / 4.3 in Length 24 cm / 9.4 in Width 12 cm / 4.7 in",
+      },
+    ],
+    skuSubjects: [
+      { id: "small", title: "Small", reference_indexes: [1, 3], filenames: ["small.png", "size-card.png"] },
+      { id: "large", title: "Large", reference_indexes: [2, 3], filenames: ["large.png", "size-card.png"] },
+    ],
+  });
+
+  const skuPrompts = plan.items.filter((item) => item.role === "sku").map((item) => item.prompt);
+  assert.ok(skuPrompts.every((prompt) => !/Dimension\/specification content to keep accurate when useful:/.test(prompt)));
 });
 
 test("creation planner converts Chinese package dimensions without truncating decimal values", () => {
@@ -3377,7 +3748,7 @@ test("creation reference analysis normalizes role suggestions and prompt notes",
     analysis.recommendations.map((entry) => [entry.filename, entry.role, entry.roleLabel, entry.note]),
     [
       ["front.png", "product", "商品主体", "正面主体，保留透明结构"],
-      ["texture.png", "material", "结构细节", "磨砂纹理和边缘细节"],
+      ["texture.png", "material", "材质结构细节", "磨砂纹理和边缘细节"],
       ["kitchen.png", "scene", "使用场景", "厨房台面使用环境"],
     ],
   );
@@ -3529,12 +3900,12 @@ test("creation reference analysis treats product-labeled exterior structure call
 
   assert.deepEqual(
     analysis.recommendations.map((entry) => [entry.filename, entry.role, entry.roleLabel]),
-    [["lure-structure-callout.png", "material", "结构细节"]],
+    [["lure-structure-callout.png", "material", "材质结构细节"]],
   );
   assert.deepEqual(analysis.skuSubjects, []);
 });
 
-test("creation reference analysis treats product-labeled feature selling-point callouts as detail references", () => {
+test("creation reference analysis classifies product-labeled feature selling-point callouts as feature references", () => {
   const analysis = normalizeCreationReferenceAnalysis(
     {
       summary: "识别到一张路亚功能卖点结构说明图。",
@@ -3561,12 +3932,12 @@ test("creation reference analysis treats product-labeled feature selling-point c
 
   assert.deepEqual(
     analysis.recommendations.map((entry) => [entry.filename, entry.role, entry.roleLabel]),
-    [["lure-structure-callout.png", "material", "结构细节"]],
+    [["lure-structure-callout.png", "feature", "功能卖点"]],
   );
   assert.deepEqual(analysis.skuSubjects, []);
 });
 
-test("creation reference analysis does not let a product role label override detail-note evidence", () => {
+test("creation reference analysis does not let a product role label override feature-note evidence", () => {
   const analysis = normalizeCreationReferenceAnalysis(
     {
       summary: "识别到一张结构标注说明图。",
@@ -3594,9 +3965,29 @@ test("creation reference analysis does not let a product role label override det
 
   assert.deepEqual(
     analysis.recommendations.map((entry) => [entry.filename, entry.role, entry.roleLabel]),
-    [["annotated-lure-detail.png", "material", "结构细节"]],
+    [["annotated-lure-detail.png", "feature", "功能卖点"]],
   );
   assert.deepEqual(analysis.skuSubjects, []);
+});
+
+test("creation reference analysis keeps an explicit material role despite incidental function wording", () => {
+  const analysis = normalizeCreationReferenceAnalysis(
+    {
+      summary: "材质和结构细节参考图。",
+      reference_roles: [
+        {
+          index: 1,
+          filename: "fabric-detail.png",
+          role: "material",
+          note: "主要展示面料纹理、缝线、表面工艺和功能结构细节。",
+        },
+      ],
+      risks: [],
+    },
+    ["fabric-detail.png"],
+  );
+
+  assert.deepEqual(analysis.recommendations.map((entry) => [entry.filename, entry.role]), [["fabric-detail.png", "material"]]);
 });
 
 test("creation reference analysis classifies other size-spec references as dimensions", () => {

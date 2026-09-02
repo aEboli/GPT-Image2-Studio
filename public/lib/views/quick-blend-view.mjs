@@ -6,6 +6,7 @@ import { normalizeOutputFormat } from "../output-format-options.mjs";
 import { getPreviewPlaceholderState } from "../preview-placeholder-state.mjs";
 import { shouldReusePreviewLoadingShell } from "../preview-loading-shell.mjs";
 import { createFilmstripRevealTracker, renderFilmstripPreservingSelection, syncFilmstripSelectedMarker } from "../filmstrip-selection.mjs";
+import { clearImageReveal, setImageRevealSource } from "../image-reveal.mjs";
 import { createViewRendererController } from "./view-renderer.mjs";
 
 const DEFAULT_QUICK_BLEND_RATIO_VALUE = "1:1";
@@ -917,7 +918,9 @@ function renderQuickBlendGenerationLoading(item) {
     !quickBlendLoadingShellNodes ||
     !shouldReusePreviewLoadingShell(quickBlendLoadingShellNodes.state || {}, placeholderState)
   ) {
+    const previousLoadingShellNodes = quickBlendLoadingShellNodes;
     quickBlendLoadingShellNodes = createPreviewLoadingShellNodes();
+    stopGenerationLoadingShell(previousLoadingShellNodes?.loading, { retainSource: true });
   }
 
   updatePreviewLoadingShell(quickBlendLoadingShellNodes, placeholderState);
@@ -967,17 +970,18 @@ function renderQuickBlendGenerationPreview() {
   }
 
   if (imageUrl) {
-    refs.quickBlendGenerationImage.src = imageUrl;
-    refs.quickBlendGenerationImage.alt = getDisplayPrompt(item) || "快速溶图生成结果";
-    refs.quickBlendGenerationImage.classList.add("is-mounted", "is-visible");
+    setImageRevealSource(refs.quickBlendGenerationImage, imageUrl, {
+      alt: getDisplayPrompt(item) || "快速溶图生成结果",
+      decoding: "async",
+      loading: "eager",
+    });
     refs.quickBlendGenerationDownloadButton.href = imageUrl;
     refs.quickBlendGenerationDownloadButton.download = item.filename || "quick-blend.png";
     refs.quickBlendGenerationDownloadButton.classList.remove("disabled");
     refs.quickBlendGenerationDownloadButton.setAttribute("aria-disabled", "false");
     refs.quickBlendGenerationLightboxButton.disabled = false;
   } else {
-    refs.quickBlendGenerationImage.removeAttribute("src");
-    refs.quickBlendGenerationImage.classList.remove("is-mounted", "is-visible");
+    clearImageReveal(refs.quickBlendGenerationImage);
     refs.quickBlendGenerationDownloadButton.href = "#";
     refs.quickBlendGenerationDownloadButton.removeAttribute("download");
     refs.quickBlendGenerationDownloadButton.classList.add("disabled");
@@ -1005,30 +1009,25 @@ function renderQuickBlendGenerationPreview() {
 
   function renderQuickBlendGenerationStripEntries() {
     const entries = getQuickBlendGenerationEntries();
-    stopGenerationLoadingShells(refs.quickBlendGenerationStrip);
-    refs.quickBlendGenerationStrip.replaceChildren();
-  refs.quickBlendGenerationStrip.classList.toggle("hidden", entries.length === 0);
-  refs.quickBlendThumbnailEmpty.classList.toggle("hidden", entries.length > 0);
+    const nextEntries = entries.map(({ key, item }, index) => {
+      const isSelected = key === state.quickBlend.previewKey;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "filmstrip-item quick-blend-generation-thumb";
+      button.dataset.quickBlendGenerationKey = key;
+      button.setAttribute("aria-pressed", String(isSelected));
+      button.setAttribute("aria-current", isSelected ? "true" : "false");
+      button.title = `切换到第 ${index + 1} 张快速溶图结果`;
+      button.classList.toggle("active", isSelected);
+      button.classList.toggle("is-running", Boolean(item?.isRunning || (item?.started && !item?.filename)));
 
-  entries.forEach(({ key, item }, index) => {
-    const isSelected = key === state.quickBlend.previewKey;
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "filmstrip-item quick-blend-generation-thumb";
-    button.dataset.quickBlendGenerationKey = key;
-    button.setAttribute("aria-pressed", String(isSelected));
-    button.setAttribute("aria-current", isSelected ? "true" : "false");
-    button.title = `切换到第 ${index + 1} 张快速溶图结果`;
-    button.classList.toggle("active", isSelected);
-    button.classList.toggle("is-running", Boolean(item?.isRunning || (item?.started && !item?.filename)));
-
-    const imageUrl = getImageUrl(item);
-    if (imageUrl) {
-      const image = document.createElement("img");
-      image.src = imageUrl;
-      image.alt = getDisplayPrompt(item) || "快速溶图结果";
-      image.loading = "lazy";
-      button.appendChild(image);
+      const imageUrl = getImageUrl(item);
+      if (imageUrl) {
+        const image = document.createElement("img");
+        image.src = imageUrl;
+        image.alt = getDisplayPrompt(item) || "快速溶图结果";
+        image.loading = "lazy";
+        button.appendChild(image);
       } else if (item?.isRunning || (item?.started && !item?.filename)) {
         const loading = createGenerationLoadingShell(document, { key, active: true, stage: getGenerationLoadingItemStage(item) });
         button.appendChild(loading.shell);
@@ -1037,20 +1036,24 @@ function renderQuickBlendGenerationPreview() {
         ghost.className = "filmstrip-ghost";
         ghost.textContent = "等待";
         button.appendChild(ghost);
-    }
+      }
 
-    const caption = document.createElement("span");
-    caption.textContent = formatClock(item?.createdAt) || item?.statusText || formatFilmstripSizeLabel(item);
-    button.appendChild(caption);
+      const caption = document.createElement("span");
+      caption.textContent = formatClock(item?.createdAt) || item?.statusText || formatFilmstripSizeLabel(item);
+      button.appendChild(caption);
 
-    const shell = document.createElement("div");
-    shell.className = "filmstrip-entry";
-    shell.dataset.quickBlendGenerationEntryKey = key;
-    shell.appendChild(button);
-    syncFilmstripSelectedMarker(shell, isSelected, { documentRef: document });
-    refs.quickBlendGenerationStrip.appendChild(shell);
-  });
-}
+      const shell = document.createElement("div");
+      shell.className = "filmstrip-entry";
+      shell.dataset.quickBlendGenerationEntryKey = key;
+      shell.appendChild(button);
+      syncFilmstripSelectedMarker(shell, isSelected, { documentRef: document });
+      return shell;
+    });
+    stopGenerationLoadingShells(refs.quickBlendGenerationStrip);
+    refs.quickBlendGenerationStrip.replaceChildren(...nextEntries);
+    refs.quickBlendGenerationStrip.classList.toggle("hidden", entries.length === 0);
+    refs.quickBlendThumbnailEmpty.classList.toggle("hidden", entries.length > 0);
+  }
 
 async function preserveQuickBlendGenerationItemForDelete(item) {
   if (!item?.filename) {

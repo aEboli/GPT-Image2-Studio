@@ -11,7 +11,7 @@ const scriptsDir = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(scriptsDir, "..");
 
 /* 工作台标记里出现过的 39 个字形，已排序去重。名字来自实测扫描：
-   子文档 index.html 有 53 处 data-lucide、app.js 有 30 处（共 83 处），
+   子文档 index.html 有 54 处 data-lucide、app.js 有 30 处（共 84 处），
    其中 2 处是 `data-lucide="${cond ? "a" : "b"}"` 形式的动态值。
    这份清单是烘焙的唯一真源——脚本不在构建期读标记，这样打包机上没有子文档也能复现产物；
    与标记的一致性由 test/temu-lucide-icons.test.mjs 用下面的 extract/discover 反查守卫。 */

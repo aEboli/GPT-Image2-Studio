@@ -6,7 +6,7 @@ import { getDefaultGenerationSize, getGenerationSizeOptions, getModelProtocolIma
 import { getOutputFormatOptions, normalizeOutputFormat, } from "/lib/output-format-options.mjs?v=20260504-vercel-static-lib-1";
 import { normalizeReferenceAnalysisLanguage, } from "/lib/reference-analysis-language.mjs?v=20260522-reference-language-1";
 import { shouldReusePreviewLoadingShell } from "/lib/preview-loading-shell.mjs";
-import { createGenerationLoadingShell, updateGenerationLoadingShell, stopGenerationLoadingShell, stopGenerationLoadingShells, getGenerationLoadingItemStage, beatGenerationLoadingHeartbeat, GENERATION_LOADING_GENERATING_MODE, GENERATION_LOADING_WAITING_MODE } from "/lib/generation-loading.mjs";
+import { createGenerationLoadingShell, updateGenerationLoadingShell, stopGenerationLoadingShell, stopGenerationLoadingShells, getGenerationLoadingItemStage, beatGenerationLoadingHeartbeat, releaseGenerationLoadingSource, releaseGenerationLoadingSourcesByPrefix, GENERATION_LOADING_GENERATING_MODE, GENERATION_LOADING_WAITING_MODE } from "/lib/generation-loading.mjs";
 import { registerHeartbeatMorphEngine } from "/lib/heartbeat-morph-icon.mjs";
 /* morphicons 的浏览器产物只存在于 public/lib/vendor/（public/ 拿不到 node_modules），
    同步与版本校验由 scripts/sync-public-lib.mjs 负责。 */
@@ -18,10 +18,10 @@ import { createFilmstripRevealTracker, renderFilmstripPreservingSelection, syncF
 import { isGenerationRequestRetryMessage, } from "/lib/generation-request-retry.mjs";
 import { cancelQueuedGenerationJob, getGenerationJobMode, getGenerationJobQueueKey, getQueuedGenerationJobCount, getRunningGenerationJobCount, isQueuedGenerationJob, selectNextQueuedGenerationJobsByMode } from "/lib/generation-queue.mjs?v=20260821-prompt-global-queue-1";
 import { buildCanceledGenerationActivityDetail, buildGenerationTaskActivityDetail, buildGenerationTaskStatusText, formatGenerationActivityModeLabel, getGenerationActivityDisplayText, hasHeartbeatPrefix, sanitizeGenerationActivityDetail } from "/lib/generation-activity-feed.mjs?v=20260829-heartbeat-morph-1";
-import { GENERATION_LOG_ALL_CHANNELS, GENERATION_LOG_CHANNELS, createGenerationLogStore, getGenerationLogAllEntries, getGenerationLogChannelEntries, getGenerationLogChannelLabel, normalizeGenerationLogChannel, normalizeGenerationLogRelayUrl, parseGenerationLogStore, serializeGenerationLogStore, upsertGenerationLogEntry, upsertGenerationLogGroupEntry } from "/lib/generation-log-store.mjs?v=20260828-generation-log-partition-1";
+import { GENERATION_LOG_ALL_CHANNELS, GENERATION_LOG_CHANNELS, createGenerationLogStore, getGenerationLogAllEntries, getGenerationLogChannelEntries, getGenerationLogChannelLabel, getGenerationLogGroupItemDetail, normalizeGenerationLogChannel, normalizeGenerationLogRelayUrl, parseGenerationLogStore, serializeGenerationLogStore, upsertGenerationLogEntry, upsertGenerationLogGroupEntry } from "/lib/generation-log-store.mjs?v=20260828-generation-log-partition-1";
 import { readGenerationLogChannelTabValue, readGenerationLogGroupToggleId, renderGenerationLogChannelTabs, renderGenerationLogRows, toggleGenerationLogGroup } from "/lib/generation-log-panel.mjs?v=20260828-generation-log-partition-1";
 import { CREATION_STREAM_EVENTS, GENERATION_STREAM_EVENTS, clearFinalImageChunks, recordFinalImageChunk, recordPartialImageChunk } from "/lib/generation-stream-protocol.mjs";
-import { mergeCreationSetPreviews } from "/lib/creation-preview-retention.mjs";
+import { mergeCreationItemStreamUpdate, mergeCreationSetPreviews, shouldRetainCompletedCreationItem } from "/lib/creation-preview-retention.mjs";
 import {
   PROMPT_ATTEMPT_KIND,
   PROMPT_ATTEMPT_STATUS,
@@ -53,13 +53,14 @@ import { buildCreationRecordListModel, createCreationRecordListState, loadMoreCr
 import { createCreationRecordListRow } from "/lib/creation-record-list-view.mjs?v=20260807-creation-record-split-workspace-1";
 import { ensureLazyViewModule, getMountedLazyViewModule } from "/lib/view-mode-loader.mjs?v=20260608-quick-blend-time-sort-1";
 import { appendBrowserConfigToFormData, getBrowserPrivateConfigRequestPayload, getOrCreateClientSessionId, readBrowserPrivateConfig, saveBrowserPrivateConfig, toPublicBrowserConfig } from "/lib/browser-config.mjs";
-import { cacheBrowserGalleryItem, clearBrowserImageCache, dataUrlToBlob, deleteBrowserCachedGalleryItem, fetchServerImageAsDataUrl, getBrowserCachedImageData, getImageUrl, getServerImageUrl, getServerThumbnailUrl, isCacheableBrowserImageUrl, mergeServerAndBrowserGalleryItems, readBrowserCachedGalleryItems } from "/lib/browser-image-cache.mjs";
+import { cacheBrowserGalleryItem, clearBrowserImageCache, dataUrlToBlob, deleteBrowserCachedGalleryItem, fetchServerImageAsDataUrl, getBrowserCachedImageData, getImageUrl, getServerImageUrl, getServerThumbnailUrl, getThumbnailUrl, isCacheableBrowserImageUrl, mergeServerAndBrowserGalleryItems, readBrowserCachedGalleryItems } from "/lib/browser-image-cache.mjs";
 import { createImageEditShellBridge } from "/lib/image-edit-shell-bridge.mjs";
 import { createCreationLogoLibraryController } from "/lib/creation-logo-library.mjs";
 import { consumeSse, requestGenerationStream } from "/lib/generation-client.mjs";
 import { createConfigModelPickerController } from "/lib/config-model-picker.mjs";
 import { createLightboxImageViewer, createLightboxViewerState } from "/lib/lightbox-image-viewer.mjs";
 import { createAssetWorkspaceController } from "/lib/asset-workspace.mjs";
+import { clearImageReveal, setImageRevealSource } from "/lib/image-reveal.mjs";
 import { createPreviewKeyboardNavigationController } from "/lib/preview-keyboard-navigation.mjs";
 import { createProductImageImportController } from "/lib/product-image-import-controller.mjs";
 import {
@@ -87,7 +88,7 @@ import { applyCreationReferenceCoverageRolePlan, normalizeCreationCoverageFields
 import { applyCreationReferenceAnalysisProductNameValue, buildCreationReferenceAnalysisAppliedFeedbackMessage, buildCreationReferenceAnalysisCategoryMatchText, getCreationReferenceAnalysisCategoryProductName, getCreationReferenceAnalysisDisplayRoleLabel, getCreationReferenceAnalysisGroupedSubjectUnitCount, getCreationReferenceAnalysisRoleCorrectionReason, normalizeCreationReferenceAnalysisUnitCountNote, resolveCreationReferenceAnalysisCategoryValue, resolveCreationReferenceAnalysisContextCategoryValue, shouldDowngradeReferenceProductAnalysisRole } from "/lib/creation-reference-analysis-view.mjs";
 import { createCreationListingController, getCreationRecordListingMetaLabel, getCreationListingSearchValues, normalizeCreationListingDraftForView, renderCreationListingDrafts } from "/lib/creation-listing-view.mjs";
 import { getCreationItemDisplayTitle } from "/lib/creation-item-display.mjs";
-import { getCreationAutoRepairNotice, getCreationCompletionFeedback, getCreationIncompleteItems, shouldAutoRepairCreationSet } from "/lib/creation-auto-repair.mjs?v=20260829-generation-schedule-1";
+import { getCreationAutoRepairNotice, getCreationAutoRepairableItems, getCreationCompletionFeedback, getCreationIncompleteItems, shouldAutoRepairCreationSet } from "/lib/creation-auto-repair.mjs?v=20260829-generation-schedule-1";
 import { getRequeueNotice } from "/lib/generation-item-retry.mjs";
 import { canRepairCreationItem as canRepairCreationItemFromQueue, getCreationRepairButtonText as getCreationRepairButtonTextFromQueue, isCreationItemRepairActive as isCreationItemRepairActiveInQueue, queueCreationItemRepair as queueCreationItemRepairInState, removeQueuedCreationItemRepair, shiftNextQueuedCreationItemRepair } from "/lib/creation-item-repair-queue.mjs";
 import { cloneCreationPlanValue, createCreationPlanPreviewRequestCoordinator, createCreationPlatformPayloadSnapshot, deepFreezeCreationPlanValue, formatCreationPlanWarning, getCreationCompatibleImageTypeState, getCreationEditablePlanDisplayCounts, getCreationSetPlanSource, getVisibleCreationPlanWarnings, mergeCreationPlatformSetParameters, resolveCreationDisplayedPlanContext, resolveCreationPlatformImageCountState, resolveCreationSelectedRolesSubmission, shouldDisableCreationGenerateButton, updateCreationPlatformItemOverride } from "/lib/creation-browser-plan-state.mjs";
@@ -489,6 +490,7 @@ const state = {
     generationScope: "",
     generating: false,
     listingGeneratingSetId: "",
+    logoBatchLoadingKey: "",
     planning: false,
     planDirty: true,
     platformItemOverrides: [],
@@ -3499,7 +3501,9 @@ function renderImageDecompositionGenerationLoading(item) {
     !imageDecompositionLoadingShellNodes ||
     !shouldReusePreviewLoadingShell(imageDecompositionLoadingShellNodes.state || {}, placeholderState)
   ) {
+    const previousLoadingShellNodes = imageDecompositionLoadingShellNodes;
     imageDecompositionLoadingShellNodes = createPreviewLoadingShellNodes();
+    stopGenerationLoadingShell(previousLoadingShellNodes?.loading, { retainSource: true });
   }
   updatePreviewLoadingShell(imageDecompositionLoadingShellNodes, placeholderState);
   refs.imageDecompositionGenerationPlaceholder.className =
@@ -3543,17 +3547,18 @@ function renderImageDecompositionGenerationPreview() {
     setImageDecompositionGenerationPlaceholderText("拆解信息图会显示在这里");
   }
   if (imageUrl) {
-    refs.imageDecompositionGenerationImage.src = imageUrl;
-    refs.imageDecompositionGenerationImage.alt = getDisplayPrompt(item) || "图片拆解生成结果";
-    refs.imageDecompositionGenerationImage.classList.add("is-mounted", "is-visible");
+    setImageRevealSource(refs.imageDecompositionGenerationImage, imageUrl, {
+      alt: getDisplayPrompt(item) || "图片拆解生成结果",
+      decoding: "async",
+      loading: "eager",
+    });
     refs.imageDecompositionGenerationDownloadButton.href = imageUrl;
     refs.imageDecompositionGenerationDownloadButton.download = item.filename || "image-decomposition.png";
     refs.imageDecompositionGenerationDownloadButton.classList.remove("disabled");
     refs.imageDecompositionGenerationDownloadButton.setAttribute("aria-disabled", "false");
     refs.imageDecompositionGenerationLightboxButton.disabled = false;
   } else {
-    refs.imageDecompositionGenerationImage.removeAttribute("src");
-    refs.imageDecompositionGenerationImage.classList.remove("is-mounted", "is-visible");
+    clearImageReveal(refs.imageDecompositionGenerationImage);
     refs.imageDecompositionGenerationDownloadButton.href = "#";
     refs.imageDecompositionGenerationDownloadButton.removeAttribute("download");
     refs.imageDecompositionGenerationDownloadButton.classList.add("disabled");
@@ -3577,11 +3582,7 @@ function renderImageDecompositionGenerationStrip() {
 
 function renderImageDecompositionGenerationStripEntries() {
   const entries = getImageDecompositionGenerationPreviewEntries();
-  stopGenerationLoadingShells(refs.imageDecompositionGenerationStrip);
-  refs.imageDecompositionGenerationStrip.replaceChildren();
-  refs.imageDecompositionGenerationStrip.classList.toggle("hidden", entries.length === 0);
-  refs.imageDecompositionThumbnailEmpty.classList.toggle("hidden", entries.length > 0);
-  entries.forEach(({ key, item }, index) => {
+  const nextEntries = entries.map(({ key, item }, index) => {
     const isSelected = key === state.imageDecomposition.previewKey;
     const button = document.createElement("button");
     button.type = "button";
@@ -3616,8 +3617,12 @@ function renderImageDecompositionGenerationStripEntries() {
     shell.dataset.imageDecompositionGenerationEntryKey = key;
     shell.appendChild(button);
     syncFilmstripSelectedMarker(shell, isSelected, { documentRef: document });
-    refs.imageDecompositionGenerationStrip.appendChild(shell);
+    return shell;
   });
+  stopGenerationLoadingShells(refs.imageDecompositionGenerationStrip);
+  refs.imageDecompositionGenerationStrip.replaceChildren(...nextEntries);
+  refs.imageDecompositionGenerationStrip.classList.toggle("hidden", entries.length === 0);
+  refs.imageDecompositionThumbnailEmpty.classList.toggle("hidden", entries.length > 0);
 }
 async function preserveImageDecompositionGenerationItemForDelete(item) {
   if (!item?.filename) {
@@ -4384,11 +4389,7 @@ function renderReferenceAnalysisGenerationStrip() {
 
 function renderReferenceAnalysisGenerationStripEntries() {
   const entries = getReferenceAnalysisGenerationPreviewEntries();
-  stopGenerationLoadingShells(refs.referenceAnalysisGenerationStrip);
-  refs.referenceAnalysisGenerationStrip.replaceChildren();
-  refs.referenceAnalysisGenerationStrip.classList.toggle("hidden", entries.length === 0);
-  refs.referenceAnalysisThumbnailEmpty.classList.toggle("hidden", entries.length > 0);
-  entries.forEach(({ key, item }, index) => {
+  const nextEntries = entries.map(({ key, item }, index) => {
     const isSelected = key === state.referenceAnalysis.previewKey;
     const button = document.createElement("button");
     button.type = "button";
@@ -4416,8 +4417,12 @@ function renderReferenceAnalysisGenerationStripEntries() {
     }
     // This rail has no shell wrapper, so the button itself hosts the marker.
     syncFilmstripSelectedMarker(button, isSelected, { documentRef: document });
-    refs.referenceAnalysisGenerationStrip.appendChild(button);
+    return button;
   });
+  stopGenerationLoadingShells(refs.referenceAnalysisGenerationStrip);
+  refs.referenceAnalysisGenerationStrip.replaceChildren(...nextEntries);
+  refs.referenceAnalysisGenerationStrip.classList.toggle("hidden", entries.length === 0);
+  refs.referenceAnalysisThumbnailEmpty.classList.toggle("hidden", entries.length > 0);
 }
 async function preserveReferenceAnalysisGenerationItemForDelete(item) {
   if (!item?.filename) {
@@ -4476,7 +4481,9 @@ function renderReferenceAnalysisGenerationLoading(item) {
     !referenceAnalysisLoadingShellNodes ||
     !shouldReusePreviewLoadingShell(referenceAnalysisLoadingShellNodes.state || {}, placeholderState)
   ) {
+    const previousLoadingShellNodes = referenceAnalysisLoadingShellNodes;
     referenceAnalysisLoadingShellNodes = createPreviewLoadingShellNodes();
+    stopGenerationLoadingShell(previousLoadingShellNodes?.loading, { retainSource: true });
   }
   updatePreviewLoadingShell(referenceAnalysisLoadingShellNodes, placeholderState);
   refs.referenceAnalysisGenerationPlaceholder.className =
@@ -4520,14 +4527,17 @@ function renderReferenceAnalysisGenerationPreview() {
     setReferenceAnalysisGenerationPlaceholderText("生成图展示框");
   }
   if (imageUrl) {
-    refs.referenceAnalysisGenerationImage.src = imageUrl;
-    refs.referenceAnalysisGenerationImage.alt = getDisplayPrompt(item) || "融图分析生成结果";
+    setImageRevealSource(refs.referenceAnalysisGenerationImage, imageUrl, {
+      alt: getDisplayPrompt(item) || "融图分析生成结果",
+      decoding: "async",
+      loading: "eager",
+    });
     refs.referenceAnalysisGenerationDownloadButton.href = imageUrl;
     refs.referenceAnalysisGenerationDownloadButton.download = item.filename || "reference-analysis.png";
     refs.referenceAnalysisGenerationDownloadButton.classList.remove("disabled");
     refs.referenceAnalysisGenerationDownloadButton.setAttribute("aria-disabled", "false");
   } else {
-    refs.referenceAnalysisGenerationImage.removeAttribute("src");
+    clearImageReveal(refs.referenceAnalysisGenerationImage);
     refs.referenceAnalysisGenerationDownloadButton.href = "#";
     refs.referenceAnalysisGenerationDownloadButton.removeAttribute("download");
     refs.referenceAnalysisGenerationDownloadButton.classList.add("disabled");
@@ -5491,6 +5501,7 @@ function renderStyleTransferLightboxComparison(item) {
 
 function syncLightboxItem() {
   if (!state.lightboxItem) {
+    clearImageReveal(refs.lightboxImage);
     refs.copyPromptButton.disabled = true;
     refs.lightbox.classList.remove("is-image-only-preview");
     refs.lightbox.classList.remove("is-style-transfer-comparison");
@@ -5522,8 +5533,14 @@ function syncLightboxItem() {
   refs.copyPromptButton.disabled = refs.lightboxPrompt.value.trim().length === 0;
   resetPromptCopyFeedback();
   resetLightboxViewer();
-  refs.lightboxImage.src = imageUrl;
-  refs.lightboxImage.alt = fresh.filename ? `图片详情 ${fresh.filename}` : "生成图片详情";
+  if (imageUrl) {
+    setImageRevealSource(refs.lightboxImage, imageUrl, {
+      alt: fresh.filename ? `图片详情 ${fresh.filename}` : "生成图片详情",
+      decoding: "async",
+    });
+  } else {
+    clearImageReveal(refs.lightboxImage);
+  }
   refs.lightboxAmbient.style.backgroundImage = imageUrl ? `url("${imageUrl}")` : "";
   refs.lightboxDownload.href = imageUrl || "#";
   refs.lightboxDownload.download = fresh.filename || "preview.png";
@@ -5916,7 +5933,9 @@ function renderPreviewPlaceholder(placeholderState) {
       !previewLoadingShellNodes ||
       !shouldReusePreviewLoadingShell(previewLoadingShellNodes.state || {}, placeholderState)
     ) {
+      const previousLoadingShellNodes = previewLoadingShellNodes;
       previewLoadingShellNodes = createPreviewLoadingShellNodes("prompt");
+      stopGenerationLoadingShell(previousLoadingShellNodes?.loading, { retainSource: true });
     }
 
     updatePreviewLoadingShell(previewLoadingShellNodes, placeholderState);
@@ -5969,8 +5988,7 @@ function renderPreview() {
     refs.previewSize.textContent = "--";
     refs.previewPlaceholder.classList.remove("hidden");
     renderPreviewPlaceholder(placeholderState);
-    refs.previewImage.removeAttribute("src");
-    refs.previewImage.classList.remove("is-mounted", "is-visible");
+    clearImageReveal(refs.previewImage);
     refs.previewDownloadButton.removeAttribute("href");
     refs.previewDownloadButton.removeAttribute("download");
     refs.previewDownloadButton.classList.add("disabled");
@@ -5991,8 +6009,7 @@ function renderPreview() {
   if (placeholderState.mode === "loading") {
     refs.previewPlaceholder.classList.remove("hidden");
     renderPreviewPlaceholder(placeholderState);
-    refs.previewImage.removeAttribute("src");
-    refs.previewImage.classList.remove("is-mounted", "is-visible");
+    clearImageReveal(refs.previewImage);
     refs.previewDownloadButton.removeAttribute("href");
     refs.previewDownloadButton.removeAttribute("download");
     refs.previewDownloadButton.classList.add("disabled");
@@ -6006,25 +6023,12 @@ function renderPreview() {
   }
 
   refs.previewPlaceholder.classList.add("hidden");
-  const currentPreviewImageSrc = refs.previewImage.getAttribute("src") || "";
-  const shouldUpdatePreviewImage = currentPreviewImageSrc !== imageUrl;
-  if (shouldUpdatePreviewImage && !currentPreviewImageSrc) {
-    refs.previewImage.classList.remove("is-visible");
-  }
-  refs.previewImage.classList.add("is-mounted");
-  refs.previewImage.onload = () => {
-    refs.previewImage.classList.add("is-visible");
-  };
   refs.previewImage.style.transform = `scale(${state.zoom})`;
-  refs.previewImage.alt = getDisplayPrompt(item);
-  if (shouldUpdatePreviewImage) {
-    refs.previewImage.src = imageUrl;
-    if (refs.previewImage.complete) {
-      refs.previewImage.classList.add("is-visible");
-    }
-  } else {
-    refs.previewImage.classList.add("is-visible");
-  }
+  setImageRevealSource(refs.previewImage, imageUrl, {
+    alt: getDisplayPrompt(item),
+    decoding: "async",
+    loading: "eager",
+  });
   refs.previewDownloadButton.href = imageUrl;
   refs.previewDownloadButton.download = item.filename || "preview.png";
   refs.previewDownloadButton.classList.remove("disabled");
@@ -6197,7 +6201,7 @@ function createFilmstripEntry(key) {
 }
 
 function syncFilmstripMedia(button, item, key = "") {
-  const imageUrl = getImageUrl(item);
+  const imageUrl = getThumbnailUrl(item);
   const existingImage = button.querySelector("img");
   const existingGhost = button.querySelector(".filmstrip-ghost");
   const existingLoading = button.querySelector(".generation-loading-shell");
@@ -6439,7 +6443,7 @@ function createRecentOutputItem(item) {
   });
 
   const image = document.createElement("img");
-  image.src = getImageUrl(item);
+  image.src = getThumbnailUrl(item);
   image.alt = getDisplayPrompt(item);
   image.loading = "lazy";
   button.appendChild(image);
@@ -6521,7 +6525,7 @@ function createGalleryTile(item) {
   });
 
   const image = document.createElement("img");
-  image.src = getImageUrl(item);
+  image.src = getThumbnailUrl(item);
   image.alt = filename === "图片" ? "生成图片" : `生成图片 ${filename}`;
   image.loading = "lazy";
   button.appendChild(image);
@@ -8138,14 +8142,15 @@ const CREATION_REFERENCE_ROLE_OPTIONS = [
   { value: "product", label: "商品主体" },
   { value: "reference-product", label: "参考主体" },
   { value: "package", label: "包装清单" },
-  { value: "material", label: "结构细节" },
+  { value: "material", label: "材质结构细节" },
+  { value: "feature", label: "功能卖点" },
   { value: "dimensions", label: "尺寸规格" },
   { value: "usage", label: "使用说明" },
   { value: "scene", label: "使用场景" },
   { value: "other", label: "其他" },
 ];
 
-const CREATION_REFERENCE_COVERAGE_ROLE_TARGETS = { usage: ["usage-suggestion"], scene: ["scene", "atmosphere"], material: ["product-detail", "ingredient-material"], dimensions: ["size-capacity-fit", "spec-table"], package: ["accessory-gift"] };
+const CREATION_REFERENCE_COVERAGE_ROLE_TARGETS = { usage: ["usage-suggestion"], scene: ["scene", "atmosphere"], material: ["product-detail", "ingredient-material"], feature: ["effect-comparison", "usage-suggestion", "after-sales"], dimensions: ["size-capacity-fit", "spec-table"], package: ["accessory-gift"] };
 
 function getCreationReferenceRoleLabel(role) {
   return CREATION_REFERENCE_ROLE_OPTIONS.find((option) => option.value === role)?.label || CREATION_REFERENCE_ROLE_OPTIONS[0].label;
@@ -9631,11 +9636,11 @@ function renderArticleIllustrationView() {
     refs.articleIllustrationStyleBibleInput.value = currentSet.styleBible || "";
   }
 
+  const referenceCards = referenceItems.map((item) => createArticleStoryboardCard(item));
+  const storyboardCards = storyboardItems.map((item) => createArticleStoryboardCard(item));
   stopGenerationLoadingShells(refs.articleIllustrationReferenceList);
   refs.articleIllustrationReferenceList.replaceChildren();
-  referenceItems.forEach((item) => {
-    refs.articleIllustrationReferenceList.appendChild(createArticleStoryboardCard(item));
-  });
+  refs.articleIllustrationReferenceList.append(...referenceCards);
   if (referenceItems.length === 0) {
     const empty = document.createElement("div");
     empty.className = "article-reference-card";
@@ -9652,9 +9657,7 @@ function renderArticleIllustrationView() {
     refs.articleIllustrationStoryboardList.appendChild(empty);
     return;
   }
-  storyboardItems.forEach((item) => {
-    refs.articleIllustrationStoryboardList.appendChild(createArticleStoryboardCard(item));
-  });
+  refs.articleIllustrationStoryboardList.append(...storyboardCards);
 }
 
 function buildArticleIllustrationPlanFormData() {
@@ -10224,6 +10227,11 @@ function normalizeCreationItemForView(item = {}, fallbackIndex = 0) {
     generationCompletedAt: String(item.generationCompletedAt || ""),
     generationDurationMs: String(item.generationDurationMs || ""),
     generationAttemptCount: Math.max(0, Math.floor(Number(item.generationAttemptCount) || 0)),
+    originalResponseRecovery: String(item.originalResponseRecovery || ""),
+    originalResponseRecoveryReason: String(item.originalResponseRecoveryReason || ""),
+    originalResponseStatus: String(item.originalResponseStatus || ""),
+    originalResponseCheckedAt: String(item.originalResponseCheckedAt || ""),
+    originalResponseAutoRetryBlocked: item.originalResponseAutoRetryBlocked === true,
     ...normalizeCreationGenerationSnapshotForView(item),
     ...normalizeCreationCoverageFields(item),
     skuSubjectId,
@@ -10254,6 +10262,13 @@ function normalizeCreationSetForView(set = {}) {
   const visualLanguage = normalizeCreationVisualLanguage(set.visualLanguage || planSource.visualLanguage);
   const platformPayload = createFrozenCreationPlatformPayload(planSource);
   const effectivePlan = normalizeCreationEffectivePlanForBrowser(planSource);
+  const rawDimensionSpecGroups = [
+    set.dimensionSpecGroups,
+    set.dimension_spec_groups,
+    planSource.dimensionSpecGroups,
+    planSource.dimension_spec_groups,
+  ].find((value) => (Array.isArray(value) ? value.length > 0 : Boolean(value)));
+  const dimensionSpecGroups = normalizeCreationDimensionGroupsForPayload(rawDimensionSpecGroups);
   const warnings = cloneCreationPlanValue(set.warnings ?? set.validation?.warnings ?? planSource.warnings ?? planSource.validation?.warnings, []);
   const errors = cloneCreationPlanValue(set.errors ?? set.validation?.errors ?? planSource.errors ?? planSource.validation?.errors, []);
   const validationIsValid = (set.validation?.isValid ?? planSource.validation?.isValid) !== false && (set.canGenerate ?? planSource.canGenerate) !== false && errors.length === 0;
@@ -10272,6 +10287,7 @@ function normalizeCreationSetForView(set = {}) {
     productDescription: String(set.productDescription || ""),
     sellingPoints: Array.isArray(set.sellingPoints) ? set.sellingPoints.map((item) => String(item)).filter(Boolean) : [],
     dimensionSpecs: String(set.dimensionSpecs || ""),
+    ...(dimensionSpecGroups.length > 0 ? { dimensionSpecGroups } : {}),
     dimensionUnitMode: normalizeCreationDimensionUnitMode(set.dimensionUnitMode),
     dimensionUnitModeLabel: String(set.dimensionUnitModeLabel || formatCreationDimensionUnitModeLabel(set.dimensionUnitMode)),
     targetLanguage: String(set.targetLanguage || "en"),
@@ -10323,6 +10339,9 @@ function normalizeCreationSetForView(set = {}) {
             role: String(item?.role || "product"),
             roleLabel: String(item?.roleLabel || getCreationReferenceRoleLabel(item?.role || "product")),
             note: String(item?.note || item?.analysisNote || item?.description || ""),
+            ...(normalizeCreationDimensionGroupsForPayload(item?.dimensionGroups || item?.dimension_groups).length > 0
+              ? { dimensionGroups: normalizeCreationDimensionGroupsForPayload(item?.dimensionGroups || item?.dimension_groups) }
+              : {}),
           }))
           .filter((item) => item.filename)
       : [],
@@ -10366,12 +10385,22 @@ function buildCreationReferenceRestoreQueue(set = {}) {
     }
 
     const role = String(roleEntry?.role || "product").trim();
+    const requestedReferenceIndex = Number.parseInt(
+      String(roleEntry?.index || roleEntry?.referenceIndex || roleEntry?.reference_index || "").trim(),
+      10,
+    );
+    const dimensionGroups = normalizeCreationDimensionGroupsForPayload(
+      roleEntry?.dimensionGroups || roleEntry?.dimension_groups,
+    );
     return {
       id: `creation-reference-restore-${index}-${resolvedFilename.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
       filename: resolvedFilename,
       role,
       roleLabel: String(roleEntry?.roleLabel || getCreationReferenceRoleLabel(role)).trim(),
       note: String(roleEntry?.note || "").trim(),
+      originalReferenceIndex:
+        Number.isFinite(requestedReferenceIndex) && requestedReferenceIndex > 0 ? requestedReferenceIndex : index + 1,
+      ...(dimensionGroups.length > 0 ? { dimensionGroups } : {}),
       status: "missing",
       referenceId: "",
       uploadedFilename: "",
@@ -10416,7 +10445,10 @@ function findCreationReferenceRestoreEntryForFile(file, restoreQueue = state.cre
   }
 
   const filename = String(file?.name || "").trim().toLowerCase();
-  return missingEntries.find((entry) => entry.filename.toLowerCase() === filename) || missingEntries[0] || null;
+  return (
+    missingEntries.find((entry) => entry.filename.toLowerCase() === filename) ||
+    (missingEntries.length === 1 ? missingEntries[0] : null)
+  );
 }
 
 function markCreationReferenceRestoreEntryMissing(restoreEntryId) {
@@ -10474,6 +10506,7 @@ function bindCreationReferenceToRestoreEntry(referenceId, restoreEntryId) {
           restoreEntryId: "",
           restoredFromRecordFilename: "",
           note: "",
+          dimensionGroups: [],
         };
       }
 
@@ -10486,15 +10519,20 @@ function bindCreationReferenceToRestoreEntry(referenceId, restoreEntryId) {
         restoreEntryId: "",
         restoredFromRecordFilename: "",
         note: "",
+        dimensionGroups: [],
       };
     }
 
+    const dimensionGroups = normalizeCreationDimensionGroupsForPayload(
+      nextRestoreEntry.dimensionGroups || nextRestoreEntry.dimension_groups,
+    );
     return {
       ...item,
       restoreEntryId: normalizedRestoreId,
       restoredFromRecordFilename: nextRestoreEntry.filename,
       role: nextRestoreEntry.role || item.role || "product",
       note: nextRestoreEntry.note || "",
+      dimensionGroups,
     };
   });
   syncCreationReferenceGenerationCompressionProfiles();
@@ -10785,7 +10823,7 @@ function upsertCreationSet(set) {
   return normalized;
 }
 
-function updateCreationCurrentItem(itemId, patch = {}) {
+function updateCreationCurrentItem(itemId, patch = {}, { protectCompletedAsset = false } = {}) {
   const currentSet = getCreationCurrentSet();
   if (!currentSet || !itemId) {
     return null;
@@ -10794,7 +10832,13 @@ function updateCreationCurrentItem(itemId, patch = {}) {
   const nextItems = [...currentSet.items];
   const index = nextItems.findIndex((item) => item.itemId === itemId);
   const existing = index >= 0 ? nextItems[index] : { itemId };
-  const nextItem = normalizeCreationItemForView({ ...existing, ...patch, itemId }, index >= 0 ? index : nextItems.length);
+  const incomingItem = { ...patch, itemId };
+  const nextItem = normalizeCreationItemForView(
+    protectCompletedAsset
+      ? mergeCreationItemStreamUpdate(existing, incomingItem)
+      : { ...existing, ...incomingItem },
+    index >= 0 ? index : nextItems.length,
+  );
 
   if (index >= 0) {
     nextItems[index] = nextItem;
@@ -10817,11 +10861,20 @@ function updateCreationCurrentItem(itemId, patch = {}) {
   return nextSet;
 }
 
+function getCreationPreviousSetForStream(set, { queueJob } = {}) {
+  const incomingSetId = String(set?.setId || "");
+  const candidates = [queueJob?.set, getCreationCurrentSet(), ...state.creation.sets].filter(Boolean);
+  if (!incomingSetId) {
+    return candidates[0] || null;
+  }
+  return candidates.find((candidate) => String(candidate?.setId || "") === incomingSetId) || null;
+}
+
 function upsertCreationSetForStream(set, { queueJob } = {}) {
   // The manifest never carries mid-generation previews, so replacing the local set
   // with it wholesale would drop an image the user already watched appear. Carry
   // previews forward for items the manifest has no stored asset for.
-  const previousSet = queueJob?.set || getCreationCurrentSet();
+  const previousSet = getCreationPreviousSetForStream(set, { queueJob });
   const normalized = normalizeCreationSetForView(mergeCreationSetPreviews(set, previousSet));
   if (!normalized.setId) {
     return null;
@@ -10844,10 +10897,19 @@ function getCreationStreamCurrentSet({ queueJob } = {}) {
   return queueJob?.set ? normalizeCreationSetForView(queueJob.set) : getCreationCurrentSet();
 }
 
+function shouldApplyCreationStreamItemUpdate(itemId, patch = {}, context = {}) {
+  if (!itemId) {
+    return true;
+  }
+  const currentSet = getCreationStreamCurrentSet(context);
+  const existing = currentSet?.items?.find((item) => item.itemId === itemId) || null;
+  return !shouldRetainCompletedCreationItem(existing, { ...patch, itemId });
+}
+
 function updateCreationStreamItem(itemId, patch = {}, context = {}) {
   const { queueJob } = context;
   if (!queueJob) {
-    return updateCreationCurrentItem(itemId, patch);
+    return updateCreationCurrentItem(itemId, patch, { protectCompletedAsset: true });
   }
 
   const currentSet = getCreationStreamCurrentSet(context);
@@ -10858,7 +10920,10 @@ function updateCreationStreamItem(itemId, patch = {}, context = {}) {
   const nextItems = [...currentSet.items];
   const index = nextItems.findIndex((item) => item.itemId === itemId);
   const existing = index >= 0 ? nextItems[index] : { itemId };
-  const nextItem = normalizeCreationItemForView({ ...existing, ...patch, itemId }, index >= 0 ? index : nextItems.length);
+  const nextItem = normalizeCreationItemForView(
+    mergeCreationItemStreamUpdate(existing, { ...patch, itemId }),
+    index >= 0 ? index : nextItems.length,
+  );
   if (index >= 0) {
     nextItems[index] = nextItem;
   } else {
@@ -10910,24 +10975,15 @@ function createCreationCardLoading(status = "generating", sequenceIndex = 0, key
 
 /* 卡片上的实时日志取该项在日志里的最新明细：视图项经过白名单归一化，
    不带 statusText，所以只有日志里存着这一行的真实状态。 */
-function getGenerationLogItemDetail(channel, itemId) {
-  const normalizedItemId = String(itemId || "").trim();
-  if (!normalizedItemId) {
-    return "";
-  }
-
-  const child = getGenerationLogChannelEntries(state.generationLog, channel)
-    .filter((row) => row?.kind === "group")
-    .flatMap((row) => (Array.isArray(row.children) ? row.children : []))
-    .findLast((entry) => String(entry?.groupItemId || "") === normalizedItemId);
-  return String(child?.detail || "").trim();
+function getGenerationLogItemDetail(channel, itemId, groupId = "") {
+  return getGenerationLogGroupItemDetail(state.generationLog, channel, groupId, itemId);
 }
 
-function getCreationCardLogText(item = {}, channel = "creation") {
+function getCreationCardLogText(item = {}, channel = "creation", groupId = "") {
   if (item.status === "failed") {
     return compactErrorMessage(item.error, "生成请求失败");
   }
-  return getGenerationLogItemDetail(channel, item.itemId) || String(getCreationItemStatusLabel(item) || "").trim();
+  return getGenerationLogItemDetail(channel, item.itemId, groupId) || String(getCreationItemStatusLabel(item) || "").trim();
 }
 
 function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
@@ -10986,7 +11042,7 @@ function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
       item.status,
       fallbackIndex,
       getCreationCardLoadingKey(item, fallbackIndex, options.keyScope),
-      getCreationCardLogText(item),
+      getCreationCardLogText(item, "creation", options.logGroupId),
     ));
   } else if (imageUrl) {
     const image = document.createElement("img");
@@ -11034,7 +11090,7 @@ function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
   return card;
 }
 
-function syncCreationResultGrid(items = [], { showActions = true, keyScope = "" } = {}) {
+function syncCreationResultGrid(items = [], { showActions = true, keyScope = "", logGroupId = "" } = {}) {
   syncCreationResultGridShell({
     grid: refs.creationResultGrid,
     items,
@@ -11042,6 +11098,7 @@ function syncCreationResultGrid(items = [], { showActions = true, keyScope = "" 
     getItemOptions: (item, _index, { firstSkuItem, firstInfographicRebuildItem }) => ({
       showActions,
       keyScope,
+      logGroupId,
       isSkuStart: item === firstSkuItem,
       isInfographicRebuildStart: item === firstInfographicRebuildItem,
     }),
@@ -11050,9 +11107,15 @@ function syncCreationResultGrid(items = [], { showActions = true, keyScope = "" 
       getFallbackTitle: (slotIndex) => CREATION_PREVIEW_SLOTS[slotIndex]?.title || "",
       getImageUrl,
       getStatusLabel: getCreationItemStatusLabel,
-      getLogText: getCreationCardLogText,
+      getLogText: (entry) => getCreationCardLogText(entry, "creation", options.logGroupId),
       shouldShowLoading: (entry) => shouldShowCreationCardLoading(entry, false),
     }),
+    shouldRetainLoadingSource: ({ existingCard }) => {
+      const loadingKey = String(
+        existingCard?.querySelector?.(".creation-card-loading")?.dataset?.generationLoadingKey || "",
+      );
+      return Boolean(keyScope && loadingKey && !loadingKey.startsWith(`${keyScope}::`));
+    },
   });
 }
 
@@ -11346,7 +11409,7 @@ const creationRecordTemuExportController = createCreationTemuExportController({
   setRecordFeedback: setCreationRecordFeedback,
   renderRecordView: renderCreationRecordView,
   compactErrorMessage,
-  // 点击「导出 Temu Excel」改为打开上品工作台覆盖层；批量导出成为覆盖层内第二个标签。
+  // 点击「temuexcel导出工作台」打开上品工作台覆盖层；批量导出成为覆盖层内第二个标签。
   openWorkbench: (setIds) => temuWorkbenchLauncher.open(setIds),
 });
 
@@ -11685,6 +11748,10 @@ async function repairCreationRecordIncompleteImages() {
     setCreationRecordFeedback(message, "error");
     showError(message);
   } finally {
+    releaseCreationLoadingSources({
+      queueId: getCreationQueueJobForSet(selectedSet)?.id,
+      setId: selectedSet.setId,
+    });
     state.creation.generating = false;
     state.creation.generationScope = "";
     renderCreationView();
@@ -12222,6 +12289,7 @@ function applyCreationReferenceFiles(fileList) {
       previewUrl: URL.createObjectURL(file),
       role: restoreEntry?.role || "product",
       note: restoreEntry?.note || "",
+      ...(restoreEntry?.dimensionGroups?.length > 0 ? { dimensionGroups: restoreEntry.dimensionGroups } : {}),
       restoreEntryId: restoreEntry?.id || "",
       restoredFromRecordFilename: restoreEntry?.filename || "",
     };
@@ -12384,16 +12452,138 @@ function renderCreationReferenceGrid() {
   syncCreationReferenceResetButton();
 }
 
+function buildCreationRestoredReferenceBindingMaps(
+  referenceFiles = state.creationReferenceFiles,
+  restoreQueue = state.creationReferenceRestoreQueue,
+) {
+  const restoreEntriesById = new Map(
+    (Array.isArray(restoreQueue) ? restoreQueue : []).map((entry) => [entry.id, entry]),
+  );
+  const indexTargets = new Map();
+  const filenameTargets = new Map();
+
+  (Array.isArray(referenceFiles) ? referenceFiles : []).forEach((item, index) => {
+    const restoreEntry = restoreEntriesById.get(item.restoreEntryId);
+    if (!restoreEntry) {
+      return;
+    }
+    const currentIndex = index + 1;
+    const currentFilename = String(item.file?.name || item.uploadedFilename || "").trim();
+    const originalIndex = Number.parseInt(String(restoreEntry.originalReferenceIndex || "").trim(), 10);
+    if (Number.isFinite(originalIndex) && originalIndex > 0) {
+      const targets = indexTargets.get(originalIndex) || new Set();
+      targets.add(currentIndex);
+      indexTargets.set(originalIndex, targets);
+    }
+    const originalFilename = String(restoreEntry.filename || "").trim().toLowerCase();
+    if (originalFilename && currentFilename) {
+      const targets = filenameTargets.get(originalFilename) || new Set();
+      targets.add(currentFilename);
+      filenameTargets.set(originalFilename, targets);
+    }
+  });
+
+  return {
+    indexMap: new Map(
+      [...indexTargets.entries()]
+        .filter(([, targets]) => targets.size === 1)
+        .map(([index, targets]) => [index, [...targets][0]]),
+    ),
+    filenameMap: new Map(
+      [...filenameTargets.entries()]
+        .filter(([, targets]) => targets.size === 1)
+        .map(([filename, targets]) => [filename, [...targets][0]]),
+    ),
+  };
+}
+
+function remapRestoredCreationDimensionGroupsForPayload(value, item = {}, bindingMaps) {
+  const groups = normalizeCreationDimensionGroupsForPayload(value);
+  if (!item.restoreEntryId || groups.length === 0) {
+    return groups;
+  }
+  const { indexMap, filenameMap } = bindingMaps || buildCreationRestoredReferenceBindingMaps();
+  return groups.map((group) => ({
+    ...group,
+    reference_indexes: group.reference_indexes
+      .map((index) => indexMap.get(index))
+      .filter((index, position, indexes) => Number.isFinite(index) && indexes.indexOf(index) === position),
+    filenames: group.filenames
+      .map((filename) => filenameMap.get(String(filename || "").trim().toLowerCase()))
+      .filter((filename, position, filenames) => filename && filenames.indexOf(filename) === position),
+  }));
+}
+
 function buildCreationReferenceRolePayload() {
+  const restoredBindingMaps = buildCreationRestoredReferenceBindingMaps();
   return state.creationReferenceFiles
-    .map((item, index) => ({
-      index: index + 1,
-      filename: item.file?.name || `reference-image-${index + 1}`,
-      role: item.role || "product",
-      note: item.note || "",
-      subjectUnitCount: item.subjectUnitCount || 0,
-    }))
+    .map((item, index) => {
+      const dimensionGroups = remapRestoredCreationDimensionGroupsForPayload(
+        item.dimensionGroups,
+        item,
+        restoredBindingMaps,
+      );
+      return {
+        index: index + 1,
+        filename: item.file?.name || `reference-image-${index + 1}`,
+        role: item.role || "product",
+        note: item.note || "",
+        subjectUnitCount: item.subjectUnitCount || 0,
+        ...(dimensionGroups.length > 0 ? { dimension_groups: dimensionGroups } : {}),
+      };
+    })
     .filter((item) => item.role !== "style");
+}
+
+function normalizeCreationDimensionGroupsForPayload(value) {
+  const groups = Array.isArray(value) ? value : [];
+  return groups
+    .slice(0, 32)
+    .map((group, index) => {
+      if (!group || typeof group !== "object") {
+        return null;
+      }
+      const referenceIndexes = [
+        ...(Array.isArray(group.reference_indexes) ? group.reference_indexes : []),
+        ...(Array.isArray(group.referenceIndexes) ? group.referenceIndexes : []),
+        ...(Array.isArray(group.indexes) ? group.indexes : []),
+      ]
+        .map((item) => Number.parseInt(String(item || "").trim(), 10))
+        .filter((item, itemIndex, items) => Number.isFinite(item) && item > 0 && items.indexOf(item) === itemIndex);
+      const filenames = [
+        ...(Array.isArray(group.filenames) ? group.filenames : []),
+        ...(Array.isArray(group.reference_filenames) ? group.reference_filenames : []),
+        ...(Array.isArray(group.referenceFilenames) ? group.referenceFilenames : []),
+        group.filename,
+      ]
+        .map((item) => String(item || "").trim())
+        .filter((item, itemIndex, items) => item && items.indexOf(item) === itemIndex);
+      const specs = [
+        ...(Array.isArray(group.specs) ? group.specs : []),
+        ...(Array.isArray(group.facts) ? group.facts : []),
+        ...(Array.isArray(group.lines) ? group.lines : []),
+      ]
+        .map((item) => String(item || "").trim())
+        .filter(Boolean)
+        .slice(0, 64);
+      const label = String(
+        group.label || group.name || group.title || group.variantLabel || group.variant_label || group.variant ||
+          group.color || group.colorName || group.color_name || group.size || group.sizeLabel || group.size_label || "",
+      ).trim();
+      const note = String(group.note || group.description || "").trim();
+      if (!label && referenceIndexes.length === 0 && filenames.length === 0 && specs.length === 0 && !note) {
+        return null;
+      }
+      return {
+        id: String(group.id || group.key || group.groupId || group.group_id || label || `dimension-group-${index + 1}`).trim(),
+        label,
+        reference_indexes: referenceIndexes,
+        filenames,
+        specs,
+        ...(note ? { note } : {}),
+      };
+    })
+    .filter(Boolean);
 }
 
 function buildCreationSkuSubjectPayload() { return buildCreationSkuSubjectsForPayload({ analysis: state.creationReferenceAnalysis.result, applied: state.creationReferenceAnalysis.applied, dirty: state.creationReferenceAnalysis.dirty, referenceRoles: buildCreationReferenceRolePayload() }); }
@@ -12509,9 +12699,10 @@ const hasCreationReferenceDimensionSpecIntent = (value) => /dimension(s)?\s*(cha
 const hasCreationReferenceDimensionSpecValue = (value) => { const text = String(value || "").trim().toLowerCase(); return /#\s*\d+|\d+\s*#\s*(?:hook|hooks|钩)?|\d+\s*(?:号|號)\s*钩|size\s*#?\s*\d+\s*hooks?/iu.test(text) || /(^|[^\p{L}\p{N}_])([+-]?(?:\d+(?:\.\d+)?|\.\d+))\s*(fl\.?\s*oz|fluid\s*ounces?|inches?|inch|in\.?|ft\.?|feet|foot|yards?|yard|yd\.?|毫米|厘米|英寸|英尺|毫升|液量盎司|千克|克|磅|盎司|升|mm|cm|kg|g|ml|lb|lbs|oz|m|l)(?=$|[^\p{L}\p{N}_])/iu.test(text); };
 const hasCreationReferenceDimensionSignal = (value) => { const text = String(value || "").trim().toLowerCase(); return hasCreationReferenceDimensionSpecIntent(text) || (hasCreationReferenceDimensionSpecValue(text) && /dimension|size|measurement|capacity|length|width|height|weight|hook|尺寸|规格|尺码|容量|长度|宽度|高度|重量|比例|尺度|钩/iu.test(text)); };
 const hasCreationReferenceUsageInstructionSignal = (value) => /usage\s*(guide|manual|instructions?|steps?|diagram|method)|user\s*(guide|manual|instructions?)|operation\s*(guide|manual|instructions?|steps?|method|diagram)|instruction(s)?|manual|tutorial|step[-\s]?by[-\s]?step|how\s*to|setup\s*(guide|instructions?|steps?)|assembly\s*(guide|instructions?|steps?)|install(?:ation)?\s*(guide|instructions?|steps?)|charging\s*(guide|instructions?|steps?|method|connection|diagram)|connection\s*(guide|instructions?|steps?|method|diagram)|polarity|positive\s*(pole|terminal|electrode)|negative\s*(pole|terminal|electrode)|使用\s*(指南|说明|教程|步骤|方法|方式|指引)|操作\s*(指南|说明|教程|步骤|方法|流程)|安装\s*(指南|说明|教程|步骤|方法|流程)|装配\s*(指南|说明|教程|步骤|方法|流程)|充电\s*(指南|说明|教程|步骤|方式|方法|连接|接线)|连接\s*(指南|说明|教程|步骤|方式|方法|示意|接线)|接线|正负极|正极|负极|请按照|注意事项|说明书|教程图|步骤图/iu.test(String(value || "").trim().toLowerCase());
-const hasCreationReferenceDetailSignal = (value) => /detail|close.?up|callout|feature\s*(callout|breakdown|point|annotation)|structure\s*(callout|breakdown|detail|annotation|notes?)|component\s*(callout|breakdown|detail|annotation)|material|texture|surface|fabric|finish|seams?|craft|细节|质感|纹理|表面|工艺|外观结构|结构表现|结构说明|结构标注|部件标注|功能卖点|卖点外观|功能拆解|结构拆解/iu.test(String(value || "").trim().toLowerCase());
+const hasCreationReferenceDetailSignal = (value) => /detail|close.?up|callout|structure\s*(callout|breakdown|detail|annotation|notes?)|component\s*(callout|breakdown|detail|annotation)|material|texture|surface|fabric|finish|seams?|craft|细节|质感|纹理|表面|工艺|外观结构|结构表现|结构说明|结构标注|部件标注|结构拆解/iu.test(String(value || "").trim().toLowerCase());
+const hasCreationReferenceFeatureSignal = (value) => /feature\s*(callout|breakdown|point|annotation|benefit|effect|demo|diagram)|functional\s*(benefit|effect|feature|proof|callout|diagram)|selling\s*point|benefit\s*(callout|diagram|proof)|功能(?:图|内容|卖点|效果|展示|说明|拆解|证据|亮点|对比|演示|结构(?:表现|说明|标注)?)|卖点(?:图|说明|拆解|展示|证据)|效果(?:图|说明|展示|证据|对比|演示)/iu.test(String(value || "").trim().toLowerCase());
 const hasCreationReferenceProductSubjectSignal = (value) => /product\s*(subject|photo|main|hero)|hero\s*product|sku\s*subject|sellable\s*(product|sku|subject)|商品主体|主体图|主图|白底主图|正面主体|可售|色款|配色|整体轮廓/iu.test(String(value || "").trim().toLowerCase()), hasCreationReferencePackageSignal = (value) => /package|packaging|box|bundle|included\s*(items?|contents?)?|contents?|accessor(?:y|ies)|in\s+the\s+box|what'?s\s+included|包装|包装清单|清单|套装|配件|盒|到手|收到|内含物/iu.test(String(value || "").trim().toLowerCase()), hasCreationReferencePackageContentSignal = (value) => /included\s*(items?|contents?)?|contents?|accessor(?:y|ies)|in\s+the\s+box|comes?\s+with|what'?s\s+included|包装清单|清单包含|包装内容|到手内容|实际收到|用户实际收到|配件清单|套装内容|内含物|标配清单|附带配件|随附配件|(?:includes?|included|comes?\s+with|包含|内含|含有|附带|随附|标配)[^。.;；\n]{0,40}(?:usb|cables?|charging\s*cable|charger|manual|accessor(?:y|ies)|propeller|eva|float|充电线|数据线|线缆|螺旋桨|叶片|漂浮|浮漂|说明书|配件|收纳袋|备用)/iu.test(String(value || "").trim().toLowerCase());
-function inferCreationReferenceAnalysisRole(entry = {}) { const explicitRole = String(entry.role || "").trim(), hasExplicitRole = CREATION_REFERENCE_ROLE_OPTIONS.some((option) => option.value === explicitRole), text = [entry.roleLabel, entry.title, entry.note, entry.description, entry.reason, entry.summary, entry.filename].map((item) => String(item || "").trim()).filter(Boolean).join(" "), evidenceText = [entry.title, entry.note, entry.description, entry.reason, entry.summary, entry.filename].map((item) => String(item || "").trim()).filter(Boolean).join(" "); if (explicitRole === "style") return "style"; const shouldUsePackageRole = (hasCreationReferencePackageContentSignal(evidenceText) && (!hasExplicitRole || explicitRole === "other" || explicitRole === "product" || explicitRole === "dimensions")) || (hasCreationReferencePackageSignal(evidenceText) && (!hasExplicitRole || explicitRole === "other" || explicitRole === "product")); const shouldUseDimensionRole = hasCreationReferenceDimensionSignal(text) && (!hasExplicitRole || explicitRole === "other" || (explicitRole === "product" && hasCreationReferenceDimensionSpecIntent(text))); const shouldUseUsageRole = hasCreationReferenceUsageInstructionSignal(text) && (!hasExplicitRole || explicitRole === "other" || explicitRole === "product" || explicitRole === "scene"); const shouldUseDetailRole = hasCreationReferenceDetailSignal(evidenceText) && (!hasExplicitRole || explicitRole === "other" || (explicitRole === "product" && !hasCreationReferenceProductSubjectSignal(evidenceText))); return shouldUsePackageRole ? "package" : shouldUseDimensionRole ? "dimensions" : shouldUseUsageRole ? "usage" : shouldUseDetailRole ? "material" : hasExplicitRole ? explicitRole : "product"; }
+function inferCreationReferenceAnalysisRole(entry = {}) { const explicitRole = String(entry.role || "").trim(), hasExplicitRole = CREATION_REFERENCE_ROLE_OPTIONS.some((option) => option.value === explicitRole), text = [entry.roleLabel, entry.title, entry.note, entry.description, entry.reason, entry.summary, entry.filename].map((item) => String(item || "").trim()).filter(Boolean).join(" "), evidenceText = [entry.title, entry.note, entry.description, entry.reason, entry.summary, entry.filename].map((item) => String(item || "").trim()).filter(Boolean).join(" "); if (explicitRole === "style") return "style"; const shouldUsePackageRole = (hasCreationReferencePackageContentSignal(evidenceText) && (!hasExplicitRole || explicitRole === "other" || explicitRole === "product" || explicitRole === "dimensions")) || (hasCreationReferencePackageSignal(evidenceText) && (!hasExplicitRole || explicitRole === "other" || explicitRole === "product")); const shouldUseDimensionRole = hasCreationReferenceDimensionSignal(text) && (!hasExplicitRole || explicitRole === "other" || (explicitRole === "product" && hasCreationReferenceDimensionSpecIntent(text))); const shouldUseUsageRole = hasCreationReferenceUsageInstructionSignal(text) && (!hasExplicitRole || explicitRole === "other" || explicitRole === "product" || explicitRole === "scene"); const shouldUseFeatureRole = hasCreationReferenceFeatureSignal(evidenceText) && (!hasExplicitRole || explicitRole === "other" || explicitRole === "product"); const shouldUseDetailRole = hasCreationReferenceDetailSignal(evidenceText) && (!hasExplicitRole || explicitRole === "other" || (explicitRole === "product" && !hasCreationReferenceProductSubjectSignal(evidenceText))); return shouldUsePackageRole ? "package" : shouldUseDimensionRole ? "dimensions" : shouldUseUsageRole ? "usage" : shouldUseFeatureRole ? "feature" : shouldUseDetailRole ? "material" : hasExplicitRole ? explicitRole : "product"; }
 
 function normalizeCreationReferenceAnalysisRecommendation(entry = {}, index = 0, skuSubjects = []) {
   const filename = String(state.creationReferenceFiles[index]?.file?.name || entry.filename || `reference-image-${index + 1}`).trim();
@@ -12522,7 +12713,8 @@ function normalizeCreationReferenceAnalysisRecommendation(entry = {}, index = 0,
   const shouldCorrectRole = Boolean(roleCorrectionReason) || shouldDowngradeReferenceProductAnalysisRole(normalizedEntry, subjectUnitCount);
   const role = shouldCorrectRole ? "product" : inferCreationReferenceAnalysisRole(normalizedEntry);
   const suppliedRole = String(entry.role || "").trim();
-  return { index: Number(entry.index) || index + 1, filename, role, subjectUnitCount, roleLabel: getCreationReferenceAnalysisDisplayRoleLabel({ role, roleLabel: String(role !== suppliedRole ? getCreationReferenceRoleLabel(role) : entry.roleLabel || getCreationReferenceRoleLabel(role)), subjectUnitCount }), roleCorrectionReason: roleCorrectionReason, note: normalizeCreationReferenceAnalysisUnitCountNote(entry.note, subjectUnitCount) };
+  const dimensionGroups = normalizeCreationDimensionGroupsForPayload(entry.dimensionGroups || entry.dimension_groups);
+  return { index: Number(entry.index) || index + 1, filename, role, subjectUnitCount, roleLabel: getCreationReferenceAnalysisDisplayRoleLabel({ role, roleLabel: String(role !== suppliedRole ? getCreationReferenceRoleLabel(role) : entry.roleLabel || getCreationReferenceRoleLabel(role)), subjectUnitCount }), roleCorrectionReason: roleCorrectionReason, note: normalizeCreationReferenceAnalysisUnitCountNote(entry.note, subjectUnitCount), ...(dimensionGroups.length > 0 ? { dimensionGroups } : {}) };
 }
 
 function normalizeCreationReferenceAnalysisPayload(payload = {}) {
@@ -12669,11 +12861,13 @@ function applyCreationReferenceAnalysisRecommendations() {
     }
     const nextItem = { ...item };
     delete nextItem.roleLocked;
+    delete nextItem.dimensionGroups;
     return {
       ...nextItem,
       role: recommendation.role || item.role || "product",
       note: recommendation.note || "",
       subjectUnitCount: recommendation.subjectUnitCount || 0,
+      ...(recommendation.dimensionGroups?.length > 0 ? { dimensionGroups: recommendation.dimensionGroups } : {}),
     };
   });
   syncCreationReferenceGenerationCompressionProfiles();
@@ -13146,8 +13340,15 @@ function renderCreationView() {
 
   /* 队列 id 在整轮生成里不变，而 setId 会在首个流事件里从本地 id 换成服务端 id，
      所以进度作用域优先取队列 id：既能隔开队列之间，也不会在运行中途把进度清零。 */
-  const loadingKeyScope = selectedQueueJob?.id || currentSet?.setId || "";
-  syncCreationResultGrid(items, { showActions: showCreationResultActions, keyScope: loadingKeyScope });
+  const loadingKeyScope =
+    state.creation.generationScope === "logo-batch" && state.creation.logoBatchLoadingKey
+      ? state.creation.logoBatchLoadingKey
+      : selectedQueueJob?.id || currentSet?.setId || "";
+  syncCreationResultGrid(items, {
+    showActions: showCreationResultActions,
+    keyScope: loadingKeyScope,
+    logGroupId: currentSet?.setId || "",
+  });
   renderCreationListingDrafts({ refs: getCreationInlineListingRefs(), state, set: currentSet });
 }
 
@@ -13426,10 +13627,12 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
   }
 
   if (eventName === "item_started") {
-    updateCreationStreamItem(payload.itemId, {
+    const itemPatch = {
       status: "generating",
       updatedAt: nowIso(),
-    }, context);
+    };
+    if (!shouldApplyCreationStreamItemUpdate(payload.itemId, itemPatch, context)) return;
+    updateCreationStreamItem(payload.itemId, itemPatch, context);
     setCreationFeedback(`正在生成 ${payload.role || payload.itemId}。`, "busy");
     recordCreationLogEvent({ setId: payload.setId, itemId: payload.itemId, status: "active", detail: "正在生成图片", context });
     renderCreationView();
@@ -13437,10 +13640,12 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
   }
 
   if (eventName === "item_status") {
-    updateCreationStreamItem(payload.itemId, {
+    const itemPatch = {
       status: "generating",
       updatedAt: nowIso(),
-    }, context);
+    };
+    if (!shouldApplyCreationStreamItemUpdate(payload.itemId, itemPatch, context)) return;
+    updateCreationStreamItem(payload.itemId, itemPatch, context);
     /* 心跳不进反馈条：上游每 15 秒推来的文本完全相同，写进去会把
        「正在生成第 N 张」这类真正有信息的状态顶掉，只剩一句反复刷新的等待提示。 */
     if (payload.message && !hasHeartbeatPrefix(payload.message)) {
@@ -13463,12 +13668,14 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
   }
 
   if (eventName === "item_partial_image") {
-    updateCreationStreamItem(payload.itemId, {
+    const itemPatch = {
       status: "generating",
       imageUrl: payload.dataUrl,
       thumbnailUrl: payload.dataUrl,
       updatedAt: nowIso(),
-    }, context);
+    };
+    if (!shouldApplyCreationStreamItemUpdate(payload.itemId, itemPatch, context)) return;
+    updateCreationStreamItem(payload.itemId, itemPatch, context);
     renderCreationView();
     return;
   }
@@ -13476,12 +13683,14 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
   if (eventName === CREATION_STREAM_EVENTS.ITEM_PARTIAL_IMAGE_CHUNK) {
     const dataUrl = recordPartialImageChunk(getCreationPartialImageChunks(context), payload);
     if (dataUrl) {
-      updateCreationStreamItem(payload.itemId, {
+      const itemPatch = {
         status: "generating",
         imageUrl: dataUrl,
         thumbnailUrl: dataUrl,
         updatedAt: nowIso(),
-      }, context);
+      };
+      if (!shouldApplyCreationStreamItemUpdate(payload.itemId, itemPatch, context)) return;
+      updateCreationStreamItem(payload.itemId, itemPatch, context);
       renderCreationView();
     }
     return;
@@ -13490,12 +13699,14 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
   if (eventName === CREATION_STREAM_EVENTS.ITEM_FINAL_IMAGE_CHUNK) {
     const dataUrl = recordFinalImageChunk(getCreationFinalImageChunks(context), payload);
     if (dataUrl) {
-      updateCreationStreamItem(payload.itemId, {
+      const itemPatch = {
         status: "generating",
         imageUrl: dataUrl,
         thumbnailUrl: dataUrl,
         updatedAt: nowIso(),
-      }, context);
+      };
+      if (!shouldApplyCreationStreamItemUpdate(payload.itemId, itemPatch, context)) return;
+      updateCreationStreamItem(payload.itemId, itemPatch, context);
       renderCreationView();
     }
     return;
@@ -13505,12 +13716,14 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
     // Chunks arrive before this event and already carry the image. A legacy server
     // that still inlines dataUrl keeps working; a chunk-only payload just refreshes
     // the item's metadata without clearing an assembled preview.
-    updateCreationStreamItem(payload.itemId, {
+    const itemPatch = {
       status: "generating",
       ...(payload.dataUrl ? { imageUrl: payload.dataUrl, thumbnailUrl: payload.dataUrl } : {}),
       ...(payload.partialImageFallback ? { partialImageFallback: true } : {}),
       updatedAt: nowIso(),
-    }, context);
+    };
+    if (!shouldApplyCreationStreamItemUpdate(payload.itemId, itemPatch, context)) return;
+    updateCreationStreamItem(payload.itemId, itemPatch, context);
     renderCreationView();
     return;
   }
@@ -13519,11 +13732,13 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
     if (payload.set) {
       upsertCreationSetForStream(payload.set, context);
     } else if (payload.item) {
-      updateCreationStreamItem(payload.item.itemId, {
+      const itemPatch = {
         ...payload.item,
         status: "completed",
         updatedAt: nowIso(),
-      }, context);
+      };
+      if (!shouldApplyCreationStreamItemUpdate(payload.item.itemId, itemPatch, context)) return;
+      updateCreationStreamItem(payload.item.itemId, itemPatch, context);
     }
     setCreationFeedback("已生成一张套图。", "success");
     recordCreationLogEvent({
@@ -13540,14 +13755,21 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
   }
 
   if (eventName === "item_requeued") {
+    const itemPatch = {
+      status: "queued",
+      error: "",
+      updatedAt: nowIso(),
+    };
+    const shouldApplyItemUpdate = shouldApplyCreationStreamItemUpdate(payload.itemId, itemPatch, context);
     if (payload.set) {
       upsertCreationSetForStream(payload.set, context);
     } else if (payload.itemId) {
-      updateCreationStreamItem(payload.itemId, {
-        status: "queued",
-        error: "",
-        updatedAt: nowIso(),
-      }, context);
+      if (!shouldApplyItemUpdate) return;
+      updateCreationStreamItem(payload.itemId, itemPatch, context);
+    }
+    if (!shouldApplyItemUpdate) {
+      renderCreationView();
+      return;
     }
     const requeueNotice = payload.notice || getRequeueNotice({
       message: payload.message,
@@ -13568,17 +13790,33 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
   }
 
   if (eventName === "item_failed") {
+    const itemPatch = {
+      status: "failed",
+      error: payload.message || "",
+      updatedAt: nowIso(),
+    };
+    const shouldApplyItemUpdate = shouldApplyCreationStreamItemUpdate(payload.itemId, itemPatch, context);
     if (payload.set) {
       upsertCreationSetForStream(payload.set, context);
     } else if (payload.itemId) {
-      updateCreationStreamItem(payload.itemId, {
-        status: "failed",
-        error: payload.message || "",
-        updatedAt: nowIso(),
-      }, context);
+      if (!shouldApplyItemUpdate) return;
+      updateCreationStreamItem(payload.itemId, itemPatch, context);
+    }
+    if (!shouldApplyItemUpdate) {
+      renderCreationView();
+      return;
     }
     const autoRepairAttemptCount = context.queueJob?.autoRepairAttemptCount ?? state.creation.autoRepairAttemptCount;
-    if (state.creation.generationScope === "full" && autoRepairAttemptCount === 0) {
+    const currentSet = getCreationStreamCurrentSet(context);
+    const failedItemCanAutoRepair = getCreationAutoRepairableItems(currentSet)
+      .some((item) => item.itemId === payload.itemId);
+    const shouldAnnounceAutoRepair = failedItemCanAutoRepair && shouldAutoRepairCreationSet({
+      set: currentSet,
+      generationScope: state.creation.generationScope,
+      autoRepairAttemptCount,
+      canRepair: canRepairCreationSet(currentSet),
+    });
+    if (shouldAnnounceAutoRepair) {
       setCreationFeedback(payload.message ? `${payload.message}，完成后将自动补图。` : "有套图项失败，完成后将自动补图。", "busy");
     } else {
       setCreationFeedback(payload.message || "套图生成失败。", "error");
@@ -13600,7 +13838,7 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
     let completedSet = payload.set || getCreationStreamCurrentSet(context);
     if (payload.set) {
       completedSet = upsertCreationSetForStream(payload.set, context) || payload.set;
-      if (!context.queueJob && await runCreationAutoRepairIfNeeded(payload.set)) {
+      if (!context.queueJob && await runCreationAutoRepairIfNeeded(completedSet)) {
         renderCreationView();
         return;
       }
@@ -13749,8 +13987,19 @@ async function loadCreationSets() {
   }
 
   const payload = await response.json();
-  const nextSets = Array.isArray(payload) ? payload.map(normalizeCreationSetForView).filter(Boolean) : [];
-  const currentSetId = state.creation.currentSet?.setId || "";
+  const currentSet = state.creation.currentSet;
+  const previousSetsById = new Map(
+    [...state.creation.sets, currentSet]
+      .filter((set) => set?.setId)
+      .map((set) => [String(set.setId), set]),
+  );
+  const nextSets = Array.isArray(payload)
+    ? payload
+        .map((set) => mergeCreationSetPreviews(set, previousSetsById.get(String(set?.setId || "")) || null))
+        .map(normalizeCreationSetForView)
+        .filter(Boolean)
+    : [];
+  const currentSetId = currentSet?.setId || "";
   state.creation.sets = nextSets;
   const nextSetIds = new Set(nextSets.map((set) => set.setId));
   state.creation.recordCheckedSetIds = state.creation.recordCheckedSetIds.filter((setId) => nextSetIds.has(setId));
@@ -13897,6 +14146,7 @@ async function startCreationLogoBatchGeneration() {
 
   state.creation.generating = true;
   state.creation.generationScope = "logo-batch";
+  state.creation.logoBatchLoadingKey = `creation-logo-batch-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   renderCreationView();
 
   try {
@@ -13943,6 +14193,8 @@ async function startCreationLogoBatchGeneration() {
     setCreationFeedback(message, "error");
     showError(message);
   } finally {
+    releaseCreationLoadingSources({ queueId: state.creation.logoBatchLoadingKey });
+    state.creation.logoBatchLoadingKey = "";
     state.creation.generating = false;
     state.creation.generationScope = "";
     renderCreationView();
@@ -13959,8 +14211,35 @@ function enqueueCreationGeneration({ formData, set }) {
   return job;
 }
 
+function releaseCreationLoadingSources({ queueId = "", setId = "" } = {}) {
+  const prefixes = new Set([
+    String(queueId || "").trim(),
+    String(setId || "").trim(),
+  ]);
+  prefixes.forEach((prefix) => {
+    if (prefix) {
+      releaseGenerationLoadingSourcesByPrefix(`${prefix}::`);
+    }
+  });
+}
+
 function getCreationQueueContext() {
-  return { creationState: state.creation, compactErrorMessage, getMaxParallelTasks: getCreationMaxParallelTaskCount, loadCreationSets, normalizeSet: normalizeCreationSetForView, nowIso, render: renderCreationView, runAutoRepairIfNeeded: runCreationQueuedAutoRepairIfNeeded, runCreationStream, setFeedback: setCreationFeedback, showError };
+  return {
+    creationState: state.creation,
+    compactErrorMessage,
+    getMaxParallelTasks: getCreationMaxParallelTaskCount,
+    loadCreationSets,
+    normalizeSet: normalizeCreationSetForView,
+    nowIso,
+    onFinished: (job) => {
+      releaseCreationLoadingSources({ queueId: job?.id, setId: job?.set?.setId });
+    },
+    render: renderCreationView,
+    runAutoRepairIfNeeded: runCreationQueuedAutoRepairIfNeeded,
+    runCreationStream,
+    setFeedback: setCreationFeedback,
+    showError,
+  };
 }
 
 async function runCreationQueuedJob(job) { await runCreationQueuedJobFromQueue(job, getCreationQueueContext()); }
@@ -14062,10 +14341,19 @@ async function repairCreationItems({ itemId = "", scope = "incomplete" } = {}) {
   try {
     await runCreationRepairRequest({ itemId, scope, set: currentSet });
   } catch (error) {
+    try {
+      await loadCreationSets();
+    } catch (refreshError) {
+      console.warn("无法在补图连接中断后刷新套图记录", refreshError);
+    }
     const message = compactErrorMessage(error instanceof Error ? error.message : String(error), "套图补图请求失败");
     setCreationFeedback(message, "error");
     showError(message);
   } finally {
+    releaseCreationLoadingSources({
+      queueId: getCreationQueueJobForSet(currentSet)?.id,
+      setId: currentSet.setId,
+    });
     state.creation.generating = false;
     state.creation.generationScope = "";
     state.creation.repairingItemId = "";
@@ -14731,7 +15019,7 @@ function createPortraitCard(item = {}, fallbackIndex = 0, options = {}) {
   if (isLoadingCard) {
     media.classList.add("is-loading");
     media.setAttribute("aria-busy", "true");
-    media.appendChild(createPortraitCardLoading(item.itemId, getCreationCardLogText(item, "portrait")));
+    media.appendChild(createPortraitCardLoading(item.itemId, getCreationCardLogText(item, "portrait", options.logGroupId)));
   } else if (imageUrl) {
     const image = document.createElement("img");
     image.loading = "lazy";
@@ -14823,7 +15111,9 @@ function renderPortraitView() {
   /* 顺序是有讲究的：先建好新卡片，让它们按 itemId 接上已有的进度源，再停掉旧卡片的动画。
      反过来先清空网格，进度源会因为没有节点被回收，每次渲染都把百分比打回 0；
      而只清空不停动画，旧节点会脱离文档却继续跑到 99%，下一轮生成直接继承这个残留值。 */
-  const nextCards = items.map((item, index) => createPortraitCard(item, index));
+  const nextCards = items.map((item, index) => createPortraitCard(item, index, {
+    logGroupId: currentSet?.setId || "",
+  }));
   stopGenerationLoadingShells(refs.portraitResultGrid);
   refs.portraitResultGrid.replaceChildren(...nextCards);
 }
@@ -15517,11 +15807,9 @@ function createPptSlideCard(slide) {
 }
 
 function renderPptSlides() {
+  const cards = getPptRenderableSlides().map((slide) => createPptSlideCard(slide));
   stopGenerationLoadingShells(refs.pptSlideList);
-  refs.pptSlideList.innerHTML = "";
-  getPptRenderableSlides().forEach((slide) => {
-    refs.pptSlideList.appendChild(createPptSlideCard(slide));
-  });
+  refs.pptSlideList.replaceChildren(...cards);
 }
 
 function getPptDeckPageCount(deck) {
@@ -16025,6 +16313,7 @@ function updateJob(jobId, patch) {
 
 function removeJob(jobId) {
   state.locallyTerminatedGenerationTaskIds.add(jobId);
+  releaseGenerationLoadingSource(makeJobPreviewKey(jobId));
   state.jobs = state.jobs.filter((job) => job.id !== jobId);
 }
 
@@ -16137,6 +16426,7 @@ function cancelQueuedJob(jobId) {
   }
 
   state.jobs = jobs;
+  releaseGenerationLoadingSource(makeJobPreviewKey(canceledJob.id));
   if (state.selectedPreviewKey === makeJobPreviewKey(canceledJob.id)) {
     state.selectedPreviewKey = "";
   }
@@ -16190,7 +16480,7 @@ async function loadGallery() {
     }
 
     const payload = await response.json();
-    const browserCachedItems = await readBrowserCachedGalleryItems();
+    const browserCachedItems = await readBrowserCachedGalleryItems({ restoreImageData: false });
     const sortedItems = sortGalleryItemsByCreatedAtDesc(
       mergeServerAndBrowserGalleryItems(Array.isArray(payload) ? payload : [], browserCachedItems),
     );
@@ -16261,6 +16551,10 @@ function applyGenerationTaskSnapshots(tasks, { render = true } = {}) {
     const wasSelectedPreview = state.selectedPreviewKey === taskPreviewKey;
     const wasTrackedQuickBlendJob = task.mode === "quick-blend" && existingJobs.has(task.id);
     const wasTrackedImageEditJob = task.mode === "image-edit" && existingJobs.has(task.id);
+
+    if (task.status === "completed" || task.status === "error") {
+      releaseGenerationLoadingSource(taskPreviewKey);
+    }
 
     if (task.status === "completed" && task.item) {
       if (task.mode === "reference-analysis") {

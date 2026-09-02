@@ -4,10 +4,19 @@ import { readFile } from "node:fs/promises";
 
 const launcherPath = new URL("../launch-studio.ps1", import.meta.url);
 
-test("launcher avoids opening an incompatible stale server on the requested port", async () => {
+test("launcher snapshots local listeners while avoiding an incompatible stale server on the requested port", async () => {
   const script = await readFile(launcherPath, "utf8");
 
-  assert.match(script, /function Get-StudioPortListener/);
+  assert.match(script, /function Get-ListeningLocalPorts/);
+  assert.match(script, /\[System\.Collections\.Generic\.HashSet\[int\]\]::new\(\)/);
+  assert.match(script, /IPGlobalProperties\]::GetIPGlobalProperties\(\)\.GetActiveTcpListeners\(\)/);
+  assert.equal((script.match(/GetActiveTcpListeners\(\)/g) || []).length, 1);
+  assert.match(script, /\$listeningPorts = Get-ListeningLocalPorts/);
+  assert.match(script, /Find-StudioPort -StartPort \$Port -ListeningPorts \$listeningPorts/);
+  assert.match(script, /\[System\.Collections\.Generic\.HashSet\[int\]\]\$ListeningPorts/);
+  assert.match(script, /\$targetPortInUse = \$listeningPorts\.Contains\(\$targetPort\)/);
+  assert.doesNotMatch(script, /Get-StudioPortListener/);
+  assert.doesNotMatch(script, /Get-NetTCPConnection/);
   assert.match(script, /function Test-StudioServer/);
   assert.match(script, /\/api\/article-illustration\/sets/);
   assert.match(script, /function Find-StudioPort/);

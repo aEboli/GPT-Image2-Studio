@@ -51,6 +51,32 @@ test("the item normalizer allowlists both provenance flags", () => {
   assert.match(normalizer, /previewRetained:/, "normalizer must allowlist previewRetained");
 });
 
+test("the item normalizer preserves original response recovery state", () => {
+  const normalizer = getFunctionSource(app, "normalizeCreationItemForView", "normalizeCreationSetForView");
+
+  for (const field of [
+    "originalResponseRecovery",
+    "originalResponseRecoveryReason",
+    "originalResponseStatus",
+    "originalResponseCheckedAt",
+    "originalResponseAutoRetryBlocked",
+  ]) {
+    assert.match(normalizer, new RegExp(`\\b${field}:`), `normalizer must allowlist ${field}`);
+  }
+});
+
+test("an unconfirmed original response does not promise automatic repair", () => {
+  const creationHandlerStart = app.indexOf("async function handleCreationStreamEvent");
+  const failureStart = app.indexOf('if (eventName === "item_failed")', creationHandlerStart);
+  const completeStart = app.indexOf('if (eventName === "complete")', failureStart);
+  const failureHandler = app.slice(failureStart, completeStart);
+
+  assert.ok(creationHandlerStart >= 0 && failureStart >= 0 && completeStart > failureStart, "creation failure handler missing");
+  assert.match(failureHandler, /getCreationAutoRepairableItems\(currentSet\)[\s\S]*?\.some\(\(item\) => item\.itemId === payload\.itemId\)/);
+  assert.match(failureHandler, /const shouldAnnounceAutoRepair = failedItemCanAutoRepair && shouldAutoRepairCreationSet\(/);
+  assert.match(failureHandler, /if \(shouldAnnounceAutoRepair\) \{/);
+});
+
 test("the creation stream carries the fallback flag onto the item", () => {
   assert.equal(
     app.includes("...(payload.partialImageFallback ? { partialImageFallback: true } : {})"),

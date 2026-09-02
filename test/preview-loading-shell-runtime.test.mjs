@@ -3,12 +3,15 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 
 import {
+  beatGenerationLoadingHeartbeat,
   createGenerationLoadingShell,
   getGenerationLoadingInterval,
   getGenerationLoadingProgress,
   getGenerationLoadingItemStage,
   getGenerationLoadingShellFamily,
   getGenerationLoadingStageFamily,
+  releaseGenerationLoadingSource,
+  releaseGenerationLoadingSourcesByPrefix,
   stopGenerationLoadingShell,
   stopGenerationLoadingShells,
   updateGenerationLoadingShell,
@@ -117,12 +120,13 @@ function installScheduler() {
   };
 }
 
-test("preview loading uses one shared drop with an accessible percentage", () => {
+test("preview loading uses one shared blurred shell with an accessible percentage", () => {
   const documentRef = createTestDocument();
   const scheduler = installScheduler();
   try {
     const nodes = createGenerationLoadingShell(documentRef, { key: "job-1", active: true });
-    assert.equal(nodes.shell.querySelectorAll(".generation-loading-drop").length, 1);
+    assert.equal(nodes.shell.querySelectorAll(".generation-loading-drop").length, 0);
+    assert.equal(nodes.shell.querySelectorAll(".generation-loading-wave").length, 0);
     assert.equal(nodes.shell.querySelectorAll(".generation-loading-percent").length, 1);
     assert.equal(nodes.percent.textContent, "0%");
     assert.equal(nodes.shell.getAttribute("aria-valuemin"), "0");
@@ -166,7 +170,7 @@ test("preview loading slows by 1500ms per additional 10 percent band", () => {
   assert.equal(getGenerationLoadingInterval(98), 12800);
 });
 
-test("preview loading exposes the tick duration for a continuous water rise", () => {
+test("preview loading exposes the tick duration for a continuous background color transition", () => {
   const documentRef = createTestDocument();
   const scheduler = installScheduler();
   try {
@@ -248,7 +252,7 @@ test("a re-render without a stage keeps the last known stage", () => {
   }
 });
 
-test("stylesheet derives water color from stage hue and progress depth", async () => {
+test("stylesheet derives blurred background color from stage hue and progress depth", async () => {
   const styles = await readFile(new URL("../public/styles.css", import.meta.url), "utf8");
   assert.match(styles, /@property --generation-loading-hue\s*\{[\s\S]*syntax:\s*"<number>"/);
   assert.match(styles, /@property --generation-loading-sat\s*\{[\s\S]*syntax:\s*"<percentage>"/);
@@ -275,41 +279,32 @@ test("stylesheet derives water color from stage hue and progress depth", async (
       ),
     );
   });
-  assert.match(styles, /\.generation-loading-drop::after\s*\{[\s\S]*var\(--generation-loading-fluid\)/);
-  assert.match(styles, /\.generation-loading-wave\s*\{[\s\S]*var\(--generation-loading-fluid\)/);
-  // 等待态不再自带取色，避免覆盖阶段色相族。
-  assert.doesNotMatch(
-    styles,
-    /\[data-generation-loading-mode="waiting"\] \.generation-loading-wave \{[\s\S]*?background-image:/,
-  );
+  assert.match(styles, /\.generation-loading-shell::before\s*\{[\s\S]*var\(--generation-loading-fluid\)/);
+  assert.doesNotMatch(styles, /generation-loading-(drop|wave|water-bubbles|water-flow|wave-drift)/);
 });
 
-test("loading surface avoids a bright moving divider and keeps status text crisp", async () => {
+test("loading surface keeps only a soft blurred background and crisp status text", async () => {
   const styles = await readFile(new URL("../public/styles.css", import.meta.url), "utf8");
-  const fillRule = styles.match(/\.generation-loading-drop::after\s*\{[\s\S]*?\n\}/)?.[0] || "";
-  const waveRule = styles.match(/\n\.generation-loading-wave \{[\s\S]*?\n\}/)?.[0] || "";
-  const waveAfterRule =
-    styles.match(/\n\.generation-loading-wave::after\s*\{\s*z-index:\s*1;[\s\S]*?\n\}/)?.[0] || "";
+  const backgroundRule = styles.match(/\.generation-loading-shell::before\s*\{[\s\S]*?\n\}/)?.[0] || "";
   const shellRule = styles.match(/\n\.generation-loading-shell\s*\{[\s\S]*?\n\}/)?.[0] || "";
 
-  assert.match(fillRule, /mask-image:\s*linear-gradient\(180deg, transparent 0%, #000 18%, #000 100%\)/);
-  assert.doesNotMatch(fillRule, /inset 0 1px 0 rgba\(255, 255, 255/);
-  assert.match(waveRule, /opacity:\s*0;/);
-  assert.match(waveRule, /animation:\s*none;/);
-  assert.doesNotMatch(waveRule, /#ffffff/);
-  assert.match(waveAfterRule, /animation:\s*none;/);
-  assert.match(shellRule, /font-family:\s*"IBM Plex Sans", "Noto Sans SC", "Microsoft YaHei", sans-serif;/);
+  assert.match(backgroundRule, /linear-gradient/);
+  assert.match(backgroundRule, /filter:\s*blur\(/);
+  assert.match(backgroundRule, /animation:\s*generation-loading-aurora-drift/);
+  assert.doesNotMatch(styles, /generation-loading-(drop|wave|water-bubbles|water-flow|wave-drift)/);
+  assert.match(shellRule, /font-family:\s*var\(--font-ui\);/);
   assert.match(styles, /\.generation-loading-heartbeat\s*\{[\s\S]*stroke-width:\s*2\.25;/);
 });
 
-test("preview loading renders a wave layer inside the water drop", () => {
+test("preview loading does not render legacy water layers", () => {
   const documentRef = createTestDocument();
   const scheduler = installScheduler();
   try {
     const nodes = createGenerationLoadingShell(documentRef, { key: "job-wave", active: true });
-    assert.equal(nodes.shell.querySelectorAll(".generation-loading-wave").length, 1);
-    assert.equal(nodes.wave.parentElement, nodes.drop);
-    assert.equal(nodes.wave.getAttribute("aria-hidden"), "true");
+    assert.equal(nodes.shell.querySelectorAll(".generation-loading-drop").length, 0);
+    assert.equal(nodes.shell.querySelectorAll(".generation-loading-wave").length, 0);
+    assert.equal(Object.hasOwn(nodes, "drop"), false);
+    assert.equal(Object.hasOwn(nodes, "wave"), false);
     stopGenerationLoadingShell(nodes);
   } finally {
     scheduler.restore();
@@ -331,6 +326,43 @@ test("preview and thumbnail loading shells share progress for the same key", () 
     assert.equal(scheduler.pending.size, 1);
     stopGenerationLoadingShell(thumbnail);
     assert.equal(scheduler.pending.size, 0);
+  } finally {
+    scheduler.restore();
+  }
+});
+
+test("rebuilding an active loading shell keeps its current heartbeat icon", () => {
+  const documentRef = createTestDocument();
+  const scheduler = installScheduler();
+  try {
+    const first = createGenerationLoadingShell(documentRef, {
+      key: "job-heartbeat-rebuild",
+      active: true,
+      showLog: true,
+      logText: "正在生成图片",
+    });
+    const initialName = first.heartbeat.name;
+    const parallel = createGenerationLoadingShell(documentRef, {
+      key: "job-heartbeat-rebuild",
+      active: true,
+      showLog: true,
+      logText: "正在生成图片",
+    });
+    assert.equal(parallel.heartbeat.name, initialName);
+
+    const heartbeatName = beatGenerationLoadingHeartbeat(first);
+    assert.notEqual(heartbeatName, initialName);
+    const rebuilt = createGenerationLoadingShell(documentRef, {
+      key: "job-heartbeat-rebuild",
+      active: true,
+      showLog: true,
+      logText: "正在生成图片",
+    });
+    assert.equal(rebuilt.heartbeat.name, heartbeatName);
+
+    stopGenerationLoadingShell(first);
+    stopGenerationLoadingShell(parallel);
+    stopGenerationLoadingShell(rebuilt);
   } finally {
     scheduler.restore();
   }
@@ -369,6 +401,104 @@ test("preview loading resets when the generation key changes and stops cleanly",
   } finally {
     scheduler.restore();
   }
+});
+
+test("a retained loading source resumes after switching away and back", () => {
+  const documentRef = createTestDocument();
+  const scheduler = installScheduler();
+  try {
+    const first = createGenerationLoadingShell(documentRef, {
+      key: "job-retained-a",
+      active: true,
+      showLog: true,
+      logText: "正在生成图片",
+    });
+    assert.equal(scheduler.runNext(), true);
+    assert.equal(scheduler.runNext(), true);
+    const heartbeatName = beatGenerationLoadingHeartbeat(first);
+    assert.equal(getGenerationLoadingProgress(first), 2);
+
+    stopGenerationLoadingShell(first, { retainSource: true });
+    const other = createGenerationLoadingShell(documentRef, {
+      key: "job-retained-b",
+      active: true,
+      mode: "waiting",
+    });
+    assert.equal(getGenerationLoadingProgress(other), 0);
+    assert.equal(other.percent.textContent, "");
+
+    assert.equal(scheduler.runNext(), true);
+    const resumed = createGenerationLoadingShell(documentRef, {
+      key: "job-retained-a",
+      active: true,
+      showLog: true,
+      logText: "正在生成图片",
+    });
+    assert.equal(getGenerationLoadingProgress(resumed), 3);
+    assert.equal(resumed.heartbeat.name, heartbeatName);
+    assert.equal(scheduler.runNext(), true);
+    assert.equal(getGenerationLoadingProgress(resumed), 4);
+
+    assert.equal(releaseGenerationLoadingSource("job-retained-a"), true);
+    assert.equal(resumed.active, false);
+    assert.equal(resumed.source, null);
+    stopGenerationLoadingShell(other);
+    stopGenerationLoadingShell(resumed);
+    const restarted = createGenerationLoadingShell(documentRef, { key: "job-retained-a", active: true });
+    assert.equal(getGenerationLoadingProgress(restarted), 0);
+    stopGenerationLoadingShell(restarted);
+    assert.equal(scheduler.pending.size, 0);
+  } finally {
+    scheduler.restore();
+  }
+});
+
+test("releasing a loading source prefix clears every retained source in that run only", () => {
+  const documentRef = createTestDocument();
+  const scheduler = installScheduler();
+  try {
+    const queueFirst = createGenerationLoadingShell(documentRef, { key: "queue-a::first", active: true });
+    const queueSecond = createGenerationLoadingShell(documentRef, { key: "queue-a::second", active: true });
+    const otherQueue = createGenerationLoadingShell(documentRef, { key: "queue-b::first", active: true });
+
+    assert.equal(scheduler.runNext(), true);
+    assert.equal(scheduler.runNext(), true);
+    assert.equal(scheduler.runNext(), true);
+    assert.equal(getGenerationLoadingProgress(otherQueue), 1);
+    stopGenerationLoadingShell(queueFirst, { retainSource: true });
+    stopGenerationLoadingShell(queueSecond, { retainSource: true });
+    stopGenerationLoadingShell(otherQueue, { retainSource: true });
+    assert.equal(releaseGenerationLoadingSourcesByPrefix("queue-a::"), 2);
+
+    const restartedFirst = createGenerationLoadingShell(documentRef, { key: "queue-a::first", active: true });
+    const resumedOtherQueue = createGenerationLoadingShell(documentRef, { key: "queue-b::first", active: true });
+    assert.equal(getGenerationLoadingProgress(restartedFirst), 0);
+    assert.equal(getGenerationLoadingProgress(resumedOtherQueue), 1);
+
+    stopGenerationLoadingShell(restartedFirst);
+    stopGenerationLoadingShell(resumedOtherQueue);
+    assert.equal(scheduler.pending.size, 0);
+  } finally {
+    scheduler.restore();
+  }
+});
+
+test("logo batch keeps one loading scope while the server replaces its temporary set id", async () => {
+  const app = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
+
+  assert.match(app, /logoBatchLoadingKey:\s*""/);
+  assert.match(
+    app,
+    /state\.creation\.generationScope === "logo-batch" && state\.creation\.logoBatchLoadingKey[\s\S]*?\? state\.creation\.logoBatchLoadingKey/,
+  );
+  assert.match(
+    app,
+    /state\.creation\.logoBatchLoadingKey = `creation-logo-batch-\$\{Date\.now\(\)\}-\$\{Math\.random\(\)\.toString\(36\)\.slice\(2, 8\)\}`;[\s\S]*?renderCreationView\(\);/,
+  );
+  assert.match(
+    app,
+    /releaseCreationLoadingSources\(\{ queueId: state\.creation\.logoBatchLoadingKey \}\);\s*state\.creation\.logoBatchLoadingKey = "";/,
+  );
 });
 
 test("waiting loading shells never schedule a percentage tick", () => {
@@ -438,7 +568,7 @@ test("queue and thumbnail strips separate adjacent same-footprint entries", asyn
   assert.match(styles, /\.creation-queue-item \+ \.creation-queue-item::before\s*\{[\s\S]*background:/);
   assert.match(styles, /\.filmstrip-entry \+ \.filmstrip-entry::before\s*\{[\s\S]*background:/);
   assert.match(styles, /\.generation-loading-shell\[data-generation-loading-mode="waiting"\]/);
-  assert.match(styles, /@keyframes generation-loading-waiting-pulse/);
+  assert.match(styles, /\.generation-loading-shell\[data-generation-loading-mode="waiting"\]::before\s*\{/);
 });
 
 test("preview loading shell reuse is limited to the same active generation", () => {
@@ -453,18 +583,16 @@ test("preview placeholder exposes a stable loading key", () => {
   assert.equal(state.loadingKey, "job-42");
 });
 
-test("app and stylesheet no longer contain the removed multi-layer generation animations", async () => {
+test("app and stylesheet use the shared blurred loading animation without water effects", async () => {
   const [app, styles] = await Promise.all([
     readFile(new URL("../public/app.js", import.meta.url), "utf8"),
     readFile(new URL("../public/styles.css", import.meta.url), "utf8"),
   ]);
   assert.match(app, /createGenerationLoadingShell\(document/);
   assert.doesNotMatch(app, /createPreviewMotionNode|preview-loading-orb-field|quick-blend-thumb-loader/);
-  assert.match(styles, /\.generation-loading-drop\s*\{/);
-  assert.match(styles, /@keyframes generation-loading-breathe/);
-  assert.match(styles, /\.generation-loading-wave\s*\{[\s\S]*bottom:\s*calc\(var\(--generation-loading-progress\)/);
-  assert.match(styles, /@keyframes generation-loading-wave-drift/);
-  assert.match(styles, /@keyframes generation-loading-water-bubbles/);
+  assert.match(styles, /\.generation-loading-shell::before\s*\{/);
+  assert.match(styles, /@keyframes generation-loading-aurora-drift/);
+  assert.doesNotMatch(styles, /generation-loading-(drop|wave|breathe|water-bubbles|water-flow|wave-drift)/);
   assert.match(styles, /@property --generation-loading-progress\s*\{[\s\S]*syntax:\s*"<percentage>"/);
   assert.match(
     styles,

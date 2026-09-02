@@ -187,16 +187,16 @@ function collectTextContent(element) {
   return [element.textContent || "", ...element.children.map((child) => collectTextContent(child))].join("");
 }
 
-test("creation card loading shell uses one shared drop and updates status", () => {
+test("creation card loading shell uses one shared blurred shell and updates status", () => {
   const documentRef = createTestDocument();
   const shell = createCreationCardLoading("queued", documentRef);
-  const drop = shell.querySelector(".generation-loading-drop");
   const percent = shell.querySelector(".generation-loading-percent");
 
   updateCreationCardLoading(shell, "generating");
 
   assert.equal(shell.dataset.creationCardLoadingStatus, "generating");
-  assert.equal(shell.querySelector(".generation-loading-drop"), drop);
+  assert.equal(shell.querySelector(".generation-loading-drop"), null);
+  assert.equal(shell.querySelector(".generation-loading-wave"), null);
   assert.equal(shell.querySelector(".generation-loading-percent"), percent);
   assert.equal(percent.textContent, "0%");
   assert.equal(shell.querySelector(".creation-card-loading-sketch-ring"), null);
@@ -209,12 +209,12 @@ test("creation card loading renderer reuses the host child across rerenders", ()
   const host = documentRef.createElement("div");
 
   const first = renderCreationCardLoading(host, "queued", documentRef);
-  const firstDrop = first.querySelector(".generation-loading-drop");
+  const firstPercent = first.querySelector(".generation-loading-percent");
   const second = renderCreationCardLoading(host, "generating", documentRef);
 
   assert.equal(second, first);
   assert.equal(host.children.length, 1);
-  assert.equal(second.querySelector(".generation-loading-drop"), firstDrop);
+  assert.equal(second.querySelector(".generation-loading-percent"), firstPercent);
   assert.equal(second.dataset.creationCardLoadingStatus, "generating");
   stopCreationCardLoading(second);
 });
@@ -224,7 +224,7 @@ test("creation card loading shell exposes a bounded percentage", () => {
   const shell = createCreationCardLoading("generating", documentRef, { key: "item-3" });
   const percent = shell.querySelector(".generation-loading-percent");
 
-  assert.equal(shell.querySelectorAll(".generation-loading-drop").length, 1);
+  assert.equal(shell.querySelectorAll(".generation-loading-drop").length, 0);
   assert.equal(percent.textContent, "0%");
   assert.equal(shell.getAttribute("aria-valuemin"), "0");
   assert.equal(shell.getAttribute("aria-valuemax"), "99");
@@ -233,14 +233,15 @@ test("creation card loading shell exposes a bounded percentage", () => {
   stopCreationCardLoading(shell);
 });
 
-test("queued and generating creation card loading share the same drop", () => {
+test("queued and generating creation card loading reuse the same shell", () => {
   const documentRef = createTestDocument();
   const shell = createCreationCardLoading("queued", documentRef, { key: "item-4" });
-  const drop = shell.querySelector(".generation-loading-drop");
+  const percent = shell.querySelector(".generation-loading-percent");
 
   assert.equal(shell.dataset.creationCardLoadingStatus, "queued");
   updateCreationCardLoading(shell, "generating", { key: "item-4" });
-  assert.equal(shell.querySelector(".generation-loading-drop"), drop);
+  assert.equal(shell.querySelector(".generation-loading-percent"), percent);
+  assert.equal(shell.querySelector(".generation-loading-drop"), null);
   assert.equal(shell.querySelector(".creation-card-loading-waiting-mark"), null);
   stopCreationCardLoading(shell);
 });
@@ -424,5 +425,47 @@ test("loading card refresh keeps the scoped progress key and its progress", () =
     assert.equal(shell.dataset.generationLoadingKey, "creation-queue-refresh::1-main");
     assert.equal(shell.__generationLoadingNodes.progress, 2);
     stopCreationCardLoading(shell);
+  });
+});
+
+test("switching creation queues restores the previous queue progress without sharing it", () => {
+  withFakeTimers(({ flush }) => {
+    const documentRef = createTestDocument();
+    const card = documentRef.createElement("article");
+    card.className = "creation-card";
+    card.classList = { toggle() {} };
+    const media = documentRef.createElement("div");
+    media.classList = { add() {}, toggle() {} };
+    media.dataset.creationCardMedia = "true";
+    const first = createCreationCardLoading("generating", documentRef, {
+      key: getCreationCardLoadingKey({ itemId: "1-main" }, 0, "creation-queue-a"),
+    });
+    media.appendChild(first);
+    card.append(media);
+
+    flush(2);
+    assert.equal(first.__generationLoadingNodes.progress, 2);
+
+    syncCreationLoadingCard(card, { itemId: "1-main", status: "queued" }, 0, {
+      keyScope: "creation-queue-b",
+      shouldShowLoading: () => true,
+    });
+    const queued = media.querySelector(".creation-card-loading");
+    assert.notEqual(queued, first);
+    assert.equal(queued.__generationLoadingNodes.progress, 0);
+    assert.equal(queued.querySelector(".generation-loading-percent").textContent, "");
+
+    flush();
+    syncCreationLoadingCard(card, { itemId: "1-main", status: "generating" }, 0, {
+      keyScope: "creation-queue-a",
+      shouldShowLoading: () => true,
+    });
+    const restored = media.querySelector(".creation-card-loading");
+    assert.equal(restored.__generationLoadingNodes.progress, 3);
+    assert.equal(restored.querySelector(".generation-loading-percent").textContent, "3%");
+
+    flush();
+    assert.equal(restored.__generationLoadingNodes.progress, 4);
+    stopCreationCardLoading(restored);
   });
 });

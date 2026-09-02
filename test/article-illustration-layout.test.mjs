@@ -107,7 +107,7 @@ test("article illustration mode has independent create and assets entries", asyn
   assert.match(app, /refs\.articleIllustrationReferenceList\.addEventListener\("click", handleArticleIllustrationCardClick\)/);
   assert.match(app, /refs\.articleIllustrationStoryboardList\.addEventListener\("click", handleArticleIllustrationCardClick\)/);
   assert.match(app, /refs\.articleIllustrationReferenceList,\s*[\r\n]+\s*refs\.articleIllustrationStoryboardList/);
-  assert.match(app, /referenceItems\.forEach\(\(item\) => \{[\s\S]*createArticleStoryboardCard\(item\)/);
+  assert.match(app, /const referenceCards = referenceItems\.map\(\(item\) => createArticleStoryboardCard\(item\)\)/);
   assert.match(app, /article-record-sections/);
   assert.match(app, /appendRecordSection\(referenceItems/);
   assert.match(app, /appendRecordSection\(storyboardItems/);

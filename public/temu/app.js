@@ -1,6 +1,7 @@
 import {
   OPTIONS,
   VARIANT_ATTRIBUTE_OPTIONS,
+  addSkuVariant,
   availableVariantAttributeOptions,
   applySkuBulkFields,
   createDefaultDraft,
@@ -9,6 +10,7 @@ import {
   normalizeAsset,
   normalizeDraft,
   reorderCarouselAsset,
+  skuKey,
   splitOrigin,
   splitLines,
   truncateProductDescription,
@@ -559,6 +561,54 @@ function renderApplyShippingToAllButton() {
   button.setAttribute("aria-label", button.title);
 }
 
+function renderAddSkuVariantButton() {
+  const button = document.querySelector("#addSkuVariantButton");
+  if (!button) return;
+  const interactionDisabled = exportPending || studioImportPending;
+  button.disabled = interactionDisabled;
+  button.title = interactionDisabled
+    ? "导出或 Studio 导入期间无法新增变种"
+    : "新增变种";
+  button.setAttribute("aria-label", button.title);
+}
+
+function nextSkuVariantValue() {
+  const values = new Set(draft.skus.map((sku) => String(sku.variant1Value || "").trim()).filter(Boolean));
+  const base = "新变种";
+  let candidate = base;
+  let suffix = 2;
+  while (values.has(candidate)) candidate = `${base} ${suffix++}`;
+  return candidate;
+}
+
+function addSkuVariantRow() {
+  if (exportPending || studioImportPending) return;
+  const variant1Value = nextSkuVariantValue();
+  const variant2Value = draft.variants.name2
+    ? String(draft.skus.find((sku) => String(sku.variant2Value || "").trim())?.variant2Value || "新变种").trim()
+    : "";
+  const result = addSkuVariant(draft, variant1Value, variant2Value);
+  if (!result.added) {
+    const reasonMessage = {
+      missing_variant1: "请填写第一变种值",
+      missing_variant2: "请填写第二变种值",
+      duplicate: "该变种组合已存在",
+    }[result.reason] || "新增变种失败";
+    showToast(reasonMessage, "error");
+    renderAddSkuVariantButton();
+    return;
+  }
+  draft = result.draft;
+  scheduleSave();
+  renderDynamic();
+  const addedIndex = draft.skus.length - 1;
+  requestAnimationFrame(() => {
+    const input = document.querySelector(`[data-sku-variant-value="variant1Value"][data-sku-index="${addedIndex}"]`);
+    if (input) startSkuVariantValueEdit(input);
+  });
+  showToast("已新增变种，请修改变种值");
+}
+
 function applyShippingToAllProducts() {
   if (exportPending || studioImportPending) return;
   const productCount = workbench.items.length;
@@ -646,9 +696,17 @@ function comboLabel(sku) {
   return [first, second].filter(Boolean).join(" / ");
 }
 
+function skuVariantCombinationKey(sku, field, value) {
+  const value1 = field === "variant1Value" ? value : sku.variant1Value;
+  const value2 = draft.variants.name2
+    ? field === "variant2Value" ? value : sku.variant2Value
+    : "";
+  return skuKey(value1, value2);
+}
+
 function skuVariantValueMarkup(sku, index, field, name) {
   const value = sku[field] || "";
-  return `<input class="sku-variant-value" data-sku-variant-value="${field}" data-sku-index="${index}" value="${escapeHtml(value)}" readonly aria-label="${escapeHtml(name)}变种值" title="双击编辑变种值">`;
+  return `<input class="sku-variant-value" data-sku-variant-value="${field}" data-sku-index="${index}" value="${escapeHtml(value)}" readonly aria-label="${escapeHtml(name)}变种值" title="点击编辑变种值">`;
 }
 
 function skuVariantAttributeOptionsMarkup(attributes, placeholder = "") {
@@ -1496,6 +1554,7 @@ function renderDescription() {
 
 function renderValidation() {
   renderApplyShippingToAllButton();
+  renderAddSkuVariantButton();
   const validationOptions = { freightTemplates: currentFreightTemplates() };
   const result = validateDraft(draft, validationOptions);
   const selectedItems = selectedProductItems(workbench);
@@ -2375,6 +2434,17 @@ function commitSkuVariantValueEdit(input) {
     return;
   }
 
+  const candidateKey = skuVariantCombinationKey(current, field, value);
+  const duplicateIndex = draft.skus.findIndex((sku, skuIndex) => (
+    skuIndex !== index && skuVariantCombinationKey(sku) === candidateKey
+  ));
+  if (duplicateIndex !== -1) {
+    input.value = current[field] || "";
+    showToast(`该变种组合已存在（第 ${duplicateIndex + 1} 行）`, "error");
+    renderValidation();
+    return;
+  }
+
   draft = updateSkuVariantValue(draft, index, field, value);
   input.value = value;
   scheduleSave();
@@ -2447,6 +2517,12 @@ document.addEventListener("dragend", handleCarouselAddDragEnd);
 document.addEventListener("dblclick", (event) => {
   const input = event.target.closest("[data-sku-variant-value]");
   if (!input) return;
+  event.preventDefault();
+  startSkuVariantValueEdit(input);
+});
+document.addEventListener("click", (event) => {
+  const input = event.target.closest("[data-sku-variant-value]");
+  if (!input || !input.readOnly) return;
   event.preventDefault();
   startSkuVariantValueEdit(input);
 });
@@ -2677,6 +2753,7 @@ window.addEventListener("scroll", closeSkuImageSourceMenu, { passive: true, capt
 window.addEventListener("resize", closeSkuImageSourceMenu);
 
 document.querySelector("#applySkuBulkButton").addEventListener("click", applySkuBulkInputs);
+document.querySelector("#addSkuVariantButton").addEventListener("click", addSkuVariantRow);
 document.querySelector("#applyShippingToAllButton").addEventListener("click", applyShippingToAllProducts);
 document.querySelector("#addFreightTemplateButton").addEventListener("click", openFreightTemplateCreator);
 document.querySelector("#addProductButton").addEventListener("click", addProduct);

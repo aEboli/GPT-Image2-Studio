@@ -9,11 +9,15 @@ $resolvedRoot = [System.IO.Path]::GetFullPath($Root)
 # variable turn a normal desktop launch into a white 1x1 image producer.
 Remove-Item Env:IMAGE_STUDIO_MOCK_IMAGE_GENERATION -ErrorAction SilentlyContinue
 
-function Get-StudioPortListener {
-  param([int]$TargetPort)
+function Get-ListeningLocalPorts {
+  $ports = [System.Collections.Generic.HashSet[int]]::new()
+  $listeners = [System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners()
 
-  Get-NetTCPConnection -LocalPort $TargetPort -State Listen -ErrorAction SilentlyContinue |
-    Select-Object -First 1
+  foreach ($listener in $listeners) {
+    [void]$ports.Add([int]$listener.Port)
+  }
+
+  Write-Output -NoEnumerate $ports
 }
 
 function Test-StudioServer {
@@ -28,11 +32,13 @@ function Test-StudioServer {
 }
 
 function Find-StudioPort {
-  param([int]$StartPort)
+  param(
+    [int]$StartPort,
+    [System.Collections.Generic.HashSet[int]]$ListeningPorts
+  )
 
   for ($targetPort = $StartPort; $targetPort -lt ($StartPort + 50); $targetPort++) {
-    $listener = Get-StudioPortListener -TargetPort $targetPort
-    if (-not $listener) {
+    if (-not $ListeningPorts.Contains($targetPort)) {
       return $targetPort
     }
 
@@ -44,17 +50,17 @@ function Find-StudioPort {
   throw "No available studio port found near $StartPort."
 }
 
-$targetPort = Find-StudioPort -StartPort $Port
-$listener = Get-StudioPortListener -TargetPort $targetPort
+$listeningPorts = Get-ListeningLocalPorts
+$targetPort = Find-StudioPort -StartPort $Port -ListeningPorts $listeningPorts
+$targetPortInUse = $listeningPorts.Contains($targetPort)
 
-if (-not $listener) {
+if (-not $targetPortInUse) {
   $command = "set IMAGE_STUDIO_MOCK_IMAGE_GENERATION=&& set PORT=$targetPort&& node server.mjs"
   Start-Process -FilePath "cmd.exe" -WorkingDirectory $resolvedRoot -ArgumentList "/k", $command | Out-Null
 
   $deadline = (Get-Date).AddSeconds(20)
   do {
     Start-Sleep -Milliseconds 500
-    $listener = Get-StudioPortListener -TargetPort $targetPort
   } until ((Test-StudioServer -TargetPort $targetPort) -or (Get-Date) -gt $deadline)
 }
 

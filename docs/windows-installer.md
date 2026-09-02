@@ -1,6 +1,6 @@
 # Windows 安装包说明
 
-`GPT-Image2-Studio-Setup-v0.2.10.exe` 是 Windows 自解压安装包，由系统自带 `iexpress.exe` 生成。由于 IExpress 构建持续报错，`v0.2.10` GitHub Release 不附带这个兼容包；当前发布请使用 [Windows 桌面程序](./windows-desktop.md) 的 NSIS 安装包或免安装 ZIP。
+`GPT-Image2-Studio-Setup-v0.2.11.exe` 是 Windows 自解压安装包，由系统自带 `iexpress.exe` 生成。由于 IExpress 构建持续报错，`v0.2.11` GitHub Release 不附带这个兼容包；当前发布请使用 [Windows 桌面程序](./windows-desktop.md) 的 NSIS 安装包或免安装 ZIP。
 
 这个兼容安装包启动后会在默认浏览器中打开工作台。需要独立窗口、任务栏身份和标准 NSIS 卸载体验时，请使用 [Windows 桌面程序](./windows-desktop.md)。
 

@@ -944,6 +944,7 @@ test("creation suite queue selection switches a queue-backed current set", () =>
 
 test("creation suite queue keeps the selected panel during another job lifecycle", async () => {
   async function runCase({ fetchImpl, runCreationStream } = {}) {
+    const finished = [];
     const selectedSet = { setId: "set-b", productName: "B", items: [] };
     const activeJob = {
       id: "queue-a",
@@ -975,24 +976,27 @@ test("creation suite queue keeps the selected panel during another job lifecycle
       loadCreationSets: async () => {},
       normalizeSet,
       nowIso: () => "2026-07-12T08:00:00.000Z",
+      onFinished: (job) => finished.push({ id: job.id, status: job.status }),
       render: () => {},
       runCreationStream: streamRunner,
       setFeedback: () => {},
       showError: () => {},
     });
-    return { activeJob, creationState };
+    return { activeJob, creationState, finished };
   }
 
   const started = await runCase({
     fetchImpl: async () => ({ ok: true, body: {} }),
   });
   assert.equal(started.creationState.currentSet.setId, "set-b");
+  assert.deepEqual(started.finished, [{ id: "queue-a", status: "completed" }]);
 
   const completed = await runCase({
     fetchImpl: async () => ({ ok: true, body: {} }),
   });
   assert.equal(completed.activeJob.status, "completed");
   assert.equal(completed.creationState.currentSet.setId, "set-b");
+  assert.deepEqual(completed.finished, [{ id: "queue-a", status: "completed" }]);
 
   const failed = await runCase({
     fetchImpl: async () => {
@@ -1001,6 +1005,7 @@ test("creation suite queue keeps the selected panel during another job lifecycle
   });
   assert.equal(failed.activeJob.status, "failed");
   assert.equal(failed.creationState.currentSet.setId, "set-b");
+  assert.deepEqual(failed.finished, [{ id: "queue-a", status: "failed" }]);
 });
 
 test("creation suite queue does not convert an SSE error into completion", async () => {

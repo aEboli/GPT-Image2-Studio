@@ -5,13 +5,13 @@ TBD - created by archiving change unify-generation-loading-animation. Update Pur
 ## Requirements
 ### Requirement: Unified generation loading indicator
 
-所有图片生成入口在没有完整结果时 SHALL 使用同一加载组件，组件 SHALL 只显示一个铺满图片占位框的动画层、百分比和可选的生成状态标签。
+所有图片生成入口在没有完整结果时 SHALL 使用同一加载组件，组件 SHALL 只显示一个铺满图片占位框的动态模糊背景、百分比和可选的生成状态标签。动态背景 SHALL NOT 绘制液位、波面、气泡、水流或其他以填充高度表达进度的图层。
 
 #### Scenario: Prompt generation is running
 
 - **WHEN** 提示词生图或风格迁移任务处于运行状态且没有完整图片
-- **THEN** 预览区域显示一个 `.generation-loading-drop` 和一个百分比文本
-- **AND** 不显示旧的 orb、环形 spinner、扫描线或步骤条；液面只作为动画层内部的单一底部填充层，并不恢复旧的多节点 fluid 动画
+- **THEN** 预览区域显示一个 `.generation-loading-shell`、动态模糊背景和一个百分比文本
+- **AND** 不显示旧的 orb、环形 spinner、扫描线、步骤条、液位、波面或气泡
 
 #### Scenario: Specialized generation is running
 
@@ -21,12 +21,12 @@ TBD - created by archiving change unify-generation-loading-animation. Update Pur
 
 ### Requirement: Loading animation fills its host image slot
 
-加载动画 SHALL 铺满承载它的图片占位框，尺寸 SHALL 由宿主决定而不是由动画自身写死：大生图板块 SHALL 得到大动画，逐项占位 SHALL 各自得到刚好填满自己占位的小动画。水纹与气泡尺度 SHALL 随宿主尺寸成比例换算。百分比、状态标签与实时日志 SHALL 保持居中且 SHALL NOT 随宿主尺寸改变自身排版。
+加载动画 SHALL 铺满承载它的图片占位框，尺寸 SHALL 由宿主决定而不是由动画自身写死：大生图板块 SHALL 得到大动画，逐项占位 SHALL 各自得到刚好填满自己占位的小动画。动态模糊背景 SHALL 在不同宿主中保持软边且不露出宿主底色。百分比、状态标签与实时日志 SHALL 保持居中且 SHALL NOT 随宿主尺寸改变自身排版。
 
 #### Scenario: Large preview panel gets a large animation
 
 - **WHEN** 提示词模式主预览处于生成中
-- **THEN** 动画层铺满整个图片画布，四边与占位框对齐且无留边
+- **THEN** 动画背景铺满整个图片画布，四边与占位框对齐且无留边
 - **AND** 画布在生成期间不因内边距把动画缩进一圈
 
 #### Scenario: Per-item placeholders each fill their own slot
@@ -38,34 +38,33 @@ TBD - created by archiving change unify-generation-loading-animation. Update Pur
 #### Scenario: Water detail scales with the host
 
 - **WHEN** 同一动画分别渲染在大预览板块与胶片条缩略图中
-- **THEN** 波高、涟漪与气泡尺度按宿主尺寸成比例缩放，而不是两处使用同一绝对厚度
+- **THEN** 模糊背景覆盖整个宿主且没有可辨认的水纹、气泡或平铺图案
 
 #### Scenario: Centered text stays unchanged
 
 - **WHEN** 动画从小占位切换到大板块
 - **THEN** 百分比、状态标签与日志仍居中显示且字号排版不变
-- **AND** 文字层压在动画层之上并保持可读对比度
+- **AND** 文字层压在动画背景之上并保持可读对比度
 
 #### Scenario: Text and icon stay legible over the coloured fill
 
-- **WHEN** 水位涨到文字与图标的正后方
+- **WHEN** 动态模糊背景位于文字与图标正后方
 - **THEN** 百分比、状态标签、日志与心跳图标相对其正后方底色的对比度不低于 4.5:1
-- **AND** 深色与浅色主题各自处理，SHALL NOT 沿用会糊进水体的 `--muted` 级灰度
+- **AND** 深色与浅色主题各自处理，SHALL NOT 沿用会糊进背景的 `--muted` 级灰度
 
 ### Requirement: Heartbeat is shown as a morphing icon
 
-上游心跳 SHALL 以一个变形图标呈现：每收到一次 heartbeat，图标 SHALL 变形切换一次，一次切换即代表一次心跳唤起。
-图标池 SHALL 为 20 个同描边风格的图标（含星、月、日、心），切换 SHALL 随机且 SHALL NOT 连续两次选中同一图标——
-连选同一个会让界面看不出变化，那一次心跳就无从感知。图标 SHALL 只由心跳事件驱动，SHALL NOT 自带轮换定时器。
-图标 SHALL 只出现在能显示状态文本的宿主中，等待态 SHALL NOT 显示。
-图标 SHALL 取代心跳文本本身，且该取代 SHALL 覆盖全部展示位：加载组件日志行、生成日志时间线的明细行、
-以及各板块的反馈条，SHALL NOT 再打印心跳文本，因为图标已经表达了同一件事。
-生成日志时间线 SHALL 保留该行的摘要与该行本身（任务仍需看得出在运行），只清除重复的心跳明细。
-反馈条 SHALL NOT 被心跳文本覆盖，以免每 15 秒把真正带信息的阶段文本顶掉。
-其余状态文本（`正在生成图片`、`正在保存到本地图片目录` 等）SHALL 照旧显示。
+生成加载壳创建时 SHALL 从 20 个同描边风格的图标池（含星、月、日、心）中随机选择一个初始图标。相同 `loadingKey` 的重复渲染 SHALL 保留该初始图标；新建的加载壳 SHALL 重新随机选择。上游心跳 SHALL 以图标变形呈现：每收到一次 heartbeat，图标 SHALL 随机变形切换一次且 SHALL NOT 连续两次选中同一图标。图标 SHALL NOT 自带轮换定时器。
 
-批量板块（套图、写真等）的每一项 SHALL 各自拥有加载壳，收到心跳的那一项 SHALL 变形自己的图标，
-同批次的其它项 SHALL NOT 被带动——否则无法分辨是哪一项还活着。
+图标 SHALL 只出现在能显示状态文本的宿主中，等待态 SHALL NOT 显示。图标 SHALL 取代心跳文本本身，且该取代 SHALL 覆盖全部展示位：加载组件日志行、生成日志时间线的明细行、以及各板块的反馈条，SHALL NOT 再打印心跳文本，因为图标已经表达了同一件事。生成日志时间线 SHALL 保留该行的摘要与该行本身（任务仍需看得出在运行），只清除重复的心跳明细。反馈条 SHALL NOT 被心跳文本覆盖，以免每 15 秒把真正带信息的阶段文本顶掉。其余状态文本（`正在生成图片`、`正在保存到本地图片目录` 等）SHALL 照旧显示。
+
+批量板块（套图、写真等）的每一项 SHALL 各自拥有加载壳，收到心跳的那一项 SHALL 变形自己的图标，同批次的其它项 SHALL NOT 被带动——否则无法分辨是哪一项还活着。
+
+#### Scenario: A new generation starts with a random icon
+
+- **WHEN** 创建一个新的生成加载壳且未指定固定图标索引
+- **THEN** 初始图标从完整图标池随机选择，而不是固定显示星形
+- **AND** 重复渲染同一 `loadingKey` 不重新随机选择
 
 #### Scenario: Each heartbeat switches the icon
 
@@ -139,33 +138,6 @@ TBD - created by archiving change unify-generation-loading-animation. Update Pur
 - **THEN** 显示变为 99%
 - **AND** 不再安排后续百分比 tick
 
-### Requirement: Liquid water appearance
-
-动画层内部 SHALL 表现为像水龙头放水一样持续上涨的水体：液位 SHALL 在两次百分比更新之间连续上升而不是逐格跳变，
-液面 SHALL 是一条柔和的液面高光，SHALL NOT 由平铺的半圆阵列构成，也 SHALL NOT 做横向漂移或整体左右摇摆——
-平铺图案会给视线一排可对齐的参照物，使连续上升被读成逐格跳变。液体内部 SHALL 有上升气泡与自下而上流过的柔光，
-使高百分比区间液位几乎不动时画面仍有自然的向上流动感。低动态偏好下 SHALL 停用这些动画并保留可读的液位与百分比。
-
-#### Scenario: Water surface stays smooth and level
-
-- **WHEN** 生图任务处于运行状态
-- **THEN** 动画层内出现一个位于液面的 `.generation-loading-wave` 层，表现为一条柔和的高光带
-- **AND** 液面不出现半圆阵列，也不做横向位移或旋转
-- **AND** 液体区域出现持续上升的气泡与自下而上的柔光
-
-#### Scenario: Water level rises continuously
-
-- **WHEN** 估算百分比从 `n%` 更新到 `n+1%`
-- **THEN** 液面在本次 tick 间隔内线性上升到新液位，期间不出现静止后突然跳变
-- **AND** 单次过渡时长等于到下一次 tick 的时间，液位因此始终在移动
-- **AND** 液面高光与液体同步上升
-
-#### Scenario: Reduced motion is preferred
-
-- **WHEN** 用户开启 `prefers-reduced-motion: reduce`
-- **THEN** 呼吸、光雾漂移、液面呼吸、水体柔光与气泡动画全部停用
-- **AND** 液位高度与百分比文本仍随进度更新
-
 ### Requirement: Queued tasks wait instead of showing progress
 
 尚未开始生成的排队任务 SHALL 使用等待态加载动画，SHALL NOT 显示或推进百分比，也 SHALL NOT 安排百分比 tick。任务真正开始生成时 SHALL 切换为生成态并从 `0%` 起算。
@@ -221,69 +193,48 @@ TBD - created by archiving change unify-generation-loading-animation. Update Pur
 
 ### Requirement: Stable shell reuse by generation key
 
-同一生图任务在重复渲染时 SHALL 复用现有加载 DOM 和当前百分比；当 `loadingKey` 改变时 SHALL 清理旧任务并重置到 `0%`。
+同一生图任务在重复渲染时 SHALL 复用现有加载 DOM、当前百分比和初始随机图标。任务仅因用户切换界面、预览项或队列而暂时没有挂载壳时，系统 SHALL 按其稳定 `loadingKey` 保留逻辑进度源；重新挂载同一仍在运行的 key 时 SHALL 恢复百分比、进度时序和当前心跳图标。切到不同任务时，新任务 SHALL 从 `0%` 开始，且 SHALL NOT 继承旧任务的进度。任务完成、失败、取消或被真正替换时 SHALL 清理其进度源；同 key 的下一次独立任务 SHALL 从 `0%` 开始。
 
 #### Scenario: Re-render the same task
 
 - **WHEN** 同一 `loadingKey` 的状态因轮询或 SSE 更新而重新渲染
-- **THEN** `.generation-loading-drop` 节点引用保持不变
+- **THEN** `.generation-loading-shell` 节点与其当前图标引用保持不变
 - **AND** 百分比不会因为重渲染回到 0
+
+#### Scenario: Return to a temporarily unfocused running task
+
+- **WHEN** 正在运行的队列 A 在显示到某个百分比后，用户切换到界面或队列 B，随后返回 A
+- **THEN** A 的新加载壳恢复离开前的百分比和当前心跳图标
+- **AND** A 在未显示期间按既定时序继续推进，直到 99%
+- **AND** B 从 0% 开始且不继承 A 的状态
 
 #### Scenario: Switch to another task
 
 - **WHEN** loading 状态切换到不同的 `loadingKey`
-- **THEN** 旧 timer 被清理
-- **AND** 新任务从 0% 创建或更新
+- **THEN** 新任务从 0% 创建或更新，并随机选择自己的初始图标
+- **AND** 旧任务仅在仍运行且只是暂时失焦时保留其逻辑进度源
 
-### Requirement: Stage-based water color
+#### Scenario: Task reaches a terminal state
 
-加载组件 SHALL 按当前阶段区分水体颜色，阶段 SHALL 由模式和百分比推导：排队等待为 `waiting`，`0%–20%` 为 `warmup`，`21%–50%` 为 `drafting`，`51%–80%` 为 `rendering`，`81%–99%` 为 `finishing`。组件 SHALL 在 DOM 上暴露 `data-generation-loading-stage`，水体的液体填充、波峰、涟漪与环境光雾 SHALL 由同一个阶段颜色变量取色。颜色 SHALL 只表达阶段，SHALL NOT 改变百分比时序、`99%` 上限或等待态语义。
-
-#### Scenario: Stage advances with the percentage bands
-
-- **WHEN** 生成态百分比依次经过 `20%`、`21%`、`50%`、`51%`、`80%`、`81%`
-- **THEN** `data-generation-loading-stage` 依次为 `warmup`、`drafting`、`drafting`、`rendering`、`rendering`、`finishing`
-- **AND** 水体填充、波峰与涟漪同时切换到该阶段的颜色
-
-#### Scenario: Queued task keeps the waiting color
-
-- **WHEN** 加载组件处于等待态
-- **THEN** `data-generation-loading-stage` 为 `waiting` 且与百分比无关
-- **AND** 水体使用灰调而不是任一生成阶段配色
-
-#### Scenario: Stage color changes smoothly
-
-- **WHEN** 阶段从一段切换到下一段
-- **THEN** 水体颜色在过渡时长内平滑插值而不是硬切
-- **AND** 液位上升时序与百分比文本不受影响
-
-#### Scenario: Light theme keeps contrast
-
-- **WHEN** 界面处于浅色主题
-- **THEN** 各阶段使用同色系的深色版本
-- **AND** 水体与浅色背景保持可辨识的对比度
-
-#### Scenario: Reduced motion keeps stage colors
-
-- **WHEN** 用户开启 `prefers-reduced-motion: reduce`
-- **THEN** 波峰流动、气泡与呼吸动画仍然停用
-- **AND** 当前阶段颜色与液位高度仍然按进度呈现
+- **WHEN** 任务完成、失败、取消或被真正替换
+- **THEN** 该任务的 timer 和共享进度源被清理
+- **AND** 之后以同一 `loadingKey` 创建的独立任务从 0% 开始
 
 ### Requirement: Stage hue and progress depth
 
-加载组件 SHALL 用两个维度合成水体颜色：色相 SHALL 由真实请求阶段决定，深浅 SHALL 由当前百分比决定。色相族 SHALL 取自既有 `statusStage`，SHALL NOT 引入不对应真实阶段的自造阶段名。组件 SHALL 暴露 `data-generation-loading-stage` 与 `data-generation-loading-family`，水体的液体填充、波峰、涟漪与环境光雾 SHALL 由同一个合成颜色取色。颜色 SHALL NOT 改变百分比时序、`99%` 上限或等待态语义。
+加载组件 SHALL 用两个维度合成动态模糊背景颜色：色相 SHALL 由真实请求阶段决定，深浅 SHALL 由当前百分比决定。色相族 SHALL 取自既有 `statusStage`，SHALL NOT 引入不对应真实阶段的自造阶段名。组件 SHALL 暴露 `data-generation-loading-stage` 与 `data-generation-loading-family`，动态模糊背景和中心可读性遮罩 SHALL 由同一个合成颜色取色。颜色 SHALL NOT 改变百分比时序、`99%` 上限或等待态语义。
 
 #### Scenario: Hue follows the real request stage
 
 - **WHEN** 任务的 `statusStage` 依次为 `queued`、`uploading`、`connecting`、`generating`、`saving`
 - **THEN** `data-generation-loading-family` 依次为 `queued`、`uploading`、`connecting`、`generating`、`saving`
-- **AND** 水体色相随之改变，且与界面上显示的阶段文字同源
+- **AND** 动态模糊背景的色相随之改变，且与界面上显示的阶段文字同源
 
 #### Scenario: Fetch and retry stages share one family
 
 - **WHEN** `statusStage` 为 `waiting_upstream`、`waiting_final`、`retrying_upstream`、`missing_final_recovery`、`fallback_final_image`、`recovering_original`、`waiting_original` 或 `recovery_unavailable`
 - **THEN** `data-generation-loading-family` 为 `recovering`
-- **AND** 水体使用区别于生成阶段的告知性色相
+- **AND** 背景使用区别于生成阶段的告知性色相
 
 #### Scenario: Failure stages use the failure family
 
@@ -293,8 +244,8 @@ TBD - created by archiving change unify-generation-loading-animation. Update Pur
 #### Scenario: Depth deepens with the percentage
 
 - **WHEN** 同一阶段内百分比从低位升到高位
-- **THEN** 水体颜色在该色相族内变深
-- **AND** 长阶段内部也能看出推进
+- **THEN** 动态模糊背景颜色在该色相族内平滑变化
+- **AND** 长阶段内部也能看出推进，但不出现液位或填充高度
 
 #### Scenario: Missing stage keeps the last known stage
 
@@ -312,24 +263,52 @@ TBD - created by archiving change unify-generation-loading-animation. Update Pur
 
 - **WHEN** 阶段从一段切换到下一段
 - **THEN** 色相与饱和度在过渡时长内平滑插值而不是硬切
-- **AND** 液位上升时序与百分比文本不受影响
+- **AND** 百分比文本不受影响
 
 #### Scenario: Families keep a comparable perceived brightness
 
-- **WHEN** 逐个查看七个色相族在同一百分比下的水体颜色
+- **WHEN** 逐个查看七个色相族在同一百分比下的动态模糊背景
 - **THEN** 各族的感知亮度接近，没有哪个阶段明显更刺眼或更发闷
 - **AND** 青与绿这类本身偏亮的色相起始亮度低于紫与红这类偏暗的色相
 
 #### Scenario: Light theme keeps contrast
 
 - **WHEN** 界面处于浅色主题
-- **THEN** 水体整体亮度低于深色主题下的同族颜色
-- **AND** 水体与浅色背景保持可辨识的对比度
+- **THEN** 背景整体亮度低于深色主题下的同族颜色
+- **AND** 背景与浅色界面保持可辨识的对比度
 - **AND** 主题以亮度偏移方式调整，各族按感知亮度做的校准在浅色主题下同样生效
 
 #### Scenario: Reduced motion keeps stage colors
 
 - **WHEN** 用户开启 `prefers-reduced-motion: reduce`
-- **THEN** 波峰流动、气泡与呼吸动画仍然停用
-- **AND** 当前阶段色相与按百分比的深浅仍然呈现
+- **THEN** 动态模糊背景的位移、缩放和呼吸动画停用
+- **AND** 当前阶段颜色与百分比仍然按进度呈现
+
+### Requirement: Animated blurred loading background
+
+生成中的加载壳 SHALL 以一个铺满宿主的动态模糊背景表达运行状态。背景 SHALL 使用连续、低干扰的柔和光带或等效软边效果；它 SHALL NOT 呈现液位、波面、气泡、水流、可辨认的平铺图案或按百分比改变填充高度的动画。运行态背景 SHALL 有缓慢、平滑的位移或透明度变化，且 SHALL NOT 遮挡中心百分比、状态文本、实时日志或心跳图标。等待态 SHALL 使用同类但更弱、更慢的背景。
+
+#### Scenario: Running generation has only the blurred dynamic
+
+- **WHEN** 任一共享加载壳处于生成态
+- **THEN** 用户只看到动态模糊背景、中心进度和状态内容
+- **AND** DOM 和样式均不绘制液位、波面、气泡或水流动画
+
+#### Scenario: The blurred background moves smoothly
+
+- **WHEN** 生成任务持续运行
+- **THEN** 背景以缓慢连续的方式变化，不出现快速跳动或明显的重复图案
+- **AND** 背景色相在阶段或进度更新时平滑过渡
+
+#### Scenario: Waiting background remains subdued
+
+- **WHEN** 加载壳处于等待态
+- **THEN** 背景保持可见但比生成态更弱、更慢
+- **AND** 不显示或推进百分比
+
+#### Scenario: Reduced motion freezes only the visual movement
+
+- **WHEN** 用户开启 `prefers-reduced-motion: reduce`
+- **THEN** 动态模糊背景不再播放位移、缩放、透明度或呼吸动画
+- **AND** 百分比、阶段颜色、状态文本与可访问性语义照旧更新
 

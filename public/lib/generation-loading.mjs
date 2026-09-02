@@ -129,7 +129,11 @@ export function beatGenerationLoadingHeartbeat(nodes) {
   if (!nodes?.heartbeat || nodes.heartbeat.svg?.hidden) {
     return "";
   }
-  return beatHeartbeatMorphIcon(nodes.heartbeat);
+  const name = beatHeartbeatMorphIcon(nodes.heartbeat);
+  if (name && nodes.source && Number.isInteger(nodes.heartbeat.index)) {
+    nodes.source.heartbeatIndex = nodes.heartbeat.index;
+  }
+  return name;
 }
 
 export function getGenerationLoadingHeartbeatIcon(nodes) {
@@ -176,6 +180,7 @@ function getSharedLoadingSource(key) {
     source = {
       key: normalizedKey,
       progress: 0,
+      heartbeatIndex: null,
       nodes: new Set(),
       timer: null,
     };
@@ -184,7 +189,49 @@ function getSharedLoadingSource(key) {
   return source;
 }
 
-function detachSharedLoadingNode(nodes) {
+function releaseSharedLoadingSource(source) {
+  if (!source || sharedLoadingSources.get(source.key) !== source) {
+    return false;
+  }
+
+  if (source.timer !== null) {
+    globalThis.clearTimeout?.(source.timer);
+    source.timer = null;
+  }
+  source.nodes.forEach((nodes) => {
+    if (nodes.source === source) {
+      nodes.source = null;
+      nodes.timer = null;
+      nodes.active = false;
+      destroyHeartbeatMorphIcon(nodes.heartbeat);
+    }
+  });
+  source.nodes.clear();
+  sharedLoadingSources.delete(source.key);
+  return true;
+}
+
+/* 队列切走时可临时保留进度源；真正终态必须显式释放，防止下一轮同 key 误继承。 */
+export function releaseGenerationLoadingSource(key = "") {
+  return releaseSharedLoadingSource(sharedLoadingSources.get(String(key || "")));
+}
+
+export function releaseGenerationLoadingSourcesByPrefix(prefix = "") {
+  const normalizedPrefix = String(prefix || "");
+  if (!normalizedPrefix) {
+    return 0;
+  }
+
+  let releasedCount = 0;
+  [...sharedLoadingSources.entries()].forEach(([key, source]) => {
+    if (key.startsWith(normalizedPrefix) && releaseSharedLoadingSource(source)) {
+      releasedCount += 1;
+    }
+  });
+  return releasedCount;
+}
+
+function detachSharedLoadingNode(nodes, { retainSource = false } = {}) {
   const source = nodes?.source;
   if (!source) {
     return;
@@ -194,11 +241,11 @@ function detachSharedLoadingNode(nodes) {
   nodes.source = null;
   nodes.timer = null;
   if (source.nodes.size === 0) {
-    if (source.timer !== null) {
-      globalThis.clearTimeout?.(source.timer);
-      source.timer = null;
+    if (retainSource) {
+      scheduleSharedGenerationLoadingTick(source);
+    } else {
+      releaseSharedLoadingSource(source);
     }
-    sharedLoadingSources.delete(source.key);
     return;
   }
 
@@ -211,6 +258,9 @@ function attachSharedLoadingNode(nodes, key) {
     return;
   }
 
+  if (!Number.isInteger(source.heartbeatIndex) && Number.isInteger(nodes.heartbeat?.index)) {
+    source.heartbeatIndex = nodes.heartbeat.index;
+  }
   source.nodes.add(nodes);
   nodes.source = source;
   nodes.progress = source.progress;
@@ -219,15 +269,19 @@ function attachSharedLoadingNode(nodes, key) {
 }
 
 function scheduleSharedGenerationLoadingTick(source) {
-  if (!source || source.nodes.size === 0 || source.progress >= GENERATION_LOADING_MAX_PERCENT || source.timer !== null) {
+  if (
+    !source ||
+    sharedLoadingSources.get(source.key) !== source ||
+    source.progress >= GENERATION_LOADING_MAX_PERCENT ||
+    source.timer !== null
+  ) {
     return;
   }
 
   source.timer = globalThis.setTimeout(() => {
     source.timer = null;
     syncSharedLoadingTimers(source);
-    if (source.nodes.size === 0) {
-      sharedLoadingSources.delete(source.key);
+    if (sharedLoadingSources.get(source.key) !== source) {
       return;
     }
 
@@ -285,18 +339,12 @@ export function createGenerationLoadingShell(
   shell.dataset.generationLoadingStage = String(stage || "");
   shell.dataset.generationLoadingFamily = getGenerationLoadingStageFamily(stage, mode);
 
-  const drop = documentValue.createElement("span");
-  drop.className = "generation-loading-drop";
-  drop.setAttribute("aria-hidden", "true");
-
-  const wave = documentValue.createElement("span");
-  wave.className = "generation-loading-wave";
-  wave.setAttribute("aria-hidden", "true");
-  drop.append(wave);
-
-  /* 心跳图标与百分比同属中间文字层，压在满幅动画层之上；
+  /* 心跳图标与百分比同属中间文字层，压在满幅模糊背景之上；
      它只在显示日志行的宿主里出现——小占位放不下，硬塞会挤压百分比。 */
-  const heartbeat = createHeartbeatMorphIcon(documentValue);
+  const existingSource = sharedLoadingSources.get(String(key || ""));
+  const heartbeat = createHeartbeatMorphIcon(documentValue, {
+    startIndex: existingSource?.heartbeatIndex,
+  });
   heartbeat.svg.hidden = true;
 
   const percent = documentValue.createElement("strong");
@@ -309,12 +357,10 @@ export function createGenerationLoadingShell(
   log.className = "generation-loading-log";
   log.hidden = true;
 
-  shell.append(drop, heartbeat.svg, percent, status, log);
+  shell.append(heartbeat.svg, percent, status, log);
 
   const nodes = {
     shell,
-    drop,
-    wave,
     heartbeat,
     percent,
     status,
@@ -383,7 +429,7 @@ export function updateGenerationLoadingShell(
   return nodes;
 }
 
-export function stopGenerationLoadingShell(nodes, { reset = false } = {}) {
+export function stopGenerationLoadingShell(nodes, { reset = false, retainSource = false } = {}) {
   if (!nodes) {
     return nodes;
   }
@@ -392,7 +438,7 @@ export function stopGenerationLoadingShell(nodes, { reset = false } = {}) {
      和共享进度源同一类泄漏。 */
   destroyHeartbeatMorphIcon(nodes.heartbeat);
   if (nodes.source) {
-    detachSharedLoadingNode(nodes);
+    detachSharedLoadingNode(nodes, { retainSource });
   } else if (nodes.timer !== null) {
     globalThis.clearTimeout?.(nodes.timer);
     nodes.timer = null;
@@ -404,12 +450,12 @@ export function stopGenerationLoadingShell(nodes, { reset = false } = {}) {
   return nodes;
 }
 
-export function stopGenerationLoadingShells(root) {
+export function stopGenerationLoadingShells(root, { retainSource = false } = {}) {
   if (!root?.querySelectorAll) {
     return;
   }
   root.querySelectorAll(".generation-loading-shell").forEach((shell) => {
-    stopGenerationLoadingShell(shell.__generationLoadingNodes);
+    stopGenerationLoadingShell(shell.__generationLoadingNodes, { retainSource });
   });
 }
 

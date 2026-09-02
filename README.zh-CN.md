@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.10-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.11-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installer-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,11 +10,23 @@
 
 把提示词生图、参考图分析、图片编辑、电商套图、人物写真、文章插图、PPT 生成和素材管理集中到一个浏览器界面中。
 
-当前版本：`v0.2.10`
+当前版本：`v0.2.11`
 
 </div>
 
-## v0.2.10 更新说明
+## v0.2.11 更新说明
+
+- Temu 工作台改为直接入口：套图记录工具栏按钮改名为“temuexcel导出工作台”，不再需要先勾选记录，也不再因未勾选而禁用。勾选的记录不会再触发自动导入对话框，需要带入已有套图时在工作台内使用“从 Studio 导入”。
+- 工作台“变种信息”新增“新增变种”操作：每次只追加一条可编辑 SKU 行，继承商品级申报价、尺寸、重量和库存默认值，不重建双变种笛卡尔矩阵，也不改写已有行的货号、价格、尺寸、重量、库存或图片。
+- 批量快速导出移入工作台的“批量快速导出”标签。
+- 本地画廊改用服务端生成的 WebP 缩略图（最长边 512px）加载列表，不再直接加载原图。
+- 生成主预览与图片详情灯箱在浏览器完成图片解码后，才从轻微模糊过渡到清晰；重复渲染同一图片地址保持清晰状态，不重播显现。图片编辑与快速溶图使用同一行为。
+- 界面不再请求 `fonts.googleapis.com` 与 `fonts.gstatic.com`，改用本地系统字体栈，首屏不依赖第三方字体主机。
+- Windows 启动脚本每次启动只采集一次本地 TCP 监听端口快照；命中端口须先通过 Studio 健康检查才复用，否则选取范围内第一个可用端口。
+- 套图单项达到本地流等待期限时，只中止流读取并保留上游原任务回查（最长 120 秒），后台自动补图不再重复提交仍在运行的任务；迟到的流事件与旧清单不会覆盖已保存的正式图片。
+- 参考图分类把“功能卖点证据”与“材质/结构细节”拆开，两者的提示词都只作为支撑证据而非可售主体；多颜色、尺码或大小变体的尺寸事实按变体分组绑定，不再压成一个全局摘要。
+
+### v0.2.10 更新
 
 - 纯文档更新：把 README 中滞留的 v0.2.8 版本事实对齐到当前版本，包括徽章、本章节、桌面安装包与免安装 ZIP 文件名、发行说明链接和构建产物路径。
 
@@ -180,13 +192,13 @@ GPT-Image2-Studio 面向个人创作者、电商运营、设计师和内容团�
 
 ### Temu 快速上架 Excel
 
-在“套图记录”勾选一套或多套记录后，使用“导出 Temu Excel”生成基于项目内置标准模板的 `.xlsx`。每个 SKU 独占一行；已有的公网 HTTPS 图片链接会直接写入模板，本地输出图片可选使用 Cloudinary unsigned upload 转成 `secure_url`。`cloudName` 与 `uploadPreset` 不是 API Secret，应用不会收集或保存 Cloudinary API Key、API Secret、签名、Authorization 或 Cookie。
+在“套图记录”勾选一套或多套记录后，进入“temuexcel导出工作台”并切换到“批量快速导出”，即可生成基于项目内置标准模板的 `.xlsx`。每个 SKU 独占一行；已有的公网 HTTPS 图片链接会直接写入模板，本地输出图片可选使用 Cloudinary unsigned upload 转成 `secure_url`。`cloudName` 与 `uploadPreset` 不是 API Secret，应用不会收集或保存 Cloudinary API Key、API Secret、签名、Authorization 或 Cookie。
 
 这项能力只在本地 Node.js 或 Windows 桌面运行时可用，不会自动登录、导入或发布到 Temu。缺少 Listing、价格、尺寸、重量、库存、产地或公网图片时，导出的工作簿会保留空单元格，并在“导出问题”工作表列出待补全项目；上传前仍需人工核对模板和 Temu 的实际校验结果。Cloudinary 远端资源的配额、生命周期和删除由 Cloudinary 账户自行管理。
 
 ### Temu 上品工作台
 
-在“套图记录”点击“导出 Temu Excel”会全屏打开内置的 Temu 上品工作台，不需要另外启动服务或管理第二个端口。工作台按你勾选的记录预选好数据，可逐个商品人工补齐 51 列模板字段、维护双变种 SKU 矩阵、逐 SKU 覆盖价格尺寸重量库存、管理轮播图与外包装图，并直接导出工作簿。
+在“套图记录”点击“temuexcel导出工作台”会全屏打开内置的 Temu 上品工作台，不需要勾选商品，也不需要另外启动服务或管理第二个端口。无论当前是否勾选记录，入口都会先进入工作台主界面；需要带入已有套图时，在工作台内主动点击“从 Studio 导入”。工作台可逐个商品人工补齐 51 列模板字段、维护双变种 SKU 矩阵、逐 SKU 覆盖价格尺寸重量库存、管理轮播图与外包装图，并直接导出工作簿。
 
 覆盖层顶部有两个平级标签：
 
@@ -253,14 +265,14 @@ Windows 用户也可以双击 `launch-studio.cmd` 启动，使用 `stop-studio-s
 从包含桌面产物的 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
 
 ```text
-GPT-Image2-Studio-Desktop-Setup-v0.2.10-x64.exe
+GPT-Image2-Studio-Desktop-Setup-v0.2.11-x64.exe
 ```
 
 安装完成后通过桌面或开始菜单中的 `GPT-Image2-Studio` 启动。程序会在独立窗口中运行，内置服务使用动态回环端口，关闭窗口后不会遗留后台服务。无需另行安装 Node.js，完整说明见 [Windows 桌面程序文档](./docs/windows-desktop.md)。
 
 源码目录也可直接启动桌面开发版：
 
-如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.10-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
+如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.11-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
 
 桌面开发使用 Electron `43`，要求 Node.js `22.12` 或更高版本；普通 `npm start` 服务仍支持 Node.js `20+`。
 
@@ -271,7 +283,7 @@ cmd /c npm run desktop
 
 ### 方式三：Windows 浏览器安装包（兼容旧版）
 
-旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.10` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
+旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.11` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
 
 ## 配置说明
 
@@ -424,8 +436,8 @@ cmd /c npm run build:desktop
 产物路径：
 
 ```text
-artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.10-x64.exe
-artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.10-x64.zip
+artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.11-x64.exe
+artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.11-x64.zip
 artifacts/desktop/win-unpacked/GPT-Image2-Studio.exe
 ```
 
@@ -443,7 +455,7 @@ cmd /c npm run build:installer
 产物路径格式：
 
 ```text
-artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.10.exe
+artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.11.exe
 ```
 
 脚本使用系统 `iexpress.exe` 生成自解压安装包，并把当前 Node.js 运行时和依赖打入安装目录；启动后仍使用默认浏览器显示工作台。
@@ -644,7 +656,7 @@ cmd /c npm run build:installer
 ## 版本发布
 
 - 版本号以 `package.json` 和 `package-lock.json` 为准。
-- Git tag 使用 `v<version>`，例如 `v0.2.10`。
+- Git tag 使用 `v<version>`，例如 `v0.2.11`。
 - Release 标题建议使用 `GPT-Image2-Studio v<version>`。
 - Release 应附带变更说明、验证结果、Windows 桌面安装包、免安装 ZIP；如仍分发兼容版，应明确区分三个文件的启动形态。
 - 正式发布提交与标签就绪后运行 `npm run check:release:strict`，确认工作树干净且标签与版本一致。

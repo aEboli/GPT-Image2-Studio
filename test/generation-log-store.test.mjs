@@ -11,6 +11,7 @@ import {
   getGenerationLogAllEntries,
   getGenerationLogChannelEntries,
   getGenerationLogChannelLabel,
+  getGenerationLogGroupItemDetail,
   isGenerationLogBatchChannel,
   normalizeGenerationLogChannel,
   normalizeGenerationLogRelayUrl,
@@ -211,6 +212,29 @@ test("generation log group order stays stable while children keep arriving", () 
   });
 
   assert.deepEqual(getGenerationLogChannelEntries(updatedStore, "creation").map((row) => row.groupId), ["set-2", "set-1"]);
+});
+
+test("generation log group item details stay isolated when queues reuse an item ID", () => {
+  const failedStore = upsertGenerationLogGroupEntry(createGenerationLogStore(), {
+    channel: "creation",
+    groupId: "set-old",
+    groupItemId: "hero",
+    detail: "生成请求失败：HTTP 404",
+    status: "error",
+    at: "2026-08-28T10:00:00.000Z",
+  });
+  const activeStore = upsertGenerationLogGroupEntry(failedStore, {
+    channel: "creation",
+    groupId: "set-new",
+    groupItemId: "hero",
+    detail: "正在生成图片",
+    status: "active",
+    at: "2026-08-28T10:01:00.000Z",
+  });
+
+  assert.equal(getGenerationLogGroupItemDetail(activeStore, "creation", "set-old", "hero"), "生成请求失败：HTTP 404");
+  assert.equal(getGenerationLogGroupItemDetail(activeStore, "creation", "set-new", "hero"), "正在生成图片");
+  assert.equal(getGenerationLogGroupItemDetail(activeStore, "creation", "", "hero"), "");
 });
 
 test("generation log cross-channel view labels every row with its channel", () => {

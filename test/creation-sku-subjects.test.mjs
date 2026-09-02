@@ -55,6 +55,68 @@ test("creation SKU payload keeps product subjects that include size facts", () =
   assert.deepEqual(subjects.map((subject) => subject.id), ["hero-product"]);
 });
 
+test("creation SKU payload preserves subject-specific dimension groups", () => {
+  const subjects = buildCreationSkuSubjectsForPayload({
+    analysis: {
+      skuSubjects: [
+        {
+          id: "black-large",
+          title: "Black L",
+          filenames: ["black-large.png"],
+          dimension_groups: [
+            { label: "Black L", reference_indexes: [3], specs: ["Length 24 cm", "Width 12 cm"] },
+          ],
+        },
+      ],
+    },
+    applied: true,
+    dirty: false,
+    referenceRoles: [{ index: 3, filename: "black-large.png", role: "product" }],
+  });
+
+  assert.deepEqual(subjects[0].dimensionGroups, [
+    { id: "Black L", label: "Black L", referenceIndexes: [3], filenames: [], specs: ["Length 24 cm", "Width 12 cm"] },
+  ]);
+});
+
+test("creation SKU payload normalizes object-form dimension groups and specs", () => {
+  const subjects = buildCreationSkuSubjectsForPayload({
+    analysis: {
+      skuSubjects: [
+        {
+          id: "black-large",
+          title: "Black L",
+          filenames: ["black-large.png"],
+          dimension_groups: {
+            "Black L": { Length: "24 cm", Width: "12 cm" },
+            "Blue XL": { specs: { Height: "30 cm", Weight: "0.8 kg" }, filenames: ["blue-xl.png"] },
+          },
+        },
+      ],
+    },
+    applied: true,
+    dirty: false,
+    referenceRoles: [{ index: 3, filename: "black-large.png", role: "product" }],
+  });
+
+  assert.deepEqual(subjects[0].dimensionGroups, [
+    {
+      id: "Black L",
+      label: "Black L",
+      referenceIndexes: [],
+      filenames: [],
+      specs: ["Length: 24 cm", "Width: 12 cm"],
+    },
+    {
+      id: "Blue XL",
+      label: "Blue XL",
+      referenceIndexes: [],
+      filenames: ["blue-xl.png"],
+      specs: ["Height: 30 cm", "Weight: 0.8 kg"],
+    },
+  ]);
+});
+
 test("creation SKU payload treats reference subjects as product subjects", () => {
   const subjects = buildCreationSkuSubjectsForPayload({
     referenceRoles: [

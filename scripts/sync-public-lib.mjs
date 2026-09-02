@@ -79,6 +79,7 @@ export const PUBLIC_LIB_SYNC_TARGETS = [
   "generation-task-reconciler.mjs",
   "http-response-error.mjs",
   "image-compress-browser.mjs",
+  "image-reveal.mjs",
   "image-edit-local-mask.mjs",
   "image-edit-shell-bridge.mjs",
   "image-route-config.mjs",

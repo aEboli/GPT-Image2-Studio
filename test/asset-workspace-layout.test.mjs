@@ -182,7 +182,7 @@ test("lightbox prioritizes the image and exposes concise accessible controls", a
   assert.match(styles, /\.lightbox-media-stage,[\s\S]*height:\s*auto;/);
   assert.match(styles, /\.lightbox-prompt-field dd,[\s\S]*white-space:\s*pre-line;/);
   assert.match(app, /button\.setAttribute\("aria-label", `查看图片 \$\{filename\}`\)/);
-  assert.match(app, /refs\.lightboxImage\.alt = fresh\.filename \? `图片详情 \$\{fresh\.filename\}` : "生成图片详情"/);
+  assert.match(app, /setImageRevealSource\(refs\.lightboxImage, imageUrl, \{\s*alt: fresh\.filename \? `图片详情 \$\{fresh\.filename\}` : "生成图片详情",/);
   assert.match(controller, /JSON\.parse\(source\)/);
   assert.match(controller, /export function getStructuredPromptFields\(value, path = ""\)/);
   assert.match(controller, /Array\.isArray\(value\)[\s\S]*return formatted \? \[\{ label: path \|\| "内容", value: formatted \}\] : \[\];/);

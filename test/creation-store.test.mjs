@@ -171,6 +171,66 @@ test("creation store preserves scenario image count and reference image metadata
   assert.deepEqual(manifest.referenceImageRoles.map((entry) => entry.index), [1, 2]);
 });
 
+test("creation store preserves grouped variant dimensions across manifest normalization", () => {
+  const manifest = normalizeCreationSetManifest({
+    setId: "creation-set-grouped-dimensions",
+    productName: "Heated gloves",
+    dimensionSpecs: "Length 22 cm\nWidth 11 cm\nLength 24 cm\nWidth 12 cm",
+    dimensionSpecGroups: [
+      {
+        id: "black-small",
+        label: "Black S",
+        reference_indexes: [2],
+        lines: ["Length 22 cm", "Width 11 cm"],
+      },
+      {
+        id: "black-large",
+        label: "Black L",
+        filenames: ["black-large.png"],
+        specs: ["Length 24 cm", "Width 12 cm"],
+      },
+    ],
+    referenceImageNames: ["size-card.png", "black-small.png", "black-large.png"],
+    referenceImageRoles: [
+      {
+        index: 1,
+        filename: "size-card.png",
+        role: "dimensions",
+        dimension_groups: [
+          { label: "Black S", reference_indexes: [2], specs: ["Length 22 cm", "Width 11 cm"] },
+          { label: "Black L", filenames: ["black-large.png"], specs: ["Length 24 cm", "Width 12 cm"] },
+        ],
+      },
+    ],
+    skuSubjects: [
+      {
+        id: "black-small",
+        title: "Black S",
+        reference_indexes: [2],
+        filenames: ["black-small.png"],
+        dimension_groups: [{ label: "Black S", specs: ["Length 22 cm", "Width 11 cm"] }],
+      },
+    ],
+    items: [],
+  });
+
+  assert.deepEqual(
+    manifest.dimensionSpecGroups.map((group) => [group.label, group.referenceIndexes, group.filenames, group.specs]),
+    [
+      ["Black S", [2], [], ["Length 22 cm", "Width 11 cm"]],
+      ["Black L", [], ["black-large.png"], ["Length 24 cm", "Width 12 cm"]],
+    ],
+  );
+  assert.deepEqual(
+    manifest.referenceImageRoles[0].dimensionGroups.map((group) => [group.label, group.referenceIndexes, group.filenames]),
+    [
+      ["Black S", [2], []],
+      ["Black L", [], ["black-large.png"]],
+    ],
+  );
+  assert.deepEqual(manifest.skuSubjects[0].dimensionGroups[0].specs, ["Length 22 cm", "Width 11 cm"]);
+});
+
 test("creation store preserves zero carousel image count with appended rebuild items", () => {
   const manifest = normalizeCreationSetManifest(
     {
@@ -290,6 +350,74 @@ test("creation store persists finite per-item upstream attempt counts", async ()
     assert.deepEqual(
       candidate.items.map((item) => item.generationAttemptCount),
       [2, 1, 0, 0, 0],
+    );
+  }
+
+  await rm(outputDir, { recursive: true, force: true });
+});
+
+test("creation store persists missing-response-ID recovery state without response identifiers", async () => {
+  const outputDir = await mkdtemp(join(tmpdir(), "creation-store-response-recovery-"));
+  const store = createCreationSetStore({ outputDir, publicBasePath: "/output" });
+  const manifest = {
+    setId: "creation-set-response-recovery",
+    productName: "Response recovery product",
+    status: "partial_failed",
+    items: [
+      {
+        itemId: "blocked",
+        slotIndex: 1,
+        status: "failed",
+        originalResponseRecovery: "unavailable",
+        originalResponseRecoveryReason: "missing_response_id",
+        originalResponseStatus: "in_progress",
+        originalResponseCheckedAt: "2026-08-30T01:00:00.000Z",
+        originalResponseAutoRetryBlocked: true,
+      },
+      {
+        itemId: "cleared",
+        slotIndex: 2,
+        status: "queued",
+        originalResponseRecovery: "",
+        originalResponseRecoveryReason: "",
+        originalResponseStatus: "",
+        originalResponseCheckedAt: "",
+        originalResponseAutoRetryBlocked: false,
+      },
+    ],
+  };
+  const expected = [
+    {
+      originalResponseRecovery: "unavailable",
+      originalResponseRecoveryReason: "missing_response_id",
+      originalResponseStatus: "in_progress",
+      originalResponseCheckedAt: "2026-08-30T01:00:00.000Z",
+      originalResponseAutoRetryBlocked: true,
+    },
+    {
+      originalResponseRecovery: "",
+      originalResponseRecoveryReason: "",
+      originalResponseStatus: "",
+      originalResponseCheckedAt: "",
+      originalResponseAutoRetryBlocked: false,
+    },
+  ];
+
+  const saved = await store.saveManifest(manifest);
+  const raw = JSON.parse(await readFile(store.manifestPath(manifest.setId), "utf8"));
+  const restored = await store.readManifest(manifest.setId);
+
+  for (const candidate of [saved, raw, restored]) {
+    assert.equal(Object.prototype.hasOwnProperty.call(candidate.items[0], "responseId"), false);
+    assert.deepEqual(
+      candidate.items.map((item) => ({
+        originalResponseRecovery: item.originalResponseRecovery,
+        originalResponseRecoveryReason: item.originalResponseRecoveryReason,
+        originalResponseStatus: item.originalResponseStatus,
+        originalResponseCheckedAt: item.originalResponseCheckedAt,
+        originalResponseAutoRetryBlocked: item.originalResponseAutoRetryBlocked,
+      })),
+      expected,
     );
   }
 

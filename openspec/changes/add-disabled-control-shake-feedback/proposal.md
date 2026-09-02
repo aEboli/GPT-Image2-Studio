@@ -10,6 +10,7 @@
 - 新增全局状态类 `.is-disabled-shaking` 与关键帧 `control-disabled-shake`：200ms、纯横向 `translate3d`、峰值 8px、7 次反向并逐次衰减、精确回到原位；幅度由 `--control-disabled-shake-distance` 暴露给组件覆盖。
 - `prefers-reduced-motion: reduce` 下以 `animation: none` 关闭该动画。
 - 覆盖范围包含原生 `disabled` 控件、`aria-disabled="true"` 控件、以及本仓库用于禁用态的 `.disabled` / `.is-disabled` 类名控件；连续点击可重放，非主键点击不触发。
+- 「导出 Temu Excel」：把 `passesOpenGuards` 里已有的两句拦截原因抽成 `getOpenBlockReason()`；按钮禁用时在捕获阶段复用 `resolveDisabledShakeTarget()` 认出它，把同一句原因写进套图记录已有的 `aria-live` 反馈区 `#creationRecordActionFeedback`；按钮恢复可用时撤回该提示，且不覆盖之后写入的新反馈。
 
 ## Capabilities
 
@@ -22,9 +23,11 @@
 - 新增：`lib/disabled-shake.mjs`、`public/lib/disabled-shake.mjs`（镜像）、`test/disabled-shake.test.mjs`
 - 修改：`public/styles.css`（新增状态类、关键帧、reduced-motion 块）、`public/app.js`（导入、实例化、`bindEvents()` 内绑定）、`scripts/sync-public-lib.mjs`（同步清单）
 - 资源版本号 `20260830-disabled-shake-1`：`public/index.html` 两处，以及钉住它的 `test/studio-preview-layout.test.mjs`、`test/creation-card-idle-ripple.test.mjs`、`test/portrait-cosplay-assets.test.mjs`
+- 修改：`lib/creation-temu-export-ui.mjs`（含 `public/lib` 镜像）、`test/creation-temu-frontend.test.mjs`
+- 原因播报不改 `public/index.html`／`public/styles.css`／`public/app.js`，资源版本号不变：`/lib/` 与 `public/` 静态资源已按 `no-cache` + ETag 下发（`server.mjs` `getStaticCacheControl`）。
 
 ## Non-Goals
 
 - 不改动任何现有禁用规则的 `pointer-events`、`opacity`、`cursor` 取值，也不改变任何控件的可用性判定。
-- 不新增文案、toast 或 `aria-live` 播报；禁用原因仍由现有 tooltip 体系解释。
+- 不为没有现成原因文案的禁用控件新增文案，也不新增 toast 或新的播报区域；本次只让已有原因的控件把它说出来。
 - 不为容器类元素（`fieldset`、滚动条轨道等）播放抖动，只针对控件本身。

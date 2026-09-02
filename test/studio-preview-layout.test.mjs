@@ -352,14 +352,15 @@ test("preview image uses contain sizing to fill the available canvas without cli
 test("preview image keeps the mounted frame visible when render refreshes the same source", async () => {
   const app = await readFile(appPath, "utf8");
 
-  assert.match(app, /const currentPreviewImageSrc = refs\.previewImage\.getAttribute\("src"\) \|\| "";/);
-  assert.match(app, /const shouldUpdatePreviewImage = currentPreviewImageSrc !== imageUrl;/);
-  assert.match(app, /if \(shouldUpdatePreviewImage && !currentPreviewImageSrc\) \{[\s\S]*refs\.previewImage\.classList\.remove\("is-visible"\);[\s\S]*\}/);
-  assert.match(app, /if \(shouldUpdatePreviewImage\) \{[\s\S]*refs\.previewImage\.src = imageUrl;[\s\S]*\} else \{[\s\S]*refs\.previewImage\.classList\.add\("is-visible"\);[\s\S]*\}/);
-  assert.doesNotMatch(
+  assert.match(app, /import \{ clearImageReveal, setImageRevealSource \} from "\/lib\/image-reveal\.mjs";/);
+  assert.match(
     app,
-    /refs\.previewImage\.classList\.remove\("is-visible"\);\s*refs\.previewImage\.classList\.add\("is-mounted"\);[\s\S]*refs\.previewImage\.src = imageUrl;/,
+    /refs\.previewImage\.style\.transform = `scale\(\$\{state\.zoom\}\)`;[\s\S]*setImageRevealSource\(refs\.previewImage, imageUrl, \{[\s\S]*decoding: "async",[\s\S]*loading: "eager",/,
   );
+  assert.match(app, /if \(placeholderState\.mode === "idle"\) \{[\s\S]*clearImageReveal\(refs\.previewImage\);/);
+  assert.match(app, /if \(placeholderState\.mode === "loading"\) \{[\s\S]*clearImageReveal\(refs\.previewImage\);/);
+  assert.doesNotMatch(app, /refs\.previewImage\.onload\s*=/);
+  assert.doesNotMatch(app, /refs\.previewImage\.src = imageUrl;/);
 });
 
 test("lightbox detail image exposes PS-style zoom and pan viewer controls", async () => {
@@ -804,8 +805,13 @@ test("studio filmstrip shows a visible placeholder while prompt thumbnails load"
     /catch \(error\) \{[\s\S]*state\.galleryLoading = false;[\s\S]*state\.galleryLoadError = error instanceof Error \? error\.message : String\(error\);[\s\S]*throw error;/,
   );
   assert.match(styles, /\.filmstrip-placeholder-entry\s*\{[\s\S]*pointer-events:\s*none;/);
-  assert.match(styles, /\.filmstrip-placeholder-ghost\.is-loading::before\s*\{[\s\S]*animation:\s*filmstrip-placeholder-sweep/);
-  assert.match(styles, /@keyframes filmstrip-placeholder-sweep/);
+  const filmstripPlaceholderAurora = readCssRule(styles, ".filmstrip-placeholder-ghost.is-loading::before");
+  assert.match(filmstripPlaceholderAurora, /filter:\s*blur\([^;]+\);/);
+  assert.match(filmstripPlaceholderAurora, /animation:\s*workbench-busy-aurora-drift/);
+  assert.match(
+    styles,
+    /@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*\.filmstrip-placeholder-ghost\.is-loading::before[\s\S]*animation:\s*none;/,
+  );
 });
 
 test("studio prompt filmstrip keeps its session boundary across direct and polled completion", async () => {
@@ -1532,7 +1538,7 @@ test("quick blend mode implements upload pairing queue preview and cleanup contr
   assert.match(styles, /\.quick-blend-generation-thumb\.is-running\s*\{/);
   assert.match(styles, /\.quick-blend-generation-thumb\.is-running\s*\{/);
   assert.match(styles, /\.filmstrip \.generation-loading-shell\s*\{/);
-  assert.match(styles, /\.filmstrip \.generation-loading-drop\s*\{/);
+  assert.doesNotMatch(styles, /\.filmstrip \.generation-loading-drop\s*\{/);
   assert.doesNotMatch(styles, /quick-blend-thumb-loader|quick-blend-thumb-ring|quick-blend-thumb-scan/);
 
   assert.match(quickBlendView, /function createQuickBlendItem\(group, file\) \{/);
@@ -2031,30 +2037,25 @@ test("studio rendering preserves the settings form scroll position during genera
   assert.match(app, /function syncStudioHeight\(\) \{[\s\S]*const settingsScrollTop = getSettingsFormScrollTop\(\);[\s\S]*restoreSettingsFormScrollTop\(settingsScrollTop\);[\s\S]*\}/);
 });
 
-test("generation loading shell renders one shared percentage drop", async () => {
+test("generation loading shell renders one shared blurred background", async () => {
   const styles = await readFile(stylesPath, "utf8");
   const app = await readFile(appPath, "utf8");
   assert.match(app, /createGenerationLoadingShell\(document, \{ active: false \}\)/);
   assert.match(app, /updateGenerationLoadingShell\(nodes\.loading,[\s\S]*active: true/);
   assert.match(styles, /\.generation-loading-shell\s*\{/);
-  assert.match(styles, /\.generation-loading-drop\s*\{[\s\S]*linear-gradient/);
-  assert.match(styles, /\.generation-loading-drop::after\s*\{[\s\S]*height:\s*var\(--generation-loading-progress\)/);
-  assert.match(styles, /@keyframes generation-loading-water-flow/);
-  assert.doesNotMatch(styles, /conic-gradient/);
+  assert.match(styles, /\.generation-loading-shell::before\s*\{[\s\S]*linear-gradient/);
+  assert.match(styles, /@keyframes generation-loading-aurora-drift/);
+  assert.doesNotMatch(styles, /generation-loading-(drop|wave|breathe|water-bubbles|water-flow|wave-drift)/);
   assert.match(styles, /\.generation-loading-percent\s*\{/);
-  assert.match(styles, /@keyframes generation-loading-breathe/);
-  assert.match(styles, /@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*\.generation-loading-drop[\s\S]*animation:\s*none;/);
+  assert.match(styles, /@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*\.generation-loading-shell::before[\s\S]*animation:\s*none;/);
   assert.doesNotMatch(app, /createPreviewMotionNode|preview-loading-orb-field|preview-loading-fluid/);
   assert.doesNotMatch(styles, /preview-loading-orb-field|preview-loading-fluid|preview-loading-ring-line|preview-loading-fill\s*\{/);
 });
 
-// 生成动画必须铺满自己所在的图片占位框，而不是画一个固定尺寸的居中圆：
-// 提示词模式的大板块得到大动画，套图模式每张卡的小占位得到刚好填满自己的小动画。
-// 这些断言锁的是「尺寸由宿主决定」这件事，任何把固定 px 尺寸写回动画层的改动都会在这里失败。
-test("generation loading animation fills its host image slot at any size", async () => {
+// 模糊背景必须铺满自己所在的图片占位框，且中央文案不参与背景动画的尺寸计算。
+test("generation loading blurred background fills its host image slot at any size", async () => {
   const styles = await readFile(stylesPath, "utf8");
 
-  /* 换行锚定：不加的话 `.reference-analysis-generation-placeholder .generation-loading-shell` 的尾部也会命中。 */
   const shellRule = styles.match(/\n\.generation-loading-shell\s*\{[\s\S]*?\n\}/)?.[0] || "";
   assert.match(shellRule, /position:\s*relative;/);
   assert.match(shellRule, /container-type:\s*inline-size;/);
@@ -2062,106 +2063,61 @@ test("generation loading animation fills its host image slot at any size", async
   assert.match(shellRule, /width:\s*100%;/);
   assert.match(shellRule, /height:\s*100%;/);
 
-  // 液体层铺满宿主：绝对定位 + inset:0，不再有固定宽度与圆形裁切。
-  const dropRule = styles.match(/\n\.generation-loading-drop\s*\{[\s\S]*?\n\}/)?.[0] || "";
-  assert.match(dropRule, /position:\s*absolute;/);
-  assert.match(dropRule, /inset:\s*0;/);
-  assert.doesNotMatch(dropRule, /aspect-ratio/);
-  assert.doesNotMatch(dropRule, /border-radius:\s*50%/);
-  assert.doesNotMatch(dropRule, /width:\s*clamp\(/);
+  const backgroundRule = styles.match(/\n\.generation-loading-shell::before\s*\{[\s\S]*?\n\}/)?.[0] || "";
+  assert.match(backgroundRule, /position:\s*absolute;/);
+  assert.match(backgroundRule, /inset:\s*-/);
+  assert.match(backgroundRule, /filter:\s*blur\(/);
+  assert.match(backgroundRule, /animation:\s*generation-loading-aurora-drift/);
+  assert.doesNotMatch(backgroundRule, /radial-gradient|background-repeat:\s*repeat/);
 
-  // 波高与气泡按容器尺寸换算，所以大板块与小卡片的水纹是成比例的而不是同一个绝对厚度。
-  assert.match(dropRule, /--generation-loading-wave-height:\s*clamp\([^;]*cqi/);
-  assert.match(dropRule, /--generation-loading-bubble-tile:\s*clamp\([^;]*cqi/);
-
-  // 满幅层是 span，会被宿主给字幕写的 span 规则命中；外边距不归零就会顶出一条空边。
-  assert.match(
-    styles,
-    /\.generation-loading-shell \.generation-loading-drop,\s*\n\.generation-loading-shell \.generation-loading-wave\s*\{[\s\S]*?margin:\s*0;/,
-  );
-
-  // 环境光雾与压暗层铺满，中间文字压在它们之上，文字自身不参与尺寸变化。
-  assert.match(styles, /\.generation-loading-shell::before\s*\{[\s\S]*?inset:\s*0;/);
+  // 背景与压暗层铺满，中间文字压在它们之上，文字自身不参与尺寸变化。
   assert.match(styles, /\.generation-loading-shell::after\s*\{[\s\S]*?inset:\s*0;/);
   assert.match(
     styles,
-    /\.generation-loading-percent,\s*\n\.generation-loading-label,\s*\n\.generation-loading-log\s*\{[\s\S]*?z-index:\s*2;/,
+    /\.generation-loading-heartbeat,\s*\n\.generation-loading-percent,\s*\n\.generation-loading-label,\s*\n\.generation-loading-log\s*\{[\s\S]*?z-index:\s*2;/,
   );
   assert.match(styles, /@keyframes generation-loading-aurora-drift/);
-  /* 满幅层只能改透明度：缩放会让边缘露出占位底色，动画就不再是铺满的。
-     先把关键帧块整段切出来再断言——直接对整份样式表用 doesNotMatch 会一路匹配到文件后面的 transform。 */
-  const breatheBlock = styles.match(/@keyframes generation-loading-breathe\s*\{[\s\S]*?\n\}/)?.[0] || "";
-  assert.notEqual(breatheBlock, "", "呼吸关键帧应保留");
-  assert.doesNotMatch(breatheBlock, /transform:/);
+  assert.doesNotMatch(styles, /generation-loading-(drop|wave|breathe|water-bubbles|water-flow|wave-drift)/);
 
-  // 各宿主只调水纹密度，不再规定动画尺寸。
-  ["\\.creation-card-loading", "\\.filmstrip", "\\.article-card-image"].forEach((host) => {
-    const rule = styles.match(new RegExp(`${host} \\.generation-loading-drop[\\s\\S]*?\\n\\}`))?.[0] || "";
-    assert.notEqual(rule, "", `${host} 的水纹规则应保留`);
-    assert.doesNotMatch(rule, /width:/);
-  });
-
-  // 生成中的占位撑满画布，画布内边距同时归零，动画才真的覆盖整个图片板块。
+  // 生成中的占位撑满画布，画布内边距同时归零，背景才真的覆盖整个图片板块。
   const loadingPlaceholderRule = styles.match(/\.preview-placeholder-loading\s*\{[\s\S]*?\n\}/)?.[0] || "";
   assert.match(loadingPlaceholderRule, /width:\s*100%;/);
   assert.match(loadingPlaceholderRule, /height:\s*100%;/);
   assert.match(loadingPlaceholderRule, /max-width:\s*none;/);
   assert.match(styles, /\.preview-canvas:has\(>\s*\.preview-placeholder-loading\)\s*\{[\s\S]*?padding:\s*0;/);
 
-  // 减少动态效果时，新增的光雾层也必须停下来。
+  // 减少动态效果时，背景动画也必须停下来。
   assert.match(
     styles,
     /@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?\.generation-loading-shell::before,[\s\S]*?animation:\s*none;/,
   );
 });
 
-/* 水位要像水龙头放水一样连续上涨：液面不能是一排平铺的半圆，也不能左右晃动。
-   平铺图案会给视线一排可对齐的参照物，液位每上升一点都被读成「跳了一格」。 */
-test("the water surface rises smoothly without tiling or sideways motion", async () => {
+test("the blurred background moves smoothly without water or tiling", async () => {
   const styles = await readFile(stylesPath, "utf8");
 
-  const waveRule = styles.match(/\n\.generation-loading-wave \{[\s\S]*?\n\}/)?.[0] || "";
-  assert.notEqual(waveRule, "", "液面必须有样式规则");
-  // 液面横向铺满液体层，不再左右各超出 15% 靠裁剪遮掉
-  assert.match(waveRule, /left:\s*0;/);
-  assert.match(waveRule, /width:\s*100%;/);
-  // 水位仍然由进度驱动
-  assert.match(waveRule, /bottom:\s*calc\(var\(--generation-loading-progress\)/);
-  // 只有纵向渐变，没有 radial 半圆
-  assert.match(waveRule, /background-image:\s*linear-gradient\(\s*\n?\s*180deg/);
-  assert.doesNotMatch(waveRule, /radial-gradient/);
+  const backgroundRule = styles.match(/\n\.generation-loading-shell::before\s*\{[\s\S]*?\n\}/)?.[0] || "";
+  const driftKeyframes = styles.match(/@keyframes generation-loading-aurora-drift \{[\s\S]*?\n\}/)?.[0] || "";
 
-  // 两层伪元素都不再平铺，也就没有可横向位移的重复单元
-  const sharedRule = styles.match(/\.generation-loading-wave::before,\s*\n\.generation-loading-wave::after \{[\s\S]*?\n\}/)?.[0] || "";
-  assert.match(sharedRule, /background-repeat:\s*no-repeat;/);
-  /* 匹配声明而不是裸词：注释里出现「没有 repeat-x」不该让断言失败。 */
-  assert.doesNotMatch(sharedRule, /background-repeat:[^;]*repeat-x/);
-
-  const beforeRule = styles.match(/\n\.generation-loading-wave::before \{[\s\S]*?\n\}/)?.[0] || "";
-  const afterRule = styles.match(/\n\.generation-loading-wave::after \{[\s\S]*?\n\}/)?.[0] || "";
-  assert.doesNotMatch(beforeRule, /radial-gradient/, "液面柔光不能再用半圆");
-  assert.doesNotMatch(afterRule, /radial-gradient/, "水体柔光不能再用半圆");
-
-  // 液面呼吸只改厚度与亮度，不做横向位移或旋转
-  const flowKeyframes = styles.match(/@keyframes generation-loading-water-flow \{[\s\S]*?\n\}/)?.[0] || "";
-  assert.notEqual(flowKeyframes, "");
-  assert.doesNotMatch(flowKeyframes, /translateX|rotate/);
-  assert.match(flowKeyframes, /scaleY/);
-
-  // 水体内部柔光自下而上流过，纯纵向
-  const driftKeyframes = styles.match(/@keyframes generation-loading-wave-drift \{[\s\S]*?\n\}/)?.[0] || "";
-  assert.notEqual(driftKeyframes, "");
-  assert.doesNotMatch(driftKeyframes, /background-position-x|translateX/);
-  assert.match(driftKeyframes, /background-position:\s*0 /);
+  assert.match(backgroundRule, /linear-gradient/);
+  assert.match(backgroundRule, /filter:\s*blur\(/);
+  assert.match(backgroundRule, /animation:\s*generation-loading-aurora-drift/);
+  assert.match(driftKeyframes, /transform:/);
+  assert.match(driftKeyframes, /opacity:/);
+  assert.doesNotMatch(driftKeyframes, /background-position/);
+  assert.doesNotMatch(styles, /generation-loading-(drop|wave|breathe|water-bubbles|water-flow|wave-drift)/);
+  assert.match(
+    styles,
+    /\.generation-loading-shell\[data-generation-loading-mode="waiting"\]::before\s*\{[\s\S]*?--generation-loading-aurora-opacity:/,
+  );
 });
 
-/* 满幅上色之后，沿用 --text / --muted 的文字会糊进水体里。 */
-test("the centered text and heartbeat icon stay legible over the fill", async () => {
+test("the centered text and heartbeat icon stay legible over the blurred background", async () => {
   const styles = await readFile(stylesPath, "utf8");
 
   const percentRule = styles.match(/\n\.generation-loading-percent \{[\s\S]*?\n\}/)?.[0] || "";
   assert.match(percentRule, /color:\s*color-mix\(in srgb, #ffffff/, "百分比要提到接近纯白");
-  assert.match(percentRule, /text-shadow:/, "需要暗描边把文字从水体里拉开");
+  assert.match(percentRule, /text-shadow:/, "需要暗描边把文字从背景里拉开");
 
   const labelRule = styles.match(/\n\.generation-loading-label \{[\s\S]*?\n\}/)?.[0] || "";
   assert.match(labelRule, /color:\s*rgba\(255, 255, 255/, "标签不能再用 --muted");
@@ -2169,7 +2125,7 @@ test("the centered text and heartbeat icon stay legible over the fill", async ()
 
   const iconRule = styles.match(/\n\.generation-loading-heartbeat \{[\s\S]*?\n\}/)?.[0] || "";
   assert.match(iconRule, /color:\s*color-mix\(in srgb, #ffffff/, "图标描边要接近纯白");
-  assert.match(iconRule, /drop-shadow/, "需要外发光把图标从同色系水体里托出来");
+  assert.match(iconRule, /drop-shadow/, "需要外发光把图标从同色系背景里托出来");
 
   // 两种主题都要各自处理，浅色下要反过来压深
   for (const selector of [
@@ -2584,15 +2540,22 @@ test("prompt agent preview marks uploaded images as zoomable and animates analys
   assert.match(html, /class="prompt-agent-zoom-badge"[\s\S]*点击放大/);
   assert.match(html, /id="promptAgentImageViewer"/);
   assert.match(html, /class="prompt-agent-analysis-motion" id="promptAgentAnalysisMotion"/);
-  assert.match(styles, /@keyframes prompt-agent-scan/);
-  assert.match(styles, /\.prompt-agent-preview\.is-analyzing[\s\S]*prompt-agent-scan-line/);
+  assert.match(styles, /@keyframes workbench-busy-aurora-drift\s*\{/);
+  const promptAgentScanLine = readCssRule(styles, ".prompt-agent-scan-line");
+  const promptAgentActiveScanLine = readCssRule(styles, ".prompt-agent-preview.is-analyzing .prompt-agent-scan-line");
+  const promptAgentAnalysisAurora = readCssRule(styles, ".prompt-agent-analysis-motion span::before");
+  assert.match(promptAgentScanLine, /pointer-events:\s*none;/);
+  assert.match(promptAgentActiveScanLine, /filter:\s*blur\([^;]+\);/);
+  assert.match(promptAgentActiveScanLine, /animation:\s*workbench-busy-aurora-drift/);
+  assert.match(promptAgentAnalysisAurora, /filter:\s*blur\([^;]+\);/);
+  assert.match(promptAgentAnalysisAurora, /animation:\s*workbench-busy-aurora-drift/);
   assert.match(styles, /\.prompt-agent-image-viewer\.open[\s\S]*display:\s*grid;/);
   assert.match(app, /function openPromptAgentImageViewer\(\)/);
   assert.match(app, /refs\.promptAgentPreviewButton\.addEventListener\("click", openPromptAgentImageViewer\)/);
   assert.match(app, /refs\.promptAgentPreview\.classList\.toggle\("is-analyzing", state\.promptAgent\.running\)/);
   assert.match(
     styles,
-    /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.prompt-agent-preview\.is-analyzing \.prompt-agent-scan-line[\s\S]*animation:\s*none;/,
+    /@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*\.prompt-agent-preview\.is-analyzing \.prompt-agent-scan-line,[\s\S]*\.prompt-agent-analysis-motion span::before\s*\{[\s\S]*animation:\s*none;/,
   );
 });
 
@@ -3898,14 +3861,18 @@ test("studio caches generated browser images for persistent preview and download
   assert.match(browserImageCache, /imageUrl: cachedImageUrl \|\| item\.imageUrl \|\| cachedItem\?\.imageUrl \|\| "",/);
   assert.match(
     browserImageCache,
-    /thumbnailUrl: cachedThumbnailUrl \|\| item\.thumbnailUrl \|\| cachedItem\?\.thumbnailUrl \|\| cachedImageUrl \|\| "",/,
+    /thumbnailUrl: item\.thumbnailUrl \|\| cachedThumbnailUrl \|\| cachedItem\?\.thumbnailUrl \|\| cachedImageUrl \|\| "",/,
   );
   assert.match(app, /function mergeGalleryItemWithExistingBrowserImage\(item\) \{/);
   assert.match(app, /const imageMergedItem = mergeGalleryItemWithExistingBrowserImage\(item\);/);
   assert.match(app, /const hydratedItem = mergeGalleryItemWithCachedMetadata\(imageMergedItem, state\.galleryMetadataCache\[item\?\.filename\]\);/);
-  assert.match(browserImageCache, /export async function readBrowserCachedGalleryItems\(\) \{/);
+  assert.match(browserImageCache, /export function getThumbnailUrl\(item\) \{/);
+  assert.match(browserImageCache, /export async function readBrowserCachedGalleryItems\(\{ restoreImageData = false \} = \{\}\) \{/);
   assert.match(app, /function upsertGalleryItem\(item\) \{[\s\S]*void cacheBrowserGalleryItem\(hydratedItem\);/);
-  assert.match(app, /async function loadGallery\(\) \{[\s\S]*const browserCachedItems = await readBrowserCachedGalleryItems\(\);[\s\S]*state\.gallery = sortGalleryItemsByCreatedAtDesc/);
+  assert.match(app, /function syncFilmstripMedia\([\s\S]*?const imageUrl = getThumbnailUrl\(item\);/);
+  assert.match(app, /function createRecentOutputItem\([\s\S]*?image\.src = getThumbnailUrl\(item\);/);
+  assert.match(app, /function createGalleryTile\([\s\S]*?image\.src = getThumbnailUrl\(item\);/);
+  assert.match(app, /async function loadGallery\(\) \{[\s\S]*const browserCachedItems = await readBrowserCachedGalleryItems\(\{ restoreImageData: false \}\);[\s\S]*state\.gallery = sortGalleryItemsByCreatedAtDesc/);
   assert.match(app, /async function deleteGalleryItem\(item\) \{[\s\S]*await deleteBrowserCachedGalleryItem\(item\.filename\);/);
   assert.match(app, /async function clearHistory\(\) \{[\s\S]*await clearBrowserImageCache\(\);/);
   assert.match(browserImageCache, /export function dataUrlToBlob\(dataUrl\) \{/);
@@ -4259,8 +4226,14 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(styles, /\.creation-reference-analysis-actions\s*\{[\s\S]*border:\s*1px solid color-mix\(in srgb, var\(--accent\) 18%, var\(--border\)\);[\s\S]*background:[\s\S]*linear-gradient\(135deg, color-mix\(in srgb, var\(--accent\) 10%, transparent\), color-mix\(in srgb, var\(--success\) 8%, transparent\)\)/);
   assert.match(styles, /\.creation-reference-analysis-actions \.reference-analysis-button\s*\{[\s\S]*background:[\s\S]*color-mix\(in srgb, var\(--accent\) 18%, var\(--control-bg\)\)/);
   assert.match(styles, /\.creation-reference-analysis-actions \.prompt-agent-feedback:empty\s*\{[\s\S]*display:\s*none;/);
-  assert.match(styles, /\.creation-reference-analyze-spinner\s*\{[\s\S]*animation:\s*creation-reference-analyze-spin 1800ms linear infinite;/);
-  assert.match(styles, /@keyframes creation-reference-analyze-spin/);
+  assert.match(readCssRule(styles, ".creation-reference-analyze-spinner"), /overflow:\s*hidden;/);
+  const creationReferenceAnalyzeAurora = readCssRule(styles, ".creation-reference-analyze-spinner::before");
+  assert.match(creationReferenceAnalyzeAurora, /filter:\s*blur\([^;]+\);/);
+  assert.match(creationReferenceAnalyzeAurora, /animation:\s*workbench-busy-aurora-drift/);
+  assert.match(
+    styles,
+    /@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*\.creation-reference-analyze-spinner::before\s*\{[\s\S]*animation:\s*none;/,
+  );
   assert.doesNotMatch(styles, /creationReferenceApplyAnalysisButton/);
   assert.match(styles, /\.creation-reference-analysis-role-correction\s*\{/);
   assert.match(styles, /\.creation-reference-note\s*\{/);
@@ -5000,7 +4973,7 @@ test("creation generation cards replace plan details with loading animation", as
   assert.match(app, /createCreationCardLoadingShell\(isQueued \? "queued" : "generating",\s*null,\s*\{ sequenceIndex, key, logText \}\)/);
   assert.match(app, /card\.classList\.toggle\("is-generating", isLoadingCard\);/);
   assert.match(app, /status\.textContent = getCreationItemStatusLabel\(item\);/);
-  assert.match(app, /media\.classList\.add\("is-loading"\);[\s\S]*media\.appendChild\(createCreationCardLoading\(\s*item\.status,\s*fallbackIndex,\s*getCreationCardLoadingKey\(item, fallbackIndex, options\.keyScope\),\s*getCreationCardLogText\(item\),\s*\)\);/);
+  assert.match(app, /media\.classList\.add\("is-loading"\);[\s\S]*media\.appendChild\(createCreationCardLoading\(\s*item\.status,\s*fallbackIndex,\s*getCreationCardLoadingKey\(item, fallbackIndex, options\.keyScope\),\s*getCreationCardLogText\(item, "creation", options\.logGroupId\),\s*\)\);/);
   assert.match(app, /const shouldRenderPath = !imageUrl && !showRecordActions && !hideGenerationDetails;/);
   assert.match(app, /if \(shouldRenderPath\) \{/);
   assert.match(app, /if \(showActions && !hideGenerationDetails\) \{/);
@@ -5015,7 +4988,7 @@ test("creation generation cards replace plan details with loading animation", as
   assert.match(styles, /\.creation-card-media\.is-loading\s*\{/);
   assert.match(styles, /\.creation-card-media\.is-loading\s*\{[\s\S]*width:\s*min\(100%,\s*220px\);/);
   assert.match(styles, /\.creation-card-loading\s*\{[\s\S]*min-height:\s*132px;[\s\S]*padding:\s*12px;/);
-  assert.match(styles, /\.creation-card-loading \.generation-loading-drop\s*\{/);
+  assert.doesNotMatch(styles, /\.creation-card-loading \.generation-loading-drop\s*\{/);
   assert.doesNotMatch(styles, /creation-card-loading-sketch|creation-card-loading-waiting|creation-card-loading-steps/);
 });
 
@@ -5025,11 +4998,14 @@ test("creation result grid keeps running card loading DOM stable across rerender
   const loadingModule = await readFile(creationCardLoadingPath, "utf8");
 
   assert.match(app, /from "\/lib\/creation-card-loading\.mjs"/);
-  assert.match(app, /function syncCreationResultGrid\(items = \[\], \{ showActions = true, keyScope = "" \} = \{\}\) \{/);
+  assert.match(app, /function syncCreationResultGrid\(items = \[\], \{ showActions = true, keyScope = "", logGroupId = "" \} = \{\}\) \{/);
   assert.match(app, /syncCreationResultGridShell\(\{/);
   assert.match(app, /syncCreationLoadingCard\(card,\s*item,\s*index/);
   assert.match(app, /createCreationCardLoadingShell\([^,]+,\s*null,\s*\{ sequenceIndex, key, logText \}\)/);
-  assert.match(app, /syncCreationResultGrid\(items, \{ showActions: showCreationResultActions, keyScope: loadingKeyScope \}\);/);
+  assert.match(
+    app,
+    /syncCreationResultGrid\(items, \{\s*showActions: showCreationResultActions,\s*keyScope: loadingKeyScope,\s*logGroupId: currentSet\?\.setId \|\| "",\s*\}\);/,
+  );
   const renderCreationViewBody = extractFunctionBefore(app, "renderCreationView", "getCreationPlanPreviewImageCount");
   assert.doesNotMatch(renderCreationViewBody, /refs\.creationResultGrid\.innerHTML = "";/);
   assert.match(loadingModule, /export function getCreationCardDomKey\(item = \{\}, fallbackIndex = 0\) \{/);
@@ -5037,7 +5013,7 @@ test("creation result grid keeps running card loading DOM stable across rerender
   assert.match(loadingModule, /\.querySelectorAll\("\.creation-card\[data-creation-card-key\]"\)/);
   assert.match(loadingModule, /updateCreationCardLoading\(loadingShell,\s*item\.status,\s*\{ key, logText \}\)/);
 
-  assert.match(styles, /\.creation-card-loading \.generation-loading-drop\s*\{/);
+  assert.doesNotMatch(styles, /\.creation-card-loading \.generation-loading-drop\s*\{/);
   assert.doesNotMatch(styles, /creation-card-loading-sketch|creation-card-loading-waiting|creation-card-loading-steps|creation-card-loading-progress|creation-card-loading-signal/);
 });
 
@@ -5152,10 +5128,24 @@ test("recognition and analysis busy states expose motion hooks", async () => {
   assert.match(pptAnalysisClient, /refs\.analyzeButton\.classList\.toggle\("is-loading", model\.analyzing\);/);
   assert.match(pptAnalysisClient, /refs\.analyzeButton\.style\.minWidth = refs\.analyzeButton\.dataset\.busyMinWidth;/);
 
-  assert.match(styles, /\.inline-busy-motion\s*\{/);
-  assert.match(styles, /\.inline-busy-motion span\s*\{[\s\S]*animation:\s*inline-busy-pulse/);
+  const inlineBusyDot = readCssRule(styles, ".inline-busy-motion span");
+  const inlineBusyAurora = readCssRule(styles, ".inline-busy-motion span::before");
+  const genericBusyAurora = readCssRule(styles, "#pptAnalyzeButton.is-loading::before");
+  assert.match(inlineBusyDot, /overflow:\s*hidden;/);
+  assert.match(genericBusyAurora, /filter:\s*blur\([^;]+\);/);
+  assert.match(genericBusyAurora, /animation:\s*workbench-busy-aurora-drift/);
+  assert.match(inlineBusyAurora, /filter:\s*blur\([^;]+\);/);
+  assert.match(inlineBusyAurora, /animation:\s*workbench-busy-aurora-drift/);
   assert.match(styles, /\.generate-button\.is-loading,\s*\.creation-record-actions \.toolbar-button\.is-loading,\s*\.reference-analysis-button\.is-loading,\s*#pptAnalyzeButton\.is-loading/);
   assert.match(styles, /\.creation-record-actions \.toolbar-button\.is-loading::before/);
+  assert.match(
+    styles,
+    /@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*\.inline-busy-motion span::before,[\s\S]*\.generate-button\.is-loading::before,[\s\S]*#pptAnalyzeButton\.is-loading::before\s*\{[\s\S]*animation:\s*none;/,
+  );
+  assert.doesNotMatch(
+    styles,
+    /@keyframes\s+(?:filmstrip-placeholder-sweep|prompt-agent-scan|prompt-agent-flow|creation-reference-analyze-spin|inline-busy-sweep|inline-busy-pulse)\b/,
+  );
   assert.match(styles, /\.creation-card-media\.is-waiting\s+span\s*\{/);
   assert.doesNotMatch(styles, /\.creation-card-media\.is-waiting::before|@keyframes creation-card-waiting-pulse/);
   assert.doesNotMatch(styles, /\.creation-card-media\.is-waiting::after/);
@@ -5184,15 +5174,26 @@ test("creation record reuse tracks reference images that need reupload", async (
   assert.match(app, /creationReferenceRestoreQueue:\s*\[\]/);
   assert.match(app, /function buildCreationReferenceRestoreQueue\(set = \{\}\) \{/);
   assert.match(app, /function findCreationReferenceRestoreEntryForFile\(file, restoreQueue = state\.creationReferenceRestoreQueue\) \{/);
+  assert.match(app, /originalReferenceIndex:[\s\S]*requestedReferenceIndex/);
+  assert.match(app, /missingEntries\.length === 1 \? missingEntries\[0\] : null/);
   assert.match(app, /function renderCreationReferenceRestoreList\(\) \{/);
   assert.match(app, /state\.creationReferenceRestoreQueue = buildCreationReferenceRestoreQueue\(normalized\);/);
   assert.match(app, /restoreEntryId:\s*restoreEntry\?\.id \|\| ""/);
   assert.match(app, /restoredFromRecordFilename:\s*restoreEntry\?\.filename \|\| ""/);
   assert.match(app, /role:\s*restoreEntry\?\.role \|\| "product"/);
   assert.match(app, /note:\s*restoreEntry\?\.note \|\| ""/);
+  assert.match(app, /const dimensionGroups = normalizeCreationDimensionGroupsForPayload\(\s*roleEntry\?\.dimensionGroups \|\| roleEntry\?\.dimension_groups/);
+  assert.match(app, /dimensionGroups\.length > 0 \? \{ dimensionGroups \} : \{\}/);
+  assert.match(app, /restoreEntry\?\.dimensionGroups\?\.length > 0 \? \{ dimensionGroups: restoreEntry\.dimensionGroups \} : \{\}/);
   assert.match(app, /markCreationReferenceRestoreEntryMissing\(target\?\.restoreEntryId\)/);
   assert.match(app, /renderCreationReferenceRestoreList\(\);/);
   assert.match(app, /if \(state\.creationReferenceRestoreQueue\.length > 0\) \{[\s\S]*return \[\];/);
+  assert.match(app, /function buildCreationRestoredReferenceBindingMaps\(/);
+  assert.match(app, /function remapRestoredCreationDimensionGroupsForPayload\(/);
+  assert.match(app, /reference_indexes: group\.reference_indexes[\s\S]*indexMap\.get\(index\)/);
+  assert.match(app, /filenames: group\.filenames[\s\S]*filenameMap\.get/);
+  assert.match(app, /const restoredBindingMaps = buildCreationRestoredReferenceBindingMaps\(\);/);
+  assert.match(app, /remapRestoredCreationDimensionGroupsForPayload\([\s\S]*item\.dimensionGroups,[\s\S]*restoredBindingMaps/);
 });
 
 test("creation reference reuploads can be manually bound to a saved reference", async () => {
@@ -5207,6 +5208,8 @@ test("creation reference reuploads can be manually bound to a saved reference", 
   assert.match(app, /restoreEntryId: normalizedRestoreId/);
   assert.match(app, /restoredFromRecordFilename: nextRestoreEntry\.filename/);
   assert.match(app, /role: nextRestoreEntry\.role \|\| item\.role \|\| "product"/);
+  assert.match(app, /const dimensionGroups = normalizeCreationDimensionGroupsForPayload\(\s*nextRestoreEntry\.dimensionGroups \|\| nextRestoreEntry\.dimension_groups/);
+  assert.match(app, /dimensionGroups,\s*\n\s*\};/);
   assert.match(app, /restoreEntryId: "",[\s\S]*restoredFromRecordFilename: "",[\s\S]*note: "",/);
   assert.match(app, /refs\.creationReferenceGrid\.addEventListener\("change",[\s\S]*creationReferenceRestoreBindId/);
 });
@@ -5264,7 +5267,7 @@ test("creation mode auto-repairs incomplete first-pass sets once through the rep
   assert.match(app, /autoRepairAttemptCount:\s*0/);
   assert.match(app, /async function runCreationRepairRequest\(\{ itemId = "", scope = "incomplete", set = getCreationRepairTargetSet\(\), streamContext = null, autoRepair = false \} = \{\}\) \{/);
   assert.match(app, /repairCreationItems[\s\S]*await runCreationRepairRequest\(\{ itemId, scope, set: currentSet \}\);/);
-  assert.match(app, /await runCreationAutoRepairIfNeeded\(payload\.set\)/);
+  assert.match(app, /await runCreationAutoRepairIfNeeded\(completedSet\)/);
   assert.match(app, /await runCreationRepairRequest\(\{ scope: "incomplete", set: currentSet, autoRepair: true \}\);/);
   assert.match(app, /getCreationAutoRepairNotice/);
   assert.doesNotMatch(repairItemsHandler, /fetch\("\/api\/creation\/repair"/);

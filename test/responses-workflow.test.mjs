@@ -1347,6 +1347,49 @@ test("consumeResponsesSse emits partial and final events, and tolerates terminat
   assert.equal(result.partialImages.length, 1);
 });
 
+test("consumeResponsesSse finishes after a final image while the upstream stream stays open", async () => {
+  const controller = new AbortController();
+  let upstreamCancelled = false;
+  const events = [];
+  const stream = new ReadableStream({
+    start(streamController) {
+      streamController.enqueue(new TextEncoder().encode([
+        "event: response.output_item.done",
+        'data: {"type":"response.output_item.done","item":{"type":"image_generation_call","result":"b3Blbi1zdHJlYW0tZmluYWw="}}',
+        "",
+        "",
+      ].join("\n")));
+      // Do not close: this reproduces a relay that delivered the final image but
+      // leaves the SSE connection open until the caller's deadline would fire.
+    },
+    cancel() {
+      upstreamCancelled = true;
+    },
+  });
+  const deadline = setTimeout(() => {
+    controller.abort(new Error("test deadline should not fire after a final image"));
+  }, 100);
+
+  let result;
+  try {
+    result = await consumeResponsesSse(stream, {
+      signal: controller.signal,
+      onEvent(event) {
+        events.push(event.type);
+      },
+    });
+  } finally {
+    clearTimeout(deadline);
+  }
+
+  assert.equal(controller.signal.aborted, false);
+  assert.equal(result.finalImageBase64, "b3Blbi1zdHJlYW0tZmluYWw=");
+  assert.equal(result.responseCompleted, true);
+  assert.deepEqual(events, ["final_image", "complete"]);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(upstreamCancelled, true);
+});
+
 test("consumeResponsesSse cancels a pending reader when its AbortSignal fires", async () => {
   const controller = new AbortController();
   let cancelled = false;
@@ -1497,7 +1540,7 @@ test("consumeResponsesSse extracts image_generation.completed b64_json final ima
   assert.equal(result.finalImageBase64, "ZmluYWwtaW1hZ2U=");
 });
 
-test("consumeResponsesSse keeps a response.completed final image before a trailing failed event", async () => {
+test("consumeResponsesSse stops after a response.completed final image before a trailing failed event", async () => {
   const chunks = [
     [
       "event: response.completed",
@@ -1539,7 +1582,7 @@ test("consumeResponsesSse keeps a response.completed final image before a traili
   });
 
   assert.deepEqual(seenEvents, ["final_image", "complete"]);
-  assert.deepEqual(result.events, ["response.completed", "response.failed"]);
+  assert.deepEqual(result.events, ["response.completed"]);
   assert.equal(result.finalImageBase64, "Y29tcGxldGVkLWZpbmFs");
   assert.equal(result.responseCompleted, true);
 });
@@ -1769,6 +1812,306 @@ test("requestImageGeneration propagates AbortSignal and does not recover or retr
   assert.equal(requests.length, 1);
   assert.equal(requests[0].init.signal, controller.signal);
   assert.equal(requests[0].init.method, "POST");
+});
+
+test("requestImageGeneration uses a separate recovery signal after a known stream deadline", async () => {
+  const streamController = new AbortController();
+  const recoveryController = new AbortController();
+  const requests = [];
+  const events = [];
+  let seenResponseId = "";
+
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode([
+        "event: response.created",
+        'data: {"type":"response.created","response":{"id":"resp_deadline","status":"in_progress"}}',
+        "",
+        "",
+      ].join("\n")));
+    },
+  });
+
+  const result = await requestImageGeneration({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    prompt: "Recover the known task after the local deadline.",
+    size: "1024x1024",
+    quality: "high",
+    responsesModel: "gpt-5.4",
+    signal: streamController.signal,
+    originalResponseRecoverySignal: recoveryController.signal,
+    originalResponseRecoveryTimeoutMs: 100,
+    responseRecoveryMaxPolls: 1,
+    responseRecoveryPollDelayMs: 0,
+    allowUnknownResultRetry: false,
+    recoverOriginalOnAbort(error) {
+      return error.abortCode === "CREATION_STREAM_DEADLINE";
+    },
+    onResponseId(responseId) {
+      seenResponseId = responseId;
+      const reason = new Error("stream deadline");
+      reason.code = "CREATION_STREAM_DEADLINE";
+      streamController.abort(reason);
+    },
+    async fetchImpl(url, init) {
+      requests.push({ url, method: init.method });
+      if (init.method === "GET") {
+        return new Response(JSON.stringify({
+          id: "resp_deadline",
+          status: "completed",
+          output: [{ type: "image_generation_call", result: "ZGVhZGxpbmUtZmluYWw=" }],
+        }), { status: 200 });
+      }
+      return new Response(stream, { status: 200, headers: { "content-type": "text/event-stream" } });
+    },
+    onEvent(event) {
+      events.push(event);
+    },
+  });
+
+  assert.equal(seenResponseId, "resp_deadline");
+  assert.deepEqual(requests.map(({ method }) => method), ["POST", "GET"]);
+  assert.equal(result.finalImageBase64, "ZGVhZGxpbmUtZmluYWw=");
+  assert.equal(result.recoveredOriginal, true);
+  assert.ok(events.some((event) => event.type === "status" && event.stage === "recovered_original"));
+});
+
+test("requestImageGeneration returns a final image when a Creation deadline fires during delivery", async () => {
+  const streamController = new AbortController();
+  const recoveryController = new AbortController();
+  const requests = [];
+  let upstreamCancelled = false;
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode([
+        "event: response.created",
+        'data: {"type":"response.created","response":{"id":"resp_buffered_final","status":"in_progress"}}',
+        "",
+        "",
+        "event: response.output_item.done",
+        'data: {"type":"response.output_item.done","item":{"type":"image_generation_call","result":"YnVmZmVyZWQtZmluYWw="}}',
+        "",
+        "",
+      ].join("\n")));
+      // Deliberately leave the stream open: the local deadline fires while the
+      // next read is pending, after the final image has already been parsed.
+    },
+    cancel() {
+      upstreamCancelled = true;
+    },
+  });
+
+  const result = await requestImageGeneration({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    prompt: "Keep the final image received before the deadline.",
+    size: "1024x1024",
+    quality: "high",
+    responsesModel: "gpt-5.4",
+    signal: streamController.signal,
+    originalResponseRecoverySignal: recoveryController.signal,
+    originalResponseRecoveryTimeoutMs: 100,
+    responseRecoveryMaxPolls: 1,
+    responseRecoveryPollDelayMs: 0,
+    allowUnknownResultRetry: false,
+    recoverOriginalOnAbort(error) {
+      return error.abortCode === "CREATION_STREAM_DEADLINE";
+    },
+    async fetchImpl(_url, init) {
+      requests.push({ method: init.method });
+      if (init.method === "GET") {
+        throw new Error("A buffered final image must not trigger original-task recovery.");
+      }
+      return new Response(stream, { status: 200, headers: { "content-type": "text/event-stream" } });
+    },
+    onEvent(event) {
+      if (event.type === "final_image") {
+        const reason = new Error("stream deadline");
+        reason.code = "CREATION_STREAM_DEADLINE";
+        streamController.abort(reason);
+      }
+    },
+  });
+
+  assert.deepEqual(requests.map(({ method }) => method), ["POST"]);
+  assert.equal(streamController.signal.aborted, true);
+  assert.equal(result.finalImageBase64, "YnVmZmVyZWQtZmluYWw=");
+  assert.equal(result.recoveredOriginal, undefined);
+  assert.equal(upstreamCancelled, true);
+});
+
+test("requestImageGeneration blocks a Creation retry when a known original task remains unresolved", async () => {
+  const requests = [];
+  const stream = [
+    "event: response.created",
+    'data: {"type":"response.created","response":{"id":"resp_blocked","status":"in_progress"}}',
+    "",
+    "data: [DONE]",
+    "",
+  ].join("\n");
+
+  await assert.rejects(
+    () => requestImageGeneration({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      prompt: "Do not create another known task.",
+      size: "1024x1024",
+      quality: "high",
+      responsesModel: "gpt-5.4",
+      allowUnknownResultRetry: false,
+      responseRecoveryPollDelayMs: 0,
+      async fetchImpl(_url, init) {
+        requests.push({ method: init.method });
+        if (init.method === "GET") {
+          return new Response("not retained", { status: 404 });
+        }
+        return new Response(stream, { status: 200, headers: { "content-type": "text/event-stream" } });
+      },
+    }),
+    (error) => {
+      assert.equal(error.originalResponseAutoRetryBlocked, true);
+      assert.equal(error.originalResponseRecovery, "unavailable");
+      return true;
+    },
+  );
+
+  assert.deepEqual(requests.map(({ method }) => method), ["POST", "GET"]);
+});
+
+test("requestImageGeneration blocks a Creation stream deadline even when no response ID was delivered", async () => {
+  const streamController = new AbortController();
+  const requests = [];
+  const pendingStream = {
+    getReader() {
+      return {
+        read() {
+          return new Promise(() => {});
+        },
+        cancel() {
+          return Promise.resolve();
+        },
+      };
+    },
+  };
+
+  await assert.rejects(
+    () => requestImageGeneration({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      prompt: "Do not retry an unidentified timed-out task.",
+      size: "1024x1024",
+      quality: "high",
+      responsesModel: "gpt-5.4",
+      signal: streamController.signal,
+      allowUnknownResultRetry: false,
+      recoverOriginalOnAbort(error) {
+        return error.abortCode === "CREATION_STREAM_DEADLINE";
+      },
+      async fetchImpl(_url, init) {
+        requests.push({ method: init.method });
+        setTimeout(() => {
+          const reason = new Error("stream deadline");
+          reason.code = "CREATION_STREAM_DEADLINE";
+          streamController.abort(reason);
+        }, 0);
+        return { ok: true, status: 200, body: pendingStream };
+      },
+    }),
+    (error) => {
+      assert.equal(error.creationStreamDeadlineExceeded, true);
+      assert.equal(error.originalResponseRecovery, "unavailable");
+      assert.equal(error.originalResponseRecoveryReason, "missing_response_id");
+      assert.equal(error.originalResponseAutoRetryBlocked, true);
+      return true;
+    },
+  );
+
+  assert.deepEqual(requests.map(({ method }) => method), ["POST"]);
+});
+
+test("recoverOriginalResponse returns a recovery-window result instead of treating its own timeout as a client abort", async () => {
+  let requestSignal;
+
+  const result = await recoverOriginalResponse({
+    endpoint: "https://example.test/v1/responses",
+    apiKey: "test-key",
+    responseId: "resp_window",
+    timeoutMs: 10,
+    fetchImpl(_url, init) {
+      requestSignal = init.signal;
+      return new Promise(() => {});
+    },
+  });
+
+  assert.equal(result.kind, "in_progress");
+  assert.equal(result.reason, "recovery_window_expired");
+  assert.equal(requestSignal?.aborted, true);
+});
+
+test("recoverOriginalResponse still aborts when its caller disconnects", async () => {
+  const controller = new AbortController();
+  let beginRequest;
+  const requestStarted = new Promise((resolve) => {
+    beginRequest = resolve;
+  });
+
+  const pending = recoverOriginalResponse({
+    endpoint: "https://example.test/v1/responses",
+    apiKey: "test-key",
+    responseId: "resp_client_closed",
+    signal: controller.signal,
+    timeoutMs: 200,
+    fetchImpl() {
+      beginRequest();
+      return new Promise(() => {});
+    },
+  });
+
+  await requestStarted;
+  controller.abort(new Error("client closed"));
+  await assert.rejects(pending, (error) => error?.name === "AbortError");
+});
+
+test("recoverOriginalResponse keeps a caller abort when the queued recovery timeout runs afterwards", async () => {
+  const controller = new AbortController();
+  const originalSetTimeout = globalThis.setTimeout;
+  const originalClearTimeout = globalThis.clearTimeout;
+  let queuedTimeout;
+  let beginRequest;
+  const requestStarted = new Promise((resolve) => {
+    beginRequest = resolve;
+  });
+
+  globalThis.setTimeout = (callback) => {
+    queuedTimeout = callback;
+    return {};
+  };
+  globalThis.clearTimeout = () => {};
+
+  try {
+    const pending = recoverOriginalResponse({
+      endpoint: "https://example.test/v1/responses",
+      apiKey: "test-key",
+      responseId: "resp_abort_wins",
+      signal: controller.signal,
+      timeoutMs: 10,
+      fetchImpl() {
+        beginRequest();
+        return new Promise(() => {});
+      },
+    });
+
+    await requestStarted;
+    controller.abort(new Error("client closed"));
+    assert.equal(typeof queuedTimeout, "function");
+    queuedTimeout();
+
+    await assert.rejects(pending, (error) => error?.name === "AbortError");
+  } finally {
+    globalThis.setTimeout = originalSetTimeout;
+    globalThis.clearTimeout = originalClearTimeout;
+  }
 });
 
 test("requestImageGeneration polls the original response with GET only", async () => {
@@ -2365,6 +2708,43 @@ test("requestImageGeneration returns compact upstream HTTP errors", async () => 
   assert.equal(attempts, 1);
 });
 
+test("requestImageGeneration blocks Creation repair when an error response body cannot be read", async () => {
+  const requests = [];
+  const bodyReadError = Object.assign(new Error("socket terminated"), { code: "ECONNRESET" });
+
+  await assert.rejects(
+    () => requestImageGeneration({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      prompt: "Do not repair an upstream request whose error body was interrupted.",
+      size: "1024x1024",
+      quality: "high",
+      responsesModel: "gpt-5.4",
+      allowUnknownResultRetry: false,
+      async fetchImpl(_url, init) {
+        requests.push({ method: init.method });
+        return {
+          ok: false,
+          status: 502,
+          text() {
+            return Promise.reject(bodyReadError);
+          },
+        };
+      },
+    }),
+    (error) => {
+      assert.equal(error.originalResponseRecovery, "unavailable");
+      assert.equal(error.originalResponseRecoveryReason, "error_response_body_failed");
+      assert.equal(error.originalResponseAutoRetryBlocked, true);
+      assert.equal(error.cause, bodyReadError);
+      assert.match(error.message, /错误响应读取失败/);
+      return true;
+    },
+  );
+
+  assert.deepEqual(requests, [{ method: "POST" }]);
+});
+
 test("requestImageGeneration does not retry transient upstream HTTP errors", async () => {
   const requests = [];
 
@@ -2502,6 +2882,7 @@ test("requestImageGeneration recovers a generic SSE error carrying an explicit o
 
 test("requestImageGeneration recovers an HTTP 402 capacity response when the task ID is present", async () => {
   const requests = [];
+  const responseIds = [];
 
   const result = await requestImageGeneration({
     baseUrl: "https://example.test/v1",
@@ -2511,6 +2892,9 @@ test("requestImageGeneration recovers an HTTP 402 capacity response when the tas
     quality: "high",
     responsesModel: "gpt-5.4",
     responseRecoveryPollDelayMs: 0,
+    onResponseId(responseId) {
+      responseIds.push(responseId);
+    },
     async fetchImpl(url, init) {
       requests.push({ url, method: init.method });
       if (init.method === "GET") {
@@ -2541,6 +2925,7 @@ test("requestImageGeneration recovers an HTTP 402 capacity response when the tas
   assert.deepEqual(requests.map(({ method }) => method), ["POST", "GET"]);
   assert.equal(requests.filter(({ method }) => method === "POST").length, 1);
   assert.equal(requests.filter(({ method }) => method === "GET").length, 1);
+  assert.deepEqual(responseIds, ["resp_http_capacity"]);
   assert.equal(result.finalImageBase64, "aHR0cC1jYXBhY2l0eS1maW5hbA==");
   assert.equal(result.recoveredOriginal, true);
 });
@@ -3205,6 +3590,30 @@ test("a failed stream connection reports the transport cause, not just fetch fai
         error.message,
         "流式连接失败，原任务状态未知；系统未自动重新生成。 fetch failed（read ECONNRESET）",
       );
+      return true;
+    },
+  );
+});
+
+test("a Creation stream connection failure blocks a later automatic repair", async () => {
+  await assert.rejects(
+    () => requestImageGeneration({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      prompt: "Do not retry after an unidentified connection failure",
+      size: "1024x1024",
+      quality: "high",
+      responsesModel: "gpt-5.4",
+      allowUnknownResultRetry: false,
+      async fetchImpl() {
+        throw new TypeError("fetch failed");
+      },
+      onEvent() {},
+    }),
+    (error) => {
+      assert.equal(error.originalResponseRecovery, "unavailable");
+      assert.equal(error.originalResponseRecoveryReason, "stream_connection_failed");
+      assert.equal(error.originalResponseAutoRetryBlocked, true);
       return true;
     },
   );

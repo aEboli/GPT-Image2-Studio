@@ -468,6 +468,7 @@ export function buildCreationQueuedSet({
       productDescription: snapshot.productDescription || productDescription,
       sellingPoints: Array.isArray(snapshot.sellingPoints) ? snapshot.sellingPoints : sellingPoints,
       dimensionSpecs: snapshot.dimensionSpecs || refs.creationDimensionSpecsInput?.value?.trim() || "",
+      dimensionSpecGroups: Array.isArray(snapshot.dimensionSpecGroups) ? snapshot.dimensionSpecGroups : [],
       dimensionUnitMode,
       dimensionUnitModeLabel: snapshot.dimensionUnitModeLabel || formatCreationDimensionUnitModeLabel(dimensionUnitMode),
       targetLanguage: snapshot.targetLanguage || language.value,
@@ -560,6 +561,7 @@ export function buildCreationQueuedSet({
     productDescription,
     sellingPoints,
     dimensionSpecs: refs.creationDimensionSpecsInput.value.trim(),
+    dimensionSpecGroups: Array.isArray(draftSet?.dimensionSpecGroups) ? draftSet.dimensionSpecGroups : [],
     dimensionUnitMode: getCreationSelectedDimensionUnitMode(),
     dimensionUnitModeLabel: formatCreationDimensionUnitModeLabel(getCreationSelectedDimensionUnitMode()),
     targetLanguage: targetLanguage.value,
@@ -693,6 +695,7 @@ export async function runCreationQueuedJob(job, context = {}) {
     loadCreationSets,
     normalizeSet,
     nowIso,
+    onFinished,
     render,
     runAutoRepairIfNeeded,
     runCreationStream,
@@ -786,6 +789,9 @@ export async function runCreationQueuedJob(job, context = {}) {
     setFeedback(message, "error");
     showError(message);
   } finally {
+    if (typeof onFinished === "function") {
+      onFinished(job);
+    }
     const runningJobs = getRunningCreationQueueJobs(creationState);
     if (creationState.activeQueueId === job.id) {
       creationState.activeQueueId = runningJobs[0]?.id || "";

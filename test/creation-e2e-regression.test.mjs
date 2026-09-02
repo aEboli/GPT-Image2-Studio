@@ -325,6 +325,319 @@ function summarizeCreationItems(set = {}) {
   }));
 }
 
+test("creation recovers a known Responses task after the stream deadline without a second POST", async (t) => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "creation-timeout-recovery-"));
+  const outputDir = join(tempRoot, "output");
+  const localDataRootDir = join(tempRoot, "local-data");
+  const upstreamRequests = [];
+  let openStreamResponse = null;
+  const upstreamServer = createHttpServer((request, response) => {
+    const pathname = new URL(request.url || "/", "http://localhost").pathname;
+    upstreamRequests.push({ method: request.method, pathname });
+
+    if (request.method === "POST" && pathname === "/v1/responses") {
+      openStreamResponse = response;
+      response.writeHead(200, { "content-type": "text/event-stream" });
+      response.write([
+        "event: response.created",
+        'data: {"type":"response.created","response":{"id":"resp_timeout_recovery","status":"in_progress"}}',
+        "",
+        "",
+      ].join("\n"));
+      return;
+    }
+
+    if (request.method === "GET" && pathname === "/v1/responses/resp_timeout_recovery") {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({
+        id: "resp_timeout_recovery",
+        status: "completed",
+        output: [{
+          type: "image_generation_call",
+          result: "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAADklEQVR4nGP4DwUMMAYAj4IP8TylVlEAAAAASUVORK5CYII=",
+        }],
+      }));
+      return;
+    }
+
+    response.writeHead(404, { "content-type": "application/json" });
+    response.end(JSON.stringify({ message: "not found" }));
+  });
+  await new Promise((resolveListen, rejectListen) => {
+    upstreamServer.once("error", rejectListen);
+    upstreamServer.listen(0, "127.0.0.1", resolveListen);
+  });
+  const upstreamAddress = upstreamServer.address();
+  const appPort = await getFreePort();
+  const baseUrl = `http://127.0.0.1:${appPort}`;
+  const server = spawn(process.execPath, ["server.mjs"], {
+    cwd: rootDir,
+    env: {
+      ...process.env,
+      PORT: String(appPort),
+      VERCEL: "1",
+      TMP: tempRoot,
+      TEMP: tempRoot,
+      IMAGE_STUDIO_OUTPUT_DIR: outputDir,
+      IMAGE_STUDIO_LOCAL_DATA_DIR: localDataRootDir,
+      IMAGE_STUDIO_CREATION_UPSTREAM_TIMEOUT_MS: "1000",
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const diagnostics = collectDiagnostics(server);
+
+  t.after(async () => {
+    openStreamResponse?.end();
+    await stopServer(server);
+    await stopHttpServer(upstreamServer);
+    await rm(tempRoot, { recursive: true, force: true });
+  });
+
+  await waitForServer(baseUrl, server, diagnostics);
+  const result = await postForm(
+    baseUrl,
+    "/api/creation/generate",
+    makeCreationForm({
+      fields: {
+        imageCount: "1",
+        selectedRoles: JSON.stringify(["hero"]),
+        baseUrl: `http://127.0.0.1:${upstreamAddress.port}/v1`,
+      },
+    }),
+  );
+
+  assert.equal(result.response.status, 200, diagnostics.stderr);
+  assert.deepEqual(result.events.filter((event) => event.eventName === "item_failed"), [], result.text);
+  const completedSet = getCompleteSet(result.events);
+  assert.equal(completedSet.items.length, 1);
+  assert.equal(completedSet.items[0].status, "completed");
+  assert.ok(completedSet.items[0].relativePath);
+  assert.deepEqual(
+    upstreamRequests.map(({ method, pathname }) => `${method} ${pathname}`),
+    ["POST /v1/responses", "GET /v1/responses/resp_timeout_recovery"],
+  );
+  assert.equal(result.text.includes("resp_timeout_recovery"), false, "upstream response IDs must stay private");
+
+  const manifestPath = await findCreationManifestPath(outputDir, completedSet.setId);
+  const manifestText = await readFile(manifestPath, "utf8");
+  assert.equal(manifestText.includes("resp_timeout_recovery"), false, "manifest must not store upstream response IDs");
+});
+
+test("creation recovers after an image completion announcement arrives before its bytes", async (t) => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "creation-completion-announcement-recovery-"));
+  const outputDir = join(tempRoot, "output");
+  const localDataRootDir = join(tempRoot, "local-data");
+  const upstreamRequests = [];
+  let openStreamResponse = null;
+  const upstreamServer = createHttpServer((request, response) => {
+    const pathname = new URL(request.url || "/", "http://localhost").pathname;
+    upstreamRequests.push({ method: request.method, pathname });
+
+    if (request.method === "POST" && pathname === "/v1/responses") {
+      openStreamResponse = response;
+      response.writeHead(200, { "content-type": "text/event-stream" });
+      response.write([
+        "event: response.created",
+        'data: {"type":"response.created","response":{"id":"resp_completion_before_bytes","status":"in_progress"}}',
+        "",
+        "",
+        "event: response.image_generation_call.completed",
+        'data: {"type":"response.image_generation_call.completed","output_index":0}',
+        "",
+        "",
+      ].join("\n"));
+      return;
+    }
+
+    if (request.method === "GET" && pathname === "/v1/responses/resp_completion_before_bytes") {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({
+        id: "resp_completion_before_bytes",
+        status: "completed",
+        output: [{
+          type: "image_generation_call",
+          result: "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAADklEQVR4nGP4DwUMMAYAj4IP8TylVlEAAAAASUVORK5CYII=",
+        }],
+      }));
+      return;
+    }
+
+    response.writeHead(404, { "content-type": "application/json" });
+    response.end(JSON.stringify({ message: "not found" }));
+  });
+  await new Promise((resolveListen, rejectListen) => {
+    upstreamServer.once("error", rejectListen);
+    upstreamServer.listen(0, "127.0.0.1", resolveListen);
+  });
+  const upstreamAddress = upstreamServer.address();
+  const appPort = await getFreePort();
+  const baseUrl = `http://127.0.0.1:${appPort}`;
+  const server = spawn(process.execPath, ["server.mjs"], {
+    cwd: rootDir,
+    env: {
+      ...process.env,
+      PORT: String(appPort),
+      VERCEL: "1",
+      TMP: tempRoot,
+      TEMP: tempRoot,
+      IMAGE_STUDIO_OUTPUT_DIR: outputDir,
+      IMAGE_STUDIO_LOCAL_DATA_DIR: localDataRootDir,
+      IMAGE_STUDIO_CREATION_UPSTREAM_TIMEOUT_MS: "1000",
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const diagnostics = collectDiagnostics(server);
+
+  t.after(async () => {
+    openStreamResponse?.end();
+    await stopServer(server);
+    await stopHttpServer(upstreamServer);
+    await rm(tempRoot, { recursive: true, force: true });
+  });
+
+  await waitForServer(baseUrl, server, diagnostics);
+  const result = await postForm(
+    baseUrl,
+    "/api/creation/generate",
+    makeCreationForm({
+      fields: {
+        imageCount: "1",
+        selectedRoles: JSON.stringify(["hero"]),
+        baseUrl: `http://127.0.0.1:${upstreamAddress.port}/v1`,
+      },
+    }),
+  );
+
+  assert.equal(result.response.status, 200, diagnostics.stderr);
+  assert.deepEqual(result.events.filter((event) => event.eventName === "item_failed"), [], result.text);
+  assert.ok(
+    result.events.some((event) => event.eventName === "item_status" && event.payload.stage === "recovering_original"),
+    result.text,
+  );
+  const completedSet = getCompleteSet(result.events);
+  assert.equal(completedSet.items[0].status, "completed");
+  assert.ok(completedSet.items[0].relativePath);
+  assert.deepEqual(
+    upstreamRequests.map(({ method, pathname }) => `${method} ${pathname}`),
+    ["POST /v1/responses", "GET /v1/responses/resp_completion_before_bytes"],
+  );
+  assert.equal(
+    upstreamRequests.filter((request) => request.method === "POST").length,
+    1,
+    "a completed announcement without bytes must not trigger a duplicate generation POST",
+  );
+});
+
+test("creation keeps polling an in-progress original task after the stream deadline without a second POST", async (t) => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "creation-polling-timeout-recovery-"));
+  const outputDir = join(tempRoot, "output");
+  const localDataRootDir = join(tempRoot, "local-data");
+  const upstreamRequests = [];
+  let openStreamResponse = null;
+  let recoveryAttempt = 0;
+  const upstreamServer = createHttpServer((request, response) => {
+    const pathname = new URL(request.url || "/", "http://localhost").pathname;
+    upstreamRequests.push({ method: request.method, pathname });
+
+    if (request.method === "POST" && pathname === "/v1/responses") {
+      openStreamResponse = response;
+      response.writeHead(200, { "content-type": "text/event-stream" });
+      response.write([
+        "event: response.created",
+        'data: {"type":"response.created","response":{"id":"resp_poll_after_deadline","status":"in_progress"}}',
+        "",
+        "",
+      ].join("\n"));
+      return;
+    }
+
+    if (request.method === "GET" && pathname === "/v1/responses/resp_poll_after_deadline") {
+      recoveryAttempt += 1;
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify(recoveryAttempt === 1
+        ? { id: "resp_poll_after_deadline", status: "in_progress" }
+        : {
+            id: "resp_poll_after_deadline",
+            status: "completed",
+            output: [{
+              type: "image_generation_call",
+              result: "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAADklEQVR4nGP4DwUMMAYAj4IP8TylVlEAAAAASUVORK5CYII=",
+            }],
+          }));
+      return;
+    }
+
+    response.writeHead(404, { "content-type": "application/json" });
+    response.end(JSON.stringify({ message: "not found" }));
+  });
+  await new Promise((resolveListen, rejectListen) => {
+    upstreamServer.once("error", rejectListen);
+    upstreamServer.listen(0, "127.0.0.1", resolveListen);
+  });
+  const upstreamAddress = upstreamServer.address();
+  const appPort = await getFreePort();
+  const baseUrl = `http://127.0.0.1:${appPort}`;
+  const server = spawn(process.execPath, ["server.mjs"], {
+    cwd: rootDir,
+    env: {
+      ...process.env,
+      PORT: String(appPort),
+      VERCEL: "1",
+      TMP: tempRoot,
+      TEMP: tempRoot,
+      IMAGE_STUDIO_OUTPUT_DIR: outputDir,
+      IMAGE_STUDIO_LOCAL_DATA_DIR: localDataRootDir,
+      IMAGE_STUDIO_CREATION_UPSTREAM_TIMEOUT_MS: "1000",
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const diagnostics = collectDiagnostics(server);
+
+  t.after(async () => {
+    openStreamResponse?.end();
+    await stopServer(server);
+    await stopHttpServer(upstreamServer);
+    await rm(tempRoot, { recursive: true, force: true });
+  });
+
+  await waitForServer(baseUrl, server, diagnostics);
+  const result = await postForm(
+    baseUrl,
+    "/api/creation/generate",
+    makeCreationForm({
+      fields: {
+        imageCount: "1",
+        selectedRoles: JSON.stringify(["hero"]),
+        baseUrl: `http://127.0.0.1:${upstreamAddress.port}/v1`,
+      },
+    }),
+  );
+
+  assert.equal(result.response.status, 200, diagnostics.stderr);
+  assert.deepEqual(result.events.filter((event) => event.eventName === "item_failed"), [], result.text);
+  assert.ok(
+    result.events.some((event) => event.eventName === "item_status" && event.payload.stage === "waiting_original"),
+    result.text,
+  );
+  const completedSet = getCompleteSet(result.events);
+  assert.equal(completedSet.items[0].status, "completed");
+  assert.ok(completedSet.items[0].relativePath);
+  assert.equal(recoveryAttempt, 2);
+  assert.deepEqual(
+    upstreamRequests.map(({ method, pathname }) => `${method} ${pathname}`),
+    [
+      "POST /v1/responses",
+      "GET /v1/responses/resp_poll_after_deadline",
+      "GET /v1/responses/resp_poll_after_deadline",
+    ],
+  );
+  assert.equal(
+    upstreamRequests.filter((request) => request.method === "POST").length,
+    1,
+    "an in-progress original task must stay GET-only until it resolves",
+  );
+});
+
 test("logo batch validation errors do not create empty completed set records", async (t) => {
   const tempRoot = await mkdtemp(join(tmpdir(), "creation-logo-batch-invalid-"));
   const outputDir = join(tempRoot, "output");

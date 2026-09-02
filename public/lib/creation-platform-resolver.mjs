@@ -125,6 +125,10 @@ const REFERENCE_COVERAGE_OVERLAYS = {
     imageType: "material-proof",
     replaceImageTypes: ["multi-angle", "benefit-proof", "lifestyle-first"],
   },
+  feature: {
+    imageType: "comparison-proof",
+    replaceImageTypes: ["variant-comparison", "multi-angle", "benefit-proof", "lifestyle-first"],
+  },
   dimensions: {
     imageType: "dimension-fit",
     replaceImageTypes: ["multi-angle", "benefit-proof", "lifestyle-first"],
@@ -392,6 +396,8 @@ function normalizeEvidence(value = {}, referenceCoverage = []) {
       evidence.specifications = true;
     } else if (entry.role === "material") {
       evidence.materials = true;
+    } else if (entry.role === "feature") {
+      evidence.performance = true;
     } else if (entry.role === "package") {
       evidence.packageContents = true;
     } else if (entry.role === "condition") {

@@ -22,6 +22,27 @@ import { MAX_CREATION_REFERENCE_IMAGES } from "../lib/studio-constants.mjs";
 
 const serverPath = new URL("../server.mjs", import.meta.url);
 
+function assertStrictJsonObjectSchema(schema, path = "$") {
+  if (!schema || typeof schema !== "object") {
+    return;
+  }
+
+  if (schema.type === "object") {
+    const properties = schema.properties || {};
+    assert.equal(schema.additionalProperties, false, `${path} must disallow extra properties`);
+    assert.deepEqual(
+      [...(schema.required || [])].sort(),
+      Object.keys(properties).sort(),
+      `${path} must require every declared property`,
+    );
+    Object.entries(properties).forEach(([key, value]) => {
+      assertStrictJsonObjectSchema(value, `${path}.${key}`);
+    });
+  }
+
+  assertStrictJsonObjectSchema(schema.items, `${path}[]`);
+}
+
 test("server runtimes default prompt-agent image analysis to medium reasoning effort", async () => {
   const server = await readFile(serverPath, "utf8");
 
@@ -465,7 +486,13 @@ test("prompt agent request can identify ecommerce creation reference roles", () 
   assert.match(requestBody.text.format.schema.properties.product_name.description, /Do not include brand names/i);
   assert.ok(requestBody.text.format.schema.properties.reference_roles.items.properties.role.enum.includes("dimensions"));
   assert.ok(requestBody.text.format.schema.properties.reference_roles.items.properties.role.enum.includes("usage"));
+  assert.ok(requestBody.text.format.schema.properties.reference_roles.items.properties.role.enum.includes("feature"));
   assert.ok(requestBody.text.format.schema.properties.reference_roles.items.properties.role.enum.includes("reference-product"));
+  assert.ok(requestBody.text.format.schema.properties.reference_roles.items.required.includes("dimension_groups"));
+  assert.deepEqual(
+    requestBody.text.format.schema.properties.reference_roles.items.properties.dimension_groups.items.required,
+    ["id", "label", "variant", "color", "size", "reference_indexes", "filenames", "specs", "note"],
+  );
   assert.match(input[0].content[0].text, /reference-product/);
   assert.match(input[0].content[0].text, /参考主体/);
   assert.equal(requestBody.text.format.schema.properties.reference_roles.maxItems, MAX_CREATION_REFERENCE_IMAGES);
@@ -505,10 +532,14 @@ test("prompt agent request can identify ecommerce creation reference roles", () 
   );
   assert.match(input[0].content[0].text, /dimensions/);
   assert.match(input[0].content[0].text, /role=dimensions/);
+  assert.match(input[0].content[0].text, /续航.*加热温度.*快充.*role=feature/s);
+  assert.match(input[0].content[0].text, /Type-C 快充.*没有步骤.*role=feature/s);
   assert.match(input[0].content[0].text, /role=usage/);
   assert.match(input[0].content[0].text, /充电指南|正负极|使用说明/);
   assert.match(input[0].content[0].text, /role=material/);
-  assert.match(input[0].content[0].text, /外观结构|功能卖点|结构表现/);
+  assert.match(input[0].content[0].text, /role=feature/);
+  assert.match(input[0].content[0].text, /功能卖点|功能效果/);
+  assert.match(input[0].content[0].text, /材质纹理|外观结构/);
   assert.match(input[0].content[0].text, /包装清单[\s\S]*即使[\s\S]*尺寸|package[\s\S]*even if[\s\S]*size/i);
   assert.match(input[0].content[0].text, /型号 F4J16、长度 13cm、重量 42g、钩号 2#/);
   assert.match(input[0].content[0].text, /Treat text outside the physical product as non-subject overlay/i);
@@ -529,6 +560,10 @@ test("prompt agent request can identify ecommerce creation reference roles", () 
   );
   assert.match(requestBody.text.format.schema.properties.sku_subjects.items.properties.filenames.description, /same grouped sellable product subject/i);
   assert.match(input[0].content[0].text, /SKU/);
+});
+
+test("creation reference analysis schema remains compatible with strict structured output", () => {
+  assertStrictJsonObjectSchema(CREATION_REFERENCE_ANALYSIS_JSON_SCHEMA);
 });
 
 test("creation reference analysis normalizes an evidence-bounded audience strategy", () => {

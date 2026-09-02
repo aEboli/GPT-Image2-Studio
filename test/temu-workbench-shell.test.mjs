@@ -92,6 +92,24 @@ test("#appVersion 与 #templateMetric 都在——删掉任一个会永久禁用
   assert.match(appSource, /document\.querySelector\("#templateMetric"\)/);
 });
 
+test("变种信息提供新增变种入口并接入单行追加交互", () => {
+  const buttons = elementsWith("button", (element) => attr(element, "id") === "addSkuVariantButton");
+  assert.equal(buttons.length, 1, "新增变种按钮必须恰好存在一个");
+  assert.equal(attr(buttons[0], "type"), "button");
+  assert.equal(attr(buttons[0], "aria-label"), "新增变种");
+  assert.match(appSource, /import \{[\s\S]*?\baddSkuVariant,[\s\S]*?\} from "\/lib\/temu\/domain\.mjs"/);
+  assert.match(appSource, /function addSkuVariantRow\(\)[\s\S]*?addSkuVariant\(draft, variant1Value, variant2Value\)/);
+  assert.match(appSource, /document\.querySelector\("#addSkuVariantButton"\)\.addEventListener\("click", addSkuVariantRow\)/);
+  assert.match(appSource, /requestAnimationFrame\(\(\) => \{[\s\S]*?startSkuVariantValueEdit\(input\)/);
+  assert.match(appSource, /function skuVariantCombinationKey\(sku, field, value\)/);
+  assert.match(appSource, /duplicateIndex = draft\.skus\.findIndex\([\s\S]*?skuVariantCombinationKey\(sku\) === candidateKey/);
+  assert.match(appSource, /document\.addEventListener\("click", \(event\) => \{[\s\S]*?startSkuVariantValueEdit\(input\)/);
+  assert.match(appSource, /title="点击编辑变种值"/);
+  assert.match(styles, /\.sku-table thead th:nth-child\(2\), \.sku-table thead th:nth-child\(3\) \{ width: auto; \}/);
+  assert.match(styles, /#addSkuVariantButton \{ min-height: 44px; height: 44px; \}/);
+  assert.match(styles, /\.sku-table \.sku-variant-value \{ font-size: 16px; \}/);
+});
+
 test("被无保护立即解引用的元素都在文档里", () => {
   // 源项目有大量 document.querySelector("#id").addEventListener(...) / .textContent = ...，
   // 缺元素即抛 TypeError。判据取「查询后紧跟一个点」——也就是没有 ?. 也没有先存变量再判空的那些；

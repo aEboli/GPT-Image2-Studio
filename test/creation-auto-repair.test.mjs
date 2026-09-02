@@ -161,3 +161,40 @@ test("creation auto repair treats reconciled missing assets as incomplete", () =
     false,
   );
 });
+
+test("creation auto repair leaves an unconfirmed original response incomplete without retrying it", () => {
+  const blockedItem = {
+    itemId: "original-response-pending",
+    status: "failed",
+    filename: "",
+    relativePath: "",
+    originalResponseRecovery: "unavailable",
+    originalResponseRecoveryReason: "missing_response_id",
+    originalResponseAutoRetryBlocked: true,
+  };
+  const blockedOnlySet = { items: [blockedItem] };
+  const set = {
+    items: [
+      blockedItem,
+      { itemId: "retryable", status: "failed", filename: "", relativePath: "" },
+    ],
+  };
+
+  assert.deepEqual(getCreationIncompleteItems(set).map((item) => item.itemId), [
+    "original-response-pending",
+    "retryable",
+  ]);
+  assert.deepEqual(getCreationAutoRepairableItems(set).map((item) => item.itemId), ["retryable"]);
+  assert.equal(
+    shouldAutoRepairCreationSet({ set, generationScope: "full", autoRepairAttemptCount: 0, canRepair: true }),
+    true,
+  );
+  assert.equal(
+    shouldAutoRepairCreationSet({ set: blockedOnlySet, generationScope: "full", autoRepairAttemptCount: 0, canRepair: true }),
+    false,
+  );
+  assert.deepEqual(getCreationCompletionFeedback(blockedOnlySet), {
+    message: "套图生成结束，仍有 1 个项目未完成，可手动补齐。",
+    tone: "error",
+  });
+});

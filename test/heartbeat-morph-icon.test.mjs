@@ -100,6 +100,20 @@ test("the picker tolerates an out-of-range or non-numeric current index", () => 
   }
 });
 
+test("a new loading icon uses the injected random initial index", () => {
+  const random = () => 0.5;
+  const nodes = createHeartbeatMorphIcon(createTestDocument(), { random });
+  const expectedIndex = Math.floor(HEARTBEAT_MORPH_ICON_ENTRIES.length * 0.5);
+
+  assert.equal(nodes.index, expectedIndex);
+  assert.equal(nodes.name, HEARTBEAT_MORPH_ICON_ENTRIES[expectedIndex][0]);
+  assert.notEqual(nodes.name, "star", "新加载壳不能总从第一个星形开始");
+
+  const fixed = createHeartbeatMorphIcon(createTestDocument(), { random, startIndex: 2 });
+  assert.equal(fixed.index, 2, "显式索引用于测试和调试时仍应优先");
+  assert.equal(fixed.name, "sun");
+});
+
 test("a beat drives the morph engine instead of swapping the path", () => {
   const documentRef = createTestDocument();
   let morphToCalls = 0;
@@ -211,13 +225,12 @@ test("heartbeat text is replaced by the icon while other status text still shows
   stopGenerationLoadingShell(nodes);
 });
 
-test("the icon sits in the text stack, never inside the full-bleed fill layer", () => {
+test("the icon sits at the start of the text stack after water layers are removed", () => {
   const nodes = createGenerationLoadingShell(createTestDocument(), { key: "job-order", active: true, stage: "generating", showLog: true, logText: "heartbeat：处理中" });
-  // 满幅动画层是 children[0]，图标必须是它的兄弟而不是子节点，否则会被当成动画的一部分缩放
-  assert.equal(nodes.shell.children[0], nodes.drop);
-  assert.equal(nodes.shell.children[1], nodes.heartbeat.svg);
-  assert.equal(nodes.shell.children[2], nodes.percent);
-  assert.ok(!nodes.drop.children.includes(nodes.heartbeat.svg), "图标不能挂在液体层里");
+  assert.equal(nodes.shell.children[0], nodes.heartbeat.svg);
+  assert.equal(nodes.shell.children[1], nodes.percent);
+  assert.equal(nodes.shell.querySelectorAll(".generation-loading-drop").length, 0);
+  assert.equal(nodes.shell.querySelectorAll(".generation-loading-wave").length, 0);
   stopGenerationLoadingShell(nodes);
 });
 
