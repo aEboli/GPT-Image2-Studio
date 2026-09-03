@@ -200,6 +200,8 @@ For ordinary Creation carousel and SKU items, the system SHALL apply the selecte
 
 The target language MUST NOT translate, transliterate, rewrite, correct, localize, redraw, replace, remove, cover, or restyle any existing content on a supplied physical product or packaging subject. Protected subject content SHALL include patterns, artwork, illustrations, symbols, Logo and brand marks, printed, engraved, embossed, or embroidered text, exact characters and spelling, writing system, original language, placement, orientation, proportions, and colors. Existing subject content in a different language SHALL remain visible in that original language and SHALL be an explicit exception to target-language-only rules for newly added text. Source-card overlays outside the physical subject, including badges, prices, captions, and watermarks, SHALL NOT become protected subject content solely because they are present in a reference image.
 
+Platform, scenario, category, and visual-language labels used for planning SHALL remain internal metadata and SHALL NOT be rendered as artwork text.
+
 Local generation and repair SHALL enforce the same protection at runtime for current plans and historical frozen prompts. The dedicated `infographic-rebuild` item SHALL remain outside this ordinary-item rule and SHALL continue following its source-only target-language translation contract.
 
 #### Scenario: User selects English target language
@@ -223,7 +225,7 @@ Local generation and repair SHALL enforce the same protection at runtime for cur
 
 #### Scenario: Dedicated infographic rebuild translates source text
 - **WHEN** an `infographic-rebuild` item is generated with a selected target language
-- **THEN** its canonical source-only prompt continues requiring complete faithful translation of translatable source text
+- **THEN** its canonical source-only prompt continues requiring complete faithful translation of translatable surrounding layout text while preserving existing physical product or packaging text in its original language
 - **AND** the ordinary carousel and SKU subject-content rule is not appended to that dedicated prompt
 
 ### Requirement: Creation assets are stored under the creation folder

@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.11-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.12-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installers-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,13 +10,20 @@
 
 Prompt-to-image, reference analysis, editing, ecommerce sets, portraits, article illustrations, PPT generation, and asset history in one browser-based workspace.
 
-Current version: `v0.2.11`
+Current version: `v0.2.12`
 
 [Chinese README](./README.zh-CN.md)
 
 </div>
 
-## What is included in v0.2.11
+## What is included in v0.2.12
+
+- Creation SKU dimension facts now remain bound to their correct variant/reference group. Normalized `variant`, `color`, and `size` identifiers survive the browser payload, product-reference enrichment, and the planner, while shared or ambiguous reference bindings are not misapplied to a different SKU.
+- Creation prompts now make a clear language boundary: physical text printed, engraved, embossed, or embroidered on supplied products and packaging remains in its original language; newly authored surrounding layout text uses the selected language. Planning labels for platform, scenario, category, and visual language stay internal metadata rather than artwork text.
+- Infographic rebuild applies the same boundary while translating translatable headings, labels, callouts, captions, steps, package contents, and specifications in the surrounding layout faithfully into the selected language.
+- Prompt Agent parsing now accepts UTF-8 BOMs, fenced or surrounding JSON, harmless JSON trailing commas, duplicated response text paths, Chat Completions `choices[].delta.content`, SSE-shaped bodies without an event-stream content type, single JSON envelopes returned with that type, and a final SSE event closed without its trailing separator.
+
+### Earlier in v0.2.11
 
 - The Temu workbench entry is now a direct entry. The Creation records toolbar button reads `temuexcel导出工作台`, no longer requires ticking any record, and is no longer disabled by an empty selection. Ticked records never trigger an automatic import dialog; use the workbench's own **Import from Studio** action instead.
 - The workbench variant section gained an **Add variant** action. Each use appends exactly one editable SKU row that inherits the product-level declared price, dimensions, weight, and stock, without rebuilding the two-variant cartesian matrix or rewriting existing rows.
@@ -205,9 +212,9 @@ On Windows, `launch-studio.cmd` starts the workbench and `stop-studio-services.c
 
 ### Windows desktop app (recommended)
 
-Download `GPT-Image2-Studio-Desktop-Setup-v0.2.11-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
+Download `GPT-Image2-Studio-Desktop-Setup-v0.2.12-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
 
-For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.11-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
+For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.12-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
 
 For desktop development, Electron 43 requires Node.js 22.12 or newer:
 
@@ -218,7 +225,7 @@ cmd /c npm run desktop
 
 ### Windows browser installer
 
-The legacy browser-installer flow remains documented for local builds, but the `v0.2.11` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
+The legacy browser-installer flow remains documented for local builds, but the `v0.2.12` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
 
 ## Configuration
 
@@ -367,7 +374,7 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 ## Releases
 
 - The source and lockfile versions are authoritative; tags use `v<version>`.
-- Current release notes: [v0.2.11](./docs/releases/v0.2.11.md).
+- Current release notes: [v0.2.12](./docs/releases/v0.2.12.md).
 - Windows packages are distributed through [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Check the release notes for hashes and signing status.
 - `npm run check:release:strict` requires a clean worktree and a matching tag on the current commit.
 

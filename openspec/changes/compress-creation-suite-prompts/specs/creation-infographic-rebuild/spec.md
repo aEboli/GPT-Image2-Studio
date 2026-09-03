@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Infographic rebuild faithfully reconstructs only its source image
-Each `infographic-rebuild` item SHALL use its corresponding source infographic as the only visual and information authority, except for the selected target language, output format, resolution, and aspect ratio. The runtime prompt SHALL require all visible source text to be reproduced completely in the selected target language, with every fact carried over unchanged. It SHALL require the source image's visible product identity and variant, brand names, model names, spelling of non-translatable identifiers, numbers, units, parameters, claims, steps, lists, and the semantic relationships expressed by icons, arrows, callouts, and groupings to be preserved.
+Each `infographic-rebuild` item SHALL use its corresponding source infographic as the only visual and information authority, except for the selected target language, output format, resolution, and aspect ratio. The runtime prompt SHALL require all translatable source text in the surrounding infographic layout to be reproduced completely in the selected target language, with every fact carried over unchanged. Text physically printed, engraved, embossed, or embroidered on the depicted product or packaging SHALL remain in its original characters and language. It SHALL require the source image's visible product identity and variant, brand names, model names, spelling of non-translatable identifiers, numbers, units, parameters, claims, steps, lists, and the semantic relationships expressed by icons, arrows, callouts, and groupings to be preserved.
 
 The prompt SHALL also require a substantial visual reconstruction. It SHALL require a new overall layout and information architecture and SHALL require materially changing at least three additional visual dimensions among composition and subject placement, background treatment, typography system, color treatment, spacing and grouping, and the design of cards, icons, arrows, callouts, or other information components. The result SHALL be immediately recognizable as a newly designed infographic while communicating only the source image's information.
 
@@ -39,7 +39,8 @@ The prompt SHALL be phrased as positive design and preservation requirements and
 #### Scenario: Runtime prompt honors selected target language
 
 - **WHEN** an `infographic-rebuild` item is generated with a selected target language
-- **THEN** the runtime prompt requires all translatable visible source text to be rendered completely in that language
+- **THEN** the runtime prompt requires all translatable surrounding layout text to be rendered completely in that language
+- **AND** it preserves existing text on the depicted physical product or packaging in its original language
 - **AND** it preserves brand names, model names, numbers, units, parameters, claims, steps, lists, and logical relationships
 - **AND** it limits its content authority to that single source infographic
 

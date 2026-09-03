@@ -1114,6 +1114,202 @@ test("prompt agent can parse streamed Responses text into JSON prompt data", asy
   assert.deepEqual(result.notes, ["保留抓拍感"]);
 });
 
+test("prompt agent joins Chat Completions SSE content deltas before parsing JSON", async () => {
+  const responseText = JSON.stringify({
+    summary: "尺寸卡与商品主体已关联。",
+    product_name: "Variant glove",
+    category_hint: "glove",
+    category_path: "",
+    reference_roles: [
+      {
+        index: 1,
+        filename: "glove.png",
+        role: "product",
+        note: "商品主体。",
+        dimension_groups: [],
+      },
+    ],
+    sku_subjects: [],
+    audience_strategy: {
+      target_audience: "general buyers",
+      purchase_motivations: [],
+      purchase_objections: [],
+      desired_outcome: "",
+      evidence_basis: [],
+      confidence: "low",
+      source: "analysis-suggestion",
+    },
+    risks: [],
+  });
+  const splitAt = Math.floor(responseText.length / 2);
+  const events = [
+    `data: ${JSON.stringify({ choices: [{ delta: { role: "assistant", content: responseText.slice(0, splitAt) } }] })}`,
+    `data: ${JSON.stringify({ choices: [{ delta: { content: responseText.slice(splitAt) } }] })}`,
+    "data: [DONE]",
+  ];
+  let index = 0;
+  const fakeStream = {
+    getReader() {
+      return {
+        async read() {
+          if (index >= events.length) {
+            return { done: true };
+          }
+
+          const value = new TextEncoder().encode(`${events[index]}\n\n`);
+          index += 1;
+          return { done: false, value };
+        },
+      };
+    },
+  };
+
+  const result = await consumePromptAgentSse(fakeStream);
+
+  assert.equal(result.summary, "尺寸卡与商品主体已关联。");
+  assert.equal(result.product_name, "Variant glove");
+});
+
+test("prompt agent flushes a final SSE event that has no terminating blank line", async () => {
+  const responseText = JSON.stringify({
+    title: "末尾事件",
+    prompt: "白底商品摄影",
+    negative_prompt: "",
+    style_tags: [],
+    subject: "商品",
+    scene: "影棚",
+    composition: "居中",
+    lighting: "柔光",
+    color_palette: "白色",
+    camera: "标准镜头",
+    aspect_ratio: "1:1",
+    notes: [],
+  });
+  let readCount = 0;
+  const fakeStream = {
+    getReader() {
+      return {
+        async read() {
+          readCount += 1;
+          if (readCount === 1) {
+            return {
+              done: false,
+              value: new TextEncoder().encode(
+                `event: response.output_text.done\ndata: ${JSON.stringify({
+                  type: "response.output_text.done",
+                  text: responseText,
+                })}`,
+              ),
+            };
+          }
+          return { done: true };
+        },
+      };
+    },
+  };
+
+  const result = await consumePromptAgentSse(fakeStream);
+
+  assert.equal(result.title, "末尾事件");
+  assert.equal(result.prompt, "白底商品摄影");
+});
+
+test("prompt agent accepts duplicate output_text copies from a Responses payload", () => {
+  const responseText = JSON.stringify({
+    title: "产品图",
+    prompt: "白底商品摄影",
+    negative_prompt: "模糊",
+    style_tags: [],
+    subject: "商品",
+    scene: "白底影棚",
+    composition: "居中",
+    lighting: "柔光",
+    color_palette: "白色",
+    camera: "标准镜头",
+    aspect_ratio: "1:1",
+    notes: [],
+  });
+  const result = extractPromptAgentJson({
+    output_text: responseText,
+    output: [{ content: [{ type: "output_text", text: responseText }] }],
+  });
+
+  assert.equal(result.prompt, "白底商品摄影");
+});
+
+test("prompt agent extracts a BOM-prefixed JSON object with trailing prose and commas", () => {
+  const result = extractPromptAgentJson(
+    `\uFEFF分析完成：{\"title\":\"产品图\",\"prompt\":\"白底商品摄影\",\"negative_prompt\":\"\",\"style_tags\":[],\"subject\":\"商品\",\"scene\":\"影棚\",\"composition\":\"居中\",\"lighting\":\"柔光\",\"color_palette\":\"白色\",\"camera\":\"标准镜头\",\"aspect_ratio\":\"1:1\",\"notes\":[],}。`,
+  );
+
+  assert.equal(result.title, "产品图");
+  assert.equal(result.prompt, "白底商品摄影");
+});
+
+test("prompt agent keeps comma-and-brace text inside JSON strings while fixing trailing commas", () => {
+  const result = extractPromptAgentJson(
+    '{"title":"标签包含 ,}","prompt":"白底商品摄影",}',
+  );
+
+  assert.equal(result.title, "标签包含 ,}");
+  assert.equal(result.prompt, "白底商品摄影");
+});
+
+test("prompt agent falls back to a valid accumulated delta when the completion event is malformed", async () => {
+  const responseText = JSON.stringify({
+    summary: "套图参考图识别完成。",
+    product_name: "Travel bottle",
+    category_hint: "Bottle",
+    category_path: "",
+    reference_roles: [
+      {
+        index: 1,
+        filename: "bottle.png",
+        role: "product",
+        note: "商品主体。",
+        dimension_groups: [],
+      },
+    ],
+    sku_subjects: [],
+    audience_strategy: {
+      target_audience: "general buyers",
+      purchase_motivations: [],
+      purchase_objections: [],
+      desired_outcome: "",
+      evidence_basis: [],
+      confidence: "low",
+      source: "analysis-suggestion",
+    },
+    risks: [],
+  });
+  const events = [
+    `event: response.output_text.delta\ndata: ${JSON.stringify({ type: "response.output_text.delta", delta: responseText })}`,
+    `event: response.output_text.done\ndata: ${JSON.stringify({ type: "response.output_text.done", text: "模型补充说明：JSON 生成失败" })}`,
+    "data: [DONE]",
+  ];
+  let index = 0;
+  const fakeStream = {
+    getReader() {
+      return {
+        async read() {
+          if (index >= events.length) {
+            return { done: true };
+          }
+
+          const value = new TextEncoder().encode(`${events[index]}\n\n`);
+          index += 1;
+          return { done: false, value };
+        },
+      };
+    },
+  };
+
+  const result = await consumePromptAgentSse(fakeStream);
+
+  assert.equal(result.product_name, "Travel bottle");
+  assert.equal(result.reference_roles[0].filename, "bottle.png");
+});
+
 test("prompt agent retries without structured output when provider rejects strict JSON schema", async () => {
   const calls = [];
   const sseBody = [
@@ -1416,6 +1612,98 @@ test("prompt agent retries creation reference analysis when the model returns pr
   assert.match(calls[1].body.input[0].content.at(-1).text, /Return exactly one JSON object/i);
   assert.equal(result.category_hint, "Fishing Lures");
   assert.equal(result.reference_roles[0].role, "product");
+});
+
+test("prompt agent parses a plain JSON envelope despite an event-stream content type", async () => {
+  const analysis = {
+    summary: "套图参考图识别完成。",
+    product_name: "Travel bottle",
+    category_hint: "Bottle",
+    category_path: "",
+    reference_roles: [
+      {
+        index: 1,
+        filename: "bottle.png",
+        role: "product",
+        note: "商品主体。",
+        dimension_groups: [],
+      },
+    ],
+    sku_subjects: [],
+    audience_strategy: {
+      target_audience: "general buyers",
+      purchase_motivations: [],
+      purchase_objections: [],
+      desired_outcome: "",
+      evidence_basis: [],
+      confidence: "low",
+      source: "analysis-suggestion",
+    },
+    risks: [],
+  };
+  const result = await requestPromptAgentAnalysis({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    image: { filename: "bottle.png", mimeType: "image/png", base64: "Ym90dGxl" },
+    mode: CREATION_REFERENCE_ANALYSIS_MODE,
+    responsesModel: "gpt-5.4",
+    async fetchImpl() {
+      return new Response(JSON.stringify({ output_text: JSON.stringify(analysis) }), {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      });
+    },
+  });
+
+  assert.equal(result.product_name, "Travel bottle");
+});
+
+test("prompt agent parses an SSE body despite an application/json content type", async () => {
+  const analysis = {
+    summary: "套图参考图识别完成。",
+    product_name: "Travel bottle",
+    category_hint: "Bottle",
+    category_path: "",
+    reference_roles: [
+      {
+        index: 1,
+        filename: "bottle.png",
+        role: "product",
+        note: "商品主体。",
+        dimension_groups: [],
+      },
+    ],
+    sku_subjects: [],
+    audience_strategy: {
+      target_audience: "general buyers",
+      purchase_motivations: [],
+      purchase_objections: [],
+      desired_outcome: "",
+      evidence_basis: [],
+      confidence: "low",
+      source: "analysis-suggestion",
+    },
+    risks: [],
+  };
+  const result = await requestPromptAgentAnalysis({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    image: { filename: "bottle.png", mimeType: "image/png", base64: "Ym90dGxl" },
+    mode: CREATION_REFERENCE_ANALYSIS_MODE,
+    responsesModel: "gpt-5.4",
+    async fetchImpl() {
+      const text = JSON.stringify(analysis);
+      return new Response(
+        `event: response.output_text.done\ndata: ${JSON.stringify({ type: "response.output_text.done", text })}\n\ndata: [DONE]\n\n`,
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    },
+  });
+
+  assert.equal(result.category_hint, "Bottle");
 });
 
 test("prompt agent returns compact upstream HTTP errors", async () => {

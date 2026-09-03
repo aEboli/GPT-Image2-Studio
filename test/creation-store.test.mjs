@@ -180,12 +180,18 @@ test("creation store preserves grouped variant dimensions across manifest normal
       {
         id: "black-small",
         label: "Black S",
+        variant: "Black",
+        color: "Black",
+        size: "S",
         reference_indexes: [2],
         lines: ["Length 22 cm", "Width 11 cm"],
       },
       {
         id: "black-large",
         label: "Black L",
+        variant: "Black",
+        color: "Black",
+        size: "L",
         filenames: ["black-large.png"],
         specs: ["Length 24 cm", "Width 12 cm"],
       },
@@ -197,8 +203,22 @@ test("creation store preserves grouped variant dimensions across manifest normal
         filename: "size-card.png",
         role: "dimensions",
         dimension_groups: [
-          { label: "Black S", reference_indexes: [2], specs: ["Length 22 cm", "Width 11 cm"] },
-          { label: "Black L", filenames: ["black-large.png"], specs: ["Length 24 cm", "Width 12 cm"] },
+          {
+            label: "Black S",
+            variant: "Black",
+            color: "Black",
+            size: "S",
+            reference_indexes: [2],
+            specs: ["Length 22 cm", "Width 11 cm"],
+          },
+          {
+            label: "Black L",
+            variant: "Black",
+            color: "Black",
+            size: "L",
+            filenames: ["black-large.png"],
+            specs: ["Length 24 cm", "Width 12 cm"],
+          },
         ],
       },
     ],
@@ -208,7 +228,7 @@ test("creation store preserves grouped variant dimensions across manifest normal
         title: "Black S",
         reference_indexes: [2],
         filenames: ["black-small.png"],
-        dimension_groups: [{ label: "Black S", specs: ["Length 22 cm", "Width 11 cm"] }],
+        dimension_groups: [{ label: "Black S", variant: "Black", color: "Black", size: "S", specs: ["Length 22 cm", "Width 11 cm"] }],
       },
     ],
     items: [],
@@ -222,12 +242,32 @@ test("creation store preserves grouped variant dimensions across manifest normal
     ],
   );
   assert.deepEqual(
+    manifest.dimensionSpecGroups.map((group) => [group.variant, group.color, group.size]),
+    [
+      ["Black", "Black", "S"],
+      ["Black", "Black", "L"],
+    ],
+  );
+  assert.deepEqual(
     manifest.referenceImageRoles[0].dimensionGroups.map((group) => [group.label, group.referenceIndexes, group.filenames]),
     [
       ["Black S", [2], []],
       ["Black L", [], ["black-large.png"]],
     ],
   );
+  assert.deepEqual(
+    manifest.referenceImageRoles[0].dimensionGroups.map((group) => [group.variant, group.color, group.size]),
+    [
+      ["Black", "Black", "S"],
+      ["Black", "Black", "L"],
+    ],
+  );
+  assert.deepEqual(
+    manifest.skuSubjects[0].dimensionGroups[0].variant,
+    "Black",
+  );
+  assert.deepEqual(manifest.skuSubjects[0].dimensionGroups[0].color, "Black");
+  assert.deepEqual(manifest.skuSubjects[0].dimensionGroups[0].size, "S");
   assert.deepEqual(manifest.skuSubjects[0].dimensionGroups[0].specs, ["Length 22 cm", "Width 11 cm"]);
 });
 

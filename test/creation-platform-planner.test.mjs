@@ -50,9 +50,9 @@ test("planner adapts conversion intent by platform and non-sensitive audience wi
   assert.deepEqual(amazon.audienceStrategy, audienceStrategy);
   assert.equal(amazon.effectiveAudienceStrategy.targetAudience, audienceStrategy.targetAudience);
   assert.ok(amazon.items.every((item) => item.conversionIntent?.conversionGoal));
-  assert.match(amazon.items[1].prompt, /CONVERSION INTENT/);
-  assert.doesNotMatch(amazon.items[0].prompt, /CONVERSION INTENT/);
-  assert.match(amazon.items[0].prompt, /Do not add visible marketing copy/i);
+  assert.match(amazon.items[1].prompt, /Conversion intent:/i);
+  assert.doesNotMatch(amazon.items[0].prompt, /Conversion intent:/i);
+  assert.match(amazon.items[0].prompt, /Keep this image free of added visible text and marketing copy/i);
   assert.notDeepEqual(
     amazon.effectiveAudienceStrategy.marketingContext,
     xhs.effectiveAudienceStrategy.marketingContext,
@@ -186,7 +186,7 @@ test("planner caps explicit roles at the current platform image-type limit", () 
   assert.deepEqual(carouselItems.map((item) => item.role), selectedRoles.slice(0, 7));
   assert.equal(carouselItems.some((item) => item.imageType === "custom"), false);
   assert.ok(plan.warnings.some((warning) => warning.code === "image-count-extension-limited"));
-  assert.ok(carouselItems.every((item) => /Do not invent dimensions, materials, package contents, condition, defects, prices, certifications, sales, rankings, guarantees, reviews, or performance claims/i.test(item.prompt)));
+  assert.ok(carouselItems.every((item) => /Build every visible dimension, material, package content, condition, and claim from the supplied product input and attached reference evidence/i.test(item.prompt)));
 });
 
 test("Temu is capped at eight while universal keeps its native 18 slots", () => {
@@ -248,8 +248,8 @@ test("Xiaohongshu prompts forbid fabricated reviews and disguised UGC", () => {
   const carouselItems = plan.items.filter((item) => item.itemKind === "carousel");
 
   assert.equal(carouselItems.length, 6);
-  assert.ok(carouselItems.every((item) => /Do not fabricate reviews, engagement metrics, endorsements, or user testimony/i.test(item.prompt)));
-  assert.ok(carouselItems.every((item) => /Do not disguise brand-created content as UGC/i.test(item.prompt)));
+  assert.ok(carouselItems.every((item) => /Keep reviews, engagement metrics, endorsements, and user testimony out of the image/i.test(item.prompt)));
+  assert.ok(carouselItems.every((item) => /不得伪造评价、互动、背书或冒充用户证言/i.test(item.prompt)));
   assert.ok(carouselItems.every((item) => !/believable user recommendation/i.test(item.prompt)));
 });
 
@@ -268,10 +268,10 @@ test("evidence-dependent platform prompts replace unsupported slots and never in
   assert.ok(plan.warnings.some((warning) => warning.code.startsWith("missing-evidence-slot-")));
   assert.ok(
     carouselItems.every((item) =>
-      /Do not invent dimensions, materials, package contents, condition, defects, prices, certifications, sales, rankings, guarantees, reviews, or performance claims/i.test(item.prompt),
+      /Build every visible dimension, material, package content, condition, and claim from the supplied product input and attached reference evidence/i.test(item.prompt),
     ),
   );
-  assert.ok(carouselItems.every((item) => /Do not claim official platform approval or compliance/i.test(item.prompt)));
+  assert.ok(carouselItems.every((item) => /Use eBay buyer-confidence priorities:/i.test(item.prompt)));
 });
 
 test("platform item prompt overrides and legacy preview overrides remain compatible", () => {

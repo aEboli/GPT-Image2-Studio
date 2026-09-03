@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.11-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.12-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installer-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,11 +10,18 @@
 
 把提示词生图、参考图分析、图片编辑、电商套图、人物写真、文章插图、PPT 生成和素材管理集中到一个浏览器界面中。
 
-当前版本：`v0.2.11`
+当前版本：`v0.2.12`
 
 </div>
 
-## v0.2.11 更新说明
+## v0.2.12 更新说明
+
+- 套图 SKU 的尺寸事实会继续绑定到正确的变种和参考图组。`variant`、`color`、`size` 标识从浏览器请求、商品参考图补全到规划器全程保留；共享或存在歧义的参考图绑定不会错误套用到其他 SKU。
+- 套图提示词明确区分文字边界：商品和包装实物表面已印刷、雕刻、压印或刺绣的文字保持原始语言；画布周边新创作的文字使用所选目标语言。平台、场景、类目和视觉语言等规划标签仅作内部元数据，不会成为画面文字。
+- 信息图重构沿用这条边界，并将周边版式中的标题、标签、标注、说明、步骤、包装清单和规格完整、忠实地翻译为所选目标语言。
+- Prompt Agent 解析兼容性增强：支持 UTF-8 BOM、围栏或夹杂文字的 JSON、末尾多余逗号、重复响应文本路径、Chat Completions 的 `choices[].delta.content`、未标注 event-stream 的 SSE 正文、带 event-stream 头的一次性 JSON 信封，以及未带末尾分隔符便关闭的最后一个 SSE 事件。
+
+### v0.2.11 更新说明
 
 - Temu 工作台改为直接入口：套图记录工具栏按钮改名为“temuexcel导出工作台”，不再需要先勾选记录，也不再因未勾选而禁用。勾选的记录不会再触发自动导入对话框，需要带入已有套图时在工作台内使用“从 Studio 导入”。
 - 工作台“变种信息”新增“新增变种”操作：每次只追加一条可编辑 SKU 行，继承商品级申报价、尺寸、重量和库存默认值，不重建双变种笛卡尔矩阵，也不改写已有行的货号、价格、尺寸、重量、库存或图片。
@@ -265,14 +272,14 @@ Windows 用户也可以双击 `launch-studio.cmd` 启动，使用 `stop-studio-s
 从包含桌面产物的 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
 
 ```text
-GPT-Image2-Studio-Desktop-Setup-v0.2.11-x64.exe
+GPT-Image2-Studio-Desktop-Setup-v0.2.12-x64.exe
 ```
 
 安装完成后通过桌面或开始菜单中的 `GPT-Image2-Studio` 启动。程序会在独立窗口中运行，内置服务使用动态回环端口，关闭窗口后不会遗留后台服务。无需另行安装 Node.js，完整说明见 [Windows 桌面程序文档](./docs/windows-desktop.md)。
 
 源码目录也可直接启动桌面开发版：
 
-如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.11-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
+如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.12-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
 
 桌面开发使用 Electron `43`，要求 Node.js `22.12` 或更高版本；普通 `npm start` 服务仍支持 Node.js `20+`。
 
@@ -283,7 +290,7 @@ cmd /c npm run desktop
 
 ### 方式三：Windows 浏览器安装包（兼容旧版）
 
-旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.11` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
+旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.12` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
 
 ## 配置说明
 
@@ -436,8 +443,8 @@ cmd /c npm run build:desktop
 产物路径：
 
 ```text
-artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.11-x64.exe
-artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.11-x64.zip
+artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.12-x64.exe
+artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.12-x64.zip
 artifacts/desktop/win-unpacked/GPT-Image2-Studio.exe
 ```
 
@@ -455,7 +462,7 @@ cmd /c npm run build:installer
 产物路径格式：
 
 ```text
-artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.11.exe
+artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.12.exe
 ```
 
 脚本使用系统 `iexpress.exe` 生成自解压安装包，并把当前 Node.js 运行时和依赖打入安装目录；启动后仍使用默认浏览器显示工作台。
@@ -656,7 +663,7 @@ cmd /c npm run build:installer
 ## 版本发布
 
 - 版本号以 `package.json` 和 `package-lock.json` 为准。
-- Git tag 使用 `v<version>`，例如 `v0.2.11`。
+- Git tag 使用 `v<version>`，例如 `v0.2.12`。
 - Release 标题建议使用 `GPT-Image2-Studio v<version>`。
 - Release 应附带变更说明、验证结果、Windows 桌面安装包、免安装 ZIP；如仍分发兼容版，应明确区分三个文件的启动形态。
 - 正式发布提交与标签就绪后运行 `npm run check:release:strict`，确认工作树干净且标签与版本一致。

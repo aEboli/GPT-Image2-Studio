@@ -12566,6 +12566,9 @@ function normalizeCreationDimensionGroupsForPayload(value) {
         .map((item) => String(item || "").trim())
         .filter(Boolean)
         .slice(0, 64);
+      const variant = String(group.variant || group.variantLabel || group.variant_label || "").trim();
+      const color = String(group.color || group.colorName || group.color_name || "").trim();
+      const size = String(group.size || group.sizeLabel || group.size_label || "").trim();
       const label = String(
         group.label || group.name || group.title || group.variantLabel || group.variant_label || group.variant ||
           group.color || group.colorName || group.color_name || group.size || group.sizeLabel || group.size_label || "",
@@ -12581,6 +12584,9 @@ function normalizeCreationDimensionGroupsForPayload(value) {
         filenames,
         specs,
         ...(note ? { note } : {}),
+        ...(variant ? { variant } : {}),
+        ...(color ? { color } : {}),
+        ...(size ? { size } : {}),
       };
     })
     .filter(Boolean);

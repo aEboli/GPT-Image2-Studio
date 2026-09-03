@@ -76,7 +76,7 @@ test("per-item generation prompt carries matching ratio and target-language guid
   const prompt = buildCreationItemGenerationPrompt("Create a lifestyle product image.", parameters);
 
   assert.match(prompt, /4:5/);
-  assert.match(prompt, /target language: en/i);
+  assert.match(prompt, /NEW LAYOUT TEXT: Use en for newly authored .* outside the physical product or packaging subject/i);
 });
 
 test("ordinary runtime prompts protect subject graphics, original text, and language for current and historical plans", () => {
@@ -95,10 +95,10 @@ test("ordinary runtime prompts protect subject graphics, original text, and lang
   );
 
   assert.match(historicalPrompt, /SUBJECT CONTENT LOCK:/);
-  assert.match(historicalPrompt, /patterns, artwork, illustrations, symbols/i);
-  assert.match(historicalPrompt, /exact characters, spelling, writing system, and original language/i);
-  assert.match(historicalPrompt, /OUTPUT LANGUAGE BOUNDARY:/);
-  assert.match(historicalPrompt, /newly authored wording outside the physical product or packaging subject, only that separate wording follows the selected language/i);
+  assert.match(historicalPrompt, /artwork, symbols, logos, surface text/i);
+  assert.match(historicalPrompt, /original characters and language/i);
+  assert.match(historicalPrompt, /selected target language for newly authored layout text outside the subject/i);
+  assert.match(historicalPrompt, /NEW LAYOUT TEXT: Use en for newly authored .* outside the physical product or packaging subject/i);
 
   const currentItem = buildCreationPlan({
     productName: "Cooling patch package",
@@ -230,11 +230,13 @@ test("infographic rebuild prompt requires substantial visual redesign while lock
 
   assert.match(prompt, /single attached source infographic/i);
   assert.match(prompt, /only visual and information authority/i);
-  assert.match(prompt, /exact visible product identity, variant, product colors, parts, and quantities/i);
-  assert.match(prompt, /render every translatable visible text string completely in the selected target language/i);
-  assert.match(prompt, /brand names, model names, numbers, units/i);
-  assert.match(prompt, /numbers, units, parameters, claims, steps, and lists exactly/i);
-  assert.match(prompt, /do not summarize, omit, add, invent, replace, or contradict/i);
+  assert.match(prompt, /visible product identity, variant, colors, parts, and quantities exact/i);
+  assert.match(prompt, /text physically printed, engraved, embossed, or embroidered on the product or packaging keeps its original characters and language/i);
+  assert.match(prompt, /translate all translatable wording in that surrounding layout into the selected target language/i);
+  assert.match(prompt, /same language for newly authored layout text around the subject/i);
+  assert.match(prompt, /brand or model names, numbers, and units/i);
+  assert.match(prompt, /headings, labels, callouts, captions, steps, package contents, specifications/i);
+  assert.match(prompt, /recreate the surrounding infographic facts and relationships faithfully/i);
 
   assert.doesNotMatch(prompt, /preserve every visible element unchanged/i);
   assert.doesNotMatch(prompt, /do not .*redesign or restyle/i);
@@ -318,6 +320,6 @@ test("submitted zero-carousel infographic rebuild stays source-only under strict
   assert.equal(submitted.items[0].itemKind, "infographic-rebuild");
   assert.equal(submitted.items[0].role, "infographic-rebuild");
   assert.equal(submitted.items[0].imageType, "infographic-rebuild");
-  assert.equal(submitted.items[0].prompt, buildCreationInfographicRebuildPrompt());
+  assert.equal(submitted.items[0].prompt, buildCreationInfographicRebuildPrompt({ targetLanguage: "en" }));
   assert.deepEqual(submitted.items[0].sourceInfographic, preview.items[0].sourceInfographic);
 });

@@ -190,6 +190,9 @@ function normalizeDimensionGroups(value) {
       const specs = normalizeDimensionSpecStrings(
         entry.specs || entry.specifications || entry.dimensions || entry.dimensionSpecs || entry.dimension_specs || entry.lines || entry.facts,
       );
+      const variant = cleanString(entry.variant || entry.variantLabel || entry.variant_label);
+      const color = cleanString(entry.color || entry.colorName || entry.color_name);
+      const size = cleanString(entry.size || entry.sizeLabel || entry.size_label);
       const label = cleanString(
         entry.label || entry.name || entry.title || entry.variantLabel || entry.variant_label || entry.variant ||
           entry.color || entry.colorName || entry.color_name || entry.size || entry.sizeLabel || entry.size_label,
@@ -205,6 +208,9 @@ function normalizeDimensionGroups(value) {
         filenames: [...new Set(filenames)],
         specs: [...new Set(specs)],
         ...(note ? { note } : {}),
+        ...(variant ? { variant } : {}),
+        ...(color ? { color } : {}),
+        ...(size ? { size } : {}),
       };
     })
     .filter(Boolean);
@@ -353,6 +359,181 @@ function mergeSubjectNotes(baseNote = "", extraNotes = []) {
   return parts.join(" | ");
 }
 
+function normalizeDimensionGroupIdentityText(value) {
+  return cleanString(value).toLowerCase();
+}
+
+function getDimensionGroupSpecKey(group = {}) {
+  return normalizeDimensionSpecStrings(group.specs)
+    .map((spec) => normalizeDimensionGroupIdentityText(spec))
+    .filter(Boolean)
+    .sort()
+    .join("\u001f");
+}
+
+function getDimensionGroupBindingSet(group = {}, field) {
+  const values = field === "referenceIndexes"
+    ? normalizeIndexArray(group.referenceIndexes)
+    : normalizeStringArray(group.filenames).map((filename) => filename.toLowerCase());
+  return new Set(values);
+}
+
+function getDimensionGroupBindingCounts(groups = []) {
+  const indexCounts = new Map();
+  const filenameCounts = new Map();
+  (Array.isArray(groups) ? groups : []).forEach((group) => {
+    getDimensionGroupBindingSet(group, "referenceIndexes").forEach((value) => {
+      indexCounts.set(value, (indexCounts.get(value) || 0) + 1);
+    });
+    getDimensionGroupBindingSet(group, "filenames").forEach((value) => {
+      filenameCounts.set(value, (filenameCounts.get(value) || 0) + 1);
+    });
+  });
+  return { indexCounts, filenameCounts };
+}
+
+function getReliableDimensionGroupBindingSet(group = {}, field, bindingCounts = {}) {
+  const values = getDimensionGroupBindingSet(group, field);
+  const counts = field === "referenceIndexes" ? bindingCounts.indexCounts : bindingCounts.filenameCounts;
+  if (!(counts instanceof Map)) {
+    return values;
+  }
+  return new Set([...values].filter((value) => counts.get(value) === 1));
+}
+
+function hasOverlappingSet(left, right) {
+  for (const value of left) {
+    if (right.has(value)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function canMergeDimensionGroups(left = {}, right = {}) {
+  const semanticFields = ["label", "variant", "color", "size"];
+  const semanticMatches = semanticFields.every((field) => {
+    const leftValue = normalizeDimensionGroupIdentityText(left[field]);
+    const rightValue = normalizeDimensionGroupIdentityText(right[field]);
+    return !leftValue || !rightValue || leftValue === rightValue;
+  });
+  if (!semanticMatches) {
+    return false;
+  }
+
+  const hasSharedSemanticIdentity = semanticFields.some((field) => {
+    const leftValue = normalizeDimensionGroupIdentityText(left[field]);
+    const rightValue = normalizeDimensionGroupIdentityText(right[field]);
+    return leftValue && rightValue && leftValue === rightValue;
+  });
+
+  const leftIndexes = getDimensionGroupBindingSet(left, "referenceIndexes");
+  const rightIndexes = getDimensionGroupBindingSet(right, "referenceIndexes");
+  const leftFilenames = getDimensionGroupBindingSet(left, "filenames");
+  const rightFilenames = getDimensionGroupBindingSet(right, "filenames");
+  const leftHasBinding = leftIndexes.size > 0 || leftFilenames.size > 0;
+  const rightHasBinding = rightIndexes.size > 0 || rightFilenames.size > 0;
+  const leftSpecs = getDimensionGroupSpecKey(left);
+  const rightSpecs = getDimensionGroupSpecKey(right);
+  if (!leftHasBinding && !rightHasBinding && hasSharedSemanticIdentity && leftSpecs && rightSpecs && leftSpecs !== rightSpecs) {
+    return false;
+  }
+  if (!hasSharedSemanticIdentity && leftSpecs && rightSpecs && leftSpecs !== rightSpecs) {
+    return false;
+  }
+
+  if (leftIndexes.size > 0 && rightIndexes.size > 0 && !hasOverlappingSet(leftIndexes, rightIndexes)) {
+    return false;
+  }
+  if (leftFilenames.size > 0 && rightFilenames.size > 0 && !hasOverlappingSet(leftFilenames, rightFilenames)) {
+    return false;
+  }
+
+  return hasSharedSemanticIdentity || Boolean(leftSpecs && rightSpecs && leftSpecs === rightSpecs);
+}
+
+function mergeDimensionGroupPair(left = {}, right = {}) {
+  const referenceIndexes = [...new Set([
+    ...normalizeIndexArray(left.referenceIndexes),
+    ...normalizeIndexArray(right.referenceIndexes),
+  ])];
+  const filenames = [...new Set([
+    ...normalizeStringArray(left.filenames),
+    ...normalizeStringArray(right.filenames),
+  ])];
+  const specs = [...new Set([
+    ...normalizeDimensionSpecStrings(left.specs),
+    ...normalizeDimensionSpecStrings(right.specs),
+  ])];
+  const note = mergeSubjectNotes(left.note, [right.note]);
+  return {
+    ...left,
+    ...(left.label || right.label ? { label: left.label || right.label } : {}),
+    referenceIndexes,
+    filenames,
+    specs,
+    ...(left.variant || right.variant ? { variant: left.variant || right.variant } : {}),
+    ...(left.color || right.color ? { color: left.color || right.color } : {}),
+    ...(left.size || right.size ? { size: left.size || right.size } : {}),
+    ...(note ? { note } : {}),
+  };
+}
+
+function getDimensionGroupsForMatchedSubject(subject = {}, matchedSubjects = []) {
+  const subjectIndexes = getDimensionGroupBindingSet(subject, "referenceIndexes");
+  const subjectFilenames = getDimensionGroupBindingSet(subject, "filenames");
+  const entries = (Array.isArray(matchedSubjects) ? matchedSubjects : []).map((entry) => ({
+    entry,
+    groups: normalizeDimensionGroups(entry.dimensionGroups ?? entry.dimension_groups),
+  }));
+  const bindingCounts = getDimensionGroupBindingCounts(entries.flatMap(({ groups }) => groups));
+  return entries.flatMap(({ entry, groups }) => {
+    if (groups.length === 0) {
+      return [];
+    }
+
+    const effectiveIndexes = new Set(subjectIndexes);
+    const entryIndex = Number.parseInt(cleanString(entry.referenceIndex), 10);
+    if (Number.isFinite(entryIndex) && entryIndex > 0) {
+      effectiveIndexes.add(entryIndex);
+    }
+    const boundGroups = groups.filter((group) =>
+      getDimensionGroupBindingSet(group, "referenceIndexes").size > 0 ||
+      getDimensionGroupBindingSet(group, "filenames").size > 0,
+    );
+    const reliableBoundGroups = groups.filter((group) =>
+      getReliableDimensionGroupBindingSet(group, "referenceIndexes", bindingCounts).size > 0 ||
+      getReliableDimensionGroupBindingSet(group, "filenames", bindingCounts).size > 0,
+    );
+    const matchingBoundGroups = reliableBoundGroups.filter((group) =>
+      hasOverlappingSet(getReliableDimensionGroupBindingSet(group, "referenceIndexes", bindingCounts), effectiveIndexes) ||
+      hasOverlappingSet(getReliableDimensionGroupBindingSet(group, "filenames", bindingCounts), subjectFilenames),
+    );
+    if (matchingBoundGroups.length > 0) {
+      return matchingBoundGroups;
+    }
+    if (boundGroups.length > 0 || groups.length !== 1) {
+      return [];
+    }
+    return groups;
+  });
+}
+
+function mergeDimensionGroups(...values) {
+  const merged = [];
+  values.forEach((value) => {
+    normalizeDimensionGroups(value).forEach((group) => {
+      const existingIndex = merged.findIndex((existing) => canMergeDimensionGroups(existing, group));
+      if (existingIndex < 0) {
+        merged.push(group);
+        return;
+      }
+      merged[existingIndex] = mergeDimensionGroupPair(merged[existingIndex], group);
+    });
+  });
+  return merged;
+}
+
 function enrichSkuSubjectFromProductReferences(subject = {}, productReferenceSubjects = []) {
   const matchedSubjects = getMatchingProductReferenceSubjects(subject, productReferenceSubjects);
   if (matchedSubjects.length === 0) {
@@ -385,6 +566,10 @@ function enrichSkuSubjectFromProductReferences(subject = {}, productReferenceSub
           normalizeCreationSkuColorLabels(entry.colorName, normalizeSubjectUnitCount(entry.subjectUnitCount) > 1),
         ),
       ]);
+  const dimensionGroups = mergeDimensionGroups(
+    subject.dimensionGroups ?? subject.dimension_groups,
+    getDimensionGroupsForMatchedSubject(subject, matchedSubjects),
+  );
 
   return {
     ...subject,
@@ -392,6 +577,7 @@ function enrichSkuSubjectFromProductReferences(subject = {}, productReferenceSub
     ...(note ? { note } : {}),
     ...(colorNames.length > 0 ? { colorNames, colorName: colorNames.join(" ") } : {}),
     ...(subjectUnitCount ? { subjectUnitCount } : {}),
+    ...(dimensionGroups.length > 0 ? { dimensionGroups } : {}),
   };
 }
 
@@ -605,7 +791,9 @@ function mergeSameReferenceSubjects(subjects = [], roleMap = new Map()) {
         normalizeCreationSkuColorLabels(item.colorNames ?? item.colorName, normalizeSubjectUnitCount(item.subjectUnitCount) > 1),
       ),
     );
-    const dimensionGroups = group.flatMap((item) => normalizeDimensionGroups(item.dimensionGroups ?? item.dimension_groups));
+    const dimensionGroups = mergeDimensionGroups(
+      ...group.map((item) => item.dimensionGroups ?? item.dimension_groups),
+    );
     return [{
       id: filename,
       title: group.map((item) => cleanString(item.title)).filter(Boolean).join(" / ") || filename,

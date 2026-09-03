@@ -64,7 +64,14 @@ test("creation SKU payload preserves subject-specific dimension groups", () => {
           title: "Black L",
           filenames: ["black-large.png"],
           dimension_groups: [
-            { label: "Black L", reference_indexes: [3], specs: ["Length 24 cm", "Width 12 cm"] },
+            {
+              label: "Black L",
+              variant: "Black",
+              color: "Black",
+              size: "L",
+              reference_indexes: [3],
+              specs: ["Length 24 cm", "Width 12 cm"],
+            },
           ],
         },
       ],
@@ -75,8 +82,188 @@ test("creation SKU payload preserves subject-specific dimension groups", () => {
   });
 
   assert.deepEqual(subjects[0].dimensionGroups, [
-    { id: "Black L", label: "Black L", referenceIndexes: [3], filenames: [], specs: ["Length 24 cm", "Width 12 cm"] },
+    {
+      id: "Black L",
+      label: "Black L",
+      referenceIndexes: [3],
+      filenames: [],
+      specs: ["Length 24 cm", "Width 12 cm"],
+      variant: "Black",
+      color: "Black",
+      size: "L",
+    },
   ]);
+});
+
+test("creation SKU payload enriches a subject with matching reference dimension groups", () => {
+  const subjects = buildCreationSkuSubjectsForPayload({
+    analysis: {
+      skuSubjects: [
+        {
+          id: "red-small",
+          title: "Red S",
+          filenames: ["red-small.png"],
+          note: "Red small product.",
+        },
+      ],
+    },
+    applied: true,
+    dirty: false,
+    referenceRoles: [
+      {
+        index: 2,
+        filename: "red-small.png",
+        role: "product",
+        note: "Red S product reference.",
+        dimension_groups: [
+          {
+            id: "red-s",
+            label: "Red S",
+            variant: "Red",
+            color: "Red",
+            size: "S",
+            reference_indexes: [2],
+            specs: ["Length 12 cm", "Width 5 cm"],
+          },
+        ],
+      },
+    ],
+  });
+
+  assert.deepEqual(subjects[0].dimensionGroups, [
+    {
+      id: "red-s",
+      label: "Red S",
+      referenceIndexes: [2],
+      filenames: [],
+      specs: ["Length 12 cm", "Width 5 cm"],
+      variant: "Red",
+      color: "Red",
+      size: "S",
+    },
+  ]);
+});
+
+test("creation SKU payload merges duplicate subject and reference dimension groups without cross-pairing", () => {
+  const subjects = buildCreationSkuSubjectsForPayload({
+    analysis: {
+      skuSubjects: [
+        {
+          id: "red-small",
+          title: "Red S",
+          filenames: ["red-small.png"],
+          dimension_groups: [
+            {
+              label: "Red S",
+              variant: "Red",
+              color: "Red",
+              size: "S",
+              specs: ["Length 12 cm"],
+            },
+          ],
+        },
+      ],
+    },
+    applied: true,
+    dirty: false,
+    referenceRoles: [
+      {
+        index: 2,
+        filename: "red-small.png",
+        role: "product",
+        dimension_groups: [
+          {
+            label: "Red S",
+            variant: "Red",
+            color: "Red",
+            size: "S",
+            reference_indexes: [2],
+            specs: ["Length 12 cm", "Width 5 cm"],
+          },
+          {
+            label: "Blue L",
+            variant: "Blue",
+            color: "Blue",
+            size: "L",
+            reference_indexes: [3],
+            specs: ["Length 18 cm"],
+          },
+        ],
+      },
+    ],
+  });
+
+  assert.deepEqual(subjects[0].dimensionGroups.map((group) => [group.label, group.variant, group.color, group.size, group.referenceIndexes, group.specs]), [
+    ["Red S", "Red", "Red", "S", [2], ["Length 12 cm", "Width 5 cm"]],
+  ]);
+});
+
+test("creation SKU payload keeps unbound same-label dimension groups with different specs separate", () => {
+  const subjects = buildCreationSkuSubjectsForPayload({
+    analysis: {
+      skuSubjects: [
+        {
+          id: "red-small",
+          title: "Red S",
+          filenames: ["red-small.png"],
+          dimension_groups: [
+            { label: "Red S", specs: ["Length 12 cm"] },
+          ],
+        },
+      ],
+    },
+    applied: true,
+    dirty: false,
+    referenceRoles: [
+      {
+        index: 2,
+        filename: "red-small.png",
+        role: "product",
+        dimension_groups: [
+          { label: "Red S", specs: ["Length 13 cm"] },
+        ],
+      },
+    ],
+  });
+
+  assert.deepEqual(
+    subjects[0].dimensionGroups.map((group) => [group.label, group.referenceIndexes, group.filenames, group.specs]),
+    [
+      ["Red S", [], [], ["Length 12 cm"]],
+      ["Red S", [], [], ["Length 13 cm"]],
+    ],
+  );
+});
+
+test("creation SKU payload ignores dimension groups that share an ambiguous filename binding", () => {
+  const subjects = buildCreationSkuSubjectsForPayload({
+    analysis: {
+      skuSubjects: [
+        {
+          id: "red-small",
+          title: "Red S",
+          reference_indexes: [2],
+          filenames: ["red-small.png", "size-card.png"],
+        },
+      ],
+    },
+    applied: true,
+    dirty: false,
+    referenceRoles: [
+      {
+        index: 2,
+        filename: "red-small.png",
+        role: "product",
+        dimension_groups: [
+          { label: "Red S", filenames: ["size-card.png"], specs: ["Length 12 cm"] },
+          { label: "Blue L", filenames: ["size-card.png"], specs: ["Length 18 cm"] },
+        ],
+      },
+    ],
+  });
+
+  assert.equal(subjects.length, 1);
+  assert.equal(subjects[0].dimensionGroups, undefined);
 });
 
 test("creation SKU payload normalizes object-form dimension groups and specs", () => {

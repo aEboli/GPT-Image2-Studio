@@ -18,7 +18,7 @@ The system SHALL provide an `infographicRebuildEnabled` option in Creation Mode 
 - **AND** no `infographic-rebuild` items are appended
 
 ### Requirement: Infographic rebuild faithfully reconstructs only its source image
-Each `infographic-rebuild` item SHALL use its corresponding source infographic as the only visual and information authority, except for the selected target language, output format, resolution, and aspect ratio. The runtime prompt MUST reproduce all visible source text completely in the selected target language without summarization or invention. It MUST preserve the source image's visible product identity and variant, brand names, model names, spelling of non-translatable identifiers, numbers, units, parameters, claims, steps, lists, and the semantic relationships expressed by icons, arrows, callouts, and groupings.
+Each `infographic-rebuild` item SHALL use its corresponding source infographic as the only visual and information authority, except for the selected target language, output format, resolution, and aspect ratio. The runtime prompt MUST reproduce all translatable source text in the surrounding infographic layout completely in the selected target language without summarization or invention. Text physically printed, engraved, embossed, or embroidered on the depicted product or packaging remains in its original characters and language. It MUST preserve the source image's visible product identity and variant, brand names, model names, spelling of non-translatable identifiers, numbers, units, parameters, claims, steps, lists, and the semantic relationships expressed by icons, arrows, callouts, and groupings.
 
 The prompt MUST also require a substantial visual reconstruction rather than a near-copy. It SHALL require a new overall layout and information architecture and SHALL require materially changing at least three additional visual dimensions among composition and subject placement, background treatment, typography system, color treatment, spacing and grouping, and the design of cards, icons, arrows, callouts, or other information components. The result MUST be immediately recognizable as a newly designed infographic while communicating only the source image's information. Upscaling, cleanup, sharpening, small spacing adjustments, a minor color shift, or restyling the same grid MUST NOT satisfy the reconstruction requirement.
 
@@ -44,7 +44,8 @@ The prompt MUST also require a substantial visual reconstruction rather than a n
 
 #### Scenario: Runtime prompt honors selected target language
 - **WHEN** an `infographic-rebuild` item is generated with a selected target language
-- **THEN** the runtime prompt requires all translatable visible source text to be rendered completely in that language
+- **THEN** the runtime prompt requires all translatable surrounding layout text to be rendered completely in that language
+- **AND** it preserves existing text on the depicted physical product or packaging in its original language
 - **AND** it preserves brand names, model names, numbers, units, parameters, claims, steps, lists, and logical relationships
 - **AND** it does not import any other suite content or visual context
 
@@ -64,7 +65,7 @@ Generation requests for an `infographic-rebuild` item SHALL attach exactly that 
 - **AND** the matching source is not downscaled or re-encoded by the browser's general generation-reference compression path
 
 ### Requirement: Infographic rebuild imports only technical generation parameters
-The system SHALL continue passing the rebuild item's frozen model route, model, ratio, size, quality, format, and reasoning parameters to the image-generation API. The selected target language SHALL be the only suite field added as a reconstruction prompt instruction, and it SHALL control only faithful translation of visible source text. The system MUST NOT turn platform, product, reference-analysis, visual-style, Logo, audience, marketing, or conversion fields into reconstruction prompt instructions or additional image inputs.
+The system SHALL continue passing the rebuild item's frozen model route, model, ratio, size, quality, format, and reasoning parameters to the image-generation API. The selected target language SHALL be the only suite field added as a reconstruction prompt instruction, and it SHALL control only faithful translation of translatable source text in the surrounding infographic layout. The system MUST NOT turn platform, product, reference-analysis, visual-style, Logo, audience, marketing, or conversion fields into reconstruction prompt instructions or additional image inputs.
 
 #### Scenario: Rebuild generation uses saved technical parameters
 - **WHEN** an `infographic-rebuild` item is generated or repaired with saved output and technical parameters
@@ -89,7 +90,7 @@ The system SHALL persist `infographicRebuildEnabled` and appended `infographic-r
 - **AND** the request fails closed when the matching source file is not available
 
 ### Requirement: Infographic rebuild honors selected output controls
-The system SHALL apply the selected target language, output format, resolution, and aspect ratio to every `infographic-rebuild` generation request. Target language SHALL control visible translatable text through the runtime prompt. Output format, effective resolution, and aspect ratio SHALL be sent through the existing image-generation API parameters. Generation records SHALL persist the resolved values, and repair SHALL reuse the saved item values.
+The system SHALL apply the selected target language, output format, resolution, and aspect ratio to every `infographic-rebuild` generation request. Target language SHALL control translatable text in the surrounding infographic layout through the runtime prompt, while existing subject-surface text remains in its original language. Output format, effective resolution, and aspect ratio SHALL be sent through the existing image-generation API parameters. Generation records SHALL persist the resolved values, and repair SHALL reuse the saved item values.
 
 #### Scenario: Local and Worker generation use four selected controls
 - **WHEN** an `infographic-rebuild` item is generated through Local or Worker

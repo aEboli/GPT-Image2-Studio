@@ -5183,6 +5183,9 @@ test("creation record reuse tracks reference images that need reupload", async (
   assert.match(app, /role:\s*restoreEntry\?\.role \|\| "product"/);
   assert.match(app, /note:\s*restoreEntry\?\.note \|\| ""/);
   assert.match(app, /const dimensionGroups = normalizeCreationDimensionGroupsForPayload\(\s*roleEntry\?\.dimensionGroups \|\| roleEntry\?\.dimension_groups/);
+  assert.match(app, /const variant = String\(group\.variant \|\| group\.variantLabel \|\| group\.variant_label/);
+  assert.match(app, /const color = String\(group\.color \|\| group\.colorName \|\| group\.color_name/);
+  assert.match(app, /const size = String\(group\.size \|\| group\.sizeLabel \|\| group\.size_label/);
   assert.match(app, /dimensionGroups\.length > 0 \? \{ dimensionGroups \} : \{\}/);
   assert.match(app, /restoreEntry\?\.dimensionGroups\?\.length > 0 \? \{ dimensionGroups: restoreEntry\.dimensionGroups \} : \{\}/);
   assert.match(app, /markCreationReferenceRestoreEntryMissing\(target\?\.restoreEntryId\)/);
