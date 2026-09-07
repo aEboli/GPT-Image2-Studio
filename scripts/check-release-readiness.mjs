@@ -6,6 +6,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { parse } from "parse5";
 
+import { MAINTAINED_VERSION_FACT_TEMPLATES, findVersionFactDrift } from "./version-facts.mjs";
+
 const execFileAsync = promisify(execFile);
 const scriptsDir = dirname(fileURLToPath(import.meta.url));
 const projectRootDir = resolve(scriptsDir, "..");
@@ -210,6 +212,33 @@ async function requireWorkbenchVersionFact(path, versionLabel) {
   requireWorkbenchVersionElement(content, versionLabel);
 }
 
+// The anchored facts above are one occurrence per file. Badges, installer filenames, the
+// release-note link, and build-output paths also name the current version, and nothing
+// checked them: a bump could pass while the README still advertised the previous download.
+async function requireCurrentVersionFacts(rootDir, version) {
+  const drifted = [];
+  await Promise.all(
+    MAINTAINED_VERSION_FACT_TEMPLATES.map(async ({ relativePath, templates }) => {
+      let content;
+      try {
+        content = await readFile(join(rootDir, relativePath), "utf8");
+      } catch (error) {
+        if (error && typeof error === "object" && error.code === "ENOENT") {
+          return;
+        }
+        throw new Error(`${relativePath} 无法读取：${error instanceof Error ? error.message : String(error)}`);
+      }
+      for (const entry of findVersionFactDrift({ text: content, templates, version })) {
+        drifted.push(`${relativePath}:${entry.lineNumber} 出现 ${entry.found}，应为 ${entry.expected}`);
+      }
+    }),
+  );
+
+  if (drifted.length) {
+    throw new Error(`以下维护中的版本事实仍指向旧版本：\n  ${drifted.join("\n  ")}`);
+  }
+}
+
 async function runGit(rootDir, args) {
   try {
     return await execFileAsync("git", args, { cwd: rootDir, encoding: "utf8" });
@@ -264,6 +293,8 @@ export async function checkReleaseReadiness({ rootDir = projectRootDir, strict =
       /^\uFEFF?# GPT-Image2-Studio (v[0-9A-Za-z.+-]+)[\t ]*(?:\r?\n|$)/gu,
     ),
   ]);
+
+  await requireCurrentVersionFacts(rootDir, version);
 
   if (strict) {
     const status = await runGit(rootDir, ["status", "--porcelain=v1"]);

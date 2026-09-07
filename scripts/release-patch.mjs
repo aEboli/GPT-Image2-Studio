@@ -4,6 +4,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { replaceWorkbenchVersionFact } from "./check-release-readiness.mjs";
+import { findVersionFactDrift, getMaintainedVersionFactTemplates, replaceVersionFacts } from "./version-facts.mjs";
 
 const scriptsDir = dirname(fileURLToPath(import.meta.url));
 const projectRootDir = resolve(scriptsDir, "..");
@@ -60,6 +61,27 @@ function replaceMaintainedVersion(content, previousVersion, version, { relativeP
     throw new Error(`${relativePath} updated current-version fact is invalid`);
   }
   return updatedContent;
+}
+
+// The anchored fact above is one occurrence per file, but the same version also appears in
+// the shields.io badge, the installer and portable filenames quoted in prose, the
+// release-note link, and the build-output paths. Those were updated by hand and got
+// forgotten, which is why v0.2.10 shipped as a documentation-only repair release. Each
+// template is a literal ending in a delimiter, so this rewrites only real version facts and
+// leaves prose, historical sections, tag examples, and longer versions untouched.
+function replaceMaintainedVersionFacts(content, previousVersion, version, relativePath) {
+  const templates = getMaintainedVersionFactTemplates(relativePath);
+  if (!templates.length) {
+    return content;
+  }
+
+  const { text } = replaceVersionFacts({ text: content, templates, previousVersion, version });
+  const drift = findVersionFactDrift({ text, templates, version });
+  if (drift.length) {
+    const detail = drift.map((entry) => `${relativePath}:${entry.lineNumber} ${entry.found}`).join("; ");
+    throw new Error(`${relativePath} still names a stale version fact after the update: ${detail}`);
+  }
+  return text;
 }
 
 async function removeFileIfPresent(path, fileOperations) {
@@ -355,9 +377,11 @@ export async function bumpPatchRelease({ rootDir = projectRootDir, summary, file
     }
   }
 
-  const updatedMaintainedSources = maintainedSources.map((content, index) =>
-    replaceMaintainedVersion(content, previousVersion, version, maintainedVersionFiles[index]),
-  );
+  const updatedMaintainedSources = maintainedSources.map((content, index) => {
+    const { relativePath } = maintainedVersionFiles[index];
+    const anchored = replaceMaintainedVersion(content, previousVersion, version, maintainedVersionFiles[index]);
+    return replaceMaintainedVersionFacts(anchored, previousVersion, version, relativePath);
+  });
   packageJson.version = version;
   packageLock.version = version;
   packageLock.packages[""].version = version;

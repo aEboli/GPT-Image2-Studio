@@ -157,9 +157,7 @@ Configuration stays local: the Node service writes `.local/config.json`, the des
 
 ### Configure in the UI
 
-Open **Configuration** and choose the route mode, direct-call mode, or Gemini model channel. In **direct-call mode**, fill the image-generation provider and the text/vision provider separately. Each group has its own Base URL, API key, endpoint suffix, and model; the image group is used for generation/editing, while the text/vision group is used for analysis and other model calls. API keys are kept in local private storage and public configuration responses expose only configured status and a mask. Use **Test connection** or the matching **Fetch Models** button before a long generation job. Gateway behavior varies, so a successful connection test is not proof that every editing, reference, or maximum-size request is supported.
-
-Existing installations using `directBaseUrl`, `directApiKey`, `directEndpointPath`, `directImageModel`, and `directResponsesModel` continue to work as a bounded compatibility fallback. New channel-specific values take precedence independently, and a blank key input keeps the previously saved private key.
+The first-run walkthrough is in [Beginner API setup](#beginner-api-setup). Existing installations using `directBaseUrl`, `directApiKey`, `directEndpointPath`, `directImageModel`, and `directResponsesModel` continue to work as a bounded compatibility fallback. New channel-specific values take precedence independently, and a blank key input keeps the previously saved private key.
 
 Common endpoint suffixes:
 
@@ -397,7 +395,9 @@ Three consequences of that split are worth knowing before you pick a ratio:
 
 - **A size is only legal for its own ratio.** The requested pixels must be one of the candidates listed for the selected ratio; anything else is rejected before the upstream call with `当前比例 <ratio> 不支持分辨率 <size>` ("the current ratio does not support that resolution"). That is why `1:1` will not accept `1824x1024` even though `16:9` offers it.
 - **Switching the call channel resets a non-default size.** Pixel values and tier values share no members, so a saved `2048x2048` becomes `Auto` the moment you switch to the Gemini channel, and a saved `4K` becomes `Auto` when you switch back.
-- **The Gemini image path supports 10 of the 15 ratios.** It accepts `1:1`, `2:3`, `3:2`, `3:4`, `4:3`, `4:5`, `5:4`, `9:16`, `16:9`, and `21:9`. Selecting `9:21`, `2:1`, `1:2`, `3:1`, or `1:3` sends `1:1` upstream instead, because a tier string carries no dimensions for the nearest-ratio fallback to work from. The prompt still carries the ratio hint, so the result may be square even though the request asked for a banner.
+- **The Gemini image path supports 10 of the 15 ratios.** It accepts `1:1`, `2:3`, `3:2`, `3:4`, `4:3`, `4:5`, `5:4`, `9:16`, `16:9`, and `21:9`. The other five are substituted with the closest supported ratio that keeps the requested orientation: `2:1` and `3:1` become `16:9` and `21:9`; `1:2`, `9:21`, and `1:3` become `9:16`. On this channel the delivered shape is therefore close to your request rather than exact, and it stays landscape or portrait as asked.
+- **Quality and output format never reach the Gemini image path.** The request body only carries `aspectRatio` and `imageSize`; PNG vs JPG and the High quality control have no effect here.
+- **The Gemini image body is selected by the model name, not by the channel.** The name must contain `gemini` plus one of `image`, `banana`, `图像`, or `生图`. Any other model on this channel is posted to `chat/completions` with neither size nor ratio.
 
 ### Workflow limits
 
@@ -475,63 +475,11 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 
 ## Version history
 
-Every release also publishes its own notes, hashes, and verification record on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases).
+Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.13](./docs/releases/v0.2.13.md).
 
 ### v0.2.13
 
 - Article illustration planning now produces a dense consecutive-keyframe storyboard. The planner counts the source's natural paragraph clusters and asks for at least one finished frame per paragraph or distinct visual beat, plus extra consecutive frames whenever action, emotion, dialogue, camera angle, or location changes. No maximum illustration count is applied, and `recommendedImageCount` reports the frames actually produced.
 - Article illustration generation fans out the whole planned set through the same bounded-concurrency loop the other set modes use, honoring the configured generation concurrency and start delay instead of walking one item at a time. Pending reference cards in a run finish before storyboard items start, so later frames can use them.
 - A failed direct-route image request now names the endpoint it actually used and unwraps Node's bare `fetch failed` into the underlying reason (`ENOTFOUND`, `ECONNREFUSED`, a TLS error, or `UND_ERR_CONNECT_TIMEOUT`). This route rewrites `images/generations` to `images/edits` once references are attached, so the failing URL is not always the configured one.
-- Both READMEs gained a step-by-step [Beginner API setup](#beginner-api-setup) walkthrough: which credentials to collect, how to open the configuration panel, how to choose among route mode, direct-call mode, and the Gemini channel, what to type in each field, how the connection test and Fetch Models actions actually behave, and a table of common first-run failures.
-
-### v0.2.12
-
-- Creation SKU dimension facts now remain bound to their correct variant/reference group. Normalized `variant`, `color`, and `size` identifiers survive the browser payload, product-reference enrichment, and the planner, while shared or ambiguous reference bindings are not misapplied to a different SKU.
-- Creation prompts now make a clear language boundary: physical text printed, engraved, embossed, or embroidered on supplied products and packaging remains in its original language; newly authored surrounding layout text uses the selected language. Planning labels for platform, scenario, category, and visual language stay internal metadata rather than artwork text.
-- Infographic rebuild applies the same boundary while translating translatable headings, labels, callouts, captions, steps, package contents, and specifications in the surrounding layout faithfully into the selected language.
-- Prompt Agent parsing now accepts UTF-8 BOMs, fenced or surrounding JSON, harmless JSON trailing commas, duplicated response text paths, Chat Completions `choices[].delta.content`, SSE-shaped bodies without an event-stream content type, single JSON envelopes returned with that type, and a final SSE event closed without its trailing separator.
-
-### v0.2.11
-
-- The Temu workbench entry is now a direct entry. The Creation records toolbar button reads `temuexcel导出工作台`, no longer requires ticking any record, and is no longer disabled by an empty selection. Ticked records never trigger an automatic import dialog; use the workbench's own **Import from Studio** action instead.
-- The workbench variant section gained an **Add variant** action. Each use appends exactly one editable SKU row that inherits the product-level declared price, dimensions, weight, and stock, without rebuilding the two-variant cartesian matrix or rewriting existing rows.
-- Batch quick export moved into the workbench's **Batch quick export** tab.
-- The local gallery loads server-generated WebP thumbnails (512px longest edge) instead of full-size originals.
-- The main generation preview and the image lightbox reveal a finished image only after the browser has decoded it, fading in from a slight blur. Re-rendering the same image URL keeps it sharp instead of replaying the reveal. Image editing and quick blend share the same behavior.
-- The workbench no longer requests `fonts.googleapis.com` or `fonts.gstatic.com`. The interface uses a local system font stack, so the first paint depends on no third-party font host.
-- The Windows launcher collects the local TCP listener snapshot once per launch attempt, reuses an occupied port only after the Studio health endpoint succeeds, and otherwise picks the first available candidate port.
-- An ecommerce set item that reaches the local stream deadline now aborts only the stream read and keeps polling the original upstream task for up to 120 seconds, so background repair no longer resubmits a task that is still running. Late stream events and stale manifests no longer overwrite an image that was already saved.
-- Reference images separate functional-claim evidence from material and structure detail, and dimension facts for multi-colour, multi-size, or multi-unit variants bind to their own variant group instead of collapsing into one global summary.
-
-### v0.2.10
-
-- Documentation-only release. It aligns the README version facts with the shipped version: badge, this section, desktop installer and portable ZIP filenames, release-notes link, and build-output paths.
-
-### v0.2.9
-
-- Every generation entry point shares one circular liquid loading indicator: prompt-to-image, style transfer, ecommerce sets, portraits, article illustrations, PPT pages, image decomposition, blend analysis, image editing, and quick blend.
-- The indicator renders as real liquid. A crest and a counter-ripple travel horizontally, bubbles rise inside, and the level fills continuously between percentages instead of stepping.
-- Percentages advance in bands. At `20%` and below each `1%` takes `800ms`; above `20%` every additional `10%` band adds `1500ms` per `1%` (`2300ms` for `21%-30%`, `12800ms` for `91%-99%`), capped at `99%` until the full image is available.
-- A queued state was added. Tasks waiting to start show neither a percentage nor a timer; they use still water with a slow breathing ripple and a queued label, then switch to the generating state from `0%`.
-- Adjacent queue and filmstrip entries with identical placeholders now have a visible separator.
-- Under `prefers-reduced-motion: reduce`, breathing, crest travel, bubbles, and waiting ripples stop while level and percentage text still track progress.
-- Ecommerce set final images are delivered in chunks, failure and malformed-response recovery paths were tightened, and a generated-image validation module was added.
-- Multi-reference edits on the direct route no longer misalign reference relationships.
-- Prompt-to-image queues bound their capacity and enqueue locally instead of rejecting once concurrency is reached.
-- Retried prompt attempts keep their earlier preview cards instead of overwriting them.
-
-### v0.2.8
-
-- A quiet lower-left workbench version label backed by the root package version, plus a maintained patch command that increments each main application update by exactly `0.0.1` and checks all current version facts for drift.
-- Prompt Kit now restores reusable long-term Prompt Agent history as stable local templates without overwriting edits or recreating templates the user dismissed. Its desktop placement stays beside the prompt controls, while hover and focus help remains above panels and dialogs.
-- Prompt-to-image keeps its initial ten-image history baseline and appends only successful results from the current page session, up to fifty visible thumbnails. The loading preview uses continuous, phase-aware liquid motion without presenting visual motion as generation progress.
-- Image inspection keeps a stable desktop frame across landscape, square, and portrait images. Structured prompt arrays are grouped under their shared field so repeatable details are easier to scan.
-- A persistent Creation record workspace with an independently scrollable record list and image/Listing detail pane on wide screens, plus a collapsible selector on small screens.
-- Temu-compatible Excel export for selected Creation records. Each SKU uses one row, existing public HTTPS images are reused, and local images can optionally be uploaded through a Cloudinary unsigned upload preset.
-- Explicit export preflight. Missing Listing fields, price, dimensions, weight, stock, origin, or public image URLs stay empty and are listed in an `Export issues` worksheet instead of being guessed.
-- Evidence-aware Listing normalization, product/package measurement boundaries, safer buyer-facing titles, and SKU image names that do not expose internal part numbers or source filename codes.
-- Prompt/reference reuse improvements: independent clear actions, drag-and-drop reference images, recent-result reuse, and filename plus relative-path context in the image inspector.
-- A Vercel Serverless entry point that installs production dependencies and avoids Electron-only initialization in cloud functions. Vercel deployments use temporary storage and do not provide the local filesystem workflow.
-- Interrupted Responses streams first recover the original upstream result by response ID and bounded polling. If the final result still cannot be confirmed, the local app reuses the current task's original input for one automatic retry, displays `重试中` (`Retrying`), and never sends a third generation request after that retry is exhausted.
-- Prompt generation supports a fifteen-task pending window with ten shared concurrent slots across the supported prompt routes, while keeping the preview surface compact.
-- The retired Cloudflare Pages/Worker/R2/Queue path and its active deployment claims have been removed; local Node.js, Windows desktop, Windows browser installer, and Vercel remain documented separately.
+- Both READMEs gained a step-by-step [Beginner API setup](#beginner-api-setup) walkthrough.

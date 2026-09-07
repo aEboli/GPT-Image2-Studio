@@ -697,6 +697,50 @@ test("Gemini model protocol request body normalizes protocol image sizes", () =>
   );
 });
 
+test("Gemini unsupported aspect ratios keep the requested orientation instead of collapsing to square", () => {
+  const geminiAspectRatio = (aspectRatio, size = "1K") =>
+    createGeminiImageGenerationRequestBody({
+      prompt: "Create an image.",
+      size,
+      aspectRatio,
+      imageModel: "gemini-3.1-flash-image-preview",
+    }).generationConfig.imageConfig.aspectRatio;
+
+  const orientationOf = (ratio) => {
+    const [width, height] = String(ratio).split(":").map(Number);
+    if (width > height) return "landscape";
+    return width < height ? "portrait" : "square";
+  };
+
+  // The channel accepts 10 ratios; these five are the ones the UI offers but it does not.
+  // Their size is a tier string, so no width/height can be parsed from it — the ratio
+  // string itself has to supply the value the nearest-match search needs.
+  for (const ratio of ["2:1", "3:1"]) {
+    const resolved = geminiAspectRatio(ratio);
+    assert.notEqual(resolved, "1:1", `${ratio} must not collapse to square`);
+    assert.equal(orientationOf(resolved), "landscape", `${ratio} resolved to ${resolved}`);
+  }
+
+  for (const ratio of ["9:21", "1:2", "1:3"]) {
+    const resolved = geminiAspectRatio(ratio);
+    assert.notEqual(resolved, "1:1", `${ratio} must not collapse to square`);
+    assert.equal(orientationOf(resolved), "portrait", `${ratio} resolved to ${resolved}`);
+  }
+
+  // Supported ratios still pass through untouched.
+  for (const ratio of ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"]) {
+    assert.equal(geminiAspectRatio(ratio), ratio, `${ratio} is supported and must pass through`);
+  }
+
+  // An explicit pixel size still wins over the ratio string.
+  assert.equal(geminiAspectRatio("2:1", "1024x3072"), "9:16");
+
+  // Only an unparseable ratio with an unparseable size may fall back to square.
+  for (const ratio of ["", "abc", "0:0", "1:0"]) {
+    assert.equal(geminiAspectRatio(ratio), "1:1", `${JSON.stringify(ratio)} should fall back to square`);
+  }
+});
+
 test("direct image generation no longer switches request shape per selected image model", async () => {
   const requests = [];
   const fetchImpl = async (url, init) => {
