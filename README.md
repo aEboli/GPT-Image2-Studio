@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.12-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.13-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installers-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,13 +10,20 @@
 
 Prompt-to-image, reference analysis, editing, ecommerce sets, portraits, article illustrations, PPT generation, and asset history in one browser-based workspace.
 
-Current version: `v0.2.12`
+Current version: `v0.2.13`
 
 [Chinese README](./README.zh-CN.md)
 
 </div>
 
-## What is included in v0.2.12
+## What is included in v0.2.13
+
+- Article illustration planning now produces a dense consecutive-keyframe storyboard. The planner counts the source's natural paragraph clusters and asks for at least one finished frame per paragraph or distinct visual beat, plus extra consecutive frames whenever action, emotion, dialogue, camera angle, or location changes. No maximum illustration count is applied, and `recommendedImageCount` reports the frames actually produced.
+- Article illustration generation fans out the whole planned set through the same bounded-concurrency loop the other set modes use, honoring the configured generation concurrency and start delay instead of walking one item at a time. Pending reference cards in a run finish before storyboard items start, so later frames can use them.
+- A failed direct-route image request now names the endpoint it actually used and unwraps Node's bare `fetch failed` into the underlying reason (`ENOTFOUND`, `ECONNREFUSED`, a TLS error, or `UND_ERR_CONNECT_TIMEOUT`). This route rewrites `images/generations` to `images/edits` once references are attached, so the failing URL is not always the configured one.
+- Both READMEs gained a step-by-step [Beginner API setup](#beginner-api-setup) walkthrough: which credentials to collect, how to open the configuration panel, how to choose among route mode, direct-call mode, and the Gemini channel, what to type in each field, how the connection test and Fetch Models actions actually behave, and a table of common first-run failures.
+
+### Earlier in v0.2.12
 
 - Creation SKU dimension facts now remain bound to their correct variant/reference group. Normalized `variant`, `color`, and `size` identifiers survive the browser payload, product-reference enrichment, and the planner, while shared or ambiguous reference bindings are not misapplied to a different SKU.
 - Creation prompts now make a clear language boundary: physical text printed, engraved, embossed, or embroidered on supplied products and packaging remains in its original language; newly authored surrounding layout text uses the selected language. Planning labels for platform, scenario, category, and visual language stay internal metadata rather than artwork text.
@@ -187,6 +194,8 @@ The extension reads supported product regions only after the user starts a colle
 
 ## Quick start
 
+Installing is not enough on its own: nothing generates until you enter your own API credentials. On a first run, follow [Beginner API setup](#beginner-api-setup).
+
 ### Run from source
 
 Requirements:
@@ -212,9 +221,9 @@ On Windows, `launch-studio.cmd` starts the workbench and `stop-studio-services.c
 
 ### Windows desktop app (recommended)
 
-Download `GPT-Image2-Studio-Desktop-Setup-v0.2.12-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
+Download `GPT-Image2-Studio-Desktop-Setup-v0.2.13-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
 
-For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.12-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
+For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.13-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
 
 For desktop development, Electron 43 requires Node.js 22.12 or newer:
 
@@ -225,9 +234,102 @@ cmd /c npm run desktop
 
 ### Windows browser installer
 
-The legacy browser-installer flow remains documented for local builds, but the `v0.2.12` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
+The legacy browser-installer flow remains documented for local builds, but the `v0.2.13` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
 
 ## Configuration
+
+### Beginner API setup
+
+Start here on a first run. Studio ships no model quota and never holds keys for you. It stores your own API credentials on the local machine and calls the service you choose with them.
+
+#### Step 1: collect three things
+
+| What you need | Meaning | Example |
+| --- | --- | --- |
+| Base URL | The API root the provider gives you, usually ending in `/v1` | `https://api.openai.com/v1` |
+| API key | The key created in the provider's console | `sk-****` |
+| Model name | A model identifier spelled the way that provider spells it | `gpt-5.4-mini`, `gpt-image-2` |
+
+Create keys in the OpenAI console for the official channel; compatible services and third-party gateways publish their own base URL and key. Billing, rate limits, and content policy come from the provider you configure.
+
+#### Step 2: open the configuration panel
+
+- From source: run `cmd /c npm start` and open `http://127.0.0.1:3600`.
+- Desktop app: launch `GPT-Image2-Studio`. The built-in service uses a dynamic loopback port, so there is no address to type.
+- Click **配置** (Configuration) in the top-right corner, or use the top navigation **配置 → 配置 API**. The first card in the panel is the call channel.
+- The drawer header carries a `CN` / `EN` switch. Press `EN` once and the whole interface, including every label below, turns English.
+- Until a save succeeds, the top-right status stays on `配置未保存` (Configuration not saved).
+
+#### Step 3: pick one call channel
+
+Each channel is stored independently, and only the selected one is used for generation. When in doubt, keep the default route mode.
+
+| Channel | Fits a provider that | You fill in |
+| --- | --- | --- |
+| Route mode (default) | Supports `POST /responses` with the `image_generation` tool, such as OpenAI itself or a gateway aligned with it | Endpoint URL, API key, Responses model |
+| Direct-call mode | Only offers `images/generations` or `chat/completions`, or when image and text come from two different providers | Three image fields plus three text/vision fields |
+| Gemini model | Serves Gemini image models over the AGICTO image-generation protocol | Base URL, API key, image model |
+
+#### Step 4: fill in the fields for that channel
+
+**Route mode.** The endpoint suffix is fixed to `responses`:
+
+```text
+Endpoint URL: https://api.openai.com/v1
+API key:      sk-****
+Responses model: gpt-5.4-mini
+```
+
+The Responses model is the outer model. The image tool model is fixed to `gpt-image-2`, shown in the prompt page parameter row as `工具模型 gpt-image-2`.
+
+**Direct-call mode** splits into two independent groups. The image group only generates and edits images; the text/vision group handles prompt enhancement, reference analysis, Listing drafts, and other model calls. The two groups can point at different providers:
+
+```text
+Image API:       https://api.openai.com/v1   suffix images/generations   model gpt-image-2
+Text/vision API: https://api.openai.com/v1   suffix responses            model gpt-5.4-mini
+```
+
+**Gemini model.** The actual request is the base URL plus `/images/generations`:
+
+```text
+Base URL:    https://api.agicto.cn/v1
+API key:     <key from the provider>
+Image model: gemini-3.1-flash-image-preview
+```
+
+If the provider gave you one complete address instead, press **完整 URL** (Full URL) next to the endpoint field and paste the whole thing, for example `https://vendor.example/v1/responses`. Studio splits it into a base URL and an endpoint suffix.
+
+Leave the generation scheduling card at its defaults (`20` concurrent requests, `1000` ms between submissions). Both fields lock while any generation task is running.
+
+#### Step 5: test the connection, then save
+
+- Press **测试连接** (Test connection). For the selected channel it requests `GET <base URL>/v1/models` (appending `/v1` when the address does not already end with it) using `Authorization: Bearer <your key>`. A key you just typed and have not saved yet is included in that test.
+- **获取模型列表** (Fetch Models) uses the same endpoint, so you can pick a model name from the list instead of typing it.
+- Press **保存** (Save). The top-right status turns into `配置已保存` (Configuration saved) and a masked hint appears next to the API key field.
+- Saving with the API key box empty keeps the previously saved key rather than clearing it.
+
+A passing connection test only proves that the credentials and the `/models` endpoint work. It is not proof that the channel supports generation, editing, references, or the largest sizes. Some gateways never implement `/models`, so the test can fail while generation still works: type the model name by hand, save, and verify with one real generation.
+
+#### Step 6: generate one image to confirm
+
+Close the panel, go back to **提示词生图** (Prompt-to-image), write one short prompt, choose the `1:1` ratio, leave the size on automatic, and generate. Progress shows on the preview stage; the full log lives in the `生成日志` (Activity log) panel at the bottom of the configuration drawer. A successful image is written to:
+
+```text
+%USERPROFILE%\Pictures\YYYY-MM\MM-DD\prompt\
+```
+
+#### Common first-run problems
+
+| Symptom | Usual cause | What to do |
+| --- | --- | --- |
+| Status stays on `配置未保存` | Save was never pressed, or the filled-in group is not the selected channel | Confirm the selected channel is the group you filled in, then save |
+| Test connection returns 401 or reports an invalid key | Wrong key, whitespace pasted with it, or a key that does not belong to that base URL | Paste the key again and confirm key and address come from the same provider |
+| Test connection returns 404, or reports no callable model | The provider serves no `/models` list | Skip the test, type the model name, save, and verify with a real generation |
+| Generation reports an unknown model | The identifier is not spelled the way that provider spells it | Use Fetch Models to read the real names |
+| Route mode fails for images while text calls succeed | The provider does not support the Responses `image_generation` tool | Switch to direct-call mode and set the image suffix to `images/generations` |
+| A token or remote authentication prompt appears | You are reaching the local service over a non-loopback address | See [Remote access](#remote-access) |
+
+Configuration stays local: the Node service writes `.local/config.json`, the desktop build writes the Electron app-data directory, and cloud deployments keep private values in the browser. Do not leave keys on a shared machine.
 
 ### Configure in the UI
 
@@ -374,7 +476,7 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 ## Releases
 
 - The source and lockfile versions are authoritative; tags use `v<version>`.
-- Current release notes: [v0.2.12](./docs/releases/v0.2.12.md).
+- Current release notes: [v0.2.13](./docs/releases/v0.2.13.md).
 - Windows packages are distributed through [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Check the release notes for hashes and signing status.
 - `npm run check:release:strict` requires a clean worktree and a matching tag on the current commit.
 

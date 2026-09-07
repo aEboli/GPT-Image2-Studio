@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.12-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.13-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installer-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,11 +10,18 @@
 
 把提示词生图、参考图分析、图片编辑、电商套图、人物写真、文章插图、PPT 生成和素材管理集中到一个浏览器界面中。
 
-当前版本：`v0.2.12`
+当前版本：`v0.2.13`
 
 </div>
 
-## v0.2.12 更新说明
+## v0.2.13 更新说明
+
+- 文章插图规划改为连续关键帧分镜：规划器先统计原文的自然段落簇，要求每个段落或每个独立视觉节拍至少产出一张成品插图，动作、情绪、对话、镜头角度或地点发生变化时再追加连续帧。不再设置插图数量上限，`recommendedImageCount` 按实际产出的帧数返回。
+- 文章插图生成改为整套并发扩散：与其他套图模式使用同一个有界并发循环，遵循配置中的请求并发数量和任务提交间隔，不再按单项串行推进。同一批次里待生成的参考卡会先于分镜完成，供后续帧复用。
+- 直连图片请求连接失败时会指明实际使用的端点，并把 Node 的 `fetch failed` 展开为底层原因（`ENOTFOUND`、`ECONNREFUSED`、TLS 错误或 `UND_ERR_CONNECT_TIMEOUT`）。该路线在附带参考图后会把 `images/generations` 改写为 `images/edits`，失败的地址不一定是配置里那一条。
+- 两份 README 新增分步的[新手配置 API 教程](#新手配置-api-教程)：需要准备哪些凭据、如何打开配置面板、路由模式与直接调用模式和 Gemini 通道怎么选、每个字段填什么、测试连接与获取模型列表的真实行为，以及常见首次使用报错对照表。
+
+### v0.2.12 更新说明
 
 - 套图 SKU 的尺寸事实会继续绑定到正确的变种和参考图组。`variant`、`color`、`size` 标识从浏览器请求、商品参考图补全到规划器全程保留；共享或存在歧义的参考图绑定不会错误套用到其他 SKU。
 - 套图提示词明确区分文字边界：商品和包装实物表面已印刷、雕刻、压印或刺绣的文字保持原始语言；画布周边新创作的文字使用所选目标语言。平台、场景、类目和视觉语言等规划标签仅作内部元数据，不会成为画面文字。
@@ -238,6 +245,8 @@ GPT-Image2-Studio 面向个人创作者、电商运营、设计师和内容团�
 
 ## 快速开始
 
+装好之后还需要填入你自己的 API 凭据才能生成图片，第一次使用请按 [新手配置 API 教程](#新手配置-api-教程) 操作。
+
 ### 方式一：源码运行
 
 前置条件：
@@ -272,14 +281,14 @@ Windows 用户也可以双击 `launch-studio.cmd` 启动，使用 `stop-studio-s
 从包含桌面产物的 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
 
 ```text
-GPT-Image2-Studio-Desktop-Setup-v0.2.12-x64.exe
+GPT-Image2-Studio-Desktop-Setup-v0.2.13-x64.exe
 ```
 
 安装完成后通过桌面或开始菜单中的 `GPT-Image2-Studio` 启动。程序会在独立窗口中运行，内置服务使用动态回环端口，关闭窗口后不会遗留后台服务。无需另行安装 Node.js，完整说明见 [Windows 桌面程序文档](./docs/windows-desktop.md)。
 
 源码目录也可直接启动桌面开发版：
 
-如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.12-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
+如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.13-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
 
 桌面开发使用 Electron `43`，要求 Node.js `22.12` 或更高版本；普通 `npm start` 服务仍支持 Node.js `20+`。
 
@@ -290,9 +299,101 @@ cmd /c npm run desktop
 
 ### 方式三：Windows 浏览器安装包（兼容旧版）
 
-旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.12` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
+旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.13` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
 
 ## 配置说明
+
+### 新手配置 API 教程
+
+第一次使用请从这一节开始。Studio 不提供模型额度，也不代管密钥。它把你自己的 API 凭据保存在本机，再用这份凭据调用你选定的服务。下面是第一次跑通的最短路径。
+
+#### 第 1 步：先准备三样东西
+
+| 需要准备 | 说明 | 示例 |
+| --- | --- | --- |
+| 接口地址（Base URL） | 服务方给出的 API 根地址，通常以 `/v1` 结尾 | `https://api.openai.com/v1` |
+| API Key | 在服务方控制台生成的密钥 | `sk-****` |
+| 模型名 | 与该服务方命名一致的模型标识 | `gpt-5.4-mini`、`gpt-image-2` |
+
+官方渠道在 OpenAI 控制台创建 Key；兼容服务或第三方中转按其自身文档获取地址和 Key。费用、限额和内容政策都以实际服务方为准。
+
+#### 第 2 步：打开配置面板
+
+- 源码运行：执行 `cmd /c npm start`，浏览器打开 `http://127.0.0.1:3600`。
+- 桌面程序：直接启动 `GPT-Image2-Studio`，内置服务使用动态回环端口，不需要手动输入地址。
+- 点右上角的**配置**按钮，或顶部导航的**配置 → 配置 API**，面板第一张卡片就是「调用通道」。
+- 保存成功之前，右上角状态一直显示「配置未保存」。
+
+#### 第 3 步：选择一个调用通道
+
+三种通道各自独立保存，只有当前选中的那一组会被用于生成。不确定时先选默认的「路由模式」。
+
+| 通道 | 适合的服务 | 需要填写 |
+| --- | --- | --- |
+| 路由模式（默认） | 支持 `POST /responses` 并允许 `image_generation` 工具的服务，例如 OpenAI 官方或对齐官方协议的中转 | 接口地址、API Key、Responses 模型 |
+| 直接调用模式 | 只提供 `images/generations` 或 `chat/completions` 的服务，或者生图与文本来自两家不同服务 | 生图 API 三项 + 文本/视觉 API 三项 |
+| Gemini模型 | 按 AGICTO 图像生成协议调用的 Gemini 图像模型 | 基础 URL、API Key、图像模型 |
+
+#### 第 4 步：按通道填写字段
+
+**路由模式**，接口后缀固定为 `responses`：
+
+```text
+接口地址：https://api.openai.com/v1
+API Key：sk-****
+Responses 模型：gpt-5.4-mini
+```
+
+这里的「Responses 模型」是外层模型；生图工具模型固定为 `gpt-image-2`，在提示词页的参数区可以看到「工具模型 gpt-image-2」。
+
+**直接调用模式**分成两组，各自独立填写。生图组只负责图片生成和编辑，文本/视觉组负责提示词增强、参考图分析和 Listing 等模型调用，两组可以分别指向不同服务商：
+
+```text
+生图 API：https://api.openai.com/v1        后缀 images/generations   生图模型 gpt-image-2
+文本/视觉 API：https://api.openai.com/v1    后缀 responses            文本/视觉模型 gpt-5.4-mini
+```
+
+**Gemini模型**，实际请求为「基础 URL + `/images/generations`」：
+
+```text
+基础 URL：https://api.agicto.cn/v1
+API Key：<服务方提供的 Key>
+图像模型：gemini-3.1-flash-image-preview
+```
+
+如果服务方只给了一条完整地址，点接口地址右侧的**完整 URL**按钮，粘贴 `https://vendor.example/v1/responses` 这样的整条地址，Studio 会自动拆成基础地址与接口后缀。
+
+「生成调度」卡片里的请求并发数量和任务提交间隔保持默认即可（`20` 个、`1000` 毫秒）；有任务在跑时这两项会暂时锁定。
+
+#### 第 5 步：测试连接并保存
+
+- 点**测试连接**。它会针对当前通道请求 `GET <基础地址>/v1/models`（地址未以 `/v1` 结尾时自动补上），带 `Authorization: Bearer <你的 Key>`。刚输入、还没保存的 Key 也会参与这次测试。
+- 点**获取模型列表**使用同一个接口，成功后可以直接从下拉列表里选模型名，不用手打。
+- 点**保存**。右上角状态变为「配置已保存」，API Key 输入框旁边显示脱敏掩码。
+- API Key 留空再保存表示保留上次保存的 Key，不会把它清空。
+
+连接测试只证明凭据和 `/models` 接口可用，不代表该通道支持生图、图片编辑、参考图或最大分辨率。部分中转不实现 `/models`，这时测试会失败但生图仍可能正常：直接手填模型名保存，用一次真实生成来验证。
+
+#### 第 6 步：生成第一张图确认打通
+
+关闭配置面板，回到**提示词生图**，写一句提示词，比例选 `1:1`，分辨率保持自动，点生成。进度可以在预览区查看，完整日志在配置面板底部的「生成日志」里。成功后图片保存在：
+
+```text
+%USERPROFILE%\Pictures\YYYY-MM\MM-DD\prompt\
+```
+
+#### 常见问题对照
+
+| 现象 | 常见原因 | 处理方式 |
+| --- | --- | --- |
+| 右上角一直显示「配置未保存」 | 没点保存，或填写的组与当前选中的通道不是同一个 | 确认选中的通道就是你填写的那一组，再点保存 |
+| 测试连接返回 401 或提示密钥无效 | Key 填错、粘贴时带了空格、Key 与接口地址不属于同一服务方 | 重新粘贴 Key，确认地址与 Key 来自同一服务方 |
+| 测试连接返回 404，或提示未找到可调用模型 | 该服务不提供 `/models` 列表接口 | 跳过测试，手填模型名保存，用一次真实生成验证 |
+| 生成时提示模型不存在 | 模型标识与该服务方的命名不一致 | 用「获取模型列表」查看真实模型名后再填 |
+| 路由模式生图失败，但文本类调用正常 | 该服务不支持 Responses 的 `image_generation` 工具 | 改用直接调用模式，生图组后缀选 `images/generations` |
+| 提示需要令牌或远程访问认证 | 正在通过非回环地址访问本地服务 | 见下方「局域网访问与请求令牌」 |
+
+配置保存在本机：本地 Node 服务写入 `.local/config.json`，桌面程序写入 Electron 应用数据目录，云端部署由浏览器侧保存。不要在公共设备上保留密钥。
 
 ### 在界面中配置 API
 
@@ -443,8 +544,8 @@ cmd /c npm run build:desktop
 产物路径：
 
 ```text
-artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.12-x64.exe
-artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.12-x64.zip
+artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.13-x64.exe
+artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.13-x64.zip
 artifacts/desktop/win-unpacked/GPT-Image2-Studio.exe
 ```
 
@@ -462,7 +563,7 @@ cmd /c npm run build:installer
 产物路径格式：
 
 ```text
-artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.12.exe
+artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.13.exe
 ```
 
 脚本使用系统 `iexpress.exe` 生成自解压安装包，并把当前 Node.js 运行时和依赖打入安装目录；启动后仍使用默认浏览器显示工作台。
@@ -663,7 +764,7 @@ cmd /c npm run build:installer
 ## 版本发布
 
 - 版本号以 `package.json` 和 `package-lock.json` 为准。
-- Git tag 使用 `v<version>`，例如 `v0.2.12`。
+- Git tag 使用 `v<version>`，例如 `v0.2.13`。
 - Release 标题建议使用 `GPT-Image2-Studio v<version>`。
 - Release 应附带变更说明、验证结果、Windows 桌面安装包、免安装 ZIP；如仍分发兼容版，应明确区分三个文件的启动形态。
 - 正式发布提交与标签就绪后运行 `npm run check:release:strict`，确认工作树干净且标签与版本一致。
