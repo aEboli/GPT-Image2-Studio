@@ -21,6 +21,7 @@ export const MAINTAINED_VERSION_FACT_TEMPLATES = [
       "GPT-Image2-Studio-Desktop-Setup-v{version}-x64.exe",
       "GPT-Image2-Studio-Portable-v{version}-x64.zip",
       "[v{version}](./docs/releases/v{version}.md)",
+      "`v{version}` GitHub Release",
     ],
   },
   {
@@ -30,6 +31,8 @@ export const MAINTAINED_VERSION_FACT_TEMPLATES = [
       "GPT-Image2-Studio-Desktop-Setup-v{version}-x64.exe",
       "GPT-Image2-Studio-Portable-v{version}-x64.zip",
       "GPT-Image2-Studio-Setup-v{version}.exe",
+      "[v{version}](./docs/releases/v{version}.md)",
+      "`v{version}` GitHub Release",
     ],
   },
   {
@@ -42,7 +45,7 @@ export const MAINTAINED_VERSION_FACT_TEMPLATES = [
   },
   {
     relativePath: "docs/windows-installer.md",
-    templates: ["GPT-Image2-Studio-Setup-v{version}.exe"],
+    templates: ["GPT-Image2-Studio-Setup-v{version}.exe", "`v{version}` GitHub Release"],
   },
 ];
 
