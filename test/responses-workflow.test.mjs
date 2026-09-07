@@ -659,7 +659,7 @@ test("model protocol image generation explains image generation endpoint mismatc
   await assert.rejects(
     () =>
       requestModelProtocolImageGeneration({
-        baseUrl: "https://api.agicto.cn/v1",
+        baseUrl: "https://relay.example.test/v1",
         apiKey: "protocol-key",
         prompt: "Create a tiny studio product photo.",
         size: "4K",
@@ -3256,12 +3256,12 @@ test("requestImageGeneration keeps a final image that arrives before a terminal 
   assert.equal(events.some((event) => event.type === "status" && event.stage === "retrying_upstream"), false);
 });
 
-test("requestImageGeneration accepts AGICTO-style completed final image before trailing failed event", async () => {
+test("requestImageGeneration accepts relay-style completed final image before trailing failed event", async () => {
   const requests = [];
   const events = [];
 
   const result = await requestImageGeneration({
-    baseUrl: "https://api.agicto.cn/v1",
+    baseUrl: "https://relay.example.test/v1",
     apiKey: "test-key",
     prompt: "Create a stable final image through a proxy.",
     size: "1024x1024",
@@ -3275,7 +3275,7 @@ test("requestImageGeneration accepts AGICTO-style completed final image before t
       return new Response(
         [
           "event: response.completed",
-          'data: {"type":"response.completed","response":{"output":[{"type":"image_generation_call","result":"YWdpY3RvLWZpbmFs"}]}}',
+          'data: {"type":"response.completed","response":{"output":[{"type":"image_generation_call","result":"cmVsYXktZmluYWw="}]}}',
           "",
           "event: response.failed",
           'data: {"type":"response.failed","response":{"error":{"code":"rate_limit_exceeded","message":"late proxy failure"}}}',
@@ -3296,17 +3296,17 @@ test("requestImageGeneration accepts AGICTO-style completed final image before t
 
   assert.deepEqual(requests, [
     {
-      url: "https://api.agicto.cn/v1/responses",
+      url: "https://relay.example.test/v1/responses",
       stream: true,
       size: "1024x1024",
     },
   ]);
-  assert.equal(result.finalImageBase64, "YWdpY3RvLWZpbmFs");
+  assert.equal(result.finalImageBase64, "cmVsYXktZmluYWw=");
   assert.equal(result.responseCompleted, true);
   assert.equal(result.fallbackUsed, false);
   assert.deepEqual(
     events.filter((event) => event.type === "final_image").map((event) => event.base64),
-    ["YWdpY3RvLWZpbmFs"],
+    ["cmVsYXktZmluYWw="],
   );
   assert.equal(events.some((event) => event.type === "status" && event.stage === "retrying_upstream"), false);
 });

@@ -92,7 +92,7 @@ Each channel is stored independently, and only the selected one is used for gene
 | --- | --- | --- |
 | Route mode (default) | Supports `POST /responses` with the `image_generation` tool, such as OpenAI itself or a gateway aligned with it | Endpoint URL, API key, Responses model |
 | Direct-call mode | Only offers `images/generations` or `chat/completions`, or when image and text come from two different providers | Three image fields plus three text/vision fields |
-| Gemini model | Serves Gemini image models over the AGICTO image-generation protocol | Base URL, API key, image model |
+| Gemini model | Serves Gemini image models over an OpenAI-compatible image-generation protocol | Base URL, API key, image model |
 
 #### Step 4: fill in the fields for that channel
 
@@ -116,7 +116,7 @@ Text/vision API: https://api.openai.com/v1   suffix responses            model g
 **Gemini model.** The actual request is the base URL plus `/images/generations`:
 
 ```text
-Base URL:    https://api.agicto.cn/v1
+Base URL:    https://api.vendor.example/v1
 API key:     <key from the provider>
 Image model: gemini-3.1-flash-image-preview
 ```

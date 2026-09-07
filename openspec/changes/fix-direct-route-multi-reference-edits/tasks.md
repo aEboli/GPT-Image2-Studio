@@ -29,7 +29,7 @@
 
 Verification notes:
 
-Root cause, measured against the live relay `https://api.agicto.cn/v1` with `gpt-image-2`:
+Root cause, measured against the live relay `https://relay.example.test/v1` with `gpt-image-2`:
 
 - `images/generations` with the app's exact body: HTTP 200, valid PNG, 113-152 s.
 - `images/edits` with a single `image` part and the app's exact body: HTTP 200, valid PNG,

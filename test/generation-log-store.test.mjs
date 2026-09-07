@@ -72,21 +72,21 @@ test("generation log entries keep their first order slot while text updates", ()
 });
 
 test("generation log relay url is stored bare and rendered with one prefix", () => {
-  assert.equal(normalizeGenerationLogRelayUrl("https://api.agicto.cn/v1"), "https://api.agicto.cn/v1");
-  assert.equal(normalizeGenerationLogRelayUrl("URL：https://api.agicto.cn/v1"), "https://api.agicto.cn/v1");
-  assert.equal(normalizeGenerationLogRelayUrl("中转: https://api.agicto.cn/v1"), "https://api.agicto.cn/v1");
+  assert.equal(normalizeGenerationLogRelayUrl("https://relay.example.test/v1"), "https://relay.example.test/v1");
+  assert.equal(normalizeGenerationLogRelayUrl("URL：https://relay.example.test/v1"), "https://relay.example.test/v1");
+  assert.equal(normalizeGenerationLogRelayUrl("中转: https://relay.example.test/v1"), "https://relay.example.test/v1");
   assert.equal(normalizeGenerationLogRelayUrl(""), "");
-  assert.equal(formatGenerationLogRelayText("https://api.agicto.cn/v1"), "URL：https://api.agicto.cn/v1");
-  assert.equal(formatGenerationLogRelayText("URL：https://api.agicto.cn/v1"), "URL：https://api.agicto.cn/v1");
+  assert.equal(formatGenerationLogRelayText("https://relay.example.test/v1"), "URL：https://relay.example.test/v1");
+  assert.equal(formatGenerationLogRelayText("URL：https://relay.example.test/v1"), "URL：https://relay.example.test/v1");
   assert.equal(formatGenerationLogRelayText(""), "");
 });
 
 test("generation log keeps the queued relay url across later updates and lets a result refine it", () => {
-  const queuedStore = upsertGenerationLogEntry(createGenerationLogStore(), buildEntry({ relayUrl: "https://api.agicto.cn/v1" }));
+  const queuedStore = upsertGenerationLogEntry(createGenerationLogStore(), buildEntry({ relayUrl: "https://relay.example.test/v1" }));
   const failedStore = upsertGenerationLogEntry(queuedStore, buildEntry({ detail: "最终失败：fetch failed", status: "error", at: "2026-08-28T10:02:00.000Z" }));
-  assert.equal(getGenerationLogChannelEntries(failedStore, "prompt")[0].relayUrl, "https://api.agicto.cn/v1");
+  assert.equal(getGenerationLogChannelEntries(failedStore, "prompt")[0].relayUrl, "https://relay.example.test/v1");
 
-  const refinedStore = upsertGenerationLogEntry(failedStore, buildEntry({ key: "job-2:task", relayUrl: "https://api.agicto.cn/v1" }));
+  const refinedStore = upsertGenerationLogEntry(failedStore, buildEntry({ key: "job-2:task", relayUrl: "https://relay.example.test/v1" }));
   const resultStore = upsertGenerationLogEntry(refinedStore, buildEntry({ key: "job-2:task", relayUrl: "https://api.openai.com/v1", status: "done" }));
   assert.equal(getGenerationLogChannelEntries(resultStore, "prompt").find((entry) => entry.key === "job-2:task").relayUrl, "https://api.openai.com/v1");
 });
@@ -94,7 +94,7 @@ test("generation log keeps the queued relay url across later updates and lets a 
 test("generation log failure entry keeps the queued relay url when the job is already gone", () => {
   // The failure path can fire after the job left state.jobs, so it may pass no
   // relay url at all. The queued value must survive rather than blanking the row.
-  const queuedStore = upsertGenerationLogEntry(createGenerationLogStore(), buildEntry({ relayUrl: "https://api.agicto.cn/v1" }));
+  const queuedStore = upsertGenerationLogEntry(createGenerationLogStore(), buildEntry({ relayUrl: "https://relay.example.test/v1" }));
   const failedStore = upsertGenerationLogEntry(queuedStore, buildEntry({
     title: "失败",
     detail: "最终失败：fetch failed",
@@ -105,8 +105,8 @@ test("generation log failure entry keeps the queued relay url when the job is al
 
   const entry = getGenerationLogChannelEntries(failedStore, "prompt")[0];
   assert.equal(entry.status, "error");
-  assert.equal(entry.relayUrl, "https://api.agicto.cn/v1");
-  assert.equal(formatGenerationLogRelayText(entry.relayUrl), "URL：https://api.agicto.cn/v1");
+  assert.equal(entry.relayUrl, "https://relay.example.test/v1");
+  assert.equal(formatGenerationLogRelayText(entry.relayUrl), "URL：https://relay.example.test/v1");
 });
 
 test("generation log groups a batch into one row with derived counts", () => {
@@ -117,7 +117,7 @@ test("generation log groups a batch into one row with derived counts", () => {
       groupLabel: "套图批次",
       groupItemId: itemId,
       totalCount: 8,
-      relayUrl: "https://api.agicto.cn/v1",
+      relayUrl: "https://relay.example.test/v1",
       title: `第 ${index + 1} 张`,
       detail: "正在生成图片",
       status: "active",
@@ -130,7 +130,7 @@ test("generation log groups a batch into one row with derived counts", () => {
   assert.equal(rows[0].kind, "group");
   assert.equal(rows[0].groupId, "set-1");
   assert.equal(rows[0].children.length, 4);
-  assert.equal(rows[0].relayUrl, "https://api.agicto.cn/v1");
+  assert.equal(rows[0].relayUrl, "https://relay.example.test/v1");
 
   const settledStore = ["a", "b", "c", "d", "e"].reduce((accumulator, itemId, index) => {
     return upsertGenerationLogGroupEntry(accumulator, {
@@ -249,15 +249,15 @@ test("generation log cross-channel view labels every row with its channel", () =
 
 test("generation log persists per channel and migrates the legacy single feed", () => {
   const store = upsertGenerationLogGroupEntry(
-    upsertGenerationLogEntry(createGenerationLogStore(), buildEntry({ relayUrl: "https://api.agicto.cn/v1", status: "done" })),
+    upsertGenerationLogEntry(createGenerationLogStore(), buildEntry({ relayUrl: "https://relay.example.test/v1", status: "done" })),
     { channel: "creation", groupId: "set-1", groupItemId: "a", status: "done", at: "2026-08-28T10:01:00.000Z" },
   );
 
   const restored = parseGenerationLogStore(JSON.stringify(serializeGenerationLogStore(store)));
-  assert.equal(getGenerationLogChannelEntries(restored, "prompt")[0].relayUrl, "https://api.agicto.cn/v1");
+  assert.equal(getGenerationLogChannelEntries(restored, "prompt")[0].relayUrl, "https://relay.example.test/v1");
   assert.equal(getGenerationLogChannelEntries(restored, "creation")[0].children.length, 1);
 
-  const legacy = parseGenerationLogStore(JSON.stringify([{ key: "job-old:task", title: "已完成", detail: "图像已成功生成", status: "done", at: "2026-08-27T10:00:00.000Z", paramsText: "URL：https://api.agicto.cn/v1" }]));
+  const legacy = parseGenerationLogStore(JSON.stringify([{ key: "job-old:task", title: "已完成", detail: "图像已成功生成", status: "done", at: "2026-08-27T10:00:00.000Z", paramsText: "URL：https://relay.example.test/v1" }]));
   const migrated = getGenerationLogChannelEntries(legacy, "prompt");
   assert.equal(migrated.length, 1);
   assert.equal(migrated[0].key, "job-old:task");

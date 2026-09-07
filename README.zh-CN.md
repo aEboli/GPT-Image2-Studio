@@ -103,7 +103,7 @@ cmd /c npm run desktop
 | --- | --- | --- |
 | 路由模式（默认） | 支持 `POST /responses` 并允许 `image_generation` 工具的服务，例如 OpenAI 官方或对齐官方协议的中转 | 接口地址、API Key、Responses 模型 |
 | 直接调用模式 | 只提供 `images/generations` 或 `chat/completions` 的服务，或者生图与文本来自两家不同服务 | 生图 API 三项 + 文本/视觉 API 三项 |
-| Gemini模型 | 按 AGICTO 图像生成协议调用的 Gemini 图像模型 | 基础 URL、API Key、图像模型 |
+| Gemini模型 | 按 OpenAI 兼容的图像生成协议调用的 Gemini 图像模型 | 基础 URL、API Key、图像模型 |
 
 #### 第 4 步：按通道填写字段
 
@@ -127,7 +127,7 @@ Responses 模型：gpt-5.4-mini
 **Gemini模型**，实际请求为「基础 URL + `/images/generations`」：
 
 ```text
-基础 URL：https://api.agicto.cn/v1
+基础 URL：https://api.vendor.example/v1
 API Key：<服务方提供的 Key>
 图像模型：gemini-3.1-flash-image-preview
 ```

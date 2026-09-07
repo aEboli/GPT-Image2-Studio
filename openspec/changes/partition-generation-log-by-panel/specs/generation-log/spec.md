@@ -121,8 +121,8 @@
 
 #### Scenario: Failed entry shows the same URL as a successful one
 
-- **WHEN** 一个任务失败，且该板块的中转地址为 `https://api.agicto.cn/v1`
-- **THEN** 失败条目显示 `URL：https://api.agicto.cn/v1`
+- **WHEN** 一个任务失败，且该板块的中转地址为 `https://relay.example.test/v1`
+- **THEN** 失败条目显示 `URL：https://relay.example.test/v1`
 - **AND** 文案与成功条目的 URL 行格式一致
 
 #### Scenario: Queued and running entries show the URL

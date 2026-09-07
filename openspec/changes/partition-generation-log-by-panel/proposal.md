@@ -2,7 +2,7 @@
 
 当前生成日志有三个问题：
 
-1. **失败条目缺少中转 URL。** `recordActivity` 只从 `paramsText` 推导中转地址，而失败路径（`handleActivityFailure`）从不传该字段，所以“图片已生成”带 `URL：https://api.agicto.cn/v1`，“生成失败”却什么都不带，排查失败时看不出走的是哪个中转。
+1. **失败条目缺少中转 URL。** `recordActivity` 只从 `paramsText` 推导中转地址，而失败路径（`handleActivityFailure`）从不传该字段，所以“图片已生成”带 `URL：https://relay.example.test/v1`，“生成失败”却什么都不带，排查失败时看不出走的是哪个中转。
 2. **所有板块挤在同一条日志里。** 只有一个全局 `state.activityFeed`（上限 12 条）渲染到配置区的单个列表，提示词生图、风格迁移、图片编辑、快速溶图等板块的条目互相顶掉，看某个板块的日志要在混排里翻找。
 3. **套图、写真、文章插图、PPT 完全没有日志。** 这些入口走各自的 SSE 流，从不调用 `recordActivity`，其中套图更是被 `creation-mode` 规范明确要求不写入日志。批量生图恰恰最需要日志，但逐张平铺又会瞬间冲掉其它板块的记录。
 

@@ -115,7 +115,7 @@ function buildStore() {
     title: "已完成",
     detail: "图像已成功生成",
     status: "done",
-    relayUrl: "https://api.agicto.cn/v1",
+    relayUrl: "https://relay.example.test/v1",
     ratio: "1:1",
     size: "1024x1024",
     modeLabel: "路由模式",
@@ -129,7 +129,7 @@ function buildStore() {
       groupLabel: "套图批次 001",
       groupItemId: itemId,
       totalCount: 8,
-      relayUrl: "https://api.agicto.cn/v1",
+      relayUrl: "https://relay.example.test/v1",
       title: `第 ${index + 1} 张`,
       detail: index === 0 ? "图像已成功生成" : "最终失败：fetch failed",
       status: index === 0 ? "done" : "error",
@@ -151,7 +151,7 @@ test("generation log panel renders flat entries with the relay url on one line",
   assert.equal(list.children.length, 1);
   assert.equal(list.children[0].className.includes("timeline-item-group"), false);
   assert.deepEqual(getText(list, "timeline-summary"), ["图片已生成"]);
-  assert.deepEqual(getText(list, "timeline-relay"), ["URL：https://api.agicto.cn/v1"]);
+  assert.deepEqual(getText(list, "timeline-relay"), ["URL：https://relay.example.test/v1"]);
   assert.equal(list.children[0].classList.contains("has-relay"), true);
   assert.deepEqual(getText(list, "timeline-ratio-size"), ["1:1 (1024x1024)"]);
   assert.deepEqual(getText(list, "timeline-mode"), ["路由模式"]);
@@ -176,15 +176,15 @@ test("generation log panel shows a failed entry with the same url format as a su
   const list = createTestElement("ol", documentRef);
   renderGenerationLogRows(list, {
     entries: [
-      { key: "job-1:task", title: "已完成", detail: "图像已成功生成", status: "done", relayUrl: "https://api.agicto.cn/v1", at: "2026-08-28T10:00:00.000Z" },
-      { key: "job-2:task", title: "失败", detail: "最终失败：fetch failed", status: "error", relayUrl: "https://api.agicto.cn/v1", at: "2026-08-28T10:01:00.000Z" },
+      { key: "job-1:task", title: "已完成", detail: "图像已成功生成", status: "done", relayUrl: "https://relay.example.test/v1", at: "2026-08-28T10:00:00.000Z" },
+      { key: "job-2:task", title: "失败", detail: "最终失败：fetch failed", status: "error", relayUrl: "https://relay.example.test/v1", at: "2026-08-28T10:01:00.000Z" },
     ],
     channel: "prompt",
     documentRef,
   });
 
   assert.deepEqual(getText(list, "timeline-summary"), ["图片已生成", "生成失败"]);
-  assert.deepEqual(getText(list, "timeline-relay"), ["URL：https://api.agicto.cn/v1", "URL：https://api.agicto.cn/v1"]);
+  assert.deepEqual(getText(list, "timeline-relay"), ["URL：https://relay.example.test/v1", "URL：https://relay.example.test/v1"]);
   assert.deepEqual(getText(list, "timeline-detail"), ["fetch failed"]);
 });
 
@@ -200,7 +200,7 @@ test("generation log panel collapses batch groups by default and expands on dema
   assert.equal(groupRow.dataset.generationLogGroupExpanded, "false");
   assert.deepEqual(getText(list, "timeline-summary"), ["套图批次 001"]);
   assert.deepEqual(getText(list, "timeline-group-summary"), ["8 张 · 完成 1 · 失败 1 · 进行中 6"]);
-  assert.deepEqual(getText(list, "timeline-relay"), ["URL：https://api.agicto.cn/v1"]);
+  assert.deepEqual(getText(list, "timeline-relay"), ["URL：https://relay.example.test/v1"]);
   assert.equal(groupRow.className.includes("active"), true);
   assert.equal(list.querySelector(".timeline-group-toggle").getAttribute("aria-expanded"), "false");
 

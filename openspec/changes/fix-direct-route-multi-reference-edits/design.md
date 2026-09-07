@@ -6,7 +6,7 @@ studio mode. When a caller supplies usable reference images and the configured e
 `createImageEditFormData` then chooses the multipart field name by source count:
 `image[]` for two or more, `image` for one.
 
-Observed live relay behavior (`https://api.agicto.cn/v1`, `gpt-image-2`):
+Observed live relay behavior (`https://relay.example.test/v1`, `gpt-image-2`):
 
 | Attempt | Result |
 | --- | --- |
