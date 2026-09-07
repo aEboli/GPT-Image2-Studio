@@ -129,6 +129,9 @@ test("article illustration API routes are exposed separately from ecommerce crea
   assert.match(server, /url\.pathname === "\/api\/article-illustration\/generate"/);
   assert.match(server, /url\.pathname === "\/api\/article-illustration\/sets"/);
   assert.doesNotMatch(server, /CREATION_IMAGE_COUNT_OPTIONS[\s\S]*article-illustration/);
+  assert.match(server, /const generationWaves = \[referenceTargetItems, storyboardTargetItems\]/);
+  assert.match(server, /await runWithConcurrency\(wave, generationConcurrency,/);
+  assert.doesNotMatch(server, /for \(const item of targetItems\)/);
 });
 
 test("article planning ignores a response after source inputs change", async () => {

@@ -176,10 +176,20 @@ test("every server fan-out waits for a shared launch turn after its slot and bef
   const server = await readFile(new URL("../server.mjs", import.meta.url), "utf8");
 
   const scopeDeclarations = server.match(/const generationStartDelayMs = resolveGenerationStartDelayMs\(formData, config\);/g) || [];
-  const fanOutSections = server.split("await runWithConcurrency(").slice(1);
+  // The article worker keeps its slot and launch-gate code in a named helper,
+  // while the other fan-outs keep it inline inside the runWithConcurrency call.
+  // Normalize both shapes before checking the ordering contract.
+  const articleWorker = server.match(
+    /async function generateArticleIllustrationItem[\s\S]*?(?=\r?\n    try \{\r?\n      for \(const wave of generationWaves)/,
+  )?.[0] || "";
+  const inlineFanOutSections = server
+    .split("await runWithConcurrency(")
+    .slice(1)
+    .filter((section) => section.includes("await waitForResponseSessionTaskSlot("));
+  const fanOutSections = [...inlineFanOutSections, articleWorker];
 
-  assert.equal(fanOutSections.length, 5, "creation generate/repair/logo-batch and portrait generate/repair fan out");
-  assert.equal(scopeDeclarations.length, 5, "every fan-out resolves the configured delay once");
+  assert.equal(fanOutSections.length, 6, "creation, article, logo-batch, and portrait fan-outs use the shared launch gate");
+  assert.equal(scopeDeclarations.length, 6, "every fan-out resolves the configured delay once");
   assert.doesNotMatch(server, /\bstartDelayMs\b/, "runWithConcurrency must not own launch pacing");
 
   fanOutSections.forEach((section, index) => {

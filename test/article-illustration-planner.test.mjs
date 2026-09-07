@@ -293,5 +293,43 @@ test("article planning caps xhigh reasoning to medium for structured long-text p
   assert.match(capturedPlanningPrompt, /Scene reference cards must follow this format/);
   assert.match(capturedPlanningPrompt, /joy, anger, sorrow, and happiness expression variations/);
   assert.match(capturedPlanningPrompt, /multiple scene views/);
+  assert.match(capturedPlanningPrompt, /dense animation-keyframe storyboard/);
+  assert.match(capturedPlanningPrompt, /at least one finished storyboard illustration for every paragraph/);
+  assert.match(capturedPlanningPrompt, /Do not economize, merge multiple beats into one image, or apply a maximum illustration count/);
+  assert.doesNotMatch(capturedPlanningPrompt, /Choose the illustration count according to emotional rhythm/);
   assert.equal(plan.title, "朱儁攻城");
+});
+
+test("article planning prompt asks for a frame per paragraph cluster", async () => {
+  let capturedPlanningPrompt = "";
+  const bundle = buildArticleBundle({
+    title: "Two beats",
+    sourceText: "Mira stopped under the old theater sign.\n\nThe rain turned the street gold.",
+  });
+
+  await requestArticleIllustrationPlan({
+    baseUrl: "https://example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "gpt-test",
+    bundle,
+    fetchImpl: async (_url, init) => {
+      capturedPlanningPrompt = JSON.parse(init.body).input[0].content[0].text;
+      return {
+        ok: true,
+        json: async () => ({
+          output_text: JSON.stringify({
+            title: "Two beats",
+            contentType: "narrative",
+            storyboards: [
+              { title: "Stop", prompt: "Mira stops under the sign.", captionText: "Mira stopped under the old theater sign." },
+              { title: "Gold rain", prompt: "The street turns gold.", captionText: "The rain turned the street gold." },
+            ],
+          }),
+        }),
+      };
+    },
+  });
+
+  assert.match(capturedPlanningPrompt, /about 2 natural paragraph clusters/);
+  assert.match(capturedPlanningPrompt, /Prefer more frames over fewer/);
 });

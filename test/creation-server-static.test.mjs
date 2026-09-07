@@ -481,8 +481,8 @@ test("creation generation avoids same-pass retries, filters automatic repairs, a
   assert.ok(generateHandler, "handleCreationGenerate slice must not be empty");
   assert.ok(logoBatchHandler, "handleCreationLogoBatchGenerate slice must not be empty");
   assert.ok(repairHandler, "handleCreationRepair slice must not be empty");
-  assert.equal([...server.matchAll(/generationLaunchGates\.acquireScope\(/g)].length, 5);
-  assert.equal([...server.matchAll(/generationLaunchGates\.releaseScope\(generationLaunchScope\);/g)].length, 5);
+  assert.equal([...server.matchAll(/generationLaunchGates\.acquireScope\(/g)].length, 6);
+  assert.equal([...server.matchAll(/generationLaunchGates\.releaseScope\(generationLaunchScope\);/g)].length, 6);
 
   for (const handler of [generateHandler, logoBatchHandler, repairHandler]) {
     assert.match(handler, /const retryLedger = createInRunRetryLedger\(\{ maxRetries: 0 \}\);/);

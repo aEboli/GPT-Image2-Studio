@@ -286,12 +286,12 @@ test("every server concurrency fan-out resolves the configured concurrency", asy
   const usedAsLimit = server.match(/await runWithConcurrency\(\w+(?:\.\w+)?, generationConcurrency,/g) || [];
   const slotOverrides = server.match(/maxParallelTasks: generationConcurrency/g) || [];
 
-  assert.equal(fanOutCalls.length, 5, "creation generate/repair/logo-batch and portrait generate/repair fan out");
-  assert.equal(resolved.length, 5, "every fan-out handler resolves the configured concurrency once");
-  assert.equal(usedAsLimit.length, 5, "every fan-out must use it as the worker limit");
+  assert.equal(fanOutCalls.length, 6, "creation, article, logo-batch, and portrait fan-outs use bounded concurrency");
+  assert.equal(resolved.length, 6, "every fan-out handler resolves the configured concurrency once");
+  assert.equal(usedAsLimit.length, 6, "every fan-out must use it as the worker limit");
   // Widening the fan-out without also raising the session slot ceiling would
   // park the extra workers in the 250ms slot-wait poll instead of generating.
-  assert.equal(slotOverrides.length, 5, "every fan-out must pass it as the slot ceiling");
+  assert.equal(slotOverrides.length, 6, "every fan-out must pass it as the slot ceiling");
 
   // A bare constant as the limit would ignore the control entirely.
   assert.doesNotMatch(server, /await runWithConcurrency\([^,]+, MAX_[A-Z_]+,/);
@@ -305,16 +305,16 @@ test("every server fan-out stops on an account-level upstream error", async () =
   const guardedWorkers = server.match(
     /try \{\r?\n\s*throwIfFanOutAborted\(controls\);\r?\n/g,
   ) || [];
-  assert.equal(guardedWorkers.length, 5, "the guard must be the first statement in each worker try block");
+  assert.equal(guardedWorkers.length, 6, "the guard must be the first statement in each worker try block");
 
   // The slot helper must receive `controls` from every fan-out, because the abort
   // is re-checked inside it AFTER the slot is granted. Without that, a worker
   // that sat in the 250ms slot poll while the abort was raised would claim a slot
   // and fire the request the abort exists to prevent.
   const slotWaitsWithControls = server.match(
-    /await waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response, \{ maxParallelTasks: generationConcurrency, controls \}\);/g,
+    /await waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response, \{\s*maxParallelTasks:\s*generationConcurrency,\s*controls\s*,?\s*\}\);/g,
   ) || [];
-  assert.equal(slotWaitsWithControls.length, 5, "every fan-out must pass controls to the slot wait");
+  assert.equal(slotWaitsWithControls.length, 6, "every fan-out must pass controls to the slot wait");
 
   // The post-claim re-check must release the slot before throwing: the caller
   // only sets its `slotClaimed` flag on the line after the wait returns, so its
@@ -330,7 +330,9 @@ test("every server fan-out stops on an account-level upstream error", async () =
   const requeueCalls = server.match(
     /= requeueFailedSetItem\(\{ response, controls, retryLedger, item, message \}\)/g,
   ) || [];
-  assert.equal(requeueCalls.length, 5, "every fan-out must hand the failure message to the requeue decision");
+  // Article illustration items intentionally finish as failed in their own
+  // set-level manifest flow and do not use the legacy in-run requeue ledger.
+  assert.equal(requeueCalls.length, 5, "retry-capable fan-outs must hand the failure message to the requeue decision");
 
   assert.match(server, /if \(isFatalUpstreamError\(message\)\) \{\s*controls\?\.abortRemaining\?\.\(message\);\s*return 0;/);
 });

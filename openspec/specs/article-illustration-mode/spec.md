@@ -21,6 +21,17 @@ The system SHALL first generate a structured article illustration plan before ge
 - **WHEN** the user submits pasted text or uploaded text files
 - **THEN** `/api/article-illustration/plan` returns a saved set manifest with style bible, characters, scenes, reference cards, storyboard items, prompts, captions, and model text hints.
 
+### Requirement: Article planning prefers dense consecutive frames
+
+The article illustration planner SHALL treat storyboard items as consecutive animation keyframes that cover every paragraph and distinct visual beat. The planner SHALL NOT economize the illustration count or collapse multiple beats into one image.
+
+#### Scenario: User plans a multi-beat article
+
+- **WHEN** the user submits an article with multiple paragraphs or visual beats
+- **THEN** the planning prompt requires at least one finished storyboard frame per paragraph or distinct visual beat
+- **AND** extra consecutive frames when action, emotion, dialogue, camera, or location changes
+- **AND** the planner does not apply a maximum illustration count
+
 ### Requirement: Reference cards support consistency
 
 The system SHALL generate key character and scene reference cards and SHALL use completed
@@ -41,6 +52,17 @@ call site.
 - **THEN** exactly one image generation call is issued for that item
 - **AND** the call carries no `mask` and no `sourceImage`
 - **AND** the request options resolve `endpointPath` from the selected route configuration
+
+### Requirement: Article generation fans out the complete planned set
+
+The article illustration generation path SHALL generate every targeted item with the same bounded-concurrency loop used by other set modes. It SHALL NOT process the set as a one-item sequential cap. When a run includes both reference cards and storyboards, reference cards SHALL complete before storyboard items so later frames can use those cards.
+
+#### Scenario: User generates a full article illustration set
+
+- **WHEN** the user confirms generation for a planned article set
+- **THEN** the server fans out every targeted item with `runWithConcurrency`
+- **AND** the fan-out uses the configured generation concurrency and start delay
+- **AND** pending reference cards in that run complete before storyboard items start
 
 #### Scenario: Article generation does not fail on a scope error
 

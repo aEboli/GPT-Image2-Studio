@@ -334,6 +334,82 @@ test("direct image generation aborts a hanging upstream request when timeoutMs i
   assert.equal(requestSignal?.aborted, true);
 });
 
+test("direct image generation reports the transport cause and endpoint behind a bare fetch failed", async () => {
+  const transportError = new TypeError("fetch failed");
+  transportError.cause = Object.assign(new Error("getaddrinfo ENOTFOUND relay.example.test"), {
+    code: "ENOTFOUND",
+  });
+
+  await assert.rejects(
+    requestDirectImageGeneration({
+      baseUrl: "https://relay.example.test/v1",
+      endpointPath: "images/generations",
+      apiKey: "route-b-key",
+      prompt: "Unreachable relay.",
+      size: "1024x1024",
+      quality: "high",
+      imageModel: "gpt-image-2",
+      fetchImpl() {
+        throw transportError;
+      },
+    }),
+    (error) => {
+      assert.match(error.message, /直连图片请求连接失败/);
+      assert.match(error.message, /https:\/\/relay\.example\.test\/v1\/images\/generations/);
+      assert.match(error.message, /ENOTFOUND/);
+      assert.equal(error.cause, transportError);
+      return true;
+    },
+  );
+});
+
+test("direct image generation names the rewritten edits endpoint when references are attached", async () => {
+  const transportError = new TypeError("fetch failed");
+  transportError.cause = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:443"), {
+    code: "ECONNREFUSED",
+  });
+
+  await assert.rejects(
+    requestDirectImageGeneration({
+      baseUrl: "https://relay.example.test/v1",
+      endpointPath: "images/generations",
+      apiKey: "route-b-key",
+      prompt: "Reference-backed frame.",
+      referenceImages: [{ filename: "card.png", mimeType: "image/png", base64: "iVBORw==" }],
+      size: "1024x1024",
+      quality: "high",
+      imageModel: "gpt-image-2",
+      fetchImpl() {
+        throw transportError;
+      },
+    }),
+    (error) => {
+      // The configured path was images/generations; attaching a reference rewrites it.
+      assert.match(error.message, /images\/edits/);
+      assert.match(error.message, /ECONNREFUSED/);
+      return true;
+    },
+  );
+});
+
+test("direct image generation still reports an abort as an abort, not a transport failure", async () => {
+  await assert.rejects(
+    requestDirectImageGeneration({
+      baseUrl: "https://relay.example.test/v1",
+      apiKey: "route-b-key",
+      prompt: "Aborted before connect.",
+      size: "1024x1024",
+      quality: "high",
+      imageModel: "gpt-image-2",
+      timeoutMs: 10,
+      fetchImpl() {
+        return new Promise(() => {});
+      },
+    }),
+    (error) => error?.name === "AbortError",
+  );
+});
+
 test("direct image generation keeps high-resolution direct requests on base64 responses", async () => {
   const requests = [];
 

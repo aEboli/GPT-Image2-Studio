@@ -3174,6 +3174,8 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
 
     const clientSessionId = getClientSessionId(request, formData);
     const generationRequestScope = "article-illustration";
+    const generationStartDelayMs = resolveGenerationStartDelayMs(formData, config);
+    const generationConcurrency = resolveGenerationConcurrencyForLimit(formData, config);
     const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || "3:2"));
     const requestedSizeInput = String(formData.get("size") || "auto").trim().toLowerCase();
     const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
@@ -3218,7 +3220,16 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
       return;
     }
 
-    for (const item of targetItems) {
+    const referenceTargetItems = targetItems.filter((item) => item.itemKind === "reference-card");
+    const storyboardTargetItems = targetItems.filter((item) => item.itemKind !== "reference-card");
+    const generationWaves = [referenceTargetItems, storyboardTargetItems].filter((wave) => wave.length > 0);
+    const generationLaunchScope = generationLaunchGates.acquireScope(
+      clientSessionId,
+      generationRequestScope,
+      generationStartDelayMs,
+    );
+
+    async function generateArticleIllustrationItem(item, controls) {
       const taskId = `${setId}-${item.itemId}`;
       const generationStartedAt = new Date().toISOString();
       const generationStartedAtMs = Date.now();
@@ -3226,7 +3237,11 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
       let slotClaimed = false;
 
       try {
-        await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response);
+        throwIfFanOutAborted(controls);
+        await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response, {
+          maxParallelTasks: generationConcurrency,
+          controls,
+        });
         slotClaimed = true;
         items = updateArticleItems(items, item.itemId, {
           status: "generating",
@@ -3251,6 +3266,13 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
           buildArticleImagePrompt({ plan, item, referenceCards }),
           ratioOption,
         );
+        await waitForResponseGenerationLaunchTurn(
+          clientSessionId,
+          generationRequestScope,
+          response,
+          generationStartDelayMs,
+          controls,
+        );
         async function handleGenerationEvent(event, { statusPrefix = "", emitFinalImage = true } = {}) {
           if (event.type === "status") {
             const message = statusPrefix ? `${statusPrefix}: ${event.message}` : event.message;
@@ -3259,7 +3281,9 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
               statusStage: event.stage,
               statusText: message,
             });
-            writeSseEvent(response, "status", {
+            writeSseEvent(response, "item_status", {
+              setId,
+              itemId: item.itemId,
               stage: event.stage,
               message,
             });
@@ -3272,7 +3296,9 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
               statusStage: "generating",
               statusText: "已收到中途预览",
             });
-            writeSseEvent(response, "partial_image", {
+            writeSseEvent(response, "item_partial_image", {
+              setId,
+              itemId: item.itemId,
               dataUrl: event.dataUrl,
             });
             return;
@@ -3288,7 +3314,9 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
               statusStage: "saving",
               statusText: "已拿到最终图像，正在写入本地",
             });
-            writeSseEvent(response, "final_image", {
+            writeSseEvent(response, "item_final_image", {
+              setId,
+              itemId: item.itemId,
               dataUrl: `data:${toOutputFormatMimeType(finalFormat)};base64,${normalizeBase64(event.base64)}`,
             });
           }
@@ -3430,6 +3458,16 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
           releaseSessionTaskSlot(clientSessionId, taskId, generationRequestScope);
         }
       }
+    }
+
+    try {
+      for (const wave of generationWaves) {
+        await runWithConcurrency(wave, generationConcurrency, async (item, _index, controls) => {
+          await generateArticleIllustrationItem(item, controls);
+        });
+      }
+    } finally {
+      generationLaunchGates.releaseScope(generationLaunchScope);
     }
 
     plan = {

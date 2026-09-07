@@ -172,6 +172,9 @@ test("local server counts active generation slots per request mode", async () =>
   assert.match(creationRepairHandler, /releaseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope\)/);
 
   assert.match(articleGenerateHandler, /const generationRequestScope = "article-illustration";/);
-  assert.match(articleGenerateHandler, /waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response\)/);
+  assert.match(articleGenerateHandler, /const generationConcurrency = resolveGenerationConcurrencyForLimit\(formData, config\);/);
+  assert.match(articleGenerateHandler, /await runWithConcurrency\(wave, generationConcurrency,/);
+  assert.match(articleGenerateHandler, /waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response, \{\s*maxParallelTasks: generationConcurrency,\s*controls,\s*\}\)/);
+  assert.match(articleGenerateHandler, /waitForResponseGenerationLaunchTurn\(/);
   assert.match(articleGenerateHandler, /releaseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope\)/);
 });
