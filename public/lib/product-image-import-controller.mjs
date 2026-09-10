@@ -211,7 +211,7 @@ function createProductImageViewerIcon(documentRef, name) {
 function getPackageFilename(response) {
   const disposition = response.headers.get("content-disposition") || "";
   return disposition.match(/filename="?([^";]+)"?/i)?.[1] ||
-    "GPT-Image2-Studio-Product-Image-Collector-v1.1.29.zip";
+    "GPT-Image2-Studio-Product-Image-Collector-v1.1.33.zip";
 }
 
 export function createProductImageImportController({

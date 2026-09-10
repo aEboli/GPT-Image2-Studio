@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.14-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.15-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installers-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,7 +10,7 @@
 
 Prompt-to-image, reference analysis, editing, ecommerce sets, portraits, article illustrations, PPT generation, and asset history in one browser-based workspace.
 
-Current version: `v0.2.14`
+Current version: `v0.2.15`
 
 [Chinese README](./README.zh-CN.md)
 
@@ -45,9 +45,9 @@ On Windows, `launch-studio.cmd` starts the workbench and `stop-studio-services.c
 
 ### Windows desktop app (recommended)
 
-Download `GPT-Image2-Studio-Desktop-Setup-v0.2.14-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
+Download `GPT-Image2-Studio-Desktop-Setup-v0.2.15-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
 
-For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.14-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
+For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.15-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
 
 For desktop development, Electron 43 requires Node.js 22.12 or newer:
 
@@ -58,7 +58,7 @@ cmd /c npm run desktop
 
 ### Windows browser installer
 
-The legacy browser-installer flow remains documented for local builds, but the `v0.2.14` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
+The legacy browser-installer flow remains documented for local builds, but the `v0.2.15` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
 
 ## Configuration
 
@@ -104,7 +104,15 @@ API key:      sk-****
 Responses model: gpt-5.4-mini
 ```
 
-The Responses model is the outer model. The image tool model is fixed to `gpt-image-2`, shown in the prompt page parameter row as `工具模型 gpt-image-2`.
+The Responses model is the outer model. The image tool model is chosen from the **生图工具模型** dropdown right below it, and the prompt page parameter row echoes it as `工具模型 <model>`. The dropdown is the only way to set it — there is no free-text field:
+
+| Option | Notes |
+| --- | --- |
+| `gpt-image-2` | Default. |
+| `gpt-image-2.5-sunburst` | Most capable; more precise editing, longer generation times. |
+| `gpt-image-2.5-flare` | Fast, high-quality everyday generation. |
+
+The prompt page parameter row also has a **质量** (quality) dropdown: `auto`, `low`, `medium`, `high` (default), plus `xhigh` and `max` — the last two exist only on the 2.5 models. Switching the tool model back to `gpt-image-2` while `xhigh`/`max` is selected clamps it down to `high` instead of sending a request the upstream would reject.
 
 **Direct-call mode** splits into two independent groups. The image group only generates and edits images; the text/vision group handles prompt enhancement, reference analysis, Listing drafts, and other model calls. The two groups can point at different providers:
 
@@ -184,6 +192,8 @@ Copy `.env.example` for a local starting point. Important variables include:
 OPENAI_API_KEY=your_api_key_here
 OPENAI_BASE_URL=https://api.openai.com/v1
 RESPONSES_MODEL=gpt-5.4-mini
+IMAGE_TOOL_MODEL=gpt-image-2
+IMAGE_QUALITY=high
 DIRECT_IMAGE_BASE_URL=https://api.openai.com/v1
 DIRECT_IMAGE_API_KEY=
 DIRECT_IMAGE_ENDPOINT_PATH=images/generations
@@ -460,7 +470,7 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 ## Releases
 
 - The source and lockfile versions are authoritative; tags use `v<version>`.
-- Current release notes: [v0.2.14](./docs/releases/v0.2.14.md).
+- Current release notes: [v0.2.15](./docs/releases/v0.2.15.md).
 - Windows packages are distributed through [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Check the release notes for hashes and signing status.
 - `npm run check:release:strict` requires a clean worktree and a matching tag on the current commit.
 
@@ -475,7 +485,7 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 
 ## Version history
 
-Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.14](./docs/releases/v0.2.14.md).
+Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.15](./docs/releases/v0.2.15.md).
 
 ### v0.2.14
 

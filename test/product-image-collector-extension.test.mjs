@@ -6,6 +6,7 @@ import { readFile } from "node:fs/promises";
 const collectorSource = await readFile(new URL("../extensions/product-image-collector/collector.js", import.meta.url), "utf8");
 const serviceWorkerSource = await readFile(new URL("../extensions/product-image-collector/service-worker.mjs", import.meta.url), "utf8");
 const floatingLauncherSource = await readFile(new URL("../extensions/product-image-collector/floating-launcher.js", import.meta.url), "utf8");
+const floatingPanelSource = await readFile(new URL("../extensions/product-image-collector/floating-panel.js", import.meta.url), "utf8");
 const fixtureHtml = await readFile(new URL("./fixtures/1688-product-page.html", import.meta.url), "utf8");
 const fixture = JSON.parse(fixtureHtml.match(/<script id="collector-fixture" type="application\/json">([\s\S]*?)<\/script>/)?.[1] || "{}");
 const structuredFixture = JSON.parse(await readFile(new URL("./fixtures/1688-product-structured-data.json", import.meta.url), "utf8"));
@@ -114,6 +115,7 @@ test("floating launcher follows SPA product routes and recovers from an unanswer
     CustomEvent: RuntimeCustomEvent,
     Error,
     Event,
+    Promise,
     String,
     URL,
     chrome: {
@@ -127,7 +129,7 @@ test("floating launcher follows SPA product routes and recovers from an unanswer
     window: { clearInterval, clearTimeout, setInterval, setTimeout },
   };
   const runtimeSource = floatingLauncherSource
-    .replace("const OPEN_TIMEOUT_MS = 8000;", "const OPEN_TIMEOUT_MS = 5;")
+    .replace("const OPEN_TIMEOUT_MS = 3000;", "const OPEN_TIMEOUT_MS = 5;")
     .replace("const LOCATION_POLL_MS = 750;", "const LOCATION_POLL_MS = 5;");
 
   vm.runInNewContext(runtimeSource, sandbox);
@@ -150,15 +152,234 @@ test("floating launcher follows SPA product routes and recovers from an unanswer
   assert.equal(messages.length, 1);
   assert.equal(messages[0].type, "product-image-collector:open");
 
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  assert.equal(messages.length, 3);
+  assert.ok(messages.every((message) => message.type === "product-image-collector:open"));
   assert.equal(button.disabled, false);
   assert.equal(status.hidden, false);
-  assert.equal(status.textContent, "商品图采集打开超时，请重试。");
+  assert.equal(status.textContent, "商品图采集暂时无法打开，请刷新页面后重试。");
 
   location.href = "https://www.amazon.com/s?k=storage";
   await new Promise((resolve) => setTimeout(resolve, 20));
   assert.equal(document.getElementById(staleHost.id), null);
   sandbox.__gptImage2StudioProductImageLauncherController.destroy();
+});
+
+test("floating launcher opens the in-page panel without any background round trip", async () => {
+  const document = new LauncherDocument();
+  const location = { href: "https://detail.1688.com/offer/1013556306942.html" };
+  const messages = [];
+  const opens = [];
+  const RuntimeCustomEvent = globalThis.CustomEvent || class CustomEvent extends Event {};
+  const sandbox = {
+    CustomEvent: RuntimeCustomEvent,
+    Error,
+    Event,
+    Promise,
+    String,
+    URL,
+    chrome: {
+      runtime: {
+        lastError: null,
+        sendMessage(message) { messages.push(message); },
+      },
+    },
+    document,
+    location,
+    window: { clearInterval, clearTimeout, setInterval, setTimeout },
+    __gptImage2StudioProductImagePanelController: {
+      version: "1.1.33",
+      open() { opens.push(location.href); },
+    },
+  };
+
+  vm.runInNewContext(floatingLauncherSource, sandbox);
+  const launcher = document.getElementById("gpt-image2-studio-product-image-launcher");
+  const { button, status } = launcher.shadowRoot;
+  button.click();
+
+  assert.deepEqual(opens, [location.href]);
+  assert.equal(messages.length, 0);
+  assert.equal(button.disabled, false);
+  assert.equal(status.hidden, true);
+  assert.equal(launcher.dataset.panelOpen, "true");
+  sandbox.__gptImage2StudioProductImageLauncherController.destroy();
+});
+
+test("floating launcher retries explicit background failures before showing refresh guidance", async () => {
+  const document = new LauncherDocument();
+  const location = { href: "https://detail.1688.com/offer/1013556306942.html" };
+  const messages = [];
+  let callCount = 0;
+  const RuntimeCustomEvent = globalThis.CustomEvent || class CustomEvent extends Event {};
+  const sandbox = {
+    CustomEvent: RuntimeCustomEvent,
+    Error,
+    Event,
+    Promise,
+    String,
+    URL,
+    chrome: {
+      runtime: {
+        lastError: null,
+        sendMessage(message, callback) {
+          messages.push(message);
+          callCount += 1;
+          callback(callCount < 3 ? { ok: false, message: "商品图采集窗尚未就绪。" } : { ok: true });
+        },
+      },
+    },
+    document,
+    location,
+    window: { clearInterval, clearTimeout, setInterval, setTimeout },
+  };
+  const runtimeSource = floatingLauncherSource
+    .replace("const OPEN_TIMEOUT_MS = 3000;", "const OPEN_TIMEOUT_MS = 20;")
+    .replace("const LOCATION_POLL_MS = 750;", "const LOCATION_POLL_MS = 20;");
+
+  vm.runInNewContext(runtimeSource, sandbox);
+  const launcher = document.getElementById("gpt-image2-studio-product-image-launcher");
+  const { button, status } = launcher.shadowRoot;
+  button.click();
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  assert.equal(messages.length, 3);
+  assert.equal(button.disabled, false);
+  assert.equal(status.hidden, true);
+  assert.equal(launcher.dataset.panelOpen, "true");
+  sandbox.__gptImage2StudioProductImageLauncherController.destroy();
+});
+
+test("floating launcher cancels a stale open when SPA navigation stays on a product route", async () => {
+  const document = new LauncherDocument();
+  const location = { href: "https://detail.1688.com/offer/1013556306942.html" };
+  const messages = [];
+  const RuntimeCustomEvent = globalThis.CustomEvent || class CustomEvent extends Event {};
+  const sandbox = {
+    CustomEvent: RuntimeCustomEvent,
+    Error,
+    Event,
+    Promise,
+    String,
+    URL,
+    chrome: {
+      runtime: {
+        lastError: null,
+        sendMessage(message) { messages.push(message); },
+      },
+    },
+    document,
+    location,
+    window: { clearInterval, clearTimeout, setInterval, setTimeout },
+  };
+  const runtimeSource = floatingLauncherSource
+    .replace("const OPEN_TIMEOUT_MS = 3000;", "const OPEN_TIMEOUT_MS = 40;")
+    .replace("const LOCATION_POLL_MS = 750;", "const LOCATION_POLL_MS = 5;");
+
+  vm.runInNewContext(runtimeSource, sandbox);
+  const launcher = document.getElementById("gpt-image2-studio-product-image-launcher");
+  const { button, status } = launcher.shadowRoot;
+  button.click();
+  assert.equal(button.disabled, true);
+  location.href = "https://detail.1688.com/offer/202020202020.html";
+  await new Promise((resolve) => setTimeout(resolve, 15));
+
+  assert.equal(messages.length, 1);
+  assert.equal(button.disabled, false);
+  assert.equal(status.hidden, true);
+  assert.equal(launcher.dataset.panelOpen, "false");
+  sandbox.__gptImage2StudioProductImageLauncherController.destroy();
+});
+
+test("collector registers an idle controller without reading the page", async () => {
+  const sandbox = {};
+  vm.runInNewContext(collectorSource, sandbox);
+  const controller = sandbox.__gptImage2StudioProductImageCollectorController;
+  assert.equal(controller.version, "1.1.33");
+  assert.equal(typeof controller.collect, "function");
+});
+
+test("panel load creates no DOM and replaces a same-version controller whose open fails", () => {
+  let createElementCalls = 0;
+  let destroyCalls = 0;
+  const staleController = {
+    version: "1.1.33",
+    open() { throw new Error("stale panel"); },
+    destroy() { destroyCalls += 1; },
+  };
+  const sandbox = {
+    Error,
+    document: {
+      createElement() {
+        createElementCalls += 1;
+        throw new Error("panel DOM must stay lazy");
+      },
+      getElementById() { return null; },
+    },
+    __gptImage2StudioProductImagePanelController: staleController,
+  };
+
+  vm.runInNewContext(floatingPanelSource, sandbox);
+  const controller = sandbox.__gptImage2StudioProductImagePanelController;
+  assert.notEqual(controller, staleController);
+  assert.equal(controller.version, "1.1.33");
+  assert.equal(typeof controller.open, "function");
+  assert.equal(typeof controller.destroy, "function");
+  assert.equal(createElementCalls, 0);
+  assert.equal(destroyCalls, 1);
+  controller.destroy();
+});
+
+test("panel collection prefers the in-page collector and falls back only for stale pages", async () => {
+  const normalizedPanelSource = floatingPanelSource.replace(/\r\n/g, "\n");
+  const start = normalizedPanelSource.indexOf("  function collectPage()");
+  const end = normalizedPanelSource.indexOf("\n\n  function selectedItems()", start);
+  assert.ok(start >= 0 && end > start);
+  const collectPageSource = normalizedPanelSource.slice(start, end);
+
+  const directSandbox = {
+    messages: [],
+    location: { href: "https://detail.1688.com/offer/123.html" },
+    __gptImage2StudioProductImageCollectorController: {
+      version: "1.1.33",
+      collect() { return Promise.resolve({ ok: true, source: "page" }); },
+    },
+  };
+  vm.runInNewContext(`
+    const COLLECTOR_CONTROLLER_KEY = "__gptImage2StudioProductImageCollectorController";
+    const PANEL_VERSION = "1.1.33";
+    const MESSAGE_COLLECT = "product-image-collector:collect";
+    function sendMessage(type, payload) {
+      globalThis.messages.push({ type, payload });
+      return Promise.resolve({ ok: true, source: "background" });
+    }
+    ${collectPageSource}
+    globalThis.resultPromise = collectPage();
+  `, directSandbox);
+  assert.deepEqual(await directSandbox.resultPromise, { ok: true, source: "page" });
+  assert.deepEqual(directSandbox.messages, []);
+
+  const fallbackSandbox = {
+    messages: [],
+    location: { href: "https://detail.1688.com/offer/123.html" },
+    __gptImage2StudioProductImageCollectorController: { version: "1.1.31" },
+  };
+  vm.runInNewContext(`
+    const COLLECTOR_CONTROLLER_KEY = "__gptImage2StudioProductImageCollectorController";
+    const PANEL_VERSION = "1.1.33";
+    const MESSAGE_COLLECT = "product-image-collector:collect";
+    function sendMessage(type, payload) {
+      globalThis.messages.push({ type, payload });
+      return Promise.resolve({ ok: true, source: "background" });
+    }
+    ${collectPageSource}
+    globalThis.resultPromise = collectPage();
+  `, fallbackSandbox);
+  assert.equal(JSON.stringify(await fallbackSandbox.resultPromise), JSON.stringify({ ok: true, source: "background" }));
+  assert.equal(JSON.stringify(fallbackSandbox.messages), JSON.stringify([{
+    type: "product-image-collector:collect",
+    payload: { pageUrl: "https://detail.1688.com/offer/123.html" },
+  }]));
 });
 
 function titledForPlatform(title, platform) {
@@ -379,7 +600,7 @@ async function runCollector({
       async text() { return `var offer_details=${JSON.stringify({ content })};`; },
     };
   };
-  const result = await vm.runInNewContext(collectorSource, {
+  const sandbox = {
     AbortController,
     DOMParser: FixtureDOMParser,
     Date,
@@ -389,7 +610,9 @@ async function runCollector({
     fetch,
     location: { href },
     setTimeout,
-  });
+  };
+  vm.runInNewContext(collectorSource, sandbox);
+  const result = await sandbox.__gptImage2StudioProductImageCollectorController.collect();
   return { fetchCalls, interactions, result };
 }
 
@@ -941,6 +1164,58 @@ test("1688 title excludes sell-point statistics and appends one unquoted platfor
   assert.equal(suffixed.manifest.product.title, `${cleanTitle}——1688`);
 });
 
+test("collected titles keep long product names instead of cutting them at 200 characters", async () => {
+  const longTitle = `长标题商品${"细节描述".repeat(60)}`;
+  assert.ok(longTitle.length > 200);
+  const { result } = await runCollector({ title: longTitle, includeOgTitle: false });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.manifest.product.title, `${longTitle}——1688`);
+  assert.ok(result.manifest.product.title.length > 200);
+});
+
+test("collected titles cap at 500 characters including the platform suffix", async () => {
+  const overlongTitle = "超长标题".repeat(200);
+  assert.ok(overlongTitle.length > 500);
+  const { result } = await runCollector({ title: overlongTitle, includeOgTitle: false });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.manifest.product.title.length, 500);
+  assert.ok(result.manifest.product.title.endsWith("——1688"));
+});
+
+test("a truncated meta title is completed from the fuller page heading", async () => {
+  const amazonFixture = structuredClone(platformFixtures[0]);
+  delete amazonFixture.jsonLd.name;
+  const fullTitle = "Heavy Duty Aluminum Wheelchair Ramp 7ft Non-Slip Surface For Home Steps And Vans";
+  const { result } = await runCollector({
+    href: amazonFixture.href,
+    images: amazonFixture.images,
+    jsonLd: amazonFixture.jsonLd,
+    title: "Heavy Duty Aluminum Wheelchair Ramp 7ft Non-Slip...",
+    productTitleContainerText: fullTitle,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.manifest.product.title, titledForPlatform(fullTitle, "amazon"));
+});
+
+test("an unrelated longer heading never replaces the selected title", async () => {
+  const amazonFixture = structuredClone(platformFixtures[0]);
+  delete amazonFixture.jsonLd.name;
+  const selectedTitle = "Wheelchair Ramp 7ft";
+  const { result } = await runCollector({
+    href: amazonFixture.href,
+    images: amazonFixture.images,
+    jsonLd: amazonFixture.jsonLd,
+    title: selectedTitle,
+    productTitleContainerText: "Completely different and much longer promotional heading text",
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.manifest.product.title, titledForPlatform(selectedTitle, "amazon"));
+});
+
 test("1688 collector fixture groups product images and excludes unrelated regions", async () => {
   const { result } = await runCollector();
 
@@ -1117,6 +1392,88 @@ test("collector fails closed on unsupported pages and unknown page structures", 
   assert.doesNotMatch(collectorSource, /querySelectorAll\(["']img["']\)|document\.images/);
 });
 
+test("background invocations reject a stale page before calling page controllers", () => {
+  const normalizedWorkerSource = serviceWorkerSource.replace(/\r\n/g, "\n");
+  const collectStart = normalizedWorkerSource.indexOf("function collectInjectedPage(");
+  const openStart = normalizedWorkerSource.indexOf("function openInjectedPanel(");
+  const openEnd = normalizedWorkerSource.indexOf("\n\nasync function injectPanel", openStart);
+  assert.ok(collectStart >= 0 && openStart > collectStart && openEnd > openStart);
+  const controllerInvocationSource = normalizedWorkerSource.slice(collectStart, openEnd);
+  const sandbox = {
+    location: { href: "https://detail.1688.com/offer/222.html" },
+    collectCalls: 0,
+    openCalls: 0,
+    __gptImage2StudioProductImageCollectorController: {
+      version: "1.1.33",
+      collect() {
+        sandbox.collectCalls += 1;
+        return { ok: true, manifest: { items: [] } };
+      },
+    },
+    __gptImage2StudioProductImagePanelController: {
+      version: "1.1.33",
+      open() { sandbox.openCalls += 1; },
+    },
+  };
+
+  vm.runInNewContext(`
+    const EXTENSION_VERSION = "1.1.33";
+    ${controllerInvocationSource}
+    globalThis.staleCollectResult = collectInjectedPage("https://detail.1688.com/offer/111.html");
+    globalThis.currentCollectResult = collectInjectedPage(location.href);
+    globalThis.staleResult = openInjectedPanel("https://detail.1688.com/offer/111.html");
+    globalThis.currentResult = openInjectedPanel(location.href);
+  `, sandbox);
+
+  assert.equal(sandbox.staleCollectResult.ok, false);
+  assert.match(sandbox.staleCollectResult.message, /商品页已切换/);
+  assert.equal(sandbox.currentCollectResult.ok, true);
+  assert.equal(sandbox.collectCalls, 1);
+  assert.equal(sandbox.staleResult.ok, false);
+  assert.match(sandbox.staleResult.message, /商品页已切换/);
+  assert.equal(sandbox.currentResult.ok, true);
+  assert.equal(sandbox.openCalls, 1);
+});
+
+test("background invocations reject stale controller versions before calling them", () => {
+  const normalizedWorkerSource = serviceWorkerSource.replace(/\r\n/g, "\n");
+  const collectStart = normalizedWorkerSource.indexOf("function collectInjectedPage(");
+  const openStart = normalizedWorkerSource.indexOf("function openInjectedPanel(");
+  const openEnd = normalizedWorkerSource.indexOf("\n\nasync function injectPanel", openStart);
+  assert.ok(collectStart >= 0 && openStart > collectStart && openEnd > openStart);
+  const controllerInvocationSource = normalizedWorkerSource.slice(collectStart, openEnd);
+  const sandbox = {
+    location: { href: "https://detail.1688.com/offer/222.html" },
+    collectCalls: 0,
+    openCalls: 0,
+    __gptImage2StudioProductImageCollectorController: {
+      version: "1.1.32",
+      collect() {
+        sandbox.collectCalls += 1;
+        return { ok: true, manifest: { items: [] } };
+      },
+    },
+    __gptImage2StudioProductImagePanelController: {
+      version: "1.1.32",
+      open() { sandbox.openCalls += 1; },
+    },
+  };
+
+  vm.runInNewContext(`
+    const EXTENSION_VERSION = "1.1.33";
+    ${controllerInvocationSource}
+    globalThis.collectResult = collectInjectedPage(location.href);
+    globalThis.openResult = openInjectedPanel(location.href);
+  `, sandbox);
+
+  assert.equal(sandbox.collectResult.ok, false);
+  assert.match(sandbox.collectResult.message, /尚未就绪/);
+  assert.equal(sandbox.collectCalls, 0);
+  assert.equal(sandbox.openResult.ok, false);
+  assert.match(sandbox.openResult.message, /尚未就绪/);
+  assert.equal(sandbox.openCalls, 0);
+});
+
 test("extension action and floating launcher open the panel using the sending tab", async () => {
   const workerWithoutImport = serviceWorkerSource.replace(
     /^(?:import\s*\{[\s\S]*?\}\s*from\s*"\.\/lib\/[^\"]+";\s*)+/,
@@ -1135,6 +1492,9 @@ test("extension action and floating launcher open the panel using the sending ta
       async executeScript(options) {
         executions.push(options);
         if (options.files?.[0] === "collector.js") {
+          return [];
+        }
+        if (typeof options.func === "function" && /ProductImage(?:Collector|Panel)Controller/.test(String(options.func))) {
           return [{ result: { ok: true, manifest: { items: [] } } }];
         }
         return [];
@@ -1161,7 +1521,11 @@ test("extension action and floating launcher open the panel using the sending ta
   const productUrl = "https://detail.1688.com/offer/1013556306942.html?offerId=1013556306942";
   await actionListener({ id: 42, url: productUrl });
   assert.equal(executions[0].target.tabId, 42);
-  assert.equal(executions[0].files.join(","), "floating-launcher.js,floating-panel.js");
+  assert.equal(executions[0].files.join(","), "collector.js,floating-launcher.js,floating-panel.js");
+  assert.equal(executions[1].target.tabId, 42);
+  assert.equal(typeof executions[1].func, "function");
+  assert.equal(executions[1].files, undefined);
+  assert.equal(executions[1].args[0], productUrl);
 
   const openResponse = await new Promise((resolve) => {
     const keepChannelOpen = messageListener(
@@ -1172,8 +1536,10 @@ test("extension action and floating launcher open the panel using the sending ta
     assert.equal(keepChannelOpen, true);
   });
   assert.equal(openResponse.ok, true);
-  assert.equal(executions[1].target.tabId, 42);
-  assert.equal(executions[1].files.join(","), "floating-launcher.js,floating-panel.js");
+  assert.equal(executions[2].target.tabId, 42);
+  assert.equal(executions[2].files.join(","), "collector.js,floating-launcher.js,floating-panel.js");
+  assert.equal(typeof executions[3].func, "function");
+  assert.equal(executions[3].args[0], productUrl);
 
   const response = await new Promise((resolve) => {
     const keepChannelOpen = messageListener(
@@ -1184,8 +1550,10 @@ test("extension action and floating launcher open the panel using the sending ta
     assert.equal(keepChannelOpen, true);
   });
   assert.equal(response.ok, true);
-  assert.equal(executions[2].target.tabId, 42);
-  assert.equal(executions[2].files.join(","), "collector.js");
+  assert.equal(executions[4].target.tabId, 42);
+  assert.equal(executions[4].files.join(","), "collector.js");
+  assert.equal(typeof executions[5].func, "function");
+  assert.equal(executions[5].args[0], productUrl);
 });
 
 test("extension download message submits images only and never a JSON data URL", async () => {
@@ -1329,7 +1697,7 @@ test("SKU variant labels keep readable fixed type, natural height, and high-cont
   assert.match(floatingPanel, /\.panel\s*\{[\s\S]*?--variant-border:\s*#f59e0b;[\s\S]*?--variant-bg:\s*#ffe08a;[\s\S]*?--variant-text:\s*#4a1f00;/);
   assert.match(floatingPanel, /\.panel\[data-theme="blue"\]\s*\{[\s\S]*?--variant-border:\s*#38d5f5;[\s\S]*?--variant-bg:\s*#07566b;[\s\S]*?--variant-text:\s*#ffffff;/);
   assert.match(floatingPanel, /\.panel\[data-theme="night"\]\s*\{[\s\S]*?--variant-border:\s*#ff79c6;[\s\S]*?--variant-bg:\s*#5b204f;[\s\S]*?--variant-text:\s*#fff7fb;/);
-  assert.match(floatingPanel, /\.image-card\.has-variant\s*\{\s*grid-template-rows:\s*auto auto 24px;/);
+  assert.match(floatingPanel, /\.image-card\.has-variant\s*\{\s*grid-template-rows:\s*auto auto auto 24px;/);
   assert.doesNotMatch(floatingPanel, /\.image-card\.has-variant\s*\{[^}]*minmax\(56px/);
   assert.match(floatingPanel, /\.image-card-variant\s*\{[\s\S]*?font-size:\s*12px;[\s\S]*?font-weight:\s*700;[\s\S]*?line-height:\s*16px;[\s\S]*?white-space:\s*normal;[\s\S]*?overflow-wrap:\s*anywhere;/);
   assert.doesNotMatch(floatingPanel, /\.image-card-variant\s*\{[^}]*(?:overflow:\s*hidden|text-overflow:\s*ellipsis)/);
@@ -1343,7 +1711,7 @@ test("extension manifest uses an on-demand minimum-permission MV3 surface", asyn
   const serviceWorker = await readFile(new URL("../extensions/product-image-collector/service-worker.mjs", import.meta.url), "utf8");
   const floatingPanel = await readFile(new URL("../extensions/product-image-collector/floating-panel.js", import.meta.url), "utf8");
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, "1.1.29");
+  assert.equal(manifest.version, "1.1.33");
   assert.deepEqual(manifest.permissions, ["activeTab", "scripting", "downloads", "clipboardWrite", "nativeMessaging"]);
   for (const permission of [
     "https://detail.1688.com/*",
@@ -1357,7 +1725,7 @@ test("extension manifest uses an on-demand minimum-permission MV3 surface", asyn
   assert.ok(typeof manifest.key === "string" && manifest.key.length > 300);
   assert.ok(manifest.host_permissions.every((permission) => !/^http:\/\//.test(permission)));
   assert.equal(manifest.content_scripts.length, 1);
-  assert.deepEqual(manifest.content_scripts[0].js, ["floating-launcher.js"]);
+  assert.deepEqual(manifest.content_scripts[0].js, ["collector.js", "floating-launcher.js", "floating-panel.js"]);
   assert.equal(manifest.content_scripts[0].run_at, "document_idle");
   for (const match of [
     "https://detail.1688.com/*",
@@ -1373,12 +1741,17 @@ test("extension manifest uses an on-demand minimum-permission MV3 surface", asyn
   assert.match(serviceWorker, /chrome\.action\.onClicked\.addListener\(async \(tab\)/);
   assert.match(serviceWorker, /sender\.tab/);
   assert.match(serviceWorker, /collectFromTab\(sender\.tab, message\.pageUrl\)/);
-  assert.match(serviceWorker, /files:\s*\["floating-launcher\.js",\s*"floating-panel\.js"\]/);
+  assert.match(serviceWorker, /\["collector\.js",\s*"floating-launcher\.js",\s*"floating-panel\.js"\]/);
+  assert.match(serviceWorker, /function openInjectedPanel\(expectedPageUrl\)[\s\S]*?location\.href !== expectedPageUrl[\s\S]*?__gptImage2StudioProductImagePanelController[\s\S]*?controller\.open\(\)/);
+  assert.match(serviceWorker, /async function injectPanel\(tabId, files, pageUrl = ""\)[\s\S]*?executeScript\(\{ target: \{ tabId \}, files \}\)[\s\S]*?func: openInjectedPanel[\s\S]*?args: \[String\(pageUrl \|\| ""\)\]/);
   assert.match(serviceWorker, /chrome\.runtime\.sendNativeMessage\(NATIVE_CLIPBOARD_HOST/);
   assert.match(serviceWorker, /com\.aeboli\.gpt_image2_studio\.product_image_clipboard/);
   assert.doesNotMatch(serviceWorker, /chrome\.tabs\.query|STUDIO_TAB_URL_PATTERNS|product-image-collector\/clipboard|chrome\.sidePanel/);
-  assert.match(floatingPanel, /PANEL_VERSION\s*=\s*"1\.1\.29"/);
-  assert.match(floatingLauncherSource, /LAUNCHER_VERSION\s*=\s*"1\.1\.29"/);
+  assert.match(floatingPanel, /PANEL_VERSION\s*=\s*"1\.1\.33"/);
+  assert.match(floatingLauncherSource, /LAUNCHER_VERSION\s*=\s*"1\.1\.33"/);
+  assert.match(collectorSource, /COLLECTOR_VERSION\s*=\s*"1\.1\.33"/);
+  assert.match(collectorSource, /globalThis\[CONTROLLER_KEY\]\s*=\s*controller/);
+  assert.match(floatingPanel, /function collectPage\(\)[\s\S]*?collector\.collect\(\)/);
   assert.match(floatingPanel, /function previewUrlFor\(item\)/);
   assert.match(floatingPanel, /state\.manifest\?\.source\?\.platform !== "gigacloud"/);
   assert.match(floatingPanel, /searchParams\.set\("x-oss-process", "image\/resize,w_300,h_300,m_pad"\)/);
@@ -1392,6 +1765,18 @@ test("extension manifest uses an on-demand minimum-permission MV3 surface", asyn
   assert.match(floatingLauncherSource, /clearTimeout\(timeoutId\)/);
   assert.match(floatingLauncherSource, /try\s*\{[\s\S]*?chrome\.runtime\.sendMessage[\s\S]*?catch/);
   assert.match(floatingLauncherSource, /product-image-collector:open/);
+  assert.match(floatingLauncherSource, /const OPEN_ATTEMPTS = 3;/);
+  assert.match(floatingLauncherSource, /PANEL_CONTROLLER_KEY\s*=\s*"__gptImage2StudioProductImagePanelController"/);
+  assert.match(floatingLauncherSource, /function openPanelInPage\(\)[\s\S]*?globalThis\[PANEL_CONTROLLER_KEY\][\s\S]*?panelController\.open\(\)/);
+  assert.match(floatingLauncherSource, /async function requestPanelOpen\(\)\s*\{[\s\S]*?if \(openPanelInPage\(\)\) \{[\s\S]*?return;/);
+  assert.match(floatingLauncherSource, /for \(let attempt = 1; attempt <= OPEN_ATTEMPTS; attempt \+= 1\)/);
+  assert.match(floatingPanel, /globalThis\[CONTROLLER_KEY\]\s*=\s*panelController/);
+  assert.match(floatingPanel, /open:\s*openPanel,/);
+  assert.match(floatingPanel, /destroy:\s*destroyPanel,/);
+  assert.match(floatingPanel, /function openPanel\(\)\s*\{[\s\S]*?panelMountSerial \+= 1;[\s\S]*?document\.documentElement\.appendChild\(host\);[\s\S]*?window\.addEventListener\("resize", clampFloatingPanel\);[\s\S]*?dispatchEvent\(new CustomEvent\(REVEAL_EVENT\)\);[\s\S]*?render\(\);\s*collectCurrentPage\(\);/);
+  assert.match(floatingPanel, /function isStaleMount\(serial\)\s*\{\s*return panelDestroyed \|\| serial !== panelMountSerial;\s*\}/);
+  assert.equal(floatingPanel.match(/document\.documentElement\.appendChild\(host\);/g)?.length, 1);
+  assert.doesNotMatch(floatingPanel, /collectCurrentPage\(\);\s*\}\)\(\);\s*$/);
   assert.match(floatingLauncherSource, /dataset\.launcherVersion/);
   assert.match(floatingLauncherSource, /function isPanelVisible\(\)[\s\S]*?dataset\.panelHidden !== "true"/);
   assert.match(floatingLauncherSource, /previousController\?\.destroy/);
@@ -1415,7 +1800,7 @@ test("extension manifest uses an on-demand minimum-permission MV3 surface", asyn
   assert.match(floatingPanel, /dataset\.collectorVersion/);
   assert.match(floatingPanel, /existing\?\.remove\(\)/);
   assert.match(floatingPanel, /REVEAL_EVENT/);
-  assert.match(floatingPanel, /currentController\?\.version === PANEL_VERSION[\s\S]*?currentController\.reveal\(\)/);
+  assert.match(floatingPanel, /currentController\?\.version === PANEL_VERSION[\s\S]*?currentController\.open\(\)/);
   assert.match(floatingPanel, /globalThis\[CONTROLLER_KEY\]\s*=\s*panelController/);
   assert.match(floatingPanel, /host\.addEventListener\(REVEAL_EVENT,\s*\(\)\s*=>\s*\{[\s\S]*?setPanelFolded\(false\)/);
   assert.match(floatingPanel, /data-dock="right"/);
@@ -1446,7 +1831,8 @@ test("extension manifest uses an on-demand minimum-permission MV3 surface", asyn
   assert.match(floatingPanel, /const PLATFORM_LABELS\s*=\s*\{[\s\S]*?"1688":\s*"1688"[\s\S]*?amazon:\s*"Amazon"[\s\S]*?gigacloud:\s*"大健云仓"/);
   assert.match(floatingPanel, /function platformLabelFor\(manifest\)[\s\S]*?manifest\?\.source\?\.platform[\s\S]*?商品平台/);
   assert.match(floatingPanel, /function panelProductTitleFor\(manifest\)[\s\S]*?title\.endsWith\(suffix\)[\s\S]*?title\.slice\(0,\s*-suffix\.length\)\.trim\(\)/);
-  assert.match(floatingPanel, /refs\.productTitle\.textContent\s*=\s*panelProductTitleFor\(state\.manifest\)/);
+  assert.match(floatingPanel, /const panelTitle\s*=\s*panelProductTitleFor\(state\.manifest\);[\s\S]*?refs\.productTitle\.textContent\s*=\s*panelTitle;[\s\S]*?refs\.productTitle\.title\s*=\s*panelTitle;/);
+  assert.match(floatingPanel, /\.product-summary strong\s*\{[\s\S]*?-webkit-line-clamp:\s*3;[\s\S]*?overflow:\s*hidden;/);
   assert.match(floatingPanel, /refs\.platformName\.textContent\s*=\s*platformLabelFor\(state\.manifest\)/);
   assert.match(floatingPanel, /\.title-block\s*\{[\s\S]*?display:\s*grid;[\s\S]*?place-content:\s*center;[\s\S]*?text-align:\s*center/);
   assert.match(floatingPanel, /\.platform-name\s*\{[\s\S]*?text-align:\s*center/);
@@ -1466,19 +1852,27 @@ test("extension manifest uses an on-demand minimum-permission MV3 surface", asyn
   assert.match(floatingPanel, /\.group-head\s*\{[\s\S]*?min-height:\s*36px[\s\S]*?justify-content:\s*space-between[\s\S]*?padding:\s*0 7px/);
   assert.match(floatingPanel, /\.image-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)[\s\S]*?gap:\s*6px/);
   assert.doesNotMatch(floatingPanel, /\.image-grid\s*\{[^}]*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
-  assert.match(floatingPanel, /\.image-card\s*\{[\s\S]*?grid-template-rows:\s*auto 24px[\s\S]*?border:\s*2px solid var\(--card-border\)[\s\S]*?border-radius:\s*5px/);
+  assert.match(floatingPanel, /\.image-card\s*\{[\s\S]*?grid-template-rows:\s*auto auto 24px[\s\S]*?border:\s*2px solid var\(--card-border\)[\s\S]*?border-radius:\s*5px/);
   assert.match(floatingPanel, /\.image-card\.is-selected\s*\{\s*border-color:\s*var\(--selection-accent\)/);
   assert.match(floatingPanel, /\.image-card-media\s*\{[\s\S]*?width:\s*100%;[\s\S]*?aspect-ratio:\s*1/);
   assert.match(floatingPanel, /\.image-card-media\s*\{[\s\S]*?background:\s*#fff/);
-  assert.match(floatingPanel, /\.image-card-media img\s*\{[\s\S]*?width:\s*98%;[\s\S]*?height:\s*98%;[\s\S]*?margin:\s*1%;[\s\S]*?object-fit:\s*contain/);
-  assert.match(floatingPanel, /\.image-card-meta\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?grid-template-columns:\s*minmax\(0,\s*auto\) auto;[\s\S]*?background:\s*rgba\(0,\s*0,\s*0,\s*0\.62\);[\s\S]*?color:\s*#fff;[\s\S]*?backdrop-filter:\s*blur\(2px\)/);
+  assert.match(floatingPanel, /\.image-card-media img\s*\{[\s\S]*?width:\s*100%;[\s\S]*?height:\s*100%;[\s\S]*?object-fit:\s*contain/);
+  assert.doesNotMatch(floatingPanel, /\.image-card-media img\s*\{[^}]*margin:\s*1%/);
+  assert.doesNotMatch(floatingPanel, /\.image-card-media input\s*\{/);
+  assert.match(floatingPanel, /\.image-card-meta\s*\{[\s\S]*?grid-template-columns:\s*auto minmax\(0,\s*auto\) auto;[\s\S]*?border-top:\s*1px solid var\(--card-action-divider\);[\s\S]*?background:\s*var\(--surface\);[\s\S]*?color:\s*var\(--control-text\)/);
+  assert.doesNotMatch(floatingPanel, /\.image-card-meta\s*\{[^}]*position:\s*absolute;/);
+  assert.match(floatingPanel, /\.image-card-meta input\s*\{[\s\S]*?accent-color:\s*var\(--selection-accent\)/);
   assert.match(floatingPanel, /\.image-card-name\s*\{[\s\S]*?background:\s*transparent;[\s\S]*?color:\s*inherit;[\s\S]*?font-size:\s*10px[\s\S]*?white-space:\s*nowrap/);
-  assert.match(floatingPanel, /\.image-card-resolution\s*\{[\s\S]*?background:\s*transparent;[\s\S]*?color:\s*inherit;[\s\S]*?font-size:\s*9px[\s\S]*?white-space:\s*nowrap/);
-  assert.match(floatingPanel, /\.image-card\.has-variant\s*\{[\s\S]*?grid-template-rows:\s*auto auto 24px/);
+  assert.match(floatingPanel, /\.image-card-resolution\s*\{[\s\S]*?background:\s*transparent;[\s\S]*?color:\s*var\(--muted\);[\s\S]*?font-size:\s*9px[\s\S]*?white-space:\s*nowrap/);
+  assert.match(floatingPanel, /\.image-card\.has-variant\s*\{[\s\S]*?grid-template-rows:\s*auto auto auto 24px/);
   assert.doesNotMatch(floatingPanel, /\.image-card\.has-variant\s*\{[^}]*minmax\(56px/);
   assert.match(floatingPanel, /\.image-card-variant\s*\{[\s\S]*?border-top:\s*1px solid var\(--variant-border\);[\s\S]*?background:\s*var\(--variant-bg\);[\s\S]*?color:\s*var\(--variant-text\);[\s\S]*?font-size:\s*12px;[\s\S]*?font-weight:\s*700;[\s\S]*?line-height:\s*16px;[\s\S]*?white-space:\s*normal;[\s\S]*?overflow-wrap:\s*anywhere/);
   assert.doesNotMatch(floatingPanel, /\.image-card-variant\s*\{[^}]*text-overflow:\s*ellipsis/);
-  assert.match(floatingPanel, /if \(item\.category === "sku" && variantTitle\)[\s\S]*?card\.classList\.add\("has-variant"\)[\s\S]*?variant\.textContent\s*=\s*variantTitle[\s\S]*?card\.append\(label, variant, actions\)/);
+  assert.match(floatingPanel, /if \(item\.category === "sku" && variantTitle\)[\s\S]*?card\.classList\.add\("has-variant"\)[\s\S]*?variant\.textContent\s*=\s*variantTitle[\s\S]*?card\.append\(label, meta, variant, actions\)/);
+  assert.match(floatingPanel, /meta\.append\(checkbox, name, resolution\)/);
+  assert.match(floatingPanel, /label\.htmlFor\s*=\s*checkbox\.id/);
+  assert.match(floatingPanel, /label\.append\(image\)/);
+  assert.match(floatingPanel, /card\.append\(label, meta, actions\)/);
   assert.doesNotMatch(floatingPanel, /\bVARIANT_FONT_MAX_PX\b|\bVARIANT_FONT_MIN_PX\b|\bVARIANT_HORIZONTAL_PADDING_PX\b|\bvariantFitFrame\b/);
   assert.doesNotMatch(floatingPanel, /function\s+(?:variantRows|fittingVariantFontSize|fitVariantRows|scheduleVariantRowFit)\b/);
   assert.doesNotMatch(floatingPanel, /rgba\(20,\s*27,\s*36,\s*0\.82\)/);
@@ -1557,7 +1951,7 @@ test("extension manifest uses an on-demand minimum-permission MV3 surface", asyn
   assert.match(floatingPanel, /\.group-head-actions\s*\{[\s\S]*?display:\s*flex/);
   assert.match(floatingPanel, /\.group-selection-count\s*\{[\s\S]*?font-size:\s*11px;[\s\S]*?font-weight:\s*700/);
   assert.match(floatingPanel, /\.group-select-all input\s*\{[\s\S]*?accent-color:\s*var\(--selection-accent\)/);
-  assert.match(floatingPanel, /\.image-card-media input\s*\{[\s\S]*?accent-color:\s*var\(--selection-accent\)/);
+  assert.match(floatingPanel, /\.image-card-meta input\s*\{[\s\S]*?accent-color:\s*var\(--selection-accent\)/);
   assert.match(floatingPanel, /\.group-download-button\s*\{[\s\S]*?color:\s*var\(--download\)/);
   assert.match(floatingPanel, /heading\.textContent\s*=\s*`\$\{CATEGORY_LABELS\[category\]\}（\$\{items\.length\}张）`/);
   assert.match(floatingPanel, /groupSelectionCount\.textContent\s*=\s*`已选 \$\{selectedInGroup\.length\} 张`/);

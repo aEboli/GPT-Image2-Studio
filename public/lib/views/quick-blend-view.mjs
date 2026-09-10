@@ -1,7 +1,8 @@
 import { getImageUrl, fetchServerImageAsDataUrl } from "../browser-image-cache.mjs";
 import { sortGalleryItemsByCreatedAtDesc } from "../gallery-organizer.mjs";
 import { getDefaultGenerationSize, normalizeGenerationSize } from "../generation-size-options.mjs";
-import { DEFAULT_RESPONSES_MODEL } from "../model-defaults.mjs";
+import { normalizeImageQuality } from "../image-quality-options.mjs";
+import { DEFAULT_RESPONSES_MODEL, normalizeImageToolModel } from "../model-defaults.mjs";
 import { normalizeOutputFormat } from "../output-format-options.mjs";
 import { getPreviewPlaceholderState } from "../preview-placeholder-state.mjs";
 import { shouldReusePreviewLoadingShell } from "../preview-loading-shell.mjs";
@@ -499,11 +500,11 @@ function createQuickBlendJobs() {
     ratioLabel: ratioOption?.label || DEFAULT_QUICK_BLEND_RATIO,
     sizeSetting,
     size,
-    quality: state.config?.defaults?.quality || "high",
+    quality: normalizeImageQuality(state.config?.defaults?.quality, { imageModel: normalizeImageToolModel(state.config?.imageToolModel) }),
     format: normalizeOutputFormat(outputFormatValue),
     baseUrl: baseUrlValue,
     responsesModel: responsesModelValue || DEFAULT_RESPONSES_MODEL,
-    imageModel: "gpt-image-2",
+    imageModel: normalizeImageToolModel(state.config?.imageToolModel),
     reasoningEffort: reasoningEffortValue,
     requestRetryCount: 0,
     quickBlendPairIndex: String(index + 1),

@@ -106,6 +106,7 @@ test("browser config module normalizes private config without requiring window g
     apiKey: "sk-browser-secret",
     endpointPath: "responses",
     responsesModel: "gpt-5.5",
+    imageToolModel: "gpt-image-2",
     directImageBaseUrl: "https://image-direct.example.test/v1",
     directImageApiKey: "sk-image-secret",
     directImageEndpointPath: "images/generations",
@@ -351,7 +352,9 @@ test("config drawer shows image route settings as exclusive mode tabs", async ()
   assert.match(styles, /\.route-config-panel\s*\{[\s\S]*display:\s*grid;/);
   assert.match(styles, /\.endpoint-address-control\s*\{/);
   assert.match(styles, /\.endpoint-suffix-select\s*\{/);
-  assert.match(styles, /\.endpoint-suffix-select option\s*\{[\s\S]*background:\s*#ffffff;[\s\S]*color:\s*#111827;/);
+  // option 弹窗由操作系统绘制，必须显式给不透明底色与字色，否则暗色下白底白字。
+  // 色值取库内 雪白/青灰（12.64:1），不用纯 #ffffff。
+  assert.match(styles, /\.endpoint-suffix-select option\s*\{[\s\S]*background:\s*#fffef9;[\s\S]*color:\s*#2b333e;/);
   assert.match(
     styles,
     /\.config-form:has\(input\[name="imageRoute"\]\[value="a"\]:checked\)\s*\[data-route-panel="b"\]/,

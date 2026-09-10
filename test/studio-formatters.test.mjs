@@ -8,8 +8,10 @@ import {
   resolveDisplayImageSize,
 } from "../lib/studio-formatters.mjs";
 
-test("formatImageModelLabel normalizes gpt-image-2 into a UI label", () => {
+test("formatImageModelLabel normalizes every tool model into a UI label", () => {
   assert.equal(formatImageModelLabel("gpt-image-2"), "GPT Image 2.0");
+  assert.equal(formatImageModelLabel("gpt-image-2.5-sunburst"), "GPT Image 2.5 Sunburst");
+  assert.equal(formatImageModelLabel("gpt-image-2.5-flare"), "GPT Image 2.5 Flare");
   assert.equal(formatImageModelLabel("custom-model"), "custom-model");
   assert.equal(formatImageModelLabel(""), "GPT Image 2.0");
 });

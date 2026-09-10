@@ -61,6 +61,15 @@ test("product image manifest round-trips normalized trusted items", () => {
   assert.ok(manifest.items.every((item) => item.url.startsWith("https://cbu01.alicdn.com/")));
 });
 
+test("product image manifest keeps a long product title instead of cutting it at 200 characters", () => {
+  const longTitle = `户外登山包 40L ${"防水耐磨".repeat(60)}`;
+  assert.ok(longTitle.length > 200);
+  const manifest = parseProductImageImportText(
+    serializeProductImageImportManifest({ ...makeManifest([makeItem("main-1", "main", 1)]), product: { id: "123456789", title: longTitle } }),
+  );
+  assert.equal(manifest.product.title, longTitle);
+});
+
 test("product image manifest preserves bounded de-duplicated SKU variant labels", () => {
   const sku = makeItem("sku-1", "sku", 1);
   sku.variantLabels = ["60cm", " 68cm ", "60cm", ...Array.from({ length: 40 }, (_, index) => `规格 ${index + 1}`)];

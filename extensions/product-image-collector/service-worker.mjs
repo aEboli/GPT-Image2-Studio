@@ -10,6 +10,7 @@ const MESSAGE_COPY = "product-image-collector:copy";
 const MESSAGE_COPY_IMAGES = "product-image-collector:copy-images";
 const MESSAGE_DOWNLOAD = "product-image-collector:download";
 const MESSAGE_OPEN = "product-image-collector:open";
+const EXTENSION_VERSION = "1.1.33";
 const NATIVE_CLIPBOARD_HOST = "com.aeboli.gpt_image2_studio.product_image_clipboard";
 
 function isSupportedProductTab(value) {
@@ -17,12 +18,18 @@ function isSupportedProductTab(value) {
 }
 
 async function collectFromTab(tab, pageUrl) {
-  if (!tab?.id || !isSupportedProductTab(pageUrl || tab.url)) {
+  const expectedPageUrl = pageUrl || tab?.url || "";
+  if (!tab?.id || !isSupportedProductTab(expectedPageUrl)) {
     throw new Error("请在受支持平台的商品详情页中使用商品图采集。");
   }
-  const results = await chrome.scripting.executeScript({
+  await chrome.scripting.executeScript({
     target: { tabId: tab.id },
     files: ["collector.js"],
+  });
+  const results = await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    func: collectInjectedPage,
+    args: [String(expectedPageUrl)],
   });
   const result = results?.[0]?.result;
   if (!result?.ok) {
@@ -31,14 +38,50 @@ async function collectFromTab(tab, pageUrl) {
   return { ...result, manifest: normalizeProductImageImportManifest(result.manifest) };
 }
 
+function collectInjectedPage(expectedPageUrl) {
+  if (expectedPageUrl && location.href !== expectedPageUrl) {
+    return { ok: false, message: "商品页已切换，请在当前页面重新采集。" };
+  }
+  const controller = globalThis["__gptImage2StudioProductImageCollectorController"];
+  if (controller?.version !== EXTENSION_VERSION || typeof controller?.collect !== "function") {
+    return { ok: false, message: "商品页采集器尚未就绪，请刷新页面后重试。" };
+  }
+  return controller.collect();
+}
+
+function openInjectedPanel(expectedPageUrl) {
+  if (expectedPageUrl && location.href !== expectedPageUrl) {
+    return { ok: false, message: "商品页已切换，请在当前页面重新打开采集窗。" };
+  }
+  const controller = globalThis.__gptImage2StudioProductImagePanelController;
+  if (controller?.version !== EXTENSION_VERSION || typeof controller?.open !== "function") {
+    return { ok: false, message: "商品图采集窗尚未就绪，请刷新页面后重试。" };
+  }
+  try {
+    controller.open();
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : String(error || "商品图采集窗打开失败。") };
+  }
+}
+
+async function injectPanel(tabId, files, pageUrl = "") {
+  await chrome.scripting.executeScript({ target: { tabId }, files });
+  const results = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: openInjectedPanel,
+    args: [String(pageUrl || "")],
+  });
+  const result = results?.[0]?.result;
+  if (!result?.ok) throw new Error(result?.message || "商品图采集窗尚未就绪，请刷新页面后重试。");
+  return result;
+}
+
 async function openPanel(tab, pageUrl) {
   if (!tab?.id || !isSupportedProductTab(pageUrl || tab.url)) {
     throw new Error("请在受支持平台的商品详情页中使用商品图采集。");
   }
-  await chrome.scripting.executeScript({
-    target: { tabId: tab.id },
-    files: ["floating-launcher.js", "floating-panel.js"],
-  });
+  await injectPanel(tab.id, ["collector.js", "floating-launcher.js", "floating-panel.js"], pageUrl || tab.url);
   return { ok: true };
 }
 
@@ -110,17 +153,13 @@ async function downloadSelection(message) {
 chrome.action.onClicked.addListener(async (tab) => {
   if (!tab?.id) return;
   try {
-    if (isSupportedProductTab(tab.url)) {
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        files: ["floating-launcher.js", "floating-panel.js"],
-      });
-    } else {
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        files: ["floating-panel.js"],
-      });
-    }
+    await injectPanel(
+      tab.id,
+      isSupportedProductTab(tab.url)
+        ? ["collector.js", "floating-launcher.js", "floating-panel.js"]
+        : ["floating-panel.js"],
+      tab.url,
+    );
   } catch (error) {
     console.warn("商品图采集悬浮窗注入失败。", error);
   }

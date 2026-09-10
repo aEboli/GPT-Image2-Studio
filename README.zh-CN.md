@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.14-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.15-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installer-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,7 +10,7 @@
 
 把提示词生图、参考图分析、图片编辑、电商套图、人物写真、文章插图、PPT 生成和素材管理集中到一个浏览器界面中。
 
-当前版本：`v0.2.14`
+当前版本：`v0.2.15`
 
 </div>
 
@@ -52,14 +52,14 @@ Windows 用户也可以双击 `launch-studio.cmd` 启动，使用 `stop-studio-s
 从包含桌面产物的 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
 
 ```text
-GPT-Image2-Studio-Desktop-Setup-v0.2.14-x64.exe
+GPT-Image2-Studio-Desktop-Setup-v0.2.15-x64.exe
 ```
 
 安装完成后通过桌面或开始菜单中的 `GPT-Image2-Studio` 启动。程序会在独立窗口中运行，内置服务使用动态回环端口，关闭窗口后不会遗留后台服务。无需另行安装 Node.js，完整说明见 [Windows 桌面程序文档](./docs/windows-desktop.md)。
 
 源码目录也可直接启动桌面开发版：
 
-如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.14-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
+如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.15-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
 
 桌面开发使用 Electron `43`，要求 Node.js `22.12` 或更高版本；普通 `npm start` 服务仍支持 Node.js `20+`。
 
@@ -70,7 +70,7 @@ cmd /c npm run desktop
 
 ### 方式三：Windows 浏览器安装包（兼容旧版）
 
-旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.14` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
+旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.15` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
 
 ## 配置说明
 
@@ -115,7 +115,15 @@ API Key：sk-****
 Responses 模型：gpt-5.4-mini
 ```
 
-这里的「Responses 模型」是外层模型；生图工具模型固定为 `gpt-image-2`，在提示词页的参数区可以看到「工具模型 gpt-image-2」。
+这里的「Responses 模型」是外层模型；生图工具模型在它下面的「生图工具模型」下拉框里选，提示词页的参数区会同步显示「工具模型 <所选模型>」。该项只能从下拉选项里选，不支持自定义填写：
+
+| 选项 | 说明 |
+| --- | --- |
+| `gpt-image-2` | 默认值。 |
+| `gpt-image-2.5-sunburst` | 能力最强，精修更准，出图更慢。 |
+| `gpt-image-2.5-flare` | 日常生图，速度更快。 |
+
+提示词页的参数区还有「质量」下拉：`auto`、`low`、`medium`、`high`（默认），以及只有 2.5 模型才有的 `xhigh` 和 `max`。选着 `xhigh` / `max` 再把工具模型切回 `gpt-image-2` 时，质量会自动降为 `high`，而不是发一个上游必然拒绝的请求。
 
 **直接调用模式**分成两组，各自独立填写。生图组只负责图片生成和编辑，文本/视觉组负责提示词增强、参考图分析和 Listing 等模型调用，两组可以分别指向不同服务商：
 
@@ -180,6 +188,8 @@ API Key：<服务方提供的 Key>
 OPENAI_API_KEY=<your-api-key>
 OPENAI_BASE_URL=https://api.openai.com/v1
 RESPONSES_MODEL=gpt-5.4-mini
+IMAGE_TOOL_MODEL=gpt-image-2
+IMAGE_QUALITY=high
 DIRECT_IMAGE_BASE_URL=https://api.openai.com/v1
 DIRECT_IMAGE_API_KEY=
 DIRECT_IMAGE_ENDPOINT_PATH=images/generations
@@ -573,8 +583,8 @@ cmd /c npm run build:desktop
 产物路径：
 
 ```text
-artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.14-x64.exe
-artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.14-x64.zip
+artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.15-x64.exe
+artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.15-x64.zip
 artifacts/desktop/win-unpacked/GPT-Image2-Studio.exe
 ```
 
@@ -592,7 +602,7 @@ cmd /c npm run build:installer
 产物路径格式：
 
 ```text
-artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.14.exe
+artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.15.exe
 ```
 
 脚本使用系统 `iexpress.exe` 生成自解压安装包，并把当前 Node.js 运行时和依赖打入安装目录；启动后仍使用默认浏览器显示工作台。
@@ -695,7 +705,7 @@ cmd /c npm run build:installer
 
 ## 版本更新说明
 
-完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.14](./docs/releases/v0.2.14.md)。
+完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.15](./docs/releases/v0.2.15.md)。
 
 ### v0.2.14 更新说明
 

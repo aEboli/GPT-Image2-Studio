@@ -64,7 +64,7 @@ test("article illustration mode has independent create and assets entries", asyn
   assert.match(styles, /\.article-record-image-grid\s*\{[\s\S]*repeat\(var\(--article-record-columns, 4\), minmax\(0, 1fr\)\)/);
   assert.match(styles, /\.article-record-image-card\s*\{[\s\S]*overflow: hidden;/);
   assert.match(styles, /\.article-record-card-meta\s*\{[\s\S]*display: flex;/);
-  assert.match(styles, /\.article-record-card-kind\.timeline\s*\{[\s\S]*rgba\(255, 201, 107, 0\.24\)/);
+  assert.match(styles, /\.article-record-card-kind\.timeline\s*\{[\s\S]*color-mix\(in srgb, var\(--warning\) 24%, transparent\)/);
   assert.match(styles, /\.article-record-detail\[data-record-columns="8"\] \.article-record-card-body/);
   assert.match(styles, /\.article-record-detail\[data-record-columns="8"\] \.article-card-head span\s*\{[\s\S]*display: none;/);
   assert.match(styles, /html\[data-ui-layout="tablet"\] \.article-record-image-grid\s*\{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);

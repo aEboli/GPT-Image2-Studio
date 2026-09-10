@@ -30,8 +30,8 @@ const generationClientPath = new URL("../lib/generation-client.mjs", import.meta
 const generationLogPanelPath = new URL("../lib/generation-log-panel.mjs", import.meta.url);
 const generationLogStorePath = new URL("../lib/generation-log-store.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20260830-temu-workbench-1";
-const appAssetVersion = "20260830-temu-workbench-1";
+const stylesAssetVersion = "20260910-zhongguose-calm-1";
+const appAssetVersion = "20260909-api-endpoint-book-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
 const creationQueueModuleAssetVersion = "20260829-generation-schedule-1";
 const quickBlendModuleAssetVersion = "20260608-quick-blend-time-sort-1";
@@ -786,8 +786,8 @@ test("filmstrip selected-state styling is shared across rails", async () => {
   assert.match(styles, /\.filmstrip-deck-badge\s*\{[\s\S]*right:\s*7px;/);
 
   // The reference-analysis rail keeps its own green palette at the same contrast.
-  assert.match(styles, /\.reference-analysis-generation-thumb\.active\s*\{[\s\S]*border-color:\s*rgba\(112, 226, 162, 0\.82\);/);
-  assert.match(styles, /\.reference-analysis-generation-thumb \.filmstrip-selected-marker\s*\{[\s\S]*background:\s*rgb\(112, 226, 162\);/);
+  assert.match(styles, /\.reference-analysis-generation-thumb\.active\s*\{[\s\S]*border-color:\s*color-mix\(in srgb, var\(--accent\) 82%, transparent\);/);
+  assert.match(styles, /\.reference-analysis-generation-thumb \.filmstrip-selected-marker\s*\{[\s\S]*background:\s*var\(--accent\);/);
 });
 
 test("studio filmstrip shows a visible placeholder while prompt thumbnails load", async () => {
@@ -886,7 +886,7 @@ test("generation activity moves into settings while studio workspace reflows to 
   assert.match(readCssRule(styles, ".timeline-summary"), /font-weight:\s*700;/);
   assert.doesNotMatch(readCssRule(styles, ".timeline-summary"), /white-space:\s*nowrap|text-overflow:\s*ellipsis|overflow:\s*hidden/);
   assert.match(styles, /\.timeline-relay\s*\{[\s\S]*display:\s*inline;[\s\S]*margin-left:\s*8px;[\s\S]*overflow-wrap:\s*anywhere;/);
-  assert.match(readCssRule(styles, ".timeline-relay"), /color:\s*rgba\(132,\s*202,\s*255,\s*0\.82\);/);
+  assert.match(readCssRule(styles, ".timeline-relay"), /color:\s*var\(--meta-relay\);/);
   assert.match(readCssRule(styles, ".timeline-relay"), /font-weight:\s*600;/);
   assert.doesNotMatch(readCssRule(styles, ".timeline-relay"), /margin-top/);
   assert.match(styles, /\.timeline-detail\s*\{[\s\S]*grid-column:\s*2 \/ -1;[\s\S]*grid-row:\s*2;/);
@@ -894,7 +894,7 @@ test("generation activity moves into settings while studio workspace reflows to 
   assert.match(styles, /\.timeline-url\s*\{[\s\S]*grid-column:\s*2 \/ -1;[\s\S]*grid-row:\s*2;/);
   assert.match(readCssRule(styles, ".timeline-url"), /white-space:\s*normal;/);
   assert.match(readCssRule(styles, ".timeline-url"), /overflow-wrap:\s*anywhere;/);
-  assert.match(readCssRule(styles, ".timeline-url"), /color:\s*rgba\(171,\s*184,\s*218,\s*0\.76\);/);
+  assert.match(readCssRule(styles, ".timeline-url"), /color:\s*color-mix\(in srgb, var\(--muted\) 76%, transparent\);/);
   assert.doesNotMatch(readCssRule(styles, ".timeline-url"), /text-overflow:\s*ellipsis|white-space:\s*nowrap/);
   assert.match(styles, /\.timeline-item\.has-url \.timeline-detail\s*\{[\s\S]*grid-row:\s*3;/);
   const timelineMetaRule = readCssRuleContaining(styles, ".timeline-meta", "display: flex");
@@ -910,7 +910,7 @@ test("generation activity moves into settings while studio workspace reflows to 
   assert.doesNotMatch(styles, /\.timeline-ratio\s*\{|\.timeline-resolution\s*\{/);
   assert.match(styles, /\.timeline-main,\s*\.timeline-url,\s*\.timeline-meta\s*\{[\s\S]*font-size:\s*0\.78rem;/);
   assert.doesNotMatch(readCssRuleContaining(styles, ".timeline-main,\n.timeline-url,\n.timeline-meta", "font-size: 0.78rem"), /color:/);
-  assert.match(styles, /\.timeline-mode,\s*\.timeline-ratio-size\s*\{[\s\S]*color:\s*rgba\(171,\s*184,\s*218,\s*0\.64\);/);
+  assert.match(styles, /\.timeline-mode,\s*\.timeline-ratio-size\s*\{[\s\S]*color:\s*var\(--muted\);/);
   assert.match(readCssRule(styles, ".timeline-mode"), /font-weight:\s*700;/);
   assert.match(styles, /\.timeline-meta\s*\{[\s\S]*align-items:\s*center;[\s\S]*white-space:\s*nowrap;[\s\S]*overflow-wrap:\s*normal;/);
   assert.match(styles, /\.timeline-ratio-size,\s*\.timeline-start-time time\s*\{[\s\S]*font-variant-numeric:\s*tabular-nums;/);
@@ -998,13 +998,13 @@ test("scrollable surfaces use subtle themed scrollbars instead of default browse
   assert.match(styles, /--scrollbar-size:\s*10px;/);
   assert.match(
     styles,
-    /\.settings-form,[\s\S]*\.creation-form,[\s\S]*\.creation-result-grid,[\s\S]*\.portrait-form,[\s\S]*\.portrait-result-grid,[\s\S]*\.ppt-form,[\s\S]*\.ppt-slide-list,[\s\S]*\.image-decomposition-form,[\s\S]*textarea\s*\{[\s\S]*scrollbar-width:\s*thin;[\s\S]*scrollbar-color:\s*var\(--scrollbar-thumb-color,\s*rgba\(132,\s*147,\s*255,\s*0\.42\)\)\s*var\(--scrollbar-track-color,\s*rgba\(255,\s*255,\s*255,\s*0\.06\)\);/,
+    /\.settings-form,[\s\S]*\.creation-form,[\s\S]*\.creation-result-grid,[\s\S]*\.portrait-form,[\s\S]*\.portrait-result-grid,[\s\S]*\.ppt-form,[\s\S]*\.ppt-slide-list,[\s\S]*\.image-decomposition-form,[\s\S]*textarea\s*\{[\s\S]*scrollbar-width:\s*thin;[\s\S]*scrollbar-color:\s*var\(--scrollbar-thumb-color,\s*color-mix\(in srgb, var\(--accent\) 42%, transparent\)\)\s*var\(--scrollbar-track-color,\s*rgba\(255,\s*255,\s*255,\s*0\.06\)\);/,
   );
   assert.match(
     styles,
     /\.settings-form::-webkit-scrollbar,[\s\S]*\.creation-form::-webkit-scrollbar,[\s\S]*\.creation-result-grid::-webkit-scrollbar,[\s\S]*\.portrait-form::-webkit-scrollbar,[\s\S]*\.portrait-result-grid::-webkit-scrollbar,[\s\S]*\.ppt-form::-webkit-scrollbar,[\s\S]*\.ppt-slide-list::-webkit-scrollbar,[\s\S]*\.image-decomposition-form::-webkit-scrollbar,[\s\S]*textarea::-webkit-scrollbar\s*\{[\s\S]*width:\s*var\(--scrollbar-size,\s*10px\);[\s\S]*height:\s*var\(--scrollbar-size,\s*10px\);/,
   );
-  assert.match(styles, /\.settings-form::-webkit-scrollbar-thumb,[\s\S]*background:\s*linear-gradient\(180deg,\s*rgba\(156,\s*170,\s*255,\s*0\.58\),\s*rgba\(111,\s*124,\s*255,\s*0\.34\)\);/);
+  assert.match(styles, /\.settings-form::-webkit-scrollbar-thumb,[\s\S]*background:\s*linear-gradient\(180deg,\s*color-mix\(in srgb, var\(--accent\) 58%, transparent\),\s*color-mix\(in srgb, var\(--accent\) 34%, transparent\)\);/);
 });
 
 test("creation workbench layouts inherit the prompt studio column split", async () => {
@@ -2116,7 +2116,7 @@ test("the centered text and heartbeat icon stay legible over the blurred backgro
   const styles = await readFile(stylesPath, "utf8");
 
   const percentRule = styles.match(/\n\.generation-loading-percent \{[\s\S]*?\n\}/)?.[0] || "";
-  assert.match(percentRule, /color:\s*color-mix\(in srgb, #ffffff/, "百分比要提到接近纯白");
+  assert.match(percentRule, /color:\s*color-mix\(in srgb, #f1f0ed/, "百分比要提到银白纸色");
   assert.match(percentRule, /text-shadow:/, "需要暗描边把文字从背景里拉开");
 
   const labelRule = styles.match(/\n\.generation-loading-label \{[\s\S]*?\n\}/)?.[0] || "";
@@ -2124,7 +2124,7 @@ test("the centered text and heartbeat icon stay legible over the blurred backgro
   assert.match(labelRule, /text-shadow:/);
 
   const iconRule = styles.match(/\n\.generation-loading-heartbeat \{[\s\S]*?\n\}/)?.[0] || "";
-  assert.match(iconRule, /color:\s*color-mix\(in srgb, #ffffff/, "图标描边要接近纯白");
+  assert.match(iconRule, /color:\s*color-mix\(in srgb, #f1f0ed/, "图标描边要接近银白纸色");
   assert.match(iconRule, /drop-shadow/, "需要外发光把图标从同色系背景里托出来");
 
   // 两种主题都要各自处理，浅色下要反过来压深
@@ -2159,7 +2159,7 @@ test("studio panels start without redundant title blocks and merge parameters un
   assert.match(app, /const REASONING_LABELS = \{[\s\S]*low: "Low",[\s\S]*medium: "Medium",[\s\S]*high: "High",[\s\S]*xhigh: "XHigh",[\s\S]*\};/);
   assert.match(app, /const REASONING_ESTIMATES = \{[\s\S]*low: "30s\+",[\s\S]*medium: "90s\+",[\s\S]*high: "150s\+",[\s\S]*xhigh: "210s\+",[\s\S]*\};/);
   assert.match(app, /option\.textContent = estimate \? `\$\{label\} ~\$\{estimate\}` : label;/);
-  assert.match(html, /<div class="advanced-controls">[\s\S]*<label class="compact-field">[\s\S]*<span data-ui-i18n="outputFormat">输出格式<\/span>[\s\S]*<\/label>[\s\S]*<div class="parameter-meta" aria-label="工具模型与质量" data-ui-i18n-aria-label="toolModelAndQuality">[\s\S]*<span data-ui-i18n="toolModel">工具模型<\/span>[\s\S]*<strong>gpt-image-2<\/strong>[\s\S]*<span data-ui-i18n="quality">质量<\/span>[\s\S]*<strong>High<\/strong>[\s\S]*<\/div>[\s\S]*<\/div>/);
+  assert.match(html, /<div class="advanced-controls">[\s\S]*<label class="compact-field">[\s\S]*<span data-ui-i18n="outputFormat">输出格式<\/span>[\s\S]*<\/label>[\s\S]*<label class="compact-field">[\s\S]*<span data-ui-i18n="quality">质量<\/span>[\s\S]*<select id="qualityInput" name="quality"><\/select>[\s\S]*<\/label>[\s\S]*<div class="parameter-meta" aria-label="工具模型" data-ui-i18n-aria-label="toolModelMeta">[\s\S]*<span data-ui-i18n="toolModel">工具模型<\/span>[\s\S]*<strong id="parameterToolModel">gpt-image-2<\/strong>[\s\S]*<\/div>[\s\S]*<\/div>/);
   assert.doesNotMatch(html, /<p>工具模型：/);
   assert.doesNotMatch(html, /<p>质量：/);
   assert.doesNotMatch(html, /<details class="advanced-box"/);
@@ -2196,11 +2196,11 @@ test("ratio picker renders every configured aspect ratio instead of a featured s
   assert.doesNotMatch(styles, /\.ratio-chip span\s*\{/);
   assert.match(
     styles,
-    /\.ratio-orientation-summary\s*\{[\s\S]*margin-left:\s*auto;[\s\S]*border-radius:\s*999px;[\s\S]*text-shadow:\s*0 0 12px rgba\(119,\s*255,\s*214,\s*0\.58\);/,
+    /\.ratio-orientation-summary\s*\{[\s\S]*margin-left:\s*auto;[\s\S]*border-radius:\s*999px;[\s\S]*color:\s*var\(--accent\);[\s\S]*text-shadow:\s*none;/,
   );
   assert.match(styles, /\.field-heading \.ratio-orientation-summary\s*\{[\s\S]*display:\s*inline-flex;[\s\S]*font-size:\s*11px;[\s\S]*font-weight:\s*800;/);
-  assert.match(styles, /\.ratio-orientation-summary\[data-orientation="landscape"\]\s*\{[\s\S]*color:\s*#a8ffdf;/);
-  assert.match(styles, /\.ratio-orientation-summary\[data-orientation="portrait"\]\s*\{[\s\S]*color:\s*#b8f7ff;/);
+  assert.match(styles, /\.ratio-orientation-summary\[data-orientation="landscape"\]\s*\{[\s\S]*color:\s*var\(--meta-mode\);/);
+  assert.match(styles, /\.ratio-orientation-summary\[data-orientation="portrait"\]\s*\{[\s\S]*color:\s*var\(--meta-relay\);/);
   assert.doesNotMatch(styles, /\.ratio-chip-orientation/);
 });
 
@@ -2278,13 +2278,13 @@ test("top navigation groups functions into an Apple-style global mega menu", asy
   assert.match(styles, /html:not\(\[data-ui-layout="tablet"\]\):not\(\[data-ui-layout="mobile"\]\) \.brand-cluster,[\s\S]*\.topbar-api-check,[\s\S]*\.topbar-ghost-actions,[\s\S]*\.nav-tab-note\s*\{[\s\S]*display:\s*none;/);
   assert.match(styles, /html:not\(\[data-ui-layout="tablet"\]\):not\(\[data-ui-layout="mobile"\]\) \.global-nav\s*\{[\s\S]*position:\s*static;[\s\S]*width:\s*auto;[\s\S]*transform:\s*none;/);
   assert.match(styles, /html:not\(\[data-ui-layout="tablet"\]\):not\(\[data-ui-layout="mobile"\]\) \.view-tabs\s*\{[\s\S]*border:\s*0;[\s\S]*background:\s*transparent;[\s\S]*box-shadow:\s*none;/);
-  assert.match(styles, /--nav-tab-bg:\s*rgba\(15,\s*23,\s*42,\s*0\.84\);[\s\S]*--nav-tab-active:\s*#34c759;[\s\S]*--nav-tab-idle:\s*#6f7cff;/);
+  assert.match(styles, /--nav-tab-bg:\s*rgba\(20,\s*35,\s*52,\s*0\.84\);[\s\S]*--nav-tab-active:\s*#68b88e;[\s\S]*--nav-tab-idle:\s*#9fa39a;/);
   assert.match(styles, /html:not\(\[data-ui-layout="tablet"\]\):not\(\[data-ui-layout="mobile"\]\) \.view-tab\s*\{[\s\S]*min-width:\s*92px;[\s\S]*min-height:\s*30px;[\s\S]*border-radius:\s*10px;[\s\S]*var\(--nav-tab-idle\)\s*22%,\s*var\(--nav-tab-bg\)/);
   assert.match(styles, /\.view-tab\.active\s*\{[\s\S]*var\(--nav-tab-active\)\s*28%,\s*var\(--nav-tab-bg\)[\s\S]*var\(--nav-tab-active\)\s*12%,\s*var\(--nav-tab-bg\)[\s\S]*color:\s*var\(--nav-tab-active\);/);
   assert.match(styles, /html:not\(\[data-ui-layout="tablet"\]\):not\(\[data-ui-layout="mobile"\]\) \.view-tab\.active::after\s*\{[\s\S]*background:\s*var\(--nav-tab-active\);/);
   assert.match(styles, /html:not\(\[data-ui-layout="tablet"\]\):not\(\[data-ui-layout="mobile"\]\) \.view-tab::after\s*\{[\s\S]*height:\s*4px;[\s\S]*background:\s*var\(--nav-tab-idle\);[\s\S]*opacity:\s*0\.86;/);
-  assert.match(styles, /--flyout-bg:\s*rgba\(8,\s*13,\s*26,\s*0\.96\);[\s\S]*--flyout-text:\s*var\(--text\);/);
-  assert.match(styles, /html\[data-theme="light"\]\s*\{[\s\S]*--flyout-bg:\s*rgba\(251,\s*251,\s*253,\s*0\.96\);[\s\S]*--flyout-text:\s*var\(--text\);/);
+  assert.match(styles, /--flyout-bg:\s*rgba\(16,\s*31,\s*48,\s*0\.97\);[\s\S]*--flyout-text:\s*var\(--text\);/);
+  assert.match(styles, /html\[data-theme="light"\]\s*\{[\s\S]*--flyout-bg:\s*rgba\(248,\s*244,\s*237,\s*0\.97\);[\s\S]*--flyout-text:\s*var\(--text\);/);
   assert.match(styles, /\.nav-flyout\.mega-menu\s*\{[\s\S]*width:\s*min\(680px,\s*calc\(100vw - 32px\)\);[\s\S]*padding:\s*24px;/);
   assert.match(styles, /\.mega-menu-grid\s*\{[\s\S]*grid-template-columns:\s*minmax\(170px,\s*1\.35fr\)\s+repeat\(2,\s*minmax\(120px,\s*1fr\)\);/);
   assert.match(styles, /\.mega-menu-link,\s*[\r\n]+\s*\.mega-menu-action\s*\{[\s\S]*font-size:\s*var\(--type-small-title-size\);[\s\S]*font-weight:\s*600;/);
@@ -2367,8 +2367,8 @@ test("theme toggle persists dark and white themes", async () => {
   assert.match(html, /image-studio-ui-theme-v1/);
   assert.match(html, /<button class="theme-toggle header-button" id="themeToggleButton" type="button" aria-pressed="false">/);
   assert.match(html, /<span id="themeToggleLabel">白色主题<\/span>/);
-  assert.match(styles, /html\[data-theme="light"\]\s*\{[\s\S]*--bg:\s*#f5f5f7;[\s\S]*--text:\s*#1d1d1f;/);
-  assert.match(styles, /html\[data-theme="light"\] body\s*\{[\s\S]*background:\s*linear-gradient\(180deg,\s*#f5f5f7 0%,\s*#ffffff 100%\);/);
+  assert.match(styles, /html\[data-theme="light"\]\s*\{[\s\S]*--bg:\s*#f1f0ed;[\s\S]*--text:\s*#2b333e;/);
+  assert.match(styles, /html\[data-theme="light"\] body\s*\{[\s\S]*background:[\s\S]*linear-gradient\(180deg,\s*#f1f0ed 0%,\s*#f8f4ed 100%\);/);
   assert.match(app, /const THEME_STORAGE_KEY = "image-studio-ui-theme-v1";/);
   assert.match(app, /function setUiTheme\(theme\) \{[\s\S]*document\.documentElement\.dataset\.theme = normalized;[\s\S]*window\.localStorage\.setItem\(THEME_STORAGE_KEY,\s*normalized\);/);
   assert.match(app, /refs\.themeToggleButton\.addEventListener\("click",\s*\(\) => \{/);
@@ -2444,7 +2444,7 @@ test("floating dialogs and popovers use theme-aware overlay surface tokens", asy
   assert.match(styles, /:root\s*\{[\s\S]*--overlay-surface-bg:/);
   assert.match(
     styles,
-    /html\[data-theme="light"\]\s*\{[\s\S]*--overlay-surface-bg:\s*linear-gradient\(180deg,\s*rgba\(255,\s*255,\s*255,\s*0\.98\)/,
+    /html\[data-theme="light"\]\s*\{[\s\S]*--overlay-surface-bg:\s*linear-gradient\(180deg,\s*rgba\(248,\s*244,\s*237,\s*0\.98\)/,
   );
 
   [
@@ -2705,7 +2705,7 @@ test("reference orchestration analysis is a separate studio mode outside prompt 
   assert.match(styles, /\.reference-analysis-panel\s*\{/);
   assert.match(styles, /\.reference-analysis-card\s*\{/);
   assert.match(styles, /\.reference-analysis-card p\s*\{[\s\S]*font-size:\s*var\(--type-body-size\);/);
-  assert.match(styles, /\.reference-analysis-apply-pill\s*\{[\s\S]*border-radius:\s*999px;[\s\S]*background:\s*linear-gradient\(135deg, rgba\(112, 226, 162, 0\.96\), rgba\(145, 159, 255, 0\.9\)\);/);
+  assert.match(styles, /\.reference-analysis-apply-pill\s*\{[\s\S]*border-radius:\s*999px;[\s\S]*background:\s*linear-gradient\(135deg, var\(--success\), color-mix\(in srgb, var\(--accent\) 90%, transparent\)\);/);
   assert.match(styles, /\.reference-analysis-apply-pill\.is-selected\s*\{/);
   assert.match(styles, /\.reference-analysis-selected\s*\{/);
   assert.match(styles, /\.reference-analysis-selected\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);/);
@@ -2723,12 +2723,12 @@ test("reference orchestration analysis is a separate studio mode outside prompt 
   assert.match(styles, /\.reference-analysis-generation-strip\s*\{[\s\S]*grid-auto-flow:\s*column;[\s\S]*overflow-x:\s*auto;/);
   assert.match(styles, /\.reference-analysis-generation-thumb\s*\{[\s\S]*width:\s*72px;[\s\S]*aspect-ratio:\s*1\s*\/\s*1;/);
   // Raised from 0.62 so this rail's selected contrast matches the shared rails.
-  assert.match(styles, /\.reference-analysis-generation-thumb\.active\s*\{[\s\S]*border-color:\s*rgba\(112, 226, 162, 0\.82\);/);
-  assert.match(styles, /\.reference-analysis-generation-thumb\.is-running\s*\{[\s\S]*border-color:\s*rgba\(112, 226, 162, 0\.42\);/);
+  assert.match(styles, /\.reference-analysis-generation-thumb\.active\s*\{[\s\S]*border-color:\s*color-mix\(in srgb, var\(--accent\) 82%, transparent\);/);
+  assert.match(styles, /\.reference-analysis-generation-thumb\.is-running\s*\{[\s\S]*border-color:\s*color-mix\(in srgb, var\(--accent\) 42%, transparent\);/);
   assert.match(styles, /\.reference-analysis-auto-collapse\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) 52px;[\s\S]*text-align:\s*left;/);
   assert.match(styles, /\.reference-analysis-switch-track\s*\{[\s\S]*width:\s*52px;[\s\S]*height:\s*30px;/);
   assert.match(styles, /\.reference-analysis-switch-thumb\s*\{[\s\S]*transform:\s*translateX\(0\);/);
-  assert.match(styles, /\.reference-analysis-auto-collapse\.is-active \.reference-analysis-switch-track\s*\{[\s\S]*background:\s*#34c759;/);
+  assert.match(styles, /\.reference-analysis-auto-collapse\.is-active \.reference-analysis-switch-track\s*\{[\s\S]*background:\s*var\(--success\);/);
   assert.match(styles, /\.reference-analysis-auto-collapse\.is-active \.reference-analysis-switch-thumb\s*\{[\s\S]*transform:\s*translateX\(22px\);/);
   assert.match(styles, /\.reference-analysis-roles\s*\{/);
   assert.match(styles, /\.reference-analysis-role\s*\{[\s\S]*width:\s*auto;/);
@@ -4211,7 +4211,8 @@ test("creation mode has product references without a separate style-reference mo
 
   assert.match(styles, /\.creation-reference-grid\s*\{/);
   assert.match(styles, /\.creation-reference-role\s*\{/);
-  assert.match(styles, /\.creation-reference-role option\s*\{[\s\S]*background:\s*#ffffff;[\s\S]*color:\s*#171b2f;/);
+  // option 弹窗由操作系统绘制，必须显式给不透明底色与字色；色值取库内 雪白/青灰。
+  assert.match(styles, /\.creation-reference-role option\s*\{[\s\S]*background:\s*#fffef9;[\s\S]*color:\s*#2b333e;/);
   assert.match(styles, /#creationProductNameInput,\s*#creationSellingPointsInput,\s*#creationDimensionSpecsInput\s*\{[\s\S]*height:\s*44px;/);
   assert.match(styles, /#creationProductDescriptionInput\s*\{[\s\S]*height:\s*72px;/);
   assert.match(styles, /#creationProductDescriptionInput,\s*#creationSellingPointsInput,\s*#creationDimensionSpecsInput\s*\{[\s\S]*overflow-y:\s*hidden;[\s\S]*resize:\s*vertical;/);
@@ -4273,8 +4274,8 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(creationToggleControlRule, /box-sizing:\s*border-box;/);
   const creationListingToggleRule = readCssRule(styles, ".creation-listing-toggle");
   assert.match(creationListingToggleRule, /min-height:\s*40px;/);
-  assert.match(creationListingToggleRule, /border-color:\s*rgba\(249,\s*192,\s*106,\s*0\.58\);/);
-  assert.match(creationListingToggleRule, /linear-gradient\(135deg,\s*rgba\(249,\s*192,\s*106,\s*0\.22\),\s*rgba\(112,\s*226,\s*162,\s*0\.11\)\)/);
+  assert.match(creationListingToggleRule, /border-color:\s*color-mix\(in srgb, var\(--warning\) 58%, transparent\);/);
+  assert.match(creationListingToggleRule, /linear-gradient\(135deg,\s*color-mix\(in srgb, var\(--warning\) 22%, transparent\),\s*color-mix\(in srgb, var\(--success\) 11%, transparent\)\)/);
   assert.doesNotMatch(readCssRule(styles, ".creation-listing-toggle.is-prominent"), /grid-column|min-height/);
   const creationListingToggleTextRule = readCssRule(styles, ".creation-listing-toggle span");
   assert.match(creationListingToggleTextRule, /font-size:\s*clamp\(0\.72rem,\s*8\.5cqw,\s*var\(--type-body-size\)\);/);
@@ -4874,7 +4875,7 @@ test("creation mode exposes record detail and item repair actions", async () => 
   );
   assert.match(
     styles,
-    /\.creation-card:hover,\s*\.creation-card:focus-within\s*\{[\s\S]*border-color:\s*#ff9f43;[\s\S]*box-shadow:\s*0\s+0\s+0\s+1px\s+rgba\(255,\s*159,\s*67,\s*0\.28\),\s*0\s+0\s+16px\s+rgba\(255,\s*136,\s*40,\s*0\.24\);/,
+    /\.creation-card:hover,\s*\.creation-card:focus-within\s*\{[\s\S]*border-color:\s*var\(--warning\);[\s\S]*box-shadow:\s*0\s+0\s+0\s+1px\s+color-mix\(in srgb, var\(--warning\) 28%, transparent\),\s*0\s+0\s+16px\s+color-mix\(in srgb, var\(--warning\) 24%, transparent\);/,
   );
   assert.match(styles, /\.creation-card-head\s*\{[\s\S]*min-width:\s*0;/);
   assert.match(styles, /\.creation-card-head strong\s*\{[\s\S]*font-size:\s*0\.82rem;[\s\S]*white-space:\s*nowrap;/);
@@ -5727,11 +5728,11 @@ test("creation mode exposes listing agent controls and record listing drafts", a
   assert.match(styles, /\.creation-record-meta\s*\{[\s\S]*display:\s*block;[\s\S]*width:\s*100%;/);
   assert.match(readCssRule(styles, ".creation-record-meta-row"), /display:\s*block;/);
   assert.match(styles, /\.creation-record-status-row\s*\{[\s\S]*display:\s*flex;[\s\S]*gap:\s*6px;/);
-  assert.match(styles, /\.creation-record-listing-badge\s*\{[\s\S]*background:\s*rgba\(54,\s*211,\s*153,\s*0\.14\);/);
+  assert.match(styles, /\.creation-record-listing-badge\s*\{[\s\S]*background:\s*color-mix\(in srgb, var\(--success\) 14%, transparent\);/);
   assert.match(styles, /\.creation-listing-content-frame\s*\{/);
   assert.match(readCssRule(styles, ".creation-listing-content-frame"), /border-top:\s*1px solid/);
   assert.match(readCssRule(styles, ".creation-listing-field"), /border-bottom:\s*1px solid/);
-  assert.match(readCssRule(styles, ".creation-listing-field:first-child"), /background:\s*rgba\(125,\s*211,\s*252,\s*0\.035\)/);
+  assert.match(readCssRule(styles, ".creation-listing-field:first-child"), /background:\s*color-mix\(in srgb, var\(--accent\) 4%, transparent\)/);
   assert.doesNotMatch(styles, /\.creation-listing-view-toolbar\s*\{|\.creation-listing-segmented\s*\{|\.creation-listing-view-control|data-creation-listing-(?:language|section)-mode/);
   assert.match(readCssRule(styles, ".creation-listing-copy-pair"), /display:\s*grid;/);
   assert.match(readCssRule(styles, ".creation-listing-copy-pair"), /grid-template-columns:\s*minmax\(0,\s*1fr\);/);

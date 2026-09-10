@@ -2,15 +2,21 @@ import { normalizeApiBaseUrl } from "./api-base-url.mjs";
 import {
   DEFAULT_DIRECT_IMAGE_MODEL,
   DEFAULT_DIRECT_RESPONSES_MODEL,
+  DEFAULT_IMAGE_TOOL_MODEL,
   DEFAULT_PROTOCOL_IMAGE_MODEL,
   DEFAULT_RESPONSES_MODEL,
+  IMAGE_TOOL_MODEL_OPTIONS,
+  normalizeImageToolModel,
 } from "./model-defaults.mjs";
 
 export {
   DEFAULT_DIRECT_IMAGE_MODEL,
   DEFAULT_DIRECT_RESPONSES_MODEL,
+  DEFAULT_IMAGE_TOOL_MODEL,
   DEFAULT_PROTOCOL_IMAGE_MODEL,
   DEFAULT_RESPONSES_MODEL,
+  IMAGE_TOOL_MODEL_OPTIONS,
+  normalizeImageToolModel,
 };
 
 export const IMAGE_ROUTE_A = "a";
@@ -386,9 +392,15 @@ export function normalizeImageRouteConfig(
     [routeC.imageModel, source.protocolImageModel, protocolEndpoint.imageModel],
     DEFAULT_PROTOCOL_IMAGE_MODEL,
   );
+  // 路由模式的生图工具模型只能取白名单内的值，非法或空值都收敛为默认模型，
+  // 使旧配置、环境变量和请求字段都无法写入自定义模型。
+  const imageToolModel = normalizeImageToolModel(
+    firstString([routeA.imageToolModel, source.imageToolModel]),
+  );
 
   return {
     imageRoute: normalizeImageRoute(source.imageRoute || source.generationRoute),
+    imageToolModel,
     baseUrl: preserveRootBaseUrl(routeABaseInput, routeAEndpoint.baseUrl, preserveRootBaseUrls, "baseUrl") || defaultBaseUrl,
     endpointPath: routeAEndpoint.endpointPath,
     apiKey: firstString([routeA.apiKey, source.apiKey]),
@@ -500,7 +512,7 @@ export function getSelectedImageGenerationConfig(config = {}) {
     endpointPath: normalized.endpointPath,
     apiKey: normalized.apiKey,
     responsesModel: normalized.responsesModel,
-    imageModel: DEFAULT_DIRECT_IMAGE_MODEL,
+    imageModel: normalized.imageToolModel,
   };
 }
 

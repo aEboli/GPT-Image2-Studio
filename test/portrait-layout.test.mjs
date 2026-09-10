@@ -235,11 +235,12 @@ test("portrait accessory asset library inserts real image assets into accessory 
   assert.match(styles, /\.portrait-accessory-asset-panel\s*\{[\s\S]*font-family:\s*var\(--font-ui\);[\s\S]*background:/);
   assert.match(
     styles,
-    /:root\s*\{[\s\S]*--portrait-accessory-asset-panel-bg:\s*linear-gradient\(180deg,\s*rgba\(21,\s*28,\s*48,\s*0\.98\),\s*rgba\(13,\s*18,\s*31,\s*0\.98\)\)/,
+    /:root\s*\{[\s\S]*--portrait-accessory-asset-panel-bg:\s*linear-gradient\(180deg,\s*rgba\(28,\s*41,\s*56,\s*0\.98\),\s*rgba\(16,\s*31,\s*48,\s*0\.98\)\)/,
   );
+  // 昼色下这块保留"纸/木"暖皮，但换成库内的 汉白玉/粉白/蚌肉白
   assert.match(
     styles,
-    /html\[data-theme="light"\]\s*\{[\s\S]*--portrait-accessory-asset-panel-bg:\s*linear-gradient\(180deg,\s*#fffaf1 0%,\s*#f4e7d6 52%,\s*#efe1cf 100%\);/,
+    /html\[data-theme="light"\]\s*\{[\s\S]*--portrait-accessory-asset-panel-bg:\s*linear-gradient\(180deg,\s*#f8f4ed 0%,\s*#fbf2e3 52%,\s*#f9f1db 100%\);/,
   );
   assert.match(
     styles,

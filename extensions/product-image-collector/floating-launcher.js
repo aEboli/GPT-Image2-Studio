@@ -2,12 +2,14 @@
   const HOST_ID = "gpt-image2-studio-product-image-launcher";
   const PANEL_HOST_ID = "gpt-image2-studio-product-image-collector";
   const CONTROLLER_KEY = "__gptImage2StudioProductImageLauncherController";
-  const LAUNCHER_VERSION = "1.1.29";
+  const PANEL_CONTROLLER_KEY = "__gptImage2StudioProductImagePanelController";
+  const LAUNCHER_VERSION = "1.1.33";
   const MESSAGE_OPEN = "product-image-collector:open";
   const PANEL_OPENED_EVENT = "gpt-image2-studio-product-image-collector:panel-opened";
   const PANEL_CLOSED_EVENT = "gpt-image2-studio-product-image-collector:panel-closed";
   const PANEL_NAVIGATED_EVENT = "gpt-image2-studio-product-image-collector:page-navigated";
-  const OPEN_TIMEOUT_MS = 8000;
+  const OPEN_TIMEOUT_MS = 3000;
+  const OPEN_ATTEMPTS = 3;
   const LOCATION_POLL_MS = 750;
   const AMAZON_HOSTS = [
     "amazon.com", "amazon.ca", "amazon.co.uk", "amazon.de", "amazon.fr", "amazon.it",
@@ -58,13 +60,18 @@
       return;
     } catch {}
   }
-  if (previousController?.destroy) previousController.destroy();
+  if (previousController?.destroy) {
+    try {
+      previousController.destroy();
+    } catch {}
+  }
   document.getElementById(HOST_ID)?.remove();
 
   let host = null;
   let button = null;
   let status = null;
   let pendingTimeoutId = 0;
+  let pendingOpenCancel = null;
   let currentHref = location.href;
 
   function isPanelVisible() {
@@ -85,43 +92,89 @@
     status.hidden = !text;
   }
 
-  function requestPanelOpen() {
-    if (!button || button.disabled) return;
-    button.disabled = true;
-    setLauncherMessage();
-    let settled = false;
-    const timeoutId = window.setTimeout(() => {
-      finish(new Error("商品图采集打开超时，请重试。"));
-    }, OPEN_TIMEOUT_MS);
-    pendingTimeoutId = timeoutId;
+  function openPanelInPage() {
+    const panelController = globalThis[PANEL_CONTROLLER_KEY];
+    if (panelController?.version !== LAUNCHER_VERSION || typeof panelController?.open !== "function") return false;
+    try {
+      panelController.open();
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
-    function finish(error, response) {
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(timeoutId);
-      if (pendingTimeoutId === timeoutId) pendingTimeoutId = 0;
-      if (!button) return;
-      button.disabled = false;
-      if (error || !response?.ok) {
-        setLauncherMessage(error?.message || response?.message || "商品图采集打开失败，请重试。");
-        return;
+  function sendOpenMessage() {
+    return new Promise((resolve) => {
+      let settled = false;
+      function settle(result) {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timeoutId);
+        if (pendingTimeoutId === timeoutId) pendingTimeoutId = 0;
+        if (pendingOpenCancel === cancel) pendingOpenCancel = null;
+        resolve(result);
       }
+      const cancel = () => settle({ canceled: true });
+      const timeoutId = window.setTimeout(() => {
+        settle({ error: new Error("商品图采集后台无响应。") });
+      }, OPEN_TIMEOUT_MS);
+      pendingTimeoutId = timeoutId;
+      pendingOpenCancel = cancel;
+
+      try {
+        chrome.runtime.sendMessage({ type: MESSAGE_OPEN, pageUrl: location.href }, (response) => {
+          const runtimeError = chrome.runtime.lastError;
+          settle(runtimeError
+            ? { error: new Error(runtimeError.message) }
+            : (response ? { response } : { error: new Error("商品图采集后台未返回结果。") }));
+        });
+      } catch (error) {
+        settle({ error: error instanceof Error ? error : new Error(String(error || "商品图采集打开失败，请重试。")) });
+      }
+    });
+  }
+
+  async function requestPanelOpen() {
+    if (!button || button.disabled) return;
+    if (openPanelInPage()) {
       setLauncherMessage();
       setPanelOpen(true);
+      return;
+    }
+    const openedButton = button;
+    openedButton.disabled = true;
+    setLauncherMessage();
+
+    for (let attempt = 1; attempt <= OPEN_ATTEMPTS; attempt += 1) {
+      const { canceled, error, response } = await sendOpenMessage();
+      if (button !== openedButton) return;
+      if (canceled) {
+        openedButton.disabled = false;
+        setLauncherMessage();
+        return;
+      }
+      if (!error && response?.ok) {
+        openedButton.disabled = false;
+        setLauncherMessage();
+        setPanelOpen(true);
+        return;
+      }
+      if (openPanelInPage()) {
+        openedButton.disabled = false;
+        setLauncherMessage();
+        setPanelOpen(true);
+        return;
+      }
     }
 
-    try {
-      chrome.runtime.sendMessage({ type: MESSAGE_OPEN, pageUrl: location.href }, (response) => {
-        const runtimeError = chrome.runtime.lastError;
-        finish(runtimeError ? new Error(runtimeError.message) : null, response);
-      });
-    } catch (error) {
-      finish(error instanceof Error ? error : new Error(String(error || "商品图采集打开失败，请重试。")));
-    }
+    if (button !== openedButton) return;
+    openedButton.disabled = false;
+    setLauncherMessage("商品图采集暂时无法打开，请刷新页面后重试。");
   }
 
   function mountLauncher() {
     if (host?.isConnected) {
+      setLauncherMessage();
       setPanelOpen(isPanelVisible());
       return;
     }
@@ -196,12 +249,18 @@
   }
 
   function removeLauncher() {
-    if (pendingTimeoutId) window.clearTimeout(pendingTimeoutId);
-    pendingTimeoutId = 0;
+    cancelPendingOpen();
     host?.remove();
     host = null;
     button = null;
     status = null;
+  }
+
+  function cancelPendingOpen() {
+    pendingOpenCancel?.();
+    pendingOpenCancel = null;
+    if (pendingTimeoutId) window.clearTimeout(pendingTimeoutId);
+    pendingTimeoutId = 0;
   }
 
   function syncLauncher() {
@@ -222,6 +281,7 @@
   function syncLocation() {
     if (currentHref === location.href) return;
     currentHref = location.href;
+    cancelPendingOpen();
     closePanelForNavigation();
     syncLauncher();
   }

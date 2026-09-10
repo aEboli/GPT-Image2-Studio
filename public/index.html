@@ -23,6 +23,31 @@
           document.documentElement.dataset.uiLanguage = document.documentElement.lang || "zh-CN";
         }
 
+        // Accent family must be set before first paint, or a cold deep-link to a
+        // non-create view (#gallery, #creation, ...) paints once in the create
+        // accent and then jumps once app.js reaches setActiveView. Keep in sync
+        // with VIEW_ACCENT_FAMILIES in app.js — asserted by the test suite.
+        const BOOT_VIEW_FAMILIES = {
+          studio: "create",
+          "style-transfer": "create",
+          "reference-analysis": "analyse",
+          "image-decomposition": "analyse",
+          "image-edit": "edit",
+          "quick-blend": "edit",
+          "image-compress": "edit",
+          creation: "suite",
+          portrait: "suite",
+          ppt: "suite",
+          "article-illustration": "suite",
+          gallery: "archive",
+          "article-record": "archive",
+          "creation-record": "archive",
+          "portrait-record": "archive",
+          "ppt-record": "archive",
+        };
+        const bootView = (window.location.hash || "").replace(/^#/, "");
+        document.documentElement.dataset.viewFamily = BOOT_VIEW_FAMILIES[bootView] || "create";
+
         const innerWidth = window.innerWidth || 0;
         const innerHeight = window.innerHeight || 0;
         const outerWidth = window.outerWidth || innerWidth || 0;
@@ -62,7 +87,7 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="./styles.css?v=20260830-temu-workbench-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260910-zhongguose-calm-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -391,11 +416,14 @@
                         <select id="outputFormatInput" name="format"></select>
                       </label>
 
-                      <div class="parameter-meta" aria-label="工具模型与质量" data-ui-i18n-aria-label="toolModelAndQuality">
-                        <span data-ui-i18n="toolModel">工具模型</span>
-                        <strong>gpt-image-2</strong>
+                      <label class="compact-field">
                         <span data-ui-i18n="quality">质量</span>
-                        <strong>High</strong>
+                        <select id="qualityInput" name="quality"></select>
+                      </label>
+
+                      <div class="parameter-meta" aria-label="工具模型" data-ui-i18n-aria-label="toolModelMeta">
+                        <span data-ui-i18n="toolModel">工具模型</span>
+                        <strong id="parameterToolModel">gpt-image-2</strong>
                       </div>
                     </div>
                   </div>
@@ -2587,7 +2615,7 @@
       </main>
     </div>
 
-    <small class="app-version" aria-label="当前版本 v0.2.14">v0.2.14</small>
+    <small class="app-version" aria-label="当前版本 v0.2.15">v0.2.15</small>
 
     <dialog
       class="creation-record-delete-dialog"
@@ -3066,6 +3094,8 @@
                     </div>
                     <div class="endpoint-address-control">
                       <input id="baseUrlInput" name="baseUrl" type="url" placeholder="https://api.openai.com/v1" required />
+                      <button class="api-endpoint-picker-toggle" id="routeApiBookToggle" type="button" aria-label="展开已保存的 API" aria-expanded="false" aria-controls="routeApiBookList" data-ui-i18n-aria-label="apiBookExpand" hidden></button>
+                      <div class="api-endpoint-options-list" id="routeApiBookList" role="listbox" hidden></div>
                     </div>
                   </div>
 
@@ -3088,6 +3118,18 @@
                       <div class="model-options-list" id="modelOptionsList" role="listbox" hidden></div>
                     </div>
                   </div>
+
+                  <label class="field">
+                    <div class="field-heading inline">
+                      <span data-ui-i18n="imageToolModel">生图工具模型</span>
+                    </div>
+                    <select id="imageToolModelSelect" name="imageToolModel">
+                      <option value="gpt-image-2">gpt-image-2</option>
+                      <option value="gpt-image-2.5-sunburst">gpt-image-2.5-sunburst</option>
+                      <option value="gpt-image-2.5-flare">gpt-image-2.5-flare</option>
+                    </select>
+                    <small class="field-hint" data-ui-i18n="imageToolModelHint">路由模式在 Responses 请求的 image_generation 工具里使用该模型。默认 gpt-image-2；sunburst 精修更准，flare 出图更快。</small>
+                  </label>
                 </div>
 
                 <div class="route-config-panel" data-route-panel="b">
@@ -3105,6 +3147,8 @@
                     </div>
                     <div class="endpoint-address-control">
                       <input id="directBaseUrlInput" name="directImageBaseUrl" type="url" placeholder="https://api.openai.com/v1" required />
+                      <button class="api-endpoint-picker-toggle" id="directImageApiBookToggle" type="button" aria-label="展开已保存的 API" aria-expanded="false" aria-controls="directImageApiBookList" data-ui-i18n-aria-label="apiBookExpand" hidden></button>
+                      <div class="api-endpoint-options-list" id="directImageApiBookList" role="listbox" hidden></div>
                     </div>
                   </div>
 
@@ -3141,6 +3185,8 @@
                     </div>
                     <div class="endpoint-address-control">
                       <input id="directTextBaseUrlInput" name="directTextBaseUrl" type="url" placeholder="https://api.openai.com/v1" required />
+                      <button class="api-endpoint-picker-toggle" id="directTextApiBookToggle" type="button" aria-label="展开已保存的 API" aria-expanded="false" aria-controls="directTextApiBookList" data-ui-i18n-aria-label="apiBookExpand" hidden></button>
+                      <div class="api-endpoint-options-list" id="directTextApiBookList" role="listbox" hidden></div>
                     </div>
                   </div>
 
@@ -3166,14 +3212,18 @@
                 </div>
 
                 <div class="route-config-panel" data-route-panel="c">
-                  <label class="field">
+                  <div class="field">
                     <div class="field-heading inline">
-                      <span data-ui-i18n="baseUrl">基础 URL</span>
+                      <label for="protocolBaseUrlInput" data-ui-i18n="baseUrl">基础 URL</label>
                     </div>
-                    <input id="protocolBaseUrlInput" name="protocolBaseUrl" type="url" placeholder="https://api.vendor.example/v1" />
+                    <div class="endpoint-address-control">
+                      <input id="protocolBaseUrlInput" name="protocolBaseUrl" type="url" placeholder="https://api.vendor.example/v1" />
+                      <button class="api-endpoint-picker-toggle" id="protocolApiBookToggle" type="button" aria-label="展开已保存的 API" aria-expanded="false" aria-controls="protocolApiBookList" data-ui-i18n-aria-label="apiBookExpand" hidden></button>
+                      <div class="api-endpoint-options-list" id="protocolApiBookList" role="listbox" hidden></div>
+                    </div>
                     <small class="field-hint" id="protocolEndpointPreview">/images/generations</small>
                     <small class="field-hint" id="protocolCompatibilityHint" data-ui-i18n="protocolHint">Gemini 图像模型按 OpenAI 兼容的图像生成协议调用；基础 URL 通常填写到 /v1，实际请求为 /images/generations。</small>
-                  </label>
+                  </div>
 
                   <label class="field">
                     <div class="field-heading inline">
@@ -3343,6 +3393,6 @@
 
     <div class="app-tooltip" id="appTooltip" role="tooltip" popover="manual"></div>
 
-    <script type="module" src="./app.js?v=20260830-temu-workbench-1"></script>
+    <script type="module" src="./app.js?v=20260909-api-endpoint-book-1"></script>
   </body>
 </html>

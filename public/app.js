@@ -4,6 +4,7 @@ import { buildGalleryReferenceFilterOptions, buildGallerySections, buildGalleryS
 import { buildGalleryMetadataCacheEntry, collectGalleryMetadataRepairPatch, mergeGalleryItemWithCachedMetadata, pruneGalleryMetadataCache } from "/lib/gallery-metadata-recovery.mjs";
 import { getDefaultGenerationSize, getGenerationSizeOptions, getModelProtocolImageSizeOptions, normalizeGenerationSize, normalizeModelProtocolImageSize } from "/lib/generation-size-options.mjs?v=20260614-image2-sizes-1";
 import { getOutputFormatOptions, normalizeOutputFormat, } from "/lib/output-format-options.mjs?v=20260504-vercel-static-lib-1";
+import { getImageQualityOptions, normalizeImageQuality } from "/lib/image-quality-options.mjs";
 import { normalizeReferenceAnalysisLanguage, } from "/lib/reference-analysis-language.mjs?v=20260522-reference-language-1";
 import { shouldReusePreviewLoadingShell } from "/lib/preview-loading-shell.mjs";
 import { createGenerationLoadingShell, updateGenerationLoadingShell, stopGenerationLoadingShell, stopGenerationLoadingShells, getGenerationLoadingItemStage, beatGenerationLoadingHeartbeat, releaseGenerationLoadingSource, releaseGenerationLoadingSourcesByPrefix, GENERATION_LOADING_GENERATING_MODE, GENERATION_LOADING_WAITING_MODE } from "/lib/generation-loading.mjs";
@@ -58,6 +59,7 @@ import { createImageEditShellBridge } from "/lib/image-edit-shell-bridge.mjs";
 import { createCreationLogoLibraryController } from "/lib/creation-logo-library.mjs";
 import { consumeSse, requestGenerationStream } from "/lib/generation-client.mjs";
 import { createConfigModelPickerController } from "/lib/config-model-picker.mjs";
+import { createApiEndpointBookPickerController } from "/lib/api-endpoint-book-picker.mjs";
 import { createLightboxImageViewer, createLightboxViewerState } from "/lib/lightbox-image-viewer.mjs";
 import { createAssetWorkspaceController } from "/lib/asset-workspace.mjs";
 import { clearImageReveal, setImageRevealSource } from "/lib/image-reveal.mjs";
@@ -70,10 +72,12 @@ import {
   API_ENDPOINT_RESPONSES,
   DEFAULT_DIRECT_IMAGE_MODEL,
   DEFAULT_DIRECT_RESPONSES_MODEL,
+  DEFAULT_IMAGE_TOOL_MODEL,
   DEFAULT_PROTOCOL_IMAGE_MODEL,
   DEFAULT_RESPONSES_MODEL,
   appendApiEndpointPath,
   normalizeApiEndpointPath,
+  normalizeImageToolModel,
   splitApiEndpointUrl,
   splitModelProtocolUrl,
 } from "/lib/image-route-config.mjs";
@@ -369,8 +373,8 @@ const GENERATION_LOG_STORAGE_KEY = "image-studio-generation-activity-v2";
 const THEME_STORAGE_KEY = "image-studio-ui-theme-v1";
 const UI_LANGUAGE_STORAGE_KEY = "image-studio-ui-language-v1";
 const UI_LANGUAGE_TEXT = {
-  "zh-CN": { activityLog: "生成日志", activityLogAllPanels: "全部板块", activityLogPanels: "生成日志板块", baseUrl: "基础 URL", brandSubtitle: "AI 图像生成工作流", close: "关闭", config: "配置", configApi: "配置 API", configSaved: "配置已保存", configTitle: "连接配置", configUnsaved: "配置未保存", connectionBusy: "并发 {running}/{max} · 队列 {queued}", connectionOpen: "打开 API、LOG", connectionSection: "调用通道", connectionStatusEmpty: "待填写API、LOG", connectionStatusEntry: "API、LOG", delete: "删除", directEndpointSuffix: "直接调用模式请求协议后缀", directMode: "直接调用模式", download: "下载", endpointUrl: "接口地址", expandModels: "展开可用模型列表", fetchModels: "获取模型列表", fetchModelsLoading: "获取中...", fit: "适配", functionMenu: "功能菜单导航", fullUrl: "完整 URL", generate: "开始生成", generateTitle: "开始生成（Ctrl+Enter）", generationRouteLabel: "生图调用模式", globalNav: "全局导航", imageModel: "生图模型", keepSavedKey: "保持已保存 Key", languageEn: "English UI", languageSwitch: "切换界面语言", languageZh: "简体中文界面", menuArticleIllustration: "文章插图", menuArticleRecord: "文章插图记录", menuAssetTools: "资产工具", menuCreation: "套图模式", menuCreationRecord: "套图记录", menuCreateTools: "创作工具", menuGallery: "瀑布画廊", menuImageCompress: "图片压缩", menuImageDecomposition: "图片拆解", menuImageEdit: "图片编辑", menuPortrait: "写真模式", menuPortraitRecord: "写真记录", menuPpt: "PPT生成", menuPptRecord: "PPT记录", menuPromptStudio: "提示词生图", menuQuickBlend: "快速溶图", menuReferenceAnalysis: "融图分析", menuSectionAssets: "资产区", menuSectionCreate: "创作区", menuSectionSettings: "配置区", menuSettings: "设置", menuStyleTransfer: "风格迁移", menuTools: "工具", modeDirect: "直接调用模式", modeProtocol: "Gemini模型", modeRoute: "路由模式", modelFetchBusy: "正在获取模型列表...", modelFetchFailed: "获取模型列表失败。", modelFetchSuccess: "已获取 {count} 个可调用模型。", modelNoCallable: "未获取到可调用模型。", modelNoMatch: "没有匹配的模型", modelNoMatchWithQuery: "没有匹配的模型：{query}", modelTestBusy: "正在测试连接...", modelTestSuccess: "连接测试成功，获取到 {count} 个模型。", navAssets: "资产", navCreate: "创作", navSettings: "配置", notSaved: "未保存", openOutput: "打开输出目录", outputFormat: "输出格式", parameters: "参数设置", previewIdleDetail: "生成日志可在配置中查看，底部胶片条可快速切换查看。", previewIdleEyebrow: "Output Preview", previewIdleTitle: "生成结果会在这里实时更新。", previewWaiting: "等待生成", prompt: "提示词", promptAgent: "图片转提示词", promptCounterSuffix: "字", promptEnhance: "增强模式", promptEnhanceAria: "开启或关闭提示词增强模式", promptEnhanceField: "增强提示词", promptEnhanceOff: "关闭", promptEnhanceOn: "开启", promptPlaceholder: "写下你要生成的画面，也可以先上传参考图说明修改方向。", promptTemplate: "提示词模板", protocolHint: "Gemini 图像模型按 OpenAI 兼容的图像生成协议调用；基础 URL 通常填写到 /v1，实际请求为 /images/generations。", protocolImageModel: "图像模型", protocolMode: "Gemini模型", quality: "质量", "ratio.1:1": "电商主图、头像、社交媒体 · 方形 1:1", "ratio.1:2": "长海报 · 竖屏 1:2", "ratio.1:3": "超长竖版广告 · 竖屏 1:3", "ratio.2:1": "Banner横幅 · 横屏 2:1", "ratio.2:3": "竖版摄影 · 竖屏 2:3", "ratio.3:1": "超宽广告图 · 横屏 3:1", "ratio.3:2": "摄影风格 · 横屏 3:2", "ratio.3:4": "海报、人像 · 竖屏 3:4", "ratio.4:3": "PPT、网页配图 · 横屏 4:3", "ratio.4:5": "Instagram帖子 · 竖屏 4:5", "ratio.5:4": "商品展示 · 横屏 5:4", "ratio.9:16": "短视频封面、手机壁纸 · 竖屏 9:16", "ratio.9:21": "超长竖图 · 竖屏 9:21", "ratio.16:9": "横版封面、YouTube · 横屏 16:9", "ratio.21:9": "超宽横幅 · 横屏 21:9", ratioLandscape: "横向", ratioPortrait: "竖向", ratioSquare: "方形", reasoningEffort: "思考等级", reference: "参考图", referenceUploadAction: "上传参考图", referenceUploadTitle: "拖入图片或点击上传", responsesModel: "Responses 模型", routeEndpointSuffix: "路由模式请求协议后缀", routeMode: "路由模式", save: "保存", schedulingSection: "生成调度", schedulingLockNote: "有生图任务正在进行或排队，暂时不能修改生成调度参数。任务全部结束后会自动恢复。", concurrencyLabel: "请求并发数量", concurrencyUnit: "个", concurrencyHint: "批量生成时同一会话内同时在跑的请求总数，默认 20 个，范围 1 到 50。调低可以减轻上游压力、降低限流和超时概率，但整批更慢；调高更快，但上游更容易限流。", size: "分辨率", startDelayHint: "同一会话内相邻两个上游请求的提交间隔，默认 1000 毫秒，范围 200 到 5000 毫秒。间隔越大越不容易触发上游限流，但最后一张开始得越晚。", startDelayLabel: "任务提交间隔", startDelayUnit: "毫秒", sizeAuto: "自动适配", sizeMax: "最大", testConnection: "测试连接", testConnectionLoading: "测试中...", themeDark: "深色主题", themeLight: "白色主题", themeMenu: "主题颜色", themeToDark: "切换到深色主题", themeToLight: "切换到白色主题", thumbnailEmpty: "暂无缩略图", thumbnailFailed: "缩略图加载失败", thumbnailLoading: "缩略图加载中", timelineNoErrors: "暂无错误", timelineWaitingResult: "等待生成结果", timelineWaitingTask: "等待任务开始", toolModel: "工具模型", toolModelAndQuality: "工具模型与质量", view: "查看", visionTextModel: "视觉/文本模型" },
-  en: { activityLog: "Generation Log", activityLogAllPanels: "All Panels", activityLogPanels: "Generation log panels", baseUrl: "Base URL", brandSubtitle: "AI image workflow", close: "Close", config: "Settings", configApi: "Configure API", configSaved: "Config saved", configTitle: "Connection Settings", configUnsaved: "Config not saved", connectionBusy: "Concurrent {running}/{max} · Queue {queued}", connectionOpen: "open API and log", connectionSection: "Request Channel", connectionStatusEmpty: "API/Log missing", connectionStatusEntry: "API, Log", delete: "Delete", directEndpointSuffix: "Direct mode endpoint suffix", directMode: "Direct Mode", download: "Download", endpointUrl: "Endpoint", expandModels: "Show available models", fetchModels: "Fetch Models", fetchModelsLoading: "Fetching...", fit: "Fit", functionMenu: "Function menu", fullUrl: "Full URL", generate: "Generate", generateTitle: "Generate (Ctrl+Enter)", generationRouteLabel: "Image request mode", globalNav: "Global navigation", imageModel: "Image Model", keepSavedKey: "Keep saved key", languageEn: "English UI", languageSwitch: "Switch interface language", languageZh: "Simplified Chinese UI", menuArticleIllustration: "Article Illustration", menuArticleRecord: "Article Records", menuAssetTools: "Asset Tools", menuCreation: "Product Suite", menuCreationRecord: "Suite Records", menuCreateTools: "Creation Tools", menuGallery: "Gallery", menuImageCompress: "Image Compress", menuImageDecomposition: "Image Decomposition", menuImageEdit: "Image Edit", menuPortrait: "Portrait Mode", menuPortraitRecord: "Portrait Records", menuPpt: "PPT Generation", menuPptRecord: "PPT Records", menuPromptStudio: "Prompt to Image", menuQuickBlend: "Quick Blend", menuReferenceAnalysis: "Reference Analysis", menuSectionAssets: "Assets", menuSectionCreate: "Creation", menuSectionSettings: "Settings", menuSettings: "Settings", menuStyleTransfer: "Style Transfer", menuTools: "Tools", modeDirect: "Direct Mode", modeProtocol: "Gemini Model", modeRoute: "Route Mode", modelFetchBusy: "Fetching model list...", modelFetchFailed: "Failed to fetch model list.", modelFetchSuccess: "Fetched {count} callable models.", modelNoCallable: "No callable models found.", modelNoMatch: "No matching models", modelNoMatchWithQuery: "No matching models: {query}", modelTestBusy: "Testing connection...", modelTestSuccess: "Connection test succeeded. Found {count} models.", navAssets: "Assets", navCreate: "Create", navSettings: "Settings", notSaved: "Not saved", openOutput: "Open Output", outputFormat: "Output Format", parameters: "Parameters", previewIdleDetail: "Generation log is in Settings. Use the filmstrip below to switch results.", previewIdleEyebrow: "Output Preview", previewIdleTitle: "Generated results update here in real time.", previewWaiting: "Waiting", prompt: "Prompt", promptAgent: "Image to Prompt", promptCounterSuffix: "chars", promptEnhance: "Enhance Mode", promptEnhanceAria: "Toggle prompt enhancement mode", promptEnhanceField: "Enhancement Prompt", promptEnhanceOff: "Off", promptEnhanceOn: "On", promptPlaceholder: "Describe the image you want, or upload references first and describe the edit direction.", promptTemplate: "Prompt templates", protocolHint: "Gemini image models use an OpenAI-compatible image generation protocol. Base URL usually ends at /v1; requests go to /images/generations.", protocolImageModel: "Image Model", protocolMode: "Gemini Model", quality: "Quality", "ratio.1:1": "Ecommerce, Avatar, Social · Square 1:1", "ratio.1:2": "Long Poster · Portrait 1:2", "ratio.1:3": "Tall Ad · Portrait 1:3", "ratio.2:1": "Banner · Landscape 2:1", "ratio.2:3": "Vertical Photo · Portrait 2:3", "ratio.3:1": "Ultrawide Ad · Landscape 3:1", "ratio.3:2": "Photography · Landscape 3:2", "ratio.3:4": "Poster, Portrait · Portrait 3:4", "ratio.4:3": "PPT, Web Graphic · Landscape 4:3", "ratio.4:5": "Instagram Post · Portrait 4:5", "ratio.5:4": "Product Display · Landscape 5:4", "ratio.9:16": "Short Video Cover, Wallpaper · Portrait 9:16", "ratio.9:21": "Tall Scroll Image · Portrait 9:21", "ratio.16:9": "Cover, YouTube · Landscape 16:9", "ratio.21:9": "Ultrawide Banner · Landscape 21:9", ratioLandscape: "Landscape", ratioPortrait: "Portrait", ratioSquare: "Square", reasoningEffort: "Reasoning", reference: "Reference", referenceUploadAction: "Upload Reference", referenceUploadTitle: "Drop images or click to upload", responsesModel: "Responses Model", routeEndpointSuffix: "Route mode endpoint suffix", routeMode: "Route Mode", save: "Save", schedulingSection: "Generation Scheduling", schedulingLockNote: "Generation tasks are running or queued, so the scheduling parameters cannot be changed right now. They unlock automatically once every task finishes.", concurrencyLabel: "Request Concurrency", concurrencyUnit: "requests", concurrencyHint: "The total number of generation requests that may run at once in one session. Default 20, range 1 to 50. Lowering it eases upstream pressure and reduces rate limiting and timeouts; raising it is faster but reaches limits sooner.", size: "Size", startDelayHint: "Interval between adjacent upstream submissions in one session. Default 1000 ms, range 200 to 5000 ms. A larger interval is gentler on a rate-limited upstream but starts the last image later.", startDelayLabel: "Task Submit Interval", startDelayUnit: "ms", sizeAuto: "Auto", sizeMax: "Max", testConnection: "Test Connection", testConnectionLoading: "Testing...", themeDark: "Dark theme", themeLight: "Light theme", themeMenu: "Theme color", themeToDark: "Switch to dark theme", themeToLight: "Switch to light theme", thumbnailEmpty: "No thumbnails", thumbnailFailed: "Thumbnail load failed", thumbnailLoading: "Loading thumbnails", timelineNoErrors: "No errors", timelineWaitingResult: "Waiting for result", timelineWaitingTask: "Waiting for task", toolModel: "Tool Model", toolModelAndQuality: "Tool model and quality", view: "View", visionTextModel: "Vision/Text Model" },
+  "zh-CN": { activityLog: "生成日志", activityLogAllPanels: "全部板块", activityLogPanels: "生成日志板块", apiBookExpand: "展开已保存的 API", apiBookEmpty: "还没有保存过 API", apiBookRemove: "删除这条 API", baseUrl: "基础 URL", brandSubtitle: "AI 图像生成工作流", close: "关闭", config: "配置", configApi: "配置 API", configSaved: "配置已保存", configTitle: "连接配置", configUnsaved: "配置未保存", connectionBusy: "并发 {running}/{max} · 队列 {queued}", connectionOpen: "打开 API、LOG", connectionSection: "调用通道", connectionStatusEmpty: "待填写API、LOG", connectionStatusEntry: "API、LOG", delete: "删除", directEndpointSuffix: "直接调用模式请求协议后缀", directMode: "直接调用模式", download: "下载", endpointUrl: "接口地址", expandModels: "展开可用模型列表", fetchModels: "获取模型列表", fetchModelsLoading: "获取中...", fit: "适配", functionMenu: "功能菜单导航", fullUrl: "完整 URL", generate: "开始生成", generateTitle: "开始生成（Ctrl+Enter）", generationRouteLabel: "生图调用模式", globalNav: "全局导航", imageModel: "生图模型", imageToolModel: "生图工具模型", imageToolModelHint: "路由模式在 Responses 请求的 image_generation 工具里使用该模型。默认 gpt-image-2；sunburst 精修更准，flare 出图更快。", keepSavedKey: "保持已保存 Key", languageEn: "English UI", languageSwitch: "切换界面语言", languageZh: "简体中文界面", menuArticleIllustration: "文章插图", menuArticleRecord: "文章插图记录", menuAssetTools: "资产工具", menuCreation: "套图模式", menuCreationRecord: "套图记录", menuCreateTools: "创作工具", menuGallery: "瀑布画廊", menuImageCompress: "图片压缩", menuImageDecomposition: "图片拆解", menuImageEdit: "图片编辑", menuPortrait: "写真模式", menuPortraitRecord: "写真记录", menuPpt: "PPT生成", menuPptRecord: "PPT记录", menuPromptStudio: "提示词生图", menuQuickBlend: "快速溶图", menuReferenceAnalysis: "融图分析", menuSectionAssets: "资产区", menuSectionCreate: "创作区", menuSectionSettings: "配置区", menuSettings: "设置", menuStyleTransfer: "风格迁移", menuTools: "工具", modeDirect: "直接调用模式", modeProtocol: "Gemini模型", modeRoute: "路由模式", modelFetchBusy: "正在获取模型列表...", modelFetchFailed: "获取模型列表失败。", modelFetchSuccess: "已获取 {count} 个可调用模型。", modelNoCallable: "未获取到可调用模型。", modelNoMatch: "没有匹配的模型", modelNoMatchWithQuery: "没有匹配的模型：{query}", modelTestBusy: "正在测试连接...", modelTestSuccess: "连接测试成功，获取到 {count} 个模型。", navAssets: "资产", navCreate: "创作", navSettings: "配置", notSaved: "未保存", openOutput: "打开输出目录", outputFormat: "输出格式", parameters: "参数设置", previewIdleDetail: "生成日志可在配置中查看，底部胶片条可快速切换查看。", previewIdleEyebrow: "Output Preview", previewIdleTitle: "生成结果会在这里实时更新。", previewWaiting: "等待生成", prompt: "提示词", promptAgent: "图片转提示词", promptCounterSuffix: "字", promptEnhance: "增强模式", promptEnhanceAria: "开启或关闭提示词增强模式", promptEnhanceField: "增强提示词", promptEnhanceOff: "关闭", promptEnhanceOn: "开启", promptPlaceholder: "写下你要生成的画面，也可以先上传参考图说明修改方向。", promptTemplate: "提示词模板", protocolHint: "Gemini 图像模型按 OpenAI 兼容的图像生成协议调用；基础 URL 通常填写到 /v1，实际请求为 /images/generations。", protocolImageModel: "图像模型", protocolMode: "Gemini模型", quality: "质量", "ratio.1:1": "电商主图、头像、社交媒体 · 方形 1:1", "ratio.1:2": "长海报 · 竖屏 1:2", "ratio.1:3": "超长竖版广告 · 竖屏 1:3", "ratio.2:1": "Banner横幅 · 横屏 2:1", "ratio.2:3": "竖版摄影 · 竖屏 2:3", "ratio.3:1": "超宽广告图 · 横屏 3:1", "ratio.3:2": "摄影风格 · 横屏 3:2", "ratio.3:4": "海报、人像 · 竖屏 3:4", "ratio.4:3": "PPT、网页配图 · 横屏 4:3", "ratio.4:5": "Instagram帖子 · 竖屏 4:5", "ratio.5:4": "商品展示 · 横屏 5:4", "ratio.9:16": "短视频封面、手机壁纸 · 竖屏 9:16", "ratio.9:21": "超长竖图 · 竖屏 9:21", "ratio.16:9": "横版封面、YouTube · 横屏 16:9", "ratio.21:9": "超宽横幅 · 横屏 21:9", ratioLandscape: "横向", ratioPortrait: "竖向", ratioSquare: "方形", reasoningEffort: "思考等级", reference: "参考图", referenceUploadAction: "上传参考图", referenceUploadTitle: "拖入图片或点击上传", responsesModel: "Responses 模型", routeEndpointSuffix: "路由模式请求协议后缀", routeMode: "路由模式", save: "保存", schedulingSection: "生成调度", schedulingLockNote: "有生图任务正在进行或排队，暂时不能修改生成调度参数。任务全部结束后会自动恢复。", concurrencyLabel: "请求并发数量", concurrencyUnit: "个", concurrencyHint: "批量生成时同一会话内同时在跑的请求总数，默认 20 个，范围 1 到 50。调低可以减轻上游压力、降低限流和超时概率，但整批更慢；调高更快，但上游更容易限流。", size: "分辨率", startDelayHint: "同一会话内相邻两个上游请求的提交间隔，默认 1000 毫秒，范围 200 到 5000 毫秒。间隔越大越不容易触发上游限流，但最后一张开始得越晚。", startDelayLabel: "任务提交间隔", startDelayUnit: "毫秒", sizeAuto: "自动适配", sizeMax: "最大", testConnection: "测试连接", testConnectionLoading: "测试中...", themeDark: "深色主题", themeLight: "白色主题", themeMenu: "主题颜色", themeToDark: "切换到深色主题", themeToLight: "切换到白色主题", thumbnailEmpty: "暂无缩略图", thumbnailFailed: "缩略图加载失败", thumbnailLoading: "缩略图加载中", timelineNoErrors: "暂无错误", timelineWaitingResult: "等待生成结果", timelineWaitingTask: "等待任务开始", toolModel: "工具模型", toolModelAndQuality: "工具模型与质量", toolModelMeta: "工具模型", view: "查看", visionTextModel: "视觉/文本模型" },
+  en: { activityLog: "Generation Log", activityLogAllPanels: "All Panels", activityLogPanels: "Generation log panels", apiBookExpand: "Show saved APIs", apiBookEmpty: "No saved APIs yet", apiBookRemove: "Delete this API", baseUrl: "Base URL", brandSubtitle: "AI image workflow", close: "Close", config: "Settings", configApi: "Configure API", configSaved: "Config saved", configTitle: "Connection Settings", configUnsaved: "Config not saved", connectionBusy: "Concurrent {running}/{max} · Queue {queued}", connectionOpen: "open API and log", connectionSection: "Request Channel", connectionStatusEmpty: "API/Log missing", connectionStatusEntry: "API, Log", delete: "Delete", directEndpointSuffix: "Direct mode endpoint suffix", directMode: "Direct Mode", download: "Download", endpointUrl: "Endpoint", expandModels: "Show available models", fetchModels: "Fetch Models", fetchModelsLoading: "Fetching...", fit: "Fit", functionMenu: "Function menu", fullUrl: "Full URL", generate: "Generate", generateTitle: "Generate (Ctrl+Enter)", generationRouteLabel: "Image request mode", globalNav: "Global navigation", imageModel: "Image Model", imageToolModel: "Image Tool Model", imageToolModelHint: "Route mode uses this model for the image_generation tool in Responses requests. Default gpt-image-2; sunburst is more precise for edits, flare is faster.", keepSavedKey: "Keep saved key", languageEn: "English UI", languageSwitch: "Switch interface language", languageZh: "Simplified Chinese UI", menuArticleIllustration: "Article Illustration", menuArticleRecord: "Article Records", menuAssetTools: "Asset Tools", menuCreation: "Product Suite", menuCreationRecord: "Suite Records", menuCreateTools: "Creation Tools", menuGallery: "Gallery", menuImageCompress: "Image Compress", menuImageDecomposition: "Image Decomposition", menuImageEdit: "Image Edit", menuPortrait: "Portrait Mode", menuPortraitRecord: "Portrait Records", menuPpt: "PPT Generation", menuPptRecord: "PPT Records", menuPromptStudio: "Prompt to Image", menuQuickBlend: "Quick Blend", menuReferenceAnalysis: "Reference Analysis", menuSectionAssets: "Assets", menuSectionCreate: "Creation", menuSectionSettings: "Settings", menuSettings: "Settings", menuStyleTransfer: "Style Transfer", menuTools: "Tools", modeDirect: "Direct Mode", modeProtocol: "Gemini Model", modeRoute: "Route Mode", modelFetchBusy: "Fetching model list...", modelFetchFailed: "Failed to fetch model list.", modelFetchSuccess: "Fetched {count} callable models.", modelNoCallable: "No callable models found.", modelNoMatch: "No matching models", modelNoMatchWithQuery: "No matching models: {query}", modelTestBusy: "Testing connection...", modelTestSuccess: "Connection test succeeded. Found {count} models.", navAssets: "Assets", navCreate: "Create", navSettings: "Settings", notSaved: "Not saved", openOutput: "Open Output", outputFormat: "Output Format", parameters: "Parameters", previewIdleDetail: "Generation log is in Settings. Use the filmstrip below to switch results.", previewIdleEyebrow: "Output Preview", previewIdleTitle: "Generated results update here in real time.", previewWaiting: "Waiting", prompt: "Prompt", promptAgent: "Image to Prompt", promptCounterSuffix: "chars", promptEnhance: "Enhance Mode", promptEnhanceAria: "Toggle prompt enhancement mode", promptEnhanceField: "Enhancement Prompt", promptEnhanceOff: "Off", promptEnhanceOn: "On", promptPlaceholder: "Describe the image you want, or upload references first and describe the edit direction.", promptTemplate: "Prompt templates", protocolHint: "Gemini image models use an OpenAI-compatible image generation protocol. Base URL usually ends at /v1; requests go to /images/generations.", protocolImageModel: "Image Model", protocolMode: "Gemini Model", quality: "Quality", "ratio.1:1": "Ecommerce, Avatar, Social · Square 1:1", "ratio.1:2": "Long Poster · Portrait 1:2", "ratio.1:3": "Tall Ad · Portrait 1:3", "ratio.2:1": "Banner · Landscape 2:1", "ratio.2:3": "Vertical Photo · Portrait 2:3", "ratio.3:1": "Ultrawide Ad · Landscape 3:1", "ratio.3:2": "Photography · Landscape 3:2", "ratio.3:4": "Poster, Portrait · Portrait 3:4", "ratio.4:3": "PPT, Web Graphic · Landscape 4:3", "ratio.4:5": "Instagram Post · Portrait 4:5", "ratio.5:4": "Product Display · Landscape 5:4", "ratio.9:16": "Short Video Cover, Wallpaper · Portrait 9:16", "ratio.9:21": "Tall Scroll Image · Portrait 9:21", "ratio.16:9": "Cover, YouTube · Landscape 16:9", "ratio.21:9": "Ultrawide Banner · Landscape 21:9", ratioLandscape: "Landscape", ratioPortrait: "Portrait", ratioSquare: "Square", reasoningEffort: "Reasoning", reference: "Reference", referenceUploadAction: "Upload Reference", referenceUploadTitle: "Drop images or click to upload", responsesModel: "Responses Model", routeEndpointSuffix: "Route mode endpoint suffix", routeMode: "Route Mode", save: "Save", schedulingSection: "Generation Scheduling", schedulingLockNote: "Generation tasks are running or queued, so the scheduling parameters cannot be changed right now. They unlock automatically once every task finishes.", concurrencyLabel: "Request Concurrency", concurrencyUnit: "requests", concurrencyHint: "The total number of generation requests that may run at once in one session. Default 20, range 1 to 50. Lowering it eases upstream pressure and reduces rate limiting and timeouts; raising it is faster but reaches limits sooner.", size: "Size", startDelayHint: "Interval between adjacent upstream submissions in one session. Default 1000 ms, range 200 to 5000 ms. A larger interval is gentler on a rate-limited upstream but starts the last image later.", startDelayLabel: "Task Submit Interval", startDelayUnit: "ms", sizeAuto: "Auto", sizeMax: "Max", testConnection: "Test Connection", testConnectionLoading: "Testing...", themeDark: "Dark theme", themeLight: "Light theme", themeMenu: "Theme color", themeToDark: "Switch to dark theme", themeToLight: "Switch to light theme", thumbnailEmpty: "No thumbnails", thumbnailFailed: "Thumbnail load failed", thumbnailLoading: "Loading thumbnails", timelineNoErrors: "No errors", timelineWaitingResult: "Waiting for result", timelineWaitingTask: "Waiting for task", toolModel: "Tool Model", toolModelAndQuality: "Tool model and quality", toolModelMeta: "Tool model", view: "View", visionTextModel: "Vision/Text Model" },
 };
 Object.assign(UI_LANGUAGE_TEXT["zh-CN"], {
   directImageApi: "生图 API",
@@ -423,6 +427,29 @@ const APP_TOOLTIP_TRIGGER_SELECTOR = "[data-tooltip]";
 const PPT_SOURCE_MODES = new Set(["upload", "text", "topic"]);
 const CREATE_VIEW_IDS = new Set(["studio", "style-transfer", "reference-analysis", "image-decomposition", "image-edit", "quick-blend", "image-compress", "creation", "portrait", "article-illustration", "ppt"]);
 const ASSET_VIEW_IDS = new Set(["gallery", "article-record", "ppt-record", "creation-record", "portrait-record"]);
+// Accent families: same-family views share one --accent, resolved by the
+// [data-view-family] rules in styles.css (just after the two theme blocks).
+// A view missing from this table falls back to "create", which is the base
+// accent in both themes. Keep this in sync with BOOT_VIEW_FAMILIES in
+// index.html, which sets the same attribute before first paint.
+const VIEW_ACCENT_FAMILIES = {
+  studio: "create",
+  "style-transfer": "create",
+  "reference-analysis": "analyse",
+  "image-decomposition": "analyse",
+  "image-edit": "edit",
+  "quick-blend": "edit",
+  "image-compress": "edit",
+  creation: "suite",
+  portrait: "suite",
+  ppt: "suite",
+  "article-illustration": "suite",
+  gallery: "archive",
+  "article-record": "archive",
+  "creation-record": "archive",
+  "portrait-record": "archive",
+  "ppt-record": "archive",
+};
 let studioHeightSyncFrame = 0;
 let studioHeightObserver = null;
 let studioDensitySyncFrame = 0;
@@ -718,6 +745,14 @@ let creationPreviousPlatformValue = "universal";
 const refs = {
   appTooltip: document.querySelector("#appTooltip"),
   apiKeyInput: document.querySelector("#apiKeyInput"),
+  routeApiBookToggle: document.querySelector("#routeApiBookToggle"),
+  routeApiBookList: document.querySelector("#routeApiBookList"),
+  directImageApiBookToggle: document.querySelector("#directImageApiBookToggle"),
+  directImageApiBookList: document.querySelector("#directImageApiBookList"),
+  directTextApiBookToggle: document.querySelector("#directTextApiBookToggle"),
+  directTextApiBookList: document.querySelector("#directTextApiBookList"),
+  protocolApiBookToggle: document.querySelector("#protocolApiBookToggle"),
+  protocolApiBookList: document.querySelector("#protocolApiBookList"),
   assetRecordDeleteCancelButton: document.querySelector("#assetRecordDeleteCancelButton"),
   assetRecordDeleteConfirmButton: document.querySelector("#assetRecordDeleteConfirmButton"),
   assetRecordDeleteDialog: document.querySelector("#assetRecordDeleteDialog"),
@@ -1037,6 +1072,7 @@ const refs = {
   openOutputButton: document.querySelector("#openOutputButton"),
   openPromptAgentButton: document.querySelector("#openPromptAgentButton"),
   outputFormatInput: document.querySelector("#outputFormatInput"),
+  qualityInput: document.querySelector("#qualityInput"),
   previewDeleteButton: document.querySelector("#previewDeleteButton"),
   previewDownloadButton: document.querySelector("#previewDownloadButton"),
   previewId: document.querySelector("#previewId"),
@@ -1194,6 +1230,8 @@ const refs = {
   modelOptionsList: document.querySelector("#modelOptionsList"),
   modelPickerToggle: document.querySelector("#modelPickerToggle"),
   responsesModelInput: document.querySelector("#responsesModelInput"),
+  imageToolModelSelect: document.querySelector("#imageToolModelSelect"),
+  parameterToolModel: document.querySelector("#parameterToolModel"),
   savedKeyMask: document.querySelector("#savedKeyMask"),
   sizeInput: document.querySelector("#sizeInput"),
   surprisePromptButton: document.querySelector("#surprisePromptButton"),
@@ -1266,7 +1304,7 @@ const previewKeyboardNavigation = createPreviewKeyboardNavigationController({
 const handlePreviewArrowNavigation = previewKeyboardNavigation.handlePreviewArrowNavigation;
 const setReferencePreviewNavigationContext = previewKeyboardNavigation.setReferencePreviewNavigationContext;
 const portraitLocationController = createPortraitLocationSelectorController({ refs, state, renderPortraitView });
-const configModelPicker = createConfigModelPickerController({ refs, state, getBrowserPrivateConfigRequestPayload, getUiText: getUiLanguageText }); const creationLogoLibrary = createCreationLogoLibraryController({ applyLogoFile: applyCreationLogoFile, refs, setFeedback: setCreationFeedback, showError });
+const configModelPicker = createConfigModelPickerController({ refs, state, getBrowserPrivateConfigRequestPayload, getUiText: getUiLanguageText }); const apiEndpointBookPicker = createApiEndpointBookPickerController({ refs, state, getUiText: getUiLanguageText, onApplied: applyPickedApiEndpointDisplay }); const creationLogoLibrary = createCreationLogoLibraryController({ applyLogoFile: applyCreationLogoFile, refs, setFeedback: setCreationFeedback, showError });
 const pptAnalysis = createPptAnalysisController({
   state,
   buildFormData: buildPptFormData,
@@ -1844,7 +1882,7 @@ function getUiRatioOrientationLabel(orientation) { return getUiLanguageText(orie
 function getUiRatioLabel(option) { return getUiLanguageText(`ratio.${option?.value}`) || option?.label || getUiRatioOrientationLabel(option?.orientation); }
 function getUiSizeLabel(option) { const label = option?.label || ""; if (option?.value === "auto") return getUiLanguageText("sizeAuto") || label; return label.replace(/^最大(?=\s|$)/, getUiLanguageText("sizeMax") || "最大"); }
 function getUiPreviewPlaceholderState(placeholderState) { if (!placeholderState || placeholderState.mode === "ready") return placeholderState; if (placeholderState.mode === "idle") return { ...placeholderState, eyebrow: getUiLanguageText("previewIdleEyebrow"), title: getUiLanguageText("previewIdleTitle"), detail: getUiLanguageText("previewIdleDetail") }; return { ...placeholderState, title: state.uiLanguage === "en" ? "Generation running" : placeholderState.title }; }
-function rerenderUiLanguageSensitiveViews() { updatePromptCounter(); syncPromptEnhanceMode(); updateGenerateButton(); syncConnectionState(); syncRatioOrientationSummary(); renderRatioGrid(); renderReferenceAnalysisRatioGrid(); renderReasoningOptions(); renderSizeOptions(); renderReferenceAnalysisSizeOptions(); syncEndpointFieldsFromFullUrlModes(); { const c = state.config || {}, s = state.uiLanguage === "en" ? "Saved" : "已保存"; if (refs.savedKeyMask) refs.savedKeyMask.textContent = c.apiKeyConfigured ? `${s} ${c.apiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存"; if (refs.directSavedKeyMask) refs.directSavedKeyMask.textContent = (c.directImageApiKeyConfigured || c.directApiKeyConfigured) ? `${s} ${c.directImageApiKeyMask || c.directApiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存"; if (refs.directTextSavedKeyMask) refs.directTextSavedKeyMask.textContent = c.directTextApiKeyConfigured ? `${s} ${c.directTextApiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存"; if (refs.protocolSavedKeyMask) refs.protocolSavedKeyMask.textContent = c.protocolApiKeyConfigured ? `${s} ${c.protocolApiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存"; } renderPreview(); renderFilmstrip(); renderTimeline(); }
+function rerenderUiLanguageSensitiveViews() { updatePromptCounter(); syncPromptEnhanceMode(); updateGenerateButton(); syncConnectionState(); syncRatioOrientationSummary(); renderRatioGrid(); renderReferenceAnalysisRatioGrid(); renderReasoningOptions(); renderSizeOptions(); renderReferenceAnalysisSizeOptions(); syncEndpointFieldsFromFullUrlModes(); { const c = state.config || {}, s = state.uiLanguage === "en" ? "Saved" : "已保存"; if (refs.savedKeyMask) refs.savedKeyMask.textContent = c.apiKeyConfigured ? `${s} ${c.apiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存"; if (refs.directSavedKeyMask) refs.directSavedKeyMask.textContent = (c.directImageApiKeyConfigured || c.directApiKeyConfigured) ? `${s} ${c.directImageApiKeyMask || c.directApiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存"; if (refs.directTextSavedKeyMask) refs.directTextSavedKeyMask.textContent = c.directTextApiKeyConfigured ? `${s} ${c.directTextApiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存"; if (refs.protocolSavedKeyMask) refs.protocolSavedKeyMask.textContent = c.protocolApiKeyConfigured ? `${s} ${c.protocolApiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存"; } apiEndpointBookPicker.render(); renderPreview(); renderFilmstrip(); renderTimeline(); }
 function syncRatioOrientationSummary() {
   if (!refs.ratioOrientationSummary) {
     return;
@@ -2283,6 +2321,7 @@ async function setActiveView(view) {
   state.activeView = view;
   document.querySelector("[data-product-image-extension-menu-entry]").hidden = view !== "creation";
   syncHash(view);
+  document.documentElement.dataset.viewFamily = VIEW_ACCENT_FAMILIES[view] || "create";
   const activeNavSection = CREATE_VIEW_IDS.has(view) ? "create" : ASSET_VIEW_IDS.has(view) ? "assets" : "";
   const activeTabView = CREATE_VIEW_IDS.has(view) ? "studio" : ASSET_VIEW_IDS.has(view) ? "gallery" : view;
   const activePanelView = view === "style-transfer" ? "studio" : view === "reference-analysis" ? "reference-analysis" : view;
@@ -3778,11 +3817,11 @@ function createImageDecompositionJob() {
     ratioLabel: ratioOption?.label || DEFAULT_UI_RATIO_LABEL,
     sizeSetting,
     size,
-    quality: state.config?.defaults?.quality || "high",
+    quality: getSelectedImageQuality(),
     format: normalizeOutputFormat(refs.outputFormatInput.value || state.config?.defaults?.format || "png"),
     baseUrl: state.config?.baseUrl || refs.baseUrlInput.value.trim(),
     responsesModel: state.config?.responsesModel || refs.responsesModelInput.value.trim() || DEFAULT_RESPONSES_MODEL,
-    imageModel: DEFAULT_DIRECT_IMAGE_MODEL,
+    imageModel: getSelectedImageToolModel(),
     reasoningEffort: refs.reasoningEffortInput.value || state.config?.defaults?.reasoningEffort || "xhigh",
     requestRetryCount: 0,
     referenceFiles: sourceItem ? [createImageDecompositionGenerationFile(sourceItem)] : [],
@@ -4656,6 +4695,26 @@ function renderOutputFormatOptions() {
   });
   refs.outputFormatInput.value = currentValue;
 }
+// 选项集合随所选工具模型变化：旧模型没有 xhigh / max。已选的扩展档在切回旧模型时
+// 由 normalizeImageQuality 降为 high，所以这里重建后一定能选中。
+function renderImageQualityOptions() {
+  if (!refs.qualityInput) return;
+  const imageModel = getSelectedImageToolModel();
+  const currentValue = normalizeImageQuality(refs.qualityInput.value || state.config?.defaults?.quality, { imageModel });
+  refs.qualityInput.innerHTML = "";
+  getImageQualityOptions(imageModel).forEach((option) => {
+    const element = document.createElement("option");
+    element.value = option.value;
+    element.textContent = option.label;
+    refs.qualityInput.appendChild(element);
+  });
+  refs.qualityInput.value = currentValue;
+}
+function getSelectedImageQuality() {
+  return normalizeImageQuality(refs.qualityInput?.value || state.config?.defaults?.quality, {
+    imageModel: getSelectedImageToolModel(),
+  });
+}
 function syncGenerationSize(value) {
   const ratioValue = refs.ratioInput.value || DEFAULT_UI_RATIO;
   const nextValue = normalizeSizeForSelectedRoute(ratioValue, value || "auto");
@@ -5189,6 +5248,20 @@ function syncEndpointFieldsFromFullUrlModes() { ["a", "b", "b-text"].forEach((im
 function getProtocolImageGenerationsUrlPreview(baseUrl = refs.protocolBaseUrlInput?.value || "") { const normalizedProtocolEndpoint = splitModelProtocolUrl(String(baseUrl || state.config?.protocolBaseUrl || "https://api.openai.com/v1").trim(), { fallbackBaseUrl: state.config?.protocolBaseUrl || "https://api.openai.com/v1" }); return appendApiEndpointPath(normalizedProtocolEndpoint.baseUrl, API_ENDPOINT_IMAGE_GENERATIONS); }
 function syncProtocolEndpointPreview() { if (refs.protocolEndpointPreview) refs.protocolEndpointPreview.textContent = getProtocolImageGenerationsUrlPreview(); }
 
+// 从 API 下拉选中一条后，地址框可能正处于「完整 URL」显示模式，所以要按当前模式
+// 重排显示；否则用户看到的是裸的基础 URL，与切换前的形态不一致。
+const PICKED_API_ENDPOINT_ROUTES = { route: "a", "direct-image": "b", "direct-text": "b-text" };
+function applyPickedApiEndpointDisplay(target) {
+  if (target === "protocol") {
+    syncProtocolEndpointPreview();
+    return;
+  }
+  const imageRoute = PICKED_API_ENDPOINT_ROUTES[target];
+  if (!imageRoute) return;
+  const endpoint = readEndpointFields(imageRoute);
+  syncEndpointInputDisplay(imageRoute, endpoint.baseUrl, endpoint.endpointPath);
+}
+
 function getCurrentPrivateConfigRequestPayload() {
   const browserPayload = getBrowserPrivateConfigRequestPayload();
   const routeAEndpoint = readEndpointFields("a");
@@ -5206,6 +5279,7 @@ function getCurrentPrivateConfigRequestPayload() {
     endpointPath: routeAEndpoint.endpointPath || browserPayload.endpointPath || state.config?.endpointPath || API_ENDPOINT_RESPONSES,
     apiKey: refs.apiKeyInput.value.trim() || browserPayload.apiKey || "",
     responsesModel: refs.responsesModelInput.value.trim() || browserPayload.responsesModel || state.config?.responsesModel || DEFAULT_RESPONSES_MODEL,
+    imageToolModel: getSelectedImageToolModel(browserPayload),
     directImageBaseUrl,
     directImageEndpointPath: directImageEndpoint.endpointPath || browserPayload.directImageEndpointPath || browserPayload.directEndpointPath || state.config?.directImageEndpointPath || state.config?.directEndpointPath || API_ENDPOINT_IMAGE_GENERATIONS,
     directImageApiKey,
@@ -5226,6 +5300,17 @@ function getCurrentPrivateConfigRequestPayload() {
     [GENERATION_START_DELAY_FIELD]: getConfiguredGenerationStartDelayMs(browserPayload),
     [GENERATION_CONCURRENCY_FIELD]: getConfiguredGenerationConcurrency(browserPayload),
   };
+}
+
+// 下拉框只提供白名单内的选项，这里再归一化一次，避免旧的本地存储值或被改过的
+// DOM 把白名单外的模型送上游。
+function getSelectedImageToolModel(browserPayload = {}) {
+  return normalizeImageToolModel(
+    refs.imageToolModelSelect?.value ||
+      browserPayload.imageToolModel ||
+      state.config?.imageToolModel ||
+      DEFAULT_IMAGE_TOOL_MODEL,
+  );
 }
 
 // A blank input means "use the saved value"; an explicit 0 is a real choice and
@@ -5272,6 +5357,9 @@ function appendJobConfigToFormData(formData, job) {
 function syncConfigUi(config) {
   syncEndpointInputDisplay("a", config.baseUrl || "", config.endpointPath || API_ENDPOINT_RESPONSES);
   refs.responsesModelInput.value = config.responsesModel || DEFAULT_RESPONSES_MODEL;
+  const imageToolModel = normalizeImageToolModel(config.imageToolModel);
+  if (refs.imageToolModelSelect) refs.imageToolModelSelect.value = imageToolModel;
+  if (refs.parameterToolModel) refs.parameterToolModel.textContent = imageToolModel;
   syncEndpointInputDisplay("b", config.directImageBaseUrl || config.directBaseUrl || config.baseUrl || "", config.directImageEndpointPath || config.directEndpointPath || API_ENDPOINT_IMAGE_GENERATIONS);
   refs.directImageModelInput.value = config.directImageModel || DEFAULT_DIRECT_IMAGE_MODEL;
   syncEndpointInputDisplay("b-text", config.directTextBaseUrl || config.directBaseUrl || config.baseUrl || "", config.directTextEndpointPath || API_ENDPOINT_RESPONSES);
@@ -5350,6 +5438,7 @@ function syncConfigUi(config) {
   renderImageDecompositionRatioGrid();
   renderReasoningOptions();
   renderOutputFormatOptions();
+  renderImageQualityOptions();
   refs.creationOutputFormatInput.value = normalizeOutputFormat(
     refs.creationOutputFormatInput.value || config.defaults?.format || "png",
   );
@@ -16197,11 +16286,11 @@ function createJob() {
     ratioLabel: ratioOption?.label || DEFAULT_UI_RATIO_LABEL,
     sizeSetting,
     size,
-    quality: state.config?.defaults?.quality || "high",
+    quality: getSelectedImageQuality(),
     format: normalizeOutputFormat(refs.outputFormatInput.value || state.config?.defaults?.format || "png"),
     baseUrl: state.config?.baseUrl || refs.baseUrlInput.value.trim(),
     responsesModel: state.config?.responsesModel || refs.responsesModelInput.value.trim() || DEFAULT_RESPONSES_MODEL,
-    imageModel: DEFAULT_DIRECT_IMAGE_MODEL,
+    imageModel: getSelectedImageToolModel(),
     reasoningEffort: refs.reasoningEffortInput.value || state.config?.defaults?.reasoningEffort || "xhigh",
     requestRetryCount: 0,
     referenceFiles,
@@ -16235,11 +16324,11 @@ function createStyleTransferJob() {
     ratioLabel: ratioOption?.label || DEFAULT_UI_RATIO_LABEL,
     sizeSetting,
     size,
-    quality: state.config?.defaults?.quality || "high",
+    quality: getSelectedImageQuality(),
     format: normalizeOutputFormat(refs.outputFormatInput.value || state.config?.defaults?.format || "png"),
     baseUrl: state.config?.baseUrl || refs.baseUrlInput.value.trim(),
     responsesModel: state.config?.responsesModel || refs.responsesModelInput.value.trim() || DEFAULT_RESPONSES_MODEL,
-    imageModel: DEFAULT_DIRECT_IMAGE_MODEL,
+    imageModel: getSelectedImageToolModel(),
     reasoningEffort: refs.reasoningEffortInput.value || state.config?.defaults?.reasoningEffort || "xhigh",
     requestRetryCount: 0,
     referenceFiles: getStyleTransferReferenceFiles(),
@@ -16287,11 +16376,11 @@ function createReferenceAnalysisJob() {
     ratioLabel: ratioOption?.label || DEFAULT_UI_RATIO_LABEL,
     sizeSetting,
     size,
-    quality: state.config?.defaults?.quality || "high",
+    quality: getSelectedImageQuality(),
     format: normalizeOutputFormat(state.config?.defaults?.format || "png"),
     baseUrl: state.config?.baseUrl || refs.baseUrlInput.value.trim(),
     responsesModel: state.config?.responsesModel || refs.responsesModelInput.value.trim() || DEFAULT_RESPONSES_MODEL,
-    imageModel: DEFAULT_DIRECT_IMAGE_MODEL,
+    imageModel: getSelectedImageToolModel(),
     reasoningEffort: refs.reasoningEffortInput.value || state.config?.defaults?.reasoningEffort || "xhigh",
     requestRetryCount: 0,
     referenceFiles,
@@ -16471,6 +16560,8 @@ async function loadConfig() {
   }
 
   state.config = browserConfig ? toPublicBrowserConfig(browserConfig, serverConfig || {}) : serverConfig;
+  // 本次改动之前保存过的 Key 也要能在下拉里选到，所以首次加载补种一次。
+  rememberApiEndpointsFromConfig(browserConfig);
   syncConfigUi(state.config);
 }
 
@@ -16735,6 +16826,27 @@ async function loadPromptAgentHistory({ force = false } = {}) {
   return state.promptAgent.history;
 }
 
+// 四个通道共用一份历史清单，所以四套「地址 + 后缀 + Key」一起记；缺地址或缺 Key
+// 的那套会被清单本身丢掉，因为它无法整套切回来。清单只在浏览器本地，不进公开
+// 配置、请求载荷和服务端配置文件。
+function rememberApiEndpointsFromConfig(browserConfig) {
+  if (!browserConfig) return;
+  apiEndpointBookPicker.remember([
+    { baseUrl: browserConfig.baseUrl, endpointPath: browserConfig.endpointPath, apiKey: browserConfig.apiKey },
+    {
+      baseUrl: browserConfig.directImageBaseUrl,
+      endpointPath: browserConfig.directImageEndpointPath,
+      apiKey: browserConfig.directImageApiKey,
+    },
+    {
+      baseUrl: browserConfig.directTextBaseUrl,
+      endpointPath: browserConfig.directTextEndpointPath,
+      apiKey: browserConfig.directTextApiKey,
+    },
+    { baseUrl: browserConfig.protocolBaseUrl, endpointPath: "", apiKey: browserConfig.protocolApiKey },
+  ]);
+}
+
 async function saveConfig(event) {
   event.preventDefault();
   clearError();
@@ -16752,6 +16864,9 @@ async function saveConfig(event) {
 
   const browserConfig = saveBrowserPrivateConfig(payload);
   state.config = toPublicBrowserConfig(browserConfig, state.config || {});
+  // 输入框留空时 payload 已回退到已保存值，所以这里记的始终是本次生效的 Key；
+  // 重复保存同一把只会把它移到清单最前，不会多出一条。
+  rememberApiEndpointsFromConfig(browserConfig);
   refs.apiKeyInput.value = "";
   refs.directApiKeyInput.value = "";
   if (refs.directTextApiKeyInput) refs.directTextApiKeyInput.value = "";
@@ -16904,6 +17019,9 @@ function buildGenerationFormData(job) {
   formData.set("ratio", job.ratio);
   formData.set("size", job.size);
   formData.set("format", job.format);
+  if (job.quality) {
+    formData.set("quality", job.quality);
+  }
   formData.set("reasoningEffort", job.reasoningEffort);
   formData.set("clientSessionId", state.clientSessionId);
   if (job.mode) {
@@ -17964,6 +18082,12 @@ function bindEvents() {
     const endpoint = readEndpointFields("a");
     syncEndpointInputDisplay("a", endpoint.baseUrl, refs.endpointPathSelect.value || endpoint.endpointPath);
   });
+  // 参数区的「工具模型」跟随下拉选择即时更新，不必等保存后重新读配置。
+  // 质量档的可选集合也随之变化：切到 2.5 会多出 XHigh / Max，切回旧模型则收回。
+  refs.imageToolModelSelect?.addEventListener("change", () => {
+    if (refs.parameterToolModel) refs.parameterToolModel.textContent = getSelectedImageToolModel();
+    renderImageQualityOptions();
+  });
   refs.directEndpointPathSelect?.addEventListener("change", () => {
     const endpoint = readEndpointFields("b");
     syncEndpointInputDisplay("b", endpoint.baseUrl, refs.directEndpointPathSelect.value || endpoint.endpointPath);
@@ -17973,6 +18097,7 @@ function bindEvents() {
     syncEndpointInputDisplay("b-text", endpoint.baseUrl, refs.directTextEndpointPathSelect.value || endpoint.endpointPath);
   });
   configModelPicker.bindEvents();
+  apiEndpointBookPicker.bindEvents();
   refs.generateForm.addEventListener("submit", startGeneration);
   refs.articleIllustrationPlanButton.addEventListener("click", () => {
     previewArticleIllustrationPlan().catch((error) => setArticleIllustrationFeedback(error.message, "error"));

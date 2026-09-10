@@ -22,9 +22,9 @@ test("timeline activity rows use distinct status and metadata colors", async () 
   assert.match(readCssRule(styles, ".timeline-item.done .timeline-summary"), /color:\s*var\(--success\);/);
   assert.match(readCssRule(styles, ".timeline-item.active .timeline-summary"), /color:\s*var\(--accent\);/);
   assert.match(readCssRule(styles, ".timeline-item.error .timeline-summary"), /color:\s*var\(--danger\);/);
-  assert.match(readCssRule(styles, ".timeline-mode"), /color:\s*#ff6fae;/);
-  assert.match(readCssRule(styles, ".timeline-ratio-size"), /color:\s*#8b5cf6;/);
-  assert.match(sharedTimeRule, /color:\s*#ffad33;/);
+  assert.match(readCssRule(styles, ".timeline-mode"), /color:\s*var\(--meta-mode\);/);
+  assert.match(readCssRule(styles, ".timeline-ratio-size"), /color:\s*var\(--meta-size\);/);
+  assert.match(sharedTimeRule, /color:\s*var\(--meta-time\);/);
   assert.match(sharedTimeRule, /font-weight:\s*700;/);
   assert.match(readCssRule(styles, ".timeline-start-time time"), /color:\s*inherit;/);
   assert.doesNotMatch(styles, /\.timeline-item\.done[^\{]*\.timeline-start-time\s*\{/);

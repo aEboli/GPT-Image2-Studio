@@ -1,4 +1,7 @@
-(async () => {
+(() => {
+  const COLLECTOR_VERSION = "1.1.33";
+  const CONTROLLER_KEY = "__gptImage2StudioProductImageCollectorController";
+  async function collectProductImages() {
   const DETAIL_TIMEOUT_MS = 8000;
   const TEMU_DETAIL_EXPAND_TIMEOUT_MS = 2500;
   const TEMU_DETAIL_STABLE_INTERVAL_MS = 120;
@@ -14,6 +17,7 @@
   const TIKTOK_IMAGE_MAX_DIMENSION = 30000;
   const AMAZON_IMAGE_BLOCK_MAX_TEXT_LENGTH = 512 * 1024;
   const AMAZON_DECLARED_IMAGE_MAX_ITEMS = 100;
+  const MAX_PRODUCT_TITLE_LENGTH = 500;
   const MAX_VARIANT_LABELS = 32;
   const MAX_VARIANT_KEY_LENGTH = 160;
   const MAX_VARIANT_SOURCE_ID_LENGTH = 120;
@@ -349,15 +353,38 @@
     return String(value || "").replace(/\s+/g, " ").trim().slice(0, maxLength);
   }
 
+  function titleBaseText(adapter, value) {
+    let normalized = compactText(value, MAX_PRODUCT_TITLE_LENGTH);
+    if (adapter.id === "1688") normalized = normalized.replace(/\s+-\s+阿里巴巴$/, "");
+    const suffixes = [
+      `——${adapter.label}`, `——‘${adapter.label}’`, `——'${adapter.label}'`, `——"${adapter.label}"`
+    ];
+    const existingSuffix = suffixes.find((candidate) => normalized.endsWith(candidate));
+    return existingSuffix ? normalized.slice(0, -existingSuffix.length).trim() : normalized;
+  }
+
   function titleWithPlatform(adapter, value) {
     const suffix = `——${adapter.label}`;
     const fallback = `${adapter.label} 商品`;
-    let normalized = compactText(value || fallback);
-    if (adapter.id === "1688") normalized = normalized.replace(/\s+-\s+阿里巴巴$/, "");
-    const existingSuffix = [suffix, `——‘${adapter.label}’`, `——'${adapter.label}'`, `——"${adapter.label}"`]
-      .find((candidate) => normalized.endsWith(candidate));
-    const base = existingSuffix ? normalized.slice(0, -existingSuffix.length).trim() : normalized;
-    return `${compactText(base || fallback, 200 - suffix.length)}${suffix}`;
+    const base = titleBaseText(adapter, value || fallback);
+    return `${compactText(base || fallback, MAX_PRODUCT_TITLE_LENGTH - suffix.length)}${suffix}`;
+  }
+
+  function truncatedTitlePrefix(value) {
+    return String(value || "").replace(/(?:\.{3}|。{2,}|…+)$/, "").trim();
+  }
+
+  function mostCompleteTitle(adapter, candidates) {
+    const bases = candidates.map((value) => titleBaseText(adapter, value)).filter(Boolean);
+    const selected = bases[0];
+    if (!selected) return "";
+    const prefix = truncatedTitlePrefix(selected);
+    if (!prefix) return selected;
+    let best = selected;
+    for (const base of bases) {
+      if (base.length > best.length && base.startsWith(prefix)) best = base;
+    }
+    return best;
   }
 
   function productTitle(adapter, declaredTitle) {
@@ -365,15 +392,15 @@
       .map((selector) => document.querySelector?.(selector)?.textContent)
       .find((value) => compactText(value));
     const meta = document.querySelector?.("meta[property='og:title']")?.content;
-    const sharedHeading = adapter.id === "1688" ? "" : [
+    const sharedHeadings = adapter.id === "1688" ? [] : [
       "[data-testid='offer-title']", "[data-testid='product-title']", "#productTitle",
       "h1[class*='title']", ".d-title", "h1"
-    ].map((selector) => document.querySelector?.(selector)?.textContent).find((value) => compactText(value));
-    const fallback = `${adapter.label} 商品`;
-    const selected = adapter.id === "1688"
-      ? (adapterHeading || declaredTitle || meta || document.title || fallback)
-      : (declaredTitle || meta || adapterHeading || sharedHeading || document.title || fallback);
-    return titleWithPlatform(adapter, selected);
+    ].map((selector) => document.querySelector?.(selector)?.textContent).filter((value) => compactText(value));
+    const ordered = adapter.id === "1688"
+      ? [adapterHeading, declaredTitle, meta]
+      : [declaredTitle, meta, adapterHeading, ...sharedHeadings];
+    const complete = mostCompleteTitle(adapter, ordered.filter((value) => compactText(value)));
+    return titleWithPlatform(adapter, complete || document.title || `${adapter.label} 商品`);
   }
 
   function readJsonToken(source, start) {
@@ -724,7 +751,7 @@
     return {
       declared: true,
       id: productId,
-      title: compactText(model.name),
+      title: compactText(model.name, MAX_PRODUCT_TITLE_LENGTH),
       mainImages,
       detailImages,
       skuImages
@@ -787,7 +814,7 @@
     }).filter(Boolean);
     return {
       id: compactText(product.sku || product.productID || product.mpn || "", 120),
-      title: compactText(product.name || ""),
+      title: compactText(product.name || "", MAX_PRODUCT_TITLE_LENGTH),
       mainImages
     };
   }
@@ -1285,4 +1312,11 @@
       items
     }
   };
+  }
+
+  const controller = {
+    version: COLLECTOR_VERSION,
+    collect: collectProductImages,
+  };
+  globalThis[CONTROLLER_KEY] = controller;
 })();

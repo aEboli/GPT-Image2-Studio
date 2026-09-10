@@ -57,6 +57,7 @@ import {
   toOutputFormatExtension,
   toOutputFormatMimeType,
 } from "./lib/output-format-options.mjs";
+import { normalizeImageQuality } from "./lib/image-quality-options.mjs";
 import {
   CREATION_STREAM_EVENTS,
   GENERATION_STREAM_EVENTS,
@@ -1287,6 +1288,7 @@ async function handleConfigPost(request, response) {
     apiKey: payload.apiKey,
     endpointPath: payload.endpointPath,
     responsesModel: payload.responsesModel,
+    imageToolModel: payload.imageToolModel,
     imageRoute: payload.imageRoute,
     directImageBaseUrl: payload.directImageBaseUrl,
     directImageApiKey: payload.directImageApiKey,
@@ -1790,6 +1792,7 @@ async function generateAndSavePptSlide({
   if (!generationConfig.apiKey) {
     throw new Error("Missing API key for the selected image generation route.");
   }
+  const slideQuality = normalizeImageQuality(config.defaults?.quality, { imageModel: generationConfig.imageModel });
   const generationResult = await requestStudioImageGeneration({
     baseUrl: generationConfig.baseUrl,
     apiKey: generationConfig.apiKey,
@@ -1797,7 +1800,7 @@ async function generateAndSavePptSlide({
     referenceImages,
     size: PPT_SLIDE_SIZE,
     aspectRatio: "16:9",
-    quality: config.defaults?.quality || "high",
+    quality: slideQuality,
     format: toApiOutputFormat(PPT_SLIDE_FORMAT),
     responsesModel: generationConfig.responsesModel,
     imageRoute: generationConfig.imageRoute,
@@ -1848,7 +1851,7 @@ async function generateAndSavePptSlide({
       ratio: "16:9",
       ratioLabel: "PPT 16:9",
       size: savedSize,
-      quality: config.defaults?.quality || "high",
+      quality: slideQuality,
       format: PPT_SLIDE_FORMAT,
       reasoningEffort,
       assetKind: "ppt-slide",
@@ -1952,7 +1955,9 @@ async function saveCompletedPptDeck({
     editablePptxWarnings,
     exportMode: normalizedExportMode,
     responsesModel: textVisionConfig.responsesModel,
-    imageModel: "gpt-image-2",
+    // 幻灯片是用 getSelectedImageGenerationConfig 生成的，清单要记录同一个模型，
+    // 否则用户选了 2.5 之后 PPT 记录仍谎报 gpt-image-2。
+    imageModel: getSelectedImageGenerationConfig(config).imageModel,
     reasoningEffort,
     motion,
   });
@@ -3179,7 +3184,9 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
     const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || "3:2"));
     const requestedSizeInput = String(formData.get("size") || "auto").trim().toLowerCase();
     const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
-    const finalQuality = config.defaults?.quality || "high";
+    const finalQuality = normalizeImageQuality(formData.get("quality") || config.defaults?.quality, {
+      imageModel: generationConfig.imageModel,
+    });
     const finalFormat = normalizeOutputFormat(String(formData.get("format") || config.defaults?.format || ARTICLE_ILLUSTRATION_FORMAT));
     const reasoningEffort = normalizeReasoningEffort(
       formData.get("reasoningEffort") || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
@@ -4468,7 +4475,9 @@ async function handlePortraitGenerate(request, response) {
     const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || plan.ratio || "4:5"));
     const requestedSizeInput = String(formData.get("size") || plan.size || "auto").trim().toLowerCase();
     const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
-    const finalQuality = config.defaults?.quality || "high";
+    const finalQuality = normalizeImageQuality(formData.get("quality") || config.defaults?.quality, {
+      imageModel: generationConfig.imageModel,
+    });
     const finalFormat = normalizeOutputFormat(String(formData.get("format") || plan.format || config.defaults?.format || "png"));
     const reasoningEffort = normalizeReasoningEffort(
       formData.get("reasoningEffort") || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
@@ -4825,7 +4834,9 @@ async function handleCreationGenerate(request, response) {
     const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
     const fallbackRatio = ratioOption.value;
     const fallbackSize = requestedSizeInput;
-    const finalQuality = config.defaults?.quality || "high";
+    const finalQuality = normalizeImageQuality(formData.get("quality") || config.defaults?.quality, {
+      imageModel: generationConfig.imageModel,
+    });
     const finalFormat = normalizeOutputFormat(String(formData.get("format") || config.defaults?.format || "png"));
     const reasoningEffort = normalizeReasoningEffort(
       formData.get("reasoningEffort") || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
@@ -5284,7 +5295,9 @@ async function handleCreationLogoBatchGenerate(request, response) {
     const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || "1:1"));
     const requestedSizeInput = String(formData.get("size") || "auto").trim().toLowerCase();
     const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
-    const finalQuality = config.defaults?.quality || "high";
+    const finalQuality = normalizeImageQuality(formData.get("quality") || config.defaults?.quality, {
+      imageModel: generationConfig.imageModel,
+    });
     const finalFormat = normalizeOutputFormat(String(formData.get("format") || config.defaults?.format || "png"));
     const reasoningEffort = normalizeReasoningEffort(
       formData.get("reasoningEffort") || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
@@ -5671,7 +5684,9 @@ async function handlePortraitRepair(request, response) {
     const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || setManifest.ratio || "4:5"));
     const requestedSizeInput = String(formData.get("size") || setManifest.size || "auto").trim().toLowerCase();
     const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
-    const finalQuality = config.defaults?.quality || "high";
+    const finalQuality = normalizeImageQuality(formData.get("quality") || config.defaults?.quality, {
+      imageModel: generationConfig.imageModel,
+    });
     const finalFormat = normalizeOutputFormat(String(formData.get("format") || setManifest.format || config.defaults?.format || "png"));
     const reasoningEffort = normalizeReasoningEffort(
       formData.get("reasoningEffort") || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
@@ -5984,7 +5999,9 @@ async function handleCreationRepair(request, response) {
     const generationConcurrency = resolveGenerationConcurrencyForLimit(formData, config);
     const fallbackRatio = String(formData.get("ratio") || "1:1");
     const fallbackSize = String(formData.get("size") || "auto").trim();
-    const finalQuality = config.defaults?.quality || "high";
+    const finalQuality = normalizeImageQuality(formData.get("quality") || config.defaults?.quality, {
+      imageModel: generationConfig.imageModel,
+    });
     const finalFormat = normalizeOutputFormat(String(formData.get("format") || config.defaults?.format || "png"));
     const reasoningEffort = normalizeReasoningEffort(
       formData.get("reasoningEffort") || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
@@ -6053,7 +6070,11 @@ async function handleCreationRepair(request, response) {
       const itemGenerationConfig = resolveCreationRepairGenerationConfig(repairItem, generationConfig);
       const referenceUploadTargetKey = referenceUploads.getTargetKey(itemGenerationConfig);
       const itemFormat = normalizeOutputFormat(repairItem.format || finalFormat);
-      const itemQuality = String(repairItem.quality || finalQuality);
+      // 补图条目自带上游目标，模型可能与本次运行的不同，按它自己的模型收敛质量档。
+      const itemQuality = normalizeImageQuality(repairItem.quality || finalQuality, {
+        imageModel: itemGenerationConfig.imageModel,
+        fallback: finalQuality,
+      });
       const itemReasoningEffort = normalizeReasoningEffort(repairItem.reasoningEffort || reasoningEffort);
       const taskId = retryLedger.getTaskId(`${setId}-repair-${item.itemId}`, item.itemId);
       const generationStartedAt = new Date().toISOString();
@@ -6706,7 +6727,9 @@ async function handleGenerate(request, response) {
     const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
 
     const finalPrompt = appendRatioHintToPrompt(prompt, ratioOption);
-    const finalQuality = config.defaults?.quality || "high";
+    const finalQuality = normalizeImageQuality(formData.get("quality") || config.defaults?.quality, {
+      imageModel: generationConfig.imageModel,
+    });
     const finalFormat = normalizeOutputFormat(requestedFormatInput || config.defaults?.format || "png");
     let finalBase64 = "";
     const generationStartedAt = new Date().toISOString();

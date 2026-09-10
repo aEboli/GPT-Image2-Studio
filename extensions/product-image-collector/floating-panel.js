@@ -1,7 +1,8 @@
 (() => {
   const HOST_ID = "gpt-image2-studio-product-image-collector";
   const CONTROLLER_KEY = "__gptImage2StudioProductImagePanelController";
-  const PANEL_VERSION = "1.1.29";
+  const COLLECTOR_CONTROLLER_KEY = "__gptImage2StudioProductImageCollectorController";
+  const PANEL_VERSION = "1.1.33";
   const THEME_STATE_KEY = "__gptImage2StudioProductImagePanelTheme";
   const REVEAL_EVENT = "gpt-image2-studio-product-image-collector:reveal";
   const PANEL_OPENED_EVENT = "gpt-image2-studio-product-image-collector:panel-opened";
@@ -58,21 +59,32 @@
   };
 
   const currentController = globalThis[CONTROLLER_KEY];
-  if (currentController?.version === PANEL_VERSION && currentController.reveal) {
-    currentController.reveal();
-    return;
+  if (currentController?.version === PANEL_VERSION && typeof currentController.open === "function") {
+    try {
+      currentController.open();
+      return;
+    } catch {}
   }
-  if (currentController?.destroy) currentController.destroy();
+  if (currentController?.destroy) {
+    try {
+      currentController.destroy();
+    } catch {}
+  }
   const existing = document.getElementById(HOST_ID);
   existing?.remove();
+  if (existing) document.dispatchEvent(new CustomEvent(PANEL_CLOSED_EVENT));
 
-  const host = document.createElement("div");
-  host.id = HOST_ID;
-  host.dataset.collectorVersion = PANEL_VERSION;
-  host.dataset.panelHidden = "false";
-  document.documentElement.appendChild(host);
-  const shadow = host.attachShadow({ mode: "open" });
-  shadow.innerHTML = `
+  let host = null;
+  let shadow = null;
+  let refs = null;
+
+  function createPanelDom() {
+    host = document.createElement("div");
+    host.id = HOST_ID;
+    host.dataset.collectorVersion = PANEL_VERSION;
+    host.dataset.panelHidden = "false";
+    shadow = host.attachShadow({ mode: "open" });
+    shadow.innerHTML = `
     <style>
       :host {
         all: initial;
@@ -302,7 +314,7 @@
       }
       .panel[data-dragging="true"] .panel-head { cursor: grabbing; }
       .product-summary { min-width: 0; align-self: stretch; display: flex; align-items: center; }
-      .product-summary strong { min-width: 0; font-size: 11px; line-height: 1.35; overflow-wrap: anywhere; white-space: normal; }
+      .product-summary strong { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; min-width: 0; max-height: 4.05em; overflow: hidden; font-size: 11px; line-height: 1.35; overflow-wrap: anywhere; white-space: normal; }
       .title-block { width: 96px; min-width: 0; align-self: stretch; display: grid; place-content: center; justify-items: center; margin: 0; padding: 0 0 0 6px; border: 0; border-left: 1px solid var(--border-soft); background: transparent; color: inherit; text-align: center; cursor: pointer; touch-action: manipulation; }
       .title-block:hover { background: var(--surface-hover); }
       .title-block:focus-visible { outline: 2px solid var(--selection-accent); outline-offset: -2px; }
@@ -370,21 +382,21 @@
         width: 100%;
         min-width: 0;
         display: grid;
-        grid-template-rows: auto 24px;
+        grid-template-rows: auto auto 24px;
         overflow: hidden;
         border: 2px solid var(--card-border);
         border-radius: 5px;
         background: var(--surface);
       }
-      .image-card.has-variant { grid-template-rows: auto auto 24px; }
+      .image-card.has-variant { grid-template-rows: auto auto auto 24px; }
       .image-card.is-selected { border-color: var(--selection-accent); }
       .image-card-media { position: relative; width: 100%; height: auto; min-width: 0; aspect-ratio: 1; display: block; overflow: hidden; background: #fff; cursor: pointer; }
-      .image-card-media input { position: absolute; top: 3px; left: 3px; z-index: 2; width: 14px; height: 14px; accent-color: var(--selection-accent); }
-      .image-card-media img { width: 98%; height: 98%; display: block; margin: 1%; content-visibility: auto; contain-intrinsic-size: 1px 1px; object-fit: contain; }
+      .image-card-media img { width: 100%; height: 100%; display: block; content-visibility: auto; contain-intrinsic-size: 1px 1px; object-fit: contain; }
       .image-card-media img.is-broken { opacity: 0.18; }
-      .image-card-meta { position: absolute; left: 4px; right: 4px; bottom: 4px; min-width: 0; display: grid; grid-template-columns: minmax(0, auto) auto; align-items: center; justify-content: space-between; gap: 4px; padding: 2px 4px; border: 1px solid rgba(255, 255, 255, 0.72); border-radius: 4px; background: rgba(0, 0, 0, 0.62); color: #fff; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); pointer-events: none; }
-      .image-card-name { min-width: 0; padding: 0; background: transparent; color: inherit; font-size: 10px; font-weight: 700; line-height: 1.25; white-space: nowrap; }
-      .image-card-resolution { justify-self: end; padding: 0; background: transparent; color: inherit; font-size: 9px; font-weight: 700; line-height: 1.25; white-space: nowrap; }
+      .image-card-meta { min-width: 0; display: grid; grid-template-columns: auto minmax(0, auto) auto; align-items: center; justify-content: space-between; gap: 4px; padding: 3px 5px; border-top: 1px solid var(--card-action-divider); background: var(--surface); color: var(--control-text); }
+      .image-card-meta input { width: 14px; height: 14px; margin: 0; accent-color: var(--selection-accent); cursor: pointer; }
+      .image-card-name { min-width: 0; padding: 0; overflow: hidden; background: transparent; color: inherit; font-size: 10px; font-weight: 700; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+      .image-card-resolution { justify-self: end; padding: 0; background: transparent; color: var(--muted); font-size: 9px; font-weight: 700; line-height: 1.25; white-space: nowrap; }
       .image-card-variant { min-width: 0; display: flex; align-items: center; justify-content: center; padding: 4px 6px; border-top: 1px solid var(--variant-border); background: var(--variant-bg); color: var(--variant-text); font-size: 12px; font-weight: 700; line-height: 16px; letter-spacing: 0; text-align: center; white-space: normal; overflow-wrap: anywhere; }
       .image-card-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--card-action-border); background: var(--surface); }
       .image-card-actions button { min-width: 0; display: grid; place-items: center; padding: 0; border: 0; border-right: 1px solid var(--card-action-divider); background: var(--surface); color: var(--control-text); cursor: pointer; }
@@ -432,7 +444,7 @@
         .panel { top: 56px; width: calc(100vw - 16px); height: calc(100vh - 68px); max-width: none; min-height: 0; }
         .panel[data-dock="left"], .panel[data-dock="right"] { width: 100%; max-width: 100%; }
         .image-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        .image-card { width: auto; grid-template-rows: auto 24px; }
+        .image-card { width: auto; grid-template-rows: auto auto 24px; }
         .image-card-media { width: 100%; height: auto; aspect-ratio: 1; }
       }
     </style>
@@ -491,7 +503,7 @@
     </aside>
   `;
 
-  const refs = {
+    refs = {
     closeButton: shadow.querySelector("#closeButton"),
     collectButton: shadow.querySelector("#collectButton"),
     copyButton: shadow.querySelector("#copyButton"),
@@ -526,7 +538,8 @@
     viewerZoomInButton: shadow.querySelector("#viewerZoomInButton"),
     viewerZoomLabel: shadow.querySelector("#viewerZoomLabel"),
     viewerZoomOutButton: shadow.querySelector("#viewerZoomOutButton"),
-  };
+    };
+  }
   const state = {
     busy: false,
     collectionNotice: "",
@@ -547,19 +560,27 @@
   };
   let copySuccessToastTimer = 0;
   let panelController = null;
-  let panelDestroyed = false;
+  let panelDestroyed = true;
+  let panelMountSerial = 0;
+  let panelInitialized = false;
 
-  refs.foldRailButton.append(createIcon("chevron-left"));
-  refs.viewerPreviousButton.append(createIcon("chevron-left"));
-  refs.viewerNextButton.append(createIcon("chevron-right"));
-  refs.viewerFitButton.append(createIcon("maximize"));
-  refs.viewerRotateLeftButton.append(createIcon("rotate-ccw"));
-  refs.viewerRotateRightButton.append(createIcon("rotate-cw"));
-  refs.viewerZoomInButton.append(createIcon("zoom-in"));
-  refs.viewerZoomOutButton.append(createIcon("zoom-out"));
-  refs.viewerOriginalSizeButton.append(createIcon("minimize"));
-  refs.viewerCloseButton.append(createIcon("x"));
-  syncThemeUi();
+  function initializePanel() {
+    if (panelInitialized) return;
+    createPanelDom();
+    refs.foldRailButton.append(createIcon("chevron-left"));
+    refs.viewerPreviousButton.append(createIcon("chevron-left"));
+    refs.viewerNextButton.append(createIcon("chevron-right"));
+    refs.viewerFitButton.append(createIcon("maximize"));
+    refs.viewerRotateLeftButton.append(createIcon("rotate-ccw"));
+    refs.viewerRotateRightButton.append(createIcon("rotate-cw"));
+    refs.viewerZoomInButton.append(createIcon("zoom-in"));
+    refs.viewerZoomOutButton.append(createIcon("zoom-out"));
+    refs.viewerOriginalSizeButton.append(createIcon("minimize"));
+    refs.viewerCloseButton.append(createIcon("x"));
+    syncThemeUi();
+    bindPanelEvents();
+    panelInitialized = true;
+  }
 
   function setStatus(message, kind = "idle") {
     refs.status.textContent = message;
@@ -633,6 +654,17 @@
         finish(() => reject(error instanceof Error ? error : new Error(String(error || "商品图采集操作失败。"))));
       }
     });
+  }
+
+  function collectPage() {
+    const collector = globalThis[COLLECTOR_CONTROLLER_KEY];
+    if (collector?.version === PANEL_VERSION && typeof collector.collect === "function") {
+      return Promise.resolve(collector.collect()).then((response) => {
+        if (!response?.ok) throw new Error(response?.message || "商品图采集操作失败。");
+        return response;
+      });
+    }
+    return sendMessage(MESSAGE_COLLECT, { pageUrl: location.href });
   }
 
   function selectedItems() {
@@ -901,7 +933,7 @@
     for (const card of shadow.querySelectorAll(".image-card[data-item-id]")) {
       const selected = state.selectedIds.has(card.dataset.itemId);
       card.classList.toggle("is-selected", selected);
-      const checkbox = card.querySelector(".image-card-media input[type=checkbox]");
+      const checkbox = card.querySelector(".image-card-meta input[type=checkbox]");
       if (checkbox) checkbox.checked = selected;
     }
     for (const section of shadow.querySelectorAll(".group[data-category]")) {
@@ -944,7 +976,9 @@
 
   function render() {
     refs.groups.replaceChildren();
-    refs.productTitle.textContent = panelProductTitleFor(state.manifest);
+    const panelTitle = panelProductTitleFor(state.manifest);
+    refs.productTitle.textContent = panelTitle;
+    refs.productTitle.title = panelTitle;
     refs.platformName.textContent = platformLabelFor(state.manifest);
     for (const category of ["main", "detail", "sku"]) {
       const items = (state.manifest?.items || []).filter((item) => item.category === category);
@@ -996,7 +1030,9 @@
         label.className = "image-card-media";
         const checkbox = document.createElement("input");
         checkbox.type = "checkbox";
+        checkbox.id = `select-${item.id}`;
         checkbox.checked = state.selectedIds.has(item.id);
+        label.htmlFor = checkbox.id;
         const variantLabels = itemVariantLabels(item);
         const variantTitle = variantLabels.join(" / ");
         const filename = displayFilename(item);
@@ -1032,9 +1068,9 @@
           }
         });
         image.src = previewUrlFor(item);
-        meta.append(name, resolution);
+        meta.append(checkbox, name, resolution);
         label.title = `${cardTitle} · ${resolution.title}`;
-        label.append(checkbox, image, meta);
+        label.append(image);
         const actions = document.createElement("div");
         actions.className = "image-card-actions";
         const viewButton = document.createElement("button");
@@ -1058,9 +1094,9 @@
           variant.className = "image-card-variant";
           variant.textContent = variantTitle;
           variant.title = variantTitle;
-          card.append(label, variant, actions);
+          card.append(label, meta, variant, actions);
         } else {
-          card.append(label, actions);
+          card.append(label, meta, actions);
         }
         grid.appendChild(card);
       }
@@ -1070,27 +1106,34 @@
     syncSelectionUi();
   }
 
+  function isStaleMount(serial) {
+    return panelDestroyed || serial !== panelMountSerial;
+  }
+
   async function collectCurrentPage() {
+    const serial = panelMountSerial;
     if (!refs.viewer.hidden) closeImageViewer();
     state.busy = true;
     syncActions();
     setStatus("正在读取当前商品页...");
     try {
-      const response = await sendMessage(MESSAGE_COLLECT, { pageUrl: location.href });
-      if (panelDestroyed) return;
+      const response = await collectPage();
+      if (isStaleMount(serial)) return;
       state.manifest = response.manifest;
       state.selectedIds = new Set(response.manifest.items.map((item) => item.id));
       state.collectionNotice = String(response.notice || "");
       syncSelectionStatus();
     } catch (error) {
-      if (panelDestroyed) return;
+      if (isStaleMount(serial)) return;
       state.manifest = null;
       state.selectedIds.clear();
       state.collectionNotice = "";
       setStatus(error instanceof Error ? error.message : String(error), "error");
     } finally {
-      state.busy = false;
-      if (!panelDestroyed) render();
+      if (!isStaleMount(serial)) {
+        state.busy = false;
+        if (!panelDestroyed) render();
+      }
     }
   }
 
@@ -1110,6 +1153,7 @@
   }
 
   async function copySelection() {
+    const serial = panelMountSerial;
     const items = selectedItems();
     if (items.length === 0) return setStatus("请先选择要复制的商品图。", "error");
     state.busy = true;
@@ -1119,19 +1163,23 @@
         manifest: state.manifest,
         selectedIds: items.map((item) => item.id),
       });
-      if (panelDestroyed) return;
+      if (isStaleMount(serial)) return;
       await writeClipboard(response.text);
+      if (isStaleMount(serial)) return;
       const variantCount = skuVariantCount(items);
       setStatus(`已复制 ${response.count} 张商品图清单${variantCount ? `，SKU 共 ${variantCount} 个规格` : ""}，可到 Studio 导入。`, "success");
     } catch (error) {
-      if (!panelDestroyed) setStatus(error instanceof Error ? error.message : String(error), "error");
+      if (!isStaleMount(serial)) setStatus(error instanceof Error ? error.message : String(error), "error");
     } finally {
-      state.busy = false;
-      if (!panelDestroyed) syncActions();
+      if (!isStaleMount(serial)) {
+        state.busy = false;
+        syncActions();
+      }
     }
   }
 
   async function downloadItems(items, { single = false } = {}) {
+    const serial = panelMountSerial;
     if (items.length === 0) return setStatus("请先选择要下载的商品图。", "error");
     state.busy = true;
     syncActions();
@@ -1140,7 +1188,7 @@
         manifest: state.manifest,
         selectedIds: items.map((item) => item.id),
       });
-      if (panelDestroyed) return;
+      if (isStaleMount(serial)) return;
       setStatus(
         single
           ? `已提交 ${displayFilename(items[0])} 到 ${response.folder}。`
@@ -1148,14 +1196,17 @@
         "success",
       );
     } catch (error) {
-      if (!panelDestroyed) setStatus(error instanceof Error ? error.message : String(error), "error");
+      if (!isStaleMount(serial)) setStatus(error instanceof Error ? error.message : String(error), "error");
     } finally {
-      state.busy = false;
-      if (!panelDestroyed) syncActions();
+      if (!isStaleMount(serial)) {
+        state.busy = false;
+        syncActions();
+      }
     }
   }
 
   async function copyImagesSelection() {
+    const serial = panelMountSerial;
     const items = selectedItems();
     if (items.length === 0) return setStatus("请先选择要复制的商品图。", "error");
     hideCopySuccessToast();
@@ -1167,7 +1218,7 @@
         manifest: state.manifest,
         selectedIds: items.map((item) => item.id),
       });
-      if (panelDestroyed) return;
+      if (isStaleMount(serial)) return;
       setStatus(
         response.failedCount > 0
           ? `已复制 ${response.count} 张图片，${response.failedCount} 张失败，可直接粘贴到聊天软件。`
@@ -1176,10 +1227,12 @@
       );
       showCopySuccessToast(`已复制 ${response.count} 张图片`);
     } catch (error) {
-      if (!panelDestroyed) setStatus(error instanceof Error ? error.message : String(error), "error");
+      if (!isStaleMount(serial)) setStatus(error instanceof Error ? error.message : String(error), "error");
     } finally {
-      state.busy = false;
-      if (!panelDestroyed) syncActions();
+      if (!isStaleMount(serial)) {
+        state.busy = false;
+        syncActions();
+      }
     }
   }
 
@@ -1369,19 +1422,54 @@
     refs.panel.style.top = `${Math.round(Math.min(Math.max(0, rect.top), maxTop))}px`;
   }
 
+  function openPanel() {
+    if (!panelDestroyed) {
+      host.dispatchEvent(new CustomEvent(REVEAL_EVENT));
+      document.dispatchEvent(new CustomEvent(PANEL_OPENED_EVENT));
+      return;
+    }
+    initializePanel();
+    panelDestroyed = false;
+    panelMountSerial += 1;
+    state.busy = false;
+    state.collectionNotice = "";
+    state.manifest = null;
+    state.selectedIds = new Set();
+    refs.viewer.hidden = true;
+    document.documentElement.appendChild(host);
+    window.addEventListener("resize", clampFloatingPanel);
+    host.dispatchEvent(new CustomEvent(REVEAL_EVENT));
+    setStatus("正在读取当前商品页...");
+    document.dispatchEvent(new CustomEvent(PANEL_OPENED_EVENT));
+    render();
+    collectCurrentPage();
+  }
+
   function closePanel() {
     if (panelDestroyed) return;
     panelDestroyed = true;
     hideCopySuccessToast();
-    endViewerDrag();
+    closeImageViewer();
+    const drag = state.drag;
+    state.drag = null;
+    delete refs?.panel?.dataset?.dragging;
+    if (drag && refs?.dragHandle?.hasPointerCapture?.(drag.pointerId)) {
+      try {
+        refs.dragHandle.releasePointerCapture(drag.pointerId);
+      } catch {}
+    }
     window.removeEventListener("pointermove", moveDrag);
     window.removeEventListener("pointerup", endDrag);
     window.removeEventListener("pointercancel", endDrag);
     window.removeEventListener("resize", clampFloatingPanel);
-    host.removeEventListener(PANEL_NAVIGATED_EVENT, closePanel);
-    host.remove();
-    if (globalThis[CONTROLLER_KEY] === panelController) delete globalThis[CONTROLLER_KEY];
+    host?.remove();
     document.dispatchEvent(new CustomEvent(PANEL_CLOSED_EVENT));
+  }
+
+  function destroyPanel() {
+    closePanel();
+    host?.removeEventListener(PANEL_NAVIGATED_EVENT, closePanel);
+    if (globalThis[CONTROLLER_KEY] === panelController) delete globalThis[CONTROLLER_KEY];
   }
 
   function setCategorySelection(category, selected) {
@@ -1393,69 +1481,63 @@
     commitSelectionChange();
   }
 
-  refs.collectButton.addEventListener("click", collectCurrentPage);
-  refs.copyButton.addEventListener("click", copySelection);
-  refs.copyImagesButton.addEventListener("click", copyImagesSelection);
-  refs.downloadButton.addEventListener("click", downloadSelection);
-  refs.selectAllButton.addEventListener("click", () => {
-    state.selectedIds = new Set((state.manifest?.items || []).map((item) => item.id));
-    commitSelectionChange();
-  });
-  refs.invertButton.addEventListener("click", () => {
-    state.selectedIds = new Set((state.manifest?.items || []).filter((item) => !state.selectedIds.has(item.id)).map((item) => item.id));
-    commitSelectionChange();
-  });
-  refs.selectMainButton.addEventListener("click", () => setCategorySelection("main", true));
-  refs.selectDetailButton.addEventListener("click", () => setCategorySelection("detail", true));
-  refs.selectSkuButton.addEventListener("click", () => setCategorySelection("sku", true));
-  refs.viewerCloseButton.addEventListener("click", closeImageViewer);
-  refs.viewerFitButton.addEventListener("click", (event) => runViewerCommand(event, fitViewerToPanel));
-  refs.viewerPreviousButton.addEventListener("click", () => showViewerItemAt(state.viewerIndex - 1));
-  refs.viewerNextButton.addEventListener("click", () => showViewerItemAt(state.viewerIndex + 1));
-  refs.viewerRotateLeftButton.addEventListener("click", (event) => runViewerCommand(event, () => rotateViewer(-90)));
-  refs.viewerRotateRightButton.addEventListener("click", (event) => runViewerCommand(event, () => rotateViewer(90)));
-  refs.viewerZoomInButton.addEventListener("click", (event) => runViewerCommand(event, () => setViewerScale(state.viewerScale * VIEWER_SCALE_FACTOR)));
-  refs.viewerZoomOutButton.addEventListener("click", (event) => runViewerCommand(event, () => setViewerScale(state.viewerScale / VIEWER_SCALE_FACTOR)));
-  refs.viewerOriginalSizeButton.addEventListener("click", (event) => runViewerCommand(event, resetViewerView));
-  refs.viewerStage.addEventListener("wheel", handleViewerWheel, { passive: false });
-  refs.viewer.addEventListener("click", handleViewerBackdropClick);
-  refs.viewerImage.addEventListener("load", resetViewerView);
-  refs.viewerImage.addEventListener("dblclick", resetViewerView);
-  refs.viewerImage.addEventListener("pointerdown", beginViewerDrag);
-  refs.foldToggleButton.addEventListener("click", togglePanelFold);
-  refs.foldRailButton.addEventListener("click", expandFoldedPanel);
-  refs.themeButton.addEventListener("click", cyclePanelTheme);
-  refs.closeButton.addEventListener("click", closePanel);
-  refs.dragHandle.addEventListener("pointerdown", beginDrag);
-  refs.panel.addEventListener("pointerenter", expandFoldedPanel);
-  refs.panel.addEventListener("pointerleave", collapseFoldedPanel);
-  host.addEventListener("keydown", (event) => {
-    if (refs.viewer.hidden) return;
-    if (event.key === "Escape") closeImageViewer();
-    else if (event.key === "ArrowLeft") showViewerItemAt(state.viewerIndex - 1);
-    else if (event.key === "ArrowRight") showViewerItemAt(state.viewerIndex + 1);
-    else return;
-    event.preventDefault();
-  });
-  host.addEventListener(REVEAL_EVENT, () => {
-    host.dataset.panelHidden = "false";
-    setPanelFolded(false);
-    clampFloatingPanel();
-  });
-  host.addEventListener(PANEL_NAVIGATED_EVENT, closePanel);
-  window.addEventListener("resize", clampFloatingPanel);
+  function bindPanelEvents() {
+    refs.collectButton.addEventListener("click", collectCurrentPage);
+    refs.copyButton.addEventListener("click", copySelection);
+    refs.copyImagesButton.addEventListener("click", copyImagesSelection);
+    refs.downloadButton.addEventListener("click", downloadSelection);
+    refs.selectAllButton.addEventListener("click", () => {
+      state.selectedIds = new Set((state.manifest?.items || []).map((item) => item.id));
+      commitSelectionChange();
+    });
+    refs.invertButton.addEventListener("click", () => {
+      state.selectedIds = new Set((state.manifest?.items || []).filter((item) => !state.selectedIds.has(item.id)).map((item) => item.id));
+      commitSelectionChange();
+    });
+    refs.selectMainButton.addEventListener("click", () => setCategorySelection("main", true));
+    refs.selectDetailButton.addEventListener("click", () => setCategorySelection("detail", true));
+    refs.selectSkuButton.addEventListener("click", () => setCategorySelection("sku", true));
+    refs.viewerCloseButton.addEventListener("click", closeImageViewer);
+    refs.viewerFitButton.addEventListener("click", (event) => runViewerCommand(event, fitViewerToPanel));
+    refs.viewerPreviousButton.addEventListener("click", () => showViewerItemAt(state.viewerIndex - 1));
+    refs.viewerNextButton.addEventListener("click", () => showViewerItemAt(state.viewerIndex + 1));
+    refs.viewerRotateLeftButton.addEventListener("click", (event) => runViewerCommand(event, () => rotateViewer(-90)));
+    refs.viewerRotateRightButton.addEventListener("click", (event) => runViewerCommand(event, () => rotateViewer(90)));
+    refs.viewerZoomInButton.addEventListener("click", (event) => runViewerCommand(event, () => setViewerScale(state.viewerScale * VIEWER_SCALE_FACTOR)));
+    refs.viewerZoomOutButton.addEventListener("click", (event) => runViewerCommand(event, () => setViewerScale(state.viewerScale / VIEWER_SCALE_FACTOR)));
+    refs.viewerOriginalSizeButton.addEventListener("click", (event) => runViewerCommand(event, resetViewerView));
+    refs.viewerStage.addEventListener("wheel", handleViewerWheel, { passive: false });
+    refs.viewer.addEventListener("click", handleViewerBackdropClick);
+    refs.viewerImage.addEventListener("load", resetViewerView);
+    refs.viewerImage.addEventListener("dblclick", resetViewerView);
+    refs.viewerImage.addEventListener("pointerdown", beginViewerDrag);
+    refs.foldToggleButton.addEventListener("click", togglePanelFold);
+    refs.foldRailButton.addEventListener("click", expandFoldedPanel);
+    refs.themeButton.addEventListener("click", cyclePanelTheme);
+    refs.closeButton.addEventListener("click", closePanel);
+    refs.dragHandle.addEventListener("pointerdown", beginDrag);
+    refs.panel.addEventListener("pointerenter", expandFoldedPanel);
+    refs.panel.addEventListener("pointerleave", collapseFoldedPanel);
+    host.addEventListener("keydown", (event) => {
+      if (refs.viewer.hidden) return;
+      if (event.key === "Escape") closeImageViewer();
+      else if (event.key === "ArrowLeft") showViewerItemAt(state.viewerIndex - 1);
+      else if (event.key === "ArrowRight") showViewerItemAt(state.viewerIndex + 1);
+      else return;
+      event.preventDefault();
+    });
+    host.addEventListener(REVEAL_EVENT, () => {
+      host.dataset.panelHidden = "false";
+      setPanelFolded(false);
+      clampFloatingPanel();
+    });
+    host.addEventListener(PANEL_NAVIGATED_EVENT, closePanel);
+  }
 
   panelController = {
     version: PANEL_VERSION,
-    reveal() {
-      if (panelDestroyed) return;
-      host.dispatchEvent(new CustomEvent(REVEAL_EVENT));
-      document.dispatchEvent(new CustomEvent(PANEL_OPENED_EVENT));
-    },
-    destroy: closePanel,
+    open: openPanel,
+    destroy: destroyPanel,
   };
   globalThis[CONTROLLER_KEY] = panelController;
-  document.dispatchEvent(new CustomEvent(PANEL_OPENED_EVENT));
-  render();
-  collectCurrentPage();
 })();
