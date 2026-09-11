@@ -1,116 +1,103 @@
 /*
- * 配色取自中国传统色（zhongguose，526 色），夜为默认。
- *
- * 「刺眼」是两件事，本表分别处理：
- *   1) 场太黑、纸太白 —— 夜场从钢蓝 L*6.5 抬到暗蓝 #101f30 L*11.3，
- *      昼纸从近纯白 #fffef9 换成银白/汉白玉，两边都收窄了明度落差（晕光的来源）。
- *   2) 点缀太亮太艳 —— 五族点缀统一压低彩度（C* 32→16 起），
- *      填色对场的对比从 8.7:1 一路降到 6.2–6.8:1，按钮不再自己发光。
- * 「看不清」是描边与面层没有台阶：旧 --border 对场只有 1.26:1、
- *   输入框底只有 1.06:1，等于没画。现在描边走晚波蓝/锌灰，
- *   控件轮廓一律 >=3:1（WCAG UI 部件下限），分隔线 1.5–1.8:1 只作装饰。
- *
- * 夜：场=暗蓝 #101f30，面=鸽蓝，起层=青灰，纸感文字=银鱼白（对场 10.8:1，护眼区间而非 16:1）
- * 昼：纸=银白 #f1f0ed，面=汉白玉 #f8f4ed，墨=青灰（对纸 11.2:1）
- * 三色分工：场（暗蓝/银白）铺满，面（鸽蓝/汉白玉）承托，点缀只给可点元件。
- * 点缀分五族，按视图族切换 --accent，见下方两个主题块之后的 [data-view-family]。
- * 朱红只作印章，尘灰/苍黄只走细线，不填面。「后素功」——素底先立，点缀到此为止。
+ * 夜色以用户指定的纯黑 #000000 铺底；面层只混入 6%–12% 的中国传统色，
+ * 用山梗紫、秋波蓝、粉绿与朱红做出仍然读作黑色的冷暖层次。
+ * 魏紫 #7e1671 用于关键操作，山梗紫 #61649f 只用于焦点与细线。
  */
 :root {
   color-scheme: dark;
   --font-ui: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
-  --bg: #101f30;
-  --bg-soft: #142334;
-  --panel: rgba(28, 41, 56, 0.9);
-  --panel-soft: rgba(205, 209, 211, 0.05);
-  /* 分隔线只需看得见（1.7:1）；控件轮廓走 --border-strong，对场 3.76:1、
-     对青灰起层 3.00:1，刚好压住 UI 部件的 3:1 下限。旧值 0.18/0.32 是 1.26/1.59，等于没画。 */
-  --border: rgba(100, 142, 147, 0.4);
-  --border-strong: rgba(100, 142, 147, 0.86);
-  --text: #cdd1d3;
-  --muted: #9fa39a;
-  --accent: #7cabb1;
-  --accent-soft: color-mix(in srgb, var(--accent) 20%, transparent);
-  --accent-fg: #101f30;
-  --accent-hover: color-mix(in srgb, var(--accent) 88%, #cdd1d3);
-  /* 夜：CTA 渐变第二停靠点往场里压深；昼：往墨里压深。见 .generate-button */
-  --accent-deep-mix: #101f30;
+  --black-violet: color-mix(in srgb, #000000 90%, #61649f);
+  --black-blue: color-mix(in srgb, #000000 88%, #8abcd1);
+  --black-green: color-mix(in srgb, #000000 92%, #83cbac);
+  --black-red: color-mix(in srgb, #000000 94%, #ed5126);
+  --bg: #000000;
+  --bg-soft: var(--black-blue);
+  --panel: var(--black-violet);
+  --panel-soft: var(--black-red);
+  --border: color-mix(in srgb, #000000 64%, #737c7b);
+  --border-strong: color-mix(in srgb, #000000 22%, #737c7b);
+  --text: #f1f0ed;
+  --muted: #a49c93;
+  --accent: #7e1671;
+  --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
+  --accent-fg: #f1f0ed;
+  --accent-hover: #8b2671;
+  --accent-active: #461629;
+  --accent-deep-mix: #310f1b;
   --seal: #ed5126;
-  --gold: #b6a476;
-  --success: #68b88e;
-  --warning: #de9e44;
-  --info: #66a9c9;
-  --danger: #f19790;
-  /* 时间线元信息：四个语义槽各借一族的族色，均在面层上 >=4.5:1 */
-  --meta-mode: #66a9c9;
-  --meta-size: #c08eaf;
-  --meta-time: #b6a476;
-  --meta-relay: #7cabb1;
-  --shadow: 0 28px 90px rgba(4, 8, 16, 0.42);
-  --overlay-surface-bg: linear-gradient(180deg, rgba(28, 41, 56, 0.96), rgba(16, 31, 48, 0.96)), rgba(16, 31, 48, 0.96);
-  --overlay-surface-bg-soft: rgba(20, 35, 52, 0.78);
-  --overlay-media-bg: rgba(8, 16, 26, 0.62);
-  --overlay-border: rgba(100, 142, 147, 0.32);
-  --overlay-border-muted: rgba(100, 142, 147, 0.2);
-  --overlay-shadow: 0 24px 80px rgba(4, 8, 16, 0.44);
-  --overlay-inset-highlight: inset 0 1px 0 rgba(205, 209, 211, 0.07);
-  --overlay-scrim: rgba(8, 16, 26, 0.52);
-  --overlay-strong-scrim: rgba(6, 12, 20, 0.62);
-  --overlay-viewer-scrim: rgba(4, 8, 14, 0.74);
+  --ornament: #61649f;
+  --success: #83cbac; /* 粉绿：兼作小字号状态文字 */
+  --warning: #ffd111;
+  --info: #8abcd1; /* 秋波蓝 */
+  --danger: #f2b9b2; /* 粉红 */
+  --meta-mode: #8abcd1;
+  --meta-size: #61649f;
+  --meta-time: #8abcd1;
+  --meta-relay: #83cbac;
+  --shadow: 0 28px 90px rgba(0, 0, 0, 0.82);
+  --overlay-surface-bg: linear-gradient(145deg, var(--black-violet), var(--black-blue) 52%, var(--black-red)), #000000;
+  --overlay-surface-bg-soft: var(--black-blue);
+  --overlay-media-bg: rgba(0, 0, 0, 0.88);
+  --overlay-border: color-mix(in srgb, #000000 46%, #737c7b);
+  --overlay-border-muted: color-mix(in srgb, #000000 68%, #737c7b);
+  --overlay-shadow: 0 24px 80px rgba(0, 0, 0, 0.9);
+  --overlay-inset-highlight: inset 0 1px 0 rgba(241, 240, 237, 0.07);
+  --overlay-scrim: rgba(0, 0, 0, 0.72);
+  --overlay-strong-scrim: rgba(0, 0, 0, 0.82);
+  --overlay-viewer-scrim: rgba(0, 0, 0, 0.92);
   --gallery-panel-height: calc(100svh - 132px);
   --scrollbar-size: 10px;
-  --scrollbar-track-color: rgba(205, 209, 211, 0.06);
-  --scrollbar-track-color-hover: rgba(205, 209, 211, 0.09);
-  --scrollbar-thumb-color: rgba(100, 142, 147, 0.52);
-  --scrollbar-thumb-color-strong: rgba(159, 163, 154, 0.66);
-  --scrollbar-thumb-shadow: rgba(20, 35, 52, 0.34);
-  --topbar-bg: rgba(16, 31, 48, 0.88);
-  --topbar-border: rgba(100, 142, 147, 0.24);
-  --topbar-shadow: 0 18px 54px rgba(4, 8, 16, 0.28);
+  --scrollbar-track-color: color-mix(in srgb, #000000 80%, #61649f);
+  --scrollbar-track-color-hover: color-mix(in srgb, #000000 72%, #8abcd1);
+  --scrollbar-thumb-color: color-mix(in srgb, #000000 36%, #737c7b);
+  --scrollbar-thumb-color-strong: color-mix(in srgb, #000000 18%, #a49c93);
+  --scrollbar-thumb-shadow: rgba(0, 0, 0, 0.72);
+  --topbar-bg: rgba(0, 0, 0, 0.94);
+  --topbar-border: color-mix(in srgb, #000000 64%, #737c7b);
+  --topbar-shadow: 0 18px 54px rgba(0, 0, 0, 0.72);
   --topbar-trigger-height: 10px;
-  --nav-tab-bg: rgba(20, 35, 52, 0.84);
-  --nav-tab-bg-hover: rgba(43, 51, 62, 0.92);
-  --nav-tab-border: rgba(100, 142, 147, 0.22);
-  --nav-tab-border-strong: rgba(100, 142, 147, 0.36);
-  --nav-tab-active: #68b88e;
-  --nav-tab-idle: #9fa39a;
-  /* 控件与输入框改用晚波蓝兑场，而不是银鱼白兑场：旧值对场只有 1.06–1.08:1，
-     输入框在深色里几乎看不出是个可填的槽。轮廓仍由 --border-strong 承担 3:1。 */
-  --control-bg: rgba(100, 142, 147, 0.14);
-  --control-bg-hover: rgba(100, 142, 147, 0.22);
-  --input-bg: rgba(100, 142, 147, 0.12);
-  --input-bg-focus: rgba(100, 142, 147, 0.18);
-  --flyout-bg: rgba(16, 31, 48, 0.97);
+  --nav-tab-bg: var(--black-violet);
+  --nav-tab-bg-hover: color-mix(in srgb, #000000 80%, #8abcd1);
+  --nav-tab-border: color-mix(in srgb, #000000 64%, #737c7b);
+  --nav-tab-border-strong: color-mix(in srgb, #000000 36%, #737c7b);
+  --nav-tab-active: var(--accent);
+  --nav-tab-idle: #a49c93;
+  --control-bg: var(--black-blue);
+  --control-bg-hover: color-mix(in srgb, #000000 78%, #61649f);
+  --input-bg: var(--black-green);
+  --input-bg-focus: color-mix(in srgb, #000000 82%, #8abcd1);
+  --flyout-bg: var(--black-violet);
   --flyout-text: var(--text);
   --flyout-muted: var(--muted);
   --flyout-border: var(--border);
   --active-tab-bg: color-mix(in srgb, var(--accent) 14%, transparent);
-  --preview-stage-bg: rgba(100, 142, 147, 0.08);
-  --preview-canvas-border: rgba(100, 142, 147, 0.22);
+  --preview-stage-bg: var(--black-green);
+  --preview-canvas-border: color-mix(in srgb, #000000 58%, #737c7b);
   --preview-canvas-bg:
-    radial-gradient(circle at top, rgba(205, 209, 211, 0.05), transparent 40%),
-    rgba(8, 16, 26, 0.62);
+    radial-gradient(circle at top left, rgba(97, 100, 159, 0.12), transparent 42%),
+    radial-gradient(circle at bottom right, rgba(237, 81, 38, 0.08), transparent 45%),
+    #000000;
   --preview-canvas-bg-size: auto;
-  --preview-canvas-inset: inset 0 1px 0 rgba(205, 209, 211, 0.05);
-  --preview-image-shadow: 0 18px 64px rgba(4, 8, 16, 0.32);
-  --portrait-accessory-asset-text: #cdd1d3;
-  --portrait-accessory-asset-muted: #9fa39a;
-  --portrait-accessory-asset-border: rgba(100, 142, 147, 0.32);
-  --portrait-accessory-asset-border-strong: rgba(100, 142, 147, 0.52);
-  --portrait-accessory-asset-panel-bg: linear-gradient(180deg, rgba(28, 41, 56, 0.98), rgba(16, 31, 48, 0.98));
-  --portrait-accessory-asset-head-bg: linear-gradient(90deg, rgba(43, 51, 62, 0.94), rgba(20, 35, 52, 0.62));
-  --portrait-accessory-asset-tab-bg: rgba(100, 142, 147, 0.1);
+  --preview-canvas-inset: inset 0 1px 0 rgba(241, 240, 237, 0.05);
+  --preview-image-shadow: 0 18px 64px rgba(0, 0, 0, 0.86);
+  --portrait-accessory-asset-text: #f1f0ed;
+  --portrait-accessory-asset-muted: #a49c93;
+  --portrait-accessory-asset-border: color-mix(in srgb, #000000 58%, #737c7b);
+  --portrait-accessory-asset-border-strong: color-mix(in srgb, #000000 30%, #737c7b);
+  --portrait-accessory-asset-panel-bg: linear-gradient(145deg, var(--black-violet), var(--black-blue) 52%, var(--black-red));
+  --portrait-accessory-asset-head-bg: linear-gradient(90deg, var(--black-red), var(--black-violet));
+  --portrait-accessory-asset-tab-bg: var(--black-blue);
   --portrait-accessory-asset-tab-active-bg: linear-gradient(180deg, color-mix(in srgb, var(--accent) 32%, transparent), color-mix(in srgb, var(--accent) 12%, transparent));
-  --portrait-accessory-asset-card-bg: rgba(100, 142, 147, 0.1);
-  --portrait-accessory-asset-card-hover-bg: linear-gradient(180deg, color-mix(in srgb, var(--accent) 16%, transparent), rgba(100, 142, 147, 0.08));
-  --portrait-accessory-asset-control-bg: rgba(100, 142, 147, 0.16);
+  --portrait-accessory-asset-card-bg: var(--black-green);
+  --portrait-accessory-asset-card-hover-bg: linear-gradient(180deg, color-mix(in srgb, var(--accent) 12%, transparent), var(--black-violet));
+  --portrait-accessory-asset-control-bg: var(--black-blue);
   --portrait-accessory-asset-image-bg: rgba(241, 240, 237, 0.92);
-  --portrait-accessory-asset-shadow: 0 28px 72px rgba(4, 8, 16, 0.46), inset 0 1px 0 rgba(205, 209, 211, 0.07);
+  --portrait-accessory-asset-shadow: 0 28px 72px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(241, 240, 237, 0.07);
   --type-title-size: 1.02rem;
   --type-small-title-size: 0.9rem;
   --type-body-size: 0.86rem;
   --type-subtitle-size: 0.78rem;
-  --panel-strong: #2b333e; /* 青灰：记录与导出面层，比鸽蓝面再抬一级 */
+  --panel-strong: var(--black-blue);
 }
 
 html[data-theme="light"] {
@@ -207,27 +194,14 @@ html[data-theme="light"] {
 }
 
 /*
- * 五族点缀：骨架（场/面/文字/描边）全站共用，只换 --accent。
- * 同族视图共享一个点缀色，相邻族在色相上是亲戚，不是陌生人。
- *   生成 create  闪蓝 #7cabb1 / 玉鈫蓝 #126e82   H210/226  作图、风格迁移
- *   解析 analyse 涧石蓝 #66a9c9 / 搪磁蓝 #11659a   H241/265  参考解析、图片拆解
- *   修编 edit    松霜绿 #83a78d / 荷叶绿 #1a6840  H152/154  改图、合图、压缩
- *   成套 suite   萝兰紫 #c08eaf / 蕈紫 #815c94    H338/316  套图、写真、文章、PPT
- *   存档 archive 尘灰 #b6a476 / 苍黄 #806332      H 91/ 80  图库与各类记录
- *
- * 夜色这五支是这次「不刺眼」的主要落点：彩度整体压下来
- *   石绿 C*32 -> 闪蓝 C*16、蛙绿 C*46 -> 松霜绿 C*20、淡灰绿 C*35 -> 尘灰 C*26，
- * 填色对场的对比从 6.1–8.7:1 收到 6.1–6.8:1，按钮自己不再发光；
- * 同时每一支在青灰起层上仍有 >=4.7:1，因为 --accent 也当文字色用。
- * 昼色五支不动：实测在新纸上是 4.7–6.2:1，本来就够，问题不在点缀而在纸和描边。
- * 选择器带 [data-theme] 以压过主题块，两族选择器权重相同，互不干扰。
- * --accent-soft / --accent-hover / CTA 渐变都由 --accent 派生，故此处只需一行。
+ * 深色各视图共用魏紫，避免切换功能时把大面积冷暖色带进黑色主题。
+ * 浅色主题仍保留原有的分视图色彩，选择器带 [data-theme] 以压过主题块。
  */
-html[data-theme="dark"][data-view-family="create"] { --accent: #7cabb1; }
-html[data-theme="dark"][data-view-family="analyse"] { --accent: #66a9c9; }
-html[data-theme="dark"][data-view-family="edit"] { --accent: #83a78d; }
-html[data-theme="dark"][data-view-family="suite"] { --accent: #c08eaf; }
-html[data-theme="dark"][data-view-family="archive"] { --accent: #b6a476; }
+html[data-theme="dark"][data-view-family="create"] { --accent: #7e1671; }
+html[data-theme="dark"][data-view-family="analyse"] { --accent: #7e1671; }
+html[data-theme="dark"][data-view-family="edit"] { --accent: #7e1671; }
+html[data-theme="dark"][data-view-family="suite"] { --accent: #7e1671; }
+html[data-theme="dark"][data-view-family="archive"] { --accent: #7e1671; }
 
 html[data-theme="light"][data-view-family="create"] { --accent: #126e82; }
 html[data-theme="light"][data-view-family="analyse"] { --accent: #11659a; }
@@ -245,12 +219,7 @@ body {
   max-width: 100%;
   min-height: 100%;
   overflow-x: clip;
-  /* 左上那道族色光晕从 16% 收到 9%：它铺在整页上，点缀一旦见光就是全屏泛色，
-     也是「刺眼」里最容易被忽略的一层。渐变收在暗蓝，不再落到近黑的钢蓝。 */
-  background:
-    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 9%, transparent), transparent 26%),
-    radial-gradient(circle at bottom center, rgba(100, 142, 147, 0.1), transparent 30%),
-    linear-gradient(180deg, #142334 0%, #101f30 100%);
+  background: var(--bg);
   color: var(--text);
   font-size: var(--ui-root-font-size, 16px);
   font-family: var(--font-ui);
@@ -596,7 +565,7 @@ textarea::-webkit-scrollbar-corner {
   padding: var(--topbar-padding, 6px 10px 14px);
   border: 1px solid var(--topbar-border, var(--border));
   border-radius: 18px;
-  background: var(--topbar-bg, rgba(16, 31, 48, 0.86));
+  background: var(--topbar-bg, rgba(0, 0, 0, 0.94));
   box-shadow: var(--topbar-shadow, 0 18px 54px rgba(0, 0, 0, 0.22));
   backdrop-filter: blur(22px);
 }
@@ -634,7 +603,7 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .topbar:hover
 html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .topbar:focus-within,
 html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]).topbar-reveal .topbar,
 html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .topbar:has(.nav-item.is-nav-open) {
-  background: var(--topbar-bg, rgba(16, 31, 48, 0.86));
+  background: var(--topbar-bg, rgba(0, 0, 0, 0.94));
   border-color: var(--topbar-border, var(--border));
   box-shadow: var(--topbar-shadow, 0 18px 54px rgba(0, 0, 0, 0.22));
   opacity: 1;
@@ -812,7 +781,7 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .view-tab.act
 
 .brand-mark-core {
   inset: 18px;
-  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 62%, var(--gold)));
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 62%, var(--ornament)));
   border: 0;
   box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 50%, transparent);
 }
@@ -840,7 +809,7 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .view-tab.act
   padding: 0 10px;
   border-radius: 9px;
   background: color-mix(in srgb, var(--accent) 24%, transparent);
-  color: #cdd1d3;
+  color: var(--text);
   font-size: var(--type-subtitle-size);
   font-weight: 600;
 }
@@ -1388,17 +1357,17 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .generation-m
   gap: 8px;
   padding: 8px 10px;
   border: 1px solid var(--border);
-  border-color: color-mix(in srgb, var(--warning) 58%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 58%, transparent);
   border-radius: 8px;
   background:
-    linear-gradient(135deg, color-mix(in srgb, var(--warning) 22%, transparent), color-mix(in srgb, var(--success) 11%, transparent)),
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 22%, transparent), color-mix(in srgb, var(--success) 11%, transparent)),
     rgba(255, 255, 255, 0.045);
   color: var(--text);
   font-size: var(--type-subtitle-size);
   font-weight: 650;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.10),
-    0 12px 30px color-mix(in srgb, var(--warning) 10%, transparent);
+    0 12px 30px color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 .creation-listing-toggle input {
@@ -1724,7 +1693,7 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .generation-m
   width: 34px;
   height: 34px;
   flex: 0 0 auto;
-  color: var(--warning);
+  color: var(--accent);
 }
 
 .creation-logo-library-button svg {
@@ -1737,8 +1706,8 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .generation-m
 }
 
 .creation-logo-library-button[aria-expanded="true"] {
-  border-color: color-mix(in srgb, var(--warning) 46%, transparent);
-  background: color-mix(in srgb, var(--warning) 13%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 46%, transparent);
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
 }
 
 .creation-logo-library-panel {
@@ -1753,7 +1722,7 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .generation-m
   display: grid;
   gap: 9px;
   padding: 10px;
-  border: 1px solid color-mix(in srgb, var(--warning) 24%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
   border-radius: 10px;
   background: var(--overlay-surface-bg);
   box-shadow: var(--overlay-shadow);
@@ -1814,9 +1783,9 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .generation-m
   display: grid;
   place-items: center;
   padding: 0 12px;
-  border: 1px dashed color-mix(in srgb, var(--warning) 28%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--accent) 28%, transparent);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--warning) 8%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
   color: var(--text);
   font-size: var(--type-subtitle-size);
   font-weight: 700;
@@ -1844,12 +1813,12 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .generation-m
   padding: 6px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: rgba(16, 31, 48, 0.28);
+  background: var(--panel-soft);
 }
 
 .creation-saved-logo-card.selected {
-  border-color: color-mix(in srgb, var(--warning) 50%, transparent);
-  background: color-mix(in srgb, var(--warning) 10%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 .creation-saved-logo-select {
@@ -1894,7 +1863,7 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .generation-m
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 999px;
-  background: rgba(16, 31, 48, 0.78);
+  background: var(--black-violet);
   color: rgba(255, 255, 255, 0.82);
   cursor: pointer;
 }
@@ -2951,19 +2920,19 @@ ul.creation-plan-message {
 .creation-card:hover,
 .creation-card:focus-within {
   z-index: 1;
-  border-color: var(--warning);
+  border-color: var(--accent);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--warning) 28%, transparent),
-    0 0 16px color-mix(in srgb, var(--warning) 24%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent),
+    0 0 16px color-mix(in srgb, var(--accent) 24%, transparent);
 }
 
 .creation-card.is-idle-rippling::after {
   content: "";
   position: absolute;
   inset: -2px;
-  border: 1px solid color-mix(in srgb, var(--warning) 78%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 78%, transparent);
   border-radius: 10px;
-  box-shadow: 0 0 8px color-mix(in srgb, var(--warning) 28%, transparent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 28%, transparent);
   pointer-events: none;
   animation: creation-card-idle-ripple 1200ms ease-out both;
 }
@@ -3071,7 +3040,7 @@ ul.creation-plan-message {
   padding: 0 12px;
   border: 1px solid color-mix(in srgb, var(--accent) 18%, rgba(255, 255, 255, 0.08));
   border-radius: 999px;
-  background: rgba(16, 31, 48, 0.38);
+  background: var(--black-violet);
   color: var(--text);
 }
 
@@ -3750,7 +3719,7 @@ ul.creation-plan-message {
   border: 1px solid var(--asset-border, var(--border));
   border-radius: 7px;
   background: color-mix(in srgb, var(--asset-surface, var(--panel)) 94%, transparent);
-  box-shadow: 0 8px 22px rgba(16, 31, 48, 0.22);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.32);
   backdrop-filter: blur(12px);
 }
 
@@ -4338,7 +4307,7 @@ html[data-ui-layout="mobile"] .creation-listing-workspace-bar .asset-listing-act
   min-width: 92px;
   min-height: 36px;
   padding: 0 16px;
-  border: 1px solid color-mix(in srgb, var(--gold) 62%, var(--border));
+  border: 1px solid color-mix(in srgb, var(--ornament) 62%, var(--border));
   border-radius: 12px;
   background: var(--control-bg);
   color: var(--text);
@@ -4351,7 +4320,7 @@ html[data-ui-layout="mobile"] .creation-listing-workspace-bar .asset-listing-act
 
 .portrait-accessory-asset-button:hover,
 .portrait-accessory-asset-button:focus-visible {
-  border-color: color-mix(in srgb, var(--gold) 82%, var(--border));
+  border-color: color-mix(in srgb, var(--ornament) 82%, var(--border));
   background: var(--control-bg-hover);
   color: var(--text);
 }
@@ -4532,7 +4501,7 @@ html[data-ui-layout="mobile"] .creation-listing-workspace-bar .asset-listing-act
   top: 10px;
   left: 10px;
   z-index: 1;
-  box-shadow: 0 0 0 3px rgba(8, 10, 18, 0.5);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.5);
 }
 
 .portrait-style-grid label:has(input:checked),
@@ -4935,9 +4904,9 @@ html[data-ui-layout="mobile"] .creation-listing-workspace-bar .asset-listing-act
   height: 26px;
   display: inline-grid;
   place-items: center;
-  border: 1px solid rgba(205, 209, 211, 0.26);
+  border: 1px solid var(--border);
   border-radius: 999px;
-  background: rgba(16, 31, 48, 0.76);
+  background: var(--black-violet);
   color: #f1f0ed;
   font-size: 12px;
   font-weight: 800;
@@ -4953,7 +4922,7 @@ html[data-ui-layout="mobile"] .creation-listing-workspace-bar .asset-listing-act
 
 .article-image-order-badge.storyboard {
   border-color: color-mix(in srgb, var(--accent) 42%, transparent);
-  color: #cdd1d3;
+  color: var(--accent-fg);
 }
 
 .article-card-image img {
@@ -5751,7 +5720,7 @@ textarea {
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: #cdd1d3;
+  color: var(--text);
   font-style: normal;
 }
 
@@ -5825,7 +5794,7 @@ textarea {
   border-radius: 0;
   border: 0;
   background: color-mix(in srgb, var(--accent) 10%, transparent);
-  color: rgba(205, 209, 211, 0.9);
+  color: var(--text);
   font-size: 2.5rem;
   line-height: 1;
   font-weight: 300;
@@ -5891,25 +5860,25 @@ textarea {
 }
 
 .creation-reference-role option {
-  background: #fffef9;
-  color: #2b333e;
+  background: var(--bg-soft);
+  color: var(--text);
 }
 
 .creation-reference-bind {
   width: 100%;
   min-height: 30px;
   padding: 0 7px;
-  border: 1px solid color-mix(in srgb, var(--warning) 26%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, transparent);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--warning) 7%, transparent);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
   color: var(--text);
   font-size: var(--type-subtitle-size);
 }
 
 .creation-reference-bind:focus {
-  border-color: color-mix(in srgb, var(--warning) 44%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 44%, transparent);
   outline: none;
-  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 .creation-reference-note {
@@ -5954,7 +5923,7 @@ textarea {
   padding: 0;
   border-radius: 999px;
   border-color: rgba(255, 255, 255, 0.2);
-  background: rgba(16, 31, 48, 0.74);
+  background: var(--black-violet);
   color: rgba(255, 255, 255, 0.82);
   font-size: var(--type-small-title-size);
   line-height: 1;
@@ -6933,7 +6902,7 @@ html[data-ui-layout="mobile"] .image-decomposition-generation-canvas {
     linear-gradient(-45deg, rgba(255, 255, 255, 0.055) 25%, transparent 25%),
     linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.055) 75%),
     linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.055) 75%),
-    #142334;
+    var(--black-blue);
   background-position:
     0 0,
     0 12px,
@@ -7985,7 +7954,7 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
   border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.018)),
-    rgba(16, 31, 48, 0.74);
+    var(--panel);
 }
 
 .creation-industry-browser-head {
@@ -8360,7 +8329,7 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
   /* 主题整体偏移，与各阶段自己的起始亮度叠加，避免主题规则盖掉阶段调校。 */
   --generation-loading-light-shift: 0%;
   --generation-loading-aurora-opacity: 0.58;
-  --generation-loading-scrim: rgba(8, 11, 22, 0.42);
+  --generation-loading-scrim: rgba(0, 0, 0, 0.42);
   /* 百分比越高背景色越深，所以同一阶段内也能看出推进。 */
   --generation-loading-fluid: hsl(
     var(--generation-loading-hue) var(--generation-loading-sat)
@@ -8509,7 +8478,7 @@ html[data-theme="light"] .generation-loading-shell[data-generation-loading-famil
   color: color-mix(in srgb, #f1f0ed 88%, var(--generation-loading-fluid));
   filter:
     drop-shadow(0 0 5px color-mix(in srgb, var(--generation-loading-fluid) 48%, transparent))
-    drop-shadow(0 1px 2px rgba(4, 7, 14, 0.72));
+    drop-shadow(0 1px 2px rgba(0, 0, 0, 0.72));
   overflow: visible;
 }
 
@@ -8536,7 +8505,7 @@ html[data-theme="light"] .generation-loading-heartbeat {
   font-weight: 700;
   line-height: 1;
   text-shadow:
-    0 1px 2px rgba(4, 7, 14, 0.72),
+    0 1px 2px rgba(0, 0, 0, 0.72),
     0 0 12px color-mix(in srgb, var(--generation-loading-fluid) 52%, transparent);
 }
 
@@ -8579,7 +8548,7 @@ html[data-theme="light"] .generation-loading-shell[data-generation-loading-mode=
   font-weight: 600;
   letter-spacing: 0;
   line-height: 1.35;
-  text-shadow: 0 1px 2px rgba(4, 7, 14, 0.66);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.66);
 }
 
 html[data-theme="light"] .generation-loading-label {
@@ -8600,7 +8569,7 @@ html[data-theme="light"] .generation-loading-label {
   white-space: normal;
   overflow-wrap: anywhere;
   text-align: center;
-  text-shadow: 0 1px 2px rgba(4, 7, 14, 0.6);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 
 .generation-loading-log[hidden] {
@@ -8925,10 +8894,10 @@ html[data-ui-layout="mobile"] .filmstrip-selected-marker {
   display: grid;
   place-items: center;
   padding: 0;
-  border: 1px solid rgba(205, 209, 211, 0.22);
+  border: 1px solid var(--border);
   border-radius: 999px;
-  background: rgba(16, 31, 48, 0.9);
-  color: #cdd1d3;
+  background: var(--black-violet);
+  color: var(--accent-fg);
   font-size: var(--type-small-title-size);
   line-height: 1;
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.22);
@@ -8952,10 +8921,10 @@ html[data-ui-layout="mobile"] .filmstrip-selected-marker {
   display: grid;
   place-items: center;
   padding: 0 6px;
-  border: 1px solid rgba(205, 209, 211, 0.24);
+  border: 1px solid var(--border);
   border-radius: 999px;
-  background: rgba(16, 31, 48, 0.92);
-  color: #cdd1d3;
+  background: var(--black-violet);
+  color: var(--accent-fg);
   font-size: var(--type-small-title-size);
   line-height: 1;
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.22);
@@ -8965,7 +8934,7 @@ html[data-ui-layout="mobile"] .filmstrip-selected-marker {
 .filmstrip-deck-badge[aria-expanded="true"] {
   border-color: color-mix(in srgb, var(--accent) 62%, transparent);
   background: color-mix(in srgb, var(--accent) 26%, transparent);
-  color: #cdd1d3;
+  color: var(--accent-fg);
 }
 
 .filmstrip-entry.has-deck .filmstrip-item img {
@@ -8979,7 +8948,7 @@ html[data-ui-layout="mobile"] .filmstrip-selected-marker {
   padding: 6px;
   border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
   border-radius: 10px;
-  background: rgba(16, 31, 48, 0.72);
+  background: var(--black-violet);
 }
 
 .filmstrip-deck-card {
@@ -9027,8 +8996,8 @@ html[data-ui-layout="mobile"] .filmstrip-selected-marker {
   padding: 2px 4px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 6px;
-  background: rgba(16, 31, 48, 0.9);
-  color: #cdd1d3;
+  background: var(--black-violet);
+  color: var(--accent-fg);
   font-size: var(--type-small-title-size);
   line-height: 1.2;
 }
@@ -9100,8 +9069,8 @@ html[data-ui-layout="mobile"] .filmstrip-selected-marker {
   padding: 0 12px;
   border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent);
   border-radius: 999px;
-  background: rgba(20, 35, 52, 0.92);
-  color: #cdd1d3;
+  background: var(--black-violet);
+  color: var(--accent-fg);
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.22);
   backdrop-filter: blur(14px);
 }
@@ -9952,7 +9921,7 @@ html[data-ui-layout="mobile"] .filmstrip-selected-marker {
   border: 1px solid var(--border);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.015)),
-    rgba(20, 35, 52, 0.92);
+    var(--panel-soft);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -10060,7 +10029,7 @@ html[data-ui-layout="mobile"] .filmstrip-selected-marker {
   display: grid;
   gap: 6px;
   padding: 14px;
-  background: linear-gradient(180deg, transparent 0%, rgba(6, 10, 18, 0.94) 100%);
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.94) 100%);
 }
 
 .lightbox {
@@ -10310,7 +10279,7 @@ html[data-ui-layout="mobile"] .filmstrip-selected-marker {
   padding: 12px;
   border: 1px solid var(--overlay-border-muted);
   border-radius: 16px;
-  background: rgba(16, 31, 48, 0.48);
+  background: var(--overlay-surface-bg-soft);
   backdrop-filter: blur(16px);
 }
 
@@ -10529,7 +10498,7 @@ html[data-theme="light"] .lightbox-fields .detail-field {
   justify-content: center;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--success) 22%, transparent);
-  background: rgba(16, 31, 48, 0.72);
+  background: var(--black-violet);
   color: var(--success);
   font-size: var(--type-subtitle-size);
   font-weight: 600;
@@ -11693,13 +11662,13 @@ html[data-ui-layout="mobile"] .portrait-accessory-asset-panel {
 }
 
 .endpoint-suffix-select option {
-  background: #fffef9;
-  color: #2b333e;
+  background: var(--bg-soft);
+  color: var(--text);
 }
 
 .endpoint-suffix-select option:checked {
-  background: #c4cbcf;
-  color: #2b333e;
+  background: var(--control-bg-hover);
+  color: var(--text);
 }
 
 .inline-button {
@@ -13004,8 +12973,8 @@ html[data-ui-layout="mobile"] .adaptive-section-summary::after {
   width: 9px;
   height: 9px;
   margin-left: auto;
-  border-right: 2px solid rgba(205, 209, 211, 0.62);
-  border-bottom: 2px solid rgba(205, 209, 211, 0.62);
+  border-right: 2px solid color-mix(in srgb, var(--text) 62%, transparent);
+  border-bottom: 2px solid color-mix(in srgb, var(--text) 62%, transparent);
   transform: rotate(45deg) translate(-1px, -1px);
   transition: transform 160ms ease;
   flex: 0 0 auto;
@@ -13474,7 +13443,7 @@ html[data-ui-layout="tablet"].topbar-reveal .topbar,
 html[data-ui-layout="mobile"].topbar-reveal .topbar,
 html[data-ui-layout="tablet"] .topbar:has(.nav-item.is-nav-open),
 html[data-ui-layout="mobile"] .topbar:has(.nav-item.is-nav-open) {
-  background: var(--topbar-bg, rgba(16, 31, 48, 0.86));
+  background: var(--topbar-bg, rgba(0, 0, 0, 0.94));
   border-color: var(--topbar-border, var(--border));
   box-shadow: var(--topbar-shadow, 0 18px 54px rgba(0, 0, 0, 0.22));
   opacity: 1;
@@ -13862,7 +13831,7 @@ html[data-ui-layout="narrow-desktop"] .ppt-workspace {
   aspect-ratio: 16 / 9;
   overflow: hidden;
   border-radius: 6px;
-  background: rgba(16, 31, 48, 0.78);
+  background: var(--panel);
   color: var(--muted);
   text-align: center;
 }
@@ -14044,7 +14013,7 @@ html[data-ui-layout="narrow-desktop"] .ppt-workspace {
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
   border-radius: 8px;
-  background: rgba(4, 7, 16, 0.42);
+  background: var(--preview-stage-bg);
   aspect-ratio: 16 / 9;
 }
 
@@ -14102,7 +14071,7 @@ html[data-ui-layout="narrow-desktop"] .ppt-workspace {
   aspect-ratio: 16 / 9;
   object-fit: cover;
   border-radius: 6px;
-  background: rgba(4, 7, 16, 0.5);
+  background: var(--overlay-media-bg);
 }
 
 .ppt-record-slide-button span {
@@ -16667,7 +16636,7 @@ html[data-ui-layout="tablet"] .lightbox-fields .detail-field {
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.32);
   border-radius: 6px;
-  background: rgba(16, 31, 48, 0.78);
+  background: var(--black-violet);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.24);
   cursor: pointer;
 }
@@ -16676,7 +16645,7 @@ html[data-ui-layout="tablet"] .lightbox-fields .detail-field {
 .gallery-tile-select:focus-within,
 .gallery-tile-shell.is-checked .gallery-tile-select {
   border-color: var(--asset-selected-border);
-  background: color-mix(in srgb, var(--asset-selected) 82%, rgba(16, 31, 48, 0.9));
+  background: color-mix(in srgb, var(--asset-selected) 82%, var(--panel));
 }
 
 .asset-record-delete-dialog {
@@ -16747,12 +16716,20 @@ html[data-ui-layout="mobile"] .ppt-record-feedback {
 }
 
 #surprisePromptButton {
+  color: var(--accent);
   font-size: 13px;
   line-height: 1;
 }
 
 .prompt-template-icon {
   display: block;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
   transform: translateY(-0.25px);
 }
 
@@ -17452,7 +17429,7 @@ html[data-ui-layout="mobile"] .creation-record-browser .asset-record-picker.is-o
   z-index: 60;
   display: flex;
   flex-direction: column;
-  background: var(--bg, #101f30);
+  background: var(--bg, #000000);
 }
 
 /* 宿主的 span/按钮外边距规则优先级高于单类选择器，会吃掉 inset:0 图层顶部一条，
@@ -17491,9 +17468,9 @@ html[data-ui-layout="mobile"] .creation-record-browser .asset-record-picker.is-o
 }
 
 .temu-workbench-tab[aria-selected="true"] {
-  color: var(--text, #cdd1d3);
+  color: var(--text, #f1f0ed);
   border-color: var(--border-strong);
-  background: var(--panel-soft, rgba(205, 209, 211, 0.05));
+  background: var(--panel-soft, rgba(0, 0, 0, 0.05));
 }
 
 .temu-workbench-frame {
@@ -17573,11 +17550,11 @@ html[data-ui-layout="mobile"] .creation-record-browser .asset-record-picker.is-o
 }
 
 /*
- * 界面点缀小元素。规矩：金只走线不填面，朱只作印不铺底，每一处都很小。
+ * 界面点缀小元素。规矩：紫蓝只走线不填面，朱只作印不铺底，每一处都很小。
  * 全部静态，无动画，因此不需要 prefers-reduced-motion 分支。
  */
 
-/* 金线：顶栏下沿一道 1px 淡灰绿/苍黄细线，压在既有描边之上，只在明显处提一下 */
+/* 紫蓝细线：顶栏下沿一道 1px 山梗紫细线，压在既有描边之上，只在明显处提一下 */
 .topbar::after {
   content: "";
   position: absolute;
@@ -17589,9 +17566,9 @@ html[data-ui-layout="mobile"] .creation-record-browser .asset-record-picker.is-o
   background: linear-gradient(
     90deg,
     transparent 0%,
-    color-mix(in srgb, var(--gold) 26%, transparent) 18%,
-    color-mix(in srgb, var(--gold) 34%, transparent) 50%,
-    color-mix(in srgb, var(--gold) 26%, transparent) 82%,
+    color-mix(in srgb, var(--ornament) 26%, transparent) 18%,
+    color-mix(in srgb, var(--ornament) 34%, transparent) 50%,
+    color-mix(in srgb, var(--ornament) 26%, transparent) 82%,
     transparent 100%
   );
   pointer-events: none;
@@ -17629,4 +17606,30 @@ html[data-ui-layout="mobile"] .creation-record-browser .asset-record-picker.is-o
 .generate-button:hover:not(:disabled) {
   background: linear-gradient(135deg, var(--accent-hover) 0%, var(--accent) 100%);
   border-color: color-mix(in srgb, var(--accent-hover) 58%, var(--border));
+}
+
+/* 深色主操作使用完整的具名色，保证常态、悬停、按下时的文字对比。 */
+html:not([data-theme="light"]) .generate-button {
+  background: var(--accent);
+}
+
+html:not([data-theme="light"]) .generate-button:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+html:not([data-theme="light"]) .generate-button:active:not(:disabled) {
+  background: var(--accent-active);
+}
+
+html:not([data-theme="light"]) .product-image-import-card.is-selected,
+html:not([data-theme="light"]) .product-image-import-card.is-selected .product-image-import-media {
+  border-color: var(--accent);
+}
+
+html:not([data-theme="light"]) .product-image-import-card.is-selected .product-image-import-media {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+html:not([data-theme="light"]) .product-image-import-card.is-selected input {
+  accent-color: var(--accent);
 }

@@ -352,9 +352,8 @@ test("config drawer shows image route settings as exclusive mode tabs", async ()
   assert.match(styles, /\.route-config-panel\s*\{[\s\S]*display:\s*grid;/);
   assert.match(styles, /\.endpoint-address-control\s*\{/);
   assert.match(styles, /\.endpoint-suffix-select\s*\{/);
-  // option 弹窗由操作系统绘制，必须显式给不透明底色与字色，否则暗色下白底白字。
-  // 色值取库内 雪白/青灰（12.64:1），不用纯 #ffffff。
-  assert.match(styles, /\.endpoint-suffix-select option\s*\{[\s\S]*background:\s*#fffef9;[\s\S]*color:\s*#2b333e;/);
+  // option 弹窗由操作系统绘制，必须显式给不透明底色与字色，并随主题切换。
+  assert.match(styles, /\.endpoint-suffix-select option\s*\{[\s\S]*background:\s*var\(--bg-soft\);[\s\S]*color:\s*var\(--text\);/);
   assert.match(
     styles,
     /\.config-form:has\(input\[name="imageRoute"\]\[value="a"\]:checked\)\s*\[data-route-panel="b"\]/,

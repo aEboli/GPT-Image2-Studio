@@ -30,7 +30,7 @@ const generationClientPath = new URL("../lib/generation-client.mjs", import.meta
 const generationLogPanelPath = new URL("../lib/generation-log-panel.mjs", import.meta.url);
 const generationLogStorePath = new URL("../lib/generation-log-store.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20260910-zhongguose-calm-1";
+const stylesAssetVersion = "20260911-imperial-black-3";
 const appAssetVersion = "20260909-api-endpoint-book-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
 const creationQueueModuleAssetVersion = "20260829-generation-schedule-1";
@@ -1120,7 +1120,7 @@ test("prompt studio exposes independent clear and reference-recycling controls",
   clearButtonMarkup.forEach((markup) => assert.doesNotMatch(markup, /×/));
   assert.match(
     html,
-    /id="surprisePromptButton"[\s\S]*aria-label="提示词模板"[\s\S]*data-tooltip="提示词模板"[\s\S]*<span class="prompt-template-icon" aria-hidden="true">⭐<\/span>/,
+    /id="surprisePromptButton"[\s\S]*aria-label="提示词模板"[\s\S]*data-tooltip="提示词模板"[\s\S]*<svg class="prompt-template-icon lucide lucide-sparkles" viewBox="0 0 24 24"[\s\S]*aria-hidden="true" focusable="false">[\s\S]*<path d="M11\.017 2\.814/,
   );
   assert.match(html, /id="previewAddReferenceButton"[\s\S]*>添加到参考图<\/button>/);
   assert.match(html, /id="previewAddReferenceButton"[\s\S]*aria-disabled="true"/);
@@ -1165,7 +1165,7 @@ test("prompt studio exposes independent clear and reference-recycling controls",
   assert.match(app, /refs\.previewAddReferenceButton\.getAttribute\("aria-disabled"\) === "true"[\s\S]*return;/);
   assert.match(styles, /\.field-heading-icon-button\s*\{[\s\S]*width:\s*24px;[\s\S]*height:\s*24px;[\s\S]*border-radius:\s*7px;/);
   assert.match(styles, /\.field-clear-icon\s*\{[\s\S]*width:\s*14px;[\s\S]*fill:\s*none;[\s\S]*stroke:\s*currentColor;[\s\S]*stroke-width:\s*1\.8;[\s\S]*stroke-linecap:\s*round;/);
-  assert.match(styles, /#surprisePromptButton\s*\{[\s\S]*font-size:\s*13px;[\s\S]*line-height:\s*1;/);
+  assert.match(styles, /#surprisePromptButton\s*\{[\s\S]*color:\s*var\(--accent\);[\s\S]*font-size:\s*13px;[\s\S]*line-height:\s*1;/);
   assert.match(styles, /\.field-clear-button:focus-visible\s*\{[\s\S]*outline:\s*2px solid/);
   assert.match(
     styles,
@@ -2278,12 +2278,12 @@ test("top navigation groups functions into an Apple-style global mega menu", asy
   assert.match(styles, /html:not\(\[data-ui-layout="tablet"\]\):not\(\[data-ui-layout="mobile"\]\) \.brand-cluster,[\s\S]*\.topbar-api-check,[\s\S]*\.topbar-ghost-actions,[\s\S]*\.nav-tab-note\s*\{[\s\S]*display:\s*none;/);
   assert.match(styles, /html:not\(\[data-ui-layout="tablet"\]\):not\(\[data-ui-layout="mobile"\]\) \.global-nav\s*\{[\s\S]*position:\s*static;[\s\S]*width:\s*auto;[\s\S]*transform:\s*none;/);
   assert.match(styles, /html:not\(\[data-ui-layout="tablet"\]\):not\(\[data-ui-layout="mobile"\]\) \.view-tabs\s*\{[\s\S]*border:\s*0;[\s\S]*background:\s*transparent;[\s\S]*box-shadow:\s*none;/);
-  assert.match(styles, /--nav-tab-bg:\s*rgba\(20,\s*35,\s*52,\s*0\.84\);[\s\S]*--nav-tab-active:\s*#68b88e;[\s\S]*--nav-tab-idle:\s*#9fa39a;/);
+  assert.match(styles, /--bg:\s*#000000;[\s\S]*--accent:\s*#7e1671;[\s\S]*--nav-tab-bg:\s*var\(--black-violet\);[\s\S]*--nav-tab-active:\s*var\(--accent\);[\s\S]*--nav-tab-idle:\s*#a49c93;/);
   assert.match(styles, /html:not\(\[data-ui-layout="tablet"\]\):not\(\[data-ui-layout="mobile"\]\) \.view-tab\s*\{[\s\S]*min-width:\s*92px;[\s\S]*min-height:\s*30px;[\s\S]*border-radius:\s*10px;[\s\S]*var\(--nav-tab-idle\)\s*22%,\s*var\(--nav-tab-bg\)/);
   assert.match(styles, /\.view-tab\.active\s*\{[\s\S]*var\(--nav-tab-active\)\s*28%,\s*var\(--nav-tab-bg\)[\s\S]*var\(--nav-tab-active\)\s*12%,\s*var\(--nav-tab-bg\)[\s\S]*color:\s*var\(--nav-tab-active\);/);
   assert.match(styles, /html:not\(\[data-ui-layout="tablet"\]\):not\(\[data-ui-layout="mobile"\]\) \.view-tab\.active::after\s*\{[\s\S]*background:\s*var\(--nav-tab-active\);/);
   assert.match(styles, /html:not\(\[data-ui-layout="tablet"\]\):not\(\[data-ui-layout="mobile"\]\) \.view-tab::after\s*\{[\s\S]*height:\s*4px;[\s\S]*background:\s*var\(--nav-tab-idle\);[\s\S]*opacity:\s*0\.86;/);
-  assert.match(styles, /--flyout-bg:\s*rgba\(16,\s*31,\s*48,\s*0\.97\);[\s\S]*--flyout-text:\s*var\(--text\);/);
+  assert.match(styles, /--flyout-bg:\s*var\(--black-violet\);[\s\S]*--flyout-text:\s*var\(--text\);/);
   assert.match(styles, /html\[data-theme="light"\]\s*\{[\s\S]*--flyout-bg:\s*rgba\(248,\s*244,\s*237,\s*0\.97\);[\s\S]*--flyout-text:\s*var\(--text\);/);
   assert.match(styles, /\.nav-flyout\.mega-menu\s*\{[\s\S]*width:\s*min\(680px,\s*calc\(100vw - 32px\)\);[\s\S]*padding:\s*24px;/);
   assert.match(styles, /\.mega-menu-grid\s*\{[\s\S]*grid-template-columns:\s*minmax\(170px,\s*1\.35fr\)\s+repeat\(2,\s*minmax\(120px,\s*1fr\)\);/);
@@ -4211,8 +4211,8 @@ test("creation mode has product references without a separate style-reference mo
 
   assert.match(styles, /\.creation-reference-grid\s*\{/);
   assert.match(styles, /\.creation-reference-role\s*\{/);
-  // option 弹窗由操作系统绘制，必须显式给不透明底色与字色；色值取库内 雪白/青灰。
-  assert.match(styles, /\.creation-reference-role option\s*\{[\s\S]*background:\s*#fffef9;[\s\S]*color:\s*#2b333e;/);
+  // option 弹窗由操作系统绘制，必须显式给不透明底色与字色，并随主题切换。
+  assert.match(styles, /\.creation-reference-role option\s*\{[\s\S]*background:\s*var\(--bg-soft\);[\s\S]*color:\s*var\(--text\);/);
   assert.match(styles, /#creationProductNameInput,\s*#creationSellingPointsInput,\s*#creationDimensionSpecsInput\s*\{[\s\S]*height:\s*44px;/);
   assert.match(styles, /#creationProductDescriptionInput\s*\{[\s\S]*height:\s*72px;/);
   assert.match(styles, /#creationProductDescriptionInput,\s*#creationSellingPointsInput,\s*#creationDimensionSpecsInput\s*\{[\s\S]*overflow-y:\s*hidden;[\s\S]*resize:\s*vertical;/);
@@ -4274,8 +4274,8 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(creationToggleControlRule, /box-sizing:\s*border-box;/);
   const creationListingToggleRule = readCssRule(styles, ".creation-listing-toggle");
   assert.match(creationListingToggleRule, /min-height:\s*40px;/);
-  assert.match(creationListingToggleRule, /border-color:\s*color-mix\(in srgb, var\(--warning\) 58%, transparent\);/);
-  assert.match(creationListingToggleRule, /linear-gradient\(135deg,\s*color-mix\(in srgb, var\(--warning\) 22%, transparent\),\s*color-mix\(in srgb, var\(--success\) 11%, transparent\)\)/);
+  assert.match(creationListingToggleRule, /border-color:\s*color-mix\(in srgb, var\(--accent\) 58%, transparent\);/);
+  assert.match(creationListingToggleRule, /linear-gradient\(135deg,\s*color-mix\(in srgb, var\(--accent\) 22%, transparent\),\s*color-mix\(in srgb, var\(--success\) 11%, transparent\)\)/);
   assert.doesNotMatch(readCssRule(styles, ".creation-listing-toggle.is-prominent"), /grid-column|min-height/);
   const creationListingToggleTextRule = readCssRule(styles, ".creation-listing-toggle span");
   assert.match(creationListingToggleTextRule, /font-size:\s*clamp\(0\.72rem,\s*8\.5cqw,\s*var\(--type-body-size\)\);/);
@@ -4875,7 +4875,7 @@ test("creation mode exposes record detail and item repair actions", async () => 
   );
   assert.match(
     styles,
-    /\.creation-card:hover,\s*\.creation-card:focus-within\s*\{[\s\S]*border-color:\s*var\(--warning\);[\s\S]*box-shadow:\s*0\s+0\s+0\s+1px\s+color-mix\(in srgb, var\(--warning\) 28%, transparent\),\s*0\s+0\s+16px\s+color-mix\(in srgb, var\(--warning\) 24%, transparent\);/,
+    /\.creation-card:hover,\s*\.creation-card:focus-within\s*\{[\s\S]*border-color:\s*var\(--accent\);[\s\S]*box-shadow:\s*0\s+0\s+0\s+1px\s+color-mix\(in srgb, var\(--accent\) 28%, transparent\),\s*0\s+0\s+16px\s+color-mix\(in srgb, var\(--accent\) 24%, transparent\);/,
   );
   assert.match(styles, /\.creation-card-head\s*\{[\s\S]*min-width:\s*0;/);
   assert.match(styles, /\.creation-card-head strong\s*\{[\s\S]*font-size:\s*0\.82rem;[\s\S]*white-space:\s*nowrap;/);

@@ -235,7 +235,7 @@ test("portrait accessory asset library inserts real image assets into accessory 
   assert.match(styles, /\.portrait-accessory-asset-panel\s*\{[\s\S]*font-family:\s*var\(--font-ui\);[\s\S]*background:/);
   assert.match(
     styles,
-    /:root\s*\{[\s\S]*--portrait-accessory-asset-panel-bg:\s*linear-gradient\(180deg,\s*rgba\(28,\s*41,\s*56,\s*0\.98\),\s*rgba\(16,\s*31,\s*48,\s*0\.98\)\)/,
+    /:root\s*\{[\s\S]*--portrait-accessory-asset-panel-bg:\s*linear-gradient\(145deg,\s*var\(--black-violet\),\s*var\(--black-blue\)\s*52%,\s*var\(--black-red\)\)/,
   );
   // 昼色下这块保留"纸/木"暖皮，但换成库内的 汉白玉/粉白/蚌肉白
   assert.match(

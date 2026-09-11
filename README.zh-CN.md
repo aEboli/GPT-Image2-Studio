@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.15-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.16-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installer-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,7 +10,7 @@
 
 把提示词生图、参考图分析、图片编辑、电商套图、人物写真、文章插图、PPT 生成和素材管理集中到一个浏览器界面中。
 
-当前版本：`v0.2.15`
+当前版本：`v0.2.16`
 
 </div>
 
@@ -52,14 +52,14 @@ Windows 用户也可以双击 `launch-studio.cmd` 启动，使用 `stop-studio-s
 从包含桌面产物的 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
 
 ```text
-GPT-Image2-Studio-Desktop-Setup-v0.2.15-x64.exe
+GPT-Image2-Studio-Desktop-Setup-v0.2.16-x64.exe
 ```
 
 安装完成后通过桌面或开始菜单中的 `GPT-Image2-Studio` 启动。程序会在独立窗口中运行，内置服务使用动态回环端口，关闭窗口后不会遗留后台服务。无需另行安装 Node.js，完整说明见 [Windows 桌面程序文档](./docs/windows-desktop.md)。
 
 源码目录也可直接启动桌面开发版：
 
-如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.15-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
+如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.16-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
 
 桌面开发使用 Electron `43`，要求 Node.js `22.12` 或更高版本；普通 `npm start` 服务仍支持 Node.js `20+`。
 
@@ -70,7 +70,7 @@ cmd /c npm run desktop
 
 ### 方式三：Windows 浏览器安装包（兼容旧版）
 
-旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.15` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
+旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.16` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
 
 ## 配置说明
 
@@ -179,6 +179,16 @@ API Key：<服务方提供的 Key>
 第一次使用请按[新手配置 API 教程](#新手配置-api-教程)操作。已存在的配置仍兼容 `directBaseUrl`、`directApiKey`、`directEndpointPath`、`directImageModel`、`directResponsesModel`。新填写的用途专属字段按组独立优先；API Key 留空表示保留之前保存的私有 Key，不会清除它。
 
 常见接口后缀：`responses`、`images/generations`、`images/edits`、`chat/completions`。供应商若只给一条完整地址，点「完整 URL」按钮粘贴即可，Studio 会拆成基础地址和后缀。
+
+#### 可复用的 API 清单
+
+每个接口地址输入框都带一个展开按钮，列出此前保存过的 API，换一个 API 不再等于覆盖掉上一个。选中一条即把该通道的接口地址、协议后缀和配套 Key 一起填好——Key 跟着 API 走，不单独挑。模型不动，仍需点「保存」生效。
+
+- 四个通道（路由模式、直连生图、直连文本/视觉、模型协议通道）共用一份清单，上限 20 条，超出丢弃最旧的。
+- 一条记录的身份是「接口地址 + Key」，同一家的第二把钥匙是另一条 API。缺地址或缺 Key 的组合不入清单，因为它无法整套切回来。
+- 协议后缀只在当前通道确实提供该选项时才跟着换：存下的 `responses` 不会把直连生图的 `images/generations` 顶掉。
+- 列表每行上行是接口地址，下行是「后缀 · Key 掩码」；每行的删除按钮只从清单移除，不影响当前已保存的配置。
+- 清单只存在浏览器本地 `localStorage`（键 `image-studio-api-endpoint-book-v1`）。`.local/config.json`、`.env` 与 `/api/config` 一个字节都不加，请求载荷不带该清单，桌面端与其他浏览器不共享。明文 Key 不进 DOM，列表只渲染地址与掩码。
 
 ### 使用环境变量
 
@@ -583,8 +593,8 @@ cmd /c npm run build:desktop
 产物路径：
 
 ```text
-artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.15-x64.exe
-artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.15-x64.zip
+artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.16-x64.exe
+artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.16-x64.zip
 artifacts/desktop/win-unpacked/GPT-Image2-Studio.exe
 ```
 
@@ -602,7 +612,7 @@ cmd /c npm run build:installer
 产物路径格式：
 
 ```text
-artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.15.exe
+artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.16.exe
 ```
 
 脚本使用系统 `iexpress.exe` 生成自解压安装包，并把当前 Node.js 运行时和依赖打入安装目录；启动后仍使用默认浏览器显示工作台。
@@ -705,7 +715,22 @@ cmd /c npm run build:installer
 
 ## 版本更新说明
 
-完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.15](./docs/releases/v0.2.15.md)。
+完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.16](./docs/releases/v0.2.16.md)。
+
+### v0.2.16 更新说明
+
+- 深色主题改为纯黑 `#000000` 铺底。面层只混入 6%–12% 的中国传统色（山梗紫、秋波蓝、粉绿、朱红），整体仍读作黑色，同时让面板、输入框和预览台分得开。样式表里写死的蓝黑值已一处不剩，并由测试钉住。
+- 主按钮、选中导航和常规交互统一为魏紫 `#7e1671`（悬停青莲 `#8b2671`，按下绀紫 `#461629`），深色五个视图族共用同一支。`select` 的 option 弹窗改为随主题切换，不再写死浅色。浅色主题不变。
+- 提示词模板按钮从 `⭐` emoji 改为 lucide sparkles 描边图标，跟随 `currentColor`，线宽与参数区其余图标一致。
+- 仓库整理：删除两张未被引用的根目录截图、一份设计 QA 草稿，以及已被 `openspec/` 覆盖的 `docs/superpowers/`。
+
+### v0.2.15 更新说明
+
+- 路由模式的生图工具模型可选：`gpt-image-2`（默认）、`gpt-image-2.5-sunburst`、`gpt-image-2.5-flare`。此前写死在代码里，记录里还会谎报一个没实际使用的模型。
+- 出图质量可选并按模型能力收敛：`auto`、`low`、`medium`、`high`，2.5 变体额外提供 `xhigh` 与 `max`。质量改为随请求逐次提交，不再只读配置默认值。
+- 用过的接口地址与 Key 保留成一份可复用清单（存在浏览器本地），换一个 API 不再覆盖掉上一把 Key；选中一条即把地址、后缀和 Key 整套填回。
+- 配色在中国传统色库内重调：夜场抬亮并做出三级面层台阶，昼纸改用纸感暖白让卡片有边界，点缀统一降彩度，控件轮廓补到 WCAG 3:1 下限。
+- 商品图采集扩展更新到 `1.1.33`：采集器、采集窗与悬浮入口停留在同一隔离世界，读取不再因后台通信而超时。
 
 ### v0.2.14 更新说明
 

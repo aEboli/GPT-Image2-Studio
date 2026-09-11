@@ -250,6 +250,19 @@ test("浅色调色板由 <html data-theme=\"light\"> 驱动并覆盖整屏渐变
   assert.match(appSource, /delete document\.documentElement\.dataset\.theme/);
 });
 
+test("深色主题保持纯黑底与魏紫主操作", () => {
+  const darkRoot = styles.match(/:root\s*\{[\s\S]*?\n\}/)?.[0];
+  assert.ok(darkRoot, "深色根主题必须存在");
+  assert.match(darkRoot, /--bg:\s*#000000;/);
+  assert.match(darkRoot, /--accent:\s*#7e1671;/);
+  assert.match(darkRoot, /--accent-hover:\s*#8b2671;/);
+  assert.match(darkRoot, /--accent-active:\s*#461629;/);
+  assert.match(darkRoot, /--accent-fg:\s*#f1f0ed;/);
+  assert.match(darkRoot, /--focus:\s*#61649f;/);
+  assert.match(styles, /\.sku-variant-value\[readonly\]:hover\s*\{\s*background:\s*var\(--surface-hover\);/);
+  assert.match(styles, /\.sku-table-thumb, \.sku-image-add\s*\{[\s\S]*background:\s*var\(--surface-solid\);/);
+});
+
 test("独立服务时代的痕迹已清除", () => {
   for (const source of [html, appSource, styles]) {
     assert.ok(!source.includes("4173"), "不应残留独立服务端口");

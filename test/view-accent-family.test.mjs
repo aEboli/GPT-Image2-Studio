@@ -6,13 +6,13 @@ const stylesPath = new URL("../public/styles.css", import.meta.url);
 const appPath = new URL("../public/app.js", import.meta.url);
 const indexPath = new URL("../public/index.html", import.meta.url);
 
-// 五族点缀：骨架全站共用，只换 --accent。夜色在 :root，昼色在 html[data-theme="light"]。
+// 深色各视图共用魏紫，浅色保留原有分视图配色。
 const EXPECTED_FAMILIES = {
-  create: { dark: "#7cabb1", light: "#126e82" },
-  analyse: { dark: "#66a9c9", light: "#11659a" },
-  edit: { dark: "#83a78d", light: "#1a6840" },
-  suite: { dark: "#c08eaf", light: "#815c94" },
-  archive: { dark: "#b6a476", light: "#806332" },
+  create: { dark: "#7e1671", light: "#126e82" },
+  analyse: { dark: "#7e1671", light: "#11659a" },
+  edit: { dark: "#7e1671", light: "#1a6840" },
+  suite: { dark: "#7e1671", light: "#815c94" },
+  archive: { dark: "#7e1671", light: "#806332" },
 };
 
 const EXPECTED_VIEW_FAMILIES = {
@@ -69,15 +69,33 @@ test("每一族在两个主题下各定义一次 --accent", async () => {
   assert.doesNotMatch(styles, /^html\[data-view-family=/m);
 });
 
-test("--accent-soft 与 --accent-hover 由 --accent 派生，故换族只需改一行", async () => {
+test("深色使用具名交互色，浅色保留随视图派生的交互色", async () => {
   const styles = await readFile(stylesPath, "utf8");
-  for (const block of [/:root\s*\{[\s\S]*?\n\}/, /html\[data-theme="light"\]\s*\{[\s\S]*?\n\}/]) {
-    const match = styles.match(block);
-    assert.ok(match, "主题块必须存在");
-    assert.match(match[0], /--accent-soft:\s*color-mix\(in srgb, var\(--accent\)/);
-    assert.match(match[0], /--accent-hover:\s*color-mix\(in srgb, var\(--accent\)/);
-    assert.match(match[0], /--accent-fg:\s*#(101f30|f1f0ed);/);
+  const dark = styles.match(/:root\s*\{[\s\S]*?\n\}/)?.[0];
+  const light = styles.match(/html\[data-theme="light"\]\s*\{[\s\S]*?\n\}/)?.[0];
+  assert.ok(dark && light, "两个主题块必须存在");
+  for (const block of [dark, light]) {
+    assert.match(block, /--accent-soft:\s*color-mix\(in srgb, var\(--accent\)/);
   }
+  assert.match(dark, /--accent-hover:\s*#8b2671;/);
+  assert.match(dark, /--accent-active:\s*#461629;/);
+  assert.match(dark, /--accent-fg:\s*#f1f0ed;/);
+  assert.match(light, /--accent-hover:\s*color-mix\(in srgb, var\(--accent\)/);
+  assert.match(light, /--accent-fg:\s*#f1f0ed;/);
+});
+
+test("深色画布与所有遗留夜色面层不再使用蓝黑底", async () => {
+  const styles = await readFile(stylesPath, "utf8");
+  const dark = styles.match(/:root\s*\{[\s\S]*?\n\}/)?.[0];
+  assert.ok(dark, "深色根主题必须存在");
+  assert.match(dark, /--bg:\s*#000000;/);
+  assert.match(dark, /--black-violet:\s*color-mix\(in srgb, #000000 90%, #61649f\);/);
+  assert.match(dark, /--black-blue:\s*color-mix\(in srgb, #000000 88%, #8abcd1\);/);
+  assert.doesNotMatch(
+    styles,
+    /#101f30|#142334|rgba\(16, 31, 48|rgba\(20, 35, 52|rgba\(28, 41, 56|rgba\(8, 16, 26|rgba\(4, 8, 16/,
+    "旧蓝黑面层会让纯黑主题在局部重新偏蓝",
+  );
 });
 
 test("setActiveView 在 await 之前就写好族名，模块加载失败也不会留在旧族色", async () => {

@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.15-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.16-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installers-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,7 +10,7 @@
 
 Prompt-to-image, reference analysis, editing, ecommerce sets, portraits, article illustrations, PPT generation, and asset history in one browser-based workspace.
 
-Current version: `v0.2.15`
+Current version: `v0.2.16`
 
 [Chinese README](./README.zh-CN.md)
 
@@ -45,9 +45,9 @@ On Windows, `launch-studio.cmd` starts the workbench and `stop-studio-services.c
 
 ### Windows desktop app (recommended)
 
-Download `GPT-Image2-Studio-Desktop-Setup-v0.2.15-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
+Download `GPT-Image2-Studio-Desktop-Setup-v0.2.16-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
 
-For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.15-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
+For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.16-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
 
 For desktop development, Electron 43 requires Node.js 22.12 or newer:
 
@@ -58,7 +58,7 @@ cmd /c npm run desktop
 
 ### Windows browser installer
 
-The legacy browser-installer flow remains documented for local builds, but the `v0.2.15` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
+The legacy browser-installer flow remains documented for local builds, but the `v0.2.16` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
 
 ## Configuration
 
@@ -166,6 +166,16 @@ Configuration stays local: the Node service writes `.local/config.json`, the des
 ### Configure in the UI
 
 The first-run walkthrough is in [Beginner API setup](#beginner-api-setup). Existing installations using `directBaseUrl`, `directApiKey`, `directEndpointPath`, `directImageModel`, and `directResponsesModel` continue to work as a bounded compatibility fallback. New channel-specific values take precedence independently, and a blank key input keeps the previously saved private key.
+
+#### Reusable API list
+
+Each endpoint field carries a toggle that opens the list of endpoints you have already saved, so switching providers no longer overwrites the previous one. Selecting an entry fills that channel's endpoint URL, endpoint suffix, and matching key together — the key follows the address rather than being picked separately. The model is left alone, and **保存** (Save) still has to be pressed.
+
+- All four channels (route mode, direct image, direct text/vision, model-protocol) share one list, capped at 20 entries; the oldest is dropped past that.
+- An entry's identity is "endpoint URL + key", so a second key for the same provider is a separate entry. A combination missing either part is not recorded, because it could not be restored as a set.
+- The suffix only follows along when the current channel actually offers that option, so a stored `responses` never overwrites the direct image channel's `images/generations`.
+- Each row shows the address above and `suffix · masked key` below, with a delete button that only removes it from the list and leaves the saved configuration untouched.
+- The list lives solely in browser `localStorage` (`image-studio-api-endpoint-book-v1`). Nothing is added to `.local/config.json`, `.env`, or `/api/config`; request payloads never carry it, and it is not shared with the desktop build or other browsers. Plaintext keys never reach the DOM — rows render the address and a mask only.
 
 Common endpoint suffixes:
 
@@ -470,7 +480,7 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 ## Releases
 
 - The source and lockfile versions are authoritative; tags use `v<version>`.
-- Current release notes: [v0.2.15](./docs/releases/v0.2.15.md).
+- Current release notes: [v0.2.16](./docs/releases/v0.2.16.md).
 - Windows packages are distributed through [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Check the release notes for hashes and signing status.
 - `npm run check:release:strict` requires a clean worktree and a matching tag on the current commit.
 
@@ -485,7 +495,22 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 
 ## Version history
 
-Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.15](./docs/releases/v0.2.15.md).
+Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.16](./docs/releases/v0.2.16.md).
+
+### v0.2.16
+
+- The dark theme now sits on pure black `#000000`. Surfaces mix in only 6–12% of a traditional color (山梗紫, 秋波蓝, 粉绿, 朱红) so the page still reads as black while panels, inputs, and the preview stage stay distinguishable. Every hardcoded blue-black value is gone from the stylesheet, and a test pins that.
+- Primary actions, the selected nav item, and general interaction are 魏紫 `#7e1671` (hover 青莲 `#8b2671`, active 绀紫 `#461629`) across all five view families in dark mode. `select` option popups follow the theme instead of a hardcoded light pair. The light theme is unchanged.
+- The prompt-template button is a lucide sparkles SVG instead of a `⭐` emoji, so it follows `currentColor` and matches the stroke weight of the other parameter-row icons.
+- Repository cleanup: two unreferenced root screenshots, a scratch design-QA log, and `docs/superpowers/` (superseded by `openspec/`) were removed.
+
+### v0.2.15
+
+- Route mode's image tool model is selectable: `gpt-image-2` (default), `gpt-image-2.5-sunburst`, and `gpt-image-2.5-flare`. It used to be hardcoded, and the record entries reported a model that was never actually used.
+- Output quality is selectable and clamped to what the model supports: `auto`, `low`, `medium`, `high`, plus `xhigh` and `max` on the 2.5 variants. Quality is now submitted per request instead of read from the config default only.
+- Endpoints and keys you have used are kept in a reusable list in browser local storage, so switching providers no longer overwrites the previous key. Selecting an entry restores address, suffix, and key as one set.
+- The palette was retuned within the Chinese traditional color library: a lighter night ground with three surface steps, a paper-toned day theme with real card boundaries, desaturated accents, and control outlines lifted to the WCAG 3:1 floor.
+- The product image collector extension moved to `1.1.33`; the collector, panel, and launcher now stay in one isolated world, so reads no longer time out waiting on background messaging.
 
 ### v0.2.14
 
