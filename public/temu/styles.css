@@ -42,6 +42,7 @@
   --red: #f2b9b2;
   --red-soft: rgba(242, 185, 178, 0.16);
   --focus: #61649f;
+  --ornament: #61649f;
   --shadow: 0 24px 64px rgba(0, 0, 0, 0.82), 0 4px 16px rgba(0, 0, 0, 0.62), inset 0 1px 0 var(--glass-highlight), inset 0 0 0 1px rgba(241, 240, 237, 0.03);
   --shadow-elevated: 0 30px 80px rgba(0, 0, 0, 0.9), 0 8px 24px rgba(0, 0, 0, 0.72), inset 0 1px 0 rgba(241, 240, 237, 0.1);
   --shadow-soft: 0 12px 30px rgba(0, 0, 0, 0.72), inset 0 1px 0 rgba(241, 240, 237, 0.06);
@@ -1095,4 +1096,477 @@ html:not([data-theme="light"]) .primary-button:hover:not(:disabled) {
 
 html:not([data-theme="light"]) .primary-button:active:not(:disabled) {
   background: var(--accent-active);
+}
+
+/* ===========================================================================
+   Studio 传统色同步
+   宿主 Studio 通过同源消息下发 data-palette / 自定义颜色。这里沿用主应用的
+   七个 palette id，但把它们映射到上品台自己的玻璃面层 token，保证整个 iframe
+   （表单、按钮、表格、抽屉和浮层）只消费同一套变量。
+   ========================================================================== */
+
+html[data-palette="qinghua"] {
+  color-scheme: light;
+  --palette-bg: #fffef9;
+  --palette-bg-raised: #e4dfd7;
+  --palette-panel: #fffef9;
+  --palette-panel-soft: #e4dfd7;
+  --palette-border: #e4dfd7;
+  --palette-border-strong: #144a74;
+  --palette-ink: #363433;
+  --palette-muted: #495c69;
+  --palette-accent: #144a74;
+  --palette-accent-hover: #15559a;
+  --palette-accent-active: #11659a;
+  --palette-accent-fg: #fffef9;
+  --palette-detail: #1772b4;
+  --palette-green: #20a162;
+  --palette-amber: #b78b26;
+  --palette-red: #f43e06;
+  --palette-focus: #1772b4;
+  --palette-page-rgb: 255, 254, 249;
+  --palette-panel-rgb: 255, 254, 249;
+  --palette-line-rgb: 228, 223, 215;
+  --palette-ink-rgb: 54, 52, 51;
+  --palette-shadow-rgb: 54, 52, 51;
+  --palette-success-rgb: 32, 161, 98;
+  --palette-warning-rgb: 183, 139, 38;
+  --palette-error-rgb: 244, 62, 6;
+}
+
+html[data-palette="jiangnan"] {
+  color-scheme: light;
+  --palette-bg: #fbf2e3;
+  --palette-bg-raised: #e4dfd7;
+  --palette-panel: #fffef9;
+  --palette-panel-soft: #e4dfd7;
+  --palette-border: #e4dfd7;
+  --palette-border-strong: #a61b29;
+  --palette-ink: #363433;
+  --palette-muted: #5d3d21;
+  --palette-accent: #a61b29;
+  --palette-accent-hover: #c21f30;
+  --palette-accent-active: #c02c38;
+  --palette-accent-fg: #fffef9;
+  --palette-detail: #6e8b74;
+  --palette-green: #229453;
+  --palette-amber: #815f25;
+  --palette-red: #c21f30;
+  --palette-focus: #6e8b74;
+  --palette-page-rgb: 251, 242, 227;
+  --palette-panel-rgb: 255, 254, 249;
+  --palette-line-rgb: 228, 223, 215;
+  --palette-ink-rgb: 54, 52, 51;
+  --palette-shadow-rgb: 54, 52, 51;
+  --palette-success-rgb: 34, 148, 83;
+  --palette-warning-rgb: 129, 95, 37;
+  --palette-error-rgb: 194, 31, 48;
+}
+
+html[data-palette="songci"] {
+  color-scheme: light;
+  --palette-bg: #eef7f2;
+  --palette-bg-raised: #d8e3e7;
+  --palette-panel: #fffef9;
+  --palette-panel-soft: #d8e3e7;
+  --palette-border: #d8e3e7;
+  --palette-border-strong: #495c69;
+  --palette-ink: #363433;
+  --palette-muted: #495c69;
+  --palette-accent: #495c69;
+  --palette-accent-hover: #5e7987;
+  --palette-accent-active: #4e7ca1;
+  --palette-accent-fg: #fffef9;
+  --palette-detail: #63bbd0;
+  --palette-green: #20a162;
+  --palette-amber: #815f25;
+  --palette-red: #c21f30;
+  --palette-focus: #63bbd0;
+  --palette-page-rgb: 238, 247, 242;
+  --palette-panel-rgb: 255, 254, 249;
+  --palette-line-rgb: 216, 227, 231;
+  --palette-ink-rgb: 54, 52, 51;
+  --palette-shadow-rgb: 54, 52, 51;
+  --palette-success-rgb: 32, 161, 98;
+  --palette-warning-rgb: 129, 95, 37;
+  --palette-error-rgb: 194, 31, 48;
+}
+
+html[data-palette="gugong"] {
+  color-scheme: light;
+  --palette-bg: #f6dead;
+  --palette-bg-raised: #e4dfd7;
+  --palette-panel: #fffef9;
+  --palette-panel-soft: #f6dead;
+  --palette-border: #e4dfd7;
+  --palette-border-strong: #862617;
+  --palette-ink: #363433;
+  --palette-muted: #5d3d21;
+  --palette-accent: #862617;
+  --palette-accent-hover: #f43e06;
+  --palette-accent-active: #ed5126;
+  --palette-accent-fg: #fffef9;
+  --palette-detail: #d6a01d;
+  --palette-green: #229453;
+  --palette-amber: #b78b26;
+  --palette-red: #f43e06;
+  --palette-focus: #d6a01d;
+  --palette-page-rgb: 246, 222, 173;
+  --palette-panel-rgb: 255, 254, 249;
+  --palette-line-rgb: 228, 223, 215;
+  --palette-ink-rgb: 54, 52, 51;
+  --palette-shadow-rgb: 54, 52, 51;
+  --palette-success-rgb: 34, 148, 83;
+  --palette-warning-rgb: 183, 139, 38;
+  --palette-error-rgb: 244, 62, 6;
+}
+
+html[data-palette="lacquer"] {
+  color-scheme: dark;
+  --palette-bg: #131824;
+  --palette-bg-raised: #2d2e36;
+  --palette-panel: #2d2e36;
+  --palette-panel-soft: #495c69;
+  --palette-border: #495c69;
+  --palette-border-strong: #f3bf4c;
+  --palette-ink: #fffef9;
+  --palette-muted: #d8e3e7;
+  --palette-accent: #ed5126;
+  --palette-accent-hover: #f43e06;
+  --palette-accent-active: #d6a01d;
+  --palette-accent-fg: #363433;
+  --palette-detail: #f3bf4c;
+  --palette-green: #5bae23;
+  --palette-amber: #ffd111;
+  --palette-red: #f43e06;
+  --palette-focus: #f3bf4c;
+  --palette-page-rgb: 19, 24, 36;
+  --palette-panel-rgb: 45, 46, 54;
+  --palette-line-rgb: 73, 92, 105;
+  --palette-ink-rgb: 255, 254, 249;
+  --palette-shadow-rgb: 0, 0, 0;
+  --palette-success-rgb: 91, 174, 35;
+  --palette-warning-rgb: 255, 209, 17;
+  --palette-error-rgb: 244, 62, 6;
+}
+
+html[data-palette="dunhuang"] {
+  color-scheme: dark;
+  --palette-bg: #15231b;
+  --palette-bg-raised: #2d2e36;
+  --palette-panel: #2d2e36;
+  --palette-panel-soft: #5d3d21;
+  --palette-border: #5d3d21;
+  --palette-border-strong: #e4bf11;
+  --palette-ink: #fffef9;
+  --palette-muted: #f6dead;
+  --palette-accent: #be7e4a;
+  --palette-accent-hover: #ed5126;
+  --palette-accent-active: #e4bf11;
+  --palette-accent-fg: #363433;
+  --palette-detail: #e4bf11;
+  --palette-green: #5bae23;
+  --palette-amber: #ffd111;
+  --palette-red: #ed5126;
+  --palette-focus: #e4bf11;
+  --palette-page-rgb: 21, 35, 27;
+  --palette-panel-rgb: 45, 46, 54;
+  --palette-line-rgb: 93, 61, 33;
+  --palette-ink-rgb: 255, 254, 249;
+  --palette-shadow-rgb: 0, 0, 0;
+  --palette-success-rgb: 91, 174, 35;
+  --palette-warning-rgb: 255, 209, 17;
+  --palette-error-rgb: 237, 81, 38;
+}
+
+/* Named palettes take precedence over the legacy light/dark token set. */
+html[data-palette]:not([data-palette="default"]) {
+  --palette-panel-selected: var(--palette-custom-surface, var(--palette-panel));
+  --palette-detail-selected: var(--palette-custom-detail, var(--palette-detail));
+  --palette-accent-selected: var(--palette-custom-accent, var(--palette-accent));
+  --bg: var(--palette-bg);
+  --bg-raised: var(--palette-bg-raised);
+  --glass-base: color-mix(in srgb, var(--palette-panel-selected) 86%, transparent);
+  --glass-elevated: color-mix(in srgb, var(--palette-panel-selected) 96%, transparent);
+  --glass-control: color-mix(in srgb, var(--palette-panel-selected) 92%, var(--palette-bg-raised));
+  --glass-control-hover: color-mix(in srgb, var(--palette-panel-soft) 78%, transparent);
+  --glass-border: color-mix(in srgb, var(--palette-border) 72%, transparent);
+  --glass-border-strong: var(--palette-border-strong);
+  --glass-highlight: color-mix(in srgb, var(--palette-ink) 10%, transparent);
+  --surface: var(--palette-panel-selected);
+  --surface-solid: var(--palette-panel-selected);
+  --surface-muted: color-mix(in srgb, var(--palette-panel-soft) 42%, transparent);
+  --surface-hover: color-mix(in srgb, var(--palette-detail-selected) 14%, transparent);
+  --ink: var(--palette-ink);
+  --muted: var(--palette-muted);
+  --line: var(--glass-border);
+  --line-strong: var(--glass-border-strong);
+  --accent: var(--palette-accent-selected);
+  --accent-hover: var(--palette-accent-hover);
+  --accent-active: var(--palette-accent-active);
+  --accent-strong: var(--palette-accent-selected);
+  --accent-soft: color-mix(in srgb, var(--accent) 15%, transparent);
+  --accent-fg: var(--palette-custom-accent-fg, var(--palette-accent-fg));
+  --green: var(--palette-green);
+  --green-dark: var(--palette-green);
+  --green-soft: color-mix(in srgb, var(--green) 15%, transparent);
+  --amber: var(--palette-amber);
+  --amber-soft: color-mix(in srgb, var(--amber) 15%, transparent);
+  --red: var(--palette-red);
+  --red-soft: color-mix(in srgb, var(--red) 14%, transparent);
+  --focus: var(--palette-focus);
+  --ornament: var(--palette-detail-selected);
+  --black-violet: var(--palette-panel-selected);
+  --black-blue: var(--palette-panel-soft);
+  --black-green: var(--palette-bg);
+  --black-red: var(--palette-panel-soft);
+  --theme-page-rgb: var(--palette-page-rgb);
+  --theme-panel-rgb: var(--palette-panel-rgb);
+  --theme-line-rgb: var(--palette-line-rgb);
+  --theme-ink-rgb: var(--palette-ink-rgb);
+  --theme-shadow-rgb: var(--palette-shadow-rgb);
+  --theme-success-rgb: var(--palette-success-rgb);
+  --theme-warning-rgb: var(--palette-warning-rgb);
+  --theme-error-rgb: var(--palette-error-rgb);
+  --shadow: 0 22px 60px rgba(var(--palette-shadow-rgb), 0.18), 0 4px 14px rgba(var(--palette-shadow-rgb), 0.1), inset 0 1px 0 var(--glass-highlight);
+  --shadow-elevated: 0 28px 74px rgba(var(--palette-shadow-rgb), 0.22), 0 8px 22px rgba(var(--palette-shadow-rgb), 0.14), inset 0 1px 0 var(--glass-highlight);
+  --shadow-soft: 0 10px 26px rgba(var(--palette-shadow-rgb), 0.14), inset 0 1px 0 var(--glass-highlight);
+}
+
+html[data-palette]:not([data-palette="default"]) body::before {
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 8%, transparent), transparent 30%),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg-raised) 100%);
+}
+html[data-palette]:not([data-palette="default"]) body::after {
+  background: repeating-linear-gradient(112deg, color-mix(in srgb, var(--ink) 4%, transparent) 0 1px, transparent 1px 7px);
+  opacity: 0.5;
+}
+
+/* 自定义颜色只覆盖用户明确选择的角色，清空后立即回到 palette 默认值。 */
+html[data-custom-accent="true"] {
+  --accent: var(--palette-custom-accent);
+  --accent-hover: color-mix(in srgb, var(--accent) 86%, var(--ink));
+  --accent-active: color-mix(in srgb, var(--accent) 70%, var(--ink));
+  --accent-strong: var(--accent);
+  --accent-soft: color-mix(in srgb, var(--accent) 15%, transparent);
+  --accent-fg: var(--palette-custom-accent-fg, #fffef9);
+  --focus: var(--accent);
+}
+html[data-custom-surface="true"] {
+  --glass-base: color-mix(in srgb, var(--palette-custom-surface) 86%, transparent);
+  --glass-elevated: color-mix(in srgb, var(--palette-custom-surface) 96%, transparent);
+  --glass-control: var(--palette-custom-surface);
+  --surface: var(--palette-custom-surface);
+  --surface-solid: var(--palette-custom-surface);
+  --surface-muted: color-mix(in srgb, var(--palette-custom-surface) 42%, transparent);
+}
+html[data-custom-detail="true"] {
+  --ornament: var(--palette-custom-detail);
+  --focus: var(--palette-custom-detail);
+  --surface-hover: color-mix(in srgb, var(--palette-custom-detail) 14%, transparent);
+}
+
+/* 这两条规则覆盖 legacy light 的固定蓝/绿，避免命名 palette 在亮色模式下串色。 */
+html[data-palette]:not([data-palette="default"]) input:focus,
+html[data-palette]:not([data-palette="default"]) textarea:focus,
+html[data-palette]:not([data-palette="default"]) select:focus {
+  border-color: color-mix(in srgb, var(--accent) 62%, transparent);
+  box-shadow: 0 0 0 3px var(--accent-soft), inset 0 1px 0 var(--glass-highlight);
+}
+html[data-palette]:not([data-palette="default"]) .carousel-add-button {
+  background: color-mix(in srgb, var(--green) 8%, transparent);
+  border-color: color-mix(in srgb, var(--green) 42%, transparent);
+}
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .topbar {
+  box-shadow: 0 10px 30px rgba(var(--theme-shadow-rgb), 0.08), inset 0 1px 0 var(--glass-highlight);
+}
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .brand-mark {
+  color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 8px 20px rgba(var(--theme-shadow-rgb), 0.1), inset 0 1px 0 var(--glass-highlight);
+}
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .icon-button:hover,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .secondary-button:hover {
+  border-color: var(--glass-border-strong);
+}
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .switch-field input {
+  background: color-mix(in srgb, var(--ink) 24%, transparent);
+}
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .switch-field input::after {
+  background: var(--accent-fg);
+}
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .table-wrap {
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
+}
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .sku-table th {
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .sku-table th [data-variant-attribute-name] {
+  background: color-mix(in srgb, var(--palette-panel-selected) 90%, transparent);
+}
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .sku-variant-value[readonly]:hover {
+  background: var(--surface-hover);
+}
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .studio-preview-select,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .studio-sku-select {
+  background: color-mix(in srgb, var(--palette-panel-selected) 94%, transparent);
+}
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .studio-status-dot {
+  background: color-mix(in srgb, var(--muted) 42%, transparent);
+}
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .studio-progress-track {
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
+}
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .product-rail-heading,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .view-heading,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .product-rail-footer {
+  background: color-mix(in srgb, var(--ink) 2%, transparent);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .product-list-tools,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .product-selection-toolbar,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .sku-bulk-toolbar,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .studio-bulk-toolbar,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .studio-record-filters {
+  background: color-mix(in srgb, var(--ink) 3.5%, transparent);
+}
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .status-chip,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .summary-head b,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .nav-item b {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  border-color: color-mix(in srgb, var(--ink) 14%, transparent);
+}
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .asset-card,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .freight-template-record,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .check-row label,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .sku-carousel-option,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .carousel-add-option,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .studio-connection,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .studio-preview-item,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .studio-sku-item {
+  background: color-mix(in srgb, var(--palette-panel-selected) 82%, transparent);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .product-row-thumb,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .sku-table-thumb,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .sku-image-add,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .asset-preview-button,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .asset-card img,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .asset-placeholder,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .product-material-image,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .description-main-image,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .sku-carousel-option-image,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .carousel-add-option-image,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .studio-record-thumb,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .studio-preview-zoom,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .studio-sku-zoom,
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .studio-sku-placeholder {
+  color: var(--muted);
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+}
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .studio-layout {
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
+}
+html[data-palette]:not([data-palette="default"])[data-theme="light"] dialog::backdrop {
+  background: rgba(var(--theme-shadow-rgb), 0.32);
+}
+html[data-palette]:not([data-palette="default"])[data-theme="light"] .image-lightbox::backdrop {
+  background: rgba(var(--theme-shadow-rgb), 0.78);
+}
+
+/* 低干扰的传统花卉/纹样点缀；不参与布局，也不依赖 emoji 字体。 */
+.app-shell { position: relative; }
+.floral-ornament {
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  z-index: 0;
+  width: 118px;
+  height: 118px;
+  display: none;
+  opacity: 0.14;
+  pointer-events: none;
+}
+html[data-ornament="on"] .floral-ornament { display: block; }
+.floral-ornament::before,
+.floral-ornament::after {
+  position: absolute;
+  display: block;
+  content: "";
+  background: var(--ornament);
+}
+html[data-ornament="on"][data-ornament-style="mei"] .floral-ornament::before {
+  inset: 18px 58px 18px 56px;
+  border-radius: 999px;
+  transform: rotate(38deg);
+}
+html[data-ornament="on"][data-ornament-style="mei"] .floral-ornament::after {
+  top: 8px;
+  right: 9px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, var(--bg) 0 10%, transparent 11%),
+    radial-gradient(circle at 50% 16%, var(--ornament) 0 17%, transparent 18%),
+    radial-gradient(circle at 84% 40%, var(--ornament) 0 17%, transparent 18%),
+    radial-gradient(circle at 68% 82%, var(--ornament) 0 17%, transparent 18%),
+    radial-gradient(circle at 30% 82%, var(--ornament) 0 17%, transparent 18%),
+    radial-gradient(circle at 16% 40%, var(--ornament) 0 17%, transparent 18%);
+}
+html[data-ornament="on"][data-ornament-style="lan"] .floral-ornament::before {
+  top: 58px;
+  left: 16px;
+  width: 76px;
+  height: 12px;
+  border-radius: 100% 0 100% 0;
+  transform: rotate(-28deg);
+  box-shadow: 26px -22px 0 -1px var(--ornament), 35px 19px 0 -1px var(--ornament);
+}
+html[data-ornament="on"][data-ornament-style="lan"] .floral-ornament::after {
+  top: 23px;
+  left: 56px;
+  width: 12px;
+  height: 76px;
+  border-radius: 100% 0 100% 0;
+  transform: rotate(30deg);
+}
+html[data-ornament="on"][data-ornament-style="zhu"] .floral-ornament::before {
+  inset: 8px 28px;
+  border-radius: 8px;
+  background: repeating-linear-gradient(180deg, var(--ornament) 0 14px, transparent 14px 19px);
+}
+html[data-ornament="on"][data-ornament-style="zhu"] .floral-ornament::after {
+  top: 7px;
+  left: 74px;
+  width: 5px;
+  height: 104px;
+  border-radius: 999px;
+  transform: rotate(18deg);
+}
+html[data-ornament="on"][data-ornament-style="mudan"] .floral-ornament::before {
+  top: 15px;
+  left: 15px;
+  width: 84px;
+  height: 84px;
+  border: 8px solid var(--ornament);
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: inset 0 0 0 8px color-mix(in srgb, var(--ornament) 72%, transparent);
+}
+html[data-ornament="on"][data-ornament-style="mudan"] .floral-ornament::after {
+  top: 43px;
+  left: 43px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  box-shadow: 0 -20px 0 -4px var(--ornament), 0 20px 0 -4px var(--ornament), 20px 0 0 -4px var(--ornament), -20px 0 0 -4px var(--ornament);
+}
+@media (max-width: 960px) {
+  .floral-ornament { top: 10px; right: 10px; transform: scale(0.78); transform-origin: top right; }
+}
+@media (forced-colors: active) {
+  .floral-ornament { display: none !important; }
 }

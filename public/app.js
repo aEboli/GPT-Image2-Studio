@@ -371,7 +371,35 @@ const GALLERY_METADATA_CACHE_KEY = "image-studio-gallery-metadata-cache-v2";
 const GENERATION_ACTIVITY_STORAGE_KEY = "image-studio-generation-activity-v1";
 const GENERATION_LOG_STORAGE_KEY = "image-studio-generation-activity-v2";
 const THEME_STORAGE_KEY = "image-studio-ui-theme-v1";
+const UI_PALETTE_STORAGE_KEY = "image-studio-ui-palette-v1";
+const UI_ORNAMENT_STORAGE_KEY = "image-studio-ui-ornament-v1";
+const UI_ORNAMENT_STYLE_STORAGE_KEY = "image-studio-ui-ornament-style-v1";
+const UI_CUSTOM_COLORS_STORAGE_KEY = "image-studio-ui-custom-colors-v1";
 const UI_LANGUAGE_STORAGE_KEY = "image-studio-ui-language-v1";
+
+// The palette names and colour values come from the zhongguose-palette
+// catalogue.  CSS owns the complete token mapping; this table is the single
+// source for labels, swatches, and persistence validation in the UI.
+const UI_PALETTE_META = Object.freeze({
+  default: { label: "默认魏紫", swatch: ["#131824", "#7e1671", "#ed5126"] },
+  qinghua: { label: "青花甜白", swatch: ["#fffef9", "#1772b4", "#144a74"] },
+  jiangnan: { label: "江南竹影", swatch: ["#fbf2e3", "#6e8b74", "#a61b29"] },
+  songci: { label: "雨过天青", swatch: ["#eef7f2", "#63bbd0", "#495c69"] },
+  gugong: { label: "故宫朱墙", swatch: ["#f6dead", "#5d3d21", "#f43e06"] },
+  lacquer: { label: "漆器朱漆", swatch: ["#131824", "#ed5126", "#f3bf4c"] },
+  dunhuang: { label: "敦煌石青", swatch: ["#15231b", "#be7e4a", "#e4bf11"] },
+});
+const UI_PALETTE_IDS = new Set(Object.keys(UI_PALETTE_META));
+const UI_ORNAMENT_STYLES = new Set(["mei", "lan", "zhu", "mudan"]);
+const UI_PALETTE_DEFAULTS = Object.freeze({
+  default: { accent: "#7e1671", surface: "#131824", detail: "#61649f" },
+  qinghua: { accent: "#144a74", surface: "#e4dfd7", detail: "#1772b4" },
+  jiangnan: { accent: "#a61b29", surface: "#e4dfd7", detail: "#6e8b74" },
+  songci: { accent: "#495c69", surface: "#d8e3e7", detail: "#63bbd0" },
+  gugong: { accent: "#862617", surface: "#f6dead", detail: "#d6a01d" },
+  lacquer: { accent: "#ed5126", surface: "#2d2e36", detail: "#f3bf4c" },
+  dunhuang: { accent: "#be7e4a", surface: "#15231b", detail: "#e4bf11" },
+});
 const UI_LANGUAGE_TEXT = {
   "zh-CN": { activityLog: "生成日志", activityLogAllPanels: "全部板块", activityLogPanels: "生成日志板块", apiBookExpand: "展开已保存的 API", apiBookEmpty: "还没有保存过 API", apiBookRemove: "删除这条 API", baseUrl: "基础 URL", brandSubtitle: "AI 图像生成工作流", close: "关闭", config: "配置", configApi: "配置 API", configSaved: "配置已保存", configTitle: "连接配置", configUnsaved: "配置未保存", connectionBusy: "并发 {running}/{max} · 队列 {queued}", connectionOpen: "打开 API、LOG", connectionSection: "调用通道", connectionStatusEmpty: "待填写API、LOG", connectionStatusEntry: "API、LOG", delete: "删除", directEndpointSuffix: "直接调用模式请求协议后缀", directMode: "直接调用模式", download: "下载", endpointUrl: "接口地址", expandModels: "展开可用模型列表", fetchModels: "获取模型列表", fetchModelsLoading: "获取中...", fit: "适配", functionMenu: "功能菜单导航", fullUrl: "完整 URL", generate: "开始生成", generateTitle: "开始生成（Ctrl+Enter）", generationRouteLabel: "生图调用模式", globalNav: "全局导航", imageModel: "生图模型", imageToolModel: "生图工具模型", imageToolModelHint: "路由模式在 Responses 请求的 image_generation 工具里使用该模型。默认 gpt-image-2；sunburst 精修更准，flare 出图更快。", keepSavedKey: "保持已保存 Key", languageEn: "English UI", languageSwitch: "切换界面语言", languageZh: "简体中文界面", menuArticleIllustration: "文章插图", menuArticleRecord: "文章插图记录", menuAssetTools: "资产工具", menuCreation: "套图模式", menuCreationRecord: "套图记录", menuCreateTools: "创作工具", menuGallery: "瀑布画廊", menuImageCompress: "图片压缩", menuImageDecomposition: "图片拆解", menuImageEdit: "图片编辑", menuPortrait: "写真模式", menuPortraitRecord: "写真记录", menuPpt: "PPT生成", menuPptRecord: "PPT记录", menuPromptStudio: "提示词生图", menuQuickBlend: "快速溶图", menuReferenceAnalysis: "融图分析", menuSectionAssets: "资产区", menuSectionCreate: "创作区", menuSectionSettings: "配置区", menuSettings: "设置", menuStyleTransfer: "风格迁移", menuTools: "工具", modeDirect: "直接调用模式", modeProtocol: "Gemini模型", modeRoute: "路由模式", modelFetchBusy: "正在获取模型列表...", modelFetchFailed: "获取模型列表失败。", modelFetchSuccess: "已获取 {count} 个可调用模型。", modelNoCallable: "未获取到可调用模型。", modelNoMatch: "没有匹配的模型", modelNoMatchWithQuery: "没有匹配的模型：{query}", modelTestBusy: "正在测试连接...", modelTestSuccess: "连接测试成功，获取到 {count} 个模型。", navAssets: "资产", navCreate: "创作", navSettings: "配置", notSaved: "未保存", openOutput: "打开输出目录", outputFormat: "输出格式", parameters: "参数设置", previewIdleDetail: "生成日志可在配置中查看，底部胶片条可快速切换查看。", previewIdleEyebrow: "Output Preview", previewIdleTitle: "生成结果会在这里实时更新。", previewWaiting: "等待生成", prompt: "提示词", promptAgent: "图片转提示词", promptCounterSuffix: "字", promptEnhance: "增强模式", promptEnhanceAria: "开启或关闭提示词增强模式", promptEnhanceField: "增强提示词", promptEnhanceOff: "关闭", promptEnhanceOn: "开启", promptPlaceholder: "写下你要生成的画面，也可以先上传参考图说明修改方向。", promptTemplate: "提示词模板", protocolHint: "Gemini 图像模型按 OpenAI 兼容的图像生成协议调用；基础 URL 通常填写到 /v1，实际请求为 /images/generations。", protocolImageModel: "图像模型", protocolMode: "Gemini模型", quality: "质量", "ratio.1:1": "电商主图、头像、社交媒体 · 方形 1:1", "ratio.1:2": "长海报 · 竖屏 1:2", "ratio.1:3": "超长竖版广告 · 竖屏 1:3", "ratio.2:1": "Banner横幅 · 横屏 2:1", "ratio.2:3": "竖版摄影 · 竖屏 2:3", "ratio.3:1": "超宽广告图 · 横屏 3:1", "ratio.3:2": "摄影风格 · 横屏 3:2", "ratio.3:4": "海报、人像 · 竖屏 3:4", "ratio.4:3": "PPT、网页配图 · 横屏 4:3", "ratio.4:5": "Instagram帖子 · 竖屏 4:5", "ratio.5:4": "商品展示 · 横屏 5:4", "ratio.9:16": "短视频封面、手机壁纸 · 竖屏 9:16", "ratio.9:21": "超长竖图 · 竖屏 9:21", "ratio.16:9": "横版封面、YouTube · 横屏 16:9", "ratio.21:9": "超宽横幅 · 横屏 21:9", ratioLandscape: "横向", ratioPortrait: "竖向", ratioSquare: "方形", reasoningEffort: "思考等级", reference: "参考图", referenceUploadAction: "上传参考图", referenceUploadTitle: "拖入图片或点击上传", responsesModel: "Responses 模型", routeEndpointSuffix: "路由模式请求协议后缀", routeMode: "路由模式", save: "保存", schedulingSection: "生成调度", schedulingLockNote: "有生图任务正在进行或排队，暂时不能修改生成调度参数。任务全部结束后会自动恢复。", concurrencyLabel: "请求并发数量", concurrencyUnit: "个", concurrencyHint: "批量生成时同一会话内同时在跑的请求总数，默认 20 个，范围 1 到 50。调低可以减轻上游压力、降低限流和超时概率，但整批更慢；调高更快，但上游更容易限流。", size: "分辨率", startDelayHint: "同一会话内相邻两个上游请求的提交间隔，默认 1000 毫秒，范围 200 到 5000 毫秒。间隔越大越不容易触发上游限流，但最后一张开始得越晚。", startDelayLabel: "任务提交间隔", startDelayUnit: "毫秒", sizeAuto: "自动适配", sizeMax: "最大", testConnection: "测试连接", testConnectionLoading: "测试中...", themeDark: "深色主题", themeLight: "白色主题", themeMenu: "主题颜色", themeToDark: "切换到深色主题", themeToLight: "切换到白色主题", thumbnailEmpty: "暂无缩略图", thumbnailFailed: "缩略图加载失败", thumbnailLoading: "缩略图加载中", timelineNoErrors: "暂无错误", timelineWaitingResult: "等待生成结果", timelineWaitingTask: "等待任务开始", toolModel: "工具模型", toolModelAndQuality: "工具模型与质量", toolModelMeta: "工具模型", view: "查看", visionTextModel: "视觉/文本模型" },
   en: { activityLog: "Generation Log", activityLogAllPanels: "All Panels", activityLogPanels: "Generation log panels", apiBookExpand: "Show saved APIs", apiBookEmpty: "No saved APIs yet", apiBookRemove: "Delete this API", baseUrl: "Base URL", brandSubtitle: "AI image workflow", close: "Close", config: "Settings", configApi: "Configure API", configSaved: "Config saved", configTitle: "Connection Settings", configUnsaved: "Config not saved", connectionBusy: "Concurrent {running}/{max} · Queue {queued}", connectionOpen: "open API and log", connectionSection: "Request Channel", connectionStatusEmpty: "API/Log missing", connectionStatusEntry: "API, Log", delete: "Delete", directEndpointSuffix: "Direct mode endpoint suffix", directMode: "Direct Mode", download: "Download", endpointUrl: "Endpoint", expandModels: "Show available models", fetchModels: "Fetch Models", fetchModelsLoading: "Fetching...", fit: "Fit", functionMenu: "Function menu", fullUrl: "Full URL", generate: "Generate", generateTitle: "Generate (Ctrl+Enter)", generationRouteLabel: "Image request mode", globalNav: "Global navigation", imageModel: "Image Model", imageToolModel: "Image Tool Model", imageToolModelHint: "Route mode uses this model for the image_generation tool in Responses requests. Default gpt-image-2; sunburst is more precise for edits, flare is faster.", keepSavedKey: "Keep saved key", languageEn: "English UI", languageSwitch: "Switch interface language", languageZh: "Simplified Chinese UI", menuArticleIllustration: "Article Illustration", menuArticleRecord: "Article Records", menuAssetTools: "Asset Tools", menuCreation: "Product Suite", menuCreationRecord: "Suite Records", menuCreateTools: "Creation Tools", menuGallery: "Gallery", menuImageCompress: "Image Compress", menuImageDecomposition: "Image Decomposition", menuImageEdit: "Image Edit", menuPortrait: "Portrait Mode", menuPortraitRecord: "Portrait Records", menuPpt: "PPT Generation", menuPptRecord: "PPT Records", menuPromptStudio: "Prompt to Image", menuQuickBlend: "Quick Blend", menuReferenceAnalysis: "Reference Analysis", menuSectionAssets: "Assets", menuSectionCreate: "Creation", menuSectionSettings: "Settings", menuSettings: "Settings", menuStyleTransfer: "Style Transfer", menuTools: "Tools", modeDirect: "Direct Mode", modeProtocol: "Gemini Model", modeRoute: "Route Mode", modelFetchBusy: "Fetching model list...", modelFetchFailed: "Failed to fetch model list.", modelFetchSuccess: "Fetched {count} callable models.", modelNoCallable: "No callable models found.", modelNoMatch: "No matching models", modelNoMatchWithQuery: "No matching models: {query}", modelTestBusy: "Testing connection...", modelTestSuccess: "Connection test succeeded. Found {count} models.", navAssets: "Assets", navCreate: "Create", navSettings: "Settings", notSaved: "Not saved", openOutput: "Open Output", outputFormat: "Output Format", parameters: "Parameters", previewIdleDetail: "Generation log is in Settings. Use the filmstrip below to switch results.", previewIdleEyebrow: "Output Preview", previewIdleTitle: "Generated results update here in real time.", previewWaiting: "Waiting", prompt: "Prompt", promptAgent: "Image to Prompt", promptCounterSuffix: "chars", promptEnhance: "Enhance Mode", promptEnhanceAria: "Toggle prompt enhancement mode", promptEnhanceField: "Enhancement Prompt", promptEnhanceOff: "Off", promptEnhanceOn: "On", promptPlaceholder: "Describe the image you want, or upload references first and describe the edit direction.", promptTemplate: "Prompt templates", protocolHint: "Gemini image models use an OpenAI-compatible image generation protocol. Base URL usually ends at /v1; requests go to /images/generations.", protocolImageModel: "Image Model", protocolMode: "Gemini Model", quality: "Quality", "ratio.1:1": "Ecommerce, Avatar, Social · Square 1:1", "ratio.1:2": "Long Poster · Portrait 1:2", "ratio.1:3": "Tall Ad · Portrait 1:3", "ratio.2:1": "Banner · Landscape 2:1", "ratio.2:3": "Vertical Photo · Portrait 2:3", "ratio.3:1": "Ultrawide Ad · Landscape 3:1", "ratio.3:2": "Photography · Landscape 3:2", "ratio.3:4": "Poster, Portrait · Portrait 3:4", "ratio.4:3": "PPT, Web Graphic · Landscape 4:3", "ratio.4:5": "Instagram Post · Portrait 4:5", "ratio.5:4": "Product Display · Landscape 5:4", "ratio.9:16": "Short Video Cover, Wallpaper · Portrait 9:16", "ratio.9:21": "Tall Scroll Image · Portrait 9:21", "ratio.16:9": "Cover, YouTube · Landscape 16:9", "ratio.21:9": "Ultrawide Banner · Landscape 21:9", ratioLandscape: "Landscape", ratioPortrait: "Portrait", ratioSquare: "Square", reasoningEffort: "Reasoning", reference: "Reference", referenceUploadAction: "Upload Reference", referenceUploadTitle: "Drop images or click to upload", responsesModel: "Responses Model", routeEndpointSuffix: "Route mode endpoint suffix", routeMode: "Route Mode", save: "Save", schedulingSection: "Generation Scheduling", schedulingLockNote: "Generation tasks are running or queued, so the scheduling parameters cannot be changed right now. They unlock automatically once every task finishes.", concurrencyLabel: "Request Concurrency", concurrencyUnit: "requests", concurrencyHint: "The total number of generation requests that may run at once in one session. Default 20, range 1 to 50. Lowering it eases upstream pressure and reduces rate limiting and timeouts; raising it is faster but reaches limits sooner.", size: "Size", startDelayHint: "Interval between adjacent upstream submissions in one session. Default 1000 ms, range 200 to 5000 ms. A larger interval is gentler on a rate-limited upstream but starts the last image later.", startDelayLabel: "Task Submit Interval", startDelayUnit: "ms", sizeAuto: "Auto", sizeMax: "Max", testConnection: "Test Connection", testConnectionLoading: "Testing...", themeDark: "Dark theme", themeLight: "Light theme", themeMenu: "Theme color", themeToDark: "Switch to dark theme", themeToLight: "Switch to light theme", thumbnailEmpty: "No thumbnails", thumbnailFailed: "Thumbnail load failed", thumbnailLoading: "Loading thumbnails", timelineNoErrors: "No errors", timelineWaitingResult: "Waiting for result", timelineWaitingTask: "Waiting for task", toolModel: "Tool Model", toolModelAndQuality: "Tool model and quality", toolModelMeta: "Tool model", view: "View", visionTextModel: "Vision/Text Model" },
@@ -384,6 +412,29 @@ Object.assign(UI_LANGUAGE_TEXT["zh-CN"], {
   directTextApiKey: "文本/视觉 API Key",
   directTextEndpointSuffix: "直接调用模式文本请求协议后缀",
   visionTextModel: "文本/视觉模型",
+  hintMarker: "查看说明",
+  paletteSection: "界面配色",
+  paletteTrigger: "配色",
+  paletteTriggerAria: "打开界面配色",
+  paletteHint: "选择一套中国传统色，立即应用到背景、卡片、按钮与细节。",
+  paletteDefault: "默认魏紫",
+  paletteQinghua: "青花甜白",
+  paletteJiangnan: "江南竹影",
+  paletteSongci: "雨过天青",
+  paletteGugong: "故宫朱墙",
+  paletteLacquer: "漆器朱漆",
+  paletteDunhuang: "敦煌石青",
+  ornamentEnable: "花卉点缀",
+  ornamentStyle: "点缀样式",
+  ornamentMei: "折枝梅",
+  ornamentLan: "兰叶小丛",
+  ornamentZhu: "竹节竖列",
+  ornamentMudan: "牡丹团花",
+  customColors: "自定义细节色",
+  customAccent: "按钮与焦点",
+  customSurface: "界面面层",
+  customDetail: "花卉与装饰",
+  customReset: "跟随",
 });
 Object.assign(UI_LANGUAGE_TEXT.en, {
   directImageApi: "Image API",
@@ -393,6 +444,29 @@ Object.assign(UI_LANGUAGE_TEXT.en, {
   directTextApiKey: "Text/Vision API key",
   directTextEndpointSuffix: "Direct text endpoint suffix",
   visionTextModel: "Text/Vision Model",
+  hintMarker: "View explanation",
+  paletteSection: "Interface palette",
+  paletteTrigger: "Palette",
+  paletteTriggerAria: "Open interface palette",
+  paletteHint: "Choose a traditional Chinese palette for backgrounds, cards, buttons, and details.",
+  paletteDefault: "Default Wei Purple",
+  paletteQinghua: "Blue-and-white porcelain",
+  paletteJiangnan: "Jiangnan bamboo",
+  paletteSongci: "Rain-washed celadon",
+  paletteGugong: "Imperial vermilion",
+  paletteLacquer: "Vermilion lacquer",
+  paletteDunhuang: "Dunhuang mineral",
+  ornamentEnable: "Floral accents",
+  ornamentStyle: "Accent motif",
+  ornamentMei: "Plum branch",
+  ornamentLan: "Orchid sprig",
+  ornamentZhu: "Bamboo nodes",
+  ornamentMudan: "Peony medallion",
+  customColors: "Custom detail colors",
+  customAccent: "Buttons and focus",
+  customSurface: "Interface surfaces",
+  customDetail: "Flowers and ornament",
+  customReset: "Use palette",
 });
 const CONNECTION_STATUS_ENTRY_LABEL = "API、LOG";
 const CONNECTION_STATUS_EMPTY_LABEL = "待填写API、LOG";
@@ -731,6 +805,10 @@ const state = {
   timelineSignatures: new Map(),
   timelineUnreadCount: 0,
   uiTheme: "dark",
+  uiPalette: "default",
+  uiOrnament: false,
+  uiOrnamentStyle: "mei",
+  uiCustomColors: { accent: "", surface: "", detail: "" },
   uiLanguage: "zh-CN",
   zoom: 1,
 };
@@ -1260,6 +1338,16 @@ const refs = {
   themeNavAction: document.querySelector("#themeNavAction"),
   themeToggleButton: document.querySelector("#themeToggleButton"),
   themeToggleLabel: document.querySelector("#themeToggleLabel"),
+  uiPaletteInput: document.querySelector("#uiPaletteInput"),
+  uiPaletteOptions: [...document.querySelectorAll("[data-ui-palette-option]")],
+  palettePickerToggle: document.querySelector("#palettePickerToggle"),
+  palettePickerPanel: document.querySelector("#palettePickerPanel"),
+  palettePickerSwatch: document.querySelector("#palettePickerSwatch"),
+  uiOrnamentInput: document.querySelector("#uiOrnamentInput"),
+  uiOrnamentStyleInput: document.querySelector("#uiOrnamentStyleInput"),
+  uiCustomAccentInput: document.querySelector("#uiCustomAccentInput"),
+  uiCustomSurfaceInput: document.querySelector("#uiCustomSurfaceInput"),
+  uiCustomDetailInput: document.querySelector("#uiCustomDetailInput"),
   topbar: document.querySelector(".topbar"),
   topbarRevealButton: document.querySelector("#topbarRevealButton"),
   timelineChannelTabs: document.querySelector("#timelineChannelTabs"),
@@ -1893,6 +1981,160 @@ function syncRatioOrientationSummary() {
 }
 function normalizeUiTheme(theme) { return theme === "light" ? "light" : "dark"; }
 function readUiTheme() { try { return normalizeUiTheme(window.localStorage.getItem(THEME_STORAGE_KEY) || document.documentElement.dataset.theme); } catch { return normalizeUiTheme(document.documentElement.dataset.theme); } }
+function normalizeUiPalette(palette) {
+  const normalized = String(palette || "").trim().toLowerCase();
+  return UI_PALETTE_IDS.has(normalized) ? normalized : "default";
+}
+function readUiPalette() {
+  try {
+    return normalizeUiPalette(window.localStorage.getItem(UI_PALETTE_STORAGE_KEY) || document.documentElement.dataset.palette);
+  } catch {
+    return normalizeUiPalette(document.documentElement.dataset.palette);
+  }
+}
+function normalizeHexColor(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return /^#[0-9a-f]{6}$/.test(normalized) ? normalized : "";
+}
+function getReadableColorForBackground(hex) {
+  const normalized = normalizeHexColor(hex);
+  if (!normalized) return "#fffef9";
+  const channels = [1, 3, 5].map((offset) => Number.parseInt(normalized.slice(offset, offset + 2), 16) / 255);
+  const luminance = channels.map((channel) => (channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4));
+  const relativeLuminance = 0.2126 * luminance[0] + 0.7152 * luminance[1] + 0.0722 * luminance[2];
+  const lightContrast = 1.05 / (relativeLuminance + 0.05);
+  const darkContrast = (relativeLuminance + 0.05) / 0.05;
+  return lightContrast >= darkContrast ? "#fffef9" : "#363433";
+}
+function readUiCustomColors() {
+  let parsed = {};
+  try {
+    parsed = JSON.parse(window.localStorage.getItem(UI_CUSTOM_COLORS_STORAGE_KEY) || "{}");
+  } catch {
+    parsed = {};
+  }
+  return {
+    accent: normalizeHexColor(parsed?.accent),
+    surface: normalizeHexColor(parsed?.surface),
+    detail: normalizeHexColor(parsed?.detail),
+  };
+}
+function readUiOrnament() {
+  try {
+    const saved = window.localStorage.getItem(UI_ORNAMENT_STORAGE_KEY);
+    if (saved !== null) return saved === "on" || saved === "true" || saved === "1";
+  } catch {
+    // Fall back to the value written by the first-paint bootstrap script.
+  }
+  return document.documentElement.dataset.ornament === "on";
+}
+function readUiOrnamentStyle() {
+  let value = "";
+  try {
+    value = window.localStorage.getItem(UI_ORNAMENT_STYLE_STORAGE_KEY) || "";
+  } catch {
+    // Fall back to the value written by the first-paint bootstrap script.
+  }
+  return UI_ORNAMENT_STYLES.has(value) ? value : (UI_ORNAMENT_STYLES.has(document.documentElement.dataset.ornamentStyle) ? document.documentElement.dataset.ornamentStyle : "mei");
+}
+function syncUiPaletteControls() {
+  const palette = normalizeUiPalette(state.uiPalette);
+  if (refs.uiPaletteInput) refs.uiPaletteInput.value = palette;
+  refs.uiPaletteOptions.forEach((button) => {
+    const active = button.dataset.uiPaletteOption === palette;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-checked", String(active));
+    const swatch = button.querySelector(".palette-swatch");
+    const meta = UI_PALETTE_META[button.dataset.uiPaletteOption];
+    if (swatch && meta) meta.swatch.forEach((color, index) => swatch.children[index]?.style.setProperty("background", color));
+  });
+  const pickerMeta = UI_PALETTE_META[palette];
+  if (refs.palettePickerSwatch && pickerMeta) {
+    pickerMeta.swatch.forEach((color, index) => refs.palettePickerSwatch.children[index]?.style.setProperty("background", color));
+  }
+}
+function syncUiOrnamentControls() {
+  const enabled = Boolean(state.uiOrnament);
+  const style = UI_ORNAMENT_STYLES.has(state.uiOrnamentStyle) ? state.uiOrnamentStyle : "mei";
+  document.documentElement.dataset.ornament = enabled ? "on" : "off";
+  document.documentElement.dataset.ornamentStyle = style;
+  if (refs.uiOrnamentInput) refs.uiOrnamentInput.checked = enabled;
+  if (refs.uiOrnamentStyleInput) {
+    refs.uiOrnamentStyleInput.value = style;
+    refs.uiOrnamentStyleInput.disabled = !enabled;
+  }
+}
+function applyUiCustomColors() {
+  const root = document.documentElement;
+  const colors = state.uiCustomColors || {};
+  const defaults = UI_PALETTE_DEFAULTS[normalizeUiPalette(state.uiPalette)] || UI_PALETTE_DEFAULTS.default;
+  const customProperties = {
+    "--palette-custom-accent": normalizeHexColor(colors.accent),
+    "--palette-custom-surface": normalizeHexColor(colors.surface),
+    "--palette-custom-detail": normalizeHexColor(colors.detail),
+  };
+  const customAccent = customProperties["--palette-custom-accent"];
+  if (customAccent) root.style.setProperty("--palette-custom-accent-fg", getReadableColorForBackground(customAccent));
+  else root.style.removeProperty("--palette-custom-accent-fg");
+  Object.entries(customProperties).forEach(([property, value]) => {
+    const name = property.replace("--palette-custom-", "");
+    if (value) {
+      root.style.setProperty(property, value);
+      root.dataset[`custom${name[0].toUpperCase()}${name.slice(1)}`] = "true";
+    } else {
+      root.style.removeProperty(property);
+      delete root.dataset[`custom${name[0].toUpperCase()}${name.slice(1)}`];
+    }
+  });
+  if (refs.uiCustomAccentInput) refs.uiCustomAccentInput.value = customProperties["--palette-custom-accent"] || defaults.accent;
+  if (refs.uiCustomSurfaceInput) refs.uiCustomSurfaceInput.value = customProperties["--palette-custom-surface"] || defaults.surface;
+  if (refs.uiCustomDetailInput) refs.uiCustomDetailInput.value = customProperties["--palette-custom-detail"] || defaults.detail;
+}
+function setUiPalette(palette) {
+  state.uiPalette = normalizeUiPalette(palette);
+  document.documentElement.dataset.palette = state.uiPalette;
+  try {
+    window.localStorage.setItem(UI_PALETTE_STORAGE_KEY, state.uiPalette);
+  } catch {
+    // Ignore storage restrictions; the current page can still switch palette.
+  }
+  syncUiPaletteControls();
+  applyUiCustomColors();
+  temuWorkbenchLauncher?.syncTheme?.();
+}
+function setUiOrnament(enabled) {
+  state.uiOrnament = Boolean(enabled);
+  try {
+    window.localStorage.setItem(UI_ORNAMENT_STORAGE_KEY, state.uiOrnament ? "on" : "off");
+  } catch {
+    // Ignore storage restrictions; the current page can still toggle ornament.
+  }
+  syncUiOrnamentControls();
+  temuWorkbenchLauncher?.syncTheme?.();
+}
+function setUiOrnamentStyle(style) {
+  state.uiOrnamentStyle = UI_ORNAMENT_STYLES.has(style) ? style : "mei";
+  document.documentElement.dataset.ornamentStyle = state.uiOrnamentStyle;
+  try {
+    window.localStorage.setItem(UI_ORNAMENT_STYLE_STORAGE_KEY, state.uiOrnamentStyle);
+  } catch {
+    // Ignore storage restrictions; the current page can still switch ornament.
+  }
+  syncUiOrnamentControls();
+  temuWorkbenchLauncher?.syncTheme?.();
+}
+function setUiCustomColor(name, value) {
+  if (!(name in (state.uiCustomColors || {}))) return;
+  state.uiCustomColors[name] = normalizeHexColor(value);
+  try {
+    window.localStorage.setItem(UI_CUSTOM_COLORS_STORAGE_KEY, JSON.stringify(state.uiCustomColors));
+  } catch {
+    // Ignore storage restrictions; the current page can still apply the color.
+  }
+  applyUiCustomColors();
+  temuWorkbenchLauncher?.syncTheme?.();
+}
+function resetUiCustomColor(name) { setUiCustomColor(name, ""); }
 function normalizeUiLanguage(language) { return language === "en" ? "en" : "zh-CN"; }
 function readUiLanguage() { try { return normalizeUiLanguage(window.localStorage.getItem(UI_LANGUAGE_STORAGE_KEY) || document.documentElement.lang); } catch { return normalizeUiLanguage(document.documentElement.lang); } }
 function getUiLanguageText(key) { return UI_LANGUAGE_TEXT[state.uiLanguage]?.[key] || UI_LANGUAGE_TEXT["zh-CN"][key] || ""; }
@@ -1920,6 +2162,10 @@ function setUiTheme(theme) {
     // Ignore storage restrictions; the current page can still switch theme.
   }
   syncThemeToggle();
+  // Keep an already-open Temu workbench in lockstep with the host.  The
+  // palette controls already use this path; the base light/dark toggle must
+  // send the same theme message so the iframe never becomes a stale island.
+  temuWorkbenchLauncher?.syncTheme?.();
 }
 function toggleUiTheme() {
   setUiTheme(state.uiTheme === "light" ? "dark" : "light");
@@ -18039,6 +18285,23 @@ function bindEvents() {
   refs.uiLanguageOptions.forEach((button) => {
     button.addEventListener("click", () => setUiLanguage(button.dataset.uiLanguageOption));
   });
+  refs.uiPaletteOptions.forEach((button) => {
+    button.addEventListener("click", () => setUiPalette(button.dataset.uiPaletteOption));
+  });
+  refs.palettePickerToggle?.addEventListener("click", () => {
+    if (!refs.palettePickerPanel) return;
+    const open = refs.palettePickerPanel.hidden;
+    refs.palettePickerPanel.hidden = !open;
+    refs.palettePickerToggle?.setAttribute("aria-expanded", String(open));
+  });
+  refs.uiOrnamentInput?.addEventListener("change", (event) => setUiOrnament(event.currentTarget.checked));
+  refs.uiOrnamentStyleInput?.addEventListener("change", (event) => setUiOrnamentStyle(event.currentTarget.value));
+  refs.uiCustomAccentInput?.addEventListener("change", (event) => setUiCustomColor("accent", event.currentTarget.value));
+  refs.uiCustomSurfaceInput?.addEventListener("change", (event) => setUiCustomColor("surface", event.currentTarget.value));
+  refs.uiCustomDetailInput?.addEventListener("change", (event) => setUiCustomColor("detail", event.currentTarget.value));
+  document.querySelectorAll("[data-custom-color-reset]").forEach((button) => {
+    button.addEventListener("click", () => resetUiCustomColor(button.dataset.customColorReset));
+  });
   refs.openPromptAgentButton.addEventListener("click", () => setPromptAgentOpen(true));
   refs.promptAgentCloseButton.addEventListener("click", () => setPromptAgentOpen(false));
   refs.promptAgentBackdrop.addEventListener("click", () => setPromptAgentOpen(false));
@@ -19379,6 +19642,14 @@ async function bootstrap() {
   syncUiLanguage();
   state.uiTheme = readUiTheme();
   setUiTheme(state.uiTheme);
+  state.uiPalette = readUiPalette();
+  state.uiOrnament = readUiOrnament();
+  state.uiOrnamentStyle = readUiOrnamentStyle();
+  state.uiCustomColors = readUiCustomColors();
+  setUiPalette(state.uiPalette);
+  setUiOrnament(state.uiOrnament);
+  setUiOrnamentStyle(state.uiOrnamentStyle);
+  applyUiCustomColors();
   state.generationLog = readGenerationLogStore();
   state.galleryMetadataCache = readGalleryMetadataCache();
   state.promptTemplates = readPromptTemplates();

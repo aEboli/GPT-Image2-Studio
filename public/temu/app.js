@@ -77,6 +77,8 @@ const API_EXPORT = `${API_BASE}/export`;
 const WORKBENCH_MESSAGE_INIT = "temu-workbench:init";
 const WORKBENCH_MESSAGE_THEME = "temu-workbench:theme";
 const WORKBENCH_MESSAGE_REQUEST_CLOSE = "temu-workbench:request-close";
+const WORKBENCH_PALETTE_IDS = new Set(["default", "qinghua", "jiangnan", "songci", "gugong", "lacquer", "dunhuang"]);
+const WORKBENCH_ORNAMENT_STYLES = new Set(["mei", "lan", "zhu", "mudan"]);
 
 const LEGACY_STORAGE_KEY = "temu-local-listing:draft:v1";
 const WORKBENCH_STORAGE_KEY = "temu-local-listing:products:v1";
@@ -2991,10 +2993,44 @@ document.querySelector("#saveSettingsButton").addEventListener("click", (event) 
 // ---- 跨文档协议（同源 iframe 覆盖层） ----
 // 工作台自己是子文档，宿主是 Studio 主页面。只认三种消息，且两端都按 location.origin 校验。
 
-function applyWorkbenchTheme(theme) {
+function normalizeWorkbenchColor(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return /^#[0-9a-f]{6}$/.test(normalized) ? normalized : "";
+}
+
+function getReadableWorkbenchColor(hex) {
+  const normalized = normalizeWorkbenchColor(hex);
+  if (!normalized) return "#fffef9";
+  const channels = [1, 3, 5].map((offset) => Number.parseInt(normalized.slice(offset, offset + 2), 16) / 255);
+  const luminance = channels.map((channel) => (channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4));
+  const relativeLuminance = 0.2126 * luminance[0] + 0.7152 * luminance[1] + 0.0722 * luminance[2];
+  const lightContrast = 1.05 / (relativeLuminance + 0.05);
+  const darkContrast = (relativeLuminance + 0.05) / 0.05;
+  return lightContrast >= darkContrast ? "#fffef9" : "#363433";
+}
+
+function applyWorkbenchTheme(theme, palette = "default", ornament = "off", ornamentStyle = "mei", customColors = {}) {
   // 深色是 :root 的默认值，因此只有 light 需要落 data-theme；其余值一律回落到深色。
   if (theme === "light") document.documentElement.dataset.theme = "light";
   else delete document.documentElement.dataset.theme;
+  document.documentElement.dataset.palette = WORKBENCH_PALETTE_IDS.has(palette) ? palette : "default";
+  document.documentElement.dataset.ornament = ornament === "on" || ornament === "true" ? "on" : "off";
+  document.documentElement.dataset.ornamentStyle = WORKBENCH_ORNAMENT_STYLES.has(ornamentStyle) ? ornamentStyle : "mei";
+  ["accent", "surface", "detail"].forEach((name) => {
+    const value = normalizeWorkbenchColor(customColors?.[name]);
+    const flag = `custom${name[0].toUpperCase()}${name.slice(1)}`;
+    if (value) {
+      document.documentElement.style.setProperty(`--palette-custom-${name}`, value);
+      document.documentElement.dataset[flag] = "true";
+      if (name === "accent") {
+        document.documentElement.style.setProperty("--palette-custom-accent-fg", getReadableWorkbenchColor(value));
+      }
+    } else {
+      document.documentElement.style.removeProperty(`--palette-custom-${name}`);
+      delete document.documentElement.dataset[flag];
+      if (name === "accent") document.documentElement.style.removeProperty("--palette-custom-accent-fg");
+    }
+  });
 }
 
 function applyWorkbenchLanguage(language) {
@@ -3013,7 +3049,7 @@ window.addEventListener("message", (event) => {
   if (!data || typeof data !== "object") return;
 
   if (data.type === WORKBENCH_MESSAGE_INIT) {
-    applyWorkbenchTheme(data.theme);
+    applyWorkbenchTheme(data.theme, data.palette, data.ornament, data.ornamentStyle, data.customColors);
     applyWorkbenchLanguage(data.lang);
     const setIds = Array.isArray(data.setIds) ? data.setIds : [];
     // 没有勾选记录时不弹导入对话框：那会让重新打开覆盖层的用户先关掉一个空列表才能回到草稿。
@@ -3022,7 +3058,7 @@ window.addEventListener("message", (event) => {
   }
 
   if (data.type === WORKBENCH_MESSAGE_THEME) {
-    applyWorkbenchTheme(data.theme);
+    applyWorkbenchTheme(data.theme, data.palette, data.ornament, data.ornamentStyle, data.customColors);
   }
 });
 

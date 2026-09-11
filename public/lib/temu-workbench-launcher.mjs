@@ -35,6 +35,14 @@ export function createTemuWorkbenchLauncher({
   openExportDialog = null,
   // 主题与语言取值函数，供 init 与后续 theme 消息使用。
   getTheme = () => documentRef.documentElement?.dataset?.theme || "",
+  getPalette = () => documentRef.documentElement?.dataset?.palette || "default",
+  getOrnament = () => documentRef.documentElement?.dataset?.ornament || "off",
+  getOrnamentStyle = () => documentRef.documentElement?.dataset?.ornamentStyle || "mei",
+  getCustomColors = () => ({
+    accent: documentRef.documentElement?.style?.getPropertyValue("--palette-custom-accent") || "",
+    surface: documentRef.documentElement?.style?.getPropertyValue("--palette-custom-surface") || "",
+    detail: documentRef.documentElement?.style?.getPropertyValue("--palette-custom-detail") || "",
+  }),
   getLanguage = () => documentRef.documentElement?.lang || "",
   // 关闭覆盖层后焦点归还处。
   getFocusTarget = () => documentRef.querySelector("#creationRecordExportTemuButton"),
@@ -63,6 +71,10 @@ export function createTemuWorkbenchLauncher({
       type: TEMU_WORKBENCH_MESSAGES.init,
       setIds: Array.isArray(setIds) ? [...setIds] : [],
       theme: getTheme(),
+      palette: getPalette(),
+      ornament: getOrnament(),
+      ornamentStyle: getOrnamentStyle(),
+      customColors: getCustomColors(),
       lang: getLanguage(),
     };
     if (frameLoaded) {
@@ -115,7 +127,36 @@ export function createTemuWorkbenchLauncher({
 
   function syncTheme() {
     if (!isOpen()) return;
-    postToFrame({ type: TEMU_WORKBENCH_MESSAGES.theme, theme: getTheme() });
+    const message = {
+      type: TEMU_WORKBENCH_MESSAGES.theme,
+      theme: getTheme(),
+      palette: getPalette(),
+      ornament: getOrnament(),
+      ornamentStyle: getOrnamentStyle(),
+      customColors: getCustomColors(),
+    };
+    // A theme change can happen in the short window between assigning the
+    // iframe src and its load event. Keep the queued init current so the first
+    // paint cannot revert to an older palette.
+    if (!frameLoaded) {
+      pendingInit = pendingInit
+        ? {
+            ...pendingInit,
+            theme: message.theme,
+            palette: message.palette,
+            ornament: message.ornament,
+            ornamentStyle: message.ornamentStyle,
+            customColors: message.customColors,
+          }
+        : {
+            ...message,
+            type: TEMU_WORKBENCH_MESSAGES.init,
+            setIds: [],
+            lang: getLanguage(),
+          };
+      return;
+    }
+    postToFrame(message);
   }
 
   function handleFrameLoad() {

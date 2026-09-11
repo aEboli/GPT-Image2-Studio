@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.16-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.17-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installers-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,7 +10,7 @@
 
 Prompt-to-image, reference analysis, editing, ecommerce sets, portraits, article illustrations, PPT generation, and asset history in one browser-based workspace.
 
-Current version: `v0.2.16`
+Current version: `v0.2.17`
 
 [Chinese README](./README.zh-CN.md)
 
@@ -45,9 +45,9 @@ On Windows, `launch-studio.cmd` starts the workbench and `stop-studio-services.c
 
 ### Windows desktop app (recommended)
 
-Download `GPT-Image2-Studio-Desktop-Setup-v0.2.16-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
+Download `GPT-Image2-Studio-Desktop-Setup-v0.2.17-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
 
-For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.16-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
+For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.17-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
 
 For desktop development, Electron 43 requires Node.js 22.12 or newer:
 
@@ -58,7 +58,7 @@ cmd /c npm run desktop
 
 ### Windows browser installer
 
-The legacy browser-installer flow remains documented for local builds, but the `v0.2.16` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
+The legacy browser-installer flow remains documented for local builds, but the `v0.2.17` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
 
 ## Configuration
 
@@ -93,6 +93,9 @@ Each channel is stored independently, and only the selected one is used for gene
 | Route mode (default) | Supports `POST /responses` with the `image_generation` tool, such as OpenAI itself or a gateway aligned with it | Endpoint URL, API key, Responses model |
 | Direct-call mode | Only offers `images/generations` or `chat/completions`, or when image and text come from two different providers | Three image fields plus three text/vision fields |
 | Gemini model | Serves Gemini image models over an OpenAI-compatible image-generation protocol | Base URL, API key, image model |
+
+Long explanations are available from their hover/focus help markers; the configuration form and generation log scroll independently, while the log heading and channel switch stay visible.
+The channel row ends with a compact **Palette** control immediately after **Gemini model**. Click it to open the full interface palette panel without pushing the generation log out of view. The panel offers seven Chinese traditional-colour palettes, three custom colour roles (buttons/focus, surfaces, and flowers/details), and optional plum, orchid, bamboo, or peony accents. The selection is saved locally and is mirrored to the embedded Temu workbench.
 
 #### Step 4: fill in the fields for that channel
 
@@ -267,6 +270,7 @@ The repository also contains a Vercel configuration. Vercel functions use tempor
 - Separate records for Creation sets, portraits, article illustrations, and PPT decks.
 - Background queue status, progress, structured errors, and retry of failed items.
 - Prompt Kit, Prompt Agent image-to-prompt output, Logo library, portrait outfit/prop library, and model selection controls.
+- Compact configuration cards with hover/focus help markers, a fixed independently scrolling generation log, seven traditional-colour palettes, custom interface colours, and optional floral accents.
 - Dark/light themes, Chinese/English UI, and responsive desktop, tablet, and mobile layouts.
 
 ## Interface preview
@@ -480,7 +484,7 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 ## Releases
 
 - The source and lockfile versions are authoritative; tags use `v<version>`.
-- Current release notes: [v0.2.16](./docs/releases/v0.2.16.md).
+- Current release notes: [v0.2.17](./docs/releases/v0.2.17.md).
 - Windows packages are distributed through [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Check the release notes for hashes and signing status.
 - `npm run check:release:strict` requires a clean worktree and a matching tag on the current commit.
 
@@ -495,7 +499,15 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 
 ## Version history
 
-Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.16](./docs/releases/v0.2.16.md).
+Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.17](./docs/releases/v0.2.17.md).
+
+### v0.2.17
+
+- The configuration drawer is compact: long explanations are hover/focus help markers, and the configuration form and generation log scroll independently so the log stays visible.
+- The channel row is now **Route mode / Direct-call mode / Gemini model / Palette**. The Palette trigger sits immediately after Gemini and opens the full palette, custom-colour, and floral-accent controls.
+- Added seven allowlisted Chinese traditional-colour palettes, three custom colour roles for buttons/focus, surfaces, and floral details, and local persistence mirrored to the embedded Temu workbench.
+- Added four low-interference decorative motifs: plum branch, orchid sprig, bamboo nodes, and peony medallion. They cannot intercept interaction and are hidden from assistive technology.
+- Added OpenSpec coverage and regression tests for the palette allowlist, colour validation, tooltip affordances, independent logs, theme-message synchronization, and the Gemini-adjacent palette trigger.
 
 ### v0.2.16
 
