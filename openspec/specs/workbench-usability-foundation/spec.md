@@ -74,9 +74,16 @@ The configuration drawer SHALL expose an allowlisted traditional-colour palette,
 - **WHEN** a user selects a named palette and reloads the workbench
 - **THEN** the same palette is applied before the first stylesheet paint and its radio control is marked selected.
 
-#### Scenario: Palette trigger follows the Gemini route choice
+#### Scenario: Configuration sections keep their fields isolated
 - **WHEN** the configuration drawer is opened
-- **THEN** a compact palette trigger appears immediately after the Gemini model choice in the route selector, and activating it reveals the full palette controls before the route-specific connection fields.
+- **THEN** it exposes four mutually exclusive sections named `路由模式`, `直连模式`, `Gemini`, and `主题`
+- **AND** selecting a route section shows only that section's connection fields and disables the other route fields
+- **AND** selecting `主题` shows only the standalone palette and theme controls, with no route-specific connection fields visible
+
+#### Scenario: Palette options stay compact inside the theme section
+- **WHEN** the `主题` section is selected
+- **THEN** the standalone palette card contains the palette controls
+- **AND** all palette options remain on one horizontal row, with horizontal scrolling when the drawer is too narrow.
 
 ### Requirement: Optional floral accents
 The configuration drawer SHALL let users enable one of the supported floral accent motifs, and the motif SHALL remain decorative and non-interactive.

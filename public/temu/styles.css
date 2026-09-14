@@ -64,6 +64,40 @@ html:not([data-theme="light"]) {
   --theme-error-rgb: 242, 185, 178;
 }
 
+/* Keep the default workbench in the v0.2.6 indigo family used by Studio. */
+html[data-palette="default"]:not([data-theme="light"]) {
+  --bg: #090d18;
+  --bg-raised: #11172a;
+  --glass-base: rgba(18, 25, 47, 0.88);
+  --glass-elevated: rgba(21, 28, 48, 0.96);
+  --glass-control: rgba(255, 255, 255, 0.03);
+  --glass-control-hover: rgba(255, 255, 255, 0.07);
+  --glass-border: rgba(135, 156, 255, 0.14);
+  --glass-border-strong: rgba(135, 156, 255, 0.24);
+  --glass-highlight: rgba(255, 255, 255, 0.06);
+  --surface: rgba(18, 25, 47, 0.88);
+  --surface-solid: #11172a;
+  --surface-muted: rgba(255, 255, 255, 0.03);
+  --surface-hover: rgba(111, 124, 255, 0.12);
+  --ink: #edf1ff;
+  --muted: rgba(237, 241, 255, 0.64);
+  --line: rgba(135, 156, 255, 0.14);
+  --line-strong: rgba(135, 156, 255, 0.24);
+  --accent: #6f7cff;
+  --accent-hover: #8290ff;
+  --accent-active: #4b58d9;
+  --accent-strong: #6f7cff;
+  --accent-soft: rgba(111, 124, 255, 0.18);
+  --accent-fg: #edf1ff;
+  --focus: #879cff;
+  --ornament: #879cff;
+  --theme-page-rgb: 9, 13, 24;
+  --theme-panel-rgb: 18, 25, 47;
+  --theme-line-rgb: 135, 156, 255;
+  --theme-ink-rgb: 237, 241, 255;
+  --theme-shadow-rgb: 0, 0, 0;
+}
+
 * { box-sizing: border-box; }
 html { min-height: 100%; scroll-behavior: smooth; }
 body { min-height: 100%; }

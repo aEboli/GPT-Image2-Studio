@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.17-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.18-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installers-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,7 +10,7 @@
 
 Prompt-to-image, reference analysis, editing, ecommerce sets, portraits, article illustrations, PPT generation, and asset history in one browser-based workspace.
 
-Current version: `v0.2.17`
+Current version: `v0.2.18`
 
 [Chinese README](./README.zh-CN.md)
 
@@ -45,9 +45,9 @@ On Windows, `launch-studio.cmd` starts the workbench and `stop-studio-services.c
 
 ### Windows desktop app (recommended)
 
-Download `GPT-Image2-Studio-Desktop-Setup-v0.2.17-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
+Download `GPT-Image2-Studio-Desktop-Setup-v0.2.18-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
 
-For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.17-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
+For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.18-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
 
 For desktop development, Electron 43 requires Node.js 22.12 or newer:
 
@@ -58,7 +58,7 @@ cmd /c npm run desktop
 
 ### Windows browser installer
 
-The legacy browser-installer flow remains documented for local builds, but the `v0.2.17` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
+The legacy browser-installer flow remains documented for local builds, but the `v0.2.18` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
 
 ## Configuration
 
@@ -84,18 +84,24 @@ Create keys in the OpenAI console for the official channel; compatible services 
 - The drawer header carries a `CN` / `EN` switch. Press `EN` once and the whole interface, including every label below, turns English.
 - Until a save succeeds, the top-right status stays on `配置未保存` (Configuration not saved).
 
-#### Step 3: pick one call channel
+#### Step 3: pick one configuration section
+
+The drawer opens on a row of four mutually exclusive sections — **路由模式** (Route mode), **直连模式** (Direct mode), **Gemini**, and **主题** (Theme). Only the selected section's fields are shown; the other sections' controls stay hidden and disabled, including their Fetch Models buttons. The first three are the call channels; the fourth carries no connection fields at all.
 
 Each channel is stored independently, and only the selected one is used for generation. When in doubt, keep the default route mode.
 
-| Channel | Fits a provider that | You fill in |
+| Section | Fits a provider that | You fill in |
 | --- | --- | --- |
 | Route mode (default) | Supports `POST /responses` with the `image_generation` tool, such as OpenAI itself or a gateway aligned with it | Endpoint URL, API key, Responses model |
-| Direct-call mode | Only offers `images/generations` or `chat/completions`, or when image and text come from two different providers | Three image fields plus three text/vision fields |
-| Gemini model | Serves Gemini image models over an OpenAI-compatible image-generation protocol | Base URL, API key, image model |
+| Direct mode | Only offers `images/generations` or `chat/completions`, or when image and text come from two different providers | Three image fields plus three text/vision fields |
+| Gemini | Serves Gemini image models over an OpenAI-compatible image-generation protocol | Base URL, API key, image model |
+| Theme | Not a call channel. Holds the interface palette instead | Nothing; selecting a channel section again restores the connection fields |
 
-Long explanations are available from their hover/focus help markers; the configuration form and generation log scroll independently, while the log heading and channel switch stay visible.
-The channel row ends with a compact **Palette** control immediately after **Gemini model**. Click it to open the full interface palette panel without pushing the generation log out of view. The panel offers seven Chinese traditional-colour palettes, three custom colour roles (buttons/focus, surfaces, and flowers/details), and optional plum, orchid, bamboo, or peony accents. The selection is saved locally and is mirrored to the embedded Temu workbench.
+Selecting **主题** hides the connection fields entirely and shows one standalone palette card: seven interface palettes, three custom colour roles (buttons/focus, surfaces, and flowers/details), and optional plum, orchid, bamboo, or peony accents. The palette options stay on a single row that scrolls horizontally when the drawer is narrow. The default palette is `经典靛蓝` (Classic indigo); the other six are drawn from the Chinese traditional-colour catalogue. The selection is saved locally and is mirrored to the embedded Temu workbench.
+
+Switching to **主题** and back does not change which call channel is active — the channel you last selected stays in effect, and the top-right status keeps reporting it.
+
+Long explanations are available from their hover/focus help markers; the configuration form and generation log scroll independently, while the log heading and section switch stay visible.
 
 #### Step 4: fill in the fields for that channel
 
@@ -117,14 +123,14 @@ The Responses model is the outer model. The image tool model is chosen from the 
 
 The prompt page parameter row also has a **质量** (quality) dropdown: `auto`, `low`, `medium`, `high` (default), plus `xhigh` and `max` — the last two exist only on the 2.5 models. Switching the tool model back to `gpt-image-2` while `xhigh`/`max` is selected clamps it down to `high` instead of sending a request the upstream would reject.
 
-**Direct-call mode** splits into two independent groups. The image group only generates and edits images; the text/vision group handles prompt enhancement, reference analysis, Listing drafts, and other model calls. The two groups can point at different providers:
+**Direct mode** splits into two independent groups. The image group only generates and edits images; the text/vision group handles prompt enhancement, reference analysis, Listing drafts, and other model calls. The two groups can point at different providers:
 
 ```text
 Image API:       https://api.openai.com/v1   suffix images/generations   model gpt-image-2
 Text/vision API: https://api.openai.com/v1   suffix responses            model gpt-5.4-mini
 ```
 
-**Gemini model.** The actual request is the base URL plus `/images/generations`:
+**Gemini.** The actual request is the base URL plus `/images/generations`:
 
 ```text
 Base URL:    https://api.vendor.example/v1
@@ -174,7 +180,7 @@ The first-run walkthrough is in [Beginner API setup](#beginner-api-setup). Exist
 
 Each endpoint field carries a toggle that opens the list of endpoints you have already saved, so switching providers no longer overwrites the previous one. Selecting an entry fills that channel's endpoint URL, endpoint suffix, and matching key together — the key follows the address rather than being picked separately. The model is left alone, and **保存** (Save) still has to be pressed.
 
-- All four channels (route mode, direct image, direct text/vision, model-protocol) share one list, capped at 20 entries; the oldest is dropped past that.
+- All four endpoint fields (route mode, direct image, direct text/vision, and Gemini) share one list, capped at 20 entries; the oldest is dropped past that.
 - An entry's identity is "endpoint URL + key", so a second key for the same provider is a separate entry. A combination missing either part is not recorded, because it could not be restored as a set.
 - The suffix only follows along when the current channel actually offers that option, so a stored `responses` never overwrites the direct image channel's `images/generations`.
 - Each row shows the address above and `suffix · masked key` below, with a delete button that only removes it from the list and leaves the saved configuration untouched.
@@ -270,7 +276,7 @@ The repository also contains a Vercel configuration. Vercel functions use tempor
 - Separate records for Creation sets, portraits, article illustrations, and PPT decks.
 - Background queue status, progress, structured errors, and retry of failed items.
 - Prompt Kit, Prompt Agent image-to-prompt output, Logo library, portrait outfit/prop library, and model selection controls.
-- Compact configuration cards with hover/focus help markers, a fixed independently scrolling generation log, seven traditional-colour palettes, custom interface colours, and optional floral accents.
+- A four-section configuration drawer (route mode, direct mode, Gemini, theme) with hover/focus help markers, a fixed independently scrolling generation log, seven interface palettes, custom interface colours, and optional floral accents.
 - Dark/light themes, Chinese/English UI, and responsive desktop, tablet, and mobile layouts.
 
 ## Interface preview
@@ -412,8 +418,8 @@ Two details are easy to misread. The `21:9` and `9:21` lists are not sorted by p
 | Channel | Protocol | Size values the app sends | Automatic value | Constraint to know |
 | --- | --- | --- | --- | --- |
 | Route mode | Responses API plus the image tool | The explicit ratio-bound pixels above | Base size for the current ratio | The UI offers only the `responses` suffix, and the upstream can still adjust delivered pixels. Image editing is the exception: it always posts to `images/edits` and ignores the configured suffix |
-| Direct-call mode | `images/generations`, `responses`, or `chat/completions` | The same explicit pixels as route mode | Base size for the current ratio | Compatibility depends on the gateway and model; edit requests may be rerouted to `images/edits` |
-| Gemini model | Gemini image generation, or a `chat/completions`-compatible shape for non-Gemini models | `512`, `1K`, `2K`, `4K` | `1K` | These are tiers, not promised pixel counts; the default model identifier is an app default, not proof the provider serves it, and some models or gateways reject references, ratios, or `4K` |
+| Direct mode | `images/generations`, `responses`, or `chat/completions` | The same explicit pixels as route mode | Base size for the current ratio | Compatibility depends on the gateway and model; edit requests may be rerouted to `images/edits` |
+| Gemini | Gemini image generation, or a `chat/completions`-compatible shape for non-Gemini models | `512`, `1K`, `2K`, `4K` | `1K` | These are tiers, not promised pixel counts; the default model identifier is an app default, not proof the provider serves it, and some models or gateways reject references, ratios, or `4K` |
 
 Three consequences of that split are worth knowing before you pick a ratio:
 
@@ -484,7 +490,7 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 ## Releases
 
 - The source and lockfile versions are authoritative; tags use `v<version>`.
-- Current release notes: [v0.2.17](./docs/releases/v0.2.17.md).
+- Current release notes: [v0.2.18](./docs/releases/v0.2.18.md).
 - Windows packages are distributed through [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Check the release notes for hashes and signing status.
 - `npm run check:release:strict` requires a clean worktree and a matching tag on the current commit.
 
@@ -499,7 +505,16 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 
 ## Version history
 
-Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.17](./docs/releases/v0.2.17.md).
+Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.18](./docs/releases/v0.2.18.md).
+
+### v0.2.18
+
+- The configuration drawer is now four mutually exclusive sections: **路由模式** / **直连模式** / **Gemini** / **主题**. Only the selected section's fields render, and the hidden sections' controls — Fetch Models included — are disabled rather than merely invisible, so a hidden channel can no longer be edited or queried by mistake.
+- The palette is no longer a popover opened from a trigger after the Gemini option. It is a standalone card inside **主题**, which carries no connection fields at all. Switching to **主题** and back leaves the active call channel unchanged.
+- Palette options stay on one horizontal row and scroll sideways in a narrow drawer, instead of reflowing into a 4-column then 2-column grid.
+- The default palette is `经典靛蓝` (Classic indigo) and restores the v0.2.6 indigo tokens (`#6f7cff` / `#12192f` / `#879cff`) across Studio and the embedded Temu workbench. The other six palettes keep their traditional-colour values, and every stored palette ID is unchanged, so an existing selection still resolves.
+- Visible palette names are shorter (`青花甜白` → `青花`, `江南竹影` → `竹影`, `雨过天青` → `天青`, `故宫朱墙` → `朱墙`, `漆器朱漆` → `朱漆`, `敦煌石青` → `敦煌`), and the two long section labels were shortened to `直连模式` and `Gemini`.
+- Corrected in the docs: the platform-profile table is version `2026-07-18.2`, and both READMEs describe the four-section drawer instead of the retired palette trigger.
 
 ### v0.2.17
 

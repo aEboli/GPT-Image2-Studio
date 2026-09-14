@@ -249,9 +249,55 @@ html[data-theme="light"] body {
    catalogue; the palette attribute is deliberately separate from data-theme so
    the existing dark/light compatibility selectors keep working. */
 html[data-palette="default"] {
-  --palette-accent-base: #7e1671;
-  --palette-surface-base: #131824;
-  --palette-detail-base: #61649f;
+  /* The default keeps the v0.2.6 indigo family while the other palettes
+     continue to provide their own traditional colour combinations. */
+  --palette-accent-base: #6f7cff;
+  --palette-surface-base: #12192f;
+  --palette-detail-base: #879cff;
+}
+
+html[data-theme="dark"][data-palette="default"] {
+  --bg: #090d18;
+  --bg-soft: #11172a;
+  --panel: rgba(18, 25, 47, 0.88);
+  --panel-soft: rgba(255, 255, 255, 0.03);
+  --border: rgba(135, 156, 255, 0.14);
+  --border-strong: rgba(135, 156, 255, 0.24);
+  --text: #edf1ff;
+  --muted: rgba(237, 241, 255, 0.64);
+  --accent: #6f7cff;
+  --accent-soft: rgba(111, 124, 255, 0.18);
+  --accent-fg: #edf1ff;
+  --accent-hover: #8290ff;
+  --accent-active: #4b58d9;
+  --accent-deep-mix: #11172a;
+  --accent-ink: #edf1ff;
+  --seal: #ed5126;
+  --ornament: #879cff;
+  --success: #70e2a2;
+  --warning: #ffd166;
+  --info: #8abcd1;
+  --danger: #ff9489;
+  --meta-mode: #8abcd1;
+  --meta-size: #879cff;
+  --meta-time: #ffd166;
+  --meta-relay: #70e2a2;
+  --black-violet: #151c30;
+  --black-blue: #11172a;
+  --black-green: #10182b;
+  --black-red: #1c1d35;
+  --control-bg: rgba(255, 255, 255, 0.03);
+  --control-bg-hover: rgba(255, 255, 255, 0.07);
+  --input-bg: rgba(255, 255, 255, 0.025);
+  --input-bg-focus: rgba(255, 255, 255, 0.04);
+  --flyout-bg: rgba(8, 13, 26, 0.96);
+  --flyout-text: var(--text);
+  --flyout-muted: var(--muted);
+  --flyout-border: var(--border);
+  --active-tab-bg: rgba(111, 124, 255, 0.12);
+  --preview-stage-bg: rgba(255, 255, 255, 0.025);
+  --preview-canvas-border: rgba(255, 255, 255, 0.05);
+  --panel-strong: #11172a;
 }
 
 html[data-palette="qinghua"] {
@@ -5788,13 +5834,20 @@ html[data-ui-layout="mobile"] .creation-listing-workspace-bar .asset-listing-act
 }
 
 .palette-options {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: nowrap;
   gap: 6px;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb-color) transparent;
+  -webkit-overflow-scrolling: touch;
 }
 
 .palette-option {
-  min-width: 0;
+  flex: 0 0 128px;
+  min-width: 128px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
@@ -5807,6 +5860,7 @@ html[data-ui-layout="mobile"] .creation-listing-workspace-bar .asset-listing-act
   color: var(--text);
   font-size: 11px;
   text-align: left;
+  white-space: nowrap;
 }
 
 .palette-option:hover,
@@ -6027,7 +6081,7 @@ html[data-ornament="on"][data-ornament-style="mudan"] .floral-ornament::after {
 
 @media (max-width: 760px) {
   .palette-options {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    flex-wrap: nowrap;
   }
 
   .floral-ornament {
@@ -12414,13 +12468,31 @@ html:is([data-ui-layout="stacked"], [data-ui-layout="tablet"], [data-ui-layout="
   overflow-x: hidden;
 }
 
-.config-form:has(input[name="imageRoute"][value="a"]:checked) [data-route-panel="b"],
-.config-form:has(input[name="imageRoute"][value="a"]:checked) [data-route-panel="c"],
-.config-form:has(input[name="imageRoute"][value="b"]:checked) [data-route-panel="a"],
-.config-form:has(input[name="imageRoute"][value="b"]:checked) [data-route-panel="c"],
-.config-form:has(input[name="imageRoute"][value="c"]:checked) [data-route-panel="a"],
-.config-form:has(input[name="imageRoute"][value="c"]:checked) [data-route-panel="b"] {
+.config-theme-panel {
   display: none;
+}
+
+.config-form[data-config-section="theme"] .config-theme-panel,
+.config-form:has(input[name="configSection"][value="theme"]:checked) .config-theme-panel {
+  display: grid;
+}
+
+.config-form[data-config-section="theme"] .config-route-fields,
+.config-form:has(input[name="configSection"][value="theme"]:checked) .config-route-fields {
+  display: none;
+}
+
+.route-config-panel {
+  display: none;
+}
+
+.config-form[data-config-section="a"] [data-route-panel="a"],
+.config-form:has(input[name="configSection"][value="a"]:checked) [data-route-panel="a"],
+.config-form[data-config-section="b"] [data-route-panel="b"],
+.config-form:has(input[name="configSection"][value="b"]:checked) [data-route-panel="b"],
+.config-form[data-config-section="c"] [data-route-panel="c"],
+.config-form:has(input[name="configSection"][value="c"]:checked) [data-route-panel="c"] {
+  display: grid;
 }
 
 .field {

@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.17-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.18-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installer-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,7 +10,7 @@
 
 把提示词生图、参考图分析、图片编辑、电商套图、人物写真、文章插图、PPT 生成和素材管理集中到一个浏览器界面中。
 
-当前版本：`v0.2.17`
+当前版本：`v0.2.18`
 
 </div>
 
@@ -52,14 +52,14 @@ Windows 用户也可以双击 `launch-studio.cmd` 启动，使用 `stop-studio-s
 从包含桌面产物的 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
 
 ```text
-GPT-Image2-Studio-Desktop-Setup-v0.2.17-x64.exe
+GPT-Image2-Studio-Desktop-Setup-v0.2.18-x64.exe
 ```
 
 安装完成后通过桌面或开始菜单中的 `GPT-Image2-Studio` 启动。程序会在独立窗口中运行，内置服务使用动态回环端口，关闭窗口后不会遗留后台服务。无需另行安装 Node.js，完整说明见 [Windows 桌面程序文档](./docs/windows-desktop.md)。
 
 源码目录也可直接启动桌面开发版：
 
-如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.17-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
+如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.18-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
 
 桌面开发使用 Electron `43`，要求 Node.js `22.12` 或更高版本；普通 `npm start` 服务仍支持 Node.js `20+`。
 
@@ -70,7 +70,7 @@ cmd /c npm run desktop
 
 ### 方式三：Windows 浏览器安装包（兼容旧版）
 
-旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.17` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
+旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.18` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
 
 ## 配置说明
 
@@ -95,18 +95,24 @@ cmd /c npm run desktop
 - 点右上角的**配置**按钮，或顶部导航的**配置 → 配置 API**，面板第一张卡片就是「调用通道」。
 - 保存成功之前，右上角状态一直显示「配置未保存」。
 
-#### 第 3 步：选择一个调用通道
+#### 第 3 步：选择一个配置区
+
+配置抽屉顶部是四个互斥的配置区：**路由模式**、**直连模式**、**Gemini** 和 **主题**。只显示当前选中配置区的字段，其余配置区的控件保持隐藏且禁用，包括它们的「获取模型列表」按钮，因此不会误改或误查一个没在用的通道。前三个是调用通道，第四个不含任何连接字段。
 
 三种通道各自独立保存，只有当前选中的那一组会被用于生成。不确定时先选默认的「路由模式」。
 
-| 通道 | 适合的服务 | 需要填写 |
+| 配置区 | 适合的服务 | 需要填写 |
 | --- | --- | --- |
 | 路由模式（默认） | 支持 `POST /responses` 并允许 `image_generation` 工具的服务，例如 OpenAI 官方或对齐官方协议的中转 | 接口地址、API Key、Responses 模型 |
-| 直接调用模式 | 只提供 `images/generations` 或 `chat/completions` 的服务，或者生图与文本来自两家不同服务 | 生图 API 三项 + 文本/视觉 API 三项 |
-| Gemini模型 | 按 OpenAI 兼容的图像生成协议调用的 Gemini 图像模型 | 基础 URL、API Key、图像模型 |
+| 直连模式 | 只提供 `images/generations` 或 `chat/completions` 的服务，或者生图与文本来自两家不同服务 | 生图 API 三项 + 文本/视觉 API 三项 |
+| Gemini | 按 OpenAI 兼容的图像生成协议调用的 Gemini 图像模型 | 基础 URL、API Key、图像模型 |
+| 主题 | 不是调用通道，只承载界面配色 | 无需填写；重新选回某个通道即恢复该通道的连接字段 |
 
-长说明可通过鼠标悬停或键盘聚焦说明标记查看；配置表单与生成日志各自滚动，日志标题和通道切换保持可见。
-通道选择栏在 **Gemini模型** 后面紧跟一个紧凑的 **配色** 入口。点击后展开完整的界面配色面板，不会把生成日志挤出视口。面板提供 7 套中国传统色、3 个自定义颜色角色（按钮与焦点、界面面层、花卉与装饰），以及折枝梅、兰叶、竹节和牡丹 4 种点缀样式。选择会保存在浏览器本地，并同步到嵌入的 Temu 工作台。
+选中 **主题** 会完全隐藏连接字段，只显示一张独立的配色卡片：7 套界面配色、3 个自定义颜色角色（按钮与焦点、界面面层、花卉与装饰），以及折枝梅、兰叶、竹节和牡丹 4 种点缀样式。配色选项固定为一行，抽屉过窄时横向滚动。默认配色为「经典靛蓝」，其余 6 套取自中国传统色库。选择会保存在浏览器本地，并同步到嵌入的 Temu 工作台。
+
+在 **主题** 和通道之间来回切换不会改动当前生效的调用通道：上次选中的通道继续生效，右上角状态也照常显示它。
+
+长说明可通过鼠标悬停或键盘聚焦说明标记查看；配置表单与生成日志各自滚动，日志标题和配置区切换保持可见。
 
 #### 第 4 步：按通道填写字段
 
@@ -128,14 +134,14 @@ Responses 模型：gpt-5.4-mini
 
 提示词页的参数区还有「质量」下拉：`auto`、`low`、`medium`、`high`（默认），以及只有 2.5 模型才有的 `xhigh` 和 `max`。选着 `xhigh` / `max` 再把工具模型切回 `gpt-image-2` 时，质量会自动降为 `high`，而不是发一个上游必然拒绝的请求。
 
-**直接调用模式**分成两组，各自独立填写。生图组只负责图片生成和编辑，文本/视觉组负责提示词增强、参考图分析和 Listing 等模型调用，两组可以分别指向不同服务商：
+**直连模式**分成两组，各自独立填写。生图组只负责图片生成和编辑，文本/视觉组负责提示词增强、参考图分析和 Listing 等模型调用，两组可以分别指向不同服务商：
 
 ```text
 生图 API：https://api.openai.com/v1        后缀 images/generations   生图模型 gpt-image-2
 文本/视觉 API：https://api.openai.com/v1    后缀 responses            文本/视觉模型 gpt-5.4-mini
 ```
 
-**Gemini模型**，实际请求为「基础 URL + `/images/generations`」：
+**Gemini**，实际请求为「基础 URL + `/images/generations`」：
 
 ```text
 基础 URL：https://api.vendor.example/v1
@@ -172,7 +178,7 @@ API Key：<服务方提供的 Key>
 | 测试连接返回 401 或提示密钥无效 | Key 填错、粘贴时带了空格、Key 与接口地址不属于同一服务方 | 重新粘贴 Key，确认地址与 Key 来自同一服务方 |
 | 测试连接返回 404，或提示未找到可调用模型 | 该服务不提供 `/models` 列表接口 | 跳过测试，手填模型名保存，用一次真实生成验证 |
 | 生成时提示模型不存在 | 模型标识与该服务方的命名不一致 | 用「获取模型列表」查看真实模型名后再填 |
-| 路由模式生图失败，但文本类调用正常 | 该服务不支持 Responses 的 `image_generation` 工具 | 改用直接调用模式，生图组后缀选 `images/generations` |
+| 路由模式生图失败，但文本类调用正常 | 该服务不支持 Responses 的 `image_generation` 工具 | 改用直连模式，生图组后缀选 `images/generations` |
 | 提示需要令牌或远程访问认证 | 正在通过非回环地址访问本地服务 | 见下方「局域网访问与请求令牌」 |
 
 配置保存在本机：本地 Node 服务写入 `.local/config.json`，桌面程序写入 Electron 应用数据目录，云端部署由浏览器侧保存。不要在公共设备上保留密钥。
@@ -225,8 +231,8 @@ IMAGE_STUDIO_DNS_FALLBACK_SERVERS=
 | `OPENAI_API_KEY` | 默认 API Key |
 | `OPENAI_BASE_URL` | 默认 API Base URL |
 | `RESPONSES_MODEL` | 默认 Responses 模型，未配置时为 `gpt-5.4-mini`；应以实际服务支持的模型为准 |
-| `DIRECT_IMAGE_BASE_URL` / `DIRECT_IMAGE_API_KEY` / `DIRECT_IMAGE_ENDPOINT_PATH` / `DIRECT_IMAGE_MODEL` | 直接调用模式的生图 API 配置；分别对应地址、密钥、接口后缀和生图模型 |
-| `DIRECT_TEXT_BASE_URL` / `DIRECT_TEXT_API_KEY` / `DIRECT_TEXT_ENDPOINT_PATH` / `DIRECT_TEXT_MODEL` | 直接调用模式的文本/视觉 API 配置；分别对应地址、密钥、接口后缀和文本/视觉模型 |
+| `DIRECT_IMAGE_BASE_URL` / `DIRECT_IMAGE_API_KEY` / `DIRECT_IMAGE_ENDPOINT_PATH` / `DIRECT_IMAGE_MODEL` | 直连模式的生图 API 配置；分别对应地址、密钥、接口后缀和生图模型 |
+| `DIRECT_TEXT_BASE_URL` / `DIRECT_TEXT_API_KEY` / `DIRECT_TEXT_ENDPOINT_PATH` / `DIRECT_TEXT_MODEL` | 直连模式的文本/视觉 API 配置；分别对应地址、密钥、接口后缀和文本/视觉模型 |
 | `DIRECT_BASE_URL` / `DIRECT_API_KEY` / `DIRECT_ENDPOINT_PATH` / `DIRECT_RESPONSES_MODEL` | 旧版直接调用变量，仅用于兼容回退；新配置请使用上面两组变量 |
 | `PORT` | 本地服务端口，默认 `3600` |
 | `HOST` | 监听地址；留空时为 `127.0.0.1` |
@@ -288,7 +294,7 @@ $env:IMAGE_STUDIO_DNS_FALLBACK_SERVERS="1.1.1.1,8.8.8.8"
 
 ### 比例与像素尺寸候选
 
-路由模式和直接调用模式共享以下应用内像素候选。“自动适配”会取该比例的基础尺寸；“其余候选”按界面从低到高列出，不包含基础与最大值。
+路由模式和直连模式共享以下应用内像素候选。“自动适配”会取该比例的基础尺寸；“其余候选”按界面从低到高列出，不包含基础与最大值。
 
 | 比例 | 常见用途 | 基础尺寸 | 其余候选 | 最大候选 |
 | --- | --- | --- | --- | --- |
@@ -315,10 +321,10 @@ $env:IMAGE_STUDIO_DNS_FALLBACK_SERVERS="1.1.1.1,8.8.8.8"
 | 界面名称 | 典型协议 | 应用提供的尺寸参数 | 自动值 | 重要限制 |
 | --- | --- | --- | --- | --- |
 | 路由模式 | Responses API + 图像工具 | 上表中与比例绑定的明确像素值 | 当前比例的基础尺寸 | 界面只提供 `responses` 后缀，最终像素仍可能被上游调整；图片编辑是例外，始终改走 `images/edits` 并忽略已配置的后缀 |
-| 直接调用模式 | `images/generations`、`responses` 或 `chat/completions` | 与路由模式相同的明确像素值 | 当前比例的基础尺寸 | 兼容程度取决于网关和模型；图片编辑请求可能改走 `images/edits` |
-| Gemini模型 | Gemini 图片生成形态；非 Gemini 模型可走模型 `chat/completions` 兼容形态 | `512`、`1K`、`2K`、`4K` | `1K` | 尺寸是档位而非承诺像素；默认模型名为 `gemini-3.1-flash-image-preview`，仅表示应用默认值，不保证服务端存在；不同模型/网关可能不接受参考图、比例或 `4K` |
+| 直连模式 | `images/generations`、`responses` 或 `chat/completions` | 与路由模式相同的明确像素值 | 当前比例的基础尺寸 | 兼容程度取决于网关和模型；图片编辑请求可能改走 `images/edits` |
+| Gemini | Gemini 图片生成形态；非 Gemini 模型可走模型 `chat/completions` 兼容形态 | `512`、`1K`、`2K`、`4K` | `1K` | 尺寸是档位而非承诺像素；默认模型名为 `gemini-3.1-flash-image-preview`，仅表示应用默认值，不保证服务端存在；不同模型/网关可能不接受参考图、比例或 `4K` |
 
-“Gemini模型”是当前界面的通道名称，不等同于“任意 Gemini API 都完整兼容”。Studio 会根据模型名选择图片生成或聊天兼容请求体，连接测试通过也不保证所有生图工作流和最大尺寸都可用。
+“Gemini”是当前界面的通道名称，不等同于“任意 Gemini API 都完整兼容”。Studio 会根据模型名选择图片生成或聊天兼容请求体，连接测试通过也不保证所有生图工作流和最大尺寸都可用。
 
 选比例之前，这三点值得先知道：
 
@@ -347,7 +353,7 @@ $env:IMAGE_STUDIO_DNS_FALLBACK_SERVERS="1.1.1.1,8.8.8.8"
 
 ### 19 种平台推荐策略
 
-平台表来自应用内版本 `2026-07-18.1` 的策略画像。推荐轮播数只统计平台画像的默认轮播槽位，不含按 SKU 追加的图片、信息图重构项或用户手动新增项。
+平台表来自应用内版本 `2026-07-18.2` 的策略画像。推荐轮播数只统计平台画像的默认轮播槽位，不含按 SKU 追加的图片、信息图重构项或用户手动新增项。
 
 | 平台 | 推荐轮播 | 分辨率档位 | 目标语言 | 证据级别 |
 | --- | ---: | --- | --- | --- |
@@ -377,7 +383,7 @@ $env:IMAGE_STUDIO_DNS_FALLBACK_SERVERS="1.1.1.1,8.8.8.8"
 
 | 工作流 | 固定或默认参数 | 说明 |
 | --- | --- | --- |
-| 文章插图 | `3:2`、`auto`、PNG | 页面没有单独尺寸控件；路由/直接通道的 `auto` 基础值为 `1536x1024`，Gemini模型通道的 `auto` 为 `1K` |
+| 文章插图 | `3:2`、`auto`、PNG | 页面没有单独尺寸控件；路由/直连通道的 `auto` 基础值为 `1536x1024`，Gemini 通道的 `auto` 为 `1K` |
 | PPT 页面 | `16:9`、请求尺寸 `2048x1152`、PNG | 最终有效尺寸可能由上游调整；导出时使用实际保存的页面图片 |
 | 写真模式 | 默认 12 张、`4:5`、PNG | 数量可改为 1 到 100，比例/尺寸/格式可在页面调整 |
 | 电商套图 | 默认 PNG；平台画像决定默认比例、档位、语言和图片类型 | 用户显式设置的套图级语言、比例、分辨率和兼容类型状态以提交时冻结的有效计划为准 |
@@ -443,7 +449,7 @@ GPT-Image2-Studio 面向个人创作者、电商运营、设计师和内容团�
 - 套图、写真、文章插图和 PPT 独立记录页。
 - 生成队列、后台任务状态、错误信息和失败项重试。
 - Prompt Kit、Prompt Agent 图片转提示词、Logo 素材库、写真搭配库和模型选择器。
-- 紧凑配置卡片、鼠标悬停/键盘聚焦说明、固定且独立滚动的生成日志、7 套传统色、自定义界面颜色和可选花卉点缀。
+- 路由模式、直连模式、Gemini、主题四个互斥配置区，配合鼠标悬停/键盘聚焦说明、固定且独立滚动的生成日志、7 套界面配色、自定义界面颜色和可选花卉点缀。
 - 深色/浅色主题、中英文界面和跨桌面/平板/手机布局。
 
 ## 真实界面预览
@@ -552,7 +558,7 @@ GPT-Image2-Studio 面向个人创作者、电商运营、设计师和内容团�
 | 图片详情灯箱 | 生成预览中的“查看”，或点击画廊/记录页图片 | 支持适配、缩放、平移、前后切换、下载、删除、复制相对/完整路径，并展示提示词、模型、比例、尺寸和工作流快照 |
 | Prompt Agent | 顶栏“图片转提示词”，或创作菜单中的同名入口 | 上传 1 张图片，分析为可复制的 JSON 提示词；历史记录长期保存在当前运行环境的数据存储中 |
 | 商品图采集插件 | 创作 -> 工具 -> 商品图采集插件 | 鼠标悬停或键盘聚焦名称可查看完整说明；点击后下载 Chrome/Edge 插件 ZIP，用于从受支持商城详情页采集主图、详情图和 SKU 图，再复制到 Studio、批量复制到聊天软件或按商品文件夹下载 |
-| 连接配置 / 生成日志 | 顶栏“配置”，或配置菜单 -> 生成日志 | 在路由模式、直接调用模式和“Gemini模型”之间切换，分别管理端点、API Key、文本/视觉模型和生图模型，并可获取模型、测试连接和保存浏览器私有配置；日志会展示当前会话的通道、时间、参数摘要、进度、结果和错误，用于定位上游超时、协议不兼容或无最终图片等问题 |
+| 连接配置 / 生成日志 | 顶栏“配置”，或配置菜单 -> 生成日志 | 在“路由模式”“直连模式”“Gemini”“主题”四个互斥配置区之间切换：前三个分别管理端点、API Key、文本/视觉模型和生图模型，并可获取模型、测试连接和保存浏览器私有配置，未选中的配置区控件保持禁用；“主题”只承载界面配色；日志会展示当前会话的通道、时间、参数摘要、进度、结果和错误，用于定位上游超时、协议不兼容或无最终图片等问题 |
 | Prompt Kit | 提示词输入区的模板按钮 | 从内置模板开始组织主体、场景、构图和视觉语言，再把模板内容带回提示词编辑区继续修改 |
 | Logo 库 | “上传图加 Logo”分支 | 上传、长期保存、选择和删除常用 Logo；可设置位置和背景策略，也可对最多 15 张上传图执行同一 Logo 批处理 |
 | 写真搭配库 | 写真模式 -> 服装道具配饰参考图 -> 搭配库 | 保存并复用服装、道具和配饰素材，将选中素材带入写真参考图与提示词摘要 |
@@ -597,8 +603,8 @@ cmd /c npm run build:desktop
 产物路径：
 
 ```text
-artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.17-x64.exe
-artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.17-x64.zip
+artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.18-x64.exe
+artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.18-x64.zip
 artifacts/desktop/win-unpacked/GPT-Image2-Studio.exe
 ```
 
@@ -616,7 +622,7 @@ cmd /c npm run build:installer
 产物路径格式：
 
 ```text
-artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.17.exe
+artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.18.exe
 ```
 
 脚本使用系统 `iexpress.exe` 生成自解压安装包，并把当前 Node.js 运行时和依赖打入安装目录；启动后仍使用默认浏览器显示工作台。
@@ -719,7 +725,16 @@ cmd /c npm run build:installer
 
 ## 版本更新说明
 
-完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.17](./docs/releases/v0.2.17.md)。
+完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.18](./docs/releases/v0.2.18.md)。
+
+### v0.2.18 更新说明
+
+- 配置抽屉改为四个互斥配置区：**路由模式** / **直连模式** / **Gemini** / **主题**。只渲染当前配置区的字段，未选中配置区的控件（含「获取模型列表」）改为禁用而不只是隐藏，不会再误改或误查一个没在用的通道。
+- 界面配色不再是 Gemini 选项后面那个入口按钮展开的浮层，而是「主题」里的一张独立卡片；「主题」不含任何连接字段。在「主题」和通道之间来回切换不改动当前生效的调用通道。
+- 配色选项固定为一行并在窄抽屉里横向滚动，不再按 4 列、2 列网格换行。
+- 默认配色为「经典靛蓝」，恢复 v0.2.6 的靛蓝色值（`#6f7cff` / `#12192f` / `#879cff`），Studio 与嵌入的 Temu 工作台一致。其余 6 套保持各自的传统色值，配色 ID 全部未变，已保存的选择仍能正确还原。
+- 配色显示名收短（`青花甜白` → `青花`，`江南竹影` → `竹影`，`雨过天青` → `天青`，`故宫朱墙` → `朱墙`，`漆器朱漆` → `朱漆`，`敦煌石青` → `敦煌`），两个过长的配置区名收短为 `直连模式` 和 `Gemini`。
+- 文档订正：平台画像表的版本为 `2026-07-18.2`；两份 README 改为描述四配置区抽屉，不再描述已移除的配色入口按钮。
 
 ### v0.2.17 更新说明
 

@@ -3453,12 +3453,15 @@ test("config endpoint controls keep suffix before full URL and mark direct image
   assert.notEqual(directResponsesInputIndex, -1);
   assert.notEqual(directResponsesFieldStart, -1);
   assert.doesNotMatch(directResponsesFieldOpenTag, /\shidden(?:[=\s>]|$)/);
-  assert.match(html, /<input name="imageRoute" type="radio" value="c" \/>[\s\S]*<span data-ui-i18n="protocolMode">Gemini模型<\/span>/);
+  assert.match(html, /<input name="configSection" type="radio" value="c" \/>[\s\S]*<span data-ui-i18n="protocolMode">Gemini<\/span>/);
+  assert.match(html, /<input name="configSection" type="radio" value="theme" \/>[\s\S]*<span data-ui-i18n="themeSection">主题<\/span>/);
+  assert.match(html, /<div class="config-route-state" hidden>[\s\S]*<input name="imageRoute" type="radio" value="c" \/>[\s\S]*<\/div>/);
   assert.match(html, /<div class="route-config-panel" data-route-panel="c"[\s\S]*id="protocolBaseUrlInput"[\s\S]*id="protocolApiKeyInput"[\s\S]*id="protocolImageModelInput"/);
   assert.match(html, /id="protocolCompatibilityHint"[\s\S]*Gemini[\s\S]*images\/generations/);
   assert.match(styles, /\.endpoint-toolbar\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*auto;/);
-  assert.match(styles, /\.config-form:has\(input\[name="imageRoute"\]\[value="c"\]:checked\) \[data-route-panel="a"\]/);
-  assert.match(styles, /\.config-form:has\(input\[name="imageRoute"\]\[value="c"\]:checked\) \[data-route-panel="b"\]/);
+  assert.match(styles, /\.config-form:has\(input\[name="configSection"\]\[value="c"\]:checked\) \[data-route-panel="c"\]/);
+  assert.match(styles, /\.config-form:has\(input\[name="configSection"\]\[value="theme"\]:checked\) \.config-theme-panel/);
+  assert.match(styles, /\.config-form:has\(input\[name="configSection"\]\[value="theme"\]:checked\) \.config-route-fields/);
   assert.match(app, /API_ENDPOINT_IMAGE_EDITS,/);
   assert.match(app, /API_ENDPOINT_CHAT_COMPLETIONS,/);
   assert.match(app, /splitModelProtocolUrl,/);

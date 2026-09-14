@@ -2664,7 +2664,7 @@
       </main>
     </div>
 
-    <small class="app-version" aria-label="当前版本 v0.2.17">v0.2.17</small>
+    <small class="app-version" aria-label="当前版本 v0.2.18">v0.2.18</small>
 
     <dialog
       class="creation-record-delete-dialog"
@@ -3113,95 +3113,30 @@
                 <h3 id="configConnectionTitle" data-ui-i18n="connectionSection">调用通道</h3>
               </div>
 
-              <fieldset class="route-selector" aria-label="生图调用模式" data-ui-i18n-aria-label="generationRouteLabel">
-                <legend data-ui-i18n="generationRouteLabel">生图调用模式</legend>
+              <fieldset class="route-selector" aria-label="配置区" data-ui-i18n-aria-label="configSectionLabel">
+                <legend data-ui-i18n="configSectionLabel">配置区</legend>
                 <label>
-                  <input name="imageRoute" type="radio" value="a" checked />
+                  <input name="configSection" type="radio" value="a" checked />
                   <span data-ui-i18n="routeMode">路由模式</span>
                 </label>
                 <label>
-                  <input name="imageRoute" type="radio" value="b" />
-                  <span data-ui-i18n="directMode">直接调用模式</span>
+                  <input name="configSection" type="radio" value="b" />
+                  <span data-ui-i18n="directMode">直连模式</span>
                 </label>
                 <label>
-                  <input name="imageRoute" type="radio" value="c" />
-                  <span data-ui-i18n="protocolMode">Gemini模型</span>
+                  <input name="configSection" type="radio" value="c" />
+                  <span data-ui-i18n="protocolMode">Gemini</span>
                 </label>
-                <button class="route-palette-toggle" id="palettePickerToggle" type="button" aria-expanded="false" aria-controls="palettePickerPanel" aria-label="打开界面配色" data-ui-i18n-aria-label="paletteTriggerAria">
-                  <span class="route-palette-swatch" id="palettePickerSwatch" aria-hidden="true"><i></i><i></i><i></i></span>
-                  <span data-ui-i18n="paletteTrigger">配色</span>
-                </button>
+                <label>
+                  <input name="configSection" type="radio" value="theme" />
+                  <span data-ui-i18n="themeSection">主题</span>
+                </label>
               </fieldset>
 
-              <div class="route-palette-panel" id="palettePickerPanel" hidden>
-                <section class="config-card palette-config-card" aria-labelledby="paletteConfigTitle">
-                <div class="config-card-head palette-config-head">
-                  <div>
-                    <h3 id="paletteConfigTitle" data-ui-i18n="paletteSection">界面配色</h3>
-                    <p class="config-card-caption" data-ui-i18n="paletteHint">选择一套中国传统色，立即应用到背景、卡片、按钮与细节。</p>
-                  </div>
-                </div>
-                <input id="uiPaletteInput" name="uiPalette" type="hidden" value="default" />
-                <div class="palette-options" role="radiogroup" aria-label="界面配色" data-ui-i18n-aria-label="paletteSection">
-                  <button class="palette-option is-active" type="button" data-ui-palette-option="default" role="radio" aria-checked="true">
-                    <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
-                    <span data-ui-i18n="paletteDefault">默认魏紫</span>
-                  </button>
-                  <button class="palette-option" type="button" data-ui-palette-option="qinghua" role="radio" aria-checked="false">
-                    <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
-                    <span data-ui-i18n="paletteQinghua">青花甜白</span>
-                  </button>
-                  <button class="palette-option" type="button" data-ui-palette-option="jiangnan" role="radio" aria-checked="false">
-                    <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
-                    <span data-ui-i18n="paletteJiangnan">江南竹影</span>
-                  </button>
-                  <button class="palette-option" type="button" data-ui-palette-option="songci" role="radio" aria-checked="false">
-                    <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
-                    <span data-ui-i18n="paletteSongci">雨过天青</span>
-                  </button>
-                  <button class="palette-option" type="button" data-ui-palette-option="gugong" role="radio" aria-checked="false">
-                    <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
-                    <span data-ui-i18n="paletteGugong">故宫朱墙</span>
-                  </button>
-                  <button class="palette-option" type="button" data-ui-palette-option="lacquer" role="radio" aria-checked="false">
-                    <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
-                    <span data-ui-i18n="paletteLacquer">漆器朱漆</span>
-                  </button>
-                  <button class="palette-option" type="button" data-ui-palette-option="dunhuang" role="radio" aria-checked="false">
-                    <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
-                    <span data-ui-i18n="paletteDunhuang">敦煌石青</span>
-                  </button>
-                </div>
-                <div class="palette-custom-grid">
-                  <div class="palette-color-field">
-                    <label for="uiCustomAccentInput" data-ui-i18n="customAccent">按钮与焦点</label>
-                    <span class="palette-color-control"><input id="uiCustomAccentInput" type="color" value="#7e1671" aria-label="按钮与焦点" data-ui-i18n-aria-label="customAccent" /><button type="button" class="palette-color-reset" data-custom-color-reset="accent" data-ui-i18n="customReset">跟随</button></span>
-                  </div>
-                  <div class="palette-color-field">
-                    <label for="uiCustomSurfaceInput" data-ui-i18n="customSurface">界面面层</label>
-                    <span class="palette-color-control"><input id="uiCustomSurfaceInput" type="color" value="#131824" aria-label="界面面层" data-ui-i18n-aria-label="customSurface" /><button type="button" class="palette-color-reset" data-custom-color-reset="surface" data-ui-i18n="customReset">跟随</button></span>
-                  </div>
-                  <div class="palette-color-field">
-                    <label for="uiCustomDetailInput" data-ui-i18n="customDetail">花卉与装饰</label>
-                    <span class="palette-color-control"><input id="uiCustomDetailInput" type="color" value="#61649f" aria-label="花卉与装饰" data-ui-i18n-aria-label="customDetail" /><button type="button" class="palette-color-reset" data-custom-color-reset="detail" data-ui-i18n="customReset">跟随</button></span>
-                  </div>
-                </div>
-                <div class="palette-ornament-row">
-                  <label class="toggle-field">
-                    <input id="uiOrnamentInput" type="checkbox" />
-                    <span data-ui-i18n="ornamentEnable">花卉点缀</span>
-                  </label>
-                  <label class="palette-style-field">
-                    <span data-ui-i18n="ornamentStyle">点缀样式</span>
-                    <select id="uiOrnamentStyleInput">
-                      <option value="mei" data-ui-i18n="ornamentMei">折枝梅</option>
-                      <option value="lan" data-ui-i18n="ornamentLan">兰叶小丛</option>
-                      <option value="zhu" data-ui-i18n="ornamentZhu">竹节竖列</option>
-                      <option value="mudan" data-ui-i18n="ornamentMudan">牡丹团花</option>
-                    </select>
-                  </label>
-                </div>
-                </section>
+              <div class="config-route-state" hidden>
+                <input name="imageRoute" type="radio" value="a" checked />
+                <input name="imageRoute" type="radio" value="b" />
+                <input name="imageRoute" type="radio" value="c" />
               </div>
 
               <div class="config-route-fields">
@@ -3373,6 +3308,75 @@
                     </div>
                   </div>
                 </div>
+              </div>
+            </section>
+
+            <section class="config-card palette-config-card config-theme-panel" aria-labelledby="paletteConfigTitle">
+              <div class="config-card-head palette-config-head">
+                <div>
+                  <h3 id="paletteConfigTitle" data-ui-i18n="paletteSection">界面配色</h3>
+                  <p class="config-card-caption" data-ui-i18n="paletteHint">选择一套界面配色，立即应用到背景、卡片、按钮与细节。</p>
+                </div>
+              </div>
+              <input id="uiPaletteInput" name="uiPalette" type="hidden" value="default" />
+              <div class="palette-options" role="radiogroup" aria-label="界面配色" data-ui-i18n-aria-label="paletteSection">
+                <button class="palette-option is-active" type="button" data-ui-palette-option="default" role="radio" aria-checked="true">
+                  <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
+                  <span data-ui-i18n="paletteDefault">经典靛蓝</span>
+                </button>
+                <button class="palette-option" type="button" data-ui-palette-option="qinghua" role="radio" aria-checked="false">
+                  <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
+                  <span data-ui-i18n="paletteQinghua">青花</span>
+                </button>
+                <button class="palette-option" type="button" data-ui-palette-option="jiangnan" role="radio" aria-checked="false">
+                  <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
+                  <span data-ui-i18n="paletteJiangnan">竹影</span>
+                </button>
+                <button class="palette-option" type="button" data-ui-palette-option="songci" role="radio" aria-checked="false">
+                  <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
+                  <span data-ui-i18n="paletteSongci">天青</span>
+                </button>
+                <button class="palette-option" type="button" data-ui-palette-option="gugong" role="radio" aria-checked="false">
+                  <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
+                  <span data-ui-i18n="paletteGugong">朱墙</span>
+                </button>
+                <button class="palette-option" type="button" data-ui-palette-option="lacquer" role="radio" aria-checked="false">
+                  <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
+                  <span data-ui-i18n="paletteLacquer">朱漆</span>
+                </button>
+                <button class="palette-option" type="button" data-ui-palette-option="dunhuang" role="radio" aria-checked="false">
+                  <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
+                  <span data-ui-i18n="paletteDunhuang">敦煌</span>
+                </button>
+              </div>
+              <div class="palette-custom-grid">
+                <div class="palette-color-field">
+                  <label for="uiCustomAccentInput" data-ui-i18n="customAccent">按钮与焦点</label>
+                  <span class="palette-color-control"><input id="uiCustomAccentInput" type="color" value="#6f7cff" aria-label="按钮与焦点" data-ui-i18n-aria-label="customAccent" /><button type="button" class="palette-color-reset" data-custom-color-reset="accent" data-ui-i18n="customReset">跟随</button></span>
+                </div>
+                <div class="palette-color-field">
+                  <label for="uiCustomSurfaceInput" data-ui-i18n="customSurface">界面面层</label>
+                  <span class="palette-color-control"><input id="uiCustomSurfaceInput" type="color" value="#12192f" aria-label="界面面层" data-ui-i18n-aria-label="customSurface" /><button type="button" class="palette-color-reset" data-custom-color-reset="surface" data-ui-i18n="customReset">跟随</button></span>
+                </div>
+                <div class="palette-color-field">
+                  <label for="uiCustomDetailInput" data-ui-i18n="customDetail">花卉与装饰</label>
+                  <span class="palette-color-control"><input id="uiCustomDetailInput" type="color" value="#879cff" aria-label="花卉与装饰" data-ui-i18n-aria-label="customDetail" /><button type="button" class="palette-color-reset" data-custom-color-reset="detail" data-ui-i18n="customReset">跟随</button></span>
+                </div>
+              </div>
+              <div class="palette-ornament-row">
+                <label class="toggle-field">
+                  <input id="uiOrnamentInput" type="checkbox" />
+                  <span data-ui-i18n="ornamentEnable">花卉点缀</span>
+                </label>
+                <label class="palette-style-field">
+                  <span data-ui-i18n="ornamentStyle">点缀样式</span>
+                  <select id="uiOrnamentStyleInput">
+                    <option value="mei" data-ui-i18n="ornamentMei">折枝梅</option>
+                    <option value="lan" data-ui-i18n="ornamentLan">兰叶小丛</option>
+                    <option value="zhu" data-ui-i18n="ornamentZhu">竹节竖列</option>
+                    <option value="mudan" data-ui-i18n="ornamentMudan">牡丹团花</option>
+                  </select>
+                </label>
               </div>
             </section>
 

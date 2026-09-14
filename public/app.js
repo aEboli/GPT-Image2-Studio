@@ -381,18 +381,18 @@ const UI_LANGUAGE_STORAGE_KEY = "image-studio-ui-language-v1";
 // catalogue.  CSS owns the complete token mapping; this table is the single
 // source for labels, swatches, and persistence validation in the UI.
 const UI_PALETTE_META = Object.freeze({
-  default: { label: "默认魏紫", swatch: ["#131824", "#7e1671", "#ed5126"] },
-  qinghua: { label: "青花甜白", swatch: ["#fffef9", "#1772b4", "#144a74"] },
-  jiangnan: { label: "江南竹影", swatch: ["#fbf2e3", "#6e8b74", "#a61b29"] },
-  songci: { label: "雨过天青", swatch: ["#eef7f2", "#63bbd0", "#495c69"] },
-  gugong: { label: "故宫朱墙", swatch: ["#f6dead", "#5d3d21", "#f43e06"] },
-  lacquer: { label: "漆器朱漆", swatch: ["#131824", "#ed5126", "#f3bf4c"] },
-  dunhuang: { label: "敦煌石青", swatch: ["#15231b", "#be7e4a", "#e4bf11"] },
+  default: { label: "经典靛蓝", swatch: ["#090d18", "#12192f", "#6f7cff"] },
+  qinghua: { label: "青花", swatch: ["#fffef9", "#1772b4", "#144a74"] },
+  jiangnan: { label: "竹影", swatch: ["#fbf2e3", "#6e8b74", "#a61b29"] },
+  songci: { label: "天青", swatch: ["#eef7f2", "#63bbd0", "#495c69"] },
+  gugong: { label: "朱墙", swatch: ["#f6dead", "#5d3d21", "#f43e06"] },
+  lacquer: { label: "朱漆", swatch: ["#131824", "#ed5126", "#f3bf4c"] },
+  dunhuang: { label: "敦煌", swatch: ["#15231b", "#be7e4a", "#e4bf11"] },
 });
 const UI_PALETTE_IDS = new Set(Object.keys(UI_PALETTE_META));
 const UI_ORNAMENT_STYLES = new Set(["mei", "lan", "zhu", "mudan"]);
 const UI_PALETTE_DEFAULTS = Object.freeze({
-  default: { accent: "#7e1671", surface: "#131824", detail: "#61649f" },
+  default: { accent: "#6f7cff", surface: "#12192f", detail: "#879cff" },
   qinghua: { accent: "#144a74", surface: "#e4dfd7", detail: "#1772b4" },
   jiangnan: { accent: "#a61b29", surface: "#e4dfd7", detail: "#6e8b74" },
   songci: { accent: "#495c69", surface: "#d8e3e7", detail: "#63bbd0" },
@@ -405,6 +405,10 @@ const UI_LANGUAGE_TEXT = {
   en: { activityLog: "Generation Log", activityLogAllPanels: "All Panels", activityLogPanels: "Generation log panels", apiBookExpand: "Show saved APIs", apiBookEmpty: "No saved APIs yet", apiBookRemove: "Delete this API", baseUrl: "Base URL", brandSubtitle: "AI image workflow", close: "Close", config: "Settings", configApi: "Configure API", configSaved: "Config saved", configTitle: "Connection Settings", configUnsaved: "Config not saved", connectionBusy: "Concurrent {running}/{max} · Queue {queued}", connectionOpen: "open API and log", connectionSection: "Request Channel", connectionStatusEmpty: "API/Log missing", connectionStatusEntry: "API, Log", delete: "Delete", directEndpointSuffix: "Direct mode endpoint suffix", directMode: "Direct Mode", download: "Download", endpointUrl: "Endpoint", expandModels: "Show available models", fetchModels: "Fetch Models", fetchModelsLoading: "Fetching...", fit: "Fit", functionMenu: "Function menu", fullUrl: "Full URL", generate: "Generate", generateTitle: "Generate (Ctrl+Enter)", generationRouteLabel: "Image request mode", globalNav: "Global navigation", imageModel: "Image Model", imageToolModel: "Image Tool Model", imageToolModelHint: "Route mode uses this model for the image_generation tool in Responses requests. Default gpt-image-2; sunburst is more precise for edits, flare is faster.", keepSavedKey: "Keep saved key", languageEn: "English UI", languageSwitch: "Switch interface language", languageZh: "Simplified Chinese UI", menuArticleIllustration: "Article Illustration", menuArticleRecord: "Article Records", menuAssetTools: "Asset Tools", menuCreation: "Product Suite", menuCreationRecord: "Suite Records", menuCreateTools: "Creation Tools", menuGallery: "Gallery", menuImageCompress: "Image Compress", menuImageDecomposition: "Image Decomposition", menuImageEdit: "Image Edit", menuPortrait: "Portrait Mode", menuPortraitRecord: "Portrait Records", menuPpt: "PPT Generation", menuPptRecord: "PPT Records", menuPromptStudio: "Prompt to Image", menuQuickBlend: "Quick Blend", menuReferenceAnalysis: "Reference Analysis", menuSectionAssets: "Assets", menuSectionCreate: "Creation", menuSectionSettings: "Settings", menuSettings: "Settings", menuStyleTransfer: "Style Transfer", menuTools: "Tools", modeDirect: "Direct Mode", modeProtocol: "Gemini Model", modeRoute: "Route Mode", modelFetchBusy: "Fetching model list...", modelFetchFailed: "Failed to fetch model list.", modelFetchSuccess: "Fetched {count} callable models.", modelNoCallable: "No callable models found.", modelNoMatch: "No matching models", modelNoMatchWithQuery: "No matching models: {query}", modelTestBusy: "Testing connection...", modelTestSuccess: "Connection test succeeded. Found {count} models.", navAssets: "Assets", navCreate: "Create", navSettings: "Settings", notSaved: "Not saved", openOutput: "Open Output", outputFormat: "Output Format", parameters: "Parameters", previewIdleDetail: "Generation log is in Settings. Use the filmstrip below to switch results.", previewIdleEyebrow: "Output Preview", previewIdleTitle: "Generated results update here in real time.", previewWaiting: "Waiting", prompt: "Prompt", promptAgent: "Image to Prompt", promptCounterSuffix: "chars", promptEnhance: "Enhance Mode", promptEnhanceAria: "Toggle prompt enhancement mode", promptEnhanceField: "Enhancement Prompt", promptEnhanceOff: "Off", promptEnhanceOn: "On", promptPlaceholder: "Describe the image you want, or upload references first and describe the edit direction.", promptTemplate: "Prompt templates", protocolHint: "Gemini image models use an OpenAI-compatible image generation protocol. Base URL usually ends at /v1; requests go to /images/generations.", protocolImageModel: "Image Model", protocolMode: "Gemini Model", quality: "Quality", "ratio.1:1": "Ecommerce, Avatar, Social · Square 1:1", "ratio.1:2": "Long Poster · Portrait 1:2", "ratio.1:3": "Tall Ad · Portrait 1:3", "ratio.2:1": "Banner · Landscape 2:1", "ratio.2:3": "Vertical Photo · Portrait 2:3", "ratio.3:1": "Ultrawide Ad · Landscape 3:1", "ratio.3:2": "Photography · Landscape 3:2", "ratio.3:4": "Poster, Portrait · Portrait 3:4", "ratio.4:3": "PPT, Web Graphic · Landscape 4:3", "ratio.4:5": "Instagram Post · Portrait 4:5", "ratio.5:4": "Product Display · Landscape 5:4", "ratio.9:16": "Short Video Cover, Wallpaper · Portrait 9:16", "ratio.9:21": "Tall Scroll Image · Portrait 9:21", "ratio.16:9": "Cover, YouTube · Landscape 16:9", "ratio.21:9": "Ultrawide Banner · Landscape 21:9", ratioLandscape: "Landscape", ratioPortrait: "Portrait", ratioSquare: "Square", reasoningEffort: "Reasoning", reference: "Reference", referenceUploadAction: "Upload Reference", referenceUploadTitle: "Drop images or click to upload", responsesModel: "Responses Model", routeEndpointSuffix: "Route mode endpoint suffix", routeMode: "Route Mode", save: "Save", schedulingSection: "Generation Scheduling", schedulingLockNote: "Generation tasks are running or queued, so the scheduling parameters cannot be changed right now. They unlock automatically once every task finishes.", concurrencyLabel: "Request Concurrency", concurrencyUnit: "requests", concurrencyHint: "The total number of generation requests that may run at once in one session. Default 20, range 1 to 50. Lowering it eases upstream pressure and reduces rate limiting and timeouts; raising it is faster but reaches limits sooner.", size: "Size", startDelayHint: "Interval between adjacent upstream submissions in one session. Default 1000 ms, range 200 to 5000 ms. A larger interval is gentler on a rate-limited upstream but starts the last image later.", startDelayLabel: "Task Submit Interval", startDelayUnit: "ms", sizeAuto: "Auto", sizeMax: "Max", testConnection: "Test Connection", testConnectionLoading: "Testing...", themeDark: "Dark theme", themeLight: "Light theme", themeMenu: "Theme color", themeToDark: "Switch to dark theme", themeToLight: "Switch to light theme", thumbnailEmpty: "No thumbnails", thumbnailFailed: "Thumbnail load failed", thumbnailLoading: "Loading thumbnails", timelineNoErrors: "No errors", timelineWaitingResult: "Waiting for result", timelineWaitingTask: "Waiting for task", toolModel: "Tool Model", toolModelAndQuality: "Tool model and quality", toolModelMeta: "Tool model", view: "View", visionTextModel: "Vision/Text Model" },
 };
 Object.assign(UI_LANGUAGE_TEXT["zh-CN"], {
+  configSectionLabel: "配置区",
+  directMode: "直连模式",
+  protocolMode: "Gemini",
+  themeSection: "主题",
   directImageApi: "生图 API",
   directImageApiKey: "生图 API Key",
   directImageEndpointSuffix: "直接调用模式生图请求协议后缀",
@@ -416,14 +420,14 @@ Object.assign(UI_LANGUAGE_TEXT["zh-CN"], {
   paletteSection: "界面配色",
   paletteTrigger: "配色",
   paletteTriggerAria: "打开界面配色",
-  paletteHint: "选择一套中国传统色，立即应用到背景、卡片、按钮与细节。",
-  paletteDefault: "默认魏紫",
-  paletteQinghua: "青花甜白",
-  paletteJiangnan: "江南竹影",
-  paletteSongci: "雨过天青",
-  paletteGugong: "故宫朱墙",
-  paletteLacquer: "漆器朱漆",
-  paletteDunhuang: "敦煌石青",
+  paletteHint: "选择一套界面配色，立即应用到背景、卡片、按钮与细节。",
+  paletteDefault: "经典靛蓝",
+  paletteQinghua: "青花",
+  paletteJiangnan: "竹影",
+  paletteSongci: "天青",
+  paletteGugong: "朱墙",
+  paletteLacquer: "朱漆",
+  paletteDunhuang: "敦煌",
   ornamentEnable: "花卉点缀",
   ornamentStyle: "点缀样式",
   ornamentMei: "折枝梅",
@@ -437,6 +441,9 @@ Object.assign(UI_LANGUAGE_TEXT["zh-CN"], {
   customReset: "跟随",
 });
 Object.assign(UI_LANGUAGE_TEXT.en, {
+  configSectionLabel: "Configuration section",
+  themeSection: "Theme",
+  protocolMode: "Gemini",
   directImageApi: "Image API",
   directImageApiKey: "Image API key",
   directImageEndpointSuffix: "Direct image endpoint suffix",
@@ -448,14 +455,14 @@ Object.assign(UI_LANGUAGE_TEXT.en, {
   paletteSection: "Interface palette",
   paletteTrigger: "Palette",
   paletteTriggerAria: "Open interface palette",
-  paletteHint: "Choose a traditional Chinese palette for backgrounds, cards, buttons, and details.",
-  paletteDefault: "Default Wei Purple",
-  paletteQinghua: "Blue-and-white porcelain",
-  paletteJiangnan: "Jiangnan bamboo",
-  paletteSongci: "Rain-washed celadon",
-  paletteGugong: "Imperial vermilion",
+  paletteHint: "Choose an interface palette for backgrounds, cards, buttons, and details.",
+  paletteDefault: "Classic indigo",
+  paletteQinghua: "Blue and white",
+  paletteJiangnan: "Bamboo shade",
+  paletteSongci: "Celadon",
+  paletteGugong: "Vermilion wall",
   paletteLacquer: "Vermilion lacquer",
-  paletteDunhuang: "Dunhuang mineral",
+  paletteDunhuang: "Dunhuang",
   ornamentEnable: "Floral accents",
   ornamentStyle: "Accent motif",
   ornamentMei: "Plum branch",
@@ -804,6 +811,7 @@ const state = {
   timelineHasRendered: false,
   timelineSignatures: new Map(),
   timelineUnreadCount: 0,
+  configSection: "a",
   uiTheme: "dark",
   uiPalette: "default",
   uiOrnament: false,
@@ -861,6 +869,7 @@ const refs = {
   directTextEndpointPathSelect: document.querySelector("#directTextEndpointPathSelect"),
   directTextSavedKeyMask: document.querySelector("#directTextSavedKeyMask"),
   endpointPathSelect: document.querySelector("#endpointPathSelect"),
+  configSectionInputs: [...document.querySelectorAll('input[name="configSection"]')],
   imageRouteInputs: [...document.querySelectorAll('input[name="imageRoute"]')],
   protocolApiKeyInput: document.querySelector("#protocolApiKeyInput"),
   protocolBaseUrlInput: document.querySelector("#protocolBaseUrlInput"),
@@ -1392,7 +1401,19 @@ const previewKeyboardNavigation = createPreviewKeyboardNavigationController({
 const handlePreviewArrowNavigation = previewKeyboardNavigation.handlePreviewArrowNavigation;
 const setReferencePreviewNavigationContext = previewKeyboardNavigation.setReferencePreviewNavigationContext;
 const portraitLocationController = createPortraitLocationSelectorController({ refs, state, renderPortraitView });
-const configModelPicker = createConfigModelPickerController({ refs, state, getBrowserPrivateConfigRequestPayload, getUiText: getUiLanguageText }); const apiEndpointBookPicker = createApiEndpointBookPickerController({ refs, state, getUiText: getUiLanguageText, onApplied: applyPickedApiEndpointDisplay }); const creationLogoLibrary = createCreationLogoLibraryController({ applyLogoFile: applyCreationLogoFile, refs, setFeedback: setCreationFeedback, showError });
+const configModelPicker = createConfigModelPickerController({
+  refs,
+  state,
+  getBrowserPrivateConfigRequestPayload,
+  getUiText: getUiLanguageText,
+  isTargetEnabled: (target) => {
+    const section = getSelectedConfigSection();
+    if (section === "theme") return false;
+    if (target === "responses") return section === "a";
+    if (target === "protocol") return section === "c";
+    return section === "b";
+  },
+}); const apiEndpointBookPicker = createApiEndpointBookPickerController({ refs, state, getUiText: getUiLanguageText, onApplied: applyPickedApiEndpointDisplay }); const creationLogoLibrary = createCreationLogoLibraryController({ applyLogoFile: applyCreationLogoFile, refs, setFeedback: setCreationFeedback, showError });
 const pptAnalysis = createPptAnalysisController({
   state,
   buildFormData: buildPptFormData,
@@ -5407,9 +5428,64 @@ function renderReferenceAnalysisRatioGrid() {
   renderRatioGrid(refs.referenceAnalysisRatioGrid, refs.referenceAnalysisRatioInput, syncReferenceAnalysisRatio);
 }
 
+const CONFIG_SECTION_IDS = new Set(["a", "b", "c", "theme"]);
+function normalizeConfigSection(section) {
+  const normalized = String(section || "").trim().toLowerCase();
+  return CONFIG_SECTION_IDS.has(normalized) ? normalized : "a";
+}
+function getSelectedConfigSection() {
+  return normalizeConfigSection(refs.configSectionInputs.find((input) => input.checked)?.value || state.configSection);
+}
+
 function getSelectedImageRoute() {
   const route = refs.imageRouteInputs.find((input) => input.checked)?.value;
   return route === "c" ? "c" : route === "b" ? "b" : "a";
+}
+
+function syncConfigSectionControls(section = getSelectedConfigSection()) {
+  const normalizedSection = normalizeConfigSection(section);
+  state.configSection = normalizedSection;
+  const activeRoute = normalizedSection === "theme" ? getSelectedImageRoute() : normalizedSection;
+
+  refs.configSectionInputs.forEach((input) => {
+    input.checked = input.value === normalizedSection;
+  });
+  if (normalizedSection !== "theme") {
+    refs.imageRouteInputs.forEach((input) => {
+      input.checked = input.value === activeRoute;
+    });
+  }
+
+  if (refs.configForm) refs.configForm.dataset.configSection = normalizedSection;
+  refs.configForm?.querySelectorAll("[data-route-panel]").forEach((panel) => {
+    const isActive = normalizedSection !== "theme" && panel.dataset.routePanel === activeRoute;
+    panel.querySelectorAll("input, select, textarea, button").forEach((control) => {
+      control.disabled = !isActive;
+    });
+  });
+  refs.configForm?.querySelectorAll(".config-theme-panel input, .config-theme-panel select, .config-theme-panel button").forEach((control) => {
+    control.disabled = normalizedSection !== "theme";
+  });
+}
+
+function selectConfigSection(section) {
+  const normalizedSection = normalizeConfigSection(section);
+  if (normalizedSection !== "theme") {
+    refs.imageRouteInputs.forEach((input) => {
+      input.checked = input.value === normalizedSection;
+    });
+  }
+  syncConfigSectionControls(normalizedSection);
+  if (normalizedSection === "theme") return;
+
+  updateGenerationModeStatus();
+  syncEndpointFieldsFromFullUrlModes();
+  syncProtocolEndpointPreview();
+  renderSizeOptions();
+  renderReferenceAnalysisSizeOptions();
+  renderImageDecompositionSizeOptions();
+  renderCreationSizeOptions();
+  renderPortraitSizeOptions();
 }
 
 function isModelProtocolImageRoute() {
@@ -5623,9 +5699,12 @@ function syncConfigUi(config) {
     );
   }
   syncProtocolEndpointPreview();
+  const normalizedImageRoute = config.imageRoute === "c" ? "c" : config.imageRoute === "b" ? "b" : "a";
+  state.configSection = state.configSection === "theme" ? "theme" : normalizedImageRoute;
   refs.imageRouteInputs.forEach((input) => {
-    input.checked = input.value === (config.imageRoute === "c" ? "c" : config.imageRoute === "b" ? "b" : "a");
+    input.checked = input.value === normalizedImageRoute;
   });
+  syncConfigSectionControls(state.configSection);
   updateGenerationModeStatus();
   const savedKeyLabel = state.uiLanguage === "en" ? "Saved" : "已保存";
   refs.savedKeyMask.textContent = config.apiKeyConfigured ? `${savedKeyLabel} ${config.apiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存";
@@ -18326,7 +18405,16 @@ function bindEvents() {
       normalizeGenerationConcurrency(refs.generationConcurrencyInput.value, DEFAULT_GENERATION_CONCURRENCY),
     );
   });
+  refs.configSectionInputs.forEach((input) => input.addEventListener("change", () => {
+    selectConfigSection(input.value);
+  }));
   refs.imageRouteInputs.forEach((input) => input.addEventListener("change", () => {
+    const route = getSelectedImageRoute();
+    state.configSection = route;
+    refs.configSectionInputs.forEach((sectionInput) => {
+      sectionInput.checked = sectionInput.value === route;
+    });
+    syncConfigSectionControls(route);
     updateGenerationModeStatus();
     syncEndpointFieldsFromFullUrlModes();
     syncProtocolEndpointPreview();

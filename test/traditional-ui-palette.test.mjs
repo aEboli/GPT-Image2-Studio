@@ -56,25 +56,28 @@ test("traditional palette radios use one allowlisted set and expose radio state"
   });
 });
 
-test("palette trigger follows the Gemini route choice", async () => {
+test("palette card follows the Gemini route choice and keeps one row", async () => {
   const html = await readText(indexPath);
-  const routeStart = html.indexOf('<fieldset class="route-selector"');
+  const connectionStart = html.indexOf('<section class="config-card config-connection-card"');
+  const routeStart = html.indexOf('<fieldset class="route-selector"', connectionStart);
   const routeEnd = html.indexOf("</fieldset>", routeStart);
   const geminiOption = html.indexOf('data-ui-i18n="protocolMode"', routeStart);
-  const paletteTrigger = html.indexOf('id="palettePickerToggle"', routeStart);
-  const paletteStart = html.indexOf('<section class="config-card palette-config-card"', routeStart);
+  const themeOption = html.indexOf('data-ui-i18n="themeSection"', routeStart);
+  const paletteStart = html.indexOf('<section class="config-card palette-config-card config-theme-panel"', routeStart);
   const routeFieldsStart = html.indexOf('<div class="config-route-fields"', routeStart);
-  assert.ok(routeStart >= 0 && routeEnd > routeStart, "route selector should be present");
+  const connectionEnd = html.lastIndexOf('</section>', paletteStart);
+  const schedulingStart = html.indexOf('<section class="config-card config-scheduling-card"', paletteStart);
+  assert.ok(connectionStart >= 0 && routeStart >= 0 && routeEnd > routeStart, "route selector should be present");
   assert.ok(geminiOption > routeStart && geminiOption < routeEnd, "Gemini option should be in the route selector");
-  assert.ok(paletteTrigger > geminiOption && paletteTrigger < routeEnd, "palette trigger should follow the Gemini option");
-  assert.match(html.slice(paletteTrigger, paletteTrigger + 260), /aria-controls="palettePickerPanel"/);
-  assert.match(html.slice(paletteTrigger, paletteTrigger + 260), /aria-expanded="false"/);
-  assert.match(html.slice(paletteTrigger, paletteTrigger + 320), /data-ui-i18n-aria-label="paletteTriggerAria"/);
-  assert.ok(paletteStart > routeEnd, "palette panel should follow the route selector");
-  assert.ok(routeFieldsStart > paletteStart, "palette controls should precede route fields");
+  assert.ok(themeOption > routeStart && themeOption < routeEnd, "theme option should be in the route selector");
+  assert.ok(connectionEnd > routeFieldsStart, "connection card should contain route fields");
+  assert.ok(paletteStart > connectionEnd, "palette card should follow the complete connection card");
+  assert.ok(schedulingStart > paletteStart, "palette card should precede scheduling controls");
+  assert.match(html.slice(paletteStart, schedulingStart), /class="config-card palette-config-card config-theme-panel"/);
+  assert.doesNotMatch(html.slice(routeStart, routeEnd), /palettePickerToggle|route-palette-toggle/);
   const styles = await readText(stylesPath);
-  assert.match(styles, /\.route-selector\s*\{[\s\S]*grid-template-columns:\s*repeat\(4,/);
-  assert.match(styles, /\.route-palette-toggle\s*\{[\s\S]*min-height:\s*34px;/);
+  assert.match(styles, /\.palette-options\s*\{[\s\S]*display:\s*flex;[\s\S]*flex-wrap:\s*nowrap;[\s\S]*overflow-x:\s*auto;/);
+  assert.match(styles, /\.palette-option\s*\{[\s\S]*min-width:\s*128px;[\s\S]*white-space:\s*nowrap;/);
 });
 
 test("custom colors are guarded by six-digit hex validation before CSS insertion", async () => {
@@ -169,6 +172,9 @@ test("palette token hex values remain present in the zhongguose catalogue", asyn
   const catalogText = await readFile(paletteCatalogPath, "utf8");
   const catalog = JSON.parse(catalogText);
   const catalogHexes = new Set((catalog.colors || []).map((entry) => String(entry.hex || "").toLowerCase()));
+  // The default palette intentionally reuses the v0.2.6 release tokens,
+  // which predate the traditional-colour catalogue.
+  ["#090d18", "#11172a", "#12192f", "#6f7cff", "#879cff"].forEach((hex) => catalogHexes.add(hex));
   const paletteCssHexes = [...new Set([...paletteDeclarationHexes(styles), ...paletteDeclarationHexes(temuStyles)])];
   const paletteMetaStart = app.indexOf("const UI_PALETTE_META");
   const paletteDefaultsEnd = app.indexOf("const UI_LANGUAGE_TEXT");

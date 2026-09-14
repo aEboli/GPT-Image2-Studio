@@ -330,9 +330,14 @@ test("config drawer shows image route settings as exclusive mode tabs", async ()
   const app = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
   const styles = await readFile(new URL("../public/styles.css", import.meta.url), "utf8");
 
-  assert.match(html, /<fieldset class="route-selector" aria-label="生图调用模式" data-ui-i18n-aria-label="generationRouteLabel">/);
+  assert.match(html, /<fieldset class="route-selector" aria-label="配置区" data-ui-i18n-aria-label="configSectionLabel">/);
   assert.match(html, /<span data-ui-i18n="routeMode">路由模式<\/span>/);
-  assert.match(html, /<span data-ui-i18n="directMode">直接调用模式<\/span>/);
+  assert.match(html, /<span data-ui-i18n="directMode">直连模式<\/span>/);
+  assert.match(html, /<input name="configSection" type="radio" value="a" checked \/>/);
+  assert.match(html, /<input name="configSection" type="radio" value="b" \/>/);
+  assert.match(html, /<input name="configSection" type="radio" value="c" \/>[\s\S]*<span data-ui-i18n="protocolMode">Gemini<\/span>/);
+  assert.match(html, /<input name="configSection" type="radio" value="theme" \/>[\s\S]*<span data-ui-i18n="themeSection">主题<\/span>/);
+  assert.match(html, /<div class="config-route-state" hidden>[\s\S]*<input name="imageRoute" type="radio" value="c" \/>[\s\S]*<\/div>/);
   assert.match(html, /id="generationModeStatus"[\s\S]*路由模式/);
   assert.match(
     html,
@@ -350,18 +355,17 @@ test("config drawer shows image route settings as exclusive mode tabs", async ()
   assert.match(html, /id="directTextBaseUrlFullToggle"[\s\S]*完整 URL/);
   assert.doesNotMatch(html, /线路A|线路B/);
   assert.match(styles, /\.route-config-panel\s*\{[\s\S]*display:\s*grid;/);
+  assert.match(styles, /\.route-config-panel\s*\{\s*display:\s*none;/);
+  assert.match(styles, /\.config-form:has\(input\[name="configSection"\]\[value="theme"\]:checked\) \.config-theme-panel/);
+  assert.match(styles, /\.config-form:has\(input\[name="configSection"\]\[value="theme"\]:checked\) \.config-route-fields/);
+  assert.match(styles, /\.config-form:has\(input\[name="configSection"\]\[value="a"\]:checked\)\s*\[data-route-panel="a"\]/);
+  assert.match(styles, /\.config-form:has\(input\[name="configSection"\]\[value="b"\]:checked\)\s*\[data-route-panel="b"\]/);
+  assert.match(styles, /\.config-form:has\(input\[name="configSection"\]\[value="c"\]:checked\)\s*\[data-route-panel="c"\]/);
   assert.match(styles, /\.endpoint-address-control\s*\{/);
   assert.match(styles, /\.endpoint-suffix-select\s*\{/);
   // option 弹窗由操作系统绘制，必须显式给不透明底色与字色，并随主题切换。
   assert.match(styles, /\.endpoint-suffix-select option\s*\{[\s\S]*background:\s*var\(--bg-soft\);[\s\S]*color:\s*var\(--text\);/);
-  assert.match(
-    styles,
-    /\.config-form:has\(input\[name="imageRoute"\]\[value="a"\]:checked\)\s*\[data-route-panel="b"\]/,
-  );
-  assert.match(
-    styles,
-    /\.config-form:has\(input\[name="imageRoute"\]\[value="b"\]:checked\)\s*\[data-route-panel="a"\]/,
-  );
+  assert.doesNotMatch(styles, /\.config-form:has\(input\[name="imageRoute"\]/);
   assert.match(styles, /\.generation-mode-status\s*\{/);
   assert.match(app, /generationModeStatus:\s*document\.querySelector\("#generationModeStatus"\),/);
   assert.match(app, /endpointPathSelect:\s*document\.querySelector\("#endpointPathSelect"\),/);
