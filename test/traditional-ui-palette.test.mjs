@@ -11,10 +11,10 @@ const launcherPath = new URL("../lib/temu-workbench-launcher.mjs", import.meta.u
 const publicLauncherPath = new URL("../public/lib/temu-workbench-launcher.mjs", import.meta.url);
 const temuAppPath = new URL("../public/temu/app.js", import.meta.url);
 const temuStylesPath = new URL("../public/temu/styles.css", import.meta.url);
-const temuIndexPath = new URL("../public/temu/index.html", import.meta.url);
 const paletteCatalogPath = join(homedir(), ".codex", "skills", "zhongguose-palette", "references", "colors.json");
 
 const PALETTE_IDS = ["default", "qinghua", "jiangnan", "songci", "gugong", "lacquer", "dunhuang"];
+const PALETTE_NAMES = ["靛蓝", "青花", "竹影", "天青", "朱墙", "朱漆", "敦煌"];
 const HEX_COLOR_PATTERN = /#[0-9a-f]{6}/gi;
 
 async function readText(path) {
@@ -56,7 +56,7 @@ test("traditional palette radios use one allowlisted set and expose radio state"
   });
 });
 
-test("palette card follows the Gemini route choice and keeps one row", async () => {
+test("palette card follows the Gemini route choice and shows four compact presets per row", async () => {
   const html = await readText(indexPath);
   const connectionStart = html.indexOf('<section class="config-card config-connection-card"');
   const routeStart = html.indexOf('<fieldset class="route-selector"', connectionStart);
@@ -75,24 +75,18 @@ test("palette card follows the Gemini route choice and keeps one row", async () 
   assert.ok(schedulingStart > paletteStart, "palette card should precede scheduling controls");
   assert.match(html.slice(paletteStart, schedulingStart), /class="config-card palette-config-card config-theme-panel"/);
   assert.doesNotMatch(html.slice(routeStart, routeEnd), /palettePickerToggle|route-palette-toggle/);
+  const paletteMarkup = html.slice(paletteStart, schedulingStart);
+  const visibleNames = [...paletteMarkup.matchAll(/data-ui-i18n="palette(?:Default|Qinghua|Jiangnan|Songci|Gugong|Lacquer|Dunhuang)">([^<]+)</g)]
+    .map((match) => match[1]);
+  assert.deepEqual(visibleNames, PALETTE_NAMES);
+  assert.doesNotMatch(paletteMarkup, /uiCustom|uiOrnament|input[^>]+type="color"|floral-ornament/);
   const styles = await readText(stylesPath);
-  assert.match(styles, /\.palette-options\s*\{[\s\S]*display:\s*flex;[\s\S]*flex-wrap:\s*nowrap;[\s\S]*overflow-x:\s*auto;/);
-  assert.match(styles, /\.palette-option\s*\{[\s\S]*min-width:\s*128px;[\s\S]*white-space:\s*nowrap;/);
-});
-
-test("custom colors are guarded by six-digit hex validation before CSS insertion", async () => {
-  const [html, app] = await Promise.all([readText(indexPath), readText(appPath)]);
-
-  assert.match(html, /const hexColorPattern = \/\^#\[0-9a-f\]\{6\}\$\/i;/);
-  assert.match(html, /hexColorPattern\.test\(String\(value \|\| ""\)\)/);
-  const normalizerStart = app.indexOf("function normalizeHexColor");
-  const normalizerEnd = app.indexOf("function getReadableColorForBackground", normalizerStart);
-  assert.ok(normalizerStart >= 0 && normalizerEnd > normalizerStart, "runtime color normalizer should be present");
-  const normalizer = app.slice(normalizerStart, normalizerEnd);
-  assert.match(normalizer, /\/\^#\[0-9a-f\]\{6\}\$\/\.test\(normalized\)/);
-  assert.match(app, /root\.style\.setProperty\(property, value\)/);
-  assert.match(app, /normalizeHexColor\(parsed\?\.accent\)/);
-  assert.match(app, /normalizeHexColor\(colors\.surface\)/);
+  const optionsRule = styles.match(/\.palette-options\s*\{[^}]*\}/)?.[0] || "";
+  assert.match(optionsRule, /display:\s*grid/);
+  assert.match(optionsRule, /grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/);
+  assert.doesNotMatch(optionsRule, /overflow-x|flex-wrap/);
+  const optionRule = styles.match(/\.palette-option\s*\{[^}]*\}/)?.[0] || "";
+  assert.doesNotMatch(optionRule, /min-width:\s*128px/);
 });
 
 test("long configuration explanations keep a keyboard tooltip affordance", async () => {
@@ -108,19 +102,19 @@ test("long configuration explanations keep a keyboard tooltip affordance", async
   assert.doesNotMatch(html, /<small class="field-hint"[^>]*data-ui-i18n="(?:imageToolModelHint|protocolHint)"/);
 });
 
-test("floral accents are decorative and cannot intercept workbench interaction", async () => {
-  const [html, styles, temuHtml, temuStyles] = await Promise.all([
+test("theme presets do not load or expose custom colours and floral accents", async () => {
+  const [html, app, styles, launcher, publicLauncher, temuApp, temuStyles] = await Promise.all([
     readText(indexPath),
+    readText(appPath),
     readText(stylesPath),
-    readText(temuIndexPath),
+    readText(launcherPath),
+    readText(publicLauncherPath),
+    readText(temuAppPath),
     readText(temuStylesPath),
   ]);
-  assert.match(html, /<span class="floral-ornament" aria-hidden="true"><\/span>/);
-  assert.match(temuHtml, /<span class="floral-ornament" aria-hidden="true"><\/span>/);
-  for (const css of [styles, temuStyles]) {
-    const ornamentRule = css.match(/\.floral-ornament\s*\{[^}]*\}/)?.[0] || "";
-    assert.match(ornamentRule, /pointer-events:\s*none/);
-    assert.match(css, /@media\s*\(forced-colors:\s*active\)[\s\S]*?\.floral-ornament\s*\{[^}]*display:\s*none\s*!important/);
+  assert.equal(publicLauncher, launcher, "public launcher mirror must stay synchronized");
+  for (const source of [html, app, styles, launcher, temuApp, temuStyles]) {
+    assert.doesNotMatch(source, /image-studio-ui-(?:ornament|custom-colors)|uiOrnament|uiCustom|floral-ornament|palette-custom|data-custom|data-ornament/);
   }
 });
 
@@ -137,23 +131,24 @@ test("configuration logs remain a fixed viewport with an independently scrolling
   assert.match(listRule, /overflow-y:\s*auto/);
 });
 
-test("host and Temu workbench exchange the complete theme payload", async () => {
+test("host and Temu workbench exchange only the selected theme and palette", async () => {
   const [launcher, publicLauncher, temuApp] = await Promise.all([
     readText(launcherPath),
     readText(publicLauncherPath),
     readText(temuAppPath),
   ]);
   assert.equal(publicLauncher, launcher, "public launcher mirror must stay synchronized");
-  for (const field of ["palette", "ornament", "ornamentStyle", "customColors"]) {
-    assert.match(launcher, new RegExp(`${field}: get${field[0].toUpperCase()}${field.slice(1)}\\(\\)`));
-  }
-  assert.match(launcher, /function syncTheme\(\)\s*\{[\s\S]*?type: TEMU_WORKBENCH_MESSAGES\.theme,[\s\S]*?customColors: getCustomColors\(\)/);
+  assert.match(launcher, /theme: getTheme\(\)/);
+  assert.match(launcher, /palette: getPalette\(\)/);
+  assert.match(launcher, /function syncTheme\(\)\s*\{[\s\S]*?type: TEMU_WORKBENCH_MESSAGES\.theme,[\s\S]*?palette: getPalette\(\)/);
   assert.match(launcher, /if \(!frameLoaded\)[\s\S]*?pendingInit = pendingInit/);
   assert.match(launcher, /theme: message\.theme/);
-  assert.match(launcher, /customColors: message\.customColors/);
+  assert.match(launcher, /palette: message\.palette/);
   assert.match(launcher, /type: TEMU_WORKBENCH_MESSAGES\.init/);
-  assert.match(temuApp, /function applyWorkbenchTheme\(theme, palette = "default", ornament = "off", ornamentStyle = "mei", customColors = \{\}\)/);
-  assert.match(temuApp, /applyWorkbenchTheme\(data\.theme, data\.palette, data\.ornament, data\.ornamentStyle, data\.customColors\)/);
+  assert.match(temuApp, /function applyWorkbenchTheme\(theme, palette = "default"\)/);
+  assert.match(temuApp, /applyWorkbenchTheme\(data\.theme, data\.palette\)/);
+  assert.doesNotMatch(launcher, /ornament|customColors/);
+  assert.doesNotMatch(temuApp, /ornament|customColors/);
 });
 
 test("palette token hex values remain present in the zhongguose catalogue", async () => {

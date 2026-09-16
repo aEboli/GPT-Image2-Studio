@@ -210,7 +210,21 @@ test("createResponsesRequestBody defaults to png output and leaves compression u
   });
 
   assert.equal(requestBody.tools[0].output_format, "png");
+  assert.equal(requestBody.tools[0].background, "opaque");
   assert.equal("output_compression" in requestBody.tools[0], false);
+});
+
+test("createResponsesRequestBody passes a transparent background to the image tool", () => {
+  const requestBody = createResponsesRequestBody({
+    prompt: "Generate a transparent sticker.",
+    size: "1024x1024",
+    quality: "high",
+    format: "png",
+    background: "transparent",
+    responsesModel: "gpt-5.4-mini",
+  });
+
+  assert.equal(requestBody.tools[0].background, "transparent");
 });
 
 test("createResponsesRequestBody can build a non-streaming Responses request", () => {
@@ -239,6 +253,7 @@ test("createDirectImageRequestBody targets the image model without Responses rou
   assert.equal(requestBody.size, "1024x1024");
   assert.equal(requestBody.quality, "high");
   assert.equal(requestBody.response_format, "b64_json");
+  assert.equal("background" in requestBody, false);
   assert.equal("stream" in requestBody, false);
   assert.equal("tools" in requestBody, false);
   assert.equal("tool_choice" in requestBody, false);
@@ -255,6 +270,7 @@ test("requestDirectImageGeneration posts once to image generations and emits the
     size: "1024x1024",
     quality: "high",
     format: "png",
+    background: "transparent",
     imageModel: "vendor-image-pro",
     async fetchImpl(url, init) {
       requests.push({ url, init, body: JSON.parse(init.body) });
@@ -274,6 +290,7 @@ test("requestDirectImageGeneration posts once to image generations and emits the
   assert.equal(requests[0].url, "https://route-b.example.test/v1/images/generations");
   assert.equal(requests[0].init.headers.Accept, "application/json");
   assert.equal(requests[0].body.model, "vendor-image-pro");
+  assert.equal(requests[0].body.background, "transparent");
   assert.equal("stream" in requests[0].body, false);
   assert.equal("tools" in requests[0].body, false);
   assert.equal(result.finalImageBase64, "ZGlyZWN0LWZpbmFs");

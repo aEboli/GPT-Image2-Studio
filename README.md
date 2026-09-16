@@ -97,7 +97,7 @@ Each channel is stored independently, and only the selected one is used for gene
 | Gemini | Serves Gemini image models over an OpenAI-compatible image-generation protocol | Base URL, API key, image model |
 | Theme | Not a call channel. Holds the interface palette instead | Nothing; selecting a channel section again restores the connection fields |
 
-Selecting **主题** hides the connection fields entirely and shows one standalone palette card: seven interface palettes, three custom colour roles (buttons/focus, surfaces, and flowers/details), and optional plum, orchid, bamboo, or peony accents. The palette options stay on a single row that scrolls horizontally when the drawer is narrow. The default palette is `经典靛蓝` (Classic indigo); the other six are drawn from the Chinese traditional-colour catalogue. The selection is saved locally and is mirrored to the embedded Temu workbench.
+Selecting **主题** hides the connection fields entirely and shows one standalone palette card with seven interface palettes. The options appear in a four-column grid, and each contains only a colour swatch and concise name. The default palette is `靛蓝` (Indigo); the other six are drawn from the Chinese traditional-colour catalogue. The selected palette is saved locally and mirrored to the embedded Temu workbench.
 
 Switching to **主题** and back does not change which call channel is active — the channel you last selected stays in effect, and the top-right status keeps reporting it.
 
@@ -121,7 +121,7 @@ The Responses model is the outer model. The image tool model is chosen from the 
 | `gpt-image-2.5-sunburst` | Most capable; more precise editing, longer generation times. |
 | `gpt-image-2.5-flare` | Fast, high-quality everyday generation. |
 
-The prompt page parameter row also has a **质量** (quality) dropdown: `auto`, `low`, `medium`, `high` (default), plus `xhigh` and `max` — the last two exist only on the 2.5 models. Switching the tool model back to `gpt-image-2` while `xhigh`/`max` is selected clamps it down to `high` instead of sending a request the upstream would reject.
+The prompt page parameter row also has a **质量** (quality) dropdown: `auto`, `low`, `medium`, `high` (default), plus `xhigh` and `max` — the last two exist only on the 2.5 models. Switching the tool model back to `gpt-image-2` while `xhigh`/`max` is selected clamps it down to `high` instead of sending a request the upstream would reject. Prompt-to-image also has an optional **透明背景** (transparent background) switch. It is available on the Route and Direct image routes only; enabling it forces PNG, sends `background=transparent`, and stores the choice with that queued prompt job. The Gemini/model-protocol route keeps the switch hidden and uses an opaque background.
 
 **Direct mode** splits into two independent groups. The image group only generates and edits images; the text/vision group handles prompt enhancement, reference analysis, Listing drafts, and other model calls. The two groups can point at different providers:
 
@@ -255,7 +255,7 @@ The repository also contains a Vercel configuration. Vercel functions use tempor
 
 ### Image creation
 
-- **Prompt-to-image** with up to 15 reference images, prompt enhancement, aspect-ratio presets, explicit pixel sizes, PNG/JPG output, and live progress.
+- **Prompt-to-image** with up to 15 reference images, prompt enhancement, aspect-ratio presets, explicit pixel sizes, PNG/JPG output or a transparent PNG, and live progress.
 - **Style transfer** with a separate source image, style reference, built-in presets, and a two-image before/after comparison viewer.
 - **Reference analysis** that turns 1-15 images into structured subjects, relationships, risks, and an applied generation prompt.
 - **Image decomposition** for products, devices, and packaging, producing structured callouts and selling-point visuals.
@@ -269,6 +269,7 @@ The repository also contains a Vercel configuration. Vercel functions use tempor
 - **Portrait mode** for consistent people, actions, clothing, props, locations, framing, and 1-100 image batches.
 - **Article illustration mode** for text packages, style bibles, character and scene references, reading-order storyboards, and final illustrations.
 - **PPT generation** from PDF, DOCX, PPTX, TXT, Markdown, CSV, pasted text, or a topic; supports 1-20 pages, page repair, image-based PPTX, and editable reconstruction.
+- **Independent generation controls** in Creation, Portrait, Article Illustration, and PPT: each mode has its own reasoning-effort and quality selectors, and queued work, repairs, missing-slide completion, and slide edits retain those values.
 
 ### Assets and operations
 
@@ -276,7 +277,7 @@ The repository also contains a Vercel configuration. Vercel functions use tempor
 - Separate records for Creation sets, portraits, article illustrations, and PPT decks.
 - Background queue status, progress, structured errors, and retry of failed items.
 - Prompt Kit, Prompt Agent image-to-prompt output, Logo library, portrait outfit/prop library, and model selection controls.
-- A four-section configuration drawer (route mode, direct mode, Gemini, theme) with hover/focus help markers, a fixed independently scrolling generation log, seven interface palettes, custom interface colours, and optional floral accents.
+- A four-section configuration drawer (route mode, direct mode, Gemini, theme) with hover/focus help markers, a fixed independently scrolling generation log, and seven interface palettes shown four per row.
 - Dark/light themes, Chinese/English UI, and responsive desktop, tablet, and mobile layouts.
 
 ## Interface preview
@@ -319,7 +320,7 @@ These screenshots come from isolated browser sessions of the current workbench. 
 
 | Workflow | Inputs | Result |
 | --- | --- | --- |
-| Prompt-to-image | Prompt, up to 15 references, ratio, size, format | PNG/JPG assets, progress, filmstrip, download, and metadata review |
+| Prompt-to-image | Prompt, up to 15 references, ratio, size, format, optional transparent background | PNG/JPG assets or transparent PNGs, progress, filmstrip, download, and metadata review |
 | Style transfer | Source image, style image or preset, optional prompt | A generated result plus a before/after preset comparison |
 | Reference analysis | 1-15 images, analysis language, target description | Structured analysis and an optional generation prompt/result |
 | Image decomposition | One product/device/package image and a decomposition brief | Callout or infographic-style PNG/JPG and saved analysis |
@@ -426,7 +427,8 @@ Three consequences of that split are worth knowing before you pick a ratio:
 - **A size is only legal for its own ratio.** The requested pixels must be one of the candidates listed for the selected ratio; anything else is rejected before the upstream call with `当前比例 <ratio> 不支持分辨率 <size>` ("the current ratio does not support that resolution"). That is why `1:1` will not accept `1824x1024` even though `16:9` offers it.
 - **Switching the call channel resets a non-default size.** Pixel values and tier values share no members, so a saved `2048x2048` becomes `Auto` the moment you switch to the Gemini channel, and a saved `4K` becomes `Auto` when you switch back.
 - **The Gemini image path supports 10 of the 15 ratios.** It accepts `1:1`, `2:3`, `3:2`, `3:4`, `4:3`, `4:5`, `5:4`, `9:16`, `16:9`, and `21:9`. The other five are substituted with the closest supported ratio that keeps the requested orientation: `2:1` and `3:1` become `16:9` and `21:9`; `1:2`, `9:21`, and `1:3` become `9:16`. On this channel the delivered shape is therefore close to your request rather than exact, and it stays landscape or portrait as asked.
-- **Quality and output format never reach the Gemini image path.** The request body only carries `aspectRatio` and `imageSize`; PNG vs JPG and the High quality control have no effect here.
+- **Quality, output format, and transparent backgrounds never reach the Gemini image path.** The request body only carries `aspectRatio` and `imageSize`; PNG vs JPG, the High quality control, and the prompt background switch have no effect here.
+- **Transparent prompt backgrounds are supported on Route and Direct image routes only.** The control is hidden for the Gemini/model-protocol route, and those prompt jobs stay opaque.
 - **The Gemini image body is selected by the model name, not by the channel.** The name must contain `gemini` plus one of `image`, `banana`, `图像`, or `生图`. Any other model on this channel is posted to `chat/completions` with neither size nor ratio.
 
 ### Workflow limits
@@ -438,12 +440,14 @@ The UI exposes conservative application candidates, not a guarantee from every u
 | Prompt references | Up to 15 images; a session has up to 15 parallel task slots |
 | Style transfer | One source image plus one style reference or built-in preset |
 | Image-edit masks | Each local mask is limited to 50 MB and normalized to the source dimensions |
-| Ecommerce SKU combinations | Up to 20 combinations; frozen plans are limited to 64 items and 4 MiB serialized size |
+| Ecommerce SKU plans | New plans use one subject per SKU bundle; frozen plans are limited to 64 items and 4 MiB serialized size |
 | Portrait batches | 1-100 images; the default is 12 |
 | PPT pages | 1-20 pages; the default is 8 |
-| Output formats | PNG or JPG for generated images; browser compression can also produce WebP |
+| Output formats | PNG or JPG for generated images; prompt jobs on Route/Direct can request a transparent PNG; browser compression can also produce WebP |
 
 Large images, high resolutions, and large batches increase browser memory use and the chance of upstream timeouts or rate limits. Start with an automatic or medium size and a small batch, then increase scale after the selected channel is proven compatible.
+
+Creation, Portrait, Article Illustration, and PPT each expose their own reasoning-effort and image-quality selectors. The selected reasoning value is sent to planning and generation, while quality is normalized against the active image model (`xhigh` and `max` are available only on the 2.5 image models). A queued set or deck keeps its values for generation, repair, missing-slide completion, and slide editing. Creation keeps the SKU generation rule editable while new plans use a fixed one-subject SKU count.
 
 ## Project structure
 
@@ -506,6 +510,13 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 ## Version history
 
 Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.18](./docs/releases/v0.2.18.md).
+
+### Unreleased
+
+- Creation, Portrait, Article Illustration, and PPT now expose independent reasoning-effort and quality controls. Plans, queued operations, repairs, missing-slide completion, and slide edits retain the selected values, with quality clamped to the active image model.
+- Prompt-to-image can request a transparent background on the Route and Direct image routes. The choice is captured per job, forces PNG output, and is recorded in saved metadata; the Gemini/model-protocol route keeps the control hidden.
+- New Creation plans use a fixed one-subject SKU count while the SKU generation rule remains editable.
+- The Theme section now shows seven concise palette swatches in a four-column grid. Custom colour roles and floral ornaments were removed, and the default palette is `靛蓝` (Indigo).
 
 ### v0.2.18
 

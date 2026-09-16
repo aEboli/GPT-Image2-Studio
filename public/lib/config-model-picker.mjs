@@ -10,6 +10,7 @@ export function createConfigModelPickerController({
   state,
   getBrowserPrivateConfigRequestPayload,
   getUiText,
+  onModelChange,
   isTargetEnabled,
   fetchImpl = fetch,
   FormDataCtor = FormData,
@@ -380,6 +381,7 @@ export function createConfigModelPickerController({
     }
     getModelState(normalizedTarget).searchQuery = "";
     setOpen(false, normalizedTarget);
+    onModelChange?.(normalizedTarget);
   }
 
   async function fetchConfigModels({ openAfterFetch = true, mode = "models", target = getTargetForSelectedRoute() } = {}) {
@@ -439,6 +441,7 @@ export function createConfigModelPickerController({
     modelState.open = modelState.items.length > 0;
     syncLegacyModelState(normalizedTarget);
     render();
+    onModelChange?.(normalizedTarget);
   }
 
   function closeAllPickers() {

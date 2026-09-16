@@ -128,7 +128,6 @@ test("creation suite queue builds a complete queued set from current form state"
     referenceFiles: [{ file: { name: "reference-a.png" } }],
     refs: {
       creationDimensionSpecsInput: { value: "13 cm" },
-      creationSkuBundleCountInput: { value: "2" },
       creationVisualLanguageInput: { value: "premium-studio" },
     },
     sellingPoints: ["point"],
@@ -147,7 +146,7 @@ test("creation suite queue builds a complete queued set from current form state"
   assert.equal(set.skuGenerationRule, "package-list");
   assert.equal(set.skuGenerationRuleLabel, "显示清单");
   assert.deepEqual(set.logo, { placement: "top-left" });
-  assert.equal(set.skuBundleCount, 2);
+  assert.equal(set.skuBundleCount, 1);
   assert.equal(set.items[0].status, "queued");
   assert.equal(set.items[0].prompt, "Frozen prompt");
   assert.equal(set.items[0].ratio, "4:3");
@@ -189,7 +188,6 @@ test("creation suite queue reads the editable draft while another set is generat
     refs: {
       creationDimensionSpecsInput: { value: "" },
       creationInfographicRebuildEnabledInput: { checked: false },
-      creationSkuBundleCountInput: { value: "1" },
       creationVisualLanguageInput: { value: "classic-commercial" },
     },
     sellingPoints: [],
@@ -231,7 +229,6 @@ test("creation suite queue appends SKU preview cards to queued sets", () => {
     productName: "Queued product",
     refs: {
       creationDimensionSpecsInput: { value: "" },
-      creationSkuBundleCountInput: { value: "1" },
       creationVisualLanguageInput: { value: "classic-commercial" },
     },
     sellingPoints: [],
@@ -278,7 +275,6 @@ test("creation suite queue compacts Chinese same-subject multi-color SKU titles"
     productName: "Queued product",
     refs: {
       creationDimensionSpecsInput: { value: "" },
-      creationSkuBundleCountInput: { value: "1" },
       creationVisualLanguageInput: { value: "classic-commercial" },
     },
     sellingPoints: [],
@@ -319,7 +315,6 @@ test("creation suite queue omits raw SKU identifiers from titles and filename to
     productName: "Queued product",
     refs: {
       creationDimensionSpecsInput: { value: "" },
-      creationSkuBundleCountInput: { value: "1" },
       creationVisualLanguageInput: { value: "classic-commercial" },
     },
     sellingPoints: [],
@@ -358,7 +353,6 @@ test("creation suite queue defaults SKU rule to color-name labels when no getter
     productName: "Queued product",
     refs: {
       creationDimensionSpecsInput: { value: "" },
-      creationSkuBundleCountInput: { value: "1" },
       creationVisualLanguageInput: { value: "classic-commercial" },
     },
     sellingPoints: [],
@@ -405,7 +399,6 @@ test("creation suite queue appends queued rebuild cards when enabled", () => {
     refs: {
       creationDimensionSpecsInput: { value: "" },
       creationInfographicRebuildEnabledInput: { checked: true },
-      creationSkuBundleCountInput: { value: "1" },
       creationVisualLanguageInput: { value: "classic-commercial" },
     },
     sellingPoints: [],
@@ -456,7 +449,6 @@ test("creation suite queue defaults infographic rebuild off", () => {
     productName: "Queued product",
     refs: {
       creationDimensionSpecsInput: { value: "" },
-      creationSkuBundleCountInput: { value: "1" },
       creationVisualLanguageInput: { value: "classic-commercial" },
     },
     sellingPoints: [],
@@ -493,7 +485,6 @@ test("creation suite queue omits appended SKU cards when disabled", () => {
     refs: {
       creationDimensionSpecsInput: { value: "" },
       creationSkuGenerationEnabledInput: { checked: false },
-      creationSkuBundleCountInput: { value: "1" },
       creationVisualLanguageInput: { value: "classic-commercial" },
     },
     sellingPoints: [],
@@ -535,7 +526,6 @@ test("creation suite queue forces infographic rebuild when carousel count is zer
     refs: {
       creationDimensionSpecsInput: { value: "" },
       creationInfographicRebuildEnabledInput: { checked: false },
-      creationSkuBundleCountInput: { value: "1" },
       creationVisualLanguageInput: { value: "classic-commercial" },
     },
     sellingPoints: [],
@@ -593,7 +583,6 @@ test("creation suite queue ignores stale carousel slots after zero count recogni
     refs: {
       creationDimensionSpecsInput: { value: "" },
       creationInfographicRebuildEnabledInput: { checked: true },
-      creationSkuBundleCountInput: { value: "1" },
       creationVisualLanguageInput: { value: "classic-commercial" },
     },
     sellingPoints: [],
@@ -654,7 +643,6 @@ test("creation suite queue keeps draft infographic rebuild items without changin
     refs: {
       creationDimensionSpecsInput: { value: "" },
       creationInfographicRebuildEnabledInput: { checked: true },
-      creationSkuBundleCountInput: { value: "1" },
       creationVisualLanguageInput: { value: "classic-commercial" },
     },
     sellingPoints: [],
@@ -724,7 +712,6 @@ test("creation suite queue rebuilds items when draft roles differ from current s
     productName: "Queued product",
     refs: {
       creationDimensionSpecsInput: { value: "" },
-      creationSkuBundleCountInput: { value: "1" },
       creationVisualLanguageInput: { value: "classic-commercial" },
     },
     sellingPoints: [],
@@ -759,7 +746,6 @@ test("creation suite queue falls back to normalized visual language labels", () 
     productName: "Queued product",
     refs: {
       creationDimensionSpecsInput: { value: "" },
-      creationSkuBundleCountInput: { value: "1" },
       creationVisualLanguageInput: { value: "premium-studio" },
     },
     sellingPoints: [],

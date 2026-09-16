@@ -8,6 +8,23 @@ import {
   pruneGalleryMetadataCache,
 } from "../lib/gallery-metadata-recovery.mjs";
 
+test("gallery recovery retains explicit background settings and only repairs missing values", () => {
+  const entry = buildGalleryMetadataCacheEntry({ imageBackground: "transparent" });
+  assert.deepEqual(entry, { imageBackground: "transparent" });
+  const recovered = mergeGalleryItemWithCachedMetadata({ filename: "background.png" }, entry);
+  assert.equal(recovered.imageBackground, "transparent");
+  assert.deepEqual(collectGalleryMetadataRepairPatch({}, recovered), { imageBackground: "transparent" });
+
+  const serverItem = { imageBackground: "opaque" };
+  const authoritative = mergeGalleryItemWithCachedMetadata(serverItem, entry);
+  assert.equal(authoritative.imageBackground, "opaque");
+  assert.deepEqual(collectGalleryMetadataRepairPatch(serverItem, authoritative), {});
+  const oldRecord = mergeGalleryItemWithCachedMetadata({}, {});
+  assert.equal(oldRecord.imageBackground || "", "");
+  assert.deepEqual(buildGalleryMetadataCacheEntry(oldRecord), {});
+  assert.deepEqual(collectGalleryMetadataRepairPatch({}, oldRecord), {});
+});
+
 test("gallery metadata recovery stores only meaningful metadata fields in cache entries", () => {
   const entry = buildGalleryMetadataCacheEntry({
     filename: "sample.jpeg",

@@ -68,7 +68,7 @@ The system SHALL expose one exported registry of browser-served shared-module sy
 - **THEN** 显示该请求档位，不显示空白
 
 ### Requirement: Traditional interface palettes
-The configuration drawer SHALL expose an allowlisted traditional-colour palette, persist the selected palette locally, and apply it to the shared interface tokens without changing the existing dark/light theme contract.
+The configuration drawer SHALL expose an allowlisted traditional-colour palette, persist the selected palette locally, and apply it to the shared interface tokens without changing the existing dark/light theme contract. The theme section SHALL show the seven preset options in a four-column grid. Each option SHALL contain only its palette swatch and concise visible name; Chinese visible names SHALL contain two characters. The theme section SHALL NOT expose custom-colour inputs or floral-accent controls, and legacy custom-colour or floral-accent local-storage values SHALL NOT affect the interface.
 
 #### Scenario: Select and restore a palette
 - **WHEN** a user selects a named palette and reloads the workbench
@@ -82,12 +82,10 @@ The configuration drawer SHALL expose an allowlisted traditional-colour palette,
 
 #### Scenario: Palette options stay compact inside the theme section
 - **WHEN** the `主题` section is selected
-- **THEN** the standalone palette card contains the palette controls
-- **AND** all palette options remain on one horizontal row, with horizontal scrolling when the drawer is too narrow.
+- **THEN** the standalone palette card contains the palette controls in four columns per row
+- **AND** every option contains a swatch and a two-character Chinese name without custom-colour or floral-accent controls
 
-### Requirement: Optional floral accents
-The configuration drawer SHALL let users enable one of the supported floral accent motifs, and the motif SHALL remain decorative and non-interactive.
-
-#### Scenario: Decorative motif does not block work
-- **WHEN** floral accents are enabled
-- **THEN** the motif uses existing palette tokens, is hidden from assistive technology, and does not cover the configuration form or generation log.
+#### Scenario: A user has prior custom theme settings
+- **WHEN** local storage contains values from the removed custom-colour or floral-accent features
+- **THEN** the workbench applies only its selected preset and dark/light theme
+- **AND** no custom colour or floral decoration is sent to the embedded Temu workbench

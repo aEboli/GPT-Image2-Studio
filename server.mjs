@@ -417,6 +417,10 @@ function normalizeGenerationMode(value) {
   return GENERATION_MODES.has(mode) ? mode : "";
 }
 
+function normalizePromptImageBackground(value) {
+  return String(value || "").trim().toLowerCase() === "transparent" ? "transparent" : "opaque";
+}
+
 function getStudioGenerationRequestScope(generationMode, imageRoute) {
   const mode = generationMode || "prompt";
   if (mode === "prompt") {
@@ -1560,6 +1564,7 @@ async function handlePromptPreviewSave(request, response) {
       ratioLabel: ratioOption.label,
       size: String(payload.size || ""),
       quality: String(payload.quality || ""),
+      imageBackground: ["transparent", "opaque"].includes(payload.imageBackground) ? payload.imageBackground : "",
       format,
       reasoningEffort: String(payload.reasoningEffort || ""),
     },
@@ -1779,6 +1784,7 @@ async function generateAndSavePptSlide({
   createdAt,
   config,
   reasoningEffort,
+  quality,
   pptDeckRelativeDir,
   referenceImages = [],
 }) {
@@ -1792,7 +1798,7 @@ async function generateAndSavePptSlide({
   if (!generationConfig.apiKey) {
     throw new Error("Missing API key for the selected image generation route.");
   }
-  const slideQuality = normalizeImageQuality(config.defaults?.quality, { imageModel: generationConfig.imageModel });
+  const slideQuality = normalizeImageQuality(quality || config.defaults?.quality, { imageModel: generationConfig.imageModel });
   const generationResult = await requestStudioImageGeneration({
     baseUrl: generationConfig.baseUrl,
     apiKey: generationConfig.apiKey,
@@ -2075,6 +2081,10 @@ async function handlePptGenerate(request, response) {
       autoAdvanceSeconds: formData.get("autoAdvanceSeconds"),
     });
     const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
+    const generationConfig = getSelectedImageGenerationConfig(config);
+    const quality = normalizeImageQuality(formData.get("quality") || config.defaults?.quality, {
+      imageModel: generationConfig.imageModel,
+    });
     const reasoningEffort = normalizeReasoningEffort(
       formData.get("reasoningEffort") || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
     );
@@ -2115,6 +2125,7 @@ async function handlePptGenerate(request, response) {
           createdAt,
           config,
           reasoningEffort,
+          quality,
           pptDeckRelativeDir,
         });
         slides.push(slide);
@@ -2186,6 +2197,9 @@ async function handlePptComplete(request, response) {
     );
 
     const generationConfig = getSelectedImageGenerationConfig(config);
+    const quality = normalizeImageQuality(payload.quality || config.defaults?.quality, {
+      imageModel: generationConfig.imageModel,
+    });
     if (!generationConfig.apiKey) {
       throw new Error("Missing API key for the selected image generation route.");
     }
@@ -2218,6 +2232,7 @@ async function handlePptComplete(request, response) {
           createdAt,
           config,
           reasoningEffort,
+          quality,
           pptDeckRelativeDir,
         });
         generatedSlides.push(slide);
@@ -2306,6 +2321,9 @@ async function handlePptSlideEdit(request, response) {
     );
 
     const generationConfig = getSelectedImageGenerationConfig(config);
+    const quality = normalizeImageQuality(formData.get("quality") || config.defaults?.quality, {
+      imageModel: generationConfig.imageModel,
+    });
     if (!generationConfig.apiKey) {
       throw new Error("Missing API key for the selected image generation route.");
     }
@@ -2344,6 +2362,7 @@ async function handlePptSlideEdit(request, response) {
       createdAt,
       config,
       reasoningEffort,
+      quality,
       pptDeckRelativeDir,
       referenceImages,
     });
@@ -2502,6 +2521,7 @@ function buildSavedItem({
   regionCount = 0,
   regionInstructions = [],
   featureCardsEnabled = false,
+  imageBackground = "",
   generationStartedAt,
   generationCompletedAt,
   generationDurationMs,
@@ -2527,6 +2547,7 @@ function buildSavedItem({
     referenceImageNames: referenceImages.map((image) => image.filename),
     referenceImageName: referenceImages[0]?.filename || "",
     generationMode,
+    ...(imageBackground ? { imageBackground } : {}),
     styleTransferSourceImageName,
     styleTransferReferenceImageName,
     styleTransferStylePreset,
@@ -6423,6 +6444,7 @@ async function handleGenerate(request, response) {
     const requestedFormatInput = String(formData.get("format") || "").trim().toLowerCase();
     const generationModeInput = String(formData.get("mode") || "").trim();
     const generationMode = normalizeGenerationMode(generationModeInput);
+    const requestedImageBackground = normalizePromptImageBackground(formData.get("imageBackground"));
     const isImageDecomposition = generationMode === IMAGE_DECOMPOSITION_MODE;
     const isImageEdit = generationMode === IMAGE_EDIT_MODE;
     const imageEditMode = String(formData.get("editMode") || "").trim();
@@ -6694,6 +6716,9 @@ async function handleGenerate(request, response) {
 
     const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
     const generationConfig = getSelectedImageGenerationConfig(config);
+    const imageBackground = generationMode === "" && generationConfig.imageRoute !== IMAGE_ROUTE_C
+      ? requestedImageBackground
+      : "opaque";
     generationRequestScope = getStudioGenerationRequestScope(generationMode, generationConfig.imageRoute);
     if (!generationConfig.apiKey) {
       generationTaskStore.failTask(clientSessionId, taskId, {
@@ -6726,11 +6751,13 @@ async function handleGenerate(request, response) {
     const ratioOption = resolveAspectRatioOption(ratio);
     const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
 
-    const finalPrompt = appendRatioHintToPrompt(prompt, ratioOption);
+    const finalPrompt = prompt;
     const finalQuality = normalizeImageQuality(formData.get("quality") || config.defaults?.quality, {
       imageModel: generationConfig.imageModel,
     });
-    const finalFormat = normalizeOutputFormat(requestedFormatInput || config.defaults?.format || "png");
+    const finalFormat = imageBackground === "transparent"
+      ? "png"
+      : normalizeOutputFormat(requestedFormatInput || config.defaults?.format || "png");
     let finalBase64 = "";
     const generationStartedAt = new Date().toISOString();
     const generationStartedAtMs = Date.now();
@@ -6742,6 +6769,7 @@ async function handleGenerate(request, response) {
       size: finalSize,
       quality: finalQuality,
       format: finalFormat,
+      ...(generationMode === "" ? { imageBackground } : {}),
       responsesModel: generationConfig.responsesModel,
       imageRoute: generationConfig.imageRoute,
       imageModel: generationConfig.imageModel,
@@ -6820,6 +6848,7 @@ async function handleGenerate(request, response) {
       aspectRatio: ratioOption.value,
       quality: finalQuality,
       format: toApiOutputFormat(finalFormat),
+      background: imageBackground,
       responsesModel: generationConfig.responsesModel,
       imageRoute: generationConfig.imageRoute,
       imageModel: generationConfig.imageModel,
@@ -6948,6 +6977,7 @@ async function handleGenerate(request, response) {
         size: savedSize,
         quality: finalQuality,
         format: finalFormat,
+        ...(generationMode === "" ? { imageBackground } : {}),
         hasReferenceImage: referenceImages.length > 0,
         referenceImageNames: referenceImages.map((image) => image.filename),
         referenceImageName: referenceImages[0]?.filename || "",
@@ -6994,6 +7024,7 @@ async function handleGenerate(request, response) {
       referenceImages,
       reasoningEffort,
       generationMode,
+      imageBackground: generationMode === "" ? imageBackground : "",
       styleTransferSourceImageName,
       styleTransferReferenceImageName,
       styleTransferStylePreset,

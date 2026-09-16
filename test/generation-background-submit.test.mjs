@@ -89,16 +89,17 @@ function parseSseEvents(text) {
     .filter(Boolean);
 }
 
-function makePromptForm(jobId, { imageRoute = "a" } = {}) {
+function makePromptForm(jobId, { imageRoute = "a", imageBackground = "opaque", format = "png" } = {}) {
   const formData = new FormData();
   formData.set("jobId", jobId);
   formData.set("prompt", `background submit regression ${jobId}`);
   formData.set("ratio", "1:1");
   formData.set("size", "auto");
-  formData.set("format", "png");
+  formData.set("format", format);
   formData.set("reasoningEffort", "low");
   formData.set("clientSessionId", "background-submit-session");
   formData.set("background", "1");
+  formData.set("imageBackground", imageBackground);
   formData.set("imageRoute", imageRoute);
   formData.set("baseUrl", "http://127.0.0.1:9/v1");
   formData.set("apiKey", "test-key");
@@ -169,7 +170,11 @@ test("local background generate releases request connections and completes throu
     jobIds.map(async (jobId, index) => {
       const response = await fetch(`${baseUrl}/api/generate`, {
         method: "POST",
-        body: makePromptForm(jobId, { imageRoute: index === 6 ? "b" : "a" }),
+        body: makePromptForm(jobId, {
+          imageRoute: index === 6 ? "b" : "a",
+          imageBackground: index === 0 ? "transparent" : index === 6 ? "unsupported" : "opaque",
+          format: index === 0 || index === 6 ? "jpg" : "png",
+        }),
       });
       const text = await response.text();
       return { response, text, events: parseSseEvents(text) };
@@ -186,7 +191,21 @@ test("local background generate releases request connections and completes throu
   const completed = await waitForCompletedTasks(baseUrl, jobIds);
   assert.equal(completed.length, 7);
   assert.equal(completed.find((task) => task.id === "background-submit-7")?.imageRoute, "b");
+  assert.equal(completed.find((task) => task.id === "background-submit-1")?.item?.imageBackground, "transparent");
+  assert.equal(completed.find((task) => task.id === "background-submit-1")?.item?.format, "png");
+  assert.equal(completed.find((task) => task.id === "background-submit-7")?.item?.imageBackground, "opaque");
+  assert.equal(completed.find((task) => task.id === "background-submit-7")?.item?.format, "jpg");
   assert.equal(completed.every((task) => task.item?.filename), true);
   assert.equal(completed.every((task) => /^\d{4}-\d{2}-\d{2}T/.test(task.generationStartedAt)), true);
   assert.equal(completed.every((task) => task.generationStartedAt === task.item?.generationStartedAt), true);
+
+  const galleryResponse = await fetch(`${baseUrl}/api/gallery`);
+  assert.equal(galleryResponse.ok, true);
+  const gallery = await galleryResponse.json();
+  for (const task of completed) {
+    const saved = gallery.find((item) => item.filename === task.item.filename);
+    assert.ok(saved, `gallery must retain the completed result ${task.id}`);
+    assert.equal(saved.imageBackground, task.item.imageBackground);
+    assert.equal(saved.format, task.item.format);
+  }
 });

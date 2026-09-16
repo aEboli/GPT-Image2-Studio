@@ -31,9 +31,9 @@ const generationLogPanelPath = new URL("../lib/generation-log-panel.mjs", import
 const generationLogStorePath = new URL("../lib/generation-log-store.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
 const stylesAssetVersion = "20260911-imperial-black-3";
-const appAssetVersion = "20260909-api-endpoint-book-1";
+const appAssetVersion = "20260915-mode-generation-controls-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
-const creationQueueModuleAssetVersion = "20260829-generation-schedule-1";
+const creationQueueModuleAssetVersion = "20260915-mode-generation-controls-1";
 const quickBlendModuleAssetVersion = "20260608-quick-blend-time-sort-1";
 
 test("static assets use the current cache-busting version", async () => {
@@ -1144,6 +1144,8 @@ test("prompt studio exposes independent clear and reference-recycling controls",
   assert.match(app, /\[data-ui-i18n-title\][\s\S]*!element\.matches\(APP_TOOLTIP_TRIGGER_SELECTOR\)/);
   assert.doesNotMatch(app, /appTooltipTitle/);
   assert.match(app, /function bindAppTooltips\(\) \{/);
+  assert.match(app, /function showAppTooltip\(trigger\) \{[\s\S]*trigger\.removeAttribute\("title"\);/);
+  assert.match(app, /function bindAppTooltips\(\) \{[\s\S]*document\.querySelectorAll\(APP_TOOLTIP_TRIGGER_SELECTOR\)\.forEach\(\(trigger\) => trigger\.removeAttribute\("title"\)\);/);
   assert.match(app, /function formatAppTooltipText\(value\) \{[\s\S]*\.replace\(\/\(\[。；\]\)\[\^\\S\\r\\n\]\*\(\?=\\S\)\/gu, "\$1\\n"\);/);
   assert.match(app, /const text = formatAppTooltipText\(trigger\.dataset\.tooltip\);/);
   const formatAppTooltipTextSource = extractFunctionBefore(app, "formatAppTooltipText", "restoreAppTooltipDescription");
@@ -4059,6 +4061,52 @@ test("studio compact panels omit repeated helper copy", async () => {
   );
 });
 
+test("non-prompt creation modes use their own reasoning and quality controls", async () => {
+  const [html, app] = await Promise.all([readFile(indexPath, "utf8"), readFile(appPath, "utf8")]);
+  const controls = [
+    ["creationReasoningEffortInput", "creationQualityInput"],
+    ["portraitReasoningEffortInput", "portraitQualityInput"],
+    ["articleIllustrationReasoningEffortInput", "articleIllustrationQualityInput"],
+    ["pptReasoningEffortInput", "pptQualityInput"],
+  ];
+
+  controls.forEach(([reasoningId, qualityId]) => {
+    assert.match(html, new RegExp(`<select id="${reasoningId}" name="reasoningEffort"></select>`));
+    assert.match(html, new RegExp(`<select id="${qualityId}" name="quality"></select>`));
+    assert.match(app, new RegExp(`${reasoningId}: document\\.querySelector\\("#${reasoningId}"\\)`));
+    assert.match(app, new RegExp(`${qualityId}: document\\.querySelector\\("#${qualityId}"\\)`));
+  });
+
+  const articlePlanForm = extractFunctionBefore(app, "buildArticleIllustrationPlanFormData", "buildArticleIllustrationGenerateFormData");
+  const articleGenerateForm = extractFunctionBefore(app, "buildArticleIllustrationGenerateFormData", "recordArticleIllustrationLogEvent");
+  const creationPlanForm = extractFunctionBefore(app, "buildCreationPlanPreviewFormData", "getArticleIllustrationPlanSnapshot");
+  const creationForm = extractFunctionBefore(app, "buildCreationFormData", "buildCreationLogoBatchFormData");
+  const creationLogoForm = extractFunctionBefore(app, "buildCreationLogoBatchFormData", "applyCreationRepairTargetFormFields");
+  const portraitForm = extractFunctionBefore(app, "buildPortraitFormData", "buildPortraitRepairFormData");
+  const portraitSnapshot = extractFunctionBefore(app, "getPortraitPlanSnapshot", "invalidateCreationReferenceAnalysisRequest");
+  const creationRepairForm = app.match(/function buildCreationRepairFormData\([^]*?(?=\r?\nasync function handleCreationStreamEvent)/)?.[0] || "";
+  const pptForm = extractFunctionBefore(app, "buildPptFormData", "getPptGenerationSnapshot");
+  const pptSnapshot = extractFunctionBefore(app, "getPptGenerationSnapshot", "buildPptCompletionRequest");
+
+  assert.match(articlePlanForm, /getSelectedReasoningEffort\(refs\.articleIllustrationReasoningEffortInput\)/);
+  assert.match(articleGenerateForm, /getSelectedReasoningEffort\(refs\.articleIllustrationReasoningEffortInput\)/);
+  assert.match(articleGenerateForm, /getSelectedImageQuality\(refs\.articleIllustrationQualityInput\)/);
+  assert.match(creationPlanForm, /getSelectedReasoningEffort\(refs\.creationReasoningEffortInput\)/);
+  assert.match(creationForm, /getSelectedReasoningEffort\(refs\.creationReasoningEffortInput\)/);
+  assert.match(creationForm, /getSelectedImageQuality\(refs\.creationQualityInput\)/);
+  assert.match(creationLogoForm, /getSelectedReasoningEffort\(refs\.creationReasoningEffortInput\)/);
+  assert.match(creationLogoForm, /getSelectedImageQuality\(refs\.creationQualityInput\)/);
+  assert.match(portraitForm, /getSelectedReasoningEffort\(refs\.portraitReasoningEffortInput\)/);
+  assert.match(portraitForm, /getSelectedImageQuality\(refs\.portraitQualityInput\)/);
+  assert.match(portraitSnapshot, /reasoningEffort:\s*getSelectedReasoningEffort\(refs\.portraitReasoningEffortInput\)/);
+  assert.match(portraitSnapshot, /quality:\s*getSelectedImageQuality\(refs\.portraitQualityInput\)/);
+  assert.match(creationRepairForm, /snapshotItem\.reasoningEffort \|\| currentSet\?\.reasoningEffort \|\| getSelectedReasoningEffort\(refs\.creationReasoningEffortInput\)/);
+  assert.match(creationRepairForm, /snapshotItem\.quality \|\| currentSet\?\.quality \|\| getSelectedImageQuality\(refs\.creationQualityInput\)/);
+  assert.match(pptForm, /getSelectedReasoningEffort\(refs\.pptReasoningEffortInput\)/);
+  assert.match(pptForm, /getSelectedImageQuality\(refs\.pptQualityInput\)/);
+  assert.match(pptSnapshot, /quality:\s*getSelectedImageQuality\(refs\.pptQualityInput\)/);
+});
+
 test("creation mode is a separate studio view with isolated state and routes", async () => {
   const html = await readFile(indexPath, "utf8");
   const styles = await readFile(stylesPath, "utf8");
@@ -4155,7 +4203,7 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(creationReferenceClearBody, /renderCreationReferenceGrid\(\);/);
   assert.doesNotMatch(creationReferenceClearBody, /state\.creationReferenceRestoreQueue\s*=|state\.creationReferenceAnalysis\s*=|setCreationReferenceAnalysisFeedback\("", ""\)|resetCreationDraftPreview|renderCreationView|creationResultGrid|state\.creation\.currentSet|state\.creation\.queue|state\.creation\.sets|state\.creationLogo/);
   assert.match(app, /refs\.creationReferenceResetButton\.addEventListener\("click", clearCreationReferenceFiles\)/);
-  assert.match(html, /SKU 组合件数[\s\S]*id="creationSkuBundleCountInput"[\s\S]*name="skuBundleCount"/);
+  assert.doesNotMatch(html, /SKU 组合件数|id="creationSkuBundleCountInput"|name="skuBundleCount"/);
   const creationImageCountMarkup = html.match(/<select id="creationImageCountInput"[\s\S]*?<\/select>/)?.[0] || "";
   assert.match(creationImageCountMarkup, /<option value="0">0 张<\/option>[\s\S]*<option value="1">1 张<\/option>[\s\S]*<option value="18" selected>18 张<\/option>/);
   assert.match(app, /function syncCreationPlatformImageCountOptions\(/);
@@ -4200,7 +4248,7 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(html, /id="creationDimensionSpecsInput"[\s\S]*rows="1"/);
   assert.match(html, /id="creationSkuGenerationEnabledInput" name="skuGenerationEnabled" type="checkbox" checked/);
   assert.match(html, /id="creationInfographicRebuildEnabledInput" name="infographicRebuildEnabled" type="checkbox" \/>/);
-  assert.match(html, /<div class="creation-control-row creation-option-grid">[\s\S]*id="creationImageCountInput"[\s\S]*id="creationSkuBundleCountInput"[\s\S]*id="creationPlatformInput"[\s\S]*id="creationTargetLanguageInput"[\s\S]*id="creationOutputFormatInput"[\s\S]*id="creationRatioInput"[\s\S]*id="creationSizeInput"[\s\S]*id="creationSkuGenerationRuleInput"[\s\S]*id="creationDimensionUnitModeInput"[\s\S]*id="creationSkuGenerationEnabledInput"[\s\S]*id="creationInfographicRebuildEnabledInput"[\s\S]*id="creationListingAgentEnabledInput"[\s\S]*id="creationIndustryTemplateBrowser"/);
+  assert.match(html, /<div class="creation-control-row creation-option-grid">[\s\S]*id="creationImageCountInput"[\s\S]*id="creationPlatformInput"[\s\S]*id="creationReasoningEffortInput"[\s\S]*id="creationTargetLanguageInput"[\s\S]*id="creationOutputFormatInput"[\s\S]*id="creationRatioInput"[\s\S]*id="creationSizeInput"[\s\S]*id="creationQualityInput"[\s\S]*id="creationSkuGenerationRuleInput"[\s\S]*id="creationDimensionUnitModeInput"[\s\S]*id="creationSkuGenerationEnabledInput"[\s\S]*id="creationInfographicRebuildEnabledInput"[\s\S]*id="creationListingAgentEnabledInput"[\s\S]*id="creationIndustryTemplateBrowser"/);
   assert.match(html, /<select id="creationRatioInput" name="ratio">[\s\S]*<option value="1:1" data-full-label="电商主图、头像、社交媒体 · 方形 1:1" selected>1:1<\/option>[\s\S]*<option value="9:21" data-full-label="超长竖图 · 竖屏 9:21">9:21<\/option>[\s\S]*<option value="1:3" data-full-label="超长竖版广告 · 竖屏 1:3">1:3<\/option>[\s\S]*<\/select>/);
   assert.match(html, /<select id="creationSizeInput" name="size">[\s\S]*<option value="1024x1024" selected>1K 1024 x 1024<\/option>[\s\S]*<option value="2880x2880">最大 2880 x 2880<\/option>[\s\S]*<\/select>/);
   assert.match(html, /<select id="portraitRatioInput" name="ratio">[\s\S]*<option value="4:5" selected>Instagram帖子 · 竖屏 4:5<\/option>[\s\S]*<option value="3:1">超宽广告图 · 横屏 3:1<\/option>[\s\S]*<\/select>/);
@@ -4292,11 +4340,10 @@ test("creation mode has product references without a separate style-reference mo
   const creationFormCompactLabelRule = readCssRule(styles, ".creation-form .compact-field > span");
   const creationPlatformSelectRule = readCssRule(styles, "#creationPlatformInput");
   const creationPlatformOptionRule = readCssRule(styles, "#creationPlatformInput option");
-  const creationSkuBundleRule = readCssRule(styles, ".creation-option-grid .creation-sku-bundle-field input");
   const creationTemplateSearchLabelRule = readCssRule(styles, ".creation-template-search-field span");
   const creationTemplateSearchRule = readCssRule(styles, ".creation-template-search");
   const creationIndustryHeadLabelRule = readCssRule(styles, ".creation-industry-browser-head span");
-  assert.doesNotMatch(styles, /\.creation-option-grid\s+\.creation-sku-bundle-field::after/);
+  assert.doesNotMatch(styles, /\.creation-sku-bundle-field/);
   assert.match(creationOptionGridControlRule, /height:\s*40px;/);
   assert.match(creationOptionGridControlRule, /min-width:\s*0;/);
   assert.match(creationOptionGridControlRule, /box-sizing:\s*border-box;/);
@@ -4307,14 +4354,9 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(creationFormCompactLabelRule, /font-size:\s*var\(--type-body-size\);/);
   assert.match(creationPlatformSelectRule, /font-size:\s*clamp\(0\.72rem,\s*8\.5cqw,\s*var\(--type-body-size\)\);/);
   assert.match(creationPlatformOptionRule, /font-size:\s*14px;/);
-  assert.match(creationSkuBundleRule, /height:\s*40px;/);
-  assert.match(creationSkuBundleRule, /padding:\s*0\s+12px;/);
-  assert.match(creationSkuBundleRule, /text-align:\s*center;/);
-  assert.match(creationSkuBundleRule, /font-size:\s*clamp\(0\.72rem,\s*8\.5cqw,\s*var\(--type-body-size\)\);/);
   assert.match(creationTemplateSearchLabelRule, /font-size:\s*var\(--type-body-size\);/);
   assert.match(creationTemplateSearchRule, /font-size:\s*var\(--type-body-size\);/);
   assert.match(creationIndustryHeadLabelRule, /font-size:\s*var\(--type-body-size\);/);
-  assert.doesNotMatch(creationSkuBundleRule, /padding:\s*0\s+40px/);
   assert.doesNotMatch(creationOptionGridControlRule, /vw/);
   assert.match(creationOptionGridControlRule, /white-space:\s*nowrap;/);
   assert.match(creationOptionGridControlRule, /text-overflow:\s*clip;/);
@@ -4346,7 +4388,7 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(app, /creationReferenceAnalysisPanel: document\.querySelector\("#creationReferenceAnalysisPanel"\)/);
   assert.match(app, /creationReferenceAnalysisToggleButton: document\.querySelector\("#creationReferenceAnalysisToggleButton"\)/);
   assert.doesNotMatch(app, /creationReferenceApplyVisualLanguageButton: document\.querySelector\("#creationReferenceApplyVisualLanguageButton"\)/);
-  assert.match(app, /creationSkuBundleCountInput: document\.querySelector\("#creationSkuBundleCountInput"\)/);
+  assert.doesNotMatch(app, /creationSkuBundleCountInput/);
   assert.match(app, /creationPlatformInput: document\.querySelector\("#creationPlatformInput"\)/);
   assert.doesNotMatch(app, /creationScenarioInput: document\.querySelector\("#creationScenarioInput"\)/);
   assert.doesNotMatch(app, /creationVisualLanguageInput: document\.querySelector\("#creationVisualLanguageInput"\)/);
@@ -4573,7 +4615,7 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(app, /formData\.set\("dimensionUnitMode", refs\.creationDimensionUnitModeInput\.value \|\| "both"\)/);
   assert.match(app, /formData\.set\("referenceImageRoles", JSON\.stringify\(buildCreationReferenceRolePayload\(\)\)\)/);
   assert.match(app, /formData\.set\("skuSubjects", JSON\.stringify\(buildCreationSkuSubjectPayload\(\)\)\)/);
-  assert.match(app, /formData\.set\("skuBundleCount", refs\.creationSkuBundleCountInput\?\.value \|\| "1"\)/);
+  assert.doesNotMatch(app, /formData\.set\("skuBundleCount"/);
   assert.match(app, /formData\.set\("platform", getCreationSelectedPlatform\(\)\.value\)/);
   assert.doesNotMatch(app, /formData\.set\("visualLanguage", refs\.creationVisualLanguageInput\?\.value \|\| "classic-commercial"\)/);
   assert.doesNotMatch(app, /formData\.set\("planOverrides"/);

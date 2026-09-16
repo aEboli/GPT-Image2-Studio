@@ -67,7 +67,6 @@ test("browser platform change directly resets and previews without confirmation"
     "creationIndustryTemplateInput",
     "creationDimensionSpecsInput",
     "creationLogoInput",
-    "creationSkuBundleCountInput",
     "creationSkuGenerationRuleInput",
     "creationOutputFormatInput",
   ]) {

@@ -76,6 +76,7 @@ import {
   DEFAULT_PROTOCOL_IMAGE_MODEL,
   DEFAULT_RESPONSES_MODEL,
   appendApiEndpointPath,
+  getSelectedImageGenerationConfig,
   normalizeApiEndpointPath,
   normalizeImageToolModel,
   splitApiEndpointUrl,
@@ -97,7 +98,7 @@ import { getRequeueNotice } from "/lib/generation-item-retry.mjs";
 import { canRepairCreationItem as canRepairCreationItemFromQueue, getCreationRepairButtonText as getCreationRepairButtonTextFromQueue, isCreationItemRepairActive as isCreationItemRepairActiveInQueue, queueCreationItemRepair as queueCreationItemRepairInState, removeQueuedCreationItemRepair, shiftNextQueuedCreationItemRepair } from "/lib/creation-item-repair-queue.mjs";
 import { cloneCreationPlanValue, createCreationPlanPreviewRequestCoordinator, createCreationPlatformPayloadSnapshot, deepFreezeCreationPlanValue, formatCreationPlanWarning, getCreationCompatibleImageTypeState, getCreationEditablePlanDisplayCounts, getCreationSetPlanSource, getVisibleCreationPlanWarnings, mergeCreationPlatformSetParameters, resolveCreationDisplayedPlanContext, resolveCreationPlatformImageCountState, resolveCreationSelectedRolesSubmission, shouldDisableCreationGenerateButton, updateCreationPlatformItemOverride } from "/lib/creation-browser-plan-state.mjs";
 import { normalizeCreationModuleEnabled, resolveCreationPlanCounts } from "/lib/creation-plan-counts.mjs";
-import { buildCreationQueuedRepairFormData, buildCreationQueuedSet as buildCreationQueuedSetFromState, createCreationQueueJob, getActiveCreationQueueJob as getActiveCreationQueueJobFromState, getCreationQueueJobs as getCreationQueueJobsFromState, getCreationRepairTargetSet as getCreationRepairTargetSetFromState, getPendingCreationQueueCount as getPendingCreationQueueCountFromState, getSelectedCreationQueueJob as getSelectedCreationQueueJobFromState, renderCreationQueueStrip as renderCreationQueueStripView, runCreationQueuedJob as runCreationQueuedJobFromQueue, scheduleCreationGenerationQueue as scheduleCreationGenerationQueueFromState, selectCreationQueueJob as selectCreationQueueJobInState, shouldSyncCreationQueueJobCurrentSet, syncActiveCreationQueueSet as syncActiveCreationQueueSetInState } from "/lib/creation-suite-queue.mjs?v=20260829-generation-schedule-1";
+import { buildCreationQueuedRepairFormData, buildCreationQueuedSet as buildCreationQueuedSetFromState, createCreationQueueJob, getActiveCreationQueueJob as getActiveCreationQueueJobFromState, getCreationQueueJobs as getCreationQueueJobsFromState, getCreationRepairTargetSet as getCreationRepairTargetSetFromState, getPendingCreationQueueCount as getPendingCreationQueueCountFromState, getSelectedCreationQueueJob as getSelectedCreationQueueJobFromState, renderCreationQueueStrip as renderCreationQueueStripView, runCreationQueuedJob as runCreationQueuedJobFromQueue, scheduleCreationGenerationQueue as scheduleCreationGenerationQueueFromState, selectCreationQueueJob as selectCreationQueueJobInState, shouldSyncCreationQueueJobCurrentSet, syncActiveCreationQueueSet as syncActiveCreationQueueSetInState } from "/lib/creation-suite-queue.mjs?v=20260915-mode-generation-controls-1";
 import { DEFAULT_PORTRAIT_ACCESSORY_ASSETS, PORTRAIT_ACCESSORY_ASSET_CATEGORIES, getPortraitAccessoryAssetFileDescriptor } from "/lib/portrait-accessory-assets.mjs?v=20260528-portrait-assets-sort-1";
 import { createDefaultPortraitLocationState, createPortraitLocationSelectorController } from "/lib/portrait-location-selector.mjs?v=20260527-portrait-location-1";
 import { getLegacyPromptAgentTemplatePrompt, getPromptAgentDisplayName, getPromptAgentTemplateDisplayName, isStructuredImagePromptJson } from "/lib/prompt-agent-display-name.mjs?v=20260819-prompt-history-mode-1";
@@ -372,16 +373,13 @@ const GENERATION_ACTIVITY_STORAGE_KEY = "image-studio-generation-activity-v1";
 const GENERATION_LOG_STORAGE_KEY = "image-studio-generation-activity-v2";
 const THEME_STORAGE_KEY = "image-studio-ui-theme-v1";
 const UI_PALETTE_STORAGE_KEY = "image-studio-ui-palette-v1";
-const UI_ORNAMENT_STORAGE_KEY = "image-studio-ui-ornament-v1";
-const UI_ORNAMENT_STYLE_STORAGE_KEY = "image-studio-ui-ornament-style-v1";
-const UI_CUSTOM_COLORS_STORAGE_KEY = "image-studio-ui-custom-colors-v1";
 const UI_LANGUAGE_STORAGE_KEY = "image-studio-ui-language-v1";
 
 // The palette names and colour values come from the zhongguose-palette
 // catalogue.  CSS owns the complete token mapping; this table is the single
 // source for labels, swatches, and persistence validation in the UI.
 const UI_PALETTE_META = Object.freeze({
-  default: { label: "经典靛蓝", swatch: ["#090d18", "#12192f", "#6f7cff"] },
+  default: { label: "靛蓝", swatch: ["#090d18", "#12192f", "#6f7cff"] },
   qinghua: { label: "青花", swatch: ["#fffef9", "#1772b4", "#144a74"] },
   jiangnan: { label: "竹影", swatch: ["#fbf2e3", "#6e8b74", "#a61b29"] },
   songci: { label: "天青", swatch: ["#eef7f2", "#63bbd0", "#495c69"] },
@@ -390,20 +388,20 @@ const UI_PALETTE_META = Object.freeze({
   dunhuang: { label: "敦煌", swatch: ["#15231b", "#be7e4a", "#e4bf11"] },
 });
 const UI_PALETTE_IDS = new Set(Object.keys(UI_PALETTE_META));
-const UI_ORNAMENT_STYLES = new Set(["mei", "lan", "zhu", "mudan"]);
-const UI_PALETTE_DEFAULTS = Object.freeze({
-  default: { accent: "#6f7cff", surface: "#12192f", detail: "#879cff" },
-  qinghua: { accent: "#144a74", surface: "#e4dfd7", detail: "#1772b4" },
-  jiangnan: { accent: "#a61b29", surface: "#e4dfd7", detail: "#6e8b74" },
-  songci: { accent: "#495c69", surface: "#d8e3e7", detail: "#63bbd0" },
-  gugong: { accent: "#862617", surface: "#f6dead", detail: "#d6a01d" },
-  lacquer: { accent: "#ed5126", surface: "#2d2e36", detail: "#f3bf4c" },
-  dunhuang: { accent: "#be7e4a", surface: "#15231b", detail: "#e4bf11" },
-});
 const UI_LANGUAGE_TEXT = {
   "zh-CN": { activityLog: "生成日志", activityLogAllPanels: "全部板块", activityLogPanels: "生成日志板块", apiBookExpand: "展开已保存的 API", apiBookEmpty: "还没有保存过 API", apiBookRemove: "删除这条 API", baseUrl: "基础 URL", brandSubtitle: "AI 图像生成工作流", close: "关闭", config: "配置", configApi: "配置 API", configSaved: "配置已保存", configTitle: "连接配置", configUnsaved: "配置未保存", connectionBusy: "并发 {running}/{max} · 队列 {queued}", connectionOpen: "打开 API、LOG", connectionSection: "调用通道", connectionStatusEmpty: "待填写API、LOG", connectionStatusEntry: "API、LOG", delete: "删除", directEndpointSuffix: "直接调用模式请求协议后缀", directMode: "直接调用模式", download: "下载", endpointUrl: "接口地址", expandModels: "展开可用模型列表", fetchModels: "获取模型列表", fetchModelsLoading: "获取中...", fit: "适配", functionMenu: "功能菜单导航", fullUrl: "完整 URL", generate: "开始生成", generateTitle: "开始生成（Ctrl+Enter）", generationRouteLabel: "生图调用模式", globalNav: "全局导航", imageModel: "生图模型", imageToolModel: "生图工具模型", imageToolModelHint: "路由模式在 Responses 请求的 image_generation 工具里使用该模型。默认 gpt-image-2；sunburst 精修更准，flare 出图更快。", keepSavedKey: "保持已保存 Key", languageEn: "English UI", languageSwitch: "切换界面语言", languageZh: "简体中文界面", menuArticleIllustration: "文章插图", menuArticleRecord: "文章插图记录", menuAssetTools: "资产工具", menuCreation: "套图模式", menuCreationRecord: "套图记录", menuCreateTools: "创作工具", menuGallery: "瀑布画廊", menuImageCompress: "图片压缩", menuImageDecomposition: "图片拆解", menuImageEdit: "图片编辑", menuPortrait: "写真模式", menuPortraitRecord: "写真记录", menuPpt: "PPT生成", menuPptRecord: "PPT记录", menuPromptStudio: "提示词生图", menuQuickBlend: "快速溶图", menuReferenceAnalysis: "融图分析", menuSectionAssets: "资产区", menuSectionCreate: "创作区", menuSectionSettings: "配置区", menuSettings: "设置", menuStyleTransfer: "风格迁移", menuTools: "工具", modeDirect: "直接调用模式", modeProtocol: "Gemini模型", modeRoute: "路由模式", modelFetchBusy: "正在获取模型列表...", modelFetchFailed: "获取模型列表失败。", modelFetchSuccess: "已获取 {count} 个可调用模型。", modelNoCallable: "未获取到可调用模型。", modelNoMatch: "没有匹配的模型", modelNoMatchWithQuery: "没有匹配的模型：{query}", modelTestBusy: "正在测试连接...", modelTestSuccess: "连接测试成功，获取到 {count} 个模型。", navAssets: "资产", navCreate: "创作", navSettings: "配置", notSaved: "未保存", openOutput: "打开输出目录", outputFormat: "输出格式", parameters: "参数设置", previewIdleDetail: "生成日志可在配置中查看，底部胶片条可快速切换查看。", previewIdleEyebrow: "Output Preview", previewIdleTitle: "生成结果会在这里实时更新。", previewWaiting: "等待生成", prompt: "提示词", promptAgent: "图片转提示词", promptCounterSuffix: "字", promptEnhance: "增强模式", promptEnhanceAria: "开启或关闭提示词增强模式", promptEnhanceField: "增强提示词", promptEnhanceOff: "关闭", promptEnhanceOn: "开启", promptPlaceholder: "写下你要生成的画面，也可以先上传参考图说明修改方向。", promptTemplate: "提示词模板", protocolHint: "Gemini 图像模型按 OpenAI 兼容的图像生成协议调用；基础 URL 通常填写到 /v1，实际请求为 /images/generations。", protocolImageModel: "图像模型", protocolMode: "Gemini模型", quality: "质量", "ratio.1:1": "电商主图、头像、社交媒体 · 方形 1:1", "ratio.1:2": "长海报 · 竖屏 1:2", "ratio.1:3": "超长竖版广告 · 竖屏 1:3", "ratio.2:1": "Banner横幅 · 横屏 2:1", "ratio.2:3": "竖版摄影 · 竖屏 2:3", "ratio.3:1": "超宽广告图 · 横屏 3:1", "ratio.3:2": "摄影风格 · 横屏 3:2", "ratio.3:4": "海报、人像 · 竖屏 3:4", "ratio.4:3": "PPT、网页配图 · 横屏 4:3", "ratio.4:5": "Instagram帖子 · 竖屏 4:5", "ratio.5:4": "商品展示 · 横屏 5:4", "ratio.9:16": "短视频封面、手机壁纸 · 竖屏 9:16", "ratio.9:21": "超长竖图 · 竖屏 9:21", "ratio.16:9": "横版封面、YouTube · 横屏 16:9", "ratio.21:9": "超宽横幅 · 横屏 21:9", ratioLandscape: "横向", ratioPortrait: "竖向", ratioSquare: "方形", reasoningEffort: "思考等级", reference: "参考图", referenceUploadAction: "上传参考图", referenceUploadTitle: "拖入图片或点击上传", responsesModel: "Responses 模型", routeEndpointSuffix: "路由模式请求协议后缀", routeMode: "路由模式", save: "保存", schedulingSection: "生成调度", schedulingLockNote: "有生图任务正在进行或排队，暂时不能修改生成调度参数。任务全部结束后会自动恢复。", concurrencyLabel: "请求并发数量", concurrencyUnit: "个", concurrencyHint: "批量生成时同一会话内同时在跑的请求总数，默认 20 个，范围 1 到 50。调低可以减轻上游压力、降低限流和超时概率，但整批更慢；调高更快，但上游更容易限流。", size: "分辨率", startDelayHint: "同一会话内相邻两个上游请求的提交间隔，默认 1000 毫秒，范围 200 到 5000 毫秒。间隔越大越不容易触发上游限流，但最后一张开始得越晚。", startDelayLabel: "任务提交间隔", startDelayUnit: "毫秒", sizeAuto: "自动适配", sizeMax: "最大", testConnection: "测试连接", testConnectionLoading: "测试中...", themeDark: "深色主题", themeLight: "白色主题", themeMenu: "主题颜色", themeToDark: "切换到深色主题", themeToLight: "切换到白色主题", thumbnailEmpty: "暂无缩略图", thumbnailFailed: "缩略图加载失败", thumbnailLoading: "缩略图加载中", timelineNoErrors: "暂无错误", timelineWaitingResult: "等待生成结果", timelineWaitingTask: "等待任务开始", toolModel: "工具模型", toolModelAndQuality: "工具模型与质量", toolModelMeta: "工具模型", view: "查看", visionTextModel: "视觉/文本模型" },
   en: { activityLog: "Generation Log", activityLogAllPanels: "All Panels", activityLogPanels: "Generation log panels", apiBookExpand: "Show saved APIs", apiBookEmpty: "No saved APIs yet", apiBookRemove: "Delete this API", baseUrl: "Base URL", brandSubtitle: "AI image workflow", close: "Close", config: "Settings", configApi: "Configure API", configSaved: "Config saved", configTitle: "Connection Settings", configUnsaved: "Config not saved", connectionBusy: "Concurrent {running}/{max} · Queue {queued}", connectionOpen: "open API and log", connectionSection: "Request Channel", connectionStatusEmpty: "API/Log missing", connectionStatusEntry: "API, Log", delete: "Delete", directEndpointSuffix: "Direct mode endpoint suffix", directMode: "Direct Mode", download: "Download", endpointUrl: "Endpoint", expandModels: "Show available models", fetchModels: "Fetch Models", fetchModelsLoading: "Fetching...", fit: "Fit", functionMenu: "Function menu", fullUrl: "Full URL", generate: "Generate", generateTitle: "Generate (Ctrl+Enter)", generationRouteLabel: "Image request mode", globalNav: "Global navigation", imageModel: "Image Model", imageToolModel: "Image Tool Model", imageToolModelHint: "Route mode uses this model for the image_generation tool in Responses requests. Default gpt-image-2; sunburst is more precise for edits, flare is faster.", keepSavedKey: "Keep saved key", languageEn: "English UI", languageSwitch: "Switch interface language", languageZh: "Simplified Chinese UI", menuArticleIllustration: "Article Illustration", menuArticleRecord: "Article Records", menuAssetTools: "Asset Tools", menuCreation: "Product Suite", menuCreationRecord: "Suite Records", menuCreateTools: "Creation Tools", menuGallery: "Gallery", menuImageCompress: "Image Compress", menuImageDecomposition: "Image Decomposition", menuImageEdit: "Image Edit", menuPortrait: "Portrait Mode", menuPortraitRecord: "Portrait Records", menuPpt: "PPT Generation", menuPptRecord: "PPT Records", menuPromptStudio: "Prompt to Image", menuQuickBlend: "Quick Blend", menuReferenceAnalysis: "Reference Analysis", menuSectionAssets: "Assets", menuSectionCreate: "Creation", menuSectionSettings: "Settings", menuSettings: "Settings", menuStyleTransfer: "Style Transfer", menuTools: "Tools", modeDirect: "Direct Mode", modeProtocol: "Gemini Model", modeRoute: "Route Mode", modelFetchBusy: "Fetching model list...", modelFetchFailed: "Failed to fetch model list.", modelFetchSuccess: "Fetched {count} callable models.", modelNoCallable: "No callable models found.", modelNoMatch: "No matching models", modelNoMatchWithQuery: "No matching models: {query}", modelTestBusy: "Testing connection...", modelTestSuccess: "Connection test succeeded. Found {count} models.", navAssets: "Assets", navCreate: "Create", navSettings: "Settings", notSaved: "Not saved", openOutput: "Open Output", outputFormat: "Output Format", parameters: "Parameters", previewIdleDetail: "Generation log is in Settings. Use the filmstrip below to switch results.", previewIdleEyebrow: "Output Preview", previewIdleTitle: "Generated results update here in real time.", previewWaiting: "Waiting", prompt: "Prompt", promptAgent: "Image to Prompt", promptCounterSuffix: "chars", promptEnhance: "Enhance Mode", promptEnhanceAria: "Toggle prompt enhancement mode", promptEnhanceField: "Enhancement Prompt", promptEnhanceOff: "Off", promptEnhanceOn: "On", promptPlaceholder: "Describe the image you want, or upload references first and describe the edit direction.", promptTemplate: "Prompt templates", protocolHint: "Gemini image models use an OpenAI-compatible image generation protocol. Base URL usually ends at /v1; requests go to /images/generations.", protocolImageModel: "Image Model", protocolMode: "Gemini Model", quality: "Quality", "ratio.1:1": "Ecommerce, Avatar, Social · Square 1:1", "ratio.1:2": "Long Poster · Portrait 1:2", "ratio.1:3": "Tall Ad · Portrait 1:3", "ratio.2:1": "Banner · Landscape 2:1", "ratio.2:3": "Vertical Photo · Portrait 2:3", "ratio.3:1": "Ultrawide Ad · Landscape 3:1", "ratio.3:2": "Photography · Landscape 3:2", "ratio.3:4": "Poster, Portrait · Portrait 3:4", "ratio.4:3": "PPT, Web Graphic · Landscape 4:3", "ratio.4:5": "Instagram Post · Portrait 4:5", "ratio.5:4": "Product Display · Landscape 5:4", "ratio.9:16": "Short Video Cover, Wallpaper · Portrait 9:16", "ratio.9:21": "Tall Scroll Image · Portrait 9:21", "ratio.16:9": "Cover, YouTube · Landscape 16:9", "ratio.21:9": "Ultrawide Banner · Landscape 21:9", ratioLandscape: "Landscape", ratioPortrait: "Portrait", ratioSquare: "Square", reasoningEffort: "Reasoning", reference: "Reference", referenceUploadAction: "Upload Reference", referenceUploadTitle: "Drop images or click to upload", responsesModel: "Responses Model", routeEndpointSuffix: "Route mode endpoint suffix", routeMode: "Route Mode", save: "Save", schedulingSection: "Generation Scheduling", schedulingLockNote: "Generation tasks are running or queued, so the scheduling parameters cannot be changed right now. They unlock automatically once every task finishes.", concurrencyLabel: "Request Concurrency", concurrencyUnit: "requests", concurrencyHint: "The total number of generation requests that may run at once in one session. Default 20, range 1 to 50. Lowering it eases upstream pressure and reduces rate limiting and timeouts; raising it is faster but reaches limits sooner.", size: "Size", startDelayHint: "Interval between adjacent upstream submissions in one session. Default 1000 ms, range 200 to 5000 ms. A larger interval is gentler on a rate-limited upstream but starts the last image later.", startDelayLabel: "Task Submit Interval", startDelayUnit: "ms", sizeAuto: "Auto", sizeMax: "Max", testConnection: "Test Connection", testConnectionLoading: "Testing...", themeDark: "Dark theme", themeLight: "Light theme", themeMenu: "Theme color", themeToDark: "Switch to dark theme", themeToLight: "Switch to light theme", thumbnailEmpty: "No thumbnails", thumbnailFailed: "Thumbnail load failed", thumbnailLoading: "Loading thumbnails", timelineNoErrors: "No errors", timelineWaitingResult: "Waiting for result", timelineWaitingTask: "Waiting for task", toolModel: "Tool Model", toolModelAndQuality: "Tool model and quality", toolModelMeta: "Tool model", view: "View", visionTextModel: "Vision/Text Model" },
 };
+Object.assign(UI_LANGUAGE_TEXT["zh-CN"], {
+  background: "背景",
+  transparent: "透明",
+  transparentBackgroundAria: "启用透明背景",
+});
+Object.assign(UI_LANGUAGE_TEXT.en, {
+  background: "Background",
+  transparent: "Transparent",
+  transparentBackgroundAria: "Use transparent background",
+});
 Object.assign(UI_LANGUAGE_TEXT["zh-CN"], {
   configSectionLabel: "配置区",
   directMode: "直连模式",
@@ -421,24 +419,13 @@ Object.assign(UI_LANGUAGE_TEXT["zh-CN"], {
   paletteTrigger: "配色",
   paletteTriggerAria: "打开界面配色",
   paletteHint: "选择一套界面配色，立即应用到背景、卡片、按钮与细节。",
-  paletteDefault: "经典靛蓝",
+  paletteDefault: "靛蓝",
   paletteQinghua: "青花",
   paletteJiangnan: "竹影",
   paletteSongci: "天青",
   paletteGugong: "朱墙",
   paletteLacquer: "朱漆",
   paletteDunhuang: "敦煌",
-  ornamentEnable: "花卉点缀",
-  ornamentStyle: "点缀样式",
-  ornamentMei: "折枝梅",
-  ornamentLan: "兰叶小丛",
-  ornamentZhu: "竹节竖列",
-  ornamentMudan: "牡丹团花",
-  customColors: "自定义细节色",
-  customAccent: "按钮与焦点",
-  customSurface: "界面面层",
-  customDetail: "花卉与装饰",
-  customReset: "跟随",
 });
 Object.assign(UI_LANGUAGE_TEXT.en, {
   configSectionLabel: "Configuration section",
@@ -456,24 +443,13 @@ Object.assign(UI_LANGUAGE_TEXT.en, {
   paletteTrigger: "Palette",
   paletteTriggerAria: "Open interface palette",
   paletteHint: "Choose an interface palette for backgrounds, cards, buttons, and details.",
-  paletteDefault: "Classic indigo",
+  paletteDefault: "Indigo",
   paletteQinghua: "Blue and white",
   paletteJiangnan: "Bamboo shade",
   paletteSongci: "Celadon",
   paletteGugong: "Vermilion wall",
   paletteLacquer: "Vermilion lacquer",
   paletteDunhuang: "Dunhuang",
-  ornamentEnable: "Floral accents",
-  ornamentStyle: "Accent motif",
-  ornamentMei: "Plum branch",
-  ornamentLan: "Orchid sprig",
-  ornamentZhu: "Bamboo nodes",
-  ornamentMudan: "Peony medallion",
-  customColors: "Custom detail colors",
-  customAccent: "Buttons and focus",
-  customSurface: "Interface surfaces",
-  customDetail: "Flowers and ornament",
-  customReset: "Use palette",
 });
 const CONNECTION_STATUS_ENTRY_LABEL = "API、LOG";
 const CONNECTION_STATUS_EMPTY_LABEL = "待填写API、LOG";
@@ -814,9 +790,6 @@ const state = {
   configSection: "a",
   uiTheme: "dark",
   uiPalette: "default",
-  uiOrnament: false,
-  uiOrnamentStyle: "mei",
-  uiCustomColors: { accent: "", surface: "", detail: "" },
   uiLanguage: "zh-CN",
   zoom: 1,
 };
@@ -902,8 +875,10 @@ const refs = {
   articleIllustrationForm: document.querySelector("#articleIllustrationForm"),
   articleIllustrationGenerateButton: document.querySelector("#articleIllustrationGenerateButton"),
   articleIllustrationPlanButton: document.querySelector("#articleIllustrationPlanButton"),
+  articleIllustrationQualityInput: document.querySelector("#articleIllustrationQualityInput"),
   articleIllustrationReferenceButton: document.querySelector("#articleIllustrationReferenceButton"),
   articleIllustrationReferenceList: document.querySelector("#articleIllustrationReferenceList"),
+  articleIllustrationReasoningEffortInput: document.querySelector("#articleIllustrationReasoningEffortInput"),
   articleIllustrationSetMeta: document.querySelector("#articleIllustrationSetMeta"),
   articleIllustrationSourceFilesInput: document.querySelector("#articleIllustrationSourceFilesInput"),
   articleIllustrationSourceLength: document.querySelector("#articleIllustrationSourceLength"),
@@ -961,6 +936,7 @@ const refs = {
   creationLogoRemoveButton: document.querySelector("#creationLogoRemoveButton"),
   creationSavedLogoGrid: document.querySelector("#creationSavedLogoGrid"),
   creationOutputFormatInput: document.querySelector("#creationOutputFormatInput"),
+  creationQualityInput: document.querySelector("#creationQualityInput"),
   creationPlanButton: document.querySelector("#creationPlanButton"),
   creationPlanRestoreButton: document.querySelector("#creationPlanRestoreButton"),
   creationPlanSummary: document.querySelector("#creationPlanSummary"),
@@ -992,7 +968,9 @@ const refs = {
   portraitOutputFormatInput: document.querySelector("#portraitOutputFormatInput"),
   portraitPlanButton: document.querySelector("#portraitPlanButton"),
   portraitProgressText: document.querySelector("#portraitProgressText"),
+  portraitQualityInput: document.querySelector("#portraitQualityInput"),
   portraitRatioInput: document.querySelector("#portraitRatioInput"),
+  portraitReasoningEffortInput: document.querySelector("#portraitReasoningEffortInput"),
   portraitRecordActionFeedback: document.querySelector("#portraitRecordActionFeedback"),
   portraitRecordArchiveDetail: document.querySelector("#portraitRecordArchiveDetail"),
   portraitRecordCopyPromptsButton: document.querySelector("#portraitRecordCopyPromptsButton"),
@@ -1088,10 +1066,10 @@ const refs = {
   creationSetOnly: [...document.querySelectorAll("[data-creation-set-only]")],
   creationSetMeta: document.querySelector("#creationSetMeta"),
   creationSizeInput: document.querySelector("#creationSizeInput"),
-  creationSkuBundleCountInput: document.querySelector("#creationSkuBundleCountInput"),
   creationSkuGenerationEnabledInput: document.querySelector("#creationSkuGenerationEnabledInput"),
   creationSkuGenerationRuleInput: document.querySelector("#creationSkuGenerationRuleInput"),
   creationRatioInput: document.querySelector("#creationRatioInput"),
+  creationReasoningEffortInput: document.querySelector("#creationReasoningEffortInput"),
   creationTargetLanguageInput: document.querySelector("#creationTargetLanguageInput"),
   errorBanner: document.querySelector("#errorBanner"),
   filmstrip: document.querySelector("#filmstrip"),
@@ -1160,6 +1138,8 @@ const refs = {
   openPromptAgentButton: document.querySelector("#openPromptAgentButton"),
   outputFormatInput: document.querySelector("#outputFormatInput"),
   qualityInput: document.querySelector("#qualityInput"),
+  transparentBackgroundField: document.querySelector("#transparentBackgroundField"),
+  transparentBackgroundInput: document.querySelector("#transparentBackgroundInput"),
   previewDeleteButton: document.querySelector("#previewDeleteButton"),
   previewDownloadButton: document.querySelector("#previewDownloadButton"),
   previewId: document.querySelector("#previewId"),
@@ -1220,6 +1200,7 @@ const refs = {
   pptOutlineBox: document.querySelector("#pptOutlineBox"),
   pptPageCountInput: document.querySelector("#pptPageCountInput"),
   pptProgressBar: document.querySelector("#pptProgressBar"),
+  pptQualityInput: document.querySelector("#pptQualityInput"),
   pptRecordDeleteCurrentButton: document.querySelector("#pptRecordDeleteCurrentButton"),
   pptRecordDeleteSelectedButton: document.querySelector("#pptRecordDeleteSelectedButton"),
   pptRecordDetail: document.querySelector("#pptRecordDetail"),
@@ -1228,6 +1209,7 @@ const refs = {
   pptRecordList: document.querySelector("#pptRecordList"),
   pptRecordRefreshButton: document.querySelector("#pptRecordRefreshButton"),
   pptRecordSelection: document.querySelector("#pptRecordSelection"),
+  pptReasoningEffortInput: document.querySelector("#pptReasoningEffortInput"),
   pptSlideList: document.querySelector("#pptSlideList"),
   pptSourceInput: document.querySelector("#pptSourceInput"),
   pptSourceModeInputs: [...document.querySelectorAll("input[name=\"pptSourceMode\"]")],
@@ -1349,14 +1331,6 @@ const refs = {
   themeToggleLabel: document.querySelector("#themeToggleLabel"),
   uiPaletteInput: document.querySelector("#uiPaletteInput"),
   uiPaletteOptions: [...document.querySelectorAll("[data-ui-palette-option]")],
-  palettePickerToggle: document.querySelector("#palettePickerToggle"),
-  palettePickerPanel: document.querySelector("#palettePickerPanel"),
-  palettePickerSwatch: document.querySelector("#palettePickerSwatch"),
-  uiOrnamentInput: document.querySelector("#uiOrnamentInput"),
-  uiOrnamentStyleInput: document.querySelector("#uiOrnamentStyleInput"),
-  uiCustomAccentInput: document.querySelector("#uiCustomAccentInput"),
-  uiCustomSurfaceInput: document.querySelector("#uiCustomSurfaceInput"),
-  uiCustomDetailInput: document.querySelector("#uiCustomDetailInput"),
   topbar: document.querySelector(".topbar"),
   topbarRevealButton: document.querySelector("#topbarRevealButton"),
   timelineChannelTabs: document.querySelector("#timelineChannelTabs"),
@@ -1406,6 +1380,9 @@ const configModelPicker = createConfigModelPickerController({
   state,
   getBrowserPrivateConfigRequestPayload,
   getUiText: getUiLanguageText,
+  onModelChange: (target) => {
+    if (target === "direct" || target === "protocol") renderImageQualityOptions();
+  },
   isTargetEnabled: (target) => {
     const section = getSelectedConfigSection();
     if (section === "theme") return false;
@@ -2013,51 +1990,6 @@ function readUiPalette() {
     return normalizeUiPalette(document.documentElement.dataset.palette);
   }
 }
-function normalizeHexColor(value) {
-  const normalized = String(value || "").trim().toLowerCase();
-  return /^#[0-9a-f]{6}$/.test(normalized) ? normalized : "";
-}
-function getReadableColorForBackground(hex) {
-  const normalized = normalizeHexColor(hex);
-  if (!normalized) return "#fffef9";
-  const channels = [1, 3, 5].map((offset) => Number.parseInt(normalized.slice(offset, offset + 2), 16) / 255);
-  const luminance = channels.map((channel) => (channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4));
-  const relativeLuminance = 0.2126 * luminance[0] + 0.7152 * luminance[1] + 0.0722 * luminance[2];
-  const lightContrast = 1.05 / (relativeLuminance + 0.05);
-  const darkContrast = (relativeLuminance + 0.05) / 0.05;
-  return lightContrast >= darkContrast ? "#fffef9" : "#363433";
-}
-function readUiCustomColors() {
-  let parsed = {};
-  try {
-    parsed = JSON.parse(window.localStorage.getItem(UI_CUSTOM_COLORS_STORAGE_KEY) || "{}");
-  } catch {
-    parsed = {};
-  }
-  return {
-    accent: normalizeHexColor(parsed?.accent),
-    surface: normalizeHexColor(parsed?.surface),
-    detail: normalizeHexColor(parsed?.detail),
-  };
-}
-function readUiOrnament() {
-  try {
-    const saved = window.localStorage.getItem(UI_ORNAMENT_STORAGE_KEY);
-    if (saved !== null) return saved === "on" || saved === "true" || saved === "1";
-  } catch {
-    // Fall back to the value written by the first-paint bootstrap script.
-  }
-  return document.documentElement.dataset.ornament === "on";
-}
-function readUiOrnamentStyle() {
-  let value = "";
-  try {
-    value = window.localStorage.getItem(UI_ORNAMENT_STYLE_STORAGE_KEY) || "";
-  } catch {
-    // Fall back to the value written by the first-paint bootstrap script.
-  }
-  return UI_ORNAMENT_STYLES.has(value) ? value : (UI_ORNAMENT_STYLES.has(document.documentElement.dataset.ornamentStyle) ? document.documentElement.dataset.ornamentStyle : "mei");
-}
 function syncUiPaletteControls() {
   const palette = normalizeUiPalette(state.uiPalette);
   if (refs.uiPaletteInput) refs.uiPaletteInput.value = palette;
@@ -2069,47 +2001,6 @@ function syncUiPaletteControls() {
     const meta = UI_PALETTE_META[button.dataset.uiPaletteOption];
     if (swatch && meta) meta.swatch.forEach((color, index) => swatch.children[index]?.style.setProperty("background", color));
   });
-  const pickerMeta = UI_PALETTE_META[palette];
-  if (refs.palettePickerSwatch && pickerMeta) {
-    pickerMeta.swatch.forEach((color, index) => refs.palettePickerSwatch.children[index]?.style.setProperty("background", color));
-  }
-}
-function syncUiOrnamentControls() {
-  const enabled = Boolean(state.uiOrnament);
-  const style = UI_ORNAMENT_STYLES.has(state.uiOrnamentStyle) ? state.uiOrnamentStyle : "mei";
-  document.documentElement.dataset.ornament = enabled ? "on" : "off";
-  document.documentElement.dataset.ornamentStyle = style;
-  if (refs.uiOrnamentInput) refs.uiOrnamentInput.checked = enabled;
-  if (refs.uiOrnamentStyleInput) {
-    refs.uiOrnamentStyleInput.value = style;
-    refs.uiOrnamentStyleInput.disabled = !enabled;
-  }
-}
-function applyUiCustomColors() {
-  const root = document.documentElement;
-  const colors = state.uiCustomColors || {};
-  const defaults = UI_PALETTE_DEFAULTS[normalizeUiPalette(state.uiPalette)] || UI_PALETTE_DEFAULTS.default;
-  const customProperties = {
-    "--palette-custom-accent": normalizeHexColor(colors.accent),
-    "--palette-custom-surface": normalizeHexColor(colors.surface),
-    "--palette-custom-detail": normalizeHexColor(colors.detail),
-  };
-  const customAccent = customProperties["--palette-custom-accent"];
-  if (customAccent) root.style.setProperty("--palette-custom-accent-fg", getReadableColorForBackground(customAccent));
-  else root.style.removeProperty("--palette-custom-accent-fg");
-  Object.entries(customProperties).forEach(([property, value]) => {
-    const name = property.replace("--palette-custom-", "");
-    if (value) {
-      root.style.setProperty(property, value);
-      root.dataset[`custom${name[0].toUpperCase()}${name.slice(1)}`] = "true";
-    } else {
-      root.style.removeProperty(property);
-      delete root.dataset[`custom${name[0].toUpperCase()}${name.slice(1)}`];
-    }
-  });
-  if (refs.uiCustomAccentInput) refs.uiCustomAccentInput.value = customProperties["--palette-custom-accent"] || defaults.accent;
-  if (refs.uiCustomSurfaceInput) refs.uiCustomSurfaceInput.value = customProperties["--palette-custom-surface"] || defaults.surface;
-  if (refs.uiCustomDetailInput) refs.uiCustomDetailInput.value = customProperties["--palette-custom-detail"] || defaults.detail;
 }
 function setUiPalette(palette) {
   state.uiPalette = normalizeUiPalette(palette);
@@ -2120,42 +2011,8 @@ function setUiPalette(palette) {
     // Ignore storage restrictions; the current page can still switch palette.
   }
   syncUiPaletteControls();
-  applyUiCustomColors();
   temuWorkbenchLauncher?.syncTheme?.();
 }
-function setUiOrnament(enabled) {
-  state.uiOrnament = Boolean(enabled);
-  try {
-    window.localStorage.setItem(UI_ORNAMENT_STORAGE_KEY, state.uiOrnament ? "on" : "off");
-  } catch {
-    // Ignore storage restrictions; the current page can still toggle ornament.
-  }
-  syncUiOrnamentControls();
-  temuWorkbenchLauncher?.syncTheme?.();
-}
-function setUiOrnamentStyle(style) {
-  state.uiOrnamentStyle = UI_ORNAMENT_STYLES.has(style) ? style : "mei";
-  document.documentElement.dataset.ornamentStyle = state.uiOrnamentStyle;
-  try {
-    window.localStorage.setItem(UI_ORNAMENT_STYLE_STORAGE_KEY, state.uiOrnamentStyle);
-  } catch {
-    // Ignore storage restrictions; the current page can still switch ornament.
-  }
-  syncUiOrnamentControls();
-  temuWorkbenchLauncher?.syncTheme?.();
-}
-function setUiCustomColor(name, value) {
-  if (!(name in (state.uiCustomColors || {}))) return;
-  state.uiCustomColors[name] = normalizeHexColor(value);
-  try {
-    window.localStorage.setItem(UI_CUSTOM_COLORS_STORAGE_KEY, JSON.stringify(state.uiCustomColors));
-  } catch {
-    // Ignore storage restrictions; the current page can still apply the color.
-  }
-  applyUiCustomColors();
-  temuWorkbenchLauncher?.syncTheme?.();
-}
-function resetUiCustomColor(name) { setUiCustomColor(name, ""); }
 function normalizeUiLanguage(language) { return language === "en" ? "en" : "zh-CN"; }
 function readUiLanguage() { try { return normalizeUiLanguage(window.localStorage.getItem(UI_LANGUAGE_STORAGE_KEY) || document.documentElement.lang); } catch { return normalizeUiLanguage(document.documentElement.lang); } }
 function getUiLanguageText(key) { return UI_LANGUAGE_TEXT[state.uiLanguage]?.[key] || UI_LANGUAGE_TEXT["zh-CN"][key] || ""; }
@@ -2282,6 +2139,7 @@ function setStudioGenerationMode(mode = "prompt") {
     block.classList.toggle("hidden", nextMode === "style-transfer");
   });
   refs.styleTransferBlock?.classList.toggle("hidden", nextMode !== "style-transfer");
+  syncPromptTransparentBackgroundControl();
   updateGenerateButton();
 }
 async function ensureActiveViewModule(view) {
@@ -2586,6 +2444,7 @@ function bindStudioDensitySync() {
 }
 async function setActiveView(view) {
   state.activeView = view;
+  syncPromptTransparentBackgroundControl();
   document.querySelector("[data-product-image-extension-menu-entry]").hidden = view !== "creation";
   syncHash(view);
   document.documentElement.dataset.viewFamily = VIEW_ACCENT_FAMILIES[view] || "create";
@@ -4934,22 +4793,68 @@ function renderReferenceAnalysis() {
     refs.referenceAnalysisList.append(risk);
   }
 }
+function getReasoningEffortInputs() {
+  return [
+    refs.reasoningEffortInput,
+    refs.creationReasoningEffortInput,
+    refs.portraitReasoningEffortInput,
+    refs.articleIllustrationReasoningEffortInput,
+    refs.pptReasoningEffortInput,
+  ].filter(Boolean);
+}
+
+function getSelectedReasoningEffort(input = refs.reasoningEffortInput) {
+  const reasoningEfforts = state.reasoningEfforts || DEFAULT_REASONING_EFFORTS;
+  const currentValue = input?.value || state.config?.defaults?.reasoningEffort || "xhigh";
+  return reasoningEfforts.includes(currentValue) ? currentValue : reasoningEfforts[0] || "xhigh";
+}
+
 function renderReasoningOptions() {
-  const currentValue = refs.reasoningEffortInput.value || state.config?.defaults?.reasoningEffort || "xhigh";
-  refs.reasoningEffortInput.innerHTML = "";
-  state.reasoningEfforts.forEach((value) => {
-    const option = document.createElement("option");
-    const label = REASONING_LABELS[value] || value;
-    const estimate = REASONING_ESTIMATES[value] || "";
-    option.value = value;
-    option.textContent = estimate ? `${label} ~${estimate}` : label;
-    refs.reasoningEffortInput.appendChild(option);
+  const reasoningEfforts = state.reasoningEfforts || DEFAULT_REASONING_EFFORTS;
+  getReasoningEffortInputs().forEach((input) => {
+    const currentValue = getSelectedReasoningEffort(input);
+    input.innerHTML = "";
+    reasoningEfforts.forEach((value) => {
+      const option = document.createElement("option");
+      const label = REASONING_LABELS[value] || value;
+      const estimate = REASONING_ESTIMATES[value] || "";
+      option.value = value;
+      option.textContent = estimate ? `${label} ~${estimate}` : label;
+      input.appendChild(option);
+    });
+    input.value = currentValue;
   });
-  if (state.reasoningEfforts.includes(currentValue)) {
-    refs.reasoningEffortInput.value = currentValue;
-  } else {
-    refs.reasoningEffortInput.value = state.reasoningEfforts[0] || "xhigh";
+}
+function supportsPromptTransparentBackground() {
+  return state.activeView === "studio" && state.studioMode === "prompt" && !isModelProtocolImageRoute();
+}
+function getPromptImageBackground() {
+  return supportsPromptTransparentBackground() && refs.transparentBackgroundInput?.checked ? "transparent" : "opaque";
+}
+function syncPromptTransparentBackgroundControl() {
+  const field = refs.transparentBackgroundField;
+  const input = refs.transparentBackgroundInput;
+  const outputFormatInput = refs.outputFormatInput;
+  if (!field || !input || !outputFormatInput) {
+    return;
   }
+
+  const isSupported = supportsPromptTransparentBackground();
+  const isTransparent = isSupported && input.checked;
+  field.hidden = !isSupported;
+
+  if (isTransparent) {
+    const currentFormat = normalizeOutputFormat(outputFormatInput.value || "png");
+    if (currentFormat !== "png") {
+      input.dataset.previousOutputFormat = currentFormat;
+    }
+    outputFormatInput.value = "png";
+  } else if (input.dataset.previousOutputFormat) {
+    outputFormatInput.value = normalizeOutputFormat(input.dataset.previousOutputFormat);
+    delete input.dataset.previousOutputFormat;
+  }
+
+  outputFormatInput.disabled = isTransparent;
 }
 function renderOutputFormatOptions() {
   const currentValue = normalizeOutputFormat(refs.outputFormatInput.value || state.config?.defaults?.format || "png");
@@ -4961,25 +4866,38 @@ function renderOutputFormatOptions() {
     refs.outputFormatInput.appendChild(element);
   });
   refs.outputFormatInput.value = currentValue;
+  syncPromptTransparentBackgroundControl();
 }
-// 选项集合随所选工具模型变化：旧模型没有 xhigh / max。已选的扩展档在切回旧模型时
+// 选项集合随当前通道的生图模型变化：旧模型没有 xhigh / max。已选的扩展档在切回旧模型时
 // 由 normalizeImageQuality 降为 high，所以这里重建后一定能选中。
-function renderImageQualityOptions() {
-  if (!refs.qualityInput) return;
-  const imageModel = getSelectedImageToolModel();
-  const currentValue = normalizeImageQuality(refs.qualityInput.value || state.config?.defaults?.quality, { imageModel });
-  refs.qualityInput.innerHTML = "";
-  getImageQualityOptions(imageModel).forEach((option) => {
-    const element = document.createElement("option");
-    element.value = option.value;
-    element.textContent = option.label;
-    refs.qualityInput.appendChild(element);
-  });
-  refs.qualityInput.value = currentValue;
+function getImageQualityInputs() {
+  return [
+    refs.qualityInput,
+    refs.creationQualityInput,
+    refs.portraitQualityInput,
+    refs.articleIllustrationQualityInput,
+    refs.pptQualityInput,
+  ].filter(Boolean);
 }
-function getSelectedImageQuality() {
-  return normalizeImageQuality(refs.qualityInput?.value || state.config?.defaults?.quality, {
-    imageModel: getSelectedImageToolModel(),
+
+function renderImageQualityOptions() {
+  const { imageModel } = getSelectedImageGenerationConfig(getCurrentPrivateConfigRequestPayload());
+  getImageQualityInputs().forEach((input) => {
+    const currentValue = normalizeImageQuality(input.value || state.config?.defaults?.quality, { imageModel });
+    input.innerHTML = "";
+    getImageQualityOptions(imageModel).forEach((option) => {
+      const element = document.createElement("option");
+      element.value = option.value;
+      element.textContent = option.label;
+      input.appendChild(element);
+    });
+    input.value = currentValue;
+  });
+}
+function getSelectedImageQuality(input = refs.qualityInput) {
+  const { imageModel } = getSelectedImageGenerationConfig(getCurrentPrivateConfigRequestPayload());
+  return normalizeImageQuality(input?.value || state.config?.defaults?.quality, {
+    imageModel,
   });
 }
 function syncGenerationSize(value) {
@@ -5482,6 +5400,8 @@ function selectConfigSection(section) {
   syncEndpointFieldsFromFullUrlModes();
   syncProtocolEndpointPreview();
   renderSizeOptions();
+  syncPromptTransparentBackgroundControl();
+  renderImageQualityOptions();
   renderReferenceAnalysisSizeOptions();
   renderImageDecompositionSizeOptions();
   renderCreationSizeOptions();
@@ -7696,6 +7616,7 @@ function showAppTooltip(trigger) {
   if (!text) {
     return;
   }
+  trigger.removeAttribute("title");
   if (appTooltipTrigger !== trigger) {
     hideAppTooltip();
     appTooltipTrigger = trigger;
@@ -7714,6 +7635,7 @@ function bindAppTooltips() {
   if (!refs.appTooltip) {
     return;
   }
+  document.querySelectorAll(APP_TOOLTIP_TRIGGER_SELECTOR).forEach((trigger) => trigger.removeAttribute("title"));
   document.addEventListener("pointerover", (event) => {
     const trigger = event.target.closest?.(APP_TOOLTIP_TRIGGER_SELECTOR);
     if (!trigger || trigger.contains(event.relatedTarget)) {
@@ -8129,7 +8051,8 @@ async function requestPptSlideEditStream() {
   formData.set("transitionSpeed", refs.pptTransitionSpeedInput.value);
   formData.set("autoAdvanceSeconds", refs.pptAutoAdvanceInput.value);
   formData.set("editInstruction", instruction);
-  formData.set("reasoningEffort", refs.reasoningEffortInput.value || state.config?.defaults?.reasoningEffort || "xhigh");
+  formData.set("reasoningEffort", getSelectedReasoningEffort(refs.pptReasoningEffortInput));
+  formData.set("quality", getSelectedImageQuality(refs.pptQualityInput));
   formData.set("sourceSlideImage", await sourceResponse.blob(), `slide-${slideNumber}-source.png`);
   formData.set("annotatedSlideImage", await buildAnnotatedPptSlideBlob(), `slide-${slideNumber}-annotated.png`);
   appendCurrentConfigToFormData(formData);
@@ -8180,13 +8103,24 @@ function buildPptFormData() {
   formData.set("transitionPreset", refs.pptTransitionPresetInput.value);
   formData.set("transitionSpeed", refs.pptTransitionSpeedInput.value);
   formData.set("autoAdvanceSeconds", refs.pptAutoAdvanceInput.value);
-  formData.set("reasoningEffort", refs.reasoningEffortInput.value || state.config?.defaults?.reasoningEffort || "xhigh");
+  formData.set("reasoningEffort", getSelectedReasoningEffort(refs.pptReasoningEffortInput));
+  formData.set("quality", getSelectedImageQuality(refs.pptQualityInput));
   appendCurrentConfigToFormData(formData);
   return formData;
 }
 
 function getPptGenerationSnapshot() {
-  return { requestConfig: getCurrentPrivateConfigRequestPayload(), stylePreset: refs.pptStylePresetInput.value, exportMode: refs.pptExportModeInput.value, dynamicPreset: refs.pptDynamicPresetInput.value, transitionPreset: refs.pptTransitionPresetInput.value, transitionSpeed: refs.pptTransitionSpeedInput.value, autoAdvanceSeconds: refs.pptAutoAdvanceInput.value, reasoningEffort: refs.reasoningEffortInput.value || state.config?.defaults?.reasoningEffort || "xhigh" };
+  return {
+    requestConfig: getCurrentPrivateConfigRequestPayload(),
+    stylePreset: refs.pptStylePresetInput.value,
+    exportMode: refs.pptExportModeInput.value,
+    dynamicPreset: refs.pptDynamicPresetInput.value,
+    transitionPreset: refs.pptTransitionPresetInput.value,
+    transitionSpeed: refs.pptTransitionSpeedInput.value,
+    autoAdvanceSeconds: refs.pptAutoAdvanceInput.value,
+    reasoningEffort: getSelectedReasoningEffort(refs.pptReasoningEffortInput),
+    quality: getSelectedImageQuality(refs.pptQualityInput),
+  };
 }
 
 function buildPptCompletionRequest(slideNumbers) {
@@ -8204,6 +8138,7 @@ function buildPptCompletionRequest(slideNumbers) {
     transitionSpeed: snapshot.transitionSpeed,
     autoAdvanceSeconds: snapshot.autoAdvanceSeconds,
     reasoningEffort: snapshot.reasoningEffort,
+    quality: snapshot.quality,
   };
 }
 
@@ -10081,7 +10016,7 @@ function buildArticleIllustrationPlanFormData() {
   formData.set("supplementalPrompt", refs.articleIllustrationSupplementInput.value.trim());
   formData.set("contentType", refs.articleIllustrationContentTypeInput.value || "auto");
   formData.set("stylePreset", refs.articleIllustrationStylePresetInput.value || DEFAULT_ARTICLE_ILLUSTRATION_STYLE_PRESET);
-  formData.set("reasoningEffort", refs.reasoningEffortInput.value || state.config?.defaults?.reasoningEffort || "xhigh");
+  formData.set("reasoningEffort", getSelectedReasoningEffort(refs.articleIllustrationReasoningEffortInput));
   state.articleIllustration.files.forEach((item) => {
     if (item.file) {
       formData.append("sourceFiles", item.file);
@@ -10100,7 +10035,8 @@ function buildArticleIllustrationGenerateFormData({ itemIds = [], regenerate = f
   formData.set("ratio", "3:2");
   formData.set("size", "auto");
   formData.set("format", "png");
-  formData.set("reasoningEffort", refs.reasoningEffortInput.value || state.config?.defaults?.reasoningEffort || "xhigh");
+  formData.set("reasoningEffort", getSelectedReasoningEffort(refs.articleIllustrationReasoningEffortInput));
+  formData.set("quality", getSelectedImageQuality(refs.articleIllustrationQualityInput));
   formData.set("clientSessionId", state.clientSessionId);
   if (itemIds.length > 0) {
     formData.set("itemIds", JSON.stringify(itemIds));
@@ -11066,7 +11002,6 @@ function applyCreationSetToForm(set) {
   refs.creationProductDescriptionInput.value = normalized.productDescription || "";
   refs.creationSellingPointsInput.value = normalized.sellingPoints.join("\n");
   refs.creationDimensionSpecsInput.value = normalized.dimensionSpecs || "";
-  if (refs.creationSkuBundleCountInput) refs.creationSkuBundleCountInput.value = String(normalized.skuBundleCount || 1);
   if (refs.creationSkuGenerationEnabledInput) refs.creationSkuGenerationEnabledInput.checked = normalized.skuGenerationEnabled !== false;
   if (refs.creationInfographicRebuildEnabledInput) refs.creationInfographicRebuildEnabledInput.checked = normalized.infographicRebuildEnabled === true;
   setCreationSelectValue(refs.creationSkuGenerationRuleInput, normalized.skuGenerationRule, DEFAULT_CREATION_SKU_GENERATION_RULE);
@@ -13790,12 +13725,12 @@ function buildCreationPlanPreviewFormData() {
   formData.set("imageCount", String(getCreationPlanPreviewImageCount(selectedRoles)));
   formData.set("skuGenerationEnabled", String(refs.creationSkuGenerationEnabledInput?.checked !== false));
   formData.set("infographicRebuildEnabled", String(isCreationInfographicRebuildRequired() || refs.creationInfographicRebuildEnabledInput?.checked === true));
+  formData.set("reasoningEffort", getSelectedReasoningEffort(refs.creationReasoningEffortInput));
   formData.set("platform", getCreationSelectedPlatform().value);
   formData.set("industryTemplate", resolveCreationReferenceAnalysisContextCategoryValue({ analysisDirty: state.creationReferenceAnalysis.dirty, categoryManuallyEdited: state.creationReferenceAnalysis.categoryManuallyEdited, categorySuggestionStale: state.creationReferenceAnalysis.categorySuggestionStale, currentCategoryValue: refs.creationIndustryTemplateInput.value, previousAutoCategoryValue: state.creationReferenceAnalysis.categoryTemplateSuggestion }));
   formData.set("selectedRoles", JSON.stringify(getCreationSelectedRoles()));
   formData.set("referenceImageRoles", JSON.stringify(buildCreationReferenceRolePayload()));
   formData.set("skuSubjects", JSON.stringify(buildCreationSkuSubjectPayload()));
-  formData.set("skuBundleCount", refs.creationSkuBundleCountInput?.value || "1");
   formData.set("skuGenerationRule", getCreationSelectedSkuGenerationRule().value);
   const audienceStrategy = effectivePlan?.audienceStrategy || (
     state.creationReferenceAnalysis.applied && !state.creationReferenceAnalysis.dirty
@@ -13835,6 +13770,7 @@ function getArticleIllustrationPlanSnapshot() {
     supplementalPrompt: refs.articleIllustrationSupplementInput.value.trim(),
     contentType: refs.articleIllustrationContentTypeInput.value || "auto",
     stylePreset: refs.articleIllustrationStylePresetInput.value || DEFAULT_ARTICLE_ILLUSTRATION_STYLE_PRESET,
+    reasoningEffort: getSelectedReasoningEffort(refs.articleIllustrationReasoningEffortInput),
     files: state.articleIllustration.files.map((item) => item.file ? buildReferenceFingerprint(item.file) : ""),
   });
 }
@@ -13849,7 +13785,8 @@ function buildCreationFormData() {
     formData.set("ratio", refs.creationRatioInput.value || DEFAULT_UI_RATIO);
     formData.set("size", refs.creationSizeInput.value || "auto");
   }
-  formData.set("reasoningEffort", refs.reasoningEffortInput.value || state.config?.defaults?.reasoningEffort || "xhigh");
+  formData.set("reasoningEffort", getSelectedReasoningEffort(refs.creationReasoningEffortInput));
+  formData.set("quality", getSelectedImageQuality(refs.creationQualityInput));
   formData.set("clientSessionId", state.clientSessionId);
   state.creationReferenceFiles.forEach((item) => {
     const file = getCreationReferenceGenerationFile(item);
@@ -13871,7 +13808,8 @@ function buildCreationLogoBatchFormData() {
   formData.set("format", normalizeOutputFormat(refs.creationOutputFormatInput.value || state.config?.defaults?.format || "png"));
   formData.set("ratio", refs.creationRatioInput.value || DEFAULT_UI_RATIO);
   formData.set("size", refs.creationSizeInput.value || "auto");
-  formData.set("reasoningEffort", refs.reasoningEffortInput.value || state.config?.defaults?.reasoningEffort || "xhigh");
+  formData.set("reasoningEffort", getSelectedReasoningEffort(refs.creationReasoningEffortInput));
+  formData.set("quality", getSelectedImageQuality(refs.creationQualityInput));
   formData.set("clientSessionId", state.clientSessionId);
   formData.set("logoOptions", JSON.stringify(getCreationLogoPayload()));
   state.creationLogoBatchFiles.forEach((item) => {
@@ -13912,7 +13850,14 @@ function buildCreationRepairFormData({ itemId = "", scope = "incomplete", set = 
   formData.set("format", normalizeOutputFormat(snapshotItem.format || "png"));
   formData.set("ratio", snapshotItem.ratio || DEFAULT_UI_RATIO);
   formData.set("size", snapshotItem.effectiveSize || snapshotItem.requestedSize || snapshotItem.size || "auto");
-  formData.set("reasoningEffort", snapshotItem.reasoningEffort || "xhigh");
+  formData.set(
+    "reasoningEffort",
+    snapshotItem.reasoningEffort || currentSet?.reasoningEffort || getSelectedReasoningEffort(refs.creationReasoningEffortInput),
+  );
+  formData.set(
+    "quality",
+    snapshotItem.quality || currentSet?.quality || getSelectedImageQuality(refs.creationQualityInput),
+  );
   formData.set("clientSessionId", state.clientSessionId);
   formData.set("referenceImageRoles", JSON.stringify(useDraftFiles ? getCreationRepairReferenceRolePayload(currentSet) : currentSet?.referenceImageRoles || []));
   if (useDraftFiles) {
@@ -14515,7 +14460,7 @@ async function previewCreationPlan() {
       referenceImageNames: state.creationReferenceFiles.map((item) => item.file?.name || "").filter(Boolean),
       referenceImageRoles: plan.referenceImageRoles || buildCreationReferenceRolePayload(),
       skuSubjects: plan.skuSubjects || buildCreationSkuSubjectPayload(),
-      skuBundleCount: plan.skuBundleCount || normalizeCreationSkuBundleCountForPayload(refs.creationSkuBundleCountInput?.value || "1"),
+      skuBundleCount: normalizeCreationSkuBundleCountForPayload(plan.skuBundleCount || "1"),
       skuGenerationRule: plan.skuGenerationRule || getCreationSelectedSkuGenerationRule().value,
       skuGenerationRuleLabel: plan.skuGenerationRuleLabel || getCreationSelectedSkuGenerationRule().label,
       logo: plan.logo || getCreationLogoPayload(),
@@ -15332,7 +15277,8 @@ function buildPortraitFormData({ includeFiles = true, repair = false, includeAct
   formData.set("size", refs.portraitSizeInput?.value || "auto");
   formData.set("format", normalizeOutputFormat(refs.portraitOutputFormatInput?.value || state.config?.defaults?.format || "png"));
   formData.set("analysis", JSON.stringify(appliedAnalysis));
-  formData.set("reasoningEffort", refs.reasoningEffortInput?.value || state.config?.defaults?.reasoningEffort || "xhigh");
+  formData.set("reasoningEffort", getSelectedReasoningEffort(refs.portraitReasoningEffortInput));
+  formData.set("quality", getSelectedImageQuality(refs.portraitQualityInput));
   formData.set("clientSessionId", state.clientSessionId);
   if (repair && currentSet?.setId) {
     formData.set("setId", currentSet.setId);
@@ -16602,6 +16548,7 @@ function createJob() {
   const referenceImageNames = state.referenceFiles.map((item) => item.file.name);
   const sizeSetting = getSelectedGenerationSize();
   const size = sizeSetting === "auto" ? ratioOption?.baseSize || getDefaultGenerationSize(ratioOption?.value) : sizeSetting;
+  const imageBackground = getPromptImageBackground();
 
   return {
     id: `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -16612,7 +16559,8 @@ function createJob() {
     sizeSetting,
     size,
     quality: getSelectedImageQuality(),
-    format: normalizeOutputFormat(refs.outputFormatInput.value || state.config?.defaults?.format || "png"),
+    format: imageBackground === "transparent" ? "png" : normalizeOutputFormat(refs.outputFormatInput.value || state.config?.defaults?.format || "png"),
+    imageBackground,
     baseUrl: state.config?.baseUrl || refs.baseUrlInput.value.trim(),
     responsesModel: state.config?.responsesModel || refs.responsesModelInput.value.trim() || DEFAULT_RESPONSES_MODEL,
     imageModel: getSelectedImageToolModel(),
@@ -16815,6 +16763,7 @@ async function savePromptAttemptPreview(deckKey, attemptIndex) {
         ratio: job?.ratio || "",
         size: job?.size || "",
         quality: job?.quality || "",
+        imageBackground: job?.imageBackground || "",
         baseUrl: job?.baseUrl || "",
         responsesModel: job?.responsesModel || "",
         imageRoute: job?.imageRoute || "",
@@ -17340,6 +17289,9 @@ function buildGenerationFormData(job) {
   const formData = new FormData();
   formData.set("jobId", job.id);
   formData.set("background", "1");
+  if (!job.mode) {
+    formData.set("imageBackground", job.imageBackground === "transparent" ? "transparent" : "opaque");
+  }
   formData.set("prompt", job.prompt);
   formData.set("ratio", job.ratio);
   formData.set("size", job.size);
@@ -17462,6 +17414,8 @@ function getPortraitPlanSnapshot() {
     ratio: refs.portraitRatioInput?.value || DEFAULT_PORTRAIT_RATIO,
     size: refs.portraitSizeInput?.value || "auto",
     format: refs.portraitOutputFormatInput?.value || "png",
+    reasoningEffort: getSelectedReasoningEffort(refs.portraitReasoningEffortInput),
+    quality: getSelectedImageQuality(refs.portraitQualityInput),
     analysis: state.portrait.referenceAnalysis.applied ? state.portrait.referenceAnalysis.result : null,
     references: getPortraitReferenceFileNames(),
   });
@@ -18367,20 +18321,6 @@ function bindEvents() {
   refs.uiPaletteOptions.forEach((button) => {
     button.addEventListener("click", () => setUiPalette(button.dataset.uiPaletteOption));
   });
-  refs.palettePickerToggle?.addEventListener("click", () => {
-    if (!refs.palettePickerPanel) return;
-    const open = refs.palettePickerPanel.hidden;
-    refs.palettePickerPanel.hidden = !open;
-    refs.palettePickerToggle?.setAttribute("aria-expanded", String(open));
-  });
-  refs.uiOrnamentInput?.addEventListener("change", (event) => setUiOrnament(event.currentTarget.checked));
-  refs.uiOrnamentStyleInput?.addEventListener("change", (event) => setUiOrnamentStyle(event.currentTarget.value));
-  refs.uiCustomAccentInput?.addEventListener("change", (event) => setUiCustomColor("accent", event.currentTarget.value));
-  refs.uiCustomSurfaceInput?.addEventListener("change", (event) => setUiCustomColor("surface", event.currentTarget.value));
-  refs.uiCustomDetailInput?.addEventListener("change", (event) => setUiCustomColor("detail", event.currentTarget.value));
-  document.querySelectorAll("[data-custom-color-reset]").forEach((button) => {
-    button.addEventListener("click", () => resetUiCustomColor(button.dataset.customColorReset));
-  });
   refs.openPromptAgentButton.addEventListener("click", () => setPromptAgentOpen(true));
   refs.promptAgentCloseButton.addEventListener("click", () => setPromptAgentOpen(false));
   refs.promptAgentBackdrop.addEventListener("click", () => setPromptAgentOpen(false));
@@ -18419,6 +18359,8 @@ function bindEvents() {
     syncEndpointFieldsFromFullUrlModes();
     syncProtocolEndpointPreview();
     renderSizeOptions();
+    syncPromptTransparentBackgroundControl();
+    renderImageQualityOptions();
     renderReferenceAnalysisSizeOptions();
     renderImageDecompositionSizeOptions();
     renderCreationSizeOptions();
@@ -18963,7 +18905,6 @@ function bindEvents() {
   refs.creationImageCountInput.addEventListener("click", syncCreationSelectedRolesToCurrentCount);
   refs.creationSkuGenerationEnabledInput?.addEventListener("change", refreshCreationPlanAfterSkuGenerationToggle);
   refs.creationInfographicRebuildEnabledInput?.addEventListener("change", resetCreationDraftPreview);
-  refs.creationSkuBundleCountInput?.addEventListener("input", resetCreationDraftPreview);
   refs.creationSkuGenerationRuleInput?.addEventListener("change", resetCreationDraftPreview);
   refs.creationIndustryTemplateTrigger.addEventListener("click", async () => {
     const shouldOpenCreationIndustryTemplateBrowser = refs.creationIndustryTemplatePopover?.hidden !== false;
@@ -19238,6 +19179,7 @@ function bindEvents() {
   refs.promptInput.addEventListener("input", updatePromptCounter);
   refs.promptInput.addEventListener("keydown", handlePromptGenerationShortcut);
   refs.promptInput.addEventListener("paste", handleStudioImagePaste); refs.promptEnhanceToggle.addEventListener("click", togglePromptEnhanceMode); refs.promptEnhanceInput.addEventListener("keydown", handlePromptGenerationShortcut);
+  refs.transparentBackgroundInput.addEventListener("change", syncPromptTransparentBackgroundControl);
   refs.clearPromptButton.addEventListener("click", clearPromptInput);
   refs.styleTransferInstructionInput.addEventListener("keydown", handlePromptGenerationShortcut);
   refs.styleTransferInstructionInput.addEventListener("paste", handleStudioImagePaste);
@@ -19731,13 +19673,7 @@ async function bootstrap() {
   state.uiTheme = readUiTheme();
   setUiTheme(state.uiTheme);
   state.uiPalette = readUiPalette();
-  state.uiOrnament = readUiOrnament();
-  state.uiOrnamentStyle = readUiOrnamentStyle();
-  state.uiCustomColors = readUiCustomColors();
   setUiPalette(state.uiPalette);
-  setUiOrnament(state.uiOrnament);
-  setUiOrnamentStyle(state.uiOrnamentStyle);
-  applyUiCustomColors();
   state.generationLog = readGenerationLogStore();
   state.galleryMetadataCache = readGalleryMetadataCache();
   state.promptTemplates = readPromptTemplates();

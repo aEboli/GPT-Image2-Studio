@@ -178,5 +178,5 @@ test("browser shell wires the controller and exposes a layout-neutral reduced-mo
   assert.match(styles, /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*\.creation-card\.is-idle-rippling::after\s*\{[\s\S]*content:\s*none;/);
   assert.doesNotMatch(styles.match(/\.creation-card\.is-idle-rippling::after\s*\{[\s\S]*?\}/)?.[0] || "", /\b(?:width|height|margin|padding):/);
   assert.match(index, /styles\.css\?v=20260911-imperial-black-3/);
-  assert.match(index, /app\.js\?v=20260909-api-endpoint-book-1/);
+  assert.match(index, /app\.js\?v=20260915-mode-generation-controls-1/);
 });

@@ -563,7 +563,7 @@ test("restore-current-platform clears only overrides and recomputes through the 
   assert.match(restoreAction, /await requestCreationPlanPreview\(\)/);
   assert.doesNotMatch(
     restoreAction,
-    /creationProductNameInput\.value\s*=|creationProductDescriptionInput\.value\s*=|creationReferenceFiles\s*=|creationLogo\s*=|creationSkuBundleCountInput\.value\s*=|state\.config\s*=/,
+    /creationProductNameInput\.value\s*=|creationProductDescriptionInput\.value\s*=|creationReferenceFiles\s*=|creationLogo\s*=|state\.config\s*=/,
   );
   assert.match(app, /refs\.creationPlanRestoreButton\?\.addEventListener\("click"/);
 });

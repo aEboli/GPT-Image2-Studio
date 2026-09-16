@@ -8,22 +8,8 @@
       (() => {
         const themeKey = "image-studio-ui-theme-v1";
         const paletteKey = "image-studio-ui-palette-v1";
-        const ornamentKey = "image-studio-ui-ornament-v1";
-        const ornamentStyleKey = "image-studio-ui-ornament-style-v1";
-        const customColorsKey = "image-studio-ui-custom-colors-v1";
         const languageKey = "image-studio-ui-language-v1";
         const paletteIds = new Set(["default", "qinghua", "jiangnan", "songci", "gugong", "lacquer", "dunhuang"]);
-        const ornamentStyles = new Set(["mei", "lan", "zhu", "mudan"]);
-        const hexColorPattern = /^#[0-9a-f]{6}$/i;
-        const readableAccentForeground = (value) => {
-          if (!hexColorPattern.test(String(value || ""))) return "#fffef9";
-          const channels = [1, 3, 5].map((offset) => Number.parseInt(value.slice(offset, offset + 2), 16) / 255);
-          const linear = channels.map((channel) => channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
-          const luminance = 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
-          const lightContrast = 1.05 / (luminance + 0.05);
-          const darkContrast = (luminance + 0.05) / 0.05;
-          return lightContrast >= darkContrast ? "#fffef9" : "#363433";
-        };
         const readStored = (key) => {
           try {
             return window.localStorage.getItem(key);
@@ -32,25 +18,8 @@
           }
         };
         const savedPalette = readStored(paletteKey);
-        const savedOrnament = readStored(ornamentKey);
-        const savedOrnamentStyle = readStored(ornamentStyleKey);
-        let savedCustomColors = {};
-        try {
-          savedCustomColors = JSON.parse(readStored(customColorsKey) || "{}");
-        } catch {
-          savedCustomColors = {};
-        }
         const root = document.documentElement;
         root.dataset.palette = paletteIds.has(savedPalette) ? savedPalette : "default";
-        root.dataset.ornament = savedOrnament === "true" || savedOrnament === "on" || savedOrnament === "1" ? "on" : "off";
-        root.dataset.ornamentStyle = ornamentStyles.has(savedOrnamentStyle) ? savedOrnamentStyle : "mei";
-        Object.entries(savedCustomColors || {}).forEach(([name, value]) => {
-          if (["accent", "surface", "detail"].includes(name) && hexColorPattern.test(String(value || ""))) {
-            root.style.setProperty(`--palette-custom-${name}`, String(value).toLowerCase());
-            root.dataset[`custom${name[0].toUpperCase()}${name.slice(1)}`] = "true";
-            if (name === "accent") root.style.setProperty("--palette-custom-accent-fg", readableAccentForeground(String(value).toLowerCase()));
-          }
-        });
         try {
           const savedTheme = readStored(themeKey);
           root.dataset.theme = savedTheme === "light" ? "light" : "dark";
@@ -134,7 +103,6 @@
   </head>
   <body>
     <div class="app-shell">
-      <span class="floral-ornament" aria-hidden="true"></span>
       <button
         class="topbar-reveal-button"
         id="topbarRevealButton"
@@ -463,6 +431,14 @@
                       <label class="compact-field">
                         <span data-ui-i18n="outputFormat">输出格式</span>
                         <select id="outputFormatInput" name="format"></select>
+                      </label>
+
+                      <label class="compact-field transparent-background-field" id="transparentBackgroundField" data-prompt-mode-block>
+                        <span data-ui-i18n="background">背景</span>
+                        <span class="transparent-background-control">
+                          <input id="transparentBackgroundInput" name="transparentBackground" type="checkbox" aria-label="启用透明背景" data-ui-i18n-aria-label="transparentBackgroundAria" />
+                          <span data-ui-i18n="transparent">透明</span>
+                        </span>
                       </label>
 
                       <label class="compact-field">
@@ -1332,6 +1308,16 @@
                       <option value="anime-storyboard">动画分镜</option>
                     </select>
                   </label>
+
+                  <label class="compact-field">
+                    <span>思考等级</span>
+                    <select id="articleIllustrationReasoningEffortInput" name="reasoningEffort"></select>
+                  </label>
+
+                  <label class="compact-field">
+                    <span>质量</span>
+                    <select id="articleIllustrationQualityInput" name="quality"></select>
+                  </label>
                 </div>
 
                 <label class="compact-field article-style-bible-field">
@@ -1600,16 +1586,16 @@
                     </select>
                   </label>
 
-                  <label class="compact-field creation-sku-bundle-field" data-creation-set-only>
-                    <span>SKU 组合件数</span>
-                    <input id="creationSkuBundleCountInput" name="skuBundleCount" type="text" inputmode="numeric" value="1" maxlength="6" />
-                  </label>
-
                   <label class="compact-field" data-creation-set-only>
                     <span>平台选择</span>
                     <select id="creationPlatformInput" name="platform">
                       <option value="universal" selected>通用电商</option>
                     </select>
+                  </label>
+
+                  <label class="compact-field">
+                    <span>思考等级</span>
+                    <select id="creationReasoningEffortInput" name="reasoningEffort"></select>
                   </label>
 
                   <label class="compact-field" data-creation-set-only>
@@ -1664,6 +1650,11 @@
                       <option value="2560x2560">2.5K 2560 x 2560</option>
                       <option value="2880x2880">最大 2880 x 2880</option>
                     </select>
+                  </label>
+
+                  <label class="compact-field">
+                    <span>质量</span>
+                    <select id="creationQualityInput" name="quality"></select>
                   </label>
 
                   <label class="compact-field creation-sku-generation-rule-field" data-creation-set-only>
@@ -2066,6 +2057,14 @@
                       <option value="jpg">JPG</option>
                     </select>
                   </label>
+                  <label class="compact-field">
+                    <span>思考等级</span>
+                    <select id="portraitReasoningEffortInput" name="reasoningEffort"></select>
+                  </label>
+                  <label class="compact-field">
+                    <span>质量</span>
+                    <select id="portraitQualityInput" name="quality"></select>
+                  </label>
                 </div>
 
                 <div class="creation-plan-actions">
@@ -2213,6 +2212,14 @@
                       <option value="flat-image">整页图片</option>
                       <option value="editable-reconstruction">可编辑重建</option>
                     </select>
+                  </label>
+                  <label class="compact-field">
+                    <span>思考等级</span>
+                    <select id="pptReasoningEffortInput" name="reasoningEffort"></select>
+                  </label>
+                  <label class="compact-field">
+                    <span>质量</span>
+                    <select id="pptQualityInput" name="quality"></select>
                   </label>
                 </div>
 
@@ -3322,7 +3329,7 @@
               <div class="palette-options" role="radiogroup" aria-label="界面配色" data-ui-i18n-aria-label="paletteSection">
                 <button class="palette-option is-active" type="button" data-ui-palette-option="default" role="radio" aria-checked="true">
                   <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
-                  <span data-ui-i18n="paletteDefault">经典靛蓝</span>
+                  <span data-ui-i18n="paletteDefault">靛蓝</span>
                 </button>
                 <button class="palette-option" type="button" data-ui-palette-option="qinghua" role="radio" aria-checked="false">
                   <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
@@ -3348,35 +3355,6 @@
                   <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
                   <span data-ui-i18n="paletteDunhuang">敦煌</span>
                 </button>
-              </div>
-              <div class="palette-custom-grid">
-                <div class="palette-color-field">
-                  <label for="uiCustomAccentInput" data-ui-i18n="customAccent">按钮与焦点</label>
-                  <span class="palette-color-control"><input id="uiCustomAccentInput" type="color" value="#6f7cff" aria-label="按钮与焦点" data-ui-i18n-aria-label="customAccent" /><button type="button" class="palette-color-reset" data-custom-color-reset="accent" data-ui-i18n="customReset">跟随</button></span>
-                </div>
-                <div class="palette-color-field">
-                  <label for="uiCustomSurfaceInput" data-ui-i18n="customSurface">界面面层</label>
-                  <span class="palette-color-control"><input id="uiCustomSurfaceInput" type="color" value="#12192f" aria-label="界面面层" data-ui-i18n-aria-label="customSurface" /><button type="button" class="palette-color-reset" data-custom-color-reset="surface" data-ui-i18n="customReset">跟随</button></span>
-                </div>
-                <div class="palette-color-field">
-                  <label for="uiCustomDetailInput" data-ui-i18n="customDetail">花卉与装饰</label>
-                  <span class="palette-color-control"><input id="uiCustomDetailInput" type="color" value="#879cff" aria-label="花卉与装饰" data-ui-i18n-aria-label="customDetail" /><button type="button" class="palette-color-reset" data-custom-color-reset="detail" data-ui-i18n="customReset">跟随</button></span>
-                </div>
-              </div>
-              <div class="palette-ornament-row">
-                <label class="toggle-field">
-                  <input id="uiOrnamentInput" type="checkbox" />
-                  <span data-ui-i18n="ornamentEnable">花卉点缀</span>
-                </label>
-                <label class="palette-style-field">
-                  <span data-ui-i18n="ornamentStyle">点缀样式</span>
-                  <select id="uiOrnamentStyleInput">
-                    <option value="mei" data-ui-i18n="ornamentMei">折枝梅</option>
-                    <option value="lan" data-ui-i18n="ornamentLan">兰叶小丛</option>
-                    <option value="zhu" data-ui-i18n="ornamentZhu">竹节竖列</option>
-                    <option value="mudan" data-ui-i18n="ornamentMudan">牡丹团花</option>
-                  </select>
-                </label>
               </div>
             </section>
 
@@ -3525,6 +3503,6 @@
 
     <div class="app-tooltip" id="appTooltip" role="tooltip" popover="manual"></div>
 
-    <script type="module" src="./app.js?v=20260909-api-endpoint-book-1"></script>
+    <script type="module" src="./app.js?v=20260915-mode-generation-controls-1"></script>
   </body>
 </html>

@@ -149,6 +149,7 @@ test("另存未完成预览写入输出目录并标记来源", async (t) => {
     format: "png",
     size: "1536x1024",
     quality: "high",
+    imageBackground: "transparent",
   });
 
   assert.equal(response.status, 200);
@@ -157,6 +158,7 @@ test("另存未完成预览写入输出目录并标记来源", async (t) => {
   assert.ok(payload.filename);
   assert.ok(payload.item, "应返回可并入画廊的条目");
   assert.equal(payload.item.previewOrigin, "partial-attempt-preview");
+  assert.equal(payload.item.imageBackground, "transparent");
 
   const files = await collectOutputFiles(outputDir);
   assert.ok(files.some((name) => name === payload.filename), "预览应已落盘");
@@ -165,6 +167,7 @@ test("另存未完成预览写入输出目录并标记来源", async (t) => {
   const gallery = await galleryResponse.json();
   const items = Array.isArray(gallery) ? gallery : gallery.items || [];
   assert.ok(items.some((item) => item.filename === payload.filename), "另存结果应出现在画廊中");
+  assert.equal(items.find((item) => item.filename === payload.filename).imageBackground, "transparent");
 });
 
 test("非法图像数据被拒绝且不落盘", async (t) => {

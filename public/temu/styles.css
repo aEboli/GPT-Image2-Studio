@@ -1315,9 +1315,9 @@ html[data-palette="dunhuang"] {
 
 /* Named palettes take precedence over the legacy light/dark token set. */
 html[data-palette]:not([data-palette="default"]) {
-  --palette-panel-selected: var(--palette-custom-surface, var(--palette-panel));
-  --palette-detail-selected: var(--palette-custom-detail, var(--palette-detail));
-  --palette-accent-selected: var(--palette-custom-accent, var(--palette-accent));
+  --palette-panel-selected: var(--palette-panel);
+  --palette-detail-selected: var(--palette-detail);
+  --palette-accent-selected: var(--palette-accent);
   --bg: var(--palette-bg);
   --bg-raised: var(--palette-bg-raised);
   --glass-base: color-mix(in srgb, var(--palette-panel-selected) 86%, transparent);
@@ -1340,7 +1340,7 @@ html[data-palette]:not([data-palette="default"]) {
   --accent-active: var(--palette-accent-active);
   --accent-strong: var(--palette-accent-selected);
   --accent-soft: color-mix(in srgb, var(--accent) 15%, transparent);
-  --accent-fg: var(--palette-custom-accent-fg, var(--palette-accent-fg));
+  --accent-fg: var(--palette-accent-fg);
   --green: var(--palette-green);
   --green-dark: var(--palette-green);
   --green-soft: color-mix(in srgb, var(--green) 15%, transparent);
@@ -1375,30 +1375,6 @@ html[data-palette]:not([data-palette="default"]) body::before {
 html[data-palette]:not([data-palette="default"]) body::after {
   background: repeating-linear-gradient(112deg, color-mix(in srgb, var(--ink) 4%, transparent) 0 1px, transparent 1px 7px);
   opacity: 0.5;
-}
-
-/* 自定义颜色只覆盖用户明确选择的角色，清空后立即回到 palette 默认值。 */
-html[data-custom-accent="true"] {
-  --accent: var(--palette-custom-accent);
-  --accent-hover: color-mix(in srgb, var(--accent) 86%, var(--ink));
-  --accent-active: color-mix(in srgb, var(--accent) 70%, var(--ink));
-  --accent-strong: var(--accent);
-  --accent-soft: color-mix(in srgb, var(--accent) 15%, transparent);
-  --accent-fg: var(--palette-custom-accent-fg, #fffef9);
-  --focus: var(--accent);
-}
-html[data-custom-surface="true"] {
-  --glass-base: color-mix(in srgb, var(--palette-custom-surface) 86%, transparent);
-  --glass-elevated: color-mix(in srgb, var(--palette-custom-surface) 96%, transparent);
-  --glass-control: var(--palette-custom-surface);
-  --surface: var(--palette-custom-surface);
-  --surface-solid: var(--palette-custom-surface);
-  --surface-muted: color-mix(in srgb, var(--palette-custom-surface) 42%, transparent);
-}
-html[data-custom-detail="true"] {
-  --ornament: var(--palette-custom-detail);
-  --focus: var(--palette-custom-detail);
-  --surface-hover: color-mix(in srgb, var(--palette-custom-detail) 14%, transparent);
 }
 
 /* 这两条规则覆盖 legacy light 的固定蓝/绿，避免命名 palette 在亮色模式下串色。 */
@@ -1508,99 +1484,4 @@ html[data-palette]:not([data-palette="default"])[data-theme="light"] dialog::bac
 }
 html[data-palette]:not([data-palette="default"])[data-theme="light"] .image-lightbox::backdrop {
   background: rgba(var(--theme-shadow-rgb), 0.78);
-}
-
-/* 低干扰的传统花卉/纹样点缀；不参与布局，也不依赖 emoji 字体。 */
-.app-shell { position: relative; }
-.floral-ornament {
-  position: absolute;
-  top: 14px;
-  right: 18px;
-  z-index: 0;
-  width: 118px;
-  height: 118px;
-  display: none;
-  opacity: 0.14;
-  pointer-events: none;
-}
-html[data-ornament="on"] .floral-ornament { display: block; }
-.floral-ornament::before,
-.floral-ornament::after {
-  position: absolute;
-  display: block;
-  content: "";
-  background: var(--ornament);
-}
-html[data-ornament="on"][data-ornament-style="mei"] .floral-ornament::before {
-  inset: 18px 58px 18px 56px;
-  border-radius: 999px;
-  transform: rotate(38deg);
-}
-html[data-ornament="on"][data-ornament-style="mei"] .floral-ornament::after {
-  top: 8px;
-  right: 9px;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 50% 50%, var(--bg) 0 10%, transparent 11%),
-    radial-gradient(circle at 50% 16%, var(--ornament) 0 17%, transparent 18%),
-    radial-gradient(circle at 84% 40%, var(--ornament) 0 17%, transparent 18%),
-    radial-gradient(circle at 68% 82%, var(--ornament) 0 17%, transparent 18%),
-    radial-gradient(circle at 30% 82%, var(--ornament) 0 17%, transparent 18%),
-    radial-gradient(circle at 16% 40%, var(--ornament) 0 17%, transparent 18%);
-}
-html[data-ornament="on"][data-ornament-style="lan"] .floral-ornament::before {
-  top: 58px;
-  left: 16px;
-  width: 76px;
-  height: 12px;
-  border-radius: 100% 0 100% 0;
-  transform: rotate(-28deg);
-  box-shadow: 26px -22px 0 -1px var(--ornament), 35px 19px 0 -1px var(--ornament);
-}
-html[data-ornament="on"][data-ornament-style="lan"] .floral-ornament::after {
-  top: 23px;
-  left: 56px;
-  width: 12px;
-  height: 76px;
-  border-radius: 100% 0 100% 0;
-  transform: rotate(30deg);
-}
-html[data-ornament="on"][data-ornament-style="zhu"] .floral-ornament::before {
-  inset: 8px 28px;
-  border-radius: 8px;
-  background: repeating-linear-gradient(180deg, var(--ornament) 0 14px, transparent 14px 19px);
-}
-html[data-ornament="on"][data-ornament-style="zhu"] .floral-ornament::after {
-  top: 7px;
-  left: 74px;
-  width: 5px;
-  height: 104px;
-  border-radius: 999px;
-  transform: rotate(18deg);
-}
-html[data-ornament="on"][data-ornament-style="mudan"] .floral-ornament::before {
-  top: 15px;
-  left: 15px;
-  width: 84px;
-  height: 84px;
-  border: 8px solid var(--ornament);
-  border-radius: 50%;
-  background: transparent;
-  box-shadow: inset 0 0 0 8px color-mix(in srgb, var(--ornament) 72%, transparent);
-}
-html[data-ornament="on"][data-ornament-style="mudan"] .floral-ornament::after {
-  top: 43px;
-  left: 43px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  box-shadow: 0 -20px 0 -4px var(--ornament), 0 20px 0 -4px var(--ornament), 20px 0 0 -4px var(--ornament), -20px 0 0 -4px var(--ornament);
-}
-@media (max-width: 960px) {
-  .floral-ornament { top: 10px; right: 10px; transform: scale(0.78); transform-origin: top right; }
-}
-@media (forced-colors: active) {
-  .floral-ornament { display: none !important; }
 }

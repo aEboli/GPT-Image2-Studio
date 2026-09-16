@@ -13,6 +13,43 @@ import {
   saveGeneratedAsset,
 } from "../lib/gallery-store.mjs";
 
+test("gallery background metadata survives saving, index recovery, and sparse metadata repair", async (t) => {
+  const rootDir = await mkdtemp(join(tmpdir(), "gallery-background-metadata-"));
+  t.after(() => rm(rootDir, { recursive: true, force: true }));
+  const outputDir = join(rootDir, "output");
+  const indexPath = join(rootDir, "gallery-index.json");
+  const metadataDir = join(outputDir, "json", "2026-09", "09-17", "2026-09-17-prompt");
+
+  for (const imageBackground of ["transparent", "opaque", undefined]) {
+    const filename = `${imageBackground || "legacy"}.png`;
+    const saved = await saveGeneratedAsset({
+      outputDir, indexPath, filename,
+      imageBuffer: Buffer.from("image"),
+      metadata: { createdAt: "2026-09-17T00:00:00.000Z", format: "png", imageBackground },
+    });
+    assert.equal(saved.metadata.imageBackground || "", imageBackground || "");
+    const sidecar = JSON.parse(await readFile(join(metadataDir, filename.replace(/\.png$/, ".json")), "utf8"));
+    const index = JSON.parse(await readFile(indexPath, "utf8"));
+    assert.equal(sidecar.imageBackground, imageBackground);
+    assert.equal(index[filename].imageBackground, imageBackground);
+  }
+
+  await rm(indexPath);
+  const items = await listGalleryItems({ outputDir, indexPath });
+  assert.equal(items.find((item) => item.filename === "transparent.png").imageBackground, "transparent");
+  assert.equal(items.find((item) => item.filename === "opaque.png").imageBackground, "opaque");
+  assert.equal(items.find((item) => item.filename === "legacy.png").imageBackground || "", "");
+  const recoveredIndex = JSON.parse(await readFile(indexPath, "utf8"));
+  assert.equal(recoveredIndex["transparent.png"].imageBackground, "transparent");
+  assert.equal(Object.hasOwn(recoveredIndex["legacy.png"], "imageBackground"), false);
+  assert.equal(Object.hasOwn(JSON.parse(await readFile(join(metadataDir, "legacy.json"), "utf8")), "imageBackground"), false);
+
+  await repairGeneratedAssetMetadata({ outputDir, indexPath, filename: "legacy.png", metadata: { imageBackground: "transparent" } });
+  const repaired = await listGalleryItems({ outputDir, indexPath });
+  assert.equal(repaired.find((item) => item.filename === "legacy.png").imageBackground, "transparent");
+  assert.equal(JSON.parse(await readFile(join(metadataDir, "legacy.json"), "utf8")).imageBackground, "transparent");
+});
+
 test("gallery store creates readable filenames from time keyword and id tail", () => {
   const filename = createTimestampedFilename({
     format: "jpeg",

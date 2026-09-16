@@ -8,6 +8,13 @@ import {
   normalizeBrowserCachedGalleryItem,
 } from "../lib/browser-image-cache.mjs";
 
+test("browser image cache retains background metadata without guessing for old records", () => {
+  for (const imageBackground of ["transparent", "opaque", undefined]) {
+    const item = normalizeBrowserCachedGalleryItem({ filename: "background.png", imageBackground });
+    assert.equal(item.imageBackground || "", imageBackground || "");
+  }
+});
+
 test("browser image cache preserves image generation route metadata", () => {
   const normalized = normalizeBrowserCachedGalleryItem({
     filename: "direct-mode.png",

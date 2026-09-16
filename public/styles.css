@@ -577,18 +577,17 @@ html[data-palette="dunhuang"] {
   --panel-strong: #2d2e36;
 }
 
-/* Palette selection wins over the legacy per-view accent family. Custom
-   colours are optional overrides; clearing a colour restores the palette. */
+/* Palette selection wins over the legacy per-view accent family. */
 html[data-palette]:not([data-palette="default"])[data-view-family] {
-  --accent: var(--palette-custom-accent, var(--palette-accent-base));
+  --accent: var(--palette-accent-base);
   --nav-tab-active: var(--accent);
   --nav-tab-active-ink: var(--accent-ink);
 }
 html[data-palette]:not([data-palette="default"]) {
-  --panel: var(--palette-custom-surface, var(--palette-surface-base));
-  --control-bg: var(--palette-custom-surface, var(--palette-surface-base));
-  --input-bg: var(--palette-custom-surface, var(--palette-surface-base));
-  --ornament: var(--palette-custom-detail, var(--palette-detail-base));
+  --panel: var(--palette-surface-base);
+  --control-bg: var(--palette-surface-base);
+  --input-bg: var(--palette-surface-base);
+  --ornament: var(--palette-detail-base);
   --topbar-bg: var(--panel);
   --topbar-border: var(--border);
   --nav-tab-bg: var(--panel);
@@ -618,37 +617,6 @@ html[data-palette]:not([data-palette="default"]) body {
     radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 6%, transparent), transparent 30%),
     linear-gradient(180deg, var(--bg) 0%, var(--bg-soft) 100%);
 }
-
-html[data-palette="default"][data-custom-accent="true"][data-view-family] {
-  --accent: var(--palette-custom-accent);
-  --accent-fg: var(--palette-custom-accent-fg);
-  --nav-tab-active: var(--accent);
-  --nav-tab-active-ink: var(--accent-ink);
-}
-
-html[data-palette]:not([data-palette="default"])[data-custom-accent="true"] {
-  --accent: var(--palette-custom-accent);
-  --accent-fg: var(--palette-custom-accent-fg);
-}
-
-html[data-palette="default"][data-custom-surface="true"] {
-  --panel: var(--palette-custom-surface);
-  --control-bg: var(--palette-custom-surface);
-  --input-bg: var(--palette-custom-surface);
-}
-
-html[data-palette="default"][data-custom-detail="true"] {
-  --ornament: var(--palette-custom-detail);
-}
-
-html[data-custom-accent="true"] {
-  --accent-ink: var(--palette-custom-accent-fg);
-  --nav-tab-active-ink: var(--palette-custom-accent-fg);
-  --accent-hover: color-mix(in srgb, var(--palette-custom-accent) 86%, var(--text));
-  --accent-active: color-mix(in srgb, var(--palette-custom-accent) 70%, var(--accent-deep-mix));
-  --accent-deep-mix: color-mix(in srgb, var(--palette-custom-accent) 44%, var(--bg));
-}
-
 
 body {
   min-height: 100vh;
@@ -5834,33 +5802,25 @@ html[data-ui-layout="mobile"] .creation-listing-workspace-bar .asset-listing-act
 }
 
 .palette-options {
-  display: flex;
-  flex-wrap: nowrap;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
-  max-width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: var(--scrollbar-thumb-color) transparent;
-  -webkit-overflow-scrolling: touch;
 }
 
 .palette-option {
-  flex: 0 0 128px;
-  min-width: 128px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 6px;
   min-height: 34px;
-  padding: 5px 6px;
+  padding: 5px;
   border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
   border-radius: 7px;
   background: color-mix(in srgb, var(--control-bg) 82%, transparent);
   color: var(--text);
   font-size: 11px;
   text-align: left;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .palette-option:hover,
@@ -5876,7 +5836,7 @@ html[data-ui-layout="mobile"] .creation-listing-workspace-bar .asset-listing-act
 }
 
 .palette-swatch {
-  width: 27px;
+  width: 24px;
   height: 16px;
   display: inline-grid;
   grid-template-columns: repeat(3, 1fr);
@@ -5894,208 +5854,6 @@ html[data-ui-layout="mobile"] .creation-listing-workspace-bar .asset-listing-act
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.palette-custom-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.palette-color-field,
-.palette-style-field {
-  min-width: 0;
-  display: grid;
-  gap: 4px;
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.palette-color-control {
-  min-width: 0;
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-
-.palette-color-field input[type="color"] {
-  width: 34px;
-  height: 28px;
-  min-width: 34px;
-  padding: 2px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--input-bg);
-  cursor: pointer;
-}
-
-.palette-color-reset {
-  min-width: 0;
-  min-height: 26px;
-  padding: 0 6px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 10px;
-}
-
-.palette-color-reset:hover,
-.palette-color-reset:focus-visible {
-  border-color: var(--accent);
-  color: var(--accent-ink);
-}
-
-.palette-ornament-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
-  gap: 8px;
-  align-items: end;
-}
-
-.toggle-field {
-  min-height: 30px;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--text);
-  font-size: 11px;
-}
-
-.toggle-field input {
-  accent-color: var(--accent);
-}
-
-.palette-style-field select {
-  min-height: 30px;
-  padding: 0 7px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--input-bg);
-  color: var(--text);
-  font-size: 11px;
-}
-
-.palette-style-field select:disabled {
-  opacity: 0.55;
-}
-
-.floral-ornament {
-  position: absolute;
-  top: 82px;
-  right: 12px;
-  z-index: 0;
-  width: 118px;
-  height: 118px;
-  display: none;
-  opacity: 0.14;
-  pointer-events: none;
-}
-
-html[data-ornament="on"] .floral-ornament {
-  display: block;
-}
-
-.floral-ornament::before,
-.floral-ornament::after {
-  content: "";
-  position: absolute;
-  display: block;
-  background: var(--ornament);
-}
-
-html[data-ornament="on"][data-ornament-style="mei"] .floral-ornament::before {
-  inset: 18px 58px 18px 56px;
-  border-radius: 999px;
-  transform: rotate(38deg);
-}
-
-html[data-ornament="on"][data-ornament-style="mei"] .floral-ornament::after {
-  width: 52px;
-  height: 52px;
-  top: 8px;
-  right: 9px;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 50% 50%, var(--bg) 0 10%, transparent 11%),
-    radial-gradient(circle at 50% 16%, var(--ornament) 0 17%, transparent 18%),
-    radial-gradient(circle at 84% 40%, var(--ornament) 0 17%, transparent 18%),
-    radial-gradient(circle at 68% 82%, var(--ornament) 0 17%, transparent 18%),
-    radial-gradient(circle at 30% 82%, var(--ornament) 0 17%, transparent 18%),
-    radial-gradient(circle at 16% 40%, var(--ornament) 0 17%, transparent 18%);
-}
-
-html[data-ornament="on"][data-ornament-style="lan"] .floral-ornament::before {
-  width: 76px;
-  height: 12px;
-  top: 58px;
-  left: 16px;
-  border-radius: 100% 0 100% 0;
-  transform: rotate(-28deg);
-  box-shadow: 26px -22px 0 -1px var(--ornament), 35px 19px 0 -1px var(--ornament);
-}
-
-html[data-ornament="on"][data-ornament-style="lan"] .floral-ornament::after {
-  width: 12px;
-  height: 76px;
-  top: 23px;
-  left: 56px;
-  border-radius: 100% 0 100% 0;
-  transform: rotate(30deg);
-}
-
-html[data-ornament="on"][data-ornament-style="zhu"] .floral-ornament::before {
-  inset: 8px 28px;
-  border-radius: 8px;
-  background: repeating-linear-gradient(180deg, var(--ornament) 0 14px, transparent 14px 19px);
-}
-
-html[data-ornament="on"][data-ornament-style="zhu"] .floral-ornament::after {
-  width: 5px;
-  height: 104px;
-  top: 7px;
-  left: 74px;
-  border-radius: 999px;
-  transform: rotate(18deg);
-}
-
-html[data-ornament="on"][data-ornament-style="mudan"] .floral-ornament::before {
-  width: 84px;
-  height: 84px;
-  top: 15px;
-  left: 15px;
-  border: 8px solid var(--ornament);
-  border-radius: 50%;
-  background: transparent;
-  box-shadow: inset 0 0 0 8px color-mix(in srgb, var(--ornament) 72%, transparent);
-}
-
-html[data-ornament="on"][data-ornament-style="mudan"] .floral-ornament::after {
-  width: 28px;
-  height: 28px;
-  top: 43px;
-  left: 43px;
-  border-radius: 50%;
-  box-shadow: 0 -20px 0 -4px var(--ornament), 0 20px 0 -4px var(--ornament), 20px 0 0 -4px var(--ornament), -20px 0 0 -4px var(--ornament);
-}
-
-@media (max-width: 760px) {
-  .palette-options {
-    flex-wrap: nowrap;
-  }
-
-  .floral-ornament {
-    top: 74px;
-    right: 4px;
-    transform: scale(0.78);
-    transform-origin: top right;
-  }
-}
-
-@media (forced-colors: active) {
-  .floral-ornament {
-    display: none !important;
-  }
 }
 
 .adaptive-section > summary {
@@ -8604,6 +8362,35 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
   text-overflow: ellipsis;
 }
 
+.transparent-background-control {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--input-bg, rgba(255, 255, 255, 0.025));
+  color: var(--text);
+}
+
+.transparent-background-control input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.transparent-background-control input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.transparent-background-control > span {
+  color: var(--text);
+  font-size: var(--type-subtitle-size);
+}
+
 .compact-field select option {
   color: var(--text);
   background: var(--bg-soft);
@@ -8636,16 +8423,6 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
 
 .creation-option-grid .compact-field:has(select)::after {
   right: 11px;
-}
-
-.creation-option-grid .creation-sku-bundle-field input {
-  width: 100%;
-  min-width: 0;
-  height: 40px;
-  box-sizing: border-box;
-  padding: 0 12px;
-  text-align: center;
-  font-size: clamp(0.72rem, 8.5cqw, var(--type-body-size));
 }
 
 .creation-option-grid .compact-field {
