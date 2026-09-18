@@ -1,6 +1,7 @@
 import {
   DEFAULT_DIRECT_IMAGE_MODEL,
   DEFAULT_DIRECT_RESPONSES_MODEL,
+  DEFAULT_GROK_IMAGE_MODEL,
   DEFAULT_PROTOCOL_IMAGE_MODEL,
   DEFAULT_RESPONSES_MODEL,
 } from "./model-defaults.mjs";
@@ -20,7 +21,8 @@ export function createConfigModelPickerController({
   const MODEL_TARGET_DIRECT = "direct";
   const MODEL_TARGET_DIRECT_RESPONSES = "direct-responses";
   const MODEL_TARGET_PROTOCOL = "protocol";
-  const MODEL_TARGETS = [MODEL_TARGET_RESPONSES, MODEL_TARGET_DIRECT, MODEL_TARGET_DIRECT_RESPONSES, MODEL_TARGET_PROTOCOL];
+  const MODEL_TARGET_GROK = "grok";
+  const MODEL_TARGETS = [MODEL_TARGET_RESPONSES, MODEL_TARGET_DIRECT, MODEL_TARGET_DIRECT_RESPONSES, MODEL_TARGET_PROTOCOL, MODEL_TARGET_GROK];
 
   state.configModels ||= { items: [], loading: false, loadingMode: "", open: false };
   state.configModels.targets ||= {};
@@ -31,6 +33,9 @@ export function createConfigModelPickerController({
     }
     if (target === MODEL_TARGET_PROTOCOL) {
       return MODEL_TARGET_PROTOCOL;
+    }
+    if (target === MODEL_TARGET_GROK) {
+      return MODEL_TARGET_GROK;
     }
     return target === MODEL_TARGET_DIRECT ? MODEL_TARGET_DIRECT : MODEL_TARGET_RESPONSES;
   }
@@ -67,13 +72,16 @@ export function createConfigModelPickerController({
 
   function getSelectedImageRoute() {
     const route = refs.imageRouteInputs?.find((input) => input.checked)?.value;
-    return route === "c" ? "c" : route === "b" ? "b" : "a";
+    return route === "d" ? "d" : route === "c" ? "c" : route === "b" ? "b" : "a";
   }
 
   function getTargetForSelectedRoute() {
     const route = getSelectedImageRoute();
     if (route === "c") {
       return MODEL_TARGET_PROTOCOL;
+    }
+    if (route === "d") {
+      return MODEL_TARGET_GROK;
     }
     return route === "b" ? MODEL_TARGET_DIRECT : MODEL_TARGET_RESPONSES;
   }
@@ -82,6 +90,9 @@ export function createConfigModelPickerController({
     const normalizedTarget = normalizeTarget(target);
     if (normalizedTarget === MODEL_TARGET_PROTOCOL) {
       return "c";
+    }
+    if (normalizedTarget === MODEL_TARGET_GROK) {
+      return "d";
     }
     return normalizedTarget === MODEL_TARGET_RESPONSES ? "a" : "b";
   }
@@ -112,6 +123,14 @@ export function createConfigModelPickerController({
         fetchButton: refs.protocolFetchModelsButton,
       };
     }
+    if (normalizedTarget === MODEL_TARGET_GROK) {
+      return {
+        input: refs.grokImageModelInput,
+        toggle: refs.grokModelPickerToggle,
+        list: refs.grokModelOptionsList,
+        fetchButton: refs.grokFetchModelsButton,
+      };
+    }
     return {
       input: refs.responsesModelInput,
       toggle: refs.modelPickerToggle,
@@ -122,6 +141,11 @@ export function createConfigModelPickerController({
 
   function setFeedback(message = "", kind = "") {
     refs.configFeedback.textContent = message;
+    if (message) {
+      refs.configFeedback.title = message;
+    } else {
+      refs.configFeedback.removeAttribute("title");
+    }
     refs.configFeedback.dataset.state = kind;
   }
 
@@ -227,6 +251,22 @@ export function createConfigModelPickerController({
         browserPayload.protocolImageModel ||
         state.config?.protocolImageModel ||
         DEFAULT_PROTOCOL_IMAGE_MODEL,
+      grokBaseUrl:
+        getInputValue(refs.grokBaseUrlInput) ||
+        browserPayload.grokBaseUrl ||
+        state.config?.grokBaseUrl ||
+        "https://api.x.ai/v1",
+      grokApiKey: getInputValue(refs.grokApiKeyInput) || browserPayload.grokApiKey || "",
+      grokEndpointPath:
+        getInputValue(refs.grokEndpointPathSelect) ||
+        browserPayload.grokEndpointPath ||
+        state.config?.grokEndpointPath ||
+        "images/generations",
+      grokImageModel:
+        getInputValue(refs.grokImageModelInput) ||
+        browserPayload.grokImageModel ||
+        state.config?.grokImageModel ||
+        DEFAULT_GROK_IMAGE_MODEL,
     };
   }
 
@@ -254,6 +294,10 @@ export function createConfigModelPickerController({
     formData.set("protocolBaseUrl", payload.protocolBaseUrl);
     formData.set("protocolApiKey", payload.protocolApiKey);
     formData.set("protocolImageModel", payload.protocolImageModel);
+    formData.set("grokBaseUrl", payload.grokBaseUrl);
+    formData.set("grokApiKey", payload.grokApiKey);
+    formData.set("grokEndpointPath", payload.grokEndpointPath);
+    formData.set("grokImageModel", payload.grokImageModel);
     return formData;
   }
 
@@ -261,7 +305,8 @@ export function createConfigModelPickerController({
     const loading = state.configModels.loading;
     const loadingTarget = normalizeTarget(state.configModels.loadingTarget || state.configModels.target);
     if (refs.testConnectionButton) {
-      refs.testConnectionButton.disabled = loading;
+      const activeTargetEnabled = typeof isTargetEnabled !== "function" || isTargetEnabled(getTargetForSelectedRoute());
+      refs.testConnectionButton.disabled = loading || !activeTargetEnabled;
       refs.testConnectionButton.textContent =
         loading && state.configModels.loadingMode === "test"
           ? uiText("testConnectionLoading", "测试中...")
@@ -345,11 +390,12 @@ export function createConfigModelPickerController({
     if (state.configModels.loading) {
       return normalizeTarget(state.configModels.loadingTarget);
     }
-    const currentTarget = normalizeTarget(state.configModels.target || getTargetForSelectedRoute());
-    if (getModelState(currentTarget).open) {
-      return currentTarget;
-    }
-    return getTargetForSelectedRoute();
+    const selectedTarget = getTargetForSelectedRoute();
+    const openTarget = normalizeTarget(state.configModels.target || selectedTarget);
+    return getModelState(openTarget).open
+      && (typeof isTargetEnabled !== "function" || isTargetEnabled(openTarget))
+      ? openTarget
+      : selectedTarget;
   }
 
   function render() {
@@ -413,7 +459,8 @@ export function createConfigModelPickerController({
       const modelState = getModelState(requestTarget);
       modelState.items = models;
       modelState.searchQuery = "";
-      modelState.open = Boolean(openAfterFetch);
+      modelState.open = Boolean(openAfterFetch)
+        && (typeof isTargetEnabled !== "function" || isTargetEnabled(requestTarget));
       syncLegacyModelState(requestTarget);
       setFeedback(
         mode === "test"
@@ -452,6 +499,17 @@ export function createConfigModelPickerController({
     render();
   }
 
+  function syncSelection() {
+    const selectedTarget = getTargetForSelectedRoute();
+    MODEL_TARGETS.forEach((target) => {
+      if (target !== selectedTarget) {
+        getModelState(target).open = false;
+      }
+    });
+    syncLegacyModelState(selectedTarget);
+    render();
+  }
+
   function isInsideModelPicker(targetNode) {
     return MODEL_TARGETS.some((target) => {
       const targetRefs = getTargetRefs(target);
@@ -479,12 +537,16 @@ export function createConfigModelPickerController({
     refs.protocolFetchModelsButton?.addEventListener("click", () => {
       fetchConfigModels({ openAfterFetch: true, mode: "models", target: MODEL_TARGET_PROTOCOL });
     });
+    refs.grokFetchModelsButton?.addEventListener("click", () => {
+      fetchConfigModels({ openAfterFetch: true, mode: "models", target: MODEL_TARGET_GROK });
+    });
     refs.modelPickerToggle.addEventListener("click", () => toggleModelPicker(MODEL_TARGET_RESPONSES));
     refs.directModelPickerToggle?.addEventListener("click", () => toggleModelPicker(MODEL_TARGET_DIRECT));
     refs.directResponsesModelPickerToggle?.addEventListener("click", () =>
       toggleModelPicker(MODEL_TARGET_DIRECT_RESPONSES),
     );
     refs.protocolModelPickerToggle?.addEventListener("click", () => toggleModelPicker(MODEL_TARGET_PROTOCOL));
+    refs.grokModelPickerToggle?.addEventListener("click", () => toggleModelPicker(MODEL_TARGET_GROK));
     refs.modelOptionsList.addEventListener("click", (event) => {
       const option = event.target?.closest("[data-model-id]");
       if (option) {
@@ -509,6 +571,12 @@ export function createConfigModelPickerController({
         selectModelOption(option.dataset.modelId, MODEL_TARGET_PROTOCOL);
       }
     });
+    refs.grokModelOptionsList?.addEventListener("click", (event) => {
+      const option = event.target?.closest("[data-model-id]");
+      if (option) {
+        selectModelOption(option.dataset.modelId, MODEL_TARGET_GROK);
+      }
+    });
     refs.responsesModelInput.addEventListener("input", () => {
       handleModelInput(MODEL_TARGET_RESPONSES);
     });
@@ -521,10 +589,12 @@ export function createConfigModelPickerController({
     refs.protocolImageModelInput?.addEventListener("input", () => {
       handleModelInput(MODEL_TARGET_PROTOCOL);
     });
+    refs.grokImageModelInput?.addEventListener("input", () => {
+      handleModelInput(MODEL_TARGET_GROK);
+    });
     refs.imageRouteInputs?.forEach((input) => {
       input.addEventListener?.("change", () => {
-        syncLegacyModelState(getTargetForSelectedRoute());
-        render();
+        syncSelection();
       });
     });
     documentRef.addEventListener("click", (event) => {
@@ -538,6 +608,7 @@ export function createConfigModelPickerController({
     bindEvents,
     fetchConfigModels,
     render,
+    syncSelection,
     setFeedback,
   };
 }

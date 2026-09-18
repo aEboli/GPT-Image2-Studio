@@ -56,20 +56,22 @@ test("traditional palette radios use one allowlisted set and expose radio state"
   });
 });
 
-test("palette card follows the Gemini route choice and shows four compact presets per row", async () => {
+test("palette card follows the provider choices and shows four compact presets per row", async () => {
   const html = await readText(indexPath);
   const connectionStart = html.indexOf('<section class="config-card config-connection-card"');
-  const routeStart = html.indexOf('<fieldset class="route-selector"', connectionStart);
+  const routeStart = html.indexOf('<fieldset class="route-selector ', connectionStart);
   const routeEnd = html.indexOf("</fieldset>", routeStart);
-  const geminiOption = html.indexOf('data-ui-i18n="protocolMode"', routeStart);
+  const geminiOption = html.indexOf('data-ui-i18n="geminiSection"', routeStart);
+  const grokOption = html.indexOf('data-ui-i18n="grokSection"', routeStart);
   const themeOption = html.indexOf('data-ui-i18n="themeSection"', routeStart);
   const paletteStart = html.indexOf('<section class="config-card palette-config-card config-theme-panel"', routeStart);
   const routeFieldsStart = html.indexOf('<div class="config-route-fields"', routeStart);
   const connectionEnd = html.lastIndexOf('</section>', paletteStart);
   const schedulingStart = html.indexOf('<section class="config-card config-scheduling-card"', paletteStart);
   assert.ok(connectionStart >= 0 && routeStart >= 0 && routeEnd > routeStart, "route selector should be present");
-  assert.ok(geminiOption > routeStart && geminiOption < routeEnd, "Gemini option should be in the route selector");
-  assert.ok(themeOption > routeStart && themeOption < routeEnd, "theme option should be in the route selector");
+  assert.ok(geminiOption > routeStart && geminiOption < grokOption, "Gemini option should precede Grok");
+  assert.ok(grokOption < themeOption && themeOption < routeEnd, "Grok should precede the palette option");
+  assert.match(html.slice(routeEnd, routeFieldsStart), /<fieldset class="route-selector config-gpt-mode-selector"/);
   assert.ok(connectionEnd > routeFieldsStart, "connection card should contain route fields");
   assert.ok(paletteStart > connectionEnd, "palette card should follow the complete connection card");
   assert.ok(schedulingStart > paletteStart, "palette card should precede scheduling controls");
@@ -92,7 +94,7 @@ test("palette card follows the Gemini route choice and shows four compact preset
 test("long configuration explanations keep a keyboard tooltip affordance", async () => {
   const html = await readText(indexPath);
   const markers = [...html.matchAll(/<span\b[^>]*class="field-hint-marker"[^>]*>/g)].map((match) => match[0]);
-  assert.equal(markers.length, 2);
+  assert.equal(markers.length, 3);
   markers.forEach((tag) => {
     assert.match(tag, /tabindex="0"/);
     assert.match(tag, /data-tooltip="[^"]+"/);

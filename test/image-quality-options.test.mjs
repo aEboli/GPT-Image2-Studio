@@ -8,11 +8,16 @@ import { createConfigStore } from "../lib/config-store.mjs";
 import { getSelectedImageGenerationConfig } from "../lib/image-route-config.mjs";
 import {
   DEFAULT_IMAGE_QUALITY,
+  DEFAULT_GROK_IMAGE_QUALITY,
   EXTENDED_IMAGE_QUALITY_OPTIONS,
   IMAGE_QUALITY_OPTIONS,
+  getGrokImageQualityOptions,
   getImageQualityOptions,
   isImageQualitySupportedByModel,
+  normalizeGrokImageQuality,
+  normalizeImageQualityForRoute,
   normalizeImageQuality,
+  normalizeStoredImageQuality,
 } from "../lib/image-quality-options.mjs";
 import { supportsExtendedImageQuality } from "../lib/model-defaults.mjs";
 import { requestImageEdit } from "../lib/responses-workflow.mjs";
@@ -21,10 +26,25 @@ const SUNBURST = "gpt-image-2.5-sunburst";
 const FLARE = "gpt-image-2.5-flare";
 const LEGACY = "gpt-image-2";
 
+test("Grok image quality follows its documented tiers", () => {
+  assert.deepEqual(
+    getGrokImageQualityOptions().map((option) => option.value),
+    ["low", "medium"],
+  );
+  assert.ok(getGrokImageQualityOptions().every((option) => option.label));
+  assert.equal(DEFAULT_GROK_IMAGE_QUALITY, "medium");
+  assert.equal(normalizeGrokImageQuality("AUTO"), "medium");
+  assert.equal(normalizeGrokImageQuality("low"), "low");
+  assert.equal(normalizeGrokImageQuality("high"), "medium");
+  assert.equal(normalizeGrokImageQuality("max"), "medium");
+  assert.equal(normalizeGrokImageQuality("unknown", "low"), "low");
+  assert.equal(normalizeGrokImageQuality("unknown", "high"), "medium");
+});
+
 test("quality options cover the official tiers and keep high as the repo default", () => {
-  assert.deepEqual(IMAGE_QUALITY_OPTIONS, ["auto", "low", "medium", "high", "xhigh", "max"]);
+  assert.deepEqual(IMAGE_QUALITY_OPTIONS, ["low", "medium", "high", "xhigh", "max"]);
   assert.deepEqual(EXTENDED_IMAGE_QUALITY_OPTIONS, ["xhigh", "max"]);
-  // 官方 API 默认 auto，但仓库既有行为是 high，不能悄悄改掉所有人的出图质量。
+  // 迁移旧 auto 值时沿用仓库既有的 high，不能悄悄改掉所有人的出图质量。
   assert.equal(DEFAULT_IMAGE_QUALITY, "high");
 });
 
@@ -38,16 +58,16 @@ test("only the 2.5 models advertise the extended tiers", () => {
 
   assert.deepEqual(
     getImageQualityOptions(SUNBURST).map((option) => option.value),
-    ["auto", "low", "medium", "high", "xhigh", "max"],
+    ["low", "medium", "high", "xhigh", "max"],
   );
   assert.deepEqual(
     getImageQualityOptions(LEGACY).map((option) => option.value),
-    ["auto", "low", "medium", "high"],
+    ["low", "medium", "high"],
   );
   // 未知或空模型按保守处理，不暴露扩展档。
   assert.deepEqual(
     getImageQualityOptions("").map((option) => option.value),
-    ["auto", "low", "medium", "high"],
+    ["low", "medium", "high"],
   );
   assert.ok(getImageQualityOptions(SUNBURST).every((option) => option.label));
 });
@@ -62,7 +82,7 @@ test("extended tiers clamp to high on models that cannot take them", () => {
   assert.equal(normalizeImageQuality("max", { imageModel: "" }), "high");
 
   // 非扩展档在任何模型上都原样透传。
-  ["auto", "low", "medium", "high"].forEach((quality) => {
+  ["low", "medium", "high"].forEach((quality) => {
     assert.equal(normalizeImageQuality(quality, { imageModel: LEGACY }), quality);
     assert.equal(normalizeImageQuality(quality, { imageModel: SUNBURST }), quality);
   });
@@ -79,6 +99,15 @@ test("extended tiers clamp to high on models that cannot take them", () => {
   assert.equal(normalizeImageQuality(undefined, { imageModel: SUNBURST }), "high");
   // 不传 imageModel 时按保守处理。
   assert.equal(normalizeImageQuality("max"), "high");
+});
+
+test("legacy auto quality values migrate to deterministic route defaults", () => {
+  assert.equal(normalizeImageQuality("auto"), "high");
+  assert.equal(normalizeImageQualityForRoute("auto", { imageRoute: "a" }), "high");
+  assert.equal(normalizeImageQualityForRoute("auto", { imageRoute: "d" }), "medium");
+  assert.equal(normalizeImageQualityForRoute("high", { imageRoute: "grok" }), "medium");
+  assert.equal(normalizeStoredImageQuality("auto", { imageRoute: "d" }), "medium");
+  assert.equal(normalizeStoredImageQuality("", { imageRoute: "d" }), "");
 });
 
 test("isImageQualitySupportedByModel gates the extended tiers", () => {
@@ -221,7 +250,7 @@ test("the parameter panel exposes quality as a dropdown instead of static text",
   const server = await readFile(new URL("../server.mjs", import.meta.url), "utf8");
   assert.doesNotMatch(server, /const finalQuality = config\.defaults\?\.quality \|\| "high"/);
   assert.doesNotMatch(server, /quality: config\.defaults\?\.quality \|\| "high"/);
-  assert.match(server, /normalizeImageQuality\(formData\.get\("quality"\) \|\| config\.defaults\?\.quality/);
+  assert.match(server, /normalizeGenerationImageQuality\(formData\.get\("quality"\), generationConfig/);
 
   assert.ok(
     (await readFile(new URL("../scripts/sync-public-lib.mjs", import.meta.url), "utf8")).includes(

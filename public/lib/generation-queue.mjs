@@ -11,8 +11,11 @@ function normalizeGenerationJobMode(value) {
 
 function normalizeGenerationJobRoute(value) {
   const route = String(value || "").trim().toLowerCase();
-  if (route === "a" || route === "b" || route === "c") {
+  if (route === "a" || route === "b" || route === "c" || route === "d") {
     return route;
+  }
+  if (route === "route-d" || route === "grok") {
+    return "d";
   }
   return "";
 }

@@ -33,11 +33,11 @@ test("PPT slide generation normalizes and preserves the requested quality", asyn
 
   assert.match(pptForm, /getSelectedImageQuality\(refs\.pptQualityInput\)/);
   assert.match(slideGenerator, /quality,/);
-  assert.match(slideGenerator, /normalizeImageQuality\(quality \|\| config\.defaults\?\.quality/);
+  assert.match(slideGenerator, /normalizeGenerationImageQuality\(quality, generationConfig, config\.defaults\?\.quality/);
   assert.match(slideGenerator, /quality:\s*slideQuality/);
-  assert.match(server, /async function handlePptGenerate\(request, response\) \{[\s\S]*const quality = normalizeImageQuality\(formData\.get\("quality"\)/);
-  assert.match(server, /async function handlePptComplete\(request, response\) \{[\s\S]*const quality = normalizeImageQuality\(payload\.quality/);
-  assert.match(server, /async function handlePptSlideEdit\(request, response\) \{[\s\S]*const quality = normalizeImageQuality\(formData\.get\("quality"\)/);
+  assert.match(server, /async function handlePptGenerate\(request, response\) \{[\s\S]*const quality = normalizeGenerationImageQuality\(formData\.get\("quality"\)/);
+  assert.match(server, /async function handlePptComplete\(request, response\) \{[\s\S]*const quality = normalizeGenerationImageQuality\(payload\.quality/);
+  assert.match(server, /async function handlePptSlideEdit\(request, response\) \{[\s\S]*const quality = normalizeGenerationImageQuality\(formData\.get\("quality"\)/);
   ["handlePptGenerate", "handlePptComplete", "handlePptSlideEdit"].forEach((handlerName) => {
     const handlerBody = server.match(new RegExp(`async function ${handlerName}\\([^]*?(?=\\r?\\nasync function|\\r?\\nfunction|$)`))?.[0] || "";
     assert.match(handlerBody, /generateAndSavePptSlide\(\{[\s\S]*quality,\r?\n\s*pptDeckRelativeDir/);

@@ -122,6 +122,10 @@ test("browser config module normalizes private config without requiring window g
     protocolBaseUrl: "https://protocol.example.test/v1",
     protocolApiKey: "sk-protocol-secret",
     protocolImageModel: "custom-protocol-image-model",
+    grokBaseUrl: "https://api.x.ai/v1",
+    grokApiKey: "",
+    grokEndpointPath: "images/generations",
+    grokImageModel: "grok-imagine-image-2.0",
     generationStartDelayMs: 1000,
     generationConcurrency: 20,
   });
@@ -142,7 +146,7 @@ test("browser config module normalizes private config without requiring window g
   assert.equal(publicConfig.protocolApiKeyConfigured, true);
   assert.equal(publicConfig.protocolApiKeyMask, "sk-p***cret");
   assert.equal(publicConfig.protocolImageModel, "custom-protocol-image-model");
-  assert.equal(publicConfig.defaults.size, "auto");
+  assert.equal(publicConfig.defaults.size, "1024x1280");
   assert.equal(formData.get("imageRoute"), "b");
   assert.equal(formData.get("baseUrl"), "https://example.test/v1");
   assert.equal(formData.get("endpointPath"), "responses");
@@ -325,19 +329,17 @@ test("browser bootstrap does not block first paint on record history requests", 
   );
 });
 
-test("config drawer shows image route settings as exclusive mode tabs", async () => {
+test("config drawer groups GPT modes beneath GPT and exposes Gemini and Grok sections", async () => {
   const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
   const app = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
   const styles = await readFile(new URL("../public/styles.css", import.meta.url), "utf8");
 
-  assert.match(html, /<fieldset class="route-selector" aria-label="配置区" data-ui-i18n-aria-label="configSectionLabel">/);
+  assert.match(html, /<fieldset class="route-selector config-section-selector" aria-label="配置区" data-ui-i18n-aria-label="configSectionLabel">/);
   assert.match(html, /<span data-ui-i18n="routeMode">路由模式<\/span>/);
   assert.match(html, /<span data-ui-i18n="directMode">直连模式<\/span>/);
-  assert.match(html, /<input name="configSection" type="radio" value="a" checked \/>/);
-  assert.match(html, /<input name="configSection" type="radio" value="b" \/>/);
-  assert.match(html, /<input name="configSection" type="radio" value="c" \/>[\s\S]*<span data-ui-i18n="protocolMode">Gemini<\/span>/);
-  assert.match(html, /<input name="configSection" type="radio" value="theme" \/>[\s\S]*<span data-ui-i18n="themeSection">主题<\/span>/);
-  assert.match(html, /<div class="config-route-state" hidden>[\s\S]*<input name="imageRoute" type="radio" value="c" \/>[\s\S]*<\/div>/);
+  assert.match(html, /<fieldset class="route-selector config-section-selector"[\s\S]*value="gpt" checked[\s\S]*value="gemini"[\s\S]*value="grok"[\s\S]*value="theme"[\s\S]*<\/fieldset>\s*<fieldset class="route-selector config-gpt-mode-selector"/);
+  assert.match(html, /<fieldset class="route-selector config-gpt-mode-selector"[\s\S]*name="gptImageRoute" type="radio" value="a" checked[\s\S]*name="gptImageRoute" type="radio" value="b"/);
+  assert.match(html, /<div class="config-route-state" hidden>[\s\S]*<input name="imageRoute" type="radio" value="d" \/>[\s\S]*<\/div>/);
   assert.match(html, /id="generationModeStatus"[\s\S]*路由模式/);
   assert.match(
     html,
@@ -358,9 +360,11 @@ test("config drawer shows image route settings as exclusive mode tabs", async ()
   assert.match(styles, /\.route-config-panel\s*\{\s*display:\s*none;/);
   assert.match(styles, /\.config-form:has\(input\[name="configSection"\]\[value="theme"\]:checked\) \.config-theme-panel/);
   assert.match(styles, /\.config-form:has\(input\[name="configSection"\]\[value="theme"\]:checked\) \.config-route-fields/);
-  assert.match(styles, /\.config-form:has\(input\[name="configSection"\]\[value="a"\]:checked\)\s*\[data-route-panel="a"\]/);
-  assert.match(styles, /\.config-form:has\(input\[name="configSection"\]\[value="b"\]:checked\)\s*\[data-route-panel="b"\]/);
-  assert.match(styles, /\.config-form:has\(input\[name="configSection"\]\[value="c"\]:checked\)\s*\[data-route-panel="c"\]/);
+  assert.match(styles, /\.config-form\[data-config-section="gpt"\]\[data-image-route="a"\] \[data-route-panel="a"\]/);
+  assert.match(styles, /\.config-form\[data-config-section="gpt"\]\[data-image-route="b"\] \[data-route-panel="b"\]/);
+  assert.match(styles, /\.config-form\[data-config-section="gemini"\] \[data-route-panel="c"\]/);
+  assert.match(styles, /\.config-form\[data-config-section="grok"\] \[data-route-panel="d"\]/);
+  assert.match(styles, /\.config-form\[data-config-section="gpt"\] \.config-gpt-mode-selector/);
   assert.match(styles, /\.endpoint-address-control\s*\{/);
   assert.match(styles, /\.endpoint-suffix-select\s*\{/);
   // option 弹窗由操作系统绘制，必须显式给不透明底色与字色，并随主题切换。

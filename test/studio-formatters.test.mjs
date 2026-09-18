@@ -91,6 +91,28 @@ test("buildParameterText shows call mode and omits Responses-only fields for dir
   assert.match(fallbackResult, /中转：https:\/\/direct-config\.example\/v1/);
 });
 
+test("buildParameterText reports Grok without GPT-only parameters", () => {
+  const result = buildParameterText(
+    {
+      imageRoute: "d",
+      size: "2048x1024",
+      quality: "medium",
+      imageModel: "grok-imagine-image-2.0",
+      reasoningEffort: "xhigh",
+    },
+    {
+      baseUrl: "https://route-a.example/v1",
+      grokBaseUrl: "https://grok.example/v1",
+      grokImageModel: "grok-imagine-image-2.0",
+    },
+  );
+
+  assert.match(result, /调用模式：Grok/);
+  assert.match(result, /图像模型：grok-imagine-image-2\.0/);
+  assert.match(result, /中转：https:\/\/grok\.example\/v1/);
+  assert.doesNotMatch(result, /思考等级：|外层模型：|route-a\.example/);
+});
+
 test("formatRecentOutputMeta composes canvas and model summary", () => {
   const result = formatRecentOutputMeta({
     size: "1024 x 1280",

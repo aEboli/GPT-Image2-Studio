@@ -2,6 +2,7 @@ export const DEFAULT_RESPONSES_MODEL = "gpt-5.4-mini";
 export const DEFAULT_DIRECT_RESPONSES_MODEL = DEFAULT_RESPONSES_MODEL;
 export const DEFAULT_DIRECT_IMAGE_MODEL = "gpt-image-2";
 export const DEFAULT_PROTOCOL_IMAGE_MODEL = "gemini-3.1-flash-image-preview";
+export const DEFAULT_GROK_IMAGE_MODEL = "grok-imagine-image-2.0";
 
 // 路由模式的生图工具模型只接受官方 image_generation 工具支持的这几个模型 ID，
 // 顺序与官方文档的模型目录一致。界面只提供下拉选择，不允许自定义，因此这里既是

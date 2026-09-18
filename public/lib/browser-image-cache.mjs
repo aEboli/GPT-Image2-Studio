@@ -1,9 +1,22 @@
+import { getDefaultGenerationSize, getDefaultModelProtocolImageSize } from "./generation-size-options.mjs";
+import { normalizeStoredImageQuality } from "./image-quality-options.mjs";
+
 export const BROWSER_IMAGE_CACHE_DB_NAME = "image-studio-browser-image-cache-v1";
 export const BROWSER_IMAGE_CACHE_STORE_NAME = "generated-images";
 export const BROWSER_IMAGE_CACHE_INDEX_KEY = "image-studio-browser-image-cache-index-v1";
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function normalizeCachedImageSize(value, ratio, imageRoute) {
+  const normalized = String(value || "").trim();
+  if (normalized.toLowerCase() !== "auto") {
+    return normalized;
+  }
+  return String(imageRoute || "").trim().toLowerCase() === "c"
+    ? getDefaultModelProtocolImageSize()
+    : getDefaultGenerationSize(ratio || "4:5");
 }
 
 export function isCacheableBrowserImageUrl(url) {
@@ -113,22 +126,24 @@ export function normalizeBrowserCachedGalleryItem(item = {}) {
 
   const serverImageUrl = getServerImageUrl(item);
   const serverThumbnailUrl = getServerThumbnailUrl(item);
+  const imageRoute = String(item.imageRoute || item.generationRoute || "");
+  const imageModel = String(item.imageModel || "gpt-image-2");
   const normalized = {
     id: String(item.id || ""),
     filename,
     createdAt: String(item.createdAt || nowIso()),
     prompt: String(item.prompt || ""),
     baseUrl: String(item.baseUrl || ""),
-    imageRoute: String(item.imageRoute || item.generationRoute || ""),
+    imageRoute,
     responsesModel: String(item.responsesModel || ""),
-    imageModel: String(item.imageModel || "gpt-image-2"),
+    imageModel,
     hasReferenceImage: Boolean(item.hasReferenceImage),
     referenceImageNames: Array.isArray(item.referenceImageNames) ? item.referenceImageNames.map(String).filter(Boolean) : [],
     referenceImageName: String(item.referenceImageName || ""),
     ratio: String(item.ratio || ""),
     ratioLabel: String(item.ratioLabel || ""),
-    size: String(item.size || ""),
-    quality: String(item.quality || ""),
+    size: normalizeCachedImageSize(item.size, item.ratio, imageRoute),
+    quality: normalizeStoredImageQuality(item.quality, { imageRoute, imageModel }),
     format: String(item.format || ""),
     imageBackground: String(item.imageBackground || ""),
     reasoningEffort: String(item.reasoningEffort || ""),

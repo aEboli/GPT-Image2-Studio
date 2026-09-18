@@ -192,7 +192,7 @@ test("no consumer still hardcodes the route-mode tool model", async () => {
   for (const file of files) {
     const source = await readFile(new URL(file, import.meta.url), "utf8");
     assert.doesNotMatch(source, /imageModel: "gpt-image-2"/, `${file} must not hardcode the tool model`);
-    assert.match(source, /imageModel: normalizeImageToolModel\(state\.config\?\.imageToolModel\)/, file);
+    assert.match(source, /imageModel: generationConfig\.imageModel \|\| normalizeImageToolModel\(state\.config\?\.imageToolModel\)/, file);
   }
 
   const server = await readFile(new URL("../server.mjs", import.meta.url), "utf8");

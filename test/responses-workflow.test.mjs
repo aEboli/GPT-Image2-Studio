@@ -5,6 +5,7 @@ import {
   buildResponsesInput,
   consumeResponsesSse,
   createDirectImageRequestBody,
+  createGrokImageGenerationRequestBody,
   createGeminiImageGenerationRequestBody,
   createResponsesRequestBody,
   createChatCompletionsImageRequestBody,
@@ -14,6 +15,7 @@ import {
   recoverOriginalResponse,
   normalizeBaseUrl,
   requestDirectImageGeneration,
+  requestGrokImageGeneration,
   requestImageEdit,
   requestImageGeneration,
   requestModelProtocolImageGeneration,
@@ -298,6 +300,147 @@ test("requestDirectImageGeneration posts once to image generations and emits the
     type: "final_image",
     base64: "ZGlyZWN0LWZpbmFs",
   });
+});
+
+test("image request builders migrate legacy auto quality to high", () => {
+  const responsesBody = createResponsesRequestBody({
+    prompt: "test",
+    size: "1024x1024",
+    quality: "auto",
+    responsesModel: "gpt-5.4-mini",
+    imageModel: "gpt-image-2",
+  });
+  const directBody = createDirectImageRequestBody({
+    prompt: "test",
+    size: "1024x1024",
+    quality: "auto",
+    imageModel: "gpt-image-2",
+  });
+  const chatBody = createChatCompletionsImageRequestBody({
+    prompt: "test",
+    size: "1024x1024",
+    quality: "auto",
+    imageModel: "gpt-image-2",
+  });
+
+  assert.equal(responsesBody.tools[0].quality, "high");
+  assert.equal(directBody.quality, "high");
+  assert.equal(chatBody.quality, "high");
+});
+
+test("Grok generation uses its JSON contract and maps unsupported studio quality", async () => {
+  const requests = [];
+  const result = await requestGrokImageGeneration({
+    baseUrl: "https://api.x.ai/v1",
+    endpointPath: "images/edits",
+    apiKey: "grok-key",
+    prompt: "A mountain at sunrise",
+    size: "2048x1024",
+    aspectRatio: "16:9",
+    quality: "high",
+    format: "jpeg",
+    imageModel: "grok-imagine-image-2.0",
+    async fetchImpl(url, init) {
+      requests.push({ url, init, body: JSON.parse(init.body) });
+      return new Response(JSON.stringify({ data: [{ b64_json: "Z3Jvay1pbWFnZQ==" }] }), { status: 200 });
+    },
+  });
+
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].url, "https://api.x.ai/v1/images/generations");
+  assert.equal(requests[0].init.headers.Authorization, "Bearer grok-key");
+  assert.equal(requests[0].init.headers["Content-Type"], "application/json");
+  assert.deepEqual(requests[0].body, {
+    model: "grok-imagine-image-2.0",
+    prompt: "A mountain at sunrise",
+    response_format: "b64_json",
+    n: 1,
+    aspect_ratio: "16:9",
+    resolution: "2k",
+    quality: "medium",
+  });
+  assert.equal("size" in requests[0].body, false);
+  assert.equal("output_format" in requests[0].body, false);
+  assert.equal("background" in requests[0].body, false);
+  assert.equal(result.imageRoute, "d");
+  assert.equal(result.endpointPath, "images/generations");
+  assert.equal(result.finalImageBase64, "Z3Jvay1pbWFnZQ==");
+});
+
+test("Grok request bodies never send legacy auto quality", () => {
+  assert.equal(
+    createGrokImageGenerationRequestBody({ prompt: "test", quality: "auto" }).quality,
+    "medium",
+  );
+});
+
+test("Grok reference edits use the documented singular and multiple image shapes", async () => {
+  const referenceImages = [
+    { mimeType: "image/png", base64: "cG5n" },
+    { mimeType: "image/jpeg", base64: "anBlZw==" },
+  ];
+  const singleBody = createGrokImageGenerationRequestBody({
+    prompt: "Polish the source",
+    referenceImages: [referenceImages[0]],
+  });
+  assert.deepEqual(singleBody.image, {
+    type: "image_url",
+    url: "data:image/png;base64,cG5n",
+  });
+  assert.equal("images" in singleBody, false);
+
+  const requests = [];
+  const result = await requestGrokImageGeneration({
+    baseUrl: "https://api.x.ai/v1",
+    endpointPath: "images/generations",
+    apiKey: "grok-key",
+    prompt: "Combine the references",
+    referenceImages,
+    referenceImageLabels: ["Reference image 1: product", "Reference image 2: packaging"],
+    size: "1024x1024",
+    quality: "low",
+    imageModel: "grok-imagine-image-2.0",
+    async fetchImpl(url, init) {
+      requests.push({ url, body: JSON.parse(init.body) });
+      return new Response(JSON.stringify({ data: [{ b64_json: "ZmluYWw=" }] }), { status: 200 });
+    },
+  });
+
+  assert.equal(requests[0].url, "https://api.x.ai/v1/images/edits");
+  assert.equal("image" in requests[0].body, false);
+  assert.deepEqual(requests[0].body.images, [
+    { type: "image_url", url: "data:image/png;base64,cG5n" },
+    { type: "image_url", url: "data:image/jpeg;base64,anBlZw==" },
+  ]);
+  assert.match(requests[0].body.prompt, /Reference image 1: product/);
+  assert.equal(result.referenceImageCount, 2);
+  assert.equal(result.endpointPath, "images/edits");
+});
+
+test("Grok rejects more than five references and local mask edits before fetching", async () => {
+  const referenceImages = Array.from({ length: 6 }, (_value, index) => ({
+    mimeType: "image/png",
+    base64: `aW1hZ2Ut${index}`,
+  }));
+  let fetchCount = 0;
+
+  assert.throws(
+    () => createGrokImageGenerationRequestBody({ prompt: "Too many", referenceImages }),
+    /Grok 单次编辑最多支持 5 张参考图/,
+  );
+  await assert.rejects(
+    requestGrokImageGeneration({
+      baseUrl: "https://api.x.ai/v1",
+      apiKey: "grok-key",
+      prompt: "Masked edit",
+      mask: { base64: "bWFzaw==" },
+      fetchImpl() {
+        fetchCount += 1;
+      },
+    }),
+    /Grok 生图不支持本地蒙版编辑/,
+  );
+  assert.equal(fetchCount, 0);
 });
 
 test("direct image generation forwards an AbortSignal to the request and image URL fetch", async () => {
@@ -3328,7 +3471,7 @@ test("requestImageGeneration accepts relay-style completed final image before tr
   assert.equal(events.some((event) => event.type === "status" && event.stage === "retrying_upstream"), false);
 });
 
-test("requestImageGeneration does not retry an invalid custom image size", async () => {
+test("requestImageGeneration migrates an invalid legacy image size to the concrete default", async () => {
   const requests = [];
 
   await assert.rejects(() => requestImageGeneration({
@@ -3355,7 +3498,7 @@ test("requestImageGeneration does not retry an invalid custom image size", async
     },
   }), /生成请求失败：HTTP 400/);
 
-  assert.deepEqual(requests, ["1536x864"]);
+  assert.deepEqual(requests, ["1024x1280"]);
 });
 
 test("complete waits for the image when the tool announces completion early", async () => {

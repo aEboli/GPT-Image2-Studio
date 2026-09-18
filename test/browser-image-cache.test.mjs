@@ -25,6 +25,17 @@ test("browser image cache preserves image generation route metadata", () => {
   assert.equal(normalized.imageRoute, "b");
 });
 
+test("browser image cache migrates legacy quality values by route", () => {
+  assert.equal(
+    normalizeBrowserCachedGalleryItem({ filename: "grok.png", imageRoute: "d", quality: "auto" }).quality,
+    "medium",
+  );
+  assert.equal(
+    normalizeBrowserCachedGalleryItem({ filename: "gpt.png", imageRoute: "a", quality: "auto" }).quality,
+    "high",
+  );
+});
+
 test("browser image cache recognizes local output and thumbnail URLs as server media", () => {
   assert.equal(isServerImageProxyUrl("/output/2026-09/09-01/demo.png"), true);
   assert.equal(isServerImageProxyUrl("/api/gallery/thumbnail?path=2026-09%2F09-01%2Fdemo.png"), true);

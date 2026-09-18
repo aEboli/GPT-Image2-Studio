@@ -280,6 +280,24 @@ function makeDirectReferenceGenerationForm({ baseUrl }) {
   return formData;
 }
 
+function makeGrokReferenceGenerationForm({ baseUrl, referenceCount = 5, jobId = "grok-reference-local" } = {}) {
+  return makeImageEditForm({
+    baseUrl,
+    fields: {
+      clientSessionId: `${jobId}-session`,
+      jobId,
+      imageRoute: "d",
+      grokBaseUrl: baseUrl,
+      grokApiKey: "grok-test-key",
+      grokEndpointPath: "images/edits",
+      grokImageModel: "grok-imagine-image-2.0",
+    },
+    referenceFiles: Array.from({ length: referenceCount }, (_value, index) =>
+      new File([`source-image-${index + 1}`], `source-${index + 1}.png`, { type: "image/png" }),
+    ),
+  });
+}
+
 function makeLocalMaskForm(options = {}) {
   const executionStrategy = options.executionStrategy || "merge";
   const regions = options.regions || makeLocalMaskRegions();
@@ -413,6 +431,70 @@ test("local direct generation with one reference uses image edits and the image 
     entry.endpointPath === "images/edits" &&
     entry.referenceImageName === "source-product.png"
   ), JSON.stringify(metadata, null, 2));
+});
+
+test("local Grok edit accepts five references and records the returned JPEG format", async (t) => {
+  const validJpegBase64 = (await readFile(join(rootDir, "docs", "images", "gallery.jpg"))).toString("base64");
+  const upstream = await createUpstreamEditServer({ responses: [{ base64: validJpegBase64 }] });
+  const { baseUrl, outputDir } = await startLocalStudioServer(t, {
+    upstream,
+    tempPrefix: "grok-reference-edit-",
+  });
+
+  const response = await fetch(`${baseUrl}/api/generate`, {
+    method: "POST",
+    body: makeGrokReferenceGenerationForm({ baseUrl: upstream.baseUrl }),
+  });
+  const text = await response.text();
+  const events = parseSseEvents(text);
+  const finalImage = events.find((event) => event.eventName === "final_image");
+  const saved = events.find((event) => event.eventName === "saved");
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(events.filter((event) => event.eventName === "error"), [], text);
+  assert.equal(upstream.requests.length, 1);
+  assert.equal(upstream.requests[0].url, "/v1/images/edits");
+  assert.equal(upstream.requests[0].headers.authorization, "Bearer grok-test-key");
+  assert.match(upstream.requests[0].headers["content-type"], /^application\/json/);
+  const requestBody = JSON.parse(upstream.requests[0].body);
+  assert.equal(requestBody.model, "grok-imagine-image-2.0");
+  assert.equal(requestBody.response_format, "b64_json");
+  assert.equal(requestBody.images.length, 5);
+  assert.equal("image" in requestBody, false);
+  assert.equal("size" in requestBody, false);
+  assert.equal("output_format" in requestBody, false);
+  assert.equal("background" in requestBody, false);
+
+  assert.match(finalImage?.payload?.dataUrl || "", /^data:image\/jpeg;base64,/);
+  assert.equal(saved?.payload?.item?.format, "jpg");
+  assert.match(saved?.payload?.item?.relativePath || "", /\.jpg$/);
+  const metadata = await readSavedMetadataEntries(outputDir);
+  assert.ok(metadata.some((entry) =>
+    entry.imageRoute === "d" &&
+    entry.endpointPath === "images/edits" &&
+    entry.format === "jpg" &&
+    entry.referenceImageNames?.length === 5
+  ), JSON.stringify(metadata, null, 2));
+});
+
+test("local Grok edit rejects more than five references before contacting xAI", async (t) => {
+  const upstream = await createUpstreamEditServer();
+  const { baseUrl } = await startLocalStudioServer(t, {
+    upstream,
+    tempPrefix: "grok-reference-edit-limit-",
+  });
+
+  const response = await fetch(`${baseUrl}/api/generate`, {
+    method: "POST",
+    body: makeGrokReferenceGenerationForm({ baseUrl: upstream.baseUrl, referenceCount: 6, jobId: "grok-reference-limit" }),
+  });
+  const events = parseSseEvents(await response.text());
+  const error = events.find((event) => event.eventName === "error");
+
+  assert.equal(response.status, 200);
+  assert.match(error?.payload?.message || "", /Grok 单次编辑最多支持 5 张参考图/);
+  assert.equal(upstream.requests.length, 0);
+  assert.equal(events.some((event) => event.eventName === "saved"), false);
 });
 
 test("local generation rejects a 1x1 upstream image before publishing or saving it", async (t) => {

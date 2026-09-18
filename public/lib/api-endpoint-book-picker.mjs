@@ -1,7 +1,7 @@
 import { forgetApiEndpoint, listApiEndpointBookEntries, rememberApiEndpoints } from "./api-endpoint-book.mjs";
 
-/* 四个 API 地址字段共用一份历史清单的下拉选择器。选中一条把地址、协议后缀和
-   配套 Key 一起填进当前通道——Key 跟着 API 走，不单独挑。
+/* 五个 API 地址字段各自维护一份历史清单的下拉选择器。选中一条把地址、协议后缀和
+   配套 Key 一起填进当前通道——Key 跟着 API 走，不单独挑；不同通道之间不串清单。
    结构刻意对齐 lib/config-model-picker.mjs：同一套 refs/state 注入、同一套展开收起
    与外部点击关闭，界面行为才不会两套下拉各走一路。 */
 
@@ -9,18 +9,21 @@ export const API_BOOK_TARGET_ROUTE = "route";
 export const API_BOOK_TARGET_DIRECT_IMAGE = "direct-image";
 export const API_BOOK_TARGET_DIRECT_TEXT = "direct-text";
 export const API_BOOK_TARGET_PROTOCOL = "protocol";
+export const API_BOOK_TARGET_GROK = "grok";
 export const API_BOOK_TARGETS = [
   API_BOOK_TARGET_ROUTE,
   API_BOOK_TARGET_DIRECT_IMAGE,
   API_BOOK_TARGET_DIRECT_TEXT,
   API_BOOK_TARGET_PROTOCOL,
+  API_BOOK_TARGET_GROK,
 ];
 
 export function createApiEndpointBookPickerController({ refs, state, getUiText, storage, onApplied } = {}) {
   const documentRef = refs?.routeApiBookList?.ownerDocument || globalThis.document;
   const resolveStorage = () => (storage === undefined ? globalThis.window?.localStorage || null : storage);
 
-  state.apiEndpointBook ||= { entries: [], open: "" };
+  state.apiEndpointBook ||= { entriesByTarget: {}, open: "" };
+  state.apiEndpointBook.entriesByTarget ||= {};
 
   function uiText(key, fallback) {
     const text = typeof getUiText === "function" ? getUiText(key) : "";
@@ -56,6 +59,15 @@ export function createApiEndpointBookPickerController({ refs, state, getUiText, 
         list: refs.protocolApiBookList,
       };
     }
+    if (target === API_BOOK_TARGET_GROK) {
+      return {
+        addressInput: refs.grokBaseUrlInput,
+        suffixSelect: refs.grokEndpointPathSelect,
+        keyInput: refs.grokApiKeyInput,
+        toggle: refs.grokApiBookToggle,
+        list: refs.grokApiBookList,
+      };
+    }
     return {
       addressInput: refs.baseUrlInput,
       suffixSelect: refs.endpointPathSelect,
@@ -66,9 +78,21 @@ export function createApiEndpointBookPickerController({ refs, state, getUiText, 
   }
 
   /* 明文 Key 只留在这份快照里，列表按索引回填；渲染进 DOM 的只有地址与掩码。 */
-  function refreshEntries() {
-    state.apiEndpointBook.entries = listApiEndpointBookEntries(resolveStorage());
-    return state.apiEndpointBook.entries;
+  function refreshEntries(target = null) {
+    const targets = target ? [target] : API_BOOK_TARGETS;
+    targets.forEach((entryTarget) => {
+      state.apiEndpointBook.entriesByTarget[entryTarget] = listApiEndpointBookEntries(entryTarget, resolveStorage());
+    });
+    // 保留一个默认别名，方便旧宿主读取状态；渲染和操作始终走按通道的 map。
+    state.apiEndpointBook.entries = state.apiEndpointBook.entriesByTarget[API_BOOK_TARGET_ROUTE] || [];
+    return target ? state.apiEndpointBook.entriesByTarget[target] : state.apiEndpointBook.entries;
+  }
+
+  function getEntries(target) {
+    if (!Array.isArray(state.apiEndpointBook.entriesByTarget[target])) {
+      refreshEntries(target);
+    }
+    return state.apiEndpointBook.entriesByTarget[target];
   }
 
   function renderEmptyState(list) {
@@ -85,7 +109,7 @@ export function createApiEndpointBookPickerController({ refs, state, getUiText, 
       return;
     }
 
-    const entries = state.apiEndpointBook.entries;
+    const entries = getEntries(target);
     const hasEntries = entries.length > 0;
     const isOpen = state.apiEndpointBook.open === target && hasEntries;
 
@@ -123,11 +147,13 @@ export function createApiEndpointBookPickerController({ refs, state, getUiText, 
       const address = documentRef.createElement("span");
       address.className = "api-endpoint-option-address";
       address.textContent = entry.label;
+      address.title = entry.baseUrl;
       option.appendChild(address);
 
       const meta = documentRef.createElement("span");
       meta.className = "api-endpoint-option-meta";
       meta.textContent = entry.endpointPath ? `${entry.endpointPath} · ${entry.mask}` : entry.mask;
+      meta.title = meta.textContent;
       option.appendChild(meta);
 
       row.appendChild(option);
@@ -156,7 +182,7 @@ export function createApiEndpointBookPickerController({ refs, state, getUiText, 
 
   function toggle(target) {
     const shouldOpen = state.apiEndpointBook.open !== target;
-    refreshEntries();
+    refreshEntries(target);
     setOpen(target, shouldOpen);
   }
 
@@ -183,7 +209,7 @@ export function createApiEndpointBookPickerController({ refs, state, getUiText, 
   /* 选中即整套切换：地址、后缀、Key 一起填。模型不动，仍要用户点保存才生效。
      顺手把它记回队首，下次展开就在最上面。 */
   function selectEntry(target, index) {
-    const entry = state.apiEndpointBook.entries[Number(index)];
+    const entry = getEntries(target)[Number(index)];
     const targetRefs = getTargetRefs(target);
     if (!entry) {
       return;
@@ -197,8 +223,8 @@ export function createApiEndpointBookPickerController({ refs, state, getUiText, 
       targetRefs.keyInput.value = entry.apiKey;
     }
 
-    rememberApiEndpoints([entry], resolveStorage());
-    refreshEntries();
+    rememberApiEndpoints(target, [entry], resolveStorage());
+    refreshEntries(target);
     setOpen(target, false);
     // 地址框可能处于「完整 URL」显示模式，交回宿主按当前模式重排显示。
     onApplied?.(target, entry);
@@ -207,18 +233,21 @@ export function createApiEndpointBookPickerController({ refs, state, getUiText, 
   /* 删除只动清单，不清当前已保存配置：用户删的是「历史里这条」，
      不是「现在正在用的这套」。 */
   function removeEntry(target, index) {
-    const entry = state.apiEndpointBook.entries[Number(index)];
+    const entry = getEntries(target)[Number(index)];
     if (!entry) {
       return;
     }
 
-    forgetApiEndpoint(entry, resolveStorage());
-    const remaining = refreshEntries();
+    forgetApiEndpoint(target, entry, resolveStorage());
+    const remaining = refreshEntries(target);
     setOpen(target, remaining.length > 0);
   }
 
-  function remember(sources) {
-    rememberApiEndpoints(sources, resolveStorage());
+  function remember(targetOrSources, maybeSources) {
+    // 旧宿主传入一组 sources 时只记入默认路由通道；新的调用必须明确 target。
+    const target = API_BOOK_TARGETS.includes(targetOrSources) ? targetOrSources : API_BOOK_TARGET_ROUTE;
+    const sources = target === targetOrSources ? maybeSources : targetOrSources;
+    rememberApiEndpoints(target, sources, resolveStorage());
     refreshEntries();
     render();
   }

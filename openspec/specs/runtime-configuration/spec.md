@@ -2,7 +2,9 @@
 
 ## Purpose
 TBD - created by archiving change harden-project-maintenance. Update Purpose after archive.
+
 ## Requirements
+
 ### Requirement: Runtime defaults use one model source
 The system SHALL resolve the default Responses model and direct text/vision model from one shared source, and both defaults SHALL be `gpt-5.4-mini` across the local Node service and browser-private configuration.
 
@@ -208,3 +210,164 @@ The local Node service and browser-private configuration SHALL use the same cano
 - **WHEN** 用户选择模型协议图像通道
 - **THEN** 提示词参数区不展示透明背景控制
 - **AND** 该通道不会因为该控制添加不受支持的背景参数
+
+### Requirement: Image quality values are explicit and route-safe
+
+The system SHALL expose only explicit supported image-quality tiers. GPT and Gemini image routes SHALL use `low`, `medium`, `high`, and model-supported `xhigh`/`max`; Grok SHALL use only `low` or `medium`. The default quality for existing GPT/Gemini behavior SHALL remain `high`, and the Grok default SHALL be `medium`. Incoming legacy `auto`, empty, or unsupported values SHALL be normalized to the applicable concrete default before they are displayed, stored, or sent upstream.
+
+#### Scenario: Legacy quality values are migrated
+
+- **WHEN** a saved configuration, browser state, task snapshot, gallery record, or request contains quality `auto`
+- **THEN** GPT/Gemini values become `high`
+- **AND** Grok values become `medium`
+- **AND** no image-generation request sends `auto`
+
+#### Scenario: Grok sends only supported quality values
+
+- **WHEN** a Grok image request is built from an empty, legacy, or GPT-specific quality value
+- **THEN** the request body contains either `low` or `medium`
+- **AND** the request does not contain any GPT-only quality tier
+
+### Requirement: Grok image configuration is independent and masked
+
+The system SHALL support route D as a Grok image channel with canonical `grokBaseUrl`, `grokEndpointPath`, `grokApiKey`, and `grokImageModel` fields. Defaults SHALL be `https://api.x.ai/v1`, `images/generations`, an empty key, and `grok-imagine-image-2.0`. Grok fields MUST NOT be populated from GPT, direct, or Gemini credentials, and public configuration MUST expose only endpoint/model metadata plus configured and masked key fields.
+
+#### Scenario: Grok defaults are available
+
+- **WHEN** the runtime starts without a Grok configuration
+- **THEN** route D resolves to the documented xAI base URL, generation endpoint, and default model
+- **AND** its API key is empty
+
+#### Scenario: Grok credentials remain isolated
+
+- **WHEN** GPT, direct, or Gemini keys are configured but Grok is not
+- **THEN** the effective Grok key remains empty
+- **AND** selecting route D does not replace another channel's key
+
+#### Scenario: Public config masks Grok credentials
+
+- **WHEN** a Grok key is saved
+- **THEN** public config reports Grok key configured state and a mask
+- **AND** public config does not contain the raw key
+
+### Requirement: Grok requests use the xAI JSON contract
+
+Route D SHALL send JSON to `images/generations` without references and to `images/edits` with references. The request SHALL use the configured model and prompt, `response_format: b64_json`, and only documented Grok controls. It MUST NOT send OpenAI-only `size`, `output_format`, `background`, multipart image fields, or mask fields.
+
+#### Scenario: Grok text-to-image request
+
+- **WHEN** route D generates without a reference image
+- **THEN** it posts JSON to `images/generations`
+- **AND** the body contains Grok model, prompt, aspect ratio, resolution, quality, response format, and `n: 1`
+
+#### Scenario: Grok reference edit request
+
+- **WHEN** route D receives one or more usable reference images
+- **THEN** it posts JSON to `images/edits`
+- **AND** one image uses the singular `image` object while multiple images use the `images` array
+- **AND** each edit contains no more than five reference images
+- **AND** each image is represented as an `image_url` data URI
+
+#### Scenario: Too many Grok reference images
+
+- **WHEN** route D receives more than five reference images
+- **THEN** the request is rejected before an upstream call is made
+- **AND** the error identifies the five-image limit
+
+#### Scenario: Grok response formats
+
+- **WHEN** Grok returns `b64_json` or a public image URL
+- **THEN** the workflow resolves it to the existing final base64 image event
+
+#### Scenario: Grok output format follows returned bytes
+
+- **WHEN** route D returns a valid PNG or JPEG image
+- **THEN** the server detects its actual format from the image bytes
+- **AND** the final image MIME type and saved extension use that format regardless of the requested studio format
+
+#### Scenario: Unsupported Grok mask
+
+- **WHEN** a route D request includes a local mask
+- **THEN** the request fails with a clear unsupported-mask message before an upstream request is sent
+
+### Requirement: Existing route configuration remains compatible
+
+The system SHALL continue to resolve legacy route A/B/C values and snapshots. Route aliases `grok` and `route-d` SHALL normalize to D. Route D SHALL participate in task snapshots, activity labels, queue scope keys, model discovery, and request payloads without being treated as route A.
+
+#### Scenario: Legacy route snapshot
+
+- **WHEN** a historical snapshot contains route A, B, or C
+- **THEN** it remains readable and displays its original channel
+- **AND** the new Grok fields do not alter its effective provider
+
+### Requirement: Image resolution values are always concrete
+
+The system SHALL expose only concrete image-resolution values for GPT/Grok pixel-size routes and Gemini model-protocol size routes. GPT/Grok SHALL use a concrete pixel-size option for the selected aspect ratio, and Gemini SHALL use one of 512, 1K, 2K, or 4K. The system MUST NOT display or send resolution auto.
+
+#### Scenario: Resolution controls have no automatic option
+
+- **WHEN** the user opens the image-generation controls for any supported route
+- **THEN** the resolution selector contains only concrete pixel sizes or Gemini size tiers
+- **AND** neither the value auto nor the label “自动适配” is available
+
+#### Scenario: Legacy automatic resolution is migrated
+
+- **WHEN** a saved configuration, browser cache, task snapshot, queue retry, manifest, sidecar, or preview metadata contains resolution auto, an empty value, or an invalid value
+- **THEN** GPT/Grok data is normalized to the first concrete size for its ratio
+- **AND** Gemini data is normalized to 1K
+- **AND** a known measured image size may be retained when migrating a missing historical field
+- **AND** the migrated value is the one used for subsequent requests and persistence
+
+#### Scenario: Upstream requests never receive automatic resolution
+
+- **WHEN** any image-generation entry point builds a new request, including a browser retry or server mock request
+- **THEN** the request contains a concrete route-appropriate size
+- **AND** no resolution field contains the string auto
+
+### Requirement: Non-resolution automatic behaviors remain compatible
+
+The system SHALL preserve existing automatic semantics for non-resolution fields such as article content type, automatic repair, and automatic collapse. Removing automatic resolution SHALL NOT rename, remove, or rewrite those unrelated fields.
+
+#### Scenario: Non-resolution automatic fields remain readable
+
+- **WHEN** an article record, creation repair request, or UI layout contains its existing automatic field
+- **THEN** the field keeps its existing value and behavior
+- **AND** resolution migration changes no unrelated field
+
+### Requirement: Image generation controls are isolated by route
+
+The system SHALL resolve image-generation quality from the selected image route and SHALL keep the selected quality value independently for GPT, Gemini, and Grok routes. GPT and Gemini SHALL expose only explicit supported quality tiers (`low`, `medium`, `high`, and model-supported `xhigh`/`max`); Grok SHALL expose and send only `low` or `medium`, with an empty or legacy `auto` Grok value defaulting to `medium`. Legacy `auto` values for GPT and Gemini SHALL migrate to the existing `high` default. GPT-only quality values sent to route D SHALL be reduced to `medium` instead of being forwarded unchanged.
+
+#### Scenario: Grok uses its own quality vocabulary
+
+- **WHEN** the selected image route is Grok and no quality is supplied
+- **THEN** the effective quality is `medium`
+- **AND** the browser quality control contains only `low` and `medium`
+
+#### Scenario: GPT quality does not leak into Grok
+
+- **WHEN** GPT quality is `high`, `xhigh`, or `max` and the user switches to Grok
+- **THEN** the Grok request uses a supported value, with GPT-only tiers mapped to `medium`
+- **AND** the saved Grok selection does not overwrite the GPT selection
+
+#### Scenario: Route quality choices survive switching
+
+- **WHEN** the user selects one quality for GPT, another for Gemini, and another for Grok, then switches between routes
+- **THEN** each route restores its own last valid quality
+- **AND** a route switch does not reuse the previous route's unsupported option
+
+### Requirement: GPT reasoning effort is excluded from Grok image requests
+
+Route D image-generation and image-edit requests SHALL NOT send `reasoningEffort`. Grok image task snapshots, preview metadata, saved image metadata, and suite snapshots SHALL omit the GPT-only reasoning field. Text/vision requests that remain on GPT SHALL continue to accept and persist their reasoning effort independently from image-route controls.
+
+#### Scenario: Grok image request omits reasoning
+
+- **WHEN** a Grok image request is created while the GPT reasoning control contains any value
+- **THEN** the upstream request does not contain `reasoningEffort`
+- **AND** the resulting image record does not claim a GPT reasoning level
+
+#### Scenario: PPT text planning keeps GPT reasoning
+
+- **WHEN** a PPT outline is generated through the GPT text/vision channel while image pages use Grok
+- **THEN** the outline request retains its selected GPT reasoning effort
+- **AND** the Grok page-image requests omit `reasoningEffort`

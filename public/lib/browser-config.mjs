@@ -9,11 +9,16 @@ import {
 import {
   DEFAULT_DIRECT_IMAGE_MODEL,
   DEFAULT_DIRECT_RESPONSES_MODEL,
+  DEFAULT_GROK_BASE_URL,
+  DEFAULT_GROK_IMAGE_MODEL,
   DEFAULT_PROTOCOL_IMAGE_MODEL,
   API_ENDPOINT_RESPONSES,
+  normalizeGrokEndpointPath,
   normalizeImageRouteConfig,
 } from "./image-route-config.mjs";
 import { DEFAULT_IMAGE_TOOL_MODEL, DEFAULT_RESPONSES_MODEL } from "./model-defaults.mjs";
+import { normalizeImageQualityForRoute } from "./image-quality-options.mjs";
+import { getDefaultGenerationSize, getDefaultModelProtocolImageSize } from "./generation-size-options.mjs";
 
 export const BROWSER_CONFIG_STORAGE_KEY = "image-studio-browser-config-v1";
 export const CLIENT_SESSION_STORAGE_KEY = "image-studio-client-session-id";
@@ -78,6 +83,10 @@ export function normalizeBrowserPrivateConfig(source = {}, { preserveRootBaseUrl
     protocolBaseUrl: routeConfig.protocolBaseUrl || DEFAULT_BROWSER_BASE_URL,
     protocolApiKey: routeConfig.protocolApiKey,
     protocolImageModel: routeConfig.protocolImageModel || DEFAULT_PROTOCOL_IMAGE_MODEL,
+    grokBaseUrl: routeConfig.grokBaseUrl || DEFAULT_GROK_BASE_URL,
+    grokApiKey: routeConfig.grokApiKey,
+    grokEndpointPath: normalizeGrokEndpointPath(routeConfig.grokEndpointPath),
+    grokImageModel: routeConfig.grokImageModel || DEFAULT_GROK_IMAGE_MODEL,
     [GENERATION_START_DELAY_FIELD]: normalizeGenerationStartDelayMs(source?.[GENERATION_START_DELAY_FIELD]),
     [GENERATION_CONCURRENCY_FIELD]: normalizeGenerationConcurrency(source?.[GENERATION_CONCURRENCY_FIELD]),
   };
@@ -98,6 +107,26 @@ export function readBrowserPrivateConfig(storage = getLocalStorage()) {
 
 export function toPublicBrowserConfig(privateConfig, baseConfig = {}) {
   const normalized = normalizeBrowserPrivateConfig(privateConfig, { preserveRootBaseUrls: true });
+  const publicDefaults = { ...(baseConfig.defaults || {}) };
+  const imageRoute = normalized.imageRoute || "a";
+  if (Object.prototype.hasOwnProperty.call(publicDefaults, "size")) {
+    const size = String(publicDefaults.size || "").trim();
+    if (!size || size.toLowerCase() === "auto") {
+      publicDefaults.size = imageRoute === "c"
+        ? getDefaultModelProtocolImageSize()
+        : getDefaultGenerationSize("4:5");
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(publicDefaults, "quality")) {
+    const imageModel = imageRoute === "d"
+      ? normalized.grokImageModel
+      : imageRoute === "c"
+        ? normalized.protocolImageModel
+        : imageRoute === "b"
+          ? normalized.directImageModel
+          : normalized.imageToolModel;
+    publicDefaults.quality = normalizeImageQualityForRoute(publicDefaults.quality, { imageRoute, imageModel });
+  }
   const apiKeyConfigured = Boolean(normalized.apiKey) || Boolean(baseConfig.apiKeyConfigured);
   const directImageApiKeyConfigured =
     Boolean(normalized.directImageApiKey) || Boolean(baseConfig.directImageApiKeyConfigured);
@@ -106,6 +135,7 @@ export function toPublicBrowserConfig(privateConfig, baseConfig = {}) {
   const directApiKeyConfigured =
     directImageApiKeyConfigured || directTextApiKeyConfigured || Boolean(baseConfig.directApiKeyConfigured);
   const protocolApiKeyConfigured = Boolean(normalized.protocolApiKey) || Boolean(baseConfig.protocolApiKeyConfigured);
+  const grokApiKeyConfigured = Boolean(normalized.grokApiKey) || Boolean(baseConfig.grokApiKeyConfigured);
   return {
     ...baseConfig,
     baseUrl: normalized.baseUrl,
@@ -138,8 +168,13 @@ export function toPublicBrowserConfig(privateConfig, baseConfig = {}) {
     protocolApiKeyConfigured,
     protocolApiKeyMask: normalized.protocolApiKey ? maskBrowserApiKey(normalized.protocolApiKey) : baseConfig.protocolApiKeyMask,
     protocolImageModel: normalized.protocolImageModel,
+    grokBaseUrl: normalized.grokBaseUrl,
+    grokApiKeyConfigured,
+    grokApiKeyMask: normalized.grokApiKey ? maskBrowserApiKey(normalized.grokApiKey) : baseConfig.grokApiKeyMask,
+    grokEndpointPath: normalized.grokEndpointPath,
+    grokImageModel: normalized.grokImageModel,
     defaults: {
-      ...(baseConfig.defaults || {}),
+      ...publicDefaults,
       [GENERATION_START_DELAY_FIELD]: normalized[GENERATION_START_DELAY_FIELD],
       [GENERATION_CONCURRENCY_FIELD]: normalized[GENERATION_CONCURRENCY_FIELD],
     },
@@ -181,6 +216,10 @@ export function saveBrowserPrivateConfig(payload, storage = getLocalStorage()) {
       protocolBaseUrl: payload.protocolBaseUrl || current.protocolBaseUrl,
       protocolApiKey: payload.protocolApiKey ? payload.protocolApiKey : current.protocolApiKey,
       protocolImageModel: payload.protocolImageModel || current.protocolImageModel,
+      grokBaseUrl: payload.grokBaseUrl || current.grokBaseUrl,
+      grokApiKey: payload.grokApiKey ? payload.grokApiKey : current.grokApiKey,
+      grokEndpointPath: payload.grokEndpointPath || current.grokEndpointPath,
+      grokImageModel: payload.grokImageModel || current.grokImageModel,
       // A saved 0 is meaningful, so only an absent field falls back to current.
       [GENERATION_START_DELAY_FIELD]:
         payload[GENERATION_START_DELAY_FIELD] === undefined || String(payload[GENERATION_START_DELAY_FIELD]).trim() === ""
@@ -198,6 +237,7 @@ export function saveBrowserPrivateConfig(payload, storage = getLocalStorage()) {
         directImageBaseUrl: payload.directImageBaseUrl === undefined,
         directTextBaseUrl: payload.directTextBaseUrl === undefined,
         protocolBaseUrl: payload.protocolBaseUrl === undefined,
+        grokBaseUrl: payload.grokBaseUrl === undefined,
       },
     },
   );
@@ -246,6 +286,7 @@ export function appendBrowserConfigToFormData(formData, readConfig = readBrowser
         directImageBaseUrl: !("directImageBaseUrl" in overrideConfig) && !("directBaseUrl" in overrideConfig),
         directTextBaseUrl: !("directTextBaseUrl" in overrideConfig) && !("directBaseUrl" in overrideConfig),
         protocolBaseUrl: !("protocolBaseUrl" in overrideConfig),
+        grokBaseUrl: !("grokBaseUrl" in overrideConfig),
       },
     },
   );
@@ -271,6 +312,10 @@ export function appendBrowserConfigToFormData(formData, readConfig = readBrowser
   formData.set("protocolBaseUrl", config.protocolBaseUrl);
   formData.set("protocolApiKey", config.protocolApiKey);
   formData.set("protocolImageModel", config.protocolImageModel);
+  formData.set("grokBaseUrl", config.grokBaseUrl);
+  formData.set("grokApiKey", config.grokApiKey);
+  formData.set("grokEndpointPath", config.grokEndpointPath);
+  formData.set("grokImageModel", config.grokImageModel);
   formData.set(GENERATION_START_DELAY_FIELD, String(config[GENERATION_START_DELAY_FIELD]));
   formData.set(GENERATION_CONCURRENCY_FIELD, String(config[GENERATION_CONCURRENCY_FIELD]));
   return formData;
@@ -302,6 +347,10 @@ export function getBrowserPrivateConfigRequestPayload(readConfig = readBrowserPr
         protocolBaseUrl: browserConfig.protocolBaseUrl,
         protocolApiKey: browserConfig.protocolApiKey,
         protocolImageModel: browserConfig.protocolImageModel,
+        grokBaseUrl: browserConfig.grokBaseUrl,
+        grokApiKey: browserConfig.grokApiKey,
+        grokEndpointPath: browserConfig.grokEndpointPath,
+        grokImageModel: browserConfig.grokImageModel,
         [GENERATION_START_DELAY_FIELD]: browserConfig[GENERATION_START_DELAY_FIELD],
         [GENERATION_CONCURRENCY_FIELD]: browserConfig[GENERATION_CONCURRENCY_FIELD],
       }

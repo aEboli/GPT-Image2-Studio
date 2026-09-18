@@ -6,8 +6,11 @@ import {
   API_ENDPOINT_IMAGE_EDITS,
   API_ENDPOINT_IMAGE_GENERATIONS,
   API_ENDPOINT_RESPONSES,
+  DEFAULT_GROK_BASE_URL,
   DEFAULT_DIRECT_RESPONSES_MODEL,
+  DEFAULT_GROK_IMAGE_MODEL,
   DEFAULT_PROTOCOL_IMAGE_MODEL,
+  IMAGE_ROUTE_D,
   IMAGE_ROUTE_C,
   appendApiEndpointPath,
   getSelectedImageGenerationConfig,
@@ -16,6 +19,7 @@ import {
   splitApiEndpointUrl,
   splitModelProtocolUrl,
   normalizeImageRouteConfig,
+  normalizeGrokEndpointPath,
 } from "../lib/image-route-config.mjs";
 
 test("image route config defaults direct text and vision model independently from direct image model", () => {
@@ -101,6 +105,49 @@ test("model protocol config defaults to Gemini image model", () => {
   });
 
   assert.equal(config.protocolImageModel, DEFAULT_PROTOCOL_IMAGE_MODEL);
+});
+
+test("Grok route defaults independently and accepts only its image endpoint paths", () => {
+  const config = normalizeImageRouteConfig({
+    imageRoute: "grok",
+    apiKey: "gpt-key",
+    directApiKey: "direct-key",
+    protocolApiKey: "gemini-key",
+  });
+
+  assert.equal(config.imageRoute, IMAGE_ROUTE_D);
+  assert.equal(config.grokBaseUrl, DEFAULT_GROK_BASE_URL);
+  assert.equal(config.grokEndpointPath, API_ENDPOINT_IMAGE_GENERATIONS);
+  assert.equal(config.grokImageModel, DEFAULT_GROK_IMAGE_MODEL);
+  assert.equal(config.grokApiKey, "");
+  assert.equal(normalizeGrokEndpointPath(API_ENDPOINT_IMAGE_EDITS), API_ENDPOINT_IMAGE_EDITS);
+  assert.equal(normalizeGrokEndpointPath(API_ENDPOINT_RESPONSES), API_ENDPOINT_IMAGE_GENERATIONS);
+});
+
+test("selected Grok generation config never borrows another provider's key or endpoint", () => {
+  assert.deepEqual(
+    getSelectedImageGenerationConfig({
+      imageRoute: "route-d",
+      baseUrl: "https://gpt.example.test/v1",
+      apiKey: "gpt-key",
+      directBaseUrl: "https://direct.example.test/v1",
+      directApiKey: "direct-key",
+      protocolBaseUrl: "https://gemini.example.test/v1",
+      protocolApiKey: "gemini-key",
+      grokBaseUrl: "https://grok.example.test/v1",
+      grokEndpointPath: API_ENDPOINT_IMAGE_EDITS,
+      grokApiKey: "grok-key",
+      grokImageModel: "custom-grok-image",
+    }),
+    {
+      imageRoute: IMAGE_ROUTE_D,
+      baseUrl: "https://grok.example.test/v1",
+      endpointPath: API_ENDPOINT_IMAGE_EDITS,
+      apiKey: "grok-key",
+      responsesModel: "custom-grok-image",
+      imageModel: "custom-grok-image",
+    },
+  );
 });
 
 test("model protocol config seeds missing protocol relay settings from existing route keys", () => {

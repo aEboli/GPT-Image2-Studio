@@ -445,7 +445,7 @@ test("a frozen plan does not promote derived legacy planning fields to overrides
   assert.match(generationBuilder, /const effectivePlan = getFrozenCreationEffectivePlan\(\)/);
   assert.match(generationBuilder, /if \(!effectivePlan\) \{/);
   assert.match(generationBuilder, /formData\.set\("ratio", refs\.creationRatioInput\.value/);
-  assert.match(generationBuilder, /formData\.set\("size", refs\.creationSizeInput\.value/);
+  assert.match(generationBuilder, /formData\.set\([\s\S]*"size",[\s\S]*normalizeSizeForSelectedRoute\([\s\S]*refs\.creationSizeInput\.value/);
 });
 
 test("automatic count stays derived while an explicit count survives frozen-plan previews", async () => {

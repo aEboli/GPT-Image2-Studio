@@ -80,26 +80,27 @@ Create keys in the OpenAI console for the official channel; compatible services 
 
 - From source: run `cmd /c npm start` and open `http://127.0.0.1:3600`.
 - Desktop app: launch `GPT-Image2-Studio`. The built-in service uses a dynamic loopback port, so there is no address to type.
-- Click **配置** (Configuration) in the top-right corner, or use the top navigation **配置 → 配置 API**. The first card in the panel is the call channel.
+- Click **配置** (Configuration) in the top-right corner, or use the top navigation **配置 → 配置 API**. The panel opens on the configuration sections.
 - The drawer header carries a `CN` / `EN` switch. Press `EN` once and the whole interface, including every label below, turns English.
 - Until a save succeeds, the top-right status stays on `配置未保存` (Configuration not saved).
 
 #### Step 3: pick one configuration section
 
-The drawer opens on a row of four mutually exclusive sections — **路由模式** (Route mode), **直连模式** (Direct mode), **Gemini**, and **主题** (Theme). Only the selected section's fields are shown; the other sections' controls stay hidden and disabled, including their Fetch Models buttons. The first three are the call channels; the fourth carries no connection fields at all.
+The drawer opens on four mutually exclusive sections: **GPT**, **Gemini**, **Grok**, and **配色** (Palette). Selecting GPT reveals a **路由模式** (Route mode) / **直连模式** (Direct mode) switch directly below the section row. Only the selected section's fields are shown; inactive connection controls and Fetch Models buttons stay disabled. Palette contains no connection fields.
 
-Each channel is stored independently, and only the selected one is used for generation. When in doubt, keep the default route mode.
+Each image route stores its connection settings independently, and only the active route is used for image generation. When in doubt, keep GPT's default Route mode.
 
 | Section | Fits a provider that | You fill in |
 | --- | --- | --- |
-| Route mode (default) | Supports `POST /responses` with the `image_generation` tool, such as OpenAI itself or a gateway aligned with it | Endpoint URL, API key, Responses model |
-| Direct mode | Only offers `images/generations` or `chat/completions`, or when image and text come from two different providers | Three image fields plus three text/vision fields |
+| GPT / Route mode (default) | Supports `POST /responses` with the `image_generation` tool, such as OpenAI itself or a gateway aligned with it | Endpoint URL, API key, Responses model |
+| GPT / Direct mode | Only offers `images/generations` or `chat/completions`, or when image and text come from two different providers | Independent image and text/vision settings |
 | Gemini | Serves Gemini image models over an OpenAI-compatible image-generation protocol | Base URL, API key, image model |
-| Theme | Not a call channel. Holds the interface palette instead | Nothing; selecting a channel section again restores the connection fields |
+| Grok | xAI or a gateway implementing the Grok Imagine image protocol | Base URL, API key, image endpoint, image model |
+| Palette | Not a call channel. Holds the interface palette instead | Nothing; selecting a provider section again restores the connection fields |
 
-Selecting **主题** hides the connection fields entirely and shows one standalone palette card with seven interface palettes. The options appear in a four-column grid, and each contains only a colour swatch and concise name. The default palette is `靛蓝` (Indigo); the other six are drawn from the Chinese traditional-colour catalogue. The selected palette is saved locally and mirrored to the embedded Temu workbench.
+Selecting **配色** hides the connection fields and shows seven concise palette swatches in a four-column grid. The default palette is `靛蓝` (Indigo); the other six are drawn from the Chinese traditional-colour catalogue. The selected palette is saved locally and mirrored to the embedded Temu workbench.
 
-Switching to **主题** and back does not change which call channel is active — the channel you last selected stays in effect, and the top-right status keeps reporting it.
+Switching to **配色** and back does not change the active image route; the top-right status keeps reporting that route.
 
 Long explanations are available from their hover/focus help markers; the configuration form and generation log scroll independently, while the log heading and section switch stay visible.
 
@@ -121,7 +122,7 @@ The Responses model is the outer model. The image tool model is chosen from the 
 | `gpt-image-2.5-sunburst` | Most capable; more precise editing, longer generation times. |
 | `gpt-image-2.5-flare` | Fast, high-quality everyday generation. |
 
-The prompt page parameter row also has a **质量** (quality) dropdown: `auto`, `low`, `medium`, `high` (default), plus `xhigh` and `max` — the last two exist only on the 2.5 models. Switching the tool model back to `gpt-image-2` while `xhigh`/`max` is selected clamps it down to `high` instead of sending a request the upstream would reject. Prompt-to-image also has an optional **透明背景** (transparent background) switch. It is available on the Route and Direct image routes only; enabling it forces PNG, sends `background=transparent`, and stores the choice with that queued prompt job. The Gemini/model-protocol route keeps the switch hidden and uses an opaque background.
+The prompt page parameter row also has a **质量** (quality) dropdown: `low`, `medium`, `high` (default), plus `xhigh` and `max`, which exist only on the 2.5 models. Switching back to `gpt-image-2` while `xhigh`/`max` is selected clamps quality to `high`. Grok offers only `low` and `medium`, defaulting to `medium`; quality selections are remembered separately for GPT, Gemini, and Grok. Legacy automatic values migrate to concrete defaults and are never offered as options or sent upstream. Prompt-to-image also has an optional **透明背景** (transparent background) switch on GPT's Route and Direct image routes. Enabling it forces PNG, sends `background=transparent`, and stores the choice with the queued job. Gemini and Grok keep this switch hidden and do not send a background parameter.
 
 **Direct mode** splits into two independent groups. The image group only generates and edits images; the text/vision group handles prompt enhancement, reference analysis, Listing drafts, and other model calls. The two groups can point at different providers:
 
@@ -130,13 +131,24 @@ Image API:       https://api.openai.com/v1   suffix images/generations   model g
 Text/vision API: https://api.openai.com/v1   suffix responses            model gpt-5.4-mini
 ```
 
-**Gemini.** The actual request is the base URL plus `/images/generations`:
+**Gemini.** The image endpoint suffix is fixed to `images/generations` and displayed in the same position as the GPT and Grok suffix controls:
 
 ```text
 Base URL:    https://api.vendor.example/v1
 API key:     <key from the provider>
 Image model: gemini-3.1-flash-image-preview
 ```
+
+**Grok.** Uses the xAI image-generation and editing JSON protocol with its own connection settings:
+
+```text
+Base URL:    https://api.x.ai/v1
+API key:     <xAI key or a compatible provider's key>
+Endpoint:    images/generations
+Image model: grok-imagine-image-2.0
+```
+
+Requests with references use `/images/edits`; one request accepts at most five reference images. The app maps the selected dimensions to `1k` or `2k`, matches unsupported ratios to the nearest supported Grok ratio, and sends only `low` or `medium` quality. Grok image calls omit GPT reasoning effort, output-format and background parameters, and do not support local mask editing. Text/vision planning continues through the separately configured GPT channel.
 
 If the provider gave you one complete address instead, press **完整 URL** (Full URL) next to the endpoint field and paste the whole thing, for example `https://vendor.example/v1/responses`. Studio splits it into a base URL and an endpoint suffix.
 
@@ -153,7 +165,7 @@ A passing connection test only proves that the credentials and the `/models` end
 
 #### Step 6: generate one image to confirm
 
-Close the panel, go back to **提示词生图** (Prompt-to-image), write one short prompt, choose the `1:1` ratio, leave the size on automatic, and generate. Progress shows on the preview stage; the full log lives in the `生成日志` (Activity log) panel at the bottom of the configuration drawer. A successful image is written to:
+Close the panel, go back to **提示词生图** (Prompt-to-image), write one short prompt, choose `1:1`, and use the concrete default resolution (`1024x1024` on GPT, `1K` on Gemini; Grok derives `1k` from the square default). Progress shows on the preview stage; the full log lives in the configuration drawer's `生成日志` (Generation log) panel, beside the fields on wide screens and below them on narrow screens. A successful image is written to:
 
 ```text
 %USERPROFILE%\Pictures\YYYY-MM\MM-DD\prompt\
@@ -180,11 +192,11 @@ The first-run walkthrough is in [Beginner API setup](#beginner-api-setup). Exist
 
 Each endpoint field carries a toggle that opens the list of endpoints you have already saved, so switching providers no longer overwrites the previous one. Selecting an entry fills that channel's endpoint URL, endpoint suffix, and matching key together — the key follows the address rather than being picked separately. The model is left alone, and **保存** (Save) still has to be pressed.
 
-- All four endpoint fields (route mode, direct image, direct text/vision, and Gemini) share one list, capped at 20 entries; the oldest is dropped past that.
+- The five endpoint fields (GPT Route, GPT Direct image, GPT Direct text/vision, Gemini, and Grok) have isolated lists, each capped at 20 entries. Saving or deleting an entry in one list never changes another list.
 - An entry's identity is "endpoint URL + key", so a second key for the same provider is a separate entry. A combination missing either part is not recorded, because it could not be restored as a set.
 - The suffix only follows along when the current channel actually offers that option, so a stored `responses` never overwrites the direct image channel's `images/generations`.
 - Each row shows the address above and `suffix · masked key` below, with a delete button that only removes it from the list and leaves the saved configuration untouched.
-- The list lives solely in browser `localStorage` (`image-studio-api-endpoint-book-v1`). Nothing is added to `.local/config.json`, `.env`, or `/api/config`; request payloads never carry it, and it is not shared with the desktop build or other browsers. Plaintext keys never reach the DOM — rows render the address and a mask only.
+- The lists live solely in browser `localStorage` (`image-studio-api-endpoint-books-v2`). Legacy v1 history is assigned only to GPT Route, not copied into every channel. Nothing is added to `.local/config.json`, `.env`, or `/api/config`; request payloads never carry these lists, and they are not shared with the desktop build or other browsers. Plaintext keys never reach the DOM; rows render only the address and a mask.
 
 Common endpoint suffixes:
 
@@ -201,6 +213,7 @@ Direct-call environment variables are split by purpose:
 | --- | --- |
 | `DIRECT_IMAGE_BASE_URL`, `DIRECT_IMAGE_API_KEY`, `DIRECT_IMAGE_ENDPOINT_PATH`, `DIRECT_IMAGE_MODEL` | Direct image-generation and editing channel |
 | `DIRECT_TEXT_BASE_URL`, `DIRECT_TEXT_API_KEY`, `DIRECT_TEXT_ENDPOINT_PATH`, `DIRECT_TEXT_MODEL` | Direct text/vision analysis channel |
+| `GROK_BASE_URL`, `GROK_API_KEY`, `GROK_ENDPOINT_PATH`, `GROK_IMAGE_MODEL` | Independent Grok image-generation and editing channel |
 | `DIRECT_BASE_URL`, `DIRECT_API_KEY`, `DIRECT_ENDPOINT_PATH`, `DIRECT_RESPONSES_MODEL` | Legacy fallback accepted for existing configurations |
 
 ### Environment variables
@@ -221,6 +234,10 @@ DIRECT_TEXT_BASE_URL=https://api.openai.com/v1
 DIRECT_TEXT_API_KEY=
 DIRECT_TEXT_ENDPOINT_PATH=responses
 DIRECT_TEXT_MODEL=gpt-5.4-mini
+GROK_BASE_URL=https://api.x.ai/v1
+GROK_API_KEY=
+GROK_ENDPOINT_PATH=images/generations
+GROK_IMAGE_MODEL=grok-imagine-image-2.0
 HOST=
 PORT=3600
 IMAGE_STUDIO_OUTPUT_DIR=
@@ -277,7 +294,7 @@ The repository also contains a Vercel configuration. Vercel functions use tempor
 - Separate records for Creation sets, portraits, article illustrations, and PPT decks.
 - Background queue status, progress, structured errors, and retry of failed items.
 - Prompt Kit, Prompt Agent image-to-prompt output, Logo library, portrait outfit/prop library, and model selection controls.
-- A four-section configuration drawer (route mode, direct mode, Gemini, theme) with hover/focus help markers, a fixed independently scrolling generation log, and seven interface palettes shown four per row.
+- A compact GPT / Gemini / Grok / Palette configuration drawer, with GPT's Route / Direct switch directly below the section row, isolated API history, aligned endpoint fields, hover/focus help, and an independently scrolling generation log. Seven interface palettes are shown four per row.
 - Dark/light themes, Chinese/English UI, and responsive desktop, tablet, and mobile layouts.
 
 ## Interface preview
@@ -392,9 +409,9 @@ Generated content still needs human review for factual accuracy, brand rules, po
 
 ### Aspect ratios and pixel sizes
 
-Route mode and direct-call mode share the pixel candidates below. `Auto` resolves to the base size for the selected ratio; the middle column lists the remaining explicit candidates in UI order, excluding the base and largest values.
+GPT's Route and Direct modes share the explicit pixel candidates below. The first candidate is the default for the selected ratio; no automatic resolution option is displayed or sent. The middle column lists the other candidates in UI order, excluding the default and largest values.
 
-| Ratio | Typical use | Base size (`Auto`) | Other candidates | Largest |
+| Ratio | Typical use | Default size | Other candidates | Largest |
 | --- | --- | --- | --- | --- |
 | `1:1` | Ecommerce hero images, avatars, social posts | `1024x1024` | `1536x1536`, `2048x2048`, `2560x2560` | `2880x2880` |
 | `4:3` | Slides, in-page web imagery | `1360x1024` | `2048x1536`, `2720x2048` | `3312x2480` |
@@ -412,23 +429,25 @@ Route mode and direct-call mode share the pixel candidates below. `Auto` resolve
 | `3:1` | Ultra-wide advertising images | `3072x1024` | none | `3840x1280` |
 | `1:3` | Ultra-tall advertising images | `1024x3072` | none | `1280x3840` |
 
-Two details are easy to misread. The `21:9` and `9:21` lists are not sorted by pixel count: their `720P` candidate (`1680x720` / `720x1680`) sits after the base size in the UI but is smaller than it. And `3:1` and `1:3` genuinely offer only three choices each (`Auto`, the base size, and the largest), so their middle column is empty rather than incomplete.
+Two details are easy to misread. The `21:9` and `9:21` lists are not sorted by pixel count: their `720P` candidate (`1680x720` / `720x1680`) sits after the default in the UI but is smaller than it. And `3:1` and `1:3` offer only two choices each (the default and largest), so their middle column is empty rather than incomplete.
 
-### How size differs across the three channels
+### How size differs across image routes
 
-| Channel | Protocol | Size values the app sends | Automatic value | Constraint to know |
+| Channel | Protocol | Size values the app sends | Concrete default | Constraint to know |
 | --- | --- | --- | --- | --- |
 | Route mode | Responses API plus the image tool | The explicit ratio-bound pixels above | Base size for the current ratio | The UI offers only the `responses` suffix, and the upstream can still adjust delivered pixels. Image editing is the exception: it always posts to `images/edits` and ignores the configured suffix |
 | Direct mode | `images/generations`, `responses`, or `chat/completions` | The same explicit pixels as route mode | Base size for the current ratio | Compatibility depends on the gateway and model; edit requests may be rerouted to `images/edits` |
 | Gemini | Gemini image generation, or a `chat/completions`-compatible shape for non-Gemini models | `512`, `1K`, `2K`, `4K` | `1K` | These are tiers, not promised pixel counts; the default model identifier is an app default, not proof the provider serves it, and some models or gateways reject references, ratios, or `4K` |
+| Grok | xAI JSON `images/generations` / `images/edits` | `resolution: 1k` or `2k`, plus a supported `aspect_ratio` | Derived from the current ratio's explicit default dimensions | Requested pixels are not sent as `size`; references are limited to five, quality to `low` / `medium`, and local masks are unsupported |
 
-Three consequences of that split are worth knowing before you pick a ratio:
+The following constraints are worth knowing before you pick a ratio:
 
 - **A size is only legal for its own ratio.** The requested pixels must be one of the candidates listed for the selected ratio; anything else is rejected before the upstream call with `当前比例 <ratio> 不支持分辨率 <size>` ("the current ratio does not support that resolution"). That is why `1:1` will not accept `1824x1024` even though `16:9` offers it.
-- **Switching the call channel resets a non-default size.** Pixel values and tier values share no members, so a saved `2048x2048` becomes `Auto` the moment you switch to the Gemini channel, and a saved `4K` becomes `Auto` when you switch back.
+- **Switching between pixel and tier routes resolves an incompatible size to a concrete default.** A saved `2048x2048` becomes `1K` on Gemini; a saved `4K` becomes the selected ratio's default pixels on GPT. Legacy automatic values follow the same normalization.
 - **The Gemini image path supports 10 of the 15 ratios.** It accepts `1:1`, `2:3`, `3:2`, `3:4`, `4:3`, `4:5`, `5:4`, `9:16`, `16:9`, and `21:9`. The other five are substituted with the closest supported ratio that keeps the requested orientation: `2:1` and `3:1` become `16:9` and `21:9`; `1:2`, `9:21`, and `1:3` become `9:16`. On this channel the delivered shape is therefore close to your request rather than exact, and it stays landscape or portrait as asked.
 - **Quality, output format, and transparent backgrounds never reach the Gemini image path.** The request body only carries `aspectRatio` and `imageSize`; PNG vs JPG, the High quality control, and the prompt background switch have no effect here.
-- **Transparent prompt backgrounds are supported on Route and Direct image routes only.** The control is hidden for the Gemini/model-protocol route, and those prompt jobs stay opaque.
+- **Transparent prompt backgrounds are supported on GPT Route and Direct image routes only.** The control is hidden for Gemini and Grok, and their requests omit the background parameter.
+- **Grok uses its own image controls.** Image requests send only `low` / `medium` quality and `1k` / `2k` resolution, never GPT reasoning effort. Quality and reasoning remain independent for GPT text/vision planning.
 - **The Gemini image body is selected by the model name, not by the channel.** The name must contain `gemini` plus one of `image`, `banana`, `图像`, or `生图`. Any other model on this channel is posted to `chat/completions` with neither size nor ratio.
 
 ### Workflow limits
@@ -437,7 +456,7 @@ The UI exposes conservative application candidates, not a guarantee from every u
 
 | Area | Current application boundary |
 | --- | --- |
-| Prompt references | Up to 15 images; a session has up to 15 parallel task slots |
+| Prompt references | Up to 15 images, or five on Grok; a session has up to 15 parallel task slots |
 | Style transfer | One source image plus one style reference or built-in preset |
 | Image-edit masks | Each local mask is limited to 50 MB and normalized to the source dimensions |
 | Ecommerce SKU plans | New plans use one subject per SKU bundle; frozen plans are limited to 64 items and 4 MiB serialized size |
@@ -445,9 +464,9 @@ The UI exposes conservative application candidates, not a guarantee from every u
 | PPT pages | 1-20 pages; the default is 8 |
 | Output formats | PNG or JPG for generated images; prompt jobs on Route/Direct can request a transparent PNG; browser compression can also produce WebP |
 
-Large images, high resolutions, and large batches increase browser memory use and the chance of upstream timeouts or rate limits. Start with an automatic or medium size and a small batch, then increase scale after the selected channel is proven compatible.
+Large images, high resolutions, and large batches increase browser memory use and the chance of upstream timeouts or rate limits. Start with the selected route's explicit default size and a small batch, then increase scale after compatibility is proven.
 
-Creation, Portrait, Article Illustration, and PPT each expose their own reasoning-effort and image-quality selectors. The selected reasoning value is sent to planning and generation, while quality is normalized against the active image model (`xhigh` and `max` are available only on the 2.5 image models). A queued set or deck keeps its values for generation, repair, missing-slide completion, and slide editing. Creation keeps the SKU generation rule editable while new plans use a fixed one-subject SKU count.
+Creation, Portrait, Article Illustration, and PPT each expose independent reasoning-effort and image-quality selectors. GPT planning retains its reasoning setting, while Grok image calls and their saved metadata omit GPT-only reasoning. Quality is normalized for the selected route and model (`xhigh` / `max` only on GPT 2.5 image models; `low` / `medium` on Grok). A queued set or deck keeps its effective values for generation, repair, missing-slide completion, and slide editing. Creation keeps the SKU generation rule editable while new plans use a fixed one-subject SKU count.
 
 ## Project structure
 
@@ -511,12 +530,17 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 
 Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.18](./docs/releases/v0.2.18.md).
 
-### Unreleased
+### v0.2.19
+
+- Added Grok image generation and reference-image editing with independent xAI connection settings, five-reference validation, and provider-specific request parameters.
+- Grok quality is limited to `low` / `medium` (default `medium`); GPT reasoning never leaks into Grok image calls, task snapshots, or saved image metadata. API histories and quality choices are isolated by route.
+- Removed automatic quality and resolution options throughout the workbench. Existing values normalize to concrete defaults before display, queueing, storage, and upstream requests.
+- Unified the configuration sections as GPT / Gemini / Grok / Palette, with Route / Direct nested under GPT. Refined spacing, aligned fields and the Gemini endpoint, and shortened controls and log labels with full-value tooltips.
 
 - Creation, Portrait, Article Illustration, and PPT now expose independent reasoning-effort and quality controls. Plans, queued operations, repairs, missing-slide completion, and slide edits retain the selected values, with quality clamped to the active image model.
 - Prompt-to-image can request a transparent background on the Route and Direct image routes. The choice is captured per job, forces PNG output, and is recorded in saved metadata; the Gemini/model-protocol route keeps the control hidden.
 - New Creation plans use a fixed one-subject SKU count while the SKU generation rule remains editable.
-- The Theme section now shows seven concise palette swatches in a four-column grid. Custom colour roles and floral ornaments were removed, and the default palette is `靛蓝` (Indigo).
+- The Palette section now shows seven concise palette swatches in a four-column grid. Custom colour roles and floral ornaments were removed, and the default palette is `靛蓝` (Indigo).
 
 ### v0.2.18
 
@@ -545,7 +569,7 @@ Full notes, hashes, and verification records live on [GitHub Releases](https://g
 ### v0.2.15
 
 - Route mode's image tool model is selectable: `gpt-image-2` (default), `gpt-image-2.5-sunburst`, and `gpt-image-2.5-flare`. It used to be hardcoded, and the record entries reported a model that was never actually used.
-- Output quality is selectable and clamped to what the model supports: `auto`, `low`, `medium`, `high`, plus `xhigh` and `max` on the 2.5 variants. Quality is now submitted per request instead of read from the config default only.
+- Output quality is selectable and clamped to what the model supports: `low`, `medium`, and `high`, plus `xhigh` and `max` on the 2.5 variants. Grok exposes only `low` and `medium`; legacy automatic values are migrated to a concrete default and are never sent upstream. Quality is submitted per request instead of read from the config default only.
 - Endpoints and keys you have used are kept in a reusable list in browser local storage, so switching providers no longer overwrites the previous key. Selecting an entry restores address, suffix, and key as one set.
 - The palette was retuned within the Chinese traditional color library: a lighter night ground with three surface steps, a paper-toned day theme with real card boundaries, desaturated accents, and control outlines lifted to the WCAG 3:1 floor.
 - The product image collector extension moved to `1.1.33`; the collector, panel, and launcher now stay in one isolated world, so reads no longer time out waiting on background messaging.

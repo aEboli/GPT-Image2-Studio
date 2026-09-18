@@ -222,3 +222,35 @@ test("request private config lets model protocol requests reuse an existing rout
   assert.equal(config.protocolApiKey, "browser-route-key");
   assert.equal(config.protocolImageModel, "gemini-3.1-flash-image-preview");
 });
+
+test("request private config keeps Grok settings and credentials isolated", () => {
+  const fallback = {
+    imageRoute: "a",
+    baseUrl: "https://route-a-server.example.test/v1",
+    apiKey: "server-a-key",
+    directBaseUrl: "https://route-b-server.example.test/v1",
+    directApiKey: "server-b-key",
+    protocolBaseUrl: "https://gemini-server.example.test/v1",
+    protocolApiKey: "server-gemini-key",
+    grokBaseUrl: "https://grok-server.example.test/v1",
+    grokEndpointPath: "images/generations",
+    grokApiKey: "server-grok-key",
+    grokImageModel: "server-grok-model",
+  };
+  const config = mergeRequestPrivateConfig({
+    imageRoute: "d",
+    grokBaseUrl: "https://grok-browser.example.test/v1/images/edits",
+    grokEndpointPath: "images/edits",
+    grokApiKey: "browser-grok-key",
+    grokImageModel: "browser-grok-model",
+  }, fallback);
+
+  assert.equal(config.imageRoute, "d");
+  assert.equal(config.grokBaseUrl, "https://grok-browser.example.test/v1");
+  assert.equal(config.grokEndpointPath, "images/edits");
+  assert.equal(config.grokApiKey, "browser-grok-key");
+  assert.equal(config.grokImageModel, "browser-grok-model");
+  assert.equal(config.apiKey, "server-a-key");
+  assert.equal(config.directApiKey, "server-b-key");
+  assert.equal(config.protocolApiKey, "server-gemini-key");
+});

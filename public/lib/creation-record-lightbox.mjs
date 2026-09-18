@@ -1,4 +1,6 @@
 import { buildParameterText } from "./studio-formatters.mjs";
+import { normalizeStoredImageQuality } from "./image-quality-options.mjs";
+import { getDefaultGenerationSize, getDefaultModelProtocolImageSize } from "./generation-size-options.mjs";
 
 function getNow(nowIso) {
   return typeof nowIso === "function" ? nowIso() : new Date().toISOString();
@@ -8,21 +10,37 @@ function cleanString(value) {
   return String(value || "").trim();
 }
 
+function normalizeSnapshotSize(value, { imageRoute = "", ratio = "" } = {}) {
+  const normalized = cleanString(value);
+  if (normalized && normalized.toLowerCase() !== "auto") {
+    return normalized;
+  }
+  return cleanString(imageRoute).toLowerCase() === "c"
+    ? getDefaultModelProtocolImageSize()
+    : getDefaultGenerationSize(ratio || "4:5");
+}
+
 export function normalizeCreationGenerationSnapshotForView(item = {}) {
+  const imageRoute = item.imageRoute || item.image_route || item.generationRoute;
+  const ratio = item.ratio || item.aspectRatio;
+  const effectiveSize = normalizeSnapshotSize(item.effectiveSize || item.effective_size || item.size, { imageRoute, ratio });
   const normalized = {
     generationPrompt: cleanString(item.generationPrompt || item.generation_prompt),
     baseUrl: cleanString(item.baseUrl || item.base_url),
-    imageRoute: cleanString(item.imageRoute || item.image_route || item.generationRoute),
+    imageRoute: cleanString(imageRoute),
     responsesModel: cleanString(item.responsesModel || item.responses_model),
     imageModel: cleanString(item.imageModel || item.image_model),
     endpointPath: cleanString(item.endpointPath || item.endpoint_path),
     ratioLabel: cleanString(item.ratioLabel || item.ratio_label),
-    requestedSize: cleanString(item.requestedSize || item.requested_size),
-    effectiveSize: cleanString(item.effectiveSize || item.effective_size || item.size),
+    requestedSize: normalizeSnapshotSize(item.requestedSize || item.requested_size, { imageRoute, ratio }),
+    effectiveSize,
     actualSize: cleanString(item.actualSize || item.actual_size),
-    size: cleanString(item.size),
+    size: normalizeSnapshotSize(item.size || effectiveSize, { imageRoute, ratio }),
     format: cleanString(item.format),
-    quality: cleanString(item.quality),
+    quality: normalizeStoredImageQuality(item.quality, {
+      imageRoute,
+      imageModel: item.imageModel || item.image_model,
+    }),
     reasoningEffort: cleanString(item.reasoningEffort || item.reasoning_effort),
     referenceImageNames: Array.isArray(item.referenceImageNames)
       ? item.referenceImageNames.map(cleanString).filter(Boolean)

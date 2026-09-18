@@ -87,6 +87,24 @@ test("generation queue starts queued prompt jobs independently per route", () =>
   );
 });
 
+test("Grok route D has an independent generation queue", () => {
+  const routeARunningJobs = Array.from({ length: 15 }, (_, index) => ({
+    id: `route-a-running-${index}`,
+    mode: "prompt",
+    imageRoute: "a",
+    started: true,
+    isRunning: true,
+  }));
+  const grokQueuedJob = { id: "grok-queued", mode: "prompt", imageRoute: "grok", started: false, isRunning: false };
+  const jobs = [grokQueuedJob, ...routeARunningJobs];
+
+  assert.equal(generationQueue.getGenerationJobQueueKey(grokQueuedJob), "prompt:d");
+  assert.deepEqual(
+    generationQueue.selectNextQueuedGenerationJobsByMode(jobs, 15).map((job) => job.id),
+    ["grok-queued"],
+  );
+});
+
 test("generation queue accepts a per-mode parallel limit", () => {
   const promptRunningJobs = Array.from({ length: 5 }, (_, index) => ({
     id: `prompt-running-${index}`,

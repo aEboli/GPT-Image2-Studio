@@ -31,12 +31,20 @@ function createElement(documentRef, tagName, className, textContent = "") {
   return element;
 }
 
+function preserveFullValue(element, value) {
+  const text = cleanText(value);
+  if (element && text) {
+    element.title = text;
+  }
+  return element;
+}
+
 function appendRelay(documentRef, main, relayUrl) {
   const relayText = formatGenerationLogRelayText(relayUrl);
   if (!relayText) {
     return false;
   }
-  main.appendChild(createElement(documentRef, "span", "timeline-relay", relayText));
+  main.appendChild(preserveFullValue(createElement(documentRef, "span", "timeline-relay", relayText), relayText));
   return true;
 }
 
@@ -78,7 +86,9 @@ function createEntryRow(documentRef, entry, { showChannelLabel, formatTime, isCh
   const copy = createElement(documentRef, "div", "timeline-copy");
   const displayText = getGenerationActivityDisplayText(entry.detail);
   const main = createElement(documentRef, "span", "timeline-main");
-  main.appendChild(createElement(documentRef, "span", "timeline-summary", displayText.summary || cleanText(entry.title)));
+  const summary = createElement(documentRef, "span", "timeline-summary", displayText.summary || cleanText(entry.title));
+  preserveFullValue(summary, displayText.summary || cleanText(entry.title));
+  main.appendChild(summary);
   if (showChannelLabel) {
     const channelLabel = getGenerationLogChannelLabel(entry.channel);
     if (channelLabel) {
@@ -93,6 +103,7 @@ function createEntryRow(documentRef, entry, { showChannelLabel, formatTime, isCh
   if (cleanText(entry.imageUrl)) {
     row.classList.add("has-url");
     const link = createElement(documentRef, "a", "timeline-url", cleanText(entry.imageUrl));
+    preserveFullValue(link, cleanText(entry.imageUrl));
     link.href = cleanText(entry.imageUrl);
     link.target = "_blank";
     link.rel = "noopener noreferrer";
@@ -101,7 +112,9 @@ function createEntryRow(documentRef, entry, { showChannelLabel, formatTime, isCh
 
   if (displayText.detail) {
     row.classList.add("has-detail");
-    copy.appendChild(createElement(documentRef, "p", "timeline-detail", displayText.detail));
+    const detail = createElement(documentRef, "p", "timeline-detail", displayText.detail);
+    preserveFullValue(detail, displayText.detail);
+    copy.appendChild(detail);
   }
 
   row.appendChild(copy);
@@ -124,7 +137,8 @@ function createGroupRow(documentRef, group, { showChannelLabel, formatTime, expa
   toggle.setAttribute(GENERATION_LOG_GROUP_TOGGLE_ATTRIBUTE, cleanText(group.groupId));
   toggle.setAttribute("aria-expanded", String(Boolean(expanded)));
   toggle.appendChild(createElement(documentRef, "span", "timeline-group-caret", expanded ? "▾" : "▸"));
-  toggle.appendChild(createElement(documentRef, "span", "timeline-summary", cleanText(group.groupLabel) || "生成批次"));
+  const groupLabel = cleanText(group.groupLabel) || "生成批次";
+  toggle.appendChild(preserveFullValue(createElement(documentRef, "span", "timeline-summary", groupLabel), groupLabel));
   main.appendChild(toggle);
   if (showChannelLabel) {
     const channelLabel = getGenerationLogChannelLabel(group.channel);
@@ -132,14 +146,8 @@ function createGroupRow(documentRef, group, { showChannelLabel, formatTime, expa
       main.appendChild(createElement(documentRef, "span", "timeline-channel", channelLabel));
     }
   }
-  main.appendChild(
-    createElement(
-      documentRef,
-      "span",
-      "timeline-group-summary",
-      formatGenerationLogGroupSummary(group, cleanText(group.groupUnit) || DEFAULT_GENERATION_LOG_GROUP_UNIT),
-    ),
-  );
+  const groupSummary = formatGenerationLogGroupSummary(group, cleanText(group.groupUnit) || DEFAULT_GENERATION_LOG_GROUP_UNIT);
+  main.appendChild(preserveFullValue(createElement(documentRef, "span", "timeline-group-summary", groupSummary), groupSummary));
   if (appendRelay(documentRef, main, group.relayUrl)) {
     row.classList.add("has-relay");
   }
@@ -204,7 +212,7 @@ export function renderGenerationLogRows(
 /* 板块切换：日志面板只有配置区那一个，靠这排标签把各板块的条目彼此隔开。 */
 export function renderGenerationLogChannelTabs(
   host,
-  { channels = [], activeChannel = GENERATION_LOG_ALL_CHANNELS, getChannelLabel = () => "", allLabel = "全部板块", documentRef = null } = {},
+  { channels = [], activeChannel = GENERATION_LOG_ALL_CHANNELS, getChannelLabel = () => "", allLabel = "全部", documentRef = null } = {},
 ) {
   if (!host) {
     return host;

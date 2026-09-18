@@ -39,7 +39,7 @@ test("generation log channels are normalized and unknown channels fall back to p
   assert.equal(normalizeGenerationLogChannel("image-edit"), "image-edit");
   assert.equal(normalizeGenerationLogChannel(""), DEFAULT_GENERATION_LOG_CHANNEL);
   assert.equal(normalizeGenerationLogChannel("gallery"), DEFAULT_GENERATION_LOG_CHANNEL);
-  assert.equal(getGenerationLogChannelLabel("quick-blend"), "快速溶图");
+  assert.equal(getGenerationLogChannelLabel("quick-blend"), "溶图");
   assert.equal(isGenerationLogBatchChannel("creation"), true);
   assert.equal(isGenerationLogBatchChannel("portrait"), true);
   assert.equal(isGenerationLogBatchChannel("prompt"), false);

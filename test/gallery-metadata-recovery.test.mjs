@@ -58,6 +58,14 @@ test("gallery metadata recovery stores only meaningful metadata fields in cache 
   });
 });
 
+test("gallery metadata recovery migrates legacy quality values by route", () => {
+  const grokEntry = buildGalleryMetadataCacheEntry({ imageRoute: "d", quality: "auto" });
+  const gptEntry = buildGalleryMetadataCacheEntry({ imageRoute: "a", quality: "auto" });
+
+  assert.equal(grokEntry.quality, "medium");
+  assert.equal(gptEntry.quality, "high");
+});
+
 test("gallery metadata recovery fills missing server fields from local cache without overriding non-empty values", () => {
   const serverItem = {
     filename: "sample.jpeg",

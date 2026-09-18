@@ -1,7 +1,6 @@
 import { getImageUrl, fetchServerImageAsDataUrl } from "../browser-image-cache.mjs";
 import { sortGalleryItemsByCreatedAtDesc } from "../gallery-organizer.mjs";
-import { getDefaultGenerationSize, normalizeGenerationSize } from "../generation-size-options.mjs";
-import { normalizeImageQuality } from "../image-quality-options.mjs";
+import { normalizeGenerationSize } from "../generation-size-options.mjs";
 import { DEFAULT_RESPONSES_MODEL, normalizeImageToolModel } from "../model-defaults.mjs";
 import { normalizeOutputFormat } from "../output-format-options.mjs";
 import { getPreviewPlaceholderState } from "../preview-placeholder-state.mjs";
@@ -98,9 +97,14 @@ export function createQuickBlendController(options = {}) {
     getDisplayPrompt = (item) => String(item?.prompt || ""),
     getGenerationLoadingItemStage = (item) => String(item?.statusStage || item?.stage || item?.status || "").trim(),
     getGenerationReferenceFile,
+    getCurrentPrivateConfigRequestPayload = () => state?.config || {},
     getMaxParallelJobCount = () => 1,
     getQueuedJobCount = () => 0,
     getRatioOption,
+    getSelectedImageGenerationConfig = (config) => config || {},
+    getSelectedImageQuality = () => "high",
+    getSelectedImageReasoningEffort = () => "",
+    getSelectedImageRoute = () => "a",
     makeGalleryPreviewKey = (filename) => "file:" + filename,
     makeJobPreviewKey = (jobId) => "job:" + jobId,
     nowIso = () => new Date().toISOString(),
@@ -112,7 +116,7 @@ export function createQuickBlendController(options = {}) {
     renderRatioGrid,
     renderSizeOptions,
     resolveGenerationSizeForSelectedRoute = (ratioOption, sizeSetting) =>
-      sizeSetting === "auto" ? ratioOption?.baseSize || getDefaultGenerationSize(ratioOption?.value) : sizeSetting,
+      normalizeGenerationSize(ratioOption?.value, sizeSetting),
     revokeReferencePreview = () => {},
     scheduleGenerationQueue = () => {},
     setActiveView = () => {},
@@ -484,27 +488,31 @@ function createQuickBlendJobs() {
   syncQuickBlendLayoutOptions();
   const ratioOption = getRatioOption(refs.quickBlendRatioInput?.value || DEFAULT_QUICK_BLEND_RATIO);
   const ratioValue = ratioOption?.value || DEFAULT_QUICK_BLEND_RATIO;
-  const sizeSetting = normalizeSizeForSelectedRoute(ratioValue, refs.quickBlendSizeInput?.value || "auto");
+  const sizeSetting = normalizeSizeForSelectedRoute(ratioValue, refs.quickBlendSizeInput?.value);
   const size = resolveGenerationSizeForSelectedRoute(ratioOption, sizeSetting);
-  const baseUrlValue = String(state.config?.baseUrl || refs.baseUrlInput?.value || "").trim();
-  const responsesModelValue = String(state.config?.responsesModel || refs.responsesModelInput?.value || DEFAULT_RESPONSES_MODEL).trim();
+  const generationConfig = getSelectedImageGenerationConfig(getCurrentPrivateConfigRequestPayload());
+  const imageRoute = generationConfig.imageRoute || getSelectedImageRoute();
+  const baseUrlValue = String(generationConfig.baseUrl || state.config?.baseUrl || refs.baseUrlInput?.value || "").trim();
+  const responsesModelValue = String(generationConfig.responsesModel || state.config?.responsesModel || refs.responsesModelInput?.value || DEFAULT_RESPONSES_MODEL).trim();
   const outputFormatValue = refs.outputFormatInput?.value || state.config?.defaults?.format || "png";
-  const reasoningEffortValue = refs.reasoningEffortInput?.value || state.config?.defaults?.reasoningEffort || "xhigh";
+  const reasoningEffortValue = getSelectedImageReasoningEffort();
 
   return getQuickBlendPairs().filter((pair) => pair.a && pair.b).map((pair, index) => ({
     id: `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     createdAt: nowIso(),
     mode: "quick-blend",
+    imageRoute,
+    generationRoute: imageRoute,
     prompt: `快速溶图 ${index + 1}`,
     ratio: ratioValue,
     ratioLabel: ratioOption?.label || DEFAULT_QUICK_BLEND_RATIO,
     sizeSetting,
     size,
-    quality: normalizeImageQuality(state.config?.defaults?.quality, { imageModel: normalizeImageToolModel(state.config?.imageToolModel) }),
+    quality: getSelectedImageQuality(),
     format: normalizeOutputFormat(outputFormatValue),
     baseUrl: baseUrlValue,
     responsesModel: responsesModelValue || DEFAULT_RESPONSES_MODEL,
-    imageModel: normalizeImageToolModel(state.config?.imageToolModel),
+    imageModel: generationConfig.imageModel || normalizeImageToolModel(state.config?.imageToolModel),
     reasoningEffort: reasoningEffortValue,
     requestRetryCount: 0,
     quickBlendPairIndex: String(index + 1),
@@ -547,7 +555,7 @@ function renderQuickBlendSizeOptions() {
 
 function syncQuickBlendSize(value) {
   const ratioValue = refs.quickBlendRatioInput.value || DEFAULT_QUICK_BLEND_RATIO;
-  refs.quickBlendSizeInput.value = normalizeSizeForSelectedRoute(ratioValue, value || "auto");
+  refs.quickBlendSizeInput.value = normalizeSizeForSelectedRoute(ratioValue, value);
 }
 
 function renderQuickBlendPairList() {

@@ -1,3 +1,6 @@
+import { getDefaultGenerationSize, getDefaultModelProtocolImageSize } from "./generation-size-options.mjs";
+import { normalizeStoredImageQuality } from "./image-quality-options.mjs";
+
 const STRING_METADATA_FIELDS = [
   "prompt",
   "createdAt",
@@ -32,6 +35,16 @@ function normalizeString(value) {
   return String(value || "").trim();
 }
 
+function normalizeRecoveredImageSize(value, item = {}) {
+  const normalized = normalizeString(value);
+  if (normalized.toLowerCase() !== "auto") {
+    return normalized;
+  }
+  return String(item.imageRoute || "").trim().toLowerCase() === "c"
+    ? getDefaultModelProtocolImageSize()
+    : getDefaultGenerationSize(item.ratio || "4:5");
+}
+
 function normalizeStringArray(values) {
   if (!Array.isArray(values)) {
     return [];
@@ -50,7 +63,11 @@ export function buildGalleryMetadataCacheEntry(item = {}) {
   for (const field of STRING_METADATA_FIELDS) {
     const value = normalizeString(item[field]);
     if (value) {
-      entry[field] = value;
+      entry[field] = field === "quality"
+        ? normalizeStoredImageQuality(value, { imageRoute: item.imageRoute, imageModel: item.imageModel })
+        : field === "size"
+          ? normalizeRecoveredImageSize(value, item)
+          : value;
     }
   }
 
@@ -88,8 +105,14 @@ export function mergeGalleryItemWithCachedMetadata(item = {}, cachedEntry = {}) 
   for (const field of STRING_METADATA_FIELDS) {
     const currentValue = normalizeString(item[field]);
     const cachedValue = normalizeString(cachedEntry[field]);
-    merged[field] = currentValue || cachedValue || "";
+    merged[field] = field === "size"
+      ? normalizeRecoveredImageSize(currentValue || cachedValue, { ...cachedEntry, ...item })
+      : currentValue || cachedValue || "";
   }
+  merged.quality = normalizeStoredImageQuality(merged.quality, {
+    imageRoute: merged.imageRoute,
+    imageModel: merged.imageModel,
+  });
 
   const currentReferenceNames = normalizeStringArray(item.referenceImageNames);
   const cachedReferenceNames = normalizeStringArray(cachedEntry.referenceImageNames);
@@ -119,7 +142,15 @@ export function collectGalleryMetadataRepairPatch(sourceItem = {}, recoveredItem
 
   for (const field of STRING_METADATA_FIELDS) {
     if (!hasMeaningfulString(sourceItem[field]) && hasMeaningfulString(recoveredItem[field])) {
-      patch[field] = normalizeString(recoveredItem[field]);
+      patch[field] = field === "size"
+        ? normalizeRecoveredImageSize(recoveredItem[field], recoveredItem)
+        : normalizeString(recoveredItem[field]);
+      if (field === "quality") {
+        patch[field] = normalizeStoredImageQuality(patch[field], {
+          imageRoute: recoveredItem.imageRoute || sourceItem.imageRoute,
+          imageModel: recoveredItem.imageModel || sourceItem.imageModel,
+        });
+      }
     }
   }
 

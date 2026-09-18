@@ -24,16 +24,16 @@ export const GENERATION_LOG_CHANNELS = [
 export const GENERATION_LOG_BATCH_CHANNELS = ["creation", "portrait", "article-illustration", "ppt"];
 
 export const GENERATION_LOG_CHANNEL_LABELS = {
-  prompt: "提示词生图",
+  prompt: "提示词",
   "style-transfer": "风格迁移",
   "image-edit": "图片编辑",
-  "quick-blend": "快速溶图",
+  "quick-blend": "溶图",
   "image-decomposition": "图片拆解",
-  "reference-analysis": "融图分析",
-  creation: "套图模式",
-  portrait: "写真模式",
+  "reference-analysis": "融图",
+  creation: "套图",
+  portrait: "写真",
   "article-illustration": "文章插图",
-  ppt: "PPT生成",
+  ppt: "PPT",
 };
 
 const GENERATION_LOG_STATUSES = ["active", "done", "error", "pending"];

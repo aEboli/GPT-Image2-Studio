@@ -74,6 +74,16 @@ test("generation task store records completion and returns immutable snapshots",
   assert.equal(store.listTasks("session-a")[0].item.filename, "generated.png");
 });
 
+test("generation task snapshots migrate legacy quality values by route", () => {
+  const store = createGenerationTaskStore();
+  store.upsertTask("session-a", { id: "grok-job", imageRoute: "d", quality: "auto" });
+  store.upsertTask("session-a", { id: "gpt-job", imageRoute: "a", quality: "auto" });
+
+  const snapshots = store.listTasks("session-a");
+  assert.equal(snapshots.find((task) => task.id === "grok-job").quality, "medium");
+  assert.equal(snapshots.find((task) => task.id === "gpt-job").quality, "high");
+});
+
 test("generation task store records errors with a compact public status", () => {
   const store = createGenerationTaskStore();
 

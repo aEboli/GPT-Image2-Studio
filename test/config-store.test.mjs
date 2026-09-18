@@ -28,6 +28,11 @@ test("config store returns empty public config before any save", async () => {
   assert.equal(config.protocolApiKeyConfigured, false);
   assert.equal(config.protocolApiKeyMask, undefined);
   assert.equal(config.protocolImageModel, "gemini-3.1-flash-image-preview");
+  assert.equal(config.grokBaseUrl, "https://api.x.ai/v1");
+  assert.equal(config.grokEndpointPath, "images/generations");
+  assert.equal(config.grokApiKeyConfigured, false);
+  assert.equal(config.grokApiKeyMask, undefined);
+  assert.equal(config.grokImageModel, "grok-imagine-image-2.0");
   assert.deepEqual(config.defaults, {
     size: "1024x1280",
     quality: "high",
@@ -66,6 +71,10 @@ test("config store uses local environment variables as defaults before any save"
       PROTOCOL_API_KEY: "env-protocol-key-1234567890",
       PROTOCOL_BASE_URL: "https://env-protocol.example.com/v1/images/generations",
       PROTOCOL_IMAGE_MODEL: "env-protocol-image",
+      GROK_API_KEY: "env-grok-key-1234567890",
+      GROK_BASE_URL: "https://env-grok.example.com/v1/images/edits",
+      GROK_ENDPOINT_PATH: "images/edits",
+      GROK_IMAGE_MODEL: "env-grok-image",
       REASONING_EFFORT: "low",
     },
   });
@@ -87,10 +96,36 @@ test("config store uses local environment variables as defaults before any save"
   assert.equal(publicConfig.protocolBaseUrl, "https://env-protocol.example.com/v1");
   assert.equal(publicConfig.protocolApiKeyConfigured, true);
   assert.equal(publicConfig.protocolImageModel, "env-protocol-image");
+  assert.equal(publicConfig.grokBaseUrl, "https://env-grok.example.com/v1");
+  assert.equal(publicConfig.grokEndpointPath, "images/edits");
+  assert.equal(publicConfig.grokApiKeyConfigured, true);
+  assert.match(publicConfig.grokApiKeyMask, /^env-.*7890$/);
+  assert.equal(publicConfig.grokImageModel, "env-grok-image");
+  assert.equal("grokApiKey" in publicConfig, false);
+  assert.equal(privateConfig.grokApiKey, "env-grok-key-1234567890");
   assert.equal(publicConfig.defaults.reasoningEffort, "low");
   assert.equal(privateConfig.apiKey, "env-route-key-1234567890");
   assert.equal(privateConfig.directApiKey, "env-direct-key-1234567890");
   assert.equal(privateConfig.protocolApiKey, "env-protocol-key-1234567890");
+});
+
+test("config store migrates a legacy auto image quality to high", async () => {
+  const rootDir = await mkdtemp(join(tmpdir(), "responses-config-quality-migration-"));
+  await mkdir(join(rootDir, ".local"), { recursive: true });
+  await writeFile(
+    join(rootDir, ".local", "config.json"),
+    `${JSON.stringify({ defaults: { quality: "auto" } }, null, 2)}\n`,
+    "utf8",
+  );
+
+  const saved = await createConfigStore({ rootDir }).readPrivateConfig();
+  assert.equal(saved.defaults.quality, "high");
+
+  const fromEnvironment = await createConfigStore({
+    rootDir: await mkdtemp(join(tmpdir(), "responses-config-quality-env-")),
+    env: { IMAGE_QUALITY: "auto" },
+  }).readPrivateConfig();
+  assert.equal(fromEnvironment.defaults.quality, "high");
 });
 
 test("config store lets temporary direct and OpenAI environment values override stale local config", async () => {

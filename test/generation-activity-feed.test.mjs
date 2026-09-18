@@ -158,6 +158,8 @@ test("heartbeat rows keep the summary but drop the repeated detail line", () => 
 test("generation activity mode label distinguishes route and direct calls", () => {
   assert.equal(formatGenerationActivityModeLabel("a"), "路由模式");
   assert.equal(formatGenerationActivityModeLabel("b"), "直接调用模式");
+  assert.equal(formatGenerationActivityModeLabel("d"), "Grok");
+  assert.equal(formatGenerationActivityModeLabel("grok"), "Grok");
   assert.equal(formatGenerationActivityModeLabel(""), "");
 });
 

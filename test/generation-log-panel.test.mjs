@@ -250,7 +250,7 @@ test("generation log panel labels channels only in the cross-panel view", () => 
 
   const allList = createTestElement("ol", documentRef);
   renderGenerationLogRows(allList, { entries, channel: "all", expandedGroupIds: ["set-1"], documentRef });
-  assert.deepEqual(getText(allList, "timeline-channel"), ["套图模式", "提示词生图"]);
+  assert.deepEqual(getText(allList, "timeline-channel"), ["套图", "提示词"]);
 });
 
 test("generation log panel renders an empty state instead of a blank list", () => {
@@ -273,11 +273,11 @@ test("generation log channel tabs mark the active board and expose their value",
     channels: ["all", "prompt", "creation"],
     activeChannel: "creation",
     getChannelLabel: getGenerationLogChannelLabel,
-    allLabel: "全部板块",
+    allLabel: "全部",
     documentRef,
   });
 
-  assert.deepEqual(host.children.map((tab) => tab.textContent), ["全部板块", "提示词生图", "套图模式"]);
+  assert.deepEqual(host.children.map((tab) => tab.textContent), ["全部", "提示词", "套图"]);
   assert.deepEqual(host.children.map((tab) => tab.getAttribute("aria-pressed")), ["false", "false", "true"]);
   assert.equal(host.children[2].classList.contains("is-active"), true);
   assert.equal(host.children[0].type, "button");

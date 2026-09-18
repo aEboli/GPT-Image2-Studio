@@ -16,8 +16,6 @@ import {
   resolveAspectRatioOption,
 } from "./lib/aspect-ratios.mjs";
 import {
-  getDefaultGenerationSize,
-  getDefaultModelProtocolImageSize,
   normalizeGenerationSize,
   normalizeModelProtocolImageSize,
 } from "./lib/generation-size-options.mjs";
@@ -57,7 +55,7 @@ import {
   toOutputFormatExtension,
   toOutputFormatMimeType,
 } from "./lib/output-format-options.mjs";
-import { normalizeImageQuality } from "./lib/image-quality-options.mjs";
+import { normalizeImageQualityForRoute } from "./lib/image-quality-options.mjs";
 import {
   CREATION_STREAM_EVENTS,
   GENERATION_STREAM_EVENTS,
@@ -81,10 +79,10 @@ import {
   resolveGalleryImageAsset,
   scheduleGalleryThumbnail,
 } from "./lib/gallery-thumbnail.mjs";
-import { normalizeBase64, requestDirectImageGeneration, requestImageEdit, requestImageGeneration, requestModelProtocolImageGeneration } from "./lib/responses-workflow.mjs";
+import { normalizeBase64, requestDirectImageGeneration, requestGrokImageGeneration, requestImageEdit, requestImageGeneration, requestModelProtocolImageGeneration } from "./lib/responses-workflow.mjs";
 import { resolveCreationUpstreamTimeoutMs, upstreamStreamFetch, warmUpstreamStreamDispatcher } from "./lib/upstream-stream-fetch.mjs";
 import { mergeRequestPrivateConfig } from "./lib/request-private-config.mjs";
-import { API_ENDPOINT_RESPONSES, IMAGE_ROUTE_A, IMAGE_ROUTE_B, IMAGE_ROUTE_C, getSelectedImageGenerationConfig, getSelectedPromptAgentAnalysisConfig, getSelectedTextVisionConfig, normalizeApiEndpointPath } from "./lib/image-route-config.mjs";
+import { API_ENDPOINT_RESPONSES, IMAGE_ROUTE_A, IMAGE_ROUTE_B, IMAGE_ROUTE_C, IMAGE_ROUTE_D, getSelectedImageGenerationConfig, getSelectedPromptAgentAnalysisConfig, getSelectedTextVisionConfig, normalizeApiEndpointPath, normalizeImageRoute } from "./lib/image-route-config.mjs";
 import { fetchAvailableModels } from "./lib/model-list-client.mjs";
 import { createGenerationTaskStore } from "./lib/generation-task-store.mjs";
 import {
@@ -428,7 +426,7 @@ function getStudioGenerationRequestScope(generationMode, imageRoute) {
   }
 
   const route = String(imageRoute || "").trim().toLowerCase();
-  return route === "a" || route === "b" || route === "c" ? `${mode}:${route}` : mode;
+  return route === "a" || route === "b" || route === "c" || route === "d" ? `${mode}:${route}` : mode;
 }
 
 function getGenerationTaskSlotScopeKey(sessionId, requestScope) {
@@ -471,6 +469,9 @@ async function requestStudioImageGeneration(options) {
     if (options.imageRoute === IMAGE_ROUTE_C) {
       return requestModelProtocolImageGeneration(options);
     }
+    if (options.imageRoute === IMAGE_ROUTE_D) {
+      return requestGrokImageGeneration(options);
+    }
     if (options.generationMode === IMAGE_EDIT_MODE) {
       return requestImageEdit(options);
     }
@@ -490,14 +491,18 @@ async function requestStudioImageGeneration(options) {
     base64: MOCK_IMAGE_BASE64,
   });
 
+  const mockSize = options.imageRoute === IMAGE_ROUTE_C
+    ? normalizeModelProtocolImageSize(options.size)
+    : normalizeGenerationSize(options.aspectRatio || "4:5", options.size);
+
   return {
     finalImageBase64: MOCK_IMAGE_BASE64,
     responseCompleted: true,
     fallbackUsed: false,
     streamFallbackUsed: false,
     sizeFallbackUsed: false,
-    requestedSize: options.size,
-    effectiveSize: options.size,
+    requestedSize: mockSize,
+    effectiveSize: mockSize,
     format: options.format,
   };
 }
@@ -1260,21 +1265,48 @@ function normalizeReasoningEffort(value, fallback = DEFAULT_REASONING_EFFORT) {
   return normalized;
 }
 
-function resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, imageRoute) {
-  if (imageRoute === IMAGE_ROUTE_C) {
-    const requestedSize = normalizeModelProtocolImageSize(requestedSizeInput || "auto");
-    const finalSize = requestedSize === "auto" ? getDefaultModelProtocolImageSize() : requestedSize;
-    return { requestedSize, finalSize };
+function normalizeGenerationImageQuality(value, generationConfig = {}, fallback = "") {
+  const imageRoute = String(generationConfig.imageRoute || IMAGE_ROUTE_A).trim().toLowerCase();
+  if (imageRoute === IMAGE_ROUTE_D) {
+    // Grok has its own quality vocabulary and must not inherit GPT's global
+    // default (`high`) when the request leaves quality unset.
+    return normalizeImageQualityForRoute(value, {
+      imageRoute,
+      imageModel: generationConfig.imageModel,
+      fallback: "",
+    });
   }
 
-  const requestedSize = normalizeGenerationSize(ratioOption.value, requestedSizeInput);
-  if (requestedSize !== requestedSizeInput && requestedSizeInput !== "") {
+  return normalizeImageQualityForRoute(value || fallback, {
+    imageRoute,
+    imageModel: generationConfig.imageModel,
+    fallback,
+  });
+}
+
+function normalizeGenerationReasoningEffort(value, generationConfig = {}, fallback = DEFAULT_REASONING_EFFORT) {
+  if (String(generationConfig.imageRoute || IMAGE_ROUTE_A).trim().toLowerCase() === IMAGE_ROUTE_D) {
+    return "";
+  }
+
+  return normalizeReasoningEffort(value || fallback);
+}
+
+function resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, imageRoute) {
+  const normalizedInput = String(requestedSizeInput || "").trim().toLowerCase();
+  if (imageRoute === IMAGE_ROUTE_C) {
+    const requestedSize = normalizeModelProtocolImageSize(normalizedInput);
+    return { requestedSize, finalSize: requestedSize };
+  }
+
+  const requestedSize = normalizeGenerationSize(ratioOption.value, normalizedInput);
+  if (requestedSize !== normalizedInput && normalizedInput && normalizedInput !== "auto") {
     throw new Error(`当前比例 ${ratioOption.value} 不支持分辨率 ${requestedSizeInput}`);
   }
 
   return {
     requestedSize,
-    finalSize: requestedSize === "auto" ? getDefaultGenerationSize(ratioOption.value) : requestedSize,
+    finalSize: requestedSize,
   };
 }
 
@@ -1310,6 +1342,10 @@ async function handleConfigPost(request, response) {
     protocolBaseUrl: payload.protocolBaseUrl,
     protocolApiKey: payload.protocolApiKey,
     protocolImageModel: payload.protocolImageModel,
+    grokBaseUrl: payload.grokBaseUrl,
+    grokApiKey: payload.grokApiKey,
+    grokEndpointPath: payload.grokEndpointPath,
+    grokImageModel: payload.grokImageModel,
     defaults: payload.defaults,
   });
 
@@ -1329,6 +1365,8 @@ async function handleModelListPost(request, response) {
       ? getSelectedTextVisionConfig(config)
       : modelTarget === "protocol"
         ? getSelectedImageGenerationConfig({ ...config, imageRoute: IMAGE_ROUTE_C })
+        : modelTarget === "grok"
+          ? getSelectedImageGenerationConfig({ ...config, imageRoute: IMAGE_ROUTE_D })
         : getSelectedImageGenerationConfig(config);
     hasApiKey = Boolean(modelConfig.apiKey);
     const models = await fetchAvailableModels({
@@ -1536,9 +1574,17 @@ async function handlePromptPreviewSave(request, response) {
   }
 
   const format = normalizeOutputFormat(payload.format || "png");
+  const previewImageRoute = normalizeImageRoute(payload.imageRoute);
+  const previewQuality = normalizeGenerationImageQuality(payload.quality, {
+    imageRoute: previewImageRoute,
+    imageModel: payload.imageModel,
+  });
   const prompt = String(payload.prompt || "").trim();
   const createdAt = new Date().toISOString();
   const ratioOption = resolveAspectRatioOption(String(payload.ratio || "").trim() || undefined);
+  const previewSize = previewImageRoute === IMAGE_ROUTE_C
+    ? normalizeModelProtocolImageSize(payload.size)
+    : normalizeGenerationSize(ratioOption.value, payload.size);
   // Filename is derived server-side; anything the client sent is ignored so a
   // crafted name cannot escape the output directory.
   const filename = createTimestampedFilename({
@@ -1562,11 +1608,13 @@ async function handlePromptPreviewSave(request, response) {
       imageModel: String(payload.imageModel || ""),
       ratio: ratioOption.value,
       ratioLabel: ratioOption.label,
-      size: String(payload.size || ""),
-      quality: String(payload.quality || ""),
+      size: previewSize,
+      quality: previewQuality,
       imageBackground: ["transparent", "opaque"].includes(payload.imageBackground) ? payload.imageBackground : "",
       format,
-      reasoningEffort: String(payload.reasoningEffort || ""),
+      ...(previewImageRoute === IMAGE_ROUTE_D
+        ? {}
+        : { reasoningEffort: String(payload.reasoningEffort || "") }),
     },
   });
 
@@ -1798,7 +1846,8 @@ async function generateAndSavePptSlide({
   if (!generationConfig.apiKey) {
     throw new Error("Missing API key for the selected image generation route.");
   }
-  const slideQuality = normalizeImageQuality(quality || config.defaults?.quality, { imageModel: generationConfig.imageModel });
+  const slideQuality = normalizeGenerationImageQuality(quality, generationConfig, config.defaults?.quality);
+  const slideReasoningEffort = normalizeGenerationReasoningEffort(reasoningEffort, generationConfig);
   const generationResult = await requestStudioImageGeneration({
     baseUrl: generationConfig.baseUrl,
     apiKey: generationConfig.apiKey,
@@ -1812,7 +1861,7 @@ async function generateAndSavePptSlide({
     imageRoute: generationConfig.imageRoute,
     imageModel: generationConfig.imageModel,
     endpointPath: generationConfig.endpointPath,
-    reasoningEffort,
+    reasoningEffort: slideReasoningEffort,
     async onEvent(event) {
       if (event.type === "partial_image") {
         writeSseEvent(response, "partial_image", {
@@ -1859,7 +1908,7 @@ async function generateAndSavePptSlide({
       size: savedSize,
       quality: slideQuality,
       format: PPT_SLIDE_FORMAT,
-      reasoningEffort,
+      ...(slideReasoningEffort ? { reasoningEffort: slideReasoningEffort } : {}),
       assetKind: "ppt-slide",
       deckId,
       slideNumber: String(slidePrompt.slideNumber),
@@ -2082,9 +2131,7 @@ async function handlePptGenerate(request, response) {
     });
     const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
     const generationConfig = getSelectedImageGenerationConfig(config);
-    const quality = normalizeImageQuality(formData.get("quality") || config.defaults?.quality, {
-      imageModel: generationConfig.imageModel,
-    });
+    const quality = normalizeGenerationImageQuality(formData.get("quality"), generationConfig, config.defaults?.quality);
     const reasoningEffort = normalizeReasoningEffort(
       formData.get("reasoningEffort") || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
     );
@@ -2197,9 +2244,7 @@ async function handlePptComplete(request, response) {
     );
 
     const generationConfig = getSelectedImageGenerationConfig(config);
-    const quality = normalizeImageQuality(payload.quality || config.defaults?.quality, {
-      imageModel: generationConfig.imageModel,
-    });
+    const quality = normalizeGenerationImageQuality(payload.quality, generationConfig, config.defaults?.quality);
     if (!generationConfig.apiKey) {
       throw new Error("Missing API key for the selected image generation route.");
     }
@@ -2316,14 +2361,11 @@ async function handlePptSlideEdit(request, response) {
       theme: stylePreset,
     });
     const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
+    const generationConfig = getSelectedImageGenerationConfig(config);
     const reasoningEffort = normalizeReasoningEffort(
       formData.get("reasoningEffort") || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
     );
-
-    const generationConfig = getSelectedImageGenerationConfig(config);
-    const quality = normalizeImageQuality(formData.get("quality") || config.defaults?.quality, {
-      imageModel: generationConfig.imageModel,
-    });
+    const quality = normalizeGenerationImageQuality(formData.get("quality"), generationConfig, config.defaults?.quality);
     if (!generationConfig.apiKey) {
       throw new Error("Missing API key for the selected image generation route.");
     }
@@ -2573,7 +2615,7 @@ function buildSavedItem({
     actualSize,
     quality,
     format,
-    reasoningEffort,
+    ...(String(imageRoute).trim().toLowerCase() === IMAGE_ROUTE_D ? {} : { reasoningEffort }),
     generationStartedAt,
     generationCompletedAt,
     generationDurationMs,
@@ -3203,14 +3245,14 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
     const generationStartDelayMs = resolveGenerationStartDelayMs(formData, config);
     const generationConcurrency = resolveGenerationConcurrencyForLimit(formData, config);
     const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || "3:2"));
-    const requestedSizeInput = String(formData.get("size") || "auto").trim().toLowerCase();
+    const requestedSizeInput = String(formData.get("size") || "").trim().toLowerCase();
     const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
-    const finalQuality = normalizeImageQuality(formData.get("quality") || config.defaults?.quality, {
-      imageModel: generationConfig.imageModel,
-    });
+    const finalQuality = normalizeGenerationImageQuality(formData.get("quality"), generationConfig, config.defaults?.quality);
     const finalFormat = normalizeOutputFormat(String(formData.get("format") || config.defaults?.format || ARTICLE_ILLUSTRATION_FORMAT));
-    const reasoningEffort = normalizeReasoningEffort(
-      formData.get("reasoningEffort") || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
+    const reasoningEffort = normalizeGenerationReasoningEffort(
+      formData.get("reasoningEffort"),
+      generationConfig,
+      config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
     );
 
     setManifest = await articleIllustrationSetStore.saveManifest(
@@ -3364,7 +3406,7 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
           imageRoute: generationConfig.imageRoute,
           imageModel: generationConfig.imageModel,
           endpointPath: generationConfig.endpointPath,
-          reasoningEffort,
+          ...(reasoningEffort ? { reasoningEffort } : {}),
           async onEvent(event) {
             await handleGenerationEvent(event);
           },
@@ -3397,7 +3439,7 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
             size: savedSize,
             quality: finalQuality,
             format: finalFormat,
-            reasoningEffort,
+            ...(reasoningEffort ? { reasoningEffort } : {}),
             generationStartedAt,
             generationCompletedAt,
             generationDurationMs,
@@ -4494,14 +4536,14 @@ async function handlePortraitGenerate(request, response) {
     const generationStartDelayMs = resolveGenerationStartDelayMs(formData, config);
     const generationConcurrency = resolveGenerationConcurrencyForLimit(formData, config);
     const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || plan.ratio || "4:5"));
-    const requestedSizeInput = String(formData.get("size") || plan.size || "auto").trim().toLowerCase();
+    const requestedSizeInput = String(formData.get("size") || plan.size || "").trim().toLowerCase();
     const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
-    const finalQuality = normalizeImageQuality(formData.get("quality") || config.defaults?.quality, {
-      imageModel: generationConfig.imageModel,
-    });
+    const finalQuality = normalizeGenerationImageQuality(formData.get("quality"), generationConfig, config.defaults?.quality);
     const finalFormat = normalizeOutputFormat(String(formData.get("format") || plan.format || config.defaults?.format || "png"));
-    const reasoningEffort = normalizeReasoningEffort(
-      formData.get("reasoningEffort") || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
+    const reasoningEffort = normalizeGenerationReasoningEffort(
+      formData.get("reasoningEffort"),
+      generationConfig,
+      config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
     );
 
     portraitRelativeDir = buildPortraitRelativeDir({
@@ -4581,7 +4623,7 @@ async function handlePortraitGenerate(request, response) {
           imageRoute: generationConfig.imageRoute,
           imageModel: generationConfig.imageModel,
           endpointPath: generationConfig.endpointPath,
-          reasoningEffort,
+          ...(reasoningEffort ? { reasoningEffort } : {}),
           async onEvent(event) {
             if (event.type === "status") {
               writeSseEvent(response, "item_status", {
@@ -4645,7 +4687,7 @@ async function handlePortraitGenerate(request, response) {
             size: savedSize,
             quality: finalQuality,
             format: finalFormat,
-            reasoningEffort,
+            ...(reasoningEffort ? { reasoningEffort } : {}),
             generationStartedAt,
             generationCompletedAt,
             generationDurationMs,
@@ -4851,16 +4893,16 @@ async function handleCreationGenerate(request, response) {
     const generationStartDelayMs = resolveGenerationStartDelayMs(formData, config);
     const generationConcurrency = resolveGenerationConcurrencyForLimit(formData, config);
     const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || "1:1"));
-    const requestedSizeInput = String(formData.get("size") || "auto").trim().toLowerCase();
+    const requestedSizeInput = String(formData.get("size") || "").trim().toLowerCase();
     const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
     const fallbackRatio = ratioOption.value;
     const fallbackSize = requestedSizeInput;
-    const finalQuality = normalizeImageQuality(formData.get("quality") || config.defaults?.quality, {
-      imageModel: generationConfig.imageModel,
-    });
+    const finalQuality = normalizeGenerationImageQuality(formData.get("quality"), generationConfig, config.defaults?.quality);
     const finalFormat = normalizeOutputFormat(String(formData.get("format") || config.defaults?.format || "png"));
-    const reasoningEffort = normalizeReasoningEffort(
-      formData.get("reasoningEffort") || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
+    const reasoningEffort = normalizeGenerationReasoningEffort(
+      formData.get("reasoningEffort"),
+      generationConfig,
+      config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
     );
 
     creationRelativeDir = buildCreationRelativeDir({
@@ -5018,7 +5060,7 @@ async function handleCreationGenerate(request, response) {
           imageRoute: generationConfig.imageRoute,
           imageModel: generationConfig.imageModel,
           endpointPath: generationConfig.endpointPath,
-          reasoningEffort,
+          ...(reasoningEffort ? { reasoningEffort } : {}),
           onResponseId: () =>
             persistCreationOriginalResponsePending({
               setId,
@@ -5112,7 +5154,7 @@ async function handleCreationGenerate(request, response) {
             size: savedSize,
             quality: finalQuality,
             format: finalFormat,
-            reasoningEffort,
+            ...(reasoningEffort ? { reasoningEffort } : {}),
             generationStartedAt,
             generationCompletedAt,
             generationDurationMs,
@@ -5314,14 +5356,14 @@ async function handleCreationLogoBatchGenerate(request, response) {
     const generationStartDelayMs = resolveGenerationStartDelayMs(formData, config);
     const generationConcurrency = resolveGenerationConcurrencyForLimit(formData, config);
     const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || "1:1"));
-    const requestedSizeInput = String(formData.get("size") || "auto").trim().toLowerCase();
+    const requestedSizeInput = String(formData.get("size") || "").trim().toLowerCase();
     const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
-    const finalQuality = normalizeImageQuality(formData.get("quality") || config.defaults?.quality, {
-      imageModel: generationConfig.imageModel,
-    });
+    const finalQuality = normalizeGenerationImageQuality(formData.get("quality"), generationConfig, config.defaults?.quality);
     const finalFormat = normalizeOutputFormat(String(formData.get("format") || config.defaults?.format || "png"));
-    const reasoningEffort = normalizeReasoningEffort(
-      formData.get("reasoningEffort") || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
+    const reasoningEffort = normalizeGenerationReasoningEffort(
+      formData.get("reasoningEffort"),
+      generationConfig,
+      config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
     );
 
     creationRelativeDir = buildCreationRelativeDir({
@@ -5420,7 +5462,7 @@ async function handleCreationLogoBatchGenerate(request, response) {
           imageRoute: generationConfig.imageRoute,
           imageModel: generationConfig.imageModel,
           endpointPath: generationConfig.endpointPath,
-          reasoningEffort,
+          ...(reasoningEffort ? { reasoningEffort } : {}),
           onResponseId: () =>
             persistCreationOriginalResponsePending({
               setId,
@@ -5502,7 +5544,7 @@ async function handleCreationLogoBatchGenerate(request, response) {
             size: savedSize,
             quality: finalQuality,
             format: finalFormat,
-            reasoningEffort,
+            ...(reasoningEffort ? { reasoningEffort } : {}),
             generationStartedAt,
             generationCompletedAt,
             generationDurationMs,
@@ -5703,14 +5745,14 @@ async function handlePortraitRepair(request, response) {
     const generationStartDelayMs = resolveGenerationStartDelayMs(formData, config);
     const generationConcurrency = resolveGenerationConcurrencyForLimit(formData, config);
     const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || setManifest.ratio || "4:5"));
-    const requestedSizeInput = String(formData.get("size") || setManifest.size || "auto").trim().toLowerCase();
+    const requestedSizeInput = String(formData.get("size") || setManifest.size || "").trim().toLowerCase();
     const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
-    const finalQuality = normalizeImageQuality(formData.get("quality") || config.defaults?.quality, {
-      imageModel: generationConfig.imageModel,
-    });
+    const finalQuality = normalizeGenerationImageQuality(formData.get("quality"), generationConfig, config.defaults?.quality);
     const finalFormat = normalizeOutputFormat(String(formData.get("format") || setManifest.format || config.defaults?.format || "png"));
-    const reasoningEffort = normalizeReasoningEffort(
-      formData.get("reasoningEffort") || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
+    const reasoningEffort = normalizeGenerationReasoningEffort(
+      formData.get("reasoningEffort"),
+      generationConfig,
+      config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
     );
     const createdAt = setManifest.createdAt || new Date().toISOString();
     const portraitRelativeDir = setManifest.relativeDir || buildPortraitRelativeDir({
@@ -5770,7 +5812,7 @@ async function handlePortraitRepair(request, response) {
           imageRoute: generationConfig.imageRoute,
           imageModel: generationConfig.imageModel,
           endpointPath: generationConfig.endpointPath,
-          reasoningEffort,
+          ...(reasoningEffort ? { reasoningEffort } : {}),
           async onEvent(event) {
             if (event.type === "status") {
               writeSseEvent(response, "item_status", {
@@ -5832,7 +5874,7 @@ async function handlePortraitRepair(request, response) {
             size: savedSize,
             quality: finalQuality,
             format: finalFormat,
-            reasoningEffort,
+            ...(reasoningEffort ? { reasoningEffort } : {}),
             generationStartedAt,
             generationCompletedAt,
             generationDurationMs,
@@ -6019,13 +6061,13 @@ async function handleCreationRepair(request, response) {
     const generationStartDelayMs = resolveGenerationStartDelayMs(formData, config);
     const generationConcurrency = resolveGenerationConcurrencyForLimit(formData, config);
     const fallbackRatio = String(formData.get("ratio") || "1:1");
-    const fallbackSize = String(formData.get("size") || "auto").trim();
-    const finalQuality = normalizeImageQuality(formData.get("quality") || config.defaults?.quality, {
-      imageModel: generationConfig.imageModel,
-    });
+    const fallbackSize = String(formData.get("size") || "").trim();
+    const finalQuality = normalizeGenerationImageQuality(formData.get("quality"), generationConfig, config.defaults?.quality);
     const finalFormat = normalizeOutputFormat(String(formData.get("format") || config.defaults?.format || "png"));
-    const reasoningEffort = normalizeReasoningEffort(
-      formData.get("reasoningEffort") || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
+    const reasoningEffort = normalizeGenerationReasoningEffort(
+      formData.get("reasoningEffort"),
+      generationConfig,
+      config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
     );
     const relativeDir =
       existingSet.relativeDir ||
@@ -6092,10 +6134,7 @@ async function handleCreationRepair(request, response) {
       const referenceUploadTargetKey = referenceUploads.getTargetKey(itemGenerationConfig);
       const itemFormat = normalizeOutputFormat(repairItem.format || finalFormat);
       // 补图条目自带上游目标，模型可能与本次运行的不同，按它自己的模型收敛质量档。
-      const itemQuality = normalizeImageQuality(repairItem.quality || finalQuality, {
-        imageModel: itemGenerationConfig.imageModel,
-        fallback: finalQuality,
-      });
+      const itemQuality = normalizeGenerationImageQuality(repairItem.quality, itemGenerationConfig, finalQuality);
       const itemReasoningEffort = normalizeReasoningEffort(repairItem.reasoningEffort || reasoningEffort);
       const taskId = retryLedger.getTaskId(`${setId}-repair-${item.itemId}`, item.itemId);
       const generationStartedAt = new Date().toISOString();
@@ -6183,7 +6222,7 @@ async function handleCreationRepair(request, response) {
           imageRoute: itemGenerationConfig.imageRoute,
           imageModel: itemGenerationConfig.imageModel,
           endpointPath: itemGenerationConfig.endpointPath,
-          reasoningEffort: itemReasoningEffort,
+          ...(itemReasoningEffort ? { reasoningEffort: itemReasoningEffort } : {}),
           onResponseId: () =>
             persistCreationOriginalResponsePending({
               setId,
@@ -6269,7 +6308,7 @@ async function handleCreationRepair(request, response) {
             size: savedSize,
             quality: itemQuality,
             format: itemFormat,
-            reasoningEffort: itemReasoningEffort,
+            ...(itemReasoningEffort ? { reasoningEffort: itemReasoningEffort } : {}),
             generationStartedAt,
             generationCompletedAt,
             generationDurationMs,
@@ -6440,7 +6479,11 @@ async function handleGenerate(request, response) {
     taskId = String(formData.get("jobId") || fallbackTaskId).trim() || fallbackTaskId;
     let prompt = String(formData.get("prompt") || "").trim();
     const ratio = String(formData.get("ratio") || "4:5");
-    const requestedSizeInput = String(formData.get("size") || "auto").trim().toLowerCase();
+    const requestedSizeInput = String(formData.get("size") || "").trim().toLowerCase();
+    const requestedImageRoute = normalizeImageRoute(formData.get("imageRoute"));
+    const initialTaskSize = requestedImageRoute === IMAGE_ROUTE_C
+      ? normalizeModelProtocolImageSize(requestedSizeInput)
+      : normalizeGenerationSize(resolveAspectRatioOption(ratio).value, requestedSizeInput);
     const requestedFormatInput = String(formData.get("format") || "").trim().toLowerCase();
     const generationModeInput = String(formData.get("mode") || "").trim();
     const generationMode = normalizeGenerationMode(generationModeInput);
@@ -6488,7 +6531,7 @@ async function handleGenerate(request, response) {
         id: taskId,
         prompt,
         ratio,
-        size: requestedSizeInput,
+        size: initialTaskSize,
         mode: generationMode,
         generationMode,
         status: "running",
@@ -6552,16 +6595,6 @@ async function handleGenerate(request, response) {
       });
       writeSseEvent(response, "error", {
         message: "图片拆解模式需要且只支持上传一张源图。",
-      });
-      return;
-    }
-    if (isImageEdit && referenceImages.length !== 1) {
-      const message = "图片编辑模式需要且只支持上传一张源图。";
-      generationTaskStore.failTask(clientSessionId, taskId, {
-        errorMessage: message,
-      });
-      writeSseEvent(response, "error", {
-        message,
       });
       return;
     }
@@ -6716,7 +6749,25 @@ async function handleGenerate(request, response) {
 
     const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
     const generationConfig = getSelectedImageGenerationConfig(config);
-    const imageBackground = generationMode === "" && generationConfig.imageRoute !== IMAGE_ROUTE_C
+    if (isImageEdit && generationConfig.imageRoute === IMAGE_ROUTE_D && referenceImages.length === 0) {
+      const message = "Grok 图片编辑至少需要一张参考图。";
+      generationTaskStore.failTask(clientSessionId, taskId, { errorMessage: message });
+      writeSseEvent(response, "error", { message });
+      return;
+    }
+    if (isImageEdit && generationConfig.imageRoute !== IMAGE_ROUTE_D && referenceImages.length !== 1) {
+      const message = "图片编辑模式需要且只支持上传一张源图。";
+      generationTaskStore.failTask(clientSessionId, taskId, { errorMessage: message });
+      writeSseEvent(response, "error", { message });
+      return;
+    }
+    if (generationConfig.imageRoute === IMAGE_ROUTE_D && referenceImages.length > 5) {
+      const message = "Grok 单次编辑最多支持 5 张参考图。";
+      generationTaskStore.failTask(clientSessionId, taskId, { errorMessage: message });
+      writeSseEvent(response, "error", { message });
+      return;
+    }
+    const imageBackground = generationMode === "" && generationConfig.imageRoute !== IMAGE_ROUTE_C && generationConfig.imageRoute !== IMAGE_ROUTE_D
       ? requestedImageBackground
       : "opaque";
     generationRequestScope = getStudioGenerationRequestScope(generationMode, generationConfig.imageRoute);
@@ -6730,8 +6781,19 @@ async function handleGenerate(request, response) {
       return;
     }
 
-    const reasoningEffort = normalizeReasoningEffort(
-      formData.get("reasoningEffort") || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
+    if (isLocalMaskImageEdit && generationConfig.imageRoute === IMAGE_ROUTE_D) {
+      const message = "Grok 生图不支持本地蒙版编辑，请切换到 GPT 路由模式。";
+      generationTaskStore.failTask(clientSessionId, taskId, {
+        errorMessage: message,
+      });
+      writeSseEvent(response, "error", { message });
+      return;
+    }
+
+    const reasoningEffort = normalizeGenerationReasoningEffort(
+      formData.get("reasoningEffort"),
+      generationConfig,
+      config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
     );
 
     async function runPreparedGeneration({ streamToResponse = true } = {}) {
@@ -6752,10 +6814,8 @@ async function handleGenerate(request, response) {
     const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
 
     const finalPrompt = prompt;
-    const finalQuality = normalizeImageQuality(formData.get("quality") || config.defaults?.quality, {
-      imageModel: generationConfig.imageModel,
-    });
-    const finalFormat = imageBackground === "transparent"
+    const finalQuality = normalizeGenerationImageQuality(formData.get("quality"), generationConfig, config.defaults?.quality);
+    let finalFormat = imageBackground === "transparent"
       ? "png"
       : normalizeOutputFormat(requestedFormatInput || config.defaults?.format || "png");
     let finalBase64 = "";
@@ -6794,7 +6854,7 @@ async function handleGenerate(request, response) {
       sourceImageName,
       featureCardsEnabled,
       editInstruction,
-      reasoningEffort,
+      ...(reasoningEffort ? { reasoningEffort } : {}),
       ...localMaskMetadata,
     });
 
@@ -6827,6 +6887,10 @@ async function handleGenerate(request, response) {
 
       if (event.type === "final_image") {
         finalBase64 = event.base64;
+        if (generationConfig.imageRoute === IMAGE_ROUTE_D) {
+          const inspection = validateGeneratedImage(Buffer.from(normalizeBase64(event.base64), "base64"));
+          finalFormat = inspection.format === "jpeg" ? "jpg" : "png";
+        }
         if (!emitFinalImage) {
           return;
         }
@@ -6834,6 +6898,7 @@ async function handleGenerate(request, response) {
           status: "running",
           statusStage: "saving",
           statusText: "已拿到最终图像，正在写入本地",
+          format: finalFormat,
         });
         emitGenerationEvent("final_image", {
           dataUrl: `data:${toOutputFormatMimeType(finalFormat)};base64,${normalizeBase64(event.base64)}`,
@@ -6854,7 +6919,7 @@ async function handleGenerate(request, response) {
       imageModel: generationConfig.imageModel,
       endpointPath: generationConfig.endpointPath,
       generationMode,
-      reasoningEffort,
+      ...(reasoningEffort ? { reasoningEffort } : {}),
     };
     let generationResult;
 
@@ -6998,7 +7063,7 @@ async function handleGenerate(request, response) {
         editInstruction,
         ...localMaskMetadata,
         featureCardsEnabled,
-        reasoningEffort,
+        ...(reasoningEffort ? { reasoningEffort } : {}),
         generationStartedAt,
         generationCompletedAt,
         generationDurationMs,

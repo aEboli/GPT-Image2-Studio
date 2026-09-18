@@ -230,10 +230,18 @@ function createModelPickerHarness() {
     directResponsesModelOptionsList: createTestElement("div", documentRef),
     directResponsesModelPickerToggle: createTestElement("button", documentRef),
     fetchModelsButton: createTestElement("button", documentRef),
+    grokApiKeyInput: createTestElement("input", documentRef),
+    grokBaseUrlInput: createTestElement("input", documentRef),
+    grokEndpointPathSelect: createTestElement("select", documentRef),
+    grokFetchModelsButton: createTestElement("button", documentRef),
+    grokImageModelInput: createTestElement("input", documentRef),
+    grokModelOptionsList: createTestElement("div", documentRef),
+    grokModelPickerToggle: createTestElement("button", documentRef),
     imageRouteInputs: [
       { value: "a", checked: true },
       { value: "b", checked: false },
       { value: "c", checked: false },
+      { value: "d", checked: false },
     ],
     modelOptionsList: createTestElement("div", documentRef),
     modelPickerToggle: createTestElement("button", documentRef),
@@ -257,6 +265,10 @@ function createModelPickerHarness() {
   refs.protocolApiKeyInput.value = "protocol-key";
   refs.protocolBaseUrlInput.value = "https://protocol.example.test/v1";
   refs.protocolImageModelInput.value = "gemini-3.1-flash-image-preview";
+  refs.grokApiKeyInput.value = "grok-key";
+  refs.grokBaseUrlInput.value = "https://api.x.ai/v1";
+  refs.grokEndpointPathSelect.value = "images/generations";
+  refs.grokImageModelInput.value = "grok-imagine-image-2.0";
   refs.responsesModelInput.value = "gpt-5.5";
   return { documentRef, refs };
 }
@@ -1080,6 +1092,31 @@ test("config drawer uses a quieter structured settings layout", async () => {
   );
 });
 
+test("config drawer compacts provider fields and keeps navigation reachable", async () => {
+  const styles = await readFile(stylesPath, "utf8");
+
+  assert.match(
+    styles,
+    /\.config-panel \.config-route-fields \.route-config-panel\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);[\s\S]*column-gap:\s*10px;/,
+  );
+  assert.match(
+    styles,
+    /\.config-panel \.config-route-fields \.route-config-panel > \.endpoint-field,[\s\S]*grid-column:\s*1\s*\/\s*-1;/,
+  );
+  assert.match(
+    styles,
+    /\.config-panel \.config-scheduling-card\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/,
+  );
+  assert.match(
+    styles,
+    /\.config-panel \.config-connection-card > \.config-section-selector,[\s\S]*position:\s*sticky;[\s\S]*background:\s*var\(--control-bg\);/,
+  );
+  assert.match(
+    styles,
+    /@media \(min-width: 1120px\)[\s\S]*\.config-drawer-body\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1\.12fr\)\s+minmax\(280px, 0\.88fr\);[\s\S]*overflow:\s*hidden;/,
+  );
+});
+
 test("reference upload appears above prompt and generate action below prompt", async () => {
   const html = await readFile(indexPath, "utf8");
 
@@ -1832,10 +1869,10 @@ test("quick blend defaults to square output and reads shared generation controls
   assert.doesNotMatch(quickBlendView, /document\.querySelector\("#reasoningEffort"\)/);
   assert.doesNotMatch(quickBlendView, /document\.querySelector\("#responsesModel"\)/);
 
-  assert.match(quickBlendView, /const baseUrlValue = String\(state\.config\?\.baseUrl \|\| refs\.baseUrlInput\?\.value \|\| ""\)\.trim\(\);/);
-  assert.match(quickBlendView, /const responsesModelValue = String\(state\.config\?\.responsesModel \|\| refs\.responsesModelInput\?\.value \|\| DEFAULT_RESPONSES_MODEL\)\.trim\(\);/);
+  assert.match(quickBlendView, /const baseUrlValue = String\(generationConfig\.baseUrl \|\| state\.config\?\.baseUrl \|\| refs\.baseUrlInput\?\.value \|\| ""\)\.trim\(\);/);
+  assert.match(quickBlendView, /const responsesModelValue = String\(generationConfig\.responsesModel \|\| state\.config\?\.responsesModel \|\| refs\.responsesModelInput\?\.value \|\| DEFAULT_RESPONSES_MODEL\)\.trim\(\);/);
   assert.match(quickBlendView, /refs\.quickBlendRatioInput\?\.value \|\| DEFAULT_QUICK_BLEND_RATIO/);
-  assert.match(quickBlendView, /refs\.quickBlendSizeInput\?\.value \|\| "auto"/);
+  assert.match(quickBlendView, /const sizeSetting = normalizeSizeForSelectedRoute\(ratioValue, refs\.quickBlendSizeInput\?\.value\);/);
 });
 
 test("style transfer mode keeps the shared studio height sync and mode styling hooks", async () => {
@@ -1986,6 +2023,7 @@ test("generation form data freezes the current route and model when the job is q
   assert.doesNotMatch(formDataBody, /appendBrowserConfigToFormData\(formData\);/);
   assert.match(server, /requestModelProtocolImageGeneration/);
   assert.match(server, /if \(options\.imageRoute === IMAGE_ROUTE_C\) \{[\s\S]*return requestModelProtocolImageGeneration\(options\);/);
+  assert.match(server, /if \(options\.imageRoute === IMAGE_ROUTE_D\) \{[\s\S]*return requestGrokImageGeneration\(options\);/);
 });
 
 test("generation size controls switch to protocol scale values in model protocol mode", async () => {
@@ -1995,8 +2033,8 @@ test("generation size controls switch to protocol scale values in model protocol
   assert.match(app, /normalizeModelProtocolImageSize/);
   assert.match(app, /function isModelProtocolImageRoute\(\)/);
   assert.match(app, /function renderSizeOptions\(sizeInput = refs\.sizeInput, ratioInput = refs\.ratioInput\) \{[\s\S]*getModelProtocolImageSizeOptions\(\)/);
-  assert.match(app, /function getSelectedGenerationSize\(\) \{[\s\S]*normalizeModelProtocolImageSize\(refs\.sizeInput\.value \|\| "auto"\)/);
-  assert.match(app, /refs\.imageRouteInputs\.forEach\(\(input\) => input\.addEventListener\("change", \(\) => \{[\s\S]*renderSizeOptions\(\);[\s\S]*\}\)\);/);
+  assert.match(app, /function getSelectedGenerationSize\(\) \{[\s\S]*normalizeModelProtocolImageSize\(refs\.sizeInput\.value\)/);
+  assert.match(app, /refs\.gptRouteInputs\.forEach\(\(input\) => input\.addEventListener\("change", \(\) => \{\s*selectGptImageRoute\(input\.value\);/);
 });
 
 test("prompt field can start generation with Ctrl+Enter", async () => {
@@ -2157,7 +2195,7 @@ test("studio panels start without redundant title blocks and merge parameters un
   assert.match(html, /<details[\s\S]*class="field-group parameter-settings adaptive-section"[\s\S]*id="parameterAdaptiveSection"[\s\S]*<div class="ratio-grid" id="ratioGrid"><\/div>[\s\S]*<div class="advanced-content">/);
   assert.match(styles, /\.parameter-settings > \.ratio-grid\s*\{[\s\S]*margin-bottom:\s*calc\(var\(--field-gap,\s*6px\) \+ 2px\);/);
   assert.doesNotMatch(promptParameterSettings, /<small>Parameters<\/small>/);
-  assert.match(html, /<details[\s\S]*class="field-group parameter-settings adaptive-section"[\s\S]*<label class="compact-field">[\s\S]*<span data-ui-i18n="reasoningEffort">思考等级<\/span>[\s\S]*id="reasoningEffortInput"[\s\S]*<label class="compact-field">[\s\S]*id="sizeInput"[\s\S]*<label class="compact-field">[\s\S]*id="outputFormatInput"/);
+  assert.match(html, /<details[\s\S]*class="field-group parameter-settings adaptive-section"[\s\S]*<label[^>]*class="compact-field"[^>]*>[\s\S]*<span data-ui-i18n="reasoningEffort">思考等级<\/span>[\s\S]*id="reasoningEffortInput"[\s\S]*<label[^>]*class="compact-field"[^>]*>[\s\S]*id="sizeInput"[\s\S]*<label[^>]*class="compact-field"[^>]*>[\s\S]*id="outputFormatInput"/);
   assert.match(app, /const REASONING_LABELS = \{[\s\S]*low: "Low",[\s\S]*medium: "Medium",[\s\S]*high: "High",[\s\S]*xhigh: "XHigh",[\s\S]*\};/);
   assert.match(app, /const REASONING_ESTIMATES = \{[\s\S]*low: "30s\+",[\s\S]*medium: "90s\+",[\s\S]*high: "150s\+",[\s\S]*xhigh: "210s\+",[\s\S]*\};/);
   assert.match(app, /option\.textContent = estimate \? `\$\{label\} ~\$\{estimate\}` : label;/);
@@ -2399,7 +2437,7 @@ test("theme language switch supports English from the config drawer", async () =
   assert.match(app, /function normalizeUiLanguage\(language\) \{[\s\S]*return language === "en" \? "en" : "zh-CN";/);
   assert.match(app, /document\.documentElement\.lang = normalized;/);
   assert.match(app, /function applyUiLanguageText\(\) \{[\s\S]*document\.querySelectorAll\("\[data-ui-i18n\]"\)[\s\S]*document\.querySelectorAll\("\[data-ui-i18n-aria-label\]"\)[\s\S]*document\.querySelectorAll\("\[data-ui-i18n-placeholder\]"\)/);
-  assert.match(app, /function getUiImageRouteLabel\(imageRoute\) \{[\s\S]*modeDirect[\s\S]*modeProtocol[\s\S]*modeRoute/);
+  assert.match(app, /function getUiImageRouteLabel\(imageRoute\) \{[\s\S]*modeDirect[\s\S]*modeProtocol[\s\S]*modeGrok[\s\S]*modeRoute/);
   assert.match(app, /refs\.uiLanguageOptions\.forEach\(\(button\) => \{[\s\S]*button\.classList\.toggle\("is-active", isActive\);[\s\S]*button\.setAttribute\("aria-pressed", String\(isActive\)\);/);
   assert.match(app, /refs\.themeNavAction\.textContent = getUiLanguageText\("themeMenu"\);/);
   assert.match(
@@ -2878,9 +2916,9 @@ test("studio error surfaces compact long upstream HTTP failures before rendering
   assert.match(app, /payload\?\.error\?\.param \|\| payload\?\.param/);
   assert.match(
     app,
-    /function showError\(message\) \{\s*refs\.errorBanner\.classList\.remove\("hidden"\);\s*refs\.errorBanner\.textContent = compactErrorMessage\(message\);/,
+    /function showError\(message\) \{[\s\S]*?refs\.errorBanner\.classList\.remove\("hidden"\);[\s\S]*?refs\.errorBanner\.textContent = compactMessage;[\s\S]*?refs\.errorBanner\.title = fullMessage \|\| compactMessage;/,
   );
-  assert.match(app, /refs\.errorBanner\.textContent = compactErrorMessage\(message\);/);
+  assert.match(app, /const compactMessage = compactErrorMessage\(fullMessage\);/);
   assert.match(app, /compactErrorMessage\(message, "生成请求失败"\)/);
   assert.match(app, /compactErrorMessage\(message, "图片分析请求失败"\)/);
   assert.match(app, /JSON\.parse\(text\)/);
@@ -3455,13 +3493,15 @@ test("config endpoint controls keep suffix before full URL and mark direct image
   assert.notEqual(directResponsesInputIndex, -1);
   assert.notEqual(directResponsesFieldStart, -1);
   assert.doesNotMatch(directResponsesFieldOpenTag, /\shidden(?:[=\s>]|$)/);
-  assert.match(html, /<input name="configSection" type="radio" value="c" \/>[\s\S]*<span data-ui-i18n="protocolMode">Gemini<\/span>/);
-  assert.match(html, /<input name="configSection" type="radio" value="theme" \/>[\s\S]*<span data-ui-i18n="themeSection">主题<\/span>/);
-  assert.match(html, /<div class="config-route-state" hidden>[\s\S]*<input name="imageRoute" type="radio" value="c" \/>[\s\S]*<\/div>/);
+  assert.match(html, /<fieldset class="route-selector config-section-selector"[\s\S]*value="gpt" checked[\s\S]*value="gemini"[\s\S]*value="grok"[\s\S]*value="theme"[\s\S]*<\/fieldset>\s*<fieldset class="route-selector config-gpt-mode-selector"/);
+  assert.match(html, /<div class="config-route-state" hidden>[\s\S]*<input name="imageRoute" type="radio" value="d" \/>[\s\S]*<\/div>/);
   assert.match(html, /<div class="route-config-panel" data-route-panel="c"[\s\S]*id="protocolBaseUrlInput"[\s\S]*id="protocolApiKeyInput"[\s\S]*id="protocolImageModelInput"/);
+  assert.match(html, /<div class="route-config-panel" data-route-panel="d"[\s\S]*id="grokBaseUrlInput"[\s\S]*id="grokApiKeyInput"[\s\S]*id="grokImageModelInput"/);
+  assert.match(html, /grok-imagine-image-2\.0/);
   assert.match(html, /id="protocolCompatibilityHint"[\s\S]*Gemini[\s\S]*images\/generations/);
   assert.match(styles, /\.endpoint-toolbar\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*auto;/);
-  assert.match(styles, /\.config-form:has\(input\[name="configSection"\]\[value="c"\]:checked\) \[data-route-panel="c"\]/);
+  assert.match(styles, /\.config-form\[data-config-section="gemini"\] \[data-route-panel="c"\]/);
+  assert.match(styles, /\.config-form\[data-config-section="grok"\] \[data-route-panel="d"\]/);
   assert.match(styles, /\.config-form:has\(input\[name="configSection"\]\[value="theme"\]:checked\) \.config-theme-panel/);
   assert.match(styles, /\.config-form:has\(input\[name="configSection"\]\[value="theme"\]:checked\) \.config-route-fields/);
   assert.match(app, /API_ENDPOINT_IMAGE_EDITS,/);
@@ -3508,6 +3548,9 @@ test("config drawer can test the connection and reveal fetched models in a picke
   assert.match(app, /directResponsesModelOptionsList:\s*document\.querySelector\("#directResponsesModelOptionsList"\),/);
   assert.match(app, /protocolModelPickerToggle:\s*document\.querySelector\("#protocolModelPickerToggle"\),/);
   assert.match(app, /protocolModelOptionsList:\s*document\.querySelector\("#protocolModelOptionsList"\),/);
+  assert.match(app, /grokFetchModelsButton:\s*document\.querySelector\("#grokFetchModelsButton"\),/);
+  assert.match(app, /grokModelPickerToggle:\s*document\.querySelector\("#grokModelPickerToggle"\),/);
+  assert.match(app, /grokModelOptionsList:\s*document\.querySelector\("#grokModelOptionsList"\),/);
   assert.match(app, /from "\/lib\/config-model-picker\.mjs";/);
   assert.match(app, /const configModelPicker = createConfigModelPickerController\(/);
   assert.match(app, /configModelPicker\.bindEvents\(\);/);
@@ -3522,6 +3565,10 @@ test("config drawer can test the connection and reveal fetched models in a picke
   assert.match(configModelPicker, /formData\.set\("protocolBaseUrl", payload\.protocolBaseUrl\);/);
   assert.match(configModelPicker, /formData\.set\("protocolApiKey", payload\.protocolApiKey\);/);
   assert.match(configModelPicker, /formData\.set\("protocolImageModel", payload\.protocolImageModel\);/);
+  assert.match(configModelPicker, /formData\.set\("grokBaseUrl", payload\.grokBaseUrl\);/);
+  assert.match(configModelPicker, /formData\.set\("grokApiKey", payload\.grokApiKey\);/);
+  assert.match(configModelPicker, /formData\.set\("grokEndpointPath", payload\.grokEndpointPath\);/);
+  assert.match(configModelPicker, /formData\.set\("grokImageModel", payload\.grokImageModel\);/);
   assert.match(configModelPicker, /function render\(\)/);
   assert.match(configModelPicker, /function renderTarget\(target, activeTarget\)/);
   assert.match(configModelPicker, /function getVisibleModels\(target = getTargetForSelectedRoute\(\)\)/);
@@ -3530,9 +3577,11 @@ test("config drawer can test the connection and reveal fetched models in a picke
   assert.match(configModelPicker, /refs\.directFetchModelsButton\?\.addEventListener\("click"/);
   assert.match(configModelPicker, /refs\.directResponsesFetchModelsButton\?\.addEventListener\("click"/);
   assert.match(configModelPicker, /refs\.protocolFetchModelsButton\?\.addEventListener\("click"/);
+  assert.match(configModelPicker, /refs\.grokFetchModelsButton\?\.addEventListener\("click"/);
   assert.match(configModelPicker, /toggleModelPicker\(MODEL_TARGET_DIRECT\)/);
   assert.match(configModelPicker, /toggleModelPicker\(MODEL_TARGET_DIRECT_RESPONSES\)/);
   assert.match(configModelPicker, /toggleModelPicker\(MODEL_TARGET_PROTOCOL\)/);
+  assert.match(configModelPicker, /toggleModelPicker\(MODEL_TARGET_GROK\)/);
   assert.match(configModelPicker, /handleModelInput\(MODEL_TARGET_RESPONSES\)/);
   assert.match(styles, /\.config-actions-row\s*\{/);
   assert.match(styles, /\.model-picker-control\s*\{/);
@@ -3701,6 +3750,51 @@ test("model protocol mode fetch models uses protocol API settings and protocol p
     refs.protocolModelOptionsList.children.map((child) => child.textContent),
     ["gemini-3.1-flash-image-preview", "gemini-3.1-flash-image-preview-vip"],
   );
+});
+
+test("Grok mode fetch models uses Grok API settings and Grok picker", async () => {
+  const { createConfigModelPickerController } = await import(publicConfigModelPickerPath);
+  const { refs } = createModelPickerHarness();
+  refs.imageRouteInputs.forEach((input) => { input.checked = input.value === "d"; });
+  const capturedBodies = [];
+  const state = { config: {}, configModels: { items: [], loading: false, loadingMode: "", open: false } };
+  const fetchImpl = async (_url, init) => {
+    capturedBodies.push(init.body);
+    return {
+      ok: true,
+      json: async () => ({ ok: true, models: ["grok-imagine-image-2.0"] }),
+    };
+  };
+  const controller = createConfigModelPickerController({
+    refs,
+    state,
+    FormDataCtor: TestFormData,
+    fetchImpl,
+    getBrowserPrivateConfigRequestPayload: () => ({
+      imageRoute: "d",
+      grokBaseUrl: "https://saved-grok.example.test/v1",
+      grokApiKey: "saved-grok-key",
+      grokEndpointPath: "images/edits",
+      grokImageModel: "saved-grok-image",
+    }),
+  });
+
+  controller.bindEvents();
+  refs.grokFetchModelsButton.dispatchEvent({ type: "click" });
+  await waitForAsyncHandlers();
+
+  assert.equal(capturedBodies.length, 1);
+  assert.equal(capturedBodies[0].get("modelTarget"), "grok");
+  assert.equal(capturedBodies[0].get("imageRoute"), "d");
+  assert.equal(capturedBodies[0].get("grokBaseUrl"), "https://api.x.ai/v1");
+  assert.equal(capturedBodies[0].get("grokApiKey"), "grok-key");
+  assert.equal(capturedBodies[0].get("grokEndpointPath"), "images/generations");
+  assert.equal(capturedBodies[0].get("grokImageModel"), "grok-imagine-image-2.0");
+  assert.equal(state.configModels.target, "grok");
+  assert.equal(refs.grokModelOptionsList.hidden, false);
+  assert.equal(refs.protocolModelOptionsList.hidden, true);
+  assert.equal(refs.modelOptionsList.hidden, true);
+  assert.deepEqual(refs.grokModelOptionsList.children.map((child) => child.textContent), ["grok-imagine-image-2.0"]);
 });
 
 test("direct text and vision model picker uses direct API settings and its own options", async () => {

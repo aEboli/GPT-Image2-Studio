@@ -4,10 +4,17 @@ import { readFile } from "node:fs/promises";
 
 import {
   API_ENDPOINT_BOOK_LIMIT,
+  API_ENDPOINT_BOOK_LEGACY_STORAGE_KEY,
   API_ENDPOINT_BOOK_STORAGE_KEY,
+  API_ENDPOINT_BOOK_TARGET_DIRECT_IMAGE,
+  API_ENDPOINT_BOOK_TARGET_DIRECT_TEXT,
+  API_ENDPOINT_BOOK_TARGET_GROK,
+  API_ENDPOINT_BOOK_TARGET_PROTOCOL,
+  API_ENDPOINT_BOOK_TARGET_ROUTE,
   formatApiEndpointLabel,
   forgetApiEndpoint,
   listApiEndpointBookEntries,
+  readApiEndpointBooks,
   maskApiKeyForBook,
   readApiEndpointBook,
   rememberApiEndpoints,
@@ -43,8 +50,12 @@ function createThrowingStorage() {
   };
 }
 
-function seed(entries) {
-  return { [API_ENDPOINT_BOOK_STORAGE_KEY]: JSON.stringify({ entries }) };
+function seed(entries, target = API_ENDPOINT_BOOK_TARGET_ROUTE) {
+  return seedBooks({ [target]: entries });
+}
+
+function seedBooks(books = {}) {
+  return { [API_ENDPOINT_BOOK_STORAGE_KEY]: JSON.stringify({ version: 2, books }) };
 }
 
 function datasetKeyForSelector(selector) {
@@ -133,7 +144,8 @@ function createPickerHarness(entries = []) {
   documentRef.createElement = (tagName) => createFakeElement(tagName, documentRef);
   documentRef.ownerDocument = documentRef;
 
-  const storage = createFakeStorage(entries.length ? seed(entries) : {});
+  const initialBooks = Array.isArray(entries) ? { [API_ENDPOINT_BOOK_TARGET_ROUTE]: entries } : entries;
+  const storage = createFakeStorage(Object.keys(initialBooks || {}).length ? seedBooks(initialBooks) : {});
   const applied = [];
   const refs = {
     baseUrlInput: createFakeElement("input", documentRef),
@@ -155,6 +167,11 @@ function createPickerHarness(entries = []) {
     protocolApiKeyInput: createFakeElement("input", documentRef),
     protocolApiBookToggle: createFakeElement("button", documentRef),
     protocolApiBookList: createFakeElement("div", documentRef),
+    grokBaseUrlInput: createFakeElement("input", documentRef),
+    grokEndpointPathSelect: createFakeSelect(["images/generations", "images/edits"], documentRef),
+    grokApiKeyInput: createFakeElement("input", documentRef),
+    grokApiBookToggle: createFakeElement("button", documentRef),
+    grokApiBookList: createFakeElement("div", documentRef),
   };
   const state = {};
   const controller = createApiEndpointBookPickerController({
@@ -181,6 +198,7 @@ function rowTexts(list) {
 
 const OPENAI = { baseUrl: "https://api.openai.com/v1", endpointPath: "responses", apiKey: "sk-abcdef123456" };
 const RELAY = { baseUrl: "https://relay.example.test/v1", endpointPath: "chat/completions", apiKey: "sk-zzzzzz999999" };
+const GROK = { baseUrl: "https://api.x.ai/v1", endpointPath: "images/edits", apiKey: "xai-grokkey123456" };
 
 test("the address label drops the scheme and any trailing slash", () => {
   assert.equal(formatApiEndpointLabel("https://api.openai.com/v1"), "api.openai.com/v1");
@@ -285,6 +303,23 @@ test("a corrupt or unavailable book reads as empty instead of throwing", () => {
 test("legacy bare array storage still reads as a book", () => {
   const storage = createFakeStorage({ [API_ENDPOINT_BOOK_STORAGE_KEY]: JSON.stringify([OPENAI, OPENAI, RELAY]) });
   assert.deepEqual(readApiEndpointBook(storage), [OPENAI, RELAY]);
+  assert.deepEqual(readApiEndpointBook(API_ENDPOINT_BOOK_TARGET_GROK, storage), []);
+});
+
+test("legacy unscoped history migrates only to the default route", () => {
+  const storage = createFakeStorage({
+    [API_ENDPOINT_BOOK_LEGACY_STORAGE_KEY]: JSON.stringify({ entries: [OPENAI, RELAY] }),
+  });
+
+  assert.deepEqual(readApiEndpointBook(API_ENDPOINT_BOOK_TARGET_ROUTE, storage), [OPENAI, RELAY]);
+  assert.deepEqual(readApiEndpointBook(API_ENDPOINT_BOOK_TARGET_DIRECT_IMAGE, storage), []);
+  assert.deepEqual(readApiEndpointBook(API_ENDPOINT_BOOK_TARGET_PROTOCOL, storage), []);
+
+  rememberApiEndpoints(API_ENDPOINT_BOOK_TARGET_GROK, [GROK], storage);
+  const stored = readApiEndpointBooks(storage);
+  assert.deepEqual(stored[API_ENDPOINT_BOOK_TARGET_ROUTE], [OPENAI, RELAY]);
+  assert.deepEqual(stored[API_ENDPOINT_BOOK_TARGET_GROK], [GROK]);
+  assert.deepEqual(stored[API_ENDPOINT_BOOK_TARGET_DIRECT_TEXT], []);
 });
 
 test("listed entries carry a label and mask alongside the plaintext", () => {
@@ -297,7 +332,7 @@ test("listed entries carry a label and mask alongside the plaintext", () => {
 test("an empty book hides every expand control", () => {
   const { refs } = createPickerHarness();
 
-  [refs.routeApiBookToggle, refs.directImageApiBookToggle, refs.directTextApiBookToggle, refs.protocolApiBookToggle].forEach(
+  [refs.routeApiBookToggle, refs.directImageApiBookToggle, refs.directTextApiBookToggle, refs.protocolApiBookToggle, refs.grokApiBookToggle].forEach(
     (toggle) => {
       assert.equal(toggle.hidden, true);
       assert.equal(toggle.disabled, true);
@@ -307,7 +342,7 @@ test("an empty book hides every expand control", () => {
 });
 
 test("picking an API switches its key, address and suffix together", () => {
-  const { applied, refs } = createPickerHarness([OPENAI, RELAY]);
+  const { applied, refs } = createPickerHarness({ [API_ENDPOINT_BOOK_TARGET_DIRECT_IMAGE]: [OPENAI, RELAY] });
 
   clickOn(refs.directImageApiBookToggle);
   const [, relayRow] = refs.directImageApiBookList.children;
@@ -321,6 +356,7 @@ test("picking an API switches its key, address and suffix together", () => {
   assert.equal(refs.baseUrlInput.value, "");
   assert.equal(refs.apiKeyInput.value, "");
   assert.equal(refs.protocolApiKeyInput.value, "");
+  assert.equal(refs.grokApiKeyInput.value, "");
   // 选中即收起，并交回宿主重排地址显示。
   assert.equal(refs.directImageApiBookList.hidden, true);
   assert.deepEqual(applied.map((item) => item.target), ["direct-image"]);
@@ -342,7 +378,7 @@ test("a suffix the current channel does not offer is left alone", () => {
 });
 
 test("the protocol channel has no suffix control and still switches key and address", () => {
-  const { applied, refs } = createPickerHarness([OPENAI]);
+  const { applied, refs } = createPickerHarness({ [API_ENDPOINT_BOOK_TARGET_PROTOCOL]: [OPENAI] });
 
   clickOn(refs.protocolApiBookToggle);
   clickOn(refs.protocolApiBookList.children[0].children[0]);
@@ -350,6 +386,21 @@ test("the protocol channel has no suffix control and still switches key and addr
   assert.equal(refs.protocolBaseUrlInput.value, OPENAI.baseUrl);
   assert.equal(refs.protocolApiKeyInput.value, OPENAI.apiKey);
   assert.deepEqual(applied.map((item) => item.target), ["protocol"]);
+});
+
+test("the Grok address picker applies its endpoint and isolated key", () => {
+  const { applied, refs } = createPickerHarness({ [API_ENDPOINT_BOOK_TARGET_GROK]: [GROK] });
+
+  clickOn(refs.grokApiBookToggle);
+  clickOn(refs.grokApiBookList.children[0].children[0]);
+
+  assert.equal(refs.grokBaseUrlInput.value, GROK.baseUrl);
+  assert.equal(refs.grokEndpointPathSelect.value, GROK.endpointPath);
+  assert.equal(refs.grokApiKeyInput.value, GROK.apiKey);
+  assert.equal(refs.apiKeyInput.value, "");
+  assert.equal(refs.directImageApiKeyInput.value, "");
+  assert.equal(refs.protocolApiKeyInput.value, "");
+  assert.deepEqual(applied.map((item) => item.target), ["grok"]);
 });
 
 test("rows show the address and a masked key, never the plaintext", () => {
@@ -376,24 +427,44 @@ test("rows show the address and a masked key, never the plaintext", () => {
   assert.ok(!serialized.includes(RELAY.apiKey));
 });
 
-test("the four channels share one book", () => {
-  const { refs } = createPickerHarness([OPENAI]);
+test("the five channels keep independent books", () => {
+  const entries = {
+    [API_ENDPOINT_BOOK_TARGET_ROUTE]: [OPENAI],
+    [API_ENDPOINT_BOOK_TARGET_DIRECT_IMAGE]: [RELAY],
+    [API_ENDPOINT_BOOK_TARGET_DIRECT_TEXT]: [{ ...RELAY, apiKey: "sk-text-only-9999" }],
+    [API_ENDPOINT_BOOK_TARGET_PROTOCOL]: [{ ...OPENAI, apiKey: "sk-gemini-only-9999" }],
+    [API_ENDPOINT_BOOK_TARGET_GROK]: [GROK],
+  };
+  const { refs } = createPickerHarness(entries);
 
   [
-    [refs.routeApiBookToggle, refs.routeApiBookList],
-    [refs.directImageApiBookToggle, refs.directImageApiBookList],
-    [refs.directTextApiBookToggle, refs.directTextApiBookList],
-    [refs.protocolApiBookToggle, refs.protocolApiBookList],
-  ].forEach(([toggle, list]) => {
+    [refs.routeApiBookToggle, refs.routeApiBookList, "api.openai.com/v1"],
+    [refs.directImageApiBookToggle, refs.directImageApiBookList, "relay.example.test/v1"],
+    [refs.directTextApiBookToggle, refs.directTextApiBookList, "relay.example.test/v1"],
+    [refs.protocolApiBookToggle, refs.protocolApiBookList, "api.openai.com/v1"],
+    [refs.grokApiBookToggle, refs.grokApiBookList, "api.x.ai/v1"],
+  ].forEach(([toggle, list, label]) => {
     assert.equal(toggle.hidden, false);
     clickOn(toggle);
     assert.equal(list.children.length, 1);
+    assert.equal(list.children[0].children[0].children[0].textContent, label);
     clickOn(toggle);
   });
+
+  // 写入一个通道后，其他四个列表仍保持原来的条目。
+  const { controller, refs: isolatedRefs } = createPickerHarness(entries);
+  controller.remember(API_ENDPOINT_BOOK_TARGET_GROK, { ...GROK, apiKey: "xai-second-key-1234" });
+  clickOn(isolatedRefs.routeApiBookToggle);
+  assert.equal(isolatedRefs.routeApiBookList.children.length, 1);
+  clickOn(isolatedRefs.grokApiBookToggle);
+  assert.equal(isolatedRefs.grokApiBookList.children.length, 2);
 });
 
 test("opening one channel closes the other", () => {
-  const { refs } = createPickerHarness([OPENAI]);
+  const { refs } = createPickerHarness({
+    [API_ENDPOINT_BOOK_TARGET_ROUTE]: [OPENAI],
+    [API_ENDPOINT_BOOK_TARGET_PROTOCOL]: [OPENAI],
+  });
 
   clickOn(refs.routeApiBookToggle);
   assert.equal(refs.routeApiBookList.hidden, false);
@@ -474,7 +545,7 @@ test("remember() feeds the book from a saved config and skips incomplete channel
   assert.equal(refs.routeApiBookToggle.hidden, false);
 });
 
-test("all four address fields carry a picker, and the key fields stay plain", async () => {
+test("all five address fields carry a picker, and the key fields stay plain", async () => {
   const html = await readFile(indexPath, "utf8");
 
   [
@@ -482,6 +553,7 @@ test("all four address fields carry a picker, and the key fields stay plain", as
     ["directBaseUrlInput", "directImageApiBookToggle", "directImageApiBookList"],
     ["directTextBaseUrlInput", "directTextApiBookToggle", "directTextApiBookList"],
     ["protocolBaseUrlInput", "protocolApiBookToggle", "protocolApiBookList"],
+    ["grokBaseUrlInput", "grokApiBookToggle", "grokApiBookList"],
   ].forEach(([inputId, toggleId, listId]) => {
     assert.match(
       html,
@@ -493,11 +565,11 @@ test("all four address fields carry a picker, and the key fields stay plain", as
   });
 
   // 下拉挂在地址上，Key 输入框保持原样：Key 跟着 API 走，不单独挑。
-  ["apiKeyInput", "directApiKeyInput", "directTextApiKeyInput", "protocolApiKeyInput"].forEach((inputId) => {
+  ["apiKeyInput", "directApiKeyInput", "directTextApiKeyInput", "protocolApiKeyInput", "grokApiKeyInput"].forEach((inputId) => {
     assert.doesNotMatch(html, new RegExp(`id="${inputId}"[\\s\\S]{0,200}?api-endpoint-picker-toggle`));
   });
-  assert.equal([...html.matchAll(/data-ui-i18n-placeholder="keepSavedKey"/g)].length, 4);
-  ["savedKeyMask", "directSavedKeyMask", "directTextSavedKeyMask", "protocolSavedKeyMask"].forEach((maskId) => {
+  assert.equal([...html.matchAll(/data-ui-i18n-placeholder="keepSavedKey"/g)].length, 5);
+  ["savedKeyMask", "directSavedKeyMask", "directTextSavedKeyMask", "protocolSavedKeyMask", "grokSavedKeyMask"].forEach((maskId) => {
     assert.match(html, new RegExp(`id="${maskId}" data-ui-i18n="notSaved"`));
   });
 

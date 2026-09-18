@@ -56,7 +56,8 @@ const MAX_RATIO_ROUNDING_DELTA = 64;
 
 test("size options match the provided gpt-image-2 ratio table", () => {
   for (const [ratio, sizes] of Object.entries(EXPECTED_SIZE_OPTIONS)) {
-    assert.deepEqual(getGenerationSizeOptions(ratio).map((option) => option.value), ["auto", ...sizes]);
+    assert.deepEqual(getGenerationSizeOptions(ratio).map((option) => option.value), sizes);
+    assert.equal(getGenerationSizeOptions(ratio).some((option) => option.value === "auto"), false);
   }
 });
 
@@ -113,24 +114,26 @@ test("size compatibility accepts the provided maximum resolutions including the 
   assert.equal(isGenerationSizeCompatible("1:3", "1280x3840"), true);
 });
 
-test("auto defaults use the first 1K candidate for each ratio", () => {
+test("default sizes use the first 1K candidate for each ratio", () => {
   for (const [ratio, sizes] of Object.entries(EXPECTED_SIZE_OPTIONS)) {
     assert.equal(getDefaultGenerationSize(ratio), sizes[0], `${ratio} should default to ${sizes[0]}`);
   }
 });
 
-test("normalizeGenerationSize falls back to auto for invalid resolutions", () => {
+test("normalizeGenerationSize falls back to the first concrete resolution", () => {
   assert.equal(normalizeGenerationSize("4:5", "2048x2560"), "2048x2560");
-  assert.equal(normalizeGenerationSize("4:5", "2048x2048"), "auto");
+  assert.equal(normalizeGenerationSize("4:5", "2048x2048"), "1024x1280");
+  assert.equal(normalizeGenerationSize("4:5", "auto"), "1024x1280");
   assert.equal(getDefaultGenerationSize("9:21"), "1024x2384");
 });
 
 test("model protocol image size options use provider scale values instead of pixel resolutions", () => {
-  assert.deepEqual(getModelProtocolImageSizeOptions().map((option) => option.value), ["auto", "512", "1K", "2K", "4K"]);
+  assert.deepEqual(getModelProtocolImageSizeOptions().map((option) => option.value), ["512", "1K", "2K", "4K"]);
   assert.equal(getDefaultModelProtocolImageSize(), "1K");
   assert.equal(normalizeModelProtocolImageSize("1k"), "1K");
   assert.equal(normalizeModelProtocolImageSize("2K"), "2K");
-  assert.equal(normalizeModelProtocolImageSize("1024x1024"), "auto");
+  assert.equal(normalizeModelProtocolImageSize("1024x1024"), "1K");
+  assert.equal(normalizeModelProtocolImageSize("auto"), "1K");
   assert.equal(isModelProtocolImageSizeCompatible("4K"), true);
   assert.equal(isModelProtocolImageSizeCompatible("2048x2048"), false);
 });
