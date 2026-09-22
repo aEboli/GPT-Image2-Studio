@@ -27,12 +27,12 @@ Each carousel or SKU item prompt SHALL contain at most 3300 characters. Every ro
 - **WHEN** the plan appends SKU items for distinct sellable subjects
 - **THEN** each SKU item prompt is at most 3300 characters
 - **AND** it contains no prohibition phrasing
-- **AND** it still requires the supplied SKU subject, its preserved shape, colors, markings, and identifiers, a new ecommerce background, the requested combination count, and one shared series template
+- **AND** it still requires the supplied SKU subject, its preserved shape, colors, markings, and identifiers, a new ecommerce background, the applicable subject count, and one shared series template
 
 ## MODIFIED Requirements
 
-### Requirement: Creation Mode generates a conversion-oriented ecommerce image set
-The system SHALL generate one set for one product with quick presets of 4, 6, 8, 10, 12, 14, or 16 ecommerce marketing roles and SHALL allow the user to customize which of the 16 image roles are generated for the current set: hero, benefit, scene, multi-angle, atmosphere, product detail, brand story, size/capacity/fit, effect comparison, specification table, craft process, accessory/gift, series showcase, ingredient/material, after-sales, and usage suggestion. The system SHALL keep those role IDs stable while presenting conversion-oriented Chinese role labels: 首图成交主视觉, 目标人群共鸣图, 适用多场景图, 多角度产品展示图, 冲动下单氛围图, 产品细节特写图, 品牌质感/礼品价值图, 尺寸容量适配图, 功能效果渲染图, 参数规格图, 品质工艺证明图, 到手清单/配件图, 多款式/SKU选择图, 材质成分解析图, 痛点图, and 卖点图. The system SHALL also allow the user to choose an industry template for general ecommerce, apparel, beauty, food, consumer electronics, home/living products, or a searchable fourth-level ecommerce category template. The system SHALL support a set-level visual-language selector that defaults to `classic-commercial` and keeps the generated set visually consistent across lighting, tone, material treatment, realism level, and brand atmosphere. When the user uses a preset without custom role changes and no non-general industry template is selected, the first four roles SHALL remain 首图成交主视觉, 目标人群共鸣图, 适用多场景图, and 多角度产品展示图.
+### Requirement: Creation Mode generates configurable ecommerce sets
+The system SHALL generate one set for one product with quick presets of 4, 6, 8, 10, 12, 14, or 16 ecommerce marketing roles and SHALL allow the user to customize which of the 16 image roles are generated for the current set: hero, benefit, scene, multi-angle, atmosphere, product detail, brand story, size/capacity/fit, effect comparison, specification table, craft process, accessory/gift, series showcase, ingredient/material, after-sales, and usage suggestion. The system SHALL keep those role IDs stable while presenting conversion-oriented Chinese role labels: 首图成交主视觉, 目标人群共鸣图, 适用多场景图, 多角度产品展示图, 冲动下单氛围图, 产品细节特写图, 品牌质感/礼品价值图, 尺寸容量适配图, 功能效果渲染图, 参数规格图, 品质工艺证明图, 到手清单/配件图, 多款式/SKU选择图, 材质成分解析图, 痛点图, and 卖点图. The system SHALL also allow the user to choose an industry template for general ecommerce, apparel, beauty, food, consumer electronics, home/living products, or a searchable fourth-level ecommerce category template. The system SHALL support a set-level visual-language selector that defaults to `classic-commercial` and keeps the generated set visually consistent across lighting, tone, material treatment, realism level, and brand atmosphere. When the user uses a preset without custom role changes and no non-general industry template is selected, the first four roles SHALL remain 首图成交主视觉, 目标人群共鸣图, 适用多场景图, and 多角度产品展示图. Newly planned SKU items SHALL use one complete subject per distinct sellable SKU; only historical frozen plans may preserve a previously recorded combination count.
 
 #### Scenario: User starts a conversion-oriented creation set
 - **WHEN** the user submits product information and a target language in Creation Mode
@@ -84,12 +84,17 @@ The system SHALL generate one set for one product with quick presets of 4, 6, 8,
 - **AND** each SKU prompt changes the background while preserving the subject shape, colors, markings, identifiers, and existing product logos
 - **AND** if the user uploaded a Logo reference, each SKU prompt also applies that supplied logo while existing product identifiers stay visible
 
+#### Scenario: New plans use one complete subject per SKU
+- **WHEN** the user previews or generates a new Creation Mode set with distinct sellable SKU subjects
+- **THEN** the UI does not expose a SKU combination-count control
+- **AND** every appended SKU image prompt uses one complete instance of its matched SKU subject
+- **AND** the plan and generation request do not accept a user-entered count for duplicating that subject
+
 #### Scenario: User sets a same-SKU combination pack count
-- **WHEN** the user sets the SKU combination count to 2, 5, or an equivalent Chinese numeral before planning or generating a Creation Mode set
-- **THEN** every appended SKU image prompt requires exactly that many identical copies of the same SKU subject
-- **AND** the prompt frames the count change as copy-and-arrange duplication of the same supplied subject with its shape, colors, markings, and hardware unchanged
-- **AND** each SKU generation request attaches only the matched SKU subject reference images, plus the optional Logo reference, so unrelated uploaded product, package, scene, or material references cannot become the SKU subject
-- **AND** a count of 1 keeps the previous single-subject SKU image behavior
+- **WHEN** a saved Creation Mode set created before this control was removed contains a frozen SKU combination count greater than one and the user repairs it
+- **THEN** the repair keeps the saved count and frozen prompt semantics
+- **AND** opening or repairing the record does not rewrite its manifest to one
+- **AND** new Creation Mode plans do not expose or submit a user-entered combination count
 
 #### Scenario: User customizes selected image roles
 - **WHEN** the user selects a custom subset of Creation Mode image roles before generation
@@ -128,8 +133,47 @@ The system SHALL generate one set for one product with quick presets of 4, 6, 8,
 - **AND** effect comparison prompts treat the role as a `功能效果渲染图` that may use premium 3D/CGI or cinematic product visualization to show a supplied function, mechanism, effect path, or outcome in one unified product-led composition
 - **AND** those prompts still limit visible technical structures, parameters, certifications, performance numbers, and effects to supplied facts
 
+#### Scenario: User changes marketing scenario
+- **WHEN** the user selects a Creation Mode marketing scenario such as livestream, marketplace search, gift guide, or brand story
+- **THEN** the role picker updates to the scenario's recommended image-role combination
+- **AND** the quick image count reflects the recommended role count when that count is supported
+- **AND** the user can still manually add or remove image roles before generation
+
+#### Scenario: User chooses a category industry template progressively
+- **WHEN** the user opens the Creation Mode industry template browser
+- **THEN** the main form shows a single current-category control instead of occupying the form with multiple category columns
+- **AND** the system opens a floating dropdown that shows only first-level categories by default
+- **AND** choosing a first-level category keeps the dropdown open and replaces the list with matching second-level categories
+- **AND** choosing a second-level category replaces the list with matching third-level categories
+- **AND** choosing a third-level category replaces the list with matching fourth-level category templates
+- **AND** the main control displays the currently chosen category name while the user progresses through the hierarchy
+- **AND** previous broad industry template choices such as apparel, beauty, food, consumer electronics, or home/living are not shown as selectable templates
+- **WHEN** the user selects a fourth-level category template
+- **THEN** the role picker updates to that category template's recommended role combination
+- **AND** the planned prompts include the selected fourth-level category's path-specific visual and compliance guidance
+- **AND** the generation and plan-preview requests include the selected category-coded industry template
+
+#### Scenario: User searches third-level or fourth-level category templates
+- **WHEN** the user searches Creation Mode industry templates by third-level category name, fourth-level category name, or category code
+- **THEN** the system shows matching category templates named by their fourth-level category
+- **AND** the search results only contain fourth-level category templates, not the previous broad industry templates
+- **AND** the search does not return category templates for queries that only match first-level or second-level category names
+- **AND** duplicate fourth-level names remain distinguishable by their full category path
+- **AND** the selected category template is submitted using its unique category code
+- **AND** the planned prompts include category-path-specific visual guidance for that fourth-level category
+
+#### Scenario: Smart reference analysis selects a category template
+- **WHEN** Creation reference-image smart analysis identifies a product category with enough context to match a fourth-level category template
+- **THEN** the system switches the industry template control to that category template
+- **AND** the role picker updates to that category template's recommended role combination
+- **AND** the analysis feedback names the matched category path
+
+#### Scenario: Product information is missing
+- **WHEN** the user submits Creation Mode without product information
+- **THEN** the system rejects the request with a visible validation message and does not start image generation
+
 ### Requirement: Creation Mode supports independent reference images and marketing scenarios
-The system SHALL allow Creation Mode to upload its own reference images and choose a marketing scenario without sharing prompt-mode reference-image state.
+The system SHALL allow Creation Mode to upload its own reference images and choose a marketing scenario without sharing prompt-mode reference-image state. Creation Mode SHALL expose its own thinking-effort and image-quality selectors in the compact generation-control grid, and these selectors SHALL not read Prompt Mode's current values.
 
 #### Scenario: User adds Creation Mode reference images
 - **WHEN** the user uploads or drops images in the Creation Mode reference area
@@ -144,9 +188,16 @@ The system SHALL allow Creation Mode to upload its own reference images and choo
 
 #### Scenario: User edits Creation Mode generation parameters
 - **WHEN** the user opens the Creation Mode parameter area
-- **THEN** set count, SKU combination count, marketing scenario, visual language, target language, output format, ratio, and resolution are presented in one compact control grid
+- **THEN** set count, target language, output format, ratio, resolution, thinking effort, and quality are presented in one compact control grid
+- **AND** the grid does not expose a SKU combination-count control
 - **AND** the desktop layout keeps those controls compact without sharing prompt-mode parameter state
 - **AND** changing the Creation Mode ratio refreshes only the Creation Mode resolution options
+
+#### Scenario: User selects Creation Mode thinking effort and quality
+- **WHEN** the user selects a thinking effort and quality before planning or generating a Creation Mode set
+- **THEN** the plan and generation requests use the selected thinking effort
+- **AND** the generation request uses the selected quality after normalization for the active image model
+- **AND** a queued set retains those values for its generation operation.
 
 #### Scenario: User tags reference image roles
 - **WHEN** the user assigns a role such as product, package, material, scene, style, or other to a Creation Mode reference image

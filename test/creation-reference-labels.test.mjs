@@ -10,7 +10,7 @@ import {
 } from "../lib/creation-reference-labels.mjs";
 import { normalizeCreationCoverageFields } from "../lib/creation-reference-coverage.mjs";
 
-test("creation reference labels state uploaded count, file list, image order, and roles", () => {
+test("creation reference labels keep a short role-scoped summary", () => {
   const labels = buildCreationReferenceImageLabels(
     [
       { filename: "F2J32257.png" },
@@ -33,17 +33,12 @@ test("creation reference labels state uploaded count, file list, image order, an
   );
 
   assert.equal(labels.length, 4);
-  assert.match(labels[0], /Creation reference image 1 of 4: F2J32257\.png\./);
-  assert.match(labels[0], /Uploaded reference count: 4\./);
-  assert.match(
-    labels[0],
-    /Uploaded reference files: 1\. F2J32257\.png; 2\. F2J32258\.png; 3\. F2J32259\.png; 4\. F2J32260\.png\./,
-  );
+  assert.match(labels[0], /Reference 1: F2J32257\.png\./);
   assert.match(labels[0], /Role: product subject\. Preserve shape and hardware\./);
-  assert.match(labels[0], /Product identity authority/);
-  assert.match(labels[1], /Creation reference image 2 of 4: F2J32258\.png\./);
+  assert.match(labels[0], /Supporting product reference/);
+  assert.match(labels[1], /Reference 2: F2J32258\.png\./);
   assert.match(labels[1], /Role: style reference\. Use this for color and lighting\./);
-  assert.match(labels[1], /Supporting-only reference/);
+  assert.doesNotMatch(labels[0], /Uploaded reference count|Uploaded reference files/);
 });
 
 test("creation reference labels are empty when no images are attached", () => {
@@ -279,6 +274,43 @@ test("creation hero item reference images prefer the selected reference subject"
     },
   ]);
   assert.match(labels[1], /Product identity authority/);
+});
+
+test("creation reference selection keeps dimensions scoped and anchors identity to the product role", () => {
+  const dimensionsOnly = [{ filename: "size-card.png" }];
+  const dimensionsRole = [{ filename: "size-card.png", role: "dimensions" }];
+
+  assert.deepEqual(
+    buildCreationItemReferenceImages({ role: "hero" }, dimensionsOnly, dimensionsRole),
+    [],
+  );
+  assert.deepEqual(
+    buildCreationItemReferenceImages({ role: "size-capacity-fit" }, dimensionsOnly, dimensionsRole),
+    dimensionsOnly,
+  );
+
+  const images = [
+    { filename: "size-card.png", referenceIndex: 1 },
+    { filename: "heated-glove.png", referenceIndex: 2 },
+  ];
+  const roles = [
+    { index: 1, filename: "size-card.png", role: "dimensions", rolePromptLabel: "dimensions and specifications" },
+    { index: 2, filename: "heated-glove.png", role: "product", rolePromptLabel: "product subject" },
+  ];
+
+  assert.deepEqual(
+    buildCreationItemReferenceImages({ role: "hero" }, images, roles).map((image) => image.filename),
+    ["heated-glove.png"],
+  );
+  assert.deepEqual(
+    buildCreationItemReferenceImages({ role: "size-capacity-fit" }, images, roles).map((image) => image.filename),
+    ["heated-glove.png", "size-card.png"],
+  );
+
+  const labels = buildCreationReferenceImageLabels(images, roles);
+  assert.doesNotMatch(labels[0], /Product identity authority:/);
+  assert.match(labels[1], /Product identity authority:/);
+  assert.equal(labels.filter((label) => /Product identity authority:/.test(label)).length, 1);
 });
 
 test("creation material item reference images keep primary product plus material details", () => {
@@ -607,9 +639,9 @@ test("creation reference labels keep roles after compression renames and subset 
 
   const labels = buildCreationReferenceImageLabels(selected, roles);
   assert.match(labels[0], /Role: reference subject\./);
-  assert.match(labels[0], /Primary subject anchor:/);
+  assert.match(labels[0], /Subject anchor:/);
   assert.match(labels[1], /Role: material detail\./);
-  assert.match(labels[1], /supporting reference after the primary subject anchor/i);
+  assert.match(labels[1], /Supporting reference: use this image for its assigned constraint/i);
   assert.doesNotMatch(labels[0], /Role: scene\./);
   assert.doesNotMatch(labels[1], /Role: reference subject\./);
 });

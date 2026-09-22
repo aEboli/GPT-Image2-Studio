@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { replaceWorkbenchVersionFact } from "./check-release-readiness.mjs";
 import { findVersionFactDrift, getMaintainedVersionFactTemplates, replaceVersionFacts } from "./version-facts.mjs";
+import { VERSION_BUMP_TYPES, bumpVersion, getVersionBumpDescription } from "./versioning.mjs";
 
 const scriptsDir = dirname(fileURLToPath(import.meta.url));
 const projectRootDir = resolve(scriptsDir, "..");
@@ -34,11 +35,15 @@ const maintainedVersionFiles = [
 ];
 
 export function incrementPatchVersion(version) {
-  const match = String(version || "").trim().match(/^(\d+)\.(\d+)\.(\d+)$/);
-  if (!match) {
-    throw new Error(`Expected a stable semantic version, received: ${version || "empty"}`);
+  return bumpVersion(version, "patch");
+}
+
+export function normalizeReleaseType(type = "patch") {
+  const value = String(type || "patch").trim().toLowerCase();
+  if (!VERSION_BUMP_TYPES.includes(value)) {
+    throw new Error(`不支持的版本升级类型：${value || "空值"}；可选值为 ${VERSION_BUMP_TYPES.join(", ")}`);
   }
-  return `${match[1]}.${match[2]}.${Number(match[3]) + 1}`;
+  return value;
 }
 
 function replaceMaintainedVersion(content, previousVersion, version, { relativePath, factPattern, replace }) {
@@ -189,7 +194,7 @@ async function writeFilesTransaction(targets, fileOperations) {
     );
     if (cleanupFailures.length) {
       throw createTransactionError(
-        "Patch release staging failed; no version files were committed and temporary-file cleanup was incomplete",
+        "Version release staging failed; no version files were committed and temporary-file cleanup was incomplete",
         [...stageFailures, ...cleanupFailures],
         {
           stageFailures,
@@ -200,13 +205,13 @@ async function writeFilesTransaction(targets, fileOperations) {
       );
     }
     throw createTransactionError(
-      "Patch release staging failed; no version files were committed",
+      "Version release staging failed; no version files were committed",
       stageFailures,
       { stageFailures, cleanupFailures, pendingTemporaryPaths: [], committed: false },
     );
   }
 
-  let commitOperation = "Committing patch release";
+  let commitOperation = "Committing version release";
   try {
     for (const entry of entries) {
       if (entry.existing) {
@@ -260,7 +265,7 @@ async function writeFilesTransaction(targets, fileOperations) {
     const pendingTemporaryPaths = cleanupFailures.map((failure) => failure.path).filter(Boolean);
     if (rollbackFailures.length) {
       throw createTransactionError(
-        "Patch release failed and rollback was incomplete",
+        "Version release failed and rollback was incomplete",
         failures,
         {
           originalError: error,
@@ -275,7 +280,7 @@ async function writeFilesTransaction(targets, fileOperations) {
     }
     if (cleanupFailures.length) {
       throw createTransactionError(
-        "Patch release failed; version files were rolled back, but transaction cleanup was incomplete",
+        "Version release failed; version files were rolled back, but transaction cleanup was incomplete",
         failures,
         {
           originalError: error,
@@ -289,7 +294,7 @@ async function writeFilesTransaction(targets, fileOperations) {
       );
     }
     throw createTransactionError(
-      "Patch release failed; version files were rolled back",
+      "Version release failed; version files were rolled back",
       [error],
       {
         originalError: error,
@@ -311,7 +316,7 @@ async function writeFilesTransaction(targets, fileOperations) {
   );
   if (backupCleanupFailures.length) {
     throw createTransactionError(
-      "Patch release was committed, but backup cleanup was incomplete; version files remain updated",
+      "Version release was committed, but backup cleanup was incomplete; version files remain updated",
       backupCleanupFailures,
       {
         committed: true,
@@ -322,7 +327,7 @@ async function writeFilesTransaction(targets, fileOperations) {
   }
 }
 
-function buildReleaseNote({ previousVersion, version, summary }) {
+function buildReleaseNote({ previousVersion, version, summary, type }) {
   return `# GPT-Image2-Studio v${version}
 
 \`v${version}\` 将主应用版本从 \`${previousVersion}\` 更新到 \`${version}\`。
@@ -331,9 +336,13 @@ function buildReleaseNote({ previousVersion, version, summary }) {
 
 - ${summary}
 
+## 版本规则
+
+- ${getVersionBumpDescription(type)}。
+- 版本格式为 \`major.minor.patch\`，patch 固定三位数字；上级版本变化时，下级版本归零。
+
 ## 升级说明
 
-- 主应用每次更新仅递增一个补丁版本，即 \`+0.0.1\`。
 - 既有配置、生成记录和图片资产不需要迁移。
 - 商品图采集扩展使用独立版本线，本次主应用更新不会修改扩展版本。
 
@@ -343,11 +352,12 @@ function buildReleaseNote({ previousVersion, version, summary }) {
 `;
 }
 
-export async function bumpPatchRelease({ rootDir = projectRootDir, summary, fileOperations } = {}) {
+export async function bumpRelease({ rootDir = projectRootDir, summary, type = "patch", fileOperations } = {}) {
   const normalizedSummary = String(summary || "").trim();
   if (!normalizedSummary) {
-    throw new Error("Patch release summary is required");
+    throw new Error("Version release summary is required");
   }
+  const normalizedType = normalizeReleaseType(type);
 
   const operations = { ...defaultFileOperations, ...fileOperations };
   const packagePath = join(rootDir, "package.json");
@@ -360,7 +370,7 @@ export async function bumpPatchRelease({ rootDir = projectRootDir, summary, file
   const packageJson = JSON.parse(packageSource);
   const packageLock = JSON.parse(lockSource);
   const previousVersion = String(packageJson.version || "").trim();
-  const version = incrementPatchVersion(previousVersion);
+  const version = bumpVersion(previousVersion, normalizedType);
   const versionLabel = `v${version}`;
 
   if (packageLock.version !== previousVersion || packageLock.packages?.[""]?.version !== previousVersion) {
@@ -408,7 +418,7 @@ export async function bumpPatchRelease({ rootDir = projectRootDir, summary, file
     {
       path: releaseNotePath,
       relativePath: `docs/releases/${versionLabel}.md`,
-      content: buildReleaseNote({ previousVersion, version, summary: normalizedSummary }),
+      content: buildReleaseNote({ previousVersion, version, summary: normalizedSummary, type: normalizedType }),
       existing: false,
     },
   ];
@@ -418,14 +428,24 @@ export async function bumpPatchRelease({ rootDir = projectRootDir, summary, file
   return { previousVersion, version, versionLabel };
 }
 
+export async function bumpPatchRelease(options = {}) {
+  return bumpRelease({ ...options, type: "patch" });
+}
+
 function readSummaryArgument(args) {
   const summaryIndex = args.indexOf("--summary");
   return summaryIndex >= 0 ? args[summaryIndex + 1] : "";
 }
 
+function readTypeArgument(args) {
+  const typeIndex = args.indexOf("--type");
+  return typeIndex >= 0 ? args[typeIndex + 1] : "patch";
+}
+
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
   try {
-    const result = await bumpPatchRelease({ summary: readSummaryArgument(process.argv.slice(2)) });
+    const args = process.argv.slice(2);
+    const result = await bumpRelease({ summary: readSummaryArgument(args), type: readTypeArgument(args) });
     console.log(`主应用版本已从 v${result.previousVersion} 更新到 ${result.versionLabel}`);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));

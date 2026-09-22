@@ -100,7 +100,7 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="./styles.css?v=20260911-imperial-black-3" />
+    <link rel="stylesheet" href="./styles.css?v=20260922-prompt-template-library-2" />
   </head>
   <body>
     <div class="app-shell">
@@ -2670,7 +2670,7 @@
       </main>
     </div>
 
-    <small class="app-version" aria-label="当前版本 v0.2.19">v0.2.19</small>
+    <small class="app-version" aria-label="当前版本 v0.2.020">v0.2.020</small>
 
     <dialog
       class="creation-record-delete-dialog"
@@ -3158,260 +3158,261 @@
                 <input name="imageRoute" type="radio" value="d" />
               </div>
 
-              <div class="config-route-fields">
-                <div class="route-config-panel" data-route-panel="a">
-                  <div class="field endpoint-field">
-                    <div class="field-heading inline endpoint-heading">
-                      <label for="baseUrlInput" data-ui-i18n="endpointUrl">接口地址</label>
-                      <div class="endpoint-toolbar">
-                        <select class="endpoint-suffix-select" id="endpointPathSelect" name="endpointPath" aria-label="路由模式请求协议后缀" data-ui-i18n-aria-label="routeEndpointSuffix">
-                          <option value="responses">responses</option>
-                        </select>
-                        <button class="inline-button endpoint-full-toggle" id="baseUrlFullToggle" type="button" aria-pressed="false" data-ui-i18n="fullUrl" data-ui-i18n-title="fullUrlHint">完整 URL</button>
+              <div class="config-content-stack">
+                <div class="config-route-fields">
+                  <div class="route-config-panel" data-route-panel="a">
+                    <div class="field endpoint-field">
+                      <div class="field-heading inline endpoint-heading">
+                        <label for="baseUrlInput" data-ui-i18n="endpointUrl">接口地址</label>
+                        <div class="endpoint-toolbar">
+                          <select class="endpoint-suffix-select" id="endpointPathSelect" name="endpointPath" aria-label="路由模式请求协议后缀" data-ui-i18n-aria-label="routeEndpointSuffix">
+                            <option value="responses">responses</option>
+                          </select>
+                          <button class="inline-button endpoint-full-toggle" id="baseUrlFullToggle" type="button" aria-pressed="false" data-ui-i18n="fullUrl" data-ui-i18n-title="fullUrlHint">完整 URL</button>
+                        </div>
+                      </div>
+                      <div class="endpoint-address-control">
+                        <input id="baseUrlInput" name="baseUrl" type="url" placeholder="https://api.openai.com/v1" required />
+                        <button class="api-endpoint-picker-toggle" id="routeApiBookToggle" type="button" aria-label="展开已保存的 API" aria-expanded="false" aria-controls="routeApiBookList" data-ui-i18n-aria-label="apiBookExpand" hidden></button>
+                        <div class="api-endpoint-options-list" id="routeApiBookList" role="listbox" hidden></div>
                       </div>
                     </div>
-                    <div class="endpoint-address-control">
-                      <input id="baseUrlInput" name="baseUrl" type="url" placeholder="https://api.openai.com/v1" required />
-                      <button class="api-endpoint-picker-toggle" id="routeApiBookToggle" type="button" aria-label="展开已保存的 API" aria-expanded="false" aria-controls="routeApiBookList" data-ui-i18n-aria-label="apiBookExpand" hidden></button>
-                      <div class="api-endpoint-options-list" id="routeApiBookList" role="listbox" hidden></div>
+
+                    <label class="field">
+                      <div class="field-heading inline">
+                        <span data-ui-i18n="apiKeyLabel">API Key</span>
+                        <small id="savedKeyMask" data-ui-i18n="notSaved">未保存</small>
+                      </div>
+                      <input id="apiKeyInput" name="apiKey" type="password" placeholder="保持已保存 Key" data-ui-i18n-placeholder="keepSavedKey" />
+                    </label>
+
+                    <div class="field model-field">
+                      <div class="field-heading inline">
+                        <label for="responsesModelInput" data-ui-i18n="responsesModel">Responses 模型</label>
+                        <button class="inline-button" id="fetchModelsButton" type="button" data-ui-i18n="fetchModels" data-ui-i18n-title="fetchModelsFull">获取模型列表</button>
+                      </div>
+                      <div class="model-picker-control">
+                        <input id="responsesModelInput" name="responsesModel" type="text" placeholder="gpt-5.4-mini" autocomplete="off" aria-controls="modelOptionsList" />
+                        <button class="model-picker-toggle" id="modelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="modelOptionsList" data-ui-i18n-aria-label="expandModels" hidden></button>
+                        <div class="model-options-list" id="modelOptionsList" role="listbox" hidden></div>
+                      </div>
+                    </div>
+
+                    <label class="field">
+                      <div class="field-heading inline">
+                        <span class="field-label-with-hint">
+                          <span data-ui-i18n="imageToolModel">生图工具模型</span>
+                          <span class="field-hint-marker" tabindex="0" role="note" aria-label="查看说明" data-ui-i18n-aria-label="hintMarker" data-tooltip="路由模式在 Responses 请求的 image_generation 工具里使用该模型。默认 gpt-image-2；sunburst 精修更准，flare 出图更快。" data-ui-i18n-tooltip="imageToolModelHint">?</span>
+                        </span>
+                      </div>
+                      <select id="imageToolModelSelect" name="imageToolModel">
+                        <option value="gpt-image-2">gpt-image-2</option>
+                        <option value="gpt-image-2.5-sunburst">gpt-image-2.5-sunburst</option>
+                        <option value="gpt-image-2.5-flare">gpt-image-2.5-flare</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <div class="route-config-panel" data-route-panel="b">
+                    <div class="field endpoint-field">
+                      <div class="field-heading inline endpoint-heading">
+                        <label for="directBaseUrlInput" data-ui-i18n="directImageApi">生图 API</label>
+                        <div class="endpoint-toolbar">
+                          <select class="endpoint-suffix-select" id="directEndpointPathSelect" name="directImageEndpointPath" aria-label="直接调用模式生图请求协议后缀" data-ui-i18n-aria-label="directImageEndpointSuffix">
+                            <option value="images/generations">images/generations</option>
+                            <option value="responses">responses</option>
+                            <option value="chat/completions">chat/completions</option>
+                          </select>
+                          <button class="inline-button endpoint-full-toggle" id="directBaseUrlFullToggle" type="button" aria-pressed="false" data-ui-i18n="fullUrl" data-ui-i18n-title="fullUrlHint">完整 URL</button>
+                        </div>
+                      </div>
+                      <div class="endpoint-address-control">
+                        <input id="directBaseUrlInput" name="directImageBaseUrl" type="url" placeholder="https://api.openai.com/v1" required />
+                        <button class="api-endpoint-picker-toggle" id="directImageApiBookToggle" type="button" aria-label="展开已保存的 API" aria-expanded="false" aria-controls="directImageApiBookList" data-ui-i18n-aria-label="apiBookExpand" hidden></button>
+                        <div class="api-endpoint-options-list" id="directImageApiBookList" role="listbox" hidden></div>
+                      </div>
+                    </div>
+
+                    <label class="field">
+                      <div class="field-heading inline">
+                        <span data-ui-i18n="directImageApiKey">生图 API Key</span>
+                        <small id="directSavedKeyMask" data-ui-i18n="notSaved">未保存</small>
+                      </div>
+                      <input id="directApiKeyInput" name="directImageApiKey" type="password" placeholder="保持已保存 Key" data-ui-i18n-placeholder="keepSavedKey" />
+                    </label>
+
+                    <div class="field model-field">
+                      <div class="field-heading inline">
+                        <label for="directImageModelInput" data-ui-i18n="imageModel">生图模型</label>
+                        <button class="inline-button" id="directFetchModelsButton" type="button" data-ui-i18n="fetchModels" data-ui-i18n-title="fetchModelsFull">获取模型列表</button>
+                      </div>
+                      <div class="model-picker-control">
+                        <input id="directImageModelInput" name="directImageModel" type="text" placeholder="gpt-image-2" autocomplete="off" aria-controls="directModelOptionsList" />
+                        <button class="model-picker-toggle" id="directModelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="directModelOptionsList" data-ui-i18n-aria-label="expandModels" hidden></button>
+                        <div class="model-options-list" id="directModelOptionsList" role="listbox" hidden></div>
+                      </div>
+                    </div>
+
+                    <div class="field endpoint-field direct-text-endpoint-field">
+                      <div class="field-heading inline endpoint-heading">
+                        <label for="directTextBaseUrlInput" data-ui-i18n="directTextApi">文本/视觉 API</label>
+                        <div class="endpoint-toolbar">
+                          <select class="endpoint-suffix-select" id="directTextEndpointPathSelect" name="directTextEndpointPath" aria-label="直接调用模式文本请求协议后缀" data-ui-i18n-aria-label="directTextEndpointSuffix">
+                            <option value="responses">responses</option>
+                            <option value="chat/completions">chat/completions</option>
+                          </select>
+                          <button class="inline-button endpoint-full-toggle" id="directTextBaseUrlFullToggle" type="button" aria-pressed="false" data-ui-i18n="fullUrl" data-ui-i18n-title="fullUrlHint">完整 URL</button>
+                        </div>
+                      </div>
+                      <div class="endpoint-address-control">
+                        <input id="directTextBaseUrlInput" name="directTextBaseUrl" type="url" placeholder="https://api.openai.com/v1" required />
+                        <button class="api-endpoint-picker-toggle" id="directTextApiBookToggle" type="button" aria-label="展开已保存的 API" aria-expanded="false" aria-controls="directTextApiBookList" data-ui-i18n-aria-label="apiBookExpand" hidden></button>
+                        <div class="api-endpoint-options-list" id="directTextApiBookList" role="listbox" hidden></div>
+                      </div>
+                    </div>
+
+                    <label class="field">
+                      <div class="field-heading inline">
+                        <span data-ui-i18n="directTextApiKey">文本/视觉 API Key</span>
+                        <small id="directTextSavedKeyMask" data-ui-i18n="notSaved">未保存</small>
+                      </div>
+                      <input id="directTextApiKeyInput" name="directTextApiKey" type="password" placeholder="保持已保存 Key" data-ui-i18n-placeholder="keepSavedKey" />
+                    </label>
+
+                    <div class="field model-field">
+                      <div class="field-heading inline">
+                        <label for="directResponsesModelInput" data-ui-i18n="visionTextModel">文本/视觉模型</label>
+                        <button class="inline-button" id="directResponsesFetchModelsButton" type="button" data-ui-i18n="fetchModels" data-ui-i18n-title="fetchModelsFull">获取模型列表</button>
+                      </div>
+                      <div class="model-picker-control">
+                        <input id="directResponsesModelInput" name="directTextModel" type="text" placeholder="gpt-5.4-mini" autocomplete="off" aria-controls="directResponsesModelOptionsList" />
+                        <button class="model-picker-toggle" id="directResponsesModelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="directResponsesModelOptionsList" data-ui-i18n-aria-label="expandModels" hidden></button>
+                        <div class="model-options-list" id="directResponsesModelOptionsList" role="listbox" hidden></div>
+                      </div>
                     </div>
                   </div>
 
-                  <label class="field">
-                    <div class="field-heading inline">
-                      <span data-ui-i18n="apiKeyLabel">API Key</span>
-                      <small id="savedKeyMask" data-ui-i18n="notSaved">未保存</small>
+                  <div class="route-config-panel" data-route-panel="c">
+                    <div class="field endpoint-field protocol-endpoint-field">
+                      <div class="field-heading inline endpoint-heading">
+                        <span class="field-label-with-hint">
+                          <label for="protocolBaseUrlInput" data-ui-i18n="baseUrl">基础 URL</label>
+                          <span class="field-hint-marker" id="protocolCompatibilityHint" tabindex="0" role="note" aria-label="查看说明" data-ui-i18n-aria-label="hintMarker" data-tooltip="Gemini 图像模型按 OpenAI 兼容的图像生成协议调用；基础 URL 通常填写到 /v1，实际请求为 /images/generations。" data-ui-i18n-tooltip="protocolHint">?</span>
+                        </span>
+                        <div class="endpoint-toolbar protocol-endpoint-toolbar">
+                          <small class="endpoint-suffix-preview" id="protocolEndpointPreview" title="https://api.openai.com/v1/images/generations" aria-label="https://api.openai.com/v1/images/generations">images/generations</small>
+                        </div>
+                      </div>
+                      <div class="endpoint-address-control">
+                        <input id="protocolBaseUrlInput" name="protocolBaseUrl" type="url" placeholder="https://api.vendor.example/v1" />
+                        <button class="api-endpoint-picker-toggle" id="protocolApiBookToggle" type="button" aria-label="展开已保存的 API" aria-expanded="false" aria-controls="protocolApiBookList" data-ui-i18n-aria-label="apiBookExpand" hidden></button>
+                        <div class="api-endpoint-options-list" id="protocolApiBookList" role="listbox" hidden></div>
+                      </div>
                     </div>
-                    <input id="apiKeyInput" name="apiKey" type="password" placeholder="保持已保存 Key" data-ui-i18n-placeholder="keepSavedKey" />
-                  </label>
 
-                  <div class="field model-field">
-                    <div class="field-heading inline">
-                      <label for="responsesModelInput" data-ui-i18n="responsesModel">Responses 模型</label>
-                      <button class="inline-button" id="fetchModelsButton" type="button" data-ui-i18n="fetchModels" data-ui-i18n-title="fetchModelsFull">获取模型列表</button>
-                    </div>
-                    <div class="model-picker-control">
-                      <input id="responsesModelInput" name="responsesModel" type="text" placeholder="gpt-5.4-mini" autocomplete="off" aria-controls="modelOptionsList" />
-                      <button class="model-picker-toggle" id="modelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="modelOptionsList" data-ui-i18n-aria-label="expandModels" hidden></button>
-                      <div class="model-options-list" id="modelOptionsList" role="listbox" hidden></div>
+                    <label class="field">
+                      <div class="field-heading inline">
+                        <span data-ui-i18n="apiKeyLabel">API Key</span>
+                        <small id="protocolSavedKeyMask" data-ui-i18n="notSaved">未保存</small>
+                      </div>
+                      <input id="protocolApiKeyInput" name="protocolApiKey" type="password" placeholder="保持已保存 Key" data-ui-i18n-placeholder="keepSavedKey" />
+                    </label>
+
+                    <div class="field model-field">
+                      <div class="field-heading inline">
+                        <label for="protocolImageModelInput" data-ui-i18n="protocolImageModel">图像模型</label>
+                        <button class="inline-button" id="protocolFetchModelsButton" type="button" data-ui-i18n="fetchModels" data-ui-i18n-title="fetchModelsFull">获取模型列表</button>
+                      </div>
+                      <div class="model-picker-control">
+                        <input id="protocolImageModelInput" name="protocolImageModel" type="text" placeholder="gemini-3.1-flash-image-preview" autocomplete="off" aria-controls="protocolModelOptionsList" />
+                        <button class="model-picker-toggle" id="protocolModelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="protocolModelOptionsList" data-ui-i18n-aria-label="expandModels" hidden></button>
+                        <div class="model-options-list" id="protocolModelOptionsList" role="listbox" hidden></div>
+                      </div>
                     </div>
                   </div>
 
-                  <label class="field">
-                    <div class="field-heading inline">
-                      <span class="field-label-with-hint">
-                        <span data-ui-i18n="imageToolModel">生图工具模型</span>
-                        <span class="field-hint-marker" tabindex="0" role="note" aria-label="查看说明" data-ui-i18n-aria-label="hintMarker" data-tooltip="路由模式在 Responses 请求的 image_generation 工具里使用该模型。默认 gpt-image-2；sunburst 精修更准，flare 出图更快。" data-ui-i18n-tooltip="imageToolModelHint">?</span>
-                      </span>
+                  <div class="route-config-panel" data-route-panel="d">
+                    <div class="field endpoint-field">
+                      <div class="field-heading inline endpoint-heading">
+                        <span class="field-label-with-hint">
+                          <label for="grokBaseUrlInput" data-ui-i18n="baseUrl">基础 URL</label>
+                          <span class="field-hint-marker" tabindex="0" role="note" aria-label="查看说明" data-ui-i18n-aria-label="hintMarker" data-tooltip="Grok 官方图片接口；基础 URL 通常填写到 /v1，实际请求为 /images/generations 或 /images/edits。" data-ui-i18n-tooltip="grokHint">?</span>
+                        </span>
+                        <div class="endpoint-toolbar">
+                          <select class="endpoint-suffix-select" id="grokEndpointPathSelect" name="grokEndpointPath" aria-label="Grok 生图请求协议后缀" data-ui-i18n-aria-label="grokEndpointSuffix">
+                            <option value="images/generations">images/generations</option>
+                            <option value="images/edits">images/edits</option>
+                          </select>
+                          <button class="inline-button endpoint-full-toggle" id="grokBaseUrlFullToggle" type="button" aria-pressed="false" data-ui-i18n="fullUrl" data-ui-i18n-title="fullUrlHint">完整 URL</button>
+                        </div>
+                      </div>
+                      <div class="endpoint-address-control">
+                        <input id="grokBaseUrlInput" name="grokBaseUrl" type="url" placeholder="https://api.x.ai/v1" />
+                        <button class="api-endpoint-picker-toggle" id="grokApiBookToggle" type="button" aria-label="展开已保存的 API" aria-expanded="false" aria-controls="grokApiBookList" data-ui-i18n-aria-label="apiBookExpand" hidden></button>
+                        <div class="api-endpoint-options-list" id="grokApiBookList" role="listbox" hidden></div>
+                      </div>
                     </div>
-                    <select id="imageToolModelSelect" name="imageToolModel">
-                      <option value="gpt-image-2">gpt-image-2</option>
-                      <option value="gpt-image-2.5-sunburst">gpt-image-2.5-sunburst</option>
-                      <option value="gpt-image-2.5-flare">gpt-image-2.5-flare</option>
-                    </select>
-                  </label>
+
+                    <label class="field">
+                      <div class="field-heading inline">
+                        <span data-ui-i18n="grokApiKey">Grok API Key</span>
+                        <small id="grokSavedKeyMask" data-ui-i18n="notSaved">未保存</small>
+                      </div>
+                      <input id="grokApiKeyInput" name="grokApiKey" type="password" placeholder="保持已保存 Key" data-ui-i18n-placeholder="keepSavedKey" />
+                    </label>
+
+                    <div class="field model-field">
+                      <div class="field-heading inline">
+                        <label for="grokImageModelInput" data-ui-i18n="grokImageModel">图像模型</label>
+                        <button class="inline-button" id="grokFetchModelsButton" type="button" data-ui-i18n="fetchModels" data-ui-i18n-title="fetchModelsFull">获取模型列表</button>
+                      </div>
+                      <div class="model-picker-control">
+                        <input id="grokImageModelInput" name="grokImageModel" type="text" placeholder="grok-imagine-image-2.0" autocomplete="off" aria-controls="grokModelOptionsList" />
+                        <button class="model-picker-toggle" id="grokModelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="grokModelOptionsList" data-ui-i18n-aria-label="expandModels" hidden></button>
+                        <div class="model-options-list" id="grokModelOptionsList" role="listbox" hidden></div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-
-                <div class="route-config-panel" data-route-panel="b">
-                  <div class="field endpoint-field">
-                    <div class="field-heading inline endpoint-heading">
-                      <label for="directBaseUrlInput" data-ui-i18n="directImageApi">生图 API</label>
-                      <div class="endpoint-toolbar">
-                        <select class="endpoint-suffix-select" id="directEndpointPathSelect" name="directImageEndpointPath" aria-label="直接调用模式生图请求协议后缀" data-ui-i18n-aria-label="directImageEndpointSuffix">
-                          <option value="images/generations">images/generations</option>
-                          <option value="responses">responses</option>
-                          <option value="chat/completions">chat/completions</option>
-                        </select>
-                        <button class="inline-button endpoint-full-toggle" id="directBaseUrlFullToggle" type="button" aria-pressed="false" data-ui-i18n="fullUrl" data-ui-i18n-title="fullUrlHint">完整 URL</button>
-                      </div>
-                    </div>
-                    <div class="endpoint-address-control">
-                      <input id="directBaseUrlInput" name="directImageBaseUrl" type="url" placeholder="https://api.openai.com/v1" required />
-                      <button class="api-endpoint-picker-toggle" id="directImageApiBookToggle" type="button" aria-label="展开已保存的 API" aria-expanded="false" aria-controls="directImageApiBookList" data-ui-i18n-aria-label="apiBookExpand" hidden></button>
-                      <div class="api-endpoint-options-list" id="directImageApiBookList" role="listbox" hidden></div>
-                    </div>
-                  </div>
-
-                  <label class="field">
-                    <div class="field-heading inline">
-                      <span data-ui-i18n="directImageApiKey">生图 API Key</span>
-                      <small id="directSavedKeyMask" data-ui-i18n="notSaved">未保存</small>
-                    </div>
-                    <input id="directApiKeyInput" name="directImageApiKey" type="password" placeholder="保持已保存 Key" data-ui-i18n-placeholder="keepSavedKey" />
-                  </label>
-
-                  <div class="field model-field">
-                    <div class="field-heading inline">
-                      <label for="directImageModelInput" data-ui-i18n="imageModel">生图模型</label>
-                      <button class="inline-button" id="directFetchModelsButton" type="button" data-ui-i18n="fetchModels" data-ui-i18n-title="fetchModelsFull">获取模型列表</button>
-                    </div>
-                    <div class="model-picker-control">
-                      <input id="directImageModelInput" name="directImageModel" type="text" placeholder="gpt-image-2" autocomplete="off" aria-controls="directModelOptionsList" />
-                      <button class="model-picker-toggle" id="directModelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="directModelOptionsList" data-ui-i18n-aria-label="expandModels" hidden></button>
-                      <div class="model-options-list" id="directModelOptionsList" role="listbox" hidden></div>
-                    </div>
-                  </div>
-
-                  <div class="field endpoint-field direct-text-endpoint-field">
-                    <div class="field-heading inline endpoint-heading">
-                      <label for="directTextBaseUrlInput" data-ui-i18n="directTextApi">文本/视觉 API</label>
-                      <div class="endpoint-toolbar">
-                        <select class="endpoint-suffix-select" id="directTextEndpointPathSelect" name="directTextEndpointPath" aria-label="直接调用模式文本请求协议后缀" data-ui-i18n-aria-label="directTextEndpointSuffix">
-                          <option value="responses">responses</option>
-                          <option value="chat/completions">chat/completions</option>
-                        </select>
-                        <button class="inline-button endpoint-full-toggle" id="directTextBaseUrlFullToggle" type="button" aria-pressed="false" data-ui-i18n="fullUrl" data-ui-i18n-title="fullUrlHint">完整 URL</button>
-                      </div>
-                    </div>
-                    <div class="endpoint-address-control">
-                      <input id="directTextBaseUrlInput" name="directTextBaseUrl" type="url" placeholder="https://api.openai.com/v1" required />
-                      <button class="api-endpoint-picker-toggle" id="directTextApiBookToggle" type="button" aria-label="展开已保存的 API" aria-expanded="false" aria-controls="directTextApiBookList" data-ui-i18n-aria-label="apiBookExpand" hidden></button>
-                      <div class="api-endpoint-options-list" id="directTextApiBookList" role="listbox" hidden></div>
-                    </div>
-                  </div>
-
-                  <label class="field">
-                    <div class="field-heading inline">
-                      <span data-ui-i18n="directTextApiKey">文本/视觉 API Key</span>
-                      <small id="directTextSavedKeyMask" data-ui-i18n="notSaved">未保存</small>
-                    </div>
-                    <input id="directTextApiKeyInput" name="directTextApiKey" type="password" placeholder="保持已保存 Key" data-ui-i18n-placeholder="keepSavedKey" />
-                  </label>
-
-                  <div class="field model-field">
-                    <div class="field-heading inline">
-                      <label for="directResponsesModelInput" data-ui-i18n="visionTextModel">文本/视觉模型</label>
-                      <button class="inline-button" id="directResponsesFetchModelsButton" type="button" data-ui-i18n="fetchModels" data-ui-i18n-title="fetchModelsFull">获取模型列表</button>
-                    </div>
-                    <div class="model-picker-control">
-                      <input id="directResponsesModelInput" name="directTextModel" type="text" placeholder="gpt-5.4-mini" autocomplete="off" aria-controls="directResponsesModelOptionsList" />
-                      <button class="model-picker-toggle" id="directResponsesModelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="directResponsesModelOptionsList" data-ui-i18n-aria-label="expandModels" hidden></button>
-                      <div class="model-options-list" id="directResponsesModelOptionsList" role="listbox" hidden></div>
-                    </div>
+              <section class="config-card palette-config-card config-theme-panel" aria-labelledby="paletteConfigTitle">
+                <div class="config-card-head palette-config-head">
+                  <div>
+                    <h3 id="paletteConfigTitle" data-ui-i18n="paletteSection">界面配色</h3>
+                    <p class="config-card-caption" data-ui-i18n="paletteHint">选择一套界面配色，立即应用到背景、卡片、按钮与细节。</p>
                   </div>
                 </div>
-
-                <div class="route-config-panel" data-route-panel="c">
-                  <div class="field endpoint-field protocol-endpoint-field">
-                    <div class="field-heading inline endpoint-heading">
-                      <span class="field-label-with-hint">
-                        <label for="protocolBaseUrlInput" data-ui-i18n="baseUrl">基础 URL</label>
-                        <span class="field-hint-marker" id="protocolCompatibilityHint" tabindex="0" role="note" aria-label="查看说明" data-ui-i18n-aria-label="hintMarker" data-tooltip="Gemini 图像模型按 OpenAI 兼容的图像生成协议调用；基础 URL 通常填写到 /v1，实际请求为 /images/generations。" data-ui-i18n-tooltip="protocolHint">?</span>
-                      </span>
-                      <div class="endpoint-toolbar protocol-endpoint-toolbar">
-                        <small class="endpoint-suffix-preview" id="protocolEndpointPreview" title="https://api.openai.com/v1/images/generations" aria-label="https://api.openai.com/v1/images/generations">images/generations</small>
-                      </div>
-                    </div>
-                    <div class="endpoint-address-control">
-                      <input id="protocolBaseUrlInput" name="protocolBaseUrl" type="url" placeholder="https://api.vendor.example/v1" />
-                      <button class="api-endpoint-picker-toggle" id="protocolApiBookToggle" type="button" aria-label="展开已保存的 API" aria-expanded="false" aria-controls="protocolApiBookList" data-ui-i18n-aria-label="apiBookExpand" hidden></button>
-                      <div class="api-endpoint-options-list" id="protocolApiBookList" role="listbox" hidden></div>
-                    </div>
-                  </div>
-
-                  <label class="field">
-                    <div class="field-heading inline">
-                      <span data-ui-i18n="apiKeyLabel">API Key</span>
-                      <small id="protocolSavedKeyMask" data-ui-i18n="notSaved">未保存</small>
-                    </div>
-                    <input id="protocolApiKeyInput" name="protocolApiKey" type="password" placeholder="保持已保存 Key" data-ui-i18n-placeholder="keepSavedKey" />
-                  </label>
-
-                  <div class="field model-field">
-                    <div class="field-heading inline">
-                      <label for="protocolImageModelInput" data-ui-i18n="protocolImageModel">图像模型</label>
-                      <button class="inline-button" id="protocolFetchModelsButton" type="button" data-ui-i18n="fetchModels" data-ui-i18n-title="fetchModelsFull">获取模型列表</button>
-                    </div>
-                    <div class="model-picker-control">
-                      <input id="protocolImageModelInput" name="protocolImageModel" type="text" placeholder="gemini-3.1-flash-image-preview" autocomplete="off" aria-controls="protocolModelOptionsList" />
-                      <button class="model-picker-toggle" id="protocolModelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="protocolModelOptionsList" data-ui-i18n-aria-label="expandModels" hidden></button>
-                      <div class="model-options-list" id="protocolModelOptionsList" role="listbox" hidden></div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="route-config-panel" data-route-panel="d">
-                  <div class="field endpoint-field">
-                    <div class="field-heading inline endpoint-heading">
-                      <span class="field-label-with-hint">
-                        <label for="grokBaseUrlInput" data-ui-i18n="baseUrl">基础 URL</label>
-                        <span class="field-hint-marker" tabindex="0" role="note" aria-label="查看说明" data-ui-i18n-aria-label="hintMarker" data-tooltip="Grok 官方图片接口；基础 URL 通常填写到 /v1，实际请求为 /images/generations 或 /images/edits。" data-ui-i18n-tooltip="grokHint">?</span>
-                      </span>
-                      <div class="endpoint-toolbar">
-                        <select class="endpoint-suffix-select" id="grokEndpointPathSelect" name="grokEndpointPath" aria-label="Grok 生图请求协议后缀" data-ui-i18n-aria-label="grokEndpointSuffix">
-                          <option value="images/generations">images/generations</option>
-                          <option value="images/edits">images/edits</option>
-                        </select>
-                        <button class="inline-button endpoint-full-toggle" id="grokBaseUrlFullToggle" type="button" aria-pressed="false" data-ui-i18n="fullUrl" data-ui-i18n-title="fullUrlHint">完整 URL</button>
-                      </div>
-                    </div>
-                    <div class="endpoint-address-control">
-                      <input id="grokBaseUrlInput" name="grokBaseUrl" type="url" placeholder="https://api.x.ai/v1" />
-                      <button class="api-endpoint-picker-toggle" id="grokApiBookToggle" type="button" aria-label="展开已保存的 API" aria-expanded="false" aria-controls="grokApiBookList" data-ui-i18n-aria-label="apiBookExpand" hidden></button>
-                      <div class="api-endpoint-options-list" id="grokApiBookList" role="listbox" hidden></div>
-                    </div>
-                  </div>
-
-                  <label class="field">
-                    <div class="field-heading inline">
-                      <span data-ui-i18n="grokApiKey">Grok API Key</span>
-                      <small id="grokSavedKeyMask" data-ui-i18n="notSaved">未保存</small>
-                    </div>
-                    <input id="grokApiKeyInput" name="grokApiKey" type="password" placeholder="保持已保存 Key" data-ui-i18n-placeholder="keepSavedKey" />
-                  </label>
-
-                  <div class="field model-field">
-                    <div class="field-heading inline">
-                      <label for="grokImageModelInput" data-ui-i18n="grokImageModel">图像模型</label>
-                      <button class="inline-button" id="grokFetchModelsButton" type="button" data-ui-i18n="fetchModels" data-ui-i18n-title="fetchModelsFull">获取模型列表</button>
-                    </div>
-                    <div class="model-picker-control">
-                      <input id="grokImageModelInput" name="grokImageModel" type="text" placeholder="grok-imagine-image-2.0" autocomplete="off" aria-controls="grokModelOptionsList" />
-                      <button class="model-picker-toggle" id="grokModelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="grokModelOptionsList" data-ui-i18n-aria-label="expandModels" hidden></button>
-                      <div class="model-options-list" id="grokModelOptionsList" role="listbox" hidden></div>
-                    </div>
-                  </div>
-                </div>
+                <input id="uiPaletteInput" name="uiPalette" type="hidden" value="default" />
+                <div class="palette-options" role="radiogroup" aria-label="界面配色" data-ui-i18n-aria-label="paletteSection">
+                  <button class="palette-option is-active" type="button" data-ui-palette-option="default" role="radio" aria-checked="true">
+                    <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <span data-ui-i18n="paletteDefault">靛蓝</span>
+                  </button>
+                  <button class="palette-option" type="button" data-ui-palette-option="qinghua" role="radio" aria-checked="false">
+                    <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <span data-ui-i18n="paletteQinghua">青花</span>
+                  </button>
+                  <button class="palette-option" type="button" data-ui-palette-option="jiangnan" role="radio" aria-checked="false">
+                    <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <span data-ui-i18n="paletteJiangnan">竹影</span>
+                  </button>
+                  <button class="palette-option" type="button" data-ui-palette-option="songci" role="radio" aria-checked="false">
+                    <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <span data-ui-i18n="paletteSongci">天青</span>
+                  </button>
+                  <button class="palette-option" type="button" data-ui-palette-option="gugong" role="radio" aria-checked="false">
+                    <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <span data-ui-i18n="paletteGugong">朱墙</span>
+                  </button>
+                  <button class="palette-option" type="button" data-ui-palette-option="lacquer" role="radio" aria-checked="false">
+                    <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <span data-ui-i18n="paletteLacquer">朱漆</span>
+                  </button>
+                  <button class="palette-option" type="button" data-ui-palette-option="dunhuang" role="radio" aria-checked="false">
+                    <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <span data-ui-i18n="paletteDunhuang">敦煌</span>
+                  </button>
               </div>
             </section>
-
-            <section class="config-card palette-config-card config-theme-panel" aria-labelledby="paletteConfigTitle">
-              <div class="config-card-head palette-config-head">
-                <div>
-                  <h3 id="paletteConfigTitle" data-ui-i18n="paletteSection">界面配色</h3>
-                  <p class="config-card-caption" data-ui-i18n="paletteHint">选择一套界面配色，立即应用到背景、卡片、按钮与细节。</p>
-                </div>
-              </div>
-              <input id="uiPaletteInput" name="uiPalette" type="hidden" value="default" />
-              <div class="palette-options" role="radiogroup" aria-label="界面配色" data-ui-i18n-aria-label="paletteSection">
-                <button class="palette-option is-active" type="button" data-ui-palette-option="default" role="radio" aria-checked="true">
-                  <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
-                  <span data-ui-i18n="paletteDefault">靛蓝</span>
-                </button>
-                <button class="palette-option" type="button" data-ui-palette-option="qinghua" role="radio" aria-checked="false">
-                  <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
-                  <span data-ui-i18n="paletteQinghua">青花</span>
-                </button>
-                <button class="palette-option" type="button" data-ui-palette-option="jiangnan" role="radio" aria-checked="false">
-                  <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
-                  <span data-ui-i18n="paletteJiangnan">竹影</span>
-                </button>
-                <button class="palette-option" type="button" data-ui-palette-option="songci" role="radio" aria-checked="false">
-                  <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
-                  <span data-ui-i18n="paletteSongci">天青</span>
-                </button>
-                <button class="palette-option" type="button" data-ui-palette-option="gugong" role="radio" aria-checked="false">
-                  <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
-                  <span data-ui-i18n="paletteGugong">朱墙</span>
-                </button>
-                <button class="palette-option" type="button" data-ui-palette-option="lacquer" role="radio" aria-checked="false">
-                  <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
-                  <span data-ui-i18n="paletteLacquer">朱漆</span>
-                </button>
-                <button class="palette-option" type="button" data-ui-palette-option="dunhuang" role="radio" aria-checked="false">
-                  <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
-                  <span data-ui-i18n="paletteDunhuang">敦煌</span>
-                </button>
               </div>
             </section>
 
@@ -3486,38 +3487,87 @@
     </aside>
 
     <aside class="prompt-template-popover hidden" id="promptTemplatePopover" aria-hidden="true">
-      <div class="prompt-template-panel" role="dialog" aria-modal="false" aria-label="提示词模板">
+      <div class="prompt-template-panel" role="dialog" aria-modal="false" aria-label="提示词模板库">
         <div class="prompt-template-head">
           <div>
             <p class="drawer-eyebrow">Prompt Kit</p>
-            <h2>提示词模板</h2>
+            <h2>提示词模板库</h2>
+            <p class="prompt-template-head-note">按分类浏览常用模板，点击图片可查看完整提示词。</p>
           </div>
           <button class="toolbar-button" id="closePromptTemplateButton" type="button">关闭</button>
         </div>
 
+        <div class="prompt-template-toolbar" role="toolbar" aria-label="模板库筛选与视图">
+          <label class="prompt-template-search">
+            <span class="sr-only">搜索模板</span>
+            <input id="promptTemplateLibrarySearch" type="search" placeholder="搜索模板名称或提示词" autocomplete="off" />
+          </label>
+          <div class="prompt-template-view-switch" role="tablist" aria-label="模板显示方式">
+            <button class="prompt-template-view-button active" type="button" role="tab" aria-selected="true" data-prompt-template-view="list">列表</button>
+            <button class="prompt-template-view-button" type="button" role="tab" aria-selected="false" data-prompt-template-view="image">图片</button>
+          </div>
+          <label class="prompt-template-font-control">
+            <span>列表字号</span>
+            <input id="promptTemplateLibraryFontSize" type="range" min="12" max="20" step="1" value="15" />
+            <output id="promptTemplateLibraryFontValue">15px</output>
+          </label>
+        </div>
+
         <div class="prompt-template-body">
-          <div class="prompt-template-list" id="promptTemplateList"></div>
-
-          <form class="prompt-template-form" id="promptTemplateForm">
-            <label class="compact-field">
-              <span>名称</span>
-              <input id="promptTemplateNameInput" type="text" maxlength="40" placeholder="模板名称" />
-            </label>
-
-            <label class="compact-field">
-              <span>内容</span>
-              <textarea id="promptTemplateTextInput" rows="8" maxlength="3000" placeholder="写入模板提示词"></textarea>
-            </label>
-
-            <div class="prompt-template-actions">
-              <button class="toolbar-button" id="newPromptTemplateButton" type="button">新建</button>
-              <button class="toolbar-button strong" type="submit">保存</button>
-              <button class="toolbar-button" id="applyPromptTemplateButton" type="button">插入</button>
-              <button class="toolbar-button danger" id="deletePromptTemplateButton" type="button">删除</button>
+          <aside class="prompt-template-sidebar" aria-label="模板分类">
+            <div class="prompt-template-sidebar-head">
+              <span>一级分类</span>
+              <small>二级分类</small>
             </div>
+            <nav class="prompt-template-library-nav" id="promptTemplateLibraryNav" aria-label="一级分类"></nav>
+            <div class="prompt-template-library-subnav-wrap">
+              <div class="prompt-template-sidebar-head"><span>当前分类</span></div>
+              <nav class="prompt-template-library-subnav" id="promptTemplateLibrarySubnav" aria-label="二级分类"></nav>
+            </div>
+            <p class="prompt-template-library-meta" id="promptTemplateLibraryMeta"></p>
+          </aside>
 
-            <p class="config-note" id="promptTemplateFeedback"></p>
-          </form>
+          <section class="prompt-template-library-area" aria-label="模板目录">
+            <div class="prompt-template-library-head">
+              <div>
+                <p class="drawer-eyebrow">Library</p>
+                <h3 id="promptTemplateLibraryTitle">人像与头像</h3>
+              </div>
+              <span class="prompt-template-library-count" id="promptTemplateLibraryCount">40 条可用模板</span>
+            </div>
+            <div class="prompt-template-library-grid" id="promptTemplateLibraryGrid" data-view="list"></div>
+          </section>
+
+          <aside class="prompt-template-personal" aria-label="我的模板">
+            <div class="prompt-template-personal-head">
+              <div>
+                <p class="drawer-eyebrow">Personal</p>
+                <h3>我的模板</h3>
+              </div>
+              <button class="mini-action" id="newPromptTemplateButton" type="button">新建</button>
+            </div>
+            <div class="prompt-template-list" id="promptTemplateList"></div>
+
+            <form class="prompt-template-form" id="promptTemplateForm">
+              <label class="compact-field">
+                <span>名称</span>
+                <input id="promptTemplateNameInput" type="text" maxlength="40" placeholder="模板名称" />
+              </label>
+
+              <label class="compact-field">
+                <span>内容</span>
+                <textarea id="promptTemplateTextInput" rows="8" maxlength="3000" placeholder="写入模板提示词"></textarea>
+              </label>
+
+              <div class="prompt-template-actions">
+                <button class="toolbar-button strong" type="submit">保存</button>
+                <button class="toolbar-button" id="applyPromptTemplateButton" type="button">插入</button>
+                <button class="toolbar-button danger" id="deletePromptTemplateButton" type="button">删除</button>
+              </div>
+
+              <p class="config-note" id="promptTemplateFeedback"></p>
+            </form>
+          </aside>
         </div>
       </div>
     </aside>
@@ -3560,6 +3610,6 @@
 
     <div class="app-tooltip" id="appTooltip" role="tooltip" popover="manual"></div>
 
-    <script type="module" src="./app.js?v=20260915-mode-generation-controls-1"></script>
+    <script type="module" src="./app.js?v=20260922-prompt-template-library-2"></script>
   </body>
 </html>

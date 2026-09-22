@@ -36,6 +36,11 @@ test("native clipboard host is purpose-bound and independently installable", asy
   assert.match(installer, /chrome-extension:\/\/gbdkgkooddcicpkikaklapgeakhjjcan\//);
   assert.equal(installer.codePointAt(0), 0xfeff);
   assert.equal(uninstaller.codePointAt(0), 0xfeff);
+  for (const script of [installer, uninstaller]) {
+    assert.match(script, /#Requires -Version 7\.4/);
+    assert.match(script, /\$IsWindows/);
+    assert.doesNotMatch(script, /HKLM:|#Requires -RunAsAdministrator/);
+  }
   assert.match(uninstaller, /Remove-Item/);
 });
 

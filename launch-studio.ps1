@@ -1,9 +1,13 @@
+#Requires -Version 7.4
 param(
   [string]$Root = $PSScriptRoot,
   [int]$Port = 3600
 )
 
-$resolvedRoot = [System.IO.Path]::GetFullPath($Root)
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+if (-not $IsWindows) { throw "此脚本需要 Windows 和 PowerShell 7.4 或更高版本。" }
+$resolvedRoot = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Root)
 
 # The mock image generator is test-only. Do not let a stale parent-process
 # variable turn a normal desktop launch into a white 1x1 image producer.
@@ -55,11 +59,16 @@ $targetPort = Find-StudioPort -StartPort $Port -ListeningPorts $listeningPorts
 $targetPortInUse = $listeningPorts.Contains($targetPort)
 
 if (-not $targetPortInUse) {
-  $command = "set IMAGE_STUDIO_MOCK_IMAGE_GENERATION=&& set PORT=$targetPort&& node server.mjs"
-  Start-Process -FilePath "cmd.exe" -WorkingDirectory $resolvedRoot -ArgumentList "/k", $command | Out-Null
+  if (-not (Test-Path -LiteralPath (Join-Path $resolvedRoot "server.mjs") -PathType Leaf)) {
+    throw "Studio server.mjs was not found in the requested root."
+  }
+  $nodePath = (Get-Command node.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+  $serverProcess = Start-Process -FilePath $nodePath -WorkingDirectory $resolvedRoot -ArgumentList "server.mjs" -Environment @{ PORT = [string]$targetPort; IMAGE_STUDIO_MOCK_IMAGE_GENERATION = $null } -WindowStyle Hidden -PassThru -ErrorAction Stop
+  if ($null -eq $serverProcess) { throw "Unable to start the Studio server process." }
 
   $deadline = (Get-Date).AddSeconds(20)
   do {
+    if ($serverProcess.HasExited) { throw "Studio server exited with code $($serverProcess.ExitCode)." }
     Start-Sleep -Milliseconds 500
   } until ((Test-StudioServer -TargetPort $targetPort) -or (Get-Date) -gt $deadline)
 }
@@ -68,8 +77,8 @@ if ($targetPort -ne $Port) {
   Write-Host "Port $Port is occupied by a different server. Opening current studio on port $targetPort."
 }
 
-Start-Process "http://localhost:$targetPort"
-
 if (-not (Test-StudioServer -TargetPort $targetPort)) {
-  Write-Host "Server startup timed out. Check the new console window."
+  throw "Server startup timed out. Check the Node.js runtime and server configuration."
 }
+
+Start-Process "http://localhost:$targetPort" -ErrorAction Stop

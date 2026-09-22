@@ -3,7 +3,7 @@
 ## 安装
 
 1. 解压下载的 ZIP 文件，保持目录结构不变。
-2. 双击 `native-host/install-native-host.cmd`，完成当前 Windows 用户的本地剪贴板助手安装。
+2. 安装 [PowerShell 7.4 或更高版本](https://learn.microsoft.com/powershell/scripting/install/installing-powershell-on-windows)，确认 `pwsh --version` 可用；双击 `native-host/install-native-host.cmd`，完成当前 Windows 用户的本地剪贴板助手安装。安装和卸载入口均调用 `pwsh.exe`，缺失时明确失败，不回退到 Windows PowerShell 5.1，不要求管理员权限；助手 EXE 的日常运行不依赖 PowerShell。
 3. 在 Chrome 或 Edge 地址栏打开扩展管理页，并开启“开发者模式”。
 4. 点击“加载已解压的扩展程序”，选择解压后的目录。
 5. 刷新已打开的 1688、Amazon、Temu、TikTok Shop、SHEIN 或大健云仓商品详情页，页面右侧会自动出现 `G2 商品图` 悬浮入口；点击入口或扩展栏图标都会直接展开采集窗。

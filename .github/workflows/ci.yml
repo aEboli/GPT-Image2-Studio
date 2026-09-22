@@ -13,6 +13,9 @@ jobs:
   verify:
     runs-on: windows-latest
     timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
 
     steps:
       - uses: actions/checkout@v4
@@ -24,6 +27,11 @@ jobs:
 
       - name: Install locked dependencies
         run: npm ci
+
+      - name: Check PowerShell runtime
+        run: |
+          if ($PSVersionTable.PSVersion -lt [version]'7.4') { throw 'PowerShell 7.4 or newer is required.' }
+          pwsh --version
 
       - name: Run serial test suite
         run: npm test

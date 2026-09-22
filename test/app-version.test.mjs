@@ -22,31 +22,31 @@ async function createPatchReleaseFixture({ includeReleasesDirectory = true } = {
     await mkdir(join(fixtureRoot, "docs", "releases"), { recursive: true });
   }
   await mkdir(join(fixtureRoot, "extensions", "product-image-collector"), { recursive: true });
-  await writeFile(join(fixtureRoot, "package.json"), '{"name":"fixture","version":"1.2.3"}\n', "utf8");
+  await writeFile(join(fixtureRoot, "package.json"), '{"name":"fixture","version":"1.2.003"}\n', "utf8");
   await writeFile(
     join(fixtureRoot, "package-lock.json"),
-    '{"name":"fixture","version":"1.2.3","packages":{"":{"version":"1.2.3"}}}\n',
+    '{"name":"fixture","version":"1.2.003","packages":{"":{"version":"1.2.003"}}}\n',
     "utf8",
   );
   await writeFile(
     join(fixtureRoot, "public", "index.html"),
-    '<small data-surface="workbench" aria-label="当前版本 v1.2.3" class="build-fact app-version">v1.2.3</small>\n',
+    '<small data-surface="workbench" aria-label="当前版本 v1.2.003" class="build-fact app-version">v1.2.003</small>\n',
     "utf8",
   );
   await writeFile(
     join(fixtureRoot, "README.md"),
-    'Current version: `v1.2.3`\nHistorical releases: v1.2.3 and v1.2.30.\nExample command: `git tag v1.2.3`.\n',
+    'Current version: `v1.2.003`\nHistorical releases: v1.2.003 and v1.2.030.\nExample command: `git tag v1.2.003`.\n',
     "utf8",
   );
-  await writeFile(join(fixtureRoot, "README.zh-CN.md"), '当前版本：`v1.2.3`\n', "utf8");
+  await writeFile(join(fixtureRoot, "README.zh-CN.md"), '当前版本：`v1.2.003`\n', "utf8");
   await writeFile(
     join(fixtureRoot, "docs", "windows-desktop.md"),
-    '`GPT-Image2-Studio-Desktop-Setup-v1.2.3-x64.exe` 是桌面安装包。\n',
+    '`GPT-Image2-Studio-Desktop-Setup-v1.2.003-x64.exe` 是桌面安装包。\n',
     "utf8",
   );
   await writeFile(
     join(fixtureRoot, "docs", "windows-installer.md"),
-    '`GPT-Image2-Studio-Setup-v1.2.3.exe` 是兼容安装包。\n',
+    '`GPT-Image2-Studio-Setup-v1.2.003.exe` 是兼容安装包。\n',
     "utf8",
   );
   await writeFile(
@@ -70,7 +70,7 @@ async function assertNoTransactionFiles(fixtureRoot) {
 
 async function assertPatchFailureLeftNoChanges(fixtureRoot, before) {
   assert.deepEqual(await readPatchTargets(fixtureRoot), before);
-  await assert.rejects(readFile(join(fixtureRoot, "docs", "releases", "v1.2.4.md"), "utf8"), { code: "ENOENT" });
+  await assert.rejects(readFile(join(fixtureRoot, "docs", "releases", "v1.2.004.md"), "utf8"), { code: "ENOENT" });
   await assertNoTransactionFiles(fixtureRoot);
 }
 
@@ -100,16 +100,16 @@ test("workbench displays the package version at the lower-left safe area", async
   assert.match(versionRule, /font-variant-numeric:\s*tabular-nums/);
 });
 
-test("patch release increments exactly 0.0.1 and synchronizes maintained version facts", async () => {
+test("patch release increments exactly 0.0.001 and synchronizes maintained version facts", async () => {
   const { bumpPatchRelease, incrementPatchVersion } = await import("../scripts/release-patch.mjs");
-  assert.equal(incrementPatchVersion("0.2.6"), "0.2.7");
-  assert.equal(incrementPatchVersion("1.9.9"), "1.9.10");
-  assert.throws(() => incrementPatchVersion("1.2"), /semantic version/i);
+  assert.equal(incrementPatchVersion("0.2.006"), "0.2.007");
+  assert.equal(incrementPatchVersion("1.9.009"), "1.9.010");
+  assert.throws(() => incrementPatchVersion("1.2"), /版本号|version/i);
 
   const fixtureRoot = await createPatchReleaseFixture();
 
   const result = await bumpPatchRelease({ rootDir: fixtureRoot, summary: "新增版本号显示。" });
-  assert.deepEqual(result, { previousVersion: "1.2.3", version: "1.2.4", versionLabel: "v1.2.4" });
+  assert.deepEqual(result, { previousVersion: "1.2.003", version: "1.2.004", versionLabel: "v1.2.004" });
 
   const [packageJson, packageLock, html, readme, chineseReadme, desktopDoc, installerDoc, releaseNote] = await Promise.all([
     readFile(join(fixtureRoot, "package.json"), "utf8").then(JSON.parse),
@@ -119,20 +119,20 @@ test("patch release increments exactly 0.0.1 and synchronizes maintained version
     readFile(join(fixtureRoot, "README.zh-CN.md"), "utf8"),
     readFile(join(fixtureRoot, "docs", "windows-desktop.md"), "utf8"),
     readFile(join(fixtureRoot, "docs", "windows-installer.md"), "utf8"),
-    readFile(join(fixtureRoot, "docs", "releases", "v1.2.4.md"), "utf8"),
+    readFile(join(fixtureRoot, "docs", "releases", "v1.2.004.md"), "utf8"),
   ]);
 
-  assert.equal(packageJson.version, "1.2.4");
-  assert.equal(packageLock.version, "1.2.4");
-  assert.equal(packageLock.packages[""].version, "1.2.4");
+  assert.equal(packageJson.version, "1.2.004");
+  assert.equal(packageLock.version, "1.2.004");
+  assert.equal(packageLock.packages[""].version, "1.2.004");
   for (const content of [html, chineseReadme, desktopDoc, installerDoc]) {
-    assert.match(content, /v1\.2\.4/);
-    assert.doesNotMatch(content, /v1\.2\.3/);
+    assert.match(content, /v1\.2\.004/);
+    assert.doesNotMatch(content, /v1\.2\.003/);
   }
-  assert.match(readme, /^Current version: `v1\.2\.4`$/m);
-  assert.match(readme, /^Historical releases: v1\.2\.3 and v1\.2\.30\.$/m);
-  assert.match(readme, /^Example command: `git tag v1\.2\.3`\.$/m);
-  assert.match(releaseNote, /^# GPT-Image2-Studio v1\.2\.4$/m);
+  assert.match(readme, /^Current version: `v1\.2\.004`$/m);
+  assert.match(readme, /^Historical releases: v1\.2\.003 and v1\.2\.030\.$/m);
+  assert.match(readme, /^Example command: `git tag v1\.2\.003`\.$/m);
+  assert.match(releaseNote, /^# GPT-Image2-Studio v1\.2\.004$/m);
   assert.match(releaseNote, /新增版本号显示。/);
   const extensionManifest = JSON.parse(
     await readFile(join(fixtureRoot, "extensions", "product-image-collector", "manifest.json"), "utf8"),
@@ -207,8 +207,8 @@ test("patch release rolls back replaced targets when a later commit fails", asyn
 test("patch release rejects missing or duplicate maintained version facts before writing", async () => {
   const { bumpPatchRelease } = await import("../scripts/release-patch.mjs");
   for (const readme of [
-    "Historical releases: v1.2.3 and v1.2.30.\n",
-    "Current version: `v1.2.3`\nCurrent version: `v1.2.3`\n",
+    "Historical releases: v1.2.003 and v1.2.030.\n",
+    "Current version: `v1.2.003`\nCurrent version: `v1.2.003`\n",
   ]) {
     const fixtureRoot = await createPatchReleaseFixture();
     await writeFile(join(fixtureRoot, "README.md"), readme, "utf8");

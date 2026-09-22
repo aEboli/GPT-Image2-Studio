@@ -1,6 +1,6 @@
 {
   "name": "gpt-image2-studio",
-  "version": "0.2.19",
+  "version": "0.2.020",
   "private": true,
   "type": "module",
   "main": "desktop/main.mjs",
@@ -17,7 +17,10 @@
     "build:extension": "node scripts/build-product-image-extension.mjs",
     "build:installer": "node scripts/build-windows-installer.mjs",
     "build:desktop": "electron-builder --win nsis --x64",
-    "release:patch": "node scripts/release-patch.mjs",
+    "release:major": "node scripts/release-patch.mjs --type major",
+    "release:minor": "node scripts/release-patch.mjs --type minor",
+    "release:feature": "node scripts/release-patch.mjs --type feature",
+    "release:patch": "node scripts/release-patch.mjs --type patch",
     "check:release": "node scripts/check-release-readiness.mjs",
     "check:release:strict": "node scripts/check-release-readiness.mjs --strict",
     "test": "node --test --test-concurrency=1 ./test/*.test.mjs",
@@ -33,6 +36,14 @@
     "jszip": "^3.10.1",
     "morphicons": "1.7.1",
     "pptxgenjs": "^4.0.1"
+  },
+  "overrides": {
+    "pptxgenjs": {
+      "image-size": "2.0.4"
+    },
+    "exceljs": {
+      "uuid": "11.1.1"
+    }
   },
   "devDependencies": {
     "@fission-ai/openspec": "1.6.0",

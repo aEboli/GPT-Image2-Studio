@@ -190,6 +190,7 @@ set "APP_NAME=${appName}"
 set "INSTALL_DIR=%LOCALAPPDATA%\\${appName}"
 set "START_MENU_DIR=%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\${appName}"
 set "DESKTOP_DIR=%USERPROFILE%\\Desktop"
+set "STUDIO_PAYLOAD=%~dp0payload.zip"
 
 if not exist "%LOCALAPPDATA%" (
   echo Cannot find LOCALAPPDATA.
@@ -198,9 +199,19 @@ if not exist "%LOCALAPPDATA%" (
 
 where tar.exe >nul 2>nul
 if errorlevel 1 (
-  powershell -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -LiteralPath '%~dp0payload.zip' -DestinationPath $env:LOCALAPPDATA -Force"
+  where pwsh.exe >nul 2>nul
+  if errorlevel 1 (
+    echo Error: install PowerShell 7.4 or newer from https://aka.ms/powershell.
+    exit /b 9009
+  )
+  pwsh.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "if ($PSVersionTable.PSVersion -lt [version]'7.4') { Write-Error 'PowerShell 7.4 or newer is required.'; exit 1 }; $ErrorActionPreference = 'Stop'; try { Expand-Archive -LiteralPath $env:STUDIO_PAYLOAD -DestinationPath $env:LOCALAPPDATA -Force } catch { Write-Error $_; exit 1 }"
 ) else (
   tar.exe -xf "%~dp0payload.zip" -C "%LOCALAPPDATA%"
+)
+
+if errorlevel 1 (
+  echo Install failed: payload extraction failed.
+  exit /b 1
 )
 
 if not exist "%INSTALL_DIR%\\${appName}.cmd" (

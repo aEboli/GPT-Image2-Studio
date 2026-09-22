@@ -92,6 +92,7 @@ export const PUBLIC_LIB_SYNC_TARGETS = [
   "preview-loading-shell.mjs",
   "preview-keyboard-navigation.mjs",
   "preview-placeholder-state.mjs",
+  "prompt-template-library.mjs",
   "prompt-attempt-deck.mjs",
   "prompt-agent-display-name.mjs",
   "prompt-agent-template-sync.mjs",

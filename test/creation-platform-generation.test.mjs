@@ -97,7 +97,7 @@ test("ordinary runtime prompts protect subject graphics, original text, and lang
   assert.match(historicalPrompt, /SUBJECT CONTENT LOCK:/);
   assert.match(historicalPrompt, /artwork, symbols, logos, surface text/i);
   assert.match(historicalPrompt, /original characters and language/i);
-  assert.match(historicalPrompt, /selected target language for newly authored layout text outside the subject/i);
+  assert.match(historicalPrompt, /Use product input and reference notes as source facts/i);
   assert.match(historicalPrompt, /NEW LAYOUT TEXT: Use en for newly authored .* outside the physical product or packaging subject/i);
 
   const currentItem = buildCreationPlan({
@@ -187,9 +187,9 @@ test("infographic rebuild runtime prompt honors only the four selected output co
     format: "jpg",
   }));
   assert.match(prompt, /target language:\s*English \(en\)/i);
-  assert.match(prompt, /output format:\s*JPG/i);
-  assert.match(prompt, /resolution:\s*requested 1\.5K; effective canvas 1536x1920/i);
-  assert.match(prompt, /aspect ratio:\s*4:5/i);
+  assert.match(prompt, /format:\s*JPG/i);
+  assert.match(prompt, /canvas:\s*requested 1\.5K; effective canvas 1536x1920/i);
+  assert.match(prompt, /ratio:\s*4:5/i);
   assert.doesNotMatch(prompt, /OTHER_FROZEN_PROMPT_SENTINEL/);
   assert.doesNotMatch(prompt, /SUBJECT CONTENT LOCK:/);
   assert.doesNotMatch(prompt, /SUBJECT IDENTITY LOCK:/);
@@ -215,28 +215,14 @@ test("infographic rebuild prompt requires substantial visual redesign while lock
   const prompt = buildCreationInfographicRebuildPrompt();
 
   assert.match(prompt, /clearly new, professionally designed infographic/i);
-  assert.match(prompt, /substantially redesigned at first glance/i);
-  assert.match(prompt, /new overall layout and information architecture/i);
-  assert.match(prompt, /at least three additional visual dimensions/i);
-  assert.match(prompt, /composition and product placement/i);
-  assert.match(prompt, /background treatment/i);
-  assert.match(prompt, /typography system/i);
-  assert.match(prompt, /color treatment/i);
-  assert.match(prompt, /spacing and grouping/i);
-  assert.match(prompt, /cards, icons, arrows, callouts/i);
-  assert.match(prompt, /not a valid rebuild if it keeps substantially the same grid/i);
-  assert.match(prompt, /only upscales, cleans, or sharpens/i);
-  assert.match(prompt, /minor spacing, color, or typography changes/i);
+  assert.match(prompt, /new information architecture and grid/i);
+  assert.match(prompt, /changing at least three of composition, background, typography, color, spacing, grouping, cards, icons, arrows, or callouts/i);
 
-  assert.match(prompt, /single attached source infographic/i);
-  assert.match(prompt, /only visual and information authority/i);
-  assert.match(prompt, /visible product identity, variant, colors, parts, and quantities exact/i);
-  assert.match(prompt, /text physically printed, engraved, embossed, or embroidered on the product or packaging keeps its original characters and language/i);
-  assert.match(prompt, /translate all translatable wording in that surrounding layout into the selected target language/i);
-  assert.match(prompt, /same language for newly authored layout text around the subject/i);
-  assert.match(prompt, /brand or model names, numbers, and units/i);
-  assert.match(prompt, /headings, labels, callouts, captions, steps, package contents, specifications/i);
-  assert.match(prompt, /recreate the surrounding infographic facts and relationships faithfully/i);
+  assert.match(prompt, /single attached source image/i);
+  assert.match(prompt, /Use that image for product identity, facts, quantities, labels, steps, package contents, specifications, names, numbers, units, and relationships/i);
+  assert.match(prompt, /product or packaging shape, variant, colors, parts, quantities, and surface text/i);
+  assert.match(prompt, /Translate surrounding layout wording with the source meaning intact/i);
+  assert.match(prompt, /retaining every source fact/i);
 
   assert.doesNotMatch(prompt, /preserve every visible element unchanged/i);
   assert.doesNotMatch(prompt, /do not .*redesign or restyle/i);
@@ -280,7 +266,7 @@ test("submitted effective plans are bounded, normalized, recounted, and hard-rul
 
   const imageTypeTampered = buildCreationSubmittedPlan({ effectivePlan: JSON.stringify({ ...amazon, items: amazon.items.map((item, index) => index === 0 ? { ...item, imageType: "generic-hero", constraints: [], scenePolicy: "lifestyle", prompt: `${item.prompt} Create a lifestyle scene with decorative props.` } : item), canGenerate: true, validation: { isValid: true } }) });
   assert.equal(imageTypeTampered.items[0].imageType, "amazon-main");
-  assert.throws(() => assertCreationPlanCanGenerate(imageTypeTampered), /纯白棚拍背景|不得使用生活场景/);
+  assert.throws(() => assertCreationPlanCanGenerate(imageTypeTampered), /Amazon 主图/);
   const disabledTampered = buildCreationSubmittedPlan({ effectivePlan: JSON.stringify({ ...amazon, items: amazon.items.map((item, index) => index === 0 ? { ...item, enabled: false, textPolicy: "moderate", prompt: `${item.prompt} Add visible marketing text.` } : item), canGenerate: true, validation: { isValid: true } }) });
   assert.equal(disabledTampered.items[0].enabled, true);
   assert.throws(() => assertCreationPlanCanGenerate(disabledTampered), /Amazon 主图不得包含营销文字/);

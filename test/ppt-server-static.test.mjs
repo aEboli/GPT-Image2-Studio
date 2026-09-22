@@ -99,6 +99,13 @@ test("package declares pptxgenjs dependency for deck export", async () => {
   assert.match(pkg.dependencies?.pptxgenjs || "", /\^4\.0\.1/);
 });
 
+test("package pins patched transitive image and UUID parsers", async () => {
+  const pkg = JSON.parse(await readFile(packagePath, "utf8"));
+
+  assert.equal(pkg.overrides?.pptxgenjs?.["image-size"], "2.0.4");
+  assert.equal(pkg.overrides?.exceljs?.uuid, "11.1.1");
+});
+
 test("PPT export loads pptxgenjs through CommonJS for Vercel runtime compatibility", async () => {
   const pptExport = await readFile(pptExportPath, "utf8");
 

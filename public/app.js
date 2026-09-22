@@ -113,40 +113,50 @@ import { DEFAULT_PORTRAIT_ACCESSORY_ASSETS, PORTRAIT_ACCESSORY_ASSET_CATEGORIES,
 import { createDefaultPortraitLocationState, createPortraitLocationSelectorController } from "/lib/portrait-location-selector.mjs?v=20260527-portrait-location-1";
 import { getLegacyPromptAgentTemplatePrompt, getPromptAgentDisplayName, getPromptAgentTemplateDisplayName, isStructuredImagePromptJson } from "/lib/prompt-agent-display-name.mjs?v=20260819-prompt-history-mode-1";
 import { mergePromptAgentHistoryTemplates } from "/lib/prompt-agent-template-sync.mjs?v=20260819-history-template-mode-1";
+import { flattenPromptTemplateLibrary, getPromptTemplateLibraryCategory, getPromptTemplateLibraryCounts, getPromptTemplateLibrarySubcategory, getPromptTemplatePreviewUrl, PROMPT_TEMPLATE_LIBRARY } from "/lib/prompt-template-library.mjs?v=20260922-prompt-template-library-1";
 import { DEFAULT_GENERATION_CONCURRENCY, DEFAULT_GENERATION_START_DELAY_MS, MAX_PROMPT_PARALLEL_TASKS, MAX_PROMPT_QUEUE_SIZE } from "/lib/studio-constants.mjs?v=20260829-generation-schedule-1";
 import { GENERATION_START_DELAY_FIELD, normalizeGenerationStartDelayMs } from "/lib/generation-start-delay.mjs?v=20260829-generation-schedule-1";
 import { GENERATION_CONCURRENCY_FIELD, normalizeGenerationConcurrency } from "/lib/generation-concurrency.mjs?v=20260829-generation-schedule-1";
 const SURPRISE_PROMPTS = [
-  { name: "清晨通勤", prompt: "生成一张清晨城市通勤生活照，年轻上班族手拿咖啡走出地铁站，晨光穿过街边树影，画面自然真实，轻微运动模糊，适合生活方式摄影。" },
-  { name: "家庭早餐", prompt: "生成一张温暖家庭早餐场景，木质餐桌上有吐司、煎蛋、牛奶和水果，家人围坐聊天，窗外柔和日光洒入，构图干净，有真实居家氛围。" },
-  { name: "居家阅读", prompt: "生成一张安静居家阅读画面，人物坐在窗边单人椅上看书，旁边有茶杯和落地灯，浅色窗帘、柔和阴影，画面舒适松弛，细节清晰。" },
   {
-    name: "厨房做饭",
-    prompt: "生成一张周末厨房做饭场景，人物在明亮厨房里切菜备餐，台面摆放新鲜蔬菜和锅具，暖白色顶光，生活化抓拍视角，干净有烟火气。",
+    name: "证件照",
+    prompt: "智感职业证件照，整体风格参考美式证件照，人物大小适中。使用淡淡的灰色到白色的渐变摄影背景，灯光柔和自然，突出真实肤色与层次感。画面清晰高质，面部保持对焦，皮肤质感通透气色好，头肩比要正常舒适。整体气质现代且优雅，神情放松，自然自信，眼神明亮有神。中景人像，人物大小适中，人物居中，低对比度，呈现出专业肖像摄影的精致感。适合作为商务与职业形象照。",
   },
   {
-    name: "超市采购",
-    prompt: "生成一张日常超市采购场景，人物推着购物车经过蔬果区，货架陈列丰富但不杂乱，室内灯光明亮，色彩自然，像真实生活纪录照片。",
+    name: "商务个人头像",
+    prompt: "生成一张可信自然的商务个人头像。人物肩部以上或半身构图，面部清晰，姿态端正但不僵硬，轻微侧身并看向镜头，穿着简洁得体的商务服装。使用干净的浅灰或米白背景和柔和侧前方光线，保留真实肤色、自然发丝与适度皮肤纹理，表情亲切自信，色彩克制，背景轻微虚化，无夸张滤镜、文字和水印，适合作为社交账号、简历和个人主页头像。",
   },
   {
-    name: "午后办公",
-    prompt: "生成一张午后居家办公场景，人物坐在整洁书桌前使用笔记本电脑，桌上有记事本、耳机和半杯咖啡，窗边自然光，画面专注而安静。",
+    name: "电商白底主图",
+    prompt: "生成一张电商产品白底主图，以主体产品为唯一视觉焦点。产品完整呈现，外形、颜色、材质和配件关系清晰，放置在画面中央并保留适度留白；背景纯白或近白，使用均匀柔和棚拍光和自然接触阴影，边缘干净锐利、细节真实，整体简洁高级。不要添加无关道具、额外物件、文字、水印或虚构品牌标识，适合作为商品首图和目录展示。",
   },
   {
-    name: "健身运动",
-    prompt: "生成一张清爽健身运动场景，人物在公园步道上做拉伸，穿着简洁运动服，背景有晨间草地和远处城市轮廓，光线清透，健康积极。",
+    name: "电商生活方式图",
+    prompt: "生成一张电商产品生活方式展示图。让主体产品保持外形、颜色、材质和品牌结构稳定，置于符合使用场景的真实环境中；辅助道具少而精，层次清楚，不遮挡主体，构图有视觉焦点并预留干净文案区域。使用自然柔和的光线、统一且克制的品牌色和真实材质细节，画面清晰高级，避免乱码文字、水印、过度堆叠和不相关物品，适合商品详情页或社交媒体营销。",
   },
   {
-    name: "朋友聚会",
-    prompt: "生成一张朋友小聚生活场景，几位朋友围坐在餐桌边分享披萨和饮料，表情自然放松，暖色室内灯光，桌面细节丰富，氛围亲密真实。",
+    name: "自然人像写真",
+    prompt: "生成一张自然真实的人像写真。人物处于日常环境中，动作松弛自然，抓拍感而非僵硬摆拍，穿着简洁协调，人物比例舒适；使用自然光和适度景深，保留真实肤色、发丝和衣物纹理，背景环境有层次但不过分抢主体。画面色彩清透、对比度适中、细节清晰，表情自然有情绪，避免过度磨皮、夸张美颜、畸形手指、文字和水印，呈现生活方式摄影质感。",
   },
   {
-    name: "亲子手作",
-    prompt: "生成一张亲子手作场景，家长和孩子在桌前一起制作彩色纸艺，桌上有剪刀、彩纸和胶水，画面明亮安全，表情专注，充满家庭陪伴感。",
+    name: "时尚穿搭图",
+    prompt: "生成一张时尚穿搭 Lookbook 摄影。完整展示人物与服装版型、面料纹理、颜色和层次，人物姿态利落自然，构图干净并给服装留出展示空间；使用简洁棚拍背景或现代城市背景，柔和但有方向性的灯光，色彩高级克制，画面清晰，服装细节保持真实。避免多余配饰、错位肢体、乱码文字和水印，呈现专业品牌目录摄影效果。",
   },
   {
-    name: "夜晚学习",
-    prompt: "生成一张夜晚学习场景，人物坐在书桌前整理笔记，台灯形成温暖光区，窗外是安静夜色，桌面有书本和便签，整体专注、平静、有秩序。",
+    name: "美食摄影",
+    prompt: "生成一张专业美食摄影作品，主体菜品摆盘精致、食材新鲜，保持真实可食用的质感和自然色泽；采用俯拍或约 45 度视角，构图有主次，餐具与配料少量点缀且不喧宾夺主。使用柔和侧光，表现酥脆、汁水、蒸汽等细节但不过度夸张，背景整洁，色彩诱人，画面清晰高级，适合菜单、餐饮宣传和社交媒体配图，不添加文字和水印。",
+  },
+  {
+    name: "室内家居效果图",
+    prompt: "生成一张真实的室内家居空间效果图，明确呈现房间功能与主要家具。视点高度自然，透视和建筑线条规整，家具比例合理，材质纹理真实，空间整洁但有生活气息；使用统一色温的自然光与室内照明，层次柔和，色彩协调，画面清晰高级。保留适度留白，不出现漂浮家具、重复物件、畸形门窗、文字和水印，适合作为装修灵感与室内设计展示。",
+  },
+  {
+    name: "旅行城市纪实",
+    prompt: "生成一张旅行与城市纪实摄影，围绕用户指定的地点或主题展现真实的环境与生活氛围。画面具有前中后景层次，人物或建筑比例自然，使用真实时间与天气下的自然光，色彩克制、细节清晰，保留适度现场感而不过度滤镜。构图有明确主体和行走或观察视角，避免虚构招牌文字、重复人物、畸形车辆和水印，适合作为旅行记录与城市内容配图。",
+  },
+  {
+    name: "社媒营销海报",
+    prompt: "生成一张适合社交媒体与活动宣传的营销视觉海报。围绕明确主题设置单一视觉主体，层级清晰，色彩和氛围统一，构图平衡，并在主体周围预留整洁、可后期排版的留白区域。采用现代商业视觉风格，画面清晰精致，避免生成长段文字、乱码、复杂 Logo 和水印，适合作为活动封面、商品推广或公众号配图。",
   },
 ];
 const REASONING_LABELS = {
@@ -167,7 +177,7 @@ const DEFAULT_PROMPT_ENHANCE_TEXT = ",sharp focus, macro details, rich textures,
 const PROMPT_TEMPLATE_STORAGE_KEY = "image-studio-prompt-templates-v2";
 const PROMPT_TEMPLATE_DISMISSED_HISTORY_KEY = "image-studio-prompt-template-dismissed-history-v1";
 const DEFAULT_PROMPT_TEMPLATES = SURPRISE_PROMPTS.map((template, index) => ({
-  id: `default-template-${index + 1}`,
+  id: `default-template-v2-${index + 1}`,
   name: template.name,
   prompt: template.prompt,
 }));
@@ -793,6 +803,14 @@ const state = {
     },
   },
   promptTemplates: [], promptTemplateDismissedHistoryIds: new Set(), promptEnhanceEnabled: false,
+  promptTemplateLibrary: {
+    categoryId: "profile-avatar",
+    subcategoryId: "",
+    query: "",
+    view: "list",
+    fontSize: 15,
+    selectedId: "",
+  },
   reasoningEfforts: [...DEFAULT_REASONING_EFFORTS],
   referenceAnalysis: {
     files: [],
@@ -1324,6 +1342,16 @@ const refs = {
   promptTemplateFeedback: document.querySelector("#promptTemplateFeedback"),
   promptTemplateForm: document.querySelector("#promptTemplateForm"),
   promptTemplateList: document.querySelector("#promptTemplateList"),
+  promptTemplateLibraryGrid: document.querySelector("#promptTemplateLibraryGrid"),
+  promptTemplateLibraryMeta: document.querySelector("#promptTemplateLibraryMeta"),
+  promptTemplateLibraryNav: document.querySelector("#promptTemplateLibraryNav"),
+  promptTemplateLibrarySearch: document.querySelector("#promptTemplateLibrarySearch"),
+  promptTemplateLibrarySubnav: document.querySelector("#promptTemplateLibrarySubnav"),
+  promptTemplateLibraryTitle: document.querySelector("#promptTemplateLibraryTitle"),
+  promptTemplateLibraryCount: document.querySelector("#promptTemplateLibraryCount"),
+  promptTemplateLibraryViewButtons: [...document.querySelectorAll("[data-prompt-template-view]")],
+  promptTemplateLibraryFontSize: document.querySelector("#promptTemplateLibraryFontSize"),
+  promptTemplateLibraryFontValue: document.querySelector("#promptTemplateLibraryFontValue"),
   promptTemplateNameInput: document.querySelector("#promptTemplateNameInput"),
   promptTemplatePopover: document.querySelector("#promptTemplatePopover"),
   promptTemplateTextInput: document.querySelector("#promptTemplateTextInput"),
@@ -5231,24 +5259,7 @@ function restoreSettingsFormScrollTop(scrollTop) {
   restore();
   window.requestAnimationFrame(restore);
 }
-function syncPromptTemplateSettingsEdge() {
-  const rootStyle = document.documentElement.style;
-  const layoutMode = getCurrentStudioLayoutMode();
-  const isStudioLikeView =
-    state.activeView === "studio" || state.activeView === "style-transfer" || state.activeView === "image-decomposition" || state.activeView === "quick-blend";
-  if (!refs.settingsPanel || STACKED_STUDIO_LAYOUT_MODES.has(layoutMode) || !isStudioLikeView) {
-    rootStyle.removeProperty("--prompt-template-settings-edge");
-    return;
-  }
-  const settingsRect = refs.settingsPanel.getBoundingClientRect();
-  if (!Number.isFinite(settingsRect.right) || settingsRect.width <= 0) {
-    rootStyle.removeProperty("--prompt-template-settings-edge");
-    return;
-  }
-  rootStyle.setProperty("--prompt-template-settings-edge", `${Math.round(settingsRect.right)}px`);
-}
 function syncStudioHeight() {
-  syncPromptTemplateSettingsEdge();
   if (!refs.settingsPanel || !refs.previewPanel || !refs.viewRoot) {
     return;
   }
@@ -7614,6 +7625,33 @@ function normalizePromptTemplate(template, index = 0) {
   };
 }
 
+function isLegacyDefaultPromptTemplate(template) {
+  return /^default-template-\d+$/.test(String(template?.id || ""));
+}
+
+function migratePromptTemplateDefaults(templates) {
+  if (!templates.some(isLegacyDefaultPromptTemplate)) {
+    return templates;
+  }
+
+  // Replace only the unversioned built-ins; user and image-to-prompt templates stay intact.
+  const currentDefaultIds = new Set(DEFAULT_PROMPT_TEMPLATES.map((template) => template.id));
+  const migratedTemplates = [
+    ...templates.filter(
+      (template) => !isLegacyDefaultPromptTemplate(template) && !currentDefaultIds.has(template.id),
+    ),
+    ...DEFAULT_PROMPT_TEMPLATES.map((template) => ({ ...template })),
+  ];
+
+  try {
+    window.localStorage.setItem(PROMPT_TEMPLATE_STORAGE_KEY, JSON.stringify(migratedTemplates));
+  } catch {
+    // Keep the migrated in-memory list even when browser storage is unavailable.
+  }
+
+  return migratedTemplates;
+}
+
 function readPromptTemplates() {
   try {
     const raw = window.localStorage.getItem(PROMPT_TEMPLATE_STORAGE_KEY);
@@ -7622,7 +7660,8 @@ function readPromptTemplates() {
     }
 
     const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed.map(normalizePromptTemplate).filter(Boolean) : [];
+    const normalized = Array.isArray(parsed) ? parsed.map(normalizePromptTemplate).filter(Boolean) : [];
+    return migratePromptTemplateDefaults(normalized);
   } catch {
     return DEFAULT_PROMPT_TEMPLATES.map((template) => ({ ...template }));
   }
@@ -7657,6 +7696,244 @@ function setPromptTemplateFeedback(message = "") {
   refs.promptTemplateFeedback.textContent = message;
 }
 
+function getPromptTemplateLibraryTemplates() {
+  const libraryState = state.promptTemplateLibrary;
+  const allTemplates = flattenPromptTemplateLibrary({
+    categoryId: libraryState.categoryId,
+    subcategoryId: libraryState.subcategoryId,
+  });
+  const query = String(libraryState.query || "").trim().toLocaleLowerCase();
+  if (!query) {
+    return allTemplates;
+  }
+
+  return allTemplates.filter((template) =>
+    [template.name, template.categoryName, template.subcategoryName, template.prompt]
+      .join("\n")
+      .toLocaleLowerCase()
+      .includes(query),
+  );
+}
+
+function selectPromptTemplateLibraryScope(categoryId, subcategoryId = "") {
+  const category = getPromptTemplateLibraryCategory(categoryId);
+  state.promptTemplateLibrary.categoryId = category?.id || PROMPT_TEMPLATE_LIBRARY[0]?.id || "";
+  state.promptTemplateLibrary.subcategoryId = subcategoryId && category?.children.some((child) => child.id === subcategoryId) ? subcategoryId : "";
+  state.promptTemplateLibrary.selectedId = "";
+  renderPromptTemplateLibrary();
+}
+
+function renderPromptTemplateLibraryNavigation() {
+  if (!refs.promptTemplateLibraryNav || !refs.promptTemplateLibrarySubnav) {
+    return;
+  }
+
+  refs.promptTemplateLibraryNav.replaceChildren();
+  refs.promptTemplateLibrarySubnav.replaceChildren();
+  const activeCategory = getPromptTemplateLibraryCategory(state.promptTemplateLibrary.categoryId);
+  if (!activeCategory) {
+    return;
+  }
+
+  PROMPT_TEMPLATE_LIBRARY.forEach((category) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "prompt-template-library-category-button";
+    button.dataset.promptTemplateCategory = category.id;
+    button.setAttribute("aria-pressed", String(category.id === activeCategory.id));
+    const label = document.createElement("span");
+    label.textContent = category.name;
+    const count = document.createElement("small");
+    count.textContent = `${category.children.reduce((sum, child) => sum + child.templates.length, 0)} 条`;
+    button.append(label, count);
+    refs.promptTemplateLibraryNav.appendChild(button);
+  });
+
+  const allButton = document.createElement("button");
+  allButton.type = "button";
+  allButton.className = "prompt-template-library-subcategory-button";
+  allButton.dataset.promptTemplateSubcategory = "";
+  allButton.setAttribute("aria-pressed", String(!state.promptTemplateLibrary.subcategoryId));
+  allButton.textContent = `全部 ${activeCategory.name}`;
+  refs.promptTemplateLibrarySubnav.appendChild(allButton);
+
+  activeCategory.children.forEach((child) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "prompt-template-library-subcategory-button";
+    button.dataset.promptTemplateSubcategory = child.id;
+    button.setAttribute("aria-pressed", String(child.id === state.promptTemplateLibrary.subcategoryId));
+    button.innerHTML = `<span>${child.name}</span><small>${child.templates.length}</small>`;
+    refs.promptTemplateLibrarySubnav.appendChild(button);
+  });
+}
+
+function createPromptTemplateLibraryActionButton(label, className, handler) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = className;
+  button.textContent = label;
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    handler();
+  });
+  return button;
+}
+
+function openPromptTemplateLibraryPreview(template) {
+  if (!template) {
+    return;
+  }
+  const imageUrl = getPromptTemplatePreviewUrl(template);
+  openLightbox({
+    id: template.id,
+    filename: `${template.id}${template.previewImage ? ".jpg" : ".svg"}`,
+    imageUrl,
+    thumbnailUrl: imageUrl,
+    previewUrl: imageUrl,
+    prompt: template.prompt,
+    paramsText: `分类：${template.categoryName} / ${template.subcategoryName}\n模板：${template.name}`,
+    imageModel: "Prompt Kit",
+    isPreviewLightboxItem: true,
+    isPromptTemplateLibraryItem: true,
+  });
+  document.querySelector('[data-lightbox-tab="prompt"]')?.click();
+}
+
+function applyPromptTemplateLibrary(template) {
+  const prompt = String(template?.prompt || "").trim();
+  if (!prompt) {
+    return;
+  }
+  state.promptTemplateLibrary.selectedId = template.id;
+  refs.promptInput.value = prompt;
+  updatePromptCounter();
+  setPromptTemplatePopoverOpen(false);
+  refs.promptInput.focus();
+}
+
+function copyPromptTemplateLibraryToPersonal(template) {
+  if (!template?.prompt) {
+    return;
+  }
+  const personalTemplate = {
+    id: createPromptTemplateId(),
+    name: template.name,
+    prompt: template.prompt,
+  };
+  state.promptTemplates.unshift(personalTemplate);
+  state.selectedPromptTemplateId = personalTemplate.id;
+  writePromptTemplates();
+  selectPromptTemplate(personalTemplate.id);
+  setPromptTemplateFeedback("已复制到我的模板，可继续编辑。");
+}
+
+function renderPromptTemplateLibrary() {
+  if (!refs.promptTemplateLibraryGrid) {
+    return;
+  }
+
+  renderPromptTemplateLibraryNavigation();
+  const libraryState = state.promptTemplateLibrary;
+  const category = getPromptTemplateLibraryCategory(libraryState.categoryId);
+  const subcategory = libraryState.subcategoryId
+    ? getPromptTemplateLibrarySubcategory(libraryState.categoryId, libraryState.subcategoryId)
+    : null;
+  const templates = getPromptTemplateLibraryTemplates();
+  const stats = getPromptTemplateLibraryCounts();
+  const view = ["list", "image"].includes(libraryState.view) ? libraryState.view : "list";
+  libraryState.view = view;
+  refs.promptTemplateLibraryGrid.dataset.view = view;
+  refs.promptTemplateLibraryGrid.style.setProperty("--prompt-template-list-font-size", `${libraryState.fontSize}px`);
+  refs.promptTemplateLibraryViewButtons.forEach((button) => {
+    const active = button.dataset.promptTemplateView === view;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  if (refs.promptTemplateLibraryFontSize) {
+    refs.promptTemplateLibraryFontSize.value = String(libraryState.fontSize);
+  }
+  if (refs.promptTemplateLibraryFontValue) {
+    refs.promptTemplateLibraryFontValue.textContent = `${libraryState.fontSize}px`;
+  }
+  if (refs.promptTemplateLibraryTitle) {
+    refs.promptTemplateLibraryTitle.textContent = subcategory?.name || category?.name || "提示词目录";
+  }
+  if (refs.promptTemplateLibraryCount) {
+    refs.promptTemplateLibraryCount.textContent = `${templates.length} 条可用模板`;
+  }
+  if (refs.promptTemplateLibraryMeta) {
+    refs.promptTemplateLibraryMeta.textContent = `${stats.categories} 个一级分类 · ${stats.subcategories} 个二级分类 · 当前显示 ${templates.length} 条`;
+  }
+
+  refs.promptTemplateLibraryGrid.replaceChildren();
+  if (templates.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "prompt-template-library-empty";
+    empty.textContent = "没有匹配的模板";
+    refs.promptTemplateLibraryGrid.appendChild(empty);
+    return;
+  }
+
+  templates.forEach((template) => {
+    const card = document.createElement("article");
+    card.className = "prompt-template-library-card";
+    card.classList.toggle("active", template.id === libraryState.selectedId);
+    card.dataset.promptTemplateLibraryItem = template.id;
+
+    const media = document.createElement("div");
+    media.className = "prompt-template-library-media";
+    const previewButton = document.createElement("button");
+    previewButton.type = "button";
+    previewButton.className = "prompt-template-library-preview-button";
+    previewButton.title = "放大查看图片与提示词";
+    previewButton.setAttribute("aria-label", `放大查看${template.name}`);
+    const image = document.createElement("img");
+    image.src = getPromptTemplatePreviewUrl(template);
+    image.alt = template.previewAlt || `${template.name}预览`;
+    image.loading = "lazy";
+    image.decoding = "async";
+    previewButton.appendChild(image);
+    previewButton.addEventListener("click", () => openPromptTemplateLibraryPreview(template));
+    media.appendChild(previewButton);
+
+    const cardActions = document.createElement("div");
+    cardActions.className = "prompt-template-library-card-actions";
+    cardActions.appendChild(
+      createPromptTemplateLibraryActionButton("应用", "mini-action strong", () => applyPromptTemplateLibrary(template)),
+    );
+    card.appendChild(cardActions);
+    card.appendChild(media);
+
+    const content = document.createElement("div");
+    content.className = "prompt-template-library-content";
+    const title = document.createElement("h3");
+    title.textContent = template.name;
+    title.title = template.name;
+    const breadcrumb = document.createElement("p");
+    breadcrumb.className = "prompt-template-library-breadcrumb";
+    breadcrumb.textContent = `${template.categoryName} / ${template.subcategoryName}`;
+    const prompt = document.createElement("p");
+    prompt.className = "prompt-template-library-prompt";
+    prompt.textContent = template.prompt;
+    const actions = document.createElement("div");
+    actions.className = "prompt-template-library-actions";
+    actions.append(
+      createPromptTemplateLibraryActionButton("复制到我的模板", "mini-action", () => copyPromptTemplateLibraryToPersonal(template)),
+    );
+    content.append(title, breadcrumb, prompt, actions);
+    card.appendChild(content);
+    card.addEventListener("click", (event) => {
+      if (event.target.closest("button")) {
+        return;
+      }
+      libraryState.selectedId = template.id;
+      renderPromptTemplateLibrary();
+    });
+    refs.promptTemplateLibraryGrid.appendChild(card);
+  });
+}
+
 function selectPromptTemplate(templateId) {
   const template = state.promptTemplates.find((entry) => entry.id === templateId) || state.promptTemplates[0] || null;
   state.selectedPromptTemplateId = template?.id || "";
@@ -7666,6 +7943,7 @@ function selectPromptTemplate(templateId) {
 }
 
 function renderPromptTemplates() {
+  renderPromptTemplateLibrary();
   refs.promptTemplateList.innerHTML = "";
 
   if (state.promptTemplates.length === 0) {
@@ -7836,9 +8114,6 @@ function deletePromptTemplate(templateId = "") {
 }
 
 function setPromptTemplatePopoverOpen(open) {
-  if (open) {
-    syncPromptTemplateSettingsEdge();
-  }
   refs.promptTemplatePopover.classList.toggle("hidden", !open);
   refs.promptTemplatePopover.setAttribute("aria-hidden", open ? "false" : "true");
   refs.surprisePromptButton.setAttribute("aria-expanded", open ? "true" : "false");
@@ -7849,7 +8124,7 @@ function setPromptTemplatePopoverOpen(open) {
       state.selectedPromptTemplateId = state.promptTemplates[0].id;
     }
     selectPromptTemplate(state.selectedPromptTemplateId);
-    refs.promptTemplateTextInput.focus();
+    refs.promptTemplateLibrarySearch?.focus({ preventScroll: true });
     loadPromptAgentHistory().catch((error) => {
       console.warn("load prompt agent history for templates failed", error);
     });
@@ -19535,6 +19810,34 @@ function bindEvents() {
   refs.newPromptTemplateButton.addEventListener("click", resetPromptTemplateForm);
   refs.applyPromptTemplateButton.addEventListener("click", applyPromptTemplate);
   refs.deletePromptTemplateButton.addEventListener("click", deletePromptTemplate);
+  refs.promptTemplateLibraryNav?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-prompt-template-category]");
+    if (!button) {
+      return;
+    }
+    selectPromptTemplateLibraryScope(button.dataset.promptTemplateCategory);
+  });
+  refs.promptTemplateLibrarySubnav?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-prompt-template-subcategory]");
+    if (!button) {
+      return;
+    }
+    selectPromptTemplateLibraryScope(state.promptTemplateLibrary.categoryId, button.dataset.promptTemplateSubcategory || "");
+  });
+  refs.promptTemplateLibrarySearch?.addEventListener("input", (event) => {
+    state.promptTemplateLibrary.query = event.target.value;
+    renderPromptTemplateLibrary();
+  });
+  refs.promptTemplateLibraryViewButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      state.promptTemplateLibrary.view = button.dataset.promptTemplateView || "list";
+      renderPromptTemplateLibrary();
+    });
+  });
+  refs.promptTemplateLibraryFontSize?.addEventListener("input", (event) => {
+    state.promptTemplateLibrary.fontSize = Math.min(20, Math.max(12, Number(event.target.value) || 15));
+    renderPromptTemplateLibrary();
+  });
   refs.promptInput.addEventListener("input", updatePromptCounter);
   refs.promptInput.addEventListener("keydown", handlePromptGenerationShortcut);
   refs.promptInput.addEventListener("paste", handleStudioImagePaste); refs.promptEnhanceToggle.addEventListener("click", togglePromptEnhanceMode); refs.promptEnhanceInput.addEventListener("keydown", handlePromptGenerationShortcut);

@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.19-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.020-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installer-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,7 +10,7 @@
 
 把提示词生图、参考图分析、图片编辑、电商套图、人物写真、文章插图、PPT 生成和素材管理集中到一个浏览器界面中。
 
-当前版本：`v0.2.19`
+当前版本：`v0.2.020`
 
 </div>
 
@@ -47,19 +47,23 @@ cmd /c npm start
 
 Windows 用户也可以双击 `launch-studio.cmd` 启动，使用 `stop-studio-services.cmd` 停止 `3600-3606` 端口上的本项目服务。
 
+Windows 脚本入口（启动器、Native Messaging 安装/卸载、图片资源生成）需要 [PowerShell 7.4 或更高版本](https://learn.microsoft.com/powershell/scripting/install/installing-powershell-on-windows)，使用 `pwsh.exe`，不回退到 Windows PowerShell 5.1。安装后重新打开终端并用 `pwsh --version` 检查。可运行 `launch-studio.cmd -Port 3601`，或 `pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./launch-studio.ps1 -Root "项目目录" -Port 3601`。缺少运行时或脚本时入口明确失败；启动器只在健康检查成功后打开浏览器，超时返回非零。纯 Node/Electron 启动与停止服务 CMD 不依赖 PowerShell 7。
+
+维护者可用 `pwsh -NoLogo -NoProfile -File ./scripts/generate-portrait-accessory-color-assets.ps1` 生成配件 PNG；该脚本使用 System.Drawing，仅支持 Windows，输出目录必须已存在，可从任意当前目录运行。
+
 ### 方式二：Windows 桌面程序（推荐）
 
 从包含桌面产物的 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
 
 ```text
-GPT-Image2-Studio-Desktop-Setup-v0.2.19-x64.exe
+GPT-Image2-Studio-Desktop-Setup-v0.2.020-x64.exe
 ```
 
 安装完成后通过桌面或开始菜单中的 `GPT-Image2-Studio` 启动。程序会在独立窗口中运行，内置服务使用动态回环端口，关闭窗口后不会遗留后台服务。无需另行安装 Node.js，完整说明见 [Windows 桌面程序文档](./docs/windows-desktop.md)。
 
 源码目录也可直接启动桌面开发版：
 
-如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.19-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
+如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.020-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
 
 桌面开发使用 Electron `43`，要求 Node.js `22.12` 或更高版本；普通 `npm start` 服务仍支持 Node.js `20+`。
 
@@ -70,7 +74,7 @@ cmd /c npm run desktop
 
 ### 方式三：Windows 浏览器安装包（兼容旧版）
 
-旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.19` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
+旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.020` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
 
 ## 配置说明
 
@@ -470,7 +474,7 @@ GPT-Image2-Studio 面向个人创作者、电商运营、设计师和内容团�
 - 瀑布画廊和图片详情灯箱，支持缩放、平移、下载和参数复盘。
 - 套图、写真、文章插图和 PPT 独立记录页。
 - 生成队列、后台任务状态、错误信息和失败项重试。
-- Prompt Kit、Prompt Agent 图片转提示词、Logo 素材库、写真搭配库和模型选择器。
+- **Prompt Kit** 现在提供可搜索的静态模板库：6 个一级分类、24 个二级分类，每个二级分类 10 条可直接复用的提示词。支持列表/图片视图、列表字号调节、完整提示词灯箱预览、一键应用和复制到我的模板；人像与头像分类随应用内置了从指定 YouMind 页面抓取并标注来源的 8 张预览图，离线运行也能正常浏览。已有自定义模板和 Prompt Agent 历史会保留，旧内置模板会按版本迁移到当前集合。
 - 紧凑的 GPT / Gemini / Grok / 配色四配置区，GPT 下方紧贴路由/直连切换；API 历史隔离、接口字段对齐，长说明通过悬停/聚焦查看，生成日志独立滚动；7 套配色每行 4 个，不再提供自定义颜色和花卉点缀。
 - 深色/浅色主题、中英文界面和跨桌面/平板/手机布局。
 
@@ -625,8 +629,8 @@ cmd /c npm run build:desktop
 产物路径：
 
 ```text
-artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.19-x64.exe
-artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.19-x64.zip
+artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.020-x64.exe
+artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.020-x64.zip
 artifacts/desktop/win-unpacked/GPT-Image2-Studio.exe
 ```
 
@@ -644,7 +648,7 @@ cmd /c npm run build:installer
 产物路径格式：
 
 ```text
-artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.19.exe
+artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.020.exe
 ```
 
 脚本使用系统 `iexpress.exe` 生成自解压安装包，并把当前 Node.js 运行时和依赖打入安装目录；启动后仍使用默认浏览器显示工作台。
@@ -688,7 +692,7 @@ GPT-Image2-Studio/
 |-- generate-image.mjs            # 命令行单图生成入口
 |-- server.mjs                    # 本地 Node.js 服务入口
 |-- launch-studio.cmd             # Windows 快速启动器
-|-- launch-studio.ps1             # Windows PowerShell 启动器
+|-- launch-studio.ps1             # Windows PowerShell 7.4+ 启动器
 |-- stop-studio-services.cmd      # Windows 停止脚本
 |-- vercel.json                   # Vercel 函数配置
 |-- package-lock.json
@@ -740,6 +744,8 @@ cmd /c npm run build:installer
 ## 版本发布
 
 - 版本号以 `package.json` 和 `package-lock.json` 为准。
+- 版本格式为 `major.minor.patch`，其中 `patch` 固定三位数字：大版本主版本 `+1` 并将下级归零，小版本次版本 `+1` 并将更新位归零，小功能更新更新位 `+0.010`，普通更新更新位 `+0.001`。
+- 分别使用 `npm run release:major`、`npm run release:minor`、`npm run release:feature` 或 `npm run release:patch`，每次只改变一个层级，并通过 `--summary` 传入更新摘要。
 - Git tag 使用 `v<version>`，与 `package.json` 的版本一致。
 - Release 标题建议使用 `GPT-Image2-Studio v<version>`。
 - Release 应附带变更说明、验证结果、Windows 桌面安装包、免安装 ZIP；如仍分发兼容版，应明确区分三个文件的启动形态。
@@ -747,7 +753,15 @@ cmd /c npm run build:installer
 
 ## 版本更新说明
 
-完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.19](./docs/releases/v0.2.19.md)。
+完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.020](./docs/releases/v0.2.020.md)。
+
+### v0.2.020 更新说明
+
+- 新增分层 Prompt Kit 模板库：6 个一级分类、24 个二级分类、每类 10 条提示词，支持搜索、列表/图片视图、字号调节、完整提示词灯箱、一键应用和复制到我的模板。人像与头像预览图从指定 YouMind 集合抓取后随应用本地打包并记录归属，运行时不依赖外站。
+- 十条旧的日常场景默认模板替换为证件照、商务头像、电商主图、生活写真、室内家居、城市旅行和营销海报等实用模板；迁移只替换旧内置 ID，不删除用户自定义模板或 Prompt Agent 历史。
+- 套图与信息图提示词改为有长度边界的正向指令，减少重复的否定约束，让新计划更短、更聚焦；已保存的历史提示词保持不变。
+- 项目自有 Windows 脚本统一要求 PowerShell 7.4+，缺少运行时或脚本时明确失败；纯 Node/Electron 入口与停止服务 CMD 不新增 PowerShell 依赖。
+- 发布工具新增 major/minor/feature/patch 四种升级入口，采用三位更新位并同步 README、Windows 文档、锁文件、工作台和发行说明中的版本事实。
 
 ### v0.2.19 更新说明
 

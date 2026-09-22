@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { parse } from "parse5";
 
 import { MAINTAINED_VERSION_FACT_TEMPLATES, findVersionFactDrift } from "./version-facts.mjs";
+import { assertCanonicalVersion } from "./versioning.mjs";
 
 const execFileAsync = promisify(execFile);
 const scriptsDir = dirname(fileURLToPath(import.meta.url));
@@ -253,6 +254,11 @@ export async function checkReleaseReadiness({ rootDir = projectRootDir, strict =
   const version = String(packageJson.version || "").trim();
   if (!version) {
     throw new Error("package.json 缺少有效 version");
+  }
+  try {
+    assertCanonicalVersion(version);
+  } catch (error) {
+    throw new Error(`package.json version 无效：${error instanceof Error ? error.message : String(error)}`);
   }
 
   if (packageLock.version !== version || packageLock.packages?.[""]?.version !== version) {

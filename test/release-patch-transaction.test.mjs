@@ -18,27 +18,27 @@ async function createFixture() {
   const rootDir = await mkdtemp(join(tmpdir(), "image-studio-release-transaction-"));
   await mkdir(join(rootDir, "public"), { recursive: true });
   await mkdir(join(rootDir, "docs", "releases"), { recursive: true });
-  await writeFile(join(rootDir, "package.json"), '{"name":"fixture","version":"1.2.3"}\n', "utf8");
+  await writeFile(join(rootDir, "package.json"), '{"name":"fixture","version":"1.2.003"}\n', "utf8");
   await writeFile(
     join(rootDir, "package-lock.json"),
-    '{"name":"fixture","version":"1.2.3","packages":{"":{"version":"1.2.3"}}}\n',
+    '{"name":"fixture","version":"1.2.003","packages":{"":{"version":"1.2.003"}}}\n',
     "utf8",
   );
   await writeFile(
     join(rootDir, "public", "index.html"),
-    '<small class="app-version" aria-label="当前版本 v1.2.3">v1.2.3</small>\n',
+    '<small class="app-version" aria-label="当前版本 v1.2.003">v1.2.003</small>\n',
     "utf8",
   );
-  await writeFile(join(rootDir, "README.md"), "Current version: `v1.2.3`\n", "utf8");
-  await writeFile(join(rootDir, "README.zh-CN.md"), "当前版本：`v1.2.3`\n", "utf8");
+  await writeFile(join(rootDir, "README.md"), "Current version: `v1.2.003`\n", "utf8");
+  await writeFile(join(rootDir, "README.zh-CN.md"), "当前版本：`v1.2.003`\n", "utf8");
   await writeFile(
     join(rootDir, "docs", "windows-desktop.md"),
-    "`GPT-Image2-Studio-Desktop-Setup-v1.2.3-x64.exe` 是桌面安装包。\n",
+    "`GPT-Image2-Studio-Desktop-Setup-v1.2.003-x64.exe` 是桌面安装包。\n",
     "utf8",
   );
   await writeFile(
     join(rootDir, "docs", "windows-installer.md"),
-    "`GPT-Image2-Studio-Setup-v1.2.3.exe` 是兼容安装包。\n",
+    "`GPT-Image2-Studio-Setup-v1.2.003.exe` 是兼容安装包。\n",
     "utf8",
   );
   return rootDir;
@@ -244,8 +244,8 @@ test("backup cleanup failure reports a committed release and leaves recovery bac
     assert.match(caught.message, /injected bak cleanup failure/);
     assert.equal(caught.committed, true);
     assert.ok(caught.pendingBackupPaths?.some((path) => /\.bak$/u.test(path)));
-    assert.equal(JSON.parse(await readFile(join(rootDir, "package.json"), "utf8")).version, "1.2.4");
-    assert.match(await readFile(join(rootDir, "docs", "releases", "v1.2.4.md"), "utf8"), /v1\.2\.4/);
+    assert.equal(JSON.parse(await readFile(join(rootDir, "package.json"), "utf8")).version, "1.2.004");
+    assert.match(await readFile(join(rootDir, "docs", "releases", "v1.2.004.md"), "utf8"), /v1\.2\.004/);
     const backups = await transactionFiles(rootDir);
     assert.ok(backups.some((path) => /\.package\.json\..+\.bak$/u.test(path)));
     assert.equal(backups.some((path) => /\.tmp$/u.test(path)), false);

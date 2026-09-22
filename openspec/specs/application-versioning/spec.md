@@ -18,3 +18,29 @@ The system SHALL display the current main application version as `v<version>` at
 - **WHEN** the version label is rendered on a phone-sized viewport or a viewport with safe-area insets
 - **THEN** the label remains within the left and bottom safe areas
 - **AND** it does not receive pointer input, create horizontal overflow, or obstruct primary controls
+
+### Requirement: Version identifiers use the structured three-segment policy
+
+The system SHALL use `major.minor.patch` version identifiers, with `patch` rendered as exactly three digits. A major release SHALL increment `major` and reset `minor` and `patch` to zero. A minor release SHALL increment `minor` and reset `patch` to zero. A feature release SHALL increment `patch` by `10`, and an ordinary update SHALL increment `patch` by `1`. Each release operation SHALL change only its selected level, and SHALL reject an update that would exceed the three-digit patch range.
+
+#### Scenario: A patch release is prepared
+
+- **WHEN** the patch release command runs for `0.2.019`
+- **THEN** the new version is `0.2.020`
+- **AND** all maintained package, lockfile, page, documentation, and release-note facts use `v0.2.020`
+
+#### Scenario: A feature release is prepared
+
+- **WHEN** the feature release command runs for `0.0.100`
+- **THEN** the new version is `0.0.110`
+
+#### Scenario: A higher-level release resets lower levels
+
+- **WHEN** the minor release command runs for `0.6.116`
+- **THEN** the new version is `0.7.000`
+- **AND** the patch segment is not carried forward
+
+#### Scenario: A non-canonical version is checked
+
+- **WHEN** release readiness checks a package version whose patch segment is not three digits
+- **THEN** the check fails with a version-format error

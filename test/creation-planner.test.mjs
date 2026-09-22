@@ -10,6 +10,8 @@ import {
   CREATION_PLATFORM_OPTIONS,
   CREATION_SKU_GENERATION_RULE_OPTIONS,
   CREATION_VISUAL_LANGUAGE_OPTIONS,
+  MAX_CREATION_INFOGRAPHIC_PROMPT_CHARS,
+  MAX_CREATION_ITEM_PROMPT_CHARS,
   getCreationIndustryRolePreset,
   getCreationScenarioRoleInstruction,
   getCreationScenarioRolePreset,
@@ -29,7 +31,11 @@ import {
   normalizeCreationSkuSubjects,
   normalizeCreationTargetLanguage,
 } from "../lib/creation-planner.mjs";
-import { buildCreationInfographicRebuildPrompt } from "../lib/creation-generation-parameters.mjs";
+import {
+  buildCreationInfographicRebuildPrompt,
+  buildCreationItemGenerationPrompt,
+  resolveCreationItemGenerationParameters,
+} from "../lib/creation-generation-parameters.mjs";
 
 test("creation submitted plans accept a legitimate 33-item snapshot above the legacy byte threshold", () => {
   const prompt = "平台套图事实提示词。".repeat(3500);
@@ -215,7 +221,64 @@ test("creation infographic rebuild prompt stays source-canonical while following
   assert.doesNotMatch(secondPrompt, /OTHER_|target-source|\.png|1:1|4:5/i);
   assert.match(firstPrompt, /TARGET LANGUAGE: Simplified Chinese \(zh-CN\)/i);
   assert.match(secondPrompt, /TARGET LANGUAGE: English \(en\)/i);
-  assert.match(firstPrompt, /selected target language, output format, resolution, and aspect ratio are output controls/i);
+  assert.match(firstPrompt, /selected language, format, resolution, and ratio are output controls/i);
+});
+
+test("creation planner bounds final carousel and SKU prompts with positive compact contracts", () => {
+  const detailedDescription = Array.from(
+    { length: 80 },
+    (_, index) => `supported product fact ${index + 1} with visible material and use evidence`,
+  ).join("; ");
+  const plan = buildCreationPlan({
+    productName: "Rechargeable heated gloves",
+    productDescription: detailedDescription,
+    sellingPoints: Array.from(
+      { length: 24 },
+      (_, index) => `buyer benefit ${index + 1} supported by the product`,
+    ).join("\n"),
+    targetLanguage: "en",
+    imageCount: "18",
+    referenceImageRoles: [
+      { index: 1, filename: "gloves.png", role: "product", note: "Black heated glove product subject." },
+      { index: 2, filename: "size-card.png", role: "dimensions", note: "Palm width 9 cm; glove length 26 cm." },
+      { index: 3, filename: "material.png", role: "material", note: "Fleece lining and water-resistant outer shell." },
+    ],
+    skuSubjects: [{ id: "black", title: "Black", filenames: ["gloves.png"] }],
+  });
+  const ordinaryItems = plan.items.filter((item) => item.role !== "infographic-rebuild");
+  const prohibitionPattern = /Do not|Avoid|Never|never|不要|不得|禁止/;
+
+  assert.equal(ordinaryItems.length, 19);
+  assert.ok(ordinaryItems.every((item) => item.prompt.length <= MAX_CREATION_ITEM_PROMPT_CHARS));
+  assert.ok(ordinaryItems.every((item) => !prohibitionPattern.test(item.prompt)));
+  assert.ok(
+    ordinaryItems.every((item) => {
+      const parameters = resolveCreationItemGenerationParameters(item, { imageRoute: "a" });
+      return buildCreationItemGenerationPrompt(item.prompt, parameters, item).length <= MAX_CREATION_ITEM_PROMPT_CHARS;
+    }),
+  );
+  assert.ok(
+    ordinaryItems
+      .filter((item) => item.itemKind === "carousel")
+      .every((item) => (item.prompt.match(/Role job:/g) || []).length === 1),
+  );
+});
+
+test("creation infographic rebuild prompts stay compact and positive with output controls", () => {
+  const prompts = [
+    buildCreationInfographicRebuildPrompt(),
+    buildCreationInfographicRebuildPrompt({
+      targetLanguage: "zh-CN",
+      ratio: "4:5",
+      requestedSize: "1.5K",
+      effectiveSize: "1536x1920",
+      format: "jpg",
+    }),
+  ];
+  const prohibitionPattern = /Do not|Avoid|Never|never|不要|不得|禁止/;
+
+  assert.ok(prompts.every((prompt) => prompt.length <= MAX_CREATION_INFOGRAPHIC_PROMPT_CHARS));
+  assert.ok(prompts.every((prompt) => !prohibitionPattern.test(prompt)));
 });
 
 test("creation planner defaults SKU generation on and infographic rebuild off", () => {
@@ -335,7 +398,7 @@ test("creation planner builds the fixed four-image ecommerce set", () => {
     plan.items.map((item) => item.title),
     ["首图成交主视觉", "目标人群共鸣图", "适用多场景图", "多角度产品展示图"],
   );
-  assert.ok(plan.items.every((item) => item.prompt.includes("Use concise English for newly authored canvas text")));
+  assert.ok(plan.items.every((item) => item.prompt.includes("Use concise English for new canvas text outside the physical subject")));
   assert.ok(plan.items.every((item) => item.prompt.includes("AeroPress Clear")));
   assert.match(plan.items[0].prompt, /conversion-first hero image/i);
   assert.match(plan.items[1].prompt, /target-shopper resonance image/i);
@@ -361,8 +424,8 @@ test("creation planner defaults to platform-aware ecommerce analysis without cha
     CREATION_ITEM_ROLES.map((role) => role.title),
   );
   assert.equal(plan.skuGenerationRule, "color-name-under-subject");
-  assert.ok(plan.items.every((item) => item.prompt.includes("Platform:")));
-  assert.ok(plan.items.every((item) => item.prompt.includes("Platform: 通用电商")));
+  assert.ok(plan.items.every((item) => item.prompt.includes("Platform fit:")));
+  assert.ok(plan.items.every((item) => item.prompt.includes("Platform fit: 通用电商")));
 });
 
 test("creation planner keeps the optimized eighteen image types when universal is explicit", () => {
@@ -398,9 +461,12 @@ test("creation planner adapts prompts to selected platform and product category"
 
   assert.equal(plan.platform, "amazon");
   assert.equal(plan.platformLabel, "Amazon");
-  assert.ok(plan.items.every((item) => item.prompt.includes("Platform: Amazon")));
-  assert.ok(plan.items.every((item) => item.prompt.includes("Product category: 3C 数码")));
-  assert.match(plan.items.find((item) => item.role === "hero").prompt, /thumbnail-legible/i);
+  assert.ok(
+    plan.items
+      .filter((item) => item.textPolicy !== "none")
+      .every((item) => item.prompt.includes("Platform fit: Amazon; product category: 3C 数码")),
+  );
+  assert.match(plan.items.find((item) => item.role === "hero").prompt, /platform's required framing, scene, visible-text, and branding policy/i);
   assert.match(plan.items.find((item) => item.role === "spec-table").prompt, /decision-relevant specifications/i);
   assert.match(plan.items.find((item) => item.role === "usage-suggestion").prompt, /buyer payoff/i);
 });
@@ -417,8 +483,8 @@ test("creation planner defaults to classic commercial photography with a shared 
   assert.equal(plan.visualLanguageLabel, "经典商业摄影");
   assert.equal(CREATION_VISUAL_LANGUAGE_OPTIONS.length, 11);
   assert.equal(normalizeCreationVisualLanguage("unknown").value, "classic-commercial");
-  assert.ok(plan.items.every((item) => item.prompt.includes("Visual language:")));
-  assert.ok(plan.items.every((item) => item.prompt.includes("Visual language: 经典商业摄影")));
+  assert.ok(plan.items.every((item) => item.prompt.includes("Visual style:")));
+  assert.ok(plan.items.every((item) => item.prompt.includes("Visual style: 经典商业摄影")));
   assert.ok(plan.items.every((item) => item.prompt.includes("classic commercial product photography")));
 });
 
@@ -434,7 +500,7 @@ test("creation planner falls back when a removed reference-style value is restor
 
   assert.equal(plan.visualLanguage, "classic-commercial");
   assert.equal(plan.visualLanguageLabel, "经典商业摄影");
-  assert.ok(plan.items.every((item) => item.prompt.includes("Visual language: 经典商业摄影")));
+  assert.ok(plan.items.every((item) => item.prompt.includes("Visual style: 经典商业摄影")));
   assert.ok(plan.items.every((item) => !item.prompt.includes("style reference")));
 });
 
@@ -450,8 +516,7 @@ test("creation planner applies one selected visual language consistently across 
 
   assert.equal(plan.visualLanguage, "lifestyle-editorial");
   assert.equal(plan.visualLanguageLabel, "生活方式杂志");
-  assert.ok(plan.items.every((item) => item.prompt.includes("Visual language: 生活方式杂志")));
-  assert.ok(plan.items.every((item) => item.prompt.includes("held as the authority for every image in the set")));
+  assert.ok(plan.items.every((item) => item.prompt.includes("Visual style: 生活方式杂志")));
   assert.ok(plan.items.every((item) => item.prompt.includes("lifestyle magazine editorial")));
 });
 
@@ -479,9 +544,8 @@ test("creation planner makes non-default visual languages decisive instead of dr
       selectedRoles: ["hero", "benefit"],
     });
 
-    assert.ok(plan.items.every((item) => item.prompt.includes("Visual language:")));
+    assert.ok(plan.items.every((item) => item.prompt.includes("Visual style:")));
     assert.ok(plan.items.every((item) => item.prompt.includes(signature)), visualLanguage);
-    assert.ok(plan.items.every((item) => item.prompt.includes("held as the authority for every image in the set")));
     assert.ok(plan.items.every((item) => !item.prompt.includes("polished commercial lighting.")));
   }
 });
@@ -504,7 +568,7 @@ test("creation planner applies the visual language lock to SKU prompts without f
   const skuItem = plan.items.find((item) => item.role === "sku");
 
   assert.ok(skuItem);
-  assert.match(skuItem.prompt, /Visual language:/);
+  assert.match(skuItem.prompt, /Visual style:/);
   assert.match(skuItem.prompt, /phone-camera creator realism/);
   assert.doesNotMatch(skuItem.prompt, /clean premium ecommerce background with polished commercial lighting/);
 });
@@ -520,7 +584,7 @@ test("creation planner limits English copy to newly authored canvas text", () =>
 
   assert.ok(
     plan.items.every((item) =>
-      item.prompt.includes("Added canvas text uses English"),
+      item.prompt.includes("Use concise English for new canvas text outside the physical subject"),
     ),
   );
 });
@@ -538,12 +602,10 @@ test("creation planner keeps English added copy separate from Chinese role templ
   for (const item of plan.items) {
     assert.equal(item.targetLanguage, "en");
     assert.equal(item.marketingCopyLanguage, "en");
-    assert.match(item.prompt, /Use concise English for newly authored canvas text/);
-    assert.match(item.prompt, /Added canvas text uses English/);
-    assert.match(item.prompt, /New canvas wording outside the physical product or packaging subject uses English/i);
-    assert.match(item.prompt, /Platform, scenario, category, and visual-language labels are internal planning metadata, never artwork text/i);
+    assert.match(item.prompt, /Use concise English for new canvas text outside the physical subject/i);
+    assert.match(item.prompt, /Planning labels for platform, scenario, category, and visual language stay internal/i);
     assert.doesNotMatch(item.prompt, /这个产品具体帮我解决什么问题？|我买它能获得哪些更明确的好处？/);
-    assert.match(item.prompt, /existing text .* original language/i);
+    assert.match(item.prompt, /existing subject text, brand\/model names, numbers, and units in their original form/i);
   }
 });
 
@@ -576,10 +638,9 @@ test("creation planner limits output language to copy outside the supplied produ
   assert.equal(ordinaryItems.length, 2);
   for (const item of ordinaryItems) {
     assert.match(item.prompt, /SUBJECT CONTENT LOCK:/);
-    assert.match(item.prompt, /physical product or packaging subject as shown/i);
-    assert.match(item.prompt, /artwork, symbols, logos, surface text/i);
-    assert.match(item.prompt, /printed, engraved, embossed, or embroidered .* original characters and language/i);
-    assert.match(item.prompt, /selected target language for newly authored layout text outside the subject/i);
+    assert.match(item.prompt, /supplied product or packaging artwork, symbols, logos, surface text/i);
+    assert.match(item.prompt, /printed, engraved, embossed, or embroidered text keeps its original characters and language/i);
+    assert.match(item.prompt, /Use concise English for new canvas text outside the physical subject/i);
     assert.doesNotMatch(item.prompt, /Translate or rewrite any source-language wording into the target language/i);
   }
 });
@@ -620,13 +681,13 @@ test("creation planner treats detailed descriptions as selective set-wide source
   assert.ok(
     plan.items.every((item) =>
       item.prompt.includes(
-        "source facts rather than literal artwork text",
+        "Use product input and reference notes as source facts",
       ),
     ),
   );
   assert.ok(
     plan.items.every((item) =>
-      item.prompt.includes("New canvas wording outside the physical product or packaging subject uses English"),
+      item.prompt.includes("Use concise English for new canvas text outside the physical subject"),
     ),
   );
 });
@@ -744,10 +805,9 @@ test("creation planner turns rechargeable features into concrete scene and usage
 
   const promptByRole = Object.fromEntries(plan.items.map((item) => [item.role, item.prompt]));
 
-  assert.match(promptByRole.scene, /conversion image of the set/i);
-  assert.match(promptByRole.scene, /concrete charging or cable-connection moment/i);
+  assert.match(promptByRole.scene, /Role job: Show 2-4 believable use scenarios/i);
   assert.match(promptByRole.scene, /USB-C|bedside charging|power bank charging/i);
-  assert.match(promptByRole["usage-suggestion"], /charging and connection ease as evidence/i);
+  assert.match(promptByRole["usage-suggestion"], /charging, or connection cues as evidence of ease or value/i);
   assert.doesNotMatch(promptByRole["usage-suggestion"], /charging step sequence|numbered steps/i);
   assert.match(promptByRole["usage-suggestion"], /USB-C|bedside charging|power bank charging/i);
   assert.match(promptByRole.atmosphere, /desire turns into action/i);
@@ -915,15 +975,15 @@ test("creation planner prevents conversion roles from becoming redundant white-b
   const promptByRole = Object.fromEntries(plan.items.map((item) => [item.role, item.prompt]));
 
   ["brand-story", "after-sales", "atmosphere"].forEach((role) => {
-    assert.match(promptByRole[role], /conversion image of the set/i);
-    assert.match(promptByRole[role], /Conversion intent:/i);
+    assert.match(promptByRole[role], /Role job:/i);
+    assert.match(promptByRole[role], /Buyer goal:/i);
   });
   assert.match(promptByRole["effect-comparison"], /one dominant, fully visible product/i);
   assert.match(promptByRole["effect-comparison"], /single anchor/i);
   assert.match(promptByRole["effect-comparison"], /seamless continuous scene/i);
   assert.doesNotMatch(promptByRole["effect-comparison"], /stage a believable buyer-facing situation, objection, comparison/i);
-  assert.doesNotMatch(promptByRole["size-capacity-fit"], /conversion image of the set/i);
-  assert.doesNotMatch(promptByRole["spec-table"], /conversion image of the set/i);
+  assert.match(promptByRole["size-capacity-fit"], /dimension, capacity, or fit verification image/i);
+  assert.match(promptByRole["spec-table"], /key-specification explainer/i);
 });
 
 test("creation planner turns brand-story role into a many-scene use-and-style collage", () => {
@@ -944,7 +1004,7 @@ test("creation planner turns brand-story role into a many-scene use-and-style co
   assert.match(prompt, /repeat the exact same product subject/i);
 });
 
-test("creation planner adds buyer-decision strategy to formerly templated conversion roles", () => {
+test("creation planner gives conversion roles one merged role directive", () => {
   const plan = buildCreationPlan({
     productName: "Rechargeable hard bait lure",
     productDescription:
@@ -970,25 +1030,25 @@ test("creation planner adds buyer-decision strategy to formerly templated conver
   const promptByRole = Object.fromEntries(plan.items.map((item) => [item.role, item.prompt]));
 
   Object.values(promptByRole).forEach((prompt) => {
-    assert.match(prompt, /Shopper question:/i);
-    assert.match(prompt, /Shopper question:/i);
+    assert.equal((prompt.match(/Role job:/g) || []).length, 1);
+    assert.doesNotMatch(prompt, /SHOPPER QUESTION:/i);
   });
   assert.match(promptByRole.benefit, /recognizable target person or buyer viewpoint/i);
-  assert.match(promptByRole["multi-angle"], /understand the product from every important side/i);
-  assert.match(promptByRole.atmosphere, /what decisive moment would make me want to buy this now/i);
-  assert.match(promptByRole["brand-story"], /all the ways and places I could use this product/i);
+  assert.match(promptByRole["multi-angle"], /Present the same exact product from 3-4 angles/i);
+  assert.match(promptByRole.atmosphere, /Build one believable ownership instant/i);
+  assert.match(promptByRole["brand-story"], /Multiple Uses & Style collage/i);
   assert.match(promptByRole["effect-comparison"], /every supported function, mechanism, effect path, and outcome/i);
-  assert.match(promptByRole["craft-process"], /why should I trust the making quality/i);
-  assert.match(promptByRole["accessory-gift"], /what exactly comes with this product/i);
-  assert.match(promptByRole["series-showcase"], /which variant, color, size, bundle, or SKU should I choose/i);
-  assert.match(promptByRole["ingredient-material"], /what is it made of and why does that matter/i);
-  assert.match(promptByRole["after-sales"], /what problem does this product solve for me\?/i);
-  assert.match(promptByRole["usage-suggestion"], /what clear benefits will I get after buying it\?/i);
+  assert.match(promptByRole["craft-process"], /production, material handling, assembly, testing, or inspection facts/i);
+  assert.match(promptByRole["accessory-gift"], /included-items and accessory checklist/i);
+  assert.match(promptByRole["series-showcase"], /colors, styles, sizes, bundles, or product variants/i);
+  assert.match(promptByRole["ingredient-material"], /ingredients, materials, components, or composition/i);
+  assert.match(promptByRole["after-sales"], /real usage pain/i);
+  assert.match(promptByRole["usage-suggestion"], /3-5 supplied core selling points/i);
   assert.match(promptByRole["human-handheld"], /live person in frame using hands or a natural grip/i);
   assert.match(promptByRole["human-wearable"], /live model visibly wearing, carrying, shouldering, or using the exact product/i);
 });
 
-test("creation planner gives every ecommerce carousel role a shopper question", () => {
+test("creation planner gives every ecommerce carousel role one merged role directive", () => {
   const plan = buildCreationPlan({
     productName: "Rechargeable hard bait lure",
     productDescription:
@@ -999,17 +1059,18 @@ test("creation planner gives every ecommerce carousel role a shopper question", 
   const promptByRole = Object.fromEntries(plan.items.map((item) => [item.role, item.prompt]));
 
   CREATION_ITEM_ROLES.forEach((role) => {
-    assert.match(promptByRole[role.role], /SHOPPER QUESTION:/i, role.role);
+    assert.equal((promptByRole[role.role].match(/Role job:/g) || []).length, 1, role.role);
+    assert.doesNotMatch(promptByRole[role.role], /SHOPPER QUESTION:/i, role.role);
   });
-  assert.match(promptByRole.hero, /what is this product and why should I care at first glance/i);
-  assert.match(promptByRole.benefit, /which target shopper will feel understood by this product right now/i);
-  assert.match(promptByRole.scene, /which real scenarios make this product feel useful and worth buying/i);
-  assert.match(promptByRole["product-detail"], /are the visible details trustworthy enough to buy/i);
-  assert.match(promptByRole["accessory-gift"], /what exactly comes with this product/i);
-  assert.match(promptByRole["after-sales"], /what problem does this product solve for me\?/i);
-  assert.match(promptByRole["usage-suggestion"], /what clear benefits will I get after buying it\?/i);
-  assert.match(promptByRole["human-handheld"], /real person's hands or in actual use/i);
-  assert.match(promptByRole["human-wearable"], /real body or when carried in a real scene/i);
+  assert.match(promptByRole.hero, /unmistakable product identity and one main buying promise/i);
+  assert.match(promptByRole.benefit, /recognizable target person or buyer viewpoint/i);
+  assert.match(promptByRole.scene, /Show 2-4 believable use scenarios/i);
+  assert.match(promptByRole["product-detail"], /macro crops, local close-up panes, and callout labels/i);
+  assert.match(promptByRole["accessory-gift"], /included-items and accessory checklist/i);
+  assert.match(promptByRole["after-sales"], /real usage pain/i);
+  assert.match(promptByRole["usage-suggestion"], /concrete product evidence and the buyer payoff/i);
+  assert.match(promptByRole["human-handheld"], /live person in frame using hands or a natural grip/i);
+  assert.match(promptByRole["human-wearable"], /live model visibly wearing, carrying, shouldering, or using the exact product/i);
 });
 
 test("creation planner gives hero images circular scenario insets and scenario cues", () => {
@@ -1065,7 +1126,7 @@ test("creation planner merges all reliable non-dimension facts into the hero sal
   assert.doesNotMatch(heroPrompt, /Description:[^.]*(?:172|100)\s*mm/i);
   assert.match(heroPrompt, /belong to the dimension image/i);
   assert.match(heroPrompt, /3-5 small circular scene frames/i);
-  assert.match(heroPrompt, /Added canvas text uses English/i);
+  assert.match(heroPrompt, /Use concise English for new canvas text outside the physical subject/i);
 });
 
 test("creation planner carries the target-shopper resonance and hero information locks into universal platform slots", () => {
@@ -1193,8 +1254,8 @@ test("creation planner keeps hard information roles factual instead of emotional
   });
   const promptByRole = Object.fromEntries(plan.items.map((item) => [item.role, item.prompt]));
 
-  assert.match(promptByRole["size-capacity-fit"], /factual verification image/i);
-  assert.match(promptByRole["spec-table"], /factual verification/i);
+  assert.match(promptByRole["size-capacity-fit"], /dimension, capacity, or fit verification image/i);
+  assert.match(promptByRole["spec-table"], /key-specification explainer/i);
   assert.match(promptByRole["size-capacity-fit"], /Show the product with accurate callout measurement lines/i);
   assert.match(promptByRole["spec-table"], /product-led key-specification explainer/i);
   assert.doesNotMatch(
@@ -1435,7 +1496,7 @@ test("creation planner injects Simplified Chinese target-language guidance", () 
 
   assert.equal(plan.targetLanguage, "zh-CN");
   assert.equal(plan.targetLanguageLabel, "简体中文");
-  assert.ok(plan.items.every((item) => item.prompt.includes("使用简体中文创作简短的新增画布文案")));
+  assert.ok(plan.items.every((item) => item.prompt.includes("Use concise 简体中文 for new canvas text outside the physical subject")));
   assert.ok(plan.items.every((item) => item.marketingCopyLanguage === "zh-CN"));
 });
 
@@ -1450,9 +1511,9 @@ test("creation planner normalizes supported target languages", () => {
 
 test("creation planner injects common international target-language guidance", () => {
   const cases = [
-    ["fr", "Français", /Use concise French for newly authored canvas text/],
-    ["de", "Deutsch", /Use concise German for newly authored canvas text/],
-    ["es", "Español", /Use concise Spanish for newly authored canvas text/],
+    ["fr", "Français", /Use concise Français for new canvas text outside the physical subject/],
+    ["de", "Deutsch", /Use concise Deutsch for new canvas text outside the physical subject/],
+    ["es", "Español", /Use concise Español for new canvas text outside the physical subject/],
   ];
 
   for (const [targetLanguage, targetLanguageLabel, promptPattern] of cases) {
@@ -1485,7 +1546,7 @@ test("creation planner defaults to English copy and metric-plus-imperial specs",
   assert.equal(plan.targetLanguageLabel, "English");
   assert.equal(plan.dimensionUnitMode, "both");
   assert.match(plan.items[0].prompt, /Length 13cm \(5\.12 in\) \/ Weight 35g \(1\.23 oz\)/);
-  assert.match(plan.items[0].prompt, /Use concise English for newly authored canvas text/);
+  assert.match(plan.items[0].prompt, /Use concise English for new canvas text outside the physical subject/);
 });
 
 test("creation planner normalizes optional logo placement and background handling", () => {
@@ -1551,7 +1612,7 @@ test("creation planner expands ecommerce scenario sets to eight images", () => {
     ["hero", "benefit", "scene", "multi-angle", "atmosphere", "product-detail", "brand-story", "size-capacity-fit"],
   );
   assert.ok(plan.items.every((item) => item.prompt.includes("Scenario: 详情页转化")));
-  assert.ok(plan.items.every((item) => item.prompt.includes("Use concise English for newly authored canvas text")));
+  assert.ok(plan.items.every((item) => item.prompt.includes("Use concise English for new canvas text outside the physical subject")));
 });
 
 test("creation planner expands ecommerce scenario sets to twelve images", () => {
@@ -1636,7 +1697,7 @@ test("creation planner appends distinct SKU images after twelve carousel roles",
   ]);
   assert.deepEqual(skuItems.map((item) => item.role), ["sku", "sku", "sku"]);
   assert.deepEqual(skuItems.map((item) => item.slotIndex), [13, 14, 15]);
-  assert.ok(skuItems.every((item) => item.prompt.includes("SKU product image")));
+  assert.ok(skuItems.every((item) => item.prompt.includes("SKU image:")));
   assert.ok(skuItems.every((item) => item.prompt.includes("Replace the uploaded plain photo background")));
   assert.ok(skuItems.every((item) => item.prompt.includes("kept exactly as supplied in shape, proportions, colors, materials, markings, logos, identifiers, and hardware")));
   assert.ok(skuItems.every((item) => !item.prompt.includes("brand-logo.png")));
@@ -1697,12 +1758,13 @@ test("creation planner leads every named-platform item with its native gallery s
       `Create ${plan.platformLabel} ${item.imageTypeLabel} as a platform-native gallery asset.`,
     )), platform);
     assert.ok(plan.items.every((item) => item.prompt.includes(
-      `Platform gallery strategy: ${plan.platformProfile.promptInstruction}`,
+      `Platform asset: ${item.imageTypeLabel};`,
     )), platform);
+    assert.ok(plan.items.every((item) => (item.prompt.match(/Role job:/g) || []).length === 1), platform);
     const sizeItem = plan.items.find((item) => item.role === "size-capacity-fit");
     assert.ok(sizeItem, `${platform} requires a size-related item`);
-    assert.match(sizeItem.prompt, /non-numeric scale or fit image/i);
-    assert.match(sizeItem.prompt, /render only measurements visible in the supplied references or explicitly provided/i);
+    assert.match(sizeItem.prompt, /Use scale or fit cues when exact measurement evidence is absent/i);
+    assert.match(sizeItem.prompt, /Role job: Show the product with accurate callout measurement lines/i);
   }
 
   const xiaohongshu = buildCreationPlan({
@@ -1711,7 +1773,7 @@ test("creation planner leads every named-platform item with its native gallery s
     platform: "xiaohongshu",
     skuGenerationEnabled: false,
   });
-  assert.match(xiaohongshu.items[0].prompt, /Platform gallery strategy:/i);
+  assert.match(xiaohongshu.items[0].prompt, /Platform asset:/i);
 });
 
 test("creation planner SKU toggle changes only appended SKU counts", () => {
@@ -1737,7 +1799,7 @@ test("creation planner SKU toggle changes only appended SKU counts", () => {
   assert.equal(enabled.totalPlannedItemCount - disabled.totalPlannedItemCount, 2);
 });
 
-test("creation planner treats sixteen-image suites as a selectable ten-image upload candidate pool", () => {
+test("creation planner keeps one role directive across sixteen-image suites", () => {
   const plan = buildCreationPlan({
     productName: "Golf cocktail graphic tee",
     productDescription:
@@ -1750,13 +1812,10 @@ test("creation planner treats sixteen-image suites as a selectable ten-image upl
   const promptByRole = Object.fromEntries(plan.items.map((item) => [item.role, item.prompt]));
 
   assert.equal(plan.imageCount, 16);
-  assert.match(promptByRole.hero, /Shopper question:/i);
-  assert.match(promptByRole.hero, /Shopper question:/i);
-  assert.match(promptByRole.hero, /Shopper question:/i);
-  assert.match(promptByRole["spec-table"], /Shopper question:/i);
-  assert.match(promptByRole["craft-process"], /Shopper question:/i);
-  assert.match(promptByRole["usage-suggestion"], /Shopper question:/i);
-  assert.match(promptByRole.hero, /Shopper question:/i);
+  ["hero", "spec-table", "craft-process", "usage-suggestion"].forEach((role) => {
+    assert.equal((promptByRole[role].match(/Role job:/g) || []).length, 1, role);
+    assert.doesNotMatch(promptByRole[role], /SHOPPER QUESTION:/i, role);
+  });
 });
 
 test("creation planner supports the refactored ecommerce image types with dedicated rules", () => {
@@ -2253,9 +2312,9 @@ test("creation planner SKU prompts treat source card text as non-subject noise",
 
   const skuItem = plan.items.find((item) => item.role === "sku");
 
-  assert.match(skuItem.prompt, /Visible text is limited to this SKU template's required product code or color label/);
-  assert.match(skuItem.prompt, /source-card badges, stickers, price tags, captions, and watermarks stay out/);
-  assert.match(skuItem.prompt, /Visible text is limited to this SKU template's required product code or color label/);
+  assert.match(skuItem.prompt, /Visible text consists of this SKU template's required product code or color label/);
+  assert.match(skuItem.prompt, /source-card badges, stickers, price tags, captions, and watermarks are omitted/);
+  assert.match(skuItem.prompt, /Visible text consists of this SKU template's required product code or color label/);
   assert.doesNotMatch(skuItem.prompt, /Preserve the SKU subject exactly:.*printed text/);
 });
 
@@ -2549,7 +2608,7 @@ test("creation planner keeps single SKU packs on the previous single-subject pro
 
   assert.equal(plan.skuBundleCount, 1);
   assert.equal(plan.items[1].skuSubject.bundleCount, 1);
-  assert.match(plan.items[1].prompt, /Create one SKU product image/);
+  assert.match(plan.items[1].prompt, /SKU image: Blue lure/);
   assert.doesNotMatch(plan.items[1].prompt, /identical copies of this same SKU subject/);
 });
 
@@ -2910,7 +2969,7 @@ test("creation planner keeps grouped variant dimensions bound to their SKU refer
   assert.match(dimensionsPrompt, /Red S: Length 12 cm \/ Width 5 cm/);
   assert.match(dimensionsPrompt, /Blue L: Length 18 cm \/ Width 7 cm/);
   assert.match(dimensionsPrompt, /every bound variant or size group as its own clearly separated product\/card or row/i);
-  assert.match(dimensionsPrompt, /Do not combine, cross-pair, or reuse values from another group/i);
+  assert.match(dimensionsPrompt, /Keep each value with its matching color, size, or product unit/i);
 
   const skuItems = plan.items.filter((item) => item.role === "sku");
   const redPrompt = skuItems.find((item) => item.skuSubject.id === "red-s").prompt;
@@ -2921,7 +2980,7 @@ test("creation planner keeps grouped variant dimensions bound to their SKU refer
   assert.match(bluePrompt, /Dimension\/specification content to keep accurate when useful: Blue L: Length 18 cm/);
   assert.doesNotMatch(bluePrompt, /Red S: Length 12 cm|Width 5 cm/);
   assert.doesNotMatch(unboundPrompt, /Dimension\/specification content to keep accurate when useful:/);
-  assert.match(unboundPrompt, /when no matching group is supplied, omit variant-specific dimensions/i);
+  assert.match(unboundPrompt, /variant-specific values only when a matching group is supplied/i);
 });
 
 test("creation planner enriches SKU subjects from matching reference dimension groups without cross-pairing", () => {
@@ -3111,7 +3170,7 @@ test("creation planner ignores dimension groups that share an ambiguous filename
   const skuPrompts = plan.items.filter((item) => item.itemKind === "sku").map((item) => item.prompt);
   assert.equal(skuPrompts.length, 2);
   assert.ok(skuPrompts.every((prompt) => !/Dimension\/specification content to keep accurate when useful:/.test(prompt)));
-  assert.ok(skuPrompts.every((prompt) => /when no matching group is supplied, omit variant-specific dimensions/i.test(prompt)));
+  assert.ok(skuPrompts.every((prompt) => /variant-specific values only when a matching group is supplied/i.test(prompt)));
 });
 
 test("creation planner matches grouped dimensions by filenames without leaking the dimension-card source", () => {
@@ -3190,7 +3249,7 @@ test("creation planner leaves unbound multi-variant dimension groups out of SKU 
   assert.deepEqual(plan.dimensionSpecGroups.map((group) => group.referenceIndexes), [[], []]);
   const skuPrompt = plan.items.find((item) => item.role === "sku").prompt;
   assert.doesNotMatch(skuPrompt, /Dimension\/specification content to keep accurate when useful:/);
-  assert.match(skuPrompt, /when no matching group is supplied, omit variant-specific dimensions/i);
+  assert.match(skuPrompt, /variant-specific values only when a matching group is supplied/i);
 });
 
 test("creation planner preserves grouped SKU dimensions when flat plan dimensions are submitted again", () => {
@@ -3307,7 +3366,7 @@ test("creation planner does not copy flat dimension input into multiple SKU prom
 
   const skuPrompts = plan.items.filter((item) => item.role === "sku").map((item) => item.prompt);
   assert.ok(skuPrompts.every((prompt) => !/Dimension\/specification content to keep accurate when useful:/.test(prompt)));
-  assert.ok(skuPrompts.every((prompt) => /when no matching group is supplied, omit variant-specific dimensions/i.test(prompt)));
+  assert.ok(skuPrompts.every((prompt) => /variant-specific values only when a matching group is supplied/i.test(prompt)));
 });
 
 test("creation planner does not mistake a legacy dimension-card fallback for a multi-SKU binding", () => {
@@ -3634,7 +3693,7 @@ test("creation planner applies industry templates to default role sets and promp
     ["hero", "benefit", "product-detail", "usage-suggestion", "ingredient-material", "atmosphere", "accessory-gift", "after-sales"],
   );
   assert.ok(plan.items.every((item) => item.prompt.includes("Beauty and personal care industry template")));
-  assert.ok(plan.items.every((item) => item.prompt.includes("texture, swatches, skincare use, packaging, and benefit hierarchy")));
+  assert.ok(plan.items.every((item) => item.prompt.includes("texture, swatches, skincare use, packaging, and evidence-based benefit hierarchy")));
 });
 
 test("creation planner applies fourth-level category templates to role presets and prompts", () => {
@@ -3861,10 +3920,10 @@ test("creation planner injects reference image role guidance", () => {
     ],
   );
   assert.equal(plan.referenceImageRoles.length, 4);
-  assert.ok(plan.items.every((item) => item.prompt.includes("Reference image roles:")));
-  assert.ok(plan.items.every((item) => item.prompt.includes("front.png = product subject")));
-  assert.ok(plan.items.every((item) => item.prompt.includes("box.png = package-list content and included items")));
-  assert.ok(plan.items.every((item) => item.prompt.includes("texture.png = detail and structure reference")));
+  assert.ok(plan.items.every((item) => item.prompt.includes("Primary subject: front.png.")));
+  assert.match(plan.items.find((item) => item.role === "accessory-gift").prompt, /Reference evidence: box\.png = package-list content and included items/);
+  assert.match(plan.items.find((item) => item.role === "product-detail").prompt, /Reference evidence: texture\.png = detail and structure reference/);
+  assert.doesNotMatch(plan.items.find((item) => item.role === "hero").prompt, /box\.png|texture\.png/);
   assert.ok(plan.items.every((item) => !item.prompt.includes("legacy-style.png")));
 });
 
@@ -3888,7 +3947,7 @@ test("creation planner normalizes reference subject as a subject role", () => {
       ["old-anchor.png", "product", "商品主体"],
     ],
   );
-  assert.ok(plan.items.every((item) => item.prompt.includes("subject-anchor.png = reference subject")));
+  assert.ok(plan.items.every((item) => item.prompt.includes("Primary subject: subject-anchor.png.")));
 });
 
 test("creation planner locks the selected reference subject as the set-wide primary subject", () => {
@@ -3908,18 +3967,11 @@ test("creation planner locks the selected reference subject as the set-wide prim
 
   assert.ok(
     plan.items.every((item) =>
-      item.prompt.includes(
-        "Primary subject: orange-reference-subject.png is the main visual product for every non-SKU image in this set",
-      ),
+      item.prompt.includes("Primary subject: orange-reference-subject.png."),
     ),
   );
-  assert.ok(
-    plan.items.every((item) =>
-      item.prompt.includes(
-        "Other product-subject references serve as secondary comparison or variant context around that primary subject.",
-      ),
-    ),
-  );
+  assert.ok(plan.items.every((item) => !item.prompt.includes("blue-backpack.png =")));
+  assert.ok(plan.items.every((item) => !item.prompt.includes("black-backpack.png =")));
 });
 
 test("creation planner creates SKU images for the selected reference subject and other product subjects", () => {
@@ -3992,8 +4044,9 @@ test("creation reference analysis normalizes role suggestions and prompt notes",
     ],
   );
   assert.deepEqual(analysis.risks, ["包装信息不足"]);
-  assert.ok(plan.items.every((item) => item.prompt.includes("texture.png = detail and structure reference")));
-  assert.ok(plan.items.every((item) => item.prompt.includes("Note: 磨砂纹理和边缘细节")));
+  assert.match(plan.items.find((item) => item.role === "product-detail").prompt, /texture\.png = detail and structure reference, 磨砂纹理和边缘细节/);
+  assert.match(plan.items.find((item) => item.role === "scene").prompt, /kitchen\.png = usage scene, 厨房台面使用环境/);
+  assert.doesNotMatch(plan.items.find((item) => item.role === "hero").prompt, /texture\.png|kitchen\.png/);
 });
 
 test("creation reference analysis keeps fifteen reference role suggestions", () => {

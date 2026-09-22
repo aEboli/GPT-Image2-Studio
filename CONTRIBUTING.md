@@ -44,7 +44,14 @@ git diff --check
 
 ## 发布
 
-准备新的主应用版本时，使用 `npm run release:patch -- --summary "本次更新摘要"` 将补丁位严格增加 `0.0.1`，并同步锁文件、页面版本、当前 README、Windows 文档和新版本说明。商品图采集扩展使用独立版本线，不随主应用自动升级。
+准备新的主应用版本时，按变更级别选择一个版本入口，并使用 `--summary` 提供本次更新摘要：
+
+- `npm run release:major -- --summary "大版本更新"`：主版本 `+1`，次版本和更新位归零，例如 `0.6.116` -> `1.0.000`。
+- `npm run release:minor -- --summary "小版本更新"`：次版本 `+1`，更新位归零，例如 `0.6.116` -> `0.7.000`。
+- `npm run release:feature -- --summary "小功能更新"`：更新位 `+0.010`，例如 `0.0.100` -> `0.0.110`。
+- `npm run release:patch -- --summary "普通更新"`：更新位 `+0.001`，任何普通变更都使用此入口。
+
+版本格式固定为 `major.minor.patch`，其中 `patch` 始终是三位数字；每次只改变一个层级，上级层级变化时所有下级归零。锁文件、页面版本、当前 README、Windows 文档和新版本说明会在同一事务中同步。商品图采集扩展使用独立版本线，不随主应用自动升级。
 
 日常分支使用 `npm run check:release` 检查 `package.json`、锁文件、两份 README、Windows 文档和当前版本发布说明。创建正式发布提交与 `v<version>` 标签后，再运行：
 

@@ -31,48 +31,48 @@ test("maintained version facts cover the badge, installers, and release-note lin
 
 test("drift detection reports stale facts and ignores absent or current ones", () => {
   const stale = [
-    "[![Version](https://img.shields.io/badge/version-v1.2.2-2563eb.svg)](x)",
-    "Download `GPT-Image2-Studio-Desktop-Setup-v1.2.3-x64.exe` today.",
+    "[![Version](https://img.shields.io/badge/version-v1.2.002-2563eb.svg)](x)",
+    "Download `GPT-Image2-Studio-Desktop-Setup-v1.2.003-x64.exe` today.",
   ].join("\n");
 
-  const drift = findVersionFactDrift({ text: stale, templates: README_TEMPLATES, version: "1.2.3" });
+  const drift = findVersionFactDrift({ text: stale, templates: README_TEMPLATES, version: "1.2.003" });
   assert.equal(drift.length, 1);
-  assert.equal(drift[0].found, "version-v1.2.2-2563eb.svg");
-  assert.equal(drift[0].expected, "version-v1.2.3-2563eb.svg");
+  assert.equal(drift[0].found, "version-v1.2.002-2563eb.svg");
+  assert.equal(drift[0].expected, "version-v1.2.003-2563eb.svg");
   assert.equal(drift[0].lineNumber, 1);
 
   // A document that never mentions a template is unconstrained by it.
-  assert.equal(findVersionFactDrift({ text: "no facts here\n", templates: README_TEMPLATES, version: "1.2.3" }).length, 0);
+  assert.equal(findVersionFactDrift({ text: "no facts here\n", templates: README_TEMPLATES, version: "1.2.003" }).length, 0);
 
   // A link naming two versions is drift even when only one half is stale.
   const link = findVersionFactDrift({
-    text: "- Current release notes: [v1.2.3](./docs/releases/v1.2.2.md).\n",
+    text: "- Current release notes: [v1.2.003](./docs/releases/v1.2.002.md).\n",
     templates: README_TEMPLATES,
-    version: "1.2.3",
+    version: "1.2.003",
   });
   assert.equal(link.length, 1);
 });
 
 test("fact replacement never bleeds into a longer version or into prose", () => {
   const source = [
-    "version-v1.2.3-2563eb.svg",
-    "`GPT-Image2-Studio-Desktop-Setup-v1.2.30-x64.exe` stays on its own version.",
-    "Historical releases: v1.2.3 and v1.2.30.",
-    "Example command: `git tag v1.2.3`.",
+    "version-v1.2.003-2563eb.svg",
+    "`GPT-Image2-Studio-Desktop-Setup-v1.2.030-x64.exe` stays on its own version.",
+    "Historical releases: v1.2.003 and v1.2.030.",
+    "Example command: `git tag v1.2.003`.",
   ].join("\n");
 
   const { text, replaced } = replaceVersionFacts({
     text: source,
     templates: README_TEMPLATES,
-    previousVersion: "1.2.3",
-    version: "1.2.4",
+    previousVersion: "1.2.003",
+    version: "1.2.004",
   });
 
   assert.equal(replaced, 1);
-  assert.ok(text.includes("version-v1.2.4-2563eb.svg"));
-  assert.ok(text.includes("Setup-v1.2.30-x64.exe"), "a longer version must not be rewritten");
-  assert.ok(text.includes("Historical releases: v1.2.3 and v1.2.30."), "prose must stay byte-for-byte");
-  assert.ok(text.includes("`git tag v1.2.3`"), "tag examples must stay byte-for-byte");
+  assert.ok(text.includes("version-v1.2.004-2563eb.svg"));
+  assert.ok(text.includes("Setup-v1.2.030-x64.exe"), "a longer version must not be rewritten");
+  assert.ok(text.includes("Historical releases: v1.2.003 and v1.2.030."), "prose must stay byte-for-byte");
+  assert.ok(text.includes("`git tag v1.2.003`"), "tag examples must stay byte-for-byte");
   assert.equal(renderVersionFact("v{version}", "9.9.9"), "v9.9.9");
 });
 
@@ -112,41 +112,41 @@ async function createReleaseFixture(version) {
 }
 
 test("release readiness rejects a stale badge that the anchored fact cannot catch", async () => {
-  const root = await createReleaseFixture("1.2.3");
+  const root = await createReleaseFixture("1.2.003");
 
   // The anchored `Current version:` fact is correct; only the badge lagged behind. This is
   // exactly the drift that used to pass every check.
   await writeFile(
     join(root, "README.md"),
-    "Current version: `v1.2.3`\n\n![badge](https://img.shields.io/badge/version-v1.2.2-2563eb.svg)\n",
+    "Current version: `v1.2.003`\n\n![badge](https://img.shields.io/badge/version-v1.2.002-2563eb.svg)\n",
     "utf8",
   );
-  await assert.rejects(checkReleaseReadiness({ rootDir: root }), /README\.md.*version-v1\.2\.2-2563eb\.svg/s);
+  await assert.rejects(checkReleaseReadiness({ rootDir: root }), /README\.md.*version-v1\.2\.002-2563eb\.svg/s);
 
   await writeFile(
     join(root, "README.md"),
-    "Current version: `v1.2.3`\n\n![badge](https://img.shields.io/badge/version-v1.2.3-2563eb.svg)\n",
+    "Current version: `v1.2.003`\n\n![badge](https://img.shields.io/badge/version-v1.2.003-2563eb.svg)\n",
     "utf8",
   );
   const result = await checkReleaseReadiness({ rootDir: root });
-  assert.equal(result.versionLabel, "v1.2.3");
+  assert.equal(result.versionLabel, "v1.2.003");
 });
 
 test("patch release updates the badge alongside the anchored fact", async () => {
-  const root = await createReleaseFixture("1.2.3");
+  const root = await createReleaseFixture("1.2.003");
 
   const result = await bumpPatchRelease({ rootDir: root, summary: "同步版本事实。" });
-  assert.equal(result.version, "1.2.4");
+  assert.equal(result.version, "1.2.004");
 
   const readme = await readFile(join(root, "README.md"), "utf8");
-  assert.ok(readme.includes("Current version: `v1.2.4`"));
-  assert.ok(readme.includes("version-v1.2.4-2563eb.svg"), "the badge must follow the bump");
-  assert.equal(readme.includes("v1.2.3"), false);
+  assert.ok(readme.includes("Current version: `v1.2.004`"));
+  assert.ok(readme.includes("version-v1.2.004-2563eb.svg"), "the badge must follow the bump");
+  assert.equal(readme.includes("v1.2.003"), false);
 
   const desktopDoc = await readFile(join(root, "docs", "windows-desktop.md"), "utf8");
-  assert.ok(desktopDoc.includes("GPT-Image2-Studio-Desktop-Setup-v1.2.4-x64.exe"));
+  assert.ok(desktopDoc.includes("GPT-Image2-Studio-Desktop-Setup-v1.2.004-x64.exe"));
 
   // The freshly bumped tree must satisfy the check that previously missed the badge.
   const check = await checkReleaseReadiness({ rootDir: root });
-  assert.equal(check.versionLabel, "v1.2.4");
+  assert.equal(check.versionLabel, "v1.2.004");
 });

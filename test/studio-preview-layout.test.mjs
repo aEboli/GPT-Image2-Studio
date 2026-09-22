@@ -30,8 +30,8 @@ const generationClientPath = new URL("../lib/generation-client.mjs", import.meta
 const generationLogPanelPath = new URL("../lib/generation-log-panel.mjs", import.meta.url);
 const generationLogStorePath = new URL("../lib/generation-log-store.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20260911-imperial-black-3";
-const appAssetVersion = "20260915-mode-generation-controls-1";
+const stylesAssetVersion = "20260922-prompt-template-library-2";
+const appAssetVersion = "20260922-prompt-template-library-2";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
 const creationQueueModuleAssetVersion = "20260915-mode-generation-controls-1";
 const quickBlendModuleAssetVersion = "20260608-quick-blend-time-sort-1";
@@ -2504,32 +2504,32 @@ test("floating dialogs and popovers use theme-aware overlay surface tokens", asy
   assert.match(readCssRule(styles, ".ppt-edit-head"), /border-bottom:\s*1px solid var\(--overlay-border-muted/);
 });
 
-test("prompt template panel anchors beside the settings panel without covering it", async () => {
+test("prompt template panel opens as a full-width library surface", async () => {
   const styles = await readFile(stylesPath, "utf8");
   const app = await readFile(appPath, "utf8");
   const panelRule = readCssRule(styles, ".prompt-template-panel");
+  const bodyRule = readCssRule(styles, ".prompt-template-body");
 
-  assert.match(panelRule, /left:\s*calc\(var\(--prompt-template-settings-edge,[\s\S]*\+\s*var\(--studio-grid-gap,\s*14px\)\);/);
+  assert.match(panelRule, /top:\s*clamp\(12px,\s*3svh,\s*32px\);/);
+  assert.match(panelRule, /left:\s*50%;/);
   assert.match(panelRule, /right:\s*auto;/);
-  assert.match(
-    panelRule,
-    /width:\s*min\(680px,\s*calc\(100vw\s*-\s*var\(--prompt-template-settings-edge,[\s\S]*-\s*var\(--studio-grid-gap,\s*14px\)\s*-\s*clamp\(12px,\s*2vw,\s*26px\)\)\);/,
-  );
-  const promptTemplateAnchorSync = extractFunctionBefore(app, "syncPromptTemplateSettingsEdge", "syncStudioHeight");
-  assert.match(promptTemplateAnchorSync, /refs\.settingsPanel\.getBoundingClientRect\(\)/);
-  assert.match(promptTemplateAnchorSync, /Math\.round\(settingsRect\.right\)/);
-  assert.match(promptTemplateAnchorSync, /setProperty\("--prompt-template-settings-edge",/);
-  assert.doesNotMatch(app, /--prompt-template-preview-anchor-left|canvasRect\.left\s*\+\s*canvasRect\.width\s*\/\s*2/);
+  assert.match(panelRule, /width:\s*min\(1440px,\s*calc\(100vw\s*-\s*24px\)\);/);
+  assert.match(panelRule, /max-height:\s*calc\(100svh\s*-\s*24px\);/);
+  assert.match(panelRule, /transform:\s*translateX\(-50%\);/);
+  assert.doesNotMatch(panelRule, /prompt-template-settings-edge/);
+  assert.match(bodyRule, /grid-template-columns:\s*minmax\(172px,\s*0\.2fr\)\s+minmax\(0,\s*1fr\)\s+minmax\(260px,\s*0\.3fr\);/);
+  assert.match(bodyRule, /overflow:\s*hidden;/);
+  assert.doesNotMatch(app, /syncPromptTemplateSettingsEdge|--prompt-template-settings-edge/);
   assert.match(app, /studioHeightObserver\.observe\(refs\.settingsPanel\);/);
   const promptTemplatePopoverOpen = extractFunctionBefore(app, "setPromptTemplatePopoverOpen", "selectRandomPrompt");
-  assert.match(promptTemplatePopoverOpen, /if \(open\) \{\s*syncPromptTemplateSettingsEdge\(\);\s*\}/);
+  assert.doesNotMatch(promptTemplatePopoverOpen, /syncPromptTemplateSettingsEdge/);
   assert.match(
     styles,
-    /html\[data-ui-layout="tablet"\] \.prompt-template-panel,[\s\S]*html\[data-ui-layout="stacked"\] \.prompt-template-panel,[\s\S]*html\[data-ui-layout="mobile"\] \.prompt-template-panel\s*\{[\s\S]*right:\s*auto;[\s\S]*left:\s*10px;[\s\S]*width:\s*calc\(100vw\s*-\s*20px\);/,
+    /html:is\(\[data-ui-layout="mobile"\],\s*\[data-ui-layout="tablet"\],\s*\[data-ui-layout="stacked"\]\) \.prompt-template-panel\s*\{[\s\S]*right:\s*8px;[\s\S]*left:\s*8px;[\s\S]*width:\s*auto;[\s\S]*transform:\s*none;/,
   );
   assert.match(
     styles,
-    /html\[data-ui-layout="tablet"\] \.prompt-template-body,[\s\S]*html\[data-ui-layout="stacked"\] \.prompt-template-body,[\s\S]*html\[data-ui-layout="mobile"\] \.prompt-template-body\s*\{[\s\S]*grid-template-columns:\s*1fr;/,
+    /\.prompt-template-body\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);/,
   );
 });
 
@@ -4042,7 +4042,7 @@ test("studio keeps local port retry exhaustion out of the visible error feed", a
   assert.doesNotMatch(generationClient, /throw new Error\(plan\.message\)/);
 });
 
-test("prompt template list shows titles only and uses title clicks to apply prompts", async () => {
+test("prompt template library exposes personal actions and list/image browse views", async () => {
   const app = await readFile(appPath, "utf8");
   const styles = await readFile(stylesPath, "utf8");
 
@@ -4050,17 +4050,92 @@ test("prompt template list shows titles only and uses title clicks to apply prom
   assert.match(app, /applyPromptTemplate\(template\.id\)/);
   assert.match(app, /editPromptTemplate\(template\.id\)/);
   assert.match(app, /deletePromptTemplate\(template\.id\)/);
-  assert.doesNotMatch(app, /prompt\.textContent = template\.prompt/);
+  assert.match(app, /flattenPromptTemplateLibrary/);
+  assert.match(app, /data-prompt-template-view/);
+  assert.match(app, /applyPromptTemplateLibrary\(template\)/);
+  assert.match(app, /copyPromptTemplateLibraryToPersonal\(template\)/);
+  assert.match(app, /openPromptTemplateLibraryPreview\(template\)/);
+  assert.match(app, /prompt\.textContent = template\.prompt/);
   assert.match(styles, /\.prompt-template-title-button\s*\{[\s\S]*white-space:\s*nowrap;/);
   assert.match(styles, /\.prompt-template-row-actions\s*\{[\s\S]*display:\s*flex;/);
   assert.match(styles, /\.prompt-template-row-actions \.mini-action\s*\{[\s\S]*width:\s*auto;[\s\S]*height:\s*24px;[\s\S]*white-space:\s*nowrap;/);
+  assert.doesNotMatch(styles, /\.prompt-template-library-grid\[data-view="masonry"\]/);
+  assert.match(styles, /\.prompt-template-library-grid\[data-view="list"\]/);
+  assert.match(styles, /\.prompt-template-library-grid\[data-view="image"\]/);
+  assert.match(styles, /\.prompt-template-library-card-actions\s*\{[\s\S]*position:\s*absolute[\s\S]*top:\s*8px/);
 });
 
 test("prompt template storage respects an intentionally empty saved list", async () => {
   const app = await readFile(appPath, "utf8");
 
   assert.match(app, /if \(raw === null\) \{[\s\S]*return DEFAULT_PROMPT_TEMPLATES\.map/);
-  assert.match(app, /return Array\.isArray\(parsed\) \? parsed\.map\(normalizePromptTemplate\)\.filter\(Boolean\) : \[\];/);
+  assert.match(app, /const normalized = Array\.isArray\(parsed\) \? parsed\.map\(normalizePromptTemplate\)\.filter\(Boolean\) : \[\];/);
+  assert.match(app, /return migratePromptTemplateDefaults\(normalized\);/);
+  assert.match(app, /window\.localStorage\.setItem\(PROMPT_TEMPLATE_STORAGE_KEY, JSON\.stringify\(migratedTemplates\)\)/);
+});
+
+test("prompt template migration replaces legacy defaults without dropping user templates", async () => {
+  const app = await readFile(appPath, "utf8");
+  const migrationSource = extractFunctionBefore(app, "isLegacyDefaultPromptTemplate", "readPromptTemplates");
+  const writes = [];
+  const migratePromptTemplateDefaults = new Function(
+    "DEFAULT_PROMPT_TEMPLATES",
+    "PROMPT_TEMPLATE_STORAGE_KEY",
+    "window",
+    `${migrationSource}\nreturn migratePromptTemplateDefaults;`,
+  )(
+    [
+      { id: "default-template-v2-1", name: "证件照", prompt: "新证件照" },
+      { id: "default-template-v2-2", name: "商务个人头像", prompt: "新头像" },
+    ],
+    "image-studio-prompt-templates-v2",
+    { localStorage: { setItem: (key, value) => writes.push({ key, value }) } },
+  );
+
+  const migrated = migratePromptTemplateDefaults([
+    { id: "default-template-1", name: "旧模板", prompt: "旧内容" },
+    { id: "template-user-1", name: "我的模板", prompt: "保留内容" },
+    { id: "prompt-agent-history-1", name: "反推历史", prompt: "历史内容" },
+    { id: "default-template-v2-1", name: "重复证件照", prompt: "重复内容" },
+  ]);
+
+  assert.deepEqual(
+    migrated.map((template) => template.id),
+    ["template-user-1", "prompt-agent-history-1", "default-template-v2-1", "default-template-v2-2"],
+  );
+  assert.deepEqual(migrated.slice(0, 2), [
+    { id: "template-user-1", name: "我的模板", prompt: "保留内容" },
+    { id: "prompt-agent-history-1", name: "反推历史", prompt: "历史内容" },
+  ]);
+  assert.equal(writes.length, 1);
+  assert.equal(JSON.parse(writes[0].value).some((template) => template.id === "default-template-1"), false);
+  assert.equal(migrated.filter((template) => template.id === "default-template-v2-1").length, 1);
+  assert.deepEqual(migratePromptTemplateDefaults([]), []);
+  assert.deepEqual(migratePromptTemplateDefaults(migrated), migrated);
+  assert.equal(writes.length, 1, "a list without legacy defaults should not be rewritten");
+
+  const storageFailureMigration = new Function(
+    "DEFAULT_PROMPT_TEMPLATES",
+    "PROMPT_TEMPLATE_STORAGE_KEY",
+    "window",
+    `${migrationSource}\nreturn migratePromptTemplateDefaults;`,
+  )(
+    [
+      { id: "default-template-v2-1", name: "证件照", prompt: "新证件照" },
+      { id: "default-template-v2-2", name: "商务个人头像", prompt: "新头像" },
+    ],
+    "image-studio-prompt-templates-v2",
+    { localStorage: { setItem: () => { throw new Error("quota"); } } },
+  );
+  const afterStorageFailure = storageFailureMigration([
+    { id: "default-template-1", name: "旧模板", prompt: "旧内容" },
+    { id: "template-user-2", name: "我的模板", prompt: "仍可用" },
+  ]);
+  assert.deepEqual(afterStorageFailure.map((template) => template.id), [
+    "template-user-2",
+    "default-template-v2-1",
+    "default-template-v2-2",
+  ]);
 });
 
 test("prompt template content accepts up to three thousand characters", async () => {
@@ -4071,25 +4146,32 @@ test("prompt template content accepts up to three thousand characters", async ()
   assert.doesNotMatch(templateTextarea, /\bmaxlength="1000"/);
 });
 
-test("default prompt templates cover ten daily life scenes", async () => {
+test("default prompt templates cover ten common image workflows", async () => {
   const app = await readFile(appPath, "utf8");
   const block = app.match(/const SURPRISE_PROMPTS = \[[\s\S]*?\];/)?.[0] || "";
   const names = [...block.matchAll(/name: "([^"]+)"/g)].map((match) => match[1]);
+  const prompts = [...block.matchAll(/prompt: "([^"]+)"/g)].map((match) => match[1]);
 
   assert.deepEqual(names, [
-    "清晨通勤",
-    "家庭早餐",
-    "居家阅读",
-    "厨房做饭",
-    "超市采购",
-    "午后办公",
-    "健身运动",
-    "朋友聚会",
-    "亲子手作",
-    "夜晚学习",
+    "证件照",
+    "商务个人头像",
+    "电商白底主图",
+    "电商生活方式图",
+    "自然人像写真",
+    "时尚穿搭图",
+    "美食摄影",
+    "室内家居效果图",
+    "旅行城市纪实",
+    "社媒营销海报",
   ]);
+  assert.equal(prompts.length, 10);
+  assert.ok(prompts.every((prompt) => prompt.length > 0 && prompt.length <= 3000));
+  assert.match(block, /智感职业证件照[\s\S]*灰色到白色的渐变摄影背景/);
+  assert.doesNotMatch(block, /清晨通勤|家庭早餐|居家阅读|厨房做饭|超市采购|午后办公|健身运动|朋友聚会|亲子手作|夜晚学习/);
+  assert.match(app, /id: `default-template-v2-\$\{index \+ 1\}`/);
   assert.match(app, /const PROMPT_TEMPLATE_STORAGE_KEY = "image-studio-prompt-templates-v2";/);
-  assert.doesNotMatch(block, /直播带货|国风服饰|数码产品/);
+  assert.match(app, /function migratePromptTemplateDefaults\(templates\) \{/);
+  assert.match(app, /isLegacyDefaultPromptTemplate\(template\)/);
 });
 
 test("PPT view exposes source options, page count, progress, retry and PPTX download controls", async () => {

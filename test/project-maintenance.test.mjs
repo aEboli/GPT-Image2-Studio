@@ -10,7 +10,10 @@ test("package scripts pin deterministic tests, OpenSpec, and release checks", as
   const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 
   assert.equal(packageJson.scripts.test, "node --test --test-concurrency=1 ./test/*.test.mjs");
-  assert.equal(packageJson.scripts["release:patch"], "node scripts/release-patch.mjs");
+  assert.equal(packageJson.scripts["release:major"], "node scripts/release-patch.mjs --type major");
+  assert.equal(packageJson.scripts["release:minor"], "node scripts/release-patch.mjs --type minor");
+  assert.equal(packageJson.scripts["release:feature"], "node scripts/release-patch.mjs --type feature");
+  assert.equal(packageJson.scripts["release:patch"], "node scripts/release-patch.mjs --type patch");
   assert.equal(packageJson.scripts["check:release"], "node scripts/check-release-readiness.mjs");
   assert.equal(packageJson.scripts["check:release:strict"], "node scripts/check-release-readiness.mjs --strict");
   assert.equal(packageJson.devDependencies["@fission-ai/openspec"], "1.6.0");
@@ -45,126 +48,130 @@ test("release readiness detects consistent and inconsistent version facts", asyn
   const fixtureRoot = await mkdtemp(join(tmpdir(), "image-studio-release-check-"));
   await mkdir(join(fixtureRoot, "docs", "releases"), { recursive: true });
   await mkdir(join(fixtureRoot, "public"), { recursive: true });
-  await writeFile(join(fixtureRoot, "package.json"), '{"version":"1.2.3"}\n', "utf8");
+  await writeFile(join(fixtureRoot, "package.json"), '{"version":"1.2.003"}\n', "utf8");
   await writeFile(
     join(fixtureRoot, "package-lock.json"),
-    '{"version":"1.2.3","packages":{"":{"version":"1.2.3"}}}\n',
+    '{"version":"1.2.003","packages":{"":{"version":"1.2.003"}}}\n',
     "utf8",
   );
-  await writeFile(join(fixtureRoot, "README.md"), "Current version: `v1.2.3`\n", "utf8");
-  await writeFile(join(fixtureRoot, "README.zh-CN.md"), "当前版本：`v1.2.3`\n", "utf8");
+  await writeFile(join(fixtureRoot, "README.md"), "Current version: `v1.2.003`\n", "utf8");
+  await writeFile(join(fixtureRoot, "README.zh-CN.md"), "当前版本：`v1.2.003`\n", "utf8");
   await writeFile(
     join(fixtureRoot, "docs", "windows-desktop.md"),
-    "`GPT-Image2-Studio-Desktop-Setup-v1.2.3-x64.exe` 是桌面安装包。\n",
+    "`GPT-Image2-Studio-Desktop-Setup-v1.2.003-x64.exe` 是桌面安装包。\n",
     "utf8",
   );
   await writeFile(
     join(fixtureRoot, "docs", "windows-installer.md"),
-    "`GPT-Image2-Studio-Setup-v1.2.3.exe` 是兼容安装包。\n",
+    "`GPT-Image2-Studio-Setup-v1.2.003.exe` 是兼容安装包。\n",
     "utf8",
   );
   await writeFile(
     join(fixtureRoot, "public", "index.html"),
-    '<small class="app-version" aria-label="当前版本 v1.2.3">v1.2.3</small>\n',
+    '<small class="app-version" aria-label="当前版本 v1.2.003">v1.2.003</small>\n',
     "utf8",
   );
   await writeFile(
-    join(fixtureRoot, "docs", "releases", "v1.2.3.md"),
-    "# GPT-Image2-Studio v1.2.3\n",
+    join(fixtureRoot, "docs", "releases", "v1.2.003.md"),
+    "# GPT-Image2-Studio v1.2.003\n",
     "utf8",
   );
 
   const result = await checkReleaseReadiness({ rootDir: fixtureRoot });
-  assert.equal(result.version, "1.2.3");
+  assert.equal(result.version, "1.2.003");
+
+  await writeFile(join(fixtureRoot, "package.json"), '{"version":"1.2.3"}\n', "utf8");
+  await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /三位 patch/);
+  await writeFile(join(fixtureRoot, "package.json"), '{"version":"1.2.003"}\n', "utf8");
 
   for (const markup of [
-    '<small class="app-version" aria-label="当前版本 v1.2.3"><span hidden>v1.2.3</span></small>\n',
-    '<small class="app-version" aria-label="当前版本 v1.2.3"><span style="display:none">v1.2.3</span></small>\n',
-    '<small class="app-version" aria-label="当前版本 v1.2.3"><script>v1.2.3</script></small>\n',
+    '<small class="app-version" aria-label="当前版本 v1.2.003"><span hidden>v1.2.003</span></small>\n',
+    '<small class="app-version" aria-label="当前版本 v1.2.003"><span style="display:none">v1.2.003</span></small>\n',
+    '<small class="app-version" aria-label="当前版本 v1.2.003"><script>v1.2.003</script></small>\n',
   ]) {
     await writeFile(join(fixtureRoot, "public", "index.html"), markup, "utf8");
-    await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /public\/index\.html.*v1\.2\.3/);
+    await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /public\/index\.html.*v1\.2\.003/);
   }
 
   await writeFile(
     join(fixtureRoot, "public", "index.html"),
-    '<small class="app&#45;version" aria-label="当前版本&#32;v1&#46;2.3">v1&#46;2.3</small>\n',
+    '<small class="app&#45;version" aria-label="当前版本&#32;v1&#46;2&#46;003">v1&#46;2&#46;003</small>\n',
     "utf8",
   );
   await checkReleaseReadiness({ rootDir: fixtureRoot });
   const encodedReplacement = replaceWorkbenchVersionFact(
-    '<small class="app&#45;version" aria-label="当前版本&#32;v1&#46;2.3">v1&#46;2.3</small>\n',
-    "v1.2.3",
-    "v1.2.4",
+    '<small class="app&#45;version" aria-label="当前版本&#32;v1&#46;2&#46;003">v1&#46;2&#46;003</small>\n',
+    "v1.2.003",
+    "v1.2.004",
   );
   assert.match(encodedReplacement, /class="app&#45;version"/u);
-  assert.match(encodedReplacement, /aria-label="当前版本 v1\.2\.4"/u);
-  assert.match(encodedReplacement, />v1\.2\.4<\/small>/u);
+  assert.match(encodedReplacement, /aria-label="当前版本 v1\.2\.004"/u);
+  assert.match(encodedReplacement, />v1\.2\.004<\/small>/u);
 
   for (const [markup, expected] of [
-    ['<small class="app-version" aria-label="当前版本 v1.2.3" style="display:none/*;*/">v1.2.3</small>\n', false],
-    ['<small class="app-version" aria-label="当前版本 v1.2.3" style="display:none;display:block">v1.2.3</small>\n', true],
-    ['<small class="app-version" aria-label="当前版本 v1.2.3" style="display:block!important;display:none">v1.2.3</small>\n', true],
-    ['<small class="app-version" aria-label="当前版本 v1.2.3" style="display:none!important;display:block">v1.2.3</small>\n', false],
-    ['<small class="app-version" aria-label="当前版本 v1.2.3" style="visibility:hidden"><span style="visibility:visible">v1.2.3</span></small>\n', false],
+    ['<small class="app-version" aria-label="当前版本 v1.2.003" style="display:none/*;*/">v1.2.003</small>\n', false],
+    ['<small class="app-version" aria-label="当前版本 v1.2.003" style="display:none;display:block">v1.2.003</small>\n', true],
+    ['<small class="app-version" aria-label="当前版本 v1.2.003" style="display:block!important;display:none">v1.2.003</small>\n', true],
+    ['<small class="app-version" aria-label="当前版本 v1.2.003" style="display:none!important;display:block">v1.2.003</small>\n', false],
+    ['<small class="app-version" aria-label="当前版本 v1.2.003" style="visibility:hidden"><span style="visibility:visible">v1.2.003</span></small>\n', false],
   ]) {
     await writeFile(join(fixtureRoot, "public", "index.html"), markup, "utf8");
     if (expected) {
       await checkReleaseReadiness({ rootDir: fixtureRoot });
     } else {
-      await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /public\/index\.html.*v1\.2\.3/);
+      await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /public\/index\.html.*v1\.2\.003/);
     }
   }
 
   for (const markup of [
-    '<!doctype html><html><head><title>Workbench</title><body><small class="app-version" aria-label="当前版本 v1.2.3">v1.2.3</small></body></html>\n',
-    '<!-- comment --!><small class="app-version" aria-label="当前版本 v1.2.3">v1.2.3</small>\n',
+    '<!doctype html><html><head><title>Workbench</title><body><small class="app-version" aria-label="当前版本 v1.2.003">v1.2.003</small></body></html>\n',
+    '<!-- comment --!><small class="app-version" aria-label="当前版本 v1.2.003">v1.2.003</small>\n',
   ]) {
     await writeFile(join(fixtureRoot, "public", "index.html"), markup, "utf8");
     await checkReleaseReadiness({ rootDir: fixtureRoot });
   }
 
   for (const [markup, expected] of [
-    ['<dialog><small class="app-version" aria-label="当前版本 v1.2.3">v1.2.3</small></dialog>\n', false],
-    ['<dialog open><small class="app-version" aria-label="当前版本 v1.2.3">v1.2.3</small></dialog>\n', true],
-    ['<details><summary>Summary</summary><div><small class="app-version" aria-label="当前版本 v1.2.3">v1.2.3</small></div></details>\n', false],
-    ['<details><summary><small class="app-version" aria-label="当前版本 v1.2.3">v1.2.3</small></summary></details>\n', true],
+    ['<dialog><small class="app-version" aria-label="当前版本 v1.2.003">v1.2.003</small></dialog>\n', false],
+    ['<dialog open><small class="app-version" aria-label="当前版本 v1.2.003">v1.2.003</small></dialog>\n', true],
+    ['<details><summary>Summary</summary><div><small class="app-version" aria-label="当前版本 v1.2.003">v1.2.003</small></div></details>\n', false],
+    ['<details><summary><small class="app-version" aria-label="当前版本 v1.2.003">v1.2.003</small></summary></details>\n', true],
   ]) {
     await writeFile(join(fixtureRoot, "public", "index.html"), markup, "utf8");
     if (expected) {
       await checkReleaseReadiness({ rootDir: fixtureRoot });
     } else {
-      await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /public\/index\.html.*v1\.2\.3/);
+      await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /public\/index\.html.*v1\.2\.003/);
     }
   }
 
   await writeFile(
     join(fixtureRoot, "public", "index.html"),
-    '<!-- 😀 -->\n<small aria-label="当前版本 v1.2.3" class="build-fact app-version">v1.2.3</small>\n',
+    '<!-- 😀 -->\n<small aria-label="当前版本 v1.2.003" class="build-fact app-version">v1.2.003</small>\n',
     "utf8",
   );
   await checkReleaseReadiness({ rootDir: fixtureRoot });
 
   await writeFile(
     join(fixtureRoot, "public", "index.html"),
-    '<!-- 😀\n<small class="app-version" aria-label="当前版本 v1.2.3">v1.2.3</small>\n-->\n',
+    '<!-- 😀\n<small class="app-version" aria-label="当前版本 v1.2.003">v1.2.003</small>\n-->\n',
     "utf8",
   );
-  await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /public\/index\.html.*v1\.2\.3/);
+  await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /public\/index\.html.*v1\.2\.003/);
 
   for (const nonRenderingMarkup of [
-    '<title><small class="app-version" aria-label="当前版本 v1.2.3">v1.2.3</small></title>\n',
-    '<template><small class="app-version" aria-label="当前版本 v1.2.3">v1.2.3</small></template>\n',
-    '<script><small class="app-version" aria-label="当前版本 v1.2.3">v1.2.3</small></script>\n',
-    '<style><small class="app-version" aria-label="当前版本 v1.2.3">v1.2.3</small></style>\n',
-    '<textarea><small class="app-version" aria-label="当前版本 v1.2.3">v1.2.3</small></textarea>\n',
-    '<iframe><small class="app-version" aria-label="当前版本 v1.2.3">v1.2.3</small></iframe>\n',
-    '<noscript><small class="app-version" aria-label="当前版本 v1.2.3">v1.2.3</small></noscript>\n',
-    '<xmp><small class="app-version" aria-label="当前版本 v1.2.3">v1.2.3</small></xmp>\n',
-    '<plaintext><small class="app-version" aria-label="当前版本 v1.2.3">v1.2.3</small></plaintext>\n',
+    '<title><small class="app-version" aria-label="当前版本 v1.2.003">v1.2.003</small></title>\n',
+    '<template><small class="app-version" aria-label="当前版本 v1.2.003">v1.2.003</small></template>\n',
+    '<script><small class="app-version" aria-label="当前版本 v1.2.003">v1.2.003</small></script>\n',
+    '<style><small class="app-version" aria-label="当前版本 v1.2.003">v1.2.003</small></style>\n',
+    '<textarea><small class="app-version" aria-label="当前版本 v1.2.003">v1.2.003</small></textarea>\n',
+    '<iframe><small class="app-version" aria-label="当前版本 v1.2.003">v1.2.003</small></iframe>\n',
+    '<noscript><small class="app-version" aria-label="当前版本 v1.2.003">v1.2.003</small></noscript>\n',
+    '<xmp><small class="app-version" aria-label="当前版本 v1.2.003">v1.2.003</small></xmp>\n',
+    '<plaintext><small class="app-version" aria-label="当前版本 v1.2.003">v1.2.003</small></plaintext>\n',
   ]) {
     await writeFile(join(fixtureRoot, "public", "index.html"), nonRenderingMarkup, "utf8");
-    await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /public\/index\.html.*v1\.2\.3/);
+    await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /public\/index\.html.*v1\.2\.003/);
   }
 
   for (const hiddenContainer of [
@@ -177,94 +184,94 @@ test("release readiness detects consistent and inconsistent version facts", asyn
       join(fixtureRoot, "public", "index.html"),
       `${hiddenContainer.replace(
         "$VERSION",
-        '<section><small class="build-fact app-version" aria-label="当前版本 v1.2.3">v1.2.3</small></section>',
+        '<section><small class="build-fact app-version" aria-label="当前版本 v1.2.003">v1.2.003</small></section>',
       )}\n`,
       "utf8",
     );
-    await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /public\/index\.html.*v1\.2\.3/);
+    await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /public\/index\.html.*v1\.2\.003/);
   }
 
   for (const hiddenAttribute of ["hidden", 'aria-hidden="true"', 'style="display:none"', 'style="visibility:hidden"']) {
     await writeFile(
       join(fixtureRoot, "public", "index.html"),
-      `<small class="app-version" aria-label="当前版本 v1.2.3" ${hiddenAttribute}>v1.2.3</small>\n`,
+      `<small class="app-version" aria-label="当前版本 v1.2.003" ${hiddenAttribute}>v1.2.003</small>\n`,
       "utf8",
     );
-    await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /public\/index\.html.*v1\.2\.3/);
+    await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /public\/index\.html.*v1\.2\.003/);
   }
 
   await writeFile(
     join(fixtureRoot, "public", "index.html"),
-    '<small class="app-version" aria-label="当前版本 v1.2.3">v1.2.3</small>\n' +
-      '<small aria-label="当前版本 v1.2.2" class="app-version">v1.2.2</small>\n',
+    '<small class="app-version" aria-label="当前版本 v1.2.003">v1.2.003</small>\n' +
+      '<small aria-label="当前版本 v1.2.002" class="app-version">v1.2.002</small>\n',
     "utf8",
   );
-  await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /public\/index\.html.*v1\.2\.3/);
+  await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /public\/index\.html.*v1\.2\.003/);
 
   await writeFile(
     join(fixtureRoot, "public", "index.html"),
-    '<small aria-label="当前版本 v1.2.3" class="build-fact app-version">v1.2.3</small>\n',
+    '<small aria-label="当前版本 v1.2.003" class="build-fact app-version">v1.2.003</small>\n',
     "utf8",
   );
 
-  await writeFile(join(fixtureRoot, "README.md"), "Current version: `v1.2.2`\nExample tag: v1.2.3\n", "utf8");
-  await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /README\.md.*v1\.2\.3/);
+  await writeFile(join(fixtureRoot, "README.md"), "Current version: `v1.2.002`\nExample tag: v1.2.003\n", "utf8");
+  await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /README\.md.*v1\.2\.003/);
 
-  await writeFile(join(fixtureRoot, "README.md"), "Current version: `v1.2.3`\n", "utf8");
-  await writeFile(join(fixtureRoot, "README.zh-CN.md"), "当前版本：`v1.2.2`\n示例标签：v1.2.3\n", "utf8");
-  await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /README\.zh-CN\.md.*v1\.2\.3/);
-  await writeFile(join(fixtureRoot, "README.zh-CN.md"), "当前版本：`v1.2.3`\n", "utf8");
+  await writeFile(join(fixtureRoot, "README.md"), "Current version: `v1.2.003`\n", "utf8");
+  await writeFile(join(fixtureRoot, "README.zh-CN.md"), "当前版本：`v1.2.002`\n示例标签：v1.2.003\n", "utf8");
+  await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /README\.zh-CN\.md.*v1\.2\.003/);
+  await writeFile(join(fixtureRoot, "README.zh-CN.md"), "当前版本：`v1.2.003`\n", "utf8");
   await writeFile(
     join(fixtureRoot, "docs", "windows-desktop.md"),
-    "`GPT-Image2-Studio-Desktop-Setup-v1.2.2-x64.exe` 是桌面安装包。\n示例标签：v1.2.3\n",
+    "`GPT-Image2-Studio-Desktop-Setup-v1.2.002-x64.exe` 是桌面安装包。\n示例标签：v1.2.003\n",
     "utf8",
   );
-  await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /docs\/windows-desktop\.md.*v1\.2\.3/);
+  await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /docs\/windows-desktop\.md.*v1\.2\.003/);
 
   await writeFile(
     join(fixtureRoot, "docs", "windows-desktop.md"),
-    "`GPT-Image2-Studio-Desktop-Setup-v1.2.3-x64.exe` 是桌面安装包。\n",
+    "`GPT-Image2-Studio-Desktop-Setup-v1.2.003-x64.exe` 是桌面安装包。\n",
     "utf8",
   );
   await writeFile(
     join(fixtureRoot, "docs", "windows-installer.md"),
-    "`GPT-Image2-Studio-Setup-v1.2.2.exe` 是兼容安装包。\n示例标签：v1.2.3\n",
+    "`GPT-Image2-Studio-Setup-v1.2.002.exe` 是兼容安装包。\n示例标签：v1.2.003\n",
     "utf8",
   );
-  await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /docs\/windows-installer\.md.*v1\.2\.3/);
+  await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /docs\/windows-installer\.md.*v1\.2\.003/);
   await writeFile(
     join(fixtureRoot, "docs", "windows-installer.md"),
-    "`GPT-Image2-Studio-Setup-v1.2.3.exe` 是兼容安装包。\n",
+    "`GPT-Image2-Studio-Setup-v1.2.003.exe` 是兼容安装包。\n",
     "utf8",
   );
   await writeFile(
     join(fixtureRoot, "public", "index.html"),
-    '<small class="app-version" aria-label="当前版本 v1.2.2">v1.2.2</small>\n',
+    '<small class="app-version" aria-label="当前版本 v1.2.002">v1.2.002</small>\n',
     "utf8",
   );
-  await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /public\/index\.html.*v1\.2\.3/);
+  await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /public\/index\.html.*v1\.2\.003/);
   await writeFile(
     join(fixtureRoot, "public", "index.html"),
-    '<small class="app-version" aria-label="当前版本 v1.2.3">v1.2.3</small>\n',
+    '<small class="app-version" aria-label="当前版本 v1.2.003">v1.2.003</small>\n',
     "utf8",
   );
   await writeFile(
-    join(fixtureRoot, "docs", "releases", "v1.2.3.md"),
-    "# GPT-Image2-Studio v1.2.2\n示例标签：v1.2.3\n",
+    join(fixtureRoot, "docs", "releases", "v1.2.003.md"),
+    "# GPT-Image2-Studio v1.2.002\n示例标签：v1.2.003\n",
     "utf8",
   );
-  await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /docs\/releases\/v1\.2\.3\.md.*v1\.2\.3/);
+  await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /docs\/releases\/v1\.2\.003\.md.*v1\.2\.003/);
 
   await writeFile(
-    join(fixtureRoot, "docs", "releases", "v1.2.3.md"),
-    "前言\n# GPT-Image2-Studio v1.2.3\n",
+    join(fixtureRoot, "docs", "releases", "v1.2.003.md"),
+    "前言\n# GPT-Image2-Studio v1.2.003\n",
     "utf8",
   );
-  await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /docs\/releases\/v1\.2\.3\.md.*v1\.2\.3/);
+  await assert.rejects(checkReleaseReadiness({ rootDir: fixtureRoot }), /docs\/releases\/v1\.2\.003\.md.*v1\.2\.003/);
 
   await writeFile(
-    join(fixtureRoot, "docs", "releases", "v1.2.3.md"),
-    "\uFEFF# GPT-Image2-Studio v1.2.3\n",
+    join(fixtureRoot, "docs", "releases", "v1.2.003.md"),
+    "\uFEFF# GPT-Image2-Studio v1.2.003\n",
     "utf8",
   );
   await checkReleaseReadiness({ rootDir: fixtureRoot });

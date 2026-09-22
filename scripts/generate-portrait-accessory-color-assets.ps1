@@ -1,6 +1,20 @@
+#Requires -Version 7.4
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+# System.Drawing 仅用于 Windows，不支持在 Linux/macOS 生成这些资源。
+if (-not $IsWindows) { throw "资源生成需要 Windows 和 PowerShell 7.4 或更高版本。" }
 Add-Type -AssemblyName System.Drawing
+$rootDir = Split-Path -Parent $PSScriptRoot
+$outDir = Join-Path $rootDir 'public\assets\portrait-accessories'
+if (-not (Test-Path -LiteralPath $outDir -PathType Container)) { throw "资源输出目录不存在。" }
 
-$json = node --input-type=module -e "import { DEFAULT_PORTRAIT_ACCESSORY_ASSETS } from './lib/portrait-accessory-assets.mjs'; console.log(JSON.stringify(DEFAULT_PORTRAIT_ACCESSORY_ASSETS.filter((a) => a.colors).map(({ id, category, colors }) => ({ id, category, colors }))));"
+Push-Location -LiteralPath $rootDir
+try {
+  $json = node --input-type=module -e "import { DEFAULT_PORTRAIT_ACCESSORY_ASSETS } from './lib/portrait-accessory-assets.mjs'; console.log(JSON.stringify(DEFAULT_PORTRAIT_ACCESSORY_ASSETS.filter((a) => a.colors).map(({ id, category, colors }) => ({ id, category, colors }))));"
+  if ($LASTEXITCODE -ne 0) { throw "Node 资源定义读取失败，退出码 $LASTEXITCODE。" }
+} finally {
+  Pop-Location
+}
 $assets = $json | ConvertFrom-Json
 $classicAssetIds = @(
   'upper-minimal-tee', 'upper-white-shirt', 'upper-tube-top', 'upper-knit-shrug',
@@ -8,7 +22,6 @@ $classicAssetIds = @(
   'shoes-white-sneakers', 'shoes-skate-sneakers', 'shoes-black-loafers', 'shoes-high-heels'
 )
 $assets = $assets | Where-Object { $classicAssetIds -contains $_.id }
-$outDir = Join-Path (Get-Location) 'public\assets\portrait-accessories'
 
 $colorMap = @{
   'pure-white' = '#f8fafc'; 'pure-black' = '#111827'; 'heather-gray' = '#9ca3af'; 'navy-stripe' = '#f8fafc'
@@ -43,12 +56,15 @@ function Darken([System.Drawing.Color] $color) {
   )
 }
 
-function Add-Polygon($graphics, $points, $brush, $pen) {
+function Add-Polygon($graphics, [System.Drawing.Point[]] $points, $brush, $pen) {
   $path = New-Object System.Drawing.Drawing2D.GraphicsPath
-  $path.AddPolygon($points)
-  $graphics.FillPath($brush, $path)
-  $graphics.DrawPath($pen, $path)
-  $path.Dispose()
+  try {
+    $path.AddPolygon($points)
+    $graphics.FillPath($brush, $path)
+    $graphics.DrawPath($pen, $path)
+  } finally {
+    $path.Dispose()
+  }
 }
 
 function Add-Texture($graphics, [string] $colorId, [System.Drawing.Color] $accent) {
@@ -56,10 +72,13 @@ function Add-Texture($graphics, [string] $colorId, [System.Drawing.Color] $accen
     return
   }
   $pen = New-Object System.Drawing.Pen($accent, 2)
-  for ($i = 90; $i -lt 390; $i += 24) {
-    $graphics.DrawLine($pen, $i, 95, $i + 45, 370)
+  try {
+    for ($i = 90; $i -lt 390; $i += 24) {
+      $graphics.DrawLine($pen, $i, 95, $i + 45, 370)
+    }
+  } finally {
+    $pen.Dispose()
   }
-  $pen.Dispose()
 }
 
 function Draw-Upper($graphics, $asset, $brush, $pen) {
@@ -145,37 +164,39 @@ foreach ($asset in $assets) {
     $accentHex = if ($accentMap.ContainsKey($color.id)) { $accentMap[$color.id] } else { '#64748b' }
     $base = ColorFromHex $baseHex
     $accent = ColorFromHex $accentHex
-    $bitmap = New-Object System.Drawing.Bitmap(480, 480)
-    $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-    $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-    $graphics.Clear([System.Drawing.Color]::FromArgb(248, 250, 252))
-    $shadow = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(36, 0, 0, 0))
-    $graphics.FillEllipse($shadow, 115, 382, 250, 28)
-    $shadow.Dispose()
-    $brush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
-      [System.Drawing.Rectangle]::new(80, 80, 320, 310),
-      [System.Drawing.Color]::White,
-      $base,
-      90
-    )
-    $pen = New-Object System.Drawing.Pen((Darken $base), 3)
-    if ($asset.category -eq 'upper') {
-      Draw-Upper $graphics $asset $brush $pen
-    } elseif ($asset.category -eq 'bottom') {
-      Draw-Bottom $graphics $asset $brush $pen
-    } else {
-      Draw-Shoes $graphics $asset $brush $pen
+    $bitmap = $graphics = $shadow = $brush = $pen = $null
+    try {
+      $bitmap = New-Object System.Drawing.Bitmap(480, 480)
+      $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+      $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+      $graphics.Clear([System.Drawing.Color]::FromArgb(248, 250, 252))
+      $shadow = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(36, 0, 0, 0))
+      $graphics.FillEllipse($shadow, 115, 382, 250, 28)
+      $brush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
+        [System.Drawing.Rectangle]::new(80, 80, 320, 310),
+        [System.Drawing.Color]::White,
+        $base,
+        90
+      )
+      $pen = New-Object System.Drawing.Pen((Darken $base), 3)
+      if ($asset.category -eq 'upper') {
+        Draw-Upper $graphics $asset $brush $pen
+      } elseif ($asset.category -eq 'bottom') {
+        Draw-Bottom $graphics $asset $brush $pen
+      } else {
+        Draw-Shoes $graphics $asset $brush $pen
+      }
+      Add-Texture $graphics $color.id $accent
+      $file = Join-Path $outDir ([IO.Path]::GetFileName($color.src))
+      $bitmap.Save($file, [System.Drawing.Imaging.ImageFormat]::Png)
+      if ($color.id -eq 'pure-white' -or -not (Test-Path -LiteralPath (Join-Path $outDir "$($asset.id).png"))) {
+        $bitmap.Save((Join-Path $outDir "$($asset.id).png"), [System.Drawing.Imaging.ImageFormat]::Png)
+      }
+    } finally {
+      foreach ($resource in @($pen, $brush, $shadow, $graphics, $bitmap)) {
+        if ($null -ne $resource) { $resource.Dispose() }
+      }
     }
-    Add-Texture $graphics $color.id $accent
-    $brush.Dispose()
-    $pen.Dispose()
-    $file = Join-Path $outDir ([IO.Path]::GetFileName($color.src))
-    $bitmap.Save($file, [System.Drawing.Imaging.ImageFormat]::Png)
-    if ($color.id -eq 'pure-white' -or -not (Test-Path (Join-Path $outDir "$($asset.id).png"))) {
-      $bitmap.Save((Join-Path $outDir "$($asset.id).png"), [System.Drawing.Imaging.ImageFormat]::Png)
-    }
-    $graphics.Dispose()
-    $bitmap.Dispose()
   }
 }
 

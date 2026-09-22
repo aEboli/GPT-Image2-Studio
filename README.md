@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.19-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.020-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installers-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,7 +10,7 @@
 
 Prompt-to-image, reference analysis, editing, ecommerce sets, portraits, article illustrations, PPT generation, and asset history in one browser-based workspace.
 
-Current version: `v0.2.19`
+Current version: `v0.2.020`
 
 [Chinese README](./README.zh-CN.md)
 
@@ -43,11 +43,13 @@ cmd /c npm start
 
 On Windows, `launch-studio.cmd` starts the workbench and `stop-studio-services.cmd` stops this project's services on ports 3600-3606.
 
+Windows 脚本入口（启动器、Native Messaging 安装/卸载、图片资源生成）需要 [PowerShell 7.4 或更高版本](https://learn.microsoft.com/powershell/scripting/install/installing-powershell-on-windows)，使用 `pwsh.exe`，不回退到 Windows PowerShell 5.1。安装后重新打开终端并用 `pwsh --version` 检查。可运行 `launch-studio.cmd -Port 3601`，或 `pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./launch-studio.ps1 -Root "项目目录" -Port 3601`。纯 Node/Electron 启动与停止服务 CMD 不依赖 PowerShell 7；兼容 IExpress 安装器在缺少 `tar.exe` 时需要 PowerShell 7.4+ 解压。
+
 ### Windows desktop app (recommended)
 
-Download `GPT-Image2-Studio-Desktop-Setup-v0.2.19-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
+Download `GPT-Image2-Studio-Desktop-Setup-v0.2.020-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
 
-For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.19-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
+For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.020-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
 
 For desktop development, Electron 43 requires Node.js 22.12 or newer:
 
@@ -58,7 +60,7 @@ cmd /c npm run desktop
 
 ### Windows browser installer
 
-The legacy browser-installer flow remains documented for local builds, but the `v0.2.19` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
+The legacy browser-installer flow remains documented for local builds, but the `v0.2.020` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
 
 ## Configuration
 
@@ -293,7 +295,7 @@ The repository also contains a Vercel configuration. Vercel functions use tempor
 - Waterfall gallery and a shared lightbox with fit, zoom, pan, download, deletion, prompt review, and request-parameter inspection.
 - Separate records for Creation sets, portraits, article illustrations, and PPT decks.
 - Background queue status, progress, structured errors, and retry of failed items.
-- Prompt Kit, Prompt Agent image-to-prompt output, Logo library, portrait outfit/prop library, and model selection controls.
+- **Prompt Kit** now includes a searchable static library with six categories, 24 subcategories, and ten reusable prompts per subcategory. It supports list and image views, adjustable list text, full-prompt lightbox previews, one-click apply, and copying entries into personal templates; the profile/avatar category bundles eight attributed preview images captured from the requested YouMind page, so the library still works offline. Existing personal templates and Prompt Agent history are preserved while legacy built-in defaults migrate to the current set.
 - A compact GPT / Gemini / Grok / Palette configuration drawer, with GPT's Route / Direct switch directly below the section row, isolated API history, aligned endpoint fields, hover/focus help, and an independently scrolling generation log. Seven interface palettes are shown four per row.
 - Dark/light themes, Chinese/English UI, and responsive desktop, tablet, and mobile layouts.
 
@@ -513,7 +515,9 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 ## Releases
 
 - The source and lockfile versions are authoritative; tags use `v<version>`.
-- Current release notes: [v0.2.19](./docs/releases/v0.2.19.md).
+- Versions use `major.minor.patch` with a three-digit patch segment: major bumps reset minor and patch, minor bumps reset patch, feature bumps add `0.010`, and ordinary updates add `0.001`.
+- Use `npm run release:major`, `npm run release:minor`, `npm run release:feature`, or `npm run release:patch` with `--summary`; each release changes exactly one level.
+- Current release notes: [v0.2.020](./docs/releases/v0.2.020.md).
 - Windows packages are distributed through [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Check the release notes for hashes and signing status.
 - `npm run check:release:strict` requires a clean worktree and a matching tag on the current commit.
 
@@ -528,7 +532,15 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 
 ## Version history
 
-Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.19](./docs/releases/v0.2.19.md).
+Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.020](./docs/releases/v0.2.020.md).
+
+### v0.2.020
+
+- Added the categorized Prompt Kit library: six categories, 24 subcategories, ten prompts per subcategory, search, list/image views, adjustable list typography, lightbox prompt review, direct apply, and copy-to-personal-template actions. The library's profile/avatar previews are bundled locally from the requested YouMind collection with attribution; runtime browsing does not depend on the third-party site.
+- Replaced the ten legacy daily-scene Prompt Kit defaults with practical identity-photo, business-avatar, ecommerce, portrait, home, travel, and marketing templates. Existing custom templates and Prompt Agent history remain intact during the versioned default migration.
+- Simplified Creation and infographic prompt construction into bounded, positive instructions so generated requests stay focused instead of repeating long negative constraint lists.
+- Standardized project-owned Windows scripts on PowerShell 7.4+, added explicit runtime and failure checks, and kept pure Node/Electron and stop-service CMD entry points independent of PowerShell.
+- Added major/minor/feature/patch release commands with a three-digit patch policy and synchronized README, Windows package, lockfile, workbench, and release-note version facts.
 
 ### v0.2.19
 

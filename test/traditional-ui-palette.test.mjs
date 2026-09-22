@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { parse } from "parse5";
 import { access, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -66,14 +67,24 @@ test("palette card follows the provider choices and shows four compact presets p
   const themeOption = html.indexOf('data-ui-i18n="themeSection"', routeStart);
   const paletteStart = html.indexOf('<section class="config-card palette-config-card config-theme-panel"', routeStart);
   const routeFieldsStart = html.indexOf('<div class="config-route-fields"', routeStart);
-  const connectionEnd = html.lastIndexOf('</section>', paletteStart);
+  const tree = parse(html);
+  const findClass = (node, name) => {
+    if (node.attrs?.some((attr) => attr.name === "class" && attr.value.split(/\s+/).includes(name))) return node;
+    return node.childNodes?.map((child) => findClass(child, name)).find(Boolean);
+  };
+  const connection = findClass(tree, "config-connection-card");
+  const stack = findClass(connection, "config-content-stack");
+  const routes = findClass(stack, "config-route-fields");
+  const palette = findClass(stack, "config-theme-panel");
   const schedulingStart = html.indexOf('<section class="config-card config-scheduling-card"', paletteStart);
   assert.ok(connectionStart >= 0 && routeStart >= 0 && routeEnd > routeStart, "route selector should be present");
   assert.ok(geminiOption > routeStart && geminiOption < grokOption, "Gemini option should precede Grok");
   assert.ok(grokOption < themeOption && themeOption < routeEnd, "Grok should precede the palette option");
   assert.match(html.slice(routeEnd, routeFieldsStart), /<fieldset class="route-selector config-gpt-mode-selector"/);
-  assert.ok(connectionEnd > routeFieldsStart, "connection card should contain route fields");
-  assert.ok(paletteStart > connectionEnd, "palette card should follow the complete connection card");
+  assert.equal(stack.parentNode, connection, "shared content belongs to the connection card");
+  assert.equal(routes.parentNode, stack, "provider fields use the shared height track");
+  assert.equal(palette.parentNode, stack, "palette uses the same height track as provider fields");
+  assert.equal(connection.parentNode.attrs.find((attr) => attr.name === "id")?.value, "configForm");
   assert.ok(schedulingStart > paletteStart, "palette card should precede scheduling controls");
   assert.match(html.slice(paletteStart, schedulingStart), /class="config-card palette-config-card config-theme-panel"/);
   assert.doesNotMatch(html.slice(routeStart, routeEnd), /palettePickerToggle|route-palette-toggle/);

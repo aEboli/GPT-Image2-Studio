@@ -1,4 +1,4 @@
-// `release:patch` rewrites one anchored fact per maintained file, and `check:release`
+// A version release rewrites one anchored fact per maintained file, and `check:release`
 // validated only those. But the current version also appears in the shields.io badge, the
 // installer and portable filenames quoted in prose, the release-note link, and the
 // build-output paths. Nothing checked them, so a bump could pass every check while the
@@ -6,12 +6,14 @@
 // documentation-only release to repair exactly that drift.
 //
 // Each entry below is a literal template with a `{version}` hole. Every template ends in a
-// delimiter, so matching cannot bleed across a longer version: `v1.2.3` never matches
-// inside `v1.2.30`. Free-form prose, historical sections, and tag examples carry no
+// delimiter, so matching cannot bleed across a longer version: `v1.2.003` never matches
+// inside `v1.2.030`. Free-form prose, historical sections, and tag examples carry no
 // template and are therefore left byte-for-byte alone, as the maintenance spec requires.
 
 const VERSION_HOLE = "{version}";
-const VERSION_CAPTURE = "(\\d+\\.\\d+\\.\\d+)";
+// Accept one- to three-digit legacy patch values while a release is migrating the
+// repository; the release-readiness check still requires the canonical three-digit form.
+const VERSION_CAPTURE = "(\\d+\\.\\d+\\.\\d{1,3})";
 
 export const MAINTAINED_VERSION_FACT_TEMPLATES = [
   {
