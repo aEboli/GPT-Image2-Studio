@@ -1,7 +1,7 @@
 /*
  * Prompt Kit 的静态目录快照。
- * 目录不写入用户模板存储。人像与头像分类使用从 YouMind 目标页面抓取并随应用打包的真实图片，
- * 其它分类保留确定性的内联 SVG 预览，离线桌面包也能正常显示。
+ * 目录不写入用户模板存储。人像与头像分类使用从 YouMind 目标页面抓取并随应用打包的真实图片；
+ * 真实素材用尽后使用按模板键确定的内联 SVG 预览，避免重复循环同一张照片，离线桌面包也能正常显示。
  */
 
 const PROMPT_TEMPLATE_VARIANTS = [
@@ -25,6 +25,54 @@ const YOUMIND_PROFILE_AVATAR_PREVIEWS = [
     sourcePage: "https://youmind.com/zh-CN/prompts/blue-backlit-portrait-prompt-35157",
   },
   {
+    path: "/assets/prompt-templates/youmind-profile-avatar/flare-seal-portrait.jpg",
+    alt: "GPT Image 2.5 Flare 海豹肖像",
+    sourceUrl: "https://cms-assets.youmind.com/media/1790066452646_2tmhlw_HSyYTuaW0AAc2rI.jpg",
+    sourcePage: "https://youmind.com/zh-CN/prompts/gpt-image-25-flare-seal-35180",
+  },
+  {
+    path: "/assets/prompt-templates/youmind-profile-avatar/autumn-fruit-jelly-portrait.jpg",
+    alt: "手持秋季水果果冻方块的女性",
+    sourceUrl: "https://cms-assets.youmind.com/media/1790066494216_j5669k_HSx-PsAbIAAJuG7.jpg",
+    sourcePage: "https://youmind.com/zh-CN/prompts/woman-holding-autumn-fruit-jelly-35199",
+  },
+  {
+    path: "/assets/prompt-templates/youmind-profile-avatar/cute-anime-girl-portrait.jpg",
+    alt: "可爱动漫少女肖像",
+    sourceUrl: "https://cms-assets.youmind.com/media/1790066522151_jsu22u_HSwTHCcaEAETKGT.jpg",
+    sourcePage: "https://youmind.com/zh-CN/prompts/cute-anime-girl-portrait-35212",
+  },
+  {
+    path: "/assets/prompt-templates/youmind-profile-avatar/lion-ruby-heart-portrait.jpg",
+    alt: "额头镶嵌红宝石心形饰品的狮子",
+    sourceUrl: "https://cms-assets.youmind.com/media/1790066489552_m9kaoz_HSvlnZuasAAAeHY.jpg",
+    sourcePage: "https://youmind.com/zh-CN/prompts/lion-ruby-heart-jewel-portrait-35196",
+  },
+  {
+    path: "/assets/prompt-templates/youmind-profile-avatar/moonlit-attic-anime.jpg",
+    alt: "月光阁楼中的沉睡少女",
+    sourceUrl: "https://cms-assets.youmind.com/media/1790066510258_ddsot4_HSvaC07a4AAbkaO.jpg",
+    sourcePage: "https://youmind.com/zh-CN/prompts/sleeping-girl-moonlit-attic-anime-35208",
+  },
+  {
+    path: "/assets/prompt-templates/youmind-profile-avatar/sailor-uniform-window.jpg",
+    alt: "窗边穿水手服的动漫少女",
+    sourceUrl: "https://cms-assets.youmind.com/media/1790066495158_746vto_HSvZpQqbkAAiRjf.jpg",
+    sourcePage: "https://youmind.com/zh-CN/prompts/anime-girl-sailor-uniform-window-35200",
+  },
+  {
+    path: "/assets/prompt-templates/youmind-profile-avatar/urban-incognito-portrait.jpg",
+    alt: "都市隐身人像提示词",
+    sourceUrl: "https://cms-assets.youmind.com/media/1790066411126_pwrpri_HStjl3Tb0AAb-Rl.jpg",
+    sourcePage: "https://youmind.com/zh-CN/prompts/urban-incognito-portrait-prompt-35129",
+  },
+  {
+    path: "/assets/prompt-templates/youmind-profile-avatar/y2k-fashion-portrait.jpg",
+    alt: "Y2K 街头风格人像提示词",
+    sourceUrl: "https://cms-assets.youmind.com/media/1790066406512_o8ifh0_HStfNQyXIAAtWaY.jpg",
+    sourcePage: "https://youmind.com/zh-CN/prompts/y2k-fashion-portrait-prompt-35131",
+  },
+  {
     path: "/assets/prompt-templates/youmind-profile-avatar/garden-dappled-light.jpg",
     alt: "GPT Image 2 提示词：花园斑驳光影",
     sourceUrl: "https://cms-assets.youmind.com/media/1789977645878_0o835b_HSbe5A6bsAAV2MH-300x451.jpg",
@@ -43,10 +91,22 @@ const YOUMIND_PROFILE_AVATAR_PREVIEWS = [
     sourcePage: "https://youmind.com/zh-CN/prompts/citrus-garden-candid-portrait-gpt-35114",
   },
   {
-    path: "/assets/prompt-templates/youmind-profile-avatar/citrus-garden-candid-2.jpg",
-    alt: "柑橘园自然抓拍人像提示词 - 2",
-    sourceUrl: "https://cms-assets.youmind.com/media/1789977643910_pwsu2r_HStQAikbQAACyps-300x400.jpg",
-    sourcePage: "https://youmind.com/zh-CN/prompts/citrus-garden-candid-portrait-gpt-35114",
+    path: "/assets/prompt-templates/youmind-profile-avatar/nano-banana-face-swap.jpg",
+    alt: "Nano Banana Pro 换脸与人像提示词",
+    sourceUrl: "https://cms-assets.youmind.com/media/1789973009449_6h3000_HStFQvUaQAA9U-S.jpg",
+    sourcePage: "https://youmind.com/zh-CN/prompts/nano-banana-pro-face-swap-35100",
+  },
+  {
+    path: "/assets/prompt-templates/youmind-profile-avatar/ancient-chinese-noble-portrait.jpg",
+    alt: "中国古代贵族肖像提示词",
+    sourceUrl: "https://cms-assets.youmind.com/media/1789980020693_3qkw35_HSq4VpnbgAAb5gB.jpg",
+    sourcePage: "https://youmind.com/zh-CN/prompts/ancient-chinese-noble-portrait-35137",
+  },
+  {
+    path: "/assets/prompt-templates/youmind-profile-avatar/luxury-beauty-portrait.jpg",
+    alt: "奢华美妆人像提示词",
+    sourceUrl: "https://cms-assets.youmind.com/media/1789973011717_vealsa_HSqkUYnagAA8dO2.jpg",
+    sourcePage: "https://youmind.com/zh-CN/prompts/luxury-beauty-portrait-identity-lock-35104",
   },
   {
     path: "/assets/prompt-templates/youmind-profile-avatar/korean-golden-hour.jpg",
@@ -65,6 +125,54 @@ const YOUMIND_PROFILE_AVATAR_PREVIEWS = [
     alt: "GPT Image 2 电影感男性人像提示词",
     sourceUrl: "https://cms-assets.youmind.com/media/1789977647215_39dbzm_HSoUJGmbQAAX-RX-300x400.jpg",
     sourcePage: "https://youmind.com/zh-CN/prompts/gpt-image-2-cinematic-male-35055",
+  },
+  {
+    path: "/assets/prompt-templates/youmind-profile-avatar/citrus-garden-candid-2.jpg",
+    alt: "柑橘园自然抓拍人像提示词 - 2",
+    sourceUrl: "https://cms-assets.youmind.com/media/1789977643910_pwsu2r_HStQAikbQAACyps.jpg",
+    sourcePage: "https://youmind.com/zh-CN/prompts/citrus-garden-candid-portrait-gpt-35114",
+  },
+  {
+    path: "/assets/prompt-templates/youmind-profile-avatar/onsen-selfie-1.jpg",
+    alt: "白毛巾温泉自拍 - 1",
+    sourceUrl: "https://cms-assets.youmind.com/media/1789977651720_plt2nq_HSno-O-aAAApSlG.jpg",
+    sourcePage: "https://youmind.com/zh-CN/prompts/onsen-selfie-white-towel-35128",
+  },
+  {
+    path: "/assets/prompt-templates/youmind-profile-avatar/onsen-selfie-2.jpg",
+    alt: "白毛巾温泉自拍 - 2",
+    sourceUrl: "https://cms-assets.youmind.com/media/1789977651731_1tvd2k_HSno-O4a4AEMI8y.jpg",
+    sourcePage: "https://youmind.com/zh-CN/prompts/onsen-selfie-white-towel-35128",
+  },
+  {
+    path: "/assets/prompt-templates/youmind-profile-avatar/onsen-selfie-3.jpg",
+    alt: "白毛巾温泉自拍 - 3",
+    sourceUrl: "https://cms-assets.youmind.com/media/1789977651704_cwunnk_HSno-O-aoAAZ13M.jpg",
+    sourcePage: "https://youmind.com/zh-CN/prompts/onsen-selfie-white-towel-35128",
+  },
+  {
+    path: "/assets/prompt-templates/youmind-profile-avatar/onsen-selfie-4.jpg",
+    alt: "白毛巾温泉自拍 - 4",
+    sourceUrl: "https://cms-assets.youmind.com/media/1789977652409_6iqh2h_HSno-O_aQAA2yzU.jpg",
+    sourcePage: "https://youmind.com/zh-CN/prompts/onsen-selfie-white-towel-35128",
+  },
+  {
+    path: "/assets/prompt-templates/youmind-profile-avatar/flare-seal-detail-1.jpg",
+    alt: "GPT Image 2.5 Flare 海豹肖像 - 附图 1",
+    sourceUrl: "https://cms-assets.youmind.com/media/1790066452648_1diwv7_HSyYTuWWwAAE8YL.jpg",
+    sourcePage: "https://youmind.com/zh-CN/prompts/gpt-image-25-flare-seal-35180",
+  },
+  {
+    path: "/assets/prompt-templates/youmind-profile-avatar/flare-seal-detail-2.jpg",
+    alt: "GPT Image 2.5 Flare 海豹肖像 - 附图 2",
+    sourceUrl: "https://cms-assets.youmind.com/media/1790066452749_ube5hu_HSyYTuWX0AAP_XZ.jpg",
+    sourcePage: "https://youmind.com/zh-CN/prompts/gpt-image-25-flare-seal-35180",
+  },
+  {
+    path: "/assets/prompt-templates/youmind-profile-avatar/urban-incognito-detail.jpg",
+    alt: "Y2K 街头风格人像提示词 - 附图",
+    sourceUrl: "https://cms-assets.youmind.com/media/1790066406771_o70d2k_HStfOCmXgAAYuHv.jpg",
+    sourcePage: "https://youmind.com/zh-CN/prompts/y2k-fashion-portrait-prompt-35131",
   },
 ];
 
@@ -300,8 +408,10 @@ function buildPromptTemplates(category, child, childIndex) {
       ? `${child.lead}${variant.tail}。${child.use}。画面清晰高质，无文字、无水印。`
       : `${child.lead}${variant.tail}。构图稳定、主体比例自然，避免畸形肢体、重复物体、乱码文字和水印。${child.use}。`;
 
+    // 分配一次性素材序号；不要取模，否则翻阅模板时会立即看到重复照片。
+    const sourcePreviewIndex = childIndex * PROMPT_TEMPLATE_VARIANTS.length + index;
     const sourcePreview = category.id === "profile-avatar"
-      ? YOUMIND_PROFILE_AVATAR_PREVIEWS[(childIndex * PROMPT_TEMPLATE_VARIANTS.length + index) % YOUMIND_PROFILE_AVATAR_PREVIEWS.length]
+      ? YOUMIND_PROFILE_AVATAR_PREVIEWS[sourcePreviewIndex] || null
       : null;
 
     return {

@@ -50,12 +50,21 @@ test("prompt template library filters by category and subcategory", () => {
 });
 
 test("prompt template library uses the scraped YouMind previews for profile templates", () => {
+  const profileTemplates = flattenPromptTemplateLibrary({ categoryId: "profile-avatar" });
   const template = flattenPromptTemplateLibrary({ categoryId: "profile-avatar", subcategoryId: "identity-photo" })[0];
   const first = getPromptTemplatePreviewUrl(template);
   const second = getPromptTemplatePreviewUrl(template);
   assert.equal(first, second);
   assert.match(first, /^\/assets\/prompt-templates\/youmind-profile-avatar\/.*\.jpg$/);
   assert.equal(template.previewSourcePage, "https://youmind.com/zh-CN/prompts/blue-backlit-portrait-prompt-35157");
+  const localPreviews = profileTemplates.map((entry) => entry.previewImage).filter(Boolean);
+  assert.equal(profileTemplates.length, 40);
+  assert.equal(localPreviews.length, 26);
+  assert.equal(new Set(localPreviews).size, 26);
+  assert.equal(profileTemplates.filter((entry) => !entry.previewImage).length, 14);
+  const previewUrls = profileTemplates.map((entry) => getPromptTemplatePreviewUrl(entry));
+  assert.equal(new Set(previewUrls).size, 40);
+  assert.ok(previewUrls.slice(26).every((url) => url.startsWith("data:image/svg+xml;charset=UTF-8,")));
   const fallbackTemplate = flattenPromptTemplateLibrary({ categoryId: "marketing-design" })[0];
   assert.match(getPromptTemplatePreviewUrl(fallbackTemplate), /^data:image\/svg\+xml;charset=UTF-8,/);
 });
