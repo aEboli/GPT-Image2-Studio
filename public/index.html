@@ -100,7 +100,7 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="./styles.css?v=20260922-prompt-template-library-2" />
+    <link rel="stylesheet" href="./styles.css?v=20260923-prompt-template-library-3" />
   </head>
   <body>
     <div class="app-shell">
@@ -212,7 +212,12 @@
           </div>
         </nav>
 
-        <div id="generationModeStatus" class="header-pill generation-mode-status" aria-label="当前生图调用模式：路由模式" title="当前生图调用模式：路由模式">路由模式</div>
+        <div id="generationModeStatus" class="header-pill generation-mode-status" aria-label="当前生图调用模式：路由模式" title="当前生图调用模式：路由模式">
+          <span class="generation-mode-status-dot" aria-hidden="true"></span>
+          <span class="generation-mode-status-prefix" data-ui-i18n="generationModePrefix">生图</span>
+          <span class="generation-mode-status-divider" aria-hidden="true">·</span>
+          <strong class="generation-mode-status-value" id="generationModeValue">路由</strong>
+        </div>
 
         <div class="topbar-api-check" aria-label="API、LOG">
           <button class="header-pill status-ready" id="connectionStatus" data-state="idle" type="button" aria-label="待填写API、LOG，打开 API、LOG">
@@ -2670,7 +2675,7 @@
       </main>
     </div>
 
-    <small class="app-version" aria-label="当前版本 v0.2.021">v0.2.021</small>
+    <small class="app-version" aria-label="当前版本 v0.2.022">v0.2.022</small>
 
     <dialog
       class="creation-record-delete-dialog"
@@ -3610,6 +3615,6 @@
 
     <div class="app-tooltip" id="appTooltip" role="tooltip" popover="manual"></div>
 
-    <script type="module" src="./app.js?v=20260922-prompt-template-library-2"></script>
+    <script type="module" src="./app.js?v=20260923-prompt-template-library-3"></script>
   </body>
 </html>

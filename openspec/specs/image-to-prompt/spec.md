@@ -220,7 +220,7 @@ Prompt Kit SHALL provide a static library organized as一级分类、二级分�
 
 - **WHEN** the user opens Prompt Kit
 - **THEN** the library shows the top-level categories and their second-level categories
-- **AND** the default selected view is the waterfall view
+- **AND** the default selected view is the list view
 - **AND** the current category contains ten or more visible reusable templates
 
 #### Scenario: User selects a second-level category
@@ -229,9 +229,9 @@ Prompt Kit SHALL provide a static library organized as一级分类、二级分�
 - **THEN** the library shows exactly the ten templates belonging to that category before search filtering
 - **AND** each template exposes a stable name, prompt and preview image
 
-### Requirement: Prompt Kit supports search and three browsing views
+### Requirement: Prompt Kit supports search and two browsing views
 
-The browser SHALL support filtering the current library scope by category name, template name and prompt text, and SHALL provide waterfall, list and image views. The selected view SHALL remain stable while the user changes category or search text until the user explicitly changes it.
+The browser SHALL support filtering the current library scope by category name, template name and prompt text, and SHALL provide list and image views only. The selected view SHALL remain stable while the user changes category or search text until the user explicitly changes it. Image-view previews SHALL preserve each source image's intrinsic aspect ratio without cropping or distortion.
 
 #### Scenario: User switches to list view
 
@@ -249,7 +249,25 @@ The browser SHALL support filtering the current library scope by category name, 
 
 - **WHEN** the user selects image view
 - **THEN** the result cards primarily show preview images without the full prompt text
+- **AND** each preview keeps its intrinsic width-to-height ratio and is not forced into a square crop
 - **AND** hovering or focusing a card exposes its name and apply action
+
+### Requirement: Prompt library images and prompts remain paired
+
+Every source-backed library entry SHALL use the preview image, display name and reusable prompt from the same source record. Repeated attachments from one source detail page SHALL remain distinct entries with their own image URL, while sharing only the source prompt when the source provides one. A library entry SHALL NOT receive an unrelated image through positional cycling or a reused fallback image.
+
+#### Scenario: User browses YouMind-backed profile templates
+
+- **WHEN** the user opens the profile/avatar category
+- **THEN** each local preview image maps to the matching YouMind source title and prompt
+- **AND** the image and prompt keep their source detail-page attribution
+- **AND** no local preview path is reused by another profile/avatar entry
+
+#### Scenario: User browses an offline non-profile template
+
+- **WHEN** a template has no source photograph
+- **THEN** its deterministic offline preview uses the same category and template variant as its prompt
+- **AND** the preview is not substituted with a photograph from another template
 
 ### Requirement: Prompt library templates can be previewed and applied
 

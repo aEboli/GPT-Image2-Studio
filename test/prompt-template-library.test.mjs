@@ -8,6 +8,7 @@ import {
   getPromptTemplatePreviewUrl,
   PROMPT_TEMPLATE_LIBRARY,
 } from "../lib/prompt-template-library.mjs";
+import { YOUMIND_PROFILE_ENTRIES } from "../lib/youmind-profile-entries.mjs";
 
 const appPath = new URL("../public/app.js", import.meta.url);
 const htmlPath = new URL("../public/index.html", import.meta.url);
@@ -56,17 +57,22 @@ test("prompt template library uses the scraped YouMind previews for profile temp
   const second = getPromptTemplatePreviewUrl(template);
   assert.equal(first, second);
   assert.match(first, /^\/assets\/prompt-templates\/youmind-profile-avatar\/.*\.jpg$/);
-  assert.equal(template.previewSourcePage, "https://youmind.com/zh-CN/prompts/blue-backlit-portrait-prompt-35157");
+  assert.equal(template.previewSourcePage, "https://youmind.com/zh-CN/gpt-image-2-prompts?id=35157");
   const localPreviews = profileTemplates.map((entry) => entry.previewImage).filter(Boolean);
   assert.equal(profileTemplates.length, 40);
-  assert.equal(localPreviews.length, 26);
-  assert.equal(new Set(localPreviews).size, 26);
-  assert.equal(profileTemplates.filter((entry) => !entry.previewImage).length, 14);
+  assert.equal(localPreviews.length, 40);
+  assert.equal(new Set(localPreviews).size, 40);
+  assert.equal(profileTemplates.filter((entry) => !entry.previewImage).length, 0);
+  assert.deepEqual(profileTemplates.map((entry) => entry.previewImage), YOUMIND_PROFILE_ENTRIES.map((entry) => entry.path));
+  assert.deepEqual(profileTemplates.map((entry) => entry.prompt), YOUMIND_PROFILE_ENTRIES.map((entry) => entry.prompt));
+  assert.ok(profileTemplates.every((entry) => entry.previewSourceUrl && entry.previewSourcePage));
   const previewUrls = profileTemplates.map((entry) => getPromptTemplatePreviewUrl(entry));
   assert.equal(new Set(previewUrls).size, 40);
-  assert.ok(previewUrls.slice(26).every((url) => url.startsWith("data:image/svg+xml;charset=UTF-8,")));
+  assert.ok(previewUrls.every((url) => url.startsWith("/assets/prompt-templates/youmind-profile-avatar/")));
   const fallbackTemplate = flattenPromptTemplateLibrary({ categoryId: "marketing-design" })[0];
   assert.match(getPromptTemplatePreviewUrl(fallbackTemplate), /^data:image\/svg\+xml;charset=UTF-8,/);
+  const fallbackUrls = flattenPromptTemplateLibrary({ categoryId: "marketing-design" }).map(getPromptTemplatePreviewUrl);
+  assert.equal(new Set(fallbackUrls.map((url) => decodeURIComponent(url.split(",", 2)[1]))).size, 40);
 });
 
 test("prompt template library browser contract covers the requested browse and apply flows", async () => {
@@ -98,6 +104,9 @@ test("prompt template library browser contract covers the requested browse and a
   assert.match(styles, /\.prompt-template-library-grid\[data-view="list"\] \.prompt-template-library-prompt\s*\{[\s\S]*font-size:\s*var\(--prompt-template-list-font-size/);
   assert.match(styles, /\.prompt-template-library-grid\[data-view="image"\] \.prompt-template-library-prompt\s*\{[\s\S]*display:\s*none/);
   assert.doesNotMatch(styles, /prompt-template-library-grid\[data-view="masonry"\]/);
+  assert.match(styles, /\.prompt-template-library-grid\[data-view="image"\]\s*\{[\s\S]*align-items:\s*start/);
+  assert.match(styles, /\.prompt-template-library-grid\[data-view="image"\] \.prompt-template-library-preview-button img\s*\{[\s\S]*aspect-ratio:\s*auto[\s\S]*object-fit:\s*contain/);
+  assert.doesNotMatch(styles, /\.prompt-template-library-grid\[data-view="image"\] \.prompt-template-library-card\s*\{[\s\S]*aspect-ratio:\s*1\s*\/\s*1/);
   assert.match(styles, /\.prompt-template-library-card-actions\s*\{[\s\S]*position:\s*absolute[\s\S]*top:\s*8px/);
   assert.doesNotMatch(styles, /prompt-template-library-hover-actions/);
   assert.match(styles, /\.prompt-template-library-category-button:focus-visible,[\s\S]*\.prompt-template-library-subcategory-button:focus-visible/);

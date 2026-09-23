@@ -4,6 +4,8 @@
  * 真实素材用尽后使用按模板键确定的内联 SVG 预览，避免重复循环同一张照片，离线桌面包也能正常显示。
  */
 
+import { YOUMIND_PROFILE_ENTRIES } from "./youmind-profile-entries.mjs";
+
 const PROMPT_TEMPLATE_VARIANTS = [
   { name: "自然光", tail: "采用柔和自然光，保留真实材质与自然层次" },
   { name: "棚拍", tail: "使用干净的专业棚拍光，边缘清晰、阴影克制" },
@@ -15,165 +17,6 @@ const PROMPT_TEMPLATE_VARIANTS = [
   { name: "黑白", tail: "以黑白摄影处理强化形体、光影和纹理，不丢失主体细节" },
   { name: "暖色", tail: "使用温暖但真实的色温，画面亲和、舒适且不偏色" },
   { name: "商业清透", tail: "采用清透的商业摄影风格，画面干净、信息明确、适合直接使用" },
-];
-
-const YOUMIND_PROFILE_AVATAR_PREVIEWS = [
-  {
-    path: "/assets/prompt-templates/youmind-profile-avatar/blue-backlit-portrait.jpg",
-    alt: "电影感蓝色背光人像",
-    sourceUrl: "https://cms-assets.youmind.com/media/1790063420310_pjle3d_HSyk80baAAAEBne-300x400.jpg",
-    sourcePage: "https://youmind.com/zh-CN/prompts/blue-backlit-portrait-prompt-35157",
-  },
-  {
-    path: "/assets/prompt-templates/youmind-profile-avatar/flare-seal-portrait.jpg",
-    alt: "GPT Image 2.5 Flare 海豹肖像",
-    sourceUrl: "https://cms-assets.youmind.com/media/1790066452646_2tmhlw_HSyYTuaW0AAc2rI.jpg",
-    sourcePage: "https://youmind.com/zh-CN/prompts/gpt-image-25-flare-seal-35180",
-  },
-  {
-    path: "/assets/prompt-templates/youmind-profile-avatar/autumn-fruit-jelly-portrait.jpg",
-    alt: "手持秋季水果果冻方块的女性",
-    sourceUrl: "https://cms-assets.youmind.com/media/1790066494216_j5669k_HSx-PsAbIAAJuG7.jpg",
-    sourcePage: "https://youmind.com/zh-CN/prompts/woman-holding-autumn-fruit-jelly-35199",
-  },
-  {
-    path: "/assets/prompt-templates/youmind-profile-avatar/cute-anime-girl-portrait.jpg",
-    alt: "可爱动漫少女肖像",
-    sourceUrl: "https://cms-assets.youmind.com/media/1790066522151_jsu22u_HSwTHCcaEAETKGT.jpg",
-    sourcePage: "https://youmind.com/zh-CN/prompts/cute-anime-girl-portrait-35212",
-  },
-  {
-    path: "/assets/prompt-templates/youmind-profile-avatar/lion-ruby-heart-portrait.jpg",
-    alt: "额头镶嵌红宝石心形饰品的狮子",
-    sourceUrl: "https://cms-assets.youmind.com/media/1790066489552_m9kaoz_HSvlnZuasAAAeHY.jpg",
-    sourcePage: "https://youmind.com/zh-CN/prompts/lion-ruby-heart-jewel-portrait-35196",
-  },
-  {
-    path: "/assets/prompt-templates/youmind-profile-avatar/moonlit-attic-anime.jpg",
-    alt: "月光阁楼中的沉睡少女",
-    sourceUrl: "https://cms-assets.youmind.com/media/1790066510258_ddsot4_HSvaC07a4AAbkaO.jpg",
-    sourcePage: "https://youmind.com/zh-CN/prompts/sleeping-girl-moonlit-attic-anime-35208",
-  },
-  {
-    path: "/assets/prompt-templates/youmind-profile-avatar/sailor-uniform-window.jpg",
-    alt: "窗边穿水手服的动漫少女",
-    sourceUrl: "https://cms-assets.youmind.com/media/1790066495158_746vto_HSvZpQqbkAAiRjf.jpg",
-    sourcePage: "https://youmind.com/zh-CN/prompts/anime-girl-sailor-uniform-window-35200",
-  },
-  {
-    path: "/assets/prompt-templates/youmind-profile-avatar/urban-incognito-portrait.jpg",
-    alt: "都市隐身人像提示词",
-    sourceUrl: "https://cms-assets.youmind.com/media/1790066411126_pwrpri_HStjl3Tb0AAb-Rl.jpg",
-    sourcePage: "https://youmind.com/zh-CN/prompts/urban-incognito-portrait-prompt-35129",
-  },
-  {
-    path: "/assets/prompt-templates/youmind-profile-avatar/y2k-fashion-portrait.jpg",
-    alt: "Y2K 街头风格人像提示词",
-    sourceUrl: "https://cms-assets.youmind.com/media/1790066406512_o8ifh0_HStfNQyXIAAtWaY.jpg",
-    sourcePage: "https://youmind.com/zh-CN/prompts/y2k-fashion-portrait-prompt-35131",
-  },
-  {
-    path: "/assets/prompt-templates/youmind-profile-avatar/garden-dappled-light.jpg",
-    alt: "GPT Image 2 提示词：花园斑驳光影",
-    sourceUrl: "https://cms-assets.youmind.com/media/1789977645878_0o835b_HSbe5A6bsAAV2MH-300x451.jpg",
-    sourcePage: "https://youmind.com/zh-CN/prompts/gpt-image-2-garden-dappled-35118",
-  },
-  {
-    path: "/assets/prompt-templates/youmind-profile-avatar/cinematic-male-portrait.jpg",
-    alt: "电影感男性肖像提示词",
-    sourceUrl: "https://cms-assets.youmind.com/media/1789977641080_bc2p0x_HStZ5D3boAEtI0F-300x400.jpg",
-    sourcePage: "https://youmind.com/zh-CN/prompts/cinematic-male-portrait-35108",
-  },
-  {
-    path: "/assets/prompt-templates/youmind-profile-avatar/citrus-garden-candid-1.jpg",
-    alt: "柑橘园自然抓拍人像提示词 - 1",
-    sourceUrl: "https://cms-assets.youmind.com/media/1789977643868_qz26gy_HStP_xWbQAAun3Z-300x400.jpg",
-    sourcePage: "https://youmind.com/zh-CN/prompts/citrus-garden-candid-portrait-gpt-35114",
-  },
-  {
-    path: "/assets/prompt-templates/youmind-profile-avatar/nano-banana-face-swap.jpg",
-    alt: "Nano Banana Pro 换脸与人像提示词",
-    sourceUrl: "https://cms-assets.youmind.com/media/1789973009449_6h3000_HStFQvUaQAA9U-S.jpg",
-    sourcePage: "https://youmind.com/zh-CN/prompts/nano-banana-pro-face-swap-35100",
-  },
-  {
-    path: "/assets/prompt-templates/youmind-profile-avatar/ancient-chinese-noble-portrait.jpg",
-    alt: "中国古代贵族肖像提示词",
-    sourceUrl: "https://cms-assets.youmind.com/media/1789980020693_3qkw35_HSq4VpnbgAAb5gB.jpg",
-    sourcePage: "https://youmind.com/zh-CN/prompts/ancient-chinese-noble-portrait-35137",
-  },
-  {
-    path: "/assets/prompt-templates/youmind-profile-avatar/luxury-beauty-portrait.jpg",
-    alt: "奢华美妆人像提示词",
-    sourceUrl: "https://cms-assets.youmind.com/media/1789973011717_vealsa_HSqkUYnagAA8dO2.jpg",
-    sourcePage: "https://youmind.com/zh-CN/prompts/luxury-beauty-portrait-identity-lock-35104",
-  },
-  {
-    path: "/assets/prompt-templates/youmind-profile-avatar/korean-golden-hour.jpg",
-    alt: "韩国女孩黄金时刻人像提示词",
-    sourceUrl: "https://cms-assets.youmind.com/media/1789977639073_9dquiz_HSobcbTboAAv9ym-300x532.jpg",
-    sourcePage: "https://youmind.com/zh-CN/prompts/korean-girl-golden-hour-portrait-35105",
-  },
-  {
-    path: "/assets/prompt-templates/youmind-profile-avatar/parisian-cafe-portrait.jpg",
-    alt: "巴黎咖啡馆人像提示词",
-    sourceUrl: "https://cms-assets.youmind.com/media/1789977640344_a2gddy_HSoUVMOakAAW65J-300x373.jpg",
-    sourcePage: "https://youmind.com/zh-CN/prompts/parisian-cafe-portrait-35107",
-  },
-  {
-    path: "/assets/prompt-templates/youmind-profile-avatar/gpt-cinematic-male.jpg",
-    alt: "GPT Image 2 电影感男性人像提示词",
-    sourceUrl: "https://cms-assets.youmind.com/media/1789977647215_39dbzm_HSoUJGmbQAAX-RX-300x400.jpg",
-    sourcePage: "https://youmind.com/zh-CN/prompts/gpt-image-2-cinematic-male-35055",
-  },
-  {
-    path: "/assets/prompt-templates/youmind-profile-avatar/citrus-garden-candid-2.jpg",
-    alt: "柑橘园自然抓拍人像提示词 - 2",
-    sourceUrl: "https://cms-assets.youmind.com/media/1789977643910_pwsu2r_HStQAikbQAACyps.jpg",
-    sourcePage: "https://youmind.com/zh-CN/prompts/citrus-garden-candid-portrait-gpt-35114",
-  },
-  {
-    path: "/assets/prompt-templates/youmind-profile-avatar/onsen-selfie-1.jpg",
-    alt: "白毛巾温泉自拍 - 1",
-    sourceUrl: "https://cms-assets.youmind.com/media/1789977651720_plt2nq_HSno-O-aAAApSlG.jpg",
-    sourcePage: "https://youmind.com/zh-CN/prompts/onsen-selfie-white-towel-35128",
-  },
-  {
-    path: "/assets/prompt-templates/youmind-profile-avatar/onsen-selfie-2.jpg",
-    alt: "白毛巾温泉自拍 - 2",
-    sourceUrl: "https://cms-assets.youmind.com/media/1789977651731_1tvd2k_HSno-O4a4AEMI8y.jpg",
-    sourcePage: "https://youmind.com/zh-CN/prompts/onsen-selfie-white-towel-35128",
-  },
-  {
-    path: "/assets/prompt-templates/youmind-profile-avatar/onsen-selfie-3.jpg",
-    alt: "白毛巾温泉自拍 - 3",
-    sourceUrl: "https://cms-assets.youmind.com/media/1789977651704_cwunnk_HSno-O-aoAAZ13M.jpg",
-    sourcePage: "https://youmind.com/zh-CN/prompts/onsen-selfie-white-towel-35128",
-  },
-  {
-    path: "/assets/prompt-templates/youmind-profile-avatar/onsen-selfie-4.jpg",
-    alt: "白毛巾温泉自拍 - 4",
-    sourceUrl: "https://cms-assets.youmind.com/media/1789977652409_6iqh2h_HSno-O_aQAA2yzU.jpg",
-    sourcePage: "https://youmind.com/zh-CN/prompts/onsen-selfie-white-towel-35128",
-  },
-  {
-    path: "/assets/prompt-templates/youmind-profile-avatar/flare-seal-detail-1.jpg",
-    alt: "GPT Image 2.5 Flare 海豹肖像 - 附图 1",
-    sourceUrl: "https://cms-assets.youmind.com/media/1790066452648_1diwv7_HSyYTuWWwAAE8YL.jpg",
-    sourcePage: "https://youmind.com/zh-CN/prompts/gpt-image-25-flare-seal-35180",
-  },
-  {
-    path: "/assets/prompt-templates/youmind-profile-avatar/flare-seal-detail-2.jpg",
-    alt: "GPT Image 2.5 Flare 海豹肖像 - 附图 2",
-    sourceUrl: "https://cms-assets.youmind.com/media/1790066452749_ube5hu_HSyYTuWX0AAP_XZ.jpg",
-    sourcePage: "https://youmind.com/zh-CN/prompts/gpt-image-25-flare-seal-35180",
-  },
-  {
-    path: "/assets/prompt-templates/youmind-profile-avatar/urban-incognito-detail.jpg",
-    alt: "Y2K 街头风格人像提示词 - 附图",
-    sourceUrl: "https://cms-assets.youmind.com/media/1790066406771_o70d2k_HStfOCmXgAAYuHv.jpg",
-    sourcePage: "https://youmind.com/zh-CN/prompts/y2k-fashion-portrait-prompt-35131",
-  },
 ];
 
 const CATEGORY_DEFINITIONS = [
@@ -404,19 +247,20 @@ const CATEGORY_DEFINITIONS = [
 function buildPromptTemplates(category, child, childIndex) {
   return PROMPT_TEMPLATE_VARIANTS.map((variant, index) => {
     const isFirstIdentityPhoto = child.id === "identity-photo" && index === 0;
-    const prompt = isFirstIdentityPhoto
+    const sourcePreviewIndex = childIndex * PROMPT_TEMPLATE_VARIANTS.length + index;
+    const sourcePreview = category.id === "profile-avatar"
+      ? YOUMIND_PROFILE_ENTRIES[sourcePreviewIndex] || null
+      : null;
+    const sourcePrompt = sourcePreview?.prompt?.trim() || "";
+    const prompt = sourcePrompt
+      ? sourcePrompt.slice(0, 3000)
+      : isFirstIdentityPhoto
       ? `${child.lead}${variant.tail}。${child.use}。画面清晰高质，无文字、无水印。`
       : `${child.lead}${variant.tail}。构图稳定、主体比例自然，避免畸形肢体、重复物体、乱码文字和水印。${child.use}。`;
 
-    // 分配一次性素材序号；不要取模，否则翻阅模板时会立即看到重复照片。
-    const sourcePreviewIndex = childIndex * PROMPT_TEMPLATE_VARIANTS.length + index;
-    const sourcePreview = category.id === "profile-avatar"
-      ? YOUMIND_PROFILE_AVATAR_PREVIEWS[sourcePreviewIndex] || null
-      : null;
-
     return {
       id: `library-${category.id}-${child.id}-${String(index + 1).padStart(2, "0")}`,
-      name: `${child.name} · ${variant.name}`,
+      name: sourcePreview?.name || `${child.name} · ${variant.name}`,
       prompt,
       categoryId: category.id,
       subcategoryId: child.id,
@@ -495,26 +339,93 @@ function renderPreviewSvg(template) {
   const accent = String(template?.previewAccent || "#667788");
   const key = hashPreviewKey(template?.previewKey || template?.id);
   const hue = key % 360;
+  const primary = `hsl(${hue}, 54%, 42%)`;
+  const secondary = `hsl(${(hue + 38) % 360}, 65%, 58%)`;
+  const soft = `hsl(${(hue + 178) % 360}, 30%, 94%)`;
+  const ink = `hsl(${(hue + 190) % 360}, 28%, 18%)`;
+  const variantIndex = key % 6;
+  const rotation = (key % 15) - 7;
   const label = escapeXml(String(template?.subcategoryName || template?.name || "模板").slice(0, 10));
   const variant = escapeXml(String(template?.name || "").split("·").at(-1)?.trim().slice(0, 8) || "参考");
   const motif = template?.previewMotif || "scene";
   const gradientId = `g${key}`;
-  const common = `<defs><linearGradient id="${gradientId}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${accent}" stop-opacity=".88"/><stop offset="1" stop-color="#f1eee8" stop-opacity=".92"/></linearGradient><filter id="s${key}" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#24333d" flood-opacity=".2"/></filter></defs>`;
+  const shadowId = `s${key}`;
+  const common = `<defs><linearGradient id="${gradientId}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${primary}" stop-opacity=".94"/><stop offset=".56" stop-color="${accent}" stop-opacity=".9"/><stop offset="1" stop-color="${soft}" stop-opacity=".96"/></linearGradient><filter id="${shadowId}" x="-25%" y="-25%" width="150%" height="150%"><feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="${ink}" flood-opacity=".24"/></filter></defs>`;
+  const backdrops = [
+    `<circle cx="302" cy="62" r="96" fill="${secondary}" opacity=".38"/><path d="M0 258C82 214 126 300 214 252s104-18 146 18v90H0Z" fill="${soft}" opacity=".7"/>`,
+    `<path d="M0 0h184L84 360H0Z" fill="${secondary}" opacity=".28"/><circle cx="292" cy="294" r="112" fill="${soft}" opacity=".72"/>`,
+    `<rect x="22" y="22" width="316" height="316" rx="34" fill="${soft}" opacity=".66"/><path d="m0 274 106-94 72 44 102-126 80 70v192H0Z" fill="${secondary}" opacity=".3"/>`,
+    `<path d="M0 78C94 10 168 118 246 54c34-28 73-32 114-4v310H0Z" fill="${secondary}" opacity=".3"/><circle cx="70" cy="72" r="38" fill="${soft}" opacity=".74"/>`,
+    `<rect x="0" y="0" width="360" height="360" fill="${soft}" opacity=".4"/><path d="m-18 94 176-112 224 132-176 112Z" fill="${secondary}" opacity=".34"/><path d="m-26 288 160-106 226 120-160 106Z" fill="${primary}" opacity=".18"/>`,
+    `<circle cx="68" cy="80" r="58" fill="${soft}" opacity=".7"/><circle cx="300" cy="284" r="92" fill="${secondary}" opacity=".3"/><path d="M0 210c76-28 110 30 180 0s112-26 180 10v140H0Z" fill="${soft}" opacity=".66"/>`,
+  ][variantIndex];
   let art = "";
   if (motif === "portrait") {
-    art = `<circle cx="180" cy="120" r="48" fill="#f5c6a5"/><path d="M92 276c5-65 42-96 88-96s83 31 88 96Z" fill="#233746" filter="url(#s${key})"/><path d="M130 116c8-45 88-58 103 7-23-16-67-18-103-7Z" fill="#2c2524"/><circle cx="164" cy="124" r="4" fill="#27343d"/><circle cx="196" cy="124" r="4" fill="#27343d"/>`;
+    const cx = 146 + (key % 72);
+    const cy = 116 + (key % 24);
+    const head = 38 + (key % 16);
+    const shoulder = `M${cx - 92} 286c8-68 48-102 92-102s84 34 92 102Z`;
+    const accessory = [
+      `<path d="M${cx - 48} ${cy + 5}h96" stroke="${secondary}" stroke-width="7" stroke-linecap="round" opacity=".8"/>`,
+      `<circle cx="${cx - 30}" cy="${cy + 18}" r="7" fill="${secondary}"/><circle cx="${cx + 30}" cy="${cy + 18}" r="7" fill="${secondary}"/>`,
+      `<path d="M${cx - 23} ${cy + 28}q23 18 46 0" fill="none" stroke="${secondary}" stroke-width="5" stroke-linecap="round"/>`,
+      `<path d="M${cx - 37} ${cy - 4}q37-25 74 0" fill="none" stroke="${secondary}" stroke-width="8" stroke-linecap="round"/>`,
+      `<circle cx="${cx + 44}" cy="${cy + 4}" r="9" fill="${accent}" stroke="${soft}" stroke-width="4"/>`,
+      `<path d="M${cx - 30} ${cy + 26}h60" stroke="${accent}" stroke-width="6" stroke-linecap="round"/>`,
+    ][variantIndex];
+    art = `<g transform="rotate(${rotation} 180 180)"><circle cx="${cx}" cy="${cy}" r="${head + 18}" fill="${soft}" opacity=".42"/><circle cx="${cx}" cy="${cy}" r="${head}" fill="#f2c3a4"/><path d="${shoulder}" fill="${primary}" filter="url(#${shadowId})"/><path d="M${cx - head - 8} ${cy - 8}c8-${head + 26} ${head * 2 + 16}-${head - 6} ${head * 2 + 20} ${head + 16}c-19-12-48-12-72 0Z" fill="${ink}"/><circle cx="${cx - 17}" cy="${cy + 6}" r="4" fill="${ink}"/><circle cx="${cx + 17}" cy="${cy + 6}" r="4" fill="${ink}"/>${accessory}</g>`;
   } else if (motif === "product") {
-    art = `<ellipse cx="180" cy="270" rx="112" ry="20" fill="#22333b" opacity=".16"/><rect x="86" y="86" width="188" height="150" rx="24" fill="#fbfaf7" stroke="#263a42" stroke-opacity=".28" stroke-width="4" filter="url(#s${key})"/><path d="M116 116h128M116 150h86" stroke="${accent}" stroke-width="12" stroke-linecap="round" opacity=".78"/><circle cx="224" cy="188" r="24" fill="${accent}" opacity=".82"/>`;
+    const productArts = [
+      `<rect x="84" y="82" width="192" height="154" rx="22" fill="${soft}" stroke="${ink}" stroke-opacity=".24" stroke-width="4" filter="url(#${shadowId})"/><path d="M116 122h126M116 154h84" stroke="${primary}" stroke-width="12" stroke-linecap="round"/><circle cx="226" cy="192" r="24" fill="${secondary}"/>`,
+      `<ellipse cx="180" cy="252" rx="110" ry="22" fill="${ink}" opacity=".16"/><circle cx="180" cy="156" r="76" fill="${soft}" stroke="${ink}" stroke-opacity=".25" stroke-width="4" filter="url(#${shadowId})"/><path d="M130 178h100M146 122h68" stroke="${primary}" stroke-width="12" stroke-linecap="round"/><circle cx="180" cy="212" r="14" fill="${secondary}"/>`,
+      `<path d="M126 108h108l20 40v106H106V148Z" fill="${soft}" stroke="${ink}" stroke-opacity=".25" stroke-width="4" filter="url(#${shadowId})"/><path d="M126 108v40h128M156 185h76M156 214h52" stroke="${primary}" stroke-width="10" stroke-linecap="round" fill="none"/><circle cx="218" cy="214" r="16" fill="${secondary}"/>`,
+      `<path d="M120 112h120l-18 156H138Z" fill="${soft}" stroke="${ink}" stroke-opacity=".25" stroke-width="4" filter="url(#${shadowId})"/><path d="M150 112q30-38 60 0M146 174h68M154 208h52" fill="none" stroke="${primary}" stroke-width="11" stroke-linecap="round"/><circle cx="180" cy="244" r="11" fill="${secondary}"/>`,
+      `<ellipse cx="180" cy="250" rx="120" ry="22" fill="${ink}" opacity=".15"/><ellipse cx="180" cy="166" rx="110" ry="70" fill="${soft}" stroke="${ink}" stroke-opacity=".26" stroke-width="4" filter="url(#${shadowId})"/><ellipse cx="180" cy="166" rx="58" ry="30" fill="${primary}" opacity=".8"/><circle cx="224" cy="212" r="17" fill="${secondary}"/>`,
+      `<rect x="110" y="92" width="140" height="176" rx="70" fill="${soft}" stroke="${ink}" stroke-opacity=".25" stroke-width="4" filter="url(#${shadowId})"/><path d="M142 148h76M142 180h54" stroke="${primary}" stroke-width="11" stroke-linecap="round"/><circle cx="180" cy="224" r="24" fill="${secondary}"/>`,
+    ];
+    art = productArts[variantIndex];
   } else if (motif === "design") {
-    art = `<rect x="78" y="58" width="204" height="220" rx="18" fill="#fffdf8" filter="url(#s${key})"/><rect x="98" y="80" width="164" height="88" rx="12" fill="${accent}" opacity=".85"/><path d="M100 202h130M100 226h96" stroke="#33454c" stroke-width="10" stroke-linecap="round" opacity=".7"/><circle cx="232" cy="236" r="18" fill="#e1a35f"/>`;
+    const designArts = [
+      `<rect x="74" y="54" width="212" height="232" rx="18" fill="${soft}" filter="url(#${shadowId})"/><rect x="96" y="78" width="168" height="92" rx="12" fill="${primary}"/><path d="M98 204h132M98 230h96" stroke="${ink}" stroke-width="10" stroke-linecap="round" opacity=".72"/><circle cx="238" cy="244" r="17" fill="${secondary}"/>`,
+      `<rect x="66" y="80" width="228" height="188" rx="24" fill="${soft}" filter="url(#${shadowId})"/><circle cx="128" cy="154" r="54" fill="${primary}"/><rect x="196" y="112" width="60" height="84" rx="12" fill="${secondary}"/><path d="M98 226h158" stroke="${ink}" stroke-width="10" stroke-linecap="round" opacity=".66"/>`,
+      `<rect x="66" y="60" width="228" height="226" rx="18" fill="${soft}" filter="url(#${shadowId})"/><path d="M66 186 176 60h118v90L184 286H66Z" fill="${primary}" opacity=".9"/><circle cx="236" cy="232" r="28" fill="${secondary}"/><path d="M90 104h74" stroke="${ink}" stroke-width="9" stroke-linecap="round"/>`,
+      `<rect x="72" y="64" width="216" height="218" rx="18" fill="${soft}" filter="url(#${shadowId})"/><rect x="96" y="88" width="74" height="170" rx="14" fill="${primary}"/><rect x="184" y="88" width="78" height="74" rx="14" fill="${secondary}"/><path d="M184 202h78M184 228h54" stroke="${ink}" stroke-width="10" stroke-linecap="round" opacity=".7"/>`,
+      `<rect x="60" y="72" width="240" height="208" rx="20" fill="${soft}" filter="url(#${shadowId})"/><circle cx="180" cy="156" r="70" fill="${primary}"/><circle cx="180" cy="156" r="34" fill="${secondary}"/><path d="M94 242h172" stroke="${ink}" stroke-width="11" stroke-linecap="round" opacity=".7"/>`,
+      `<rect x="70" y="56" width="220" height="230" rx="18" fill="${soft}" filter="url(#${shadowId})"/><path d="M92 236 132 92l58 80 48-96 30 160Z" fill="${primary}" opacity=".9"/><circle cx="126" cy="108" r="21" fill="${secondary}"/><path d="M98 258h146" stroke="${ink}" stroke-width="9" stroke-linecap="round"/>`,
+    ];
+    art = designArts[variantIndex];
   } else if (motif === "art") {
-    art = `<circle cx="180" cy="164" r="92" fill="#f6ddc0" opacity=".82"/><path d="M76 236c34-86 86-98 140-148 20 48 38 79 88 120-68 47-150 52-228 28Z" fill="${accent}" opacity=".83"/><circle cx="142" cy="126" r="26" fill="#e6a95e" opacity=".9"/>`;
+    const artVariants = [
+      `<circle cx="180" cy="166" r="92" fill="${soft}"/><path d="M76 236c34-86 86-98 140-148 20 48 38 79 88 120-68 47-150 52-228 28Z" fill="${primary}"/><circle cx="142" cy="126" r="26" fill="${secondary}"/>`,
+      `<path d="M54 222 122 66l90 52 88-64-32 202Z" fill="${primary}" opacity=".92"/><circle cx="120" cy="222" r="48" fill="${soft}"/><circle cx="240" cy="124" r="27" fill="${secondary}"/>`,
+      `<rect x="76" y="74" width="208" height="208" rx="104" fill="${soft}"/><path d="M76 182c52-72 106-78 208-54v154H76Z" fill="${primary}"/><path d="M98 100 260 260" stroke="${secondary}" stroke-width="22" stroke-linecap="round"/>`,
+      `<path d="M56 242c70-144 114-174 246-146-36 100-94 152-246 146Z" fill="${primary}"/><path d="M94 96c44 40 96 40 172 0" fill="none" stroke="${soft}" stroke-width="20" stroke-linecap="round"/><circle cx="108" cy="222" r="24" fill="${secondary}"/>`,
+      `<circle cx="180" cy="166" r="100" fill="${primary}"/><path d="M80 166h200M180 66v200" stroke="${soft}" stroke-width="20" opacity=".78"/><circle cx="180" cy="166" r="36" fill="${secondary}"/>`,
+      `<path d="M72 250 96 92l84-34 108 80-38 122Z" fill="${primary}"/><path d="m116 218 66-100 54 74" fill="none" stroke="${soft}" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/><circle cx="252" cy="106" r="22" fill="${secondary}"/>`,
+    ];
+    art = artVariants[variantIndex];
   } else if (motif === "editorial") {
-    art = `<rect x="70" y="64" width="220" height="210" rx="20" fill="#faf9f3" filter="url(#s${key})"/><path d="M92 224 150 142l35 42 31-58 54 98Z" fill="${accent}" opacity=".82"/><circle cx="238" cy="108" r="22" fill="#e5a764"/><path d="M92 246h152" stroke="#33454c" stroke-width="10" stroke-linecap="round" opacity=".5"/>`;
+    const editorialVariants = [
+      `<rect x="68" y="58" width="224" height="224" rx="20" fill="${soft}" filter="url(#${shadowId})"/><path d="M90 226 148 142l35 42 31-58 56 100Z" fill="${primary}"/><circle cx="240" cy="108" r="22" fill="${secondary}"/><path d="M90 250h154" stroke="${ink}" stroke-width="10" stroke-linecap="round" opacity=".55"/>`,
+      `<rect x="60" y="76" width="240" height="196" rx="18" fill="${soft}" filter="url(#${shadowId})"/><path d="M88 236h184" stroke="${ink}" stroke-width="8" opacity=".5"/><path d="M96 214v-54M136 214v-92M176 214v-76M216 214v-126M256 214v-38" stroke="${primary}" stroke-width="22" stroke-linecap="round"/><circle cx="250" cy="108" r="20" fill="${secondary}"/>`,
+      `<rect x="70" y="56" width="220" height="232" rx="18" fill="${soft}" filter="url(#${shadowId})"/><circle cx="126" cy="112" r="24" fill="${secondary}"/><path d="M98 166h140M98 196h160M98 226h112" stroke="${ink}" stroke-width="10" stroke-linecap="round" opacity=".65"/><path d="m226 244 30-46 30 46Z" fill="${primary}"/>`,
+      `<rect x="62" y="66" width="236" height="214" rx="20" fill="${soft}" filter="url(#${shadowId})"/><path d="M92 224h168" stroke="${ink}" stroke-width="8" opacity=".5"/><circle cx="116" cy="144" r="30" fill="${primary}"/><circle cx="180" cy="144" r="30" fill="${secondary}"/><circle cx="244" cy="144" r="30" fill="${accent}"/><path d="M104 248h144" stroke="${ink}" stroke-width="10" stroke-linecap="round" opacity=".65"/>`,
+      `<rect x="68" y="64" width="224" height="220" rx="20" fill="${soft}" filter="url(#${shadowId})"/><path d="M92 230h162" stroke="${ink}" stroke-width="8" opacity=".5"/><path d="M102 202 144 134l36 38 40-74 48 104Z" fill="${primary}"/><circle cx="236" cy="104" r="21" fill="${secondary}"/>`,
+      `<rect x="58" y="82" width="244" height="192" rx="18" fill="${soft}" filter="url(#${shadowId})"/><path d="M88 128h182M88 164h182M88 200h182" stroke="${ink}" stroke-width="7" stroke-linecap="round" opacity=".45"/><rect x="90" y="224" width="58" height="28" rx="10" fill="${primary}"/><rect x="158" y="224" width="74" height="28" rx="10" fill="${secondary}"/><rect x="242" y="224" width="28" height="28" rx="10" fill="${accent}"/>`,
+    ];
+    art = editorialVariants[variantIndex];
   } else {
-    art = `<rect x="56" y="78" width="248" height="176" rx="28" fill="#eef2ed"/><path d="M58 208 126 128l40 44 42-62 98 98Z" fill="${accent}" opacity=".85"/><circle cx="238" cy="112" r="25" fill="#e4a25f"/>`;
+    const sceneVariants = [
+      `<rect x="54" y="82" width="252" height="180" rx="28" fill="${soft}" filter="url(#${shadowId})"/><path d="M56 210 126 128l40 44 42-62 98 98Z" fill="${primary}"/><circle cx="238" cy="112" r="25" fill="${secondary}"/>`,
+      `<rect x="52" y="64" width="256" height="208" rx="20" fill="${soft}" filter="url(#${shadowId})"/><path d="M76 236V126h84v110M202 236V98h82v138" fill="${primary}" opacity=".82"/><path d="M60 236h244" stroke="${ink}" stroke-width="10" stroke-linecap="round" opacity=".5"/><circle cx="112" cy="104" r="22" fill="${secondary}"/>`,
+      `<rect x="48" y="90" width="264" height="174" rx="28" fill="${soft}" filter="url(#${shadowId})"/><path d="M50 204c58-58 98-50 148 0 48 48 78 44 114 12v52H48Z" fill="${primary}"/><path d="M50 184c56-52 106-48 164 0 46 38 70 34 98 10" fill="none" stroke="${secondary}" stroke-width="16"/><circle cx="102" cy="118" r="24" fill="${secondary}"/>`,
+      `<rect x="54" y="76" width="252" height="194" rx="24" fill="${soft}" filter="url(#${shadowId})"/><path d="M54 206 116 152l44 34 62-82 84 102v64H54Z" fill="${primary}"/><path d="m70 238 68-58 44 34 58-76" fill="none" stroke="${secondary}" stroke-width="12" stroke-linecap="round"/><circle cx="246" cy="112" r="22" fill="${accent}"/>`,
+      `<rect x="58" y="62" width="244" height="224" rx="18" fill="${soft}" filter="url(#${shadowId})"/><circle cx="180" cy="154" r="72" fill="${primary}" opacity=".88"/><path d="M110 248h140" stroke="${ink}" stroke-width="10" stroke-linecap="round" opacity=".55"/><path d="M180 82v144M108 154h144" stroke="${secondary}" stroke-width="10" stroke-linecap="round" opacity=".8"/>`,
+      `<rect x="48" y="84" width="264" height="184" rx="32" fill="${soft}" filter="url(#${shadowId})"/><path d="M66 218 128 134l40 48 52-80 74 116Z" fill="${primary}"/><path d="M76 242h204" stroke="${ink}" stroke-width="9" stroke-linecap="round" opacity=".5"/><circle cx="112" cy="112" r="24" fill="${secondary}"/>`,
+    ];
+    art = sceneVariants[variantIndex];
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 360" role="img" aria-label="${label} ${variant}"><rect width="360" height="360" rx="28" fill="url(#${gradientId})"/><circle cx="304" cy="52" r="86" fill="#fff" opacity=".16"/><circle cx="46" cy="326" r="92" fill="#fff" opacity=".14"/>${art}<rect x="24" y="296" width="312" height="40" rx="12" fill="#142a34" opacity=".78"/><text x="42" y="322" font-size="17" font-family="system-ui, sans-serif" font-weight="700" fill="#fff">${label}</text><text x="318" y="322" text-anchor="end" font-size="14" font-family="system-ui, sans-serif" fill="#dce9e9">${variant}</text></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 360" role="img" aria-label="${label} ${variant}">${common}<rect width="360" height="360" rx="28" fill="url(#${gradientId})"/>${backdrops}${art}<rect x="20" y="298" width="320" height="42" rx="12" fill="${ink}" opacity=".84"/><text x="38" y="325" font-size="17" font-family="system-ui, sans-serif" font-weight="700" fill="#fff">${label}</text><text x="322" y="325" text-anchor="end" font-size="14" font-family="system-ui, sans-serif" fill="#edf5f4">${variant}</text></svg>`;
 }
 
 export function getPromptTemplatePreviewUrl(template) {
