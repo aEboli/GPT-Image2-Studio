@@ -1565,6 +1565,8 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .generation-m
   right: 14px;
   z-index: 35;
   display: inline-flex;
+  align-items: center;
+  gap: 6px;
   min-height: 28px;
   padding: 0 12px;
   border-radius: 10px;
@@ -1578,9 +1580,41 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .generation-m
   transform: translateY(-50%);
 }
 
+.generation-mode-status-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.generation-mode-status-prefix,
+.generation-mode-status-divider {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.generation-mode-status-value {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  font-size: inherit;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .generation-mode-status[data-image-route="b"] {
   border-color: color-mix(in srgb, var(--accent) 42%, var(--nav-tab-border));
   color: var(--accent);
+}
+
+html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .generation-mode-status[data-image-route="c"],
+html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .generation-mode-status[data-image-route="d"] {
+  border-color: color-mix(in srgb, var(--success) 42%, var(--nav-tab-border));
+  color: var(--success);
 }
 
 .header-pill,
@@ -1600,6 +1634,10 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .generation-m
   align-items: center;
   gap: 10px;
   color: var(--text);
+}
+
+.header-pill.generation-mode-status {
+  gap: 6px;
 }
 
 .header-button,
@@ -10838,6 +10876,14 @@ html[data-theme="light"] .lightbox-fields .detail-field {
   gap: 12px;
 }
 
+.detail-field-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
 .detail-field span {
   font-size: var(--type-body-size);
   color: var(--muted);
@@ -10848,6 +10894,14 @@ html[data-theme="light"] .lightbox-fields .detail-field {
   padding: 0 12px;
   border-color: var(--border);
   color: var(--muted);
+  flex: 0 0 auto;
+}
+
+.detail-apply-button {
+  min-height: 32px;
+  padding: 0 12px;
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
+  color: var(--accent);
   flex: 0 0 auto;
 }
 
@@ -14237,6 +14291,14 @@ html[data-ui-layout="mobile"] .generation-mode-status[data-image-route="b"] {
   color: var(--accent);
 }
 
+html[data-ui-layout="tablet"] .generation-mode-status[data-image-route="c"],
+html[data-ui-layout="tablet"] .generation-mode-status[data-image-route="d"],
+html[data-ui-layout="mobile"] .generation-mode-status[data-image-route="c"],
+html[data-ui-layout="mobile"] .generation-mode-status[data-image-route="d"] {
+  border-color: color-mix(in srgb, var(--success) 42%, var(--nav-tab-border));
+  color: var(--success);
+}
+
 html[data-ui-layout="tablet"] .primary-nav,
 html[data-ui-layout="mobile"] .primary-nav,
 html[data-ui-layout="tablet"] .global-nav,
@@ -14273,7 +14335,8 @@ html[data-ui-layout="mobile"] .view-tab {
 }
 
 html[data-ui-layout="mobile"] .generation-mode-status {
-  max-width: clamp(64px, 18vw, 76px);
+  max-width: clamp(78px, 22vw, 88px);
+  gap: 4px;
   padding: 0 8px;
 }
 
@@ -19438,6 +19501,7 @@ html:not([data-theme="light"]) .product-image-import-card.is-selected input {
   overflow: auto;
   padding: 1px 4px 6px 1px;
   scrollbar-width: thin;
+  grid-auto-rows: max-content;
 }
 
 .prompt-template-library-grid[data-view="list"] {
@@ -19817,13 +19881,11 @@ html:not([data-theme="light"]) .product-image-import-card.is-selected input {
 
   .prompt-template-library-grid[data-view="list"] .prompt-template-library-card {
     grid-template-columns: 92px minmax(0, 1fr);
-    min-height: 92px;
   }
 
   .prompt-template-library-grid[data-view="list"] .prompt-template-library-media,
-  .prompt-template-library-grid[data-view="list"] .prompt-template-library-preview-button,
-  .prompt-template-library-grid[data-view="list"] .prompt-template-library-preview-button img {
-    min-height: 92px;
+  .prompt-template-library-grid[data-view="list"] .prompt-template-library-preview-button {
+    height: auto;
   }
 
   .prompt-template-library-grid[data-view="list"] .prompt-template-library-content {

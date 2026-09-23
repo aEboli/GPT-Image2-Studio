@@ -113,7 +113,7 @@ import { DEFAULT_PORTRAIT_ACCESSORY_ASSETS, PORTRAIT_ACCESSORY_ASSET_CATEGORIES,
 import { createDefaultPortraitLocationState, createPortraitLocationSelectorController } from "/lib/portrait-location-selector.mjs?v=20260527-portrait-location-1";
 import { getLegacyPromptAgentTemplatePrompt, getPromptAgentDisplayName, getPromptAgentTemplateDisplayName, isStructuredImagePromptJson } from "/lib/prompt-agent-display-name.mjs?v=20260819-prompt-history-mode-1";
 import { mergePromptAgentHistoryTemplates } from "/lib/prompt-agent-template-sync.mjs?v=20260819-history-template-mode-1";
-import { flattenPromptTemplateLibrary, getPromptTemplateLibraryCategory, getPromptTemplateLibraryCounts, getPromptTemplateLibrarySubcategory, getPromptTemplatePreviewUrl, PROMPT_TEMPLATE_LIBRARY } from "/lib/prompt-template-library.mjs?v=20260923-prompt-template-library-2";
+import { flattenPromptTemplateLibrary, getPromptTemplateLibraryCategory, getPromptTemplateLibraryCounts, getPromptTemplateLibrarySubcategory, getPromptTemplatePreviewUrl, PROMPT_TEMPLATE_LIBRARY } from "/lib/prompt-template-library.mjs?v=20260923-prompt-template-library-4";
 import { DEFAULT_GENERATION_CONCURRENCY, DEFAULT_GENERATION_START_DELAY_MS, MAX_PROMPT_PARALLEL_TASKS, MAX_PROMPT_QUEUE_SIZE } from "/lib/studio-constants.mjs?v=20260829-generation-schedule-1";
 import { GENERATION_START_DELAY_FIELD, normalizeGenerationStartDelayMs } from "/lib/generation-start-delay.mjs?v=20260829-generation-schedule-1";
 import { GENERATION_CONCURRENCY_FIELD, normalizeGenerationConcurrency } from "/lib/generation-concurrency.mjs?v=20260829-generation-schedule-1";
@@ -1222,13 +1222,17 @@ const refs = {
   generateButton: document.querySelector("#generateButton"),
   generateForm: document.querySelector("#generateForm"),
   generationModeStatus: document.querySelector("#generationModeStatus"),
+  generationModeValue: document.querySelector("#generationModeValue"),
   globalNav: document.querySelector(".global-nav"),
   globalNavItems: [...document.querySelectorAll("[data-nav-section]")],
   lightbox: document.querySelector("#lightbox"),
   lightboxAmbient: document.querySelector("#lightboxAmbient"),
   lightboxBackdrop: document.querySelector("#lightboxBackdrop"),
   lightboxClose: document.querySelector("#lightboxClose"),
+  lightboxCloseLabel: document.querySelector("#lightboxCloseLabel"),
+  lightboxDismissButton: document.querySelector("#lightboxDismissButton"),
   lightboxComparison: document.querySelector("#lightboxComparison"),
+  applyPromptButton: document.querySelector("#applyPromptButton"),
   copyPromptButton: document.querySelector("#copyPromptButton"),
   lightboxDownload: document.querySelector("#lightboxDownload"),
   lightboxId: document.querySelector("#lightboxId"),
@@ -5661,7 +5665,11 @@ function updateGenerationModeStatus() {
   const imageRoute = getSelectedImageRoute();
   const label = getUiImageRouteLabel(imageRoute);
   const statusText = getUiImageRouteStatusText(label);
-  refs.generationModeStatus.textContent = label;
+  if (refs.generationModeValue) {
+    refs.generationModeValue.textContent = label;
+  } else {
+    refs.generationModeStatus.textContent = label;
+  }
   refs.generationModeStatus.dataset.imageRoute = imageRoute;
   refs.generationModeStatus.title = statusText;
   refs.generationModeStatus.setAttribute("aria-label", statusText);
@@ -6114,7 +6122,11 @@ function openLightbox(item, navigation = null) {
   window.requestAnimationFrame(() => syncLightboxImageMetrics());
 }
 
+let lightboxCloseOptions = null;
 function closeLightbox() {
+  const { restoreFocus = true, closePromptTemplateLibrary = false } = lightboxCloseOptions || {};
+  lightboxCloseOptions = null;
+  const closesPromptTemplateLibrary = closePromptTemplateLibrary && Boolean(state.lightboxItem?.isPromptTemplateLibraryItem);
   state.lightboxItem = null;
   previewKeyboardNavigation.clearLightboxNavigation();
   resetPromptCopyFeedback();
@@ -6122,7 +6134,31 @@ function closeLightbox() {
   refs.lightbox.classList.remove("is-style-transfer-comparison");
   renderStyleTransferLightboxComparison(null);
   setLightboxOpen(false);
-  restoreOverlayTriggerFocus("lightbox");
+  if (closesPromptTemplateLibrary) {
+    overlayFocusTriggers.delete("lightbox");
+    setPromptTemplatePopoverOpen(false);
+    focusOverlayTarget(refs.surprisePromptButton);
+  } else if (restoreFocus) {
+    restoreOverlayTriggerFocus("lightbox");
+  } else {
+    overlayFocusTriggers.delete("lightbox");
+  }
+}
+
+function closeLightboxWithOptions(options = {}) {
+  lightboxCloseOptions = options;
+  closeLightbox();
+}
+
+function applyLightboxPrompt() {
+  const item = state.lightboxItem;
+  if (!item?.isPromptTemplateLibraryItem) {
+    return;
+  }
+
+  const template = item.promptTemplate || { id: item.id, prompt: item.prompt };
+  applyPromptTemplateLibrary(template);
+  closeLightboxWithOptions({ restoreFocus: false });
 }
 
 function renderStyleTransferLightboxComparison(item) {
@@ -6157,7 +6193,13 @@ function renderStyleTransferLightboxComparison(item) {
 function syncLightboxItem() {
   if (!state.lightboxItem) {
     clearImageReveal(refs.lightboxImage);
+    if (refs.lightboxCloseLabel) refs.lightboxCloseLabel.textContent = "返回";
+    refs.lightboxClose.title = "返回";
+    refs.lightboxClose.setAttribute("aria-label", "返回图片列表");
     refs.copyPromptButton.disabled = true;
+    refs.applyPromptButton.disabled = true;
+    refs.applyPromptButton.classList.add("hidden");
+    refs.lightboxDismissButton.classList.add("hidden");
     refs.lightbox.classList.remove("is-image-only-preview");
     refs.lightbox.classList.remove("is-style-transfer-comparison");
     renderStyleTransferLightboxComparison(null);
@@ -6186,6 +6228,13 @@ function syncLightboxItem() {
   if (refs.lightboxFilename) refs.lightboxFilename.textContent = fresh.filename || "--";
   if (refs.lightboxRelativePath) refs.lightboxRelativePath.textContent = fresh.relativePath || fresh.filename || "--";
   refs.copyPromptButton.disabled = refs.lightboxPrompt.value.trim().length === 0;
+  const isPromptTemplateLibraryItem = Boolean(fresh.isPromptTemplateLibraryItem);
+  if (refs.lightboxCloseLabel) refs.lightboxCloseLabel.textContent = isPromptTemplateLibraryItem ? "返回模板库" : "返回";
+  refs.lightboxClose.title = isPromptTemplateLibraryItem ? "返回模板库" : "返回";
+  refs.lightboxClose.setAttribute("aria-label", isPromptTemplateLibraryItem ? "返回提示词模板库" : "返回图片列表");
+  refs.applyPromptButton.classList.toggle("hidden", !isPromptTemplateLibraryItem);
+  refs.applyPromptButton.disabled = !isPromptTemplateLibraryItem || refs.lightboxPrompt.value.trim().length === 0;
+  refs.lightboxDismissButton.classList.toggle("hidden", !isPromptTemplateLibraryItem);
   resetPromptCopyFeedback();
   resetLightboxViewer();
   if (imageUrl) {
@@ -7796,6 +7845,7 @@ function openPromptTemplateLibraryPreview(template) {
     prompt: template.prompt,
     paramsText: `分类：${template.categoryName} / ${template.subcategoryName}\n模板：${template.name}`,
     imageModel: "Prompt Kit",
+    promptTemplate: template,
     isPreviewLightboxItem: true,
     isPromptTemplateLibraryItem: true,
   });
@@ -7891,10 +7941,20 @@ function renderPromptTemplateLibrary() {
     previewButton.title = "放大查看图片与提示词";
     previewButton.setAttribute("aria-label", `放大查看${template.name}`);
     const image = document.createElement("img");
+    const syncPromptTemplateImageRatio = () => {
+      if (image.naturalWidth > 0 && image.naturalHeight > 0) {
+        image.style.aspectRatio = `${image.naturalWidth} / ${image.naturalHeight}`;
+      }
+    };
+    image.style.aspectRatio = template.previewImage ? "3 / 4" : "1 / 1";
+    image.addEventListener("load", syncPromptTemplateImageRatio, { once: true });
     image.src = getPromptTemplatePreviewUrl(template);
     image.alt = template.previewAlt || `${template.name}预览`;
     image.loading = "lazy";
     image.decoding = "async";
+    if (image.complete) {
+      syncPromptTemplateImageRatio();
+    }
     previewButton.appendChild(image);
     previewButton.addEventListener("click", () => openPromptTemplateLibraryPreview(template));
     media.appendChild(previewButton);
@@ -20216,6 +20276,7 @@ function bindEvents() {
   lightboxViewerController.bindEvents();
   refs.lightboxBackdrop.addEventListener("click", closeLightbox);
   refs.lightboxClose.addEventListener("click", closeLightbox);
+  refs.lightboxDismissButton.addEventListener("click", () => closeLightboxWithOptions({ closePromptTemplateLibrary: true }));
   refs.lightboxDownload.addEventListener("click", (event) => {
     event.preventDefault();
     downloadGalleryItem(state.lightboxItem, refs.lightboxImage).catch((error) => {
@@ -20227,6 +20288,7 @@ function bindEvents() {
       showError(error.message);
     });
   });
+  refs.applyPromptButton.addEventListener("click", applyLightboxPrompt);
   document.addEventListener("keydown", handlePreviewArrowNavigation);
 
   document.addEventListener("keydown", (event) => {

@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.022-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.023-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installer-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,7 +10,7 @@
 
 把提示词生图、参考图分析、图片编辑、电商套图、人物写真、文章插图、PPT 生成和素材管理集中到一个浏览器界面中。
 
-当前版本：`v0.2.022`
+当前版本：`v0.2.023`
 
 </div>
 
@@ -56,14 +56,14 @@ Windows 脚本入口（启动器、Native Messaging 安装/卸载、图片资源
 从包含桌面产物的 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
 
 ```text
-GPT-Image2-Studio-Desktop-Setup-v0.2.022-x64.exe
+GPT-Image2-Studio-Desktop-Setup-v0.2.023-x64.exe
 ```
 
 安装完成后通过桌面或开始菜单中的 `GPT-Image2-Studio` 启动。程序会在独立窗口中运行，内置服务使用动态回环端口，关闭窗口后不会遗留后台服务。无需另行安装 Node.js，完整说明见 [Windows 桌面程序文档](./docs/windows-desktop.md)。
 
 源码目录也可直接启动桌面开发版：
 
-如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.022-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
+如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.023-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
 
 桌面开发使用 Electron `43`，要求 Node.js `22.12` 或更高版本；普通 `npm start` 服务仍支持 Node.js `20+`。
 
@@ -74,7 +74,7 @@ cmd /c npm run desktop
 
 ### 方式三：Windows 浏览器安装包（兼容旧版）
 
-旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.022` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
+旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.023` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
 
 ## 配置说明
 
@@ -629,8 +629,8 @@ cmd /c npm run build:desktop
 产物路径：
 
 ```text
-artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.022-x64.exe
-artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.022-x64.zip
+artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.023-x64.exe
+artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.023-x64.zip
 artifacts/desktop/win-unpacked/GPT-Image2-Studio.exe
 ```
 
@@ -648,7 +648,7 @@ cmd /c npm run build:installer
 产物路径格式：
 
 ```text
-artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.022.exe
+artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.023.exe
 ```
 
 脚本使用系统 `iexpress.exe` 生成自解压安装包，并把当前 Node.js 运行时和依赖打入安装目录；启动后仍使用默认浏览器显示工作台。
@@ -753,7 +753,7 @@ cmd /c npm run build:installer
 
 ## 版本更新说明
 
-完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.022](./docs/releases/v0.2.022.md)。
+完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.023](./docs/releases/v0.2.023.md)。
 
 ### v0.2.020 更新说明
 

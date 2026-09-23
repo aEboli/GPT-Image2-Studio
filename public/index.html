@@ -100,7 +100,7 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="./styles.css?v=20260923-prompt-template-library-3" />
+    <link rel="stylesheet" href="./styles.css?v=20260923-prompt-template-library-4" />
   </head>
   <body>
     <div class="app-shell">
@@ -2675,7 +2675,7 @@
       </main>
     </div>
 
-    <small class="app-version" aria-label="当前版本 v0.2.022">v0.2.022</small>
+    <small class="app-version" aria-label="当前版本 v0.2.023">v0.2.023</small>
 
     <dialog
       class="creation-record-delete-dialog"
@@ -2942,7 +2942,7 @@
           <div class="lightbox-meta">
             <button class="toolbar-button lightbox-back-button" id="lightboxClose" type="button" aria-label="返回图片列表" title="返回">
               <span class="lightbox-back-icon" aria-hidden="true">←</span>
-              <span>返回</span>
+              <span id="lightboxCloseLabel">返回</span>
             </button>
             <strong id="lightboxTitle">图片详情</strong>
             <span class="model-badge" id="lightboxModel">GPT Image 2.0</span>
@@ -2959,6 +2959,7 @@
               <button class="toolbar-button" id="lightboxActualSizeButton" type="button" aria-label="按原始尺寸查看" title="按原始尺寸查看">100%</button>
             </div>
             <a class="toolbar-button asset-primary-action" id="lightboxDownload" href="#" download>下载</a>
+            <button class="toolbar-button lightbox-dismiss-button hidden" id="lightboxDismissButton" type="button" aria-label="关闭图片详情" title="关闭">关闭</button>
           </div>
         </div>
 
@@ -2977,7 +2978,13 @@
                 <button type="button" role="tab" aria-selected="true" data-lightbox-tab="params">参数</button>
               </div>
               <section class="detail-field hidden" role="tabpanel" data-lightbox-panel="prompt">
-                <div class="detail-field-head"><span id="lightboxPromptLabel">提示词</span><button class="inline-button detail-copy-button" id="copyPromptButton" type="button">复制</button></div>
+                <div class="detail-field-head">
+                  <span id="lightboxPromptLabel">提示词</span>
+                  <div class="detail-field-actions">
+                    <button class="inline-button detail-copy-button" id="copyPromptButton" type="button">复制</button>
+                    <button class="inline-button detail-apply-button hidden" id="applyPromptButton" type="button" aria-label="应用提示词">应用</button>
+                  </div>
+                </div>
                 <div class="lightbox-structured-prompt" id="lightboxPromptStructured"></div>
                 <textarea id="lightboxPrompt" rows="4" readonly aria-labelledby="lightboxPromptLabel"></textarea>
               </section>
@@ -3615,6 +3622,6 @@
 
     <div class="app-tooltip" id="appTooltip" role="tooltip" popover="manual"></div>
 
-    <script type="module" src="./app.js?v=20260923-prompt-template-library-3"></script>
+    <script type="module" src="./app.js?v=20260923-prompt-template-library-4"></script>
   </body>
 </html>

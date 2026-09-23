@@ -73,6 +73,10 @@ test("prompt template library uses the scraped YouMind previews for profile temp
   assert.match(getPromptTemplatePreviewUrl(fallbackTemplate), /^data:image\/svg\+xml;charset=UTF-8,/);
   const fallbackUrls = flattenPromptTemplateLibrary({ categoryId: "marketing-design" }).map(getPromptTemplatePreviewUrl);
   assert.equal(new Set(fallbackUrls.map((url) => decodeURIComponent(url.split(",", 2)[1]))).size, 40);
+  for (const template of flattenPromptTemplateLibrary().filter((entry) => entry.categoryId !== "profile-avatar")) {
+    const svg = decodeURIComponent(getPromptTemplatePreviewUrl(template).split(",", 2)[1]);
+    assert.match(svg, new RegExp(`data-preview-scene="${template.subcategoryId}"`));
+  }
 });
 
 test("prompt template library browser contract covers the requested browse and apply flows", async () => {
@@ -98,7 +102,13 @@ test("prompt template library browser contract covers the requested browse and a
   assert.match(app, /copyPromptTemplateLibraryToPersonal\(template\)/);
   assert.match(app, /writePromptTemplates\(\);[\s\S]*selectPromptTemplate\(personalTemplate\.id\)/);
   assert.match(app, /isPreviewLightboxItem:\s*true,[\s\S]*isPromptTemplateLibraryItem:\s*true/);
+  assert.match(app, /promptTemplate:\s*template,[\s\S]*isPreviewLightboxItem/);
+  assert.match(app, /lightboxDismissButton[\s\S]*closeLightboxWithOptions\(\{ closePromptTemplateLibrary: true \}\)/);
+  assert.match(app, /function applyLightboxPrompt\(\)[\s\S]*applyPromptTemplateLibrary\(template\)[\s\S]*closeLightboxWithOptions\(\{ restoreFocus: false \}\)/);
+  assert.match(app, /applyPromptButton\.classList\.toggle\("hidden", !isPromptTemplateLibraryItem\)/);
   assert.match(app, /shouldResolveLightboxItem = !state\.lightboxItem\.isCreationRecordItem[\s\S]*!state\.lightboxItem\.isPreviewLightboxItem/);
+  assert.match(html, /id="lightboxDismissButton"[^>]+>关闭<\/button>/);
+  assert.match(html, /id="copyPromptButton"[^>]*>复制<\/button>[\s\S]*id="applyPromptButton"[^>]*>应用<\/button>/);
 
   assert.match(styles, /\.prompt-template-library-grid\[data-view="list"\] \.prompt-template-library-card\s*\{[\s\S]*grid-template-columns:\s*148px/);
   assert.match(styles, /\.prompt-template-library-grid\[data-view="list"\] \.prompt-template-library-prompt\s*\{[\s\S]*font-size:\s*var\(--prompt-template-list-font-size/);
@@ -107,8 +117,14 @@ test("prompt template library browser contract covers the requested browse and a
   assert.match(styles, /\.prompt-template-library-grid\[data-view="image"\]\s*\{[\s\S]*align-items:\s*start/);
   assert.match(styles, /\.prompt-template-library-grid\[data-view="image"\] \.prompt-template-library-preview-button img\s*\{[\s\S]*aspect-ratio:\s*auto[\s\S]*object-fit:\s*contain/);
   assert.doesNotMatch(styles, /\.prompt-template-library-grid\[data-view="image"\] \.prompt-template-library-card\s*\{[\s\S]*aspect-ratio:\s*1\s*\/\s*1/);
+  assert.match(styles, /\.prompt-template-library-grid\s*\{[\s\S]*grid-auto-rows:\s*max-content/);
+  assert.match(app, /image\.style\.aspectRatio = template\.previewImage \? "3 \/ 4" : "1 \/ 1"/);
+  assert.match(app, /image\.naturalWidth > 0 && image\.naturalHeight > 0/);
+  assert.match(app, /lightboxCloseLabel/);
+  assert.match(app, /返回提示词模板库/);
   assert.match(styles, /\.prompt-template-library-card-actions\s*\{[\s\S]*position:\s*absolute[\s\S]*top:\s*8px/);
   assert.doesNotMatch(styles, /prompt-template-library-hover-actions/);
   assert.match(styles, /\.prompt-template-library-category-button:focus-visible,[\s\S]*\.prompt-template-library-subcategory-button:focus-visible/);
   assert.match(styles, /\.prompt-template-library-grid\[data-view="image"\] \.prompt-template-library-actions \.mini-action:last-child\s*\{[\s\S]*display:\s*none/);
+  assert.match(styles, /\.detail-field-actions\s*\{[\s\S]*gap:\s*6px/);
 });

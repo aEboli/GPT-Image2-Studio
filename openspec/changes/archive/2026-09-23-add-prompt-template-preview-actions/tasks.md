@@ -1,0 +1,5 @@
+- [x] Add template preview close and apply controls.
+- [x] Keep Back scoped to the previous template-library layer.
+- [x] Add responsive styles for the prompt action group.
+- [x] Extend browser contract tests for the new actions.
+- [x] Run targeted and full test suites.
