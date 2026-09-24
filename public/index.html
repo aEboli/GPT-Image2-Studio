@@ -44,6 +44,7 @@
           studio: "create",
           "style-transfer": "create",
           "reference-analysis": "analyse",
+          "product-agent": "create",
           "image-decomposition": "analyse",
           "image-edit": "edit",
           "quick-blend": "edit",
@@ -143,6 +144,7 @@
                     <a class="mega-menu-link large" href="#studio" data-ui-i18n="menuPromptStudio">提示词生图</a>
                     <a class="mega-menu-link" href="#style-transfer" data-ui-i18n="menuStyleTransfer">风格迁移</a>
                     <a class="mega-menu-link" href="#reference-analysis" data-ui-i18n="menuReferenceAnalysis">融图分析</a>
+                    <a class="mega-menu-link" href="#product-agent">图片裂变工作台</a>
                     <a class="mega-menu-link" href="#image-decomposition" data-ui-i18n="menuImageDecomposition">图片拆解</a>
                     <a class="mega-menu-link" href="#image-edit" data-ui-i18n="menuImageEdit">图片编辑</a>
                     <a class="mega-menu-link" href="#quick-blend" data-ui-i18n="menuQuickBlend">快速溶图</a>
@@ -646,6 +648,110 @@
                 </div>
               </div>
             </section>
+          </div>
+        </section>
+
+        <section class="view-panel product-agent-view hidden" data-view-panel="product-agent">
+          <div class="product-agent-workspace">
+            <header class="studio-panel product-agent-command-bar">
+              <div>
+                <p class="drawer-eyebrow">IMAGE REPLICATION WORKBENCH</p>
+                <h2>图片裂变工作台</h2>
+                <p class="panel-subtitle">以一组母图为源，按内容用途、发布渠道和画面任务批量裂变，统一预览、生成和导出。</p>
+              </div>
+              <div class="product-agent-command-actions">
+                <span class="count-pill" id="productAgentTaskCount">0 个任务</span>
+                <button class="generate-button" id="productAgentGenerateAllButton" type="button" disabled>生成全部任务</button>
+              </div>
+            </header>
+
+            <div class="product-agent-workbench-grid" id="productAgentWorkbenchGrid">
+              <div class="product-agent-setup-column">
+                <section class="studio-panel product-agent-input-panel">
+                <div class="panel-title between">
+                  <div>
+                    <p class="drawer-eyebrow">STEP 1 · SOURCE</p>
+                    <h3>放入母图</h3>
+                  </div>
+                  <span class="count-pill" id="productAgentReferenceCount">0 / 15</span>
+                </div>
+
+                <label class="reference-dropzone product-agent-dropzone" id="productAgentDropzone">
+                  <input id="productAgentInput" type="file" accept="image/*" multiple />
+                  <div class="reference-icon" aria-hidden="true"></div>
+                  <strong>拖入母图或点击上传</strong>
+                  <span>主图、细节图、使用图和规格图均可，最多 15 张</span>
+                  <em>所有裂变任务都会继承这里的商品主体</em>
+                </label>
+                <div class="reference-grid product-agent-reference-grid" id="productAgentReferenceGrid"></div>
+
+                <label class="compact-field product-agent-context-field">
+                  <span>本轮裂变目标（可选）</span>
+                  <textarea id="productAgentContextInput" rows="4" maxlength="1200" placeholder="例如：保持红色急救包外观不变，突出收纳清晰、随车携带和家庭应急，不添加未确认的品牌或功能。"></textarea>
+                </label>
+                <div class="product-agent-action-row">
+                  <button class="generate-button" id="productAgentAnalyzeButton" type="button">建立裂变草案</button>
+                  <button class="inline-button" id="productAgentClearButton" type="button">清空母图</button>
+                </div>
+                <p class="prompt-agent-feedback" id="productAgentFeedback" aria-live="polite"></p>
+                </section>
+
+                <section class="studio-panel product-agent-routing-panel">
+                <div class="panel-title between">
+                  <div>
+                    <p class="drawer-eyebrow">STEP 2 · ROUTING</p>
+                    <h3>决定图片用在哪里</h3>
+                  </div>
+                  <button class="inline-button" id="productAgentResetRoutingButton" type="button">恢复常用组合</button>
+                </div>
+                <p class="product-agent-panel-note">先选用途，再选渠道，最后选画面重点。系统只生成相互匹配的组合。</p>
+                <div class="product-agent-routing-guide" aria-label="选择说明">
+                  <div><strong>用途</strong><span>图片要用在哪类业务场景</span></div>
+                  <div><strong>渠道</strong><span>图片最终发到哪个平台或版位</span></div>
+                  <div><strong>方向</strong><span>这张图重点要表达什么</span></div>
+                </div>
+                <fieldset class="product-agent-routing-group">
+                  <legend>1 · 用途｜图片用在哪里</legend>
+                  <div class="product-agent-option-grid" id="productAgentSpaceOptions"></div>
+                </fieldset>
+                <fieldset class="product-agent-routing-group">
+                  <legend>2 · 渠道｜图片发到哪里</legend>
+                  <div class="product-agent-option-grid" id="productAgentChannelOptions"></div>
+                </fieldset>
+                <fieldset class="product-agent-routing-group">
+                  <legend>3 · 方向｜画面重点是什么</legend>
+                  <div class="product-agent-option-grid" id="productAgentDirectionOptions"></div>
+                </fieldset>
+                <div class="product-agent-routing-summary" id="productAgentRoutingSummary">先选择内容用途、发布渠道和画面方向，再建立裂变草案。</div>
+                </section>
+              </div>
+
+              <section class="studio-panel product-agent-output-panel" id="productAgentOutputPanel">
+                <div class="panel-title between">
+                  <div>
+                    <p class="drawer-eyebrow">STEP 3 · BOARD</p>
+                    <h3>生成裂变任务</h3>
+                    <p class="panel-subtitle" id="productAgentBoardMeta">每个格子都是一个可单独生成、重做和下载的任务。</p>
+                  </div>
+                </div>
+                <div class="product-agent-empty" id="productAgentEmpty">
+                  <div class="product-agent-empty-copy">
+                    <strong>任务板会在这里出现</strong>
+                    <p>完成左侧上传和路由选择后，点击“建立裂变草案”；这里会把每个“用途 × 渠道 × 方向”组合变成一个独立任务格。</p>
+                    <ol class="product-agent-empty-steps">
+                      <li><span>01</span><span>上传母图，锁定商品主体和可用细节。</span></li>
+                      <li><span>02</span><span>选择图片用途、发布渠道和画面重点。</span></li>
+                      <li><span>03</span><span>在任务格中逐张生成、重做或下载结果。</span></li>
+                    </ol>
+                  </div>
+                </div>
+                <div class="product-agent-analysis hidden" id="productAgentAnalysis">
+                  <div class="product-agent-insight-grid" id="productAgentInsightGrid"></div>
+                  <div class="product-agent-risk-box hidden" id="productAgentRiskBox"></div>
+                  <div class="product-agent-plan-list" id="productAgentPlanList"></div>
+                </div>
+              </section>
+            </div>
           </div>
         </section>
 
@@ -2675,7 +2781,7 @@
       </main>
     </div>
 
-    <small class="app-version" aria-label="当前版本 v0.2.023">v0.2.023</small>
+    <small class="app-version" aria-label="当前版本 v0.2.033">v0.2.033</small>
 
     <dialog
       class="creation-record-delete-dialog"

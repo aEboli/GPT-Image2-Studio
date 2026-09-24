@@ -2,15 +2,15 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.023-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.033-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installers-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
 **A local-first AI image generation and visual production workbench**
 
-Prompt-to-image, reference analysis, editing, ecommerce sets, portraits, article illustrations, PPT generation, and asset history in one browser-based workspace.
+Prompt-to-image, reference analysis, editing, product-image replication, ecommerce sets, portraits, article illustrations, PPT generation, and asset history in one browser-based workspace.
 
-Current version: `v0.2.023`
+Current version: `v0.2.033`
 
 [Chinese README](./README.zh-CN.md)
 
@@ -47,9 +47,9 @@ Windows 脚本入口（启动器、Native Messaging 安装/卸载、图片资源
 
 ### Windows desktop app (recommended)
 
-Download `GPT-Image2-Studio-Desktop-Setup-v0.2.023-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
+Download `GPT-Image2-Studio-Desktop-Setup-v0.2.033-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
 
-For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.023-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
+For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.033-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
 
 For desktop development, Electron 43 requires Node.js 22.12 or newer:
 
@@ -60,7 +60,7 @@ cmd /c npm run desktop
 
 ### Windows browser installer
 
-The legacy browser-installer flow remains documented for local builds, but the `v0.2.023` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
+The legacy browser-installer flow remains documented for local builds, but the `v0.2.033` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
 
 ## Configuration
 
@@ -285,6 +285,7 @@ The repository also contains a Vercel configuration. Vercel functions use tempor
 ### Commerce and content workflows
 
 - **Ecommerce sets** with platform, category, product facts, audience, SKU, language, carousel roles, frozen plans, retries, and Listing drafts. A separate logo-batch branch adds one uploaded Logo to up to 15 source images. Nineteen platform profiles are included; the generic baseline keeps 18 native carousel slots.
+- **Product image replication workbench** that analyzes up to 15 mother images, extracts evidence-backed product insights, and expands them into a bounded workspace x channel x direction task board. Each task keeps the selected references, an English generation prompt, Chinese counterpart, aspect ratio, and individual or batch generation/download actions.
 - **Portrait mode** for consistent people, actions, clothing, props, locations, framing, and 1-100 image batches.
 - **Article illustration mode** for text packages, style bibles, character and scene references, reading-order storyboards, and final illustrations.
 - **PPT generation** from PDF, DOCX, PPTX, TXT, Markdown, CSV, pasted text, or a topic; supports 1-20 pages, page repair, image-based PPTX, and editable reconstruction.
@@ -345,6 +346,7 @@ These screenshots come from isolated browser sessions of the current workbench. 
 | Image decomposition | One product/device/package image and a decomposition brief | Callout or infographic-style PNG/JPG and saved analysis |
 | Image editing | Source image, whole-image instruction, or local masks | Edited PNG/JPG, region retry, and lightbox review |
 | Quick blend | Indexed A/B groups, optional C/D groups, layout settings | One independent generation task per matched group |
+| Product image replication | Up to 15 product mother images, optional goal, workspace/channel/direction selections | Evidence-backed analysis, routed task matrix, English generation prompts with Chinese counterparts, per-task or batch image generation |
 | Ecommerce set | Product facts, references, platform, category, SKU | Frozen carousel plan, generated set, Listing draft, and record; separate logo-batch processing for uploaded source images |
 | Portraits | Person/action/clothing references, location, style, framing, count | A consistent 1-100 image series and retryable record |
 | Article illustrations | Text package or pasted article, style and content type | Style bible, reference cards, storyboard, and PNG illustrations |
@@ -517,7 +519,7 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 - The source and lockfile versions are authoritative; tags use `v<version>`.
 - Versions use `major.minor.patch` with a three-digit patch segment: major bumps reset minor and patch, minor bumps reset patch, feature bumps add `0.010`, and ordinary updates add `0.001`.
 - Use `npm run release:major`, `npm run release:minor`, `npm run release:feature`, or `npm run release:patch` with `--summary`; each release changes exactly one level.
-- Current release notes: [v0.2.023](./docs/releases/v0.2.023.md).
+- Current release notes: [v0.2.033](./docs/releases/v0.2.033.md).
 - Windows packages are distributed through [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Check the release notes for hashes and signing status.
 - `npm run check:release:strict` requires a clean worktree and a matching tag on the current commit.
 
@@ -532,7 +534,15 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 
 ## Version history
 
-Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.023](./docs/releases/v0.2.023.md).
+Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.033](./docs/releases/v0.2.033.md).
+
+### v0.2.033
+
+- Added the Product Image Replication Workbench. Upload up to 15 mother images, add an optional goal, and run an evidence-backed product-group analysis that keeps uncertain claims in a reviewable risk list.
+- Added a routed task board that combines compatible workspaces, channels, and content directions. Every task keeps its source references, aspect ratio, English generation prompt, Simplified Chinese counterpart, and per-task or batch generate/download controls.
+- Added the product-image-agent structured JSON contract and default text/vision configuration path, while continuing to use the existing image-generation endpoint for routed outputs.
+- Added deterministic local Prompt Kit preview assets and corrected preview filename handling; image editing now normalizes English target clauses without duplicating user requirements.
+- Compressed ordinary Creation and SKU prompt control text while keeping product facts, reference roles, platform constraints, subject identity, surface content, and target-language boundaries.
 
 ### v0.2.020
 

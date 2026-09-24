@@ -76,7 +76,9 @@ test("per-item generation prompt carries matching ratio and target-language guid
   const prompt = buildCreationItemGenerationPrompt("Create a lifestyle product image.", parameters);
 
   assert.match(prompt, /4:5/);
-  assert.match(prompt, /NEW LAYOUT TEXT: Use en for newly authored .* outside the physical product or packaging subject/i);
+  assert.match(prompt, /CANVAS LANGUAGE: Use concise English \(en\) for new text outside the product or packaging/i);
+  assert.match(prompt, /preserve existing subject text, brand\/model names, numbers, and units/i);
+  assert.ok(prompt.endsWith("CANVAS LANGUAGE: Use concise English (en) for new text outside the product or packaging; preserve existing subject text, brand/model names, numbers, and units."));
 });
 
 test("ordinary runtime prompts protect subject graphics, original text, and language for current and historical plans", () => {
@@ -95,10 +97,22 @@ test("ordinary runtime prompts protect subject graphics, original text, and lang
   );
 
   assert.match(historicalPrompt, /SUBJECT CONTENT LOCK:/);
-  assert.match(historicalPrompt, /artwork, symbols, logos, surface text/i);
+  assert.match(historicalPrompt, /Preserve supplied product or packaging artwork, symbols, logos, surface text, shape/i);
   assert.match(historicalPrompt, /original characters and language/i);
-  assert.match(historicalPrompt, /Use product input and reference notes as source facts/i);
-  assert.match(historicalPrompt, /NEW LAYOUT TEXT: Use en for newly authored .* outside the physical product or packaging subject/i);
+  assert.match(historicalPrompt, /Treat supplied details and references as source facts/i);
+  assert.match(historicalPrompt, /CANVAS LANGUAGE: Use concise English \(en\) for new text outside the product or packaging/i);
+  assert.ok(historicalPrompt.lastIndexOf("CANVAS LANGUAGE:") > historicalPrompt.lastIndexOf("SUBJECT CONTENT LOCK:"));
+
+  const staleItem = {
+    ...historicalItem,
+    prompt: "Create an English product graphic. Keep all source names and corner text unchanged.",
+  };
+  const stalePrompt = buildCreationItemGenerationPrompt(
+    staleItem.prompt,
+    resolveCreationItemGenerationParameters(staleItem, { imageRoute: "a" }),
+    staleItem,
+  );
+  assert.ok(stalePrompt.lastIndexOf("CANVAS LANGUAGE:") > stalePrompt.indexOf("Keep all source names and corner text unchanged."));
 
   const currentItem = buildCreationPlan({
     productName: "Cooling patch package",
@@ -122,6 +136,7 @@ test("ordinary runtime prompts protect subject graphics, original text, and lang
   );
   assert.match(noTextPrompt, /SUBJECT CONTENT LOCK:/);
   assert.match(noTextPrompt, /SUBJECT IDENTITY LOCK:/);
+  assert.match(noTextPrompt, /CANVAS TEXT POLICY: Use existing product or packaging markings only/i);
   assert.doesNotMatch(noTextPrompt, /Newly added marketing copy target language:/i);
 });
 
@@ -187,9 +202,13 @@ test("infographic rebuild runtime prompt honors only the four selected output co
     format: "jpg",
   }));
   assert.match(prompt, /target language:\s*English \(en\)/i);
+  assert.match(prompt, /all off-product text uses Latin letters only/i);
+  assert.match(prompt, /Replace source-script text with English only when clear; otherwise erase it and leave clean space/i);
+  assert.match(prompt, /Never copy source glyphs as decoration/i);
   assert.match(prompt, /format:\s*JPG/i);
   assert.match(prompt, /canvas:\s*requested 1\.5K; effective canvas 1536x1920/i);
   assert.match(prompt, /ratio:\s*4:5/i);
+  assert.doesNotMatch(prompt, /\p{Script=Han}/u);
   assert.doesNotMatch(prompt, /OTHER_FROZEN_PROMPT_SENTINEL/);
   assert.doesNotMatch(prompt, /SUBJECT CONTENT LOCK:/);
   assert.doesNotMatch(prompt, /SUBJECT IDENTITY LOCK:/);
@@ -214,15 +233,18 @@ test("infographic rebuild runtime prompt honors only the four selected output co
 test("infographic rebuild prompt requires substantial visual redesign while locking source facts", () => {
   const prompt = buildCreationInfographicRebuildPrompt();
 
-  assert.match(prompt, /clearly new, professionally designed infographic/i);
-  assert.match(prompt, /new information architecture and grid/i);
-  assert.match(prompt, /changing at least three of composition, background, typography, color, spacing, grouping, cards, icons, arrows, or callouts/i);
+  assert.match(prompt, /Redesign the attached source image as a professional infographic/i);
+  assert.match(prompt, /professional infographic with a new grid/i);
+  assert.match(prompt, /change at least three of layout, background, typography, color, spacing, grouping, icons, or callouts/i);
 
-  assert.match(prompt, /single attached source image/i);
-  assert.match(prompt, /Use that image for product identity, facts, quantities, labels, steps, package contents, specifications, names, numbers, units, and relationships/i);
-  assert.match(prompt, /product or packaging shape, variant, colors, parts, quantities, and surface text/i);
-  assert.match(prompt, /Translate surrounding layout wording with the source meaning intact/i);
-  assert.match(prompt, /retaining every source fact/i);
+  assert.match(prompt, /attached source image/i);
+  assert.match(prompt, /treat off-product source wording as layout content, not product data/i);
+  assert.match(prompt, /All visible canvas text, including headings, labels, captions, specifications, badges, and corner graphics, uses only the selected target language/i);
+  assert.match(prompt, /Translate or rebuild off-product wording and replace source characters/i);
+  assert.match(prompt, /Keep source language only for text physically on the product or packaging/i);
+  assert.match(prompt, /Keep physical product shape, variant, colors, parts, quantities, and surface text exact/i);
+  assert.doesNotMatch(prompt, /preserve identifiers/i);
+  assert.doesNotMatch(prompt, /\blogos?\b/i);
 
   assert.doesNotMatch(prompt, /preserve every visible element unchanged/i);
   assert.doesNotMatch(prompt, /do not .*redesign or restyle/i);

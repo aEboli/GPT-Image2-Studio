@@ -35,7 +35,7 @@ test("creation reference labels keep a short role-scoped summary", () => {
   assert.equal(labels.length, 4);
   assert.match(labels[0], /Reference 1: F2J32257\.png\./);
   assert.match(labels[0], /Role: product subject\. Preserve shape and hardware\./);
-  assert.match(labels[0], /Supporting product reference/);
+  assert.match(labels[0], /Supporting product evidence only/);
   assert.match(labels[1], /Reference 2: F2J32258\.png\./);
   assert.match(labels[1], /Role: style reference\. Use this for color and lighting\./);
   assert.doesNotMatch(labels[0], /Uploaded reference count|Uploaded reference files/);
@@ -43,6 +43,37 @@ test("creation reference labels keep a short role-scoped summary", () => {
 
 test("creation reference labels are empty when no images are attached", () => {
   assert.deepEqual(buildCreationReferenceImageLabels([], []), []);
+});
+
+test("eight reference labels keep assigned roles without repeating the subject lock", () => {
+  const images = Array.from({ length: 8 }, (_, index) => ({ filename: `R${index + 1}.png` }));
+  const roleNames = ["product", "dimensions", "material", "feature", "usage", "package", "scene", "other"];
+  const roles = roleNames.map((role, index) => ({
+    index: index + 1,
+    filename: `R${index + 1}.png`,
+    role,
+    rolePromptLabel: role,
+    note: `${role} evidence ${index + 1}`,
+  }));
+  const labels = buildCreationReferenceImageLabels(images, roles);
+
+  assert.equal(labels.length, 8);
+  assert.match(labels[0], /Role: product\./);
+  assert.match(labels[0], /Primary product identity anchor/);
+  assert.ok(labels.slice(1).every((label, index) => label.includes(`Role: ${roleNames[index + 1]}.`)));
+  assert.ok(labels.slice(1).every((label, index) => label.includes(`${roleNames[index + 1]} evidence ${index + 2}`)));
+  assert.doesNotMatch(labels.join(" "), /Subject anchor: preserve this product identity|while the primary product identity stays fixed/i);
+});
+
+test("reference labels preserve long user notes without truncation", () => {
+  const note = Array.from({ length: 24 }, (_, index) => `user detail ${index + 1}`).join("; ");
+  const [label] = buildCreationReferenceImageLabels(
+    [{ filename: "material.png" }],
+    [{ filename: "material.png", role: "material", note }],
+  );
+
+  assert.ok(note.length > 120);
+  assert.ok(label.includes(`Note: ${note}.`));
 });
 
 test("creation SKU item reference images only include the matching subject files", () => {
@@ -273,7 +304,8 @@ test("creation hero item reference images prefer the selected reference subject"
       promptInstruction: "Use this as the subject anchor.",
     },
   ]);
-  assert.match(labels[1], /Product identity authority/);
+  assert.match(labels[1], /Primary product identity anchor/);
+  assert.doesNotMatch(labels.join(" "), /\blogos?\b/i);
 });
 
 test("creation reference selection keeps dimensions scoped and anchors identity to the product role", () => {
@@ -308,9 +340,9 @@ test("creation reference selection keeps dimensions scoped and anchors identity 
   );
 
   const labels = buildCreationReferenceImageLabels(images, roles);
-  assert.doesNotMatch(labels[0], /Product identity authority:/);
-  assert.match(labels[1], /Product identity authority:/);
-  assert.equal(labels.filter((label) => /Product identity authority:/.test(label)).length, 1);
+  assert.doesNotMatch(labels[0], /Primary product identity anchor/);
+  assert.match(labels[1], /Primary product identity anchor/);
+  assert.equal(labels.filter((label) => /Primary product identity anchor/.test(label)).length, 1);
 });
 
 test("creation material item reference images keep primary product plus material details", () => {
@@ -622,7 +654,7 @@ test("creation reference labels retain each selected image role after the schedu
   const labels = buildCreationReferenceImageLabels(selected, roles);
 
   assert.equal(selected.length, 2);
-  assert.match(labels[1], /Role: material detail\./);
+  assert.match(labels[1], /Role: material\./);
   assert.doesNotMatch(labels[1], /package details/);
 });
 
@@ -639,9 +671,9 @@ test("creation reference labels keep roles after compression renames and subset 
 
   const labels = buildCreationReferenceImageLabels(selected, roles);
   assert.match(labels[0], /Role: reference subject\./);
-  assert.match(labels[0], /Subject anchor:/);
-  assert.match(labels[1], /Role: material detail\./);
-  assert.match(labels[1], /Supporting reference: use this image for its assigned constraint/i);
+  assert.match(labels[0], /Primary product identity anchor/);
+  assert.match(labels[1], /Role: material\./);
+  assert.match(labels[1], /Assigned reference evidence only/i);
   assert.doesNotMatch(labels[0], /Role: scene\./);
   assert.doesNotMatch(labels[1], /Role: reference subject\./);
 });
@@ -658,9 +690,9 @@ test("creation reference labels do not promote a later product view to another i
     ],
   );
 
-  assert.match(labels[0], /Product identity authority:/);
-  assert.match(labels[1], /Supporting product reference:/);
-  assert.doesNotMatch(labels[1], /Product identity authority:/);
+  assert.match(labels[0], /Primary product identity anchor/);
+  assert.match(labels[1], /Supporting product evidence only/);
+  assert.doesNotMatch(labels[1], /Primary product identity anchor/);
 });
 
 test("creation reference scheduling uses stable indexes for reordered coverage and SKU sources", () => {

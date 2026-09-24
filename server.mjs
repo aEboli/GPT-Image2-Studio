@@ -100,6 +100,7 @@ import {
   buildCreationItemGenerationPrompt,
   resolveCreationItemGenerationParameters,
 } from "./lib/creation-generation-parameters.mjs";
+import { buildImageEditPrompt } from "./lib/image-edit-prompt.mjs";
 import { buildCreationGenerationSnapshot } from "./lib/creation-generation-snapshot.mjs";
 import {
   DEFAULT_REASONING_EFFORT,
@@ -119,6 +120,7 @@ import {
 import {
   CREATION_REFERENCE_ANALYSIS_MODE,
   PORTRAIT_REFERENCE_ANALYSIS_MODE,
+  PRODUCT_IMAGE_AGENT_MODE,
   REFERENCE_ORCHESTRATION_MODE,
   requestPromptAgentAnalysis,
 } from "./lib/prompt-agent.mjs";
@@ -333,6 +335,7 @@ if (MOCK_IMAGE_GENERATION_REQUESTED && !MOCK_IMAGE_GENERATION_ENABLED) {
 const GENERATION_MODES = new Set([
   "style-transfer",
   "reference-analysis",
+  PRODUCT_IMAGE_AGENT_MODE,
   IMAGE_DECOMPOSITION_MODE,
   QUICK_BLEND_MODE,
   IMAGE_EDIT_MODE,
@@ -2455,6 +2458,7 @@ async function handlePromptAgentAnalyze(request, response) {
   ];
   const images = await toReferenceImages(rawImages);
   const mode = String(formData.get("mode") || "").trim();
+  const contextPrompt = String(formData.get("contextPrompt") || "").trim();
   const targetLanguageInput = String(formData.get("targetLanguage") || "").trim();
   const targetLanguageLabelInput = String(formData.get("targetLanguageLabel") || "").trim();
   const maxReferenceImages =
@@ -2479,7 +2483,9 @@ async function handlePromptAgentAnalyze(request, response) {
   }
 
   const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
-  const textVisionConfig = getSelectedPromptAgentAnalysisConfig(config);
+  const textVisionConfig = mode === PRODUCT_IMAGE_AGENT_MODE
+    ? getSelectedTextVisionConfig(config)
+    : getSelectedPromptAgentAnalysisConfig(config);
   if (!textVisionConfig.apiKey) {
     return sendJson(response, 400, {
       message: "当前未保存 API Key，请先在配置中保存。",
@@ -2502,6 +2508,7 @@ async function handlePromptAgentAnalyze(request, response) {
     mode,
     targetLanguage: targetLanguageInput,
     targetLanguageLabel: targetLanguageLabelInput,
+    contextPrompt,
     responsesModel: textVisionConfig.responsesModel,
     imageModel: textVisionConfig.imageModel,
     reasoningEffort,
@@ -6674,6 +6681,10 @@ async function handleGenerate(request, response) {
           : localMaskMetadata.editInstruction;
         editInstruction = localMaskMetadata.editInstruction;
       } else {
+        editInstruction = prompt;
+      }
+      prompt = buildImageEditPrompt(prompt);
+      if (!isLocalMaskImageEdit) {
         editInstruction = prompt;
       }
       generationTaskStore.updateTask(clientSessionId, taskId, {

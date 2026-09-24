@@ -52,7 +52,7 @@ test("planner adapts conversion intent by platform and non-sensitive audience wi
   assert.ok(amazon.items.every((item) => item.conversionIntent?.conversionGoal));
   assert.match(amazon.items[1].prompt, /Buyer goal:/i);
   assert.doesNotMatch(amazon.items[0].prompt, /Buyer goal:/i);
-  assert.match(amazon.items[0].prompt, /Canvas text uses existing subject-surface markings only/i);
+  assert.match(amazon.items[0].prompt, /CANVAS TEXT POLICY: Use existing product or packaging markings only/i);
   assert.notDeepEqual(
     amazon.effectiveAudienceStrategy.marketingContext,
     xhs.effectiveAudienceStrategy.marketingContext,
@@ -186,7 +186,7 @@ test("planner caps explicit roles at the current platform image-type limit", () 
   assert.deepEqual(carouselItems.map((item) => item.role), selectedRoles.slice(0, 7));
   assert.equal(carouselItems.some((item) => item.imageType === "custom"), false);
   assert.ok(plan.warnings.some((warning) => warning.code === "image-count-extension-limited"));
-  assert.ok(carouselItems.every((item) => /Use product input and reference notes as source facts/i.test(item.prompt)));
+  assert.ok(carouselItems.every((item) => /Treat supplied details and references as source facts/i.test(item.prompt)));
 });
 
 test("Temu is capped at eight while universal keeps its native 18 slots", () => {
@@ -236,9 +236,9 @@ test("strict marketplace main images remove generic hero conflicts and external 
   assert.equal(main.logoPolicy, "forbid-overlay");
   assert.equal(main.textPolicy, "none");
   assert.equal(main.composition, "centered-white-85-percent");
-  assert.match(main.prompt, /Platform asset: Amazon 白底主图; centered-white-85-percent composition and studio-white scene/i);
+  assert.match(main.prompt, /Composition: centered-white-85-percent; scene: studio-white\./i);
   assert.match(main.prompt, /Keep the supplied product in one clean product-led composition/i);
-  assert.match(main.prompt, /Use identifiers printed on the supplied product as branding/i);
+  assert.match(main.prompt, /Use identifiers printed on the supplied product as factual markings/i);
   assert.doesNotMatch(main.prompt, /uploaded external Logo/i);
   assert.doesNotMatch(main.prompt, /Add 3-5 small circular scene frames/i);
   assert.doesNotMatch(main.prompt, /Hero coverage:/i);
@@ -252,7 +252,7 @@ test("Xiaohongshu prompts use evidence-backed lifestyle context", () => {
 
   assert.equal(carouselItems.length, 6);
   assert.ok(carouselItems.every((item) => /Use authentic lifestyle context with concise editorial copy/i.test(item.prompt)));
-  assert.ok(carouselItems.every((item) => /Use product input and reference notes as source facts/i.test(item.prompt)));
+  assert.ok(carouselItems.every((item) => /Treat supplied details and references as source facts/i.test(item.prompt)));
   assert.ok(carouselItems.every((item) => !/reviews|engagement metrics|endorsements|user testimony|believable user recommendation/i.test(item.prompt)));
 });
 
@@ -271,18 +271,18 @@ test("evidence-dependent platform prompts replace unsupported slots and never in
   assert.ok(plan.warnings.some((warning) => warning.code.startsWith("missing-evidence-slot-")));
   assert.ok(
     carouselItems.every((item) =>
-      /Use product input and reference notes as source facts/i.test(item.prompt),
+      /Treat supplied details and references as source facts/i.test(item.prompt),
     ),
   );
   assert.ok(
     carouselItems
       .filter((item) => item.textPolicy !== "none")
-      .every((item) => /Platform fit: eBay;/i.test(item.prompt)),
+      .every((item) => /Platform fit: ebay\./i.test(item.prompt)),
   );
   assert.ok(
     carouselItems
       .filter((item) => item.textPolicy === "none")
-      .every((item) => /Platform asset:/i.test(item.prompt)),
+      .every((item) => /Composition:/i.test(item.prompt)),
   );
 });
 

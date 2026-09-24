@@ -401,6 +401,37 @@ test("local generate sends image edit requests to the edits endpoint and saves m
   ));
 });
 
+test("local image edit replaces the English target in the upstream prompt and metadata", async (t) => {
+  const upstream = await createUpstreamEditServer();
+  const { baseUrl, outputDir } = await startLocalStudioServer(t, {
+    upstream,
+    tempPrefix: "image-edit-english-rewrite-",
+  });
+  const expectedPrompt =
+    "重构这张图，非商品/包装文字（含左上角和角落图形）全部重构为英文；商品/包装表面文字保留，模糊文字删除，将单位转换为公制单位/英制单位";
+
+  const response = await fetch(`${baseUrl}/api/generate`, {
+    method: "POST",
+    body: makeImageEditForm({
+      baseUrl: upstream.baseUrl,
+      fields: { prompt: "重构这张图，输出为英文，将单位转换为公制单位/英制单位" },
+    }),
+  });
+  const events = parseSseEvents(await response.text());
+  const saved = events.find((event) => event.eventName === "saved");
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(events.filter((event) => event.eventName === "error"), []);
+  assert.equal(upstream.requests.length, 1);
+  assert.match(upstream.requests[0].body, new RegExp(expectedPrompt));
+  assert.doesNotMatch(upstream.requests[0].body, /ENGLISH TEXT RULE|logo/i);
+  assert.equal(saved?.payload?.item?.prompt, expectedPrompt);
+  assert.equal(saved?.payload?.item?.editInstruction, expectedPrompt);
+
+  const metadata = await readSavedMetadataEntries(outputDir);
+  assert.ok(metadata.some((entry) => entry.prompt === expectedPrompt && entry.editInstruction === expectedPrompt));
+});
+
 test("local direct generation with one reference uses image edits and the image field", async (t) => {
   const upstream = await createUpstreamEditServer();
   const { baseUrl, outputDir } = await startLocalStudioServer(t, {

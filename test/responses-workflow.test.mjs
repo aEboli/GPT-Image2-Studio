@@ -178,10 +178,10 @@ test("Responses input keeps the creation subject lock adjacent to its reordered 
     "input_image",
   ]);
   assert.match(content[1].text, /Role: reference subject\./);
-  assert.match(content[1].text, /Product identity authority:/);
+  assert.match(content[1].text, /Primary product identity anchor/);
   assert.equal(content[2].image_url, "data:image/jpeg;base64,YW5jaG9y");
-  assert.match(content[3].text, /Role: material detail\./);
-  assert.match(content[3].text, /Supporting reference: use this image for its assigned constraint while the primary product identity stays fixed/i);
+  assert.match(content[3].text, /Role: material\./);
+  assert.match(content[3].text, /Assigned reference evidence only/i);
   assert.equal(content[4].image_url, "data:image/jpeg;base64,ZGV0YWls");
 });
 

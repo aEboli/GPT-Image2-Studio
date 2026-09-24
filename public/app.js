@@ -577,7 +577,7 @@ const TOPBAR_REVEAL_EDGE_PX = 16;
 const WORKSPACE_BOTTOM_GAP_PX = 2;
 const APP_TOOLTIP_TRIGGER_SELECTOR = "[data-tooltip]";
 const PPT_SOURCE_MODES = new Set(["upload", "text", "topic"]);
-const CREATE_VIEW_IDS = new Set(["studio", "style-transfer", "reference-analysis", "image-decomposition", "image-edit", "quick-blend", "image-compress", "creation", "portrait", "article-illustration", "ppt"]);
+const CREATE_VIEW_IDS = new Set(["studio", "style-transfer", "reference-analysis", "product-agent", "image-decomposition", "image-edit", "quick-blend", "image-compress", "creation", "portrait", "article-illustration", "ppt"]);
 const ASSET_VIEW_IDS = new Set(["gallery", "article-record", "ppt-record", "creation-record", "portrait-record"]);
 // Accent families: same-family views share one --accent, resolved by the
 // [data-view-family] rules in styles.css (just after the two theme blocks).
@@ -588,6 +588,7 @@ const VIEW_ACCENT_FAMILIES = {
   studio: "create",
   "style-transfer": "create",
   "reference-analysis": "analyse",
+  "product-agent": "create",
   "image-decomposition": "analyse",
   "image-edit": "edit",
   "quick-blend": "edit",
@@ -2191,6 +2192,9 @@ function getViewFromHash() {
   if (window.location.hash === "#reference-analysis") {
     return "reference-analysis";
   }
+  if (window.location.hash === "#product-agent") {
+    return "product-agent";
+  }
   if (window.location.hash === "#image-decomposition") {
     return "image-decomposition";
   }
@@ -2236,8 +2240,10 @@ function syncHash(view) {
   const nextHash =
     view === "portrait" ? "#portrait" : view === "creation" ? "#creation" : view === "style-transfer"
         ? "#style-transfer"
-        : view === "reference-analysis"
-          ? "#reference-analysis"
+          : view === "reference-analysis"
+            ? "#reference-analysis"
+          : view === "product-agent"
+            ? "#product-agent"
           : view === "image-decomposition"
             ? "#image-decomposition"
           : view === "image-edit"
@@ -2301,6 +2307,7 @@ async function ensureActiveViewModule(view) {
         getGenerationLoadingItemStage,
         getGenerationReferenceFile,
         getCurrentPrivateConfigRequestPayload,
+        appendCurrentConfigToFormData,
         getSelectedImageGenerationConfig,
         getSelectedImageQuality,
         getSelectedImageReasoningEffort,
@@ -7838,7 +7845,7 @@ function openPromptTemplateLibraryPreview(template) {
   const imageUrl = getPromptTemplatePreviewUrl(template);
   openLightbox({
     id: template.id,
-    filename: `${template.id}${template.previewImage ? ".jpg" : ".svg"}`,
+    filename: `${template.id}${template.previewImage?.toLowerCase().endsWith(".jpg") ? ".jpg" : ".png"}`,
     imageUrl,
     thumbnailUrl: imageUrl,
     previewUrl: imageUrl,

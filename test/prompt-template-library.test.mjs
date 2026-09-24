@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
@@ -69,13 +69,17 @@ test("prompt template library uses the scraped YouMind previews for profile temp
   const previewUrls = profileTemplates.map((entry) => getPromptTemplatePreviewUrl(entry));
   assert.equal(new Set(previewUrls).size, 40);
   assert.ok(previewUrls.every((url) => url.startsWith("/assets/prompt-templates/youmind-profile-avatar/")));
-  const fallbackTemplate = flattenPromptTemplateLibrary({ categoryId: "marketing-design" })[0];
-  assert.match(getPromptTemplatePreviewUrl(fallbackTemplate), /^data:image\/svg\+xml;charset=UTF-8,/);
-  const fallbackUrls = flattenPromptTemplateLibrary({ categoryId: "marketing-design" }).map(getPromptTemplatePreviewUrl);
-  assert.equal(new Set(fallbackUrls.map((url) => decodeURIComponent(url.split(",", 2)[1]))).size, 40);
-  for (const template of flattenPromptTemplateLibrary().filter((entry) => entry.categoryId !== "profile-avatar")) {
-    const svg = decodeURIComponent(getPromptTemplatePreviewUrl(template).split(",", 2)[1]);
-    assert.match(svg, new RegExp(`data-preview-scene="${template.subcategoryId}"`));
+
+});
+
+
+test("prompt template library uses real local raster previews for every template", async () => {
+  const templates = flattenPromptTemplateLibrary();
+  assert.equal(templates.length, 240);
+  for (const template of templates) {
+    assert.match(template.previewImage, /^\/assets\/prompt-templates\/(?:youmind-profile-avatar\/.*\.jpg|generated\/.*\.png)$/);
+    assert.equal(getPromptTemplatePreviewUrl(template), template.previewImage);
+    await access(new URL(`../public${template.previewImage}`, import.meta.url));
   }
 });
 

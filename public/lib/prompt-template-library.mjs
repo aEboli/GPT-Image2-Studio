@@ -1,7 +1,6 @@
 /*
  * Prompt Kit 的静态目录快照。
- * 目录不写入用户模板存储。人像与头像分类使用从 YouMind 目标页面抓取并随应用打包的真实图片；
- * 真实素材用尽后使用按模板键确定的内联 SVG 预览，避免重复循环同一张照片，离线桌面包也能正常显示。
+ * 目录不写入用户模板存储。所有模板都使用随应用打包的真实本地图片预览，离线桌面包也能正常显示。
  */
 
 import { YOUMIND_PROFILE_ENTRIES } from "./youmind-profile-entries.mjs";
@@ -244,6 +243,29 @@ const CATEGORY_DEFINITIONS = [
   },
 ];
 
+const NON_PROFILE_PREVIEW_PATHS = Object.freeze({
+  "ecommerce-white": "/assets/prompt-templates/generated/ecommerce-white.png",
+  "ecommerce-lifestyle": "/assets/prompt-templates/generated/ecommerce-lifestyle.png",
+  "fashion-product": "/assets/prompt-templates/generated/fashion-product.png",
+  "food-commerce": "/assets/prompt-templates/generated/food-commerce.png",
+  "social-poster": "/assets/prompt-templates/generated/social-poster.png",
+  "brand-visual": "/assets/prompt-templates/generated/brand-visual.png",
+  "product-detail": "/assets/prompt-templates/generated/product-detail.png",
+  "event-cover": "/assets/prompt-templates/generated/event-cover.png",
+  "interior-home": "/assets/prompt-templates/generated/interior-home.png",
+  architecture: "/assets/prompt-templates/generated/architecture.png",
+  "travel-city": "/assets/prompt-templates/generated/travel-city.png",
+  "nature-landscape": "/assets/prompt-templates/generated/nature-landscape.png",
+  cinematic: "/assets/prompt-templates/generated/cinematic.png",
+  illustration: "/assets/prompt-templates/generated/illustration.png",
+  "3d-render": "/assets/prompt-templates/generated/3d-render.png",
+  "retro-film": "/assets/prompt-templates/generated/retro-film.png",
+  "article-illustration": "/assets/prompt-templates/generated/article-illustration.png",
+  presentation: "/assets/prompt-templates/generated/presentation.png",
+  infographic: "/assets/prompt-templates/generated/infographic.png",
+  tutorial: "/assets/prompt-templates/generated/tutorial.png",
+});
+
 function buildPromptTemplates(category, child, childIndex) {
   return PROMPT_TEMPLATE_VARIANTS.map((variant, index) => {
     const isFirstIdentityPhoto = child.id === "identity-photo" && index === 0;
@@ -251,6 +273,7 @@ function buildPromptTemplates(category, child, childIndex) {
     const sourcePreview = category.id === "profile-avatar"
       ? YOUMIND_PROFILE_ENTRIES[sourcePreviewIndex] || null
       : null;
+    const previewImage = sourcePreview?.path || NON_PROFILE_PREVIEW_PATHS[child.id] || "";
     const sourcePrompt = sourcePreview?.prompt?.trim() || "";
     const prompt = sourcePrompt
       ? sourcePrompt.slice(0, 3000)
@@ -269,7 +292,7 @@ function buildPromptTemplates(category, child, childIndex) {
       previewKey: `${category.id}:${child.id}:${index}`,
       previewAccent: category.accent,
       previewMotif: category.motif,
-      previewImage: sourcePreview?.path || "",
+      previewImage,
       previewAlt: sourcePreview?.alt || "",
       previewSourceUrl: sourcePreview?.sourceUrl || "",
       previewSourcePage: sourcePreview?.sourcePage || "",
@@ -316,184 +339,6 @@ export function getPromptTemplateLibraryCounts() {
   );
 }
 
-const previewUrlCache = new Map();
-
-function escapeXml(value) {
-  return String(value || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
-}
-
-function hashPreviewKey(value) {
-  let hash = 0;
-  for (const char of String(value || "")) {
-    hash = (hash * 31 + char.codePointAt(0)) >>> 0;
-  }
-  return hash;
-}
-
-function renderSemanticPreviewArt(template, colors) {
-  const { accent, ink, primary, secondary, shadowId, soft, variantIndex } = colors;
-  const scene = String(template?.subcategoryId || "");
-  const tilt = (variantIndex % 3) - 1;
-  const surface = `<ellipse cx="180" cy="276" rx="122" ry="18" fill="${ink}" opacity=".16"/>`;
-  const frame = (content, attributes = "") =>
-    `<g transform="rotate(${tilt} 180 180)" ${attributes}>${content}</g>`;
-
-  switch (scene) {
-    case "ecommerce-white":
-      return frame(`${surface}<rect x="92" y="88" width="176" height="170" rx="22" fill="${soft}" stroke="${ink}" stroke-opacity=".28" stroke-width="4" filter="url(#${shadowId})"/><rect x="116" y="116" width="128" height="30" rx="9" fill="${primary}"/><path d="M126 176h108M126 202h76" stroke="${ink}" stroke-width="10" stroke-linecap="round" opacity=".55"/><circle cx="224" cy="224" r="17" fill="${secondary}"/>`);
-    case "ecommerce-lifestyle":
-      return frame(`${surface}<rect x="54" y="238" width="252" height="20" rx="10" fill="${ink}" opacity=".62"/><rect x="110" y="112" width="112" height="114" rx="18" fill="${soft}" stroke="${ink}" stroke-opacity=".28" stroke-width="4" filter="url(#${shadowId})"/><path d="M132 146h68M132 174h48" stroke="${primary}" stroke-width="11" stroke-linecap="round"/><path d="M246 218c-12-52 6-82 30-100M258 158c-20-18-34-22-48-16M268 140c18-20 28-20 40-16" fill="none" stroke="${secondary}" stroke-width="8" stroke-linecap="round"/>`);
-    case "fashion-product":
-      return frame(`${surface}<path d="M128 92 156 76h48l28 16 42 32-26 42-28-18v104H120V148l-28 18-26-42Z" fill="${soft}" stroke="${ink}" stroke-opacity=".28" stroke-width="4" filter="url(#${shadowId})"/><path d="M156 76q24 32 48 0M132 154h96" fill="none" stroke="${primary}" stroke-width="11" stroke-linecap="round"/><circle cx="242" cy="122" r="15" fill="${secondary}"/>`);
-    case "food-commerce":
-      return frame(`${surface}<ellipse cx="180" cy="190" rx="116" ry="70" fill="${soft}" stroke="${ink}" stroke-opacity=".28" stroke-width="4" filter="url(#${shadowId})"/><ellipse cx="180" cy="190" rx="76" ry="43" fill="${primary}"/><circle cx="142" cy="178" r="14" fill="${secondary}"/><circle cx="192" cy="164" r="16" fill="${accent}"/><circle cx="214" cy="204" r="12" fill="${secondary}"/><path d="M112 118c16-22 31-28 46-28M236 112c14-18 28-22 42-18" fill="none" stroke="${secondary}" stroke-width="8" stroke-linecap="round"/>`);
-    case "social-poster":
-      return frame(`<rect x="72" y="50" width="216" height="238" rx="18" fill="${soft}" filter="url(#${shadowId})"/><circle cx="180" cy="132" r="54" fill="${primary}"/><path d="M104 218h152M104 244h104" stroke="${ink}" stroke-width="10" stroke-linecap="round" opacity=".7"/><circle cx="240" cy="84" r="17" fill="${secondary}"/>`);
-    case "brand-visual":
-      return frame(`<rect x="60" y="72" width="240" height="202" rx="20" fill="${soft}" filter="url(#${shadowId})"/><circle cx="132" cy="150" r="52" fill="${primary}"/><path d="M212 112h54M212 144h40M212 176h58" stroke="${ink}" stroke-width="11" stroke-linecap="round" opacity=".66"/><rect x="92" y="224" width="42" height="22" rx="8" fill="${secondary}"/><rect x="144" y="224" width="42" height="22" rx="8" fill="${accent}"/><rect x="196" y="224" width="42" height="22" rx="8" fill="${primary}"/>`);
-    case "product-detail":
-      return frame(`<rect x="60" y="72" width="240" height="202" rx="22" fill="${soft}" filter="url(#${shadowId})"/><rect x="90" y="104" width="92" height="124" rx="16" fill="${primary}"/><circle cx="136" cy="144" r="20" fill="${secondary}"/><path d="M210 122h50M210 154h38M210 186h56M210 218h34" stroke="${ink}" stroke-width="9" stroke-linecap="round" opacity=".65"/>`);
-    case "event-cover":
-      return frame(`<rect x="58" y="74" width="244" height="202" rx="22" fill="${soft}" filter="url(#${shadowId})"/><path d="M58 74h244l-34 54H92Z" fill="${primary}" opacity=".9"/><circle cx="180" cy="166" r="46" fill="${secondary}"/><path d="M100 236h160" stroke="${ink}" stroke-width="11" stroke-linecap="round" opacity=".72"/>`);
-    case "interior-home":
-      return frame(`<rect x="54" y="72" width="252" height="190" rx="18" fill="${soft}" filter="url(#${shadowId})"/><path d="M54 210h252" stroke="${ink}" stroke-width="9" opacity=".5"/><rect x="88" y="154" width="108" height="68" rx="16" fill="${primary}"/><path d="M88 174h108M104 222v34M180 222v34" stroke="${ink}" stroke-width="9" stroke-linecap="round" opacity=".65"/><rect x="232" y="108" width="36" height="82" rx="10" fill="${secondary}"/><circle cx="250" cy="96" r="22" fill="${secondary}" opacity=".8"/>`);
-    case "architecture":
-      return frame(`<rect x="58" y="70" width="244" height="204" rx="16" fill="${soft}" filter="url(#${shadowId})"/><path d="M76 252V136l104-64 104 64v116Z" fill="${primary}"/><path d="M112 142v104M148 142v104M184 142v104M220 142v104M256 142v104" stroke="${soft}" stroke-width="13" opacity=".9"/><path d="M72 252h216" stroke="${ink}" stroke-width="11" stroke-linecap="round" opacity=".7"/>`);
-    case "travel-city":
-      return frame(`<rect x="48" y="68" width="264" height="210" rx="20" fill="${soft}" filter="url(#${shadowId})"/><circle cx="246" cy="108" r="28" fill="${secondary}"/><path d="M70 240V166h48v74M128 240V124h58v116M198 240V150h46v90M254 240V104h34v136" fill="${primary}"/><path d="M62 252h236" stroke="${ink}" stroke-width="11" stroke-linecap="round" opacity=".65"/>`);
-    case "nature-landscape":
-      return frame(`<rect x="48" y="74" width="264" height="196" rx="22" fill="${soft}" filter="url(#${shadowId})"/><circle cx="246" cy="112" r="28" fill="${secondary}"/><path d="M54 232 126 138l44 48 54-86 84 132v40H54Z" fill="${primary}"/><path d="M54 232c68-40 118-34 176 0 34 20 56 22 82 8v32H54Z" fill="${accent}" opacity=".72"/>`);
-    case "cinematic":
-      return frame(`<rect x="54" y="72" width="252" height="196" rx="18" fill="${soft}" filter="url(#${shadowId})"/><circle cx="248" cy="112" r="27" fill="${secondary}"/><path d="M54 218c58-58 96-56 142-12 40 38 74 38 110 8v54H54Z" fill="${primary}"/><circle cx="152" cy="164" r="24" fill="${accent}"/><path d="M152 188v42M130 214h44" stroke="${ink}" stroke-width="10" stroke-linecap="round"/>`);
-    case "illustration":
-      return frame(`<rect x="62" y="62" width="236" height="220" rx="28" fill="${soft}" filter="url(#${shadowId})"/><circle cx="180" cy="150" r="62" fill="${primary}"/><circle cx="156" cy="142" r="8" fill="${ink}"/><circle cx="204" cy="142" r="8" fill="${ink}"/><path d="M148 176q32 24 64 0" fill="none" stroke="${secondary}" stroke-width="9" stroke-linecap="round"/><path d="M104 238h152" stroke="${ink}" stroke-width="11" stroke-linecap="round" opacity=".62"/>`);
-    case "3d-render":
-      return frame(`<rect x="62" y="70" width="236" height="204" rx="22" fill="${soft}" filter="url(#${shadowId})"/><path d="m180 92 72 42v82l-72 42-72-42v-82Z" fill="${primary}"/><path d="m180 92 72 42-72 42-72-42Z" fill="${secondary}"/><path d="M180 176v82" stroke="${ink}" stroke-width="9" opacity=".68"/>`);
-    case "retro-film":
-      return frame(`<rect x="52" y="76" width="256" height="190" rx="18" fill="${ink}" opacity=".86" filter="url(#${shadowId})"/><rect x="84" y="106" width="82" height="96" rx="10" fill="${primary}"/><rect x="194" y="106" width="82" height="96" rx="10" fill="${secondary}"/><path d="M70 94v154M290 94v154" stroke="${soft}" stroke-width="10" stroke-dasharray="10 14" opacity=".7"/><circle cx="124" cy="154" r="22" fill="${soft}" opacity=".72"/>`);
-    case "article-illustration":
-      return frame(`<rect x="66" y="60" width="228" height="224" rx="18" fill="${soft}" filter="url(#${shadowId})"/><rect x="92" y="88" width="176" height="92" rx="12" fill="${primary}"/><path d="M98 218h154M98 246h118" stroke="${ink}" stroke-width="10" stroke-linecap="round" opacity=".66"/><circle cx="238" cy="116" r="20" fill="${secondary}"/>`);
-    case "presentation":
-      return frame(`<rect x="48" y="82" width="264" height="174" rx="16" fill="${soft}" filter="url(#${shadowId})"/><path d="M76 218h212" stroke="${ink}" stroke-width="8" opacity=".5"/><path d="M92 202v-48M132 202v-82M172 202v-64M212 202v-112M252 202v-28" stroke="${primary}" stroke-width="22" stroke-linecap="round"/><circle cx="260" cy="112" r="20" fill="${secondary}"/>`);
-    case "infographic":
-      return frame(`<rect x="66" y="62" width="228" height="220" rx="18" fill="${soft}" filter="url(#${shadowId})"/><circle cx="116" cy="128" r="24" fill="${primary}"/><circle cx="244" cy="128" r="24" fill="${secondary}"/><circle cx="180" cy="232" r="24" fill="${accent}"/><path d="M138 132h82M128 146l38 70M232 146l-38 70" stroke="${ink}" stroke-width="9" stroke-linecap="round" opacity=".7"/>`);
-    case "tutorial":
-      return frame(`<rect x="58" y="68" width="244" height="208" rx="20" fill="${soft}" filter="url(#${shadowId})"/><circle cx="108" cy="120" r="23" fill="${primary}"/><circle cx="108" cy="176" r="23" fill="${secondary}"/><circle cx="108" cy="232" r="23" fill="${accent}"/><path d="M154 120h104M154 176h80M154 232h112" stroke="${ink}" stroke-width="11" stroke-linecap="round" opacity=".66"/>`);
-    default:
-      return "";
-  }
-}
-
-function renderPreviewSvg(template) {
-  const accent = String(template?.previewAccent || "#667788");
-  const key = hashPreviewKey(template?.previewKey || template?.id);
-  const hue = key % 360;
-  const primary = `hsl(${hue}, 54%, 42%)`;
-  const secondary = `hsl(${(hue + 38) % 360}, 65%, 58%)`;
-  const soft = `hsl(${(hue + 178) % 360}, 30%, 94%)`;
-  const ink = `hsl(${(hue + 190) % 360}, 28%, 18%)`;
-  const variantIndex = key % 6;
-  const rotation = (key % 15) - 7;
-  const label = escapeXml(String(template?.subcategoryName || template?.name || "模板").slice(0, 10));
-  const variant = escapeXml(String(template?.name || "").split("·").at(-1)?.trim().slice(0, 8) || "参考");
-  const motif = template?.previewMotif || "scene";
-  const gradientId = `g${key}`;
-  const shadowId = `s${key}`;
-  const common = `<defs><linearGradient id="${gradientId}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${primary}" stop-opacity=".94"/><stop offset=".56" stop-color="${accent}" stop-opacity=".9"/><stop offset="1" stop-color="${soft}" stop-opacity=".96"/></linearGradient><filter id="${shadowId}" x="-25%" y="-25%" width="150%" height="150%"><feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="${ink}" flood-opacity=".24"/></filter></defs>`;
-  const backdrops = [
-    `<circle cx="302" cy="62" r="96" fill="${secondary}" opacity=".38"/><path d="M0 258C82 214 126 300 214 252s104-18 146 18v90H0Z" fill="${soft}" opacity=".7"/>`,
-    `<path d="M0 0h184L84 360H0Z" fill="${secondary}" opacity=".28"/><circle cx="292" cy="294" r="112" fill="${soft}" opacity=".72"/>`,
-    `<rect x="22" y="22" width="316" height="316" rx="34" fill="${soft}" opacity=".66"/><path d="m0 274 106-94 72 44 102-126 80 70v192H0Z" fill="${secondary}" opacity=".3"/>`,
-    `<path d="M0 78C94 10 168 118 246 54c34-28 73-32 114-4v310H0Z" fill="${secondary}" opacity=".3"/><circle cx="70" cy="72" r="38" fill="${soft}" opacity=".74"/>`,
-    `<rect x="0" y="0" width="360" height="360" fill="${soft}" opacity=".4"/><path d="m-18 94 176-112 224 132-176 112Z" fill="${secondary}" opacity=".34"/><path d="m-26 288 160-106 226 120-160 106Z" fill="${primary}" opacity=".18"/>`,
-    `<circle cx="68" cy="80" r="58" fill="${soft}" opacity=".7"/><circle cx="300" cy="284" r="92" fill="${secondary}" opacity=".3"/><path d="M0 210c76-28 110 30 180 0s112-26 180 10v140H0Z" fill="${soft}" opacity=".66"/>`,
-  ][variantIndex];
-  let art = "";
-  if (motif === "portrait") {
-    const cx = 146 + (key % 72);
-    const cy = 116 + (key % 24);
-    const head = 38 + (key % 16);
-    const shoulder = `M${cx - 92} 286c8-68 48-102 92-102s84 34 92 102Z`;
-    const accessory = [
-      `<path d="M${cx - 48} ${cy + 5}h96" stroke="${secondary}" stroke-width="7" stroke-linecap="round" opacity=".8"/>`,
-      `<circle cx="${cx - 30}" cy="${cy + 18}" r="7" fill="${secondary}"/><circle cx="${cx + 30}" cy="${cy + 18}" r="7" fill="${secondary}"/>`,
-      `<path d="M${cx - 23} ${cy + 28}q23 18 46 0" fill="none" stroke="${secondary}" stroke-width="5" stroke-linecap="round"/>`,
-      `<path d="M${cx - 37} ${cy - 4}q37-25 74 0" fill="none" stroke="${secondary}" stroke-width="8" stroke-linecap="round"/>`,
-      `<circle cx="${cx + 44}" cy="${cy + 4}" r="9" fill="${accent}" stroke="${soft}" stroke-width="4"/>`,
-      `<path d="M${cx - 30} ${cy + 26}h60" stroke="${accent}" stroke-width="6" stroke-linecap="round"/>`,
-    ][variantIndex];
-    art = `<g transform="rotate(${rotation} 180 180)"><circle cx="${cx}" cy="${cy}" r="${head + 18}" fill="${soft}" opacity=".42"/><circle cx="${cx}" cy="${cy}" r="${head}" fill="#f2c3a4"/><path d="${shoulder}" fill="${primary}" filter="url(#${shadowId})"/><path d="M${cx - head - 8} ${cy - 8}c8-${head + 26} ${head * 2 + 16}-${head - 6} ${head * 2 + 20} ${head + 16}c-19-12-48-12-72 0Z" fill="${ink}"/><circle cx="${cx - 17}" cy="${cy + 6}" r="4" fill="${ink}"/><circle cx="${cx + 17}" cy="${cy + 6}" r="4" fill="${ink}"/>${accessory}</g>`;
-  } else if (motif === "product") {
-    const productArts = [
-      `<rect x="84" y="82" width="192" height="154" rx="22" fill="${soft}" stroke="${ink}" stroke-opacity=".24" stroke-width="4" filter="url(#${shadowId})"/><path d="M116 122h126M116 154h84" stroke="${primary}" stroke-width="12" stroke-linecap="round"/><circle cx="226" cy="192" r="24" fill="${secondary}"/>`,
-      `<ellipse cx="180" cy="252" rx="110" ry="22" fill="${ink}" opacity=".16"/><circle cx="180" cy="156" r="76" fill="${soft}" stroke="${ink}" stroke-opacity=".25" stroke-width="4" filter="url(#${shadowId})"/><path d="M130 178h100M146 122h68" stroke="${primary}" stroke-width="12" stroke-linecap="round"/><circle cx="180" cy="212" r="14" fill="${secondary}"/>`,
-      `<path d="M126 108h108l20 40v106H106V148Z" fill="${soft}" stroke="${ink}" stroke-opacity=".25" stroke-width="4" filter="url(#${shadowId})"/><path d="M126 108v40h128M156 185h76M156 214h52" stroke="${primary}" stroke-width="10" stroke-linecap="round" fill="none"/><circle cx="218" cy="214" r="16" fill="${secondary}"/>`,
-      `<path d="M120 112h120l-18 156H138Z" fill="${soft}" stroke="${ink}" stroke-opacity=".25" stroke-width="4" filter="url(#${shadowId})"/><path d="M150 112q30-38 60 0M146 174h68M154 208h52" fill="none" stroke="${primary}" stroke-width="11" stroke-linecap="round"/><circle cx="180" cy="244" r="11" fill="${secondary}"/>`,
-      `<ellipse cx="180" cy="250" rx="120" ry="22" fill="${ink}" opacity=".15"/><ellipse cx="180" cy="166" rx="110" ry="70" fill="${soft}" stroke="${ink}" stroke-opacity=".26" stroke-width="4" filter="url(#${shadowId})"/><ellipse cx="180" cy="166" rx="58" ry="30" fill="${primary}" opacity=".8"/><circle cx="224" cy="212" r="17" fill="${secondary}"/>`,
-      `<rect x="110" y="92" width="140" height="176" rx="70" fill="${soft}" stroke="${ink}" stroke-opacity=".25" stroke-width="4" filter="url(#${shadowId})"/><path d="M142 148h76M142 180h54" stroke="${primary}" stroke-width="11" stroke-linecap="round"/><circle cx="180" cy="224" r="24" fill="${secondary}"/>`,
-    ];
-    art = productArts[variantIndex];
-  } else if (motif === "design") {
-    const designArts = [
-      `<rect x="74" y="54" width="212" height="232" rx="18" fill="${soft}" filter="url(#${shadowId})"/><rect x="96" y="78" width="168" height="92" rx="12" fill="${primary}"/><path d="M98 204h132M98 230h96" stroke="${ink}" stroke-width="10" stroke-linecap="round" opacity=".72"/><circle cx="238" cy="244" r="17" fill="${secondary}"/>`,
-      `<rect x="66" y="80" width="228" height="188" rx="24" fill="${soft}" filter="url(#${shadowId})"/><circle cx="128" cy="154" r="54" fill="${primary}"/><rect x="196" y="112" width="60" height="84" rx="12" fill="${secondary}"/><path d="M98 226h158" stroke="${ink}" stroke-width="10" stroke-linecap="round" opacity=".66"/>`,
-      `<rect x="66" y="60" width="228" height="226" rx="18" fill="${soft}" filter="url(#${shadowId})"/><path d="M66 186 176 60h118v90L184 286H66Z" fill="${primary}" opacity=".9"/><circle cx="236" cy="232" r="28" fill="${secondary}"/><path d="M90 104h74" stroke="${ink}" stroke-width="9" stroke-linecap="round"/>`,
-      `<rect x="72" y="64" width="216" height="218" rx="18" fill="${soft}" filter="url(#${shadowId})"/><rect x="96" y="88" width="74" height="170" rx="14" fill="${primary}"/><rect x="184" y="88" width="78" height="74" rx="14" fill="${secondary}"/><path d="M184 202h78M184 228h54" stroke="${ink}" stroke-width="10" stroke-linecap="round" opacity=".7"/>`,
-      `<rect x="60" y="72" width="240" height="208" rx="20" fill="${soft}" filter="url(#${shadowId})"/><circle cx="180" cy="156" r="70" fill="${primary}"/><circle cx="180" cy="156" r="34" fill="${secondary}"/><path d="M94 242h172" stroke="${ink}" stroke-width="11" stroke-linecap="round" opacity=".7"/>`,
-      `<rect x="70" y="56" width="220" height="230" rx="18" fill="${soft}" filter="url(#${shadowId})"/><path d="M92 236 132 92l58 80 48-96 30 160Z" fill="${primary}" opacity=".9"/><circle cx="126" cy="108" r="21" fill="${secondary}"/><path d="M98 258h146" stroke="${ink}" stroke-width="9" stroke-linecap="round"/>`,
-    ];
-    art = designArts[variantIndex];
-  } else if (motif === "art") {
-    const artVariants = [
-      `<circle cx="180" cy="166" r="92" fill="${soft}"/><path d="M76 236c34-86 86-98 140-148 20 48 38 79 88 120-68 47-150 52-228 28Z" fill="${primary}"/><circle cx="142" cy="126" r="26" fill="${secondary}"/>`,
-      `<path d="M54 222 122 66l90 52 88-64-32 202Z" fill="${primary}" opacity=".92"/><circle cx="120" cy="222" r="48" fill="${soft}"/><circle cx="240" cy="124" r="27" fill="${secondary}"/>`,
-      `<rect x="76" y="74" width="208" height="208" rx="104" fill="${soft}"/><path d="M76 182c52-72 106-78 208-54v154H76Z" fill="${primary}"/><path d="M98 100 260 260" stroke="${secondary}" stroke-width="22" stroke-linecap="round"/>`,
-      `<path d="M56 242c70-144 114-174 246-146-36 100-94 152-246 146Z" fill="${primary}"/><path d="M94 96c44 40 96 40 172 0" fill="none" stroke="${soft}" stroke-width="20" stroke-linecap="round"/><circle cx="108" cy="222" r="24" fill="${secondary}"/>`,
-      `<circle cx="180" cy="166" r="100" fill="${primary}"/><path d="M80 166h200M180 66v200" stroke="${soft}" stroke-width="20" opacity=".78"/><circle cx="180" cy="166" r="36" fill="${secondary}"/>`,
-      `<path d="M72 250 96 92l84-34 108 80-38 122Z" fill="${primary}"/><path d="m116 218 66-100 54 74" fill="none" stroke="${soft}" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/><circle cx="252" cy="106" r="22" fill="${secondary}"/>`,
-    ];
-    art = artVariants[variantIndex];
-  } else if (motif === "editorial") {
-    const editorialVariants = [
-      `<rect x="68" y="58" width="224" height="224" rx="20" fill="${soft}" filter="url(#${shadowId})"/><path d="M90 226 148 142l35 42 31-58 56 100Z" fill="${primary}"/><circle cx="240" cy="108" r="22" fill="${secondary}"/><path d="M90 250h154" stroke="${ink}" stroke-width="10" stroke-linecap="round" opacity=".55"/>`,
-      `<rect x="60" y="76" width="240" height="196" rx="18" fill="${soft}" filter="url(#${shadowId})"/><path d="M88 236h184" stroke="${ink}" stroke-width="8" opacity=".5"/><path d="M96 214v-54M136 214v-92M176 214v-76M216 214v-126M256 214v-38" stroke="${primary}" stroke-width="22" stroke-linecap="round"/><circle cx="250" cy="108" r="20" fill="${secondary}"/>`,
-      `<rect x="70" y="56" width="220" height="232" rx="18" fill="${soft}" filter="url(#${shadowId})"/><circle cx="126" cy="112" r="24" fill="${secondary}"/><path d="M98 166h140M98 196h160M98 226h112" stroke="${ink}" stroke-width="10" stroke-linecap="round" opacity=".65"/><path d="m226 244 30-46 30 46Z" fill="${primary}"/>`,
-      `<rect x="62" y="66" width="236" height="214" rx="20" fill="${soft}" filter="url(#${shadowId})"/><path d="M92 224h168" stroke="${ink}" stroke-width="8" opacity=".5"/><circle cx="116" cy="144" r="30" fill="${primary}"/><circle cx="180" cy="144" r="30" fill="${secondary}"/><circle cx="244" cy="144" r="30" fill="${accent}"/><path d="M104 248h144" stroke="${ink}" stroke-width="10" stroke-linecap="round" opacity=".65"/>`,
-      `<rect x="68" y="64" width="224" height="220" rx="20" fill="${soft}" filter="url(#${shadowId})"/><path d="M92 230h162" stroke="${ink}" stroke-width="8" opacity=".5"/><path d="M102 202 144 134l36 38 40-74 48 104Z" fill="${primary}"/><circle cx="236" cy="104" r="21" fill="${secondary}"/>`,
-      `<rect x="58" y="82" width="244" height="192" rx="18" fill="${soft}" filter="url(#${shadowId})"/><path d="M88 128h182M88 164h182M88 200h182" stroke="${ink}" stroke-width="7" stroke-linecap="round" opacity=".45"/><rect x="90" y="224" width="58" height="28" rx="10" fill="${primary}"/><rect x="158" y="224" width="74" height="28" rx="10" fill="${secondary}"/><rect x="242" y="224" width="28" height="28" rx="10" fill="${accent}"/>`,
-    ];
-    art = editorialVariants[variantIndex];
-  } else {
-    const sceneVariants = [
-      `<rect x="54" y="82" width="252" height="180" rx="28" fill="${soft}" filter="url(#${shadowId})"/><path d="M56 210 126 128l40 44 42-62 98 98Z" fill="${primary}"/><circle cx="238" cy="112" r="25" fill="${secondary}"/>`,
-      `<rect x="52" y="64" width="256" height="208" rx="20" fill="${soft}" filter="url(#${shadowId})"/><path d="M76 236V126h84v110M202 236V98h82v138" fill="${primary}" opacity=".82"/><path d="M60 236h244" stroke="${ink}" stroke-width="10" stroke-linecap="round" opacity=".5"/><circle cx="112" cy="104" r="22" fill="${secondary}"/>`,
-      `<rect x="48" y="90" width="264" height="174" rx="28" fill="${soft}" filter="url(#${shadowId})"/><path d="M50 204c58-58 98-50 148 0 48 48 78 44 114 12v52H48Z" fill="${primary}"/><path d="M50 184c56-52 106-48 164 0 46 38 70 34 98 10" fill="none" stroke="${secondary}" stroke-width="16"/><circle cx="102" cy="118" r="24" fill="${secondary}"/>`,
-      `<rect x="54" y="76" width="252" height="194" rx="24" fill="${soft}" filter="url(#${shadowId})"/><path d="M54 206 116 152l44 34 62-82 84 102v64H54Z" fill="${primary}"/><path d="m70 238 68-58 44 34 58-76" fill="none" stroke="${secondary}" stroke-width="12" stroke-linecap="round"/><circle cx="246" cy="112" r="22" fill="${accent}"/>`,
-      `<rect x="58" y="62" width="244" height="224" rx="18" fill="${soft}" filter="url(#${shadowId})"/><circle cx="180" cy="154" r="72" fill="${primary}" opacity=".88"/><path d="M110 248h140" stroke="${ink}" stroke-width="10" stroke-linecap="round" opacity=".55"/><path d="M180 82v144M108 154h144" stroke="${secondary}" stroke-width="10" stroke-linecap="round" opacity=".8"/>`,
-      `<rect x="48" y="84" width="264" height="184" rx="32" fill="${soft}" filter="url(#${shadowId})"/><path d="M66 218 128 134l40 48 52-80 74 116Z" fill="${primary}"/><path d="M76 242h204" stroke="${ink}" stroke-width="9" stroke-linecap="round" opacity=".5"/><circle cx="112" cy="112" r="24" fill="${secondary}"/>`,
-    ];
-    art = sceneVariants[variantIndex];
-  }
-  art = renderSemanticPreviewArt(template, { accent, ink, primary, secondary, shadowId, soft, variantIndex }) || art;
-  const scene = escapeXml(String(template?.subcategoryId || "scene"));
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 360" role="img" aria-label="${label} ${variant}" data-preview-scene="${scene}">${common}<rect width="360" height="360" rx="28" fill="url(#${gradientId})"/>${backdrops}${art}<rect x="20" y="298" width="320" height="42" rx="12" fill="${ink}" opacity=".84"/><text x="38" y="325" font-size="17" font-family="system-ui, sans-serif" font-weight="700" fill="#fff">${label}</text><text x="322" y="325" text-anchor="end" font-size="14" font-family="system-ui, sans-serif" fill="#edf5f4">${variant}</text></svg>`;
-}
-
 export function getPromptTemplatePreviewUrl(template) {
-  const cacheKey = String(template?.previewKey || template?.id || "");
-  if (!cacheKey) {
-    return "";
-  }
-  if (template?.previewImage) {
-    return template.previewImage;
-  }
-  if (!previewUrlCache.has(cacheKey)) {
-    previewUrlCache.set(cacheKey, `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(renderPreviewSvg(template))}`);
-  }
-  return previewUrlCache.get(cacheKey);
+  return String(template?.previewImage || "");
 }

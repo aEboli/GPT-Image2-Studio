@@ -2,15 +2,15 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.023-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.033-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installer-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
 **本地优先的 AI 图像生成与视觉创作工作台**
 
-把提示词生图、参考图分析、图片编辑、电商套图、人物写真、文章插图、PPT 生成和素材管理集中到一个浏览器界面中。
+把提示词生图、参考图分析、图片编辑、商品图裂变、电商套图、人物写真、文章插图、PPT 生成和素材管理集中到一个浏览器界面中。
 
-当前版本：`v0.2.023`
+当前版本：`v0.2.033`
 
 </div>
 
@@ -56,14 +56,14 @@ Windows 脚本入口（启动器、Native Messaging 安装/卸载、图片资源
 从包含桌面产物的 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
 
 ```text
-GPT-Image2-Studio-Desktop-Setup-v0.2.023-x64.exe
+GPT-Image2-Studio-Desktop-Setup-v0.2.033-x64.exe
 ```
 
 安装完成后通过桌面或开始菜单中的 `GPT-Image2-Studio` 启动。程序会在独立窗口中运行，内置服务使用动态回环端口，关闭窗口后不会遗留后台服务。无需另行安装 Node.js，完整说明见 [Windows 桌面程序文档](./docs/windows-desktop.md)。
 
 源码目录也可直接启动桌面开发版：
 
-如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.023-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
+如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.033-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
 
 桌面开发使用 Electron `43`，要求 Node.js `22.12` 或更高版本；普通 `npm start` 服务仍支持 Node.js `20+`。
 
@@ -74,7 +74,7 @@ cmd /c npm run desktop
 
 ### 方式三：Windows 浏览器安装包（兼容旧版）
 
-旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.023` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
+旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.033` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
 
 ## 配置说明
 
@@ -465,6 +465,7 @@ GPT-Image2-Studio 面向个人创作者、电商运营、设计师和内容团�
 ### 业务工作流
 
 - **电商套图**：按平台、类目、商品事实、受众和 SKU 生成推荐轮播计划，支持套图级参数覆盖、兼容图片类型启停、补图队列和 Listing 草稿；新计划固定一个 SKU 主体但保留 SKU 生成规则；另有独立的“上传图加 Logo”批处理分支；通用电商保留 18 个原生轮播槽位。
+- **图片裂变工作台**：上传最多 15 张商品母图，补充本轮目标后由商品组图 Agent 提炼有证据支持的事实、痛点、卖点、人群和场景，并按“用途 × 渠道 × 方向”生成有上限的裂变任务板。每格保留选定母图、比例、纯英文生图提示词及简体中文对照，可逐格生成、重做、下载，也可批量处理。
 - **写真模式**：组合人物、动作、服装、道具和地点，生成 1 到 100 张系列写真，并独立选择思考等级与质量。
 - **文章插图**：解析文章包，建立风格、角色和场景设定，再生成正式插图计划，并独立选择思考等级与质量。
 - **PPT 生成**：从主题或文档生成 1 到 20 页演示文稿，支持单页编辑、补图、普通 PPTX 和可编辑重建导出；整套操作保留 PPT 自己的思考等级与质量。
@@ -543,6 +544,7 @@ GPT-Image2-Studio 面向个人创作者、电商运营、设计师和内容团�
 | 图片编辑 | `#image-edit`，创作 -> 图片编辑 | 1 张源图；整图修改文字，或多个局部蒙版及逐区指令 | 整图模式直接编辑；局部模式将蒙版与源图规范化为同尺寸 PNG，可合并执行或逐区顺序执行 | PNG/JPG 编辑结果、局部区域管理、重试、下载、灯箱和画廊记录 |
 | 快速融图 | `#quick-blend`，创作 -> 快速溶图 | A/B 两组必选图片，C/D 两组可选；布局、位置形状、比例和分辨率 | 按相同序号配对；A/B 数量必须一致，启用的 C/D 也必须与 A/B 一致；每一对形成独立生成任务 | 每对一张 PNG/JPG 结果，可重排、移除整对、查看进度、下载和归档 |
 | 图片压缩 | `#image-compress`，创作 -> 图片压缩 | 多张浏览器可解码图片；质量或目标大小、输出格式、可选目标宽高 | 完全在浏览器本地以 Canvas 解码、等比缩放留边并重新编码，不上传到生图服务 | 保留原格式或转换为 PNG/JPEG/WebP；显示前后体积、压缩率、像素尺寸并逐张下载 |
+| 图片裂变工作台 | `#product-agent`，创作 -> 图片裂变工作台 | 最多 15 张商品母图、可选裂变目标、用途/渠道/方向选择 | 先用默认文本/视觉模型分析商品组图，再把兼容组合展开成任务矩阵；每格沿用当前母图证据和对应比例 | 证据摘要、风险提示、纯英文提示词与中文对照；支持单格生成、重做、复制指令、下载和批量生成 |
 | 电商套图 | `#creation`，创作 -> 套图模式 | 商品事实、最多 15 张产品参考图、平台、类目、SKU、语言、思考等级、质量与计划覆盖项 | 智能识别参考图角色，按 19 种平台画像生成轮播计划，可覆盖套图级语言、比例和分辨率并启停兼容图片类型，再并发生成；新计划固定一个 SKU 主体 | 套图、队列、按冻结计划补齐失败项、Listing 草稿及套图记录；另有独立“上传图加 Logo”批处理分支 |
 | 写真模式 | `#portrait`，创作 -> 写真模式 | 人物图、动作图、服装道具配饰图、人物描述、地点、风格、景别、数量、思考等级和质量 | 先建立人物一致性和拍摄计划，再按动作、景别、地点与风格组合生成 | 1 到 100 张 PNG/JPG 写真、计划预览、失败项重试、写真记录和素材复用 |
 | 文章插图 | `#article-illustration`，创作 -> 文章插图 | 正文、补充说明，或多个 TXT/MD/CSV/JSON 文件；内容类型、风格预设、思考等级和质量 | 整体解析文章，建立风格圣经、人物/场景参考卡和阅读顺序分镜；可先生成参考图再生成正文插图 | PNG 参考图和正文插图、分镜编辑、说明文字、重新生成及文章插图记录 |
@@ -629,8 +631,8 @@ cmd /c npm run build:desktop
 产物路径：
 
 ```text
-artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.023-x64.exe
-artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.023-x64.zip
+artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.033-x64.exe
+artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.033-x64.zip
 artifacts/desktop/win-unpacked/GPT-Image2-Studio.exe
 ```
 
@@ -648,7 +650,7 @@ cmd /c npm run build:installer
 产物路径格式：
 
 ```text
-artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.023.exe
+artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.033.exe
 ```
 
 脚本使用系统 `iexpress.exe` 生成自解压安装包，并把当前 Node.js 运行时和依赖打入安装目录；启动后仍使用默认浏览器显示工作台。
@@ -753,7 +755,7 @@ cmd /c npm run build:installer
 
 ## 版本更新说明
 
-完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.023](./docs/releases/v0.2.023.md)。
+完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.033](./docs/releases/v0.2.033.md)。
 
 ### v0.2.020 更新说明
 

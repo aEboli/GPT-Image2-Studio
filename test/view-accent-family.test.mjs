@@ -19,6 +19,7 @@ const EXPECTED_VIEW_FAMILIES = {
   studio: "create",
   "style-transfer": "create",
   "reference-analysis": "analyse",
+  "product-agent": "create",
   "image-decomposition": "analyse",
   "image-edit": "edit",
   "quick-blend": "edit",
@@ -109,7 +110,7 @@ test("setActiveView 在 await 之前就写好族名，模块加载失败也不�
   assert.match(body.slice(write, write + 120), /VIEW_ACCENT_FAMILIES\[view\] \|\| "create"/);
 });
 
-test("视图到族的映射覆盖全部 16 个视图", async () => {
+test("视图到族的映射覆盖全部 17 个视图", async () => {
   const app = await readFile(appPath, "utf8");
   const map = parseObjectLiteral(app, "const VIEW_ACCENT_FAMILIES");
   assert.deepEqual(map, EXPECTED_VIEW_FAMILIES);

@@ -851,8 +851,8 @@ test("creation workflow reuses history, reuploads references, tweaks prompts, re
   assert.equal(planBody.plan.items.length, 4);
   assert.equal(planBody.plan.items[0].itemId, "1-hero");
   assert.match(planBody.plan.items[0].prompt, /manual historical binding/);
-  assert.match(planBody.plan.items[0].prompt, /industry template:/i);
-  assert.match(planBody.plan.items[1].prompt, /visual style:/i);
+  assert.match(planBody.plan.items[0].prompt, /emphasize texture, swatches, skincare use, packaging, and evidence-based benefit hierarchy/i);
+  assert.doesNotMatch(planBody.plan.items[1].prompt, /visual style:/i);
   assert.match(planBody.plan.items[1].prompt, /lifestyle magazine editorial/);
 
   const xiaohongshuForm = new FormData();
@@ -920,7 +920,7 @@ test("creation workflow reuses history, reuploads references, tweaks prompts, re
   assert.equal(generatedSet.items[0].quality, "high");
   assert.equal(generatedSet.items[0].reasoningEffort, "low");
   assert.deepEqual(generatedSet.items[0].referenceImageNames, ["front.png"]);
-  assert.match(generatedSet.items[1].prompt, /visual style:/i);
+  assert.doesNotMatch(generatedSet.items[1].prompt, /visual style:/i);
   assert.match(generatedSet.items[1].prompt, /lifestyle magazine editorial/);
   assert.ok(generatedSet.items[0].relativePath);
   assert.match(generatedSet.items[0].filename, /^1-\d{4}-首图成交主视觉-[a-z0-9]{4}\.png$/u);
