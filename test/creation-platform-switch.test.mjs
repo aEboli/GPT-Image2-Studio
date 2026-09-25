@@ -63,9 +63,7 @@ test("browser platform change directly resets and previews without confirmation"
   for (const protectedField of [
     "creationProductNameInput",
     "creationProductDescriptionInput",
-    "creationSellingPointsInput",
     "creationIndustryTemplateInput",
-    "creationDimensionSpecsInput",
     "creationLogoInput",
     "creationSkuGenerationRuleInput",
     "creationOutputFormatInput",

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 import * as imageRouteConfig from "../lib/image-route-config.mjs";
+import { appendBrowserConfigToFormData } from "../lib/browser-config.mjs";
 import {
   getGrokImageQualityOptions,
   getImageQualityOptions,
@@ -21,11 +22,18 @@ const extendedModel = "gpt-image-2.5-sunburst";
 
 function createControl(value = "") {
   const listeners = new Map();
+  const attributes = new Map();
+  const classes = new Set();
   return {
     value, checked: false, dataset: {}, children: [],
     set innerHTML(_value) { this.children = []; },
     appendChild(child) { this.children.push(child); },
-    setAttribute() {},
+    setAttribute(name, value) { attributes.set(name, String(value)); },
+    getAttribute(name) { return attributes.get(name) ?? null; },
+    classList: {
+      toggle(name, enabled) { if (enabled) classes.add(name); else classes.delete(name); },
+      contains(name) { return classes.has(name); },
+    },
     addEventListener(type, callback) {
       if (!listeners.has(type)) listeners.set(type, []);
       listeners.get(type).push(callback);
@@ -40,6 +48,7 @@ function createHarness({ route = "a", browserConfig = {} } = {}) {
   const refs = Object.fromEntries([
     ...qualityFields, "transparentBackgroundField", "transparentBackgroundInput", "outputFormatInput",
     "imageToolModelSelect", "directImageModelInput", "protocolImageModelInput", "directResponsesModelInput",
+    "includeImageToolModelToggle", "directImageStreamToggle",
     "baseUrlInput", "apiKeyInput", "responsesModelInput", "protocolBaseUrlInput", "protocolApiKeyInput",
     "configFeedback", "testConnectionButton", "fetchModelsButton", "modelPickerToggle", "modelOptionsList",
     "directModelPickerToggle", "directModelOptionsList", "protocolModelPickerToggle", "protocolModelOptionsList",
@@ -53,13 +62,16 @@ function createHarness({ route = "a", browserConfig = {} } = {}) {
   refs.configForm = { dataset: {}, querySelectorAll: () => [] };
   for (const name of ["globalNavItems", "viewTabs", "viewPanels", "promptModeBlocks"]) refs[name] = [];
   refs.imageToolModelSelect.value = legacyModel;
+  refs.includeImageToolModelToggle.setAttribute("aria-checked", "true");
+  refs.includeImageToolModelToggle.classList.toggle("is-active", true);
+  refs.directImageStreamToggle.setAttribute("aria-checked", "false");
   refs.directImageModelInput.value = extendedModel;
   refs.protocolImageModelInput.value = "gemini-3.1-flash-image-preview";
   refs.outputFormatInput.value = "jpg";
   const document = { ...createControl(), createElement: createControl, querySelector: () => ({}), documentElement: { dataset: {} } };
   refs.modelOptionsList.ownerDocument = document;
   const context = {
-    ...imageRouteConfig, refs, document, FormData, createConfigModelPickerController,
+    ...imageRouteConfig, refs, document, FormData, createConfigModelPickerController, appendBrowserConfigToFormData,
     state: { activeView: "studio", studioMode: "prompt", referenceFiles: [], configSection, config: { defaults: { quality: "high" } } },
     getGrokImageQualityOptions, getImageQualityOptions, normalizeGrokImageQuality, normalizeImageQualityForRoute, normalizeImageQuality, normalizeOutputFormat,
     normalizeGenerationSize, normalizeModelProtocolImageSize,
@@ -91,6 +103,7 @@ function createHarness({ route = "a", browserConfig = {} } = {}) {
     "getSelectedReasoningEffort", "getSelectedImageReasoningEffort",
     "setActiveView", "setStudioGenerationMode", "normalizeSizeForSelectedRoute", "resolveGenerationSizeForSelectedRoute",
     "selectConfigSection", "createJob", "savePromptAttemptPreview",
+    "applyQueuedJobConfigSnapshot", "appendJobConfigToFormData",
   ].map((name) => {
     const source = app.match(new RegExp(`(?:async )?function ${name}\\([^]*?\\n\\}`))?.[0];
     assert.ok(source, `${name} must be present`);
@@ -100,9 +113,41 @@ function createHarness({ route = "a", browserConfig = {} } = {}) {
   const pickerEnd = app.indexOf("}); const apiEndpointBookPicker", pickerStart) + 3;
   const eventsStart = app.indexOf('  refs.configSectionInputs.forEach((input) => input.addEventListener("change"');
   const eventsEnd = app.indexOf("  configModelPicker.bindEvents();", eventsStart) + "  configModelPicker.bindEvents();".length;
-  vm.runInNewContext([...functions, app.slice(pickerStart, pickerEnd), app.slice(eventsStart, eventsEnd)].join("\n"), context);
+  const toggleStart = app.indexOf('  refs.includeImageToolModelToggle?.addEventListener("click"');
+  const toggleEnd = app.indexOf("\n  });", toggleStart) + "\n  });".length;
+  assert.ok(toggleStart >= 0 && toggleEnd > toggleStart);
+  vm.runInNewContext([...functions, app.slice(pickerStart, pickerEnd), app.slice(eventsStart, eventsEnd), app.slice(toggleStart, toggleEnd)].join("\n"), context);
   return context;
 }
+
+test("工具模型开关更新请求值与无障碍状态，不改变直连流式开关", () => {
+  const context = createHarness();
+  const toggle = context.refs.includeImageToolModelToggle;
+  context.refs.imageToolModelSelect.value = extendedModel;
+  assert.equal(context.getCurrentPrivateConfigRequestPayload().includeImageToolModel, true);
+  toggle.dispatch("click");
+  assert.equal(toggle.getAttribute("aria-checked"), "false");
+  assert.equal(toggle.classList.contains("is-active"), false);
+  assert.equal(context.getCurrentPrivateConfigRequestPayload().includeImageToolModel, false);
+  assert.equal(context.refs.imageToolModelSelect.value, extendedModel);
+  toggle.dispatch("click");
+  assert.equal(toggle.getAttribute("aria-checked"), "true");
+  assert.equal(toggle.classList.contains("is-active"), true);
+  assert.equal(context.getCurrentPrivateConfigRequestPayload().includeImageToolModel, true);
+  assert.equal(context.refs.directImageStreamToggle.getAttribute("aria-checked"), "false");
+});
+
+test("排队任务保留提交时的工具模型与开关，不受后续界面修改影响", () => {
+  const context = createHarness();
+  context.refs.imageToolModelSelect.value = extendedModel;
+  context.refs.includeImageToolModelToggle.dispatch("click");
+  const job = context.applyQueuedJobConfigSnapshot({});
+  context.refs.imageToolModelSelect.value = legacyModel;
+  context.refs.includeImageToolModelToggle.dispatch("click");
+  const form = context.appendJobConfigToFormData(new FormData(), job);
+  assert.equal(form.get("imageToolModel"), extendedModel);
+  assert.equal(form.get("includeImageToolModel"), "false");
+});
 
 for (const view of ["image-decomposition", "quick-blend", "style-transfer"]) {
   test(`leaving transparent prompt mode for ${view} restores the shared format before loading the view`, async () => {

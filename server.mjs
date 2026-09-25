@@ -476,7 +476,10 @@ async function requestStudioImageGeneration(options) {
       return requestGrokImageGeneration(options);
     }
     if (options.generationMode === IMAGE_EDIT_MODE) {
-      return requestImageEdit(options);
+      return requestImageEdit({
+        ...options,
+        directImageStream: options.imageRoute === IMAGE_ROUTE_B && options.directImageStream === true,
+      });
     }
     if (options.imageRoute === IMAGE_ROUTE_B) {
       return requestDirectImageGeneration(options);
@@ -1328,6 +1331,7 @@ async function handleConfigPost(request, response) {
     endpointPath: payload.endpointPath,
     responsesModel: payload.responsesModel,
     imageToolModel: payload.imageToolModel,
+    ...(payload.includeImageToolModel !== undefined ? { includeImageToolModel: payload.includeImageToolModel } : {}),
     imageRoute: payload.imageRoute,
     directImageBaseUrl: payload.directImageBaseUrl,
     directImageApiKey: payload.directImageApiKey,
@@ -1863,7 +1867,9 @@ async function generateAndSavePptSlide({
     responsesModel: generationConfig.responsesModel,
     imageRoute: generationConfig.imageRoute,
     imageModel: generationConfig.imageModel,
+    includeImageToolModel: generationConfig.includeImageToolModel,
     endpointPath: generationConfig.endpointPath,
+    directImageStream: config.directImageStream === true && generationConfig.imageRoute === IMAGE_ROUTE_B,
     reasoningEffort: slideReasoningEffort,
     async onEvent(event) {
       if (event.type === "partial_image") {
@@ -3412,7 +3418,9 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
           responsesModel: generationConfig.responsesModel,
           imageRoute: generationConfig.imageRoute,
           imageModel: generationConfig.imageModel,
+          includeImageToolModel: generationConfig.includeImageToolModel,
           endpointPath: generationConfig.endpointPath,
+          directImageStream: config.directImageStream === true,
           ...(reasoningEffort ? { reasoningEffort } : {}),
           async onEvent(event) {
             await handleGenerationEvent(event);
@@ -4419,7 +4427,6 @@ async function handleCreationReferenceAnalyze(request, response) {
       industryTemplatePath ? `类目路径：${industryTemplatePath}` : "",
       String(formData.get("productName") || "").trim() ? `商品名称：${String(formData.get("productName")).trim()}` : "",
       String(formData.get("productDescription") || "").trim() ? `商品描述：${String(formData.get("productDescription")).trim()}` : "",
-      String(formData.get("sellingPoints") || "").trim() ? `核心卖点：${String(formData.get("sellingPoints")).trim()}` : "",
       "请根据该平台和商品类型判断每张参考图最适合支持主图、详情页信息、SKU 对比、规格核对、移动端缩略图或直播/内容场景中的哪类套图生成用途。",
     ]
       .filter(Boolean)
@@ -4629,7 +4636,9 @@ async function handlePortraitGenerate(request, response) {
           responsesModel: generationConfig.responsesModel,
           imageRoute: generationConfig.imageRoute,
           imageModel: generationConfig.imageModel,
+          includeImageToolModel: generationConfig.includeImageToolModel,
           endpointPath: generationConfig.endpointPath,
+          directImageStream: config.directImageStream === true,
           ...(reasoningEffort ? { reasoningEffort } : {}),
           async onEvent(event) {
             if (event.type === "status") {
@@ -5066,7 +5075,9 @@ async function handleCreationGenerate(request, response) {
           responsesModel: generationConfig.responsesModel,
           imageRoute: generationConfig.imageRoute,
           imageModel: generationConfig.imageModel,
+          includeImageToolModel: generationConfig.includeImageToolModel,
           endpointPath: generationConfig.endpointPath,
+          directImageStream: config.directImageStream === true,
           ...(reasoningEffort ? { reasoningEffort } : {}),
           onResponseId: () =>
             persistCreationOriginalResponsePending({
@@ -5468,7 +5479,9 @@ async function handleCreationLogoBatchGenerate(request, response) {
           responsesModel: generationConfig.responsesModel,
           imageRoute: generationConfig.imageRoute,
           imageModel: generationConfig.imageModel,
+          includeImageToolModel: generationConfig.includeImageToolModel,
           endpointPath: generationConfig.endpointPath,
+          directImageStream: config.directImageStream === true,
           ...(reasoningEffort ? { reasoningEffort } : {}),
           onResponseId: () =>
             persistCreationOriginalResponsePending({
@@ -5818,7 +5831,9 @@ async function handlePortraitRepair(request, response) {
           responsesModel: generationConfig.responsesModel,
           imageRoute: generationConfig.imageRoute,
           imageModel: generationConfig.imageModel,
+          includeImageToolModel: generationConfig.includeImageToolModel,
           endpointPath: generationConfig.endpointPath,
+          directImageStream: config.directImageStream === true,
           ...(reasoningEffort ? { reasoningEffort } : {}),
           async onEvent(event) {
             if (event.type === "status") {
@@ -6228,7 +6243,9 @@ async function handleCreationRepair(request, response) {
           responsesModel: itemGenerationConfig.responsesModel,
           imageRoute: itemGenerationConfig.imageRoute,
           imageModel: itemGenerationConfig.imageModel,
+          includeImageToolModel: itemGenerationConfig.includeImageToolModel,
           endpointPath: itemGenerationConfig.endpointPath,
+          directImageStream: config.directImageStream === true,
           ...(itemReasoningEffort ? { reasoningEffort: itemReasoningEffort } : {}),
           onResponseId: () =>
             persistCreationOriginalResponsePending({
@@ -6928,7 +6945,9 @@ async function handleGenerate(request, response) {
       responsesModel: generationConfig.responsesModel,
       imageRoute: generationConfig.imageRoute,
       imageModel: generationConfig.imageModel,
+      includeImageToolModel: generationConfig.includeImageToolModel,
       endpointPath: generationConfig.endpointPath,
+      directImageStream: config.directImageStream === true,
       generationMode,
       ...(reasoningEffort ? { reasoningEffort } : {}),
     };

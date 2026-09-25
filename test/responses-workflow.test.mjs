@@ -302,6 +302,211 @@ test("requestDirectImageGeneration posts once to image generations and emits the
   });
 });
 
+test("requestDirectImageGeneration requests upstream streaming when enabled", async () => {
+  let request;
+
+  await requestDirectImageGeneration({
+    baseUrl: "https://route-b.example.test/v1",
+    endpointPath: "images/generations",
+    apiKey: "route-b-key",
+    prompt: "Create a streamed image.",
+    size: "1024x1024",
+    quality: "high",
+    imageModel: "gpt-image-2",
+    directImageStream: true,
+    async fetchImpl(url, init) {
+      request = { url, init, body: JSON.parse(init.body) };
+      return new Response(JSON.stringify({ data: [{ b64_json: "c3RyZWFtZWQtZmluYWw=" }] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    },
+  });
+
+  assert.equal(request.url, "https://route-b.example.test/v1/images/generations");
+  assert.equal(request.init.headers.Accept, "text/event-stream");
+  assert.equal(request.body.stream, true);
+  assert.equal(request.body.partial_images, 2);
+});
+
+test("direct Images API streaming emits partial and completed image events", async () => {
+  const requests = [];
+  const events = [];
+  const sseBody = [
+    "event: image_generation.partial_image",
+    'data: {"type":"image_generation.partial_image","b64_json":"cGFydGlhbA==","output_format":"png"}',
+    "",
+    "event: image_generation.completed",
+    'data: {"type":"image_generation.completed","b64_json":"ZmluYWw=","output_format":"png"}',
+    "",
+  ].join("\n");
+
+  const result = await requestDirectImageGeneration({
+    baseUrl: "https://direct.example.test/v1",
+    endpointPath: "images/generations",
+    apiKey: "direct-key",
+    prompt: "Create a streamed image.",
+    size: "1024x1024",
+    quality: "high",
+    imageModel: "gpt-image-2",
+    directImageStream: true,
+    async fetchImpl(url, init) {
+      requests.push({ url, init, body: JSON.parse(init.body) });
+      return new Response(sseBody, {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      });
+    },
+    onEvent(event) {
+      events.push(event);
+    },
+  });
+
+  assert.equal(requests.length, 1);
+  assert.deepEqual(events.map((event) => event.type), ["status", "partial_image", "status", "final_image"]);
+  assert.equal(events.find((event) => event.type === "partial_image")?.base64, "cGFydGlhbA==");
+  assert.equal(result.finalImageBase64, "ZmluYWw=");
+  assert.equal(result.streamFallbackUsed, false);
+});
+
+test("direct Images API accepts SSE frames from a relay that labels them as JSON", async () => {
+  const requests = [];
+  const sseBody = [
+    'data: {"type":"image_generation.completed","b64_json":"cmVsYXktZmluYWw="}',
+    "",
+  ].join("\n");
+
+  const result = await requestDirectImageGeneration({
+    baseUrl: "https://relay.example.test/v1",
+    endpointPath: "images/generations",
+    apiKey: "relay-key",
+    prompt: "Create a relay-compatible streamed image.",
+    size: "1024x1024",
+    quality: "high",
+    imageModel: "gpt-image-2",
+    directImageStream: true,
+    async fetchImpl(url, init) {
+      requests.push({ url, init, body: JSON.parse(init.body) });
+      return new Response(sseBody, {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    },
+  });
+
+  assert.equal(requests.length, 1);
+  assert.equal(result.finalImageBase64, "cmVsYXktZmluYWw=");
+  assert.equal(result.streamFallbackUsed, false);
+});
+
+test("direct Images API extracts the final image from the relay envelope data array", async () => {
+  const relayEnvelope = {
+    object: "image.generation.chunk",
+    created: 1770000000,
+    model: "gw/gpt-image-2",
+    index: 0,
+    total: 1,
+    upstream_event_type: "",
+    data: [{
+      b64_json: "cmVhbC1yZWxheS1maW5hbA==",
+      url: "https://relay.example.test/generated.png",
+      revised_prompt: "A simple red apple on a clean white background.",
+    }],
+  };
+  const sseBody = `data: ${JSON.stringify(relayEnvelope)}\n\n`;
+
+  const result = await requestDirectImageGeneration({
+    baseUrl: "https://relay.example.test/v1",
+    endpointPath: "images/generations",
+    apiKey: "relay-key",
+    prompt: "Create a relay envelope image.",
+    size: "1024x1024",
+    quality: "high",
+    imageModel: "gw/gpt-image-2",
+    directImageStream: true,
+    async fetchImpl() {
+      return new Response(sseBody, {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      });
+    },
+  });
+
+  assert.equal(result.finalImageBase64, "cmVhbC1yZWxheS1maW5hbA==");
+  assert.equal(result.streamFallbackUsed, false);
+});
+
+test("direct Images API maps the relay upstream event type for nested partial images", async () => {
+  const events = [];
+  const sseBody = [
+    'data: {"object":"image.generation.chunk","upstream_event_type":"image_generation.partial_image","data":[{"b64_json":"cmVsYXktcGFydGlhbA==","partial_image_index":0,"output_format":"png"}]}',
+    "",
+    'data: {"object":"image.generation.chunk","upstream_event_type":"image_generation.completed","data":[{"b64_json":"cmVsYXktZmluYWw="}]}',
+    "",
+  ].join("\n");
+
+  const result = await requestDirectImageGeneration({
+    baseUrl: "https://relay.example.test/v1",
+    endpointPath: "images/generations",
+    apiKey: "relay-key",
+    prompt: "Create a relay partial image.",
+    size: "1024x1024",
+    quality: "high",
+    imageModel: "gw/gpt-image-2",
+    directImageStream: true,
+    async fetchImpl() {
+      return new Response(sseBody, {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      });
+    },
+    onEvent(event) {
+      events.push(event);
+    },
+  });
+
+  assert.equal(events.find((event) => event.type === "partial_image")?.base64, "cmVsYXktcGFydGlhbA==");
+  assert.equal(result.finalImageBase64, "cmVsYXktZmluYWw=");
+});
+
+test("direct Images API falls back once when streaming is explicitly unsupported before SSE starts", async () => {
+  const requests = [];
+  const statusMessages = [];
+
+  const result = await requestDirectImageGeneration({
+    baseUrl: "https://relay.example.test/v1",
+    endpointPath: "images/generations",
+    apiKey: "relay-key",
+    prompt: "Create a fallback image.",
+    size: "1024x1024",
+    quality: "high",
+    imageModel: "gpt-image-2",
+    directImageStream: true,
+    async onEvent(event) {
+      if (event.type === "status") statusMessages.push(event.message);
+    },
+    async fetchImpl(url, init) {
+      requests.push({ url, init, body: JSON.parse(init.body) });
+      if (requests.length === 1) {
+        return new Response(JSON.stringify({ error: { message: "streaming is not supported" } }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ data: [{ b64_json: "ZmFsbGJhY2stZmluYWw=" }] }), { status: 200 });
+    },
+  });
+
+  assert.equal(requests.length, 2);
+  assert.equal(requests[0].body.stream, true);
+  assert.equal(requests[1].body.stream, undefined);
+  assert.equal(requests[0].init.headers.Accept, "text/event-stream");
+  assert.equal(requests[1].init.headers.Accept, "application/json");
+  assert.equal(result.finalImageBase64, "ZmFsbGJhY2stZmluYWw=");
+  assert.equal(result.streamFallbackUsed, true);
+  assert.ok(statusMessages.some((message) => message.includes("不支持")));
+});
+
 test("image request builders migrate legacy auto quality to high", () => {
   const responsesBody = createResponsesRequestBody({
     prompt: "test",

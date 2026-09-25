@@ -2,9 +2,7 @@
 
 ## Purpose
 TBD - created by archiving change add-creation-mode. Update Purpose after archive.
-
 ## Requirements
-
 ### Requirement: Creation Mode tab is independent
 The system SHALL expose Creation Mode as a separate tab under the creation workspace and SHALL NOT share prompt text, reference-image selections, prompt templates, queued jobs, or prompt-mode generated state with Creation Mode.
 
@@ -1696,7 +1694,7 @@ For each newly planned or locally queued SKU image, the system SHALL create a `f
 
 ### Requirement: 提示词模式胶片条使用页面会话展示窗口
 
-提示词模式胶片条首次成功载入 SHALL 只展示最近 10 张提示词模式历史图片，并把这 10 张作为当前页面会话的初始基线。当前页面提交的有效提示词生成任务 SHALL 只在其图片成功保存后加入该基线；系统 MUST NOT 为了填满窗口而加入基线之外、更早的历史图片。基线与当前页面成功结果 SHALL 按创建时间倒序组成最多 50 张历史缩略图的滚动窗口；超过 50 张时，排序最早的可见项 SHALL 被移出。运行中任务占位 SHALL 与历史图片窗口分开计数。基线、当前会话任务和结果窗口 MUST NOT 持久化，刷新或下一次载入 SHALL 恢复为最近 10 张提示词模式历史图片。
+提示词模式胶片条首次成功载入 SHALL 只展示最近 10 张提示词模式历史图片，并把这 10 张作为当前页面会话的初始基线。当前页面提交的有效提示词生成任务 SHALL 只在其图片成功保存后加入该基线；系统 MUST NOT 为了填满窗口而加入基线之外、更早的历史图片。基线与当前页面成功结果 SHALL 按创建时间倒序组成最多 50 张历史缩略图的滚动窗口；超过 50 张时，排序最早的可见项 SHALL 被移出。运行中任务占位 SHALL 与历史图片窗口分开计数，并 SHALL 按提交时间倒序显示，最新请求位于左侧、较早请求依次向右；相同提交时间的任务 SHALL 保持队列顺序。任务状态更新 MUST NOT 改变其胶片条排序。基线、当前会话任务和结果窗口 MUST NOT 持久化，刷新或下一次载入 SHALL 恢复为最近 10 张提示词模式历史图片。
 
 #### Scenario: 首次载入提示词模式
 
@@ -1729,6 +1727,14 @@ For each newly planned or locally queued SKU image, the system SHALL create a `f
 - **GIVEN** 当前页面的胶片条已包含当前会话成功结果
 - **WHEN** 用户刷新页面或下一次载入应用
 - **THEN** 胶片条恢复为只展示最近 10 张提示词模式历史图片
+
+#### Scenario: 运行中请求按最新优先排列
+
+- **GIVEN** 当前会话中存在多个运行中或排队中的提示词请求
+- **WHEN** 胶片条首次渲染或因请求状态更新而重绘
+- **THEN** 最新提交的请求位于最左侧，较早请求依次向右
+- **AND** 相同提交时间的请求保持队列顺序
+- **AND** 状态更新不改变请求的位置
 
 ### Requirement: 提示词模板面板避让参数区
 
@@ -1934,3 +1940,19 @@ For each newly planned or locally queued SKU image, the system SHALL create a `f
 - **WHEN** 生成 infographic-rebuild 项
 - **THEN** 系统继续使用该模式的来源事实和翻译提示词
 - **AND** 普通轮播图与 SKU 的提示词压缩规则不会移除其必要的来源保真或翻译约束
+
+### Requirement: Creation Mode uses one product information field
+
+Creation Mode SHALL present one 商品描述 textarea for product description, selling points, and size specifications. The textarea SHALL retain the existing product-description height and placeholder, and controls below it SHALL follow the normal document flow. New plans SHALL use the complete textarea value as product description and SHALL continue extracting supported measurements from that value for dimension and specification roles. Reusing a historical set SHALL place its saved product description, selling points, and dimension specifications in the textarea without losing non-empty values.
+
+#### Scenario: User enters combined product information
+
+- **WHEN** the user submits a product description containing product facts, selling points, or supported measurements
+- **THEN** the complete text is used as product information for planning
+- **AND** supported measurements continue to populate the planned dimension specifications
+
+#### Scenario: User reuses a historical set
+
+- **WHEN** the user reuses a set that has separate saved product description, selling points, or dimension specifications
+- **THEN** each non-empty value appears in the single 商品描述 textarea
+- **AND** the original saved set remains unchanged

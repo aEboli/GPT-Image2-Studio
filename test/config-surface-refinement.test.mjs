@@ -35,7 +35,7 @@ test("wide configuration drawer uses balanced columns and route fields stay symm
   );
   assert.match(
     styles,
-    /\.config-panel \.config-route-fields \.route-config-panel\[data-route-panel="a"\] > \.field:nth-child\(4\)\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;/,
+    /\.config-panel \.config-route-fields \.route-config-panel\[data-route-panel="a"\] > \.field\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;/,
   );
   assert.match(
     styles,

@@ -312,3 +312,13 @@ TBD - created by archiving change unify-generation-loading-animation. Update Pur
 - **THEN** 动态模糊背景不再播放位移、缩放、透明度或呼吸动画
 - **AND** 百分比、阶段颜色、状态文本与可访问性语义照旧更新
 
+### Requirement: Direct Images API partial images use the existing preview event path
+
+直连 Images API 流收到中间图片时 SHALL 使用生成工作流已有的 `partial_image` 事件与预览通道，使各创作模式可按其现有订阅更新预览。
+
+#### Scenario: Direct route emits an intermediate preview
+
+- **WHEN** 直连 Images API 返回 partial image SSE 事件
+- **THEN** 生成订阅者收到 MIME 类型与所选输出格式一致的 `partial_image` data URL
+- **AND** 后续最终图像仍使用既有 `final_image` 事件保存和完成任务
+

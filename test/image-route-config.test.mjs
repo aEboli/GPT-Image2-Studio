@@ -33,6 +33,7 @@ test("image route config defaults direct text and vision model independently fro
   assert.equal(config.directImageModel, "gpt-image-2");
   assert.equal(config.directResponsesModel, DEFAULT_DIRECT_RESPONSES_MODEL);
   assert.equal(config.directResponsesModel, "gpt-5.4-mini");
+  assert.equal(config.directImageStream, false);
   assert.equal(config.endpointPath, API_ENDPOINT_RESPONSES);
   assert.equal(config.directEndpointPath, API_ENDPOINT_IMAGE_GENERATIONS);
 });
@@ -412,6 +413,7 @@ test("selected image and text/vision configs use their own direct API settings",
     directImageEndpointPath: "responses",
     directImageApiKey: "image-key",
     directImageModel: "vendor-image-pro",
+    directImageStream: true,
     directTextBaseUrl: "https://text.example.test/v1",
     directTextEndpointPath: "chat/completions",
     directTextApiKey: "text-key",
@@ -432,6 +434,7 @@ test("selected image and text/vision configs use their own direct API settings",
     responsesModel: "vendor-image-pro",
     imageModel: "vendor-image-pro",
     endpointPath: "responses",
+    directImageStream: true,
   });
 });
 
@@ -442,6 +445,7 @@ test("selected direct responses image generation uses the image model", () => {
     directImageEndpointPath: "responses",
     directImageApiKey: "image-key",
     directImageModel: "vendor-image-pro",
+    directImageStream: true,
     directTextModel: "vendor-vision-text",
   };
 
@@ -452,6 +456,7 @@ test("selected direct responses image generation uses the image model", () => {
     responsesModel: "vendor-image-pro",
     imageModel: "vendor-image-pro",
     endpointPath: "responses",
+    directImageStream: true,
   });
 });
 
@@ -462,6 +467,7 @@ test("selected direct image generation config uses the image model for image pro
     directImageEndpointPath: "images/generations",
     directImageApiKey: "image-key",
     directImageModel: "vendor-image-pro",
+    directImageStream: true,
     directTextModel: "vendor-vision-text",
   };
 
@@ -472,6 +478,7 @@ test("selected direct image generation config uses the image model for image pro
     responsesModel: "vendor-image-pro",
     imageModel: "vendor-image-pro",
     endpointPath: "images/generations",
+    directImageStream: true,
   });
 });
 

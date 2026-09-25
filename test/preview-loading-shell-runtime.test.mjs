@@ -17,7 +17,7 @@ import {
   updateGenerationLoadingShell,
 } from "../lib/generation-loading.mjs";
 import { shouldReusePreviewLoadingShell } from "../lib/preview-loading-shell.mjs";
-import { getPreviewPlaceholderState, isWaitingPreviewItem } from "../lib/preview-placeholder-state.mjs";
+import { getPreviewPlaceholderState, getStablePreviewLoadingItems, isWaitingPreviewItem } from "../lib/preview-placeholder-state.mjs";
 
 function createTestElement(tagName = "div", ownerDocument = null) {
   const element = {
@@ -581,6 +581,22 @@ test("preview placeholder exposes a stable loading key", () => {
   const state = getPreviewPlaceholderState({ item: { id: "job-42", statusStage: "generating" } });
   assert.equal(state.mode, "loading");
   assert.equal(state.loadingKey, "job-42");
+});
+
+test("running preview jobs stay newest-first with stable ties", () => {
+  const jobs = [
+    { id: "job-new", createdAt: "2026-09-26T02:00:02.000Z" },
+    { id: "job-old", createdAt: "2026-09-26T02:00:01.000Z" },
+  ];
+  assert.deepEqual(getStablePreviewLoadingItems(jobs).map((job) => job.id), ["job-new", "job-old"]);
+  assert.deepEqual(getStablePreviewLoadingItems([
+    { id: "job-latest-submitted", createdAt: "2026-09-26T02:00:02.000Z" },
+    { id: "job-earlier-submitted", createdAt: "2026-09-26T02:00:02.000Z" },
+  ]).map((job) => job.id), ["job-latest-submitted", "job-earlier-submitted"]);
+  assert.deepEqual(getStablePreviewLoadingItems([
+    { id: "job-without-time-first", updatedAt: "2026-09-26T02:00:02.000Z" },
+    { id: "job-without-time-second", updatedAt: "2026-09-26T02:00:01.000Z" },
+  ]).map((job) => job.id), ["job-without-time-first", "job-without-time-second"]);
 });
 
 test("app and stylesheet use the shared blurred loading animation without water effects", async () => {

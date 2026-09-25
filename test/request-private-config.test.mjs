@@ -76,6 +76,32 @@ test("request private config keeps route B direct image settings separate from r
   assert.equal(config.directResponsesModel, "vendor-vision-text");
 });
 
+test("request private config defaults direct image streaming to disabled", () => {
+  const config = mergeRequestPrivateConfig({ imageRoute: "b" }, {
+    imageRoute: "b",
+    directImageBaseUrl: "https://image.example.test/v1",
+    directImageApiKey: "image-key",
+  });
+
+  assert.equal(config.directImageStream, false);
+});
+
+test("request private config carries the direct image streaming choice", () => {
+  const fallback = {
+    imageRoute: "b",
+    directImageStream: false,
+    directImageBaseUrl: "https://image.example.test/v1",
+    directImageApiKey: "image-key",
+  };
+  const fields = new FormData();
+  fields.set("imageRoute", "b");
+  fields.set("directImageStream", "true");
+
+  const config = mergeRequestPrivateConfig(fields, fallback);
+
+  assert.equal(config.directImageStream, true);
+});
+
 test("request private config preserves complete root endpoint URLs", () => {
   const fallback = {
     baseUrl: "https://api.openai.com/v1",

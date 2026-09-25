@@ -2,9 +2,7 @@
 
 ## Purpose
 TBD - created by archiving change harden-project-maintenance. Update Purpose after archive.
-
 ## Requirements
-
 ### Requirement: Runtime defaults use one model source
 The system SHALL resolve the default Responses model and direct text/vision model from one shared source, and both defaults SHALL be `gpt-5.4-mini` across the local Node service and browser-private configuration.
 
@@ -371,3 +369,88 @@ Route D image-generation and image-edit requests SHALL NOT send `reasoningEffort
 - **WHEN** a PPT outline is generated through the GPT text/vision channel while image pages use Grok
 - **THEN** the outline request retains its selected GPT reasoning effort
 - **AND** the Grok page-image requests omit `reasoningEffort`
+
+### Requirement: Direct Images API streaming is configurable
+
+直连图像配置 SHALL 提供默认关闭的流式输出布尔开关，并在浏览器保存、读取和请求快照中保留该值。只有有效端点为 `images/generations` 或 `images/edits` 时，该设置 SHALL 控制上游 Images API SSE 请求，并请求两张中间预览；`responses`、`chat/completions`、文本/视觉请求及其他路由 SHALL 保持既有行为。旧配置没有该字段时 SHALL 视为关闭。
+
+#### Scenario: Streaming is disabled by default
+
+- **WHEN** 用户首次使用直连模式或读取没有该字段的旧浏览器配置
+- **THEN** 流式输出开关显示为关闭
+- **AND** 直连 Images API 请求使用普通 JSON 响应
+
+#### Scenario: User keeps direct image streaming disabled
+
+- **WHEN** 用户保持流式输出关闭并保存或提交直连图像任务
+- **THEN** 原生 Images API 请求使用普通 JSON 响应
+- **AND** 直连文本/视觉请求保持不变
+
+#### Scenario: Non-Images direct endpoint is selected
+
+- **WHEN** 直连图像端点选择 `responses` 或 `chat/completions`
+- **THEN** 流式开关不改变该协议原有请求体与响应处理
+
+### Requirement: Direct Images API stream events deliver previews and one final image
+
+启用流式输出后，直连 Images API SHALL 将 `image_generation.partial_image` / `image_edit.partial_image` 的图像内容作为 `partial_image` 事件发布，并将 completed 事件中的最终图像作为 `final_image` 发布。流中图片事件必须依据事件类型区分预览与最终图片。
+
+#### Scenario: Generation or edit emits partial images
+
+- **WHEN** Images API SSE 返回一个或多个 partial image 事件，随后返回 completed 事件
+- **THEN** 每张中间图按顺序进入现有预览流程
+- **AND** completed 图片只作为最终结果交付一次
+
+#### Scenario: Provider rejects streaming before an SSE response starts
+
+- **WHEN** 上游在返回任何 SSE 事件前明确拒绝流式请求
+- **THEN** 系统改用普通 JSON 请求重试一次
+- **AND** 记录发生过流式回退
+
+#### Scenario: Stream disconnects after it starts
+
+- **WHEN** 至少一个 SSE 事件已收到后连接中断且没有最终图像
+- **THEN** 系统报告本次请求失败或中断
+- **AND** 系统不会重新 POST 生成请求
+
+### Requirement: 路由模式可控制是否发送生图工具模型
+
+路由模式 SHALL 提供一个独立开关，控制 Responses `image_generation` 工具请求是否包含 `tools[].model`。该设置 SHALL 使用 `includeImageToolModel` 持久化，默认值 SHALL 为 `true`；旧配置缺少该字段时 SHALL 归一化为 `true`。
+
+开关开启时，路由模式的 `image_generation` 请求 SHALL 在 `tools[].model` 中发送当前生图工具模型下拉框所选的白名单模型。开关关闭时，请求 SHALL 完全省略 `tools[].model`，且 SHALL 保留模型下拉框当前选择。开关状态 SHALL 随配置保存，并在浏览器私有配置载荷中传递到服务端。
+
+该开关 SHALL 使用与「流式输出」相同的 switch 控件样式，但 SHALL NOT 改变 Responses 请求的流式行为。直连模式、Gemini、Grok 和 `/images/edits` 请求 SHALL NOT 受该设置影响。
+
+路由配置界面 SHALL 在有足够宽度时并排显示 Responses 文本模型与生图工具模型，并在两者下方显示全宽开关；窄屏布局 SHALL 将两个模型控件纵向排列。
+
+#### Scenario: 新配置默认发送所选工具模型
+
+- **WHEN** 用户首次使用路由模式，或载入的旧配置没有 `includeImageToolModel`
+- **THEN** 开关默认开启
+- **AND** Responses `image_generation` 请求的 `tools[].model` 等于当前选择的白名单模型
+
+#### Scenario: 用户关闭工具模型字段
+
+- **WHEN** 用户关闭「发送 `tools[].model`」并保存配置
+- **THEN** 路由模式的 Responses `image_generation` 请求不包含 `tools[].model`
+- **AND** 生图工具模型下拉框继续显示并保留当前选择
+- **AND** 重新打开配置后该开关仍为关闭状态
+
+#### Scenario: 用户重新启用工具模型字段
+
+- **WHEN** 用户重新开启「发送 `tools[].model`」
+- **THEN** 后续路由模式请求在 `tools[].model` 中发送下拉框当前选择的白名单模型
+
+#### Scenario: 工具模型设置不影响其他路线
+
+- **WHEN** 用户关闭路由模式的 `includeImageToolModel`
+- **THEN** 直连模式仍按自身图像模型和流式配置发送请求
+- **AND** Gemini、Grok 与图片编辑仍按其既有协议发送请求
+
+#### Scenario: 模型控件响应式对齐
+
+- **WHEN** 路由配置面板有足够横向空间
+- **THEN** Responses 文本模型和生图工具模型位于同一行
+- **AND** 开关位于两者下方并横跨整行
+- **WHEN** 路由配置面板处于窄屏布局
+- **THEN** 两个模型控件改为纵向排列

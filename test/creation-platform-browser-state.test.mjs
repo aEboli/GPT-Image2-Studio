@@ -406,7 +406,10 @@ test("applied reference analysis forwards product facts and audience strategy wi
 
   assert.match(app, /async function buildCreationReferenceAnalysisFormData\(\)[\s\S]*formData\.set\("productName"/);
   assert.match(app, /async function buildCreationReferenceAnalysisFormData\(\)[\s\S]*formData\.set\("productDescription"/);
-  assert.match(app, /async function buildCreationReferenceAnalysisFormData\(\)[\s\S]*formData\.set\("sellingPoints"/);
+  assert.doesNotMatch(
+    app.match(/async function buildCreationReferenceAnalysisFormData\(\)[\s\S]*?(?=\nasync function |\nfunction )/)?.[0] || "",
+    /formData\.set\("sellingPoints"/,
+  );
   assert.match(previewBuilder, /state\.creationReferenceAnalysis\.applied && !state\.creationReferenceAnalysis\.dirty/);
   assert.match(previewBuilder, /formData\.set\("audienceStrategy", JSON\.stringify\(audienceStrategy\)\)/);
 });

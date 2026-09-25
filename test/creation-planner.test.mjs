@@ -2818,6 +2818,27 @@ test("creation planner only injects selected size specifications into the dimens
   assert.doesNotMatch(comparisonPrompt, /145mm|110mm|350ml|Dimension specifications for this size chart only|Set-level dimension/);
 });
 
+test("creation planner extracts selling-point and dimension facts from combined product description", () => {
+  const productDescription = "透明手冲咖啡壶，轻便、易清洁\n长 13 cm，宽 2 cm，高 3 cm，重 42 g";
+  const plan = buildCreationPlan({
+    productName: "AeroPress Clear",
+    productDescription,
+    dimensionSpecs: productDescription,
+    targetLanguage: "en",
+    selectedRoles: ["benefit", "size-capacity-fit"],
+    dimensionUnitMode: "metric",
+  });
+  const benefitPrompt = plan.items.find((item) => item.role === "benefit").prompt;
+  const dimensionsPrompt = plan.items.find((item) => item.role === "size-capacity-fit").prompt;
+
+  assert.equal(plan.productDescription, productDescription);
+  assert.match(benefitPrompt, /轻便|易清洁/);
+  assert.match(dimensionsPrompt, /13 cm/);
+  assert.match(dimensionsPrompt, /2 cm/);
+  assert.match(dimensionsPrompt, /3 cm/);
+  assert.match(dimensionsPrompt, /42 g/);
+});
+
 test("creation planner converts dimension specs to the selected unit mode", () => {
   const metricPlan = buildCreationPlan({
     productName: "AeroPress Clear",

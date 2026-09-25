@@ -63,7 +63,15 @@ if (-not $targetPortInUse) {
     throw "Studio server.mjs was not found in the requested root."
   }
   $nodePath = (Get-Command node.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
-  $serverProcess = Start-Process -FilePath $nodePath -WorkingDirectory $resolvedRoot -ArgumentList "server.mjs" -Environment @{ PORT = [string]$targetPort; IMAGE_STUDIO_MOCK_IMAGE_GENERATION = $null } -WindowStyle Hidden -PassThru -ErrorAction Stop
+  $runtimeDir = Join-Path $resolvedRoot ".local\image-studio"
+  $imageStudioPath = Join-Path $runtimeDir "image-studio.exe"
+  New-Item -ItemType Directory -Path $runtimeDir -Force | Out-Null
+  $nodeFile = Get-Item -LiteralPath $nodePath
+  $imageStudioFile = Get-Item -LiteralPath $imageStudioPath -ErrorAction SilentlyContinue
+  if ($null -eq $imageStudioFile -or $imageStudioFile.Length -ne $nodeFile.Length -or $imageStudioFile.LastWriteTimeUtc -ne $nodeFile.LastWriteTimeUtc) {
+    Copy-Item -LiteralPath $nodePath -Destination $imageStudioPath -Force
+  }
+  $serverProcess = Start-Process -FilePath $imageStudioPath -WorkingDirectory $resolvedRoot -ArgumentList "server.mjs" -Environment @{ PORT = [string]$targetPort; IMAGE_STUDIO_MOCK_IMAGE_GENERATION = $null } -WindowStyle Hidden -PassThru -ErrorAction Stop
   if ($null -eq $serverProcess) { throw "Unable to start the Studio server process." }
 
   $deadline = (Get-Date).AddSeconds(20)

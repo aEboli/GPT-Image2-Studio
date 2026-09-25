@@ -1519,6 +1519,10 @@ html:is([data-ui-layout="stacked"], [data-ui-layout="tablet"], [data-ui-layout="
 
 .generation-mode-status {
   display: none;
+  appearance: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .topbar-api-check {
@@ -1564,57 +1568,120 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .generation-m
   top: 50%;
   right: 14px;
   z-index: 35;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 28px;
-  padding: 0 12px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  row-gap: 2px;
+  width: min(330px, calc(100vw - 28px));
+  min-height: 42px;
+  padding: 5px 12px;
   border-radius: 10px;
   border-color: color-mix(in srgb, var(--nav-tab-idle) 34%, var(--nav-tab-border));
   background: color-mix(in srgb, var(--nav-tab-bg) 82%, transparent);
   color: var(--text);
-  font-size: var(--type-subtitle-size);
+  font-size: var(--type-body-size);
   font-weight: 600;
   letter-spacing: 0;
-  white-space: nowrap;
   transform: translateY(-50%);
 }
 
 .generation-mode-status-dot {
   width: 7px;
   height: 7px;
+  grid-row: 1 / span 2;
+  align-self: start;
+  margin-top: 5px;
   flex: 0 0 auto;
   border-radius: 50%;
   background: currentColor;
   box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 14%, transparent);
 }
 
+.generation-mode-status-copy,
+.generation-mode-status-models,
+.generation-mode-status-text-model {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.generation-mode-status-copy {
+  line-height: 1.15;
+}
+
 .generation-mode-status-prefix,
-.generation-mode-status-divider {
+.generation-mode-status-model-label {
   color: var(--muted);
   font-size: 11px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .generation-mode-status-value {
   min-width: 0;
   overflow: hidden;
   color: inherit;
-  font-size: inherit;
+  font-size: var(--type-subtitle-size);
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .generation-mode-status[data-image-route="b"] {
+.generation-mode-status-models {
+  overflow: hidden;
+  line-height: 1.15;
+}
+
+.generation-mode-status-model-value {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--type-subtitle-size);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.generation-mode-status-text-model {
+  flex: 0 1 auto;
+  overflow: hidden;
+  margin-left: 4px;
+  padding-left: 8px;
+  border-left: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+.generation-mode-status-text-model .generation-mode-status-model-value {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.generation-mode-status[data-image-route="b"] {
   border-color: color-mix(in srgb, var(--accent) 42%, var(--nav-tab-border));
   color: var(--accent);
 }
 
-html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .generation-mode-status[data-image-route="c"],
-html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .generation-mode-status[data-image-route="d"] {
+.generation-mode-status[data-image-route="c"],
+.generation-mode-status[data-image-route="d"] {
   border-color: color-mix(in srgb, var(--success) 42%, var(--nav-tab-border));
   color: var(--success);
+}
+
+html:is([data-ui-layout="stacked"], [data-ui-layout="tablet"], [data-ui-layout="mobile"]) .generation-mode-status {
+  position: static;
+  grid-column: 1;
+  width: min(100%, 460px);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  row-gap: 2px;
+  min-height: 42px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  transform: none;
 }
 
 .header-pill,
@@ -1637,7 +1704,14 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .generation-m
 }
 
 .header-pill.generation-mode-status {
-  gap: 6px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  row-gap: 2px;
+  min-height: 42px;
+  padding: 5px 12px;
+  border-radius: 10px;
 }
 
 .header-button,
@@ -7169,6 +7243,11 @@ textarea {
   transform: scale(0.99);
 }
 
+.direct-image-stream-field .direct-image-stream-toggle,
+.route-tool-model-toggle-field .route-tool-model-toggle {
+  border-radius: 8px;
+}
+
 .image-decomposition-workspace {
   display: grid;
   grid-template-columns: var(--studio-grid-left, 392px) minmax(0, 1fr);
@@ -8338,9 +8417,7 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
   font-weight: 700;
 }
 
-#creationProductNameInput,
-#creationSellingPointsInput,
-#creationDimensionSpecsInput {
+#creationProductNameInput {
   min-height: 44px;
   height: 44px;
 }
@@ -8348,11 +8425,6 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
 #creationProductDescriptionInput {
   min-height: 72px;
   height: 72px;
-}
-
-#creationProductDescriptionInput,
-#creationSellingPointsInput,
-#creationDimensionSpecsInput {
   overflow-y: hidden;
   resize: vertical;
 }
@@ -18393,17 +18465,6 @@ html[data-ui-layout="mobile"] .creation-record-browser .asset-record-picker.is-o
   background: var(--seal);
   vertical-align: 1px;
 }
-/* 族色短竖线：字段小标题左侧一道 2px 族色，随视图族变色，作段落的起首标记 */
-.field-heading::before {
-  content: "";
-  flex: 0 0 auto;
-  width: 2px;
-  height: 0.82em;
-  margin-right: 7px;
-  border-radius: 1px;
-  background: color-mix(in srgb, var(--accent) 72%, transparent);
-}
-
 /*
  * 本来还想给 .studio-panel 上沿加一道族色渐隐，放弃了：那条规则与
  * .lightbox-dialog 共用，没有 position: relative，补上会影响弹窗定位。
@@ -18813,12 +18874,6 @@ html:not([data-theme="light"]) .product-image-import-card.is-selected input {
   white-space: nowrap;
 }
 
-@media (min-width: 600px) {
-  .config-panel .config-route-fields .route-config-panel[data-route-panel="a"] > .field:nth-child(4) {
-    grid-column: 1 / -1;
-  }
-}
-
 @media (min-width: 1120px) {
   .config-drawer .drawer-panel {
     width: min(960px, calc(100vw - 24px));
@@ -19027,10 +19082,6 @@ html:not([data-theme="light"]) .product-image-import-card.is-selected input {
   visibility: visible;
 }
 
-.config-panel .field-heading::before {
-  content: none;
-}
-
 .config-panel .field-heading.inline {
   min-height: 32px;
   flex-wrap: wrap;
@@ -19111,23 +19162,58 @@ html:not([data-theme="light"]) .product-image-import-card.is-selected input {
     column-gap: 18px;
   }
 
+  .config-panel .config-route-fields .route-config-panel[data-route-panel="a"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 18px;
+  }
+
+  .config-panel .config-route-fields .route-config-panel[data-route-panel="a"] > .field {
+    grid-column: 1 / -1;
+  }
+
+  .config-panel .config-route-fields .route-config-panel[data-route-panel="a"] > .route-text-model-field {
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  .config-panel .config-route-fields .route-config-panel[data-route-panel="a"] > .route-tool-model-field {
+    grid-column: 2;
+    grid-row: 3;
+  }
+
   .config-panel .config-route-fields .route-config-panel[data-route-panel="b"] > .field {
     grid-column: 1;
   }
 
-  .config-panel .config-route-fields .route-config-panel[data-route-panel="b"] > .field:nth-child(n + 4) {
-    grid-column: 2;
-  }
-
-  .config-panel .config-route-fields .route-config-panel[data-route-panel="b"] > .field:nth-child(3n + 1) {
+  .config-panel .config-route-fields .route-config-panel[data-route-panel="b"] > .field:nth-child(1) {
     grid-row: 1;
   }
 
-  .config-panel .config-route-fields .route-config-panel[data-route-panel="b"] > .field:nth-child(3n + 2) {
+  .config-panel .config-route-fields .route-config-panel[data-route-panel="b"] > .field:nth-child(2) {
     grid-row: 2;
   }
 
-  .config-panel .config-route-fields .route-config-panel[data-route-panel="b"] > .field:nth-child(3n) {
+  .config-panel .config-route-fields .route-config-panel[data-route-panel="b"] > .field:nth-child(3) {
+    grid-row: 3;
+  }
+
+  .config-panel .config-route-fields .route-config-panel[data-route-panel="b"] > .direct-image-stream-field {
+    grid-column: 1 / -1;
+    grid-row: 4;
+  }
+
+  .config-panel .config-route-fields .route-config-panel[data-route-panel="b"] > .field:nth-child(5) {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .config-panel .config-route-fields .route-config-panel[data-route-panel="b"] > .field:nth-child(6) {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .config-panel .config-route-fields .route-config-panel[data-route-panel="b"] > .field:nth-child(7) {
+    grid-column: 2;
     grid-row: 3;
   }
 
@@ -19647,28 +19733,40 @@ html:not([data-theme="light"]) .product-image-import-card.is-selected input {
 .prompt-template-library-grid[data-view="list"] .prompt-template-library-card {
   display: grid;
   grid-template-columns: 148px minmax(0, 1fr);
+  height: var(--prompt-template-card-height, auto);
+  min-height: 0;
   align-items: start;
 }
 
 .prompt-template-library-grid[data-view="list"] .prompt-template-library-media,
 .prompt-template-library-grid[data-view="list"] .prompt-template-library-preview-button {
-  height: auto;
+  height: 100%;
+  min-height: 0;
 }
 
 .prompt-template-library-grid[data-view="list"] .prompt-template-library-preview-button img {
   width: 100%;
-  height: auto;
+  height: 100%;
   aspect-ratio: auto;
   object-fit: contain;
 }
 
 .prompt-template-library-grid[data-view="list"] .prompt-template-library-content {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
   align-content: start;
   padding: 13px 96px 13px 15px;
 }
 
 .prompt-template-library-grid[data-view="list"] .prompt-template-library-prompt {
+  min-height: 0;
   font-size: var(--prompt-template-list-font-size, 15px);
+  display: -webkit-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--prompt-template-prompt-lines, 6);
 }
 
 .prompt-template-library-grid[data-view="image"] .prompt-template-library-card {
@@ -19885,7 +19983,7 @@ html:not([data-theme="light"]) .product-image-import-card.is-selected input {
 
   .prompt-template-library-grid[data-view="list"] .prompt-template-library-media,
   .prompt-template-library-grid[data-view="list"] .prompt-template-library-preview-button {
-    height: auto;
+    height: 100%;
   }
 
   .prompt-template-library-grid[data-view="list"] .prompt-template-library-content {

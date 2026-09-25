@@ -1,6 +1,6 @@
 {
   "name": "gpt-image2-studio",
-  "version": "0.2.033",
+  "version": "0.2.043",
   "private": true,
   "type": "module",
   "main": "desktop/main.mjs",
@@ -13,6 +13,7 @@
     "test:desktop-smoke": "electron . --desktop-smoke",
     "generate": "node generate-image.mjs",
     "help": "node generate-image.mjs --help",
+    "import:youmind": "node scripts/import-youmind-prompt-library.mjs",
     "sync:public-lib": "node scripts/sync-public-lib.mjs",
     "build:extension": "node scripts/build-product-image-extension.mjs",
     "build:installer": "node scripts/build-windows-installer.mjs",

@@ -23,6 +23,7 @@ test("config store returns empty public config before any save", async () => {
   assert.equal(config.directApiKeyConfigured, false);
   assert.equal(config.directApiKeyMask, undefined);
   assert.equal(config.directImageModel, "gpt-image-2");
+  assert.equal(config.directImageStream, false);
   assert.equal(config.directResponsesModel, "gpt-5.4-mini");
   assert.equal(config.protocolBaseUrl, "https://api.openai.com/v1");
   assert.equal(config.protocolApiKeyConfigured, false);

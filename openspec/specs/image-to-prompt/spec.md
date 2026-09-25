@@ -214,20 +214,32 @@ When the browser reads a valid saved template array containing one or more legac
 
 ### Requirement: Prompt Kit provides a layered static template library
 
-Prompt Kit SHALL provide a static library organized as一级分类、二级分类和模板条目三级结构。每个二级分类 SHALL contain exactly ten reusable prompt templates, each with a stable ID, non-empty name, non-empty prompt text and a preview image URL. The library SHALL be shipped with the application and SHALL NOT require a request to the referenced third-party site at runtime.
+Prompt Kit SHALL provide a static library with exactly three top-level filter dimensions: “使用场景”, “风格” and “主体”. Their second-level labels SHALL match the user-provided screenshot: 使用场景 SHALL contain 10 labels, 风格 SHALL contain 16 labels, and 主体 SHALL contain 15 labels. Each source-backed template SHALL have one stable ID, one non-empty name, one complete non-empty prompt and one local raster preview. The catalog SHALL use the official YouMind GPT Image 2 prompt snapshot, retaining each record's CMS media URL, YouMind detail page and CC BY 4.0 attribution. A canonical source-backed template MAY be reused by multiple second-level categories within a dimension, while each second-level category SHALL expose at least 20 distinct canonical template IDs before search filtering. The library SHALL be shipped with the application and SHALL NOT request the referenced third-party site at runtime. The all-items view SHALL contain each canonical stable template ID once.
 
 #### Scenario: User opens the template library
 
 - **WHEN** the user opens Prompt Kit
-- **THEN** the library shows the top-level categories and their second-level categories
-- **AND** the default selected view is the list view
-- **AND** the current category contains ten or more visible reusable templates
+- **THEN** the library shows the three top-level dimensions and all 41 screenshot labels under their matching dimension
+- **AND** the default selected dimension is 使用场景 with no second-level filter selected
+- **AND** the all-items result contains 126 unique paired templates
+
+#### Scenario: User filters a paired template by each dimension
+
+- **WHEN** the user selects the matching second-level category under 使用场景, 风格 or 主体
+- **THEN** the same stable template ID, local image and prompt are returned for every matching dimension
+- **AND** each matching second-level category shows the canonical pair at most once
 
 #### Scenario: User selects a second-level category
 
-- **WHEN** the user selects a second-level category
-- **THEN** the library shows exactly the ten templates belonging to that category before search filtering
-- **AND** each template exposes a stable name, prompt and preview image
+- **WHEN** the user selects a second-level category under one of the three dimensions
+- **THEN** the library shows at least 20 distinct source-backed entries mapped to that category before search filtering
+- **AND** each result exposes its stable name, complete prompt and paired local preview
+
+#### Scenario: Every screenshot category has source-backed coverage
+
+- **WHEN** the user selects any of the 41 second-level categories
+- **THEN** the library shows at least 20 distinct canonical image-prompt pairs
+- **AND** reused entries retain the same source image, prompt and attribution
 
 ### Requirement: Prompt Kit supports search and two browsing views
 
@@ -254,20 +266,64 @@ The browser SHALL support filtering the current library scope by category name, 
 
 ### Requirement: Prompt library images and prompts remain paired
 
-Every source-backed library entry SHALL use the preview image, display name and reusable prompt from the same source record. Repeated attachments from one source detail page SHALL remain distinct entries with their own image URL, while sharing only the source prompt when the source provides one. A library entry SHALL NOT receive an unrelated image through positional cycling or a reused fallback image.
+Every library entry SHALL use exactly one local preview image and the complete prompt belonging to that same record. Every current filtered scope SHALL contain each stable ID at most once. A preview path MAY appear in multiple category scopes only when it is the same canonical source record; it SHALL NOT be paired with a different prompt. The library SHALL omit entries without either a local image or non-empty prompt, and SHALL NOT use generic generated previews or unrelated fallback images. Existing YouMind source records SHALL retain their source attribution. User-provided source material SHALL retain the provided image and prompt as one local record.
 
 #### Scenario: User browses YouMind-backed profile templates
 
-- **WHEN** the user opens the profile/avatar category
-- **THEN** each local preview image maps to the matching YouMind source title and prompt
-- **AND** the image and prompt keep their source detail-page attribution
-- **AND** no local preview path is reused by another profile/avatar entry
+- **WHEN** the user opens a category containing a YouMind-backed entry
+- **THEN** each local preview maps to its matching source name and prompt
+- **AND** the image and prompt retain their source detail-page attribution
+- **AND** a reused preview path always refers to the same canonical source ID and prompt
 
-#### Scenario: User browses an offline non-profile template
+#### Scenario: User browses a YouMind kitchen record
 
-- **WHEN** a template has no source photograph
-- **THEN** its deterministic offline preview uses the same category and template variant as its prompt
-- **AND** the preview is not substituted with a photograph from another template
+- **WHEN** the user selects personal avatar, photography or portrait/selfie filters
+- **THEN** the official YouMind kitchen image appears with its complete website prompt
+- **AND** the entry appears only once in the all-items view
+
+#### Scenario: User browses an offline YouMind template
+
+- **WHEN** the user browses a YouMind template while the source website is unavailable
+- **THEN** its local preview remains paired with the complete website prompt
+- **AND** the library does not substitute a generated or unrelated preview
+
+#### Scenario: The library loads offline
+
+- **WHEN** the application runs without access to the source website
+- **THEN** all 126 canonical image and prompt records remain available from bundled local files
+- **AND** every screenshot category still exposes at least 20 placements without network access
+
+### Requirement: Prompt library list view follows preview image geometry
+
+In list view, each template card SHALL use the preview image's intrinsic aspect ratio and rendered media width to determine its height. The text content area SHALL occupy the same vertical height as the image, wrap within its column, and truncate excess prompt text with a visible multiline ellipsis. Image view SHALL continue to preserve each image's intrinsic ratio independently.
+
+#### Scenario: A list prompt is longer than its paired image
+
+- **WHEN** a template prompt exceeds the available height beside its preview image
+- **THEN** the card height remains determined by the image ratio
+- **AND** the prompt remains inside the text column with a multiline ellipsis
+
+### Requirement: Returning from a template preview restores the template library
+
+When a Prompt Kit preview is open, the left “返回模板库” action SHALL close only the preview lightbox and SHALL keep the template library open with the active category, subcategory, search, view and scroll position. The separate top-right “关闭” action MAY close the template library as its existing behavior.
+
+#### Scenario: User returns from a template preview
+
+- **WHEN** the user activates “返回模板库”
+- **THEN** the preview lightbox closes
+- **AND** the Prompt Kit list returns at the previous scroll position
+- **AND** the active category and subcategory remain selected
+
+#### Scenario: User clicks the preview backdrop
+
+- **WHEN** the user clicks the blank backdrop or presses Escape while a template preview is open
+- **THEN** only the preview lightbox closes
+- **AND** the Prompt Kit list remains open at the previous scroll position
+
+#### Scenario: User explicitly closes the template library
+
+- **WHEN** the user activates the top-right “关闭” action in the preview surface
+- **THEN** both the preview and Prompt Kit library close
 
 ### Requirement: Prompt library templates can be previewed and applied
 

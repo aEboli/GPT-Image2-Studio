@@ -30,8 +30,8 @@ const generationClientPath = new URL("../lib/generation-client.mjs", import.meta
 const generationLogPanelPath = new URL("../lib/generation-log-panel.mjs", import.meta.url);
 const generationLogStorePath = new URL("../lib/generation-log-store.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20260923-prompt-template-library-4";
-const appAssetVersion = "20260923-prompt-template-library-4";
+const stylesAssetVersion = "20260926-route-tool-model-toggle-1";
+const appAssetVersion = "20260926-route-tool-model-toggle-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
 const creationQueueModuleAssetVersion = "20260915-mode-generation-controls-1";
 const quickBlendModuleAssetVersion = "20260608-quick-blend-time-sort-1";
@@ -564,7 +564,7 @@ test("filmstrip keeps all prompt queue jobs within the fifteen-task window", asy
     () => "",
     () => "",
     () => [],
-    (items) => [...items].reverse(),
+    (items) => items,
     () => [],
     15,
     50,
@@ -574,7 +574,7 @@ test("filmstrip keeps all prompt queue jobs within the fifteen-task window", asy
 
   assert.deepEqual(
     entries.map((entry) => entry.item.id),
-    Array.from({ length: 15 }, (_, index) => `job-${index + 1}`),
+    Array.from({ length: 15 }, (_, index) => `job-${16 - index}`),
   );
 });
 
@@ -625,7 +625,7 @@ test("filmstrip keeps the initial baseline and current-session results within a 
     (item) => String(item?.size || ""),
     (value) => String(value || ""),
     (items) => items,
-    (items) => [...items].reverse(),
+    (items) => items,
     () => [],
     15,
     50,
@@ -633,7 +633,7 @@ test("filmstrip keeps the initial baseline and current-session results within a 
 
   const entries = getFilmstripItems();
 
-  assert.deepEqual(entries.slice(0, 15).map((entry) => entry.key), Array.from({ length: 15 }, (_, index) => `job:job-${index + 1}`));
+  assert.deepEqual(entries.slice(0, 15).map((entry) => entry.key), Array.from({ length: 15 }, (_, index) => `job:job-${16 - index}`));
   assert.equal(entries.filter((entry) => entry.key.startsWith("job:")).length, 15);
   assert.equal(entries.filter((entry) => entry.key.startsWith("file:")).length, 10);
   assert.deepEqual(entries.filter((entry) => entry.key.startsWith("file:")).map((entry) => entry.item.filename), baselineFilenames);
@@ -2199,7 +2199,7 @@ test("studio panels start without redundant title blocks and merge parameters un
   assert.match(app, /const REASONING_LABELS = \{[\s\S]*low: "Low",[\s\S]*medium: "Medium",[\s\S]*high: "High",[\s\S]*xhigh: "XHigh",[\s\S]*\};/);
   assert.match(app, /const REASONING_ESTIMATES = \{[\s\S]*low: "30s\+",[\s\S]*medium: "90s\+",[\s\S]*high: "150s\+",[\s\S]*xhigh: "210s\+",[\s\S]*\};/);
   assert.match(app, /option\.textContent = estimate \? `\$\{label\} ~\$\{estimate\}` : label;/);
-  assert.match(html, /<div class="advanced-controls">[\s\S]*<label class="compact-field">[\s\S]*<span data-ui-i18n="outputFormat">输出格式<\/span>[\s\S]*<\/label>[\s\S]*<label class="compact-field">[\s\S]*<span data-ui-i18n="quality">质量<\/span>[\s\S]*<select id="qualityInput" name="quality"><\/select>[\s\S]*<\/label>[\s\S]*<div class="parameter-meta" aria-label="工具模型" data-ui-i18n-aria-label="toolModelMeta">[\s\S]*<span data-ui-i18n="toolModel">工具模型<\/span>[\s\S]*<strong id="parameterToolModel">gpt-image-2<\/strong>[\s\S]*<\/div>[\s\S]*<\/div>/);
+  assert.match(html, /<div class="advanced-controls">[\s\S]*<label class="compact-field">[\s\S]*<span data-ui-i18n="outputFormat">输出格式<\/span>[\s\S]*<\/label>[\s\S]*<label class="compact-field">[\s\S]*<span data-ui-i18n="quality">质量<\/span>[\s\S]*<select id="qualityInput" name="quality"><\/select>[\s\S]*<\/label>[\s\S]*<div class="parameter-meta" aria-label="当前生图调用" data-ui-i18n-aria-label="activeCallMeta"[^>]*>[\s\S]*<span data-ui-i18n="activeCall">当前调用<\/span>[\s\S]*<strong id="parameterGenerationMode">路由模式<\/strong>[\s\S]*<span data-ui-i18n="imageModel">生图模型<\/span>[\s\S]*<strong id="parameterToolModel">gpt-image-2<\/strong>[\s\S]*<\/div>[\s\S]*<\/div>/);
   assert.doesNotMatch(html, /<p>工具模型：/);
   assert.doesNotMatch(html, /<p>质量：/);
   assert.doesNotMatch(html, /<details class="advanced-box"/);
@@ -2437,7 +2437,7 @@ test("theme language switch supports English from the config drawer", async () =
   assert.match(app, /function normalizeUiLanguage\(language\) \{[\s\S]*return language === "en" \? "en" : "zh-CN";/);
   assert.match(app, /document\.documentElement\.lang = normalized;/);
   assert.match(app, /function applyUiLanguageText\(\) \{[\s\S]*document\.querySelectorAll\("\[data-ui-i18n\]"\)[\s\S]*document\.querySelectorAll\("\[data-ui-i18n-aria-label\]"\)[\s\S]*document\.querySelectorAll\("\[data-ui-i18n-placeholder\]"\)/);
-  assert.match(app, /function getUiImageRouteLabel\(imageRoute\) \{[\s\S]*modeDirect[\s\S]*modeProtocol[\s\S]*modeGrok[\s\S]*modeRoute/);
+  assert.match(app, /function getUiImageRouteLabel\(imageRoute\) \{[\s\S]*directMode[\s\S]*protocolMode[\s\S]*modeGrok[\s\S]*routeMode/);
   assert.match(app, /refs\.uiLanguageOptions\.forEach\(\(button\) => \{[\s\S]*button\.classList\.toggle\("is-active", isActive\);[\s\S]*button\.setAttribute\("aria-pressed", String\(isActive\)\);/);
   assert.match(app, /refs\.themeNavAction\.textContent = getUiLanguageText\("themeMenu"\);/);
   assert.match(
@@ -4416,12 +4416,10 @@ test("creation mode has product references without a separate style-reference mo
   assert.ok(creationIndustrySearchInput);
   assert.doesNotMatch(creationIndustrySearchInput, /placeholder=/);
   assert.doesNotMatch(html, /placeholder="搜索三级\/四级类目名或编码"/);
-  assert.match(html, /id="creationSellingPointsInput"[\s\S]*id="creationDimensionSpecsInput"[\s\S]*name="dimensionSpecs"[\s\S]*例如：长 13 cm，宽 2 cm，高 3 cm，重 42 g/);
-  assert.match(html, /id="creationDimensionSpecsInput"[\s\S]*id="creationDimensionUnitModeInput"[\s\S]*name="dimensionUnitMode"[\s\S]*<option value="metric">[\s\S]*<option value="imperial">[\s\S]*<option value="both" selected>/);
+  assert.doesNotMatch(html, /id="creationSellingPointsInput"|id="creationDimensionSpecsInput"|name="sellingPoints"|name="dimensionSpecs"/);
+  assert.match(html, /id="creationDimensionUnitModeInput"[\s\S]*name="dimensionUnitMode"[\s\S]*<option value="metric">[\s\S]*<option value="imperial">[\s\S]*<option value="both" selected>/);
   assert.doesNotMatch(html, /写清商品是什么|每行或用逗号分隔|只用于尺寸规格图/);
-  assert.match(html, /id="creationProductDescriptionInput"[\s\S]*rows="2"/);
-  assert.match(html, /id="creationSellingPointsInput"[\s\S]*rows="1"/);
-  assert.match(html, /id="creationDimensionSpecsInput"[\s\S]*rows="1"/);
+  assert.match(html, /id="creationProductDescriptionInput"[\s\S]*rows="2"[\s\S]*maxlength="1320"[\s\S]*placeholder="例如：透明手冲咖啡壶，适合办公室和露营，轻盈清透。"/);
   assert.match(html, /id="creationSkuGenerationEnabledInput" name="skuGenerationEnabled" type="checkbox" checked/);
   assert.match(html, /id="creationInfographicRebuildEnabledInput" name="infographicRebuildEnabled" type="checkbox" \/>/);
   assert.match(html, /<div class="creation-control-row creation-option-grid">[\s\S]*id="creationImageCountInput"[\s\S]*id="creationPlatformInput"[\s\S]*id="creationReasoningEffortInput"[\s\S]*id="creationTargetLanguageInput"[\s\S]*id="creationOutputFormatInput"[\s\S]*id="creationRatioInput"[\s\S]*id="creationSizeInput"[\s\S]*id="creationQualityInput"[\s\S]*id="creationSkuGenerationRuleInput"[\s\S]*id="creationDimensionUnitModeInput"[\s\S]*id="creationSkuGenerationEnabledInput"[\s\S]*id="creationInfographicRebuildEnabledInput"[\s\S]*id="creationListingAgentEnabledInput"[\s\S]*id="creationIndustryTemplateBrowser"/);
@@ -4440,10 +4438,10 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(styles, /\.creation-reference-role\s*\{/);
   // option 弹窗由操作系统绘制，必须显式给不透明底色与字色，并随主题切换。
   assert.match(styles, /\.creation-reference-role option\s*\{[\s\S]*background:\s*var\(--bg-soft\);[\s\S]*color:\s*var\(--text\);/);
-  assert.match(styles, /#creationProductNameInput,\s*#creationSellingPointsInput,\s*#creationDimensionSpecsInput\s*\{[\s\S]*height:\s*44px;/);
+  assert.match(styles, /#creationProductNameInput\s*\{[\s\S]*height:\s*44px;/);
   assert.match(styles, /#creationProductDescriptionInput\s*\{[\s\S]*height:\s*72px;/);
-  assert.match(styles, /#creationProductDescriptionInput,\s*#creationSellingPointsInput,\s*#creationDimensionSpecsInput\s*\{[\s\S]*overflow-y:\s*hidden;[\s\S]*resize:\s*vertical;/);
-  assert.doesNotMatch(styles, /#creationSellingPointsInput,\s*#creationDimensionSpecsInput\s*\{[^}]*resize:\s*none;/);
+  assert.match(styles, /#creationProductDescriptionInput\s*\{[\s\S]*overflow-y:\s*hidden;[\s\S]*resize:\s*vertical;/);
+  assert.doesNotMatch(styles, /#creationSellingPointsInput|#creationDimensionSpecsInput/);
   assert.match(styles, /\.creation-reference-analysis-panel\s*\{/);
   assert.match(styles, /\.creation-reference-analysis-panel \.reference-analysis-head\s*\{[\s\S]*grid-template-columns:\s*auto minmax\(0,\s*1fr\) auto;/);
   assert.match(styles, /\.creation-reference-analysis-head-copy\s*\{[\s\S]*grid-column:\s*1;[\s\S]*grid-row:\s*1;[\s\S]*display:\s*flex;/);
@@ -4568,7 +4566,7 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(app, /creationPlatformInput: document\.querySelector\("#creationPlatformInput"\)/);
   assert.doesNotMatch(app, /creationScenarioInput: document\.querySelector\("#creationScenarioInput"\)/);
   assert.doesNotMatch(app, /creationVisualLanguageInput: document\.querySelector\("#creationVisualLanguageInput"\)/);
-  assert.match(app, /creationDimensionSpecsInput: document\.querySelector\("#creationDimensionSpecsInput"\)/);
+  assert.doesNotMatch(app, /creationSellingPointsInput|creationDimensionSpecsInput/);
   assert.match(app, /creationDimensionUnitModeInput: document\.querySelector\("#creationDimensionUnitModeInput"\)/);
   assert.match(app, /creationIndustryTemplateBrowser: document\.querySelector\("#creationIndustryTemplateBrowser"\)/);
   assert.match(app, /creationIndustryTemplateTrigger: document\.querySelector\("#creationIndustryTemplateTrigger"\)/);
@@ -4787,7 +4785,7 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(app, /function previewCreationPlan\(\) \{/);
   assert.match(app, /function resetCreationDraftPreview\(\) \{/);
   assert.match(app, /const file = getCreationReferenceGenerationFile\(item\);[\s\S]*formData\.append\("referenceImages", file\)/);
-  assert.match(app, /formData\.set\("dimensionSpecs", refs\.creationDimensionSpecsInput\.value\.trim\(\)\)/);
+  assert.match(app, /formData\.set\("dimensionSpecs", productDescription\)/);
   assert.match(app, /formData\.set\("dimensionUnitMode", refs\.creationDimensionUnitModeInput\.value \|\| "both"\)/);
   assert.match(app, /formData\.set\("referenceImageRoles", JSON\.stringify\(buildCreationReferenceRolePayload\(\)\)\)/);
   assert.match(app, /formData\.set\("skuSubjects", JSON\.stringify\(buildCreationSkuSubjectPayload\(\)\)\)/);
@@ -4827,7 +4825,7 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(app, /const DEFAULT_CREATION_SKU_GENERATION_RULE = "color-name-under-subject";/);
   assert.match(app, /"color-name-under-subject": "显示颜色"/);
   assert.match(app, /formData\.set\("industryTemplate", resolveCreationReferenceAnalysisContextCategoryValue\(\{ analysisDirty: state\.creationReferenceAnalysis\.dirty,[^\n]*categorySuggestionStale: state\.creationReferenceAnalysis\.categorySuggestionStale,[^\n]*previousAutoCategoryValue: state\.creationReferenceAnalysis\.categoryTemplateSuggestion \}\)\)/);
-  assert.match(app, /\[refs\.creationProductNameInput, refs\.creationProductDescriptionInput, refs\.creationSellingPointsInput, refs\.creationDimensionSpecsInput\]\.forEach\(\(input\) => input\.addEventListener\("input", resetCreationDraftPreview\)\)/);
+  assert.match(app, /\[refs\.creationProductNameInput, refs\.creationProductDescriptionInput\]\.forEach\(\(input\) => input\.addEventListener\("input", resetCreationDraftPreview\)\)/);
   assert.match(app, /\[refs\.creationDimensionUnitModeInput, refs\.creationTargetLanguageInput, refs\.creationPlatformInput\]\.forEach\(\(input\) => input\?\.addEventListener\("change", resetCreationDraftPreview\)\)/);
   assert.match(app, /refs\.creationImageCountInput\.addEventListener\("change",\s*\(\) => \{[\s\S]*syncCreationSelectedRolesToCount\(\)[\s\S]*requestCreationPlanPreview\(\)/);
   assert.match(app, /refs\.creationImageCountInput\.addEventListener\("click", syncCreationSelectedRolesToCurrentCount\)/);
@@ -5583,9 +5581,8 @@ test("asset record views include PPT records and Creation set records", async ()
   assert.match(app, /state\.creation\.sets = nextSets;[\s\S]*renderCreationRecordView\(\);/);
   assert.match(app, /applyCreationSetToForm\(selectedSet\);[\s\S]*state\.creation\.currentSet = normalizeCreationSetForView\(selectedSet\);[\s\S]*setActiveView\("creation"\);/);
   assert.match(app, /refs\.creationProductNameInput\.value = normalized\.productName \|\| "";/);
-  assert.match(app, /refs\.creationProductDescriptionInput\.value = normalized\.productDescription \|\| "";/);
-  assert.match(app, /refs\.creationSellingPointsInput\.value = normalized\.sellingPoints\.join\("\\n"\);/);
-  assert.match(app, /refs\.creationDimensionSpecsInput\.value = normalized\.dimensionSpecs \|\| "";/);
+  assert.match(app, /function formatCreationProductDetails\(set = \{\}\) \{[\s\S]*set\.productDescription,[\s\S]*set\.dimensionSpecs[\s\S]*\.join\("\\n"\)/);
+  assert.match(app, /refs\.creationProductDescriptionInput\.value = formatCreationProductDetails\(normalized\);/);
   assert.match(app, /setCreationSelectValue\(refs\.creationTargetLanguageInput, normalized\.targetLanguage, "en"\);/);
   assert.match(app, /setCreationSelectValue\(refs\.creationPlatformInput, normalized\.platform, "universal"\);/);
   assert.match(app, /setCreationIndustryTemplateValue\(normalized\.industryTemplate/);

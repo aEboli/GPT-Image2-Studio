@@ -16,7 +16,7 @@ function getFunctionSource(source, name, nextName) {
 const statusLabel = new Function(
   "CREATION_ITEM_STATUS_LABELS",
   `${getFunctionSource(app, "getCreationStatusLabel", "getCreationItemStatusLabel")}
-   ${getFunctionSource(app, "getCreationItemStatusLabel", "getCreationSellingPoints")}
+   ${getFunctionSource(app, "getCreationItemStatusLabel", "getCreationSelectedLanguage")}
    return getCreationItemStatusLabel;`,
 )({ completed: "已完成", failed: "失败", generating: "生成中" });
 

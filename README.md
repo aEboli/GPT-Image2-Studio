@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.033-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.043-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installers-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,7 +10,7 @@
 
 Prompt-to-image, reference analysis, editing, product-image replication, ecommerce sets, portraits, article illustrations, PPT generation, and asset history in one browser-based workspace.
 
-Current version: `v0.2.033`
+Current version: `v0.2.043`
 
 [Chinese README](./README.zh-CN.md)
 
@@ -47,9 +47,9 @@ Windows 脚本入口（启动器、Native Messaging 安装/卸载、图片资源
 
 ### Windows desktop app (recommended)
 
-Download `GPT-Image2-Studio-Desktop-Setup-v0.2.033-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
+Download `GPT-Image2-Studio-Desktop-Setup-v0.2.043-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
 
-For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.033-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
+For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.043-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
 
 For desktop development, Electron 43 requires Node.js 22.12 or newer:
 
@@ -60,7 +60,7 @@ cmd /c npm run desktop
 
 ### Windows browser installer
 
-The legacy browser-installer flow remains documented for local builds, but the `v0.2.033` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
+The legacy browser-installer flow remains documented for local builds, but the `v0.2.043` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
 
 ## Configuration
 
@@ -519,7 +519,7 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 - The source and lockfile versions are authoritative; tags use `v<version>`.
 - Versions use `major.minor.patch` with a three-digit patch segment: major bumps reset minor and patch, minor bumps reset patch, feature bumps add `0.010`, and ordinary updates add `0.001`.
 - Use `npm run release:major`, `npm run release:minor`, `npm run release:feature`, or `npm run release:patch` with `--summary`; each release changes exactly one level.
-- Current release notes: [v0.2.033](./docs/releases/v0.2.033.md).
+- Current release notes: [v0.2.043](./docs/releases/v0.2.043.md).
 - Windows packages are distributed through [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Check the release notes for hashes and signing status.
 - `npm run check:release:strict` requires a clean worktree and a matching tag on the current commit.
 
@@ -534,7 +534,15 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 
 ## Version history
 
-Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.033](./docs/releases/v0.2.033.md).
+Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.043](./docs/releases/v0.2.043.md).
+
+### v0.2.043
+
+- Added the YouMind GPT Image 2 Prompt Kit snapshot as a local, source-attributed library with scenario, visual-style, and subject taxonomy, paired previews, search, list/image browsing, lightbox review, apply, and personal-template actions.
+- Added the Product Image Replication Workbench for up to 15 mother images, evidence-backed product facts and audience strategy, a bounded workspace-by-channel-by-direction task board, English prompts with Simplified Chinese counterparts, and per-task or batch generation.
+- Added a Route-mode image tool model selector with an explicit enable/disable switch. Queued jobs freeze the effective tool model and quality settings, while loading shells, filmstrips, retries, recovery polling, and partial-preview provenance keep long generations inspectable.
+- Added COS cosplay reference assets for Portrait Mode, merged Creation product description, selling-point, and dimension inputs without dropping historical facts, and refreshed the Windows PowerShell 7.4+ launcher and port display.
+- Synced browser modules and release contracts, including the new local prompt assets, favicon, OpenSpec changes, and regression coverage for the updated workbench behavior.
 
 ### v0.2.033
 

@@ -116,6 +116,15 @@ export function normalizeImageRoute(value) {
   return IMAGE_ROUTE_A;
 }
 
+export function normalizeDirectImageStream(value, fallback = false) {
+  if (typeof value === "boolean") return value;
+  if (value === 0 || value === 1) return Boolean(value);
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (["false", "0", "off", "no"].includes(normalized)) return false;
+  if (["true", "1", "on", "yes"].includes(normalized)) return true;
+  return fallback;
+}
+
 export function normalizeApiEndpointPath(value, fallback = API_ENDPOINT_RESPONSES) {
   const normalized = String(value || "").trim().replace(/^\/+|\/+$/g, "").toLowerCase();
   if (API_ENDPOINT_PATHS.includes(normalized)) {
@@ -431,7 +440,9 @@ export function normalizeImageRouteConfig(
 
   return {
     imageRoute: normalizeImageRoute(source.imageRoute || source.generationRoute),
+    directImageStream: normalizeDirectImageStream(source.directImageStream),
     imageToolModel,
+    includeImageToolModel: (routeA.includeImageToolModel ?? source.includeImageToolModel) !== false,
     baseUrl: preserveRootBaseUrl(routeABaseInput, routeAEndpoint.baseUrl, preserveRootBaseUrls, "baseUrl") || defaultBaseUrl,
     endpointPath: routeAEndpoint.endpointPath,
     apiKey: firstString([routeA.apiKey, source.apiKey]),
@@ -555,6 +566,7 @@ export function getSelectedImageGenerationConfig(config = {}) {
       apiKey: normalized.directImageApiKey,
       responsesModel: normalized.directImageModel,
       imageModel: normalized.directImageModel,
+      directImageStream: normalizeDirectImageStream(normalized.directImageStream),
     };
   }
 
@@ -565,6 +577,7 @@ export function getSelectedImageGenerationConfig(config = {}) {
     apiKey: normalized.apiKey,
     responsesModel: normalized.responsesModel,
     imageModel: normalized.imageToolModel,
+    includeImageToolModel: normalized.includeImageToolModel,
   };
 }
 

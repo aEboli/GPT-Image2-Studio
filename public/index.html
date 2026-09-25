@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Image Studio</title>
-    <link rel="icon" href="data:," />
+    <link rel="icon" type="image/png" href="/icon.png?v=20260926-cat-2" />
     <script>
       (() => {
         const themeKey = "image-studio-ui-theme-v1";
@@ -101,7 +101,7 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="./styles.css?v=20260923-prompt-template-library-4" />
+    <link rel="stylesheet" href="./styles.css?v=20260926-route-tool-model-toggle-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -214,12 +214,21 @@
           </div>
         </nav>
 
-        <div id="generationModeStatus" class="header-pill generation-mode-status" aria-label="当前生图调用模式：路由模式" title="当前生图调用模式：路由模式">
+        <button id="generationModeStatus" class="header-pill generation-mode-status" type="button" aria-label="当前生图调用模式：路由模式" title="当前生图调用模式：路由模式">
           <span class="generation-mode-status-dot" aria-hidden="true"></span>
-          <span class="generation-mode-status-prefix" data-ui-i18n="generationModePrefix">生图</span>
-          <span class="generation-mode-status-divider" aria-hidden="true">·</span>
-          <strong class="generation-mode-status-value" id="generationModeValue">路由</strong>
-        </div>
+          <span class="generation-mode-status-copy">
+            <span class="generation-mode-status-prefix" data-ui-i18n="activeCall">当前调用</span>
+            <strong class="generation-mode-status-value" id="generationModeValue">路由模式</strong>
+          </span>
+          <span class="generation-mode-status-models">
+            <span class="generation-mode-status-model-label" data-ui-i18n="imageModel">生图模型</span>
+            <code class="generation-mode-status-model-value" id="generationModelValue">gpt-image-2</code>
+            <span class="generation-mode-status-text-model hidden" id="generationTextModelStatus">
+              <span class="generation-mode-status-model-label" data-ui-i18n="visionTextModel">文本模型</span>
+              <code class="generation-mode-status-model-value" id="generationTextModelValue">gpt-5.4-mini</code>
+            </span>
+          </span>
+        </button>
 
         <div class="topbar-api-check" aria-label="API、LOG">
           <button class="header-pill status-ready" id="connectionStatus" data-state="idle" type="button" aria-label="待填写API、LOG，打开 API、LOG">
@@ -454,9 +463,13 @@
                         <select id="qualityInput" name="quality"></select>
                       </label>
 
-                      <div class="parameter-meta" aria-label="工具模型" data-ui-i18n-aria-label="toolModelMeta">
-                        <span data-ui-i18n="toolModel">工具模型</span>
+                      <div class="parameter-meta" aria-label="当前生图调用" data-ui-i18n-aria-label="activeCallMeta" aria-live="polite">
+                        <span data-ui-i18n="activeCall">当前调用</span>
+                        <strong id="parameterGenerationMode">路由模式</strong>
+                        <span data-ui-i18n="imageModel">生图模型</span>
                         <strong id="parameterToolModel">gpt-image-2</strong>
+                        <span id="parameterTextModelLabel" data-ui-i18n="visionTextModel">文本模型</span>
+                        <strong id="parameterTextModel">gpt-5.4-mini</strong>
                       </div>
                     </div>
                   </div>
@@ -1529,30 +1542,8 @@
                     id="creationProductDescriptionInput"
                     name="productDescription"
                     rows="2"
-                    maxlength="600"
+                    maxlength="1320"
                     placeholder="例如：透明手冲咖啡壶，适合办公室和露营，轻盈清透。"
-                  ></textarea>
-                </label>
-
-                <label class="compact-field" data-creation-set-only>
-                  <span>核心卖点</span>
-                  <textarea
-                    id="creationSellingPointsInput"
-                    name="sellingPoints"
-                    rows="1"
-                    maxlength="360"
-                    placeholder="例如：轻便、易清洁、口感稳定"
-                  ></textarea>
-                </label>
-
-                <label class="compact-field" data-creation-set-only>
-                  <span>尺寸规格</span>
-                  <textarea
-                    id="creationDimensionSpecsInput"
-                    name="dimensionSpecs"
-                    rows="1"
-                    maxlength="360"
-                    placeholder="例如：长 13 cm，宽 2 cm，高 3 cm，重 42 g"
                   ></textarea>
                 </label>
 
@@ -2781,7 +2772,7 @@
       </main>
     </div>
 
-    <small class="app-version" aria-label="当前版本 v0.2.033">v0.2.033</small>
+    <small class="app-version" aria-label="当前版本 v0.2.043">v0.2.043</small>
 
     <dialog
       class="creation-record-delete-dialog"
@@ -3304,7 +3295,7 @@
                       <input id="apiKeyInput" name="apiKey" type="password" placeholder="保持已保存 Key" data-ui-i18n-placeholder="keepSavedKey" />
                     </label>
 
-                    <div class="field model-field">
+                    <div class="field model-field route-text-model-field">
                       <div class="field-heading inline">
                         <label for="responsesModelInput" data-ui-i18n="responsesModel">Responses 模型</label>
                         <button class="inline-button" id="fetchModelsButton" type="button" data-ui-i18n="fetchModels" data-ui-i18n-title="fetchModelsFull">获取模型列表</button>
@@ -3316,7 +3307,7 @@
                       </div>
                     </div>
 
-                    <label class="field">
+                    <label class="field route-tool-model-field">
                       <div class="field-heading inline">
                         <span class="field-label-with-hint">
                           <span data-ui-i18n="imageToolModel">生图工具模型</span>
@@ -3329,6 +3320,12 @@
                         <option value="gpt-image-2.5-flare">gpt-image-2.5-flare</option>
                       </select>
                     </label>
+                    <div class="field route-tool-model-toggle-field">
+                      <button class="reference-analysis-auto-collapse route-tool-model-toggle is-active" id="includeImageToolModelToggle" type="button" role="switch" aria-checked="true" aria-label="发送 tools[].model" data-ui-i18n-aria-label="includeImageToolModel">
+                        <span class="reference-analysis-switch-label" data-ui-i18n="includeImageToolModel">发送 tools[].model</span>
+                        <span class="reference-analysis-switch-track" aria-hidden="true"><span class="reference-analysis-switch-thumb"></span></span>
+                      </button>
+                    </div>
                   </div>
 
                   <div class="route-config-panel" data-route-panel="b">
@@ -3369,6 +3366,13 @@
                         <button class="model-picker-toggle" id="directModelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="directModelOptionsList" data-ui-i18n-aria-label="expandModels" hidden></button>
                         <div class="model-options-list" id="directModelOptionsList" role="listbox" hidden></div>
                       </div>
+                    </div>
+
+                    <div class="field direct-image-stream-field">
+                      <button class="reference-analysis-auto-collapse direct-image-stream-toggle" id="directImageStreamToggle" type="button" role="switch" aria-checked="false" aria-label="流式输出" data-ui-i18n-aria-label="directImageStream">
+                        <span class="reference-analysis-switch-label" data-ui-i18n="directImageStream">流式输出</span>
+                        <span class="reference-analysis-switch-track" aria-hidden="true"><span class="reference-analysis-switch-thumb"></span></span>
+                      </button>
                     </div>
 
                     <div class="field endpoint-field direct-text-endpoint-field">
@@ -3610,7 +3614,7 @@
           <div>
             <p class="drawer-eyebrow">Prompt Kit</p>
             <h2>提示词模板库</h2>
-            <p class="prompt-template-head-note">按分类浏览常用模板，点击图片可查看完整提示词。</p>
+            <p class="prompt-template-head-note">按图示分类浏览一一对应的图片与提示词，点击图片可查看完整内容。</p>
           </div>
           <button class="toolbar-button" id="closePromptTemplateButton" type="button">关闭</button>
         </div>
@@ -3649,9 +3653,9 @@
             <div class="prompt-template-library-head">
               <div>
                 <p class="drawer-eyebrow">Library</p>
-                <h3 id="promptTemplateLibraryTitle">人像与头像</h3>
+                <h3 id="promptTemplateLibraryTitle">使用场景</h3>
               </div>
-              <span class="prompt-template-library-count" id="promptTemplateLibraryCount">40 条可用模板</span>
+              <span class="prompt-template-library-count" id="promptTemplateLibraryCount">41 条可用模板</span>
             </div>
             <div class="prompt-template-library-grid" id="promptTemplateLibraryGrid" data-view="list"></div>
           </section>
@@ -3728,6 +3732,6 @@
 
     <div class="app-tooltip" id="appTooltip" role="tooltip" popover="manual"></div>
 
-    <script type="module" src="./app.js?v=20260923-prompt-template-library-4"></script>
+    <script type="module" src="./app.js?v=20260926-route-tool-model-toggle-1"></script>
   </body>
 </html>

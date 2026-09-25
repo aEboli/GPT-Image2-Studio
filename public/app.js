@@ -1,5 +1,5 @@
 import { buildParameterText, formatImageModelLabel, formatRecentOutputMeta, resolveDisplayImageSize } from "/lib/studio-formatters.mjs";
-import { formatLoadingThumbnailStatusLabel, getPreviewPlaceholderState, getStablePreviewLoadingItems, isWaitingPreviewItem } from "/lib/preview-placeholder-state.mjs?v=20260826-waiting-loading-1";
+import { formatLoadingThumbnailStatusLabel, getPreviewPlaceholderState, getStablePreviewLoadingItems, isWaitingPreviewItem } from "/lib/preview-placeholder-state.mjs?v=20260926-filmstrip-request-order-1";
 import { buildGalleryReferenceFilterOptions, buildGallerySections, buildGallerySizeFilterOptions, buildGalleryTimeFilterOptions, distributeGalleryItemsIntoColumns, filterGalleryItems, getGalleryHistorySectionLayouts, getGalleryLayoutModeForWidth, getPromptGenerationGalleryItems, getRecentGalleryItems, normalizeGalleryFilters, paginateGallerySections, sortGalleryItemsByCreatedAtDesc } from "/lib/gallery-organizer.mjs?v=20260806-gallery-five-date-page-1";
 import { buildGalleryMetadataCacheEntry, collectGalleryMetadataRepairPatch, mergeGalleryItemWithCachedMetadata, pruneGalleryMetadataCache } from "/lib/gallery-metadata-recovery.mjs";
 import { getGenerationSizeOptions, getModelProtocolImageSizeOptions, normalizeGenerationSize, normalizeModelProtocolImageSize } from "/lib/generation-size-options.mjs?v=20260614-image2-sizes-1";
@@ -86,6 +86,7 @@ import {
   DEFAULT_RESPONSES_MODEL,
   appendApiEndpointPath,
   getSelectedImageGenerationConfig,
+  getSelectedTextVisionConfig,
   normalizeApiEndpointPath,
   normalizeGrokEndpointPath,
   normalizeImageToolModel,
@@ -113,7 +114,7 @@ import { DEFAULT_PORTRAIT_ACCESSORY_ASSETS, PORTRAIT_ACCESSORY_ASSET_CATEGORIES,
 import { createDefaultPortraitLocationState, createPortraitLocationSelectorController } from "/lib/portrait-location-selector.mjs?v=20260527-portrait-location-1";
 import { getLegacyPromptAgentTemplatePrompt, getPromptAgentDisplayName, getPromptAgentTemplateDisplayName, isStructuredImagePromptJson } from "/lib/prompt-agent-display-name.mjs?v=20260819-prompt-history-mode-1";
 import { mergePromptAgentHistoryTemplates } from "/lib/prompt-agent-template-sync.mjs?v=20260819-history-template-mode-1";
-import { flattenPromptTemplateLibrary, getPromptTemplateLibraryCategory, getPromptTemplateLibraryCounts, getPromptTemplateLibrarySubcategory, getPromptTemplatePreviewUrl, PROMPT_TEMPLATE_LIBRARY } from "/lib/prompt-template-library.mjs?v=20260923-prompt-template-library-4";
+import { flattenPromptTemplateLibrary, getPromptTemplateLibraryCategory, getPromptTemplateLibraryCounts, getPromptTemplateLibrarySubcategory, getPromptTemplatePreviewUrl, PROMPT_TEMPLATE_LIBRARY } from "/lib/prompt-template-library.mjs?v=20260925-prompt-library-ui-2";
 import { DEFAULT_GENERATION_CONCURRENCY, DEFAULT_GENERATION_START_DELAY_MS, MAX_PROMPT_PARALLEL_TASKS, MAX_PROMPT_QUEUE_SIZE } from "/lib/studio-constants.mjs?v=20260829-generation-schedule-1";
 import { GENERATION_START_DELAY_FIELD, normalizeGenerationStartDelayMs } from "/lib/generation-start-delay.mjs?v=20260829-generation-schedule-1";
 import { GENERATION_CONCURRENCY_FIELD, normalizeGenerationConcurrency } from "/lib/generation-concurrency.mjs?v=20260829-generation-schedule-1";
@@ -176,6 +177,7 @@ const CREATION_IMAGE_COUNT_OPTIONS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 
 const DEFAULT_PROMPT_ENHANCE_TEXT = ",sharp focus, macro details, rich textures, crisp edges, photorealistic texture, visible grain, detailed surface material, cinematic lighting"; function buildPromptModePrompt() { const prompt = refs.promptInput.value.trim(); if (!state.promptEnhanceEnabled) { return prompt; } const enhanceText = String(refs.promptEnhanceInput?.value || "").trim(); return enhanceText ? `${prompt}${enhanceText.startsWith(",") ? "" : "\n\n"}${enhanceText}` : prompt; } function syncPromptEnhanceMode() { refs.promptEnhanceToggle.classList.toggle("is-active", state.promptEnhanceEnabled); refs.promptEnhanceToggle.setAttribute("aria-checked", String(state.promptEnhanceEnabled)); refs.promptEnhanceToggle.querySelector("small").textContent = getUiLanguageText(state.promptEnhanceEnabled ? "promptEnhanceOn" : "promptEnhanceOff"); refs.promptEnhanceField.classList.toggle("hidden", !state.promptEnhanceEnabled); } function togglePromptEnhanceMode() { state.promptEnhanceEnabled = !state.promptEnhanceEnabled; syncPromptEnhanceMode(); if (state.promptEnhanceEnabled) { refs.promptEnhanceInput.focus(); } }
 const PROMPT_TEMPLATE_STORAGE_KEY = "image-studio-prompt-templates-v2";
 const PROMPT_TEMPLATE_DISMISSED_HISTORY_KEY = "image-studio-prompt-template-dismissed-history-v1";
+const PROMPT_TEMPLATE_LIBRARY_ASSET_VERSION = "20260925-prompt-library-assets-1";
 const DEFAULT_PROMPT_TEMPLATES = SURPRISE_PROMPTS.map((template, index) => ({
   id: `default-template-v2-${index + 1}`,
   name: template.name,
@@ -413,11 +415,15 @@ const UI_LANGUAGE_TEXT = {
   en: { activityLog: "Generation Log", activityLogAllPanels: "All Panels", activityLogPanels: "Generation log panels", apiBookExpand: "Show saved APIs", apiBookEmpty: "No saved APIs yet", apiBookRemove: "Delete this API", baseUrl: "Base URL", brandSubtitle: "AI image workflow", close: "Close", config: "Settings", configApi: "Configure API", configSaved: "Config saved", configTitle: "Connection Settings", configUnsaved: "Config not saved", connectionBusy: "Concurrent {running}/{max} · Queue {queued}", connectionOpen: "open API and log", connectionSection: "Request Channel", connectionStatusEmpty: "API/Log missing", connectionStatusEntry: "API, Log", delete: "Delete", directEndpointSuffix: "Direct mode endpoint suffix", directMode: "Direct Mode", download: "Download", endpointUrl: "Endpoint", expandModels: "Show available models", fetchModels: "Fetch Models", fetchModelsLoading: "Fetching...", fit: "Fit", functionMenu: "Function menu", fullUrl: "Full URL", generate: "Generate", generateTitle: "Generate (Ctrl+Enter)", generationRouteLabel: "Image request mode", globalNav: "Global navigation", imageModel: "Image Model", imageToolModel: "Image Tool Model", imageToolModelHint: "Route mode uses this model for the image_generation tool in Responses requests. Default gpt-image-2; sunburst is more precise for edits, flare is faster.", keepSavedKey: "Keep saved key", languageEn: "English UI", languageSwitch: "Switch interface language", languageZh: "Simplified Chinese UI", menuArticleIllustration: "Article Illustration", menuArticleRecord: "Article Records", menuAssetTools: "Asset Tools", menuCreation: "Product Suite", menuCreationRecord: "Suite Records", menuCreateTools: "Creation Tools", menuGallery: "Gallery", menuImageCompress: "Image Compress", menuImageDecomposition: "Image Decomposition", menuImageEdit: "Image Edit", menuPortrait: "Portrait Mode", menuPortraitRecord: "Portrait Records", menuPpt: "PPT Generation", menuPptRecord: "PPT Records", menuPromptStudio: "Prompt to Image", menuQuickBlend: "Quick Blend", menuReferenceAnalysis: "Reference Analysis", menuSectionAssets: "Assets", menuSectionCreate: "Creation", menuSectionSettings: "Settings", menuSettings: "Settings", menuStyleTransfer: "Style Transfer", menuTools: "Tools", modeDirect: "Direct Mode", modeProtocol: "Gemini Model", modeRoute: "Route Mode", modelFetchBusy: "Fetching model list...", modelFetchFailed: "Failed to fetch model list.", modelFetchSuccess: "Fetched {count} callable models.", modelNoCallable: "No callable models found.", modelNoMatch: "No matching models", modelNoMatchWithQuery: "No matching models: {query}", modelTestBusy: "Testing connection...", modelTestSuccess: "Connection test succeeded. Found {count} models.", navAssets: "Assets", navCreate: "Create", navSettings: "Settings", notSaved: "Not saved", openOutput: "Open Output", outputFormat: "Output Format", parameters: "Parameters", previewIdleDetail: "Generation log is in Settings. Use the filmstrip below to switch results.", previewIdleEyebrow: "Output Preview", previewIdleTitle: "Generated results update here in real time.", previewWaiting: "Waiting", prompt: "Prompt", promptAgent: "Image to Prompt", promptCounterSuffix: "chars", promptEnhance: "Enhance Mode", promptEnhanceAria: "Toggle prompt enhancement mode", promptEnhanceField: "Enhancement Prompt", promptEnhanceOff: "Off", promptEnhanceOn: "On", promptPlaceholder: "Describe the image you want, or upload references first and describe the edit direction.", promptTemplate: "Prompt templates", protocolHint: "Gemini image models use an OpenAI-compatible image generation protocol. Base URL usually ends at /v1; requests go to /images/generations.", protocolImageModel: "Image Model", protocolMode: "Gemini Model", quality: "Quality", "ratio.1:1": "Ecommerce, Avatar, Social · Square 1:1", "ratio.1:2": "Long Poster · Portrait 1:2", "ratio.1:3": "Tall Ad · Portrait 1:3", "ratio.2:1": "Banner · Landscape 2:1", "ratio.2:3": "Vertical Photo · Portrait 2:3", "ratio.3:1": "Ultrawide Ad · Landscape 3:1", "ratio.3:2": "Photography · Landscape 3:2", "ratio.3:4": "Poster, Portrait · Portrait 3:4", "ratio.4:3": "PPT, Web Graphic · Landscape 4:3", "ratio.4:5": "Instagram Post · Portrait 4:5", "ratio.5:4": "Product Display · Landscape 5:4", "ratio.9:16": "Short Video Cover, Wallpaper · Portrait 9:16", "ratio.9:21": "Tall Scroll Image · Portrait 9:21", "ratio.16:9": "Cover, YouTube · Landscape 16:9", "ratio.21:9": "Ultrawide Banner · Landscape 21:9", ratioLandscape: "Landscape", ratioPortrait: "Portrait", ratioSquare: "Square", reasoningEffort: "Reasoning", reference: "Reference", referenceUploadAction: "Upload Reference", referenceUploadTitle: "Drop images or click to upload", responsesModel: "Responses Model", routeEndpointSuffix: "Route mode endpoint suffix", routeMode: "Route Mode", save: "Save", schedulingSection: "Generation Scheduling", schedulingLockNote: "Generation tasks are running or queued, so the scheduling parameters cannot be changed right now. They unlock automatically once every task finishes.", concurrencyLabel: "Request Concurrency", concurrencyUnit: "requests", concurrencyHint: "The total number of generation requests that may run at once in one session. Default 20, range 1 to 50. Lowering it eases upstream pressure and reduces rate limiting and timeouts; raising it is faster but reaches limits sooner.", size: "Size", startDelayHint: "Interval between adjacent upstream submissions in one session. Default 1000 ms, range 200 to 5000 ms. A larger interval is gentler on a rate-limited upstream but starts the last image later.", startDelayLabel: "Task Submit Interval", startDelayUnit: "ms", sizeMax: "Max", testConnection: "Test Connection", testConnectionLoading: "Testing...", themeDark: "Dark theme", themeLight: "Light theme", themeMenu: "Theme color", themeToDark: "Switch to dark theme", themeToLight: "Switch to light theme", thumbnailEmpty: "No thumbnails", thumbnailFailed: "Thumbnail load failed", thumbnailLoading: "Loading thumbnails", timelineNoErrors: "No errors", timelineWaitingResult: "Waiting for result", timelineWaitingTask: "Waiting for task", toolModel: "Tool Model", toolModelAndQuality: "Tool model and quality", toolModelMeta: "Tool model", view: "View", visionTextModel: "Vision/Text Model" },
 };
 Object.assign(UI_LANGUAGE_TEXT["zh-CN"], {
+  activeCall: "当前调用",
+  activeCallMeta: "当前生图调用",
   background: "背景",
   transparent: "透明",
   transparentBackgroundAria: "启用透明背景",
 });
 Object.assign(UI_LANGUAGE_TEXT.en, {
+  activeCall: "Active call",
+  activeCallMeta: "Current image call",
   background: "Background",
   transparent: "Transparent",
   transparentBackgroundAria: "Use transparent background",
@@ -448,9 +454,11 @@ Object.assign(UI_LANGUAGE_TEXT["zh-CN"], {
   fetchModelsLoading: "获取中",
   directEndpointSuffix: "直连后缀",
   imageToolModel: "工具模型",
+  includeImageToolModel: "发送 tools[].model",
   responsesModel: "文本模型",
   directImageApi: "生图接口",
   directImageApiKey: "API 密钥",
+  directImageStream: "流式输出",
   directTextApi: "文本接口",
   directTextApiKey: "API 密钥",
   visionTextModel: "文本模型",
@@ -506,6 +514,7 @@ Object.assign(UI_LANGUAGE_TEXT.en, {
   fetchModelsLoading: "Loading",
   directEndpointSuffix: "Direct suffix",
   imageToolModel: "Tool model",
+  includeImageToolModel: "Send tools[].model",
   responsesModel: "Text model",
   directImageApi: "Image API",
   directImageApiKey: "API key",
@@ -524,6 +533,7 @@ Object.assign(UI_LANGUAGE_TEXT.en, {
   modeGrok: "Grok",
   directImageApi: "Image API",
   directImageApiKey: "Image API key",
+  directImageStream: "Stream output",
   directImageEndpointSuffix: "Direct image endpoint suffix",
   directTextApi: "Text/Vision API",
   directTextApiKey: "Text/Vision API key",
@@ -807,12 +817,13 @@ const state = {
   },
   promptTemplates: [], promptTemplateDismissedHistoryIds: new Set(), promptEnhanceEnabled: false,
   promptTemplateLibrary: {
-    categoryId: "profile-avatar",
+    categoryId: "usage-scenario",
     subcategoryId: "",
     query: "",
     view: "list",
     fontSize: 15,
     selectedId: "",
+    scrollTop: 0,
   },
   reasoningEfforts: [...DEFAULT_REASONING_EFFORTS],
   referenceAnalysis: {
@@ -937,6 +948,7 @@ const refs = {
   directImageEndpointPathSelect: document.querySelector("#directEndpointPathSelect"),
   directFetchModelsButton: document.querySelector("#directFetchModelsButton"),
   directImageModelInput: document.querySelector("#directImageModelInput"),
+  directImageStreamToggle: document.querySelector("#directImageStreamToggle"),
   directModelOptionsList: document.querySelector("#directModelOptionsList"),
   directModelPickerToggle: document.querySelector("#directModelPickerToggle"),
   directResponsesFetchModelsButton: document.querySelector("#directResponsesFetchModelsButton"),
@@ -1025,7 +1037,6 @@ const refs = {
   creationGenerateButton: document.querySelector("#creationGenerateButton"),
   creationInfographicRebuildEnabledInput: document.querySelector("#creationInfographicRebuildEnabledInput"),
   creationListingAgentEnabledInput: document.querySelector("#creationListingAgentEnabledInput"),
-  creationDimensionSpecsInput: document.querySelector("#creationDimensionSpecsInput"),
   creationDimensionUnitModeInput: document.querySelector("#creationDimensionUnitModeInput"),
   creationImageCountInput: document.querySelector("#creationImageCountInput"),
   creationInlineListingDrafts: document.querySelector("#creationInlineListingDrafts"),
@@ -1180,7 +1191,6 @@ const refs = {
   creationRoleCount: document.querySelector("#creationRoleCount"),
   creationRoleGrid: document.querySelector("#creationRoleGrid"),
   creationPlatformInput: document.querySelector("#creationPlatformInput"),
-  creationSellingPointsInput: document.querySelector("#creationSellingPointsInput"),
   creationSetOnly: [...document.querySelectorAll("[data-creation-set-only]")],
   creationSetMeta: document.querySelector("#creationSetMeta"),
   creationSizeInput: document.querySelector("#creationSizeInput"),
@@ -1222,8 +1232,11 @@ const refs = {
   galleryView: document.querySelector(".gallery-view"),
   generateButton: document.querySelector("#generateButton"),
   generateForm: document.querySelector("#generateForm"),
+  generationModelValue: document.querySelector("#generationModelValue"),
   generationModeStatus: document.querySelector("#generationModeStatus"),
   generationModeValue: document.querySelector("#generationModeValue"),
+  generationTextModelStatus: document.querySelector("#generationTextModelStatus"),
+  generationTextModelValue: document.querySelector("#generationTextModelValue"),
   globalNav: document.querySelector(".global-nav"),
   globalNavItems: [...document.querySelectorAll("[data-nav-section]")],
   lightbox: document.querySelector("#lightbox"),
@@ -1259,6 +1272,9 @@ const refs = {
   openOutputButton: document.querySelector("#openOutputButton"),
   openPromptAgentButton: document.querySelector("#openPromptAgentButton"),
   outputFormatInput: document.querySelector("#outputFormatInput"),
+  parameterGenerationMode: document.querySelector("#parameterGenerationMode"),
+  parameterTextModel: document.querySelector("#parameterTextModel"),
+  parameterTextModelLabel: document.querySelector("#parameterTextModelLabel"),
   qualityInput: document.querySelector("#qualityInput"),
   transparentBackgroundField: document.querySelector("#transparentBackgroundField"),
   transparentBackgroundInput: document.querySelector("#transparentBackgroundInput"),
@@ -1433,6 +1449,7 @@ const refs = {
   modelPickerToggle: document.querySelector("#modelPickerToggle"),
   responsesModelInput: document.querySelector("#responsesModelInput"),
   imageToolModelSelect: document.querySelector("#imageToolModelSelect"),
+  includeImageToolModelToggle: document.querySelector("#includeImageToolModelToggle"),
   parameterToolModel: document.querySelector("#parameterToolModel"),
   savedKeyMask: document.querySelector("#savedKeyMask"),
   sizeInput: document.querySelector("#sizeInput"),
@@ -2154,8 +2171,7 @@ function normalizeUiLanguage(language) { return language === "en" ? "en" : "zh-C
 function readUiLanguage() { try { return normalizeUiLanguage(window.localStorage.getItem(UI_LANGUAGE_STORAGE_KEY) || document.documentElement.lang); } catch { return normalizeUiLanguage(document.documentElement.lang); } }
 function getUiLanguageText(key) { return UI_LANGUAGE_TEXT[state.uiLanguage]?.[key] || UI_LANGUAGE_TEXT["zh-CN"][key] || ""; }
 function applyUiLanguageText() { document.querySelectorAll("[data-ui-i18n]").forEach((element) => { const text = getUiLanguageText(element.dataset.uiI18n); if (text) element.textContent = text; }); document.querySelectorAll("[data-ui-i18n-aria-label]").forEach((element) => { const text = getUiLanguageText(element.dataset.uiI18nAriaLabel); if (text) element.setAttribute("aria-label", text); }); document.querySelectorAll("[data-ui-i18n-placeholder]").forEach((element) => { const text = getUiLanguageText(element.dataset.uiI18nPlaceholder); if (text) element.setAttribute("placeholder", text); }); document.querySelectorAll("[data-ui-i18n-title]").forEach((element) => { const text = getUiLanguageText(element.dataset.uiI18nTitle); if (text && !element.matches(APP_TOOLTIP_TRIGGER_SELECTOR)) element.setAttribute("title", text); }); document.querySelectorAll("[data-ui-i18n-tooltip]").forEach((element) => { const text = getUiLanguageText(element.dataset.uiI18nTooltip); if (text) element.dataset.tooltip = text; }); }
-function getUiImageRouteLabel(imageRoute) { if (imageRoute === "b") return getUiLanguageText("modeDirect"); if (imageRoute === "c") return getUiLanguageText("modeProtocol"); if (imageRoute === "d") return getUiLanguageText("modeGrok"); return getUiLanguageText("modeRoute"); }
-function getUiImageRouteStatusText(label) { return state.uiLanguage === "en" ? `Current image request mode: ${label}` : `当前生图调用模式：${label}`; }
+function getUiImageRouteLabel(imageRoute) { if (imageRoute === "b") return getUiLanguageText("directMode"); if (imageRoute === "c") return getUiLanguageText("protocolMode"); if (imageRoute === "d") return getUiLanguageText("modeGrok"); return getUiLanguageText("routeMode"); }
 function syncUiLanguage() { const normalized = normalizeUiLanguage(state.uiLanguage); state.uiLanguage = normalized; document.documentElement.lang = normalized; document.documentElement.dataset.uiLanguage = normalized; if (refs.uiLanguageInput) refs.uiLanguageInput.value = normalized; refs.uiLanguageOptions.forEach((button) => { const isActive = button.dataset.uiLanguageOption === normalized; button.classList.toggle("is-active", isActive); button.setAttribute("aria-pressed", String(isActive)); }); applyUiLanguageText(); configModelPicker.render(); rerenderUiLanguageSensitiveViews(); if (refs.themeNavAction) refs.themeNavAction.textContent = getUiLanguageText("themeMenu"); updateGenerationModeStatus(); syncThemeToggle(); }
 function setUiLanguage(language) { state.uiLanguage = normalizeUiLanguage(language); try { window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, state.uiLanguage); } catch {} syncUiLanguage(); }
 function syncThemeToggle() {
@@ -5669,14 +5685,42 @@ function resolveGenerationSizeForSelectedRoute(ratioOption, sizeValue = "") {
 
 function updateGenerationModeStatus() {
   if (!refs.generationModeStatus) return;
-  const imageRoute = getSelectedImageRoute();
+  const payload = getCurrentPrivateConfigRequestPayload();
+  const generationConfig = getSelectedImageGenerationConfig(payload);
+  const textConfig = getSelectedTextVisionConfig(payload);
+  const imageRoute = generationConfig.imageRoute || getSelectedImageRoute();
   const label = getUiImageRouteLabel(imageRoute);
-  const statusText = getUiImageRouteStatusText(label);
+  const imageModel = generationConfig.imageModel || generationConfig.responsesModel || "--";
+  const textModel = imageRoute === "a" || imageRoute === "b" ? textConfig.responsesModel || "--" : "";
+  const statusText = state.uiLanguage === "en"
+    ? `Current image call: ${label}; image model: ${imageModel}${textModel ? `; text model: ${textModel}` : ""}`
+    : `当前生图调用：${label}；生图模型：${imageModel}${textModel ? `；文本模型：${textModel}` : ""}`;
   if (refs.generationModeValue) {
     refs.generationModeValue.textContent = label;
   } else {
     refs.generationModeStatus.textContent = label;
   }
+  if (refs.generationModelValue) {
+    refs.generationModelValue.textContent = imageModel;
+  }
+  if (!getCurrentPreviewItem() && refs.previewModel) {
+    refs.previewModel.textContent = formatImageModelLabel(imageModel);
+  }
+  if (refs.generationTextModelValue) {
+    refs.generationTextModelValue.textContent = textModel;
+  }
+  refs.generationTextModelStatus?.classList.toggle("hidden", !textModel);
+  if (refs.parameterGenerationMode) {
+    refs.parameterGenerationMode.textContent = label;
+  }
+  if (refs.parameterToolModel) {
+    refs.parameterToolModel.textContent = imageModel;
+  }
+  if (refs.parameterTextModel) {
+    refs.parameterTextModel.textContent = textModel;
+  }
+  refs.parameterTextModelLabel?.classList.toggle("hidden", !textModel);
+  refs.parameterTextModel?.classList.toggle("hidden", !textModel);
   refs.generationModeStatus.dataset.imageRoute = imageRoute;
   refs.generationModeStatus.title = statusText;
   refs.generationModeStatus.setAttribute("aria-label", statusText);
@@ -5779,6 +5823,7 @@ function getCurrentPrivateConfigRequestPayload() {
   const directImageApiKey = refs.directImageApiKeyInput?.value.trim() || browserPayload.directImageApiKey || browserPayload.directApiKey || "";
   const directTextApiKey = refs.directTextApiKeyInput?.value.trim() || browserPayload.directTextApiKey || browserPayload.directApiKey || "";
   const directImageModel = refs.directImageModelInput.value.trim() || browserPayload.directImageModel || state.config?.directImageModel || DEFAULT_DIRECT_IMAGE_MODEL;
+  const directImageStream = refs.directImageStreamToggle?.getAttribute("aria-checked") === "true";
   const directTextModel = refs.directResponsesModelInput.value.trim() || browserPayload.directTextModel || browserPayload.directResponsesModel || state.config?.directTextModel || state.config?.directResponsesModel || DEFAULT_DIRECT_RESPONSES_MODEL;
   const grokBaseUrl = grokEndpoint.baseUrl || browserPayload.grokBaseUrl || state.config?.grokBaseUrl || DEFAULT_GROK_BASE_URL;
   const grokApiKey = refs.grokApiKeyInput?.value.trim() || browserPayload.grokApiKey || "";
@@ -5790,10 +5835,12 @@ function getCurrentPrivateConfigRequestPayload() {
     apiKey: refs.apiKeyInput.value.trim() || browserPayload.apiKey || "",
     responsesModel: refs.responsesModelInput.value.trim() || browserPayload.responsesModel || state.config?.responsesModel || DEFAULT_RESPONSES_MODEL,
     imageToolModel: getSelectedImageToolModel(browserPayload),
+    includeImageToolModel: refs.includeImageToolModelToggle?.getAttribute("aria-checked") !== "false",
     directImageBaseUrl,
     directImageEndpointPath: directImageEndpoint.endpointPath || browserPayload.directImageEndpointPath || browserPayload.directEndpointPath || state.config?.directImageEndpointPath || state.config?.directEndpointPath || API_ENDPOINT_IMAGE_GENERATIONS,
     directImageApiKey,
     directImageModel,
+    directImageStream,
     directTextBaseUrl,
     directTextEndpointPath: directTextEndpoint.endpointPath || browserPayload.directTextEndpointPath || state.config?.directTextEndpointPath || browserPayload.directEndpointPath || state.config?.directEndpointPath || API_ENDPOINT_RESPONSES,
     directTextApiKey,
@@ -5881,9 +5928,12 @@ function applyQueuedJobConfigSnapshot(job) {
     endpointPath: generationConfig.endpointPath || job.endpointPath || endpointPath,
     responsesModel: generationConfig.responsesModel || job.responsesModel || responsesModel,
     imageModel: generationConfig.imageModel || job.imageModel,
+    imageToolModel: payload.imageToolModel,
+    includeImageToolModel: payload.includeImageToolModel,
     directImageBaseUrl: payload.directImageBaseUrl,
     directImageEndpointPath: payload.directImageEndpointPath,
     directImageModel: payload.directImageModel,
+    directImageStream: payload.directImageStream,
     directTextBaseUrl: payload.directTextBaseUrl,
     directTextEndpointPath: payload.directTextEndpointPath,
     directTextModel: payload.directTextModel,
@@ -5903,6 +5953,9 @@ function applyQueuedJobConfigSnapshot(job) {
 function appendJobConfigToFormData(formData, job) {
   const payload = getCurrentPrivateConfigRequestPayload();
   ["baseUrl", "endpointPath", "responsesModel", "directImageBaseUrl", "directImageEndpointPath", "directImageModel", "directTextBaseUrl", "directTextEndpointPath", "directTextModel", "directBaseUrl", "directEndpointPath", "directResponsesModel", "protocolBaseUrl", "protocolImageModel", "grokBaseUrl", "grokEndpointPath", "grokImageModel"].forEach((key) => { if (job?.[key]) payload[key] = job[key]; });
+  if (job?.directImageStream !== undefined) payload.directImageStream = job.directImageStream;
+  if (job?.imageToolModel) payload.imageToolModel = job.imageToolModel;
+  if (job?.includeImageToolModel !== undefined) payload.includeImageToolModel = job.includeImageToolModel;
   payload.imageRoute = job?.imageRoute || job?.generationRoute || payload.imageRoute;
   appendBrowserConfigToFormData(formData, undefined, payload); return formData;
 }
@@ -5912,9 +5965,15 @@ function syncConfigUi(config) {
   refs.responsesModelInput.value = config.responsesModel || DEFAULT_RESPONSES_MODEL;
   const imageToolModel = normalizeImageToolModel(config.imageToolModel);
   if (refs.imageToolModelSelect) refs.imageToolModelSelect.value = imageToolModel;
+  const includeImageToolModel = config.includeImageToolModel !== false;
+  refs.includeImageToolModelToggle?.classList.toggle("is-active", includeImageToolModel);
+  refs.includeImageToolModelToggle?.setAttribute("aria-checked", String(includeImageToolModel));
   if (refs.parameterToolModel) refs.parameterToolModel.textContent = imageToolModel;
   syncEndpointInputDisplay("b", config.directImageBaseUrl || config.directBaseUrl || config.baseUrl || "", config.directImageEndpointPath || config.directEndpointPath || API_ENDPOINT_IMAGE_GENERATIONS);
   refs.directImageModelInput.value = config.directImageModel || DEFAULT_DIRECT_IMAGE_MODEL;
+  const directImageStream = config.directImageStream === true;
+  refs.directImageStreamToggle?.classList.toggle("is-active", directImageStream);
+  refs.directImageStreamToggle?.setAttribute("aria-checked", String(directImageStream));
   syncEndpointInputDisplay("b-text", config.directTextBaseUrl || config.directBaseUrl || config.baseUrl || "", config.directTextEndpointPath || API_ENDPOINT_RESPONSES);
   refs.directResponsesModelInput.value = config.directTextModel || config.directResponsesModel || DEFAULT_DIRECT_RESPONSES_MODEL;
   refs.protocolBaseUrlInput.value = config.protocolBaseUrl || config.baseUrl || "https://api.openai.com/v1";
@@ -6155,6 +6214,28 @@ function closeLightbox() {
 function closeLightboxWithOptions(options = {}) {
   lightboxCloseOptions = options;
   closeLightbox();
+}
+
+function returnToPromptTemplateLibrary() {
+  const isPromptTemplateLibraryItem = Boolean(state.lightboxItem?.isPromptTemplateLibraryItem);
+  if (!isPromptTemplateLibraryItem) {
+    closeLightbox();
+    return;
+  }
+
+  const scrollTop = Math.max(0, Number(state.promptTemplateLibrary.scrollTop) || 0);
+  const libraryWasHidden = refs.promptTemplatePopover.classList.contains("hidden");
+  closeLightboxWithOptions({ restoreFocus: true });
+  if (libraryWasHidden) {
+    refs.promptTemplatePopover.classList.remove("hidden");
+    refs.promptTemplatePopover.setAttribute("aria-hidden", "false");
+    refs.surprisePromptButton.setAttribute("aria-expanded", "true");
+  }
+  window.requestAnimationFrame(() => {
+    if (refs.promptTemplateLibraryGrid) {
+      refs.promptTemplateLibraryGrid.scrollTop = scrollTop;
+    }
+  });
 }
 
 function applyLightboxPrompt() {
@@ -6693,7 +6774,7 @@ function renderPreview() {
   refs.zoomLabel.textContent = `${Math.round(state.zoom * 100)}%`;
 
   if (placeholderState.mode === "idle") {
-    refs.previewModel.textContent = "GPT Image 2.0";
+    refs.previewModel.textContent = formatImageModelLabel(refs.generationModelValue?.textContent?.trim());
     refs.previewTime.textContent = getUiLanguageText("previewWaiting");
     refs.previewId.textContent = "ID: --";
     refs.previewSize.textContent = "--";
@@ -7842,7 +7923,8 @@ function openPromptTemplateLibraryPreview(template) {
   if (!template) {
     return;
   }
-  const imageUrl = getPromptTemplatePreviewUrl(template);
+  state.promptTemplateLibrary.scrollTop = refs.promptTemplateLibraryGrid?.scrollTop || 0;
+  const imageUrl = getPromptTemplateLibraryImageUrl(template);
   openLightbox({
     id: template.id,
     filename: `${template.id}${template.previewImage?.toLowerCase().endsWith(".jpg") ? ".jpg" : ".png"}`,
@@ -7857,6 +7939,15 @@ function openPromptTemplateLibraryPreview(template) {
     isPromptTemplateLibraryItem: true,
   });
   document.querySelector('[data-lightbox-tab="prompt"]')?.click();
+}
+
+function getPromptTemplateLibraryImageUrl(template) {
+  const imageUrl = getPromptTemplatePreviewUrl(template);
+  if (!imageUrl || !imageUrl.startsWith("/assets/")) {
+    return imageUrl;
+  }
+  const separator = imageUrl.includes("?") ? "&" : "?";
+  return `${imageUrl}${separator}v=${PROMPT_TEMPLATE_LIBRARY_ASSET_VERSION}`;
 }
 
 function applyPromptTemplateLibrary(template) {
@@ -7954,8 +8045,18 @@ function renderPromptTemplateLibrary() {
       }
     };
     image.style.aspectRatio = template.previewImage ? "3 / 4" : "1 / 1";
-    image.addEventListener("load", syncPromptTemplateImageRatio, { once: true });
-    image.src = getPromptTemplatePreviewUrl(template);
+    let syncPromptTemplateListDimensions = () => {};
+    image.addEventListener("load", () => {
+      syncPromptTemplateImageRatio();
+      syncPromptTemplateListDimensions();
+    });
+    image.addEventListener("error", () => {
+      const fallbackUrl = String(template.previewSourceUrl || "").trim();
+      if (fallbackUrl && image.src !== fallbackUrl) {
+        image.src = fallbackUrl;
+      }
+    }, { once: true });
+    image.src = getPromptTemplateLibraryImageUrl(template);
     image.alt = template.previewAlt || `${template.name}预览`;
     image.loading = "lazy";
     image.decoding = "async";
@@ -7992,6 +8093,24 @@ function renderPromptTemplateLibrary() {
     );
     content.append(title, breadcrumb, prompt, actions);
     card.appendChild(content);
+    syncPromptTemplateListDimensions = () => {
+      if (image.naturalWidth <= 0 || image.naturalHeight <= 0 || state.promptTemplateLibrary.view !== "list") {
+        return;
+      }
+      const mediaWidth = previewButton.getBoundingClientRect().width;
+      if (mediaWidth <= 0) {
+        return;
+      }
+      const mediaHeight = Math.max(1, Math.round(mediaWidth * image.naturalHeight / image.naturalWidth));
+      card.style.setProperty("--prompt-template-card-height", `${mediaHeight}px`);
+      const contentStyle = window.getComputedStyle(content);
+      const promptStyle = window.getComputedStyle(prompt);
+      const lineHeight = Number.parseFloat(promptStyle.lineHeight) || Number.parseFloat(promptStyle.fontSize) * 1.55 || 20;
+      const fixedHeight = title.offsetHeight + breadcrumb.offsetHeight + actions.offsetHeight + 12;
+      const paddingHeight = (Number.parseFloat(contentStyle.paddingTop) || 0) + (Number.parseFloat(contentStyle.paddingBottom) || 0);
+      const availablePromptHeight = Math.max(lineHeight, mediaHeight - fixedHeight - paddingHeight);
+      prompt.style.setProperty("--prompt-template-prompt-lines", String(Math.max(1, Math.floor(availablePromptHeight / lineHeight))));
+    };
     card.addEventListener("click", (event) => {
       if (event.target.closest("button")) {
         return;
@@ -8000,6 +8119,10 @@ function renderPromptTemplateLibrary() {
       renderPromptTemplateLibrary();
     });
     refs.promptTemplateLibraryGrid.appendChild(card);
+    if (image.complete) {
+      syncPromptTemplateImageRatio();
+      syncPromptTemplateListDimensions();
+    }
   });
 }
 
@@ -9995,13 +10118,6 @@ function getCreationItemStatusLabel(item = {}) {
   return base;
 }
 
-function getCreationSellingPoints(value) {
-  return String(value || "")
-    .split(/[\n,，;；、]+/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
 function getCreationSelectedLanguage() {
   const select = refs.creationTargetLanguageInput;
   const option = select?.selectedOptions?.[0];
@@ -11651,13 +11767,46 @@ function resetCreationLogoForRecordReuse(normalized = null) {
   renderCreationLogo();
 }
 
+function getCreationProductDetailMeasurementTokens(value) {
+  return String(value || "")
+    .match(/[+-]?(?:\d+(?:\.\d+)?|\.\d+)\s*(?:fl\.?\s*oz|毫米|厘米|英寸|英尺|毫升|千克|公斤|磅|盎司|升|mm|cm|inches?|inch|in\.?|feet|foot|ft\.?|ml|kg|lbs?|oz|g|m|l)/giu)
+    ?.map((token) => token.replace(/\s+/gu, " ").trim().toLowerCase()) || [];
+}
+
+function formatCreationProductDetails(set = {}) {
+  const sellingPoints = Array.isArray(set.sellingPoints) ? set.sellingPoints : [set.sellingPoints];
+  const values = [set.productDescription, ...sellingPoints]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join("\n")
+    .split(/\r?\n/u)
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const measurementCounts = new Map();
+  getCreationProductDetailMeasurementTokens(values.join("\n")).forEach((token) => {
+    measurementCounts.set(token, (measurementCounts.get(token) || 0) + 1);
+  });
+  String(set.dimensionSpecs || "")
+    .split(/\r?\n/u)
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .forEach((line) => {
+      const tokens = getCreationProductDetailMeasurementTokens(line);
+      const alreadyIncluded = tokens.length > 0 && tokens.every((token) => (measurementCounts.get(token) || 0) > 0);
+      if (alreadyIncluded) {
+        tokens.forEach((token) => measurementCounts.set(token, measurementCounts.get(token) - 1));
+        return;
+      }
+      values.push(line);
+    });
+  return values.join("\n");
+}
+
 function applyCreationSetToForm(set) {
   const normalized = normalizeCreationSetForView(set);
   state.creation.draftSet = normalized;
   refs.creationProductNameInput.value = normalized.productName || "";
-  refs.creationProductDescriptionInput.value = normalized.productDescription || "";
-  refs.creationSellingPointsInput.value = normalized.sellingPoints.join("\n");
-  refs.creationDimensionSpecsInput.value = normalized.dimensionSpecs || "";
+  refs.creationProductDescriptionInput.value = formatCreationProductDetails(normalized);
   if (refs.creationSkuGenerationEnabledInput) refs.creationSkuGenerationEnabledInput.checked = normalized.skuGenerationEnabled !== false;
   if (refs.creationInfographicRebuildEnabledInput) refs.creationInfographicRebuildEnabledInput.checked = normalized.infographicRebuildEnabled === true;
   setCreationSelectValue(refs.creationSkuGenerationRuleInput, normalized.skuGenerationRule, DEFAULT_CREATION_SKU_GENERATION_RULE);
@@ -14005,7 +14154,6 @@ async function buildCreationReferenceAnalysisFormData() {
   formData.set("industryTemplatePath", contextIndustryTemplate.categoryPath || "");
   formData.set("productName", refs.creationProductNameInput?.value?.trim() || "");
   formData.set("productDescription", refs.creationProductDescriptionInput?.value?.trim() || "");
-  formData.set("sellingPoints", refs.creationSellingPointsInput?.value?.trim() || "");
   appendCurrentConfigToFormData(formData);
   return formData;
 }
@@ -14373,9 +14521,9 @@ function buildCreationPlanPreviewFormData() {
   const selectedRoles = getCreationSelectedRoles();
 
   formData.set("productName", refs.creationProductNameInput.value.trim());
-  formData.set("productDescription", refs.creationProductDescriptionInput.value.trim());
-  formData.set("sellingPoints", refs.creationSellingPointsInput.value.trim());
-  formData.set("dimensionSpecs", refs.creationDimensionSpecsInput.value.trim());
+  const productDescription = refs.creationProductDescriptionInput.value.trim();
+  formData.set("productDescription", productDescription);
+  formData.set("dimensionSpecs", productDescription);
   formData.set("dimensionUnitMode", refs.creationDimensionUnitModeInput.value || "both");
   formData.set("targetLanguage", targetLanguage.value);
   formData.set("imageCount", String(getCreationPlanPreviewImageCount(selectedRoles)));
@@ -15054,8 +15202,7 @@ async function loadCreationSets() {
 function hasCreationPlanPreviewInput() {
   return Boolean(
     refs.creationProductNameInput.value.trim() ||
-    refs.creationProductDescriptionInput.value.trim() ||
-    getCreationSellingPoints(refs.creationSellingPointsInput.value).length > 0
+    refs.creationProductDescriptionInput.value.trim()
   );
 }
 
@@ -15065,9 +15212,8 @@ async function previewCreationPlan() {
 
   const productName = refs.creationProductNameInput.value.trim();
   const productDescription = refs.creationProductDescriptionInput.value.trim();
-  const sellingPoints = getCreationSellingPoints(refs.creationSellingPointsInput.value);
-  if (!productName && !productDescription && sellingPoints.length === 0) {
-    const message = "请至少填写商品名称、商品描述或核心卖点。";
+  if (!productName && !productDescription) {
+    const message = "请至少填写商品名称或商品描述。";
     setCreationFeedback(message, "error");
     showError(message);
     return;
@@ -15108,8 +15254,8 @@ async function previewCreationPlan() {
       setId: previousDraft?.setId || `creation-draft-${Date.now()}`,
       productName: plan.productName || productName,
       productDescription: plan.productDescription || productDescription,
-      sellingPoints: plan.sellingPoints || sellingPoints,
-      dimensionSpecs: plan.dimensionSpecs || refs.creationDimensionSpecsInput.value.trim(),
+      sellingPoints: plan.sellingPoints || [],
+      dimensionSpecs: plan.dimensionSpecs || "",
       dimensionUnitMode: plan.dimensionUnitMode || getCreationSelectedDimensionUnitMode(),
       dimensionUnitModeLabel: plan.dimensionUnitModeLabel || formatCreationDimensionUnitModeLabel(getCreationSelectedDimensionUnitMode()),
       targetLanguage: plan.targetLanguage || getCreationSelectedLanguage().value,
@@ -15295,9 +15441,8 @@ async function startCreationGeneration(event) {
 
   const productName = refs.creationProductNameInput.value.trim();
   const productDescription = refs.creationProductDescriptionInput.value.trim();
-  const sellingPoints = getCreationSellingPoints(refs.creationSellingPointsInput.value);
-  if (!productName && !productDescription && sellingPoints.length === 0) {
-    const message = "请至少填写商品名称、商品描述或核心卖点。";
+  if (!productName && !productDescription) {
+    const message = "请至少填写商品名称或商品描述。";
     setCreationFeedback(message, "error");
     showError(message);
     return;
@@ -15315,7 +15460,7 @@ async function startCreationGeneration(event) {
     await ensureCreationReferenceGenerationFilesReady();
     const generationFormData = buildCreationFormData();
     const createdAt = nowIso();
-    const queuedSet = buildCreationQueuedSet({ productName, productDescription, sellingPoints, createdAt });
+    const queuedSet = buildCreationQueuedSet({ productName, productDescription, sellingPoints: [], createdAt });
     enqueueCreationGeneration({ formData: generationFormData, set: queuedSet });
   } catch (error) {
     const message = compactErrorMessage(error instanceof Error ? error.message : String(error), "套图生成请求失败");
@@ -19022,6 +19167,7 @@ function bindEvents() {
     toggleUiTheme();
   });
   refs.connectionStatus.addEventListener("click", () => setDrawerOpen(true));
+  refs.generationModeStatus?.addEventListener("click", () => setDrawerOpen(true));
   refs.openConfigButton.addEventListener("click", () => setDrawerOpen(true));
   refs.closeConfigButton.addEventListener("click", () => setDrawerOpen(false));
   refs.closeConfigBackdrop.addEventListener("click", () => setDrawerOpen(false));
@@ -19042,6 +19188,16 @@ function bindEvents() {
   });
   refs.configForm.addEventListener("submit", (event) => {
     saveConfig(event).catch((error) => showError(error.message));
+  });
+  refs.directImageStreamToggle?.addEventListener("click", () => {
+    const enabled = refs.directImageStreamToggle.getAttribute("aria-checked") !== "true";
+    refs.directImageStreamToggle.classList.toggle("is-active", enabled);
+    refs.directImageStreamToggle.setAttribute("aria-checked", String(enabled));
+  });
+  refs.includeImageToolModelToggle?.addEventListener("click", () => {
+    const enabled = refs.includeImageToolModelToggle.getAttribute("aria-checked") !== "true";
+    refs.includeImageToolModelToggle.classList.toggle("is-active", enabled);
+    refs.includeImageToolModelToggle.setAttribute("aria-checked", String(enabled));
   });
   // Clamp in place on commit so an out-of-range delay never fails native form
   // validation and blocks saving the rest of the configuration.
@@ -19074,8 +19230,18 @@ function bindEvents() {
   // 参数区的「工具模型」跟随下拉选择即时更新，不必等保存后重新读配置。
   // 质量档的可选集合也随之变化：切到 2.5 会多出 XHigh / Max，切回旧模型则收回。
   refs.imageToolModelSelect?.addEventListener("change", () => {
-    if (refs.parameterToolModel) refs.parameterToolModel.textContent = getSelectedImageToolModel();
+    updateGenerationModeStatus();
     renderImageQualityOptions();
+  });
+  [
+    refs.responsesModelInput,
+    refs.directImageModelInput,
+    refs.directResponsesModelInput,
+    refs.protocolImageModelInput,
+    refs.grokImageModelInput,
+  ].forEach((input) => {
+    input?.addEventListener("input", updateGenerationModeStatus);
+    input?.addEventListener("change", updateGenerationModeStatus);
   });
   getImageQualityInputs().forEach((input) => {
     input.addEventListener("change", () => rememberImageQualityForRoute());
@@ -19580,7 +19746,7 @@ function bindEvents() {
       setCreationFeedback(error.message, "error"),
     );
   });
-  [refs.creationProductNameInput, refs.creationProductDescriptionInput, refs.creationSellingPointsInput, refs.creationDimensionSpecsInput].forEach((input) => input.addEventListener("input", resetCreationDraftPreview));
+  [refs.creationProductNameInput, refs.creationProductDescriptionInput].forEach((input) => input.addEventListener("input", resetCreationDraftPreview));
   refs.creationDimensionUnitModeInput?.addEventListener("change", resetCreationDraftPreview);
   refs.creationTargetLanguageInput?.addEventListener("change", () => {
     refreshCreationPlanAfterExplicitSetParameterChange({ targetLanguage: getCreationSelectedLanguage().value });
@@ -20281,8 +20447,14 @@ function bindEvents() {
   refs.zoomInButton.addEventListener("click", () => stepZoom(0.1));
   refs.zoomResetButton.addEventListener("click", resetZoom);
   lightboxViewerController.bindEvents();
-  refs.lightboxBackdrop.addEventListener("click", closeLightbox);
-  refs.lightboxClose.addEventListener("click", closeLightbox);
+  refs.lightboxBackdrop.addEventListener("click", () => {
+    if (state.lightboxItem?.isPromptTemplateLibraryItem) {
+      returnToPromptTemplateLibrary();
+      return;
+    }
+    closeLightbox();
+  });
+  refs.lightboxClose.addEventListener("click", returnToPromptTemplateLibrary);
   refs.lightboxDismissButton.addEventListener("click", () => closeLightboxWithOptions({ closePromptTemplateLibrary: true }));
   refs.lightboxDownload.addEventListener("click", (event) => {
     event.preventDefault();
@@ -20320,13 +20492,17 @@ function bindEvents() {
         return;
       }
 
-      if (!refs.promptTemplatePopover.classList.contains("hidden")) {
-        setPromptTemplatePopoverOpen(false);
+      if (!refs.lightbox.classList.contains("hidden")) {
+        if (state.lightboxItem?.isPromptTemplateLibraryItem) {
+          returnToPromptTemplateLibrary();
+        } else {
+          closeLightbox();
+        }
         return;
       }
 
-      if (!refs.lightbox.classList.contains("hidden")) {
-        closeLightbox();
+      if (!refs.promptTemplatePopover.classList.contains("hidden")) {
+        setPromptTemplatePopoverOpen(false);
         return;
       }
 
@@ -20375,6 +20551,10 @@ function bindEvents() {
       }
 
       setPortraitAccessoryAssetPopoverOpen(false);
+    }
+
+    if (!refs.lightbox.classList.contains("hidden")) {
+      return;
     }
 
     if (refs.promptTemplatePopover.classList.contains("hidden")) {

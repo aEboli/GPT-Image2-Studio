@@ -85,6 +85,7 @@ test("browser config module normalizes private config without requiring window g
     directImageApiKey: "sk-image-secret",
     directImageEndpointPath: "images/generations",
     directImageModel: "custom-image-model",
+    directImageStream: true,
     directTextBaseUrl: "https://text-direct.example.test/v1/chat/completions",
     directTextApiKey: "sk-text-secret",
     directTextEndpointPath: "chat/completions",
@@ -107,10 +108,12 @@ test("browser config module normalizes private config without requiring window g
     endpointPath: "responses",
     responsesModel: "gpt-5.5",
     imageToolModel: "gpt-image-2",
+    includeImageToolModel: true,
     directImageBaseUrl: "https://image-direct.example.test/v1",
     directImageApiKey: "sk-image-secret",
     directImageEndpointPath: "images/generations",
     directImageModel: "custom-image-model",
+    directImageStream: true,
     directTextBaseUrl: "https://text-direct.example.test/v1",
     directTextApiKey: "sk-text-secret",
     directTextEndpointPath: "chat/completions",
@@ -167,6 +170,14 @@ test("browser config module normalizes private config without requiring window g
   assert.equal(formData.get("protocolBaseUrl"), "https://protocol.example.test/v1");
   assert.equal(formData.get("protocolApiKey"), "sk-protocol-secret");
   assert.equal(formData.get("protocolImageModel"), "custom-protocol-image-model");
+});
+
+test("browser direct image streaming defaults to disabled", () => {
+  const normalized = normalizeBrowserPrivateConfig({ imageRoute: "b" });
+  const formData = appendBrowserConfigToFormData(new FormData(), () => normalized);
+
+  assert.equal(normalized.directImageStream, false);
+  assert.equal(formData.get("directImageStream"), "false");
 });
 
 test("browser config keeps complete root endpoint URLs without appending v1", () => {
