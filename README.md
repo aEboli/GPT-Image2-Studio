@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.043-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.044-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installers-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,7 +10,7 @@
 
 Prompt-to-image, reference analysis, editing, product-image replication, ecommerce sets, portraits, article illustrations, PPT generation, and asset history in one browser-based workspace.
 
-Current version: `v0.2.043`
+Current version: `v0.2.044`
 
 [Chinese README](./README.zh-CN.md)
 
@@ -47,9 +47,9 @@ Windows 脚本入口（启动器、Native Messaging 安装/卸载、图片资源
 
 ### Windows desktop app (recommended)
 
-Download `GPT-Image2-Studio-Desktop-Setup-v0.2.043-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
+Download `GPT-Image2-Studio-Desktop-Setup-v0.2.044-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
 
-For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.043-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
+For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.044-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
 
 For desktop development, Electron 43 requires Node.js 22.12 or newer:
 
@@ -60,7 +60,7 @@ cmd /c npm run desktop
 
 ### Windows browser installer
 
-The legacy browser-installer flow remains documented for local builds, but the `v0.2.043` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
+The legacy browser-installer flow remains documented for local builds, but the `v0.2.044` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
 
 ## Configuration
 
@@ -123,6 +123,8 @@ The Responses model is the outer model. The image tool model is chosen from the 
 | `gpt-image-2` | Default. |
 | `gpt-image-2.5-sunburst` | Most capable; more precise editing, longer generation times. |
 | `gpt-image-2.5-flare` | Fast, high-quality everyday generation. |
+
+The **发送 tools[].model** switch is off by default. With it off, Route requests omit `tools[].model` and let the configured service choose its image-tool model; the dropdown selection is still saved and retained for queued jobs. Turn the switch on when the relay requires an explicit tool model, and Studio then sends the selected allowlisted model. Older configurations that do not have this field are normalized to off.
 
 The prompt page parameter row also has a **质量** (quality) dropdown: `low`, `medium`, `high` (default), plus `xhigh` and `max`, which exist only on the 2.5 models. Switching back to `gpt-image-2` while `xhigh`/`max` is selected clamps quality to `high`. Grok offers only `low` and `medium`, defaulting to `medium`; quality selections are remembered separately for GPT, Gemini, and Grok. Legacy automatic values migrate to concrete defaults and are never offered as options or sent upstream. Prompt-to-image also has an optional **透明背景** (transparent background) switch on GPT's Route and Direct image routes. Enabling it forces PNG, sends `background=transparent`, and stores the choice with the queued job. Gemini and Grok keep this switch hidden and do not send a background parameter.
 
@@ -519,7 +521,7 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 - The source and lockfile versions are authoritative; tags use `v<version>`.
 - Versions use `major.minor.patch` with a three-digit patch segment: major bumps reset minor and patch, minor bumps reset patch, feature bumps add `0.010`, and ordinary updates add `0.001`.
 - Use `npm run release:major`, `npm run release:minor`, `npm run release:feature`, or `npm run release:patch` with `--summary`; each release changes exactly one level.
-- Current release notes: [v0.2.043](./docs/releases/v0.2.043.md).
+- Current release notes: [v0.2.044](./docs/releases/v0.2.044.md).
 - Windows packages are distributed through [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Check the release notes for hashes and signing status.
 - `npm run check:release:strict` requires a clean worktree and a matching tag on the current commit.
 
@@ -534,7 +536,14 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 
 ## Version history
 
-Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.043](./docs/releases/v0.2.043.md).
+Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.044](./docs/releases/v0.2.044.md).
+
+### v0.2.044
+
+- Route mode now leaves `tools[].model` out of image-generation requests by default, which lets compatible relays choose the image-tool model without rejecting an extra field.
+- Added the **发送 tools[].model** switch to opt into sending the selected allowlisted image-tool model; the setting is saved with route configuration, browser-private requests, and queued jobs, while direct image routes keep their existing explicit model behavior.
+- Normalized missing or legacy `includeImageToolModel` values to off across local config, browser storage, request payloads, server defaults, and the public browser module mirror.
+- Updated the runtime specification, archived change records, English and Simplified Chinese README guidance, and regression coverage for default, disabled, enabled, persistence, and request-body behavior.
 
 ### v0.2.043
 

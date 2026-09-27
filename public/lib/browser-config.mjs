@@ -196,9 +196,7 @@ export function saveBrowserPrivateConfig(payload, storage = getLocalStorage()) {
       endpointPath: payload.endpointPath || current.endpointPath,
       responsesModel: payload.responsesModel,
       imageToolModel: payload.imageToolModel || current.imageToolModel,
-      includeImageToolModel: payload.includeImageToolModel === undefined
-        ? current.includeImageToolModel
-        : payload.includeImageToolModel !== false,
+      includeImageToolModel: payload.includeImageToolModel === true,
       imageRoute: payload.imageRoute || current.imageRoute,
       directImageBaseUrl: payload.directImageBaseUrl || payload.directBaseUrl || current.directImageBaseUrl,
       directImageApiKey: payload.directImageApiKey
@@ -343,7 +341,7 @@ export function getBrowserPrivateConfigRequestPayload(readConfig = readBrowserPr
         endpointPath: browserConfig.endpointPath,
         responsesModel: browserConfig.responsesModel,
         imageToolModel: browserConfig.imageToolModel,
-        includeImageToolModel: browserConfig.includeImageToolModel !== false,
+        includeImageToolModel: browserConfig.includeImageToolModel === true,
         imageRoute: browserConfig.imageRoute,
         directImageBaseUrl: browserConfig.directImageBaseUrl,
         directImageApiKey: browserConfig.directImageApiKey,

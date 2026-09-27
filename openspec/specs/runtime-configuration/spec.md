@@ -415,7 +415,7 @@ Route D image-generation and image-edit requests SHALL NOT send `reasoningEffort
 
 ### Requirement: 路由模式可控制是否发送生图工具模型
 
-路由模式 SHALL 提供一个独立开关，控制 Responses `image_generation` 工具请求是否包含 `tools[].model`。该设置 SHALL 使用 `includeImageToolModel` 持久化，默认值 SHALL 为 `true`；旧配置缺少该字段时 SHALL 归一化为 `true`。
+路由模式 SHALL 提供一个独立开关，控制 Responses `image_generation` 工具请求是否包含 `tools[].model`。该设置 SHALL 使用 `includeImageToolModel` 持久化，默认值 SHALL 为 `false`；旧配置缺少该字段时 SHALL 归一化为 `false`。
 
 开关开启时，路由模式的 `image_generation` 请求 SHALL 在 `tools[].model` 中发送当前生图工具模型下拉框所选的白名单模型。开关关闭时，请求 SHALL 完全省略 `tools[].model`，且 SHALL 保留模型下拉框当前选择。开关状态 SHALL 随配置保存，并在浏览器私有配置载荷中传递到服务端。
 
@@ -426,8 +426,8 @@ Route D image-generation and image-edit requests SHALL NOT send `reasoningEffort
 #### Scenario: 新配置默认发送所选工具模型
 
 - **WHEN** 用户首次使用路由模式，或载入的旧配置没有 `includeImageToolModel`
-- **THEN** 开关默认开启
-- **AND** Responses `image_generation` 请求的 `tools[].model` 等于当前选择的白名单模型
+- **THEN** 开关默认关闭
+- **AND** Responses `image_generation` 请求不包含 `tools[].model`
 
 #### Scenario: 用户关闭工具模型字段
 

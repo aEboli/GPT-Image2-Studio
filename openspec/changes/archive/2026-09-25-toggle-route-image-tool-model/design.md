@@ -2,13 +2,13 @@
 
 路由模式的 `imageToolModel` 已贯通配置、模型选择和生成元数据；Responses 请求构造器只在收到非空 `imageModel` 时添加 `tools[].model`。路由模式的配置界面把 Responses 模型和工具模型上下排列，现有直连模式则用 switch 控件呈现「流式输出」。
 
-本变更把“是否发送工具模型 ID”作为独立的布尔配置保存，并沿现有私有配置传递链送到图片请求。默认值为 `true`，旧配置缺少该字段时按开启处理，显式指定当前所选工具模型。
+本变更把“是否发送工具模型 ID”作为独立的布尔配置保存，并沿现有私有配置传递链送到图片请求。默认值为 `false`，旧配置缺少该字段时按关闭处理，显式开启时发送当前所选工具模型。
 
 ## Decisions
 
 ### Use `includeImageToolModel` as the setting
 
-该字段表达请求行为，而不是所选模型本身是否有效。配置、浏览器载荷和生成配置统一使用 `includeImageToolModel`。字段缺失、空值或旧配置迁移时归一化为 `true`；显式 `false` 才关闭。
+该字段表达请求行为，而不是所选模型本身是否有效。配置、浏览器载荷和生成配置统一使用 `includeImageToolModel`。字段缺失、空值或旧配置迁移时归一化为 `false`；显式 `true` 才开启。
 
 ### Apply the flag at the Responses image tool body
 

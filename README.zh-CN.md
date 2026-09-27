@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.043-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.044-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installer-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,7 +10,7 @@
 
 把提示词生图、参考图分析、图片编辑、商品图裂变、电商套图、人物写真、文章插图、PPT 生成和素材管理集中到一个浏览器界面中。
 
-当前版本：`v0.2.043`
+当前版本：`v0.2.044`
 
 </div>
 
@@ -56,14 +56,14 @@ Windows 脚本入口（启动器、Native Messaging 安装/卸载、图片资源
 从包含桌面产物的 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
 
 ```text
-GPT-Image2-Studio-Desktop-Setup-v0.2.043-x64.exe
+GPT-Image2-Studio-Desktop-Setup-v0.2.044-x64.exe
 ```
 
 安装完成后通过桌面或开始菜单中的 `GPT-Image2-Studio` 启动。程序会在独立窗口中运行，内置服务使用动态回环端口，关闭窗口后不会遗留后台服务。无需另行安装 Node.js，完整说明见 [Windows 桌面程序文档](./docs/windows-desktop.md)。
 
 源码目录也可直接启动桌面开发版：
 
-如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.043-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
+如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.044-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
 
 桌面开发使用 Electron `43`，要求 Node.js `22.12` 或更高版本；普通 `npm start` 服务仍支持 Node.js `20+`。
 
@@ -74,7 +74,7 @@ cmd /c npm run desktop
 
 ### 方式三：Windows 浏览器安装包（兼容旧版）
 
-旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.043` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
+旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.044` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
 
 ## 配置说明
 
@@ -136,6 +136,8 @@ Responses 模型：gpt-5.4-mini
 | `gpt-image-2` | 默认值。 |
 | `gpt-image-2.5-sunburst` | 能力最强，精修更准，出图更慢。 |
 | `gpt-image-2.5-flare` | 日常生图，速度更快。 |
+
+「发送 tools[].model」开关默认关闭。关闭时，路由请求会省略 `tools[].model`，交给当前服务决定生图工具模型；下拉框的选择仍会保存，排队任务也会保留提交时的选择。只有中转服务要求明确指定工具模型时才需要打开，打开后才会发送下拉框当前选中的白名单模型。旧配置缺少这个字段时也会归一化为关闭。
 
 提示词页的参数区还有「质量」下拉：`low`、`medium`、`high`（默认），以及只有 2.5 模型才有的 `xhigh` 和 `max`。选中 `xhigh` / `max` 后切回 `gpt-image-2` 时，质量会收敛为 `high`。Grok 只提供 `low`、`medium`，默认 `medium`；GPT、Gemini、Grok 分别记住各自的质量选择。旧配置中的自动值会迁移为确定默认值，不再作为选项显示，也不发送给上游。提示词生图还提供可选的「透明背景」开关，仅在 GPT 的路由模式和直连生图路线显示；开启后固定输出 PNG，发送 `background=transparent`，并把选择随任务保存。Gemini 和 Grok 隐藏此开关，不发送背景参数。
 
@@ -631,8 +633,8 @@ cmd /c npm run build:desktop
 产物路径：
 
 ```text
-artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.043-x64.exe
-artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.043-x64.zip
+artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.044-x64.exe
+artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.044-x64.zip
 artifacts/desktop/win-unpacked/GPT-Image2-Studio.exe
 ```
 
@@ -650,7 +652,7 @@ cmd /c npm run build:installer
 产物路径格式：
 
 ```text
-artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.043.exe
+artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.044.exe
 ```
 
 脚本使用系统 `iexpress.exe` 生成自解压安装包，并把当前 Node.js 运行时和依赖打入安装目录；启动后仍使用默认浏览器显示工作台。
@@ -755,7 +757,14 @@ cmd /c npm run build:installer
 
 ## 版本更新说明
 
-完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.043](./docs/releases/v0.2.043.md)。
+完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.044](./docs/releases/v0.2.044.md)。
+
+### v0.2.044 更新说明
+
+- 路由模式默认不再发送 `tools[].model`，兼容中转可以自行选择生图工具模型，也不会因为多出的字段拒绝请求。
+- 新增「发送 tools[].model」开关；打开后才发送当前下拉框选中的白名单生图工具模型。开关会随路线配置、浏览器私有请求和排队任务保存，直连生图路线继续保持原有的明确模型行为。
+- 本地配置、浏览器存储、请求载荷、服务端默认值和 `public/lib` 公共模块镜像统一把缺失或旧版 `includeImageToolModel` 归一化为关闭。
+- 同步运行时规范、归档变更记录、中英文 README 说明，以及默认、关闭、重新开启、持久化和请求体行为的回归测试。
 
 ### v0.2.043 更新说明
 

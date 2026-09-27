@@ -16,10 +16,10 @@ import { createResponsesRequestBody, requestImageGeneration } from "../lib/respo
 
 const model = "gpt-image-2.5-sunburst";
 
-test("工具模型开关默认开启，关闭时保留选中的模型", () => {
+test("工具模型开关默认关闭，开启时发送选中的模型", () => {
   for (const includeImageToolModel of [undefined, null, true, false]) {
     const config = { imageToolModel: model, includeImageToolModel };
-    const expected = includeImageToolModel !== false;
+    const expected = includeImageToolModel === true;
     assert.equal(normalizeImageRouteConfig(config).includeImageToolModel, expected);
     assert.equal(normalizeBrowserPrivateConfig(config).includeImageToolModel, expected);
     const selected = getSelectedImageGenerationConfig(config);
@@ -28,11 +28,11 @@ test("工具模型开关默认开启，关闭时保留选中的模型", () => {
   }
 });
 
-test("本地配置保存关闭状态，旧配置默认开启，公开配置同步状态", async (t) => {
+test("本地配置保存关闭状态，旧配置默认关闭，公开配置同步状态", async (t) => {
   const rootDir = await mkdtemp(join(tmpdir(), "image-studio-route-toggle-"));
   t.after(() => rm(rootDir, { recursive: true, force: true }));
   const store = createConfigStore({ rootDir, env: {} });
-  assert.equal((await store.readPrivateConfig()).includeImageToolModel, true);
+  assert.equal((await store.readPrivateConfig()).includeImageToolModel, false);
   await store.saveConfig({ imageToolModel: model, includeImageToolModel: false });
   await store.saveConfig({ responsesModel: "test-text-model" });
   assert.equal((await store.readPrivateConfig()).includeImageToolModel, false);
@@ -64,7 +64,7 @@ test("浏览器保存、公开配置、JSON 和表单均保留关闭状态", () 
 
 test("本地请求沿用已保存开关，浏览器私有请求可以重新开启", () => {
   const fallback = normalizeBrowserPrivateConfig({ apiKey: "local-key", includeImageToolModel: false });
-  assert.equal(mergeRequestPrivateConfig({ imageRoute: "a", includeImageToolModel: true }, fallback).includeImageToolModel, false);
+  assert.equal(mergeRequestPrivateConfig({ imageRoute: "a" }, fallback).includeImageToolModel, false);
   assert.equal(mergeRequestPrivateConfig({ apiKey: "browser-key", includeImageToolModel: true }, fallback).includeImageToolModel, true);
 });
 
@@ -79,7 +79,7 @@ test("其他路线不使用工具模型开关", () => {
 
 test("关闭工具模型仅省略 model 属性，保留质量与流式参数", () => {
   const options = { prompt: "test", size: "1024x1024", imageModel: model, quality: "max", responsesModel: "text-model" };
-  const enabled = createResponsesRequestBody(options);
+  const enabled = createResponsesRequestBody({ ...options, includeImageToolModel: true });
   const disabled = createResponsesRequestBody({ ...options, includeImageToolModel: false });
   assert.equal(enabled.tools[0].model, model);
   assert.equal(Object.hasOwn(disabled.tools[0], "model"), false);
@@ -110,8 +110,8 @@ test("路由生成真实构造的请求按默认、关闭、重开状态发送�
     assert.equal(body.model, "text-model");
     assert.equal(body.stream, true);
     assert.equal(body.tools[0].quality, "max");
-    assert.equal(Object.hasOwn(body.tools[0], "model"), includeImageToolModel !== false);
-    if (includeImageToolModel !== false) assert.equal(body.tools[0].model, model);
+    assert.equal(Object.hasOwn(body.tools[0], "model"), includeImageToolModel === true);
+    if (includeImageToolModel === true) assert.equal(body.tools[0].model, model);
   }
 });
 
@@ -135,7 +135,7 @@ test("服务端配置保存接口往返开关，省略字段时保留已保存�
   assert.equal(generationCalls.length, 8, "所有生成入口都应传递路由开关，包括套图修复与共享生图选项");
 });
 
-test("路由模型并排布局与默认开启开关仅存在于路由面板", async () => {
+test("路由模型并排布局与默认关闭开关仅存在于路由面板", async () => {
   const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
   const css = await readFile(new URL("../public/styles.css", import.meta.url), "utf8");
   const nodes = [];
@@ -152,7 +152,7 @@ test("路由模型并排布局与默认开启开关仅存在于路由面板", as
   const toggle = toggles[0];
   assert.equal(toggle.parentNode, fields[4]);
   assert.equal(attr(toggle, "role"), "switch");
-  assert.equal(attr(toggle, "aria-checked"), "true");
+  assert.equal(attr(toggle, "aria-checked"), "false");
   assert.equal(attr(toggle, "data-ui-i18n-aria-label"), "includeImageToolModel");
   assert.match(attr(toggle, "class"), /reference-analysis-auto-collapse/);
   assert.match(css, /\.route-config-panel\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\);/);

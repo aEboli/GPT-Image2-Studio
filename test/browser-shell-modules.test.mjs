@@ -108,7 +108,7 @@ test("browser config module normalizes private config without requiring window g
     endpointPath: "responses",
     responsesModel: "gpt-5.5",
     imageToolModel: "gpt-image-2",
-    includeImageToolModel: true,
+    includeImageToolModel: false,
     directImageBaseUrl: "https://image-direct.example.test/v1",
     directImageApiKey: "sk-image-secret",
     directImageEndpointPath: "images/generations",

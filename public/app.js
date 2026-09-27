@@ -5835,7 +5835,7 @@ function getCurrentPrivateConfigRequestPayload() {
     apiKey: refs.apiKeyInput.value.trim() || browserPayload.apiKey || "",
     responsesModel: refs.responsesModelInput.value.trim() || browserPayload.responsesModel || state.config?.responsesModel || DEFAULT_RESPONSES_MODEL,
     imageToolModel: getSelectedImageToolModel(browserPayload),
-    includeImageToolModel: refs.includeImageToolModelToggle?.getAttribute("aria-checked") !== "false",
+    includeImageToolModel: refs.includeImageToolModelToggle?.getAttribute("aria-checked") === "true",
     directImageBaseUrl,
     directImageEndpointPath: directImageEndpoint.endpointPath || browserPayload.directImageEndpointPath || browserPayload.directEndpointPath || state.config?.directImageEndpointPath || state.config?.directEndpointPath || API_ENDPOINT_IMAGE_GENERATIONS,
     directImageApiKey,
