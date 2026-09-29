@@ -64,6 +64,17 @@ const WEATHER_SIGNALS = [
   { pattern: /晴天|晴朗/u, label: "晴天" },
 ];
 
+const VISUAL_ATMOSPHERE_SIGNALS = [
+  { pattern: /暖色|暖光|橙黄色|暖白/u, label: "暖光" },
+  { pattern: /冷色|冷光|蓝色调/u, label: "冷调" },
+  { pattern: /自然光|窗边漫射/u, label: "自然光" },
+  { pattern: /柔和|柔光|漫射/u, label: "柔光" },
+  { pattern: /低照度|昏暗|低反差|低对比/u, label: "低调" },
+  { pattern: /电影感|电影级/u, label: "电影感" },
+  { pattern: /浅景深|背景虚化|柔焦/u, label: "浅景深" },
+  { pattern: /写实摄影|摄影质感|照片级/u, label: "写实" },
+];
+
 const ENVIRONMENT_PLACE_SIGNALS = [
   { pattern: /庭院/u, label: "庭院" },
   { pattern: /花园/u, label: "花园" },
@@ -78,6 +89,8 @@ const ENVIRONMENT_PLACE_SIGNALS = [
   { pattern: /山地|山野|山间/u, label: "山野" },
   { pattern: /草地|草坪/u, label: "草地" },
   { pattern: /咖啡馆|咖啡店/u, label: "咖啡馆" },
+  { pattern: /家居室内|家居环境/u, label: "家居室内" },
+  { pattern: /室内/u, label: "室内" },
   { pattern: /床铺|床面|床单|床上/u, label: "床铺" },
   { pattern: /卧室/u, label: "卧室" },
   { pattern: /客厅/u, label: "客厅" },
@@ -104,6 +117,21 @@ const ENVIRONMENT_OBJECT_SIGNALS = [
   { pattern: /灌木/u, label: "灌木" },
   { pattern: /建筑窗光|窗光/u, label: "窗光" },
   { pattern: /纸巾盒|抽纸盒|纸团/u, label: "纸巾盒" },
+];
+
+const SCENE_FALLBACK_OBJECT_SIGNALS = [
+  { pattern: /瑜伽垫/u, label: "瑜伽垫" },
+  { pattern: /木质楼梯/u, label: "木质楼梯" },
+  { pattern: /楼梯/u, label: "楼梯" },
+  { pattern: /沙发/u, label: "沙发" },
+  { pattern: /边柜|边桌/u, label: "边柜" },
+  { pattern: /台灯/u, label: "台灯" },
+  { pattern: /绿植|植物/u, label: "绿植" },
+  { pattern: /走廊/u, label: "走廊" },
+  { pattern: /玻璃水杯|水杯/u, label: "水杯" },
+  { pattern: /毛巾/u, label: "毛巾" },
+  { pattern: /衣物|衣服/u, label: "衣物" },
+  { pattern: /木地板/u, label: "木地板" },
 ];
 
 function normalizeDisplayNamePart(value) {
@@ -178,6 +206,16 @@ function getPromptAgentSubjectAction(subject, subjectSource) {
   const verb = /^(?:拿着|握住|握持)$/u.test(propMatch[1]) ? "手持" : propMatch[1].replace(/着$/u, "");
   const object = normalizeDisplayNamePart(propMatch[2].replace(/(?:并|同时|且).*/u, ""));
   return truncateDisplayName(`${verb}${object}`, 12);
+}
+
+function getPromptAgentAtmosphereName(subjectSource, sceneSource, visualSource) {
+  const time = findDisplayNameSignal(`${sceneSource} ${visualSource}`, TIME_SIGNALS);
+  const weather = findDisplayNameSignal(`${subjectSource} ${sceneSource} ${visualSource}`, WEATHER_SIGNALS);
+  const timeWeather = [time, weather].filter((part, index, parts) => part && parts.indexOf(part) === index);
+  if (timeWeather.length > 0) {
+    return timeWeather.join("");
+  }
+  return findDisplayNameSignal(visualSource, VISUAL_ATMOSPHERE_SIGNALS);
 }
 
 export function isStructuredImagePromptJson(value) {
@@ -283,25 +321,31 @@ export function getStructuredImagePromptDisplayName(json) {
     .filter(Boolean)
     .join(" ");
 
-  const primaryParts = [
-    findDisplayNameSignal(`${sceneSource} ${visualSource}`, TIME_SIGNALS),
-    findDisplayNameSignal(`${subjectSource} ${sceneSource} ${visualSource}`, WEATHER_SIGNALS),
+  let subjectName = [
     getPromptAgentSubjectAction(subject, subjectSource),
     getPromptAgentSubjectLabel(subject),
   ].filter((part, index, parts) => part && parts.indexOf(part) === index);
-  const primaryName = primaryParts.join("");
 
   const place = findDisplayNameSignal(sceneSource, ENVIRONMENT_PLACE_SIGNALS);
-  const environmentObjects = findDisplayNameSignals(environmentSource, ENVIRONMENT_OBJECT_SIGNALS, place ? 1 : 2);
-  const environmentParts = [place, ...environmentObjects].filter(
+  let environmentObjects = findDisplayNameSignals(environmentSource, ENVIRONMENT_OBJECT_SIGNALS, place ? 1 : 2);
+  if (environmentObjects.length === 0) {
+    environmentObjects = findDisplayNameSignals(environmentSource, SCENE_FALLBACK_OBJECT_SIGNALS, place ? 1 : 2);
+  }
+
+  if (subjectName.length === 0 && environmentObjects.length > 0) {
+    subjectName = [environmentObjects.shift()];
+  }
+
+  const sceneParts = [place, ...environmentObjects].filter(
     (part, index, parts) =>
       part &&
       parts.indexOf(part) === index &&
-      !primaryName.includes(part),
+      !subjectName.join("").includes(part),
   );
-  const environmentName = environmentParts.join("");
+  const sceneName = sceneParts.join("");
+  const atmosphereName = getPromptAgentAtmosphereName(subjectSource, sceneSource, visualSource);
 
-  return truncateDisplayName([primaryName, environmentName].filter(Boolean).join("·"));
+  return truncateDisplayName([subjectName.join(""), sceneName, atmosphereName].filter(Boolean).join("·"));
 }
 
 export function getPromptAgentDisplayName(item) {

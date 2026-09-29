@@ -173,6 +173,7 @@ import {
   normalizeCreationReferenceAnalysis,
   normalizeCreationReferenceRoles,
 } from "./lib/creation-planner.mjs";
+import { translateCreationPlanPrompts } from "./lib/creation-prompt-translation.mjs";
 import {
   CREATION_LOGO_BATCH_REFERENCE_LABELS,
   buildCreationLogoBatchPlan,
@@ -227,6 +228,11 @@ import { buildArticleRelativeDir, createArticleIllustrationSetStore } from "./li
 const rootDir = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(rootDir, "public");
 const libDir = join(rootDir, "lib");
+const publicIconAliases = new Map([
+  ["/favicon.png", "icon.png"],
+  ["/apple-touch-icon.png", "icon.png"],
+  ["/apple-touch-icon-precomposed.png", "icon.png"],
+]);
 const outputDir =
   process.env.IMAGE_STUDIO_OUTPUT_DIR ||
   (process.env.VERCEL ? join(tmpdir(), "gpt-image2-studio-output") : join(homedir(), "Pictures"));
@@ -375,6 +381,7 @@ const MIME_TYPES = {
   ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   ".svg": "image/svg+xml",
   ".webp": "image/webp",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
   ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 };
 
@@ -1613,8 +1620,14 @@ async function handlePromptPreviewSave(request, response) {
       responsesModel: String(payload.responsesModel || ""),
       imageRoute: String(payload.imageRoute || ""),
       imageModel: String(payload.imageModel || ""),
+      ...(previewImageRoute === IMAGE_ROUTE_A && Object.hasOwn(payload, "includeImageToolModel")
+        ? { includeImageToolModel: payload.includeImageToolModel === true }
+        : {}),
+      ...(previewImageRoute === IMAGE_ROUTE_B && Object.hasOwn(payload, "directImageStream")
+        ? { directImageStream: payload.directImageStream === true }
+        : {}),
       ratio: ratioOption.value,
-      ratioLabel: ratioOption.label,
+      ratioLabel: ratioOption.value,
       size: previewSize,
       quality: previewQuality,
       imageBackground: ["transparent", "opaque"].includes(payload.imageBackground) ? payload.imageBackground : "",
@@ -1913,7 +1926,7 @@ async function generateAndSavePptSlide({
       imageModel: generationConfig.imageModel,
       endpointPath: generationResult.endpointPath || generationConfig.endpointPath,
       ratio: "16:9",
-      ratioLabel: "PPT 16:9",
+      ratioLabel: "16:9",
       size: savedSize,
       quality: slideQuality,
       format: PPT_SLIDE_FORMAT,
@@ -2577,6 +2590,8 @@ function buildSavedItem({
   regionInstructions = [],
   featureCardsEnabled = false,
   imageBackground = "",
+  includeImageToolModel,
+  directImageStream,
   generationStartedAt,
   generationCompletedAt,
   generationDurationMs,
@@ -2622,8 +2637,10 @@ function buildSavedItem({
     ...(Number(regionCount) > 0 ? { regionCount: Number(regionCount) } : {}),
     ...(Array.isArray(regionInstructions) && regionInstructions.length > 0 ? { regionInstructions } : {}),
     featureCardsEnabled,
+    ...(includeImageToolModel !== undefined ? { includeImageToolModel: includeImageToolModel === true } : {}),
+    ...(directImageStream !== undefined ? { directImageStream: directImageStream === true } : {}),
     ratio: ratioOption.value,
-    ratioLabel: ratioOption.label,
+    ratioLabel: ratioOption.value,
     size,
     actualSize,
     quality,
@@ -3450,7 +3467,7 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
             imageModel: generationConfig.imageModel,
             endpointPath: generationResult.endpointPath || generationConfig.endpointPath,
             ratio: ratioOption.value,
-            ratioLabel: ratioOption.label,
+            ratioLabel: ratioOption.value,
             size: savedSize,
             quality: finalQuality,
             format: finalFormat,
@@ -4699,7 +4716,7 @@ async function handlePortraitGenerate(request, response) {
             endpointPath: generationConfig.endpointPath,
             generationMode: "portrait",
             ratio: ratioOption.value,
-            ratioLabel: ratioOption.label,
+            ratioLabel: ratioOption.value,
             size: savedSize,
             quality: finalQuality,
             format: finalFormat,
@@ -4921,6 +4938,11 @@ async function handleCreationGenerate(request, response) {
       config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
     );
 
+    const promptTranslation = await translateCreationPlanPrompts(plan, {
+      config: getSelectedTextVisionConfig(config),
+    });
+    plan = promptTranslation.plan;
+
     creationRelativeDir = buildCreationRelativeDir({
       createdAt,
       productName: plan.productName || plan.productDescription,
@@ -4936,7 +4958,7 @@ async function handleCreationGenerate(request, response) {
       return {
       ...item,
       ratio: parameters.ratioOption.value,
-      ratioLabel: parameters.ratioOption.label,
+      ratioLabel: parameters.ratioOption.value,
       resolutionTier: parameters.resolutionTier,
       requestedSize: parameters.requestedSize,
       effectiveSize: parameters.finalSize,
@@ -4965,6 +4987,9 @@ async function handleCreationGenerate(request, response) {
 
     writeSseEvent(response, "set_started", { set: setManifest });
     writeSseEvent(response, "plan", { setId, items });
+    if (promptTranslation.warning) {
+      writeSseEvent(response, "prompt_translation_warning", { setId, message: promptTranslation.warning });
+    }
 
     const referenceUploadImages = collectCreationReferenceImagesForUpload(
       plan.items,
@@ -5165,7 +5190,7 @@ async function handleCreationGenerate(request, response) {
             imageModel: generationConfig.imageModel,
             endpointPath: generationConfig.endpointPath,
             ratio: itemGenerationParameters.ratioOption.value,
-            ratioLabel: itemGenerationParameters.ratioOption.label,
+            ratioLabel: itemGenerationParameters.ratioOption.value,
             resolutionTier: itemGenerationParameters.resolutionTier,
             requestedSize: itemGenerationParameters.requestedSize,
             effectiveSize: savedSize,
@@ -5209,7 +5234,7 @@ async function handleCreationGenerate(request, response) {
           generationCompletedAt,
           generationDurationMs,
           ratio: itemGenerationParameters.ratioOption.value,
-          ratioLabel: itemGenerationParameters.ratioOption.label,
+          ratioLabel: itemGenerationParameters.ratioOption.value,
           resolutionTier: itemGenerationParameters.resolutionTier,
           requestedSize: itemGenerationParameters.requestedSize,
           effectiveSize: savedSize,
@@ -5560,7 +5585,7 @@ async function handleCreationLogoBatchGenerate(request, response) {
             imageModel: generationConfig.imageModel,
             endpointPath: generationConfig.endpointPath,
             ratio: ratioOption.value,
-            ratioLabel: ratioOption.label,
+            ratioLabel: ratioOption.value,
             size: savedSize,
             quality: finalQuality,
             format: finalFormat,
@@ -5892,7 +5917,7 @@ async function handlePortraitRepair(request, response) {
             endpointPath: generationConfig.endpointPath,
             generationMode: "portrait",
             ratio: ratioOption.value,
-            ratioLabel: ratioOption.label,
+            ratioLabel: ratioOption.value,
             size: savedSize,
             quality: finalQuality,
             format: finalFormat,
@@ -6325,7 +6350,7 @@ async function handleCreationRepair(request, response) {
             imageModel: itemGenerationConfig.imageModel,
             endpointPath: itemGenerationConfig.endpointPath,
             ratio: itemGenerationParameters.ratioOption.value,
-            ratioLabel: itemGenerationParameters.ratioOption.label,
+            ratioLabel: itemGenerationParameters.ratioOption.value,
             resolutionTier: itemGenerationParameters.resolutionTier,
             requestedSize: itemGenerationParameters.requestedSize,
             effectiveSize: savedSize,
@@ -6372,7 +6397,7 @@ async function handleCreationRepair(request, response) {
           generationCompletedAt,
           generationDurationMs,
           ratio: itemGenerationParameters.ratioOption.value,
-          ratioLabel: itemGenerationParameters.ratioOption.label,
+          ratioLabel: itemGenerationParameters.ratioOption.value,
           resolutionTier: itemGenerationParameters.resolutionTier,
           requestedSize: itemGenerationParameters.requestedSize,
           effectiveSize: savedSize,
@@ -6853,7 +6878,7 @@ async function handleGenerate(request, response) {
     generationTaskStore.updateTask(clientSessionId, taskId, {
       generationStartedAt,
       ratio: ratioOption.value,
-      ratioLabel: ratioOption.label,
+      ratioLabel: ratioOption.value,
       size: finalSize,
       quality: finalQuality,
       format: finalFormat,
@@ -7068,11 +7093,17 @@ async function handleGenerate(request, response) {
         imageModel: generationConfig.imageModel,
         endpointPath: generationResult.endpointPath || generationConfig.endpointPath,
         ratio: ratioOption.value,
-        ratioLabel: ratioOption.label,
+        ratioLabel: ratioOption.value,
         size: savedSize,
         quality: finalQuality,
         format: finalFormat,
         ...(generationMode === "" ? { imageBackground } : {}),
+        ...(generationConfig.imageRoute === IMAGE_ROUTE_A
+          ? { includeImageToolModel: generationConfig.includeImageToolModel === true }
+          : {}),
+        ...(generationConfig.imageRoute === IMAGE_ROUTE_B
+          ? { directImageStream: config.directImageStream === true }
+          : {}),
         hasReferenceImage: referenceImages.length > 0,
         referenceImageNames: referenceImages.map((image) => image.filename),
         referenceImageName: referenceImages[0]?.filename || "",
@@ -7120,6 +7151,12 @@ async function handleGenerate(request, response) {
       reasoningEffort,
       generationMode,
       imageBackground: generationMode === "" ? imageBackground : "",
+      ...(generationConfig.imageRoute === IMAGE_ROUTE_A
+        ? { includeImageToolModel: generationConfig.includeImageToolModel === true }
+        : {}),
+      ...(generationConfig.imageRoute === IMAGE_ROUTE_B
+        ? { directImageStream: config.directImageStream === true }
+        : {}),
       styleTransferSourceImageName,
       styleTransferReferenceImageName,
       styleTransferStylePreset,
@@ -7156,7 +7193,7 @@ async function handleGenerate(request, response) {
       filename,
       absolutePath: saved.absolutePath,
       ratio: ratioOption.value,
-      ratioLabel: ratioOption.label,
+      ratioLabel: ratioOption.value,
       size: savedSize,
       item,
     });
@@ -7472,6 +7509,10 @@ async function routeRequest(request, response) {
 
       throw error;
     }
+  }
+
+  if (request.method === "GET" && publicIconAliases.has(url.pathname)) {
+    return serveFile(request, response, join(publicDir, publicIconAliases.get(url.pathname)));
   }
 
   if (request.method === "GET") {

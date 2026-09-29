@@ -1,0 +1,14 @@
+{
+  "name": "GPT-Image2-Studio",
+  "short_name": "Image Studio",
+  "start_url": "/",
+  "display": "standalone",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

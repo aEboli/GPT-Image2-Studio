@@ -15,7 +15,7 @@ import { clearImageReveal, setImageRevealSource } from "../image-reveal.mjs";
 import { createViewRendererController } from "./view-renderer.mjs";
 
 const DEFAULT_IMAGE_EDIT_RATIO = "1:1";
-const DEFAULT_IMAGE_EDIT_RATIO_LABEL = "电商主图、头像、社交媒体 · 方形 1:1";
+const DEFAULT_IMAGE_EDIT_RATIO_LABEL = "1:1";
 
 const LOCAL_MASK_COLORS = ["#f5506e", "#14b8a6", "#f59e0b", "#6366f1", "#22c55e", "#ec4899"];
 const LOCAL_MASK_UNDO_LIMIT = 24;
@@ -1195,7 +1195,7 @@ export function createImageEditController(options = {}) {
         ? { mask: payload.mask || null, masks: payload.masks || [] }
         : null,
       ratio: ratioValue,
-      ratioLabel: ratioOption?.label || DEFAULT_IMAGE_EDIT_RATIO_LABEL,
+      ratioLabel: ratioOption?.value || DEFAULT_IMAGE_EDIT_RATIO_LABEL,
       sizeSetting,
       size,
       quality: getSelectedImageQuality(),

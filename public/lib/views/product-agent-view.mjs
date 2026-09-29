@@ -180,6 +180,8 @@ function renderSelectionOptions() {
 function renderReferenceGrid() {
   refs.referenceGrid.replaceChildren();
   refs.referenceCount.textContent = `${state.files.length} / ${MAX_FILES}`;
+  refs.dropzone.classList.toggle("is-compact-hidden", state.files.length > 0);
+  refs.referenceGrid.classList.toggle("hidden", state.files.length === 0);
   state.files.forEach((entry, index) => {
     const card = document.createElement("div");
     card.className = "product-agent-reference-card";
@@ -196,6 +198,29 @@ function renderReferenceGrid() {
     card.append(image, meta, remove);
     refs.referenceGrid.append(card);
   });
+  if (state.files.length > 0 && state.files.length < MAX_FILES) {
+    const addCard = document.createElement("div");
+    addCard.className = "reference-card reference-add-card";
+    const addButton = document.createElement("button");
+    addButton.type = "button";
+    addButton.className = "reference-add-button";
+    addButton.textContent = "+";
+    addButton.title = "继续上传母图";
+    addButton.setAttribute("aria-label", "继续上传母图");
+    addButton.addEventListener("click", () => refs.input.click());
+    addCard.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      addCard.classList.add("dragover");
+    });
+    addCard.addEventListener("dragleave", () => addCard.classList.remove("dragover"));
+    addCard.addEventListener("drop", (event) => {
+      event.preventDefault();
+      addCard.classList.remove("dragover");
+      addFiles(event.dataTransfer?.files);
+    });
+    addCard.append(addButton);
+    refs.referenceGrid.append(addCard);
+  }
 }
 
 function createTextList(title, values) {

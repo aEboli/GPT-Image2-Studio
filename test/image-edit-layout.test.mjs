@@ -60,7 +60,7 @@ test("image edit mode is exposed as an independent Create view", async () => {
   assert.match(app, /if \(job\.mode === "image-edit"\) \{[\s\S]*removeImageEditGenerationKey\(makeJobPreviewKey\(job\.id\)\);[\s\S]*setImageEditFeedback\(message, "error"\);/);
   assert.match(app, /preserveImageEditGenerationItemForDelete\(item\)/);
 
-  assert.match(loader, /"image-edit": "\/lib\/views\/image-edit-view\.mjs"/);
+  assert.match(loader, /"image-edit": "\/lib\/views\/image-edit-view\.mjs\?v=20260928-aspect-ratio-value-only-1"/);
   assert.match(view, /function getImageEditRefs\(\)/);
   assert.match(view, /function createImageEditController/);
   assert.match(view, /imageEditOutputFormatInput:\s*document\.querySelector\("#imageEditOutputFormatInput"\)/);

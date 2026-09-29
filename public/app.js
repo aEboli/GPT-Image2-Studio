@@ -1,4 +1,4 @@
-import { buildParameterText, formatImageModelLabel, formatRecentOutputMeta, resolveDisplayImageSize } from "/lib/studio-formatters.mjs";
+import { buildParameterEntries, buildParameterText, formatImageModelLabel, formatRecentOutputMeta, resolveDisplayImageSize } from "/lib/studio-formatters.mjs";
 import { formatLoadingThumbnailStatusLabel, getPreviewPlaceholderState, getStablePreviewLoadingItems, isWaitingPreviewItem } from "/lib/preview-placeholder-state.mjs?v=20260926-filmstrip-request-order-1";
 import { buildGalleryReferenceFilterOptions, buildGallerySections, buildGallerySizeFilterOptions, buildGalleryTimeFilterOptions, distributeGalleryItemsIntoColumns, filterGalleryItems, getGalleryHistorySectionLayouts, getGalleryLayoutModeForWidth, getPromptGenerationGalleryItems, getRecentGalleryItems, normalizeGalleryFilters, paginateGallerySections, sortGalleryItemsByCreatedAtDesc } from "/lib/gallery-organizer.mjs?v=20260806-gallery-five-date-page-1";
 import { buildGalleryMetadataCacheEntry, collectGalleryMetadataRepairPatch, mergeGalleryItemWithCachedMetadata, pruneGalleryMetadataCache } from "/lib/gallery-metadata-recovery.mjs";
@@ -52,7 +52,7 @@ import { createAssetRecordTimeFilterController, getArticleRecordSearchText, getP
 import { buildCreationRecordTimeFilterOptions, filterCreationRecordSetsByTime, formatCreationRecordTimeFilterLabel, hasActiveCreationRecordTimeFilter, normalizeCreationRecordDateFilter, normalizeCreationRecordTimeFilter } from "/lib/creation-record-filter.mjs?v=20260722-creation-record-time-filter-1";
 import { buildCreationRecordListModel, createCreationRecordListState, loadMoreCreationRecordListState } from "/lib/creation-record-list-model.mjs?v=20260807-creation-record-split-workspace-1";
 import { createCreationRecordListRow } from "/lib/creation-record-list-view.mjs?v=20260807-creation-record-split-workspace-1";
-import { ensureLazyViewModule, getMountedLazyViewModule } from "/lib/view-mode-loader.mjs?v=20260608-quick-blend-time-sort-1";
+import { ensureLazyViewModule, getMountedLazyViewModule } from "/lib/view-mode-loader.mjs?v=20260928-aspect-ratio-value-only-1";
 import { appendBrowserConfigToFormData, getBrowserPrivateConfigRequestPayload, getOrCreateClientSessionId, readBrowserPrivateConfig, saveBrowserPrivateConfig, toPublicBrowserConfig } from "/lib/browser-config.mjs";
 import { cacheBrowserGalleryItem, clearBrowserImageCache, dataUrlToBlob, deleteBrowserCachedGalleryItem, fetchServerImageAsDataUrl, getBrowserCachedImageData, getImageUrl, getServerImageUrl, getServerThumbnailUrl, getThumbnailUrl, isCacheableBrowserImageUrl, mergeServerAndBrowserGalleryItems, readBrowserCachedGalleryItems } from "/lib/browser-image-cache.mjs";
 import { createImageEditShellBridge } from "/lib/image-edit-shell-bridge.mjs";
@@ -236,7 +236,7 @@ const PORTRAIT_SHOT_TYPE_LABELS = {
   "close-up": "近景",
   "extreme-close-up": "特写",
 };
-const DEFAULT_UI_RATIO_LABEL = "电商主图、头像、社交媒体 · 方形 1:1";
+const DEFAULT_UI_RATIO_LABEL = "1:1";
 const CREATION_LOGO_PLACEMENTS = new Set([
   "top-left",
   "top-center",
@@ -1257,9 +1257,9 @@ const refs = {
   lightboxMediaStage: document.querySelector(".lightbox-media-stage"),
   lightboxModel: document.querySelector("#lightboxModel"),
   lightboxParams: document.querySelector("#lightboxParams"),
+  lightboxParamsEntries: document.querySelector("#lightboxParamsEntries"),
   lightboxPrompt: document.querySelector("#lightboxPrompt"),
   lightboxPromptStructured: document.querySelector("#lightboxPromptStructured"),
-  lightboxRelativePath: document.querySelector("#lightboxRelativePath"),
   lightboxTime: document.querySelector("#lightboxTime"),
   lightboxActualSizeButton: document.querySelector("#lightboxActualSizeButton"),
   lightboxFitButton: document.querySelector("#lightboxFitButton"),
@@ -2119,7 +2119,7 @@ function getRatioOrientationLabel(orientation) {
 }
 function getUiTextWithReplacements(key, replacements = {}, fallback = "") { let text = getUiLanguageText(key) || fallback; Object.entries(replacements).forEach(([name, value]) => { text = text.replaceAll(`{${name}}`, String(value)); }); return text; }
 function getUiRatioOrientationLabel(orientation) { return getUiLanguageText(orientation === "landscape" ? "ratioLandscape" : orientation === "portrait" ? "ratioPortrait" : "ratioSquare") || getRatioOrientationLabel(orientation); }
-function getUiRatioLabel(option) { return getUiLanguageText(`ratio.${option?.value}`) || option?.label || getUiRatioOrientationLabel(option?.orientation); }
+function getUiRatioLabel(option) { return option?.value || ""; }
 function getUiSizeLabel(option) { const label = option?.label || ""; return label.replace(/^最大(?=\s|$)/, getUiLanguageText("sizeMax") || "最大"); }
 function getUiPreviewPlaceholderState(placeholderState) { if (!placeholderState || placeholderState.mode === "ready") return placeholderState; if (placeholderState.mode === "idle") return { ...placeholderState, eyebrow: getUiLanguageText("previewIdleEyebrow"), title: getUiLanguageText("previewIdleTitle"), detail: getUiLanguageText("previewIdleDetail") }; return { ...placeholderState, title: state.uiLanguage === "en" ? "Generation running" : placeholderState.title }; }
 function rerenderUiLanguageSensitiveViews() { updatePromptCounter(); syncPromptEnhanceMode(); updateGenerateButton(); syncConnectionState(); syncRatioOrientationSummary(); renderRatioGrid(); renderReferenceAnalysisRatioGrid(); renderReasoningOptions(); renderSizeOptions(); renderReferenceAnalysisSizeOptions(); syncEndpointFieldsFromFullUrlModes(); { const c = state.config || {}, s = state.uiLanguage === "en" ? "Saved" : "已保存"; if (refs.savedKeyMask) refs.savedKeyMask.textContent = c.apiKeyConfigured ? `${s} ${c.apiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存"; if (refs.directSavedKeyMask) refs.directSavedKeyMask.textContent = (c.directImageApiKeyConfigured || c.directApiKeyConfigured) ? `${s} ${c.directImageApiKeyMask || c.directApiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存"; if (refs.directTextSavedKeyMask) refs.directTextSavedKeyMask.textContent = c.directTextApiKeyConfigured ? `${s} ${c.directTextApiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存"; if (refs.protocolSavedKeyMask) refs.protocolSavedKeyMask.textContent = c.protocolApiKeyConfigured ? `${s} ${c.protocolApiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存"; } apiEndpointBookPicker.render(); renderPreview(); renderFilmstrip(); renderTimeline(); }
@@ -4111,7 +4111,7 @@ function createImageDecompositionJob() {
     customTargetLanguage: refs.imageDecompositionCustomLanguageInput.value.trim(),
     featureCardsEnabled: refs.imageDecompositionFeatureCardsInput.value === "on",
     ratio: ratioOption?.value || DEFAULT_UI_RATIO,
-    ratioLabel: ratioOption?.label || DEFAULT_UI_RATIO_LABEL,
+    ratioLabel: ratioOption?.value || DEFAULT_UI_RATIO_LABEL,
     sizeSetting,
     size,
     quality: getSelectedImageQuality(),
@@ -6311,12 +6311,45 @@ function syncLightboxItem() {
   refs.lightboxTime.textContent = formatTime(fresh.createdAt);
   refs.lightboxId.textContent = `ID: ${getDisplayId(fresh)}`;
   refs.lightboxPrompt.value = getDisplayPrompt(fresh);
-  refs.lightboxParams.value = String(fresh.paramsText || "").trim() || buildParameterText(fresh, state.config || {});
+  const isPromptTemplateLibraryItem = Boolean(fresh.isPromptTemplateLibraryItem);
+  const isCreationRecordItem = Boolean(fresh.isCreationRecordItem);
+  const parameterText = isPromptTemplateLibraryItem
+    ? String(fresh.paramsText || "").trim()
+    : isCreationRecordItem
+      ? buildParameterText(fresh, {}, { strictSnapshot: true })
+      : buildParameterText(fresh, state.config || {});
+  const parameterEntries = isPromptTemplateLibraryItem
+    ? String(fresh.paramsText || "")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const separatorIndex = line.search(/[：:]/);
+        return separatorIndex > 0
+          ? { label: line.slice(0, separatorIndex).trim(), value: line.slice(separatorIndex + 1).trim() }
+          : { label: "参数", value: line };
+      })
+    : isCreationRecordItem
+      ? buildParameterEntries(fresh, {}, { strictSnapshot: true })
+      : buildParameterEntries(fresh, state.config || {});
+  refs.lightboxParams.value = parameterText;
+  if (refs.lightboxParamsEntries) {
+    refs.lightboxParamsEntries.replaceChildren(
+      ...parameterEntries.map(({ label, value }) => {
+        const row = document.createElement("div");
+        row.className = "lightbox-parameter-row";
+        const labelElement = document.createElement("dt");
+        labelElement.textContent = String(label || "参数");
+        const valueElement = document.createElement("dd");
+        valueElement.textContent = String(value ?? "");
+        row.append(labelElement, valueElement);
+        return row;
+      }),
+    );
+  }
   assetWorkspaceController.renderStructuredPrompt(refs.lightboxPrompt.value);
   if (refs.lightboxFilename) refs.lightboxFilename.textContent = fresh.filename || "--";
-  if (refs.lightboxRelativePath) refs.lightboxRelativePath.textContent = fresh.relativePath || fresh.filename || "--";
   refs.copyPromptButton.disabled = refs.lightboxPrompt.value.trim().length === 0;
-  const isPromptTemplateLibraryItem = Boolean(fresh.isPromptTemplateLibraryItem);
   if (refs.lightboxCloseLabel) refs.lightboxCloseLabel.textContent = isPromptTemplateLibraryItem ? "返回模板库" : "返回";
   refs.lightboxClose.title = isPromptTemplateLibraryItem ? "返回模板库" : "返回";
   refs.lightboxClose.setAttribute("aria-label", isPromptTemplateLibraryItem ? "返回提示词模板库" : "返回图片列表");
@@ -9164,7 +9197,7 @@ const CREATION_ITEM_STATUS_LABELS = {
   planning: "待开始",
 };
 
-const CREATION_PREVIEW_SLOTS = "1-hero|hero|首图成交主视觉|主商品占主视觉，合并除尺寸外的可靠信息并用目标语言电商排版，周围保留多个小圆框展示工具、穿搭或使用场景;2-benefit|benefit|目标人群共鸣图|锁定一个目标买家和熟悉的需求或犹豫瞬间，让商品成为有共情的选择，不重复卖点列表;3-scene|scene|适用多场景图|用 2-4 个真实适用场景展示产品价值，带宣传片式层次和购买代入感;4-multi-angle|multi-angle|多角度产品展示图|3-4 个清晰视角展示形态、结构、厚度和表面，不堆营销字;5-atmosphere|atmosphere|冲动下单氛围图|把商品融入有动作、有目标人群、有情绪触发的决定性使用或拥有瞬间，而不是平淡陈列;6-product-detail|product-detail|产品细节特写图|用微距、局部和指向标注证明材质、结构、做工或关键部位;7-brand-story|brand-story|品牌质感/礼品价值图|做成多场景用途与风格拼贴，展示多种真实使用场景和底部使用方式小图标;8-size-capacity-fit|size-capacity-fit|尺寸容量适配图|用准确尺寸、容量、比例和适配参照降低买错风险;9-effect-comparison|effect-comparison|功能效果渲染图|以一个清晰完整的商品主体为核心覆盖所有可靠功能；同屏不清晰时使用连续无损场景拼接，不做对比或遗漏;10-spec-table|spec-table|参数规格图|用清晰参数表呈现型号、尺寸、单位和关键规格，便于快速核对;11-craft-process|craft-process|品质工艺证明图|把工艺、材料处理、装配或检测事实转成质量证据;12-accessory-gift|accessory-gift|到手清单/配件图|完整展示到手包含物、数量、包装和配件，减少到货不确定;13-series-showcase|series-showcase|多款式/SKU选择图|只展示已提供的颜色、款式、尺码、套装或 SKU，帮助快速选择;14-ingredient-material|ingredient-material|材质成分解析图|用材质、成分、结构或组件解释为什么值得信任或偏好;15-after-sales|after-sales|痛点图|用真实使用困扰、解决路径和结果变化，让买家知道它具体替我解决什么问题;16-usage-suggestion|usage-suggestion|卖点图|用 3-5 个核心卖点连接功能证据和买后收益，让买家知道买它能获得什么好处;17-human-handheld|human-handheld|真人手持展示图|真人出镜，手持、举到镜头前或用鱼线悬挂展示商品，让尺度、细节和真实使用感更直观;18-human-wearable|human-wearable|真人穿戴场景图|真人穿着、背着、提着或佩戴商品，在真实场景里展示版型、比例、背负关系和生活代入感".split(";").map((entry) => { const [itemId, role, title, brief] = entry.split("|"); return { itemId, role, title, brief }; });
+const CREATION_PREVIEW_SLOTS = "1-hero|hero|首图成交主视觉|主商品占主视觉，合并除尺寸外的可靠信息并用目标语言电商排版，周围保留多个小圆框展示工具、穿搭或使用场景;2-benefit|benefit|目标人群共鸣图|锁定一个目标买家和熟悉的需求或犹豫瞬间，让商品成为有共情的选择，不重复卖点列表;3-scene|scene|适用多场景图|用 2-4 个真实适用场景展示产品价值，带宣传片式层次和购买代入感;4-multi-angle|multi-angle|多角度产品展示图|3-4 个清晰视角展示形态、结构、厚度和表面，不堆营销字;5-atmosphere|atmosphere|冲动下单氛围图|把商品融入有动作、有目标人群、有情绪触发的决定性使用或拥有瞬间，而不是平淡陈列;6-product-detail|product-detail|产品细节特写图|用微距、局部和指向标注证明材质、结构、做工或关键部位;7-brand-story|brand-story|品牌质感/礼品价值图|做成多场景用途与风格拼贴，展示多种真实使用场景和底部使用方式小图标;8-size-capacity-fit|size-capacity-fit|尺寸容量适配图|用准确尺寸、容量、比例和适配参照降低买错风险;9-effect-comparison|effect-comparison|功能效果渲染图|以一个清晰完整的商品主体为核心覆盖所有可靠功能；同屏不清晰时使用连续无损场景拼接，不做对比或遗漏;10-scene-fit-1|scene-fit-1|场景适配图一|把商品放进一个真实使用场景，比例真实、环境适配、少文字，优先使用商品信息里的第一个场景;11-scene-fit-2|scene-fit-2|场景适配图二|换一个不同的真实使用场景展示商品适配，优先使用商品信息里的第二个场景;12-accessory-gift|accessory-gift|到手清单/配件图|完整展示到手包含物、数量、包装和配件，减少到货不确定;13-series-showcase|series-showcase|多款式/SKU选择图|只展示已提供的颜色、款式、尺码、套装或 SKU，帮助快速选择;14-scene-fit-3|scene-fit-3|场景适配图三|再换一个季节、送礼或特定场合的真实场景，优先使用商品信息里的第三个场景;15-after-sales|after-sales|痛点图|用同一场景、同一机位的真实照片左右对比：左边是使用普通替代品时的困扰，右边是用本商品解决后的效果;16-usage-suggestion|usage-suggestion|卖点图|用 3-5 个核心卖点连接功能证据和买后收益，让买家知道买它能获得什么好处;17-human-handheld|human-handheld|真人手持展示图|真人出镜，手持、举到镜头前或用鱼线悬挂展示商品，让尺度、细节和真实使用感更直观;18-human-wearable|human-wearable|真人穿戴场景图|真人穿着、背着、提着或佩戴商品，在真实场景里展示版型、比例、背负关系和生活代入感；不可穿戴商品改拍携带、打包或收纳场景".split(";").map((entry) => { const [itemId, role, title, brief] = entry.split("|"); return { itemId, role, title, brief }; });
 
 const CREATION_SCENARIO_LABELS = { standard: "标准电商", "detail-page": "详情页转化", "social-seeding": "社媒种草", launch: "新品发布", promotion: "活动促销", livestream: "直播电商", "gift-guide": "礼品推荐", "marketplace-search": "平台搜索", "brand-story": "品牌故事" };
 const CREATION_VISUAL_LANGUAGE_LABELS = { "classic-commercial": "经典商业摄影", "premium-studio": "高端棚拍", "clean-marketplace": "平台清爽白底", "lifestyle-editorial": "生活方式杂志", "social-ugc": "社媒实拍", "detail-infographic": "详情页信息图", "macro-material": "微距材质", "outdoor-context": "户外场景", "minimal-luxury": "极简奢华", "bold-campaign": "活动海报", "warm-handcrafted": "手作温度" };
@@ -9274,7 +9307,7 @@ const CREATION_REFERENCE_ROLE_OPTIONS = [
   { value: "other", label: "其他" },
 ];
 
-const CREATION_REFERENCE_COVERAGE_ROLE_TARGETS = { usage: ["usage-suggestion"], scene: ["scene", "atmosphere"], material: ["product-detail", "ingredient-material"], feature: ["effect-comparison", "usage-suggestion", "after-sales"], dimensions: ["size-capacity-fit", "spec-table"], package: ["accessory-gift"] };
+const CREATION_REFERENCE_COVERAGE_ROLE_TARGETS = { usage: ["usage-suggestion"], scene: ["scene", "atmosphere"], material: ["product-detail", "ingredient-material"], feature: ["effect-comparison", "usage-suggestion"], dimensions: ["size-capacity-fit", "spec-table"], package: ["accessory-gift"] };
 
 function getCreationReferenceRoleLabel(role) {
   return CREATION_REFERENCE_ROLE_OPTIONS.find((option) => option.value === role)?.label || CREATION_REFERENCE_ROLE_OPTIONS[0].label;
@@ -12672,7 +12705,16 @@ function buildCreationCurrentLightboxItem(item = {}) {
   const itemId = String(item.itemId || item.id || item.filename || "item").trim() || "item";
   const relativeFilename = String(item.relativePath || "").split(/[\\/]/).filter(Boolean).pop() || "";
   const filename = String(item.filename || relativeFilename || "creation-preview.png").trim() || "creation-preview.png";
-  return { ...item, id: `creation-current:${itemId}`, filename, imageUrl, thumbnailUrl: item.thumbnailUrl || imageUrl, prompt: "", isImageOnlyLightboxItem: true, };
+  if (isCreationLogoBatchBranch()) {
+    return { ...item, id: `creation-current:${itemId}`, filename, imageUrl, thumbnailUrl: item.thumbnailUrl || imageUrl, prompt: "", isImageOnlyLightboxItem: true };
+  }
+  return {
+    ...buildCreationRecordLightboxItem(item, getCreationDisplayedSet()),
+    id: `creation-current:${itemId}`,
+    filename,
+    imageUrl,
+    thumbnailUrl: item.thumbnailUrl || imageUrl,
+  };
 }
 
 function openCreationCurrentItemPreview(itemId) {
@@ -14791,6 +14833,11 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
       });
     });
     renderCreationView();
+    return;
+  }
+
+  if (eventName === "prompt_translation_warning") {
+    setCreationFeedback(payload.message || "提示词翻译失败，已使用原提示词。", "error");
     return;
   }
 
@@ -17380,7 +17427,7 @@ function createJob() {
     generationRoute: imageRoute,
     prompt: buildPromptModePrompt(),
     ratio: ratioOption?.value || DEFAULT_UI_RATIO,
-    ratioLabel: ratioOption?.label || DEFAULT_UI_RATIO_LABEL,
+    ratioLabel: ratioOption?.value || DEFAULT_UI_RATIO_LABEL,
     sizeSetting,
     size,
     quality: getSelectedImageQuality(),
@@ -17389,6 +17436,8 @@ function createJob() {
     baseUrl: state.config?.baseUrl || refs.baseUrlInput.value.trim(),
     responsesModel: state.config?.responsesModel || refs.responsesModelInput.value.trim() || DEFAULT_RESPONSES_MODEL,
     imageModel: getSelectedImageToolModel(),
+    ...(imageRoute === "a" ? { includeImageToolModel: state.config?.includeImageToolModel === true } : {}),
+    ...(imageRoute === "b" ? { directImageStream: state.config?.directImageStream === true } : {}),
     reasoningEffort: getSelectedImageReasoningEffort(),
     requestRetryCount: 0,
     referenceFiles,
@@ -17422,7 +17471,7 @@ function createStyleTransferJob() {
     generationRoute: imageRoute,
     prompt: buildStyleTransferPrompt(),
     ratio: ratioOption?.value || DEFAULT_UI_RATIO,
-    ratioLabel: ratioOption?.label || DEFAULT_UI_RATIO_LABEL,
+    ratioLabel: ratioOption?.value || DEFAULT_UI_RATIO_LABEL,
     sizeSetting,
     size,
     quality: getSelectedImageQuality(),
@@ -17477,7 +17526,7 @@ function createReferenceAnalysisJob() {
     targetLanguage: targetLanguage.value,
     targetLanguageLabel: targetLanguage.label,
     ratio: ratioOption?.value || DEFAULT_UI_RATIO,
-    ratioLabel: ratioOption?.label || DEFAULT_UI_RATIO_LABEL,
+    ratioLabel: ratioOption?.value || DEFAULT_UI_RATIO_LABEL,
     sizeSetting,
     size,
     quality: getSelectedImageQuality(),
@@ -17599,6 +17648,8 @@ async function savePromptAttemptPreview(deckKey, attemptIndex) {
         responsesModel: job?.responsesModel || "",
         imageRoute: job?.imageRoute || "",
         imageModel: job?.imageModel || "",
+        ...(job?.includeImageToolModel !== undefined ? { includeImageToolModel: job.includeImageToolModel } : {}),
+        ...(job?.directImageStream !== undefined ? { directImageStream: job.directImageStream } : {}),
         reasoningEffort: job?.reasoningEffort || "",
       }),
     });

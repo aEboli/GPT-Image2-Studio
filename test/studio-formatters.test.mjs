@@ -19,6 +19,7 @@ test("formatImageModelLabel normalizes every tool model into a UI label", () => 
 test("buildParameterText includes reasoning effort and multiple reference image names", () => {
   const result = buildParameterText(
     {
+      ratio: "4:5",
       ratioLabel: "标准 4:5",
       size: "1024x1280",
       actualSize: "2048x2560",
@@ -36,7 +37,8 @@ test("buildParameterText includes reasoning effort and multiple reference image 
     {},
   );
 
-  assert.match(result, /比例：标准 4:5/);
+  assert.match(result, /比例：4:5/);
+  assert.doesNotMatch(result, /标准 4:5/);
   assert.match(result, /请求分辨率：1024x1280/);
   assert.match(result, /实际生成分辨率：2048x2560/);
   assert.match(result, /图像模型：GPT Image 2.0/);
@@ -56,6 +58,13 @@ test("buildParameterText explicitly shows when no reference image was used", () 
   });
 
   assert.match(result, /参考图：无/);
+});
+
+test("buildParameterText does not display a legacy descriptive ratio label without a ratio value", () => {
+  const result = buildParameterText({ ratioLabel: "旧用途描述 · 4:5" });
+
+  assert.match(result, /比例：未记录/);
+  assert.doesNotMatch(result, /旧用途描述|4:5/);
 });
 
 test("buildParameterText shows call mode and omits Responses-only fields for direct image calls", () => {
@@ -144,4 +153,29 @@ test("buildParameterText still separates the requested size from the measured on
   const result = buildParameterText({ size: "2048x2048", actualSize: "1254x1254" }, {});
   assert.match(result, /请求分辨率：2048x2048/);
   assert.match(result, /实际生成分辨率：1254x1254/);
+});
+
+test("buildParameterText shows background and route transport settings without relative paths", () => {
+  const routeItem = {
+    imageRoute: "a",
+    imageBackground: "transparent",
+    includeImageToolModel: "true",
+    relativePath: "2026-09/09-28/image.png",
+  };
+  const routeText = buildParameterText(routeItem, {}, { strictSnapshot: true });
+  assert.match(routeText, /透明背景：是/);
+  assert.match(routeText, /工具传输（路由）：是/);
+  assert.doesNotMatch(routeText, /相对路径|2026-09\/09-28\/image\.png/);
+
+  const directText = buildParameterText({
+    imageRoute: "b",
+    imageBackground: "opaque",
+    directImageStream: "false",
+  }, {}, { strictSnapshot: true });
+  assert.match(directText, /透明背景：否/);
+  assert.match(directText, /流传输（直连）：否/);
+
+  const missingText = buildParameterText({ imageRoute: "a" }, {}, { strictSnapshot: true });
+  assert.match(missingText, /透明背景：未记录/);
+  assert.match(missingText, /工具传输（路由）：未记录/);
 });

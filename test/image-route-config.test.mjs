@@ -32,7 +32,7 @@ test("image route config defaults direct text and vision model independently fro
   assert.equal(config.imageRoute, "b");
   assert.equal(config.directImageModel, "gpt-image-2");
   assert.equal(config.directResponsesModel, DEFAULT_DIRECT_RESPONSES_MODEL);
-  assert.equal(config.directResponsesModel, "gpt-5.4-mini");
+  assert.equal(config.directResponsesModel, "gpt-6-luna");
   assert.equal(config.directImageStream, false);
   assert.equal(config.endpointPath, API_ENDPOINT_RESPONSES);
   assert.equal(config.directEndpointPath, API_ENDPOINT_IMAGE_GENERATIONS);

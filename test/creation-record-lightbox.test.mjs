@@ -5,6 +5,18 @@ import {
   buildCreationRecordLightboxItem,
   normalizeCreationGenerationSnapshotForView,
 } from "../lib/creation-record-lightbox.mjs";
+import { buildCreationGenerationSnapshot } from "../lib/creation-generation-snapshot.mjs";
+
+test("Creation generation snapshots record their fixed opaque background", () => {
+  const snapshot = buildCreationGenerationSnapshot({
+    generationPrompt: "creation prompt",
+    generationConfig: { imageRoute: "a" },
+    parameters: {},
+  });
+
+  assert.equal(snapshot.imageBackground, "opaque");
+  assert.match(buildCreationRecordLightboxItem(snapshot).paramsText, /透明背景：否/);
+});
 
 test("Creation API snapshots survive browser normalization before lightbox rendering", () => {
   const apiItem = {
@@ -44,6 +56,8 @@ test("Creation API snapshots survive browser normalization before lightbox rende
   assert.equal(normalizedItem.hasReferenceImage, false);
   assert.deepEqual(normalizedItem.referenceImageNames, []);
   assert.equal(lightboxItem.prompt, "actual upstream prompt after browser state");
+  assert.match(lightboxItem.paramsText, /比例：1:1/);
+  assert.doesNotMatch(lightboxItem.paramsText, /1:1 方形/);
   assert.match(lightboxItem.paramsText, /请求分辨率：2048x2048/);
   assert.match(lightboxItem.paramsText, /实际生成分辨率：1254x1254/);
   assert.match(lightboxItem.paramsText, /外层模型：gpt-5\.4-mini/);

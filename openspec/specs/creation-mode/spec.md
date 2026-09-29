@@ -22,6 +22,8 @@ Necessary constraints SHALL be preserved as positive requirements. In particular
 
 Prompt composition SHALL NOT impose a character-length ceiling or truncate assembled sections to satisfy a total prompt length. Every role SHALL contribute one merged role directive instead of separate brief, shopper-question, buyer-decision, role-intent, role-focus, and rendering-constraint blocks.
 
+Ordinary carousel item prompts SHALL be organized as separate lines for the task, the assigned references, product fidelity, canvas text, and style. The task line SHALL carry the role directive without a `Role job` label. Universal carousel prompts SHALL omit internal composition and scene-policy labels and buyer-goal labels; platform-native slots SHALL keep their composition and scene policy. Product identity and surface-content preservation SHALL be expressed once as a single `PRODUCT FIDELITY` instruction naming the primary product anchor when one exists, and runtime generation SHALL treat that instruction as satisfying both subject locks. Each assigned reference and its note SHALL appear once per prompt.
+
 #### Scenario: Planner builds a standard eight-image set
 
 - **WHEN** the user plans an eight-image Creation set with product information, selling points, and dimension specifications
@@ -35,6 +37,18 @@ Prompt composition SHALL NOT impose a character-length ceiling or truncate assem
 - **THEN** the non-dimension item prompts state that size and weight values belong to the dimension and specification images
 - **AND** the item prompts state that existing product and packaging surface text, artwork, and marks stay exactly as shown in their original language
 - **AND** the item prompts state that visible facts come only from supplied product input and reference evidence
+
+#### Scenario: Carousel prompt is organized without duplicate blocks
+
+- **WHEN** the planner builds a universal set with a primary product reference and an assigned package reference
+- **THEN** each carousel prompt contains one `PRODUCT FIDELITY` instruction naming the primary reference and no separate subject content or identity lock
+- **AND** it contains no `Role job`, `Buyer goal`, or `Composition:` label
+- **AND** the package reference filename appears once in the item that carries it
+
+#### Scenario: Runtime keeps the merged fidelity instruction
+
+- **WHEN** Local generation executes a carousel item whose prompt contains `PRODUCT FIDELITY`
+- **THEN** the runtime prompt adds no separate subject content or identity lock
 
 #### Scenario: SKU prompt is compressed
 
@@ -1956,3 +1970,111 @@ Creation Mode SHALL present one 商品描述 textarea for product description, s
 - **WHEN** the user reuses a set that has separate saved product description, selling points, or dimension specifications
 - **THEN** each non-empty value appears in the single 商品描述 textarea
 - **AND** the original saved set remains unchanged
+
+### Requirement: 套图工作区结果预览展示复现信息
+
+套图工作区 SHALL 在打开已生成结果图片时展示实际发送给上游图片请求的逐图提示词和已保存的请求参数快照。若旧记录没有实际生成提示词，界面 SHALL 回退显示该单张已保存的规划提示词。缺失的历史参数 SHALL 显示“未记录”，不得使用当前全局配置推测。Creation 灯箱 SHALL 提供复制当前提示词的操作。
+
+#### Scenario: 用户查看套图结果图片
+
+- **WHEN** 用户在套图工作区打开一张已生成的结果图片
+- **THEN** 灯箱显示该图片的实际生成提示词和已保存的逐图请求参数
+- **AND** 用户可以复制灯箱中显示的提示词
+- **AND** 缺失的历史参数显示“未记录”而不是当前配置值
+
+#### Scenario: 用户查看 Logo 批处理图片
+
+- **WHEN** 用户在套图工作区的 Logo 批处理分支打开一张结果图片
+- **THEN** 图片继续使用纯图片预览
+
+### Requirement: Universal sets favor scene-fit images over overlapping information images
+
+The universal ecommerce profile SHALL expose three single-scene adaptation roles `scene-fit-1`, `scene-fit-2`, and `scene-fit-3` (场景适配图一/二/三) in the slot positions formerly used by `spec-table`, `craft-proof`, and `material-proof`, keeping 18 role-aligned native slots. Each scene-fit item SHALL show the exact product in one real use setting with true scale and minimal canvas text. The planner SHALL assign the Nth scene fact recognized from the product input to `scene-fit-N`; when that fact is missing it SHALL fall back to the setting where the product's main function is used most often, a second real setting implied by the product's function or buyer, and a seasonal, gifting, or special-occasion moment that genuinely fits the product, respectively. The three items SHALL use different shots: a product-in-environment still life without a person, a hands-only action close-up, and a wide view at a different time of day, weather, or season. Scene-fit items SHALL receive only the product subject reference, not scene references. Only the `scene` role SHALL reconstruct a scene reference as a faithful visual blueprint; other roles assigned that reference SHALL keep only its kind of environment and activity and create a new person, pose, camera angle, and moment. The `spec-table`, `craft-process`, and `ingredient-material` roles SHALL remain available to named platform profiles and category overlays.
+
+#### Scenario: Universal 18-image set uses scene-fit slots
+
+- **WHEN** the user plans a universal set of 18 images
+- **THEN** the plan contains `scene-fit-1`, `scene-fit-2`, and `scene-fit-3`
+- **AND** the plan contains no `spec-table`, `craft-process`, or `ingredient-material` item
+
+#### Scenario: Scene facts are distributed across scene-fit items
+
+- **WHEN** the product description names outdoor camping, car interior, and office use
+- **THEN** each scene-fit item prompt is assigned a different one of those settings
+
+#### Scenario: Named platforms keep specification slots
+
+- **WHEN** the user selects JD
+- **THEN** the plan still contains its `spec-table` and `craft-proof` slots
+
+#### Scenario: One scene reference does not repeat across lifestyle images
+
+- **WHEN** a set carries one scene reference showing a person in a setting
+- **THEN** only the `scene` item treats it as a visual blueprint
+- **AND** atmosphere, handheld, and wearable items ask for a new person, pose, camera angle, and moment
+- **AND** scene-fit items receive no scene reference image and use three different shots
+
+### Requirement: Creation set items use distinct visual formats, casts, and reference sources
+
+Each ordinary Creation carousel role SHALL declare one visual format in its prompt, and the 18 universal roles SHALL NOT share a format. Annotated callout infographics SHALL be limited to the hero, size/capacity/fit, and selling-point roles; the functional-effect role SHALL use a 3D cutaway or motion rendering, and the pain-point role SHALL use a photographic two-panel before-and-after comparison of the same setting, person, and camera angle. Roles that show people SHALL each declare a different age band, gender preference that yields to single-gender products, wardrobe, and framing. The worn-demonstration role SHALL show carrying, packing, or storage when the product is not worn. In the universal 18-image set, each supporting reference type (feature, material, scene, usage, dimensions, package) SHALL feed at most two roles, and only `scene` and `atmosphere` SHALL receive scene-reference coverage.
+
+#### Scenario: Universal set declares distinct formats
+
+- **WHEN** the planner builds a universal 18-image set
+- **THEN** every carousel prompt contains one `Visual format:` line
+- **AND** no two carousel prompts share the same visual format
+
+#### Scenario: People differ across person-led images
+
+- **WHEN** the set contains benefit, atmosphere, handheld, wearable, and pain-point items
+- **THEN** each of those prompts declares a `Cast:` with a different age band
+
+#### Scenario: Supporting references are spread out
+
+- **WHEN** a universal set carries feature, material, scene, usage, dimension, and package references
+- **THEN** each of those references is selected for at most two carousel items
+
+### Requirement: Creation set divergence stays anchored to the product
+
+Every ordinary Creation carousel item that is not dominated by platform policy SHALL instruct the image model to extend ideas from the product's own category, function, visible features, and likely buyer, SHALL require every added prop, person, setting, or line of text to serve that product's real use, and SHALL keep product features, accessories, and claims within the supplied facts.
+
+#### Scenario: Universal item carries grounded creative range
+
+- **WHEN** the planner builds a universal 18-image set
+- **THEN** every carousel prompt contains the product-anchored creative range guidance
+
+#### Scenario: Platform-dominated slot stays strict
+
+- **WHEN** the planner builds an Amazon white-background main image
+- **THEN** that prompt does not contain the creative range guidance
+
+### Requirement: Creation prompts are free of internal planning labels and translated to the target language
+
+Creation item prompts SHALL NOT contain internal planning metadata labels, including `Category template:`, `Ecommerce category path:`, a `Product category:` line naming a category code, `Scenario:` labels, and `Role focus:` or `Role category focus:` labels. Selected category and scenario values SHALL remain available in the plan parameters. For a fourth-level category template, each role SHALL contribute only its most specific category guidance once.
+
+The dimension and size-capacity image SHALL render only the listed specification values as canvas labels; other wording printed on the reference images SHALL stay off that canvas.
+
+When a Creation set is submitted for generation and an item's target language is not Chinese, the system SHALL translate the Chinese segments of that item's prompt into the target language with the configured text model in one request per language before generation. Infographic rebuild items and Chinese-target items SHALL keep their prompts unchanged. When no text model is configured or translation fails, generation SHALL continue with the original prompts and the client SHALL show a translation warning.
+
+#### Scenario: Category template metadata stays out of prompts
+
+- **WHEN** the user plans a set with a fourth-level category template
+- **THEN** no item prompt contains the category template name label, the category path label, the category code, or a role category focus label
+- **AND** each role prompt still contains that role's category-specific visual guidance
+
+#### Scenario: Scenario labels stay out of prompts
+
+- **WHEN** the user plans a set for any marketing scenario
+- **THEN** no item prompt contains a `Scenario:` label
+
+#### Scenario: English set translates Chinese prompt segments at generation
+
+- **WHEN** the user submits an English-target set whose prompts contain Chinese product name, description, selling points, or reference notes
+- **THEN** the server sends one translation request to the configured text model
+- **AND** generation uses prompts with those segments replaced by English translations
+
+#### Scenario: Translation is unavailable
+
+- **WHEN** the user submits an English-target set with Chinese prompt segments and no text model is configured or the translation request fails
+- **THEN** generation continues with the original prompts
+- **AND** the client shows a prompt translation warning

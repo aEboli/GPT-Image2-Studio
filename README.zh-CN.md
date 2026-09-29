@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.044-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.045-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installer-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,7 +10,7 @@
 
 把提示词生图、参考图分析、图片编辑、商品图裂变、电商套图、人物写真、文章插图、PPT 生成和素材管理集中到一个浏览器界面中。
 
-当前版本：`v0.2.044`
+当前版本：`v0.2.045`
 
 </div>
 
@@ -56,14 +56,14 @@ Windows 脚本入口（启动器、Native Messaging 安装/卸载、图片资源
 从包含桌面产物的 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
 
 ```text
-GPT-Image2-Studio-Desktop-Setup-v0.2.044-x64.exe
+GPT-Image2-Studio-Desktop-Setup-v0.2.045-x64.exe
 ```
 
 安装完成后通过桌面或开始菜单中的 `GPT-Image2-Studio` 启动。程序会在独立窗口中运行，内置服务使用动态回环端口，关闭窗口后不会遗留后台服务。无需另行安装 Node.js，完整说明见 [Windows 桌面程序文档](./docs/windows-desktop.md)。
 
 源码目录也可直接启动桌面开发版：
 
-如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.044-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
+如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.045-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
 
 桌面开发使用 Electron `43`，要求 Node.js `22.12` 或更高版本；普通 `npm start` 服务仍支持 Node.js `20+`。
 
@@ -74,7 +74,7 @@ cmd /c npm run desktop
 
 ### 方式三：Windows 浏览器安装包（兼容旧版）
 
-旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.044` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
+旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.045` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
 
 ## 配置说明
 
@@ -88,7 +88,7 @@ cmd /c npm run desktop
 | --- | --- | --- |
 | 接口地址（Base URL） | 服务方给出的 API 根地址，通常以 `/v1` 结尾 | `https://api.openai.com/v1` |
 | API Key | 在服务方控制台生成的密钥 | `sk-****` |
-| 模型名 | 与该服务方命名一致的模型标识 | `gpt-5.4-mini`、`gpt-image-2` |
+| 模型名 | 与该服务方命名一致的模型标识 | `gpt-6-luna`、`gpt-image-2` |
 
 官方渠道在 OpenAI 控制台创建 Key；兼容服务或第三方中转按其自身文档获取地址和 Key。费用、限额和内容政策都以实际服务方为准。
 
@@ -126,8 +126,10 @@ cmd /c npm run desktop
 ```text
 接口地址：https://api.openai.com/v1
 API Key：sk-****
-Responses 模型：gpt-5.4-mini
+Responses 模型：gpt-6-luna
 ```
+
+文本/视觉模型默认使用 `gpt-6-luna`。已有的非空模型配置会继续生效，直到你主动修改。
 
 这里的「Responses 模型」是外层模型；生图工具模型在它下面的「生图工具模型」下拉框里选，提示词页的参数区会同步显示「工具模型 <所选模型>」。该项只能从下拉选项里选，不支持自定义填写：
 
@@ -145,7 +147,7 @@ Responses 模型：gpt-5.4-mini
 
 ```text
 生图 API：https://api.openai.com/v1        后缀 images/generations   生图模型 gpt-image-2
-文本/视觉 API：https://api.openai.com/v1    后缀 responses            文本/视觉模型 gpt-5.4-mini
+文本/视觉 API：https://api.openai.com/v1    后缀 responses            文本/视觉模型 gpt-6-luna
 ```
 
 **Gemini**，生图接口后缀固定为 `images/generations`，与 GPT、Grok 的接口控件在相同位置对齐显示：
@@ -224,7 +226,7 @@ API Key：<xAI 或兼容服务方提供的 Key>
 ```dotenv
 OPENAI_API_KEY=<your-api-key>
 OPENAI_BASE_URL=https://api.openai.com/v1
-RESPONSES_MODEL=gpt-5.4-mini
+RESPONSES_MODEL=gpt-6-luna
 IMAGE_TOOL_MODEL=gpt-image-2
 IMAGE_QUALITY=high
 DIRECT_IMAGE_BASE_URL=https://api.openai.com/v1
@@ -234,7 +236,7 @@ DIRECT_IMAGE_MODEL=gpt-image-2
 DIRECT_TEXT_BASE_URL=https://api.openai.com/v1
 DIRECT_TEXT_API_KEY=
 DIRECT_TEXT_ENDPOINT_PATH=responses
-DIRECT_TEXT_MODEL=gpt-5.4-mini
+DIRECT_TEXT_MODEL=gpt-6-luna
 GROK_BASE_URL=https://api.x.ai/v1
 GROK_API_KEY=
 GROK_ENDPOINT_PATH=images/generations
@@ -252,7 +254,7 @@ IMAGE_STUDIO_DNS_FALLBACK_SERVERS=
 | --- | --- |
 | `OPENAI_API_KEY` | 默认 API Key |
 | `OPENAI_BASE_URL` | 默认 API Base URL |
-| `RESPONSES_MODEL` | 默认 Responses 模型，未配置时为 `gpt-5.4-mini`；应以实际服务支持的模型为准 |
+| `RESPONSES_MODEL` | 默认 Responses 模型，未配置时为 `gpt-6-luna`；应以实际服务支持的模型为准 |
 | `DIRECT_IMAGE_BASE_URL` / `DIRECT_IMAGE_API_KEY` / `DIRECT_IMAGE_ENDPOINT_PATH` / `DIRECT_IMAGE_MODEL` | 直连模式的生图 API 配置；分别对应地址、密钥、接口后缀和生图模型 |
 | `DIRECT_TEXT_BASE_URL` / `DIRECT_TEXT_API_KEY` / `DIRECT_TEXT_ENDPOINT_PATH` / `DIRECT_TEXT_MODEL` | 直连模式的文本/视觉 API 配置；分别对应地址、密钥、接口后缀和文本/视觉模型 |
 | `GROK_BASE_URL` / `GROK_API_KEY` / `GROK_ENDPOINT_PATH` / `GROK_IMAGE_MODEL` | 独立的 Grok 生图与编辑配置；分别对应地址、密钥、接口后缀和图像模型 |
@@ -466,7 +468,7 @@ GPT-Image2-Studio 面向个人创作者、电商运营、设计师和内容团�
 
 ### 业务工作流
 
-- **电商套图**：按平台、类目、商品事实、受众和 SKU 生成推荐轮播计划，支持套图级参数覆盖、兼容图片类型启停、补图队列和 Listing 草稿；新计划固定一个 SKU 主体但保留 SKU 生成规则；另有独立的“上传图加 Logo”批处理分支；通用电商保留 18 个原生轮播槽位。
+- **电商套图**：按平台、类目、商品事实、受众和 SKU 生成推荐轮播计划，支持套图级参数覆盖、兼容图片类型启停、补图队列和 Listing 草稿；通用 18 槽位改用 3 张彼此不同的真实场景适配图，平台专属配置仍保留自己的规格图角色；新计划固定一个 SKU 主体但保留 SKU 生成规则；另有独立的“上传图加 Logo”批处理分支。
 - **图片裂变工作台**：上传最多 15 张商品母图，补充本轮目标后由商品组图 Agent 提炼有证据支持的事实、痛点、卖点、人群和场景，并按“用途 × 渠道 × 方向”生成有上限的裂变任务板。每格保留选定母图、比例、纯英文生图提示词及简体中文对照，可逐格生成、重做、下载，也可批量处理。
 - **写真模式**：组合人物、动作、服装、道具和地点，生成 1 到 100 张系列写真，并独立选择思考等级与质量。
 - **文章插图**：解析文章包，建立风格、角色和场景设定，再生成正式插图计划，并独立选择思考等级与质量。
@@ -474,7 +476,7 @@ GPT-Image2-Studio 面向个人创作者、电商运营、设计师和内容团�
 
 ### 资产与任务
 
-- 瀑布画廊和图片详情灯箱，支持缩放、平移、下载和参数复盘。
+- 瀑布画廊和图片详情灯箱，支持缩放、平移、下载和参数复盘；套图结果可查看实际生成提示词及逐图保存的请求参数，历史缺失值明确显示“未记录”，不会用当前配置猜测。
 - 套图、写真、文章插图和 PPT 独立记录页。
 - 生成队列、后台任务状态、错误信息和失败项重试。
 - **Prompt Kit** 现在提供可搜索的静态模板库：6 个一级分类、24 个二级分类，每个二级分类 10 条可直接复用的提示词。支持列表/图片视图，图片按每张预览图的原始宽高比显示，支持列表字号调节、完整提示词灯箱预览、一键应用和复制到我的模板；人像与头像分类随应用内置了从指定 YouMind 集合抓取并标注来源的 40 个不同预览资源，每张图片都绑定对应的来源标题和提示词。其他分类使用按模板稳定生成、构图和主体各不相同的离线预览，不再反复显示同一张占位图。已有自定义模板和 Prompt Agent 历史会保留，旧内置模板会按版本迁移到当前集合。
@@ -633,8 +635,8 @@ cmd /c npm run build:desktop
 产物路径：
 
 ```text
-artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.044-x64.exe
-artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.044-x64.zip
+artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.045-x64.exe
+artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.045-x64.zip
 artifacts/desktop/win-unpacked/GPT-Image2-Studio.exe
 ```
 
@@ -652,7 +654,7 @@ cmd /c npm run build:installer
 产物路径格式：
 
 ```text
-artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.044.exe
+artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.045.exe
 ```
 
 脚本使用系统 `iexpress.exe` 生成自解压安装包，并把当前 Node.js 运行时和依赖打入安装目录；启动后仍使用默认浏览器显示工作台。
@@ -757,7 +759,15 @@ cmd /c npm run build:installer
 
 ## 版本更新说明
 
-完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.044](./docs/releases/v0.2.044.md)。
+完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.045](./docs/releases/v0.2.045.md)。
+
+### v0.2.045 更新说明
+
+- 重做通用电商套图：将原先重叠的参数规格、品质工艺和材质成分槽位替换为 3 个彼此不同的场景适配角色，按商品场景事实分配不同环境和镜头；平台专属配置仍保留自己的规格图角色。
+- 增加以商品为锚点的画面差异化：每个普通角色声明独立画面形式和人物设定，限制辅助参考图重复使用；只有场景角色忠实重建场景参考图，其余角色使用新的动作、人物、机位和时刻；不可穿戴商品会改为携带、打包或收纳表达。
+- 精简普通套图提示词，移除内部规划标签，合并商品锁定指令；目标语言不是中文时，生成前用配置的文本模型翻译提示词中的中文片段。翻译失败仍继续生成，并通过界面提示原因。
+- 套图结果灯箱新增实际生成提示词和逐图参数复现信息，展示比例、尺寸、质量、透明背景、路线开关、模型、参考图、端点和耗时；历史缺失值显示“未记录”。
+- 比例元数据统一保存规范比例值，补齐 favicon 与 Web Manifest 路由，文本/视觉模型默认更新为 `gpt-6-luna`；已有非空模型配置保持不变。
 
 ### v0.2.044 更新说明
 

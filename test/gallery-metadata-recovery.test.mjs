@@ -50,7 +50,7 @@ test("gallery metadata recovery stores only meaningful metadata fields in cache 
     responsesModel: "gpt-5.4",
     imageModel: "gpt-image-2",
     ratio: "4:5",
-    ratioLabel: "标准 4:5",
+    ratioLabel: "4:5",
     size: "1024x1536",
     quality: "high",
     format: "jpeg",
@@ -106,7 +106,7 @@ test("gallery metadata recovery fills missing server fields from local cache wit
   assert.equal(merged.responsesModel, "gpt-5.4");
   assert.equal(merged.imageModel, "gpt-image-2");
   assert.equal(merged.ratio, "4:5");
-  assert.equal(merged.ratioLabel, "标准 4:5");
+  assert.equal(merged.ratioLabel, "4:5");
   assert.equal(merged.size, "1024x1536");
   assert.equal(merged.quality, "high");
   assert.equal(merged.reasoningEffort, "xhigh");
@@ -140,7 +140,7 @@ test("gallery metadata recovery only requests repair fields that are missing on 
     responsesModel: "gpt-5.4",
     imageModel: "gpt-image-2",
     ratio: "4:5",
-    ratioLabel: "标准 4:5",
+    ratioLabel: "4:5",
     quality: "high",
     reasoningEffort: "xhigh",
     referenceImageNames: ["reference-a.png"],
@@ -161,7 +161,7 @@ test("gallery metadata recovery only requests repair fields that are missing on 
     referenceImageNames: ["reference-a.png"],
     referenceImageName: "reference-a.png",
     ratio: "4:5",
-    ratioLabel: "标准 4:5",
+    ratioLabel: "4:5",
     quality: "high",
     reasoningEffort: "xhigh",
   });

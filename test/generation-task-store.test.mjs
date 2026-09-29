@@ -84,6 +84,19 @@ test("generation task snapshots migrate legacy quality values by route", () => {
   assert.equal(snapshots.find((task) => task.id === "gpt-job").quality, "high");
 });
 
+test("generation task snapshots normalize legacy ratio labels to the selected ratio", () => {
+  const store = createGenerationTaskStore();
+  store.upsertTask("session-a", {
+    id: "ratio-job",
+    ratio: "4:5",
+    ratioLabel: "Instagram帖子 · 竖屏 4:5",
+  });
+
+  const [snapshot] = store.listTasks("session-a");
+  assert.equal(snapshot.ratio, "4:5");
+  assert.equal(snapshot.ratioLabel, "4:5");
+});
+
 test("generation task store records errors with a compact public status", () => {
   const store = createGenerationTaskStore();
 

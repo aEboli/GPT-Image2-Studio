@@ -19,6 +19,21 @@ function normalizeCachedImageSize(value, ratio, imageRoute) {
     : getDefaultGenerationSize(ratio || "4:5");
 }
 
+function normalizeCachedBoolean(value) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (["1", "true", "on", "yes", "enabled"].includes(normalized)) {
+    return true;
+  }
+  if (["0", "false", "off", "no", "disabled"].includes(normalized)) {
+    return false;
+  }
+  return false;
+}
+
 export function isCacheableBrowserImageUrl(url) {
   return /^data:image\/[a-z0-9.+-]+;base64,/i.test(String(url || ""));
 }
@@ -146,6 +161,12 @@ export function normalizeBrowserCachedGalleryItem(item = {}) {
     quality: normalizeStoredImageQuality(item.quality, { imageRoute, imageModel }),
     format: String(item.format || ""),
     imageBackground: String(item.imageBackground || ""),
+    ...(Object.prototype.hasOwnProperty.call(item, "includeImageToolModel")
+      ? { includeImageToolModel: normalizeCachedBoolean(item.includeImageToolModel) }
+      : {}),
+    ...(Object.prototype.hasOwnProperty.call(item, "directImageStream")
+      ? { directImageStream: normalizeCachedBoolean(item.directImageStream) }
+      : {}),
     reasoningEffort: String(item.reasoningEffort || ""),
     generationStartedAt: String(item.generationStartedAt || ""),
     generationCompletedAt: String(item.generationCompletedAt || ""),

@@ -103,7 +103,7 @@ The system SHALL expose a visible Back command beside the lightbox title instead
 
 #### Scenario: User uses existing lightbox actions after zooming
 - **WHEN** the user has zoomed or panned a lightbox image
-- **THEN** download, delete, copy prompt, copy relative path, copy full path, backdrop close, Back, and Esc close continue to perform their existing actions
+- **THEN** download, delete, copy prompt, backdrop close, Back, and Esc close continue to perform their existing actions
 - **AND** viewer pointer interactions do not trigger delete, download, copy, or unintended close actions
 
 #### Scenario: User presses Escape while viewer is zoomed
@@ -114,20 +114,49 @@ The system SHALL expose a visible Back command beside the lightbox title instead
 
 ### Requirement: 图片详情参数面板展示文件信息
 
-图片详情 SHALL 保留“提示词”和“参数”两个信息页签；参数页签 SHALL 在生成参数内容下方展示当前图片的文件名和相对路径，且不再提供独立“文件”页签。
+图片详情 SHALL 保留“提示词”和“参数”两个信息页签；参数页签 SHALL 在生成参数内容下方展示当前图片的文件名，且不展示相对路径，也不提供独立“文件”页签。若记录了绝对本地文件信息，可按既有“本地文件”参数展示。内部资产路径 SHALL 继续用于图片资源定位和安全删除，不得作为相对路径参数展示。
 
 #### Scenario: 用户查看图片参数
 
 - **WHEN** 用户打开图片详情并选择“参数”
 - **THEN** 页面显示生成参数
-- **AND** 生成参数下方显示文件名和相对路径
+- **AND** 生成参数下方显示文件名，不显示相对路径条目
 - **AND** 文件信息不会要求用户切换到另一个页签
 
 #### Scenario: 文件字段缺失
 
-- **WHEN** 当前图片没有文件名或相对路径
+- **WHEN** 当前图片没有文件名
 - **THEN** 对应字段显示现有占位符 `--`
 - **AND** 参数文本仍可正常查看
+
+### Requirement: 图片详情参数以悬挂对齐方式展示
+
+参数页签 SHALL 使用标签列和数值列展示每个参数；标签列宽度稳定，数值列独立换行，长 URL、文件名和多行值 SHALL 在数值列内换行。
+
+#### Scenario: 用户查看较长的参数值
+
+- **WHEN** 参数值包含长 URL、长文件名或多行文本
+- **THEN** 参数标签保持左侧对齐且不会随数值换行
+- **AND** 参数值在自身列内换行，不造成面板横向溢出
+
+### Requirement: 图片详情展示已记录的生成开关
+
+参数页签 SHALL 展示透明背景、路由模式工具传输或直连模式流传输的已记录状态；缺失的历史字段 SHALL 显示“未记录”，不得根据当前配置推测历史取值。Creation 记录 SHALL 将固定的不透明背景保存为显式参数。
+
+#### Scenario: 用户查看路由模式生成记录
+
+- **WHEN** 图片记录的路由为路由模式
+- **THEN** 参数显示透明背景状态和路由模式工具传输状态
+
+#### Scenario: 用户查看直连模式生成记录
+
+- **WHEN** 图片记录的路由为直连模式
+- **THEN** 参数显示透明背景状态和直连模式流传输状态
+
+#### Scenario: 历史记录缺少生成开关
+
+- **WHEN** 图片记录没有保存某个相关开关
+- **THEN** 对应参数显示“未记录”而不是当前配置值
 
 ### Requirement: 图片详情媒体区保持稳定桌面外框
 

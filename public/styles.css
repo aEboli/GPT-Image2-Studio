@@ -918,20 +918,21 @@ textarea::-webkit-scrollbar-corner {
 }
 
 .app-version {
-  position: fixed;
-  left: max(12px, calc(env(safe-area-inset-left) + 6px));
-  bottom: max(10px, calc(env(safe-area-inset-bottom) + 6px));
-  z-index: 20;
+  position: absolute;
+  top: 50%;
+  left: max(10px, env(safe-area-inset-left));
+  z-index: 35;
   max-width: calc(100vw - 24px);
   overflow: hidden;
   color: color-mix(in srgb, var(--muted) 72%, transparent);
   font-family: var(--font-ui);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   line-height: 1;
   letter-spacing: 0;
   pointer-events: none;
+  transform: translateY(-50%);
   text-overflow: ellipsis;
   user-select: none;
   white-space: nowrap;
@@ -964,10 +965,10 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .topbar {
   z-index: 80;
   display: flex;
   width: min(var(--app-shell-max-width, 1680px), calc(100vw - 20px));
-  min-height: 34px;
+  min-height: 68px;
   justify-content: center;
   gap: 0;
-  padding: 4px 12px;
+  padding: 8px 16px;
   border-top: 0;
   border-radius: 0 0 14px 14px;
   background: color-mix(in srgb, var(--topbar-bg) 64%, transparent);
@@ -1009,7 +1010,7 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .global-nav {
 html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .view-tabs {
   width: auto;
   min-width: 0;
-  gap: clamp(8px, 1.8vw, 22px);
+  gap: 32px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -1023,9 +1024,9 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .global-nav-l
 
 html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .view-tab {
   position: relative;
-  min-width: 92px;
-  min-height: 30px;
-  padding: 0 16px;
+  min-width: 112px;
+  min-height: 54px;
+  padding: 0 20px;
   border: 1px solid var(--nav-tab-border);
   border-radius: 10px;
   background:
@@ -1656,6 +1657,20 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .generation-m
 .generation-mode-status-text-model .generation-mode-status-model-value {
   color: var(--muted);
   font-weight: 600;
+}
+
+html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .nav-flyout {
+  top: calc(100% + 9px);
+}
+
+html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .nav-tab-label {
+  font-size: 1rem;
+  letter-spacing: 0.22em;
+}
+
+html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .app-version {
+  left: 18px;
+  font-size: 14px;
 }
 
 .generation-mode-status[data-image-route="b"] {
@@ -17711,14 +17726,47 @@ html[data-theme="light"] .reference-preview-viewer .reference-preview-backdrop {
 }
 
 .lightbox-fields .lightbox-params-field {
-  grid-template-rows: auto minmax(96px, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: auto;
 }
 
-.lightbox-fields .lightbox-params-field textarea {
-  height: auto;
-  min-height: 96px;
-  max-height: none;
+.lightbox-parameter-list {
+  display: grid;
+  align-content: start;
+  gap: 0;
+  min-width: 0;
+  margin: 0;
+  overflow: auto;
+}
+
+.lightbox-parameter-row {
+  display: grid;
+  grid-template-columns: minmax(112px, 132px) minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  min-width: 0;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--asset-border);
+}
+
+.lightbox-parameter-row dt {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: normal;
+}
+
+.lightbox-parameter-row dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
 }
 
 .lightbox-fields .lightbox-params-field .lightbox-file-list {
@@ -17736,11 +17784,11 @@ html:is([data-ui-layout="tablet"], [data-ui-layout="mobile"]) .preview-add-refer
 }
 
 html:is([data-ui-layout="tablet"], [data-ui-layout="mobile"]) .lightbox-fields .lightbox-params-field {
-  grid-template-rows: auto minmax(112px, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
-html:is([data-ui-layout="tablet"], [data-ui-layout="mobile"]) .lightbox-fields .lightbox-params-field textarea {
-  min-height: 112px;
+html:is([data-ui-layout="tablet"], [data-ui-layout="mobile"]) .lightbox-parameter-row {
+  grid-template-columns: minmax(96px, 112px) minmax(0, 1fr);
 }
 
 html:is([data-ui-layout="stacked"], [data-ui-layout="tablet"], [data-ui-layout="mobile"]) .field-heading-icon-button {
@@ -21752,7 +21800,7 @@ html:not([data-theme="light"]) .product-image-import-card.is-selected input {
 
 @media (min-width: 1261px) {
   .product-agent-workbench-grid {
-    grid-template-columns: minmax(360px, 0.85fr) minmax(480px, 1.15fr);
+    grid-template-columns: minmax(440px, 500px) minmax(480px, 1fr);
   }
 
   .product-agent-routing-panel {
@@ -21796,7 +21844,7 @@ html:not([data-theme="light"]) .product-image-import-card.is-selected input {
 
 @media (min-width: 981px) and (max-width: 1260px) {
   .product-agent-workbench-grid {
-    grid-template-columns: minmax(300px, 0.8fr) minmax(0, 1.2fr);
+    grid-template-columns: minmax(440px, 500px) minmax(0, 1fr);
   }
 
   .product-agent-setup-column {
@@ -21873,5 +21921,58 @@ html:not([data-theme="light"]) .product-image-import-card.is-selected input {
 @media (max-width: 640px) {
   .product-agent-option-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Keep both setup panels compact so the task board remains visible. */
+@media (min-width: 981px) {
+  .product-agent-input-panel,
+  .product-agent-routing-panel {
+    max-height: min(520px, calc(100vh - 380px));
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+  }
+
+  .product-agent-input-panel {
+    overflow-x: hidden;
+    padding: 10px;
+  }
+
+  .product-agent-routing-panel {
+    padding: 10px;
+  }
+
+  .product-agent-routing-panel .panel-title {
+    margin-bottom: 8px;
+  }
+
+  .product-agent-routing-panel .product-agent-panel-note {
+    margin-bottom: 6px;
+  }
+
+  .product-agent-routing-guide {
+    gap: 6px;
+    padding: 6px 8px;
+  }
+
+  .product-agent-routing-group {
+    margin-top: 6px;
+    padding: 6px;
+  }
+
+  .product-agent-option {
+    min-height: 42px;
+    gap: 6px;
+    padding: 5px 6px;
+  }
+
+  .product-agent-option-copy strong,
+  .product-agent-option-copy small {
+    line-height: 1.25;
+  }
+
+  .product-agent-routing-summary {
+    margin-top: 6px;
+    padding: 6px 8px;
   }
 }

@@ -78,7 +78,7 @@ function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-test("workbench displays the package version at the lower-left safe area", async () => {
+test("workbench displays the package version inside the topbar", async () => {
   const [packageJson, html, styles] = await Promise.all([
     readFile(new URL("../package.json", import.meta.url), "utf8").then(JSON.parse),
     readFile(new URL("../public/index.html", import.meta.url), "utf8"),
@@ -93,9 +93,9 @@ test("workbench displays the package version at the lower-left safe area", async
   assert.equal([...html.matchAll(versionMarkup)].length, 1);
 
   const versionRule = styles.match(/\.app-version\s*\{([\s\S]*?)\n\}/)?.[1] || "";
-  assert.match(versionRule, /position:\s*fixed/);
+  assert.match(versionRule, /position:\s*absolute/);
+  assert.match(versionRule, /top:\s*50%/);
   assert.match(versionRule, /left:\s*max\([^;]*env\(safe-area-inset-left\)[^;]*\)/);
-  assert.match(versionRule, /bottom:\s*max\([^;]*env\(safe-area-inset-bottom\)[^;]*\)/);
   assert.match(versionRule, /pointer-events:\s*none/);
   assert.match(versionRule, /font-variant-numeric:\s*tabular-nums/);
 });

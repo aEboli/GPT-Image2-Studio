@@ -31,7 +31,7 @@ function structuredPrompt({ subject = {}, framing = {}, scene = "", visual = "" 
   };
 }
 
-test("structured image prompt name combines grounded time, weather, prop, subject, and environment", () => {
+test("structured image prompt name orders subject, scene, and atmosphere", () => {
   const json = structuredPrompt({
     subject: {
       type: "年轻女性人像",
@@ -42,8 +42,8 @@ test("structured image prompt name combines grounded time, weather, prop, subjec
     visual: "低照度夜景人像，湿地反光明显。",
   });
 
-  assert.equal(getStructuredImagePromptDisplayName(json), "夜晚雨中打伞年轻女性·庭院地灯");
-  assert.equal(getPromptAgentDisplayName({ json, filename: "image-analysis.jpg" }), "夜晚雨中打伞年轻女性·庭院地灯");
+  assert.equal(getStructuredImagePromptDisplayName(json), "打伞年轻女性·庭院地灯·夜晚雨中");
+  assert.equal(getPromptAgentDisplayName({ json, filename: "image-analysis.jpg" }), "打伞年轻女性·庭院地灯·夜晚雨中");
 });
 
 test("structured image prompt name separates a concise subject action from framing landmarks", () => {
@@ -59,7 +59,7 @@ test("structured image prompt name separates a concise subject action from frami
     visual: "阴天漫射自然光，整体低反差。",
   });
 
-  assert.equal(getStructuredImagePromptDisplayName(json), "阴天看手机年轻女性·窗框长凳");
+  assert.equal(getStructuredImagePromptDisplayName(json), "看手机年轻女性·窗框长凳·阴天");
 });
 
 test("structured image prompt name keeps a distinctive styled subject and bed context", () => {
@@ -76,6 +76,16 @@ test("structured image prompt name keeps a distinctive styled subject and bed co
   assert.equal(getStructuredImagePromptDisplayName(json), "躺卧Q版动漫少女·床铺纸巾盒");
 });
 
+test("structured image prompt name uses a grounded scene anchor when subject details are empty", () => {
+  const json = structuredPrompt({
+    scene: "温暖家居室内，木地板上铺着灰色瑜伽垫，左侧有浅色沙发、边柜、台灯和绿植。",
+    visual: "室内暖色台灯与环境光共同照明，整体为写实摄影质感。",
+  });
+
+  assert.equal(getStructuredImagePromptDisplayName(json), "瑜伽垫·家居室内·暖光");
+  assert.equal(getPromptAgentDisplayName({ json, filename: "hash-analysis.jpg" }), "瑜伽垫·家居室内·暖光");
+});
+
 test("structured image prompt name preserves a descriptive non-human subject type", () => {
   const json = structuredPrompt({
     subject: {
@@ -84,7 +94,7 @@ test("structured image prompt name preserves a descriptive non-human subject typ
     visual: "阴天漫射光下的末日题材写实摄影。",
   });
 
-  assert.equal(getStructuredImagePromptDisplayName(json), "阴天坐在废墟中的全身装甲人形机器人");
+  assert.equal(getStructuredImagePromptDisplayName(json), "坐在废墟中的全身装甲人形机器人·阴天");
 });
 
 test("display name keeps a legacy title ahead of derived content", () => {
@@ -127,7 +137,7 @@ test("automatic prompt templates migrate filename-like names from their structur
       { id: "prompt-agent-record-1", name: "image-analysis.jpg" },
       json,
     ),
-    "夜晚雨中打伞年轻女性·庭院地灯",
+    "打伞年轻女性·庭院地灯·夜晚雨中",
   );
   assert.equal(
     getPromptAgentTemplateDisplayName(

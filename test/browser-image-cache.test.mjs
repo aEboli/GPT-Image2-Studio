@@ -25,6 +25,32 @@ test("browser image cache preserves image generation route metadata", () => {
   assert.equal(normalized.imageRoute, "b");
 });
 
+test("browser image cache normalizes explicit image transport booleans", () => {
+  for (const value of [true, 1, "1", "true", "on", "yes", "enabled"]) {
+    const normalized = normalizeBrowserCachedGalleryItem({
+      filename: "transport.png",
+      includeImageToolModel: value,
+      directImageStream: value,
+    });
+    assert.equal(normalized.includeImageToolModel, true);
+    assert.equal(normalized.directImageStream, true);
+  }
+
+  for (const value of [false, 0, "0", "false", "off", "no", "disabled"]) {
+    const normalized = normalizeBrowserCachedGalleryItem({
+      filename: "transport.png",
+      includeImageToolModel: value,
+      directImageStream: value,
+    });
+    assert.equal(normalized.includeImageToolModel, false);
+    assert.equal(normalized.directImageStream, false);
+  }
+
+  const legacy = normalizeBrowserCachedGalleryItem({ filename: "legacy.png" });
+  assert.equal(Object.hasOwn(legacy, "includeImageToolModel"), false);
+  assert.equal(Object.hasOwn(legacy, "directImageStream"), false);
+});
+
 test("browser image cache migrates legacy quality values by route", () => {
   assert.equal(
     normalizeBrowserCachedGalleryItem({ filename: "grok.png", imageRoute: "d", quality: "auto" }).quality,

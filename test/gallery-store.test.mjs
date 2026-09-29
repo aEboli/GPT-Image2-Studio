@@ -338,7 +338,7 @@ test("gallery store writes images into dated folders and persists searchable met
   assert.equal(items[0].imageModel, "gpt-image-2");
   assert.equal(items[0].quality, "medium");
   assert.equal(items[0].ratio, "16:9");
-  assert.equal(items[0].ratioLabel, "瀹藉睆 16:9");
+  assert.equal(items[0].ratioLabel, "16:9");
   assert.equal(items[0].referenceImageName, "reference-a.png");
   assert.equal(items[0].reasoningEffort, "medium");
   assert.equal(items[0].generationDurationMs, "7345");

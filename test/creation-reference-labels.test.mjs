@@ -36,6 +36,7 @@ test("creation reference labels keep a short role-scoped summary", () => {
   assert.match(labels[0], /Reference 1: F2J32257\.png\./);
   assert.match(labels[0], /Role: product subject\. Preserve shape and hardware\./);
   assert.match(labels[0], /Supporting product evidence only/);
+  assert.match(labels[0], /Source canvas wording and graphic layout are evidence, not output copy/i);
   assert.match(labels[1], /Reference 2: F2J32258\.png\./);
   assert.match(labels[1], /Role: style reference\. Use this for color and lighting\./);
   assert.doesNotMatch(labels[0], /Uploaded reference count|Uploaded reference files/);
@@ -445,7 +446,7 @@ test("creation package references stay scoped to the package image role", () => 
   );
   assert.deepEqual(
     buildCreationItemReferenceImages({ role: "effect-comparison" }, images, roles).map((image) => image.filename),
-    ["lure-main.png", "joint-detail.png"],
+    ["lure-main.png"],
   );
   assert.deepEqual(
     buildCreationItemReferenceImages({ role: "after-sales" }, images, roles).map((image) => image.filename),
@@ -461,7 +462,7 @@ test("creation package references stay scoped to the package image role", () => 
   );
   assert.deepEqual(
     buildCreationItemReferenceImages({ role: "brand-story" }, images, roles).map((image) => image.filename),
-    ["lure-main.png", "joint-detail.png", "lake-scene.png"],
+    ["lure-main.png"],
   );
   assert.deepEqual(
     buildCreationItemReferenceImages({ role: "atmosphere" }, images, roles).map((image) => image.filename),
@@ -501,7 +502,7 @@ test("creation feature references feed functional and benefit image roles", () =
 
   assert.deepEqual(
     buildCreationItemReferenceImages({ role: "effect-comparison" }, images, roles).map((image) => image.filename),
-    ["lure-main.png", "feature-card.png", "material-detail.png"],
+    ["lure-main.png", "feature-card.png"],
   );
   assert.deepEqual(
     buildCreationItemReferenceImages({ role: "usage-suggestion" }, images, roles).map((image) => image.filename),
@@ -545,7 +546,7 @@ test("creation expanded suite roles keep the selected reference subject as the s
   );
   assert.deepEqual(
     buildCreationItemReferenceImages({ role: "usage-suggestion" }, images, roles).map((image) => image.filename),
-    ["orange-reference-subject.png", "trail-scene.png", "usage-guide.png"],
+    ["orange-reference-subject.png", "usage-guide.png"],
   );
   assert.deepEqual(
     buildCreationItemReferenceImages({ role: "after-sales" }, images, roles).map((image) => image.filename),
@@ -553,7 +554,7 @@ test("creation expanded suite roles keep the selected reference subject as the s
   );
   assert.deepEqual(
     buildCreationItemReferenceImages({ role: "brand-story" }, images, roles).map((image) => image.filename),
-    ["orange-reference-subject.png", "mesh-detail.png", "trail-scene.png"],
+    ["orange-reference-subject.png"],
   );
   assert.deepEqual(
     buildCreationItemReferenceImages({ role: "ingredient-material" }, images, roles).map((image) => image.filename),
@@ -565,7 +566,7 @@ test("creation expanded suite roles keep the selected reference subject as the s
   );
   assert.deepEqual(
     buildCreationItemReferenceImages({ role: "multi-angle" }, images, roles).map((image) => image.filename),
-    ["orange-reference-subject.png", "mesh-detail.png"],
+    ["orange-reference-subject.png"],
   );
   assert.deepEqual(
     buildCreationItemReferenceImages({ role: "atmosphere" }, images, roles).map((image) => image.filename),
@@ -819,7 +820,7 @@ test("a primary subject compressed to the browser ceiling still leaves room for 
     { filename: "detail.png", role: "material" },
   ];
   const item = {
-    role: "effect-comparison",
+    role: "product-detail",
     coverageSources: [{ filename: "size-card.png", role: "dimensions" }],
   };
 
@@ -851,4 +852,18 @@ test("coverage metadata that does not match an uploaded file never falls back to
     roles,
   );
   assert.deepEqual(selected.map((image) => image.filename), ["product.png"]);
+});
+
+test("scene-fit items receive only the product anchor, not scene references", () => {
+  const referenceImageRoles = [
+    { index: 1, filename: "lure.png", role: "product", note: "Lure product subject" },
+    { index: 2, filename: "boat.jpg", role: "scene", note: "Angler on a boat" },
+    { index: 3, filename: "how-to.jpg", role: "usage", note: "Rigging steps" },
+  ];
+  const images = referenceImageRoles.map((entry) => ({ originalname: entry.filename, name: entry.filename, size: 1000, buffer: Buffer.alloc(4) }));
+  const names = buildCreationItemReferenceImages(
+    { role: "scene-fit-2", itemKind: "carousel" }, images, referenceImageRoles)
+    .map((image) => image.originalname || image.name);
+
+  assert.deepEqual(names, ["lure.png"]);
 });

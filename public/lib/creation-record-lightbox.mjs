@@ -10,6 +10,20 @@ function cleanString(value) {
   return String(value || "").trim();
 }
 
+function parseStoredBoolean(value) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (["1", "true", "on", "yes", "enabled"].includes(normalized)) {
+    return true;
+  }
+  if (["0", "false", "off", "no", "disabled"].includes(normalized)) {
+    return false;
+  }
+  return undefined;
+}
+
 function normalizeSnapshotSize(value, { imageRoute = "", ratio = "" } = {}) {
   const normalized = cleanString(value);
   if (normalized && normalized.toLowerCase() !== "auto") {
@@ -31,7 +45,7 @@ export function normalizeCreationGenerationSnapshotForView(item = {}) {
     responsesModel: cleanString(item.responsesModel || item.responses_model),
     imageModel: cleanString(item.imageModel || item.image_model),
     endpointPath: cleanString(item.endpointPath || item.endpoint_path),
-    ratioLabel: cleanString(item.ratioLabel || item.ratio_label),
+    ratioLabel: cleanString(ratio),
     requestedSize: normalizeSnapshotSize(item.requestedSize || item.requested_size, { imageRoute, ratio }),
     effectiveSize,
     actualSize: cleanString(item.actualSize || item.actual_size),
@@ -42,6 +56,17 @@ export function normalizeCreationGenerationSnapshotForView(item = {}) {
       imageModel: item.imageModel || item.image_model,
     }),
     reasoningEffort: cleanString(item.reasoningEffort || item.reasoning_effort),
+    imageBackground: cleanString(item.imageBackground || item.image_background),
+    ...(Object.prototype.hasOwnProperty.call(item, "includeImageToolModel")
+      ? { includeImageToolModel: parseStoredBoolean(item.includeImageToolModel) }
+      : Object.prototype.hasOwnProperty.call(item, "include_image_tool_model")
+        ? { includeImageToolModel: parseStoredBoolean(item.include_image_tool_model) }
+        : {}),
+    ...(Object.prototype.hasOwnProperty.call(item, "directImageStream")
+      ? { directImageStream: parseStoredBoolean(item.directImageStream) }
+      : Object.prototype.hasOwnProperty.call(item, "direct_image_stream")
+        ? { directImageStream: parseStoredBoolean(item.direct_image_stream) }
+        : {}),
     referenceImageNames: Array.isArray(item.referenceImageNames)
       ? item.referenceImageNames.map(cleanString).filter(Boolean)
       : [],

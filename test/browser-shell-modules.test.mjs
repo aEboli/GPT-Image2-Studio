@@ -314,7 +314,7 @@ test("public app shell delegates browser config and cache behavior to public mod
 
   assert.match(app, /from "\/lib\/browser-config\.mjs"/);
   assert.match(app, /from "\/lib\/browser-image-cache\.mjs"/);
-  assert.match(app, /from "\/lib\/view-mode-loader\.mjs\?v=20260608-quick-blend-time-sort-1"/);
+  assert.match(app, /from "\/lib\/view-mode-loader\.mjs\?v=20260928-aspect-ratio-value-only-1"/);
   assert.match(app, /from "\/lib\/generation-client\.mjs"/);
   assert.match(app, /from "\/lib\/creation-listing-view\.mjs"/);
   assert.match(app, /from "\/lib\/creation-temu-export-ui\.mjs"/);

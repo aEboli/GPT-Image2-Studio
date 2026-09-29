@@ -15,8 +15,8 @@ import {
 } from "../lib/model-defaults.mjs";
 
 test("shared model defaults keep text defaults aligned without changing image protocols", () => {
-  assert.equal(DEFAULT_RESPONSES_MODEL, "gpt-5.4-mini");
-  assert.equal(DEFAULT_DIRECT_RESPONSES_MODEL, "gpt-5.4-mini");
+  assert.equal(DEFAULT_RESPONSES_MODEL, "gpt-6-luna");
+  assert.equal(DEFAULT_DIRECT_RESPONSES_MODEL, "gpt-6-luna");
   assert.equal(DEFAULT_DIRECT_IMAGE_MODEL, "gpt-image-2");
   assert.equal(DEFAULT_PROTOCOL_IMAGE_MODEL, "gemini-3.1-flash-image-preview");
 });

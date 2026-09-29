@@ -30,11 +30,11 @@ const generationClientPath = new URL("../lib/generation-client.mjs", import.meta
 const generationLogPanelPath = new URL("../lib/generation-log-panel.mjs", import.meta.url);
 const generationLogStorePath = new URL("../lib/generation-log-store.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20260926-route-tool-model-toggle-1";
-const appAssetVersion = "20260926-route-tool-model-toggle-1";
+const stylesAssetVersion = "20260929-topbar-label-spacing-1";
+const appAssetVersion = "20260928-aspect-ratio-value-only-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
 const creationQueueModuleAssetVersion = "20260915-mode-generation-controls-1";
-const quickBlendModuleAssetVersion = "20260608-quick-blend-time-sort-1";
+const quickBlendModuleAssetVersion = "20260928-aspect-ratio-value-only-1";
 
 test("static assets use the current cache-busting version", async () => {
   const html = await readFile(indexPath, "utf8");
@@ -381,6 +381,7 @@ test("lightbox detail image exposes PS-style zoom and pan viewer controls", asyn
   const app = await readFile(appPath, "utf8");
   const lightboxViewer = await readFile(publicLightboxViewerPath, "utf8");
   const lightboxImageRule = readCssRule(styles, "#lightboxImage");
+  const parameterPanel = html.match(/<section class="detail-field lightbox-params-field"[\s\S]*?<\/section>/)?.[0] || "";
 
   assert.match(
     html,
@@ -390,6 +391,9 @@ test("lightbox detail image exposes PS-style zoom and pan viewer controls", asyn
     html,
     /<div class="lightbox-media-stage">[\s\S]*<div class="lightbox-image-shell">[\s\S]*<img id="lightboxImage"[\s\S]*<aside class="lightbox-fields"[\s\S]*data-lightbox-tab="prompt"[\s\S]*data-lightbox-tab="params"[\s\S]*id="lightboxPrompt"[\s\S]*id="lightboxParams"[\s\S]*lightbox-file-list/,
   );
+  assert.match(parameterPanel, /id="lightboxParamsEntries"/);
+  assert.match(parameterPanel, /<dt>文件名<\/dt><dd id="lightboxFilename"/);
+  assert.doesNotMatch(parameterPanel, /相对路径|relativePath/);
   assert.match(styles, /\.lightbox-viewer-controls\s*\{[\s\S]*display:\s*flex;[\s\S]*align-items:\s*center;/);
   assert.match(styles, /\.lightbox-zoom-label\s*\{[\s\S]*min-width:\s*54px;[\s\S]*text-align:\s*center;/);
   assert.match(
@@ -1216,9 +1220,10 @@ test("prompt studio exposes independent clear and reference-recycling controls",
   );
   assert.match(styles, /\.reference-grid\.dragover\s*\{/);
   assert.match(styles, /\.reference-preview-viewer \.reference-preview-backdrop\s*\{[\s\S]*background:\s*rgba\(0,\s*0,\s*0,\s*0\.24\);[\s\S]*backdrop-filter:\s*none;[\s\S]*-webkit-backdrop-filter:\s*none;/);
-  assert.match(styles, /\.lightbox-fields \.lightbox-params-field\s*\{[\s\S]*grid-template-rows:\s*auto minmax\(96px,\s*1fr\) auto;[\s\S]*overflow:\s*auto;/);
-  assert.match(styles, /\.lightbox-fields \.lightbox-params-field textarea\s*\{[\s\S]*height:\s*auto;[\s\S]*min-height:\s*96px;/);
-  assert.match(styles, /html:is\(\[data-ui-layout="tablet"\],\s*\[data-ui-layout="mobile"\]\) \.lightbox-fields \.lightbox-params-field\s*\{[\s\S]*minmax\(112px,\s*1fr\) auto;/);
+  assert.match(styles, /\.lightbox-fields \.lightbox-params-field\s*\{[\s\S]*grid-template-rows:\s*auto minmax\(0,\s*1fr\) auto;[\s\S]*overflow:\s*auto;/);
+  assert.match(styles, /\.lightbox-parameter-row\s*\{[\s\S]*grid-template-columns:\s*minmax\(112px,\s*132px\) minmax\(0,\s*1fr\);/);
+  assert.match(styles, /\.lightbox-parameter-row dd\s*\{[\s\S]*overflow-wrap:\s*anywhere;[\s\S]*white-space:\s*pre-wrap;/);
+  assert.match(styles, /html:is\(\[data-ui-layout="tablet"\],\s*\[data-ui-layout="mobile"\]\) \.lightbox-parameter-row\s*\{[\s\S]*grid-template-columns:\s*minmax\(96px,\s*112px\) minmax\(0,\s*1fr\);/);
 });
 
 test("reference preview cards do not render uploaded filenames", async () => {
@@ -2229,6 +2234,7 @@ test("ratio picker renders every configured aspect ratio instead of a featured s
   assert.doesNotMatch(app, /button\.appendChild\(subtitle\)/);
   assert.match(html, /<summary class="field-heading adaptive-section-summary">[\s\S]*<span data-ui-i18n="parameters">参数设置<\/span>[\s\S]*<span class="ratio-orientation-summary" id="ratioOrientationSummary" aria-live="polite"><\/span>[\s\S]*<\/summary>/);
   assert.match(app, /ratioOrientationSummary:\s*document\.querySelector\("#ratioOrientationSummary"\)/);
+  assert.match(app, /function getUiRatioLabel\(option\) \{ return option\?\.value \|\| ""; \}/);
   assert.match(app, /function syncRatioOrientationSummary\(\) \{[\s\S]*const ratioOption = getRatioOption\(refs\.ratioInput\.value \|\| DEFAULT_UI_RATIO\);[\s\S]*refs\.ratioOrientationSummary\.textContent = getUiRatioLabel\(ratioOption\);[\s\S]*refs\.ratioOrientationSummary\.dataset\.orientation = ratioOption\?\.orientation \|\| "square";[\s\S]*\}/);
   assert.match(app, /syncGenerationRatio\(value\) \{[\s\S]*renderRatioGrid\(\);[\s\S]*syncRatioOrientationSummary\(\);[\s\S]*renderReferenceAnalysisRatioGrid\(\);/);
   assert.match(app, /const orientationLabel = getUiRatioOrientationLabel\(option\.orientation\);[\s\S]*button\.dataset\.orientation = option\.orientation \|\| "square";[\s\S]*button\.setAttribute\("aria-label", getUiRatioLabel\(option\) \|\| `\$\{option\.value\} \$\{orientationLabel\}`\);/);
@@ -2319,7 +2325,7 @@ test("top navigation groups functions into an Apple-style global mega menu", asy
   assert.match(styles, /html:not\(\[data-ui-layout="tablet"\]\):not\(\[data-ui-layout="mobile"\]\) \.global-nav\s*\{[\s\S]*position:\s*static;[\s\S]*width:\s*auto;[\s\S]*transform:\s*none;/);
   assert.match(styles, /html:not\(\[data-ui-layout="tablet"\]\):not\(\[data-ui-layout="mobile"\]\) \.view-tabs\s*\{[\s\S]*border:\s*0;[\s\S]*background:\s*transparent;[\s\S]*box-shadow:\s*none;/);
   assert.match(styles, /--bg:\s*#000000;[\s\S]*--accent:\s*#7e1671;[\s\S]*--nav-tab-bg:\s*var\(--black-violet\);[\s\S]*--nav-tab-active:\s*var\(--accent\);[\s\S]*--nav-tab-idle:\s*#a49c93;/);
-  assert.match(styles, /html:not\(\[data-ui-layout="tablet"\]\):not\(\[data-ui-layout="mobile"\]\) \.view-tab\s*\{[\s\S]*min-width:\s*92px;[\s\S]*min-height:\s*30px;[\s\S]*border-radius:\s*10px;[\s\S]*var\(--nav-tab-idle\)\s*22%,\s*var\(--nav-tab-bg\)/);
+  assert.match(styles, /html:not\(\[data-ui-layout="tablet"\]\):not\(\[data-ui-layout="mobile"\]\) \.view-tab\s*\{[\s\S]*min-width:\s*112px;[\s\S]*min-height:\s*54px;[\s\S]*border-radius:\s*10px;[\s\S]*var\(--nav-tab-idle\)\s*22%,\s*var\(--nav-tab-bg\)/);
   assert.match(styles, /\.view-tab\.active\s*\{[\s\S]*var\(--nav-tab-active\)\s*28%,\s*var\(--nav-tab-bg\)[\s\S]*var\(--nav-tab-active\)\s*12%,\s*var\(--nav-tab-bg\)[\s\S]*color:\s*var\(--nav-tab-active\);/);
   assert.match(styles, /html:not\(\[data-ui-layout="tablet"\]\):not\(\[data-ui-layout="mobile"\]\) \.view-tab\.active::after\s*\{[\s\S]*background:\s*var\(--nav-tab-active\);/);
   assert.match(styles, /html:not\(\[data-ui-layout="tablet"\]\):not\(\[data-ui-layout="mobile"\]\) \.view-tab::after\s*\{[\s\S]*height:\s*4px;[\s\S]*background:\s*var\(--nav-tab-idle\);[\s\S]*opacity:\s*0\.86;/);
@@ -4423,9 +4429,9 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(html, /id="creationSkuGenerationEnabledInput" name="skuGenerationEnabled" type="checkbox" checked/);
   assert.match(html, /id="creationInfographicRebuildEnabledInput" name="infographicRebuildEnabled" type="checkbox" \/>/);
   assert.match(html, /<div class="creation-control-row creation-option-grid">[\s\S]*id="creationImageCountInput"[\s\S]*id="creationPlatformInput"[\s\S]*id="creationReasoningEffortInput"[\s\S]*id="creationTargetLanguageInput"[\s\S]*id="creationOutputFormatInput"[\s\S]*id="creationRatioInput"[\s\S]*id="creationSizeInput"[\s\S]*id="creationQualityInput"[\s\S]*id="creationSkuGenerationRuleInput"[\s\S]*id="creationDimensionUnitModeInput"[\s\S]*id="creationSkuGenerationEnabledInput"[\s\S]*id="creationInfographicRebuildEnabledInput"[\s\S]*id="creationListingAgentEnabledInput"[\s\S]*id="creationIndustryTemplateBrowser"/);
-  assert.match(html, /<select id="creationRatioInput" name="ratio">[\s\S]*<option value="1:1" data-full-label="电商主图、头像、社交媒体 · 方形 1:1" selected>1:1<\/option>[\s\S]*<option value="9:21" data-full-label="超长竖图 · 竖屏 9:21">9:21<\/option>[\s\S]*<option value="1:3" data-full-label="超长竖版广告 · 竖屏 1:3">1:3<\/option>[\s\S]*<\/select>/);
+  assert.match(html, /<select id="creationRatioInput" name="ratio">[\s\S]*<option value="1:1" selected>1:1<\/option>[\s\S]*<option value="9:21">9:21<\/option>[\s\S]*<option value="1:3">1:3<\/option>[\s\S]*<\/select>/);
   assert.match(html, /<select id="creationSizeInput" name="size">[\s\S]*<option value="1024x1024" selected>1K 1024 x 1024<\/option>[\s\S]*<option value="2880x2880">最大 2880 x 2880<\/option>[\s\S]*<\/select>/);
-  assert.match(html, /<select id="portraitRatioInput" name="ratio">[\s\S]*<option value="4:5" selected>Instagram帖子 · 竖屏 4:5<\/option>[\s\S]*<option value="3:1">超宽广告图 · 横屏 3:1<\/option>[\s\S]*<\/select>/);
+  assert.match(html, /<select id="portraitRatioInput" name="ratio">[\s\S]*<option value="4:5" selected>4:5<\/option>[\s\S]*<option value="3:1">3:1<\/option>[\s\S]*<\/select>/);
   assert.match(html, /<select id="portraitSizeInput" name="size">[\s\S]*<option value="1024x1280" selected>1K 1024 x 1280<\/option>[\s\S]*<option value="2560x3200">最大 2560 x 3200<\/option>[\s\S]*<\/select>/);
   assert.doesNotMatch(html, /id="creationScenarioHint"/);
   assert.match(html, /id="creationRolePicker"/);
@@ -4614,14 +4620,14 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(app, /8-size-capacity-fit\|size-capacity-fit\|尺寸容量适配图/);
   assert.match(app, /9-effect-comparison\|effect-comparison\|功能效果渲染图/);
   assert.match(app, /9-effect-comparison\|effect-comparison\|功能效果渲染图\|以一个清晰完整的商品主体为核心覆盖所有可靠功能；同屏不清晰时使用连续无损场景拼接，不做对比或遗漏/);
-  assert.match(app, /10-spec-table\|spec-table\|参数规格图/);
-  assert.match(app, /11-craft-process\|craft-process\|品质工艺证明图/);
+  assert.match(app, /10-scene-fit-1\|scene-fit-1\|场景适配图一/);
+  assert.match(app, /11-scene-fit-2\|scene-fit-2\|场景适配图二/);
   assert.match(app, /12-accessory-gift\|accessory-gift\|到手清单\/配件图/);
   assert.match(app, /13-series-showcase\|series-showcase\|多款式\/SKU选择图/);
-  assert.match(app, /14-ingredient-material\|ingredient-material\|材质成分解析图/);
+  assert.match(app, /14-scene-fit-3\|scene-fit-3\|场景适配图三/);
   assert.match(
     app,
-    /15-after-sales\|after-sales\|痛点图\|用真实使用困扰、解决路径和结果变化，让买家知道它具体替我解决什么问题/,
+    /15-after-sales\|after-sales\|痛点图\|用同一场景、同一机位的真实照片左右对比/,
   );
   assert.match(
     app,
@@ -5169,8 +5175,12 @@ test("creation result card images open the lightbox from the thumbnail", async (
   assert.match(app, /document\.createElement\(\(showRecordActions \|\| isResultPreviewMedia\) && imageUrl \? "button" : "div"\)/);
   assert.match(app, /media\.classList\.add\("creation-result-preview-media"\);/);
   assert.match(app, /media\.dataset\.creationPreviewItemId = item\.itemId;/);
-  assert.match(app, /function buildCreationCurrentLightboxItem\(item = \{\}\) \{/);
-  assert.match(app, /isImageOnlyLightboxItem:\s*true,/);
+  const currentLightboxBuilder = extractFunctionBefore(app, "buildCreationCurrentLightboxItem(item = {})", "openCreationCurrentItemPreview");
+  assert.match(currentLightboxBuilder, /if \(isCreationLogoBatchBranch\(\)\)/);
+  assert.match(currentLightboxBuilder, /\.\.\.buildCreationRecordLightboxItem\(item,\s*getCreationDisplayedSet\(\)\)/);
+  assert.match(currentLightboxBuilder, /prompt:\s*"",\s*isImageOnlyLightboxItem:\s*true/);
+  assert.match(app, /const isCreationRecordItem = Boolean\(fresh\.isCreationRecordItem\);[\s\S]*isCreationRecordItem\s*\?\s*buildParameterText\(fresh,\s*\{\},\s*\{\s*strictSnapshot:\s*true\s*\}\)/);
+  assert.match(app, /isCreationRecordItem\s*\?\s*buildParameterEntries\(fresh,\s*\{\},\s*\{\s*strictSnapshot:\s*true\s*\}\)/);
   assert.match(app, /function openCreationCurrentItemPreview\(itemId\) \{/);
   assert.match(app, /openCreationCurrentItemPreview\(itemId\) \{[\s\S]*const lightboxItem = buildCreationCurrentLightboxItem\(item\);[\s\S]*openLightbox\(lightboxItem,\s*\{[\s\S]*items:\s*currentSet\?\.items \|\| \[\],[\s\S]*buildItem:\s*buildCreationCurrentLightboxItem,[\s\S]*\}\);[\s\S]*\}/);
   assert.match(app, /const shouldResolveLightboxItem = !state\.lightboxItem\.isCreationRecordItem && !state\.lightboxItem\.isImageOnlyLightboxItem && !state\.lightboxItem\.isPreviewLightboxItem;/);

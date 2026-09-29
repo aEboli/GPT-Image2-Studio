@@ -505,7 +505,7 @@ function createQuickBlendJobs() {
     generationRoute: imageRoute,
     prompt: `快速溶图 ${index + 1}`,
     ratio: ratioValue,
-    ratioLabel: ratioOption?.label || DEFAULT_QUICK_BLEND_RATIO,
+      ratioLabel: ratioValue,
     sizeSetting,
     size,
     quality: getSelectedImageQuality(),

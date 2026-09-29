@@ -139,7 +139,7 @@ test("prompt template library browser contract covers the requested browse and a
   assert.match(html, /id="lightboxDismissButton"[^>]+>关闭<\/button>/);
   assert.match(html, /id="copyPromptButton"[^>]*>复制<\/button>[\s\S]*id="applyPromptButton"[^>]*>应用<\/button>/);
   assert.match(app, /promptTemplateLibrary:\s*\{[\s\S]*categoryId:\s*"usage-scenario"/);
-  assert.match(html, /app\.js\?v=20260926-route-tool-model-toggle-1/);
+  assert.match(html, /app\.js\?v=20260928-aspect-ratio-value-only-1/);
   assert.match(app, /PROMPT_TEMPLATE_LIBRARY_ASSET_VERSION\s*=\s*"20260925-prompt-library-assets-1"/);
   assert.match(app, /image\.addEventListener\("error",[\s\S]*template\.previewSourceUrl/);
   assert.match(app, /image\.src = getPromptTemplateLibraryImageUrl\(template\)/);

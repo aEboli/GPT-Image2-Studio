@@ -81,6 +81,24 @@ test("per-item generation prompt carries matching ratio and target-language guid
   assert.ok(prompt.endsWith("CANVAS LANGUAGE: Use concise English (en) for new text outside the product or packaging; preserve existing subject text, brand/model names, numbers, and units."));
 });
 
+test("runtime replaces stale canvas-language guidance from a frozen prompt", () => {
+  const item = {
+    role: "size-capacity-fit",
+    prompt: "Create a product specification image. CANVAS LANGUAGE: Use concise Simplified Chinese (zh-CN) for new text outside the product or packaging; preserve existing subject text, brand/model names, numbers, and units.",
+    ratio: "1:1",
+    resolutionTier: "1K",
+    targetLanguage: "en",
+  };
+  const prompt = buildCreationItemGenerationPrompt(
+    item.prompt,
+    resolveCreationItemGenerationParameters(item, { imageRoute: "a" }),
+    item,
+  );
+
+  assert.match(prompt, /CANVAS LANGUAGE: Use concise English \(en\) for new text outside the product or packaging/i);
+  assert.doesNotMatch(prompt, /Simplified Chinese \(zh-CN\)/i);
+});
+
 test("ordinary runtime prompts protect subject graphics, original text, and language for current and historical plans", () => {
   const historicalItem = {
     role: "hero",
@@ -125,8 +143,8 @@ test("ordinary runtime prompts protect subject graphics, original text, and lang
   const currentParameters = resolveCreationItemGenerationParameters(currentItem, { imageRoute: "a" });
   const currentPrompt = buildCreationItemGenerationPrompt(currentItem.prompt, currentParameters, currentItem);
 
-  assert.equal([...currentPrompt.matchAll(/SUBJECT CONTENT LOCK:/g)].length, 1);
-  assert.equal([...currentPrompt.matchAll(/SUBJECT IDENTITY LOCK:/g)].length, 1);
+  assert.equal([...currentPrompt.matchAll(/PRODUCT FIDELITY:/g)].length, 1);
+  assert.equal([...currentPrompt.matchAll(/SUBJECT (?:CONTENT|IDENTITY) LOCK:/g)].length, 0);
 
   const noTextItem = { ...historicalItem, textPolicy: "none" };
   const noTextPrompt = buildCreationItemGenerationPrompt(

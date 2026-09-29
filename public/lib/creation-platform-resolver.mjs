@@ -47,6 +47,9 @@ const CUSTOM_ROLE_LIFESTYLE_ROLES = new Set([
   "usage-suggestion",
   "human-handheld",
   "human-wearable",
+  "scene-fit-1",
+  "scene-fit-2",
+  "scene-fit-3",
 ]);
 const CUSTOM_ROLE_STORY_ROLES = new Set([
   "hero",
@@ -768,7 +771,7 @@ function getConversionGoal(slot = {}) {
   const role = cleanString(slot.role);
   if (role === "hero") return "create instant product recognition and connect it to the primary purchase motivation";
   if (["benefit", "usage-suggestion", "effect-comparison"].includes(role)) return "turn supplied product evidence into a clear buyer outcome";
-  if (["scene", "atmosphere", "human-handheld", "human-wearable"].includes(role)) return "help the buyer imagine a believable ownership or use moment";
+  if (["scene", "atmosphere", "human-handheld", "human-wearable", "scene-fit-1", "scene-fit-2", "scene-fit-3"].includes(role)) return "help the buyer imagine a believable ownership or use moment";
   if (["size-capacity-fit", "spec-table", "multi-angle", "product-detail", "ingredient-material", "craft-process"].includes(role)) return "reduce product, fit, specification, or quality uncertainty with factual evidence";
   if (["sku", "series-showcase", "accessory-gift"].includes(role)) return "reduce choice and package-completeness uncertainty";
   if (role === "after-sales") return "provide only supplied reassurance that helps the buyer decide confidently";

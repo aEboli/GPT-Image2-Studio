@@ -63,13 +63,19 @@ The system SHALL return ordinary image-to-prompt analysis as one strict JSON obj
 
 ### Requirement: Reverse prompt records and templates use grounded descriptive names
 
-The system SHALL present each image-to-prompt result with one concise display name shared by its history row and automatically saved prompt template. An existing non-empty `json.title` SHALL remain authoritative. Otherwise, a new five-group structured result SHALL derive a grounded Chinese name from available time or weather, subject action or visible prop, subject type, and representative environment details; missing dimensions SHALL be skipped, repeated details SHALL be removed, and the result SHALL NOT exceed 40 Unicode characters. If no structured name can be derived, the system SHALL use the uploaded filename without its image extension, followed by `图片反推 JSON` only when no usable filename stem exists.
+The system SHALL present each image-to-prompt result with one concise display name shared by its history row and automatically saved prompt template. An existing non-empty `json.title` SHALL remain authoritative. Otherwise, a new five-group structured result SHALL derive a grounded Chinese name in the order of subject or visible action, representative scene details, and one concise atmosphere segment based on time, weather, lighting, color, or tone; missing dimensions SHALL be skipped, repeated details SHALL be removed, and the result SHALL NOT exceed 40 Unicode characters. When subject fields are empty, a grounded representative scene object MAY serve as the first name segment. If no structured name can be derived, the system SHALL use the uploaded filename without its image extension, followed by `图片反推 JSON` only when no usable filename stem exists.
 
 #### Scenario: Structured result contains complementary visual details
 
 - **WHEN** a five-group result describes a young woman holding an umbrella at night in rain with courtyard lights
-- **THEN** its history row and automatic template use the same short name combining the grounded night, rain, umbrella action, woman, and representative environment details
+- **THEN** its history row and automatic template use the same short name combining the umbrella action and woman, the representative environment details, and the grounded night and rain atmosphere in that order
 - **AND** the name does not contain an image filename extension
+
+#### Scenario: Subject fields are empty but scene and visual details remain
+
+- **WHEN** a five-group result has no reliable subject type but describes a representative scene object, location, and visible lighting or color treatment
+- **THEN** its history row and automatic template use the grounded scene object, location, and atmosphere as the available name segments
+- **AND** the name does not fall back to the uploaded filename while those structured details are available
 
 #### Scenario: Existing result has a title
 

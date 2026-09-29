@@ -1,0 +1,3 @@
+schema: spec-driven
+created: 2026-09-28
+goal: 让新配置默认使用 gpt-6-luna，并移除 gpt-5.4-mini 作为默认值和示例的展示

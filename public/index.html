@@ -4,7 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Image Studio</title>
-    <link rel="icon" type="image/png" href="/icon.png?v=20260926-cat-2" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="1024x1024" href="/favicon.png?v=20260926-cat-2" />
+    <link rel="icon" type="image/png" sizes="1024x1024" href="/icon.png?v=20260926-cat-2" />
+    <link rel="apple-touch-icon" sizes="1024x1024" href="/apple-touch-icon.png?v=20260926-cat-2" />
+    <link rel="manifest" href="/site.webmanifest" />
     <script>
       (() => {
         const themeKey = "image-studio-ui-theme-v1";
@@ -101,7 +106,7 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="./styles.css?v=20260926-route-tool-model-toggle-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260929-topbar-label-spacing-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -117,6 +122,7 @@
         <span class="topbar-reveal-icon" aria-hidden="true"></span>
       </button>
       <header class="topbar" id="globalTopbar">
+        <small class="app-version" aria-label="当前版本 v0.2.045">v0.2.045</small>
         <div class="brand-cluster">
           <div class="brand-mark" aria-hidden="true">
             <span class="brand-mark-core"></span>
@@ -225,7 +231,7 @@
             <code class="generation-mode-status-model-value" id="generationModelValue">gpt-image-2</code>
             <span class="generation-mode-status-text-model hidden" id="generationTextModelStatus">
               <span class="generation-mode-status-model-label" data-ui-i18n="visionTextModel">文本模型</span>
-              <code class="generation-mode-status-model-value" id="generationTextModelValue">gpt-5.4-mini</code>
+              <code class="generation-mode-status-model-value" id="generationTextModelValue">gpt-6-luna</code>
             </span>
           </span>
         </button>
@@ -469,7 +475,7 @@
                         <span data-ui-i18n="imageModel">生图模型</span>
                         <strong id="parameterToolModel">gpt-image-2</strong>
                         <span id="parameterTextModelLabel" data-ui-i18n="visionTextModel">文本模型</span>
-                        <strong id="parameterTextModel">gpt-5.4-mini</strong>
+                        <strong id="parameterTextModel">gpt-6-luna</strong>
                       </div>
                     </div>
                   </div>
@@ -1725,21 +1731,21 @@
                   <label class="compact-field">
                     <span>比例</span>
                     <select id="creationRatioInput" name="ratio">
-                      <option value="1:1" data-full-label="电商主图、头像、社交媒体 · 方形 1:1" selected>1:1</option>
-                      <option value="4:3" data-full-label="PPT、网页配图 · 横屏 4:3">4:3</option>
-                      <option value="3:4" data-full-label="海报、人像 · 竖屏 3:4">3:4</option>
-                      <option value="3:2" data-full-label="摄影风格 · 横屏 3:2">3:2</option>
-                      <option value="2:3" data-full-label="竖版摄影 · 竖屏 2:3">2:3</option>
-                      <option value="5:4" data-full-label="商品展示 · 横屏 5:4">5:4</option>
-                      <option value="4:5" data-full-label="Instagram帖子 · 竖屏 4:5">4:5</option>
-                      <option value="16:9" data-full-label="横版封面、YouTube · 横屏 16:9">16:9</option>
-                      <option value="9:16" data-full-label="短视频封面、手机壁纸 · 竖屏 9:16">9:16</option>
-                      <option value="21:9" data-full-label="超宽横幅 · 横屏 21:9">21:9</option>
-                      <option value="9:21" data-full-label="超长竖图 · 竖屏 9:21">9:21</option>
-                      <option value="2:1" data-full-label="Banner横幅 · 横屏 2:1">2:1</option>
-                      <option value="1:2" data-full-label="长海报 · 竖屏 1:2">1:2</option>
-                      <option value="3:1" data-full-label="超宽广告图 · 横屏 3:1">3:1</option>
-                      <option value="1:3" data-full-label="超长竖版广告 · 竖屏 1:3">1:3</option>
+                      <option value="1:1" selected>1:1</option>
+                      <option value="4:3">4:3</option>
+                      <option value="3:4">3:4</option>
+                      <option value="3:2">3:2</option>
+                      <option value="2:3">2:3</option>
+                      <option value="5:4">5:4</option>
+                      <option value="4:5">4:5</option>
+                      <option value="16:9">16:9</option>
+                      <option value="9:16">9:16</option>
+                      <option value="21:9">21:9</option>
+                      <option value="9:21">9:21</option>
+                      <option value="2:1">2:1</option>
+                      <option value="1:2">1:2</option>
+                      <option value="3:1">3:1</option>
+                      <option value="1:3">1:3</option>
                     </select>
                   </label>
 
@@ -2125,21 +2131,21 @@
                   <label class="compact-field">
                     <span>比例</span>
                     <select id="portraitRatioInput" name="ratio">
-                      <option value="1:1">电商主图、头像、社交媒体 · 方形 1:1</option>
-                      <option value="4:3">PPT、网页配图 · 横屏 4:3</option>
-                      <option value="3:4">海报、人像 · 竖屏 3:4</option>
-                      <option value="3:2">摄影风格 · 横屏 3:2</option>
-                      <option value="2:3">竖版摄影 · 竖屏 2:3</option>
-                      <option value="5:4">商品展示 · 横屏 5:4</option>
-                      <option value="4:5" selected>Instagram帖子 · 竖屏 4:5</option>
-                      <option value="16:9">横版封面、YouTube · 横屏 16:9</option>
-                      <option value="9:16">短视频封面、手机壁纸 · 竖屏 9:16</option>
-                      <option value="21:9">超宽横幅 · 横屏 21:9</option>
-                      <option value="9:21">超长竖图 · 竖屏 9:21</option>
-                      <option value="2:1">Banner横幅 · 横屏 2:1</option>
-                      <option value="1:2">长海报 · 竖屏 1:2</option>
-                      <option value="3:1">超宽广告图 · 横屏 3:1</option>
-                      <option value="1:3">超长竖版广告 · 竖屏 1:3</option>
+                      <option value="1:1">1:1</option>
+                      <option value="4:3">4:3</option>
+                      <option value="3:4">3:4</option>
+                      <option value="3:2">3:2</option>
+                      <option value="2:3">2:3</option>
+                      <option value="5:4">5:4</option>
+                      <option value="4:5" selected>4:5</option>
+                      <option value="16:9">16:9</option>
+                      <option value="9:16">9:16</option>
+                      <option value="21:9">21:9</option>
+                      <option value="9:21">9:21</option>
+                      <option value="2:1">2:1</option>
+                      <option value="1:2">1:2</option>
+                      <option value="3:1">3:1</option>
+                      <option value="1:3">1:3</option>
                     </select>
                   </label>
                   <label class="compact-field">
@@ -2772,8 +2778,6 @@
       </main>
     </div>
 
-    <small class="app-version" aria-label="当前版本 v0.2.044">v0.2.044</small>
-
     <dialog
       class="creation-record-delete-dialog"
       id="creationRecordDeleteDialog"
@@ -3087,10 +3091,10 @@
               </section>
               <section class="detail-field lightbox-params-field" role="tabpanel" data-lightbox-panel="params">
                 <span id="lightboxParamsLabel">参数</span>
-                <textarea id="lightboxParams" rows="6" readonly aria-labelledby="lightboxParamsLabel"></textarea>
+                <div class="lightbox-parameter-list" id="lightboxParamsEntries" aria-label="参数列表"></div>
+                <textarea class="hidden" id="lightboxParams" rows="6" readonly aria-labelledby="lightboxParamsLabel"></textarea>
                 <dl class="lightbox-file-list" aria-label="文件信息">
                   <div><dt>文件名</dt><dd id="lightboxFilename">--</dd></div>
-                  <div><dt>相对路径</dt><dd id="lightboxRelativePath">--</dd></div>
                 </dl>
               </section>
             </div>
@@ -3301,7 +3305,7 @@
                         <button class="inline-button" id="fetchModelsButton" type="button" data-ui-i18n="fetchModels" data-ui-i18n-title="fetchModelsFull">获取模型列表</button>
                       </div>
                       <div class="model-picker-control">
-                        <input id="responsesModelInput" name="responsesModel" type="text" placeholder="gpt-5.4-mini" autocomplete="off" aria-controls="modelOptionsList" />
+                        <input id="responsesModelInput" name="responsesModel" type="text" placeholder="gpt-6-luna" autocomplete="off" aria-controls="modelOptionsList" />
                         <button class="model-picker-toggle" id="modelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="modelOptionsList" data-ui-i18n-aria-label="expandModels" hidden></button>
                         <div class="model-options-list" id="modelOptionsList" role="listbox" hidden></div>
                       </div>
@@ -3407,7 +3411,7 @@
                         <button class="inline-button" id="directResponsesFetchModelsButton" type="button" data-ui-i18n="fetchModels" data-ui-i18n-title="fetchModelsFull">获取模型列表</button>
                       </div>
                       <div class="model-picker-control">
-                        <input id="directResponsesModelInput" name="directTextModel" type="text" placeholder="gpt-5.4-mini" autocomplete="off" aria-controls="directResponsesModelOptionsList" />
+                        <input id="directResponsesModelInput" name="directTextModel" type="text" placeholder="gpt-6-luna" autocomplete="off" aria-controls="directResponsesModelOptionsList" />
                         <button class="model-picker-toggle" id="directResponsesModelPickerToggle" type="button" aria-label="展开可用模型列表" aria-expanded="false" aria-controls="directResponsesModelOptionsList" data-ui-i18n-aria-label="expandModels" hidden></button>
                         <div class="model-options-list" id="directResponsesModelOptionsList" role="listbox" hidden></div>
                       </div>
@@ -3732,6 +3736,6 @@
 
     <div class="app-tooltip" id="appTooltip" role="tooltip" popover="manual"></div>
 
-    <script type="module" src="./app.js?v=20260926-route-tool-model-toggle-1"></script>
+    <script type="module" src="./app.js?v=20260928-aspect-ratio-value-only-1"></script>
   </body>
 </html>

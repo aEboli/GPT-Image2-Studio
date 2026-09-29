@@ -30,9 +30,27 @@ const STRING_METADATA_FIELDS = [
   "subjectName",
   "subjectSummary",
 ];
+const BOOLEAN_METADATA_FIELDS = [
+  "includeImageToolModel",
+  "directImageStream",
+];
 
 function normalizeString(value) {
   return String(value || "").trim();
+}
+
+function normalizeBoolean(value) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (["1", "true", "on", "yes", "enabled"].includes(normalized)) {
+    return true;
+  }
+  if (["0", "false", "off", "no", "disabled"].includes(normalized)) {
+    return false;
+  }
+  return undefined;
 }
 
 function normalizeRecoveredImageSize(value, item = {}) {
@@ -61,14 +79,31 @@ export function buildGalleryMetadataCacheEntry(item = {}) {
   const entry = {};
 
   for (const field of STRING_METADATA_FIELDS) {
+    if (field === "ratioLabel" && !normalizeString(item.ratio)) {
+      continue;
+    }
     const value = normalizeString(item[field]);
     if (value) {
       entry[field] = field === "quality"
         ? normalizeStoredImageQuality(value, { imageRoute: item.imageRoute, imageModel: item.imageModel })
         : field === "size"
           ? normalizeRecoveredImageSize(value, item)
-          : value;
+          : field === "ratioLabel"
+            ? normalizeString(item.ratio)
+            : value;
     }
+  }
+
+  for (const field of BOOLEAN_METADATA_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(item, field)) {
+      const value = normalizeBoolean(item[field]);
+      if (value !== undefined) {
+        entry[field] = value;
+      }
+    }
+  }
+  if (normalizeString(item.ratio)) {
+    entry.ratioLabel = normalizeString(item.ratio);
   }
 
   const referenceImageNames = normalizeStringArray(item.referenceImageNames);
@@ -109,6 +144,18 @@ export function mergeGalleryItemWithCachedMetadata(item = {}, cachedEntry = {}) 
       ? normalizeRecoveredImageSize(currentValue || cachedValue, { ...cachedEntry, ...item })
       : currentValue || cachedValue || "";
   }
+  for (const field of BOOLEAN_METADATA_FIELDS) {
+    const currentValue = Object.prototype.hasOwnProperty.call(item, field) ? normalizeBoolean(item[field]) : undefined;
+    const cachedValue = Object.prototype.hasOwnProperty.call(cachedEntry, field) ? normalizeBoolean(cachedEntry[field]) : undefined;
+    if (currentValue !== undefined) {
+      merged[field] = currentValue;
+    } else if (cachedValue !== undefined) {
+      merged[field] = cachedValue;
+    } else {
+      delete merged[field];
+    }
+  }
+  merged.ratioLabel = normalizeString(merged.ratio);
   merged.quality = normalizeStoredImageQuality(merged.quality, {
     imageRoute: merged.imageRoute,
     imageModel: merged.imageModel,
@@ -150,6 +197,15 @@ export function collectGalleryMetadataRepairPatch(sourceItem = {}, recoveredItem
           imageRoute: recoveredItem.imageRoute || sourceItem.imageRoute,
           imageModel: recoveredItem.imageModel || sourceItem.imageModel,
         });
+      }
+    }
+  }
+
+  for (const field of BOOLEAN_METADATA_FIELDS) {
+    if (!Object.prototype.hasOwnProperty.call(sourceItem, field) && Object.prototype.hasOwnProperty.call(recoveredItem, field)) {
+      const value = normalizeBoolean(recoveredItem[field]);
+      if (value !== undefined) {
+        patch[field] = value;
       }
     }
   }

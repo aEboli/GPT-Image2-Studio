@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.044-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.045-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installers-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,7 +10,7 @@
 
 Prompt-to-image, reference analysis, editing, product-image replication, ecommerce sets, portraits, article illustrations, PPT generation, and asset history in one browser-based workspace.
 
-Current version: `v0.2.044`
+Current version: `v0.2.045`
 
 [Chinese README](./README.zh-CN.md)
 
@@ -47,9 +47,9 @@ Windows 脚本入口（启动器、Native Messaging 安装/卸载、图片资源
 
 ### Windows desktop app (recommended)
 
-Download `GPT-Image2-Studio-Desktop-Setup-v0.2.044-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
+Download `GPT-Image2-Studio-Desktop-Setup-v0.2.045-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
 
-For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.044-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
+For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.045-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
 
 For desktop development, Electron 43 requires Node.js 22.12 or newer:
 
@@ -60,7 +60,7 @@ cmd /c npm run desktop
 
 ### Windows browser installer
 
-The legacy browser-installer flow remains documented for local builds, but the `v0.2.044` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
+The legacy browser-installer flow remains documented for local builds, but the `v0.2.045` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
 
 ## Configuration
 
@@ -74,7 +74,7 @@ Start here on a first run. Studio ships no model quota and never holds keys for 
 | --- | --- | --- |
 | Base URL | The API root the provider gives you, usually ending in `/v1` | `https://api.openai.com/v1` |
 | API key | The key created in the provider's console | `sk-****` |
-| Model name | A model identifier spelled the way that provider spells it | `gpt-5.4-mini`, `gpt-image-2` |
+| Model name | A model identifier spelled the way that provider spells it | `gpt-6-luna`, `gpt-image-2` |
 
 Create keys in the OpenAI console for the official channel; compatible services and third-party gateways publish their own base URL and key. Billing, rate limits, and content policy come from the provider you configure.
 
@@ -113,8 +113,10 @@ Long explanations are available from their hover/focus help markers; the configu
 ```text
 Endpoint URL: https://api.openai.com/v1
 API key:      sk-****
-Responses model: gpt-5.4-mini
+Responses model: gpt-6-luna
 ```
+
+The default text/vision model is `gpt-6-luna`. Existing non-empty model settings remain in effect until you change them.
 
 The Responses model is the outer model. The image tool model is chosen from the **生图工具模型** dropdown right below it, and the prompt page parameter row echoes it as `工具模型 <model>`. The dropdown is the only way to set it — there is no free-text field:
 
@@ -132,7 +134,7 @@ The prompt page parameter row also has a **质量** (quality) dropdown: `low`, `
 
 ```text
 Image API:       https://api.openai.com/v1   suffix images/generations   model gpt-image-2
-Text/vision API: https://api.openai.com/v1   suffix responses            model gpt-5.4-mini
+Text/vision API: https://api.openai.com/v1   suffix responses            model gpt-6-luna
 ```
 
 **Gemini.** The image endpoint suffix is fixed to `images/generations` and displayed in the same position as the GPT and Grok suffix controls:
@@ -227,7 +229,7 @@ Copy `.env.example` for a local starting point. Important variables include:
 ```text
 OPENAI_API_KEY=your_api_key_here
 OPENAI_BASE_URL=https://api.openai.com/v1
-RESPONSES_MODEL=gpt-5.4-mini
+RESPONSES_MODEL=gpt-6-luna
 IMAGE_TOOL_MODEL=gpt-image-2
 IMAGE_QUALITY=high
 DIRECT_IMAGE_BASE_URL=https://api.openai.com/v1
@@ -237,7 +239,7 @@ DIRECT_IMAGE_MODEL=gpt-image-2
 DIRECT_TEXT_BASE_URL=https://api.openai.com/v1
 DIRECT_TEXT_API_KEY=
 DIRECT_TEXT_ENDPOINT_PATH=responses
-DIRECT_TEXT_MODEL=gpt-5.4-mini
+DIRECT_TEXT_MODEL=gpt-6-luna
 GROK_BASE_URL=https://api.x.ai/v1
 GROK_API_KEY=
 GROK_ENDPOINT_PATH=images/generations
@@ -286,7 +288,7 @@ The repository also contains a Vercel configuration. Vercel functions use tempor
 
 ### Commerce and content workflows
 
-- **Ecommerce sets** with platform, category, product facts, audience, SKU, language, carousel roles, frozen plans, retries, and Listing drafts. A separate logo-batch branch adds one uploaded Logo to up to 15 source images. Nineteen platform profiles are included; the generic baseline keeps 18 native carousel slots.
+- **Ecommerce sets** with platform, category, product facts, audience, SKU, language, carousel roles, frozen plans, retries, and Listing drafts. The universal 18-slot baseline now uses three distinct scene-fit images for real product contexts; platform-native specification roles remain available where required. A separate logo-batch branch adds one uploaded Logo to up to 15 source images. Nineteen platform profiles are included.
 - **Product image replication workbench** that analyzes up to 15 mother images, extracts evidence-backed product insights, and expands them into a bounded workspace x channel x direction task board. Each task keeps the selected references, an English generation prompt, Chinese counterpart, aspect ratio, and individual or batch generation/download actions.
 - **Portrait mode** for consistent people, actions, clothing, props, locations, framing, and 1-100 image batches.
 - **Article illustration mode** for text packages, style bibles, character and scene references, reading-order storyboards, and final illustrations.
@@ -295,7 +297,7 @@ The repository also contains a Vercel configuration. Vercel functions use tempor
 
 ### Assets and operations
 
-- Waterfall gallery and a shared lightbox with fit, zoom, pan, download, deletion, prompt review, and request-parameter inspection.
+- Waterfall gallery and a shared lightbox with fit, zoom, pan, download, deletion, prompt review, and request-parameter inspection. Creation results show the exact saved generation prompt and recorded per-image parameters; missing historical values are shown as unrecorded instead of inferred from current settings.
 - Separate records for Creation sets, portraits, article illustrations, and PPT decks.
 - Background queue status, progress, structured errors, and retry of failed items.
 - **Prompt Kit** now includes a searchable static library with six categories, 24 subcategories, and ten reusable prompts per subcategory. It supports list and image views, preserves each preview's intrinsic aspect ratio, adjustable list text, full-prompt lightbox previews, one-click apply, and copying entries into personal templates; the profile/avatar category bundles 40 distinct attributed YouMind previews, each paired with the matching source title and prompt. The remaining categories use deterministic, motif-specific offline previews that vary by template instead of repeating one placeholder composition. Existing personal templates and Prompt Agent history are preserved while legacy built-in defaults migrate to the current set.
@@ -521,7 +523,7 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 - The source and lockfile versions are authoritative; tags use `v<version>`.
 - Versions use `major.minor.patch` with a three-digit patch segment: major bumps reset minor and patch, minor bumps reset patch, feature bumps add `0.010`, and ordinary updates add `0.001`.
 - Use `npm run release:major`, `npm run release:minor`, `npm run release:feature`, or `npm run release:patch` with `--summary`; each release changes exactly one level.
-- Current release notes: [v0.2.044](./docs/releases/v0.2.044.md).
+- Current release notes: [v0.2.045](./docs/releases/v0.2.045.md).
 - Windows packages are distributed through [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Check the release notes for hashes and signing status.
 - `npm run check:release:strict` requires a clean worktree and a matching tag on the current commit.
 
@@ -536,7 +538,15 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 
 ## Version history
 
-Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.044](./docs/releases/v0.2.044.md).
+Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.045](./docs/releases/v0.2.045.md).
+
+### v0.2.045
+
+- Reworked the universal ecommerce set so the former overlapping specification, craft, and material slots become three distinct scene-fit roles. Scene facts are distributed across different settings and shots, while platform-native profiles keep their own specification roles.
+- Added product-grounded visual divergence: distinct visual formats and casts, bounded supporting-reference reuse, new scene references for non-blueprint roles, and usable carry/pack/store directions for products that cannot be worn.
+- Simplified ordinary Creation prompts by removing internal planning labels, merging subject locks into one product-fidelity instruction, and translating Chinese prompt segments at generation time for non-Chinese target languages. Translation failures keep generation running and surface a warning.
+- Added saved generation detail inspection for Creation results, including the actual prompt, ratio, size, quality, transparency, route switches, models, reference images, endpoint, and duration. Historical gaps remain explicitly unrecorded.
+- Updated ratio metadata to canonical values, added favicon and web-manifest routes, and changed the default text/vision model to `gpt-6-luna` while preserving existing non-empty settings.
 
 ### v0.2.044
 

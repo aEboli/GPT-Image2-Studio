@@ -50,8 +50,7 @@ test("planner adapts conversion intent by platform and non-sensitive audience wi
   assert.deepEqual(amazon.audienceStrategy, audienceStrategy);
   assert.equal(amazon.effectiveAudienceStrategy.targetAudience, audienceStrategy.targetAudience);
   assert.ok(amazon.items.every((item) => item.conversionIntent?.conversionGoal));
-  assert.match(amazon.items[1].prompt, /Buyer goal:/i);
-  assert.doesNotMatch(amazon.items[0].prompt, /Buyer goal:/i);
+  assert.ok(amazon.items.every((item) => !/Buyer goal:/i.test(item.prompt)));
   assert.match(amazon.items[0].prompt, /CANVAS TEXT POLICY: Use existing product or packaging markings only/i);
   assert.notDeepEqual(
     amazon.effectiveAudienceStrategy.marketingContext,
@@ -393,4 +392,135 @@ test("strict main-image prompt overrides are revalidated after platform and lega
     legacyOverridden.errors.some((error) => error.constraintId === "amazon-main-no-external-logo"),
     "legacy prompt override must trigger the external-Logo constraint",
   );
+});
+
+test("universal 18-image set replaces overlapping information images with scene-fit images", () => {
+  const universal = buildPlatformPlan("universal", { imageCount: 18 });
+  const universalRoles = universal.items.filter((item) => item.itemKind === "carousel").map((item) => item.role);
+
+  assert.equal(universalRoles.length, 18);
+  for (const role of ["scene-fit-1", "scene-fit-2", "scene-fit-3"]) assert.ok(universalRoles.includes(role), role);
+  for (const role of ["spec-table", "craft-process", "ingredient-material"]) assert.ok(!universalRoles.includes(role), role);
+
+  const legacy = buildCreationPlan({ productName: "Portable first aid kit", imageCount: 18 });
+  assert.deepEqual(legacy.items.map((item) => item.role), universalRoles);
+
+  const jdRoles = buildPlatformPlan("jd").items.map((item) => item.imageType);
+  assert.ok(jdRoles.includes("spec-table"));
+  assert.ok(jdRoles.includes("craft-proof"));
+});
+
+test("scene-fit items are each assigned a different supplied scene", () => {
+  const plan = buildCreationPlan({
+    productName: "便携急救包",
+    productDescription: "防水材质，适用户外露营、车内、办公室",
+    imageCount: 18,
+  });
+  const prompts = ["scene-fit-1", "scene-fit-2", "scene-fit-3"].map(
+    (role) => plan.items.find((item) => item.role === role).prompt,
+  );
+
+  assert.match(prompts[0], /Scene assignment: 适用户外露营/);
+  assert.match(prompts[1], /Scene assignment: 车内/);
+  assert.match(prompts[2], /Scene assignment: 办公室/);
+
+  const fallback = buildCreationPlan({ productName: "Ceramic mug", imageCount: 18 });
+  const fallbackPrompts = ["scene-fit-1", "scene-fit-2", "scene-fit-3"].map(
+    (role) => fallback.items.find((item) => item.role === role).prompt.match(/Scene assignment: [^.]+/)[0],
+  );
+  assert.equal(new Set(fallbackPrompts).size, 3);
+});
+
+test("only the scene role copies a scene reference as a blueprint and scene-fit items vary the shot", () => {
+  const plan = buildCreationPlan({
+    productName: "Jointed swimbait lure",
+    imageCount: 18,
+    referenceImageRoles: [
+      { index: 1, filename: "lure.png", role: "product", note: "Lure product subject" },
+      { index: 2, filename: "boat.jpg", role: "scene", note: "Angler on a boat holding a fish" },
+    ],
+  });
+  const byRole = Object.fromEntries(plan.items.map((item) => [item.role, item.prompt]));
+
+  assert.match(byRole.scene, /Scene source boat\.jpg is a visual blueprint/);
+  assert.match(byRole.atmosphere, /Scene source boat\.jpg is setting context: keep its kind of environment and activity, and create a new person/);
+  for (const role of ["human-handheld", "human-wearable"]) {
+    assert.doesNotMatch(byRole[role], /boat\.jpg/, role);
+  }
+  const shots = ["scene-fit-1", "scene-fit-2", "scene-fit-3"].map((role) => byRole[role].match(/Shot: [^.;]+/)[0]);
+  assert.equal(new Set(shots).size, 3);
+  assert.ok(plan.items.every((item) => !item.prompt.includes("围绕商品核心价值提炼短卖点")));
+});
+
+test("pain-point image is a photographic before-and-after comparison", () => {
+  const plan = buildCreationPlan({ productName: "Jointed swimbait lure", selectedRoles: ["after-sales"] });
+
+  assert.match(plan.items[0].prompt, /photographic before-and-after comparison: two side-by-side panels of the same buyer situation/);
+});
+
+test("universal set gives every carousel item a distinct visual format and person-led items distinct casts", () => {
+  const plan = buildCreationPlan({ productName: "Ceramic pour-over coffee dripper", imageCount: 18 });
+  const carousel = plan.items.filter((item) => item.itemKind === "carousel");
+  const formats = carousel.map((item) => (item.prompt.match(/Visual format: [^.]+\./) || [""])[0]);
+
+  assert.ok(formats.every(Boolean), "every item declares a visual format");
+  assert.equal(new Set(formats).size, carousel.length);
+
+  const ages = ["benefit", "atmosphere", "human-handheld", "human-wearable", "after-sales"].map((role) => {
+    const prompt = carousel.find((item) => item.role === role).prompt;
+    return prompt.match(/Cast: [^.]*?(\d0s(?:-\d0s)?|late teens or 20s)/)[1];
+  });
+  assert.equal(new Set(ages).size, ages.length);
+
+  const wearable = carousel.find((item) => item.role === "human-wearable").prompt;
+  assert.match(wearable, /When the product is not worn, show a person carrying, packing, or storing it/);
+});
+
+test("each supporting reference feeds at most two universal carousel items", () => {
+  const referenceImageRoles = [
+    { index: 1, filename: "product.png", role: "product", note: "Product subject" },
+    { index: 2, filename: "feature.png", role: "feature", note: "Feature callouts" },
+    { index: 3, filename: "material.png", role: "material", note: "Material detail" },
+    { index: 4, filename: "scene.png", role: "scene", note: "Person using it outdoors" },
+    { index: 5, filename: "usage.png", role: "usage", note: "Setup steps" },
+    { index: 6, filename: "size.png", role: "dimensions", note: "Length 14cm" },
+    { index: 7, filename: "box.png", role: "package", note: "Included items" },
+  ];
+  const plan = buildCreationPlan({ productName: "Travel kettle", imageCount: 18, referenceImageRoles });
+  const images = referenceImageRoles.map((entry) => ({ originalname: entry.filename, name: entry.filename, size: 1000, buffer: Buffer.alloc(4) }));
+  const counts = new Map();
+  for (const item of plan.items.filter((entry) => entry.itemKind === "carousel")) {
+    for (const image of creationReferenceLabels.buildCreationItemReferenceImages(item, images, referenceImageRoles)) {
+      counts.set(image.originalname, (counts.get(image.originalname) || 0) + 1);
+    }
+  }
+  counts.delete("product.png");
+  for (const [name, count] of counts) assert.ok(count <= 2, `${name} used ${count} times`);
+});
+
+test("five SKUs all reach the SKU choice image and each SKU image keeps its own subject", () => {
+  const colors = ["gold", "green", "red", "purple", "blue"];
+  const referenceImageRoles = colors.map((color, index) => ({ index: index + 1, filename: `${color}.png`, role: "product", note: `${color} lure` }));
+  const skuSubjects = colors.map((color, index) => ({ id: color, title: color, filenames: [`${color}.png`], referenceIndexes: [index + 1] }));
+  const plan = buildCreationPlan({ productName: "Swimbait lure", imageCount: 18, referenceImageRoles, skuSubjects });
+  const images = referenceImageRoles.map((entry) => ({ originalname: entry.filename, name: entry.filename, size: 1000, buffer: Buffer.alloc(4) }));
+  const namesFor = (item) => creationReferenceLabels.buildCreationItemReferenceImages(item, images, referenceImageRoles).map((image) => image.originalname);
+
+  assert.deepEqual(namesFor(plan.items.find((item) => item.role === "series-showcase")).sort(), colors.map((color) => `${color}.png`).sort());
+  const skuItems = plan.items.filter((item) => item.role === "sku");
+  assert.equal(skuItems.length, 5);
+  skuItems.forEach((item, index) => assert.equal(namesFor(item)[0], `${colors[index]}.png`));
+});
+
+test("ordinary items diverge from the product itself while added elements stay grounded", () => {
+  const plan = buildCreationPlan({ productName: "Ceramic pour-over coffee dripper", imageCount: 18 });
+  for (const item of plan.items.filter((entry) => entry.itemKind === "carousel")) {
+    assert.match(item.prompt, /Creative range: extend ideas from this product's own category, function, visible features, and likely buyer/, item.role);
+    assert.match(item.prompt, /every added prop, person, setting, or line of text serves that product's real use/, item.role);
+  }
+  const fallback = plan.items.find((item) => item.role === "scene-fit-2").prompt;
+  assert.match(fallback, /Scene assignment: a second real setting implied by this product's function or buyer/);
+
+  const amazon = buildCreationPlan({ productName: "Ceramic pour-over coffee dripper", platform: "amazon" });
+  assert.doesNotMatch(amazon.items[0].prompt, /Creative range:/);
 });
