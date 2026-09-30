@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.045-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.046-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installers-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,7 +10,7 @@
 
 Prompt-to-image, reference analysis, editing, product-image replication, ecommerce sets, portraits, article illustrations, PPT generation, and asset history in one browser-based workspace.
 
-Current version: `v0.2.045`
+Current version: `v0.2.046`
 
 [Chinese README](./README.zh-CN.md)
 
@@ -19,6 +19,16 @@ Current version: `v0.2.045`
 ## Quick start
 
 Installing is not enough on its own: nothing generates until you enter your own API credentials. On a first run, follow [Beginner API setup](#beginner-api-setup).
+
+### Choose a path
+
+| Goal | Recommended start | What you get |
+| --- | --- | --- |
+| Use Studio on Windows | Download the [desktop installer](https://github.com/aEboli/GPT-Image2-Studio/releases) | A self-contained Electron window; Node.js is not required after installation |
+| Try or develop locally | Run the source service with Node.js 20+ | Direct access to the UI and server source, local files, and development commands |
+| Host a preview | Deploy the repository with Vercel | A browser endpoint for validation; use temporary storage and validate long jobs before production |
+
+The desktop installer is the shortest path for daily Windows use. Use the portable ZIP when you do not want an install record. Use the source checkout when you need local development or want to inspect the generated files.
 
 ### Run from source
 
@@ -47,9 +57,9 @@ Windows 脚本入口（启动器、Native Messaging 安装/卸载、图片资源
 
 ### Windows desktop app (recommended)
 
-Download `GPT-Image2-Studio-Desktop-Setup-v0.2.045-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
+Download `GPT-Image2-Studio-Desktop-Setup-v0.2.046-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
 
-For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.045-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
+For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.046-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
 
 For desktop development, Electron 43 requires Node.js 22.12 or newer:
 
@@ -60,7 +70,7 @@ cmd /c npm run desktop
 
 ### Windows browser installer
 
-The legacy browser-installer flow remains documented for local builds, but the `v0.2.045` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
+The legacy browser-installer flow remains documented for local builds, but the `v0.2.046` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
 
 ## Configuration
 
@@ -419,6 +429,8 @@ Generated content still needs human review for factual accuracy, brand rules, po
 
 GPT's Route and Direct modes share the explicit pixel candidates below. The first candidate is the default for the selected ratio; no automatic resolution option is displayed or sent. The middle column lists the other candidates in UI order, excluding the default and largest values.
 
+The parameter selectors keep the visible values literal: reasoning options show only `Low`, `Medium`, `High`, and `XHigh`, while concrete GPT sizes show only `width x height`. The `value` sent to the provider is unchanged. Gemini's `512`/`1K`/`2K`/`4K` and Grok's `1k`/`2k` remain provider-specific resolution tiers.
+
 | Ratio | Typical use | Default size | Other candidates | Largest |
 | --- | --- | --- | --- | --- |
 | `1:1` | Ecommerce hero images, avatars, social posts | `1024x1024` | `1536x1536`, `2048x2048`, `2560x2560` | `2880x2880` |
@@ -523,7 +535,7 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 - The source and lockfile versions are authoritative; tags use `v<version>`.
 - Versions use `major.minor.patch` with a three-digit patch segment: major bumps reset minor and patch, minor bumps reset patch, feature bumps add `0.010`, and ordinary updates add `0.001`.
 - Use `npm run release:major`, `npm run release:minor`, `npm run release:feature`, or `npm run release:patch` with `--summary`; each release changes exactly one level.
-- Current release notes: [v0.2.045](./docs/releases/v0.2.045.md).
+- Current release notes: [v0.2.046](./docs/releases/v0.2.046.md).
 - Windows packages are distributed through [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Check the release notes for hashes and signing status.
 - `npm run check:release:strict` requires a clean worktree and a matching tag on the current commit.
 
@@ -538,7 +550,12 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 
 ## Version history
 
-Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.045](./docs/releases/v0.2.045.md).
+Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.046](./docs/releases/v0.2.046.md).
+
+### v0.2.046
+
+- Simplified reasoning selectors to show only the effort name and concrete GPT resolution selectors to show only pixel dimensions; submitted values and provider-specific Gemini/Grok tiers are unchanged.
+- Reworked the quick-start entry with a runtime choice table and clarified how selector labels relate to provider request values.
 
 ### v0.2.045
 

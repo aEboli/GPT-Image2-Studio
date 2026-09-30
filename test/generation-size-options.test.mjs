@@ -56,7 +56,10 @@ const MAX_RATIO_ROUNDING_DELTA = 64;
 
 test("size options match the provided gpt-image-2 ratio table", () => {
   for (const [ratio, sizes] of Object.entries(EXPECTED_SIZE_OPTIONS)) {
-    assert.deepEqual(getGenerationSizeOptions(ratio).map((option) => option.value), sizes);
+    const options = getGenerationSizeOptions(ratio);
+    assert.deepEqual(options.map((option) => option.value), sizes);
+    assert.deepEqual(options.map((option) => option.label), sizes.map((size) => size.replace("x", " x ")));
+    assert.ok(options.every((option) => !/(?:^|\s)(?:\d+(?:\.\d+)?K|720P|最大)(?:\s|$)/u.test(option.label)));
     assert.equal(getGenerationSizeOptions(ratio).some((option) => option.value === "auto"), false);
   }
 });

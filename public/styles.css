@@ -8471,10 +8471,8 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
     0 0 0 1px color-mix(in srgb, var(--accent) 5%, transparent);
 }
 
-/* 侧栏参数区是 392px 里的两列网格，每个 select 只有 135px。默认 padding
-   0 40px 0 12px 只留 83px 文字宽，而「XHigh ~210s+」要 88px、最长的分辨率选项
-   「1.5K 1536 x 1536」要 104px，收起态会把尾巴直接切掉。这里收紧左右内边距，
-   把文字宽度放到 107px 让全部选项完整显示。
+/* 侧栏参数区是 392px 里的两列网格，每个 select 只有 135px。选项只显示等级名或
+   像素宽高，仍需为右侧原生箭头预留空间；这里收紧左右内边距，避免窄面板截断文本。
    箭头是 9px 方块转 45°，包围盒宽 9√2≈12.7px，左缘落在 right + 10.9px 处，
    所以 padding-right 必须比 right 大 13px 以上才不会和文字末端贴上。
    text-overflow 是兜底：将来若出现更长的选项，用省略号收尾而不是硬切。 */

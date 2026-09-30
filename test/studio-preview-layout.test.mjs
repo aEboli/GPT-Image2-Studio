@@ -2202,8 +2202,8 @@ test("studio panels start without redundant title blocks and merge parameters un
   assert.doesNotMatch(promptParameterSettings, /<small>Parameters<\/small>/);
   assert.match(html, /<details[\s\S]*class="field-group parameter-settings adaptive-section"[\s\S]*<label[^>]*class="compact-field"[^>]*>[\s\S]*<span data-ui-i18n="reasoningEffort">思考等级<\/span>[\s\S]*id="reasoningEffortInput"[\s\S]*<label[^>]*class="compact-field"[^>]*>[\s\S]*id="sizeInput"[\s\S]*<label[^>]*class="compact-field"[^>]*>[\s\S]*id="outputFormatInput"/);
   assert.match(app, /const REASONING_LABELS = \{[\s\S]*low: "Low",[\s\S]*medium: "Medium",[\s\S]*high: "High",[\s\S]*xhigh: "XHigh",[\s\S]*\};/);
-  assert.match(app, /const REASONING_ESTIMATES = \{[\s\S]*low: "30s\+",[\s\S]*medium: "90s\+",[\s\S]*high: "150s\+",[\s\S]*xhigh: "210s\+",[\s\S]*\};/);
-  assert.match(app, /option\.textContent = estimate \? `\$\{label\} ~\$\{estimate\}` : label;/);
+  assert.doesNotMatch(app, /REASONING_ESTIMATES|30s\+|90s\+|150s\+|210s\+/);
+  assert.match(app, /option\.textContent = label;/);
   assert.match(html, /<div class="advanced-controls">[\s\S]*<label class="compact-field">[\s\S]*<span data-ui-i18n="outputFormat">输出格式<\/span>[\s\S]*<\/label>[\s\S]*<label class="compact-field">[\s\S]*<span data-ui-i18n="quality">质量<\/span>[\s\S]*<select id="qualityInput" name="quality"><\/select>[\s\S]*<\/label>[\s\S]*<div class="parameter-meta" aria-label="当前生图调用" data-ui-i18n-aria-label="activeCallMeta"[^>]*>[\s\S]*<span data-ui-i18n="activeCall">当前调用<\/span>[\s\S]*<strong id="parameterGenerationMode">路由模式<\/strong>[\s\S]*<span data-ui-i18n="imageModel">生图模型<\/span>[\s\S]*<strong id="parameterToolModel">gpt-image-2<\/strong>[\s\S]*<\/div>[\s\S]*<\/div>/);
   assert.doesNotMatch(html, /<p>工具模型：/);
   assert.doesNotMatch(html, /<p>质量：/);
@@ -4430,9 +4430,9 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(html, /id="creationInfographicRebuildEnabledInput" name="infographicRebuildEnabled" type="checkbox" \/>/);
   assert.match(html, /<div class="creation-control-row creation-option-grid">[\s\S]*id="creationImageCountInput"[\s\S]*id="creationPlatformInput"[\s\S]*id="creationReasoningEffortInput"[\s\S]*id="creationTargetLanguageInput"[\s\S]*id="creationOutputFormatInput"[\s\S]*id="creationRatioInput"[\s\S]*id="creationSizeInput"[\s\S]*id="creationQualityInput"[\s\S]*id="creationSkuGenerationRuleInput"[\s\S]*id="creationDimensionUnitModeInput"[\s\S]*id="creationSkuGenerationEnabledInput"[\s\S]*id="creationInfographicRebuildEnabledInput"[\s\S]*id="creationListingAgentEnabledInput"[\s\S]*id="creationIndustryTemplateBrowser"/);
   assert.match(html, /<select id="creationRatioInput" name="ratio">[\s\S]*<option value="1:1" selected>1:1<\/option>[\s\S]*<option value="9:21">9:21<\/option>[\s\S]*<option value="1:3">1:3<\/option>[\s\S]*<\/select>/);
-  assert.match(html, /<select id="creationSizeInput" name="size">[\s\S]*<option value="1024x1024" selected>1K 1024 x 1024<\/option>[\s\S]*<option value="2880x2880">最大 2880 x 2880<\/option>[\s\S]*<\/select>/);
+  assert.match(html, /<select id="creationSizeInput" name="size">[\s\S]*<option value="1024x1024" selected>1024 x 1024<\/option>[\s\S]*<option value="2880x2880">2880 x 2880<\/option>[\s\S]*<\/select>/);
   assert.match(html, /<select id="portraitRatioInput" name="ratio">[\s\S]*<option value="4:5" selected>4:5<\/option>[\s\S]*<option value="3:1">3:1<\/option>[\s\S]*<\/select>/);
-  assert.match(html, /<select id="portraitSizeInput" name="size">[\s\S]*<option value="1024x1280" selected>1K 1024 x 1280<\/option>[\s\S]*<option value="2560x3200">最大 2560 x 3200<\/option>[\s\S]*<\/select>/);
+  assert.match(html, /<select id="portraitSizeInput" name="size">[\s\S]*<option value="1024x1280" selected>1024 x 1280<\/option>[\s\S]*<option value="2560x3200">2560 x 3200<\/option>[\s\S]*<\/select>/);
   assert.doesNotMatch(html, /id="creationScenarioHint"/);
   assert.match(html, /id="creationRolePicker"/);
   assert.match(html, /id="creationRoleGrid"/);
