@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.045-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.046-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installer-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,13 +10,23 @@
 
 把提示词生图、参考图分析、图片编辑、商品图裂变、电商套图、人物写真、文章插图、PPT 生成和素材管理集中到一个浏览器界面中。
 
-当前版本：`v0.2.045`
+当前版本：`v0.2.046`
 
 </div>
 
 ## 快速开始
 
 装好之后还需要填入你自己的 API 凭据才能生成图片，第一次使用请按 [新手配置 API 教程](#新手配置-api-教程) 操作。
+
+### 先选一种运行方式
+
+| 目标 | 推荐入口 | 适合场景 |
+| --- | --- | --- |
+| Windows 日常使用 | 从 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载桌面安装包 | 独立 Electron 窗口，安装后不需要另装 Node.js |
+| 本地试用或开发 | 使用 Node.js 20+ 运行源码 | 直接调试界面和服务端源码，管理本地文件并执行开发命令 |
+| 部署预览 | 使用 Vercel 部署仓库 | 获得浏览器访问地址；云端使用临时文件，长任务上线前要先做 Preview 验证 |
+
+Windows 日常使用优先选桌面安装包；不想写入安装记录时选择免安装 ZIP；需要开发或检查生成文件时选择源码运行。
 
 ### 方式一：源码运行
 
@@ -56,14 +66,12 @@ Windows 脚本入口（启动器、Native Messaging 安装/卸载、图片资源
 从包含桌面产物的 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
 
 ```text
-GPT-Image2-Studio-Desktop-Setup-v0.2.045-x64.exe
+GPT-Image2-Studio-Desktop-Setup-v0.2.046-x64.exe
 ```
 
 安装完成后通过桌面或开始菜单中的 `GPT-Image2-Studio` 启动。程序会在独立窗口中运行，内置服务使用动态回环端口，关闭窗口后不会遗留后台服务。无需另行安装 Node.js，完整说明见 [Windows 桌面程序文档](./docs/windows-desktop.md)。
 
-源码目录也可直接启动桌面开发版：
-
-如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.045-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
+如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.046-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
 
 桌面开发使用 Electron `43`，要求 Node.js `22.12` 或更高版本；普通 `npm start` 服务仍支持 Node.js `20+`。
 
@@ -74,7 +82,7 @@ cmd /c npm run desktop
 
 ### 方式三：Windows 浏览器安装包（兼容旧版）
 
-旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.045` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
+旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.046` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
 
 ## 配置说明
 
@@ -320,6 +328,8 @@ $env:IMAGE_STUDIO_DNS_FALLBACK_SERVERS="1.1.1.1,8.8.8.8"
 ### 比例与像素尺寸候选
 
 GPT 路由模式和直连模式共享以下明确像素候选，第一档就是当前比例的默认值，不再显示或发送自动分辨率选项。“其余候选”按界面顺序列出，不包含默认与最大值。
+
+参数选择器现在保持直白显示：思考等级只显示 `Low`、`Medium`、`High`、`XHigh`，具体 GPT 分辨率只显示 `宽 x 高`；提交给服务商的 `value` 不变。Gemini 的 `512`/`1K`/`2K`/`4K` 与 Grok 的 `1k`/`2k` 仍然是各自协议的分辨率档位。
 
 | 比例 | 常见用途 | 默认尺寸 | 其余候选 | 最大候选 |
 | --- | --- | --- | --- | --- |
@@ -635,8 +645,8 @@ cmd /c npm run build:desktop
 产物路径：
 
 ```text
-artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.045-x64.exe
-artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.045-x64.zip
+artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.046-x64.exe
+artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.046-x64.zip
 artifacts/desktop/win-unpacked/GPT-Image2-Studio.exe
 ```
 
@@ -654,7 +664,7 @@ cmd /c npm run build:installer
 产物路径格式：
 
 ```text
-artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.045.exe
+artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.046.exe
 ```
 
 脚本使用系统 `iexpress.exe` 生成自解压安装包，并把当前 Node.js 运行时和依赖打入安装目录；启动后仍使用默认浏览器显示工作台。
@@ -759,7 +769,12 @@ cmd /c npm run build:installer
 
 ## 版本更新说明
 
-完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.045](./docs/releases/v0.2.045.md)。
+完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.046](./docs/releases/v0.2.046.md)。
+
+### v0.2.046 更新说明
+
+- 思考等级选择器只显示等级名，具体 GPT 分辨率只显示像素宽高；提交值和 Gemini/Grok 各自的档位参数保持不变。
+- 快速开始新增运行方式选择表，并说明界面标签与服务商请求值的关系。
 
 ### v0.2.045 更新说明
 

@@ -1,6 +1,6 @@
 function sizeOption(scale, value) {
   const [width, height] = value.split("x");
-  return { value, label: `${scale} ${width} x ${height}` };
+  return { value, label: `${width} x ${height}` };
 }
 
 const SIZE_OPTIONS_BY_RATIO = {

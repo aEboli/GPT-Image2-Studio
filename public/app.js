@@ -166,12 +166,6 @@ const REASONING_LABELS = {
   high: "High",
   xhigh: "XHigh",
 };
-const REASONING_ESTIMATES = {
-  low: "30s+",
-  medium: "90s+",
-  high: "150s+",
-  xhigh: "210s+",
-};
 const DEFAULT_LIMITS = { maxParallelTasksPerSession: 15, maxReferenceImages: 15, maxCreationReferenceImages: 15, maxPortraitPersonReferenceImages: 3, maxPortraitActionReferenceImages: 3, maxPortraitAccessoryReferenceImages: 9 }; const PROMPT_FILMSTRIP_INITIAL_HISTORY_LIMIT = 10; const PROMPT_FILMSTRIP_MAX_HISTORY_LIMIT = 50; const PROMPT_FILMSTRIP_JOB_LIMIT = MAX_PROMPT_QUEUE_SIZE;
 const CREATION_IMAGE_COUNT_OPTIONS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
 const DEFAULT_PROMPT_ENHANCE_TEXT = ",sharp focus, macro details, rich textures, crisp edges, photorealistic texture, visible grain, detailed surface material, cinematic lighting"; function buildPromptModePrompt() { const prompt = refs.promptInput.value.trim(); if (!state.promptEnhanceEnabled) { return prompt; } const enhanceText = String(refs.promptEnhanceInput?.value || "").trim(); return enhanceText ? `${prompt}${enhanceText.startsWith(",") ? "" : "\n\n"}${enhanceText}` : prompt; } function syncPromptEnhanceMode() { refs.promptEnhanceToggle.classList.toggle("is-active", state.promptEnhanceEnabled); refs.promptEnhanceToggle.setAttribute("aria-checked", String(state.promptEnhanceEnabled)); refs.promptEnhanceToggle.querySelector("small").textContent = getUiLanguageText(state.promptEnhanceEnabled ? "promptEnhanceOn" : "promptEnhanceOff"); refs.promptEnhanceField.classList.toggle("hidden", !state.promptEnhanceEnabled); } function togglePromptEnhanceMode() { state.promptEnhanceEnabled = !state.promptEnhanceEnabled; syncPromptEnhanceMode(); if (state.promptEnhanceEnabled) { refs.promptEnhanceInput.focus(); } }
@@ -2120,7 +2114,7 @@ function getRatioOrientationLabel(orientation) {
 function getUiTextWithReplacements(key, replacements = {}, fallback = "") { let text = getUiLanguageText(key) || fallback; Object.entries(replacements).forEach(([name, value]) => { text = text.replaceAll(`{${name}}`, String(value)); }); return text; }
 function getUiRatioOrientationLabel(orientation) { return getUiLanguageText(orientation === "landscape" ? "ratioLandscape" : orientation === "portrait" ? "ratioPortrait" : "ratioSquare") || getRatioOrientationLabel(orientation); }
 function getUiRatioLabel(option) { return option?.value || ""; }
-function getUiSizeLabel(option) { const label = option?.label || ""; return label.replace(/^最大(?=\s|$)/, getUiLanguageText("sizeMax") || "最大"); }
+function getUiSizeLabel(option) { return option?.label || ""; }
 function getUiPreviewPlaceholderState(placeholderState) { if (!placeholderState || placeholderState.mode === "ready") return placeholderState; if (placeholderState.mode === "idle") return { ...placeholderState, eyebrow: getUiLanguageText("previewIdleEyebrow"), title: getUiLanguageText("previewIdleTitle"), detail: getUiLanguageText("previewIdleDetail") }; return { ...placeholderState, title: state.uiLanguage === "en" ? "Generation running" : placeholderState.title }; }
 function rerenderUiLanguageSensitiveViews() { updatePromptCounter(); syncPromptEnhanceMode(); updateGenerateButton(); syncConnectionState(); syncRatioOrientationSummary(); renderRatioGrid(); renderReferenceAnalysisRatioGrid(); renderReasoningOptions(); renderSizeOptions(); renderReferenceAnalysisSizeOptions(); syncEndpointFieldsFromFullUrlModes(); { const c = state.config || {}, s = state.uiLanguage === "en" ? "Saved" : "已保存"; if (refs.savedKeyMask) refs.savedKeyMask.textContent = c.apiKeyConfigured ? `${s} ${c.apiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存"; if (refs.directSavedKeyMask) refs.directSavedKeyMask.textContent = (c.directImageApiKeyConfigured || c.directApiKeyConfigured) ? `${s} ${c.directImageApiKeyMask || c.directApiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存"; if (refs.directTextSavedKeyMask) refs.directTextSavedKeyMask.textContent = c.directTextApiKeyConfigured ? `${s} ${c.directTextApiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存"; if (refs.protocolSavedKeyMask) refs.protocolSavedKeyMask.textContent = c.protocolApiKeyConfigured ? `${s} ${c.protocolApiKeyMask || ""}` : getUiLanguageText("notSaved") || "未保存"; } apiEndpointBookPicker.render(); renderPreview(); renderFilmstrip(); renderTimeline(); }
 function syncRatioOrientationSummary() {
@@ -5003,9 +4997,8 @@ function renderReasoningOptions() {
     reasoningEfforts.forEach((value) => {
       const option = document.createElement("option");
       const label = REASONING_LABELS[value] || value;
-      const estimate = REASONING_ESTIMATES[value] || "";
       option.value = value;
-      option.textContent = estimate ? `${label} ~${estimate}` : label;
+      option.textContent = label;
       input.appendChild(option);
     });
     input.value = currentValue;
