@@ -20,3 +20,15 @@ The system SHALL call the Image API edits endpoint for Image Edit jobs using the
 #### Scenario: Image edit keeps the default model when unconfigured
 - **WHEN** the user has not changed the image tool model
 - **THEN** the `/v1/images/edits` request carries `model=gpt-image-2`
+
+#### Scenario: Upstream returns a final edited image
+- **WHEN** the upstream edit request returns base64 image data
+- **THEN** the system emits the edited image through the existing final-image SSE path
+- **AND** the system saves the edited image to the gallery
+- **AND** the system completes the generation task
+
+#### Scenario: Upstream rejects the edit request
+- **WHEN** the upstream edit request returns an error
+- **THEN** the system emits an error through the existing SSE error path
+- **AND** the generation task is marked failed
+- **AND** other Create modes remain usable

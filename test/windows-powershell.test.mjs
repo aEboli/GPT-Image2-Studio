@@ -123,12 +123,14 @@ test("launcher resolves relative Root after Set-Location and starts a healthy No
       $env:IMAGE_STUDIO_MOCK_IMAGE_GENERATION='1'
       $global:child=$null; $global:opened=$false
       Set-Location -LiteralPath ${quote(dir)}
+      $expectedRoot=[IO.Path]::GetFullPath(${quote(dir)}).TrimEnd([char[]]@('\\','/'))
       $listener=[System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback,0)
       $listener.Start(); $port=$listener.LocalEndpoint.Port; $listener.Stop()
       function Start-Process {
         param($FilePath,$WorkingDirectory,$ArgumentList,$Environment,$WindowStyle,[switch]$PassThru,$ErrorAction)
         if ($FilePath -like 'http*') { $global:opened=$true; return }
-        if ($WorkingDirectory -ne ${quote(dir)}) { throw 'Root resolved against the wrong working directory' }
+        $actualRoot=[IO.Path]::GetFullPath($WorkingDirectory).TrimEnd([char[]]@('\\','/'))
+        if ($actualRoot -ne $expectedRoot) { throw 'Root resolved against the wrong working directory' }
         $global:child=Microsoft.PowerShell.Management\\Start-Process -FilePath $FilePath -WorkingDirectory $WorkingDirectory -ArgumentList $ArgumentList -Environment $Environment -WindowStyle Hidden -PassThru
         $global:child
       }
