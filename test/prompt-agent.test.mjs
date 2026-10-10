@@ -253,6 +253,11 @@ test("image-to-prompt instruction requests detailed subject and reproducible fra
   assert.match(instruction, /只保留会改变可见画面|影响最终像素/);
   assert.match(instruction, /空泛|精美|高级|震撼/);
   assert.match(instruction, /近义|同义|重复/);
+  assert.match(instruction, /风格锁定/);
+  assert.match(instruction, /媒介与渲染方式|色彩与对比|光线方向与质地|材质与表面反应/);
+  assert.match(instruction, /镜头与景深|后期处理与氛围/);
+  assert.match(instruction, /8-16 个|具体短语/);
+  assert.match(instruction, /错误媒介|错误色彩体系|过度磨皮/);
   assert.match(instruction, /用途建议|主图|详情页|SKU|直播|缩略图/);
   assert.match(instruction, /subject.*framing.*scene.*visual.*avoid/s);
   assert.match(instruction, /景别|主体占比/);
@@ -289,6 +294,8 @@ test("image-to-prompt instruction requests detailed subject and reproducible fra
     "depth_of_field",
   ]);
   assert.match(PROMPT_AGENT_JSON_SCHEMA.properties.framing.properties.camera.description, /明确|单一/);
+  assert.match(PROMPT_AGENT_JSON_SCHEMA.properties.visual.description, /风格锁定/);
+  assert.match(PROMPT_AGENT_JSON_SCHEMA.properties.visual.description, /媒介与渲染|色彩与对比|材质与表面/);
 });
 
 test("prompt agent request can orchestrate multiple reference images into scene prompts", () => {

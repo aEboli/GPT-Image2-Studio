@@ -29,7 +29,7 @@ async function collectFromTab(tab, pageUrl) {
   const results = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
     func: collectInjectedPage,
-    args: [String(expectedPageUrl)],
+    args: [String(expectedPageUrl), EXTENSION_VERSION],
   });
   const result = results?.[0]?.result;
   if (!result?.ok) {
@@ -38,23 +38,23 @@ async function collectFromTab(tab, pageUrl) {
   return { ...result, manifest: normalizeProductImageImportManifest(result.manifest) };
 }
 
-function collectInjectedPage(expectedPageUrl) {
+function collectInjectedPage(expectedPageUrl, expectedVersion) {
   if (expectedPageUrl && location.href !== expectedPageUrl) {
     return { ok: false, message: "商品页已切换，请在当前页面重新采集。" };
   }
   const controller = globalThis["__gptImage2StudioProductImageCollectorController"];
-  if (controller?.version !== EXTENSION_VERSION || typeof controller?.collect !== "function") {
+  if (controller?.version !== expectedVersion || typeof controller?.collect !== "function") {
     return { ok: false, message: "商品页采集器尚未就绪，请刷新页面后重试。" };
   }
   return controller.collect();
 }
 
-function openInjectedPanel(expectedPageUrl) {
+function openInjectedPanel(expectedPageUrl, expectedVersion) {
   if (expectedPageUrl && location.href !== expectedPageUrl) {
     return { ok: false, message: "商品页已切换，请在当前页面重新打开采集窗。" };
   }
   const controller = globalThis.__gptImage2StudioProductImagePanelController;
-  if (controller?.version !== EXTENSION_VERSION || typeof controller?.open !== "function") {
+  if (controller?.version !== expectedVersion || typeof controller?.open !== "function") {
     return { ok: false, message: "商品图采集窗尚未就绪，请刷新页面后重试。" };
   }
   try {
@@ -70,7 +70,7 @@ async function injectPanel(tabId, files, pageUrl = "") {
   const results = await chrome.scripting.executeScript({
     target: { tabId },
     func: openInjectedPanel,
-    args: [String(pageUrl || "")],
+    args: [String(pageUrl || ""), EXTENSION_VERSION],
   });
   const result = results?.[0]?.result;
   if (!result?.ok) throw new Error(result?.message || "商品图采集窗尚未就绪，请刷新页面后重试。");

@@ -123,7 +123,7 @@ test("服务端配置保存接口往返开关，省略字段时保留已保存�
   const handler = source.match(/async function handleConfigPost\([^]*?\n\}/)?.[0];
   assert.ok(handler);
   let result;
-  const context = { configStore, readJsonBody: async (request) => request, getAspectRatioOptions: () => [], sendJson: (_response, status, body) => { result = { status, body }; } };
+  const context = { isServerlessRuntime: false, configStore, readJsonBody: async (request) => request, getAspectRatioOptions: () => [], sendJson: (_response, status, body) => { result = { status, body }; } };
   vm.runInNewContext(handler, context);
   for (const [payload, expected] of [[{ includeImageToolModel: false }, false], [{}, false], [{ includeImageToolModel: true }, true]]) {
     await context.handleConfigPost(payload, {});
@@ -131,6 +131,10 @@ test("服务端配置保存接口往返开关，省略字段时保留已保存�
     assert.equal(result.body.includeImageToolModel, expected);
     assert.equal((await configStore.readPrivateConfig()).includeImageToolModel, expected);
   }
+  context.isServerlessRuntime = true;
+  await context.handleConfigPost({ includeImageToolModel: false }, {});
+  assert.equal(result.status, 403);
+  assert.equal((await configStore.readPrivateConfig()).includeImageToolModel, true);
   const generationCalls = [...source.matchAll(/imageModel: (generationConfig|itemGenerationConfig)\.imageModel,\r?\n\s+includeImageToolModel: \1\.includeImageToolModel,\r?\n\s+endpointPath: \1\.endpointPath,/g)];
   assert.equal(generationCalls.length, 8, "所有生成入口都应传递路由开关，包括套图修复与共享生图选项");
 });

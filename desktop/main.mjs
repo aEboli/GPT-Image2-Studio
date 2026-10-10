@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -7,6 +7,7 @@ import {
   isAllowedExternalUrl,
   isAllowedStudioNavigation,
 } from "./url-policy.mjs";
+import { registerDesktopConfigBridge } from "./config-bridge.mjs";
 
 const APP_ID = "com.aeboli.gptimage2studio";
 const APP_NAME = "GPT-Image2-Studio";
@@ -16,6 +17,7 @@ let allowQuit = false;
 let mainWindow = null;
 let shutdownPromise = null;
 let studioRuntime = null;
+let disposeDesktopConfigBridge = null;
 
 app.setName(APP_NAME);
 app.setAppUserModelId(APP_ID);
@@ -83,6 +85,7 @@ async function createMainWindow(studioUrl) {
     title: APP_NAME,
     icon: join(app.getAppPath(), "build", "desktop", "icon.png"),
     webPreferences: {
+      preload: join(app.getAppPath(), "desktop", "preload.cjs"),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
@@ -120,6 +123,12 @@ async function startDesktopApplication() {
   // Never inherit the test-only mock image generator into the desktop app.
   delete process.env.IMAGE_STUDIO_MOCK_IMAGE_GENERATION;
   studioRuntime = await import("../server.mjs");
+  disposeDesktopConfigBridge = registerDesktopConfigBridge({
+    ipcMain,
+    userDataDir: app.getPath("userData"),
+    studioUrl: studioRuntime.studioServerUrl,
+    getWebContents: () => mainWindow?.webContents,
+  });
   await createMainWindow(studioRuntime.studioServerUrl);
 }
 
@@ -133,6 +142,7 @@ function shutdownDesktopApplication() {
       mainWindow.destroy();
     }
     mainWindow = null;
+    disposeDesktopConfigBridge?.();
     await studioRuntime?.closeStudioServer?.();
     allowQuit = true;
     app.quit();

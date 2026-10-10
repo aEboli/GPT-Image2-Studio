@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.046-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.056-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installers-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,7 +10,7 @@
 
 Prompt-to-image, reference analysis, editing, product-image replication, ecommerce sets, portraits, article illustrations, PPT generation, and asset history in one browser-based workspace.
 
-Current version: `v0.2.046`
+Current version: `v0.2.056`
 
 [Chinese README](./README.zh-CN.md)
 
@@ -57,9 +57,9 @@ Windows 脚本入口（启动器、Native Messaging 安装/卸载、图片资源
 
 ### Windows desktop app (recommended)
 
-Download `GPT-Image2-Studio-Desktop-Setup-v0.2.046-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
+Download `GPT-Image2-Studio-Desktop-Setup-v0.2.056-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
 
-For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.046-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
+For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.056-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
 
 For desktop development, Electron 43 requires Node.js 22.12 or newer:
 
@@ -70,7 +70,7 @@ cmd /c npm run desktop
 
 ### Windows browser installer
 
-The legacy browser-installer flow remains documented for local builds, but the `v0.2.046` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
+The legacy browser-installer flow remains documented for local builds, but the `v0.2.056` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
 
 ## Configuration
 
@@ -284,6 +284,10 @@ The same application can run in three ways:
 
 The repository also contains a Vercel configuration. Vercel functions use temporary storage, so Preview validation is required for long jobs, SSE, and file lifecycles before production deployment.
 
+### Reverse a reference image into a prompt
+
+Open **Image-to-prompt** from the top bar or the Create menu, upload one image, and analyze it. The result is reusable JSON with detailed subject and framing fields plus a `visual` section that begins with **风格锁定**. That section captures the source medium, aesthetic, palette, lighting, material response, depth, and finishing cues; `avoid` records plausible style drift. Copy the JSON into the prompt workflow to keep those visual cues explicit during a second generation.
+
 ## Core capabilities
 
 ### Image creation
@@ -311,6 +315,7 @@ The repository also contains a Vercel configuration. Vercel functions use tempor
 - Separate records for Creation sets, portraits, article illustrations, and PPT decks.
 - Background queue status, progress, structured errors, and retry of failed items.
 - **Prompt Kit** now includes a searchable static library with six categories, 24 subcategories, and ten reusable prompts per subcategory. It supports list and image views, preserves each preview's intrinsic aspect ratio, adjustable list text, full-prompt lightbox previews, one-click apply, and copying entries into personal templates; the profile/avatar category bundles 40 distinct attributed YouMind previews, each paired with the matching source title and prompt. The remaining categories use deterministic, motif-specific offline previews that vary by template instead of repeating one placeholder composition. Existing personal templates and Prompt Agent history are preserved while legacy built-in defaults migrate to the current set.
+- **Image-to-prompt** returns structured JSON with a dedicated style-lock vocabulary for medium, aesthetic, palette, lighting, material, depth, and finishing, plus image-specific style-drift constraints.
 - A compact GPT / Gemini / Grok / Palette configuration drawer, with GPT's Route / Direct switch directly below the section row, isolated API history, aligned endpoint fields, hover/focus help, and an independently scrolling generation log. Seven interface palettes are shown four per row.
 - Dark/light themes, Chinese/English UI, and responsive desktop, tablet, and mobile layouts.
 
@@ -355,6 +360,7 @@ These screenshots come from isolated browser sessions of the current workbench. 
 | Workflow | Inputs | Result |
 | --- | --- | --- |
 | Prompt-to-image | Prompt, up to 15 references, ratio, size, format, optional transparent background | PNG/JPG assets or transparent PNGs, progress, filmstrip, download, and metadata review |
+| Image-to-prompt | One image | Reusable subject and framing JSON with explicit source-style vocabulary and style-drift constraints |
 | Style transfer | Source image, style image or preset, optional prompt | A generated result plus a before/after preset comparison |
 | Reference analysis | 1-15 images, analysis language, target description | Structured analysis and an optional generation prompt/result |
 | Image decomposition | One product/device/package image and a decomposition brief | Callout or infographic-style PNG/JPG and saved analysis |
@@ -535,7 +541,7 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 - The source and lockfile versions are authoritative; tags use `v<version>`.
 - Versions use `major.minor.patch` with a three-digit patch segment: major bumps reset minor and patch, minor bumps reset patch, feature bumps add `0.010`, and ordinary updates add `0.001`.
 - Use `npm run release:major`, `npm run release:minor`, `npm run release:feature`, or `npm run release:patch` with `--summary`; each release changes exactly one level.
-- Current release notes: [v0.2.046](./docs/releases/v0.2.046.md).
+- Current release notes: [v0.2.056](./docs/releases/v0.2.056.md).
 - Windows packages are distributed through [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Check the release notes for hashes and signing status.
 - `npm run check:release:strict` requires a clean worktree and a matching tag on the current commit.
 
@@ -550,7 +556,14 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 
 ## Version history
 
-Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.046](./docs/releases/v0.2.046.md).
+Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.056](./docs/releases/v0.2.056.md).
+
+### v0.2.056
+
+- Added explicit style-lock vocabulary to image-to-prompt results so a second generation can preserve the source medium, aesthetic, palette, lighting, material response, depth, and finishing cues.
+- Added image-specific style-drift constraints to the structured `avoid` field and clarified the Prompt Agent entry point in the interface.
+- Hardened provider credential routing, concurrent record/history persistence, running task retention, PPT record paths, extension page injection, and Listing response timeouts.
+- Persisted desktop API configuration across application restarts and dynamically assigned local ports through restricted sandboxed IPC.
 
 ### v0.2.046
 

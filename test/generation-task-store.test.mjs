@@ -37,7 +37,7 @@ test("generation task store scopes and sorts recent tasks by session", () => {
 
   assert.deepEqual(
     store.listTasks("session-a").map((task) => task.id),
-    ["second", "third"],
+    ["second", "third", "first"],
   );
   assert.deepEqual(
     store.listTasks("session-b").map((task) => task.id),
@@ -138,14 +138,14 @@ test("generation task store preserves explicit empty fields when a task is updat
   assert.equal(snapshot.statusText, "");
 });
 
-test("generation task store keeps at most 20 recent tasks by default", () => {
+test("generation task store keeps at most 20 completed tasks by default", () => {
   const store = createGenerationTaskStore();
 
   for (let index = 1; index <= 21; index += 1) {
     store.upsertTask("session-a", {
       id: `job-${index}`,
       prompt: `第 ${index} 张图`,
-      status: "running",
+      status: "completed",
       createdAt: `2026-04-28T01:${String(index).padStart(2, "0")}:00.000Z`,
       updatedAt: `2026-04-28T01:${String(index).padStart(2, "0")}:00.000Z`,
     });

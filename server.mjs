@@ -1331,6 +1331,9 @@ async function handleConfigGet(response) {
 }
 
 async function handleConfigPost(request, response) {
+  if (isServerlessRuntime) {
+    return sendJson(response, 403, { message: "云端 API 配置应保存在当前浏览器，不能修改服务端私有配置。" });
+  }
   const payload = await readJsonBody(request);
   await configStore.saveConfig({
     baseUrl: payload.baseUrl,

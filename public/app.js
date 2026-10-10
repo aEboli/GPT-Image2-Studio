@@ -53,7 +53,7 @@ import { buildCreationRecordTimeFilterOptions, filterCreationRecordSetsByTime, f
 import { buildCreationRecordListModel, createCreationRecordListState, loadMoreCreationRecordListState } from "/lib/creation-record-list-model.mjs?v=20260807-creation-record-split-workspace-1";
 import { createCreationRecordListRow } from "/lib/creation-record-list-view.mjs?v=20260807-creation-record-split-workspace-1";
 import { ensureLazyViewModule, getMountedLazyViewModule } from "/lib/view-mode-loader.mjs?v=20260928-aspect-ratio-value-only-1";
-import { appendBrowserConfigToFormData, getBrowserPrivateConfigRequestPayload, getOrCreateClientSessionId, readBrowserPrivateConfig, saveBrowserPrivateConfig, toPublicBrowserConfig } from "/lib/browser-config.mjs";
+import { appendBrowserConfigToFormData, getBrowserPrivateConfigRequestPayload, getOrCreateClientSessionId, readBrowserPrivateConfig, restoreDesktopBrowserConfig, saveBrowserPrivateConfig, toPublicBrowserConfig } from "/lib/browser-config.mjs";
 import { cacheBrowserGalleryItem, clearBrowserImageCache, dataUrlToBlob, deleteBrowserCachedGalleryItem, fetchServerImageAsDataUrl, getBrowserCachedImageData, getImageUrl, getServerImageUrl, getServerThumbnailUrl, getThumbnailUrl, isCacheableBrowserImageUrl, mergeServerAndBrowserGalleryItems, readBrowserCachedGalleryItems } from "/lib/browser-image-cache.mjs";
 import { createImageEditShellBridge } from "/lib/image-edit-shell-bridge.mjs";
 import { createCreationLogoLibraryController } from "/lib/creation-logo-library.mjs";
@@ -17693,6 +17693,7 @@ function cancelQueuedJob(jobId) {
 }
 
 async function loadConfig() {
+  await restoreDesktopBrowserConfig();
   let serverConfig = null;
   try {
     const response = await fetch("/api/config");
@@ -18028,6 +18029,7 @@ async function saveConfig(event) {
   }
 
   const browserConfig = saveBrowserPrivateConfig(payload);
+  await window.studioDesktopConfig?.saveConfig(browserConfig);
   state.config = toPublicBrowserConfig(browserConfig, state.config || {});
   // 输入框留空时 payload 已回退到已保存值，所以这里记的始终是本次生效的 Key；
   // 重复保存同一把只会把它移到清单最前，不会多出一条。
@@ -18037,7 +18039,7 @@ async function saveConfig(event) {
   if (refs.directTextApiKeyInput) refs.directTextApiKeyInput.value = "";
   refs.protocolApiKeyInput.value = "";
   if (refs.grokApiKeyInput) refs.grokApiKeyInput.value = "";
-  configModelPicker.setFeedback("配置已保存到当前浏览器。", "success");
+  configModelPicker.setFeedback(window.studioDesktopConfig ? "配置已保存到当前桌面应用。" : "配置已保存到当前浏览器。", "success");
   syncConfigUi(state.config);
 }
 

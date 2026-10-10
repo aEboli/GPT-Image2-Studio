@@ -1417,12 +1417,11 @@ test("background invocations reject a stale page before calling page controllers
   };
 
   vm.runInNewContext(`
-    const EXTENSION_VERSION = "1.1.33";
     ${controllerInvocationSource}
-    globalThis.staleCollectResult = collectInjectedPage("https://detail.1688.com/offer/111.html");
-    globalThis.currentCollectResult = collectInjectedPage(location.href);
-    globalThis.staleResult = openInjectedPanel("https://detail.1688.com/offer/111.html");
-    globalThis.currentResult = openInjectedPanel(location.href);
+    globalThis.staleCollectResult = collectInjectedPage("https://detail.1688.com/offer/111.html", "1.1.33");
+    globalThis.currentCollectResult = collectInjectedPage(location.href, "1.1.33");
+    globalThis.staleResult = openInjectedPanel("https://detail.1688.com/offer/111.html", "1.1.33");
+    globalThis.currentResult = openInjectedPanel(location.href, "1.1.33");
   `, sandbox);
 
   assert.equal(sandbox.staleCollectResult.ok, false);
@@ -1460,10 +1459,9 @@ test("background invocations reject stale controller versions before calling the
   };
 
   vm.runInNewContext(`
-    const EXTENSION_VERSION = "1.1.33";
     ${controllerInvocationSource}
-    globalThis.collectResult = collectInjectedPage(location.href);
-    globalThis.openResult = openInjectedPanel(location.href);
+    globalThis.collectResult = collectInjectedPage(location.href, "1.1.33");
+    globalThis.openResult = openInjectedPanel(location.href, "1.1.33");
   `, sandbox);
 
   assert.equal(sandbox.collectResult.ok, false);
@@ -1742,8 +1740,8 @@ test("extension manifest uses an on-demand minimum-permission MV3 surface", asyn
   assert.match(serviceWorker, /sender\.tab/);
   assert.match(serviceWorker, /collectFromTab\(sender\.tab, message\.pageUrl\)/);
   assert.match(serviceWorker, /\["collector\.js",\s*"floating-launcher\.js",\s*"floating-panel\.js"\]/);
-  assert.match(serviceWorker, /function openInjectedPanel\(expectedPageUrl\)[\s\S]*?location\.href !== expectedPageUrl[\s\S]*?__gptImage2StudioProductImagePanelController[\s\S]*?controller\.open\(\)/);
-  assert.match(serviceWorker, /async function injectPanel\(tabId, files, pageUrl = ""\)[\s\S]*?executeScript\(\{ target: \{ tabId \}, files \}\)[\s\S]*?func: openInjectedPanel[\s\S]*?args: \[String\(pageUrl \|\| ""\)\]/);
+  assert.match(serviceWorker, /function openInjectedPanel\(expectedPageUrl, expectedVersion\)[\s\S]*?location\.href !== expectedPageUrl[\s\S]*?__gptImage2StudioProductImagePanelController[\s\S]*?controller\.open\(\)/);
+  assert.match(serviceWorker, /async function injectPanel\(tabId, files, pageUrl = ""\)[\s\S]*?executeScript\(\{ target: \{ tabId \}, files \}\)[\s\S]*?func: openInjectedPanel[\s\S]*?args: \[String\(pageUrl \|\| ""\), EXTENSION_VERSION\]/);
   assert.match(serviceWorker, /chrome\.runtime\.sendNativeMessage\(NATIVE_CLIPBOARD_HOST/);
   assert.match(serviceWorker, /com\.aeboli\.gpt_image2_studio\.product_image_clipboard/);
   assert.doesNotMatch(serviceWorker, /chrome\.tabs\.query|STUDIO_TAB_URL_PATTERNS|product-image-collector\/clipboard|chrome\.sidePanel/);

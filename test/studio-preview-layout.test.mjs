@@ -2635,7 +2635,7 @@ test("prompt agent uses one structured JSON result for display, copy, mapping, a
   assert.match(html, /id="copyPromptAgentJsonButton"[\s\S]*复制 JSON/);
   assert.doesNotMatch(html, /id="copyPromptAgentPromptButton"/);
   assert.match(html, /id="promptAgentResultLabel">结构化反推 JSON/);
-  assert.match(html, /<h2>图片转提示词<\/h2>[\s\S]*主体与景别详细、背景与视觉精简/);
+  assert.match(html, /<h2>图片转提示词<\/h2>[\s\S]*主体与景别详细、背景精简、视觉风格锁定/);
   assert.match(app, /setPromptAgentFeedback\("已生成结构化反推 JSON。", "success"\);/);
   assert.match(app, /state\.promptTemplates = nextTemplates;/);
   assert.match(app, /writePromptTemplates\(\);[\s\S]*renderPromptTemplates\(\);/);
@@ -3434,7 +3434,7 @@ test("studio stores API settings in the browser and sends them with cloud genera
   const browserConfig = await readFile(browserConfigPath, "utf8");
 
   assert.match(html, /id="configFeedback"[^>]*aria-live="polite"[^>]*><\/p>/);
-  assert.match(app, /configModelPicker\.setFeedback\("配置已保存到当前浏览器。", "success"\);/);
+  assert.match(app, /configModelPicker\.setFeedback\(window\.studioDesktopConfig \? "配置已保存到当前桌面应用。" : "配置已保存到当前浏览器。", "success"\);/);
   assert.match(app, /from "\/lib\/browser-config\.mjs";/);
   assert.match(app, /appendBrowserConfigToFormData,\s*[\s\S]*getBrowserPrivateConfigRequestPayload,\s*[\s\S]*readBrowserPrivateConfig,\s*[\s\S]*saveBrowserPrivateConfig,/);
   assert.match(browserConfig, /export const BROWSER_CONFIG_STORAGE_KEY = "image-studio-browser-config-v1";/);

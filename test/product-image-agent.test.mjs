@@ -101,7 +101,7 @@ test("product image agent view and server mode are exposed", async () => {
   assert.match(html, /id="productAgentChannelOptions"/);
   assert.match(html, /id="productAgentDirectionOptions"/);
   assert.match(html, /id="productAgentPlanList"/);
-  assert.match(app, /appendCurrentConfigToFormData,\n\s+getSelectedImageGenerationConfig/);
+  assert.match(app, /appendCurrentConfigToFormData,\r?\n\s+getSelectedImageGenerationConfig/);
   assert.match(view, /appendCurrentConfig\(formData\);[\s\S]*fetch\("\/api\/prompt-agent\/analyze"/);
   assert.match(view, /referenceFiles\.forEach\(\(file\) => formData\.append\("referenceImages", file\)\);[\s\S]*appendCurrentConfig\(formData\);[\s\S]*requestGenerationStream/);
   assert.match(view, /options\.appendCurrentConfigToFormData/);

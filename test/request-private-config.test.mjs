@@ -141,7 +141,7 @@ test("request private config preserves complete root endpoint URLs", () => {
   assert.equal(config.protocolBaseUrl, "https://browser-protocol.example.test");
 });
 
-test("request private config applies explicit direct channel fields while reusing saved keys", () => {
+test("request private config applies explicit direct channel fields with request-owned keys", () => {
   const fallback = {
     baseUrl: "https://route-a-server.example.test/v1",
     apiKey: "server-a-key",
@@ -160,6 +160,7 @@ test("request private config applies explicit direct channel fields while reusin
       imageRoute: "b",
       baseUrl: "https://browser-route-a.example.test",
       directBaseUrl: "https://browser-route-b.example.test",
+      directApiKey: "browser-b-key",
       directImageModel: "browser-image-model",
       directResponsesModel: "browser-vision-model",
     },
@@ -173,7 +174,7 @@ test("request private config applies explicit direct channel fields while reusin
   assert.equal(config.endpointPath, "responses");
   assert.equal(config.directBaseUrl, "https://browser-route-b.example.test/v1");
   assert.equal(config.directEndpointPath, "images/generations");
-  assert.equal(config.directApiKey, "server-a-key");
+  assert.equal(config.directApiKey, "browser-b-key");
   assert.equal(config.directImageModel, "browser-image-model");
   assert.equal(config.directResponsesModel, "browser-vision-model");
   assert.equal(config.directImageBaseUrl, "https://browser-route-b.example.test/v1");

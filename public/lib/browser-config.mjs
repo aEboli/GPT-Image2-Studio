@@ -108,6 +108,18 @@ export function readBrowserPrivateConfig(storage = getLocalStorage()) {
   }
 }
 
+export async function restoreDesktopBrowserConfig(storage = getLocalStorage(), desktopConfig = globalThis.window?.studioDesktopConfig) {
+  if (!desktopConfig) return;
+  const savedConfig = await desktopConfig.readConfig();
+  if (savedConfig) {
+    const normalized = normalizeBrowserPrivateConfig(savedConfig, { preserveRootBaseUrls: true });
+    storage?.setItem?.(BROWSER_CONFIG_STORAGE_KEY, JSON.stringify(normalized));
+  } else {
+    const browserConfig = readBrowserPrivateConfig(storage);
+    if (browserConfig) await desktopConfig.saveConfig(browserConfig);
+  }
+}
+
 export function toPublicBrowserConfig(privateConfig, baseConfig = {}) {
   const normalized = normalizeBrowserPrivateConfig(privateConfig, { preserveRootBaseUrls: true });
   const publicDefaults = { ...(baseConfig.defaults || {}) };

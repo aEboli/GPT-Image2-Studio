@@ -163,7 +163,7 @@ test("desktop main process fixes single-instance, sandbox, navigation, data, and
   assert.match(source, /nodeIntegration:\s*false/);
   assert.match(source, /contextIsolation:\s*true/);
   assert.match(source, /sandbox:\s*true/);
-  assert.doesNotMatch(source, /preload\s*:/);
+  assert.match(source, /preload:\s*join\(app\.getAppPath\(\), "desktop", "preload\.cjs"\)/);
   assert.match(source, /setWindowOpenHandler/);
   assert.match(source, /will-navigate/);
   assert.match(source, /page-title-updated/);
