@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -69,10 +69,17 @@ test("desktop persistence migrates an existing browser configuration only when n
 });
 
 test("sandboxed Electron restores configuration after a process restart with a new port", { skip: process.platform !== "win32", timeout: 30000 }, async (t) => {
-  const userDataDir = await mkdtemp(join(tmpdir(), "studio-electron-config-restart-"));
-  t.after(() => rm(userDataDir, { recursive: true, force: true, maxRetries: 6, retryDelay: 100 }));
   const repoRoot = fileURLToPath(new URL("../", import.meta.url));
   const electronPath = join(repoRoot, "node_modules", "electron", "dist", "electron.exe");
+  try {
+    await access(electronPath);
+  } catch {
+    t.skip("Electron runtime is unavailable in this environment");
+    return;
+  }
+
+  const userDataDir = await mkdtemp(join(tmpdir(), "studio-electron-config-restart-"));
+  t.after(() => rm(userDataDir, { recursive: true, force: true, maxRetries: 6, retryDelay: 100 }));
   const probePath = fileURLToPath(new URL("./fixtures/desktop-config-restart-probe.mjs", import.meta.url));
   const run = promisify(execFile);
   const env = { ...process.env };

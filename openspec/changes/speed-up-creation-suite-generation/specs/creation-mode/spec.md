@@ -89,3 +89,19 @@ The system SHALL include effective ratio, resolution tier, resolved size, and ta
 - **THEN** each item's upstream request uses that item's ratio, resolved size, and target language
 - **AND** the saved item records the effective values that were used
 - **AND** an item without an explicit user resolution override uses the 1K tier
+
+#### Scenario: One set uses mixed ratios
+- **WHEN** a platform plan contains square and portrait items
+- **THEN** each generation request uses the ratio saved on its matching item
+- **AND** the prompt ratio guidance, requested upstream aspect ratio, activity metadata, saved item metadata, and lightbox parameters agree for that item
+
+#### Scenario: Selected route does not support the recommended size
+- **WHEN** an item's resolution tier cannot be represented exactly by the active image-generation route
+- **THEN** the system selects the nearest supported size for the same aspect ratio
+- **AND** plan or generation feedback exposes the effective size
+- **AND** the effective size is stored on the item for later retry and review
+
+#### Scenario: One mixed-parameter item fails
+- **WHEN** one item in a platform-planned set fails while another item completes
+- **THEN** the completed item remains saved with its own effective parameters
+- **AND** the set remains repairable without recalculating successful or failed items from current form values
