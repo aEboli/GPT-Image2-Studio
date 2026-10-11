@@ -39,20 +39,18 @@ test("Vercel deployment config includes PPT export runtime dependencies", async 
   assert.equal(config.functions?.["server.mjs"]?.includeFiles, "node_modules/pptxgenjs/**");
 });
 
-test("server import completes when Vercel captures the listen call", async (t) => {
+test("server import completes without binding a local listener in Vercel runtime", async (t) => {
   const tempRoot = await mkdtemp(join(tmpdir(), "image-studio-vercel-capture-"));
   t.after(() => rm(tempRoot, { recursive: true, force: true }));
 
   const source = `
-import { Server, createServer, request as httpRequest } from "node:http";
-const originalListen = Server.prototype.listen;
-Server.prototype.listen = function () {
-  Server.prototype.listen = originalListen;
-  return this;
-};
+import { createServer, request as httpRequest } from "node:http";
 const runtime = await import("./server.mjs?vercel-capture-probe");
 if (!runtime.studioServer || typeof runtime.default !== "function") {
   throw new Error("Vercel default request handler was not exported");
+}
+if (runtime.studioServer.listening) {
+  throw new Error("Vercel runtime must not bind a local listener during import");
 }
 const handlerServer = createServer(runtime.default);
 await new Promise((resolve, reject) => {

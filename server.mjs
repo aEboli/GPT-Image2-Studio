@@ -266,6 +266,9 @@ const port = Number(process.env.PORT || 3600);
 const explicitHost = String(process.env.HOST || "").trim();
 const serverHost = explicitHost || "127.0.0.1";
 let isServerlessRuntime = false;
+const isDeployedVercelRuntime = Boolean(
+  process.env.VERCEL_REGION || process.env.VERCEL_URL || process.env.VERCEL_ENV,
+);
 const requestToken = String(process.env.IMAGE_STUDIO_REQUEST_TOKEN || randomUUID()).trim();
 const plainHttpBindingPolicy = getLocalServerPlainHttpBindingPolicy({
   host: serverHost,
@@ -7587,35 +7590,40 @@ const listenPromise = new Promise((resolve, reject) => {
 const handleListenError = (error) => {
   rejectListen(error);
 };
-server.once("error", handleListenError);
 
-// Vercel captures the first listen call and restores the prototype without running its callback.
-// Keep waiting for the real listener locally, but let the captured server be exported immediately.
-const listenMethodBeforeCapture = server.listen;
-server.listen(port, serverHost, () => {
-  server.off("error", handleListenError);
-  const address = server.address();
-  if (address && typeof address === "object") {
-    listeningPort = address.port;
-  }
-
-  const now = new Date();
-  console.log(`Responses Image Studio 正在运行: http://${serverHost}:${listeningPort}`);
-  if (plainHttpBindingPolicy.insecure) {
-    console.warn("警告：远程访问正在使用明文 HTTP，访问令牌、提示词和生成资产可能被网络监听。请改用 TLS 反向代理。");
-  }
-  console.log("远程浏览器认证用户名: studio");
-  console.log(`远程访问令牌: ${requestToken}`);
-  console.log(`输出根目录: ${outputDir}`);
-  console.log(`当前输出目录: ${join(outputDir, formatMonthFolder(now), formatDayFolder(now))}`);
-  console.log(`配置文件: ${configStore.configPath}`);
-  resolveListen();
-});
-isServerlessRuntime = server.listen !== listenMethodBeforeCapture;
-if (!isServerlessRuntime) {
-  await listenPromise;
+// Vercel invokes the exported handler directly. Binding a local port during
+// module initialization can make the Serverless Function fail before a request
+// reaches the handler, so only the local runtime starts a listener.
+if (isDeployedVercelRuntime) {
+  isServerlessRuntime = true;
 } else {
-  server.off("error", handleListenError);
+  server.once("error", handleListenError);
+  const listenMethodBeforeCapture = server.listen;
+  server.listen(port, serverHost, () => {
+    server.off("error", handleListenError);
+    const address = server.address();
+    if (address && typeof address === "object") {
+      listeningPort = address.port;
+    }
+
+    const now = new Date();
+    console.log(`Responses Image Studio 正在运行: http://${serverHost}:${listeningPort}`);
+    if (plainHttpBindingPolicy.insecure) {
+      console.warn("警告：远程访问正在使用明文 HTTP，访问令牌、提示词和生成资产可能被网络监听。请改用 TLS 反向代理。");
+    }
+    console.log("远程浏览器认证用户名: studio");
+    console.log(`远程访问令牌: ${requestToken}`);
+    console.log(`输出根目录: ${outputDir}`);
+    console.log(`当前输出目录: ${join(outputDir, formatMonthFolder(now), formatDayFolder(now))}`);
+    console.log(`配置文件: ${configStore.configPath}`);
+    resolveListen();
+  });
+  isServerlessRuntime = server.listen !== listenMethodBeforeCapture;
+  if (!isServerlessRuntime) {
+    await listenPromise;
+  } else {
+    server.off("error", handleListenError);
+  }
 }
 
 export const studioServer = server;
