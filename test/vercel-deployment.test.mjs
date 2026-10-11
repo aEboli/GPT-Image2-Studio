@@ -83,6 +83,7 @@ console.log("CAPTURE_IMPORT_RESOLVED");
       ...process.env,
       VERCEL: "1",
       VERCEL_REGION: "iad1",
+      HOST: "0.0.0.0",
       PORT: "0",
       IMAGE_STUDIO_OUTPUT_DIR: join(tempRoot, "output"),
       IMAGE_STUDIO_LOCAL_DATA_DIR: join(tempRoot, "local-data"),

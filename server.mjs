@@ -262,13 +262,17 @@ const temuWorkbenchRoutes = createTemuWorkbenchRoutes({
   readJsonBody,
   isServerlessRuntime: () => isServerlessRuntime,
 });
+const isVercelEnvironment = Boolean(process.env.VERCEL);
+const isDeployedVercelRuntime = Boolean(
+  process.env.VERCEL_REGION
+  || process.env.VERCEL_URL
+  || process.env.VERCEL_ENV
+  || (isVercelEnvironment && process.env.NODE_ENV === "production"),
+);
 const port = Number(process.env.PORT || 3600);
-const explicitHost = String(process.env.HOST || "").trim();
+const explicitHost = isDeployedVercelRuntime ? "" : String(process.env.HOST || "").trim();
 const serverHost = explicitHost || "127.0.0.1";
 let isServerlessRuntime = false;
-const isDeployedVercelRuntime = Boolean(
-  process.env.VERCEL_REGION || process.env.VERCEL_URL || process.env.VERCEL_ENV,
-);
 const requestToken = String(process.env.IMAGE_STUDIO_REQUEST_TOKEN || randomUUID()).trim();
 const plainHttpBindingPolicy = getLocalServerPlainHttpBindingPolicy({
   host: serverHost,
