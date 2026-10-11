@@ -229,6 +229,8 @@ export function buildParameterEntries(item = {}, fallbackConfig = {}, options = 
     entries.push({ label: "本地文件", value: item.absolutePath });
   }
 
+  entries.push({ label: "请求发起IP", value: item.requestIp || "未记录" });
+
   return entries;
 }
 

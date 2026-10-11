@@ -50,6 +50,28 @@ test("gallery background metadata survives saving, index recovery, and sparse me
   assert.equal(JSON.parse(await readFile(join(metadataDir, "legacy.json"), "utf8")).imageBackground, "transparent");
 });
 
+test("gallery store persists the request IP for generated image records", async (t) => {
+  const rootDir = await mkdtemp(join(tmpdir(), "gallery-request-ip-metadata-"));
+  t.after(() => rm(rootDir, { recursive: true, force: true }));
+  const outputDir = join(rootDir, "output");
+  const indexPath = join(rootDir, "gallery-index.json");
+
+  await saveGeneratedAsset({
+    outputDir,
+    indexPath,
+    filename: "request-ip.png",
+    imageBuffer: Buffer.from("image"),
+    metadata: {
+      createdAt: "2026-10-11T00:00:00.000Z",
+      format: "png",
+      requestIp: "203.0.113.42",
+    },
+  });
+
+  const items = await listGalleryItems({ outputDir, indexPath });
+  assert.equal(items[0].requestIp, "203.0.113.42");
+});
+
 test("gallery store creates readable filenames from time keyword and id tail", () => {
   const filename = createTimestampedFilename({
     format: "jpeg",

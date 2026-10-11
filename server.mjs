@@ -1050,6 +1050,30 @@ function getClientSessionId(request, formData) {
   return resolved || "global-default-session";
 }
 
+function normalizeRequestIp(value) {
+  const normalized = String(value || "").trim();
+  return normalized.startsWith("::ffff:") ? normalized.slice(7) : normalized;
+}
+
+function getRequestIp(request) {
+  const headers = request?.headers || {};
+  const forwardedValues = [
+    headers["cf-connecting-ip"],
+    headers["x-real-ip"],
+    String(headers["x-forwarded-for"] || "").split(",", 1)[0],
+    request?.socket?.remoteAddress,
+  ];
+
+  for (const value of forwardedValues) {
+    const normalized = normalizeRequestIp(value);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return "";
+}
+
 function getClientSessionIdFromRequest(request, url) {
   const headerValue = request.headers["x-client-session-id"];
   const queryValue = url.searchParams.get("clientSessionId");
@@ -1330,10 +1354,11 @@ function resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, imageRou
   };
 }
 
-async function handleConfigGet(response) {
+async function handleConfigGet(request, response) {
   sendJson(response, 200, {
     ...(await configStore.readPublicConfig()),
     aspectRatios: getAspectRatioOptions(),
+    requestIp: getRequestIp(request),
   });
 }
 
@@ -1342,6 +1367,22 @@ async function handleConfigPost(request, response) {
     return sendJson(response, 403, { message: "云端 API 配置应保存在当前浏览器，不能修改服务端私有配置。" });
   }
   const payload = await readJsonBody(request);
+  const requestIp = (() => {
+    const headers = request?.headers || {};
+    const values = [
+      headers["cf-connecting-ip"],
+      headers["x-real-ip"],
+      String(headers["x-forwarded-for"] || "").split(",", 1)[0],
+      request?.socket?.remoteAddress,
+    ];
+    for (const value of values) {
+      const normalized = String(value || "").trim().replace(/^::ffff:/, "");
+      if (normalized) {
+        return normalized;
+      }
+    }
+    return "";
+  })();
   await configStore.saveConfig({
     baseUrl: payload.baseUrl,
     apiKey: payload.apiKey,
@@ -1376,6 +1417,7 @@ async function handleConfigPost(request, response) {
   sendJson(response, 200, {
     ...(await configStore.readPublicConfig()),
     aspectRatios: getAspectRatioOptions(),
+    requestIp,
   });
 }
 
@@ -2602,6 +2644,7 @@ function buildSavedItem({
   imageBackground = "",
   includeImageToolModel,
   directImageStream,
+  requestIp = "",
   generationStartedAt,
   generationCompletedAt,
   generationDurationMs,
@@ -2649,6 +2692,7 @@ function buildSavedItem({
     featureCardsEnabled,
     ...(includeImageToolModel !== undefined ? { includeImageToolModel: includeImageToolModel === true } : {}),
     ...(directImageStream !== undefined ? { directImageStream: directImageStream === true } : {}),
+    requestIp,
     ratio: ratioOption.value,
     ratioLabel: ratioOption.value,
     size,
@@ -6582,6 +6626,7 @@ async function handleGenerate(request, response) {
     let localMask = null;
     let localMasks = [];
     clientSessionId = getClientSessionId(request, formData);
+    const requestIp = getRequestIp(request);
     const createdAt = new Date().toISOString();
 
     function recordRunningTask(patch = {}) {
@@ -6887,6 +6932,7 @@ async function handleGenerate(request, response) {
 
     generationTaskStore.updateTask(clientSessionId, taskId, {
       generationStartedAt,
+      requestIp,
       ratio: ratioOption.value,
       ratioLabel: ratioOption.value,
       size: finalSize,
@@ -7098,6 +7144,7 @@ async function handleGenerate(request, response) {
         prompt,
         createdAt,
         baseUrl: generationConfig.baseUrl,
+        requestIp,
         responsesModel: generationConfig.responsesModel,
         imageRoute: generationConfig.imageRoute,
         imageModel: generationConfig.imageModel,
@@ -7167,6 +7214,7 @@ async function handleGenerate(request, response) {
       ...(generationConfig.imageRoute === IMAGE_ROUTE_B
         ? { directImageStream: config.directImageStream === true }
         : {}),
+      requestIp,
       styleTransferSourceImageName,
       styleTransferReferenceImageName,
       styleTransferStylePreset,
@@ -7287,7 +7335,7 @@ async function routeRequest(request, response) {
   }
 
   if (request.method === "GET" && url.pathname === "/api/config") {
-    return handleConfigGet(response);
+    return handleConfigGet(request, response);
   }
 
   if (request.method === "POST" && url.pathname === "/api/config") {

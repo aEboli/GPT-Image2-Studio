@@ -165,6 +165,11 @@ test("local background generate releases request connections and completes throu
 
   await waitForServer(baseUrl, server, diagnostics);
 
+  const configResponse = await fetch(`${baseUrl}/api/config`);
+  assert.equal(configResponse.ok, true);
+  const config = await configResponse.json();
+  assert.match(config.requestIp, /^\d{1,3}(?:\.\d{1,3}){3}$|^[0-9a-f:]+$/i);
+
   const jobIds = Array.from({ length: 7 }, (_, index) => `background-submit-${index + 1}`);
   const responses = await Promise.all(
     jobIds.map(async (jobId, index) => {
@@ -196,6 +201,7 @@ test("local background generate releases request connections and completes throu
   assert.equal(completed.find((task) => task.id === "background-submit-7")?.item?.imageBackground, "opaque");
   assert.equal(completed.find((task) => task.id === "background-submit-7")?.item?.format, "jpg");
   assert.equal(completed.every((task) => task.item?.filename), true);
+  assert.equal(completed.every((task) => task.item?.requestIp === config.requestIp), true);
   assert.equal(completed.every((task) => /^\d{4}-\d{2}-\d{2}T/.test(task.generationStartedAt)), true);
   assert.equal(completed.every((task) => task.generationStartedAt === task.item?.generationStartedAt), true);
 
@@ -207,5 +213,6 @@ test("local background generate releases request connections and completes throu
     assert.ok(saved, `gallery must retain the completed result ${task.id}`);
     assert.equal(saved.imageBackground, task.item.imageBackground);
     assert.equal(saved.format, task.item.format);
+    assert.equal(saved.requestIp, config.requestIp);
   }
 });

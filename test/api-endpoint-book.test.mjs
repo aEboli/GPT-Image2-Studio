@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import vm from "node:vm";
 
 import {
   API_ENDPOINT_BOOK_LIMIT,
@@ -151,25 +152,31 @@ function createPickerHarness(entries = []) {
     baseUrlInput: createFakeElement("input", documentRef),
     endpointPathSelect: createFakeSelect(["responses"], documentRef),
     apiKeyInput: createFakeElement("input", documentRef),
+    responsesModelInput: createFakeElement("input", documentRef),
+    imageToolModelSelect: createFakeSelect(["gpt-image-2", "gpt-image-2.5-sunburst", "gpt-image-2.5-flare"], documentRef),
     routeApiBookToggle: createFakeElement("button", documentRef),
     routeApiBookList: createFakeElement("div", documentRef),
     directBaseUrlInput: createFakeElement("input", documentRef),
     directEndpointPathSelect: createFakeSelect(["images/generations", "responses", "chat/completions"], documentRef),
     directImageApiKeyInput: createFakeElement("input", documentRef),
+    directImageModelInput: createFakeElement("input", documentRef),
     directImageApiBookToggle: createFakeElement("button", documentRef),
     directImageApiBookList: createFakeElement("div", documentRef),
     directTextBaseUrlInput: createFakeElement("input", documentRef),
     directTextEndpointPathSelect: createFakeSelect(["responses", "chat/completions"], documentRef),
     directTextApiKeyInput: createFakeElement("input", documentRef),
+    directResponsesModelInput: createFakeElement("input", documentRef),
     directTextApiBookToggle: createFakeElement("button", documentRef),
     directTextApiBookList: createFakeElement("div", documentRef),
     protocolBaseUrlInput: createFakeElement("input", documentRef),
     protocolApiKeyInput: createFakeElement("input", documentRef),
+    protocolImageModelInput: createFakeElement("input", documentRef),
     protocolApiBookToggle: createFakeElement("button", documentRef),
     protocolApiBookList: createFakeElement("div", documentRef),
     grokBaseUrlInput: createFakeElement("input", documentRef),
     grokEndpointPathSelect: createFakeSelect(["images/generations", "images/edits"], documentRef),
     grokApiKeyInput: createFakeElement("input", documentRef),
+    grokImageModelInput: createFakeElement("input", documentRef),
     grokApiBookToggle: createFakeElement("button", documentRef),
     grokApiBookList: createFakeElement("div", documentRef),
   };
@@ -199,6 +206,155 @@ function rowTexts(list) {
 const OPENAI = { baseUrl: "https://api.openai.com/v1", endpointPath: "responses", apiKey: "sk-abcdef123456" };
 const RELAY = { baseUrl: "https://relay.example.test/v1", endpointPath: "chat/completions", apiKey: "sk-zzzzzz999999" };
 const GROK = { baseUrl: "https://api.x.ai/v1", endpointPath: "images/edits", apiKey: "xai-grokkey123456" };
+
+test("API 历史保留归一化后的模型，重复保存采用最新模型", () => {
+  const storage = createFakeStorage();
+  rememberApiEndpoints([{ ...OPENAI, model: " text-model-a ", imageToolModel: " gpt-image-2.5-sunburst " }], storage);
+  assert.deepEqual(readApiEndpointBook(storage), [{ ...OPENAI, model: "text-model-a", imageToolModel: "gpt-image-2.5-sunburst" }]);
+
+  rememberApiEndpoints([{ ...OPENAI, model: "text-model-b", imageToolModel: "gpt-image-2.5-flare" }], storage);
+  assert.deepEqual(readApiEndpointBook(storage), [{ ...OPENAI, model: "text-model-b", imageToolModel: "gpt-image-2.5-flare" }]);
+});
+
+test("空模型字段兼容旧 API 历史，读取不会补入默认模型", () => {
+  const storage = createFakeStorage(seed([{ ...OPENAI, model: "  ", imageToolModel: null }]));
+  assert.deepEqual(readApiEndpointBook(storage), [OPENAI]);
+});
+
+const modelTargets = [
+  [API_ENDPOINT_BOOK_TARGET_ROUTE, "routeApiBookToggle", "routeApiBookList", "responsesModelInput"],
+  [API_ENDPOINT_BOOK_TARGET_DIRECT_IMAGE, "directImageApiBookToggle", "directImageApiBookList", "directImageModelInput"],
+  [API_ENDPOINT_BOOK_TARGET_DIRECT_TEXT, "directTextApiBookToggle", "directTextApiBookList", "directResponsesModelInput"],
+  [API_ENDPOINT_BOOK_TARGET_PROTOCOL, "protocolApiBookToggle", "protocolApiBookList", "protocolImageModelInput"],
+  [API_ENDPOINT_BOOK_TARGET_GROK, "grokApiBookToggle", "grokApiBookList", "grokImageModelInput"],
+];
+
+for (const [target, toggleRef, listRef, modelRef] of modelTargets) {
+  test(`${target} 切换 API 恢复各自最后保存的模型，未保存编辑不覆盖历史`, () => {
+    const first = { ...OPENAI, model: "model-a" };
+    const second = { ...RELAY, model: "model-b" };
+    const { refs, storage } = createPickerHarness({ [target]: [first, second] });
+    for (const [, , , otherModelRef] of modelTargets) refs[otherModelRef].value = "current-model";
+
+    clickOn(refs[toggleRef]);
+    clickOn(refs[listRef].children[0].children[0]);
+    assert.equal(refs[modelRef].value, first.model);
+    refs[modelRef].value = "unsaved-model";
+
+    clickOn(refs[toggleRef]);
+    clickOn(refs[listRef].children[1].children[0]);
+    assert.equal(refs[modelRef].value, second.model);
+    clickOn(refs[toggleRef]);
+    clickOn(refs[listRef].children[1].children[0]);
+    assert.equal(refs[modelRef].value, first.model);
+    assert.deepEqual(readApiEndpointBook(target, storage), [first, second]);
+
+    for (const [otherTarget, , , otherModelRef] of modelTargets) {
+      if (otherTarget !== target) assert.equal(refs[otherModelRef].value, "current-model");
+    }
+  });
+}
+
+test("相同地址和 Key 在各通道内分别记忆模型，不同 Key 也分别恢复", () => {
+  const books = Object.fromEntries(modelTargets.map(([target]) => [target, [{ ...OPENAI, model: `${target}-model` }]]));
+  books[API_ENDPOINT_BOOK_TARGET_ROUTE].push({ ...OPENAI, apiKey: "sk-second-key-9999", model: "second-key-model" });
+  const { refs } = createPickerHarness(books);
+  for (const [target, toggleRef, listRef, modelRef] of modelTargets) {
+    clickOn(refs[toggleRef]);
+    clickOn(refs[listRef].children[0].children[0]);
+    assert.equal(refs[modelRef].value, `${target}-model`);
+  }
+
+  clickOn(refs.routeApiBookToggle);
+  clickOn(refs.routeApiBookList.children[1].children[0]);
+  assert.equal(refs.responsesModelInput.value, "second-key-model");
+  assert.equal(refs.directImageModelInput.value, "direct-image-model");
+});
+
+test("路由 API 同时恢复生图工具模型，缺失或不支持的工具模型保留当前选择", () => {
+  const { refs } = createPickerHarness([
+    { ...OPENAI, model: "route-model", imageToolModel: "gpt-image-2.5-sunburst" },
+    { ...RELAY, imageToolModel: "unsupported-tool-model" },
+  ]);
+  clickOn(refs.routeApiBookToggle);
+  clickOn(refs.routeApiBookList.children[0].children[0]);
+  assert.equal(refs.responsesModelInput.value, "route-model");
+  assert.equal(refs.imageToolModelSelect.value, "gpt-image-2.5-sunburst");
+
+  clickOn(refs.routeApiBookToggle);
+  clickOn(refs.routeApiBookList.children[1].children[0]);
+  assert.equal(refs.imageToolModelSelect.value, "gpt-image-2.5-sunburst");
+});
+
+test("旧 API 没有模型时保留当前文本和工具模型", () => {
+  const { refs } = createPickerHarness([OPENAI]);
+  refs.responsesModelInput.value = "current-text-model";
+  refs.imageToolModelSelect.value = "gpt-image-2.5-flare";
+  clickOn(refs.routeApiBookToggle);
+  clickOn(refs.routeApiBookList.children[0].children[0]);
+  assert.equal(refs.responsesModelInput.value, "current-text-model");
+  assert.equal(refs.imageToolModelSelect.value, "gpt-image-2.5-flare");
+});
+
+test("已保存私有配置补种所有通道模型，更新模型后重新读取仍可恢复", async () => {
+  const app = await readFile(appPath, "utf8");
+  const source = app.match(/function rememberApiEndpointsFromConfig\(browserConfig\)[^]*?\n\}/)?.[0];
+  assert.ok(source);
+  const { controller, storage } = createPickerHarness();
+  const context = {
+    apiEndpointBookPicker: controller,
+    API_BOOK_TARGET_ROUTE: API_ENDPOINT_BOOK_TARGET_ROUTE,
+    API_BOOK_TARGET_DIRECT_IMAGE: API_ENDPOINT_BOOK_TARGET_DIRECT_IMAGE,
+    API_BOOK_TARGET_DIRECT_TEXT: API_ENDPOINT_BOOK_TARGET_DIRECT_TEXT,
+    API_BOOK_TARGET_PROTOCOL: API_ENDPOINT_BOOK_TARGET_PROTOCOL,
+    API_BOOK_TARGET_GROK: API_ENDPOINT_BOOK_TARGET_GROK,
+  };
+  vm.runInNewContext(source, context);
+  const config = {
+    ...OPENAI, responsesModel: "route-model", imageToolModel: "gpt-image-2.5-sunburst",
+    directImageBaseUrl: RELAY.baseUrl, directImageEndpointPath: "images/generations", directImageApiKey: RELAY.apiKey, directImageModel: "image-model",
+    directTextBaseUrl: RELAY.baseUrl, directTextEndpointPath: "responses", directTextApiKey: RELAY.apiKey, directTextModel: "text-model",
+    protocolBaseUrl: OPENAI.baseUrl, protocolApiKey: OPENAI.apiKey, protocolImageModel: "gemini-model",
+    grokBaseUrl: GROK.baseUrl, grokEndpointPath: GROK.endpointPath, grokApiKey: GROK.apiKey, grokImageModel: "grok-model",
+  };
+  context.rememberApiEndpointsFromConfig(config);
+  for (const [target] of modelTargets) {
+    assert.equal(readApiEndpointBook(target, storage)[0].model, {
+      route: "route-model", "direct-image": "image-model", "direct-text": "text-model", protocol: "gemini-model", grok: "grok-model",
+    }[target]);
+  }
+  config.directImageModel = "saved-image-model-v2";
+  context.rememberApiEndpointsFromConfig(config);
+
+  const { refs } = createPickerHarness(readApiEndpointBooks(storage));
+  clickOn(refs.directImageApiBookToggle);
+  clickOn(refs.directImageApiBookList.children[0].children[0]);
+  assert.equal(refs.directImageModelInput.value, "saved-image-model-v2");
+  clickOn(refs.routeApiBookToggle);
+  clickOn(refs.routeApiBookList.children[0].children[0]);
+  assert.equal(refs.responsesModelInput.value, "route-model");
+  assert.equal(refs.imageToolModelSelect.value, "gpt-image-2.5-sunburst");
+});
+
+test("API 回填后刷新地址显示、模型选中态和模型相关界面", async () => {
+  const app = await readFile(appPath, "utf8");
+  const source = app.match(/function applyPickedApiEndpointDisplay\(target\)[^]*?\n\}/)?.[0];
+  assert.ok(source);
+  for (const [target] of modelTargets) {
+    const calls = [];
+    const context = {
+      PICKED_API_ENDPOINT_ROUTES: { route: "a", "direct-image": "b", "direct-text": "b-text", grok: "d" },
+      syncProtocolEndpointPreview: () => calls.push("protocol-preview"),
+      readEndpointFields: () => ({ baseUrl: OPENAI.baseUrl, endpointPath: OPENAI.endpointPath }),
+      syncEndpointInputDisplay: () => calls.push("endpoint-display"),
+      configModelPicker: { render: () => calls.push("model-picker") },
+      refreshSelectedImageRouteUi: () => calls.push("route-ui"),
+    };
+    vm.runInNewContext(source, context);
+    context.applyPickedApiEndpointDisplay(target);
+    assert.deepEqual(calls, [target === "protocol" ? "protocol-preview" : "endpoint-display", "model-picker", "route-ui"]);
+  }
+});
 
 test("the address label drops the scheme and any trailing slash", () => {
   assert.equal(formatApiEndpointLabel("https://api.openai.com/v1"), "api.openai.com/v1");

@@ -31,6 +31,7 @@ test("buildParameterText includes reasoning effort and multiple reference image 
       hasReferenceImage: true,
       referenceImageNames: ["girl-a.jpeg", "girl-b.jpeg"],
       baseUrl: "https://api.openai.com/v1",
+      requestIp: "203.0.113.42",
       absolutePath: "C:/output/demo.jpeg",
       generationDurationMs: 1234,
     },
@@ -47,6 +48,7 @@ test("buildParameterText includes reasoning effort and multiple reference image 
   assert.match(result, /参考图：有（2 张：girl-a\.jpeg, girl-b\.jpeg）/);
   assert.match(result, /中转：https:\/\/api\.openai\.com\/v1/);
   assert.match(result, /本地文件：C:\/output\/demo\.jpeg/);
+  assert.match(result, /请求发起IP：203\.0\.113\.42$/);
 });
 
 test("buildParameterText explicitly shows when no reference image was used", () => {

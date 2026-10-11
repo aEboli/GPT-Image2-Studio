@@ -412,6 +412,8 @@ Object.assign(UI_LANGUAGE_TEXT["zh-CN"], {
   activeCall: "当前调用",
   activeCallMeta: "当前生图调用",
   background: "背景",
+  notRecorded: "未记录",
+  requestIp: "请求发起IP",
   transparent: "透明",
   transparentBackgroundAria: "启用透明背景",
 });
@@ -419,6 +421,8 @@ Object.assign(UI_LANGUAGE_TEXT.en, {
   activeCall: "Active call",
   activeCallMeta: "Current image call",
   background: "Background",
+  notRecorded: "Not recorded",
+  requestIp: "Request IP",
   transparent: "Transparent",
   transparentBackgroundAria: "Use transparent background",
 });
@@ -1445,6 +1449,7 @@ const refs = {
   imageToolModelSelect: document.querySelector("#imageToolModelSelect"),
   includeImageToolModelToggle: document.querySelector("#includeImageToolModelToggle"),
   parameterToolModel: document.querySelector("#parameterToolModel"),
+  parameterRequestIp: document.querySelector("#parameterRequestIp"),
   savedKeyMask: document.querySelector("#savedKeyMask"),
   sizeInput: document.querySelector("#sizeInput"),
   surprisePromptButton: document.querySelector("#surprisePromptButton"),
@@ -5712,6 +5717,9 @@ function updateGenerationModeStatus() {
   if (refs.parameterTextModel) {
     refs.parameterTextModel.textContent = textModel;
   }
+  if (refs.parameterRequestIp) {
+    refs.parameterRequestIp.textContent = state.config?.requestIp || getUiLanguageText("notRecorded") || "未记录";
+  }
   refs.parameterTextModelLabel?.classList.toggle("hidden", !textModel);
   refs.parameterTextModel?.classList.toggle("hidden", !textModel);
   refs.generationModeStatus.dataset.imageRoute = imageRoute;
@@ -5797,12 +5805,14 @@ const PICKED_API_ENDPOINT_ROUTES = { route: "a", "direct-image": "b", "direct-te
 function applyPickedApiEndpointDisplay(target) {
   if (target === "protocol") {
     syncProtocolEndpointPreview();
-    return;
+  } else {
+    const imageRoute = PICKED_API_ENDPOINT_ROUTES[target];
+    if (!imageRoute) return;
+    const endpoint = readEndpointFields(imageRoute);
+    syncEndpointInputDisplay(imageRoute, endpoint.baseUrl, endpoint.endpointPath);
   }
-  const imageRoute = PICKED_API_ENDPOINT_ROUTES[target];
-  if (!imageRoute) return;
-  const endpoint = readEndpointFields(imageRoute);
-  syncEndpointInputDisplay(imageRoute, endpoint.baseUrl, endpoint.endpointPath);
+  configModelPicker.render();
+  refreshSelectedImageRouteUi();
 }
 
 function getCurrentPrivateConfigRequestPayload() {
@@ -17987,28 +17997,42 @@ async function loadPromptAgentHistory({ force = false } = {}) {
   return state.promptAgent.history;
 }
 
-// 每个调用通道单独记一套「地址 + 后缀 + Key」；缺地址或缺 Key 的那套会被清单本身
+// 每个调用通道单独记一套「地址 + 后缀 + Key + 模型」；缺地址或缺 Key 的那套会被清单本身
 // 丢掉，因为它无法整套切回来。清单只在浏览器本地，不进公开配置、请求载荷和服务端
 // 配置文件。
 function rememberApiEndpointsFromConfig(browserConfig) {
   if (!browserConfig) return;
   [
-    [API_BOOK_TARGET_ROUTE, { baseUrl: browserConfig.baseUrl, endpointPath: browserConfig.endpointPath, apiKey: browserConfig.apiKey }],
+    [API_BOOK_TARGET_ROUTE, {
+      baseUrl: browserConfig.baseUrl,
+      endpointPath: browserConfig.endpointPath,
+      apiKey: browserConfig.apiKey,
+      model: browserConfig.responsesModel,
+      imageToolModel: browserConfig.imageToolModel,
+    }],
     [API_BOOK_TARGET_DIRECT_IMAGE, {
       baseUrl: browserConfig.directImageBaseUrl,
       endpointPath: browserConfig.directImageEndpointPath,
       apiKey: browserConfig.directImageApiKey,
+      model: browserConfig.directImageModel,
     }],
     [API_BOOK_TARGET_DIRECT_TEXT, {
       baseUrl: browserConfig.directTextBaseUrl,
       endpointPath: browserConfig.directTextEndpointPath,
       apiKey: browserConfig.directTextApiKey,
+      model: browserConfig.directTextModel || browserConfig.directResponsesModel,
     }],
-    [API_BOOK_TARGET_PROTOCOL, { baseUrl: browserConfig.protocolBaseUrl, endpointPath: "", apiKey: browserConfig.protocolApiKey }],
+    [API_BOOK_TARGET_PROTOCOL, {
+      baseUrl: browserConfig.protocolBaseUrl,
+      endpointPath: "",
+      apiKey: browserConfig.protocolApiKey,
+      model: browserConfig.protocolImageModel,
+    }],
     [API_BOOK_TARGET_GROK, {
       baseUrl: browserConfig.grokBaseUrl,
       endpointPath: browserConfig.grokEndpointPath,
       apiKey: browserConfig.grokApiKey,
+      model: browserConfig.grokImageModel,
     }],
   ].forEach(([target, entry]) => apiEndpointBookPicker.remember(target, entry));
 }

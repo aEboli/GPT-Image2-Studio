@@ -203,3 +203,17 @@ The system SHALL expose a visible Back command beside the lightbox title instead
 - **WHEN** 用户点击图片详情中的“复制”
 - **THEN** 复制内容仍是图片记录保存的原始提示词文本
 - **AND** 检查器的聚合展示不会改变复制结果
+
+### Requirement: 图片详情显示请求发起 IP
+
+图片详情参数页 SHALL 在所有既有参数之后显示“请求发起IP”。若图片记录保存了请求发起 IP，参数页 SHALL 显示该值；若历史记录没有该字段，参数页 SHALL 显示“未记录”，不得使用当前访问者地址替代。
+
+#### Scenario: 查看新生成图片的参数
+
+- **WHEN** 用户打开保存了请求发起 IP 的生成图片并选择“参数”
+- **THEN** 参数列表最后显示请求发起 IP
+
+#### Scenario: 查看旧图片的参数
+
+- **WHEN** 用户打开没有请求发起 IP 字段的历史图片并选择“参数”
+- **THEN** 参数列表最后显示“请求发起IP：未记录”

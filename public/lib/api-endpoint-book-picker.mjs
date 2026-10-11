@@ -1,7 +1,7 @@
 import { forgetApiEndpoint, listApiEndpointBookEntries, rememberApiEndpoints } from "./api-endpoint-book.mjs";
 
-/* 五个 API 地址字段各自维护一份历史清单的下拉选择器。选中一条把地址、协议后缀和
-   配套 Key 一起填进当前通道——Key 跟着 API 走，不单独挑；不同通道之间不串清单。
+/* 五个 API 地址字段各自维护一份历史清单的下拉选择器。选中一条把地址、协议后缀、
+   配套 Key 和最后保存的模型一起填进当前通道；不同通道之间不串清单。
    结构刻意对齐 lib/config-model-picker.mjs：同一套 refs/state 注入、同一套展开收起
    与外部点击关闭，界面行为才不会两套下拉各走一路。 */
 
@@ -36,6 +36,7 @@ export function createApiEndpointBookPickerController({ refs, state, getUiText, 
         addressInput: refs.directBaseUrlInput,
         suffixSelect: refs.directEndpointPathSelect,
         keyInput: refs.directImageApiKeyInput,
+        modelInput: refs.directImageModelInput,
         toggle: refs.directImageApiBookToggle,
         list: refs.directImageApiBookList,
       };
@@ -45,6 +46,7 @@ export function createApiEndpointBookPickerController({ refs, state, getUiText, 
         addressInput: refs.directTextBaseUrlInput,
         suffixSelect: refs.directTextEndpointPathSelect,
         keyInput: refs.directTextApiKeyInput,
+        modelInput: refs.directResponsesModelInput,
         toggle: refs.directTextApiBookToggle,
         list: refs.directTextApiBookList,
       };
@@ -55,6 +57,7 @@ export function createApiEndpointBookPickerController({ refs, state, getUiText, 
         addressInput: refs.protocolBaseUrlInput,
         suffixSelect: null,
         keyInput: refs.protocolApiKeyInput,
+        modelInput: refs.protocolImageModelInput,
         toggle: refs.protocolApiBookToggle,
         list: refs.protocolApiBookList,
       };
@@ -64,6 +67,7 @@ export function createApiEndpointBookPickerController({ refs, state, getUiText, 
         addressInput: refs.grokBaseUrlInput,
         suffixSelect: refs.grokEndpointPathSelect,
         keyInput: refs.grokApiKeyInput,
+        modelInput: refs.grokImageModelInput,
         toggle: refs.grokApiBookToggle,
         list: refs.grokApiBookList,
       };
@@ -72,6 +76,8 @@ export function createApiEndpointBookPickerController({ refs, state, getUiText, 
       addressInput: refs.baseUrlInput,
       suffixSelect: refs.endpointPathSelect,
       keyInput: refs.apiKeyInput,
+      modelInput: refs.responsesModelInput,
+      imageToolModelSelect: refs.imageToolModelSelect,
       toggle: refs.routeApiBookToggle,
       list: refs.routeApiBookList,
     };
@@ -193,21 +199,20 @@ export function createApiEndpointBookPickerController({ refs, state, getUiText, 
     setOpen("", false);
   }
 
-  /* 后缀只在当前通道确实有这个选项时才跟着换：路由 A 存的 responses 不该把
-     直连生图的 images/generations 顶掉成一个它不支持的值。 */
-  function applySuffix(suffixSelect, endpointPath) {
-    if (!suffixSelect || !endpointPath) {
+  /* 后缀和工具模型只恢复当前下拉支持的选项。 */
+  function applySelectValue(select, value) {
+    if (!select || !value) {
       return;
     }
-    const options = Array.from(suffixSelect.options || []).map((option) => String(option?.value ?? ""));
-    if (options.length > 0 && !options.includes(endpointPath)) {
+    const options = Array.from(select.options || []).map((option) => String(option?.value ?? ""));
+    if (options.length > 0 && !options.includes(value)) {
       return;
     }
-    suffixSelect.value = endpointPath;
+    select.value = value;
   }
 
-  /* 选中即整套切换：地址、后缀、Key 一起填。模型不动，仍要用户点保存才生效。
-     顺手把它记回队首，下次展开就在最上面。 */
+  /* 选中即恢复最后保存的配置；旧条目未记录模型时保留当前值。
+     记回队首只使用历史快照，不把表单中的未保存模型写进历史。 */
   function selectEntry(target, index) {
     const entry = getEntries(target)[Number(index)];
     const targetRefs = getTargetRefs(target);
@@ -218,10 +223,14 @@ export function createApiEndpointBookPickerController({ refs, state, getUiText, 
     if (targetRefs.addressInput) {
       targetRefs.addressInput.value = entry.baseUrl;
     }
-    applySuffix(targetRefs.suffixSelect, entry.endpointPath);
+    applySelectValue(targetRefs.suffixSelect, entry.endpointPath);
     if (targetRefs.keyInput) {
       targetRefs.keyInput.value = entry.apiKey;
     }
+    if (targetRefs.modelInput && entry.model) {
+      targetRefs.modelInput.value = entry.model;
+    }
+    applySelectValue(targetRefs.imageToolModelSelect, entry.imageToolModel);
 
     rememberApiEndpoints(target, [entry], resolveStorage());
     refreshEntries(target);
