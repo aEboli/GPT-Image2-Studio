@@ -1,0 +1,5 @@
+- [x] Remove the copy-to-personal-template card action and its handler.
+- [x] Hide incomplete list text and show full image-view labels in masonry layout.
+- [x] Make the card apply action visually prominent.
+- [x] Update template-library contract checks and cache versions.
+- [x] Run focused checks and archive the validated change.

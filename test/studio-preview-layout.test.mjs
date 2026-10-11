@@ -30,8 +30,8 @@ const generationClientPath = new URL("../lib/generation-client.mjs", import.meta
 const generationLogPanelPath = new URL("../lib/generation-log-panel.mjs", import.meta.url);
 const generationLogStorePath = new URL("../lib/generation-log-store.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20260929-topbar-label-spacing-1";
-const appAssetVersion = "20260928-aspect-ratio-value-only-1";
+const stylesAssetVersion = "20261011-prompt-template-card-layout-1";
+const appAssetVersion = "20261011-prompt-template-card-layout-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
 const creationQueueModuleAssetVersion = "20260915-mode-generation-controls-1";
 const quickBlendModuleAssetVersion = "20260928-aspect-ratio-value-only-1";
@@ -4059,7 +4059,7 @@ test("prompt template library exposes personal actions and list/image browse vie
   assert.match(app, /flattenPromptTemplateLibrary/);
   assert.match(app, /data-prompt-template-view/);
   assert.match(app, /applyPromptTemplateLibrary\(template\)/);
-  assert.match(app, /copyPromptTemplateLibraryToPersonal\(template\)/);
+  assert.doesNotMatch(app, /copyPromptTemplateLibraryToPersonal|复制到我的模板/);
   assert.match(app, /openPromptTemplateLibraryPreview\(template\)/);
   assert.match(app, /prompt\.textContent = template\.prompt/);
   assert.match(styles, /\.prompt-template-title-button\s*\{[\s\S]*white-space:\s*nowrap;/);

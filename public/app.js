@@ -6235,8 +6235,10 @@ function returnToPromptTemplateLibrary() {
     refs.surprisePromptButton.setAttribute("aria-expanded", "true");
   }
   window.requestAnimationFrame(() => {
-    if (refs.promptTemplateLibraryGrid) {
-      refs.promptTemplateLibraryGrid.scrollTop = scrollTop;
+    const grid = refs.promptTemplateLibraryGrid;
+    const scrollContainer = grid?.dataset.view === "image" ? grid.parentElement : grid;
+    if (scrollContainer) {
+      scrollContainer.scrollTop = scrollTop;
     }
   });
 }
@@ -7959,7 +7961,9 @@ function openPromptTemplateLibraryPreview(template) {
   if (!template) {
     return;
   }
-  state.promptTemplateLibrary.scrollTop = refs.promptTemplateLibraryGrid?.scrollTop || 0;
+  const grid = refs.promptTemplateLibraryGrid;
+  const scrollContainer = grid?.dataset.view === "image" ? grid.parentElement : grid;
+  state.promptTemplateLibrary.scrollTop = scrollContainer?.scrollTop || 0;
   const imageUrl = getPromptTemplateLibraryImageUrl(template);
   openLightbox({
     id: template.id,
@@ -7996,22 +8000,6 @@ function applyPromptTemplateLibrary(template) {
   updatePromptCounter();
   setPromptTemplatePopoverOpen(false);
   refs.promptInput.focus();
-}
-
-function copyPromptTemplateLibraryToPersonal(template) {
-  if (!template?.prompt) {
-    return;
-  }
-  const personalTemplate = {
-    id: createPromptTemplateId(),
-    name: template.name,
-    prompt: template.prompt,
-  };
-  state.promptTemplates.unshift(personalTemplate);
-  state.selectedPromptTemplateId = personalTemplate.id;
-  writePromptTemplates();
-  selectPromptTemplate(personalTemplate.id);
-  setPromptTemplateFeedback("已复制到我的模板，可继续编辑。");
 }
 
 function renderPromptTemplateLibrary() {
@@ -8122,12 +8110,7 @@ function renderPromptTemplateLibrary() {
     const prompt = document.createElement("p");
     prompt.className = "prompt-template-library-prompt";
     prompt.textContent = template.prompt;
-    const actions = document.createElement("div");
-    actions.className = "prompt-template-library-actions";
-    actions.append(
-      createPromptTemplateLibraryActionButton("复制到我的模板", "mini-action", () => copyPromptTemplateLibraryToPersonal(template)),
-    );
-    content.append(title, breadcrumb, prompt, actions);
+    content.append(title, breadcrumb, prompt);
     card.appendChild(content);
     syncPromptTemplateListDimensions = () => {
       if (image.naturalWidth <= 0 || image.naturalHeight <= 0 || state.promptTemplateLibrary.view !== "list") {
@@ -8139,13 +8122,18 @@ function renderPromptTemplateLibrary() {
       }
       const mediaHeight = Math.max(1, Math.round(mediaWidth * image.naturalHeight / image.naturalWidth));
       card.style.setProperty("--prompt-template-card-height", `${mediaHeight}px`);
+      title.hidden = false;
+      breadcrumb.hidden = false;
+      prompt.hidden = false;
+      title.hidden = title.scrollWidth > title.clientWidth;
+      breadcrumb.hidden = breadcrumb.scrollWidth > breadcrumb.clientWidth;
       const contentStyle = window.getComputedStyle(content);
-      const promptStyle = window.getComputedStyle(prompt);
-      const lineHeight = Number.parseFloat(promptStyle.lineHeight) || Number.parseFloat(promptStyle.fontSize) * 1.55 || 20;
-      const fixedHeight = title.offsetHeight + breadcrumb.offsetHeight + actions.offsetHeight + 12;
       const paddingHeight = (Number.parseFloat(contentStyle.paddingTop) || 0) + (Number.parseFloat(contentStyle.paddingBottom) || 0);
-      const availablePromptHeight = Math.max(lineHeight, mediaHeight - fixedHeight - paddingHeight);
-      prompt.style.setProperty("--prompt-template-prompt-lines", String(Math.max(1, Math.floor(availablePromptHeight / lineHeight))));
+      const visibleLabels = [title, breadcrumb].filter((label) => !label.hidden);
+      const labelsHeight = visibleLabels.reduce((height, label) => height + label.offsetHeight, 0);
+      const availablePromptHeight = mediaHeight - labelsHeight - visibleLabels.length * 6 - paddingHeight;
+      prompt.hidden = prompt.scrollHeight > availablePromptHeight;
+      content.hidden = title.hidden && breadcrumb.hidden && prompt.hidden;
     };
     card.addEventListener("click", (event) => {
       if (event.target.closest("button")) {
