@@ -370,6 +370,8 @@ The expanded library SHALL preserve the existing default templates, user-authore
 
 普通图片反推 SHALL keep the existing five top-level groups and SHALL make `visual` a reusable style-lock segment beginning with `风格锁定：` (or an equivalent target-language marker when the mode supports another language). The segment SHALL preserve concrete, image-grounded terms for applicable overall aesthetic or genre, medium/rendering, palette and contrast, lighting, material and surface finish, lens/depth treatment, and post-processing or atmosphere. It SHALL use specific words that can affect rendered pixels instead of a short generic quality summary.
 
+The style-lock segment SHALL prioritize the source image's most distinctive style anchors instead of reducing them to generic labels. It SHALL include `4K/8K级超高清成像质感` once as a visual-quality intention, not as source metadata or a guarantee of actual output dimensions. When the primary subject is visibly in focus, it SHALL request a clear focal plane, naturally resolved source-visible texture, clean edges, and orderly visual hierarchy without invented micro-detail or uniform over-sharpening. `avoid` SHALL constrain source-inconsistent blur, smudging, artifacts, malformed/repeated details, style drift, and unrelated clutter only when those differ from the source, while preserving intentional bokeh, shallow depth of field, soft focus, film grain, and motion effects.
+
 #### Scenario: Source image has a distinct visual identity
 
 - **WHEN** the uploaded image has a recognizable medium, aesthetic, palette, lighting setup, material finish, or photographic treatment
@@ -382,6 +384,13 @@ The expanded library SHALL preserve the existing default templates, user-authore
 - **WHEN** the user copies the structured result into the Studio prompt field
 - **THEN** the style-lock segment is explicit enough for the downstream image model to retain the source medium, aesthetic, palette, lighting, material response, and depth treatment
 - **AND** `avoid` includes image-specific style drift such as an incorrect medium, time-of-day lighting, palette, or surface finish when those deviations are plausible
+
+#### Scenario: Source image has a clear subject and intentional background softness
+
+- **WHEN** the uploaded image has a sharply focused subject with intentional background bokeh, soft focus, grain, or motion treatment
+- **THEN** `visual` requests natural clarity and source-visible texture at the primary focal plane
+- **AND** `avoid` prevents unintended subject blur and artifacts without removing the source's intentional softness
+- **AND** `4K/8K级超高清成像质感` remains prompt wording and does not claim a specific output pixel size
 
 #### Scenario: Style cues are uncertain
 

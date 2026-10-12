@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.067-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.068-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installers-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,7 +10,7 @@
 
 Prompt-to-image, reference analysis, editing, product-image replication, ecommerce sets, portraits, article illustrations, PPT generation, and asset history in one browser-based workspace.
 
-Current version: `v0.2.067`
+Current version: `v0.2.068`
 
 [Chinese README](./README.zh-CN.md)
 
@@ -57,9 +57,9 @@ Windows 脚本入口（启动器、Native Messaging 安装/卸载、图片资源
 
 ### Windows desktop app (recommended)
 
-Download `GPT-Image2-Studio-Desktop-Setup-v0.2.067-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
+Download `GPT-Image2-Studio-Desktop-Setup-v0.2.068-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
 
-For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.067-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
+For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.068-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
 
 For desktop development, Electron 43 requires Node.js 22.12 or newer:
 
@@ -70,7 +70,7 @@ cmd /c npm run desktop
 
 ### Windows browser installer
 
-The legacy browser-installer flow remains documented for local builds, but the `v0.2.067` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
+The legacy browser-installer flow remains documented for local builds, but the `v0.2.068` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
 
 ## Configuration
 
@@ -286,7 +286,7 @@ The repository also contains a Vercel configuration. Vercel functions use tempor
 
 ### Reverse a reference image into a prompt
 
-Open **Image-to-prompt** from the top bar or the Create menu, upload one image, and analyze it. The result is reusable JSON with detailed subject and framing fields plus a `visual` section that begins with **风格锁定**. That section captures the source medium, aesthetic, palette, lighting, material response, depth, and finishing cues; `avoid` records plausible style drift. Copy the JSON into the prompt workflow to keep those visual cues explicit during a second generation.
+Open **Image-to-prompt** from the top bar or the Create menu, upload one image, and analyze it. The reusable JSON keeps detailed subject and framing fields and gives `visual` a prioritized style lock for the source medium, aesthetic, palette, lighting, material response, depth, and finishing. It also asks for a sharply focused subject, naturally clear source-visible texture, clean edges, and a `4K/8K` visual-quality intent; this wording does not guarantee the generated image's pixel dimensions. `avoid` targets plausible style drift, accidental blur, artifacts, and unrelated clutter while preserving intentional bokeh, soft focus, grain, or motion. Copy the JSON into the prompt workflow to keep those source-specific visual cues explicit during a second generation.
 
 ## Core capabilities
 
@@ -360,7 +360,7 @@ These screenshots come from isolated browser sessions of the current workbench. 
 | Workflow | Inputs | Result |
 | --- | --- | --- |
 | Prompt-to-image | Prompt, up to 15 references, ratio, size, format, optional transparent background | PNG/JPG assets or transparent PNGs, progress, filmstrip, download, and metadata review |
-| Image-to-prompt | One image | Reusable subject and framing JSON with explicit source-style vocabulary and style-drift constraints |
+| Image-to-prompt | One image | Reusable subject and framing JSON with prioritized source-style anchors, crisp subject/texture intent, `4K/8K` visual-quality wording, and image-specific drift constraints |
 | Style transfer | Source image, style image or preset, optional prompt | A generated result plus a before/after preset comparison |
 | Reference analysis | 1-15 images, analysis language, target description | Structured analysis and an optional generation prompt/result |
 | Image decomposition | One product/device/package image and a decomposition brief | Callout or infographic-style PNG/JPG and saved analysis |
@@ -541,7 +541,7 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 - The source and lockfile versions are authoritative; tags use `v<version>`.
 - Versions use `major.minor.patch` with a three-digit patch segment: major bumps reset minor and patch, minor bumps reset patch, feature bumps add `0.010`, and ordinary updates add `0.001`.
 - Use `npm run release:major`, `npm run release:minor`, `npm run release:feature`, or `npm run release:patch` with `--summary`; each release changes exactly one level.
-- Current release notes: [v0.2.067](./docs/releases/v0.2.067.md).
+- Current release notes: [v0.2.068](./docs/releases/v0.2.068.md).
 - Windows packages are distributed through [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Check the release notes for hashes and signing status.
 - `npm run check:release:strict` requires a clean worktree and a matching tag on the current commit.
 
@@ -556,7 +556,12 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 
 ## Version history
 
-Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.067](./docs/releases/v0.2.067.md).
+Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.068](./docs/releases/v0.2.068.md).
+
+### v0.2.068
+
+- Strengthened image-to-prompt style locking with prioritized source-specific visual anchors and clear subject/texture intent, plus `4K/8K` visual-quality wording that does not promise actual output dimensions.
+- Added image-grounded constraints against unintended blur, smudging, artifacts, and unrelated clutter while preserving intentional bokeh, soft focus, grain, and motion.
 
 ### v0.2.067
 

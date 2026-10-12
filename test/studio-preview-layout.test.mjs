@@ -2635,7 +2635,8 @@ test("prompt agent uses one structured JSON result for display, copy, mapping, a
   assert.match(html, /id="copyPromptAgentJsonButton"[\s\S]*复制 JSON/);
   assert.doesNotMatch(html, /id="copyPromptAgentPromptButton"/);
   assert.match(html, /id="promptAgentResultLabel">结构化反推 JSON/);
-  assert.match(html, /<h2>图片转提示词<\/h2>[\s\S]*主体与景别详细、背景精简、视觉风格锁定/);
+  assert.match(html, /<h2>图片转提示词<\/h2>[\s\S]*锁定原图风格，强化主体清晰度与 4K\/8K 级成像质感/);
+  assert.match(html, /提示词目标，不代表实际像素/);
   assert.match(app, /setPromptAgentFeedback\("已生成结构化反推 JSON。", "success"\);/);
   assert.match(app, /state\.promptTemplates = nextTemplates;/);
   assert.match(app, /writePromptTemplates\(\);[\s\S]*renderPromptTemplates\(\);/);

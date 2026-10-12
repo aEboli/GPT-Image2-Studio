@@ -254,6 +254,10 @@ test("image-to-prompt instruction requests detailed subject and reproducible fra
   assert.match(instruction, /空泛|精美|高级|震撼/);
   assert.match(instruction, /近义|同义|重复/);
   assert.match(instruction, /风格锁定/);
+  assert.match(instruction, /最具辨识度的风格组合|辨识度.*风格/);
+  assert.match(instruction, /4K\/8K级超高清成像质感/);
+  assert.match(instruction, /主体焦点清楚.*自然锐利/);
+  assert.match(instruction, /背景散景.*胶片颗粒/);
   assert.match(instruction, /媒介与渲染方式|色彩与对比|光线方向与质地|材质与表面反应/);
   assert.match(instruction, /镜头与景深|后期处理与氛围/);
   assert.match(instruction, /8-16 个|具体短语/);
@@ -295,7 +299,10 @@ test("image-to-prompt instruction requests detailed subject and reproducible fra
   ]);
   assert.match(PROMPT_AGENT_JSON_SCHEMA.properties.framing.properties.camera.description, /明确|单一/);
   assert.match(PROMPT_AGENT_JSON_SCHEMA.properties.visual.description, /风格锁定/);
-  assert.match(PROMPT_AGENT_JSON_SCHEMA.properties.visual.description, /媒介与渲染|色彩与对比|材质与表面/);
+  assert.match(PROMPT_AGENT_JSON_SCHEMA.properties.visual.description, /4K\/8K级超高清成像质感/);
+  assert.match(PROMPT_AGENT_JSON_SCHEMA.properties.visual.description, /不得.*承诺实际输出像素/);
+  assert.match(PROMPT_AGENT_JSON_SCHEMA.properties.visual.description, /媒介、审美、色彩、用光和材质锚点/);
+  assert.match(PROMPT_AGENT_JSON_SCHEMA.properties.visual.description, /镜头景深与后期/);
 });
 
 test("prompt agent request can orchestrate multiple reference images into scene prompts", () => {
