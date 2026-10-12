@@ -2,6 +2,6 @@
 - [x] Add source-grounded 4K/8K visual intent, natural subject sharpness, visible texture, and clean hierarchy without promising output pixels.
 - [x] Keep `avoid` conditional so intentional bokeh, soft focus, grain, and motion remain intact.
 - [x] Update the upload hint and the image-to-prompt sections in both READMEs.
-- [x] Add the local release note and pass focused Prompt Agent, release-consistency, OpenSpec, syntax, and whitespace checks.
-- [ ] Complete the full suite and Windows desktop build; record validation and artifact hashes in the release note.
-- [ ] Archive the OpenSpec change after final validation.
+- [x] Add the release note with full-suite results, desktop build results, artifact hashes, and signature status.
+- [x] Pass the full `2481/2481` suite and Windows desktop/packaged smoke checks.
+- [x] Archive the OpenSpec change after strict validation.
