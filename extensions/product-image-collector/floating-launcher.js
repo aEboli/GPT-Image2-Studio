@@ -3,7 +3,7 @@
   const PANEL_HOST_ID = "gpt-image2-studio-product-image-collector";
   const CONTROLLER_KEY = "__gptImage2StudioProductImageLauncherController";
   const PANEL_CONTROLLER_KEY = "__gptImage2StudioProductImagePanelController";
-  const LAUNCHER_VERSION = "1.1.33";
+  const LAUNCHER_VERSION = "1.1.34";
   const MESSAGE_OPEN = "product-image-collector:open";
   const PANEL_OPENED_EVENT = "gpt-image2-studio-product-image-collector:panel-opened";
   const PANEL_CLOSED_EVENT = "gpt-image2-studio-product-image-collector:panel-closed";

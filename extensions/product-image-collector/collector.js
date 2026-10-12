@@ -1,5 +1,5 @@
 (() => {
-  const COLLECTOR_VERSION = "1.1.33";
+  const COLLECTOR_VERSION = "1.1.34";
   const CONTROLLER_KEY = "__gptImage2StudioProductImageCollectorController";
   async function collectProductImages() {
   const DETAIL_TIMEOUT_MS = 8000;

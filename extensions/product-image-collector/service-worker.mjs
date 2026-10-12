@@ -10,8 +10,9 @@ const MESSAGE_COPY = "product-image-collector:copy";
 const MESSAGE_COPY_IMAGES = "product-image-collector:copy-images";
 const MESSAGE_DOWNLOAD = "product-image-collector:download";
 const MESSAGE_OPEN = "product-image-collector:open";
-const EXTENSION_VERSION = "1.1.33";
+const EXTENSION_VERSION = "1.1.34";
 const NATIVE_CLIPBOARD_HOST = "com.aeboli.gpt_image2_studio.product_image_clipboard";
+const DOWNLOAD_CONCURRENCY = 8;
 
 function isSupportedProductTab(value) {
   return Boolean(getProductImagePlatformForSourceUrl(value));
@@ -139,15 +140,41 @@ async function downloadSelection(message) {
   if (plan.items.length === 0) {
     throw new Error("请先选择要下载的商品图。");
   }
-  for (const item of plan.items) {
-    await chrome.downloads.download({
-      url: item.url,
-      filename: item.path,
-      conflictAction: "uniquify",
-      saveAs: false,
-    });
+
+  let nextIndex = 0;
+  let count = 0;
+  const failures = [];
+  async function submitNext() {
+    while (nextIndex < plan.items.length) {
+      const item = plan.items[nextIndex++];
+      try {
+        await chrome.downloads.download({
+          url: item.url,
+          filename: item.path,
+          conflictAction: "uniquify",
+          saveAs: false,
+        });
+        count += 1;
+      } catch (error) {
+        failures.push(error instanceof Error ? error.message : String(error || "未知下载错误"));
+      }
+    }
   }
-  return { ok: true, count: plan.items.length, folder: plan.folder };
+
+  await Promise.all(Array.from(
+    { length: Math.min(DOWNLOAD_CONCURRENCY, plan.items.length) },
+    () => submitNext(),
+  ));
+  if (count === 0) {
+    throw new Error(failures[0] || "所有图片都未能启动下载。");
+  }
+  return {
+    ok: true,
+    count,
+    failedCount: failures.length,
+    failureMessage: failures[0] || "",
+    folder: plan.folder,
+  };
 }
 
 chrome.action.onClicked.addListener(async (tab) => {

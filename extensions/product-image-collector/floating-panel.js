@@ -2,7 +2,7 @@
   const HOST_ID = "gpt-image2-studio-product-image-collector";
   const CONTROLLER_KEY = "__gptImage2StudioProductImagePanelController";
   const COLLECTOR_CONTROLLER_KEY = "__gptImage2StudioProductImageCollectorController";
-  const PANEL_VERSION = "1.1.33";
+  const PANEL_VERSION = "1.1.34";
   const THEME_STATE_KEY = "__gptImage2StudioProductImagePanelTheme";
   const REVEAL_EVENT = "gpt-image2-studio-product-image-collector:reveal";
   const PANEL_OPENED_EVENT = "gpt-image2-studio-product-image-collector:panel-opened";
@@ -359,6 +359,10 @@
       .status { margin: 0; padding: 4px 8px; border-top: 1px solid var(--border-soft); background: var(--surface); color: var(--muted); font-size: 10px; line-height: 1.4; overflow-wrap: anywhere; white-space: normal; }
       .status[data-state="error"] { color: var(--danger); }
       .status[data-state="success"] { color: var(--success); }
+      .status[data-state="busy"] { position: relative; padding-right: 26px; color: var(--link-strong); }
+      .status[data-state="busy"]::after { content: ""; position: absolute; top: 50%; right: 10px; width: 8px; height: 8px; border-radius: 50%; background: var(--link); filter: blur(3px); opacity: .25; transform: translateY(-50%) scale(.75); animation: status-busy-pulse 900ms ease-in-out infinite alternate; pointer-events: none; }
+      @keyframes status-busy-pulse { to { opacity: .75; transform: translateY(-50%) scale(1.25); } }
+      @media (prefers-reduced-motion: reduce) { .status[data-state="busy"]::after { animation: none; opacity: .45; transform: translateY(-50%); } }
       .groups { display: grid; align-content: start; min-height: 0; overflow: auto; scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) var(--scroll-track); }
       .groups::-webkit-scrollbar, .selection-tools::-webkit-scrollbar { width: 8px; height: 8px; }
       .groups::-webkit-scrollbar-track, .selection-tools::-webkit-scrollbar-track { background: var(--scroll-track); }
@@ -472,7 +476,7 @@
           <button id="selectSkuButton" type="button">选 SKU 图</button>
         </div>
       </div>
-      <p class="status" id="status" data-state="idle">正在读取当前商品页...</p>
+      <p class="status" id="status" role="status" aria-live="polite" aria-atomic="true" aria-busy="false" data-state="idle">正在读取当前商品页...</p>
       <div class="groups" id="groups"></div>
       <footer class="action-bar">
         <button class="secondary" id="copyButton" type="button" disabled>复制到 Studio</button>
@@ -585,6 +589,7 @@
   function setStatus(message, kind = "idle") {
     refs.status.textContent = message;
     refs.status.dataset.state = kind;
+    refs.status.setAttribute("aria-busy", String(kind === "busy"));
   }
 
   function hideCopySuccessToast() {
@@ -699,6 +704,7 @@
   }
 
   function syncSelectionStatus() {
+    if (refs.status.dataset.state === "busy") return;
     setStatus(selectionStatusMessage(), state.collectionNotice ? "idle" : "success");
   }
 
@@ -1182,6 +1188,7 @@
     const serial = panelMountSerial;
     if (items.length === 0) return setStatus("请先选择要下载的商品图。", "error");
     state.busy = true;
+    setStatus(`正在提交 ${items.length} 张图片下载...`, "busy");
     syncActions();
     try {
       const response = await sendMessage(MESSAGE_DOWNLOAD, {
@@ -1189,12 +1196,17 @@
         selectedIds: items.map((item) => item.id),
       });
       if (isStaleMount(serial)) return;
-      setStatus(
-        single
-          ? `已提交 ${displayFilename(items[0])} 到 ${response.folder}。`
-          : `已提交 ${response.count} 张图片到 ${response.folder}，未生成 JSON 文件。`,
-        "success",
-      );
+      if (response.failedCount > 0) {
+        const failureDetail = response.failureMessage ? ` 首个错误：${response.failureMessage}` : "";
+        setStatus(`已提交 ${response.count} 张，${response.failedCount} 张提交失败。${failureDetail}`, "error");
+      } else {
+        setStatus(
+          single
+            ? `已提交 ${displayFilename(items[0])} 到 ${response.folder}。`
+            : `已提交 ${response.count} 张图片到 ${response.folder}，未生成 JSON 文件。`,
+          "success",
+        );
+      }
     } catch (error) {
       if (!isStaleMount(serial)) setStatus(error instanceof Error ? error.message : String(error), "error");
     } finally {

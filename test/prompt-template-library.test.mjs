@@ -144,7 +144,7 @@ test("prompt template library browser contract covers the requested browse and a
   assert.match(html, /id="lightboxDismissButton"[^>]+>关闭<\/button>/);
   assert.match(html, /id="copyPromptButton"[^>]*>复制<\/button>[\s\S]*id="applyPromptButton"[^>]*>应用<\/button>/);
   assert.match(app, /promptTemplateLibrary:\s*\{[\s\S]*categoryId:\s*"usage-scenario"/);
-  assert.match(html, /styles\.css\?v=20261011-prompt-template-card-layout-1/);
+  assert.match(html, /styles\.css\?v=20261011-contrast-and-surface-ladder-1/);
   assert.match(html, /app\.js\?v=20261011-prompt-template-card-layout-1/);
   assert.match(app, /PROMPT_TEMPLATE_LIBRARY_ASSET_VERSION\s*=\s*"20260925-prompt-library-assets-1"/);
   assert.match(app, /image\.addEventListener\("error",[\s\S]*template\.previewSourceUrl/);

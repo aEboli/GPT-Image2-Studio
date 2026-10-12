@@ -188,7 +188,7 @@ test("floating launcher opens the in-page panel without any background round tri
     location,
     window: { clearInterval, clearTimeout, setInterval, setTimeout },
     __gptImage2StudioProductImagePanelController: {
-      version: "1.1.33",
+      version: "1.1.34",
       open() { opens.push(location.href); },
     },
   };
@@ -295,7 +295,7 @@ test("collector registers an idle controller without reading the page", async ()
   const sandbox = {};
   vm.runInNewContext(collectorSource, sandbox);
   const controller = sandbox.__gptImage2StudioProductImageCollectorController;
-  assert.equal(controller.version, "1.1.33");
+  assert.equal(controller.version, "1.1.34");
   assert.equal(typeof controller.collect, "function");
 });
 
@@ -303,7 +303,7 @@ test("panel load creates no DOM and replaces a same-version controller whose ope
   let createElementCalls = 0;
   let destroyCalls = 0;
   const staleController = {
-    version: "1.1.33",
+    version: "1.1.34",
     open() { throw new Error("stale panel"); },
     destroy() { destroyCalls += 1; },
   };
@@ -322,7 +322,7 @@ test("panel load creates no DOM and replaces a same-version controller whose ope
   vm.runInNewContext(floatingPanelSource, sandbox);
   const controller = sandbox.__gptImage2StudioProductImagePanelController;
   assert.notEqual(controller, staleController);
-  assert.equal(controller.version, "1.1.33");
+  assert.equal(controller.version, "1.1.34");
   assert.equal(typeof controller.open, "function");
   assert.equal(typeof controller.destroy, "function");
   assert.equal(createElementCalls, 0);
@@ -341,13 +341,13 @@ test("panel collection prefers the in-page collector and falls back only for sta
     messages: [],
     location: { href: "https://detail.1688.com/offer/123.html" },
     __gptImage2StudioProductImageCollectorController: {
-      version: "1.1.33",
+      version: "1.1.34",
       collect() { return Promise.resolve({ ok: true, source: "page" }); },
     },
   };
   vm.runInNewContext(`
     const COLLECTOR_CONTROLLER_KEY = "__gptImage2StudioProductImageCollectorController";
-    const PANEL_VERSION = "1.1.33";
+    const PANEL_VERSION = "1.1.34";
     const MESSAGE_COLLECT = "product-image-collector:collect";
     function sendMessage(type, payload) {
       globalThis.messages.push({ type, payload });
@@ -366,7 +366,7 @@ test("panel collection prefers the in-page collector and falls back only for sta
   };
   vm.runInNewContext(`
     const COLLECTOR_CONTROLLER_KEY = "__gptImage2StudioProductImageCollectorController";
-    const PANEL_VERSION = "1.1.33";
+    const PANEL_VERSION = "1.1.34";
     const MESSAGE_COLLECT = "product-image-collector:collect";
     function sendMessage(type, payload) {
       globalThis.messages.push({ type, payload });
@@ -1404,24 +1404,24 @@ test("background invocations reject a stale page before calling page controllers
     collectCalls: 0,
     openCalls: 0,
     __gptImage2StudioProductImageCollectorController: {
-      version: "1.1.33",
+      version: "1.1.34",
       collect() {
         sandbox.collectCalls += 1;
         return { ok: true, manifest: { items: [] } };
       },
     },
     __gptImage2StudioProductImagePanelController: {
-      version: "1.1.33",
+      version: "1.1.34",
       open() { sandbox.openCalls += 1; },
     },
   };
 
   vm.runInNewContext(`
     ${controllerInvocationSource}
-    globalThis.staleCollectResult = collectInjectedPage("https://detail.1688.com/offer/111.html", "1.1.33");
-    globalThis.currentCollectResult = collectInjectedPage(location.href, "1.1.33");
-    globalThis.staleResult = openInjectedPanel("https://detail.1688.com/offer/111.html", "1.1.33");
-    globalThis.currentResult = openInjectedPanel(location.href, "1.1.33");
+    globalThis.staleCollectResult = collectInjectedPage("https://detail.1688.com/offer/111.html", "1.1.34");
+    globalThis.currentCollectResult = collectInjectedPage(location.href, "1.1.34");
+    globalThis.staleResult = openInjectedPanel("https://detail.1688.com/offer/111.html", "1.1.34");
+    globalThis.currentResult = openInjectedPanel(location.href, "1.1.34");
   `, sandbox);
 
   assert.equal(sandbox.staleCollectResult.ok, false);
@@ -1460,8 +1460,8 @@ test("background invocations reject stale controller versions before calling the
 
   vm.runInNewContext(`
     ${controllerInvocationSource}
-    globalThis.collectResult = collectInjectedPage(location.href, "1.1.33");
-    globalThis.openResult = openInjectedPanel(location.href, "1.1.33");
+    globalThis.collectResult = collectInjectedPage(location.href, "1.1.34");
+    globalThis.openResult = openInjectedPanel(location.href, "1.1.34");
   `, sandbox);
 
   assert.equal(sandbox.collectResult.ok, false);
@@ -1709,7 +1709,7 @@ test("extension manifest uses an on-demand minimum-permission MV3 surface", asyn
   const serviceWorker = await readFile(new URL("../extensions/product-image-collector/service-worker.mjs", import.meta.url), "utf8");
   const floatingPanel = await readFile(new URL("../extensions/product-image-collector/floating-panel.js", import.meta.url), "utf8");
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, "1.1.33");
+  assert.equal(manifest.version, "1.1.34");
   assert.deepEqual(manifest.permissions, ["activeTab", "scripting", "downloads", "clipboardWrite", "nativeMessaging"]);
   for (const permission of [
     "https://detail.1688.com/*",
@@ -1745,9 +1745,9 @@ test("extension manifest uses an on-demand minimum-permission MV3 surface", asyn
   assert.match(serviceWorker, /chrome\.runtime\.sendNativeMessage\(NATIVE_CLIPBOARD_HOST/);
   assert.match(serviceWorker, /com\.aeboli\.gpt_image2_studio\.product_image_clipboard/);
   assert.doesNotMatch(serviceWorker, /chrome\.tabs\.query|STUDIO_TAB_URL_PATTERNS|product-image-collector\/clipboard|chrome\.sidePanel/);
-  assert.match(floatingPanel, /PANEL_VERSION\s*=\s*"1\.1\.33"/);
-  assert.match(floatingLauncherSource, /LAUNCHER_VERSION\s*=\s*"1\.1\.33"/);
-  assert.match(collectorSource, /COLLECTOR_VERSION\s*=\s*"1\.1\.33"/);
+  assert.match(floatingPanel, /PANEL_VERSION\s*=\s*"1\.1\.34"/);
+  assert.match(floatingLauncherSource, /LAUNCHER_VERSION\s*=\s*"1\.1\.34"/);
+  assert.match(collectorSource, /COLLECTOR_VERSION\s*=\s*"1\.1\.34"/);
   assert.match(collectorSource, /globalThis\[CONTROLLER_KEY\]\s*=\s*controller/);
   assert.match(floatingPanel, /function collectPage\(\)[\s\S]*?collector\.collect\(\)/);
   assert.match(floatingPanel, /function previewUrlFor\(item\)/);

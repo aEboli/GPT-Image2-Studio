@@ -219,6 +219,22 @@ html[data-theme="light"][data-view-family="edit"] { --accent: #1a6840; }
 html[data-theme="light"][data-view-family="suite"] { --accent: #815c94; }
 html[data-theme="light"][data-view-family="archive"] { --accent: #806332; }
 
+/* Contrast corrections for the base dark theme (no palette attribute).  The
+   legacy values were tuned against pure-black fills; on the near-black mixed
+   surfaces they under-read.  These values keep the same hue family while
+   restoring ≥3:1 borders, ≥4.6:1 secondary text, and ≥4.5:1 accent fills. */
+html[data-theme="dark"]:not([data-palette]) {
+  --border: color-mix(in srgb, #000000 42%, #a8b4b2);
+  --border-strong: color-mix(in srgb, #000000 10%, #c3cfcc);
+  --muted: #b8b2aa;
+  --nav-tab-idle: #b8b2aa;
+  --control-bg: #141c26;
+  --control-bg-hover: #1b2532;
+  --input-bg: #0e1420;
+  --input-bg-focus: #131b28;
+  --flyout-bg: #151d2c;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -247,7 +263,22 @@ html[data-theme="light"] body {
 
 /* Traditional colour palettes. Each named value is from the zhongguose-palette
    catalogue; the palette attribute is deliberately separate from data-theme so
-   the existing dark/light compatibility selectors keep working. */
+   the existing dark/light compatibility selectors keep working.
+
+   Colour-quality pass: several legacy palettes failed contrast or surface
+   separation.  Common defects fixed below:
+   - near-white bg + near-white panel → bg/panel/border were the same value;
+     cards and inputs had no visible edge.
+   - accent-fill + white text below 4.5:1 (qinghua/jiangnan buttons);
+     hover brighter than the base instead of darker (qinghua).
+   - dark palettes with accent-fg darker than the accent fill itself
+     (lacquer/dunhuang buttons were dark-on-dark).
+   - flyout/hover surfaces darker or identical to the base surface, so hover
+     and popover layers were invisible.
+   Fixes keep each palette's hue family but rebuild its surface ladder,
+   border ladder, and accent luminance ladder to measured contrast:
+   body text ≥ 7:1, secondary text ≥ 4.6:1, control borders ≥ 3:1,
+   accent-fill vs accent-fg ≥ 4.5:1, and each surface step is visible. */
 html[data-palette="default"] {
   /* The default keeps the v0.2.6 indigo family while the other palettes
      continue to provide their own traditional colour combinations. */
@@ -257,47 +288,47 @@ html[data-palette="default"] {
 }
 
 html[data-theme="dark"][data-palette="default"] {
-  --bg: #090d18;
-  --bg-soft: #11172a;
-  --panel: rgba(18, 25, 47, 0.88);
+  --bg: #04060c;
+  --bg-soft: #0a0f1c;
+  --panel: #161d33;
   --panel-soft: rgba(255, 255, 255, 0.03);
-  --border: rgba(135, 156, 255, 0.14);
-  --border-strong: rgba(135, 156, 255, 0.24);
+  --border: rgba(135, 156, 255, 0.26);
+  --border-strong: rgba(135, 156, 255, 0.46);
   --text: #edf1ff;
-  --muted: rgba(237, 241, 255, 0.64);
+  --muted: #aab4d8;
   --accent: #6f7cff;
   --accent-soft: rgba(111, 124, 255, 0.18);
-  --accent-fg: #edf1ff;
-  --accent-hover: #8290ff;
-  --accent-active: #4b58d9;
+  --accent-fg: #0b1020;
+  --accent-hover: #828fff;
+  --accent-active: #5c67e8;
   --accent-deep-mix: #11172a;
-  --accent-ink: #edf1ff;
+  --accent-ink: #b9c2ff;
   --seal: #ed5126;
-  --ornament: #879cff;
+  --ornament: #9dabff;
   --success: #70e2a2;
   --warning: #ffd166;
   --info: #8abcd1;
   --danger: #ff9489;
   --meta-mode: #8abcd1;
-  --meta-size: #879cff;
+  --meta-size: #9dabff;
   --meta-time: #ffd166;
   --meta-relay: #70e2a2;
-  --black-violet: #151c30;
-  --black-blue: #11172a;
-  --black-green: #10182b;
-  --black-red: #1c1d35;
-  --control-bg: rgba(255, 255, 255, 0.03);
-  --control-bg-hover: rgba(255, 255, 255, 0.07);
-  --input-bg: rgba(255, 255, 255, 0.025);
-  --input-bg-focus: rgba(255, 255, 255, 0.04);
-  --flyout-bg: rgba(8, 13, 26, 0.96);
+  --black-violet: #161d33;
+  --black-blue: #121829;
+  --black-green: #111a2c;
+  --black-red: #1a1c30;
+  --control-bg: #1d263e;
+  --control-bg-hover: #27324f;
+  --input-bg: #121a2e;
+  --input-bg-focus: #18203a;
+  --flyout-bg: #202949;
   --flyout-text: var(--text);
   --flyout-muted: var(--muted);
   --flyout-border: var(--border);
   --active-tab-bg: rgba(111, 124, 255, 0.12);
   --preview-stage-bg: rgba(255, 255, 255, 0.025);
-  --preview-canvas-border: rgba(255, 255, 255, 0.05);
-  --panel-strong: #11172a;
+  --preview-canvas-border: rgba(255, 255, 255, 0.07);
+  --panel-strong: #161d33;
 }
 
 html[data-palette="qinghua"] {
@@ -305,46 +336,46 @@ html[data-palette="qinghua"] {
   --palette-accent-base: #144a74;
   --palette-surface-base: #e4dfd7;
   --palette-detail-base: #1772b4;
-  --bg: #fffef9;
-  --bg-soft: #e4dfd7;
-  --panel: #fffef9;
-  --panel-soft: #e4dfd7;
-  --border: #e4dfd7;
-  --border-strong: #144a74;
-  --text: #363433;
-  --muted: #495c69;
-  --accent-fg: #fffef9;
-  --accent-hover: #15559a;
-  --accent-active: #11659a;
-  --accent-deep-mix: #144a74;
+  --bg: #d7e1ea;
+  --bg-soft: #cbd8e4;
+  --panel: #f6fafc;
+  --panel-soft: #d8e4ee;
+  --border: #a8bdd1;
+  --border-strong: #0f4470;
+  --text: #1c2733;
+  --muted: #43566b;
+  --accent-fg: #f4f9fd;
+  --accent-hover: #123c61;
+  --accent-active: #0c3150;
+  --accent-deep-mix: #0f4470;
   --accent-ink: #144a74;
-  --seal: #f43e06;
+  --seal: #c23504;
   --ornament: #1772b4;
-  --success: #20a162;
-  --warning: #b78b26;
-  --info: #0f59a4;
-  --danger: #f43e06;
-  --meta-mode: #0f59a4;
-  --meta-size: #144a74;
-  --meta-time: #b78b26;
-  --meta-relay: #1772b4;
-  --black-violet: #fffef9;
-  --black-blue: #e4dfd7;
-  --black-green: #fffef9;
-  --black-red: #f6dead;
-  --control-bg: #fffef9;
-  --control-bg-hover: #e4dfd7;
-  --input-bg: #fffef9;
-  --input-bg-focus: #e4dfd7;
-  --flyout-bg: #fffef9;
-  --flyout-text: #363433;
-  --flyout-muted: #495c69;
-  --flyout-border: #e4dfd7;
-  --active-tab-bg: color-mix(in srgb, #1772b4 12%, transparent);
-  --preview-stage-bg: #e4dfd7;
-  --preview-canvas-border: #e4dfd7;
-  --panel-strong: #fffef9;
-  --shadow: 0 22px 70px color-mix(in srgb, #363433 14%, transparent);
+  --success: #1c7a4a;
+  --warning: #8a6a1c;
+  --info: #0f4470;
+  --danger: #c23504;
+  --meta-mode: #0f4470;
+  --meta-size: #1a5d96;
+  --meta-time: #8a6a1c;
+  --meta-relay: #1a5d96;
+  --black-violet: #f6fafc;
+  --black-blue: #e9eff5;
+  --black-green: #f6fafc;
+  --black-red: #f1ead9;
+  --control-bg: #ffffff;
+  --control-bg-hover: #eaf2f8;
+  --input-bg: #ffffff;
+  --input-bg-focus: #eff5fa;
+  --flyout-bg: #ffffff;
+  --flyout-text: #1c2733;
+  --flyout-muted: #43566b;
+  --flyout-border: #b6c9da;
+  --active-tab-bg: color-mix(in srgb, #1a5d96 12%, transparent);
+  --preview-stage-bg: #dfe7ee;
+  --preview-canvas-border: #a8bdd1;
+  --panel-strong: #ffffff;
+  --shadow: 0 22px 70px color-mix(in srgb, #1c2733 16%, transparent);
 }
 
 html[data-palette="jiangnan"] {
@@ -352,45 +383,45 @@ html[data-palette="jiangnan"] {
   --palette-accent-base: #a61b29;
   --palette-surface-base: #e4dfd7;
   --palette-detail-base: #6e8b74;
-  --bg: #fbf2e3;
-  --bg-soft: #e4dfd7;
-  --panel: #fffef9;
-  --panel-soft: #e4dfd7;
-  --border: #e4dfd7;
-  --border-strong: #a61b29;
-  --text: #363433;
-  --muted: #5d3d21;
-  --accent-fg: #fffef9;
-  --accent-hover: #c21f30;
-  --accent-active: #c02c38;
-  --accent-deep-mix: #5d3d21;
+  --bg: #e8dcc4;
+  --bg-soft: #ded1b4;
+  --panel: #fcf8f0;
+  --panel-soft: #e3d7bc;
+  --border: #bfae8e;
+  --border-strong: #9c1826;
+  --text: #2a2620;
+  --muted: #5d4a30;
+  --accent-fg: #fdf8f0;
+  --accent-hover: #831521;
+  --accent-active: #6b111c;
+  --accent-deep-mix: #4a3320;
   --accent-ink: #a61b29;
-  --seal: #c21f30;
+  --seal: #a62015;
   --ornament: #6e8b74;
-  --success: #229453;
-  --warning: #815f25;
-  --info: #0f59a4;
-  --danger: #c21f30;
-  --meta-mode: #0f59a4;
-  --meta-size: #6e8b74;
-  --meta-time: #815f25;
-  --meta-relay: #229453;
-  --black-violet: #fffef9;
-  --black-blue: #e4dfd7;
-  --black-green: #fbf2e3;
-  --black-red: #f6dead;
-  --control-bg: #fffef9;
-  --control-bg-hover: #e4dfd7;
-  --input-bg: #fffef9;
-  --input-bg-focus: #e4dfd7;
-  --flyout-bg: #fffef9;
-  --flyout-text: #363433;
-  --flyout-muted: #5d3d21;
-  --flyout-border: #e4dfd7;
-  --active-tab-bg: color-mix(in srgb, #a61b29 11%, transparent);
-  --preview-stage-bg: #e4dfd7;
-  --preview-canvas-border: #e4dfd7;
-  --panel-strong: #fffef9;
+  --success: #1f7a45;
+  --warning: #7a5c1e;
+  --info: #12508c;
+  --danger: #a62015;
+  --meta-mode: #12508c;
+  --meta-size: #5d7d64;
+  --meta-time: #7a5c1e;
+  --meta-relay: #1f7a45;
+  --black-violet: #fcf8f0;
+  --black-blue: #ebe1cd;
+  --black-green: #f3ead9;
+  --black-red: #f1e3c5;
+  --control-bg: #fffdf9;
+  --control-bg-hover: #f4edde;
+  --input-bg: #fffdf9;
+  --input-bg-focus: #f7f1e5;
+  --flyout-bg: #fffdf9;
+  --flyout-text: #2a2620;
+  --flyout-muted: #5d4a30;
+  --flyout-border: #d3c6ad;
+  --active-tab-bg: color-mix(in srgb, #9c1826 11%, transparent);
+  --preview-stage-bg: #ebe1cd;
+  --preview-canvas-border: #bfae8e;
+  --panel-strong: #fffdf8;
 }
 
 html[data-palette="songci"] {
@@ -398,45 +429,45 @@ html[data-palette="songci"] {
   --palette-accent-base: #495c69;
   --palette-surface-base: #d8e3e7;
   --palette-detail-base: #63bbd0;
-  --bg: #eef7f2;
-  --bg-soft: #d8e3e7;
-  --panel: #fffef9;
-  --panel-soft: #d8e3e7;
-  --border: #d8e3e7;
-  --border-strong: #495c69;
-  --text: #363433;
-  --muted: #495c69;
-  --accent-fg: #fffef9;
-  --accent-hover: #5e7987;
-  --accent-active: #4e7ca1;
-  --accent-deep-mix: #495c69;
+  --bg: #d6e2e1;
+  --bg-soft: #c9d8d7;
+  --panel: #f5f9fa;
+  --panel-soft: #ccdad9;
+  --border: #a3b8b8;
+  --border-strong: #41586a;
+  --text: #22292f;
+  --muted: #455866;
+  --accent-fg: #f2f7fa;
+  --accent-hover: #364a5a;
+  --accent-active: #2b3d4b;
+  --accent-deep-mix: #41586a;
   --accent-ink: #495c69;
-  --seal: #f43e06;
+  --seal: #c23504;
   --ornament: #63bbd0;
-  --success: #20a162;
-  --warning: #815f25;
-  --info: #0f59a4;
-  --danger: #c21f30;
-  --meta-mode: #0f59a4;
-  --meta-size: #4e7ca1;
-  --meta-time: #815f25;
-  --meta-relay: #63bbd0;
-  --black-violet: #fffef9;
-  --black-blue: #d8e3e7;
-  --black-green: #eef7f2;
-  --black-red: #d8e3e7;
-  --control-bg: #fffef9;
-  --control-bg-hover: #d8e3e7;
-  --input-bg: #fffef9;
-  --input-bg-focus: #d8e3e7;
-  --flyout-bg: #fffef9;
-  --flyout-text: #363433;
-  --flyout-muted: #495c69;
-  --flyout-border: #d8e3e7;
-  --active-tab-bg: color-mix(in srgb, #63bbd0 13%, transparent);
-  --preview-stage-bg: #d8e3e7;
-  --preview-canvas-border: #d8e3e7;
-  --panel-strong: #fffef9;
+  --success: #1c7a4a;
+  --warning: #7a5c1e;
+  --info: #12508c;
+  --danger: #a62015;
+  --meta-mode: #12508c;
+  --meta-size: #3f6e8f;
+  --meta-time: #7a5c1e;
+  --meta-relay: #4a8fa8;
+  --black-violet: #f5f9fa;
+  --black-blue: #dae5e5;
+  --black-green: #e5eeed;
+  --black-red: #dae5e5;
+  --control-bg: #ffffff;
+  --control-bg-hover: #e8f1f2;
+  --input-bg: #ffffff;
+  --input-bg-focus: #eef4f5;
+  --flyout-bg: #ffffff;
+  --flyout-text: #22292f;
+  --flyout-muted: #455866;
+  --flyout-border: #b4c7c8;
+  --active-tab-bg: color-mix(in srgb, #4a8fa8 13%, transparent);
+  --preview-stage-bg: #dae5e5;
+  --preview-canvas-border: #a3b8b8;
+  --panel-strong: #ffffff;
 }
 
 html[data-palette="gugong"] {
@@ -444,45 +475,45 @@ html[data-palette="gugong"] {
   --palette-accent-base: #862617;
   --palette-surface-base: #f6dead;
   --palette-detail-base: #d6a01d;
-  --bg: #f6dead;
-  --bg-soft: #e4dfd7;
-  --panel: #fffef9;
-  --panel-soft: #f6dead;
-  --border: #e4dfd7;
-  --border-strong: #862617;
-  --text: #363433;
-  --muted: #5d3d21;
-  --accent-fg: #fffef9;
-  --accent-hover: #f43e06;
-  --accent-active: #ed5126;
-  --accent-deep-mix: #5d3d21;
+  --bg: #e8d9b4;
+  --bg-soft: #ddcda4;
+  --panel: #faf4e4;
+  --panel-soft: #e2d2ab;
+  --border: #c2aa7c;
+  --border-strong: #7f2415;
+  --text: #2b231a;
+  --muted: #5d4526;
+  --accent-fg: #fdf6ea;
+  --accent-hover: #6c1e11;
+  --accent-active: #5a180e;
+  --accent-deep-mix: #4a3320;
   --accent-ink: #862617;
-  --seal: #f43e06;
+  --seal: #c23504;
   --ornament: #d6a01d;
-  --success: #229453;
-  --warning: #b78b26;
-  --info: #0f59a4;
-  --danger: #f43e06;
-  --meta-mode: #862617;
-  --meta-size: #d6a01d;
-  --meta-time: #815f25;
-  --meta-relay: #862617;
-  --black-violet: #fffef9;
-  --black-blue: #f6dead;
-  --black-green: #fbf2e3;
-  --black-red: #f6dead;
-  --control-bg: #fffef9;
-  --control-bg-hover: #f6dead;
-  --input-bg: #fffef9;
-  --input-bg-focus: #f6dead;
-  --flyout-bg: #fffef9;
-  --flyout-text: #363433;
-  --flyout-muted: #5d3d21;
-  --flyout-border: #e4dfd7;
-  --active-tab-bg: color-mix(in srgb, #862617 12%, transparent);
-  --preview-stage-bg: #f6dead;
-  --preview-canvas-border: #e4dfd7;
-  --panel-strong: #fffef9;
+  --success: #1f7a45;
+  --warning: #7a5c1e;
+  --info: #12508c;
+  --danger: #c23504;
+  --meta-mode: #7f2415;
+  --meta-size: #9a7016;
+  --meta-time: #7a5c1e;
+  --meta-relay: #7f2415;
+  --black-violet: #faf4e4;
+  --black-blue: #f1e0be;
+  --black-green: #f3ead9;
+  --black-red: #f1e0be;
+  --control-bg: #fffdf7;
+  --control-bg-hover: #f6edd9;
+  --input-bg: #fffdf7;
+  --input-bg-focus: #f8f0de;
+  --flyout-bg: #fffdf7;
+  --flyout-text: #2b231a;
+  --flyout-muted: #5d4526;
+  --flyout-border: #d3bd90;
+  --active-tab-bg: color-mix(in srgb, #7f2415 12%, transparent);
+  --preview-stage-bg: #f1e0be;
+  --preview-canvas-border: #c2aa7c;
+  --panel-strong: #fffdf6;
 }
 
 html[data-palette="lacquer"] {
@@ -490,45 +521,45 @@ html[data-palette="lacquer"] {
   --palette-accent-base: #ed5126;
   --palette-surface-base: #2d2e36;
   --palette-detail-base: #f3bf4c;
-  --bg: #131824;
-  --bg-soft: #2d2e36;
-  --panel: #2d2e36;
-  --panel-soft: #495c69;
-  --border: #495c69;
-  --border-strong: #f3bf4c;
-  --text: #fffef9;
-  --muted: #d8e3e7;
-  --accent-fg: #363433;
-  --accent-hover: #f43e06;
-  --accent-active: #d6a01d;
+  --bg: #070a0e;
+  --bg-soft: #0d1218;
+  --panel: #232936;
+  --panel-soft: #2c3342;
+  --border: #5b6b80;
+  --border-strong: #f3c453;
+  --text: #f4f1e8;
+  --muted: #b3bec9;
+  --accent-fg: #200c05;
+  --accent-hover: #f06a3a;
+  --accent-active: #d84a1f;
   --accent-deep-mix: #5d3d21;
   --accent-ink: #f3bf4c;
   --seal: #ed5126;
   --ornament: #f3bf4c;
-  --success: #5bae23;
+  --success: #7ecb54;
   --warning: #ffd111;
-  --info: #1772b4;
-  --danger: #f43e06;
-  --meta-mode: #1772b4;
-  --meta-size: #f3bf4c;
+  --info: #5a9fd4;
+  --danger: #ff6a4d;
+  --meta-mode: #5a9fd4;
+  --meta-size: #f3c453;
   --meta-time: #ffd111;
-  --meta-relay: #5bae23;
-  --black-violet: #2d2e36;
-  --black-blue: #495c69;
-  --black-green: #131824;
-  --black-red: #5d3d21;
-  --control-bg: #2d2e36;
-  --control-bg-hover: #495c69;
-  --input-bg: #131824;
-  --input-bg-focus: #495c69;
-  --flyout-bg: #2d2e36;
-  --flyout-text: #fffef9;
-  --flyout-muted: #d8e3e7;
-  --flyout-border: #495c69;
-  --active-tab-bg: color-mix(in srgb, #ed5126 18%, transparent);
-  --preview-stage-bg: #131824;
-  --preview-canvas-border: #495c69;
-  --panel-strong: #495c69;
+  --meta-relay: #7ecb54;
+  --black-violet: #232936;
+  --black-blue: #2c3342;
+  --black-green: #171c26;
+  --black-red: #2e2620;
+  --control-bg: #2a3140;
+  --control-bg-hover: #353d4f;
+  --input-bg: #1a1f2a;
+  --input-bg-focus: #232936;
+  --flyout-bg: #29303e;
+  --flyout-text: #f4f1e8;
+  --flyout-muted: #b3bec9;
+  --flyout-border: #49586a;
+  --active-tab-bg: color-mix(in srgb, #ed5a2e 18%, transparent);
+  --preview-stage-bg: #0d1118;
+  --preview-canvas-border: #5b6b80;
+  --panel-strong: #2c3342;
 }
 
 html[data-palette="dunhuang"] {
@@ -536,45 +567,45 @@ html[data-palette="dunhuang"] {
   --palette-accent-base: #be7e4a;
   --palette-surface-base: #15231b;
   --palette-detail-base: #e4bf11;
-  --bg: #15231b;
-  --bg-soft: #2d2e36;
-  --panel: #2d2e36;
-  --panel-soft: #5d3d21;
-  --border: #5d3d21;
-  --border-strong: #e4bf11;
-  --text: #fffef9;
-  --muted: #f6dead;
-  --accent-fg: #363433;
-  --accent-hover: #ed5126;
-  --accent-active: #e4bf11;
-  --accent-deep-mix: #5d3d21;
+  --bg: #0d1410;
+  --bg-soft: #141d16;
+  --panel: #26301f;
+  --panel-soft: #303c29;
+  --border: #6e6b3e;
+  --border-strong: #e4c318;
+  --text: #f4f1e4;
+  --muted: #d3c9a8;
+  --accent-fg: #241505;
+  --accent-hover: #d49a60;
+  --accent-active: #b0763f;
+  --accent-deep-mix: #4a3320;
   --accent-ink: #e4bf11;
   --seal: #ed5126;
   --ornament: #e4bf11;
-  --success: #5bae23;
+  --success: #7ecb54;
   --warning: #ffd111;
-  --info: #1772b4;
-  --danger: #ed5126;
-  --meta-mode: #1772b4;
-  --meta-size: #e4bf11;
-  --meta-time: #f6dead;
-  --meta-relay: #5bae23;
-  --black-violet: #2d2e36;
-  --black-blue: #5d3d21;
-  --black-green: #15231b;
-  --black-red: #5d3d21;
-  --control-bg: #2d2e36;
-  --control-bg-hover: #5d3d21;
-  --input-bg: #15231b;
-  --input-bg-focus: #5d3d21;
-  --flyout-bg: #2d2e36;
-  --flyout-text: #fffef9;
-  --flyout-muted: #f6dead;
-  --flyout-border: #5d3d21;
-  --active-tab-bg: color-mix(in srgb, #be7e4a 18%, transparent);
-  --preview-stage-bg: #15231b;
-  --preview-canvas-border: #5d3d21;
-  --panel-strong: #2d2e36;
+  --info: #5a9fd4;
+  --danger: #ff6a4d;
+  --meta-mode: #5a9fd4;
+  --meta-size: #e4c318;
+  --meta-time: #f0d98a;
+  --meta-relay: #7ecb54;
+  --black-violet: #26301f;
+  --black-blue: #303c29;
+  --black-green: #1a2218;
+  --black-red: #332e1c;
+  --control-bg: #2d3823;
+  --control-bg-hover: #39462d;
+  --input-bg: #1c251a;
+  --input-bg-focus: #26301f;
+  --flyout-bg: #2c3722;
+  --flyout-text: #f4f1e4;
+  --flyout-muted: #d3c9a8;
+  --flyout-border: #6e6b3e;
+  --active-tab-bg: color-mix(in srgb, #c48852 18%, transparent);
+  --preview-stage-bg: #0d1410;
+  --preview-canvas-border: #6e6b3e;
+  --panel-strong: #303c29;
 }
 
 /* Palette selection wins over the legacy per-view accent family. */
@@ -611,6 +642,98 @@ html[data-palette]:not([data-palette="default"]) {
   --asset-border: var(--border);
   --asset-border-strong: var(--border-strong);
 }
+
+/*
+ * Surface-ladder correction for the named palettes.
+ *
+ * The shared block above maps --panel, --control-bg and --input-bg onto the
+ * single --palette-surface-base value.  That left every named palette with
+ * three identical surfaces: cards, buttons and text fields all painted the
+ * same colour, so a field had no visible edge and hover states vanished.
+ * The catalogued --palette-surface-base value is also far too light (or, in
+ * the dark palettes, far too dark) to carry a whole page of chrome.
+ *
+ * This block declares the missing ladder explicitly.  It carries one ID plus
+ * two attribute selectors against the shared block's one ID plus two, and it
+ * follows it in source order, so these values win; the catalogued --palette-*
+ * values above stay untouched.  Ladder per palette:
+ *   bg (page) < panel (card) < control-bg (interactive) < control-bg hover
+ * while inputs step the other way, so a text field reads as a slot cut into
+ * the card rather than another card.
+ */
+
+/* 青花 */
+html[data-theme][data-palette="qinghua"] {
+  --panel: #f6fafc;
+  --panel-strong: #ffffff;
+  --control-bg: #ffffff;
+  --control-bg-hover: #e6eff7;
+  --input-bg: #ffffff;
+  --input-bg-focus: #eef5fa;
+  --preview-stage-bg: #dfe7ee;
+  --preview-canvas-border: #a8bdd1;
+}
+
+/* 竹影 */
+html[data-theme][data-palette="jiangnan"] {
+  --panel: #fcf8f0;
+  --panel-strong: #fffdf9;
+  --control-bg: #fffdf9;
+  --control-bg-hover: #f2e9d8;
+  --input-bg: #fffdf9;
+  --input-bg-focus: #f7f1e5;
+  --preview-stage-bg: #ebe1cd;
+  --preview-canvas-border: #bfae8e;
+}
+
+/* 天青 */
+html[data-theme][data-palette="songci"] {
+  --panel: #f5f9fa;
+  --panel-strong: #ffffff;
+  --control-bg: #ffffff;
+  --control-bg-hover: #e4eff0;
+  --input-bg: #ffffff;
+  --input-bg-focus: #edf4f5;
+  --preview-stage-bg: #dae5e5;
+  --preview-canvas-border: #a3b8b8;
+}
+
+/* 朱墙 */
+html[data-theme][data-palette="gugong"] {
+  --panel: #faf4e4;
+  --panel-strong: #fffdf7;
+  --control-bg: #fffdf7;
+  --control-bg-hover: #f4e9d2;
+  --input-bg: #fffdf7;
+  --input-bg-focus: #f8f0de;
+  --preview-stage-bg: #f1e0be;
+  --preview-canvas-border: #c2aa7c;
+}
+
+/* 朱漆 */
+html[data-theme][data-palette="lacquer"] {
+  --panel: #232936;
+  --panel-strong: #2c3342;
+  --control-bg: #2a3140;
+  --control-bg-hover: #394257;
+  --input-bg: #171c26;
+  --input-bg-focus: #222835;
+  --preview-stage-bg: #0b0f16;
+  --preview-canvas-border: #5b6b80;
+}
+
+/* 敦煌 */
+html[data-theme][data-palette="dunhuang"] {
+  --panel: #26301f;
+  --panel-strong: #303c29;
+  --control-bg: #2d3823;
+  --control-bg-hover: #3d4a2e;
+  --input-bg: #1a2218;
+  --input-bg-focus: #242e22;
+  --preview-stage-bg: #141d16;
+  --preview-canvas-border: #6e6b3e;
+}
+
 
 html[data-palette]:not([data-palette="default"]) body {
   background:
