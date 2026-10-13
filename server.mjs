@@ -81,6 +81,7 @@ import {
 } from "./lib/gallery-thumbnail.mjs";
 import { normalizeBase64, requestDirectImageGeneration, requestGrokImageGeneration, requestImageEdit, requestImageGeneration, requestModelProtocolImageGeneration } from "./lib/responses-workflow.mjs";
 import { resolveCreationUpstreamTimeoutMs, upstreamStreamFetch, warmUpstreamStreamDispatcher } from "./lib/upstream-stream-fetch.mjs";
+import { createOutboundRequestIpLookup } from "./lib/outbound-request-ip.mjs";
 import { mergeRequestPrivateConfig } from "./lib/request-private-config.mjs";
 import { API_ENDPOINT_RESPONSES, IMAGE_ROUTE_A, IMAGE_ROUTE_B, IMAGE_ROUTE_C, IMAGE_ROUTE_D, getSelectedImageGenerationConfig, getSelectedPromptAgentAnalysisConfig, getSelectedTextVisionConfig, normalizeApiEndpointPath, normalizeImageRoute } from "./lib/image-route-config.mjs";
 import { fetchAvailableModels } from "./lib/model-list-client.mjs";
@@ -1050,29 +1051,7 @@ function getClientSessionId(request, formData) {
   return resolved || "global-default-session";
 }
 
-function normalizeRequestIp(value) {
-  const normalized = String(value || "").trim();
-  return normalized.startsWith("::ffff:") ? normalized.slice(7) : normalized;
-}
-
-function getRequestIp(request) {
-  const headers = request?.headers || {};
-  const forwardedValues = [
-    headers["cf-connecting-ip"],
-    headers["x-real-ip"],
-    String(headers["x-forwarded-for"] || "").split(",", 1)[0],
-    request?.socket?.remoteAddress,
-  ];
-
-  for (const value of forwardedValues) {
-    const normalized = normalizeRequestIp(value);
-    if (normalized) {
-      return normalized;
-    }
-  }
-
-  return "";
-}
+const getOutboundRequestIp = createOutboundRequestIpLookup({ fetchImpl: upstreamStreamFetch });
 
 function getClientSessionIdFromRequest(request, url) {
   const headerValue = request.headers["x-client-session-id"];
@@ -1354,11 +1333,11 @@ function resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, imageRou
   };
 }
 
-async function handleConfigGet(request, response) {
+async function handleConfigGet(_request, response) {
   sendJson(response, 200, {
     ...(await configStore.readPublicConfig()),
     aspectRatios: getAspectRatioOptions(),
-    requestIp: getRequestIp(request),
+    requestIp: await getOutboundRequestIp(),
   });
 }
 
@@ -1367,22 +1346,6 @@ async function handleConfigPost(request, response) {
     return sendJson(response, 403, { message: "云端 API 配置应保存在当前浏览器，不能修改服务端私有配置。" });
   }
   const payload = await readJsonBody(request);
-  const requestIp = (() => {
-    const headers = request?.headers || {};
-    const values = [
-      headers["cf-connecting-ip"],
-      headers["x-real-ip"],
-      String(headers["x-forwarded-for"] || "").split(",", 1)[0],
-      request?.socket?.remoteAddress,
-    ];
-    for (const value of values) {
-      const normalized = String(value || "").trim().replace(/^::ffff:/, "");
-      if (normalized) {
-        return normalized;
-      }
-    }
-    return "";
-  })();
   await configStore.saveConfig({
     baseUrl: payload.baseUrl,
     apiKey: payload.apiKey,
@@ -1417,7 +1380,7 @@ async function handleConfigPost(request, response) {
   sendJson(response, 200, {
     ...(await configStore.readPublicConfig()),
     aspectRatios: getAspectRatioOptions(),
-    requestIp,
+    requestIp: await getOutboundRequestIp(),
   });
 }
 
@@ -6626,7 +6589,6 @@ async function handleGenerate(request, response) {
     let localMask = null;
     let localMasks = [];
     clientSessionId = getClientSessionId(request, formData);
-    const requestIp = getRequestIp(request);
     const createdAt = new Date().toISOString();
 
     function recordRunningTask(patch = {}) {
@@ -6917,6 +6879,7 @@ async function handleGenerate(request, response) {
       await waitForSessionTaskSlot(clientSessionId, taskId, generationRequestScope);
     }
     slotClaimed = true;
+    const requestIpPromise = getOutboundRequestIp();
 
     const ratioOption = resolveAspectRatioOption(ratio);
     const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
@@ -6927,6 +6890,7 @@ async function handleGenerate(request, response) {
       ? "png"
       : normalizeOutputFormat(requestedFormatInput || config.defaults?.format || "png");
     let finalBase64 = "";
+    const requestIp = await requestIpPromise;
     const generationStartedAt = new Date().toISOString();
     const generationStartedAtMs = Date.now();
 

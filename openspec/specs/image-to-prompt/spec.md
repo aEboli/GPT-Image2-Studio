@@ -400,12 +400,14 @@ The style-lock segment SHALL prioritize the source image's most distinctive styl
 
 ### Requirement: Prompt Kit cards avoid incomplete text and gaps
 
-The Prompt Kit SHALL omit the card-level “复制到我的模板” action. In list view, a title or category that does not fit completely on one line SHALL be hidden, and a prompt that does not fit completely within the card SHALL be hidden. In image view, cards SHALL preserve image proportions, pack into a masonry layout, and show the full title and category below each image. The card-level “应用” action SHALL remain visible and visually prominent. Template-detail lightbox copy and apply actions SHALL remain available.
+The Prompt Kit SHALL omit the card-level “复制到我的模板” action. In list view, a title or category that does not fit completely on one line SHALL be hidden. A prompt with room for at least one rendered line SHALL remain visible as a wrapped excerpt with a multiline ellipsis, capped at three lines and the space available beside the image; it SHALL be hidden only when less than one rendered line fits. In image view, cards SHALL preserve image proportions, pack into a masonry layout, and show the full title and category below each image. The card-level “应用” action SHALL remain visible and visually prominent. Template-detail lightbox copy and apply actions SHALL remain available.
 
 #### Scenario: Browse list cards with limited space
 
 - **WHEN** a list card has a title, category, or prompt that cannot fit in its available area
-- **THEN** the affected text is hidden in full instead of being clipped or truncated
+- **THEN** an overlong title or category is hidden in full
+- **AND** a prompt with room for at least one line remains visible as a wrapped excerpt ending in an ellipsis when truncated
+- **AND** the prompt is hidden only when less than one rendered line fits
 - **AND** no copy-to-personal-template button is shown on the card
 
 #### Scenario: Browse image cards

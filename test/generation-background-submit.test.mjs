@@ -165,16 +165,21 @@ test("local background generate releases request connections and completes throu
 
   await waitForServer(baseUrl, server, diagnostics);
 
-  const configResponse = await fetch(`${baseUrl}/api/config`);
+  const configResponse = await fetch(`${baseUrl}/api/config`, {
+    headers: { "x-forwarded-for": "198.51.100.99" },
+  });
   assert.equal(configResponse.ok, true);
   const config = await configResponse.json();
-  assert.match(config.requestIp, /^\d{1,3}(?:\.\d{1,3}){3}$|^[0-9a-f:]+$/i);
+  assert.equal(typeof config.requestIp, "string");
+  assert.match(config.requestIp, /^(?:\d{1,3}(?:\.\d{1,3}){3}|[0-9a-f:]+)?$/i);
+  assert.notEqual(config.requestIp, "198.51.100.99");
 
   const jobIds = Array.from({ length: 7 }, (_, index) => `background-submit-${index + 1}`);
   const responses = await Promise.all(
     jobIds.map(async (jobId, index) => {
       const response = await fetch(`${baseUrl}/api/generate`, {
         method: "POST",
+        headers: { "x-forwarded-for": "198.51.100.99" },
         body: makePromptForm(jobId, {
           imageRoute: index === 6 ? "b" : "a",
           imageBackground: index === 0 ? "transparent" : index === 6 ? "unsupported" : "opaque",

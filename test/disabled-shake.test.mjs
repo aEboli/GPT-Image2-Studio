@@ -270,8 +270,8 @@ test("browser shell wires the controller and styles a layout-neutral, reduced-mo
     styles,
     new RegExp(`@media \\(prefers-reduced-motion: reduce\\) \\{\\r?\\n\\s*\\.${DISABLED_SHAKE_CLASS} \\{\\r?\\n\\s*animation: none;`),
   );
-  assert.match(index, /styles\.css\?v=20261011-contrast-and-surface-ladder-1/);
-  assert.match(index, /app\.js\?v=20261011-prompt-template-card-layout-1/);
+  assert.match(index, /styles\.css\?v=20261013-prompt-template-excerpts-1/);
+  assert.match(index, /app\.js\?v=20261013-prompt-template-excerpts-1/);
 });
 
 test("the hit-test list stays in step with the stylesheet rules that swallow pointer events", async () => {

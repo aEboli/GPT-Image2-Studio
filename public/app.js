@@ -8132,7 +8132,13 @@ function renderPromptTemplateLibrary() {
       const visibleLabels = [title, breadcrumb].filter((label) => !label.hidden);
       const labelsHeight = visibleLabels.reduce((height, label) => height + label.offsetHeight, 0);
       const availablePromptHeight = mediaHeight - labelsHeight - visibleLabels.length * 6 - paddingHeight;
-      prompt.hidden = prompt.scrollHeight > availablePromptHeight;
+      const promptStyle = window.getComputedStyle(prompt);
+      const promptFontSize = Number.parseFloat(promptStyle.fontSize) || 14;
+      const promptLineHeight = Number.parseFloat(promptStyle.lineHeight) || promptFontSize * 1.55;
+      const visiblePromptLines = Math.min(3, Math.floor(availablePromptHeight / promptLineHeight));
+      prompt.hidden = visiblePromptLines === 0;
+      prompt.style.setProperty("-webkit-line-clamp", String(Math.max(1, visiblePromptLines)));
+      prompt.style.maxHeight = prompt.hidden ? "" : `${promptLineHeight * visiblePromptLines}px`;
       content.hidden = title.hidden && breadcrumb.hidden && prompt.hidden;
     };
     card.addEventListener("click", (event) => {

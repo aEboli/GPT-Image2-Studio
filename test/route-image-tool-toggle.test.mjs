@@ -123,7 +123,7 @@ test("服务端配置保存接口往返开关，省略字段时保留已保存�
   const handler = source.match(/async function handleConfigPost\([^]*?\n\}/)?.[0];
   assert.ok(handler);
   let result;
-  const context = { isServerlessRuntime: false, configStore, readJsonBody: async (request) => request, getAspectRatioOptions: () => [], sendJson: (_response, status, body) => { result = { status, body }; } };
+  const context = { isServerlessRuntime: false, configStore, readJsonBody: async (request) => request, getAspectRatioOptions: () => [], getOutboundRequestIp: async () => "", sendJson: (_response, status, body) => { result = { status, body }; } };
   vm.runInNewContext(handler, context);
   for (const [payload, expected] of [[{ includeImageToolModel: false }, false], [{}, false], [{ includeImageToolModel: true }, true]]) {
     await context.handleConfigPost(payload, {});

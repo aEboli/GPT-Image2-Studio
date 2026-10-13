@@ -19941,8 +19941,11 @@ html:not([data-theme="light"]) .product-image-import-card.is-selected input {
 }
 
 .prompt-template-library-grid[data-view="list"] .prompt-template-library-prompt {
+  display: -webkit-box;
   min-height: 0;
+  overflow: hidden;
   font-size: var(--prompt-template-list-font-size, 15px);
+  -webkit-box-orient: vertical;
 }
 
 .prompt-template-library-grid[data-view="image"] .prompt-template-library-card {
