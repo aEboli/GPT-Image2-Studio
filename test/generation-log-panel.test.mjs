@@ -152,6 +152,7 @@ test("generation log panel renders flat entries with the relay url on one line",
   assert.equal(list.children[0].className.includes("timeline-item-group"), false);
   assert.deepEqual(getText(list, "timeline-summary"), ["图片已生成"]);
   assert.deepEqual(getText(list, "timeline-relay"), ["URL：https://relay.example.test/v1"]);
+  assert.equal(list.querySelector(".timeline-relay").tabIndex, 0);
   assert.equal(list.children[0].classList.contains("has-relay"), true);
   assert.deepEqual(getText(list, "timeline-ratio-size"), ["1:1 (1024x1024)"]);
   assert.deepEqual(getText(list, "timeline-mode"), ["路由模式"]);

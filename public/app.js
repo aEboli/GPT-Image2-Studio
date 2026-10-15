@@ -1894,17 +1894,17 @@ function formatCompactRatioLabel(ratio) {
     .replace(/\s*[：:]\s*/g, ":");
   return /^\d+:\d+$/.test(normalized) ? normalized : "";
 }
-/* 中转地址在入队时就按当前路由解析一次并存进条目，失败路径拿不到 item 也能显示 URL。 */
+/* 只读任务自身的地址快照，轮询历史任务时不能借用当前选中的 API。 */
 function resolveGenerationRelayUrl(source = {}) {
-  const route = String(source?.imageRoute || source?.generationRoute || getSelectedImageRoute() || "").toLowerCase();
+  const route = String(source?.imageRoute || source?.generationRoute || "").toLowerCase();
   const routeBaseUrl = route === "c"
-    ? source?.protocolBaseUrl || state.config?.protocolBaseUrl
+    ? source?.protocolBaseUrl
     : route === "d"
-      ? source?.grokBaseUrl || state.config?.grokBaseUrl
+      ? source?.grokBaseUrl
       : route === "b"
-        ? source?.directImageBaseUrl || source?.directBaseUrl || state.config?.directImageBaseUrl || state.config?.directBaseUrl
-        : source?.baseUrl || state.config?.baseUrl;
-  return normalizeGenerationLogRelayUrl(routeBaseUrl || state.config?.baseUrl || "");
+        ? source?.directImageBaseUrl || source?.directBaseUrl
+        : source?.baseUrl;
+  return normalizeGenerationLogRelayUrl(routeBaseUrl || source?.baseUrl || "");
 }
 function buildGenerationActivityRelayUrl(item = {}) { return normalizeGenerationLogRelayUrl(item?.baseUrl || "") || resolveGenerationRelayUrl(item); }
 function formatFilmstripSizeLabel(item) {
@@ -5785,7 +5785,7 @@ function readEndpointFields(imageRoute = "a") {
 function setEndpointSelectValue(select, endpointPath, fallbackEndpointPath, imageRoute = "a") {
   if (select) select.value = normalizeEndpointSelectValue(imageRoute, endpointPath, fallbackEndpointPath);
 }
-function syncEndpointInputDisplay(imageRoute = "a", baseUrl = "", endpointPath = "") { const controls = getEndpointControls(imageRoute); const fullMode = isEndpointFullUrlMode(imageRoute); const normalizedEndpointPath = normalizeEndpointSelectValue(imageRoute, endpointPath, controls.defaultEndpointPath); setEndpointSelectValue(controls.select, normalizedEndpointPath, controls.defaultEndpointPath, imageRoute); if (controls.input) { controls.input.value = fullMode ? appendApiEndpointPath(baseUrl || controls.fallbackBaseUrl, normalizedEndpointPath) : baseUrl || controls.fallbackBaseUrl; controls.input.placeholder = fullMode ? appendApiEndpointPath("https://api.openai.com/v1", normalizedEndpointPath) : "https://api.openai.com/v1"; } if (controls.toggle) controls.toggle.textContent = fullMode ? getUiLanguageText("baseUrl") || "基础 URL" : getUiLanguageText("fullUrl") || "完整 URL"; }
+function syncEndpointInputDisplay(imageRoute = "a", baseUrl = "", endpointPath = "") { const controls = getEndpointControls(imageRoute); const fullMode = isEndpointFullUrlMode(imageRoute); const normalizedEndpointPath = normalizeEndpointSelectValue(imageRoute, endpointPath, controls.defaultEndpointPath); setEndpointSelectValue(controls.select, normalizedEndpointPath, controls.defaultEndpointPath, imageRoute); if (controls.select) controls.select.title = normalizedEndpointPath; if (controls.input) { controls.input.value = fullMode ? appendApiEndpointPath(baseUrl || controls.fallbackBaseUrl, normalizedEndpointPath) : baseUrl || controls.fallbackBaseUrl; controls.input.title = controls.input.value; controls.input.placeholder = fullMode ? appendApiEndpointPath("https://api.openai.com/v1", normalizedEndpointPath) : "https://api.openai.com/v1"; } if (controls.toggle) controls.toggle.textContent = fullMode ? getUiLanguageText("baseUrl") || "基础 URL" : getUiLanguageText("fullUrl") || "完整 URL"; }
 function toggleEndpointFullUrlMode(imageRoute = "a") { const controls = getEndpointControls(imageRoute); if (!controls.toggle) return; const endpoint = readEndpointFields(imageRoute); controls.toggle.setAttribute("aria-pressed", String(!isEndpointFullUrlMode(imageRoute))); syncEndpointInputDisplay(imageRoute, endpoint.baseUrl, endpoint.endpointPath); }
 function syncEndpointFieldsFromFullUrlModes() { ["a", "b", "b-text", "d"].forEach((imageRoute) => { const endpoint = readEndpointFields(imageRoute); syncEndpointInputDisplay(imageRoute, endpoint.baseUrl, endpoint.endpointPath); }); }
 function getProtocolImageGenerationsUrlPreview(baseUrl = refs.protocolBaseUrlInput?.value || "") { const normalizedProtocolEndpoint = splitModelProtocolUrl(String(baseUrl || state.config?.protocolBaseUrl || "https://api.openai.com/v1").trim(), { fallbackBaseUrl: state.config?.protocolBaseUrl || "https://api.openai.com/v1" }); return appendApiEndpointPath(normalizedProtocolEndpoint.baseUrl, API_ENDPOINT_IMAGE_GENERATIONS); }
@@ -5794,6 +5794,7 @@ function syncProtocolEndpointPreview() {
   if (!preview) return;
 
   const fullUrl = getProtocolImageGenerationsUrlPreview();
+  if (refs.protocolBaseUrlInput) refs.protocolBaseUrlInput.title = refs.protocolBaseUrlInput.value;
   preview.textContent = API_ENDPOINT_IMAGE_GENERATIONS;
   preview.title = fullUrl;
   preview.setAttribute("aria-label", fullUrl);
@@ -8069,10 +8070,8 @@ function renderPromptTemplateLibrary() {
       }
     };
     image.style.aspectRatio = template.previewImage ? "3 / 4" : "1 / 1";
-    let syncPromptTemplateListDimensions = () => {};
     image.addEventListener("load", () => {
       syncPromptTemplateImageRatio();
-      syncPromptTemplateListDimensions();
     });
     image.addEventListener("error", () => {
       const fallbackUrl = String(template.previewSourceUrl || "").trim();
@@ -8112,35 +8111,6 @@ function renderPromptTemplateLibrary() {
     prompt.textContent = template.prompt;
     content.append(title, breadcrumb, prompt);
     card.appendChild(content);
-    syncPromptTemplateListDimensions = () => {
-      if (image.naturalWidth <= 0 || image.naturalHeight <= 0 || state.promptTemplateLibrary.view !== "list") {
-        return;
-      }
-      const mediaWidth = previewButton.getBoundingClientRect().width;
-      if (mediaWidth <= 0) {
-        return;
-      }
-      const mediaHeight = Math.max(1, Math.round(mediaWidth * image.naturalHeight / image.naturalWidth));
-      card.style.setProperty("--prompt-template-card-height", `${mediaHeight}px`);
-      title.hidden = false;
-      breadcrumb.hidden = false;
-      prompt.hidden = false;
-      title.hidden = title.scrollWidth > title.clientWidth;
-      breadcrumb.hidden = breadcrumb.scrollWidth > breadcrumb.clientWidth;
-      const contentStyle = window.getComputedStyle(content);
-      const paddingHeight = (Number.parseFloat(contentStyle.paddingTop) || 0) + (Number.parseFloat(contentStyle.paddingBottom) || 0);
-      const visibleLabels = [title, breadcrumb].filter((label) => !label.hidden);
-      const labelsHeight = visibleLabels.reduce((height, label) => height + label.offsetHeight, 0);
-      const availablePromptHeight = mediaHeight - labelsHeight - visibleLabels.length * 6 - paddingHeight;
-      const promptStyle = window.getComputedStyle(prompt);
-      const promptFontSize = Number.parseFloat(promptStyle.fontSize) || 14;
-      const promptLineHeight = Number.parseFloat(promptStyle.lineHeight) || promptFontSize * 1.55;
-      const visiblePromptLines = Math.min(3, Math.floor(availablePromptHeight / promptLineHeight));
-      prompt.hidden = visiblePromptLines === 0;
-      prompt.style.setProperty("-webkit-line-clamp", String(Math.max(1, visiblePromptLines)));
-      prompt.style.maxHeight = prompt.hidden ? "" : `${promptLineHeight * visiblePromptLines}px`;
-      content.hidden = title.hidden && breadcrumb.hidden && prompt.hidden;
-    };
     card.addEventListener("click", (event) => {
       if (event.target.closest("button")) {
         return;
@@ -8151,7 +8121,6 @@ function renderPromptTemplateLibrary() {
     refs.promptTemplateLibraryGrid.appendChild(card);
     if (image.complete) {
       syncPromptTemplateImageRatio();
-      syncPromptTemplateListDimensions();
     }
   });
 }
@@ -8336,6 +8305,9 @@ function deletePromptTemplate(templateId = "") {
 }
 
 function setPromptTemplatePopoverOpen(open) {
+  if (open) {
+    refs.previewPanel.querySelector(".prompt-preview-surface").appendChild(refs.promptTemplatePopover);
+  }
   refs.promptTemplatePopover.classList.toggle("hidden", !open);
   refs.promptTemplatePopover.setAttribute("aria-hidden", open ? "false" : "true");
   refs.surprisePromptButton.setAttribute("aria-expanded", open ? "true" : "false");
@@ -19283,6 +19255,9 @@ function bindEvents() {
   }));
   refs.protocolBaseUrlInput?.addEventListener("input", syncProtocolEndpointPreview);
   refs.protocolImageModelInput?.addEventListener("input", syncProtocolEndpointPreview);
+  [refs.baseUrlInput, refs.directBaseUrlInput, refs.directTextBaseUrlInput, refs.grokBaseUrlInput].forEach((input) => {
+    input?.addEventListener("input", () => { input.title = input.value; });
+  });
   refs.baseUrlFullToggle?.addEventListener("click", () => toggleEndpointFullUrlMode("a"));
   refs.directBaseUrlFullToggle?.addEventListener("click", () => toggleEndpointFullUrlMode("b"));
   refs.directTextBaseUrlFullToggle?.addEventListener("click", () => toggleEndpointFullUrlMode("b-text"));

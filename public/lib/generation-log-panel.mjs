@@ -44,7 +44,9 @@ function appendRelay(documentRef, main, relayUrl) {
   if (!relayText) {
     return false;
   }
-  main.appendChild(preserveFullValue(createElement(documentRef, "span", "timeline-relay", relayText), relayText));
+  const relay = preserveFullValue(createElement(documentRef, "span", "timeline-relay", relayText), relayText);
+  relay.tabIndex = 0;
+  main.appendChild(relay);
   return true;
 }
 

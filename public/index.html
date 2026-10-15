@@ -106,7 +106,7 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="./styles.css?v=20261013-prompt-template-excerpts-1" />
+    <link rel="stylesheet" href="./styles.css?v=20261015-prompt-library-layout-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -122,7 +122,7 @@
         <span class="topbar-reveal-icon" aria-hidden="true"></span>
       </button>
       <header class="topbar" id="globalTopbar">
-        <small class="app-version" aria-label="当前版本 v0.2.070">v0.2.070</small>
+        <small class="app-version" aria-label="当前版本 v0.2.071">v0.2.071</small>
         <div class="brand-cluster">
           <div class="brand-mark" aria-hidden="true">
             <span class="brand-mark-core"></span>
@@ -488,19 +488,21 @@
 
             <section class="studio-panel preview-panel">
               <div class="preview-stage">
-                <div class="preview-meta">
-                  <span class="model-badge" id="previewModel">GPT Image 2.0</span>
-                  <span id="previewTime">等待生成</span>
-                  <span id="previewId">ID: --</span>
-                  <span id="previewSize">--</span>
-                </div>
-
-                <div class="preview-canvas" id="previewCanvas">
-                  <div class="preview-placeholder" id="previewPlaceholder">
-                    <h3 data-ui-i18n="previewIdleTitle">生成结果会在这里实时更新。</h3>
-                    <span data-ui-i18n="previewIdleDetail">生成日志可在配置中查看，底部胶片条可快速切换查看。</span>
+                <div class="prompt-preview-surface">
+                  <div class="preview-meta">
+                    <span class="model-badge" id="previewModel">GPT Image 2.0</span>
+                    <span id="previewTime">等待生成</span>
+                    <span id="previewId">ID: --</span>
+                    <span id="previewSize">--</span>
                   </div>
-                  <img id="previewImage" alt="当前预览" />
+
+                  <div class="preview-canvas" id="previewCanvas">
+                    <div class="preview-placeholder" id="previewPlaceholder">
+                      <h3 data-ui-i18n="previewIdleTitle">生成结果会在这里实时更新。</h3>
+                      <span data-ui-i18n="previewIdleDetail">生成日志可在配置中查看，底部胶片条可快速切换查看。</span>
+                    </div>
+                    <img id="previewImage" alt="当前预览" />
+                  </div>
                 </div>
 
                 <div class="preview-toolbar">
@@ -3618,17 +3620,14 @@
       <div class="prompt-template-panel" role="dialog" aria-modal="false" aria-label="提示词模板库">
         <div class="prompt-template-head">
           <div>
-            <p class="drawer-eyebrow">Prompt Kit</p>
             <h2>提示词模板库</h2>
-            <p class="prompt-template-head-note">按图示分类浏览一一对应的图片与提示词，点击图片可查看完整内容。</p>
           </div>
           <button class="toolbar-button" id="closePromptTemplateButton" type="button">关闭</button>
         </div>
 
         <div class="prompt-template-toolbar" role="toolbar" aria-label="模板库筛选与视图">
           <label class="prompt-template-search">
-            <span class="sr-only">搜索模板</span>
-            <input id="promptTemplateLibrarySearch" type="search" placeholder="搜索模板名称或提示词" autocomplete="off" />
+            <input id="promptTemplateLibrarySearch" type="search" aria-label="搜索模板" placeholder="搜索模板名称或提示词" autocomplete="off" />
           </label>
           <div class="prompt-template-view-switch" role="tablist" aria-label="模板显示方式">
             <button class="prompt-template-view-button active" type="button" role="tab" aria-selected="true" data-prompt-template-view="list">列表</button>
@@ -3658,7 +3657,6 @@
           <section class="prompt-template-library-area" aria-label="模板目录">
             <div class="prompt-template-library-head">
               <div>
-                <p class="drawer-eyebrow">Library</p>
                 <h3 id="promptTemplateLibraryTitle">使用场景</h3>
               </div>
               <span class="prompt-template-library-count" id="promptTemplateLibraryCount">41 条可用模板</span>
@@ -3669,7 +3667,6 @@
           <aside class="prompt-template-personal" aria-label="我的模板">
             <div class="prompt-template-personal-head">
               <div>
-                <p class="drawer-eyebrow">Personal</p>
                 <h3>我的模板</h3>
               </div>
               <button class="mini-action" id="newPromptTemplateButton" type="button">新建</button>
@@ -3738,6 +3735,6 @@
 
     <div class="app-tooltip" id="appTooltip" role="tooltip" popover="manual"></div>
 
-    <script type="module" src="./app.js?v=20261013-prompt-template-excerpts-1"></script>
+    <script type="module" src="./app.js?v=20261015-prompt-library-layout-1"></script>
   </body>
 </html>

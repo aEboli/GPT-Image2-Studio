@@ -30,8 +30,8 @@ const generationClientPath = new URL("../lib/generation-client.mjs", import.meta
 const generationLogPanelPath = new URL("../lib/generation-log-panel.mjs", import.meta.url);
 const generationLogStorePath = new URL("../lib/generation-log-store.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20261013-prompt-template-excerpts-1";
-const appAssetVersion = "20261013-prompt-template-excerpts-1";
+const stylesAssetVersion = "20261015-prompt-library-layout-1";
+const appAssetVersion = "20261015-prompt-library-layout-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
 const creationQueueModuleAssetVersion = "20260915-mode-generation-controls-1";
 const quickBlendModuleAssetVersion = "20260928-aspect-ratio-value-only-1";
@@ -2510,29 +2510,25 @@ test("floating dialogs and popovers use theme-aware overlay surface tokens", asy
   assert.match(readCssRule(styles, ".ppt-edit-head"), /border-bottom:\s*1px solid var\(--overlay-border-muted/);
 });
 
-test("prompt template panel opens as a full-width library surface", async () => {
+test("prompt template panel stays inside the preview content surface", async () => {
   const styles = await readFile(stylesPath, "utf8");
   const app = await readFile(appPath, "utf8");
   const panelRule = readCssRule(styles, ".prompt-template-panel");
   const bodyRule = readCssRule(styles, ".prompt-template-body");
 
-  assert.match(panelRule, /top:\s*clamp\(12px,\s*3svh,\s*32px\);/);
-  assert.match(panelRule, /left:\s*50%;/);
-  assert.match(panelRule, /right:\s*auto;/);
-  assert.match(panelRule, /width:\s*min\(1440px,\s*calc\(100vw\s*-\s*24px\)\);/);
-  assert.match(panelRule, /max-height:\s*calc\(100svh\s*-\s*24px\);/);
-  assert.match(panelRule, /transform:\s*translateX\(-50%\);/);
+  assert.match(panelRule, /inset:\s*0;/);
+  assert.match(panelRule, /width:\s*100%;/);
+  assert.match(panelRule, /height:\s*100%;/);
+  assert.match(panelRule, /container-type:\s*inline-size;/);
   assert.doesNotMatch(panelRule, /prompt-template-settings-edge/);
-  assert.match(bodyRule, /grid-template-columns:\s*minmax\(172px,\s*0\.2fr\)\s+minmax\(0,\s*1fr\)\s+minmax\(260px,\s*0\.3fr\);/);
+  assert.match(bodyRule, /grid-template-columns:\s*164px\s+minmax\(0,\s*1fr\)\s+248px;/);
   assert.match(bodyRule, /overflow:\s*hidden;/);
   assert.doesNotMatch(app, /syncPromptTemplateSettingsEdge|--prompt-template-settings-edge/);
   assert.match(app, /studioHeightObserver\.observe\(refs\.settingsPanel\);/);
   const promptTemplatePopoverOpen = extractFunctionBefore(app, "setPromptTemplatePopoverOpen", "selectRandomPrompt");
-  assert.doesNotMatch(promptTemplatePopoverOpen, /syncPromptTemplateSettingsEdge/);
-  assert.match(
-    styles,
-    /html:is\(\[data-ui-layout="mobile"\],\s*\[data-ui-layout="tablet"\],\s*\[data-ui-layout="stacked"\]\) \.prompt-template-panel\s*\{[\s\S]*right:\s*8px;[\s\S]*left:\s*8px;[\s\S]*width:\s*auto;[\s\S]*transform:\s*none;/,
-  );
+  assert.match(promptTemplatePopoverOpen, /refs\.previewPanel\.querySelector\("\.prompt-preview-surface"\)\.appendChild\(refs\.promptTemplatePopover\)/);
+  assert.match(readCssRule(styles, ".prompt-template-popover"), /position:\s*absolute;/);
+  assert.match(styles, /@container \(max-width:\s*760px\)/);
   assert.match(
     styles,
     /\.prompt-template-body\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);/,

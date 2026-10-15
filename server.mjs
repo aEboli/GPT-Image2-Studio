@@ -6819,6 +6819,11 @@ async function handleGenerate(request, response) {
 
     const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
     const generationConfig = getSelectedImageGenerationConfig(config);
+    generationTaskStore.updateTask(clientSessionId, taskId, {
+      imageRoute: generationConfig.imageRoute,
+      baseUrl: generationConfig.baseUrl,
+      endpointPath: generationConfig.endpointPath,
+    });
     if (isImageEdit && generationConfig.imageRoute === IMAGE_ROUTE_D && referenceImages.length === 0) {
       const message = "Grok 图片编辑至少需要一张参考图。";
       generationTaskStore.failTask(clientSessionId, taskId, { errorMessage: message });

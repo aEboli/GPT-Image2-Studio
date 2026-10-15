@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.070-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.071-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installer-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,9 +10,18 @@
 
 把提示词生图、参考图分析、图片编辑、商品图裂变、电商套图、人物写真、文章插图、PPT 生成和素材管理集中到一个浏览器界面中。
 
-当前版本：`v0.2.070`
+当前版本：`v0.2.071`
 
 </div>
+
+<p align="center">
+  <a href="#快速开始">快速开始</a> ·
+  <a href="#配置说明">API 配置</a> ·
+  <a href="#核心功能">核心功能</a> ·
+  <a href="#页面介绍">工作流</a> ·
+  <a href="#开发与验证">开发</a> ·
+  <a href="#版本发布">发行版</a>
+</p>
 
 ## 快速开始
 
@@ -70,12 +79,12 @@ Windows 脚本入口（启动器、Native Messaging 安装/卸载、图片资源
 从包含桌面产物的 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
 
 ```text
-GPT-Image2-Studio-Desktop-Setup-v0.2.070-x64.exe
+GPT-Image2-Studio-Desktop-Setup-v0.2.071-x64.exe
 ```
 
 安装完成后通过桌面或开始菜单中的 `GPT-Image2-Studio` 启动。程序会在独立窗口中运行，内置服务使用动态回环端口，关闭窗口后不会遗留后台服务。无需另行安装 Node.js，完整说明见 [Windows 桌面程序文档](./docs/windows-desktop.md)。
 
-如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.070-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
+如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.071-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
 
 桌面开发使用 Electron `43`，要求 Node.js `22.12` 或更高版本；普通 `npm start` 服务仍支持 Node.js `20+`。
 
@@ -86,7 +95,7 @@ cmd /c npm run desktop
 
 ### 方式三：Windows 浏览器安装包（兼容旧版）
 
-旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.070` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
+旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.071` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
 
 ## 配置说明
 
@@ -651,8 +660,8 @@ cmd /c npm run build:desktop
 产物路径：
 
 ```text
-artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.070-x64.exe
-artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.070-x64.zip
+artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.071-x64.exe
+artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.071-x64.zip
 artifacts/desktop/win-unpacked/GPT-Image2-Studio.exe
 ```
 
@@ -670,7 +679,7 @@ cmd /c npm run build:installer
 产物路径格式：
 
 ```text
-artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.070.exe
+artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.071.exe
 ```
 
 脚本使用系统 `iexpress.exe` 生成自解压安装包，并把当前 Node.js 运行时和依赖打入安装目录；启动后仍使用默认浏览器显示工作台。
@@ -775,7 +784,23 @@ cmd /c npm run build:installer
 
 ## 版本更新说明
 
-完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.070](./docs/releases/v0.2.070.md)。
+完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.071](./docs/releases/v0.2.071.md)。
+
+### v0.2.071 更新说明
+
+- 提示词模板库调整为嵌入图片预览区域，并按容器宽度自适应；列表卡片收紧布局，同时保留标题、分类和三行提示词摘要。
+- 生成日志按任务自身快照保留接口地址，切换 API 后查看历史记录或失败任务时不会串用当前地址；长中转 URL 支持键盘聚焦和横向检查。
+- 加宽并重新排布桌面端 API 配置抽屉，为较长接口地址补充完整值提示。
+
+### v0.2.070 更新说明
+
+- 优化提示词模板卡片摘要，最多显示三行提示词内容。
+- 修正请求出口 IP 的记录来源：通过上游 HTTP transport 查询；查询失败时显示“未记录”，且查询不发送 API 凭据、提示词或生成图片。
+
+### v0.2.069 更新说明
+
+- 商品图采集扩展升级到 `1.1.34`，支持有并发上限的多图下载，并改进部分失败状态提示。
+- 调整深色基础主题及六套传统配色的文字、边框、按钮、输入框和弹出层对比度。
 
 ### v0.2.068 更新说明
 

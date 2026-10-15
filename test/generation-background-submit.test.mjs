@@ -206,6 +206,9 @@ test("local background generate releases request connections and completes throu
   assert.equal(completed.find((task) => task.id === "background-submit-7")?.item?.imageBackground, "opaque");
   assert.equal(completed.find((task) => task.id === "background-submit-7")?.item?.format, "jpg");
   assert.equal(completed.every((task) => task.item?.filename), true);
+  assert.equal(completed.every((task) => task.baseUrl === "http://127.0.0.1:9/v1"), true);
+  assert.equal(completed.every((task) => task.baseUrl === task.item?.baseUrl), true);
+  assert.equal(completed.some((task) => "apiKey" in task || "directApiKey" in task), false);
   assert.equal(completed.every((task) => task.item?.requestIp === config.requestIp), true);
   assert.equal(completed.every((task) => /^\d{4}-\d{2}-\d{2}T/.test(task.generationStartedAt)), true);
   assert.equal(completed.every((task) => task.generationStartedAt === task.item?.generationStartedAt), true);
@@ -220,4 +223,14 @@ test("local background generate releases request connections and completes throu
     assert.equal(saved.format, task.item.format);
     assert.equal(saved.requestIp, config.requestIp);
   }
+
+  const failedForm = makePromptForm("failed-relay-snapshot", { imageRoute: "b" });
+  failedForm.set("directImageBaseUrl", "https://original-direct.example.test/v1");
+  failedForm.set("mode", "image-edit");
+  const failedResponse = await fetch(`${baseUrl}/api/generate`, { method: "POST", body: failedForm });
+  assert.equal(parseSseEvents(await failedResponse.text()).some((event) => event.eventName === "error"), true);
+  const failedTask = (await fetchTasks(baseUrl)).find((task) => task.id === "failed-relay-snapshot");
+  assert.equal(failedTask?.status, "error");
+  assert.equal(failedTask?.imageRoute, "b");
+  assert.equal(failedTask?.baseUrl, "https://original-direct.example.test/v1");
 });
