@@ -6,7 +6,7 @@ const appPath = new URL("../public/app.js", import.meta.url);
 const indexPath = new URL("../public/index.html", import.meta.url);
 const assetModulePath = new URL("../lib/portrait-accessory-assets.mjs", import.meta.url);
 const attributionPath = new URL("../public/assets/portrait-accessories/ATTRIBUTION.md", import.meta.url);
-const shellAssetVersion = "20261015-prompt-library-layout-1";
+const appAssetVersion = "20261016-enhance-clarity-1";
 
 const COSPLAY_ASSETS = [
   ["cosplay-shrine-miko", "巫女COS", "cosplay-shrine-miko.png", /cosplay portrait[\s\S]*costume[\s\S]*props/],
@@ -30,7 +30,7 @@ test("portrait accessory library adds COS cosplay references with prompt metadat
     app,
     /formData\.set\("notes",\s*\[rawPortraitNotes,\s*getPortraitAccessoryPromptSummary\(\)\]\.filter\(Boolean\)\.join\("\\n\\n"\)\)/,
   );
-  assert.match(index, new RegExp(`app\\.js\\?v=${shellAssetVersion}`));
+  assert.match(index, new RegExp(`app\\.js\\?v=${appAssetVersion}`));
   assert.match(attribution, /cosplay character reference assets/);
   assert.match(attribution, /generic anime-inspired and fantasy character archetypes/);
 

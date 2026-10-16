@@ -19,7 +19,6 @@ const EXPECTED_VIEW_FAMILIES = {
   studio: "create",
   "style-transfer": "create",
   "reference-analysis": "analyse",
-  "product-agent": "create",
   "image-decomposition": "analyse",
   "image-edit": "edit",
   "quick-blend": "edit",

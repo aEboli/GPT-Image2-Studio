@@ -39,6 +39,15 @@ function preserveFullValue(element, value) {
   return element;
 }
 
+function formatOutputFilename(imageUrl) {
+  const filename = cleanText(imageUrl).split(/[?#]/)[0].split(/[\\/]/).pop();
+  try {
+    return decodeURIComponent(filename);
+  } catch (_error) {
+    return filename;
+  }
+}
+
 function appendRelay(documentRef, main, relayUrl) {
   const relayText = formatGenerationLogRelayText(relayUrl);
   if (!relayText) {
@@ -83,8 +92,6 @@ function createEntryRow(documentRef, entry, { showChannelLabel, formatTime, isCh
   if (isChild) {
     row.classList.add("timeline-item-child");
   }
-  row.appendChild(createElement(documentRef, "span", "timeline-dot"));
-
   const copy = createElement(documentRef, "div", "timeline-copy");
   const displayText = getGenerationActivityDisplayText(entry.detail);
   const main = createElement(documentRef, "span", "timeline-main");
@@ -102,9 +109,10 @@ function createEntryRow(documentRef, entry, { showChannelLabel, formatTime, isCh
   }
   copy.appendChild(main);
 
-  if (cleanText(entry.imageUrl)) {
+  const showDetail = displayText.detail && (entry.status === "error" || !cleanText(entry.imageUrl));
+  if (cleanText(entry.imageUrl) && !showDetail) {
     row.classList.add("has-url");
-    const link = createElement(documentRef, "a", "timeline-url", cleanText(entry.imageUrl));
+    const link = createElement(documentRef, "a", "timeline-url", formatOutputFilename(entry.imageUrl));
     preserveFullValue(link, cleanText(entry.imageUrl));
     link.href = cleanText(entry.imageUrl);
     link.target = "_blank";
@@ -112,7 +120,7 @@ function createEntryRow(documentRef, entry, { showChannelLabel, formatTime, isCh
     copy.appendChild(link);
   }
 
-  if (displayText.detail) {
+  if (showDetail) {
     row.classList.add("has-detail");
     const detail = createElement(documentRef, "p", "timeline-detail", displayText.detail);
     preserveFullValue(detail, displayText.detail);
@@ -130,8 +138,6 @@ function createGroupRow(documentRef, group, { showChannelLabel, formatTime, expa
   row.dataset.timelineKey = cleanText(group.key);
   row.dataset.generationLogGroupId = cleanText(group.groupId);
   row.dataset.generationLogGroupExpanded = String(Boolean(expanded));
-  row.appendChild(createElement(documentRef, "span", "timeline-dot"));
-
   const copy = createElement(documentRef, "div", "timeline-copy");
   const main = createElement(documentRef, "span", "timeline-main");
   const toggle = createElement(documentRef, "button", "timeline-group-toggle");
@@ -149,11 +155,11 @@ function createGroupRow(documentRef, group, { showChannelLabel, formatTime, expa
     }
   }
   const groupSummary = formatGenerationLogGroupSummary(group, cleanText(group.groupUnit) || DEFAULT_GENERATION_LOG_GROUP_UNIT);
-  main.appendChild(preserveFullValue(createElement(documentRef, "span", "timeline-group-summary", groupSummary), groupSummary));
   if (appendRelay(documentRef, main, group.relayUrl)) {
     row.classList.add("has-relay");
   }
   copy.appendChild(main);
+  copy.appendChild(preserveFullValue(createElement(documentRef, "span", "timeline-group-summary", groupSummary), groupSummary));
   row.appendChild(copy);
   appendMeta(documentRef, row, { ...group, ratio: "", size: "" }, { formatTime });
   return row;
@@ -182,7 +188,6 @@ export function renderGenerationLogRows(
   if (entries.length === 0) {
     const empty = createElement(documentValue, "li", "timeline-item timeline-item-empty pending");
     empty.dataset.timelineKey = "generation-log:empty";
-    empty.appendChild(createElement(documentValue, "span", "timeline-dot"));
     const copy = createElement(documentValue, "div", "timeline-copy");
     const main = createElement(documentValue, "span", "timeline-main");
     main.appendChild(createElement(documentValue, "span", "timeline-summary", emptyText));

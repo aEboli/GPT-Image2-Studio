@@ -121,7 +121,6 @@ import {
 import {
   CREATION_REFERENCE_ANALYSIS_MODE,
   PORTRAIT_REFERENCE_ANALYSIS_MODE,
-  PRODUCT_IMAGE_AGENT_MODE,
   REFERENCE_ORCHESTRATION_MODE,
   requestPromptAgentAnalysis,
 } from "./lib/prompt-agent.mjs";
@@ -349,7 +348,6 @@ if (MOCK_IMAGE_GENERATION_REQUESTED && !MOCK_IMAGE_GENERATION_ENABLED) {
 const GENERATION_MODES = new Set([
   "style-transfer",
   "reference-analysis",
-  PRODUCT_IMAGE_AGENT_MODE,
   IMAGE_DECOMPOSITION_MODE,
   QUICK_BLEND_MODE,
   IMAGE_EDIT_MODE,
@@ -2517,9 +2515,7 @@ async function handlePromptAgentAnalyze(request, response) {
   }
 
   const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
-  const textVisionConfig = mode === PRODUCT_IMAGE_AGENT_MODE
-    ? getSelectedTextVisionConfig(config)
-    : getSelectedPromptAgentAnalysisConfig(config);
+  const textVisionConfig = getSelectedPromptAgentAnalysisConfig(config);
   if (!textVisionConfig.apiKey) {
     return sendJson(response, 400, {
       message: "当前未保存 API Key，请先在配置中保存。",

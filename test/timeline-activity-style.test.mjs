@@ -65,12 +65,10 @@ test("timeline renders ordered generation times without labels and keeps the leg
   assert.doesNotMatch(logPanel, /开始生图时间|Generation started|结束生图时间|Generation completed/);
 });
 
-test("timeline status dot is vertically centered in its current row", async () => {
+test("timeline rows align without status dots or connectors", async () => {
   const styles = await readFile(stylesPath, "utf8");
-  const dotRule = readCssRule(styles, ".timeline-dot");
-  const connectorRule = readCssRule(styles, ".timeline-item:not(:last-child)::after");
-
-  assert.match(dotRule, /align-self:\s*center;/);
-  assert.match(dotRule, /margin-top:\s*0;/);
-  assert.match(connectorRule, /top:\s*calc\(50% \+ 11px\);/);
+  const logPanel = await readFile(generationLogPanelPath, "utf8");
+  assert.doesNotMatch(logPanel, /"timeline-dot"/);
+  assert.doesNotMatch(styles, /\.timeline-dot|\.timeline-item:not\(:last-child\)::after/);
+  assert.match(readCssRule(styles, ".timeline-item"), /grid-template-columns:\s*minmax\(0,\s*1fr\);/);
 });

@@ -178,7 +178,7 @@ test("generation log panel shows a failed entry with the same url format as a su
   renderGenerationLogRows(list, {
     entries: [
       { key: "job-1:task", title: "已完成", detail: "图像已成功生成", status: "done", relayUrl: "https://relay.example.test/v1", at: "2026-08-28T10:00:00.000Z" },
-      { key: "job-2:task", title: "失败", detail: "最终失败：fetch failed", status: "error", relayUrl: "https://relay.example.test/v1", at: "2026-08-28T10:01:00.000Z" },
+      { key: "job-2:task", title: "失败", detail: "最终失败：fetch failed", status: "error", imageUrl: "/output/partial-preview.png", relayUrl: "https://relay.example.test/v1", at: "2026-08-28T10:01:00.000Z" },
     ],
     channel: "prompt",
     documentRef,
@@ -187,6 +187,30 @@ test("generation log panel shows a failed entry with the same url format as a su
   assert.deepEqual(getText(list, "timeline-summary"), ["图片已生成", "生成失败"]);
   assert.deepEqual(getText(list, "timeline-relay"), ["URL：https://relay.example.test/v1", "URL：https://relay.example.test/v1"]);
   assert.deepEqual(getText(list, "timeline-detail"), ["fetch failed"]);
+  assert.deepEqual(getText(list, "timeline-url"), []);
+});
+
+test("generation log panel keeps the relay on the status row and shortens output paths", () => {
+  const documentRef = createTestDocument();
+  const list = createTestElement("ol", documentRef);
+  renderGenerationLogRows(list, {
+    entries: [{
+      key: "job-3:task",
+      title: "已完成",
+      detail: "图像已成功生成",
+      status: "done",
+      relayUrl: "https://relay.example.test/v1",
+      imageUrl: "/output/2026-10-16/2026-10-16-prompt/1414-%E7%8C%AB.png",
+      at: "2026-10-16T10:00:00.000Z",
+    }],
+    channel: "prompt",
+    documentRef,
+  });
+
+  assert.deepEqual(getText(list, "timeline-relay"), ["URL：https://relay.example.test/v1"]);
+  assert.deepEqual(getText(list, "timeline-url"), ["1414-猫.png"]);
+  assert.equal(list.querySelector(".timeline-url").title, "/output/2026-10-16/2026-10-16-prompt/1414-%E7%8C%AB.png");
+  assert.deepEqual(getText(list, "timeline-detail"), []);
 });
 
 test("generation log panel collapses batch groups by default and expands on demand", () => {

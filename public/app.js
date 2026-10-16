@@ -20,7 +20,7 @@ import { isGenerationRequestRetryMessage, } from "/lib/generation-request-retry.
 import { cancelQueuedGenerationJob, getGenerationJobMode, getGenerationJobQueueKey, getQueuedGenerationJobCount, getRunningGenerationJobCount, isQueuedGenerationJob, selectNextQueuedGenerationJobsByMode } from "/lib/generation-queue.mjs?v=20260821-prompt-global-queue-1";
 import { buildCanceledGenerationActivityDetail, buildGenerationTaskActivityDetail, buildGenerationTaskStatusText, formatGenerationActivityModeLabel, getGenerationActivityDisplayText, hasHeartbeatPrefix, sanitizeGenerationActivityDetail } from "/lib/generation-activity-feed.mjs?v=20260829-heartbeat-morph-1";
 import { GENERATION_LOG_ALL_CHANNELS, GENERATION_LOG_CHANNELS, createGenerationLogStore, getGenerationLogAllEntries, getGenerationLogChannelEntries, getGenerationLogChannelLabel, getGenerationLogGroupItemDetail, normalizeGenerationLogChannel, normalizeGenerationLogRelayUrl, parseGenerationLogStore, serializeGenerationLogStore, upsertGenerationLogEntry, upsertGenerationLogGroupEntry } from "/lib/generation-log-store.mjs?v=20260828-generation-log-partition-1";
-import { readGenerationLogChannelTabValue, readGenerationLogGroupToggleId, renderGenerationLogChannelTabs, renderGenerationLogRows, toggleGenerationLogGroup } from "/lib/generation-log-panel.mjs?v=20260828-generation-log-partition-1";
+import { readGenerationLogChannelTabValue, readGenerationLogGroupToggleId, renderGenerationLogChannelTabs, renderGenerationLogRows, toggleGenerationLogGroup } from "/lib/generation-log-panel.mjs?v=20261016-compact-log-rows-1";
 import { CREATION_STREAM_EVENTS, GENERATION_STREAM_EVENTS, clearFinalImageChunks, recordFinalImageChunk, recordPartialImageChunk } from "/lib/generation-stream-protocol.mjs";
 import { mergeCreationItemStreamUpdate, mergeCreationSetPreviews, shouldRetainCompletedCreationItem } from "/lib/creation-preview-retention.mjs";
 import {
@@ -52,7 +52,7 @@ import { createAssetRecordTimeFilterController, getArticleRecordSearchText, getP
 import { buildCreationRecordTimeFilterOptions, filterCreationRecordSetsByTime, formatCreationRecordTimeFilterLabel, hasActiveCreationRecordTimeFilter, normalizeCreationRecordDateFilter, normalizeCreationRecordTimeFilter } from "/lib/creation-record-filter.mjs?v=20260722-creation-record-time-filter-1";
 import { buildCreationRecordListModel, createCreationRecordListState, loadMoreCreationRecordListState } from "/lib/creation-record-list-model.mjs?v=20260807-creation-record-split-workspace-1";
 import { createCreationRecordListRow } from "/lib/creation-record-list-view.mjs?v=20260807-creation-record-split-workspace-1";
-import { ensureLazyViewModule, getMountedLazyViewModule } from "/lib/view-mode-loader.mjs?v=20260928-aspect-ratio-value-only-1";
+import { ensureLazyViewModule, getMountedLazyViewModule } from "/lib/view-mode-loader.mjs?v=20261016-remove-workbench-1";
 import { appendBrowserConfigToFormData, getBrowserPrivateConfigRequestPayload, getOrCreateClientSessionId, readBrowserPrivateConfig, restoreDesktopBrowserConfig, saveBrowserPrivateConfig, toPublicBrowserConfig } from "/lib/browser-config.mjs";
 import { cacheBrowserGalleryItem, clearBrowserImageCache, dataUrlToBlob, deleteBrowserCachedGalleryItem, fetchServerImageAsDataUrl, getBrowserCachedImageData, getImageUrl, getServerImageUrl, getServerThumbnailUrl, getThumbnailUrl, isCacheableBrowserImageUrl, mergeServerAndBrowserGalleryItems, readBrowserCachedGalleryItems } from "/lib/browser-image-cache.mjs";
 import { createImageEditShellBridge } from "/lib/image-edit-shell-bridge.mjs";
@@ -168,7 +168,7 @@ const REASONING_LABELS = {
 };
 const DEFAULT_LIMITS = { maxParallelTasksPerSession: 15, maxReferenceImages: 15, maxCreationReferenceImages: 15, maxPortraitPersonReferenceImages: 3, maxPortraitActionReferenceImages: 3, maxPortraitAccessoryReferenceImages: 9 }; const PROMPT_FILMSTRIP_INITIAL_HISTORY_LIMIT = 10; const PROMPT_FILMSTRIP_MAX_HISTORY_LIMIT = 50; const PROMPT_FILMSTRIP_JOB_LIMIT = MAX_PROMPT_QUEUE_SIZE;
 const CREATION_IMAGE_COUNT_OPTIONS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
-const DEFAULT_PROMPT_ENHANCE_TEXT = ",sharp focus, macro details, rich textures, crisp edges, photorealistic texture, visible grain, detailed surface material, cinematic lighting"; function buildPromptModePrompt() { const prompt = refs.promptInput.value.trim(); if (!state.promptEnhanceEnabled) { return prompt; } const enhanceText = String(refs.promptEnhanceInput?.value || "").trim(); return enhanceText ? `${prompt}${enhanceText.startsWith(",") ? "" : "\n\n"}${enhanceText}` : prompt; } function syncPromptEnhanceMode() { refs.promptEnhanceToggle.classList.toggle("is-active", state.promptEnhanceEnabled); refs.promptEnhanceToggle.setAttribute("aria-checked", String(state.promptEnhanceEnabled)); refs.promptEnhanceToggle.querySelector("small").textContent = getUiLanguageText(state.promptEnhanceEnabled ? "promptEnhanceOn" : "promptEnhanceOff"); refs.promptEnhanceField.classList.toggle("hidden", !state.promptEnhanceEnabled); } function togglePromptEnhanceMode() { state.promptEnhanceEnabled = !state.promptEnhanceEnabled; syncPromptEnhanceMode(); if (state.promptEnhanceEnabled) { refs.promptEnhanceInput.focus(); } }
+const DEFAULT_PROMPT_ENHANCE_TEXT = "Quality only; original prompt and references take priority. 8K ultra-HD look, clear subject, precise focus, natural edges, style-faithful detail, smooth gradients, clean tonal separation. Reduce unintended blur, aliasing, banding, compression artifacts, oversharpening, repeated details. Preserve subject, identity, count, composition, proportions, text, style, color, lighting, materials, intentional blur/grain/pixel art/minimalism. Add no objects, details or quality labels. Size follows settings."; function buildPromptModePrompt() { const prompt = refs.promptInput.value.trim(); if (!state.promptEnhanceEnabled) { return prompt; } const enhanceText = String(refs.promptEnhanceInput?.value || "").trim(); return enhanceText ? `${prompt}${enhanceText.startsWith(",") ? "" : "\n\n"}${enhanceText}` : prompt; } function syncPromptEnhanceMode() { refs.promptEnhanceToggle.classList.toggle("is-active", state.promptEnhanceEnabled); refs.promptEnhanceToggle.setAttribute("aria-checked", String(state.promptEnhanceEnabled)); refs.promptEnhanceToggle.querySelector("small").textContent = getUiLanguageText(state.promptEnhanceEnabled ? "promptEnhanceOn" : "promptEnhanceOff"); refs.promptEnhanceField.classList.toggle("hidden", !state.promptEnhanceEnabled); } function togglePromptEnhanceMode() { state.promptEnhanceEnabled = !state.promptEnhanceEnabled; syncPromptEnhanceMode(); if (state.promptEnhanceEnabled) { refs.promptEnhanceInput.focus(); } }
 const PROMPT_TEMPLATE_STORAGE_KEY = "image-studio-prompt-templates-v2";
 const PROMPT_TEMPLATE_DISMISSED_HISTORY_KEY = "image-studio-prompt-template-dismissed-history-v1";
 const PROMPT_TEMPLATE_LIBRARY_ASSET_VERSION = "20260925-prompt-library-assets-1";
@@ -585,7 +585,7 @@ const TOPBAR_REVEAL_EDGE_PX = 16;
 const WORKSPACE_BOTTOM_GAP_PX = 2;
 const APP_TOOLTIP_TRIGGER_SELECTOR = "[data-tooltip]";
 const PPT_SOURCE_MODES = new Set(["upload", "text", "topic"]);
-const CREATE_VIEW_IDS = new Set(["studio", "style-transfer", "reference-analysis", "product-agent", "image-decomposition", "image-edit", "quick-blend", "image-compress", "creation", "portrait", "article-illustration", "ppt"]);
+const CREATE_VIEW_IDS = new Set(["studio", "style-transfer", "reference-analysis", "image-decomposition", "image-edit", "quick-blend", "image-compress", "creation", "portrait", "article-illustration", "ppt"]);
 const ASSET_VIEW_IDS = new Set(["gallery", "article-record", "ppt-record", "creation-record", "portrait-record"]);
 // Accent families: same-family views share one --accent, resolved by the
 // [data-view-family] rules in styles.css (just after the two theme blocks).
@@ -596,7 +596,6 @@ const VIEW_ACCENT_FAMILIES = {
   studio: "create",
   "style-transfer": "create",
   "reference-analysis": "analyse",
-  "product-agent": "create",
   "image-decomposition": "analyse",
   "image-edit": "edit",
   "quick-blend": "edit",
@@ -1450,6 +1449,7 @@ const refs = {
   includeImageToolModelToggle: document.querySelector("#includeImageToolModelToggle"),
   parameterToolModel: document.querySelector("#parameterToolModel"),
   parameterRequestIp: document.querySelector("#parameterRequestIp"),
+  parameterRequestUrl: document.querySelector("#parameterRequestUrl"),
   savedKeyMask: document.querySelector("#savedKeyMask"),
   sizeInput: document.querySelector("#sizeInput"),
   surprisePromptButton: document.querySelector("#surprisePromptButton"),
@@ -2207,9 +2207,6 @@ function getViewFromHash() {
   if (window.location.hash === "#reference-analysis") {
     return "reference-analysis";
   }
-  if (window.location.hash === "#product-agent") {
-    return "product-agent";
-  }
   if (window.location.hash === "#image-decomposition") {
     return "image-decomposition";
   }
@@ -2257,8 +2254,6 @@ function syncHash(view) {
         ? "#style-transfer"
           : view === "reference-analysis"
             ? "#reference-analysis"
-          : view === "product-agent"
-            ? "#product-agent"
           : view === "image-decomposition"
             ? "#image-decomposition"
           : view === "image-edit"
@@ -2322,7 +2317,6 @@ async function ensureActiveViewModule(view) {
         getGenerationLoadingItemStage,
         getGenerationReferenceFile,
         getCurrentPrivateConfigRequestPayload,
-        appendCurrentConfigToFormData,
         getSelectedImageGenerationConfig,
         getSelectedImageQuality,
         getSelectedImageReasoningEffort,
@@ -5719,6 +5713,17 @@ function updateGenerationModeStatus() {
   }
   if (refs.parameterRequestIp) {
     refs.parameterRequestIp.textContent = state.config?.requestIp || getUiLanguageText("notRecorded") || "未记录";
+  }
+  if (refs.parameterRequestUrl) {
+    let requestUrl = "";
+    try {
+      const url = new URL(generationConfig.baseUrl);
+      if (url.protocol === "https:" || url.protocol === "http:") requestUrl = url.origin;
+    } catch (_error) {}
+    refs.parameterRequestUrl.textContent = requestUrl || getUiLanguageText("notRecorded") || "未记录";
+    refs.parameterRequestUrl.title = requestUrl;
+    if (requestUrl) refs.parameterRequestUrl.href = requestUrl;
+    else refs.parameterRequestUrl.removeAttribute("href");
   }
   refs.parameterTextModelLabel?.classList.toggle("hidden", !textModel);
   refs.parameterTextModel?.classList.toggle("hidden", !textModel);
@@ -19296,6 +19301,10 @@ function bindEvents() {
   refs.grokEndpointPathSelect?.addEventListener("change", () => {
     const endpoint = readEndpointFields("d");
     syncEndpointInputDisplay("d", endpoint.baseUrl, refs.grokEndpointPathSelect.value || endpoint.endpointPath);
+  });
+  [refs.baseUrlInput, refs.directBaseUrlInput, refs.protocolBaseUrlInput, refs.grokBaseUrlInput].forEach((input) => {
+    input?.addEventListener("input", updateGenerationModeStatus);
+    input?.addEventListener("change", updateGenerationModeStatus);
   });
   configModelPicker.bindEvents();
   apiEndpointBookPicker.bindEvents();
