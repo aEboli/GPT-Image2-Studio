@@ -74,6 +74,7 @@ import {
   repairGeneratedAssetMetadata,
   saveGeneratedAsset,
 } from "./lib/gallery-store.mjs";
+import { buildImageFilenameDescriptor } from "./lib/image-filename-descriptor.mjs";
 import {
   buildGalleryThumbnailUrl,
   resolveGalleryImageAsset,
@@ -1613,12 +1614,15 @@ async function handlePromptPreviewSave(request, response) {
     ? normalizeModelProtocolImageSize(payload.size)
     : normalizeGenerationSize(ratioOption.value, payload.size);
   // Filename is derived server-side; anything the client sent is ignored so a
-  // crafted name cannot escape the output directory.
+  // crafted name cannot escape the output directory. A saved attempt preview keeps
+  // the same time-description shape as a finished image but stays recognisable, so
+  // it cannot take the final image's name.
+  const previewDescriptor = buildImageFilenameDescriptor(prompt);
   const filename = createTimestampedFilename({
     format,
     prompt,
     createdAt,
-    filenameKeyword: "partial-preview",
+    filenameKeyword: previewDescriptor ? previewDescriptor + "预览" : "试拍预览",
   });
 
   const saved = await saveGeneratedAsset({
@@ -1923,7 +1927,6 @@ async function generateAndSavePptSlide({
     format: PPT_SLIDE_FORMAT,
     prompt: `${outline.title}-${slidePrompt.title}`,
     createdAt,
-    idSource: `${deckId}-${slidePrompt.slideNumber}`,
   });
   const saved = await saveGeneratedAsset({
     outputDir,
@@ -1954,7 +1957,7 @@ async function generateAndSavePptSlide({
   return {
     slideNumber: slidePrompt.slideNumber,
     title: slidePrompt.title,
-    filename,
+    filename: saved.filename,
     relativePath: saved.relativePath,
     absolutePath: saved.absolutePath,
     imageUrl: buildPptPublicUrl(saved.relativePath),
@@ -2773,18 +2776,18 @@ function getCreationFilenameSequence(item = {}) {
   return itemId.match(/-(\d+)$/)?.[1] || "1";
 }
 
+// 套图 keeps its sequence prefix so the items of one set stay easy to tell apart
+// (3-1542-首图成交主视觉.png); every other mode is just time plus a description.
 function buildCreationImageFilename({ item, createdAt, setId, format }) {
   const filenameTokenSource =
     item.role === "sku" ? item.filenameToken || item.title : item.title || item.filenameToken;
   const filenameToken = sanitizeCreationFilenameToken(filenameTokenSource || item.role || item.itemId, "creation");
-  const filenameSequence = getCreationFilenameSequence(item);
   return createTimestampedFilename({
     format,
     prompt: item.title || item.filenameToken || item.role || item.prompt,
-    filenamePrefix: filenameSequence,
     filenameKeyword: filenameToken,
+    filenamePrefix: getCreationFilenameSequence(item),
     createdAt,
-    idSource: `${setId}-${item.slotIndex || item.itemId}`,
   });
 }
 
@@ -3024,7 +3027,7 @@ function normalizeArticleFilenameToken(value, fallback = "article") {
   return sanitized || fallback;
 }
 
-function buildArticleImageFilename({ item, createdAt, setId, format }) {
+function buildArticleImageFilename({ item, createdAt, format }) {
   const filenameToken = normalizeArticleFilenameToken(
     item.itemKind === "reference-card" ? `ref-${item.cardId || item.itemId}` : item.title || item.itemId,
     item.itemKind === "reference-card" ? "reference" : "illustration",
@@ -3032,9 +3035,8 @@ function buildArticleImageFilename({ item, createdAt, setId, format }) {
   return createTimestampedFilename({
     format,
     prompt: `${item.title} ${item.prompt}`,
-    filenameKeyword: filenameToken,
+    filenameKeyword: buildImageFilenameDescriptor(`${item.title} ${item.prompt}`) || filenameToken,
     createdAt,
-    idSource: `${setId}-${item.itemId}`,
   });
 }
 
@@ -3463,7 +3465,6 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
         const filename = buildArticleImageFilename({
           item,
           createdAt,
-          setId,
           format: finalFormat,
         });
         const saved = await saveGeneratedAsset({
@@ -3506,7 +3507,7 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
 
         items = updateArticleItems(items, item.itemId, {
           status: "completed",
-          filename,
+          filename: saved.filename,
           relativePath: saved.relativePath,
           imageUrl,
           thumbnailUrl: imageUrl,
@@ -4710,9 +4711,10 @@ async function handlePortraitGenerate(request, response) {
         const filename = createTimestampedFilename({
           format: finalFormat,
           prompt: item.title || item.prompt,
-          filenameKeyword: item.filenameToken || item.shotType || item.style || item.itemId,
+          filenameKeyword:
+            buildImageFilenameDescriptor(`${item.title} ${item.prompt}`) ||
+            item.filenameToken || item.shotType || item.style || item.itemId,
           createdAt,
-          idSource: `${setId}-${item.slotIndex || item.itemId}`,
         });
         const saved = await saveGeneratedAsset({
           outputDir,
@@ -4757,7 +4759,7 @@ async function handlePortraitGenerate(request, response) {
 
         items = updatePortraitItems(items, item.itemId, {
           status: "completed",
-          filename,
+          filename: saved.filename,
           relativePath: saved.relativePath,
           imageUrl,
           thumbnailUrl: imageUrl,
@@ -5183,8 +5185,8 @@ async function handleCreationGenerate(request, response) {
         const savedSize = generationResult.effectiveSize || itemGenerationParameters.finalSize;
         const filename = buildCreationImageFilename({
           item,
-          createdAt,
           setId,
+          createdAt,
           format: finalFormat,
         });
         const saved = await saveGeneratedAsset({
@@ -5239,7 +5241,7 @@ async function handleCreationGenerate(request, response) {
           ...clearCreationOriginalResponseRecoveryPatch(),
           status: "completed",
           missingAsset: false,
-          filename,
+          filename: saved.filename,
           relativePath: saved.relativePath,
           imageUrl,
           thumbnailUrl: imageUrl,
@@ -5579,8 +5581,8 @@ async function handleCreationLogoBatchGenerate(request, response) {
         const savedSize = generationResult.effectiveSize || finalSize;
         const filename = buildCreationImageFilename({
           item,
-          createdAt,
           setId,
+          createdAt,
           format: finalFormat,
         });
         const saved = await saveGeneratedAsset({
@@ -5630,7 +5632,7 @@ async function handleCreationLogoBatchGenerate(request, response) {
         items = updateCreationItems(items, item.itemId, {
           ...clearCreationOriginalResponseRecoveryPatch(),
           status: "completed",
-          filename,
+          filename: saved.filename,
           relativePath: saved.relativePath,
           imageUrl,
           thumbnailUrl: imageUrl,
@@ -5911,9 +5913,10 @@ async function handlePortraitRepair(request, response) {
         const filename = createTimestampedFilename({
           format: finalFormat,
           prompt: item.title || item.prompt,
-          filenameKeyword: item.filenameToken || item.shotType || item.style || item.itemId,
+          filenameKeyword:
+            buildImageFilenameDescriptor(`${item.title} ${item.prompt}`) ||
+            item.filenameToken || item.shotType || item.style || item.itemId,
           createdAt: generationCompletedAt,
-          idSource: `${setId}-${item.slotIndex || item.itemId}`,
         });
         const saved = await saveGeneratedAsset({
           outputDir,
@@ -5958,7 +5961,7 @@ async function handlePortraitRepair(request, response) {
         items = updatePortraitItems(items, item.itemId, {
           ...item,
           status: "completed",
-          filename,
+          filename: saved.filename,
           relativePath: saved.relativePath,
           imageUrl,
           thumbnailUrl: imageUrl,
@@ -6343,8 +6346,8 @@ async function handleCreationRepair(request, response) {
         const savedSize = generationResult.effectiveSize || itemGenerationParameters.finalSize;
         const filename = buildCreationImageFilename({
           item: repairItem,
-          createdAt: generationCompletedAt,
           setId,
+          createdAt: generationCompletedAt,
           format: itemFormat,
         });
         const saved = await saveGeneratedAsset({
@@ -6402,7 +6405,7 @@ async function handleCreationRepair(request, response) {
           marketingCopy: repairItem.marketingCopy,
           status: "completed",
           missingAsset: false,
-          filename,
+          filename: saved.filename,
           relativePath: saved.relativePath,
           imageUrl,
           thumbnailUrl: imageUrl,
@@ -7096,9 +7099,7 @@ async function handleGenerate(request, response) {
       format: finalFormat,
       prompt,
       createdAt,
-      idSource: taskId,
       filenameKeyword: quickBlendFilenameToken,
-      omitDatePrefix: isQuickBlend,
     });
     const imageBuffer = decodeAndValidateGeneratedImage(finalBase64, "生成结果");
     const saved = await saveGeneratedAsset({
@@ -7154,7 +7155,7 @@ async function handleGenerate(request, response) {
     });
 
     const item = buildSavedItem({
-      filename,
+      filename: saved.filename,
       absolutePath: saved.absolutePath,
       relativePath: saved.relativePath,
       createdAt: saved.createdAt,

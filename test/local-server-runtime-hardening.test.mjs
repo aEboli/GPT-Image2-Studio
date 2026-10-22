@@ -6,7 +6,7 @@ import { request as httpRequest } from "node:http";
 import { createServer as createTcpServer } from "node:net";
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { networkInterfaces, tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
@@ -242,6 +242,45 @@ test("local portrait mock emits non-empty success and error SSE and persists the
   assert.ok(errorText.trim(), "error SSE body must not be empty");
   assert.ok(error, errorText);
   assert.match(error.payload.message, /人物描述不能为空/);
+});
+
+test("portrait generation and repair retain the saved filenames after collisions", async (t) => {
+  const { baseUrl, outputDir } = await startServer(t);
+  const form = makePortraitForm();
+  form.set("imageCount", "2");
+  form.set("generationStartDelayMs", "0");
+  form.set("planOverrides", JSON.stringify([1, 2].map((slotIndex) => ({
+    slotIndex, title: "女士室内大提琴演奏", prompt: "女士在室内演奏大提琴。",
+  }))));
+  const response = await fetch(`${baseUrl}/api/portrait/generate`, { method: "POST", body: form });
+  const events = parseSseEvents(await response.text());
+  const set = events.find((event) => event.eventName === "complete")?.payload.set;
+  assert.equal(set?.status, "completed");
+  assert.equal(new Set(set.items.map((item) => item.filename)).size, 2);
+  assert.match(set.items[1].filename, /-2\.png$/);
+  for (const item of set.items) {
+    assert.equal(item.filename, basename(item.relativePath));
+    await readFile(join(outputDir, item.relativePath));
+  }
+
+  const repair = makePortraitForm();
+  repair.set("setId", set.setId);
+  repair.set("itemId", set.items[0].itemId);
+  repair.set("generationStartDelayMs", "0");
+  const repairResponse = await fetch(`${baseUrl}/api/portrait/repair`, { method: "POST", body: repair });
+  const repairEvents = parseSseEvents(await repairResponse.text());
+  const repaired = repairEvents.find((event) => event.eventName === "complete")?.payload.set;
+  assert.equal(repaired?.status, "completed");
+  assert.equal(new Set(repaired.items.map((item) => item.filename)).size, 2);
+  const manifestDir = join(outputDir, "json", "portrait-sets");
+  const [manifestFilename] = (await readdir(manifestDir)).filter((entry) => entry.endsWith(".json"));
+  const manifest = JSON.parse(await readFile(join(manifestDir, manifestFilename), "utf8"));
+  assert.equal(manifest.setId, set.setId);
+  for (const item of repaired.items) {
+    assert.equal(item.filename, basename(item.relativePath));
+    assert.equal(manifest.items.find((entry) => entry.itemId === item.itemId).filename, item.filename);
+    await readFile(join(outputDir, item.relativePath));
+  }
 });
 
 test("local server defaults to loopback and rejects cross-origin or non-loopback-host POST requests", async (t) => {

@@ -777,16 +777,50 @@ test("creation suite queue renders selectable active and queued suites", () => {
     assert.equal(strip.classList.contains("hidden"), false);
     assert.equal(strip.children.length, 3);
     assert.equal(strip.children[0].dataset.creationQueueId, "active");
-    assert.equal(strip.children[0].children[0].textContent, "队列一");
+    assert.equal(strip.children[0].children[0].textContent, "一 - Active");
     assert.equal(strip.children[0].classList.contains("is-active"), true);
     assert.equal(strip.children[0].classList.contains("is-selected"), false);
     assert.equal(strip.children[1].dataset.creationQueueId, "queued");
-    assert.equal(strip.children[1].children[0].textContent, "队列二");
+    assert.equal(strip.children[1].children[0].textContent, "二 - Queued");
     assert.equal(strip.children[1].classList.contains("is-selected"), true);
     assert.equal(strip.children[1].attributes["aria-pressed"], "true");
     assert.equal(strip.children[1].children[2].textContent, "0/4");
-    assert.equal(strip.children[2].children[0].textContent, "队列三");
+    assert.equal(strip.children[2].children[0].textContent, "三 - Completed");
     assert.equal(strip.children[2].children[1].textContent, "已完成");
+  } finally {
+    globalThis.document = originalDocument;
+  }
+});
+
+test("creation queue labels pair the ordinal with the product, not with a fixed slot", () => {
+  const originalDocument = globalThis.document;
+  globalThis.document = { createElement: createFakeElement };
+  try {
+    const strip = createFakeElement("div");
+    renderCreationQueueStrip({
+      strip,
+      queueJobs: [
+        { id: "glove", status: "completed", set: { productName: "手套", status: "completed", items: [] } },
+        { id: "shirt", status: "queued", set: { productName: "  衣服  ", status: "queued", items: [] } },
+        { id: "unnamed", status: "queued", set: { productName: "", status: "queued", items: [] } },
+      ],
+      selectedQueueId: "",
+      normalizeSet,
+      getProgressSummary: () => ({ completed: 1, total: 2 }),
+      getStatusLabel: (status) => status,
+      formatClock: () => "16:00",
+    });
+
+    assert.deepEqual(
+      strip.children.map((item) => item.children[0].textContent),
+      ["一 - 手套", "二 - 衣服", "三 - 未命名商品"],
+    );
+    // 序号只是当前列表里的位次：前一条队列收尾后，同一个序号会挂到下一个商品上。
+    assert.deepEqual(
+      strip.children.map((item) => item.dataset.creationQueueId),
+      ["glove", "shirt", "unnamed"],
+    );
+    assert.equal(strip.children[0].title, "一 - 手套 · completed 1/2");
   } finally {
     globalThis.document = originalDocument;
   }

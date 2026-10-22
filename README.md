@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.072-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.073-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installers-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,7 +10,7 @@
 
 Prompt-to-image, reference analysis, editing, ecommerce sets, portraits, article illustrations, PPT generation, and asset history in one browser-based workspace.
 
-Current version: `v0.2.072`
+Current version: `v0.2.073`
 
 [Chinese README](./README.zh-CN.md)
 
@@ -72,9 +72,9 @@ The pure Node.js/Electron start commands and `stop-studio-services.cmd` do not r
 
 ### Windows desktop app (recommended)
 
-Download `GPT-Image2-Studio-Desktop-Setup-v0.2.072-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
+Download `GPT-Image2-Studio-Desktop-Setup-v0.2.073-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
 
-For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.072-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
+For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.073-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
 
 For desktop development, Electron 43 requires Node.js 22.12 or newer:
 
@@ -85,7 +85,7 @@ cmd /c npm run desktop
 
 ### Windows browser installer
 
-The legacy browser-installer flow remains documented for local builds, but the `v0.2.072` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
+The legacy browser-installer flow remains documented for local builds, but the `v0.2.073` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
 
 ## Configuration
 
@@ -125,7 +125,7 @@ Each image route stores its connection settings independently, and only the acti
 | Grok | xAI or a gateway implementing the Grok Imagine image protocol | Base URL, API key, image endpoint, image model |
 | Palette | Not a call channel. Holds the interface palette instead | Nothing; selecting a provider section again restores the connection fields |
 
-Selecting **配色** hides the connection fields and shows seven concise palette swatches in a four-column grid. The default palette is `靛蓝` (Indigo); the other six are drawn from the Chinese traditional-colour catalogue. The selected palette is saved locally and mirrored to the embedded Temu workbench.
+Selecting **配色** hides the connection fields and shows eight concise palette swatches in a four-column grid. The default palette is `黑曜` (Obsidian) — obsidian-black surfaces under liquid-glass materials; `靛蓝` (Indigo) keeps the classic indigo tokens, and the remaining six are drawn from the Chinese traditional-colour catalogue. The selected palette is saved locally and mirrored to the embedded Temu workbench.
 
 Switching to **配色** and back does not change the active image route; the top-right status keeps reporting that route.
 
@@ -327,11 +327,12 @@ Open **Image-to-prompt** from the top bar or the Create menu, upload one image, 
 
 - Waterfall gallery and a shared lightbox with fit, zoom, pan, download, deletion, prompt review, and request-parameter inspection. Creation results show the exact saved generation prompt and recorded per-image parameters; missing historical values are shown as unrecorded instead of inferred from current settings.
 - Separate records for Creation sets, portraits, article illustrations, and PPT decks.
-- Background queue status, progress, structured errors, and retry of failed items.
+- Background queue status, progress, structured errors, and retry of failed items. Creation queue entries show both their position and product name.
+- Generated images use time-prefixed descriptive filenames; set items retain sequence numbers, collisions receive suffixes, and gallery downloads use the saved filename.
 - Generation log rows retain each task's endpoint and show a concise output filename; failed items keep their error details.
 - **Prompt Kit** now includes a searchable static library with six categories, 24 subcategories, and ten reusable prompts per subcategory. It supports list and image views, preserves each preview's intrinsic aspect ratio, adjustable list text, full-prompt lightbox previews, one-click apply, and copying entries into personal templates; the profile/avatar category bundles 40 distinct attributed YouMind previews, each paired with the matching source title and prompt. The remaining categories use deterministic, motif-specific offline previews that vary by template instead of repeating one placeholder composition. Existing personal templates and Prompt Agent history are preserved while legacy built-in defaults migrate to the current set.
 - **Image-to-prompt** returns structured JSON with a dedicated style-lock vocabulary for medium, aesthetic, palette, lighting, material, depth, and finishing, plus image-specific style-drift constraints.
-- A compact GPT / Gemini / Grok / Palette configuration drawer, with GPT's Route / Direct switch directly below the section row, isolated API history, aligned endpoint fields, hover/focus help, and an independently scrolling generation log. The current-call summary includes the outbound request IP and a clickable image-service origin. Seven interface palettes are shown four per row.
+- A compact GPT / Gemini / Grok / Palette configuration drawer, with GPT's Route / Direct switch directly below the section row, isolated API history, aligned endpoint fields, hover/focus help, and an independently scrolling generation log. The current-call summary includes the outbound request IP and a clickable image-service origin. Eight interface palettes are shown four per row, with `黑曜` (Obsidian) as the default.
 - Dark/light themes, Chinese/English UI, and responsive desktop, tablet, and mobile layouts.
 
 ## Interface preview
@@ -555,7 +556,7 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 - The source and lockfile versions are authoritative; tags use `v<version>`.
 - Versions use `major.minor.patch` with a three-digit patch segment: major bumps reset minor and patch, minor bumps reset patch, feature bumps add `0.010`, and ordinary updates add `0.001`.
 - Use `npm run release:major`, `npm run release:minor`, `npm run release:feature`, or `npm run release:patch` with `--summary`; each release changes exactly one level.
-- Current release notes: [v0.2.072](./docs/releases/v0.2.072.md).
+- Current release notes: [v0.2.073](./docs/releases/v0.2.073.md).
 - Windows packages are distributed through [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Check the release notes for hashes and signing status.
 - `npm run check:release:strict` requires a clean worktree and a matching tag on the current commit.
 
@@ -570,7 +571,13 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 
 ## Version history
 
-Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.072](./docs/releases/v0.2.072.md).
+Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.073](./docs/releases/v0.2.073.md).
+
+### v0.2.073
+
+- Generated images now use descriptive time-prefixed filenames. Set images retain their sequence number, duplicate names receive collision suffixes, and gallery downloads use the saved filename.
+- Added the Obsidian palette as the default while retaining Indigo and the six traditional-colour palettes.
+- Creation queue entries show the product name alongside the queue position; closed configuration controls are inert to keyboard interaction.
 
 ### v0.2.072
 

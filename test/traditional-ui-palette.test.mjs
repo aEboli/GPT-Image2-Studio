@@ -14,8 +14,8 @@ const temuAppPath = new URL("../public/temu/app.js", import.meta.url);
 const temuStylesPath = new URL("../public/temu/styles.css", import.meta.url);
 const paletteCatalogPath = join(homedir(), ".codex", "skills", "zhongguose-palette", "references", "colors.json");
 
-const PALETTE_IDS = ["default", "qinghua", "jiangnan", "songci", "gugong", "lacquer", "dunhuang"];
-const PALETTE_NAMES = ["靛蓝", "青花", "竹影", "天青", "朱墙", "朱漆", "敦煌"];
+const PALETTE_IDS = ["obsidian", "default", "qinghua", "jiangnan", "songci", "gugong", "lacquer", "dunhuang"];
+const PALETTE_NAMES = ["黑曜", "靛蓝", "青花", "竹影", "天青", "朱墙", "朱漆", "敦煌"];
 const HEX_COLOR_PATTERN = /#[0-9a-f]{6}/gi;
 
 async function readText(path) {
@@ -89,7 +89,7 @@ test("palette card follows the provider choices and shows four compact presets p
   assert.match(html.slice(paletteStart, schedulingStart), /class="config-card palette-config-card config-theme-panel"/);
   assert.doesNotMatch(html.slice(routeStart, routeEnd), /palettePickerToggle|route-palette-toggle/);
   const paletteMarkup = html.slice(paletteStart, schedulingStart);
-  const visibleNames = [...paletteMarkup.matchAll(/data-ui-i18n="palette(?:Default|Qinghua|Jiangnan|Songci|Gugong|Lacquer|Dunhuang)">([^<]+)</g)]
+  const visibleNames = [...paletteMarkup.matchAll(/data-ui-i18n="palette(?:Obsidian|Default|Qinghua|Jiangnan|Songci|Gugong|Lacquer|Dunhuang)">([^<]+)</g)]
     .map((match) => match[1]);
   assert.deepEqual(visibleNames, PALETTE_NAMES);
   assert.doesNotMatch(paletteMarkup, /uiCustom|uiOrnament|input[^>]+type="color"|floral-ornament/);
@@ -158,7 +158,7 @@ test("host and Temu workbench exchange only the selected theme and palette", asy
   assert.match(launcher, /theme: message\.theme/);
   assert.match(launcher, /palette: message\.palette/);
   assert.match(launcher, /type: TEMU_WORKBENCH_MESSAGES\.init/);
-  assert.match(temuApp, /function applyWorkbenchTheme\(theme, palette = "default"\)/);
+  assert.match(temuApp, /function applyWorkbenchTheme\(theme, palette = "obsidian"\)/);
   assert.match(temuApp, /applyWorkbenchTheme\(data\.theme, data\.palette\)/);
   assert.doesNotMatch(launcher, /ornament|customColors/);
   assert.doesNotMatch(temuApp, /ornament|customColors/);
@@ -183,6 +183,13 @@ test("palette token hex values remain present in the zhongguose catalogue", asyn
   // The default palette intentionally reuses the v0.2.6 release tokens,
   // which predate the traditional-colour catalogue.
   ["#090d18", "#11172a", "#12192f", "#6f7cff", "#879cff"].forEach((hex) => catalogHexes.add(hex));
+  // The obsidian palette (黑曜) is the new default: its black, cool hairline and
+  // liquid-glass glows are measured values for this interface, not entries in
+  // the traditional-colour catalogue.
+  [
+    "#07080c", "#08090f", "#14161c", "#1c2030", "#363a45", "#6f79ee", "#6fd7a0",
+    "#7c8698", "#8b95ff", "#a3abff", "#a4adff", "#aab2c0", "#f09088", "#f2f4f8", "#f5c85f",
+  ].forEach((hex) => catalogHexes.add(hex));
   const paletteCssHexes = [...new Set([...paletteDeclarationHexes(styles), ...paletteDeclarationHexes(temuStyles)])];
   const paletteMetaStart = app.indexOf("const UI_PALETTE_META");
   const paletteDefaultsEnd = app.indexOf("const UI_LANGUAGE_TEXT");

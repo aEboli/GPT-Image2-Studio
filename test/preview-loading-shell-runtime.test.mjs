@@ -563,9 +563,12 @@ test("queued prompt items are reported as waiting previews", () => {
   assert.equal(getPreviewPlaceholderState({ item: { id: "job-g", statusStage: "generating" } }).waiting, false);
 });
 
-test("queue and thumbnail strips separate adjacent same-footprint entries", async () => {
+test("queue strip wraps its pills while the thumbnail strip separates adjacent same-footprint entries", async () => {
   const styles = await readFile(new URL("../public/styles.css", import.meta.url), "utf8");
-  assert.match(styles, /\.creation-queue-item \+ \.creation-queue-item::before\s*\{[\s\S]*background:/);
+  /* 队列胶囊带上商品名后会换行，只在单行成立的相邻分隔线会在换行处留下孤立竖线，
+     所以队列条带改成靠间距与边框区分；缩略图条带仍是单行，分隔线保留。 */
+  assert.match(styles, /\.creation-queue-strip\s*\{[\s\S]*flex-wrap: wrap;/);
+  assert.doesNotMatch(styles, /\.creation-queue-item \+ \.creation-queue-item::before/);
   assert.match(styles, /\.filmstrip-entry \+ \.filmstrip-entry::before\s*\{[\s\S]*background:/);
   assert.match(styles, /\.generation-loading-shell\[data-generation-loading-mode="waiting"\]/);
   assert.match(styles, /\.generation-loading-shell\[data-generation-loading-mode="waiting"\]::before\s*\{/);

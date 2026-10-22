@@ -77,7 +77,7 @@ const API_EXPORT = `${API_BASE}/export`;
 const WORKBENCH_MESSAGE_INIT = "temu-workbench:init";
 const WORKBENCH_MESSAGE_THEME = "temu-workbench:theme";
 const WORKBENCH_MESSAGE_REQUEST_CLOSE = "temu-workbench:request-close";
-const WORKBENCH_PALETTE_IDS = new Set(["default", "qinghua", "jiangnan", "songci", "gugong", "lacquer", "dunhuang"]);
+const WORKBENCH_PALETTE_IDS = new Set(["obsidian", "default", "qinghua", "jiangnan", "songci", "gugong", "lacquer", "dunhuang"]);
 
 const LEGACY_STORAGE_KEY = "temu-local-listing:draft:v1";
 const WORKBENCH_STORAGE_KEY = "temu-local-listing:products:v1";
@@ -2992,11 +2992,11 @@ document.querySelector("#saveSettingsButton").addEventListener("click", (event) 
 // ---- 跨文档协议（同源 iframe 覆盖层） ----
 // 工作台自己是子文档，宿主是 Studio 主页面。只认三种消息，且两端都按 location.origin 校验。
 
-function applyWorkbenchTheme(theme, palette = "default") {
+function applyWorkbenchTheme(theme, palette = "obsidian") {
   // 深色是 :root 的默认值，因此只有 light 需要落 data-theme；其余值一律回落到深色。
   if (theme === "light") document.documentElement.dataset.theme = "light";
   else delete document.documentElement.dataset.theme;
-  document.documentElement.dataset.palette = WORKBENCH_PALETTE_IDS.has(palette) ? palette : "default";
+  document.documentElement.dataset.palette = WORKBENCH_PALETTE_IDS.has(palette) ? palette : "obsidian";
 }
 
 function applyWorkbenchLanguage(language) {

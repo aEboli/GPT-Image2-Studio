@@ -1135,9 +1135,39 @@ html:not([data-theme="light"]) .primary-button:active:not(:disabled) {
 /* ===========================================================================
    Studio 传统色同步
    宿主 Studio 通过同源消息下发 data-palette / 自定义颜色。这里沿用主应用的
-   七个 palette id，但把它们映射到上品台自己的玻璃面层 token，保证整个 iframe
+   八个 palette id，但把它们映射到上品台自己的玻璃面层 token，保证整个 iframe
    （表单、按钮、表格、抽屉和浮层）只消费同一套变量。
    ========================================================================== */
+
+/* 黑曜：与 Studio 同一组值 —— 近黑玻璃面层，发丝分隔线，点缀只留给紫蓝。 */
+html[data-palette="obsidian"] {
+  color-scheme: dark;
+  --palette-bg: #07080c;
+  --palette-bg-raised: #14161c;
+  --palette-panel: #14161c;
+  --palette-panel-soft: #1c2030;
+  --palette-border: #363a45;
+  --palette-border-strong: #7c8698;
+  --palette-ink: #f2f4f8;
+  --palette-muted: #aab2c0;
+  --palette-accent: #8b95ff;
+  --palette-accent-hover: #a3abff;
+  --palette-accent-active: #6f79ee;
+  --palette-accent-fg: #08090f;
+  --palette-detail: #a4adff;
+  --palette-green: #6fd7a0;
+  --palette-amber: #f5c85f;
+  --palette-red: #f09088;
+  --palette-focus: #8b95ff;
+  --palette-page-rgb: 7, 8, 12;
+  --palette-panel-rgb: 20, 22, 28;
+  --palette-line-rgb: 54, 58, 69;
+  --palette-ink-rgb: 242, 244, 248;
+  --palette-shadow-rgb: 0, 0, 0;
+  --palette-success-rgb: 111, 215, 160;
+  --palette-warning-rgb: 245, 200, 95;
+  --palette-error-rgb: 240, 144, 136;
+}
 
 html[data-palette="qinghua"] {
   color-scheme: light;

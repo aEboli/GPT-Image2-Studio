@@ -68,11 +68,17 @@ The system SHALL expose one exported registry of browser-served shared-module sy
 - **THEN** 显示该请求档位，不显示空白
 
 ### Requirement: Traditional interface palettes
-The configuration drawer SHALL expose an allowlisted traditional-colour palette, persist the selected palette locally, and apply it to the shared interface tokens without changing the existing dark/light theme contract. The theme section SHALL show the seven preset options in a four-column grid. Each option SHALL contain only its palette swatch and concise visible name; Chinese visible names SHALL contain two characters. The theme section SHALL NOT expose custom-colour inputs or floral-accent controls, and legacy custom-colour or floral-accent local-storage values SHALL NOT affect the interface.
+The configuration drawer SHALL expose an allowlisted palette set, persist the selected palette locally, and apply it to the shared interface tokens without changing the existing dark/light theme contract. The set SHALL contain eight presets — 黑曜 (`obsidian`), 靛蓝 (`default`), and the six traditional-colour palettes — and the theme section SHALL show them in a four-column grid. 黑曜 SHALL be the default for a profile that has never chosen a palette; the existing `default` identifier SHALL continue to select 靛蓝 with the v0.2.6 dark-blue values. Existing palette identifiers SHALL remain stable. Each option SHALL contain only its palette swatch and concise visible name; Chinese visible names SHALL contain two characters. The theme section SHALL NOT expose custom-colour inputs or floral-accent controls, and legacy custom-colour or floral-accent local-storage values SHALL NOT affect the interface.
 
 #### Scenario: Select and restore a palette
 - **WHEN** a user selects a named palette and reloads the workbench
 - **THEN** the same palette is applied before the first stylesheet paint and its radio control is marked selected.
+
+#### Scenario: A profile has never chosen a palette
+- **WHEN** local storage holds no palette value
+- **THEN** the workbench applies 黑曜 before the first stylesheet paint
+- **AND** 黑曜 keeps its page and panel surfaces below a mid-grey lightness so the interface reads as obsidian black rather than grey or white
+- **AND** every foreground token keeps at least 4.5:1 against the surfaces it is painted on, control outlines (--border-strong) at least 3:1, container hairlines (--border) at least 1.25:1, and the accent fill at least 4.5:1 against its label
 
 #### Scenario: Configuration sections keep their fields isolated
 - **WHEN** the configuration drawer is opened
@@ -163,3 +169,19 @@ The template-library surface SHALL provide reachable category controls, view con
 - **THEN** 沿用既有行为，仅提交原始提示词
 - **WHEN** 用户编辑增强文本并开启增强模式
 - **THEN** 沿用既有行为，附加用户当前编辑的内容
+
+### Requirement: Configuration sections keep route and theme fields isolated
+
+The configuration drawer SHALL expose four mutually exclusive sections named `路由模式`, `直连模式`, `Gemini`, and `主题`. The first three sections SHALL show only their matching connection fields. The `主题` section SHALL show the existing interface-palette card as a standalone region and SHALL hide and disable all route-specific connection fields. The existing palette identifiers and custom colour controls SHALL remain available.
+
+#### Scenario: Theme section is selected
+
+- **WHEN** the user selects the `主题` section
+- **THEN** the palette card is visible as the only section-specific content
+- **AND** route-specific connection fields are hidden and disabled
+
+#### Scenario: Narrow theme section
+
+- **WHEN** the `主题` section is narrower than the combined minimum width of the palette options
+- **THEN** every palette option remains on one horizontal row
+- **AND** the palette region can be scrolled horizontally without wrapping

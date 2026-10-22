@@ -16,11 +16,17 @@ The configuration drawer SHALL expose four mutually exclusive sections named `�
 - **THEN** every palette option remains on one horizontal row
 - **AND** the palette region can be scrolled horizontally without wrapping
 
-### Requirement: Default palette uses the legacy indigo colours
+### Requirement: Obsidian is the default palette and Indigo remains available
 
-The default palette SHALL retain the persisted identifier `default`, display the concise name `经典靛蓝` (Classic indigo), and use the v0.2.6 dark-blue values for its dark surface and accent. The independent light/dark theme setting SHALL continue to be persisted and synchronized with the Temu workbench.
+The palette set SHALL contain eight options: 黑曜 (`obsidian`), 靛蓝 (`default`), and six traditional-colour palettes. A profile without a saved palette SHALL use 黑曜 by default. The existing `default` identifier SHALL continue to select 靛蓝 with the v0.2.6 dark-blue values. The independent light/dark theme setting SHALL continue to be persisted and synchronized with the Temu workbench.
 
-#### Scenario: Existing stored palette and theme
+#### Scenario: A profile has never chosen a palette
+
+- **WHEN** local storage holds no palette value
+- **THEN** the workbench applies 黑曜 before the first stylesheet paint
+- **AND** the page and panel surfaces remain near black with readable foreground, border, and accent contrast
+
+#### Scenario: Existing Indigo selection remains stored
 
 - **WHEN** local storage contains an existing palette identifier or theme value
-- **THEN** the workbench restores both values without discarding custom colours
+- **THEN** the workbench restores both values without changing the saved Indigo selection

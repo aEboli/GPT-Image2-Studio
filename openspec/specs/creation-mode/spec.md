@@ -1101,14 +1101,15 @@ The system SHALL show an orange boundary highlight around both current and saved
 
 ### Requirement: 套图图片文件名以编号开头
 
-系统 SHALL 对本地服务新生成的套图图片使用 `编号-时间-图片类型-短标识.扩展名` 的文件名结构。编号 SHALL 位于四位时分时间之前，非套图模式的文件名结构 SHALL 保持不变。
+系统 SHALL 对本地服务新生成的套图图片使用 `编号-HHMM-名称.扩展名` 的文件名结构。编号 SHALL 位于四位时分时间之前，名称 SHALL 是该图片类型的可读标题或安全 SKU token，文件名 MUST NOT 再带随机短标识。非套图模式的文件名结构 SHALL 使用 `HHMM-名称.扩展名`。
 
 #### Scenario: 生成或修复一张套图图片
 
 - **WHEN** 用户首次生成、补齐或重生成一张套图图片
 - **THEN** 文件名以该图片在套图中的编号开头
 - **AND** 紧随编号之后的是四位时分时间
-- **AND** 图片类型、短标识和扩展名仍保留在文件名中
+- **AND** 图片类型名称和扩展名仍保留在文件名中
+- **AND** 文件名不含随机短标识
 
 ### Requirement: 摩托车骑行护目镜使用真实四级类目
 
@@ -1293,7 +1294,7 @@ Creation Mode SHALL 将新计划和本地队列中的 SKU 项命名为 `SKU imag
 
 名称中的中文压缩 SHALL 只作用于计划项和队列项的用户可见名称，不得改变 SKU 图内提示词标签。单个复合颜色如 `深蓝色`、`玫瑰金色` 或 `米白色` SHALL 保持完整，不得因没有多个独立颜色而去掉末尾“色”。
 
-当没有可靠颜色标签时，系统 SHALL 使用 `SKU image {序号}`，MUST NOT 回退到原始 SKU 标题、ID、货号或参考文件名。新计划的 SKU `filenameToken` 和新生成图片的文件名短标识 SHALL 只使用稳定 SKU 序号和可选的可靠颜色 token，MUST NOT 包含原始 SKU 标题、ID、货号或参考文件名。该名称变化 SHALL 不改变 SKU 项序号、排序、ID、生成提示词、Listing、导出字段、原始参考文件名、参考索引、图片关联或已持久化历史项。
+当没有可靠颜色标签时，系统 SHALL 使用 `SKU image {序号}`，MUST NOT 回退到原始 SKU 标题、ID、货号或参考文件名。新计划的 SKU `filenameToken` 和新生成图片文件名的名称部分 SHALL 只使用稳定 SKU 序号和可选的可靠颜色 token，MUST NOT 包含原始 SKU 标题、ID、货号或参考文件名。该名称变化 SHALL 不改变 SKU 项序号、排序、ID、生成提示词、Listing、导出字段、原始参考文件名、参考索引、图片关联或已持久化历史项。
 
 #### Scenario: 单一 SKU 使用本地化颜色名称
 

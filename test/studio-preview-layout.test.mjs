@@ -30,10 +30,10 @@ const generationClientPath = new URL("../lib/generation-client.mjs", import.meta
 const generationLogPanelPath = new URL("../lib/generation-log-panel.mjs", import.meta.url);
 const generationLogStorePath = new URL("../lib/generation-log-store.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20261016-remove-workbench-1";
-const appAssetVersion = "20261016-enhance-clarity-1";
+const stylesAssetVersion = "20261022-obsidian-1";
+const appAssetVersion = "20261022-obsidian-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
-const creationQueueModuleAssetVersion = "20260915-mode-generation-controls-1";
+const creationQueueModuleAssetVersion = "20261020-queue-label-product-1";
 const quickBlendModuleAssetVersion = "20260928-aspect-ratio-value-only-1";
 
 test("static assets use the current cache-busting version", async () => {
@@ -5282,7 +5282,7 @@ test("creation mode exposes a set-level queue strip for queued suites", async ()
   assert.match(app, /refs\.creationQueueStrip\.addEventListener\("click"/);
   assert.match(queueModule, /export function renderCreationQueueStrip\(/);
   assert.match(queueModule, /button\.dataset\.creationQueueId = job\.id;/);
-  assert.match(queueModule, /formatCreationQueueLabel\(index \+ 1\)/);
+  assert.match(queueModule, /formatCreationQueueLabel\(index \+ 1, set\.productName\)/);
   assert.match(queueModule, /buildCreationQueuedSkuItems\(skuSubjects/);
 
   assert.match(styles, /\.creation-queue-strip\s*\{/);
@@ -5290,7 +5290,7 @@ test("creation mode exposes a set-level queue strip for queued suites", async ()
   assert.match(styles, /\.creation-queue-strip\s*\{[\s\S]*min-height:\s*22px;/);
   assert.match(styles, /\.creation-queue-strip\s*\{[\s\S]*overflow-y:\s*hidden;/);
   assert.match(styles, /\.creation-queue-item\s*\{/);
-  assert.match(styles, /\.creation-queue-item\s*\{[\s\S]*max-width:\s*150px;/);
+  assert.match(styles, /\.creation-queue-item\s*\{[\s\S]*max-width:\s*220px;/);
   assert.match(styles, /\.creation-queue-item\s*\{[\s\S]*border-radius:\s*999px;/);
   assert.match(styles, /\.creation-queue-item\s*\{[\s\S]*background:/);
   assert.match(styles, /\.creation-queue-label\s*\{/);

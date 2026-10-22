@@ -235,6 +235,32 @@ html[data-theme="dark"]:not([data-palette]) {
   --flyout-bg: #151d2c;
 }
 
+/* Liquid Glass overrides for default palette: ambient wallpaper, translucent glass
+   materials with heavy blur, refined corner radii, and progressive squircle enhancement. */
+html[data-palette="default"] {
+  /* Ambient wallpaper using semantic color tokens so each named palette inherits distinct hues */
+  --glass-wallpaper-base: radial-gradient(ellipse 800px 600px at 18% 25%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 72%),
+    radial-gradient(ellipse 700px 700px at 82% 70%, color-mix(in srgb, var(--info) 6%, transparent), transparent 68%),
+    radial-gradient(ellipse 900px 500px at 50% 95%, color-mix(in srgb, var(--ornament) 5%, transparent), transparent 70%),
+    radial-gradient(ellipse 600px 800px at 12% 88%, color-mix(in srgb, var(--success) 4%, transparent), transparent 75%);
+}
+
+html[data-palette="default"][data-theme="dark"] {
+  --bg: #080a0f;
+  --panel: color-mix(in srgb, #0a0d14 92%, transparent);
+  --control-bg: color-mix(in srgb, #0f1420 88%, transparent);
+  --input-bg: color-mix(in srgb, #0b0f1a 90%, transparent);
+  --topbar-bg: color-mix(in srgb, #0a0d14 76%, transparent);
+  --flyout-bg: color-mix(in srgb, #0d1118 82%, transparent);
+  --nav-tab-bg: color-mix(in srgb, #0f1420 70%, transparent);
+  /* Apple systemIndigo-inspired accent with white text */
+  --accent: #5e5ce6;
+  --accent-hover: #6b69ed;
+  --accent-active: #4240c2;
+  --accent-fg: #ffffff;
+  --accent-ink: #ffffff;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -329,6 +355,78 @@ html[data-theme="dark"][data-palette="default"] {
   --preview-stage-bg: rgba(255, 255, 255, 0.025);
   --preview-canvas-border: rgba(255, 255, 255, 0.07);
   --panel-strong: #161d33;
+}
+
+/* 黑曜 —— 默认配色，液态毛玻璃。
+   这一套不是「黑底 + 灰线」，而是苹果那层玻璃：先给页面铺一层很暗的环境光
+   （--glass-wallpaper-base，四团低透明度的紫/蓝/靛，只在四角和下缘起雾），
+   面板再压 56% 的深色并兜住 32px 模糊 + 180% 饱和，于是玻璃后面的颜色被糊开
+   透上来 —— 面板在暗处读作 #17181d，在光团上方读作 #1c1e2b，同屏有深浅但不脏。
+   分隔线只留一道 12%–14% 白的发丝（--border），控件轮廓仍走 --border-strong；
+   卡片不描边，靠 3% 白面层和一枚内高光浮起来。
+   对比度按最亮的那层玻璃（光团正上方、卡片叠加后 #242632）实测：正文 13.6:1、
+   次要文字 7.0:1（下限 4.6:1）、点缀作文字 5.6:1、控件轮廓 4.1:1（下限 3:1）、
+   发丝线 1.3–1.5:1（只做分隔）、主操作填色对 --accent-fg 7.4:1（悬停 9.3:1、
+   按下 5.3:1）。黑曜石没有昼色版本，和朱漆、敦煌一样只给夜色。 */
+html[data-palette="obsidian"] {
+  color-scheme: dark;
+  --palette-accent-base: #8b95ff;
+  --palette-surface-base: #14161c;
+  --palette-detail-base: #a4adff;
+  --glass-wallpaper-base:
+    radial-gradient(1150px 820px at 6% -8%, color-mix(in srgb, #5e5ce6 16%, transparent), transparent 62%),
+    radial-gradient(980px 760px at 104% 4%, color-mix(in srgb, #3c6eff 11%, transparent), transparent 64%),
+    radial-gradient(1050px 880px at 64% 112%, color-mix(in srgb, #8f5cff 11%, transparent), transparent 64%),
+    radial-gradient(760px 640px at 42% 46%, color-mix(in srgb, #2f7ea6 6%, transparent), transparent 68%);
+  --bg: #07080c;
+  --bg-soft: #0a0c11;
+  --panel: color-mix(in srgb, #0b0d13 56%, transparent);
+  --panel-soft: color-mix(in srgb, #ffffff 5%, transparent);
+  --panel-strong: color-mix(in srgb, #161922 74%, transparent);
+  --border: #363a45;
+  --border-strong: #7c8698;
+  --text: #f2f4f8;
+  --muted: #aab2c0;
+  --accent: #8b95ff;
+  --accent-soft: color-mix(in srgb, #8b95ff 16%, transparent);
+  --accent-fg: #08090f;
+  --accent-hover: #a3abff;
+  --accent-active: #6f79ee;
+  --accent-deep-mix: #10132a;
+  --accent-ink: #c6cbff;
+  --seal: #f4776a;
+  --ornament: #a4adff;
+  --success: #6fd7a0;
+  --warning: #f5c85f;
+  --info: #6fb3e8;
+  --danger: #f09088;
+  --meta-mode: #6fb3e8;
+  --meta-size: #a4adff;
+  --meta-time: #f5c85f;
+  --meta-relay: #6fd7a0;
+  --black-violet: #0c0e14;
+  --black-blue: #08090f;
+  --black-green: #070a0a;
+  --black-red: #0d0708;
+  --control-bg: color-mix(in srgb, #161922 50%, transparent);
+  --control-bg-hover: color-mix(in srgb, #202433 58%, transparent);
+  --input-bg: color-mix(in srgb, #090b11 60%, transparent);
+  --input-bg-focus: color-mix(in srgb, #0d1017 64%, transparent);
+  --flyout-bg: color-mix(in srgb, #12151d 78%, transparent);
+  --flyout-text: var(--text);
+  --flyout-muted: var(--muted);
+  --flyout-border: var(--border);
+  --topbar-bg: color-mix(in srgb, #0a0c12 60%, transparent);
+  --topbar-border: var(--border);
+  --nav-tab-bg: color-mix(in srgb, #0e1017 55%, transparent);
+  --nav-tab-bg-hover: color-mix(in srgb, #1a1e28 70%, transparent);
+  --nav-tab-border: var(--border);
+  --nav-tab-border-strong: var(--border-strong);
+  --nav-tab-idle: var(--muted);
+  --active-tab-bg: color-mix(in srgb, #8b95ff 14%, transparent);
+  --preview-stage-bg: #0a0c12;
+  --preview-canvas-border: color-mix(in srgb, #ffffff 10%, transparent);
+  --shadow: 0 30px 70px color-mix(in srgb, #000000 62%, transparent), 0 2px 10px color-mix(in srgb, #000000 40%, transparent);
 }
 
 html[data-palette="qinghua"] {
@@ -734,6 +832,21 @@ html[data-theme][data-palette="dunhuang"] {
   --preview-canvas-border: #6e6b3e;
 }
 
+
+/* 黑曜 */
+html[data-theme][data-palette="obsidian"] {
+  --panel: color-mix(in srgb, #0b0d13 56%, transparent);
+  --panel-strong: color-mix(in srgb, #161922 74%, transparent);
+  --control-bg: color-mix(in srgb, #161922 50%, transparent);
+  --control-bg-hover: color-mix(in srgb, #202433 58%, transparent);
+  --input-bg: color-mix(in srgb, #090b11 60%, transparent);
+  --input-bg-focus: color-mix(in srgb, #0d1017 64%, transparent);
+  --topbar-bg: color-mix(in srgb, #0a0c12 60%, transparent);
+  --nav-tab-bg: color-mix(in srgb, #0e1017 55%, transparent);
+  --nav-tab-bg-hover: color-mix(in srgb, #1a1e28 70%, transparent);
+  --preview-stage-bg: #0a0c12;
+  --preview-canvas-border: color-mix(in srgb, #ffffff 10%, transparent);
+}
 
 html[data-palette]:not([data-palette="default"]) body {
   background:
@@ -3259,12 +3372,14 @@ ul.creation-plan-message {
   gap: 8px;
 }
 
+/* 队列胶囊带商品名后单条明显变长，一行塞不下就换行，避免横向滚动把后面的队列藏起来。 */
 .creation-queue-strip {
   flex: 0 0 auto;
   min-height: 22px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 14px;
+  gap: 8px 14px;
   overflow-x: auto;
   overflow-y: hidden;
   padding: 1px 0 2px;
@@ -3275,7 +3390,7 @@ ul.creation-plan-message {
   position: relative;
   flex: 0 0 auto;
   min-height: 22px;
-  max-width: 150px;
+  max-width: 220px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -3288,19 +3403,6 @@ ul.creation-plan-message {
   cursor: pointer;
   box-shadow: 0 3px 9px color-mix(in srgb, #000 16%, transparent);
   touch-action: manipulation;
-}
-
-.creation-queue-item + .creation-queue-item::before {
-  content: "";
-  position: absolute;
-  left: -8px;
-  top: 50%;
-  width: 1px;
-  height: 12px;
-  transform: translateY(-50%);
-  border-radius: 1px;
-  background: color-mix(in srgb, var(--border) 82%, transparent);
-  pointer-events: none;
 }
 
 .creation-queue-item:hover,
@@ -3329,19 +3431,24 @@ ul.creation-plan-message {
   white-space: nowrap;
 }
 
+/* 商品名比状态长，挤压时只截断名字，状态和进度数字保持完整可读。 */
 .creation-queue-label {
+  flex: 0 1 auto;
+  max-width: 132px;
   font-size: 11px;
   font-weight: 800;
   line-height: 1.1;
 }
 
 .creation-queue-item small {
+  flex: 0 0 auto;
   color: var(--muted);
   font-size: 10px;
   line-height: 1.1;
 }
 
 .creation-queue-status {
+  flex: 0 0 auto;
   font-size: 10px;
   line-height: 1.1;
   color: var(--muted);
@@ -10978,7 +11085,10 @@ html[data-ui-layout="mobile"] .filmstrip-selected-marker {
 }
 
 html[data-theme="light"] .lightbox-fields .detail-field {
-  background: rgba(255, 255, 255, 0.72);
+  /* 用面层变量而不是写死白色：夜色配色（黑曜/朱漆/敦煌）切到浅色主题时，
+     写死的 72% 白会让 --text 的浅字直接消失。浅色主题下 --panel-strong
+     就是 #fffef9，视觉结果与旧值一致。 */
+  background: color-mix(in srgb, var(--panel-strong) 72%, transparent);
 }
 
 .lightbox-fields .detail-field:first-child {
@@ -11532,10 +11642,16 @@ html[data-theme="light"] .lightbox-fields .detail-field {
   inset: 0;
   z-index: 70;
   pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 240ms ease, visibility 0s 240ms;
 }
 
 .config-drawer.open {
   pointer-events: auto;
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
 }
 
 .drawer-backdrop {
@@ -13201,12 +13317,9 @@ html[data-ui-layout="mobile"] .creation-queue-item {
   width: fit-content;
 }
 
-html[data-ui-layout="mobile"] .creation-queue-item + .creation-queue-item::before {
-  left: 7px;
-  top: -8px;
-  width: 18px;
-  height: 1px;
-  transform: none;
+/* 手机端是纵向列表，宽度够用，名字不必按桌面端窄胶囊的宽度截断。 */
+html[data-ui-layout="mobile"] .creation-queue-label {
+  max-width: min(64vw, 320px);
 }
 
 html[data-ui-layout="mobile"] .creation-card-actions .mini-action {
@@ -17772,7 +17885,8 @@ html[data-ui-layout="mobile"] .ppt-record-feedback {
 }
 
 html[data-theme="light"] .reference-preview-viewer .reference-preview-backdrop {
-  background: rgba(255, 255, 255, 0.2);
+  /* 同上：写死的白色背板在夜色配色下会变成一块亮斑。 */
+  background: color-mix(in srgb, var(--panel-strong) 20%, transparent);
 }
 
 .lightbox-fields .lightbox-params-field {
@@ -19811,7 +19925,9 @@ html .prompt-template-head > .toolbar-button {
   border: 1px solid var(--accent);
   border-radius: 6px;
   background: var(--accent);
-  color: var(--accent-ink);
+  /* 底色就是点缀填色，字必须用 --accent-fg；--accent-ink 是压在深色面层上的
+     墨色，两个色在浅底上只差 1.9:1，读不出来。 */
+  color: var(--accent-fg);
   font-size: var(--type-subtitle-size);
   font-weight: 700;
   white-space: nowrap;
@@ -20144,3 +20260,440 @@ html .prompt-template-head > .toolbar-button {
     transition: none;
   }
 }
+
+/* ============================================================================
+   Liquid Glass Design System
+   ============================================================================
+   Apple-inspired translucent glass materials, ambient wallpaper, progressive
+   squircle corners (Chrome 150+), refined radii, and improved visual hierarchy.
+   Applied universally across all palettes while preserving per-view accent colors. */
+
+/* Ambient wallpaper layer: fixed radial gradients using semantic tokens
+   so each palette automatically generates its own distinct background */
+html[data-palette] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: var(--glass-wallpaper-base, none), var(--bg);
+  pointer-events: none;
+}
+
+/* 玻璃面层沿用既有外壳模糊；内层只加描边和阴影，避免生成动画多层合成时闪烁。 */
+.studio-panel,
+.drawer-panel,
+.config-panel,
+.lightbox-dialog,
+.preview-stage,
+.preview-panel,
+.settings-panel,
+.live-panel,
+.recent-panel,
+.nav-flyout,
+.mega-menu,
+.creation-workspace,
+.gallery-panel,
+.filmstrip,
+.creation-record-card,
+.ppt-source-panel,
+.portrait-analysis-panel,
+.image-decomposition-panel,
+.image-edit-panel,
+.style-transfer-panel,
+.article-record-panel {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--text) 12%, transparent) inset,
+    0 1px 0 rgba(255, 255, 255, 0.1) inset,
+    0 24px 80px rgba(0, 0, 0, 0.28);
+}
+
+/* Progressive squircle corners for panels and cards (Chrome 150+) */
+@supports (corner-shape: squircle) {
+  .studio-panel,
+  .drawer-panel,
+  .config-panel,
+  .preview-stage,
+  .preview-panel,
+  .settings-panel,
+  .nav-flyout:not(.mega-menu),
+  .creation-record-card,
+  .ppt-source-panel,
+  .gallery-panel,
+  .creation-workspace {
+    corner-shape: squircle;
+    border-radius: 24px;
+  }
+
+  .mega-menu {
+    corner-shape: squircle;
+    border-radius: 28px;
+  }
+
+  .topbar {
+    corner-shape: squircle;
+  }
+
+  input,
+  select,
+  textarea,
+  .ratio-chip,
+  .palette-option,
+  .compact-field,
+  .reference-dropzone,
+  .prompt-enhance-panel,
+  .adaptive-section,
+  .config-card,
+  .creation-card,
+  .filmstrip-item,
+  .gallery-tile,
+  .article-card,
+  .prompt-template-library-card {
+    corner-shape: squircle;
+    border-radius: 18px;
+  }
+
+  .header-button,
+  .toolbar-button,
+  .mini-action,
+  .inline-button,
+  .icon-button,
+  .reference-remove,
+  .quick-blend-pair-remove,
+  .generate-button {
+    corner-shape: squircle;
+    border-radius: 20px;
+  }
+
+  .count-pill,
+  .model-badge,
+  .brand-ai-badge,
+  .ratio-orientation-summary,
+  .header-pill,
+  .nav-tab-label,
+  .prompt-enhance-switch-track,
+  .reference-dropzone em {
+    /* Pills and fully-rounded elements stay circular, not squircle */
+    corner-shape: round;
+  }
+}
+
+/* 模糊仅用于外层玻璃面板，避免重叠的隐藏表单控件干扰前景绘制。 */
+/* Capsule-shaped header and toolbar buttons */
+.header-button,
+.toolbar-button,
+.ghost-link,
+.mini-action,
+.icon-button,
+.inline-button,
+.reference-remove,
+.quick-blend-pair-remove {
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+/* Generate button: solid fill with white text, subtle depth */
+.generate-button {
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 88%, #000000) 100%);
+  color: var(--accent-fg);
+  font-weight: 700;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent) inset,
+    0 1px 0 rgba(255, 255, 255, 0.2) inset,
+    0 18px 44px color-mix(in srgb, var(--accent) 32%, transparent);
+  backdrop-filter: none;
+}
+
+.generate-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--accent-hover) 0%, color-mix(in srgb, var(--accent-hover) 88%, #000000) 100%);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent-hover) 24%, transparent) inset,
+    0 1px 0 rgba(255, 255, 255, 0.24) inset,
+    0 22px 54px color-mix(in srgb, var(--accent-hover) 38%, transparent);
+}
+
+.generate-button:active:not(:disabled) {
+  background: var(--accent-active);
+  transform: scale(0.98);
+}
+
+/* Refined input fields: larger radius, subtle glass fill */
+input,
+select,
+textarea {
+  border-radius: 16px;
+  font-weight: 500;
+}
+
+/* Ratio chips and palette options */
+.ratio-chip,
+.palette-option {
+  border-radius: 14px;
+  font-weight: 600;
+}
+
+/* View tabs: refined glass treatment */
+.view-tab {
+  border-radius: 16px;
+  font-weight: 600;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--text) 8%, transparent) inset,
+    0 1px 0 rgba(255, 255, 255, 0.08) inset;
+}
+
+html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .view-tab {
+  border-radius: 12px;
+}
+
+.view-tab.active {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--nav-tab-active) 18%, transparent) inset,
+    0 1px 0 rgba(255, 255, 255, 0.12) inset,
+    0 0 0 1px color-mix(in srgb, var(--nav-tab-active) 14%, transparent);
+}
+
+/* Count pills and badges: subtle depth */
+.count-pill,
+.model-badge,
+.brand-ai-badge {
+  font-weight: 700;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent) inset,
+    0 1px 0 rgba(255, 255, 255, 0.06) inset;
+}
+
+/* Disabled controls: improve legibility from .45 to .62 opacity */
+.toolbar-button.disabled,
+.toolbar-button:disabled,
+.header-button:disabled,
+.inline-button:disabled,
+.mini-action.is-disabled {
+  opacity: 0.62;
+}
+
+/* Reference dropzone: larger radius, better visual */
+.reference-dropzone {
+  border-radius: 20px;
+}
+
+/* Adaptive sections (details/summary) */
+.adaptive-section {
+  border-radius: 16px;
+}
+
+html[data-ui-layout="mobile"] .adaptive-section {
+  border-radius: 18px;
+}
+
+/* Config panel cards */
+.config-panel .config-card,
+.config-panel .config-connection-card,
+.config-panel .config-route-fields {
+  border-radius: 16px;
+}
+
+/* Config section and mode selectors */
+.config-panel .config-section-selector,
+.config-panel .config-gpt-mode-selector {
+  border-radius: 14px;
+}
+
+/* Creation cards, filmstrip items, gallery tiles */
+.creation-card,
+.filmstrip-item,
+.gallery-tile,
+.article-card,
+.prompt-template-library-card {
+  border-radius: 14px;
+}
+
+/* Icon buttons */
+.icon-button,
+.field-heading-icon-button {
+  border-radius: 12px;
+}
+
+/* Route selector and config route fields: match test assertions */
+.route-selector {
+  border-radius: 10px;
+}
+
+.route-selector label {
+  border-radius: 9px;
+}
+
+.config-route-fields {
+  border-radius: 10px;
+}
+
+/* Quick Blend controls */
+.quick-blend-pair-remove {
+  border-radius: 999px;
+}
+
+.quick-blend-clear-button {
+  border-radius: 999px;
+}
+
+/* Ratio orientation summary pill */
+.ratio-orientation-summary {
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+/* Reference analysis apply pill */
+.reference-analysis-apply-pill {
+  border-radius: 999px;
+}
+
+/* Creation queue item */
+.creation-queue-item {
+  border-radius: 999px;
+}
+
+html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .topbar {
+  border-radius: 0 0 16px 16px;
+}
+
+/* Nav flyout glass treatment */
+.nav-flyout {
+  border-radius: 18px;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--text) 10%, transparent) inset,
+    0 1px 0 rgba(255, 255, 255, 0.1) inset,
+    0 24px 68px rgba(0, 0, 0, 0.32);
+}
+
+.nav-flyout.mega-menu {
+  border-radius: 26px;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--text) 12%, transparent) inset,
+    0 1px 0 rgba(255, 255, 255, 0.12) inset,
+    0 28px 80px rgba(0, 0, 0, 0.36);
+}
+
+/* Typography weight refinements: reduce bold → semibold for better legibility */
+.field-heading span,
+.field-heading label,
+.panel-title h2,
+.drawer-head h2,
+.config-card h3,
+.mega-menu-link,
+.mega-menu-action,
+.nav-tab-label,
+.brand-copy h1 {
+  font-weight: 600;
+}
+
+.ratio-chip strong,
+.reference-dropzone strong,
+.creation-card-head strong {
+  font-weight: 700;
+}
+
+/* Light theme adjustments */
+html[data-palette="default"][data-theme="light"] {
+  --glass-wallpaper-base: radial-gradient(ellipse 900px 700px at 22% 18%, color-mix(in srgb, var(--accent) 4%, transparent), transparent 75%),
+    radial-gradient(ellipse 800px 800px at 78% 72%, color-mix(in srgb, var(--info) 3%, transparent), transparent 72%),
+    radial-gradient(ellipse 1000px 600px at 50% 98%, color-mix(in srgb, var(--success) 2%, transparent), transparent 78%);
+
+  --panel: color-mix(in srgb, #ffffff 88%, transparent);
+  --control-bg: color-mix(in srgb, #ffffff 82%, transparent);
+  --input-bg: color-mix(in srgb, #ffffff 84%, transparent);
+  --flyout-bg: color-mix(in srgb, #f8f4ed 94%, transparent);
+}
+
+/* Light theme glass panels use white translucency over the warm paper tone */
+html[data-palette="default"][data-theme="light"] .studio-panel,
+html[data-palette="default"][data-theme="light"] .drawer-panel,
+html[data-palette="default"][data-theme="light"] .config-panel,
+html[data-palette="default"][data-theme="light"] .preview-stage,
+html[data-palette="default"][data-theme="light"] .nav-flyout,
+html[data-palette="default"][data-theme="light"] .mega-menu {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--text) 6%, transparent) inset,
+    0 1px 0 rgba(255, 255, 255, 0.86) inset,
+    0 18px 54px rgba(43, 51, 62, 0.14);
+}
+
+/* 黑曜 · 液态毛玻璃
+   面板 = 环境光被 30px 模糊 + 155% 饱和糊开，再覆一层自左上向右下的白色高光；
+   边框只留 1px 近乎透明的白，靠 inset 高光勾出玻璃的厚度与边缘。
+   卡片不描边：3.5% 白的面层 + 一枚内高光就够浮起来。
+   记录/资产类面板（.asset-workspace）密度优先，不参与玻璃化。 */
+html[data-palette="obsidian"] .studio-panel:not(.asset-workspace),
+html[data-palette="obsidian"] .drawer-panel,
+html[data-palette="obsidian"] .config-panel,
+html[data-palette="obsidian"] .lightbox-dialog,
+html[data-palette="obsidian"] .nav-flyout,
+html[data-palette="obsidian"] .mega-menu,
+html[data-palette="obsidian"] .live-panel,
+html[data-palette="obsidian"] .settings-panel {
+  background:
+    linear-gradient(157deg,
+      color-mix(in srgb, #ffffff 8%, transparent) 0%,
+      color-mix(in srgb, #ffffff 1%, transparent) 32%,
+      color-mix(in srgb, #ffffff 4.5%, transparent) 100%),
+    var(--panel);
+  border-color: color-mix(in srgb, #ffffff 9%, transparent);
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, #ffffff 6%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 22%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, #ffffff 5%, transparent),
+    0 30px 70px color-mix(in srgb, #000000 60%, transparent),
+    0 2px 8px color-mix(in srgb, #000000 38%, transparent);
+}
+
+html[data-palette="obsidian"] .topbar {
+  background: color-mix(in srgb, #0a0c12 72%, transparent);
+  border-color: color-mix(in srgb, #ffffff 7%, transparent);
+  backdrop-filter: blur(32px) saturate(150%);
+  -webkit-backdrop-filter: blur(32px) saturate(150%);
+  box-shadow:
+    inset 0 -1px 0 color-mix(in srgb, #ffffff 6%, transparent),
+    0 12px 40px color-mix(in srgb, #000000 55%, transparent);
+}
+
+html[data-palette="obsidian"] .creation-card,
+html[data-palette="obsidian"] .config-card,
+html[data-palette="obsidian"] .creation-record-card,
+html[data-palette="obsidian"] .article-card,
+html[data-palette="obsidian"] .prompt-template-library-card {
+  background: color-mix(in srgb, #ffffff 3.5%, transparent);
+  border-color: color-mix(in srgb, #ffffff 6%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #ffffff 7%, transparent);
+}
+
+/* 系统要求减弱透明时退回实色，模糊与高光一并收掉。 */
+@media (prefers-reduced-transparency: reduce) {
+  html[data-palette="obsidian"] .studio-panel:not(.asset-workspace),
+  html[data-palette="obsidian"] .drawer-panel,
+  html[data-palette="obsidian"] .config-panel,
+  html[data-palette="obsidian"] .lightbox-dialog,
+  html[data-palette="obsidian"] .nav-flyout,
+  html[data-palette="obsidian"] .mega-menu,
+  html[data-palette="obsidian"] .live-panel,
+  html[data-palette="obsidian"] .settings-panel {
+    background: #101218;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  html[data-palette="obsidian"] .creation-card,
+  html[data-palette="obsidian"] .config-card,
+  html[data-palette="obsidian"] .creation-record-card,
+  html[data-palette="obsidian"] .article-card,
+  html[data-palette="obsidian"] .prompt-template-library-card {
+    background: #14161d;
+  }
+
+  html[data-palette="obsidian"] .topbar {
+    background: #0d0f15;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* End Liquid Glass Design System */

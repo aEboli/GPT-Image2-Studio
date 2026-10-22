@@ -72,15 +72,14 @@ test("gallery store persists the request IP for generated image records", async 
   assert.equal(items[0].requestIp, "203.0.113.42");
 });
 
-test("gallery store creates readable filenames from time keyword and id tail", () => {
+test("gallery store names prompt-derived images by time and where-who-what description", () => {
   const filename = createTimestampedFilename({
     format: "jpeg",
     prompt: "生成一张护肤礼盒直播带货主视觉，商业摄影风格",
     createdAt: "2026-04-26T15:42:33",
-    idSource: "task-demo-a1b2c3d4",
   });
 
-  assert.equal(filename, "1542-护肤礼盒-c3d4.jpeg");
+  assert.equal(filename, "1542-礼盒拍摄.jpeg");
 });
 
 test("gallery store falls back to a compact generic keyword when prompt is not filename-friendly", () => {
@@ -88,35 +87,30 @@ test("gallery store falls back to a compact generic keyword when prompt is not f
     format: "png",
     prompt: "   !!!   ",
     createdAt: "2026-04-26T09:08:07",
-    idSource: "job-xyz9",
   });
 
-  assert.equal(filename, "0908-未命名-xyz9.png");
+  assert.equal(filename, "0908-未命名.png");
 });
 
-test("gallery store can create hour-minute prefixed filenames from explicit keywords", () => {
-  const filename = createTimestampedFilename({
+test("gallery store names every generated image with time and a readable name only", () => {
+  const quickBlend = createTimestampedFilename({
     format: "png",
     prompt: "Quick Blend pair 2",
     createdAt: "2026-04-26T15:42:33",
-    idSource: "task-demo-a1b2c3d4",
     filenameKeyword: "a-dress-b-shoe",
     omitDatePrefix: true,
   });
 
-  assert.equal(filename, "1542-a-dress-b-shoe-c3d4.png");
-});
+  assert.equal(quickBlend, "1542-a-dress-b-shoe.png");
 
-test("gallery store can place an explicit sequence before the hour-minute timestamp", () => {
-  const filename = createTimestampedFilename({
+  const creationItem = createTimestampedFilename({
     format: "png",
     createdAt: "2026-04-26T15:42:33",
-    idSource: "creation-set-item-a1b2c3d4",
     filenamePrefix: "3",
     filenameKeyword: "核心卖点图",
   });
 
-  assert.equal(filename, "3-1542-核心卖点图-c3d4.png");
+  assert.equal(creationItem, "3-1542-核心卖点图.png");
 });
 
 test("gallery store prefixes the prompt image folder with the image date", async () => {
@@ -518,17 +512,123 @@ test("gallery store batch renames historical images and sidecars together", asyn
     indexPath,
     publicBasePath: "/output",
   });
-  const renamedFilename = "1542-护肤礼盒-cdef.png";
+  const renamedFilename = "1542-礼盒.png";
   const dateDir = join(outputDir, "2026-04", "04-26", "2026-04-26-prompt");
   const jsonDir = join(outputDir, "json", "2026-04", "04-26", "2026-04-26-prompt");
   const indexPayload = JSON.parse(await readFile(indexPath, "utf8"));
 
   assert.equal(result.renamedCount, 1);
   await access(join(dateDir, renamedFilename));
-  await access(join(jsonDir, "1542-护肤礼盒-cdef.json"));
+  await access(join(jsonDir, "1542-礼盒.json"));
   await assert.rejects(access(join(dateDir, "asset_12345678-90ab-cdef-1234-567890abcdef.png")));
   assert.deepEqual(Object.keys(indexPayload), [renamedFilename]);
   assert.equal(items[0].filename, renamedFilename);
+});
+
+test("gallery store gives same-minute duplicates a sequence suffix instead of overwriting", async () => {
+  const rootDir = await mkdtemp(join(tmpdir(), "responses-gallery-descriptive-collision-"));
+  const outputDir = join(rootDir, "output");
+  const indexPath = join(rootDir, "gallery-index.json");
+  const createdAt = "2026-04-26T15:42:33";
+  const metadata = {
+    prompt: "一位女士在室内演奏大提琴，柔和的侧光，写实摄影",
+    createdAt,
+    format: "png",
+  };
+
+  const filename = createTimestampedFilename({ format: "png", prompt: metadata.prompt, createdAt });
+  assert.equal(filename, "1542-女士室内大提琴演奏.png");
+
+  const first = await saveGeneratedAsset({ outputDir, indexPath, filename, imageBuffer: Buffer.from("first"), metadata });
+  const second = await saveGeneratedAsset({ outputDir, indexPath, filename, imageBuffer: Buffer.from("second"), metadata });
+
+  assert.equal(first.filename, filename);
+  assert.equal(second.filename, "1542-女士室内大提琴演奏-2.png");
+  assert.equal(await readFile(join(outputDir, first.relativePath), "utf8"), "first");
+  assert.equal(await readFile(join(outputDir, second.relativePath), "utf8"), "second");
+
+  const indexPayload = JSON.parse(await readFile(indexPath, "utf8"));
+  assert.deepEqual(Object.keys(indexPayload).sort(), [first.filename, second.filename].sort());
+});
+
+test("gallery store keeps one metadata sidecar per description across formats", async () => {
+  const rootDir = await mkdtemp(join(tmpdir(), "responses-gallery-descriptive-formats-"));
+  const outputDir = join(rootDir, "output");
+  const indexPath = join(rootDir, "gallery-index.json");
+  const createdAt = "2026-04-26T15:42:33";
+  const prompt = "一位女士在室内演奏大提琴，柔和的侧光，写实摄影";
+  const pngName = createTimestampedFilename({ format: "png", prompt, createdAt });
+  const jpgName = createTimestampedFilename({ format: "jpg", prompt, createdAt });
+
+  const png = await saveGeneratedAsset({
+    outputDir,
+    indexPath,
+    filename: pngName,
+    imageBuffer: Buffer.from("png"),
+    metadata: { prompt, createdAt, format: "png", imageBackground: "transparent" },
+  });
+  const jpg = await saveGeneratedAsset({
+    outputDir,
+    indexPath,
+    filename: jpgName,
+    imageBuffer: Buffer.from("jpg"),
+    metadata: { prompt, createdAt, format: "jpg", imageBackground: "opaque" },
+  });
+
+  assert.equal(png.filename, "1542-女士室内大提琴演奏.png");
+  assert.equal(jpg.filename, "1542-女士室内大提琴演奏-2.jpg");
+
+  const items = await listGalleryItems({ outputDir, indexPath, publicBasePath: "/output" });
+  const pngItem = items.find((item) => item.filename === png.filename);
+  const jpgItem = items.find((item) => item.filename === jpg.filename);
+
+  assert.equal(pngItem.imageBackground, "transparent");
+  assert.equal(jpgItem.imageBackground, "opaque");
+});
+
+test("gallery store reserves filename stems without case sensitivity across formats", async () => {
+  const rootDir = await mkdtemp(join(tmpdir(), "responses-gallery-case-collision-"));
+  const outputDir = join(rootDir, "output");
+  const indexPath = join(rootDir, "gallery-index.json");
+  const metadata = { createdAt: "2026-04-26T15:42:33", format: "png" };
+  const first = await saveGeneratedAsset({
+    outputDir, indexPath, filename: "1542-Product.png", imageBuffer: Buffer.from("first"), metadata,
+  });
+  const second = await saveGeneratedAsset({
+    outputDir, indexPath, filename: "1542-product.jpg", imageBuffer: Buffer.from("second"),
+    metadata: { ...metadata, format: "jpg" },
+  });
+
+  assert.equal(second.filename, "1542-product-2.jpg");
+  assert.equal(await readFile(join(outputDir, first.relativePath), "utf8"), "first");
+  assert.equal(await readFile(join(outputDir, second.relativePath), "utf8"), "second");
+  assert.equal((await listGalleryItems({ outputDir, indexPath, publicBasePath: "/output" })).length, 2);
+  assert.equal((await renameGalleryAssets({ outputDir, indexPath })).renamedCount, 0);
+});
+
+test("gallery store keeps descriptive filenames during batch rename", async () => {
+  const rootDir = await mkdtemp(join(tmpdir(), "responses-gallery-descriptive-rename-"));
+  const outputDir = join(rootDir, "output");
+  const indexPath = join(rootDir, ".local", "gallery-index.json");
+  const filename = "1542-女士室内大提琴拍摄.png";
+
+  await saveGeneratedAsset({
+    outputDir,
+    indexPath,
+    filename,
+    imageBuffer: Buffer.from("image"),
+    metadata: {
+      prompt: "一位女士在室内演奏大提琴，柔和的侧光，写实摄影",
+      createdAt: "2026-04-26T15:42:33",
+      format: "png",
+    },
+  });
+
+  const result = await renameGalleryAssets({ outputDir, indexPath });
+  const items = await listGalleryItems({ outputDir, indexPath, publicBasePath: "/output" });
+
+  assert.equal(result.renamedCount, 0);
+  assert.equal(items[0].filename, filename);
 });
 
 test("gallery store batch rename preserves unified hour-minute prefixed filenames", async () => {

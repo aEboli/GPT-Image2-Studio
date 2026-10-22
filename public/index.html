@@ -15,7 +15,7 @@
         const themeKey = "image-studio-ui-theme-v1";
         const paletteKey = "image-studio-ui-palette-v1";
         const languageKey = "image-studio-ui-language-v1";
-        const paletteIds = new Set(["default", "qinghua", "jiangnan", "songci", "gugong", "lacquer", "dunhuang"]);
+        const paletteIds = new Set(["obsidian", "default", "qinghua", "jiangnan", "songci", "gugong", "lacquer", "dunhuang"]);
         const readStored = (key) => {
           try {
             return window.localStorage.getItem(key);
@@ -25,7 +25,7 @@
         };
         const savedPalette = readStored(paletteKey);
         const root = document.documentElement;
-        root.dataset.palette = paletteIds.has(savedPalette) ? savedPalette : "default";
+        root.dataset.palette = paletteIds.has(savedPalette) ? savedPalette : "obsidian";
         try {
           const savedTheme = readStored(themeKey);
           root.dataset.theme = savedTheme === "light" ? "light" : "dark";
@@ -105,7 +105,7 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="./styles.css?v=20261016-remove-workbench-1" />
+    <link rel="stylesheet" href="./styles.css?v=20261022-obsidian-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -121,7 +121,7 @@
         <span class="topbar-reveal-icon" aria-hidden="true"></span>
       </button>
       <header class="topbar" id="globalTopbar">
-        <small class="app-version" aria-label="当前版本 v0.2.072">v0.2.072</small>
+        <small class="app-version" aria-label="当前版本 v0.2.073">v0.2.073</small>
         <div class="brand-cluster">
           <div class="brand-mark" aria-hidden="true">
             <span class="brand-mark-core"></span>
@@ -3108,7 +3108,7 @@
       </div>
     </aside>
 
-    <aside class="config-drawer" id="configDrawer" aria-hidden="true">
+    <aside class="config-drawer" id="configDrawer" aria-hidden="true" inert>
       <div class="drawer-backdrop" id="closeConfigBackdrop"></div>
       <div class="drawer-panel config-panel">
         <div class="drawer-head">
@@ -3407,9 +3407,13 @@
                     <p class="config-card-caption" data-ui-i18n="paletteHint">选择一套界面配色，立即应用到背景、卡片、按钮与细节。</p>
                   </div>
                 </div>
-                <input id="uiPaletteInput" name="uiPalette" type="hidden" value="default" />
+                <input id="uiPaletteInput" name="uiPalette" type="hidden" value="obsidian" />
                 <div class="palette-options" role="radiogroup" aria-label="界面配色" data-ui-i18n-aria-label="paletteSection">
-                  <button class="palette-option is-active" type="button" data-ui-palette-option="default" role="radio" aria-checked="true">
+                  <button class="palette-option is-active" type="button" data-ui-palette-option="obsidian" role="radio" aria-checked="true">
+                    <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <span data-ui-i18n="paletteObsidian">黑曜</span>
+                  </button>
+                  <button class="palette-option" type="button" data-ui-palette-option="default" role="radio" aria-checked="false">
                     <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
                     <span data-ui-i18n="paletteDefault">靛蓝</span>
                   </button>
@@ -3631,6 +3635,6 @@
 
     <div class="app-tooltip" id="appTooltip" role="tooltip" popover="manual"></div>
 
-    <script type="module" src="./app.js?v=20261016-enhance-clarity-1"></script>
+    <script type="module" src="./app.js?v=20261022-obsidian-1"></script>
   </body>
 </html>

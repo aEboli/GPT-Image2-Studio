@@ -35,7 +35,7 @@ export function createTemuWorkbenchLauncher({
   openExportDialog = null,
   // 主题与语言取值函数，供 init 与后续 theme 消息使用。
   getTheme = () => documentRef.documentElement?.dataset?.theme || "",
-  getPalette = () => documentRef.documentElement?.dataset?.palette || "default",
+  getPalette = () => documentRef.documentElement?.dataset?.palette || "obsidian",
   getLanguage = () => documentRef.documentElement?.lang || "",
   // 关闭覆盖层后焦点归还处。
   getFocusTarget = () => documentRef.querySelector("#creationRecordExportTemuButton"),

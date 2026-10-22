@@ -109,7 +109,7 @@ import { getRequeueNotice } from "/lib/generation-item-retry.mjs";
 import { canRepairCreationItem as canRepairCreationItemFromQueue, getCreationRepairButtonText as getCreationRepairButtonTextFromQueue, isCreationItemRepairActive as isCreationItemRepairActiveInQueue, queueCreationItemRepair as queueCreationItemRepairInState, removeQueuedCreationItemRepair, shiftNextQueuedCreationItemRepair } from "/lib/creation-item-repair-queue.mjs";
 import { cloneCreationPlanValue, createCreationPlanPreviewRequestCoordinator, createCreationPlatformPayloadSnapshot, deepFreezeCreationPlanValue, formatCreationPlanWarning, getCreationCompatibleImageTypeState, getCreationEditablePlanDisplayCounts, getCreationSetPlanSource, getVisibleCreationPlanWarnings, mergeCreationPlatformSetParameters, resolveCreationDisplayedPlanContext, resolveCreationPlatformImageCountState, resolveCreationSelectedRolesSubmission, shouldDisableCreationGenerateButton, updateCreationPlatformItemOverride } from "/lib/creation-browser-plan-state.mjs";
 import { normalizeCreationModuleEnabled, resolveCreationPlanCounts } from "/lib/creation-plan-counts.mjs";
-import { buildCreationQueuedRepairFormData, buildCreationQueuedSet as buildCreationQueuedSetFromState, createCreationQueueJob, getActiveCreationQueueJob as getActiveCreationQueueJobFromState, getCreationQueueJobs as getCreationQueueJobsFromState, getCreationRepairTargetSet as getCreationRepairTargetSetFromState, getPendingCreationQueueCount as getPendingCreationQueueCountFromState, getSelectedCreationQueueJob as getSelectedCreationQueueJobFromState, renderCreationQueueStrip as renderCreationQueueStripView, runCreationQueuedJob as runCreationQueuedJobFromQueue, scheduleCreationGenerationQueue as scheduleCreationGenerationQueueFromState, selectCreationQueueJob as selectCreationQueueJobInState, shouldSyncCreationQueueJobCurrentSet, syncActiveCreationQueueSet as syncActiveCreationQueueSetInState } from "/lib/creation-suite-queue.mjs?v=20260915-mode-generation-controls-1";
+import { buildCreationQueuedRepairFormData, buildCreationQueuedSet as buildCreationQueuedSetFromState, createCreationQueueJob, getActiveCreationQueueJob as getActiveCreationQueueJobFromState, getCreationQueueJobs as getCreationQueueJobsFromState, getCreationRepairTargetSet as getCreationRepairTargetSetFromState, getPendingCreationQueueCount as getPendingCreationQueueCountFromState, getSelectedCreationQueueJob as getSelectedCreationQueueJobFromState, renderCreationQueueStrip as renderCreationQueueStripView, runCreationQueuedJob as runCreationQueuedJobFromQueue, scheduleCreationGenerationQueue as scheduleCreationGenerationQueueFromState, selectCreationQueueJob as selectCreationQueueJobInState, shouldSyncCreationQueueJobCurrentSet, syncActiveCreationQueueSet as syncActiveCreationQueueSetInState } from "/lib/creation-suite-queue.mjs?v=20261020-queue-label-product-1";
 import { DEFAULT_PORTRAIT_ACCESSORY_ASSETS, PORTRAIT_ACCESSORY_ASSET_CATEGORIES, getPortraitAccessoryAssetFileDescriptor } from "/lib/portrait-accessory-assets.mjs?v=20260528-portrait-assets-sort-1";
 import { createDefaultPortraitLocationState, createPortraitLocationSelectorController } from "/lib/portrait-location-selector.mjs?v=20260527-portrait-location-1";
 import { getLegacyPromptAgentTemplatePrompt, getPromptAgentDisplayName, getPromptAgentTemplateDisplayName, isStructuredImagePromptJson } from "/lib/prompt-agent-display-name.mjs?v=20260819-prompt-history-mode-1";
@@ -395,6 +395,7 @@ const UI_LANGUAGE_STORAGE_KEY = "image-studio-ui-language-v1";
 // catalogue.  CSS owns the complete token mapping; this table is the single
 // source for labels, swatches, and persistence validation in the UI.
 const UI_PALETTE_META = Object.freeze({
+  obsidian: { label: "黑曜", swatch: ["#14161c", "#8b95ff", "#a4adff"] },
   default: { label: "靛蓝", swatch: ["#090d18", "#12192f", "#6f7cff"] },
   qinghua: { label: "青花", swatch: ["#fffef9", "#1772b4", "#144a74"] },
   jiangnan: { label: "竹影", swatch: ["#fbf2e3", "#6e8b74", "#a61b29"] },
@@ -479,6 +480,7 @@ Object.assign(UI_LANGUAGE_TEXT["zh-CN"], {
   paletteTrigger: "配色",
   paletteTriggerAria: "打开界面配色",
   paletteHint: "选择一套界面配色，立即应用到背景、卡片、按钮与细节。",
+  paletteObsidian: "黑曜",
   paletteDefault: "靛蓝",
   paletteQinghua: "青花",
   paletteJiangnan: "竹影",
@@ -546,6 +548,7 @@ Object.assign(UI_LANGUAGE_TEXT.en, {
   paletteTrigger: "Palette",
   paletteTriggerAria: "Open interface palette",
   paletteHint: "Choose an interface palette for backgrounds, cards, buttons, and details.",
+  paletteObsidian: "Obsidian",
   paletteDefault: "Indigo",
   paletteQinghua: "Blue and white",
   paletteJiangnan: "Bamboo shade",
@@ -903,7 +906,7 @@ const state = {
   imageQualityByRoute: {},
   imageQualityRoute: "",
   uiTheme: "dark",
-  uiPalette: "default",
+  uiPalette: "obsidian",
   uiLanguage: "zh-CN",
   zoom: 1,
 };
@@ -2134,7 +2137,7 @@ function normalizeUiTheme(theme) { return theme === "light" ? "light" : "dark"; 
 function readUiTheme() { try { return normalizeUiTheme(window.localStorage.getItem(THEME_STORAGE_KEY) || document.documentElement.dataset.theme); } catch { return normalizeUiTheme(document.documentElement.dataset.theme); } }
 function normalizeUiPalette(palette) {
   const normalized = String(palette || "").trim().toLowerCase();
-  return UI_PALETTE_IDS.has(normalized) ? normalized : "default";
+  return UI_PALETTE_IDS.has(normalized) ? normalized : "obsidian";
 }
 function readUiPalette() {
   try {
@@ -2432,6 +2435,7 @@ function syncConnectionState() {
 function setDrawerOpen(open) {
   const wasOpen = refs.configDrawer.classList.contains("open");
   refs.configDrawer.classList.toggle("open", open);
+  refs.configDrawer.inert = !open;
   document.documentElement.classList.toggle(TOPBAR_SUPPRESSED_CLASS, open);
   refs.configDrawer.setAttribute("aria-hidden", String(!open));
   if (open) {
