@@ -800,7 +800,7 @@
   function viewerFitScale() {
     const metrics = viewerStageMetrics();
     if (!metrics.imageWidth || !metrics.imageHeight) return 1;
-    return Math.min(1, metrics.width / metrics.imageWidth, metrics.height / metrics.imageHeight);
+    return Math.min(VIEWER_MAX_SCALE, metrics.width / metrics.imageWidth, metrics.height / metrics.imageHeight);
   }
 
   function viewerMinimumScale() {

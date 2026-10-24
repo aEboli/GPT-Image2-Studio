@@ -89,7 +89,7 @@ function createHarness({ route = "a", browserConfig = {} } = {}) {
     getGenerationReferenceFile: (item) => item.file, buildGenerationTaskStatusText: () => "queued",
   };
   for (const name of [
-    "syncHash", "renderActiveView", "syncGalleryLayoutMode", "scheduleStudioHeightSync", "scheduleGalleryPanelHeightSync",
+    "syncHash", "renderActiveView", "syncGalleryLayoutMode", "scheduleStudioHeightSync", "scheduleGalleryPanelHeightSync", "scheduleStudioPromptFillSync",
     "scheduleGalleryScrollSync", "updateGenerateButton", "syncConfigSectionControls", "updateGenerationModeStatus",
     "syncEndpointFieldsFromFullUrlModes", "syncProtocolEndpointPreview", "renderSizeOptions", "renderReferenceAnalysisSizeOptions",
     "renderImageDecompositionSizeOptions", "renderCreationSizeOptions", "renderPortraitSizeOptions",

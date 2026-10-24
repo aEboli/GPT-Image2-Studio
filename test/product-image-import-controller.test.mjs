@@ -414,6 +414,31 @@ test("candidate viewer mirrors the plugin controls while keeping the proxied sou
   assert.equal(dialog.open, true);
 });
 
+test("candidate viewer fits small images to the panel instead of stopping at 100%", () => {
+  const documentRef = new FakeImportDocument();
+  const viewerStage = documentRef.querySelector("#productImageImportViewerStage");
+  const viewerImage = documentRef.querySelector("#productImageImportViewerImage");
+  viewerStage.clientWidth = 900;
+  viewerStage.clientHeight = 600;
+  viewerImage.naturalWidth = 300;
+  viewerImage.naturalHeight = 200;
+  const controller = createProductImageImportController({
+    documentRef,
+    clipboard: {},
+    getMaximumCount: () => 15,
+    getRemainingCapacity: () => 15,
+    applyFiles: () => ({}),
+  });
+  controller.bind();
+  controller.openManifest(makeManifest());
+
+  const firstCard = documentRef.querySelector("#productImageImportGroups").children[0].children[1].children[0];
+  firstCard.children[1].children[1].dispatch("click");
+  viewerImage.dispatch("load");
+
+  // 可视区 872×528：300×200 的图按高度贴边放大到 264%，不再停在 100%。
+  assert.match(viewerImage.style.transform, /scale\(2\.64/);
+});
 test("clipboard import falls back to every readable native image item", async () => {
   const result = await readProductImageImportClipboard({
     clipboard: {

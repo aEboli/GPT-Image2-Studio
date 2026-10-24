@@ -1916,7 +1916,7 @@ test("extension manifest uses an on-demand minimum-permission MV3 surface", asyn
   assert.match(floatingPanel, /rotate\(\$\{state\.viewerRotation\}deg\)/);
   assert.match(floatingPanel, /function rotateViewer\(degrees\)/);
   assert.match(floatingPanel, /function viewerImageDimensions\(\)[\s\S]*?refs\.viewerImage\.naturalWidth[\s\S]*?refs\.viewerImage\.naturalHeight/);
-  assert.match(floatingPanel, /function viewerFitScale\(\)[\s\S]*?Math\.min\(1, metrics\.width \/ metrics\.imageWidth, metrics\.height \/ metrics\.imageHeight\)/);
+  assert.match(floatingPanel, /function viewerFitScale\(\)[\s\S]*?Math\.min\(VIEWER_MAX_SCALE, metrics\.width \/ metrics\.imageWidth, metrics\.height \/ metrics\.imageHeight\)/);
   assert.match(floatingPanel, /function viewerMinimumScale\(\)\s*\{\s*return Math\.min\(VIEWER_MIN_SCALE, viewerFitScale\(\)\);\s*\}/);
   assert.match(floatingPanel, /\.image-viewer-stage img\s*\{[\s\S]*?cursor:\s*grab;/);
   assert.doesNotMatch(floatingPanel, /data-pannable|dataset\.pannable/);
@@ -1931,7 +1931,7 @@ test("extension manifest uses an on-demand minimum-permission MV3 surface", asyn
   assert.doesNotMatch(floatingPanel, /function showViewerAtOriginalSize\(|function viewerOriginalScale\(/);
   const longImageStage = { width: 500, height: 800 };
   const longImage = { width: 800, height: 3700 };
-  const longImageContainScale = Math.min(1, longImageStage.width / longImage.width, longImageStage.height / longImage.height);
+  const longImageContainScale = Math.min(4, longImageStage.width / longImage.width, longImageStage.height / longImage.height);
   const longImageCoverScale = Math.max(longImageStage.width / longImage.width, longImageStage.height / longImage.height);
   assert.ok(longImageContainScale < 0.5);
   assert.ok(longImageContainScale < longImageCoverScale);
@@ -1940,6 +1940,11 @@ test("extension manifest uses an on-demand minimum-permission MV3 surface", asyn
   assert.ok(axisDragLimit(500, 800, longImageContainScale) > 0);
   assert.equal(axisDragLimit(800, 3700, longImageContainScale), 0);
   assert.ok(axisDragLimit(800, 800, 0.5) > 0);
+  // 小图也要放大到贴边：240×240 放进 480×520 的可视区应按短边放大到 200%。
+  const smallImageStage = { width: 480, height: 520 };
+  const smallImage = { width: 240, height: 240 };
+  const smallImageFitScale = Math.min(4, smallImageStage.width / smallImage.width, smallImageStage.height / smallImage.height);
+  assert.equal(smallImageFitScale, 2);
   assert.match(floatingPanel, /function runViewerCommand\(event, command\)[\s\S]*?command\(\);[\s\S]*?event\.detail > 0[\s\S]*?event\.currentTarget\.blur\(\)/);
   assert.match(floatingPanel, /refs\.viewerFitButton\.addEventListener\("click",\s*\(event\)\s*=>\s*runViewerCommand\(event, fitViewerToPanel\)\)/);
   assert.match(floatingPanel, /refs\.viewerRotateLeftButton\.addEventListener\("click",\s*\(event\)\s*=>\s*runViewerCommand\(event,\s*\(\)\s*=>\s*rotateViewer\(-90\)\)\)/);

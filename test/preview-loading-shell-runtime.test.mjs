@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 import {
   beatGenerationLoadingHeartbeat,
   createGenerationLoadingShell,
+  GENERATION_LOADING_RAINBOW_PERIOD_MS,
   getGenerationLoadingInterval,
   getGenerationLoadingProgress,
   getGenerationLoadingItemStage,
@@ -170,21 +171,6 @@ test("preview loading slows by 1500ms per additional 10 percent band", () => {
   assert.equal(getGenerationLoadingInterval(98), 12800);
 });
 
-test("preview loading exposes the tick duration for a continuous background color transition", () => {
-  const documentRef = createTestDocument();
-  const scheduler = installScheduler();
-  try {
-    const nodes = createGenerationLoadingShell(documentRef, { key: "job-rise", active: true });
-    assert.equal(nodes.shell.style.properties.get("--generation-loading-rise-duration"), "800ms");
-    nodes.progress = 25;
-    updateGenerationLoadingShell(nodes, { key: "job-rise", active: true });
-    assert.equal(nodes.shell.style.properties.get("--generation-loading-rise-duration"), "2300ms");
-    stopGenerationLoadingShell(nodes);
-  } finally {
-    scheduler.restore();
-  }
-});
-
 test("stage color families follow the real request stages", () => {
   assert.equal(getGenerationLoadingStageFamily("queued"), "queued");
   assert.equal(getGenerationLoadingStageFamily("uploading"), "uploading");
@@ -252,16 +238,32 @@ test("a re-render without a stage keeps the last known stage", () => {
   }
 });
 
+test("rainbow phase follows the wall clock so a rebuilt shell keeps its colour", () => {
+  const documentRef = createTestDocument();
+  const scheduler = installScheduler();
+  try {
+    const nodes = createGenerationLoadingShell(documentRef, { key: "job-rainbow", active: true });
+    // 负延迟＝从周期中间开始：重建占位时颜色接着走，不会跳回 0 度。
+    const phase = nodes.shell.style.properties.get("--generation-loading-rainbow-phase");
+    assert.match(phase, /^-\d+(\.\d+)?s$/);
+    assert.equal(GENERATION_LOADING_RAINBOW_PERIOD_MS, 60000);
+    stopGenerationLoadingShell(nodes);
+  } finally {
+    scheduler.restore();
+  }
+});
+
 test("stylesheet derives blurred background color from stage hue and progress depth", async () => {
   const styles = await readFile(new URL("../public/styles.css", import.meta.url), "utf8");
   assert.match(styles, /@property --generation-loading-hue\s*\{[\s\S]*syntax:\s*"<number>"/);
   assert.match(styles, /@property --generation-loading-sat\s*\{[\s\S]*syntax:\s*"<percentage>"/);
   // 深浅由百分比推导，所以同一阶段内也能看出推进。
+  assert.match(styles, /--generation-loading-light:\s*calc\([\s\S]*?var\(--generation-loading-progress\)/);
   assert.match(
     styles,
-    /--generation-loading-fluid:\s*hsl\([\s\S]*var\(--generation-loading-hue\)[\s\S]*calc\([\s\S]*var\(--generation-loading-progress\)/,
+    /--generation-loading-fluid:\s*hsl\(\s*var\(--generation-loading-hue\)\s+var\(--generation-loading-sat\)\s+var\(--generation-loading-light\)\s*\)/,
   );
-  assert.match(styles, /--generation-loading-hue 900ms ease-in-out/);
+  assert.match(styles, /--generation-loading-hue 3000ms linear/);
   // 浅色主题必须用亮度偏移而不是固定值，否则会盖掉各阶段按感知亮度做的校准。
   assert.match(
     styles,
@@ -279,7 +281,8 @@ test("stylesheet derives blurred background color from stage hue and progress de
       ),
     );
   });
-  assert.match(styles, /\.generation-loading-shell::before\s*\{[\s\S]*var\(--generation-loading-fluid\)/);
+  assert.match(styles, /--generation-loading-cloud-a:\s*var\(--generation-loading-fluid\)/);
+  assert.match(styles, /\.generation-loading-shell::before\s*\{[\s\S]*var\(--generation-loading-cloud-a\)/);
   assert.doesNotMatch(styles, /generation-loading-(drop|wave|water-bubbles|water-flow|wave-drift)/);
 });
 
@@ -615,8 +618,9 @@ test("app and stylesheet use the shared blurred loading animation without water 
   assert.match(styles, /@property --generation-loading-progress\s*\{[\s\S]*syntax:\s*"<percentage>"/);
   assert.match(
     styles,
-    /\.generation-loading-shell\s*\{[\s\S]*transition:\s*--generation-loading-progress var\(--generation-loading-rise-duration,\s*800ms\) linear/,
+    /\.generation-loading-shell\s*\{[\s\S]*transition:\s*[\s\S]*--generation-loading-hue 3000ms linear/,
   );
+  assert.doesNotMatch(styles, /transition:[^;]*--generation-loading-progress/, "进度不插值：插值会让整块模糊背景逐帧重绘");
   assert.doesNotMatch(styles, /preview-loading-orb-field|preview-loading-fluid|creation-card-loading-sketch|quick-blend-thumb-loader|image-edit-spin|image-decomposition-spin/);
 });
 

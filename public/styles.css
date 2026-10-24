@@ -235,32 +235,6 @@ html[data-theme="dark"]:not([data-palette]) {
   --flyout-bg: #151d2c;
 }
 
-/* Liquid Glass overrides for default palette: ambient wallpaper, translucent glass
-   materials with heavy blur, refined corner radii, and progressive squircle enhancement. */
-html[data-palette="default"] {
-  /* Ambient wallpaper using semantic color tokens so each named palette inherits distinct hues */
-  --glass-wallpaper-base: radial-gradient(ellipse 800px 600px at 18% 25%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 72%),
-    radial-gradient(ellipse 700px 700px at 82% 70%, color-mix(in srgb, var(--info) 6%, transparent), transparent 68%),
-    radial-gradient(ellipse 900px 500px at 50% 95%, color-mix(in srgb, var(--ornament) 5%, transparent), transparent 70%),
-    radial-gradient(ellipse 600px 800px at 12% 88%, color-mix(in srgb, var(--success) 4%, transparent), transparent 75%);
-}
-
-html[data-palette="default"][data-theme="dark"] {
-  --bg: #080a0f;
-  --panel: color-mix(in srgb, #0a0d14 92%, transparent);
-  --control-bg: color-mix(in srgb, #0f1420 88%, transparent);
-  --input-bg: color-mix(in srgb, #0b0f1a 90%, transparent);
-  --topbar-bg: color-mix(in srgb, #0a0d14 76%, transparent);
-  --flyout-bg: color-mix(in srgb, #0d1118 82%, transparent);
-  --nav-tab-bg: color-mix(in srgb, #0f1420 70%, transparent);
-  /* Apple systemIndigo-inspired accent with white text */
-  --accent: #5e5ce6;
-  --accent-hover: #6b69ed;
-  --accent-active: #4240c2;
-  --accent-fg: #ffffff;
-  --accent-ink: #ffffff;
-}
-
 * {
   box-sizing: border-box;
 }
@@ -287,424 +261,7 @@ html[data-theme="light"] body {
     linear-gradient(180deg, #f1f0ed 0%, #f8f4ed 100%);
 }
 
-/* Traditional colour palettes. Each named value is from the zhongguose-palette
-   catalogue; the palette attribute is deliberately separate from data-theme so
-   the existing dark/light compatibility selectors keep working.
 
-   Colour-quality pass: several legacy palettes failed contrast or surface
-   separation.  Common defects fixed below:
-   - near-white bg + near-white panel → bg/panel/border were the same value;
-     cards and inputs had no visible edge.
-   - accent-fill + white text below 4.5:1 (qinghua/jiangnan buttons);
-     hover brighter than the base instead of darker (qinghua).
-   - dark palettes with accent-fg darker than the accent fill itself
-     (lacquer/dunhuang buttons were dark-on-dark).
-   - flyout/hover surfaces darker or identical to the base surface, so hover
-     and popover layers were invisible.
-   Fixes keep each palette's hue family but rebuild its surface ladder,
-   border ladder, and accent luminance ladder to measured contrast:
-   body text ≥ 7:1, secondary text ≥ 4.6:1, control borders ≥ 3:1,
-   accent-fill vs accent-fg ≥ 4.5:1, and each surface step is visible. */
-html[data-palette="default"] {
-  /* The default keeps the v0.2.6 indigo family while the other palettes
-     continue to provide their own traditional colour combinations. */
-  --palette-accent-base: #6f7cff;
-  --palette-surface-base: #12192f;
-  --palette-detail-base: #879cff;
-}
-
-html[data-theme="dark"][data-palette="default"] {
-  --bg: #04060c;
-  --bg-soft: #0a0f1c;
-  --panel: #161d33;
-  --panel-soft: rgba(255, 255, 255, 0.03);
-  --border: rgba(135, 156, 255, 0.26);
-  --border-strong: rgba(135, 156, 255, 0.46);
-  --text: #edf1ff;
-  --muted: #aab4d8;
-  --accent: #6f7cff;
-  --accent-soft: rgba(111, 124, 255, 0.18);
-  --accent-fg: #0b1020;
-  --accent-hover: #828fff;
-  --accent-active: #5c67e8;
-  --accent-deep-mix: #11172a;
-  --accent-ink: #b9c2ff;
-  --seal: #ed5126;
-  --ornament: #9dabff;
-  --success: #70e2a2;
-  --warning: #ffd166;
-  --info: #8abcd1;
-  --danger: #ff9489;
-  --meta-mode: #8abcd1;
-  --meta-size: #9dabff;
-  --meta-time: #ffd166;
-  --meta-relay: #70e2a2;
-  --black-violet: #161d33;
-  --black-blue: #121829;
-  --black-green: #111a2c;
-  --black-red: #1a1c30;
-  --control-bg: #1d263e;
-  --control-bg-hover: #27324f;
-  --input-bg: #121a2e;
-  --input-bg-focus: #18203a;
-  --flyout-bg: #202949;
-  --flyout-text: var(--text);
-  --flyout-muted: var(--muted);
-  --flyout-border: var(--border);
-  --active-tab-bg: rgba(111, 124, 255, 0.12);
-  --preview-stage-bg: rgba(255, 255, 255, 0.025);
-  --preview-canvas-border: rgba(255, 255, 255, 0.07);
-  --panel-strong: #161d33;
-}
-
-/* 黑曜 —— 默认配色，液态毛玻璃。
-   这一套不是「黑底 + 灰线」，而是苹果那层玻璃：先给页面铺一层很暗的环境光
-   （--glass-wallpaper-base，四团低透明度的紫/蓝/靛，只在四角和下缘起雾），
-   面板再压 56% 的深色并兜住 32px 模糊 + 180% 饱和，于是玻璃后面的颜色被糊开
-   透上来 —— 面板在暗处读作 #17181d，在光团上方读作 #1c1e2b，同屏有深浅但不脏。
-   分隔线只留一道 12%–14% 白的发丝（--border），控件轮廓仍走 --border-strong；
-   卡片不描边，靠 3% 白面层和一枚内高光浮起来。
-   对比度按最亮的那层玻璃（光团正上方、卡片叠加后 #242632）实测：正文 13.6:1、
-   次要文字 7.0:1（下限 4.6:1）、点缀作文字 5.6:1、控件轮廓 4.1:1（下限 3:1）、
-   发丝线 1.3–1.5:1（只做分隔）、主操作填色对 --accent-fg 7.4:1（悬停 9.3:1、
-   按下 5.3:1）。黑曜石没有昼色版本，和朱漆、敦煌一样只给夜色。 */
-html[data-palette="obsidian"] {
-  color-scheme: dark;
-  --palette-accent-base: #8b95ff;
-  --palette-surface-base: #14161c;
-  --palette-detail-base: #a4adff;
-  --glass-wallpaper-base:
-    radial-gradient(1150px 820px at 6% -8%, color-mix(in srgb, #5e5ce6 16%, transparent), transparent 62%),
-    radial-gradient(980px 760px at 104% 4%, color-mix(in srgb, #3c6eff 11%, transparent), transparent 64%),
-    radial-gradient(1050px 880px at 64% 112%, color-mix(in srgb, #8f5cff 11%, transparent), transparent 64%),
-    radial-gradient(760px 640px at 42% 46%, color-mix(in srgb, #2f7ea6 6%, transparent), transparent 68%);
-  --bg: #07080c;
-  --bg-soft: #0a0c11;
-  --panel: color-mix(in srgb, #0b0d13 56%, transparent);
-  --panel-soft: color-mix(in srgb, #ffffff 5%, transparent);
-  --panel-strong: color-mix(in srgb, #161922 74%, transparent);
-  --border: #363a45;
-  --border-strong: #7c8698;
-  --text: #f2f4f8;
-  --muted: #aab2c0;
-  --accent: #8b95ff;
-  --accent-soft: color-mix(in srgb, #8b95ff 16%, transparent);
-  --accent-fg: #08090f;
-  --accent-hover: #a3abff;
-  --accent-active: #6f79ee;
-  --accent-deep-mix: #10132a;
-  --accent-ink: #c6cbff;
-  --seal: #f4776a;
-  --ornament: #a4adff;
-  --success: #6fd7a0;
-  --warning: #f5c85f;
-  --info: #6fb3e8;
-  --danger: #f09088;
-  --meta-mode: #6fb3e8;
-  --meta-size: #a4adff;
-  --meta-time: #f5c85f;
-  --meta-relay: #6fd7a0;
-  --black-violet: #0c0e14;
-  --black-blue: #08090f;
-  --black-green: #070a0a;
-  --black-red: #0d0708;
-  --control-bg: color-mix(in srgb, #161922 50%, transparent);
-  --control-bg-hover: color-mix(in srgb, #202433 58%, transparent);
-  --input-bg: color-mix(in srgb, #090b11 60%, transparent);
-  --input-bg-focus: color-mix(in srgb, #0d1017 64%, transparent);
-  --flyout-bg: color-mix(in srgb, #12151d 78%, transparent);
-  --flyout-text: var(--text);
-  --flyout-muted: var(--muted);
-  --flyout-border: var(--border);
-  --topbar-bg: color-mix(in srgb, #0a0c12 60%, transparent);
-  --topbar-border: var(--border);
-  --nav-tab-bg: color-mix(in srgb, #0e1017 55%, transparent);
-  --nav-tab-bg-hover: color-mix(in srgb, #1a1e28 70%, transparent);
-  --nav-tab-border: var(--border);
-  --nav-tab-border-strong: var(--border-strong);
-  --nav-tab-idle: var(--muted);
-  --active-tab-bg: color-mix(in srgb, #8b95ff 14%, transparent);
-  --preview-stage-bg: #0a0c12;
-  --preview-canvas-border: color-mix(in srgb, #ffffff 10%, transparent);
-  --shadow: 0 30px 70px color-mix(in srgb, #000000 62%, transparent), 0 2px 10px color-mix(in srgb, #000000 40%, transparent);
-}
-
-html[data-palette="qinghua"] {
-  color-scheme: light;
-  --palette-accent-base: #144a74;
-  --palette-surface-base: #e4dfd7;
-  --palette-detail-base: #1772b4;
-  --bg: #d7e1ea;
-  --bg-soft: #cbd8e4;
-  --panel: #f6fafc;
-  --panel-soft: #d8e4ee;
-  --border: #a8bdd1;
-  --border-strong: #0f4470;
-  --text: #1c2733;
-  --muted: #43566b;
-  --accent-fg: #f4f9fd;
-  --accent-hover: #123c61;
-  --accent-active: #0c3150;
-  --accent-deep-mix: #0f4470;
-  --accent-ink: #144a74;
-  --seal: #c23504;
-  --ornament: #1772b4;
-  --success: #1c7a4a;
-  --warning: #8a6a1c;
-  --info: #0f4470;
-  --danger: #c23504;
-  --meta-mode: #0f4470;
-  --meta-size: #1a5d96;
-  --meta-time: #8a6a1c;
-  --meta-relay: #1a5d96;
-  --black-violet: #f6fafc;
-  --black-blue: #e9eff5;
-  --black-green: #f6fafc;
-  --black-red: #f1ead9;
-  --control-bg: #ffffff;
-  --control-bg-hover: #eaf2f8;
-  --input-bg: #ffffff;
-  --input-bg-focus: #eff5fa;
-  --flyout-bg: #ffffff;
-  --flyout-text: #1c2733;
-  --flyout-muted: #43566b;
-  --flyout-border: #b6c9da;
-  --active-tab-bg: color-mix(in srgb, #1a5d96 12%, transparent);
-  --preview-stage-bg: #dfe7ee;
-  --preview-canvas-border: #a8bdd1;
-  --panel-strong: #ffffff;
-  --shadow: 0 22px 70px color-mix(in srgb, #1c2733 16%, transparent);
-}
-
-html[data-palette="jiangnan"] {
-  color-scheme: light;
-  --palette-accent-base: #a61b29;
-  --palette-surface-base: #e4dfd7;
-  --palette-detail-base: #6e8b74;
-  --bg: #e8dcc4;
-  --bg-soft: #ded1b4;
-  --panel: #fcf8f0;
-  --panel-soft: #e3d7bc;
-  --border: #bfae8e;
-  --border-strong: #9c1826;
-  --text: #2a2620;
-  --muted: #5d4a30;
-  --accent-fg: #fdf8f0;
-  --accent-hover: #831521;
-  --accent-active: #6b111c;
-  --accent-deep-mix: #4a3320;
-  --accent-ink: #a61b29;
-  --seal: #a62015;
-  --ornament: #6e8b74;
-  --success: #1f7a45;
-  --warning: #7a5c1e;
-  --info: #12508c;
-  --danger: #a62015;
-  --meta-mode: #12508c;
-  --meta-size: #5d7d64;
-  --meta-time: #7a5c1e;
-  --meta-relay: #1f7a45;
-  --black-violet: #fcf8f0;
-  --black-blue: #ebe1cd;
-  --black-green: #f3ead9;
-  --black-red: #f1e3c5;
-  --control-bg: #fffdf9;
-  --control-bg-hover: #f4edde;
-  --input-bg: #fffdf9;
-  --input-bg-focus: #f7f1e5;
-  --flyout-bg: #fffdf9;
-  --flyout-text: #2a2620;
-  --flyout-muted: #5d4a30;
-  --flyout-border: #d3c6ad;
-  --active-tab-bg: color-mix(in srgb, #9c1826 11%, transparent);
-  --preview-stage-bg: #ebe1cd;
-  --preview-canvas-border: #bfae8e;
-  --panel-strong: #fffdf8;
-}
-
-html[data-palette="songci"] {
-  color-scheme: light;
-  --palette-accent-base: #495c69;
-  --palette-surface-base: #d8e3e7;
-  --palette-detail-base: #63bbd0;
-  --bg: #d6e2e1;
-  --bg-soft: #c9d8d7;
-  --panel: #f5f9fa;
-  --panel-soft: #ccdad9;
-  --border: #a3b8b8;
-  --border-strong: #41586a;
-  --text: #22292f;
-  --muted: #455866;
-  --accent-fg: #f2f7fa;
-  --accent-hover: #364a5a;
-  --accent-active: #2b3d4b;
-  --accent-deep-mix: #41586a;
-  --accent-ink: #495c69;
-  --seal: #c23504;
-  --ornament: #63bbd0;
-  --success: #1c7a4a;
-  --warning: #7a5c1e;
-  --info: #12508c;
-  --danger: #a62015;
-  --meta-mode: #12508c;
-  --meta-size: #3f6e8f;
-  --meta-time: #7a5c1e;
-  --meta-relay: #4a8fa8;
-  --black-violet: #f5f9fa;
-  --black-blue: #dae5e5;
-  --black-green: #e5eeed;
-  --black-red: #dae5e5;
-  --control-bg: #ffffff;
-  --control-bg-hover: #e8f1f2;
-  --input-bg: #ffffff;
-  --input-bg-focus: #eef4f5;
-  --flyout-bg: #ffffff;
-  --flyout-text: #22292f;
-  --flyout-muted: #455866;
-  --flyout-border: #b4c7c8;
-  --active-tab-bg: color-mix(in srgb, #4a8fa8 13%, transparent);
-  --preview-stage-bg: #dae5e5;
-  --preview-canvas-border: #a3b8b8;
-  --panel-strong: #ffffff;
-}
-
-html[data-palette="gugong"] {
-  color-scheme: light;
-  --palette-accent-base: #862617;
-  --palette-surface-base: #f6dead;
-  --palette-detail-base: #d6a01d;
-  --bg: #e8d9b4;
-  --bg-soft: #ddcda4;
-  --panel: #faf4e4;
-  --panel-soft: #e2d2ab;
-  --border: #c2aa7c;
-  --border-strong: #7f2415;
-  --text: #2b231a;
-  --muted: #5d4526;
-  --accent-fg: #fdf6ea;
-  --accent-hover: #6c1e11;
-  --accent-active: #5a180e;
-  --accent-deep-mix: #4a3320;
-  --accent-ink: #862617;
-  --seal: #c23504;
-  --ornament: #d6a01d;
-  --success: #1f7a45;
-  --warning: #7a5c1e;
-  --info: #12508c;
-  --danger: #c23504;
-  --meta-mode: #7f2415;
-  --meta-size: #9a7016;
-  --meta-time: #7a5c1e;
-  --meta-relay: #7f2415;
-  --black-violet: #faf4e4;
-  --black-blue: #f1e0be;
-  --black-green: #f3ead9;
-  --black-red: #f1e0be;
-  --control-bg: #fffdf7;
-  --control-bg-hover: #f6edd9;
-  --input-bg: #fffdf7;
-  --input-bg-focus: #f8f0de;
-  --flyout-bg: #fffdf7;
-  --flyout-text: #2b231a;
-  --flyout-muted: #5d4526;
-  --flyout-border: #d3bd90;
-  --active-tab-bg: color-mix(in srgb, #7f2415 12%, transparent);
-  --preview-stage-bg: #f1e0be;
-  --preview-canvas-border: #c2aa7c;
-  --panel-strong: #fffdf6;
-}
-
-html[data-palette="lacquer"] {
-  color-scheme: dark;
-  --palette-accent-base: #ed5126;
-  --palette-surface-base: #2d2e36;
-  --palette-detail-base: #f3bf4c;
-  --bg: #070a0e;
-  --bg-soft: #0d1218;
-  --panel: #232936;
-  --panel-soft: #2c3342;
-  --border: #5b6b80;
-  --border-strong: #f3c453;
-  --text: #f4f1e8;
-  --muted: #b3bec9;
-  --accent-fg: #200c05;
-  --accent-hover: #f06a3a;
-  --accent-active: #d84a1f;
-  --accent-deep-mix: #5d3d21;
-  --accent-ink: #f3bf4c;
-  --seal: #ed5126;
-  --ornament: #f3bf4c;
-  --success: #7ecb54;
-  --warning: #ffd111;
-  --info: #5a9fd4;
-  --danger: #ff6a4d;
-  --meta-mode: #5a9fd4;
-  --meta-size: #f3c453;
-  --meta-time: #ffd111;
-  --meta-relay: #7ecb54;
-  --black-violet: #232936;
-  --black-blue: #2c3342;
-  --black-green: #171c26;
-  --black-red: #2e2620;
-  --control-bg: #2a3140;
-  --control-bg-hover: #353d4f;
-  --input-bg: #1a1f2a;
-  --input-bg-focus: #232936;
-  --flyout-bg: #29303e;
-  --flyout-text: #f4f1e8;
-  --flyout-muted: #b3bec9;
-  --flyout-border: #49586a;
-  --active-tab-bg: color-mix(in srgb, #ed5a2e 18%, transparent);
-  --preview-stage-bg: #0d1118;
-  --preview-canvas-border: #5b6b80;
-  --panel-strong: #2c3342;
-}
-
-html[data-palette="dunhuang"] {
-  color-scheme: dark;
-  --palette-accent-base: #be7e4a;
-  --palette-surface-base: #15231b;
-  --palette-detail-base: #e4bf11;
-  --bg: #0d1410;
-  --bg-soft: #141d16;
-  --panel: #26301f;
-  --panel-soft: #303c29;
-  --border: #6e6b3e;
-  --border-strong: #e4c318;
-  --text: #f4f1e4;
-  --muted: #d3c9a8;
-  --accent-fg: #241505;
-  --accent-hover: #d49a60;
-  --accent-active: #b0763f;
-  --accent-deep-mix: #4a3320;
-  --accent-ink: #e4bf11;
-  --seal: #ed5126;
-  --ornament: #e4bf11;
-  --success: #7ecb54;
-  --warning: #ffd111;
-  --info: #5a9fd4;
-  --danger: #ff6a4d;
-  --meta-mode: #5a9fd4;
-  --meta-size: #e4c318;
-  --meta-time: #f0d98a;
-  --meta-relay: #7ecb54;
-  --black-violet: #26301f;
-  --black-blue: #303c29;
-  --black-green: #1a2218;
-  --black-red: #332e1c;
-  --control-bg: #2d3823;
-  --control-bg-hover: #39462d;
-  --input-bg: #1c251a;
-  --input-bg-focus: #26301f;
-  --flyout-bg: #2c3722;
-  --flyout-text: #f4f1e4;
-  --flyout-muted: #d3c9a8;
-  --flyout-border: #6e6b3e;
-  --active-tab-bg: color-mix(in srgb, #c48852 18%, transparent);
-  --preview-stage-bg: #0d1410;
-  --preview-canvas-border: #6e6b3e;
-  --panel-strong: #303c29;
-}
 
 /* Palette selection wins over the legacy per-view accent family. */
 html[data-palette]:not([data-palette="default"])[data-view-family] {
@@ -741,117 +298,1666 @@ html[data-palette]:not([data-palette="default"]) {
   --asset-border-strong: var(--border-strong);
 }
 
-/*
- * Surface-ladder correction for the named palettes.
- *
- * The shared block above maps --panel, --control-bg and --input-bg onto the
- * single --palette-surface-base value.  That left every named palette with
- * three identical surfaces: cards, buttons and text fields all painted the
- * same colour, so a field had no visible edge and hover states vanished.
- * The catalogued --palette-surface-base value is also far too light (or, in
- * the dark palettes, far too dark) to carry a whole page of chrome.
- *
- * This block declares the missing ladder explicitly.  It carries one ID plus
- * two attribute selectors against the shared block's one ID plus two, and it
- * follows it in source order, so these values win; the catalogued --palette-*
- * values above stay untouched.  Ladder per palette:
- *   bg (page) < panel (card) < control-bg (interactive) < control-bg hover
- * while inputs step the other way, so a text field reads as a slot cut into
- * the card rather than another card.
- */
-
-/* 青花 */
-html[data-theme][data-palette="qinghua"] {
-  --panel: #f6fafc;
-  --panel-strong: #ffffff;
-  --control-bg: #ffffff;
-  --control-bg-hover: #e6eff7;
-  --input-bg: #ffffff;
-  --input-bg-focus: #eef5fa;
-  --preview-stage-bg: #dfe7ee;
-  --preview-canvas-border: #a8bdd1;
+/* ==== 界面配色生成区 开始（scripts/generate-interface-palettes.mjs） ==== */
+/* 黑曜 · 昼 */
+html[data-theme="light"][data-palette="obsidian"] {
+  color-scheme: light;
+  --glass-blur: 34px;
+  --glass-sat: 160%;
+  --glass-radius-panel: 22px;
+  --glass-radius-card: 15px;
+  --glass-sheen-top: rgba(255, 255, 255, 0.340);
+  --glass-sheen-mid: rgba(255, 255, 255, 0.041);
+  --glass-sheen-bottom: rgba(255, 255, 255, 0.187);
+  --glass-ring: rgba(255, 255, 255, 0.50);
+  --glass-edge: rgba(255, 255, 255, 0.90);
+  --glass-card: color-mix(in srgb, #ffffff 44%, transparent);
+  --glass-shadow: rgba(22, 26, 34, 0.10);
+  --glass-shadow-near: rgba(22, 26, 34, 0.05);
+  --palette-accent-base: #5560bc;
+  --palette-surface-base: #f3f4f8;
+  --palette-detail-base: #5963b0;
+  --bg: #eaedf2;
+  --bg-soft: #f3f5f8;
+  --panel: color-mix(in srgb, #f3f4f8 60%, transparent);
+  --panel-soft: color-mix(in srgb, #15171d 6%, transparent);
+  --panel-strong: color-mix(in srgb, #f3f4f8 76%, transparent);
+  --border: #cacdd3;
+  --border-strong: #82858a;
+  --text: #2a2c32;
+  --muted: #616469;
+  --accent: #5560bc;
+  --accent-soft: color-mix(in srgb, #5560bc 14%, transparent);
+  --accent-fg: #ffffff;
+  --accent-hover: #4b54a5;
+  --accent-active: #444d96;
+  --accent-deep-mix: #c5cae5;
+  --accent-ink: #5560bc;
+  --seal: #a8301c;
+  --ornament: #5963b0;
+  --success: #1c7949;
+  --warning: #7a5c12;
+  --info: #0f5590;
+  --danger: #b02a20;
+  --meta-mode: #0f5590;
+  --meta-size: #5963b0;
+  --meta-time: #7a5c12;
+  --meta-relay: #1c7949;
+  --black-violet: #e0e3ee;
+  --black-blue: #dde4ec;
+  --black-green: #dee6e8;
+  --black-red: #e7e1e5;
+  --control-bg: color-mix(in srgb, #f3f4f8 55%, transparent);
+  --control-bg-hover: color-mix(in srgb, #f3f4f8 75%, transparent);
+  --input-bg: color-mix(in srgb, #eef1f5 50%, transparent);
+  --input-bg-focus: color-mix(in srgb, #eef1f5 50%, transparent);
+  --flyout-bg: color-mix(in srgb, #f3f4f8 88%, transparent);
+  --flyout-text: var(--text);
+  --flyout-muted: var(--muted);
+  --flyout-border: var(--border);
+  --topbar-bg: color-mix(in srgb, #f3f4f8 72%, transparent);
+  --topbar-border: var(--border);
+  --nav-tab-bg: color-mix(in srgb, #f3f4f8 62%, transparent);
+  --nav-tab-bg-hover: color-mix(in srgb, #f3f4f8 82%, transparent);
+  --nav-tab-border: var(--border);
+  --nav-tab-border-strong: var(--border-strong);
+  --nav-tab-idle: var(--muted);
+  --active-tab-bg: color-mix(in srgb, #5560bc 14%, transparent);
+  --preview-stage-bg: #f7f8fa;
+  --preview-canvas-border: #c4c6cc;
+  --shadow: 0 24px 60px var(--glass-shadow), 0 2px 8px var(--glass-shadow-near);
 }
 
-/* 竹影 */
-html[data-theme][data-palette="jiangnan"] {
-  --panel: #fcf8f0;
-  --panel-strong: #fffdf9;
-  --control-bg: #fffdf9;
-  --control-bg-hover: #f2e9d8;
-  --input-bg: #fffdf9;
-  --input-bg-focus: #f7f1e5;
-  --preview-stage-bg: #ebe1cd;
-  --preview-canvas-border: #bfae8e;
-}
-
-/* 天青 */
-html[data-theme][data-palette="songci"] {
-  --panel: #f5f9fa;
-  --panel-strong: #ffffff;
-  --control-bg: #ffffff;
-  --control-bg-hover: #e4eff0;
-  --input-bg: #ffffff;
-  --input-bg-focus: #edf4f5;
-  --preview-stage-bg: #dae5e5;
-  --preview-canvas-border: #a3b8b8;
-}
-
-/* 朱墙 */
-html[data-theme][data-palette="gugong"] {
-  --panel: #faf4e4;
-  --panel-strong: #fffdf7;
-  --control-bg: #fffdf7;
-  --control-bg-hover: #f4e9d2;
-  --input-bg: #fffdf7;
-  --input-bg-focus: #f8f0de;
-  --preview-stage-bg: #f1e0be;
-  --preview-canvas-border: #c2aa7c;
-}
-
-/* 朱漆 */
-html[data-theme][data-palette="lacquer"] {
-  --panel: #232936;
-  --panel-strong: #2c3342;
-  --control-bg: #2a3140;
-  --control-bg-hover: #394257;
-  --input-bg: #171c26;
-  --input-bg-focus: #222835;
-  --preview-stage-bg: #0b0f16;
-  --preview-canvas-border: #5b6b80;
-}
-
-/* 敦煌 */
-html[data-theme][data-palette="dunhuang"] {
-  --panel: #26301f;
-  --panel-strong: #303c29;
-  --control-bg: #2d3823;
-  --control-bg-hover: #3d4a2e;
-  --input-bg: #1a2218;
-  --input-bg-focus: #242e22;
-  --preview-stage-bg: #141d16;
-  --preview-canvas-border: #6e6b3e;
-}
-
-
-/* 黑曜 */
-html[data-theme][data-palette="obsidian"] {
-  --panel: color-mix(in srgb, #0b0d13 56%, transparent);
-  --panel-strong: color-mix(in srgb, #161922 74%, transparent);
-  --control-bg: color-mix(in srgb, #161922 50%, transparent);
-  --control-bg-hover: color-mix(in srgb, #202433 58%, transparent);
-  --input-bg: color-mix(in srgb, #090b11 60%, transparent);
-  --input-bg-focus: color-mix(in srgb, #0d1017 64%, transparent);
-  --topbar-bg: color-mix(in srgb, #0a0c12 60%, transparent);
-  --nav-tab-bg: color-mix(in srgb, #0e1017 55%, transparent);
-  --nav-tab-bg-hover: color-mix(in srgb, #1a1e28 70%, transparent);
-  --preview-stage-bg: #0a0c12;
+/* 黑曜 · 夜 */
+html[data-theme="dark"][data-palette="obsidian"] {
+  color-scheme: dark;
+  --glass-blur: 34px;
+  --glass-sat: 160%;
+  --glass-radius-panel: 22px;
+  --glass-radius-card: 15px;
+  --glass-sheen-top: rgba(255, 255, 255, 0.090);
+  --glass-sheen-mid: rgba(255, 255, 255, 0.011);
+  --glass-sheen-bottom: rgba(255, 255, 255, 0.050);
+  --glass-ring: rgba(255, 255, 255, 0.07);
+  --glass-edge: rgba(255, 255, 255, 0.24);
+  --glass-card: color-mix(in srgb, #ffffff 3.5%, transparent);
+  --glass-shadow: rgba(0, 0, 0, 0.62);
+  --glass-shadow-near: rgba(0, 0, 0, 0.38);
+  --palette-accent-base: #8b95ff;
+  --palette-surface-base: #0a0b0f;
+  --palette-detail-base: #a4adff;
+  --bg: #0a0b0f;
+  --bg-soft: #090a0e;
+  --panel: color-mix(in srgb, #0a0b0f 56%, transparent);
+  --panel-soft: color-mix(in srgb, #ffffff 5%, transparent);
+  --panel-strong: color-mix(in srgb, #0a0b0f 72%, transparent);
+  --border: #313236;
+  --border-strong: #66676b;
+  --text: #e4e6ea;
+  --muted: #85868a;
+  --accent: #8b95ff;
+  --accent-soft: color-mix(in srgb, #8b95ff 14%, transparent);
+  --accent-fg: #08090f;
+  --accent-hover: #9ea6ff;
+  --accent-active: #737bd3;
+  --accent-deep-mix: #2a2e4b;
+  --accent-ink: #8b95ff;
+  --seal: #f4776a;
+  --ornament: #a4adff;
+  --success: #6fd7a0;
+  --warning: #f5c85f;
+  --info: #6fb3e8;
+  --danger: #f09088;
+  --meta-mode: #6fb3e8;
+  --meta-size: #a4adff;
+  --meta-time: #f5c85f;
+  --meta-relay: #6fd7a0;
+  --black-violet: #191c2c;
+  --black-blue: #141c25;
+  --black-green: #141f1d;
+  --black-red: #21181b;
+  --control-bg: color-mix(in srgb, #0a0b0f 50%, transparent);
+  --control-bg-hover: color-mix(in srgb, #0a0b0f 6%, transparent);
+  --input-bg: color-mix(in srgb, #090a10 60%, transparent);
+  --input-bg-focus: color-mix(in srgb, #090a10 60%, transparent);
+  --flyout-bg: color-mix(in srgb, #0a0b0f 78%, transparent);
+  --flyout-text: var(--text);
+  --flyout-muted: var(--muted);
+  --flyout-border: var(--border);
+  --topbar-bg: color-mix(in srgb, #0a0b0f 60%, transparent);
+  --topbar-border: var(--border);
+  --nav-tab-bg: color-mix(in srgb, #0a0b0f 55%, transparent);
+  --nav-tab-bg-hover: color-mix(in srgb, #0a0b0f 70%, transparent);
+  --nav-tab-border: var(--border);
+  --nav-tab-border-strong: var(--border-strong);
+  --nav-tab-idle: var(--muted);
+  --active-tab-bg: color-mix(in srgb, #8b95ff 14%, transparent);
+  --preview-stage-bg: #090a0e;
   --preview-canvas-border: color-mix(in srgb, #ffffff 10%, transparent);
+  --shadow: 0 30px 70px var(--glass-shadow), 0 2px 10px var(--glass-shadow-near);
 }
+
+/* 靛蓝 · 昼 */
+html[data-theme="light"][data-palette="default"] {
+  color-scheme: light;
+  --glass-blur: 30px;
+  --glass-sat: 150%;
+  --glass-radius-panel: 20px;
+  --glass-radius-card: 14px;
+  --glass-sheen-top: rgba(255, 255, 255, 0.300);
+  --glass-sheen-mid: rgba(255, 255, 255, 0.036);
+  --glass-sheen-bottom: rgba(255, 255, 255, 0.165);
+  --glass-ring: rgba(255, 255, 255, 0.48);
+  --glass-edge: rgba(255, 255, 255, 0.88);
+  --glass-card: color-mix(in srgb, #ffffff 45%, transparent);
+  --glass-shadow: rgba(22, 26, 34, 0.10);
+  --glass-shadow-near: rgba(22, 26, 34, 0.05);
+  --palette-accent-base: #4b58d0;
+  --palette-surface-base: #f3f5fc;
+  --palette-detail-base: #525dcc;
+  --bg: #eaeef8;
+  --bg-soft: #f3f6fb;
+  --panel: color-mix(in srgb, #f3f5fc 62%, transparent);
+  --panel-soft: color-mix(in srgb, #15171d 6%, transparent);
+  --panel-strong: color-mix(in srgb, #f3f5fc 78%, transparent);
+  --border: #caced9;
+  --border-strong: #82858e;
+  --text: #2a2c33;
+  --muted: #61646b;
+  --accent: #4b58d0;
+  --accent-soft: color-mix(in srgb, #4b58d0 14%, transparent);
+  --accent-fg: #ffffff;
+  --accent-hover: #424db7;
+  --accent-active: #3c46a6;
+  --accent-deep-mix: #c2c9ee;
+  --accent-ink: #4b58d0;
+  --seal: #a8301c;
+  --ornament: #525dcc;
+  --success: #1c7949;
+  --warning: #7a5c12;
+  --info: #0f5590;
+  --danger: #b02a20;
+  --meta-mode: #0f5590;
+  --meta-size: #525dcc;
+  --meta-time: #7a5c12;
+  --meta-relay: #1c7949;
+  --black-violet: #dfe4f5;
+  --black-blue: #dde5f2;
+  --black-green: #dee7ed;
+  --black-red: #e7e2eb;
+  --control-bg: color-mix(in srgb, #f3f5fc 55%, transparent);
+  --control-bg-hover: color-mix(in srgb, #f3f5fc 75%, transparent);
+  --input-bg: color-mix(in srgb, #eef1fa 50%, transparent);
+  --input-bg-focus: color-mix(in srgb, #eef1fa 50%, transparent);
+  --flyout-bg: color-mix(in srgb, #f3f5fc 88%, transparent);
+  --flyout-text: var(--text);
+  --flyout-muted: var(--muted);
+  --flyout-border: var(--border);
+  --topbar-bg: color-mix(in srgb, #f3f5fc 72%, transparent);
+  --topbar-border: var(--border);
+  --nav-tab-bg: color-mix(in srgb, #f3f5fc 62%, transparent);
+  --nav-tab-bg-hover: color-mix(in srgb, #f3f5fc 82%, transparent);
+  --nav-tab-border: var(--border);
+  --nav-tab-border-strong: var(--border-strong);
+  --nav-tab-idle: var(--muted);
+  --active-tab-bg: color-mix(in srgb, #4b58d0 14%, transparent);
+  --preview-stage-bg: #f7f8fc;
+  --preview-canvas-border: #c4c7d1;
+  --shadow: 0 24px 60px var(--glass-shadow), 0 2px 8px var(--glass-shadow-near);
+}
+
+/* 靛蓝 · 夜 */
+html[data-theme="dark"][data-palette="default"] {
+  color-scheme: dark;
+  --glass-blur: 30px;
+  --glass-sat: 150%;
+  --glass-radius-panel: 20px;
+  --glass-radius-card: 14px;
+  --glass-sheen-top: rgba(255, 255, 255, 0.070);
+  --glass-sheen-mid: rgba(255, 255, 255, 0.008);
+  --glass-sheen-bottom: rgba(255, 255, 255, 0.039);
+  --glass-ring: rgba(255, 255, 255, 0.06);
+  --glass-edge: rgba(255, 255, 255, 0.20);
+  --glass-card: color-mix(in srgb, #ffffff 3.5%, transparent);
+  --glass-shadow: rgba(0, 0, 0, 0.58);
+  --glass-shadow-near: rgba(0, 0, 0, 0.38);
+  --palette-accent-base: #7b87ff;
+  --palette-surface-base: #0a0d14;
+  --palette-detail-base: #879cff;
+  --bg: #0a0e1b;
+  --bg-soft: #090d18;
+  --panel: color-mix(in srgb, #0a0d14 56%, transparent);
+  --panel-soft: color-mix(in srgb, #ffffff 5%, transparent);
+  --panel-strong: color-mix(in srgb, #0a0d14 72%, transparent);
+  --border: #313542;
+  --border-strong: #666972;
+  --text: #e4e6eb;
+  --muted: #82858d;
+  --accent: #7b87ff;
+  --accent-soft: color-mix(in srgb, #7b87ff 14%, transparent);
+  --accent-fg: #08090f;
+  --accent-hover: #909aff;
+  --accent-active: #6670d3;
+  --accent-deep-mix: #262c54;
+  --accent-ink: #7b87ff;
+  --seal: #f4776a;
+  --ornament: #879cff;
+  --success: #6fd7a0;
+  --warning: #f5c85f;
+  --info: #6fb3e8;
+  --danger: #f09088;
+  --meta-mode: #6fb3e8;
+  --meta-size: #879cff;
+  --meta-time: #f5c85f;
+  --meta-relay: #6fd7a0;
+  --black-violet: #181d36;
+  --black-blue: #141e30;
+  --black-green: #142228;
+  --black-red: #211b26;
+  --control-bg: color-mix(in srgb, #0a0d14 50%, transparent);
+  --control-bg-hover: color-mix(in srgb, #0a0d14 6%, transparent);
+  --input-bg: color-mix(in srgb, #090c17 60%, transparent);
+  --input-bg-focus: color-mix(in srgb, #090c17 60%, transparent);
+  --flyout-bg: color-mix(in srgb, #0a0d14 78%, transparent);
+  --flyout-text: var(--text);
+  --flyout-muted: var(--muted);
+  --flyout-border: var(--border);
+  --topbar-bg: color-mix(in srgb, #0a0d14 60%, transparent);
+  --topbar-border: var(--border);
+  --nav-tab-bg: color-mix(in srgb, #0a0d14 55%, transparent);
+  --nav-tab-bg-hover: color-mix(in srgb, #0a0d14 70%, transparent);
+  --nav-tab-border: var(--border);
+  --nav-tab-border-strong: var(--border-strong);
+  --nav-tab-idle: var(--muted);
+  --active-tab-bg: color-mix(in srgb, #7b87ff 14%, transparent);
+  --preview-stage-bg: #090d18;
+  --preview-canvas-border: color-mix(in srgb, #ffffff 10%, transparent);
+  --shadow: 0 30px 70px var(--glass-shadow), 0 2px 10px var(--glass-shadow-near);
+}
+
+/* 青花 · 昼 */
+html[data-theme="light"][data-palette="qinghua"] {
+  color-scheme: light;
+  --glass-blur: 18px;
+  --glass-sat: 125%;
+  --glass-radius-panel: 10px;
+  --glass-radius-card: 8px;
+  --glass-sheen-top: rgba(255, 255, 255, 0.420);
+  --glass-sheen-mid: rgba(255, 255, 255, 0.050);
+  --glass-sheen-bottom: rgba(255, 255, 255, 0.231);
+  --glass-ring: rgba(255, 255, 255, 0.62);
+  --glass-edge: rgba(255, 255, 255, 0.96);
+  --glass-card: color-mix(in srgb, #ffffff 48%, transparent);
+  --glass-shadow: rgba(22, 26, 34, 0.07);
+  --glass-shadow-near: rgba(22, 26, 34, 0.03);
+  --palette-accent-base: #144a74;
+  --palette-surface-base: #f2f7fc;
+  --palette-detail-base: #176faf;
+  --bg: #e9f1f9;
+  --bg-soft: #f3f7fc;
+  --panel: color-mix(in srgb, #f2f7fc 72%, transparent);
+  --panel-soft: color-mix(in srgb, #15171d 6%, transparent);
+  --panel-strong: color-mix(in srgb, #f2f7fc 88%, transparent);
+  --border: #cad2d9;
+  --border-strong: #82878e;
+  --text: #2a2d33;
+  --muted: #61656b;
+  --accent: #144a74;
+  --accent-soft: color-mix(in srgb, #144a74 14%, transparent);
+  --accent-fg: #ffffff;
+  --accent-hover: #124166;
+  --accent-active: #103b5d;
+  --accent-deep-mix: #b4c7d8;
+  --accent-ink: #144a74;
+  --seal: #a8301c;
+  --ornament: #176faf;
+  --success: #1c7a4a;
+  --warning: #7a5c12;
+  --info: #0f5590;
+  --danger: #b02a20;
+  --meta-mode: #0f5590;
+  --meta-size: #176faf;
+  --meta-time: #7a5c12;
+  --meta-relay: #1c7a4a;
+  --black-violet: #dae5f0;
+  --black-blue: #dce8f3;
+  --black-green: #ddeaee;
+  --black-red: #e6e5ec;
+  --control-bg: color-mix(in srgb, #f2f7fc 55%, transparent);
+  --control-bg-hover: color-mix(in srgb, #f2f7fc 75%, transparent);
+  --input-bg: color-mix(in srgb, #eef4fa 50%, transparent);
+  --input-bg-focus: color-mix(in srgb, #eef4fa 50%, transparent);
+  --flyout-bg: color-mix(in srgb, #f2f7fc 88%, transparent);
+  --flyout-text: var(--text);
+  --flyout-muted: var(--muted);
+  --flyout-border: var(--border);
+  --topbar-bg: color-mix(in srgb, #f2f7fc 72%, transparent);
+  --topbar-border: var(--border);
+  --nav-tab-bg: color-mix(in srgb, #f2f7fc 62%, transparent);
+  --nav-tab-bg-hover: color-mix(in srgb, #f2f7fc 82%, transparent);
+  --nav-tab-border: var(--border);
+  --nav-tab-border-strong: var(--border-strong);
+  --nav-tab-idle: var(--muted);
+  --active-tab-bg: color-mix(in srgb, #144a74 14%, transparent);
+  --preview-stage-bg: #f6f9fd;
+  --preview-canvas-border: #c3cad1;
+  --shadow: 0 24px 60px var(--glass-shadow), 0 2px 8px var(--glass-shadow-near);
+}
+
+/* 青花 · 夜 */
+html[data-theme="dark"][data-palette="qinghua"] {
+  color-scheme: dark;
+  --glass-blur: 18px;
+  --glass-sat: 125%;
+  --glass-radius-panel: 10px;
+  --glass-radius-card: 8px;
+  --glass-sheen-top: rgba(255, 255, 255, 0.050);
+  --glass-sheen-mid: rgba(255, 255, 255, 0.006);
+  --glass-sheen-bottom: rgba(255, 255, 255, 0.028);
+  --glass-ring: rgba(255, 255, 255, 0.05);
+  --glass-edge: rgba(255, 255, 255, 0.16);
+  --glass-card: color-mix(in srgb, #ffffff 3.5%, transparent);
+  --glass-shadow: rgba(0, 0, 0, 0.42);
+  --glass-shadow-near: rgba(0, 0, 0, 0.38);
+  --palette-accent-base: #79b3dd;
+  --palette-surface-base: #080d12;
+  --palette-detail-base: #8ec2e6;
+  --bg: #060f17;
+  --bg-soft: #060e15;
+  --panel: color-mix(in srgb, #080d12 62%, transparent);
+  --panel-soft: color-mix(in srgb, #ffffff 5%, transparent);
+  --panel-strong: color-mix(in srgb, #080d12 78%, transparent);
+  --border: #2e363e;
+  --border-strong: #636970;
+  --text: #e4e6ea;
+  --muted: #80858b;
+  --accent: #79b3dd;
+  --accent-soft: color-mix(in srgb, #79b3dd 14%, transparent);
+  --accent-fg: #08090f;
+  --accent-hover: #8ebfe2;
+  --accent-active: #6494b7;
+  --accent-deep-mix: #233849;
+  --accent-ink: #79b3dd;
+  --seal: #f4776a;
+  --ornament: #8ec2e6;
+  --success: #6fd7a0;
+  --warning: #f5c85f;
+  --info: #6fb3e8;
+  --danger: #f09088;
+  --meta-mode: #6fb3e8;
+  --meta-size: #8ec2e6;
+  --meta-time: #f5c85f;
+  --meta-relay: #6fd7a0;
+  --black-violet: #14232f;
+  --black-blue: #111f2c;
+  --black-green: #112325;
+  --black-red: #1d1c22;
+  --control-bg: color-mix(in srgb, #080d12 50%, transparent);
+  --control-bg-hover: color-mix(in srgb, #080d12 6%, transparent);
+  --input-bg: color-mix(in srgb, #070d15 60%, transparent);
+  --input-bg-focus: color-mix(in srgb, #070d15 60%, transparent);
+  --flyout-bg: color-mix(in srgb, #080d12 78%, transparent);
+  --flyout-text: var(--text);
+  --flyout-muted: var(--muted);
+  --flyout-border: var(--border);
+  --topbar-bg: color-mix(in srgb, #080d12 60%, transparent);
+  --topbar-border: var(--border);
+  --nav-tab-bg: color-mix(in srgb, #080d12 55%, transparent);
+  --nav-tab-bg-hover: color-mix(in srgb, #080d12 70%, transparent);
+  --nav-tab-border: var(--border);
+  --nav-tab-border-strong: var(--border-strong);
+  --nav-tab-idle: var(--muted);
+  --active-tab-bg: color-mix(in srgb, #79b3dd 14%, transparent);
+  --preview-stage-bg: #060d15;
+  --preview-canvas-border: color-mix(in srgb, #ffffff 10%, transparent);
+  --shadow: 0 30px 70px var(--glass-shadow), 0 2px 10px var(--glass-shadow-near);
+}
+
+/* 竹影 · 昼 */
+html[data-theme="light"][data-palette="jiangnan"] {
+  color-scheme: light;
+  --glass-blur: 26px;
+  --glass-sat: 135%;
+  --glass-radius-panel: 12px;
+  --glass-radius-card: 10px;
+  --glass-sheen-top: rgba(255, 255, 255, 0.340);
+  --glass-sheen-mid: rgba(255, 255, 255, 0.041);
+  --glass-sheen-bottom: rgba(255, 255, 255, 0.187);
+  --glass-ring: rgba(255, 255, 255, 0.50);
+  --glass-edge: rgba(255, 255, 255, 0.90);
+  --glass-card: color-mix(in srgb, #ffffff 46%, transparent);
+  --glass-shadow: rgba(22, 26, 34, 0.09);
+  --glass-shadow-near: rgba(22, 26, 34, 0.04);
+  --palette-accent-base: #a61b29;
+  --palette-surface-base: #faf7ef;
+  --palette-detail-base: #56725e;
+  --bg: #f6f0e4;
+  --bg-soft: #faf7f0;
+  --panel: color-mix(in srgb, #faf7ef 64%, transparent);
+  --panel-soft: color-mix(in srgb, #15171d 6%, transparent);
+  --panel-strong: color-mix(in srgb, #faf7ef 80%, transparent);
+  --border: #d6d1c6;
+  --border-strong: #898783;
+  --text: #2c2d31;
+  --muted: #666564;
+  --accent: #a61b29;
+  --accent-soft: color-mix(in srgb, #a61b29 14%, transparent);
+  --accent-fg: #ffffff;
+  --accent-hover: #921824;
+  --accent-active: #851621;
+  --accent-deep-mix: #e2bbb5;
+  --accent-ink: #a61b29;
+  --seal: #a8301c;
+  --ornament: #56725e;
+  --success: #1c7a4a;
+  --warning: #7a5c12;
+  --info: #0f5590;
+  --danger: #b02a20;
+  --meta-mode: #0f5590;
+  --meta-size: #56725e;
+  --meta-time: #7a5c12;
+  --meta-relay: #1c7a4a;
+  --black-violet: #f0e1d7;
+  --black-blue: #e8e7df;
+  --black-green: #e9e9db;
+  --black-red: #f2e4d8;
+  --control-bg: color-mix(in srgb, #faf7ef 55%, transparent);
+  --control-bg-hover: color-mix(in srgb, #faf7ef 75%, transparent);
+  --input-bg: color-mix(in srgb, #f8f4e9 50%, transparent);
+  --input-bg-focus: color-mix(in srgb, #f8f4e9 50%, transparent);
+  --flyout-bg: color-mix(in srgb, #faf7ef 88%, transparent);
+  --flyout-text: var(--text);
+  --flyout-muted: var(--muted);
+  --flyout-border: var(--border);
+  --topbar-bg: color-mix(in srgb, #faf7ef 72%, transparent);
+  --topbar-border: var(--border);
+  --nav-tab-bg: color-mix(in srgb, #faf7ef 62%, transparent);
+  --nav-tab-bg-hover: color-mix(in srgb, #faf7ef 82%, transparent);
+  --nav-tab-border: var(--border);
+  --nav-tab-border-strong: var(--border-strong);
+  --nav-tab-idle: var(--muted);
+  --active-tab-bg: color-mix(in srgb, #a61b29 14%, transparent);
+  --preview-stage-bg: #fbf9f4;
+  --preview-canvas-border: #cec9c0;
+  --shadow: 0 24px 60px var(--glass-shadow), 0 2px 8px var(--glass-shadow-near);
+}
+
+/* 竹影 · 夜 */
+html[data-theme="dark"][data-palette="jiangnan"] {
+  color-scheme: dark;
+  --glass-blur: 26px;
+  --glass-sat: 135%;
+  --glass-radius-panel: 12px;
+  --glass-radius-card: 10px;
+  --glass-sheen-top: rgba(255, 255, 255, 0.060);
+  --glass-sheen-mid: rgba(255, 255, 255, 0.007);
+  --glass-sheen-bottom: rgba(255, 255, 255, 0.033);
+  --glass-ring: rgba(255, 255, 255, 0.05);
+  --glass-edge: rgba(255, 255, 255, 0.18);
+  --glass-card: color-mix(in srgb, #ffffff 3.5%, transparent);
+  --glass-shadow: rgba(0, 0, 0, 0.50);
+  --glass-shadow-near: rgba(0, 0, 0, 0.38);
+  --palette-accent-base: #e9838d;
+  --palette-surface-base: #0a0b0c;
+  --palette-detail-base: #9fb8a4;
+  --bg: #0b0a08;
+  --bg-soft: #0a0908;
+  --panel: color-mix(in srgb, #0a0b0c 60%, transparent);
+  --panel-soft: color-mix(in srgb, #ffffff 5%, transparent);
+  --panel-strong: color-mix(in srgb, #0a0b0c 76%, transparent);
+  --border: #323130;
+  --border-strong: #666667;
+  --text: #e4e6ea;
+  --muted: #828384;
+  --accent: #e9838d;
+  --accent-soft: color-mix(in srgb, #e9838d 14%, transparent);
+  --accent-fg: #08090f;
+  --accent-hover: #ed979f;
+  --accent-active: #c06c75;
+  --accent-deep-mix: #432829;
+  --accent-ink: #e9838d;
+  --seal: #f4776a;
+  --ornament: #9fb8a4;
+  --success: #6fd7a0;
+  --warning: #f5c85f;
+  --info: #6fb3e8;
+  --danger: #f09088;
+  --meta-mode: #6fb3e8;
+  --meta-size: #9fb8a4;
+  --meta-time: #f5c85f;
+  --meta-relay: #6fd7a0;
+  --black-violet: #261918;
+  --black-blue: #151b1e;
+  --black-green: #151e17;
+  --black-red: #221715;
+  --control-bg: color-mix(in srgb, #0a0b0c 50%, transparent);
+  --control-bg-hover: color-mix(in srgb, #0a0b0c 6%, transparent);
+  --input-bg: color-mix(in srgb, #0a0a0c 60%, transparent);
+  --input-bg-focus: color-mix(in srgb, #0a0a0c 60%, transparent);
+  --flyout-bg: color-mix(in srgb, #0a0b0c 78%, transparent);
+  --flyout-text: var(--text);
+  --flyout-muted: var(--muted);
+  --flyout-border: var(--border);
+  --topbar-bg: color-mix(in srgb, #0a0b0c 60%, transparent);
+  --topbar-border: var(--border);
+  --nav-tab-bg: color-mix(in srgb, #0a0b0c 55%, transparent);
+  --nav-tab-bg-hover: color-mix(in srgb, #0a0b0c 70%, transparent);
+  --nav-tab-border: var(--border);
+  --nav-tab-border-strong: var(--border-strong);
+  --nav-tab-idle: var(--muted);
+  --active-tab-bg: color-mix(in srgb, #e9838d 14%, transparent);
+  --preview-stage-bg: #0a0908;
+  --preview-canvas-border: color-mix(in srgb, #ffffff 10%, transparent);
+  --shadow: 0 30px 70px var(--glass-shadow), 0 2px 10px var(--glass-shadow-near);
+}
+
+/* 天青 · 昼 */
+html[data-theme="light"][data-palette="songci"] {
+  color-scheme: light;
+  --glass-blur: 32px;
+  --glass-sat: 140%;
+  --glass-radius-panel: 18px;
+  --glass-radius-card: 13px;
+  --glass-sheen-top: rgba(255, 255, 255, 0.360);
+  --glass-sheen-mid: rgba(255, 255, 255, 0.043);
+  --glass-sheen-bottom: rgba(255, 255, 255, 0.198);
+  --glass-ring: rgba(255, 255, 255, 0.52);
+  --glass-edge: rgba(255, 255, 255, 0.92);
+  --glass-card: color-mix(in srgb, #ffffff 46%, transparent);
+  --glass-shadow: rgba(22, 26, 34, 0.09);
+  --glass-shadow-near: rgba(22, 26, 34, 0.04);
+  --palette-accent-base: #3f5560;
+  --palette-surface-base: #f3f8f7;
+  --palette-detail-base: #337581;
+  --bg: #eaf3f1;
+  --bg-soft: #f3f8f7;
+  --panel: color-mix(in srgb, #f3f8f7 60%, transparent);
+  --panel-soft: color-mix(in srgb, #15171d 6%, transparent);
+  --panel-strong: color-mix(in srgb, #f3f8f7 76%, transparent);
+  --border: #cad3d2;
+  --border-strong: #82888a;
+  --text: #2a2d32;
+  --muted: #616569;
+  --accent: #3f5560;
+  --accent-soft: color-mix(in srgb, #3f5560 14%, transparent);
+  --accent-fg: #ffffff;
+  --accent-hover: #374b54;
+  --accent-active: #32444d;
+  --accent-deep-mix: #bfcccd;
+  --accent-ink: #3f5560;
+  --seal: #a8301c;
+  --ornament: #337581;
+  --success: #1c7a4a;
+  --warning: #7a5c12;
+  --info: #0f5590;
+  --danger: #b02a20;
+  --meta-mode: #0f5590;
+  --meta-size: #337581;
+  --meta-time: #7a5c12;
+  --meta-relay: #1c7a4a;
+  --black-violet: #dee8e7;
+  --black-blue: #ddeaeb;
+  --black-green: #deece7;
+  --black-red: #e7e7e4;
+  --control-bg: color-mix(in srgb, #f3f8f7 55%, transparent);
+  --control-bg-hover: color-mix(in srgb, #f3f8f7 75%, transparent);
+  --input-bg: color-mix(in srgb, #eef6f4 50%, transparent);
+  --input-bg-focus: color-mix(in srgb, #eef6f4 50%, transparent);
+  --flyout-bg: color-mix(in srgb, #f3f8f7 88%, transparent);
+  --flyout-text: var(--text);
+  --flyout-muted: var(--muted);
+  --flyout-border: var(--border);
+  --topbar-bg: color-mix(in srgb, #f3f8f7 72%, transparent);
+  --topbar-border: var(--border);
+  --nav-tab-bg: color-mix(in srgb, #f3f8f7 62%, transparent);
+  --nav-tab-bg-hover: color-mix(in srgb, #f3f8f7 82%, transparent);
+  --nav-tab-border: var(--border);
+  --nav-tab-border-strong: var(--border-strong);
+  --nav-tab-idle: var(--muted);
+  --active-tab-bg: color-mix(in srgb, #3f5560 14%, transparent);
+  --preview-stage-bg: #f7faf9;
+  --preview-canvas-border: #c4cbcb;
+  --shadow: 0 24px 60px var(--glass-shadow), 0 2px 8px var(--glass-shadow-near);
+}
+
+/* 天青 · 夜 */
+html[data-theme="dark"][data-palette="songci"] {
+  color-scheme: dark;
+  --glass-blur: 32px;
+  --glass-sat: 140%;
+  --glass-radius-panel: 18px;
+  --glass-radius-card: 13px;
+  --glass-sheen-top: rgba(255, 255, 255, 0.070);
+  --glass-sheen-mid: rgba(255, 255, 255, 0.008);
+  --glass-sheen-bottom: rgba(255, 255, 255, 0.039);
+  --glass-ring: rgba(255, 255, 255, 0.05);
+  --glass-edge: rgba(255, 255, 255, 0.18);
+  --glass-card: color-mix(in srgb, #ffffff 3.5%, transparent);
+  --glass-shadow: rgba(0, 0, 0, 0.52);
+  --glass-shadow-near: rgba(0, 0, 0, 0.38);
+  --palette-accent-base: #8fb8c6;
+  --palette-surface-base: #080d0e;
+  --palette-detail-base: #8fd0dc;
+  --bg: #060f0e;
+  --bg-soft: #060e0d;
+  --panel: color-mix(in srgb, #080d0e 58%, transparent);
+  --panel-soft: color-mix(in srgb, #ffffff 5%, transparent);
+  --panel-strong: color-mix(in srgb, #080d0e 74%, transparent);
+  --border: #2e3635;
+  --border-strong: #63696a;
+  --text: #e4e6ea;
+  --muted: #808587;
+  --accent: #8fb8c6;
+  --accent-soft: color-mix(in srgb, #8fb8c6 14%, transparent);
+  --accent-fg: #08090f;
+  --accent-hover: #a1c3cf;
+  --accent-active: #7698a4;
+  --accent-deep-mix: #28393c;
+  --accent-ink: #8fb8c6;
+  --seal: #f4776a;
+  --ornament: #8fd0dc;
+  --success: #6fd7a0;
+  --warning: #f5c85f;
+  --info: #6fb3e8;
+  --danger: #f09088;
+  --meta-mode: #6fb3e8;
+  --meta-size: #8fd0dc;
+  --meta-time: #f5c85f;
+  --meta-relay: #6fd7a0;
+  --black-violet: #162324;
+  --black-blue: #111f24;
+  --black-green: #11231d;
+  --black-red: #1d1c1a;
+  --control-bg: color-mix(in srgb, #080d0e 50%, transparent);
+  --control-bg-hover: color-mix(in srgb, #080d0e 6%, transparent);
+  --input-bg: color-mix(in srgb, #070d10 60%, transparent);
+  --input-bg-focus: color-mix(in srgb, #070d10 60%, transparent);
+  --flyout-bg: color-mix(in srgb, #080d0e 78%, transparent);
+  --flyout-text: var(--text);
+  --flyout-muted: var(--muted);
+  --flyout-border: var(--border);
+  --topbar-bg: color-mix(in srgb, #080d0e 60%, transparent);
+  --topbar-border: var(--border);
+  --nav-tab-bg: color-mix(in srgb, #080d0e 55%, transparent);
+  --nav-tab-bg-hover: color-mix(in srgb, #080d0e 70%, transparent);
+  --nav-tab-border: var(--border);
+  --nav-tab-border-strong: var(--border-strong);
+  --nav-tab-idle: var(--muted);
+  --active-tab-bg: color-mix(in srgb, #8fb8c6 14%, transparent);
+  --preview-stage-bg: #060d0d;
+  --preview-canvas-border: color-mix(in srgb, #ffffff 10%, transparent);
+  --shadow: 0 30px 70px var(--glass-shadow), 0 2px 10px var(--glass-shadow-near);
+}
+
+/* 朱墙 · 昼 */
+html[data-theme="light"][data-palette="gugong"] {
+  color-scheme: light;
+  --glass-blur: 20px;
+  --glass-sat: 130%;
+  --glass-radius-panel: 8px;
+  --glass-radius-card: 7px;
+  --glass-sheen-top: rgba(255, 255, 255, 0.280);
+  --glass-sheen-mid: rgba(255, 255, 255, 0.034);
+  --glass-sheen-bottom: rgba(255, 255, 255, 0.154);
+  --glass-ring: rgba(255, 255, 255, 0.44);
+  --glass-edge: rgba(255, 255, 255, 0.86);
+  --glass-card: color-mix(in srgb, #ffffff 48%, transparent);
+  --glass-shadow: rgba(22, 26, 34, 0.13);
+  --glass-shadow-near: rgba(22, 26, 34, 0.06);
+  --palette-accent-base: #862617;
+  --palette-surface-base: #fbf5eb;
+  --palette-detail-base: #8c6212;
+  --bg: #f6eedf;
+  --bg-soft: #faf6ed;
+  --panel: color-mix(in srgb, #fbf5eb 68%, transparent);
+  --panel-soft: color-mix(in srgb, #15171d 6%, transparent);
+  --panel-strong: color-mix(in srgb, #fbf5eb 84%, transparent);
+  --border: #d7cec0;
+  --border-strong: #898581;
+  --text: #2c2c30;
+  --muted: #666463;
+  --accent: #862617;
+  --accent-soft: color-mix(in srgb, #862617 14%, transparent);
+  --accent-fg: #ffffff;
+  --accent-hover: #762114;
+  --accent-active: #6b1e12;
+  --accent-deep-mix: #dabcad;
+  --accent-ink: #862617;
+  --seal: #a8301c;
+  --ornament: #8c6212;
+  --success: #1c7a4a;
+  --warning: #7a5c12;
+  --info: #0f5590;
+  --danger: #b02a20;
+  --meta-mode: #0f5590;
+  --meta-size: #8c6212;
+  --meta-time: #7a5c12;
+  --meta-relay: #1c7a4a;
+  --black-violet: #eee0d1;
+  --black-blue: #e8e5da;
+  --black-green: #e9e7d6;
+  --black-red: #f2e2d4;
+  --control-bg: color-mix(in srgb, #fbf5eb 55%, transparent);
+  --control-bg-hover: color-mix(in srgb, #fbf5eb 75%, transparent);
+  --input-bg: color-mix(in srgb, #f9f1e4 50%, transparent);
+  --input-bg-focus: color-mix(in srgb, #f9f1e4 50%, transparent);
+  --flyout-bg: color-mix(in srgb, #fbf5eb 88%, transparent);
+  --flyout-text: var(--text);
+  --flyout-muted: var(--muted);
+  --flyout-border: var(--border);
+  --topbar-bg: color-mix(in srgb, #fbf5eb 72%, transparent);
+  --topbar-border: var(--border);
+  --nav-tab-bg: color-mix(in srgb, #fbf5eb 62%, transparent);
+  --nav-tab-bg-hover: color-mix(in srgb, #fbf5eb 82%, transparent);
+  --nav-tab-border: var(--border);
+  --nav-tab-border-strong: var(--border-strong);
+  --nav-tab-idle: var(--muted);
+  --active-tab-bg: color-mix(in srgb, #862617 14%, transparent);
+  --preview-stage-bg: #fbf8f2;
+  --preview-canvas-border: #cec7bc;
+  --shadow: 0 24px 60px var(--glass-shadow), 0 2px 8px var(--glass-shadow-near);
+}
+
+/* 朱墙 · 夜 */
+html[data-theme="dark"][data-palette="gugong"] {
+  color-scheme: dark;
+  --glass-blur: 20px;
+  --glass-sat: 130%;
+  --glass-radius-panel: 8px;
+  --glass-radius-card: 7px;
+  --glass-sheen-top: rgba(255, 255, 255, 0.050);
+  --glass-sheen-mid: rgba(255, 255, 255, 0.006);
+  --glass-sheen-bottom: rgba(255, 255, 255, 0.028);
+  --glass-ring: rgba(255, 255, 255, 0.05);
+  --glass-edge: rgba(255, 255, 255, 0.16);
+  --glass-card: color-mix(in srgb, #ffffff 3.5%, transparent);
+  --glass-shadow: rgba(0, 0, 0, 0.50);
+  --glass-shadow-near: rgba(0, 0, 0, 0.38);
+  --palette-accent-base: #e8756a;
+  --palette-surface-base: #0d0b0b;
+  --palette-detail-base: #e0b64d;
+  --bg: #110a07;
+  --bg-soft: #0f0907;
+  --panel: color-mix(in srgb, #0d0b0b 62%, transparent);
+  --panel-soft: color-mix(in srgb, #ffffff 5%, transparent);
+  --panel-strong: color-mix(in srgb, #0d0b0b 78%, transparent);
+  --border: #38312f;
+  --border-strong: #6a6666;
+  --text: #e5e6ea;
+  --muted: #868384;
+  --accent: #e8756a;
+  --accent-soft: color-mix(in srgb, #e8756a 14%, transparent);
+  --accent-fg: #08090f;
+  --accent-hover: #ec8b82;
+  --accent-active: #bf6159;
+  --accent-deep-mix: #472520;
+  --accent-ink: #e8756a;
+  --seal: #f4776a;
+  --ornament: #e0b64d;
+  --success: #6fd7a0;
+  --warning: #f5c85f;
+  --info: #6fb3e8;
+  --danger: #f09088;
+  --meta-mode: #6fb3e8;
+  --meta-size: #e0b64d;
+  --meta-time: #f5c85f;
+  --meta-relay: #6fd7a0;
+  --black-violet: #2b1713;
+  --black-blue: #1a1b1d;
+  --black-green: #1a1e16;
+  --black-red: #271714;
+  --control-bg: color-mix(in srgb, #0d0b0b 50%, transparent);
+  --control-bg-hover: color-mix(in srgb, #0d0b0b 6%, transparent);
+  --input-bg: color-mix(in srgb, #0d0a0c 60%, transparent);
+  --input-bg-focus: color-mix(in srgb, #0d0a0c 60%, transparent);
+  --flyout-bg: color-mix(in srgb, #0d0b0b 78%, transparent);
+  --flyout-text: var(--text);
+  --flyout-muted: var(--muted);
+  --flyout-border: var(--border);
+  --topbar-bg: color-mix(in srgb, #0d0b0b 60%, transparent);
+  --topbar-border: var(--border);
+  --nav-tab-bg: color-mix(in srgb, #0d0b0b 55%, transparent);
+  --nav-tab-bg-hover: color-mix(in srgb, #0d0b0b 70%, transparent);
+  --nav-tab-border: var(--border);
+  --nav-tab-border-strong: var(--border-strong);
+  --nav-tab-idle: var(--muted);
+  --active-tab-bg: color-mix(in srgb, #e8756a 14%, transparent);
+  --preview-stage-bg: #0f0908;
+  --preview-canvas-border: color-mix(in srgb, #ffffff 10%, transparent);
+  --shadow: 0 30px 70px var(--glass-shadow), 0 2px 10px var(--glass-shadow-near);
+}
+
+/* 朱漆 · 昼 */
+html[data-theme="light"][data-palette="lacquer"] {
+  color-scheme: light;
+  --glass-blur: 22px;
+  --glass-sat: 145%;
+  --glass-radius-panel: 14px;
+  --glass-radius-card: 11px;
+  --glass-sheen-top: rgba(255, 255, 255, 0.460);
+  --glass-sheen-mid: rgba(255, 255, 255, 0.055);
+  --glass-sheen-bottom: rgba(255, 255, 255, 0.253);
+  --glass-ring: rgba(255, 255, 255, 0.62);
+  --glass-edge: rgba(255, 255, 255, 0.98);
+  --glass-card: color-mix(in srgb, #ffffff 46%, transparent);
+  --glass-shadow: rgba(22, 26, 34, 0.12);
+  --glass-shadow-near: rgba(22, 26, 34, 0.05);
+  --palette-accent-base: #b23a1c;
+  --palette-surface-base: #fbf4ee;
+  --palette-detail-base: #856512;
+  --bg: #f7ede4;
+  --bg-soft: #fbf5f0;
+  --panel: color-mix(in srgb, #fbf4ee 70%, transparent);
+  --panel-soft: color-mix(in srgb, #15171d 6%, transparent);
+  --panel-strong: color-mix(in srgb, #fbf4ee 86%, transparent);
+  --border: #d7cdc5;
+  --border-strong: #8a8583;
+  --text: #2c2c31;
+  --muted: #666464;
+  --accent: #b23a1c;
+  --accent-soft: color-mix(in srgb, #b23a1c 14%, transparent);
+  --accent-fg: #ffffff;
+  --accent-hover: #9d3319;
+  --accent-active: #8e2e16;
+  --accent-deep-mix: #e6c0b2;
+  --accent-ink: #b23a1c;
+  --seal: #a8301c;
+  --ornament: #856512;
+  --success: #1c7a4a;
+  --warning: #7a5c12;
+  --info: #0f5590;
+  --danger: #b02a20;
+  --meta-mode: #0f5590;
+  --meta-size: #856512;
+  --meta-time: #7a5c12;
+  --meta-relay: #1c7a4a;
+  --black-violet: #f2e0d6;
+  --black-blue: #e9e4df;
+  --black-green: #eae6db;
+  --black-red: #f3e1d8;
+  --control-bg: color-mix(in srgb, #fbf4ee 55%, transparent);
+  --control-bg-hover: color-mix(in srgb, #fbf4ee 75%, transparent);
+  --input-bg: color-mix(in srgb, #faf1e8 50%, transparent);
+  --input-bg-focus: color-mix(in srgb, #faf1e8 50%, transparent);
+  --flyout-bg: color-mix(in srgb, #fbf4ee 88%, transparent);
+  --flyout-text: var(--text);
+  --flyout-muted: var(--muted);
+  --flyout-border: var(--border);
+  --topbar-bg: color-mix(in srgb, #fbf4ee 72%, transparent);
+  --topbar-border: var(--border);
+  --nav-tab-bg: color-mix(in srgb, #fbf4ee 62%, transparent);
+  --nav-tab-bg-hover: color-mix(in srgb, #fbf4ee 82%, transparent);
+  --nav-tab-border: var(--border);
+  --nav-tab-border-strong: var(--border-strong);
+  --nav-tab-idle: var(--muted);
+  --active-tab-bg: color-mix(in srgb, #b23a1c 14%, transparent);
+  --preview-stage-bg: #fcf8f4;
+  --preview-canvas-border: #cec6c0;
+  --shadow: 0 24px 60px var(--glass-shadow), 0 2px 8px var(--glass-shadow-near);
+}
+
+/* 朱漆 · 夜 */
+html[data-theme="dark"][data-palette="lacquer"] {
+  color-scheme: dark;
+  --glass-blur: 22px;
+  --glass-sat: 145%;
+  --glass-radius-panel: 14px;
+  --glass-radius-card: 11px;
+  --glass-sheen-top: rgba(255, 255, 255, 0.100);
+  --glass-sheen-mid: rgba(255, 255, 255, 0.012);
+  --glass-sheen-bottom: rgba(255, 255, 255, 0.055);
+  --glass-ring: rgba(255, 255, 255, 0.07);
+  --glass-edge: rgba(255, 255, 255, 0.26);
+  --glass-card: color-mix(in srgb, #ffffff 3.5%, transparent);
+  --glass-shadow: rgba(0, 0, 0, 0.55);
+  --glass-shadow-near: rgba(0, 0, 0, 0.38);
+  --palette-accent-base: #f07a52;
+  --palette-surface-base: #0b0b0c;
+  --palette-detail-base: #f3bf4c;
+  --bg: #0c0a0a;
+  --bg-soft: #0b090a;
+  --panel: color-mix(in srgb, #0b0b0c 60%, transparent);
+  --panel-soft: color-mix(in srgb, #ffffff 5%, transparent);
+  --panel-strong: color-mix(in srgb, #0b0b0c 76%, transparent);
+  --border: #343131;
+  --border-strong: #69686a;
+  --text: #e4e6ea;
+  --muted: #8a8a8c;
+  --accent: #f07a52;
+  --accent-soft: color-mix(in srgb, #f07a52 14%, transparent);
+  --accent-fg: #08090f;
+  --accent-hover: #f28f6e;
+  --accent-active: #c66545;
+  --accent-deep-mix: #45261c;
+  --accent-ink: #f07a52;
+  --seal: #f4776a;
+  --ornament: #f3bf4c;
+  --success: #6fd7a0;
+  --warning: #f5c85f;
+  --info: #6fb3e8;
+  --danger: #f09088;
+  --meta-mode: #6fb3e8;
+  --meta-size: #f3bf4c;
+  --meta-time: #f5c85f;
+  --meta-relay: #6fd7a0;
+  --black-violet: #271713;
+  --black-blue: #161b20;
+  --black-green: #161e19;
+  --black-red: #231717;
+  --control-bg: color-mix(in srgb, #0b0b0c 50%, transparent);
+  --control-bg-hover: color-mix(in srgb, #0b0b0c 6%, transparent);
+  --input-bg: color-mix(in srgb, #0b0a0d 60%, transparent);
+  --input-bg-focus: color-mix(in srgb, #0b0a0d 60%, transparent);
+  --flyout-bg: color-mix(in srgb, #0b0b0c 78%, transparent);
+  --flyout-text: var(--text);
+  --flyout-muted: var(--muted);
+  --flyout-border: var(--border);
+  --topbar-bg: color-mix(in srgb, #0b0b0c 60%, transparent);
+  --topbar-border: var(--border);
+  --nav-tab-bg: color-mix(in srgb, #0b0b0c 55%, transparent);
+  --nav-tab-bg-hover: color-mix(in srgb, #0b0b0c 70%, transparent);
+  --nav-tab-border: var(--border);
+  --nav-tab-border-strong: var(--border-strong);
+  --nav-tab-idle: var(--muted);
+  --active-tab-bg: color-mix(in srgb, #f07a52 14%, transparent);
+  --preview-stage-bg: #0b090a;
+  --preview-canvas-border: color-mix(in srgb, #ffffff 10%, transparent);
+  --shadow: 0 30px 70px var(--glass-shadow), 0 2px 10px var(--glass-shadow-near);
+}
+
+/* 敦煌 · 昼 */
+html[data-theme="light"][data-palette="dunhuang"] {
+  color-scheme: light;
+  --glass-blur: 14px;
+  --glass-sat: 120%;
+  --glass-radius-panel: 8px;
+  --glass-radius-card: 7px;
+  --glass-sheen-top: rgba(255, 255, 255, 0.200);
+  --glass-sheen-mid: rgba(255, 255, 255, 0.024);
+  --glass-sheen-bottom: rgba(255, 255, 255, 0.110);
+  --glass-ring: rgba(255, 255, 255, 0.34);
+  --glass-edge: rgba(255, 255, 255, 0.70);
+  --glass-card: color-mix(in srgb, #ffffff 49%, transparent);
+  --glass-shadow: rgba(22, 26, 34, 0.10);
+  --glass-shadow-near: rgba(22, 26, 34, 0.05);
+  --palette-accent-base: #8a5a2c;
+  --palette-surface-base: #faf5ea;
+  --palette-detail-base: #826408;
+  --bg: #f6eedd;
+  --bg-soft: #faf6ec;
+  --panel: color-mix(in srgb, #faf5ea 74%, transparent);
+  --panel-soft: color-mix(in srgb, #15171d 6%, transparent);
+  --panel-strong: color-mix(in srgb, #faf5ea 90%, transparent);
+  --border: #d6cfbf;
+  --border-strong: #898580;
+  --text: #2c2c30;
+  --muted: #666462;
+  --accent: #8a5a2c;
+  --accent-soft: color-mix(in srgb, #8a5a2c 14%, transparent);
+  --accent-fg: #ffffff;
+  --accent-hover: #794f27;
+  --accent-active: #6e4823;
+  --accent-deep-mix: #dbc9b1;
+  --accent-ink: #8a5a2c;
+  --seal: #a8301c;
+  --ornament: #826408;
+  --success: #1c7a4a;
+  --warning: #7a5c12;
+  --info: #0f5590;
+  --danger: #b02a20;
+  --meta-mode: #0f5590;
+  --meta-size: #826408;
+  --meta-time: #7a5c12;
+  --meta-relay: #1c7a4a;
+  --black-violet: #eee4d1;
+  --black-blue: #e8e5d8;
+  --black-green: #e9e7d4;
+  --black-red: #f2e2d2;
+  --control-bg: color-mix(in srgb, #faf5ea 55%, transparent);
+  --control-bg-hover: color-mix(in srgb, #faf5ea 75%, transparent);
+  --input-bg: color-mix(in srgb, #f8f2e3 50%, transparent);
+  --input-bg-focus: color-mix(in srgb, #f8f2e3 50%, transparent);
+  --flyout-bg: color-mix(in srgb, #faf5ea 88%, transparent);
+  --flyout-text: var(--text);
+  --flyout-muted: var(--muted);
+  --flyout-border: var(--border);
+  --topbar-bg: color-mix(in srgb, #faf5ea 72%, transparent);
+  --topbar-border: var(--border);
+  --nav-tab-bg: color-mix(in srgb, #faf5ea 62%, transparent);
+  --nav-tab-bg-hover: color-mix(in srgb, #faf5ea 82%, transparent);
+  --nav-tab-border: var(--border);
+  --nav-tab-border-strong: var(--border-strong);
+  --nav-tab-idle: var(--muted);
+  --active-tab-bg: color-mix(in srgb, #8a5a2c 14%, transparent);
+  --preview-stage-bg: #fbf8f1;
+  --preview-canvas-border: #cec7ba;
+  --shadow: 0 24px 60px var(--glass-shadow), 0 2px 8px var(--glass-shadow-near);
+}
+
+/* 敦煌 · 夜 */
+html[data-theme="dark"][data-palette="dunhuang"] {
+  color-scheme: dark;
+  --glass-blur: 14px;
+  --glass-sat: 120%;
+  --glass-radius-panel: 8px;
+  --glass-radius-card: 7px;
+  --glass-sheen-top: rgba(255, 255, 255, 0.035);
+  --glass-sheen-mid: rgba(255, 255, 255, 0.004);
+  --glass-sheen-bottom: rgba(255, 255, 255, 0.019);
+  --glass-ring: rgba(255, 255, 255, 0.04);
+  --glass-edge: rgba(255, 255, 255, 0.12);
+  --glass-card: color-mix(in srgb, #ffffff 3.5%, transparent);
+  --glass-shadow: rgba(0, 0, 0, 0.46);
+  --glass-shadow-near: rgba(0, 0, 0, 0.38);
+  --palette-accent-base: #d69a68;
+  --palette-surface-base: #0c0c0b;
+  --palette-detail-base: #e4bf11;
+  --bg: #0d0d07;
+  --bg-soft: #0c0c07;
+  --panel: color-mix(in srgb, #0c0c0b 66%, transparent);
+  --panel-soft: color-mix(in srgb, #ffffff 5%, transparent);
+  --panel-strong: color-mix(in srgb, #0c0c0b 82%, transparent);
+  --border: #35342f;
+  --border-strong: #676866;
+  --text: #e4e6ea;
+  --muted: #838484;
+  --accent: #d69a68;
+  --accent-soft: color-mix(in srgb, #d69a68 14%, transparent);
+  --accent-fg: #08090f;
+  --accent-hover: #ddaa80;
+  --accent-active: #b07f57;
+  --accent-deep-mix: #3f301f;
+  --accent-ink: #d69a68;
+  --seal: #f4776a;
+  --ornament: #e4bf11;
+  --success: #6fd7a0;
+  --warning: #f5c85f;
+  --info: #6fb3e8;
+  --danger: #f09088;
+  --meta-mode: #6fb3e8;
+  --meta-size: #e4bf11;
+  --meta-time: #f5c85f;
+  --meta-relay: #6fd7a0;
+  --black-violet: #251e13;
+  --black-blue: #171e1d;
+  --black-green: #172116;
+  --black-red: #241a14;
+  --control-bg: color-mix(in srgb, #0c0c0b 50%, transparent);
+  --control-bg-hover: color-mix(in srgb, #0c0c0b 6%, transparent);
+  --input-bg: color-mix(in srgb, #0b0b0c 60%, transparent);
+  --input-bg-focus: color-mix(in srgb, #0b0b0c 60%, transparent);
+  --flyout-bg: color-mix(in srgb, #0c0c0b 78%, transparent);
+  --flyout-text: var(--text);
+  --flyout-muted: var(--muted);
+  --flyout-border: var(--border);
+  --topbar-bg: color-mix(in srgb, #0c0c0b 60%, transparent);
+  --topbar-border: var(--border);
+  --nav-tab-bg: color-mix(in srgb, #0c0c0b 55%, transparent);
+  --nav-tab-bg-hover: color-mix(in srgb, #0c0c0b 70%, transparent);
+  --nav-tab-border: var(--border);
+  --nav-tab-border-strong: var(--border-strong);
+  --nav-tab-idle: var(--muted);
+  --active-tab-bg: color-mix(in srgb, #d69a68 14%, transparent);
+  --preview-stage-bg: #0c0c08;
+  --preview-canvas-border: color-mix(in srgb, #ffffff 10%, transparent);
+  --shadow: 0 30px 70px var(--glass-shadow), 0 2px 10px var(--glass-shadow-near);
+}
+
+/* 松石 · 昼 */
+html[data-theme="light"][data-palette="songshi"] {
+  color-scheme: light;
+  --glass-blur: 36px;
+  --glass-sat: 155%;
+  --glass-radius-panel: 24px;
+  --glass-radius-card: 16px;
+  --glass-sheen-top: rgba(255, 255, 255, 0.380);
+  --glass-sheen-mid: rgba(255, 255, 255, 0.046);
+  --glass-sheen-bottom: rgba(255, 255, 255, 0.209);
+  --glass-ring: rgba(255, 255, 255, 0.54);
+  --glass-edge: rgba(255, 255, 255, 0.94);
+  --glass-card: color-mix(in srgb, #ffffff 47%, transparent);
+  --glass-shadow: rgba(22, 26, 34, 0.08);
+  --glass-shadow-near: rgba(22, 26, 34, 0.04);
+  --palette-accent-base: #156d5b;
+  --palette-surface-base: #f1f8f5;
+  --palette-detail-base: #197865;
+  --bg: #e7f2ef;
+  --bg-soft: #f2f8f6;
+  --panel: color-mix(in srgb, #f1f8f5 56%, transparent);
+  --panel-soft: color-mix(in srgb, #15171d 6%, transparent);
+  --panel-strong: color-mix(in srgb, #f1f8f5 72%, transparent);
+  --border: #c8d2d0;
+  --border-strong: #818889;
+  --text: #2a2d32;
+  --muted: #616568;
+  --accent: #156d5b;
+  --accent-soft: color-mix(in srgb, #156d5b 14%, transparent);
+  --accent-fg: #ffffff;
+  --accent-hover: #126050;
+  --accent-active: #115749;
+  --accent-deep-mix: #b3d1ca;
+  --accent-ink: #156d5b;
+  --seal: #a8301c;
+  --ornament: #197865;
+  --success: #1c7a4a;
+  --warning: #7a5c12;
+  --info: #0f5590;
+  --danger: #b02a20;
+  --meta-mode: #0f5590;
+  --meta-size: #197865;
+  --meta-time: #7a5c12;
+  --meta-relay: #1c7a4a;
+  --black-violet: #d8e9e5;
+  --black-blue: #dae9e9;
+  --black-green: #dbebe5;
+  --black-red: #e4e6e3;
+  --control-bg: color-mix(in srgb, #f1f8f5 55%, transparent);
+  --control-bg-hover: color-mix(in srgb, #f1f8f5 75%, transparent);
+  --input-bg: color-mix(in srgb, #ecf5f2 50%, transparent);
+  --input-bg-focus: color-mix(in srgb, #ecf5f2 50%, transparent);
+  --flyout-bg: color-mix(in srgb, #f1f8f5 88%, transparent);
+  --flyout-text: var(--text);
+  --flyout-muted: var(--muted);
+  --flyout-border: var(--border);
+  --topbar-bg: color-mix(in srgb, #f1f8f5 72%, transparent);
+  --topbar-border: var(--border);
+  --nav-tab-bg: color-mix(in srgb, #f1f8f5 62%, transparent);
+  --nav-tab-bg-hover: color-mix(in srgb, #f1f8f5 82%, transparent);
+  --nav-tab-border: var(--border);
+  --nav-tab-border-strong: var(--border-strong);
+  --nav-tab-idle: var(--muted);
+  --active-tab-bg: color-mix(in srgb, #156d5b 14%, transparent);
+  --preview-stage-bg: #f5faf9;
+  --preview-canvas-border: #c1cbc9;
+  --shadow: 0 24px 60px var(--glass-shadow), 0 2px 8px var(--glass-shadow-near);
+}
+
+/* 松石 · 夜 */
+html[data-theme="dark"][data-palette="songshi"] {
+  color-scheme: dark;
+  --glass-blur: 36px;
+  --glass-sat: 155%;
+  --glass-radius-panel: 24px;
+  --glass-radius-card: 16px;
+  --glass-sheen-top: rgba(255, 255, 255, 0.080);
+  --glass-sheen-mid: rgba(255, 255, 255, 0.010);
+  --glass-sheen-bottom: rgba(255, 255, 255, 0.044);
+  --glass-ring: rgba(255, 255, 255, 0.06);
+  --glass-edge: rgba(255, 255, 255, 0.20);
+  --glass-card: color-mix(in srgb, #ffffff 3.5%, transparent);
+  --glass-shadow: rgba(0, 0, 0, 0.55);
+  --glass-shadow-near: rgba(0, 0, 0, 0.38);
+  --palette-accent-base: #5cd0b4;
+  --palette-surface-base: #080d0e;
+  --palette-detail-base: #7fdcc6;
+  --bg: #05100e;
+  --bg-soft: #050f0d;
+  --panel: color-mix(in srgb, #080d0e 54%, transparent);
+  --panel-soft: color-mix(in srgb, #ffffff 5%, transparent);
+  --panel-strong: color-mix(in srgb, #080d0e 70%, transparent);
+  --border: #2d3735;
+  --border-strong: #636a6a;
+  --text: #e4e6ea;
+  --muted: #818788;
+  --accent: #5cd0b4;
+  --accent-soft: color-mix(in srgb, #5cd0b4 14%, transparent);
+  --accent-fg: #08090f;
+  --accent-hover: #76d8c0;
+  --accent-active: #4cac95;
+  --accent-deep-mix: #1b4038;
+  --accent-ink: #5cd0b4;
+  --seal: #f4776a;
+  --ornament: #7fdcc6;
+  --success: #6fd7a0;
+  --warning: #f5c85f;
+  --info: #6fb3e8;
+  --danger: #f09088;
+  --meta-mode: #6fb3e8;
+  --meta-size: #7fdcc6;
+  --meta-time: #f5c85f;
+  --meta-relay: #6fd7a0;
+  --black-violet: #0f2722;
+  --black-blue: #102024;
+  --black-green: #10241d;
+  --black-red: #1c1d1a;
+  --control-bg: color-mix(in srgb, #080d0e 50%, transparent);
+  --control-bg-hover: color-mix(in srgb, #080d0e 6%, transparent);
+  --input-bg: color-mix(in srgb, #070d0f 60%, transparent);
+  --input-bg-focus: color-mix(in srgb, #070d0f 60%, transparent);
+  --flyout-bg: color-mix(in srgb, #080d0e 78%, transparent);
+  --flyout-text: var(--text);
+  --flyout-muted: var(--muted);
+  --flyout-border: var(--border);
+  --topbar-bg: color-mix(in srgb, #080d0e 60%, transparent);
+  --topbar-border: var(--border);
+  --nav-tab-bg: color-mix(in srgb, #080d0e 55%, transparent);
+  --nav-tab-bg-hover: color-mix(in srgb, #080d0e 70%, transparent);
+  --nav-tab-border: var(--border);
+  --nav-tab-border-strong: var(--border-strong);
+  --nav-tab-idle: var(--muted);
+  --active-tab-bg: color-mix(in srgb, #5cd0b4 14%, transparent);
+  --preview-stage-bg: #050e0d;
+  --preview-canvas-border: color-mix(in srgb, #ffffff 10%, transparent);
+  --shadow: 0 30px 70px var(--glass-shadow), 0 2px 10px var(--glass-shadow-near);
+}
+
+/* 玫瑰 · 昼 */
+html[data-theme="light"][data-palette="meigui"] {
+  color-scheme: light;
+  --glass-blur: 34px;
+  --glass-sat: 150%;
+  --glass-radius-panel: 22px;
+  --glass-radius-card: 15px;
+  --glass-sheen-top: rgba(255, 255, 255, 0.360);
+  --glass-sheen-mid: rgba(255, 255, 255, 0.043);
+  --glass-sheen-bottom: rgba(255, 255, 255, 0.198);
+  --glass-ring: rgba(255, 255, 255, 0.52);
+  --glass-edge: rgba(255, 255, 255, 0.92);
+  --glass-card: color-mix(in srgb, #ffffff 47%, transparent);
+  --glass-shadow: rgba(22, 26, 34, 0.08);
+  --glass-shadow-near: rgba(22, 26, 34, 0.04);
+  --palette-accent-base: #a8305a;
+  --palette-surface-base: #fbf3f6;
+  --palette-detail-base: #b2436b;
+  --bg: #f7ebf0;
+  --bg-soft: #fbf4f7;
+  --panel: color-mix(in srgb, #fbf3f6 58%, transparent);
+  --panel-soft: color-mix(in srgb, #15171d 6%, transparent);
+  --panel-strong: color-mix(in srgb, #fbf3f6 74%, transparent);
+  --border: #d7ccd1;
+  --border-strong: #8a8489;
+  --text: #2c2c32;
+  --muted: #666369;
+  --accent: #a8305a;
+  --accent-soft: color-mix(in srgb, #a8305a 14%, transparent);
+  --accent-fg: #ffffff;
+  --accent-hover: #942a4f;
+  --accent-active: #862648;
+  --accent-deep-mix: #e3bccb;
+  --accent-ink: #a8305a;
+  --seal: #a8301c;
+  --ornament: #b2436b;
+  --success: #1c7a4a;
+  --warning: #7a5c12;
+  --info: #0f5590;
+  --danger: #b02a20;
+  --meta-mode: #0f5590;
+  --meta-size: #b2436b;
+  --meta-time: #7a5c12;
+  --meta-relay: #1c7a4a;
+  --black-violet: #f1dee6;
+  --black-blue: #e9e2ea;
+  --black-green: #eae4e6;
+  --black-red: #f3dfe4;
+  --control-bg: color-mix(in srgb, #fbf3f6 55%, transparent);
+  --control-bg-hover: color-mix(in srgb, #fbf3f6 75%, transparent);
+  --input-bg: color-mix(in srgb, #faeff3 50%, transparent);
+  --input-bg-focus: color-mix(in srgb, #faeff3 50%, transparent);
+  --flyout-bg: color-mix(in srgb, #fbf3f6 88%, transparent);
+  --flyout-text: var(--text);
+  --flyout-muted: var(--muted);
+  --flyout-border: var(--border);
+  --topbar-bg: color-mix(in srgb, #fbf3f6 72%, transparent);
+  --topbar-border: var(--border);
+  --nav-tab-bg: color-mix(in srgb, #fbf3f6 62%, transparent);
+  --nav-tab-bg-hover: color-mix(in srgb, #fbf3f6 82%, transparent);
+  --nav-tab-border: var(--border);
+  --nav-tab-border-strong: var(--border-strong);
+  --nav-tab-idle: var(--muted);
+  --active-tab-bg: color-mix(in srgb, #a8305a 14%, transparent);
+  --preview-stage-bg: #fcf7f9;
+  --preview-canvas-border: #cec5ca;
+  --shadow: 0 24px 60px var(--glass-shadow), 0 2px 8px var(--glass-shadow-near);
+}
+
+/* 玫瑰 · 夜 */
+html[data-theme="dark"][data-palette="meigui"] {
+  color-scheme: dark;
+  --glass-blur: 34px;
+  --glass-sat: 150%;
+  --glass-radius-panel: 22px;
+  --glass-radius-card: 15px;
+  --glass-sheen-top: rgba(255, 255, 255, 0.080);
+  --glass-sheen-mid: rgba(255, 255, 255, 0.010);
+  --glass-sheen-bottom: rgba(255, 255, 255, 0.044);
+  --glass-ring: rgba(255, 255, 255, 0.06);
+  --glass-edge: rgba(255, 255, 255, 0.20);
+  --glass-card: color-mix(in srgb, #ffffff 3.5%, transparent);
+  --glass-shadow: rgba(0, 0, 0, 0.56);
+  --glass-shadow-near: rgba(0, 0, 0, 0.38);
+  --palette-accent-base: #ef8aa8;
+  --palette-surface-base: #0d090c;
+  --palette-detail-base: #f5a8c0;
+  --bg: #10060a;
+  --bg-soft: #0e060a;
+  --panel: color-mix(in srgb, #0d090c 55%, transparent);
+  --panel-soft: color-mix(in srgb, #ffffff 5%, transparent);
+  --panel-strong: color-mix(in srgb, #0d090c 71%, transparent);
+  --border: #372e31;
+  --border-strong: #696468;
+  --text: #e4e6ea;
+  --muted: #868286;
+  --accent: #ef8aa8;
+  --accent-soft: color-mix(in srgb, #ef8aa8 14%, transparent);
+  --accent-fg: #08090f;
+  --accent-hover: #f29db6;
+  --accent-active: #c5728c;
+  --accent-deep-mix: #482732;
+  --accent-ink: #ef8aa8;
+  --seal: #f4776a;
+  --ornament: #f5a8c0;
+  --success: #6fd7a0;
+  --warning: #f5c85f;
+  --info: #6fb3e8;
+  --danger: #f09088;
+  --meta-mode: #6fb3e8;
+  --meta-size: #f5a8c0;
+  --meta-time: #f5c85f;
+  --meta-relay: #6fd7a0;
+  --black-violet: #2b161d;
+  --black-blue: #1a1720;
+  --black-green: #1a1b19;
+  --black-red: #261417;
+  --control-bg: color-mix(in srgb, #0d090c 50%, transparent);
+  --control-bg-hover: color-mix(in srgb, #0d090c 6%, transparent);
+  --input-bg: color-mix(in srgb, #0d080d 60%, transparent);
+  --input-bg-focus: color-mix(in srgb, #0d080d 60%, transparent);
+  --flyout-bg: color-mix(in srgb, #0d090c 78%, transparent);
+  --flyout-text: var(--text);
+  --flyout-muted: var(--muted);
+  --flyout-border: var(--border);
+  --topbar-bg: color-mix(in srgb, #0d090c 60%, transparent);
+  --topbar-border: var(--border);
+  --nav-tab-bg: color-mix(in srgb, #0d090c 55%, transparent);
+  --nav-tab-bg-hover: color-mix(in srgb, #0d090c 70%, transparent);
+  --nav-tab-border: var(--border);
+  --nav-tab-border-strong: var(--border-strong);
+  --nav-tab-idle: var(--muted);
+  --active-tab-bg: color-mix(in srgb, #ef8aa8 14%, transparent);
+  --preview-stage-bg: #0e060a;
+  --preview-canvas-border: color-mix(in srgb, #ffffff 10%, transparent);
+  --shadow: 0 30px 70px var(--glass-shadow), 0 2px 10px var(--glass-shadow-near);
+}
+
+/* 月白 · 昼 */
+html[data-theme="light"][data-palette="yuebai"] {
+  color-scheme: light;
+  --glass-blur: 38px;
+  --glass-sat: 145%;
+  --glass-radius-panel: 24px;
+  --glass-radius-card: 16px;
+  --glass-sheen-top: rgba(255, 255, 255, 0.400);
+  --glass-sheen-mid: rgba(255, 255, 255, 0.048);
+  --glass-sheen-bottom: rgba(255, 255, 255, 0.220);
+  --glass-ring: rgba(255, 255, 255, 0.56);
+  --glass-edge: rgba(255, 255, 255, 0.96);
+  --glass-card: color-mix(in srgb, #ffffff 46%, transparent);
+  --glass-shadow: rgba(22, 26, 34, 0.07);
+  --glass-shadow-near: rgba(22, 26, 34, 0.03);
+  --palette-accent-base: #2f6a94;
+  --palette-surface-base: #f3f8fc;
+  --palette-detail-base: #356e97;
+  --bg: #eaf2f9;
+  --bg-soft: #f3f8fc;
+  --panel: color-mix(in srgb, #f3f8fc 54%, transparent);
+  --panel-soft: color-mix(in srgb, #15171d 6%, transparent);
+  --panel-strong: color-mix(in srgb, #f3f8fc 70%, transparent);
+  --border: #cad2da;
+  --border-strong: #82888e;
+  --text: #2a2d33;
+  --muted: #61656b;
+  --accent: #2f6a94;
+  --accent-soft: color-mix(in srgb, #2f6a94 14%, transparent);
+  --accent-fg: #ffffff;
+  --accent-hover: #295d82;
+  --accent-active: #265576;
+  --accent-deep-mix: #bbd0e0;
+  --accent-ink: #2f6a94;
+  --seal: #a8301c;
+  --ornament: #356e97;
+  --success: #1c7a4a;
+  --warning: #7a5c12;
+  --info: #0f5590;
+  --danger: #b02a20;
+  --meta-mode: #0f5590;
+  --meta-size: #356e97;
+  --meta-time: #7a5c12;
+  --meta-relay: #1c7a4a;
+  --black-violet: #dde8f2;
+  --black-blue: #dde9f3;
+  --black-green: #deebee;
+  --black-red: #e7e6ec;
+  --control-bg: color-mix(in srgb, #f3f8fc 55%, transparent);
+  --control-bg-hover: color-mix(in srgb, #f3f8fc 75%, transparent);
+  --input-bg: color-mix(in srgb, #eef5fb 50%, transparent);
+  --input-bg-focus: color-mix(in srgb, #eef5fb 50%, transparent);
+  --flyout-bg: color-mix(in srgb, #f3f8fc 88%, transparent);
+  --flyout-text: var(--text);
+  --flyout-muted: var(--muted);
+  --flyout-border: var(--border);
+  --topbar-bg: color-mix(in srgb, #f3f8fc 72%, transparent);
+  --topbar-border: var(--border);
+  --nav-tab-bg: color-mix(in srgb, #f3f8fc 62%, transparent);
+  --nav-tab-bg-hover: color-mix(in srgb, #f3f8fc 82%, transparent);
+  --nav-tab-border: var(--border);
+  --nav-tab-border-strong: var(--border-strong);
+  --nav-tab-idle: var(--muted);
+  --active-tab-bg: color-mix(in srgb, #2f6a94 14%, transparent);
+  --preview-stage-bg: #f7fafd;
+  --preview-canvas-border: #c4cbd1;
+  --shadow: 0 24px 60px var(--glass-shadow), 0 2px 8px var(--glass-shadow-near);
+}
+
+/* 月白 · 夜 */
+html[data-theme="dark"][data-palette="yuebai"] {
+  color-scheme: dark;
+  --glass-blur: 38px;
+  --glass-sat: 145%;
+  --glass-radius-panel: 24px;
+  --glass-radius-card: 16px;
+  --glass-sheen-top: rgba(255, 255, 255, 0.090);
+  --glass-sheen-mid: rgba(255, 255, 255, 0.011);
+  --glass-sheen-bottom: rgba(255, 255, 255, 0.050);
+  --glass-ring: rgba(255, 255, 255, 0.06);
+  --glass-edge: rgba(255, 255, 255, 0.22);
+  --glass-card: color-mix(in srgb, #ffffff 3.5%, transparent);
+  --glass-shadow: rgba(0, 0, 0, 0.54);
+  --glass-shadow-near: rgba(0, 0, 0, 0.38);
+  --palette-accent-base: #93c4e6;
+  --palette-surface-base: #080b0f;
+  --palette-detail-base: #b0d4ee;
+  --bg: #050b10;
+  --bg-soft: #050a0f;
+  --panel: color-mix(in srgb, #080b0f 52%, transparent);
+  --panel-soft: color-mix(in srgb, #ffffff 5%, transparent);
+  --panel-strong: color-mix(in srgb, #080b0f 68%, transparent);
+  --border: #2d3237;
+  --border-strong: #63676c;
+  --text: #e4e6ea;
+  --muted: #84868b;
+  --accent: #93c4e6;
+  --accent-soft: color-mix(in srgb, #93c4e6 14%, transparent);
+  --accent-fg: #08090f;
+  --accent-hover: #a4cdea;
+  --accent-active: #79a2be;
+  --accent-deep-mix: #293946;
+  --accent-ink: #93c4e6;
+  --seal: #f4776a;
+  --ornament: #b0d4ee;
+  --success: #6fd7a0;
+  --warning: #f5c85f;
+  --info: #6fb3e8;
+  --danger: #f09088;
+  --meta-mode: #6fb3e8;
+  --meta-size: #b0d4ee;
+  --meta-time: #f5c85f;
+  --meta-relay: #6fd7a0;
+  --black-violet: #16212a;
+  --black-blue: #101c26;
+  --black-green: #101f1e;
+  --black-red: #1c181c;
+  --control-bg: color-mix(in srgb, #080b0f 50%, transparent);
+  --control-bg-hover: color-mix(in srgb, #080b0f 6%, transparent);
+  --input-bg: color-mix(in srgb, #070a11 60%, transparent);
+  --input-bg-focus: color-mix(in srgb, #070a11 60%, transparent);
+  --flyout-bg: color-mix(in srgb, #080b0f 78%, transparent);
+  --flyout-text: var(--text);
+  --flyout-muted: var(--muted);
+  --flyout-border: var(--border);
+  --topbar-bg: color-mix(in srgb, #080b0f 60%, transparent);
+  --topbar-border: var(--border);
+  --nav-tab-bg: color-mix(in srgb, #080b0f 55%, transparent);
+  --nav-tab-bg-hover: color-mix(in srgb, #080b0f 70%, transparent);
+  --nav-tab-border: var(--border);
+  --nav-tab-border-strong: var(--border-strong);
+  --nav-tab-idle: var(--muted);
+  --active-tab-bg: color-mix(in srgb, #93c4e6 14%, transparent);
+  --preview-stage-bg: #050a0f;
+  --preview-canvas-border: color-mix(in srgb, #ffffff 10%, transparent);
+  --shadow: 0 30px 70px var(--glass-shadow), 0 2px 10px var(--glass-shadow-near);
+}
+
+/* 流金 · 昼 */
+html[data-theme="light"][data-palette="liujin"] {
+  color-scheme: light;
+  --glass-blur: 24px;
+  --glass-sat: 140%;
+  --glass-radius-panel: 12px;
+  --glass-radius-card: 10px;
+  --glass-sheen-top: rgba(255, 255, 255, 0.340);
+  --glass-sheen-mid: rgba(255, 255, 255, 0.041);
+  --glass-sheen-bottom: rgba(255, 255, 255, 0.187);
+  --glass-ring: rgba(255, 255, 255, 0.50);
+  --glass-edge: rgba(255, 255, 255, 0.90);
+  --glass-card: color-mix(in srgb, #ffffff 48%, transparent);
+  --glass-shadow: rgba(22, 26, 34, 0.11);
+  --glass-shadow-near: rgba(22, 26, 34, 0.05);
+  --palette-accent-base: #8a6412;
+  --palette-surface-base: #fbf7ec;
+  --palette-detail-base: #856414;
+  --bg: #f6f0df;
+  --bg-soft: #faf7ed;
+  --panel: color-mix(in srgb, #fbf7ec 66%, transparent);
+  --panel-soft: color-mix(in srgb, #15171d 6%, transparent);
+  --panel-strong: color-mix(in srgb, #fbf7ec 82%, transparent);
+  --border: #d7d1c1;
+  --border-strong: #898781;
+  --text: #2c2d30;
+  --muted: #666563;
+  --accent: #8a6412;
+  --accent-soft: color-mix(in srgb, #8a6412 14%, transparent);
+  --accent-fg: #ffffff;
+  --accent-hover: #795810;
+  --accent-active: #6e500e;
+  --accent-deep-mix: #dbcdac;
+  --accent-ink: #8a6412;
+  --seal: #a8301c;
+  --ornament: #856414;
+  --success: #1c7a4a;
+  --warning: #7a5c12;
+  --info: #0f5590;
+  --danger: #b02a20;
+  --meta-mode: #0f5590;
+  --meta-size: #856414;
+  --meta-time: #7a5c12;
+  --meta-relay: #1c7a4a;
+  --black-violet: #eee6d1;
+  --black-blue: #e8e7da;
+  --black-green: #e9e9d6;
+  --black-red: #f2e4d4;
+  --control-bg: color-mix(in srgb, #fbf7ec 55%, transparent);
+  --control-bg-hover: color-mix(in srgb, #fbf7ec 75%, transparent);
+  --input-bg: color-mix(in srgb, #f9f4e5 50%, transparent);
+  --input-bg-focus: color-mix(in srgb, #f9f4e5 50%, transparent);
+  --flyout-bg: color-mix(in srgb, #fbf7ec 88%, transparent);
+  --flyout-text: var(--text);
+  --flyout-muted: var(--muted);
+  --flyout-border: var(--border);
+  --topbar-bg: color-mix(in srgb, #fbf7ec 72%, transparent);
+  --topbar-border: var(--border);
+  --nav-tab-bg: color-mix(in srgb, #fbf7ec 62%, transparent);
+  --nav-tab-bg-hover: color-mix(in srgb, #fbf7ec 82%, transparent);
+  --nav-tab-border: var(--border);
+  --nav-tab-border-strong: var(--border-strong);
+  --nav-tab-idle: var(--muted);
+  --active-tab-bg: color-mix(in srgb, #8a6412 14%, transparent);
+  --preview-stage-bg: #fbf9f2;
+  --preview-canvas-border: #cec9bc;
+  --shadow: 0 24px 60px var(--glass-shadow), 0 2px 8px var(--glass-shadow-near);
+}
+
+/* 流金 · 夜 */
+html[data-theme="dark"][data-palette="liujin"] {
+  color-scheme: dark;
+  --glass-blur: 24px;
+  --glass-sat: 140%;
+  --glass-radius-panel: 12px;
+  --glass-radius-card: 10px;
+  --glass-sheen-top: rgba(255, 255, 255, 0.080);
+  --glass-sheen-mid: rgba(255, 255, 255, 0.010);
+  --glass-sheen-bottom: rgba(255, 255, 255, 0.044);
+  --glass-ring: rgba(255, 255, 255, 0.06);
+  --glass-edge: rgba(255, 255, 255, 0.20);
+  --glass-card: color-mix(in srgb, #ffffff 3.5%, transparent);
+  --glass-shadow: rgba(0, 0, 0, 0.50);
+  --glass-shadow-near: rgba(0, 0, 0, 0.38);
+  --palette-accent-base: #dfb554;
+  --palette-surface-base: #0c0b0b;
+  --palette-detail-base: #e8c46a;
+  --bg: #0e0c06;
+  --bg-soft: #0d0b07;
+  --panel: color-mix(in srgb, #0c0b0b 60%, transparent);
+  --panel-soft: color-mix(in srgb, #ffffff 5%, transparent);
+  --panel-strong: color-mix(in srgb, #0c0b0b 76%, transparent);
+  --border: #35332d;
+  --border-strong: #686865;
+  --text: #e4e6e9;
+  --muted: #858584;
+  --accent: #dfb554;
+  --accent-soft: color-mix(in srgb, #dfb554 14%, transparent);
+  --accent-fg: #08090f;
+  --accent-hover: #e4c16f;
+  --accent-active: #b89647;
+  --accent-deep-mix: #42361a;
+  --accent-ink: #dfb554;
+  --seal: #f4776a;
+  --ornament: #e8c46a;
+  --success: #6fd7a0;
+  --warning: #f5c85f;
+  --info: #6fb3e8;
+  --danger: #f09088;
+  --meta-mode: #6fb3e8;
+  --meta-size: #e8c46a;
+  --meta-time: #f5c85f;
+  --meta-relay: #6fd7a0;
+  --black-violet: #27200f;
+  --black-blue: #181d1d;
+  --black-green: #182015;
+  --black-red: #251913;
+  --control-bg: color-mix(in srgb, #0c0b0b 50%, transparent);
+  --control-bg-hover: color-mix(in srgb, #0c0b0b 6%, transparent);
+  --input-bg: color-mix(in srgb, #0c0b0b 60%, transparent);
+  --input-bg-focus: color-mix(in srgb, #0c0b0b 60%, transparent);
+  --flyout-bg: color-mix(in srgb, #0c0b0b 78%, transparent);
+  --flyout-text: var(--text);
+  --flyout-muted: var(--muted);
+  --flyout-border: var(--border);
+  --topbar-bg: color-mix(in srgb, #0c0b0b 60%, transparent);
+  --topbar-border: var(--border);
+  --nav-tab-bg: color-mix(in srgb, #0c0b0b 55%, transparent);
+  --nav-tab-bg-hover: color-mix(in srgb, #0c0b0b 70%, transparent);
+  --nav-tab-border: var(--border);
+  --nav-tab-border-strong: var(--border-strong);
+  --nav-tab-idle: var(--muted);
+  --active-tab-bg: color-mix(in srgb, #dfb554 14%, transparent);
+  --preview-stage-bg: #0c0b07;
+  --preview-canvas-border: color-mix(in srgb, #ffffff 10%, transparent);
+  --shadow: 0 30px 70px var(--glass-shadow), 0 2px 10px var(--glass-shadow-near);
+}
+/* ==== 界面配色生成区 结束 ==== */
 
 html[data-palette]:not([data-palette="default"]) body {
-  background:
-    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 6%, transparent), transparent 30%),
-    linear-gradient(180deg, var(--bg) 0%, var(--bg-soft) 100%);
+  background: var(--bg);
 }
 
 body {
@@ -6597,6 +7703,70 @@ textarea {
   gap: 10px;
 }
 
+/* 参考图空态和缩略图卡共用同一个槽高：三列卡片的高度由容器宽度反推，
+   没有传图时不再单独占一条更高的空态，增删参考图时上方输入区不会上下跳。
+   桌面布局把空态收成横向一行（图标 + 文案 + 上传按钮），保证塞进卡片高度。 */
+html:is([data-ui-layout="desktop"], [data-ui-layout="narrow-desktop"]) .reference-field-group {
+  container-type: inline-size;
+}
+
+html:is([data-ui-layout="desktop"], [data-ui-layout="narrow-desktop"]) .reference-field-group > .reference-grid {
+  grid-auto-rows: calc((100cqi - 20px) / 3);
+}
+
+html:is([data-ui-layout="desktop"], [data-ui-layout="narrow-desktop"]) .reference-field-group > .reference-dropzone {
+  min-height: calc((100cqi - 20px) / 3);
+  padding: 10px 12px;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-content: center;
+  align-items: center;
+  justify-items: start;
+  column-gap: 10px;
+  row-gap: 4px;
+  text-align: left;
+}
+
+html:is([data-ui-layout="desktop"], [data-ui-layout="narrow-desktop"]) .reference-field-group > .reference-dropzone.is-compact-hidden {
+  min-height: 0;
+  padding: 0;
+}
+
+/* 提示词框的自动高度允许比默认下限再低一档：窗口稍矮时先收提示词，
+   而不是让左栏整体溢出、把底边对齐顶掉。 */
+html:is([data-ui-layout="desktop"], [data-ui-layout="narrow-desktop"]) .prompt-field textarea {
+  min-height: max(56px, calc(var(--textarea-min-height, 96px) - 24px));
+}
+
+html:is([data-ui-layout="desktop"], [data-ui-layout="narrow-desktop"]) .reference-field-group > .reference-dropzone .reference-icon {
+  grid-row: 1 / span 2;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+}
+
+html:is([data-ui-layout="desktop"], [data-ui-layout="narrow-desktop"]) .reference-field-group > .reference-dropzone .reference-icon::before {
+  inset: 8px 7px 10px;
+  border-radius: 5px;
+}
+
+html:is([data-ui-layout="desktop"], [data-ui-layout="narrow-desktop"]) .reference-field-group > .reference-dropzone .reference-icon::after {
+  left: 12px;
+  right: 12px;
+  top: 12px;
+  box-shadow: 0 7px 0 color-mix(in srgb, var(--accent) 46%, transparent);
+}
+
+html:is([data-ui-layout="desktop"], [data-ui-layout="narrow-desktop"]) .reference-field-group > .reference-dropzone strong,
+html:is([data-ui-layout="desktop"], [data-ui-layout="narrow-desktop"]) .reference-field-group > .reference-dropzone em {
+  grid-column: 2;
+}
+
+html:is([data-ui-layout="desktop"], [data-ui-layout="narrow-desktop"]) .reference-field-group > .reference-dropzone em {
+  min-height: 26px;
+  padding: 0 10px;
+}
+
 .reference-card {
   position: relative;
   display: grid;
@@ -9143,6 +10313,35 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
   position: relative;
 }
 
+/* 显示区形状跟着结果图比例走：先按宽度铺满，再用「按可用高度反推的宽度」封顶，
+   窗口变矮时画布收窄而不是把工具栏顶出面板。 */
+.preview-surface > .preview-canvas {
+  width: min(100%, calc(100cqh * var(--preview-ratio)));
+  height: auto;
+  margin: 0;
+  flex: none;
+  aspect-ratio: var(--preview-ratio);
+}
+
+/* 有结果图时画布不再画底/描边：画框就是图片本身，避免图片四周留下与面板不同色的边。 */
+.preview-surface > .preview-canvas:has(> img.is-mounted) {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+/* 深色主题下不给预览垫底板：纯黑底 + 图片自己的黑色投影，会在结果四周圈住一圈黑边，
+   看着像图片被套进框里。画布转透明、描边与内阴影撤掉以后，图片的圆角直接和面板背景接壤；
+   工作室预览再把内边距归零，图片贴到画布边缘，不再隔一层黑带。浅色主题仍保留纸面网格板。 */
+html[data-theme="dark"] .preview-canvas {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+html[data-theme="dark"] .preview-surface > .preview-canvas {
+  padding: 0;
+}
+
 .preview-placeholder {
   display: grid;
   gap: 8px;
@@ -9202,6 +10401,13 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
   initial-value: 78%;
 }
 
+/* 亮度基准也注册成可插值：阶段切换时背景不能一下子亮/暗一档。 */
+@property --generation-loading-light-base {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 74%;
+}
+
 .generation-loading-shell {
   --generation-loading-progress: 0%;
   --generation-loading-hue: 265;
@@ -9210,20 +10416,42 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
   --generation-loading-light-span: 0.2;
   /* 主题整体偏移，与各阶段自己的起始亮度叠加，避免主题规则盖掉阶段调校。 */
   --generation-loading-light-shift: 0%;
-  --generation-loading-aurora-opacity: 0.58;
+  /* 旧动画在关键帧里把透明度来回拉到 0.62–0.82（均值≈0.72），恒定后取这个均值，
+     观感不变，但透明度重新由主题与排队态说了算。 */
+  --generation-loading-aurora-opacity: 0.72;
   --generation-loading-scrim: rgba(0, 0, 0, 0.42);
   /* 百分比越高背景色越深，所以同一阶段内也能看出推进。 */
-  --generation-loading-fluid: hsl(
-    var(--generation-loading-hue) var(--generation-loading-sat)
-      calc(
-        var(--generation-loading-light-base) + var(--generation-loading-light-shift) -
-          var(--generation-loading-progress) * var(--generation-loading-light-span)
-      )
+  --generation-loading-light: calc(
+    var(--generation-loading-light-base) + var(--generation-loading-light-shift) -
+      var(--generation-loading-progress) * var(--generation-loading-light-span)
   );
+  --generation-loading-fluid: hsl(var(--generation-loading-hue) var(--generation-loading-sat) var(--generation-loading-light));
+  /* 七彩祥云：主色带之外的另外三条色带沿色轮铺开；外壳再整体转色，云的颜色就一直在流动。 */
+  --generation-loading-cloud-a: var(--generation-loading-fluid);
+  --generation-loading-cloud-b: hsl(
+    calc(var(--generation-loading-hue) + 70) calc(var(--generation-loading-sat) * 1.02)
+      calc(var(--generation-loading-light) - 4%)
+  );
+  --generation-loading-cloud-c: hsl(
+    calc(var(--generation-loading-hue) + 145) calc(var(--generation-loading-sat) * 0.96)
+      calc(var(--generation-loading-light) - 2%)
+  );
+  --generation-loading-cloud-d: hsl(
+    calc(var(--generation-loading-hue) + 215) calc(var(--generation-loading-sat) * 0.9)
+      calc(var(--generation-loading-light) - 7%)
+  );
+  /* 整片云沿色轮转一圈（60s），七彩的颜色就是慢慢变化的；
+     转色放在外壳的 filter 上，模糊层不用重绘，主线程几乎零成本。 */
+  animation: generation-loading-rainbow-color 60000ms linear infinite;
+  /* 相位由墙钟给（负数延迟=从半路开始），占位重建时颜色接着走，不会跳回起点。 */
+  animation-delay: var(--generation-loading-rainbow-phase, 0s);
+  /* 只插值阶段色相与饱和度。进度不插值：1% 只差 0.2% 亮度，肉眼分辨不出，
+     却会让整块模糊背景在每次 tick 之后逐帧重绘（实测 4s 内主线程任务耗时
+     493ms vs 12ms），动画反而被拖出卡顿。 */
   transition:
-    --generation-loading-progress var(--generation-loading-rise-duration, 800ms) linear,
-    --generation-loading-hue 900ms ease-in-out,
-    --generation-loading-sat 900ms ease-in-out;
+    --generation-loading-hue 3000ms linear,
+    --generation-loading-sat 3000ms linear,
+    --generation-loading-light-base 3000ms linear;
   /* 背景随宿主铺满；容器单位仍用于中心内容与遮罩的稳定比例。 */
   position: relative;
   isolation: isolate;
@@ -9284,10 +10512,12 @@ html[data-ui-layout="mobile"] .image-compress-result-ghost {
   --generation-loading-light-base: 63%;
 }
 
+/* 失败态保持纯红：整片云转色会把报错信号转成青绿，所以这一族不参与七彩循环。 */
 .generation-loading-shell[data-generation-loading-family="failed"] {
   --generation-loading-hue: 5;
   --generation-loading-sat: 70%;
   --generation-loading-light-base: 78%;
+  animation: none;
 }
 
 /* 浅色主题整体下移亮度并压缩深浅跨度，保证背景与白底的对比度；
@@ -9310,18 +10540,23 @@ html[data-theme="light"] .generation-loading-shell[data-generation-loading-famil
   position: absolute;
   z-index: 0;
   inset: -22%;
-  opacity: var(--generation-loading-aurora-opacity, 0.58);
+  opacity: var(--generation-loading-aurora-opacity, 0.72);
   background:
-    linear-gradient(118deg, transparent 12%, color-mix(in srgb, var(--generation-loading-fluid) 54%, transparent) 43%, transparent 74%),
-    linear-gradient(236deg, transparent 20%, color-mix(in srgb, hsl(calc(var(--generation-loading-hue) + 28) var(--generation-loading-sat) 70%) 38%, transparent) 51%, transparent 80%),
-    linear-gradient(180deg, color-mix(in srgb, var(--generation-loading-fluid) 18%, transparent), transparent 68%);
-  background-size: 148% 132%, 132% 148%, 120% 120%;
+    radial-gradient(52% 58% at 22% 24%, color-mix(in srgb, var(--generation-loading-cloud-b) 48%, transparent), transparent 74%),
+    radial-gradient(54% 54% at 78% 26%, color-mix(in srgb, var(--generation-loading-cloud-c) 46%, transparent), transparent 76%),
+    radial-gradient(56% 56% at 70% 80%, color-mix(in srgb, var(--generation-loading-cloud-d) 44%, transparent), transparent 78%),
+    linear-gradient(118deg, transparent 10%, color-mix(in srgb, var(--generation-loading-cloud-a) 50%, transparent) 44%, transparent 76%),
+    linear-gradient(180deg, color-mix(in srgb, var(--generation-loading-cloud-a) 16%, transparent), transparent 70%);
+  background-size: 100% 100%;
   background-repeat: no-repeat;
-  background-position: 4% 8%, 92% 88%, 50% 50%;
+  background-position: 50% 50%;
   filter: blur(clamp(18px, 3.2cqi, 48px)) saturate(1.12);
-  transform: translate3d(-2%, -1%, 0) scale(1.04);
-  will-change: transform, opacity;
-  animation: generation-loading-aurora-drift 14000ms cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+  /* 排队态压暗也要渐入渐出，不能在生成/等待之间硬切。 */
+  transition: opacity 2400ms linear;
+  /* 只做匀速漂移：不再缩放、不再呼吸透明度，整层栅格化一次后交给合成器平移。 */
+  transform: translate3d(0, 0, 0) rotate(0deg) scale(1.08);
+  will-change: transform;
+  animation: generation-loading-aurora-drift 28000ms linear infinite;
   pointer-events: none;
 }
 
@@ -9409,7 +10644,7 @@ html[data-theme="light"] .generation-loading-percent {
 /* 排队时把满幅模糊背景压暗放慢：等待和真正在生成必须一眼能分出来。 */
 .generation-loading-shell[data-generation-loading-mode="waiting"]::before {
   --generation-loading-aurora-opacity: 0.26;
-  animation-duration: 18000ms;
+  animation-duration: 46000ms;
 }
 
 /* 等待态是灰蓝色族，文字压不住背景就更该提亮，
@@ -9506,30 +10741,100 @@ html[data-theme="light"] .generation-loading-log {
   display: none;
 }
 
-/* 背景外扩后再缓慢平移与缩放，任一帧都不会露出宿主底色。 */
+/* 背景外扩 22% 后再绕圈匀速漂移：整圈回到起点，所以循环处不会"停顿再反向"。
+   关键帧按弧长等距采样，椭圆才不会在长轴两端加速、短轴两侧拖慢。
+   只动 transform，不插值 opacity——透明度交给 --generation-loading-aurora-opacity，
+   主题和排队态才能真的压暗它，背景也不会一明一暗地喘气。 */
 @keyframes generation-loading-aurora-drift {
   0% {
-    opacity: 0.62;
-    transform: translate3d(-4%, -2%, 0) scale(1.04);
+    transform: translate3d(4.60%, 0.00%, 0) rotate(0.00deg) scale(1.08);
+  }
+
+  6.25% {
+    transform: translate3d(3.86%, 1.85%, 0) rotate(0.60deg) scale(1.08);
+  }
+
+  12.5% {
+    transform: translate3d(2.64%, 2.79%, 0) rotate(0.90deg) scale(1.08);
+  }
+
+  18.75% {
+    transform: translate3d(1.33%, 3.25%, 0) rotate(1.05deg) scale(1.08);
+  }
+
+  25% {
+    transform: translate3d(-0.00%, 3.40%, 0) rotate(1.10deg) scale(1.08);
+  }
+
+  31.25% {
+    transform: translate3d(-1.33%, 3.25%, 0) rotate(1.05deg) scale(1.08);
+  }
+
+  37.5% {
+    transform: translate3d(-2.64%, 2.79%, 0) rotate(0.90deg) scale(1.08);
+  }
+
+  43.75% {
+    transform: translate3d(-3.86%, 1.85%, 0) rotate(0.60deg) scale(1.08);
   }
 
   50% {
-    opacity: 0.82;
-    transform: translate3d(3%, -5%, 0) scale(1.11);
+    transform: translate3d(-4.60%, 0.00%, 0) rotate(0.00deg) scale(1.08);
+  }
+
+  56.25% {
+    transform: translate3d(-3.86%, -1.85%, 0) rotate(-0.60deg) scale(1.08);
+  }
+
+  62.5% {
+    transform: translate3d(-2.64%, -2.79%, 0) rotate(-0.90deg) scale(1.08);
+  }
+
+  68.75% {
+    transform: translate3d(-1.33%, -3.25%, 0) rotate(-1.05deg) scale(1.08);
+  }
+
+  75% {
+    transform: translate3d(0.00%, -3.40%, 0) rotate(-1.10deg) scale(1.08);
+  }
+
+  81.25% {
+    transform: translate3d(1.33%, -3.25%, 0) rotate(-1.05deg) scale(1.08);
+  }
+
+  87.5% {
+    transform: translate3d(2.64%, -2.79%, 0) rotate(-0.90deg) scale(1.08);
+  }
+
+  93.75% {
+    transform: translate3d(3.86%, -1.85%, 0) rotate(-0.60deg) scale(1.08);
   }
 
   100% {
-    opacity: 0.68;
-    transform: translate3d(5%, 3%, 0) scale(1.07);
+    transform: translate3d(4.60%, 0.00%, 0) rotate(0.00deg) scale(1.08);
+  }
+}/* 整片云绕色轮走一圈：60s 一循环，肉眼几乎察觉不到“在转”，只觉得颜色在慢慢变。
+   转色放在外壳 filter 上而不是重写渐变——模糊层不用重新渲染。 */
+@keyframes generation-loading-rainbow-color {
+  from {
+    filter: hue-rotate(0deg);
+  }
+
+  to {
+    filter: hue-rotate(360deg);
   }
 }
 
+/* 化形节奏：先静默，再慢慢浮起、停一会儿、最后散掉；进出都是缓的。 */
+
 @media (prefers-reduced-motion: reduce) {
+  .generation-loading-shell,
   .generation-loading-shell::before,
   .generation-loading-shell[data-generation-loading-mode="waiting"]::before {
     animation: none;
   }
 }
+
 
 .preview-panel {
   height: var(--studio-panel-height, var(--studio-column-height, auto));
@@ -9553,6 +10858,10 @@ html[data-theme="light"] .generation-loading-log {
 #previewImage.is-mounted {
   display: block;
 }
+/* 底板撤掉后，86% 黑的 64px 投影会直接糊在面板背景上，仍是一圈黑边，深色主题下一并取消。 */
+html[data-theme="dark"] #previewImage {
+  box-shadow: none;
+}
 
 #previewImage.is-visible {
   opacity: 1;
@@ -9562,6 +10871,34 @@ html[data-theme="light"] .generation-loading-log {
   justify-content: space-between;
   margin-top: 10px;
   flex-wrap: wrap;
+}
+
+/* 预览信息（模型 / 时间 / ID / 尺寸）挪到工具栏同一行，画布上方不再占高度。 */
+.preview-toolbar-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* basis 0 而不是 auto：按内容算基准宽会把右侧动作按钮挤到第二行。 */
+  flex: 1 1 0%;
+  min-width: 0;
+}
+
+.preview-toolbar-info .preview-meta {
+  flex: 0 1 auto;
+  min-width: 0;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.preview-toolbar-info .preview-meta > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.preview-toolbar-info .model-badge {
+  flex: 0 0 auto;
 }
 
 .zoom-controls,
@@ -11617,11 +12954,14 @@ html[data-theme="light"] .lightbox-fields .detail-field {
 #referencePreviewImage {
   min-width: 0;
   min-height: 0;
+  /* 等比铺满预览框：短边贴边，小图同样放大；宽高比由脚本写入 --preview-image-ratio。 */
+  width: min(100%, calc((100svh - 126px) * var(--preview-image-ratio, 1)));
+  height: auto;
   max-width: 100%;
   max-height: calc(100svh - 126px);
   justify-self: center;
   border-radius: 14px;
-  object-fit: scale-down;
+  object-fit: contain;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
 }
 
@@ -11711,14 +13051,21 @@ html[data-theme="light"] .lightbox-fields .detail-field {
   transform: translateX(0);
 }
 
-.prompt-preview-surface {
+/* 预览画布外面这一层只做两件事：给画布量可用尺寸（容器查询），以及把画布居中。
+   工作室预览和图片编辑 / 快速溶图 / 图片拆解共用这个类。 */
+.preview-surface {
+  /* 显示区比例：默认 16:9，出图后由 app.js 按结果图实际比例（1254×1254 / 937×1679 …）覆盖，
+     这样不同分辨率的图不会在画框里留下一条和面板不同色的底。 */
+  --preview-ratio: 1.7777778;
   position: relative;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  place-items: center;
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   isolation: isolate;
+  /* 画布尺寸要靠容器查询单位反推，所以这块的高度必须由布局决定、不被内容撑高。 */
+  container-type: size;
 }
 
 .prompt-template-popover {
@@ -14327,6 +15674,33 @@ html[data-ui-layout="mobile"] .preview-toolbar {
   gap: 6px;
   align-items: stretch;
   margin-top: 6px;
+}
+
+html[data-ui-layout="tablet"] .preview-toolbar-info,
+html[data-ui-layout="mobile"] .preview-toolbar-info {
+  /* 窄屏信息行允许换行：状态文字和模型标识能挤一行，缩放控件自己占满下一行。 */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+/* 窄屏/堆叠布局里预览面板是内容高度，容器查询拿不到确定高度，退回按宽度定比例。 */
+html[data-ui-layout="stacked"] .preview-surface,
+html[data-ui-layout="tablet"] .preview-surface,
+html[data-ui-layout="mobile"] .preview-surface {
+  container-type: normal;
+}
+
+html[data-ui-layout="stacked"] .preview-surface > .preview-canvas,
+html[data-ui-layout="tablet"] .preview-surface > .preview-canvas,
+html[data-ui-layout="mobile"] .preview-surface > .preview-canvas {
+  width: 100%;
+  height: auto;
+  /* 窄屏原本用 min-height 兜住空画布，会把 16:9 撑变形，这里让比例说了算。 */
+  min-height: 0;
+  margin-top: 0;
 }
 
 html[data-ui-layout="tablet"] .zoom-controls,
@@ -19582,7 +20956,7 @@ html .prompt-template-panel .prompt-template-head {
   align-items: center;
   flex-direction: row;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 9px 12px;
 }
 
 html .prompt-template-head > .toolbar-button {
@@ -19590,14 +20964,29 @@ html .prompt-template-head > .toolbar-button {
   flex: 0 0 auto;
 }
 
+.prompt-template-head > div {
+  min-width: 0;
+}
+
 .prompt-template-head h2 {
   margin: 0;
   font-size: 16px;
 }
 
+.prompt-template-subtitle {
+  margin: 3px 0 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--type-subtitle-size);
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .prompt-template-toolbar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
   padding: 8px 12px;
@@ -19605,8 +20994,8 @@ html .prompt-template-head > .toolbar-button {
 }
 
 .prompt-template-search {
-  flex: 1 1 260px;
-  min-width: 0;
+  flex: 1 1 240px;
+  min-width: 160px;
 }
 
 .prompt-template-search input {
@@ -19617,6 +21006,53 @@ html .prompt-template-head > .toolbar-button {
   background: color-mix(in srgb, var(--panel) 72%, transparent);
   color: var(--text);
   padding: 0 12px;
+}
+
+.prompt-template-select-control {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: var(--type-subtitle-size);
+  white-space: nowrap;
+}
+
+.prompt-template-select-control select {
+  min-height: 36px;
+  max-width: 156px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 72%, transparent);
+  color: var(--text);
+  padding: 0 28px 0 9px;
+  font: inherit;
+  font-size: var(--type-subtitle-size);
+  cursor: pointer;
+}
+
+.prompt-template-select-control select:focus-visible,
+.prompt-template-reset:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 72%, transparent);
+  outline-offset: 2px;
+}
+
+.prompt-template-reset {
+  min-height: 36px;
+  flex: 0 0 auto;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 72%, transparent);
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--type-subtitle-size);
+  cursor: pointer;
+}
+
+.prompt-template-reset:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  color: var(--text);
 }
 
 .prompt-template-view-switch {
@@ -19646,27 +21082,6 @@ html .prompt-template-head > .toolbar-button {
 .prompt-template-view-button.active {
   background: color-mix(in srgb, var(--accent) 18%, transparent);
   color: var(--text);
-}
-
-.prompt-template-font-control {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 7px;
-  color: var(--muted);
-  font-size: var(--type-subtitle-size);
-  white-space: nowrap;
-}
-
-.prompt-template-font-control input {
-  width: 86px;
-  accent-color: var(--accent);
-}
-
-.prompt-template-font-control output {
-  min-width: 36px;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
 }
 
 .prompt-template-body {
@@ -19786,6 +21201,7 @@ html .prompt-template-head > .toolbar-button {
   color: var(--muted);
   font-size: var(--type-micro-size);
   line-height: 1.5;
+  white-space: pre-line;
 }
 
 .prompt-template-library-area {
@@ -19864,8 +21280,7 @@ html .prompt-template-head > .toolbar-button {
 }
 
 .prompt-template-library-card:hover,
-.prompt-template-library-card:focus-within,
-.prompt-template-library-card.active {
+.prompt-template-library-card:focus-within {
   border-color: color-mix(in srgb, var(--accent) 45%, transparent);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.12);
 }
@@ -19883,6 +21298,7 @@ html .prompt-template-head > .toolbar-button {
 .prompt-template-library-preview-button {
   display: block;
   width: 100%;
+  height: 100%;
   padding: 0;
   border: 0;
   background: transparent;
@@ -19890,7 +21306,8 @@ html .prompt-template-head > .toolbar-button {
 }
 
 .prompt-template-library-preview-button:focus-visible,
-.prompt-template-library-card-actions .mini-action:focus-visible {
+.prompt-template-library-apply:focus-visible,
+.prompt-template-library-preview-link:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--accent) 78%, white);
   outline-offset: -2px;
 }
@@ -19908,68 +21325,137 @@ html .prompt-template-head > .toolbar-button {
   transform: scale(1.025);
 }
 
-.prompt-template-library-card-actions {
-  position: absolute;
-  right: 8px;
-  top: 8px;
-  z-index: 2;
-  display: flex;
-  gap: 5px;
-}
-
-.prompt-template-library-card-actions .mini-action {
-  width: auto;
-  min-width: 58px;
-  min-height: 34px;
-  padding: 0 12px;
-  border: 1px solid var(--accent);
-  border-radius: 6px;
-  background: var(--accent);
-  /* 底色就是点缀填色，字必须用 --accent-fg；--accent-ink 是压在深色面层上的
-     墨色，两个色在浅底上只差 1.9:1，读不出来。 */
-  color: var(--accent-fg);
-  font-size: var(--type-subtitle-size);
-  font-weight: 700;
-  white-space: nowrap;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.3);
-}
-
 .prompt-template-library-content {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 6px;
   min-width: 0;
-  padding: 10px 11px 11px;
+  padding: 11px 13px;
 }
 
-.prompt-template-library-content h3 {
+.prompt-template-library-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.prompt-template-library-card-head h3 {
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
   overflow: hidden;
   color: var(--text);
   font-size: var(--type-small-title-size);
-  line-height: 1.3;
-  text-overflow: clip;
+  line-height: 1.35;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.prompt-template-library-apply {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 52px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font: inherit;
+  font-size: var(--type-micro-size);
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.prompt-template-library-apply:hover {
+  filter: brightness(1.08);
+}
+
+.prompt-template-library-summary {
+  display: -webkit-box;
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--type-subtitle-size);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.prompt-template-library-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  margin-top: auto;
+}
+
 .prompt-template-library-breadcrumb {
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
   overflow: hidden;
   color: var(--muted);
   font-size: var(--type-micro-size);
-  text-overflow: clip;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.prompt-template-library-prompt {
-  margin: 0;
-  color: color-mix(in srgb, var(--text) 88%, var(--muted));
-  font-size: var(--type-subtitle-size);
-  line-height: 1.55;
-  overflow-wrap: anywhere;
+.prompt-template-library-reference-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.prompt-template-library-reference-status::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.prompt-template-library-reference-status[data-requires-reference="true"] {
+  color: color-mix(in srgb, #e0a83e 82%, var(--text));
+}
+
+.prompt-template-library-reference-status[data-requires-reference="false"] {
+  color: color-mix(in srgb, #6cae8a 64%, var(--muted));
+}
+
+.prompt-template-library-preview-link {
+  flex: 0 0 auto;
+  width: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--type-micro-size);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.prompt-template-library-preview-link:hover {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .prompt-template-library-empty {
   grid-column: 1 / -1;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
   padding: 30px 16px;
   border: 1px dashed var(--border);
   border-radius: 10px;
@@ -19977,58 +21463,58 @@ html .prompt-template-head > .toolbar-button {
   text-align: center;
 }
 
+.prompt-template-library-empty strong {
+  color: var(--text);
+  font-size: var(--type-small-title-size);
+}
+
+.prompt-template-library-empty > span {
+  max-width: 460px;
+  line-height: 1.55;
+}
+
+.prompt-template-library-empty .mini-action {
+  width: auto;
+  min-height: 34px;
+  margin-top: 4px;
+  padding: 0 12px;
+}
+
 .prompt-template-library-grid[data-view="list"] .prompt-template-library-card {
   display: grid;
-  grid-template-columns: 112px minmax(0, 1fr);
-  height: calc(80px + var(--prompt-template-list-font-size, 15px) * 4.65);
-  min-height: 0;
-  align-items: start;
+  grid-template-columns: 104px minmax(0, 1fr);
+  height: auto;
+  min-height: 104px;
+  align-items: stretch;
 }
 
-.prompt-template-library-grid[data-view="list"] .prompt-template-library-media,
-.prompt-template-library-grid[data-view="list"] .prompt-template-library-preview-button {
+.prompt-template-library-grid[data-view="list"] .prompt-template-library-media {
+  width: 104px;
   height: 100%;
-  min-height: 0;
+  min-height: 104px;
+  aspect-ratio: 1 / 1;
 }
 
+.prompt-template-library-grid[data-view="list"] .prompt-template-library-preview-button,
 .prompt-template-library-grid[data-view="list"] .prompt-template-library-preview-button img {
   width: 100%;
   height: 100%;
+}
+
+.prompt-template-library-grid[data-view="list"] .prompt-template-library-preview-button img {
   aspect-ratio: auto;
-  object-fit: contain;
+  object-fit: cover;
 }
 
 .prompt-template-library-grid[data-view="list"] .prompt-template-library-content {
-  height: 100%;
-  min-height: 0;
+  min-height: 104px;
+  justify-content: flex-start;
   overflow: hidden;
-  align-content: start;
-  grid-template-rows: auto auto minmax(0, 1fr);
-  gap: 4px;
-  padding: 8px 10px;
-}
-
-.prompt-template-library-grid[data-view="list"] .prompt-template-library-content h3 {
-  display: -webkit-box;
-  padding-right: 64px;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  padding: 10px 12px;
 }
 
 .prompt-template-library-grid[data-view="list"] .prompt-template-library-breadcrumb {
   text-overflow: ellipsis;
-}
-
-.prompt-template-library-grid[data-view="list"] .prompt-template-library-prompt {
-  display: -webkit-box;
-  min-height: 0;
-  overflow: hidden;
-  font-size: var(--prompt-template-list-font-size, 15px);
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  max-height: 4.65em;
 }
 
 .prompt-template-library-grid[data-view="image"] .prompt-template-library-card {
@@ -20052,18 +21538,15 @@ html .prompt-template-head > .toolbar-button {
 }
 
 .prompt-template-library-grid[data-view="image"] .prompt-template-library-content {
-  position: static;
-  padding: 8px 10px 10px;
+  padding: 9px 10px 10px;
   overflow: visible;
-  background: transparent;
-  color: var(--text);
 }
 
-.prompt-template-library-grid[data-view="image"] .prompt-template-library-prompt {
+.prompt-template-library-grid[data-view="image"] .prompt-template-library-summary {
   display: none;
 }
 
-.prompt-template-library-grid[data-view="image"] .prompt-template-library-content h3,
+.prompt-template-library-grid[data-view="image"] .prompt-template-library-card-head h3,
 .prompt-template-library-grid[data-view="image"] .prompt-template-library-breadcrumb {
   overflow: visible;
   text-overflow: clip;
@@ -20071,19 +21554,52 @@ html .prompt-template-head > .toolbar-button {
   overflow-wrap: anywhere;
 }
 
+.prompt-template-library-grid[data-view="image"] .prompt-template-library-card-head h3 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.prompt-template-library-grid[data-view="image"] .prompt-template-library-card-foot {
+  margin-top: 0;
+}
+
 .prompt-template-personal {
-  display: grid;
-  grid-template-rows: auto minmax(80px, 1fr) minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: 8px;
+  min-height: 0;
   overflow: hidden;
   padding-left: 10px;
   border-left: 1px solid var(--overlay-border-muted);
 }
 
 .prompt-template-personal .prompt-template-list {
+  flex: 1 1 auto;
+  min-height: 0;
   max-height: none;
-  overflow: auto;
+  overflow-y: auto;
   padding-right: 2px;
+  scrollbar-width: thin;
+}
+
+.prompt-template-personal .prompt-template-form {
+  display: none;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  gap: 8px;
+  padding-right: 2px;
+  scrollbar-width: thin;
+}
+
+.prompt-template-personal.is-editing .prompt-template-list {
+  display: none;
+}
+
+.prompt-template-personal.is-editing .prompt-template-form {
+  display: grid;
 }
 
 .prompt-template-personal-head .mini-action {
@@ -20093,15 +21609,11 @@ html .prompt-template-head > .toolbar-button {
   white-space: nowrap;
 }
 
-.prompt-template-personal .prompt-template-form {
-  max-height: none;
-  gap: 8px;
-  overflow: auto;
-  padding-right: 2px;
-}
-
 .prompt-template-personal .prompt-template-form textarea {
-  min-height: 96px;
+  min-height: 120px;
+  max-height: none;
+  overflow: hidden;
+  resize: none;
 }
 
 .prompt-template-personal .prompt-template-item {
@@ -20113,7 +21625,13 @@ html .prompt-template-head > .toolbar-button {
   display: none;
 }
 
-@container (max-width: 1000px) {
+@container (min-width: 1480px) {
+  .prompt-template-library-grid[data-view="list"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container (max-width: 1200px) {
   .prompt-template-body {
     grid-template-columns: 142px minmax(0, 1fr) 216px;
   }
@@ -20130,6 +21648,10 @@ html .prompt-template-head > .toolbar-button {
 
   .prompt-template-search {
     flex-basis: 100%;
+  }
+
+  .prompt-template-library-grid[data-view="image"] {
+    column-count: 2;
   }
 
   .prompt-template-body {
@@ -20218,15 +21740,6 @@ html .prompt-template-head > .toolbar-button {
     padding-inline: 6px;
   }
 
-  .prompt-template-font-control {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .prompt-template-font-control input {
-    flex: 1 1 auto;
-  }
-
   .prompt-template-library-grid[data-view="image"] {
     column-count: 2;
   }
@@ -20235,15 +21748,14 @@ html .prompt-template-head > .toolbar-button {
     grid-template-columns: 92px minmax(0, 1fr);
   }
 
-  .prompt-template-library-grid[data-view="list"] .prompt-template-library-media,
-  .prompt-template-library-grid[data-view="list"] .prompt-template-library-preview-button {
-    height: 100%;
+  .prompt-template-library-grid[data-view="list"] .prompt-template-library-media {
+    width: 92px;
+    min-height: 92px;
   }
 
   .prompt-template-library-grid[data-view="list"] .prompt-template-library-content {
     padding: 8px;
   }
-
 }
 
 @media (max-width: 860px) {
@@ -20254,9 +21766,7 @@ html .prompt-template-head > .toolbar-button {
 
 @media (prefers-reduced-motion: reduce) {
   .prompt-template-library-card,
-  .prompt-template-library-preview-button img,
-  .prompt-template-library-content,
-  .prompt-template-library-card-actions {
+  .prompt-template-library-preview-button img {
     transition: none;
   }
 }
@@ -20268,16 +21778,7 @@ html .prompt-template-head > .toolbar-button {
    squircle corners (Chrome 150+), refined radii, and improved visual hierarchy.
    Applied universally across all palettes while preserving per-view accent colors. */
 
-/* Ambient wallpaper layer: fixed radial gradients using semantic tokens
-   so each palette automatically generates its own distinct background */
-html[data-palette] body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background: var(--glass-wallpaper-base, none), var(--bg);
-  pointer-events: none;
-}
+/* 不再铺彩色环境光：玻璃靠自己那层高光和模糊成立，页面上没有光斑。 */
 
 /* 玻璃面层沿用既有外壳模糊；内层只加描边和阴影，避免生成动画多层合成时闪烁。 */
 .studio-panel,
@@ -20591,106 +22092,111 @@ html:not([data-ui-layout="tablet"]):not([data-ui-layout="mobile"]) .topbar {
   font-weight: 700;
 }
 
-/* Light theme adjustments */
-html[data-palette="default"][data-theme="light"] {
-  --glass-wallpaper-base: radial-gradient(ellipse 900px 700px at 22% 18%, color-mix(in srgb, var(--accent) 4%, transparent), transparent 75%),
-    radial-gradient(ellipse 800px 800px at 78% 72%, color-mix(in srgb, var(--info) 3%, transparent), transparent 72%),
-    radial-gradient(ellipse 1000px 600px at 50% 98%, color-mix(in srgb, var(--success) 2%, transparent), transparent 78%);
-
-  --panel: color-mix(in srgb, #ffffff 88%, transparent);
-  --control-bg: color-mix(in srgb, #ffffff 82%, transparent);
-  --input-bg: color-mix(in srgb, #ffffff 84%, transparent);
-  --flyout-bg: color-mix(in srgb, #f8f4ed 94%, transparent);
-}
-
-/* Light theme glass panels use white translucency over the warm paper tone */
-html[data-palette="default"][data-theme="light"] .studio-panel,
-html[data-palette="default"][data-theme="light"] .drawer-panel,
-html[data-palette="default"][data-theme="light"] .config-panel,
-html[data-palette="default"][data-theme="light"] .preview-stage,
-html[data-palette="default"][data-theme="light"] .nav-flyout,
-html[data-palette="default"][data-theme="light"] .mega-menu {
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--text) 6%, transparent) inset,
-    0 1px 0 rgba(255, 255, 255, 0.86) inset,
-    0 18px 54px rgba(43, 51, 62, 0.14);
-}
-
-/* 黑曜 · 液态毛玻璃
-   面板 = 环境光被 30px 模糊 + 155% 饱和糊开，再覆一层自左上向右下的白色高光；
-   边框只留 1px 近乎透明的白，靠 inset 高光勾出玻璃的厚度与边缘。
-   卡片不描边：3.5% 白的面层 + 一枚内高光就够浮起来。
-   记录/资产类面板（.asset-workspace）密度优先，不参与玻璃化。 */
-html[data-palette="obsidian"] .studio-panel:not(.asset-workspace),
-html[data-palette="obsidian"] .drawer-panel,
-html[data-palette="obsidian"] .config-panel,
-html[data-palette="obsidian"] .lightbox-dialog,
-html[data-palette="obsidian"] .nav-flyout,
-html[data-palette="obsidian"] .mega-menu,
-html[data-palette="obsidian"] .live-panel,
-html[data-palette="obsidian"] .settings-panel {
+/* ===========================================================================
+   液态毛玻璃：材质参数全部来自配色 token
+   ---------------------------------------------------------------------------
+   模糊半径、饱和度、高光强度、内描边、圆角、玻璃实度、阴影都由
+   --glass-* 提供，所以每套配色的「材质」不同（瓷是薄胎硬边，漆是高光厚面，
+   土壁几乎不反光，月白是最薄的一层）。页面上不铺任何彩色光斑。
+   ========================================================================== */
+html[data-theme="dark"] .studio-panel:not(.asset-workspace),
+html[data-theme="dark"] .drawer-panel,
+html[data-theme="dark"] .config-panel,
+html[data-theme="dark"] .lightbox-dialog,
+html[data-theme="dark"] .nav-flyout,
+html[data-theme="dark"] .mega-menu,
+html[data-theme="dark"] .live-panel,
+html[data-theme="dark"] .settings-panel {
   background:
     linear-gradient(157deg,
-      color-mix(in srgb, #ffffff 8%, transparent) 0%,
-      color-mix(in srgb, #ffffff 1%, transparent) 32%,
-      color-mix(in srgb, #ffffff 4.5%, transparent) 100%),
+      var(--glass-sheen-top) 0%,
+      var(--glass-sheen-mid) 34%,
+      var(--glass-sheen-bottom) 100%),
     var(--panel);
-  border-color: color-mix(in srgb, #ffffff 9%, transparent);
-  backdrop-filter: blur(32px) saturate(180%);
-  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  border-color: var(--border);
+  border-radius: var(--glass-radius-panel);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
   box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, #ffffff 6%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #ffffff 22%, transparent),
-    inset 0 -1px 0 color-mix(in srgb, #ffffff 5%, transparent),
-    0 30px 70px color-mix(in srgb, #000000 60%, transparent),
-    0 2px 8px color-mix(in srgb, #000000 38%, transparent);
+    inset 0 0 0 1px var(--glass-ring),
+    inset 0 1px 0 var(--glass-edge),
+    0 30px 70px var(--glass-shadow),
+    0 2px 8px var(--glass-shadow-near);
 }
 
-html[data-palette="obsidian"] .topbar {
-  background: color-mix(in srgb, #0a0c12 72%, transparent);
-  border-color: color-mix(in srgb, #ffffff 7%, transparent);
-  backdrop-filter: blur(32px) saturate(150%);
-  -webkit-backdrop-filter: blur(32px) saturate(150%);
+html[data-theme="light"] .studio-panel:not(.asset-workspace),
+html[data-theme="light"] .drawer-panel,
+html[data-theme="light"] .config-panel,
+html[data-theme="light"] .lightbox-dialog,
+html[data-theme="light"] .nav-flyout,
+html[data-theme="light"] .mega-menu,
+html[data-theme="light"] .live-panel,
+html[data-theme="light"] .settings-panel {
+  background:
+    linear-gradient(157deg,
+      var(--glass-sheen-top) 0%,
+      var(--glass-sheen-mid) 34%,
+      var(--glass-sheen-bottom) 100%),
+    var(--panel);
+  border-color: var(--border);
+  border-radius: var(--glass-radius-panel);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
   box-shadow:
-    inset 0 -1px 0 color-mix(in srgb, #ffffff 6%, transparent),
-    0 12px 40px color-mix(in srgb, #000000 55%, transparent);
+    inset 0 0 0 1px var(--glass-ring),
+    inset 0 1px 0 var(--glass-edge),
+    0 18px 44px var(--glass-shadow),
+    0 2px 8px var(--glass-shadow-near);
 }
 
-html[data-palette="obsidian"] .creation-card,
-html[data-palette="obsidian"] .config-card,
-html[data-palette="obsidian"] .creation-record-card,
-html[data-palette="obsidian"] .article-card,
-html[data-palette="obsidian"] .prompt-template-library-card {
-  background: color-mix(in srgb, #ffffff 3.5%, transparent);
-  border-color: color-mix(in srgb, #ffffff 6%, transparent);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #ffffff 7%, transparent);
+html[data-theme="dark"] .topbar,
+html[data-theme="light"] .topbar {
+  background: var(--topbar-bg);
+  border-color: var(--border);
+  border-radius: 0;
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  box-shadow:
+    inset 0 -1px 0 var(--glass-ring),
+    0 12px 40px var(--glass-shadow);
 }
 
-/* 系统要求减弱透明时退回实色，模糊与高光一并收掉。 */
+html[data-theme="dark"] .creation-card,
+html[data-theme="dark"] .config-card,
+html[data-theme="dark"] .creation-record-card,
+html[data-theme="dark"] .article-card,
+html[data-theme="dark"] .prompt-template-library-card,
+html[data-theme="light"] .creation-card,
+html[data-theme="light"] .config-card,
+html[data-theme="light"] .creation-record-card,
+html[data-theme="light"] .article-card,
+html[data-theme="light"] .prompt-template-library-card {
+  background: var(--glass-card);
+  border-color: var(--border);
+  border-radius: var(--glass-radius-card);
+  box-shadow: inset 0 1px 0 var(--glass-ring);
+}
+
 @media (prefers-reduced-transparency: reduce) {
-  html[data-palette="obsidian"] .studio-panel:not(.asset-workspace),
-  html[data-palette="obsidian"] .drawer-panel,
-  html[data-palette="obsidian"] .config-panel,
-  html[data-palette="obsidian"] .lightbox-dialog,
-  html[data-palette="obsidian"] .nav-flyout,
-  html[data-palette="obsidian"] .mega-menu,
-  html[data-palette="obsidian"] .live-panel,
-  html[data-palette="obsidian"] .settings-panel {
-    background: #101218;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
-
-  html[data-palette="obsidian"] .creation-card,
-  html[data-palette="obsidian"] .config-card,
-  html[data-palette="obsidian"] .creation-record-card,
-  html[data-palette="obsidian"] .article-card,
-  html[data-palette="obsidian"] .prompt-template-library-card {
-    background: #14161d;
-  }
-
-  html[data-palette="obsidian"] .topbar {
-    background: #0d0f15;
+  html[data-theme="dark"] .studio-panel:not(.asset-workspace),
+html[data-theme="dark"] .drawer-panel,
+html[data-theme="dark"] .config-panel,
+html[data-theme="dark"] .lightbox-dialog,
+html[data-theme="dark"] .nav-flyout,
+html[data-theme="dark"] .mega-menu,
+html[data-theme="dark"] .live-panel,
+html[data-theme="dark"] .settings-panel,
+  html[data-theme="light"] .studio-panel:not(.asset-workspace),
+html[data-theme="light"] .drawer-panel,
+html[data-theme="light"] .config-panel,
+html[data-theme="light"] .lightbox-dialog,
+html[data-theme="light"] .nav-flyout,
+html[data-theme="light"] .mega-menu,
+html[data-theme="light"] .live-panel,
+html[data-theme="light"] .settings-panel,
+  html[data-theme="dark"] .topbar,
+  html[data-theme="light"] .topbar {
+    background: var(--panel-strong);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }

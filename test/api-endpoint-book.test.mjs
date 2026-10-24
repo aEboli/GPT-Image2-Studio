@@ -687,6 +687,48 @@ test("clicking outside closes an open list", () => {
   assert.equal(refs.routeApiBookList.hidden, true);
 });
 
+test("deleting a saved API keeps the list open for the next delete", () => {
+  const { documentRef, refs, storage } = createPickerHarness([OPENAI, RELAY, GROK]);
+  // 真实浏览器里清单在文档树内，删除按钮的点击会冒泡到 document。挂进 document 才能复现
+  // 「重绘后点击目标已离开文档、于是被当成外部点击收起」的场景。
+  documentRef.appendChild(refs.routeApiBookList);
+
+  clickOn(refs.routeApiBookToggle);
+  assert.equal(refs.routeApiBookList.hidden, false);
+
+  clickOn(optionRows(refs.routeApiBookList)[0][1]);
+  // 删一条之后清单还在，剩下两条和展开按钮都保持可用，才能接着删。
+  assert.equal(refs.routeApiBookList.hidden, false);
+  assert.equal(refs.routeApiBookToggle.hidden, false);
+  assert.equal(refs.routeApiBookToggle.getAttribute("aria-expanded"), "true");
+  assert.equal(refs.routeApiBookList.children.length, 2);
+  assert.deepEqual(readApiEndpointBook(storage).map((entry) => entry.baseUrl), [RELAY.baseUrl, GROK.baseUrl]);
+
+  clickOn(optionRows(refs.routeApiBookList)[0][1]);
+  assert.equal(refs.routeApiBookList.hidden, false);
+  assert.equal(refs.routeApiBookList.children.length, 1);
+
+  // 删到空才收起，并藏掉展开按钮。
+  clickOn(optionRows(refs.routeApiBookList)[0][1]);
+  assert.equal(refs.routeApiBookList.hidden, true);
+  assert.equal(refs.routeApiBookToggle.hidden, true);
+  assert.equal(refs.routeApiBookToggle.getAttribute("aria-expanded"), "false");
+  assert.deepEqual(readApiEndpointBook(storage), []);
+});
+
+test("deleting a saved API still lets an outside click close the list", () => {
+  const { documentRef, refs } = createPickerHarness([OPENAI, RELAY]);
+  documentRef.appendChild(refs.routeApiBookList);
+
+  clickOn(refs.routeApiBookToggle);
+  clickOn(optionRows(refs.routeApiBookList)[0][1]);
+  assert.equal(refs.routeApiBookList.hidden, false);
+
+  // 删除时挡掉的只是那一次点击，之后的外部点击照常收起。
+  documentRef.dispatchEvent({ type: "click", target: createFakeElement("div", documentRef) });
+  assert.equal(refs.routeApiBookList.hidden, true);
+});
+
 test("remember() feeds the book from a saved config and skips incomplete channels", () => {
   const { controller, refs, storage } = createPickerHarness();
 

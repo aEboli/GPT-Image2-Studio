@@ -23,6 +23,9 @@ export const GENERATION_LOADING_SAVING_FAMILY = "saving";
 export const GENERATION_LOADING_FAILED_FAMILY = "failed";
 export const GENERATION_LOADING_DEFAULT_FAMILY = GENERATION_LOADING_GENERATING_FAMILY;
 
+/* 七彩转色的周期，必须与 styles.css 的 generation-loading-rainbow-color 一致。 */
+export const GENERATION_LOADING_RAINBOW_PERIOD_MS = 60000;
+
 /* 真实请求阶段到色相族的映射：色相表达当前在做什么，深浅另由百分比决定。
    取值与 lib/preview-placeholder-state.mjs 的 statusStage 保持一致。 */
 export const GENERATION_LOADING_STAGE_FAMILIES = {
@@ -157,8 +160,8 @@ function renderGenerationLoadingProgress(nodes, value = nodes?.progress) {
   nodes.shell.dataset.generationLoadingStage = String(nodes.stage || "");
   nodes.shell.dataset.generationLoadingFamily = nodes.family;
   nodes.shell.setAttribute("aria-valuenow", String(progress));
+  /* 只写进度本身：色深不做逐帧插值，避免整块模糊背景在每次 tick 后连续重绘。 */
   nodes.shell.style?.setProperty?.("--generation-loading-progress", `${progress}%`);
-  nodes.shell.style?.setProperty?.("--generation-loading-rise-duration", `${getGenerationLoadingInterval(progress)}ms`);
   nodes.percent.textContent = waiting ? "" : `${progress}%`;
   nodes.percent.setAttribute("aria-valuenow", String(progress));
 }
@@ -338,6 +341,12 @@ export function createGenerationLoadingShell(
   shell.dataset.generationLoadingMode = normalizeLoadingMode(mode);
   shell.dataset.generationLoadingStage = String(stage || "");
   shell.dataset.generationLoadingFamily = getGenerationLoadingStageFamily(stage, mode);
+
+  /* 相位取墙钟而不是 0：列表重排把占位重建一遍时，颜色接着当前这一秒走，不会跳回起点。 */
+  shell.style?.setProperty?.(
+    "--generation-loading-rainbow-phase",
+    `-${((Date.now() % GENERATION_LOADING_RAINBOW_PERIOD_MS) / 1000).toFixed(2)}s`,
+  );
 
   /* 心跳图标与百分比同属中间文字层，压在满幅模糊背景之上；
      它只在显示日志行的宿主里出现——小占位放不下，硬塞会挤压百分比。 */

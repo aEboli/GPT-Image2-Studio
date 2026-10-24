@@ -174,16 +174,18 @@ function getPromptAgentSubjectLabel(subject) {
   const normalizedType = type
     .replace(/^(?:一位|一名|一个|一只|一辆|一组|一对)\s*/u, "")
     .replace(/(?:主体|人像|照片|图像|摄影作品|摄影)$/u, "");
-  const humanLabel = findDisplayNameSignal(type, HUMAN_SUBJECT_SIGNALS);
+  // 标题只需要主体本身：类型里常见的“，二次元插画风格”“；群像”等补充说明不进入名称。
+  const conciseType = normalizeDisplayNamePart(normalizedType.split(/[，,。；;|/]/u)[0]);
+  const humanLabel = findDisplayNameSignal(conciseType, HUMAN_SUBJECT_SIGNALS);
   if (humanLabel) {
     const specificHumanType = normalizeDisplayNamePart(
-      normalizedType
-        .slice(normalizedType.lastIndexOf("的") + 1)
+      conciseType
+        .slice(conciseType.lastIndexOf("的") + 1)
         .replace(/(?:人物|角色|形象|人像)$/u, ""),
     );
     return truncateDisplayName(specificHumanType || humanLabel, 18);
   }
-  return truncateDisplayName(normalizedType, 18);
+  return truncateDisplayName(conciseType, 18);
 }
 
 function getPromptAgentSubjectAction(subject, subjectSource) {
@@ -206,6 +208,23 @@ function getPromptAgentSubjectAction(subject, subjectSource) {
   const verb = /^(?:拿着|握住|握持)$/u.test(propMatch[1]) ? "手持" : propMatch[1].replace(/着$/u, "");
   const object = normalizeDisplayNamePart(propMatch[2].replace(/(?:并|同时|且).*/u, ""));
   return truncateDisplayName(`${verb}${object}`, 12);
+}
+
+const VISUAL_STYLE_PREFIX_PATTERN = /^风格锁定\s*[:：]\s*/u;
+
+function getPromptAgentVisualAnchor(visualSource) {
+  // 主体和场景都提不出名称时，用“风格锁定：”后第一个媒介/审美短语兜底，
+  // 让标题仍然是画面里真实存在的锚点，而不是只剩“柔光”“暖光”这类氛围词。
+  const text = normalizeDisplayNamePart(visualSource);
+  if (!VISUAL_STYLE_PREFIX_PATTERN.test(text)) {
+    return "";
+  }
+  const firstClause = text
+    .replace(VISUAL_STYLE_PREFIX_PATTERN, "")
+    .split(/[，,；;。]/u)
+    .map((item) => normalizeDisplayNamePart(item))
+    .find(Boolean);
+  return firstClause ? truncateDisplayName(firstClause, 16) : "";
 }
 
 function getPromptAgentAtmosphereName(subjectSource, sceneSource, visualSource) {
@@ -344,8 +363,14 @@ export function getStructuredImagePromptDisplayName(json) {
   );
   const sceneName = sceneParts.join("");
   const atmosphereName = getPromptAgentAtmosphereName(subjectSource, sceneSource, visualSource);
+  const visualAnchor = subjectName.length === 0 && !sceneName ? getPromptAgentVisualAnchor(visualSource) : "";
+  const leadSegments = [subjectName.join(""), sceneName, visualAnchor].filter(Boolean);
+  if (leadSegments.length === 0) {
+    // 只有氛围词（“柔光”“暖光”）不构成标题，交给文件名兜底。
+    return "";
+  }
 
-  return truncateDisplayName([subjectName.join(""), sceneName, atmosphereName].filter(Boolean).join("·"));
+  return truncateDisplayName([...leadSegments, atmosphereName].filter(Boolean).join("·"));
 }
 
 export function getPromptAgentDisplayName(item) {

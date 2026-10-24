@@ -15,7 +15,7 @@
         const themeKey = "image-studio-ui-theme-v1";
         const paletteKey = "image-studio-ui-palette-v1";
         const languageKey = "image-studio-ui-language-v1";
-        const paletteIds = new Set(["obsidian", "default", "qinghua", "jiangnan", "songci", "gugong", "lacquer", "dunhuang"]);
+        const paletteIds = new Set(["obsidian","default","qinghua","jiangnan","songci","gugong","lacquer","dunhuang","songshi","meigui","yuebai","liujin"]);
         const readStored = (key) => {
           try {
             return window.localStorage.getItem(key);
@@ -105,7 +105,7 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="./styles.css?v=20261022-obsidian-1" />
+    <link rel="stylesheet" href="./styles.css?v=20261024-studio-bottom-align-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -121,7 +121,7 @@
         <span class="topbar-reveal-icon" aria-hidden="true"></span>
       </button>
       <header class="topbar" id="globalTopbar">
-        <small class="app-version" aria-label="当前版本 v0.2.073">v0.2.073</small>
+        <small class="app-version" aria-label="当前版本 v0.2.074">v0.2.074</small>
         <div class="brand-cluster">
           <div class="brand-mark" aria-hidden="true">
             <span class="brand-mark-core"></span>
@@ -488,14 +488,7 @@
 
             <section class="studio-panel preview-panel">
               <div class="preview-stage">
-                <div class="prompt-preview-surface">
-                  <div class="preview-meta">
-                    <span class="model-badge" id="previewModel">GPT Image 2.0</span>
-                    <span id="previewTime">等待生成</span>
-                    <span id="previewId">ID: --</span>
-                    <span id="previewSize">--</span>
-                  </div>
-
+                <div class="prompt-preview-surface preview-surface">
                   <div class="preview-canvas" id="previewCanvas">
                     <div class="preview-placeholder" id="previewPlaceholder">
                       <h3 data-ui-i18n="previewIdleTitle">生成结果会在这里实时更新。</h3>
@@ -506,11 +499,20 @@
                 </div>
 
                 <div class="preview-toolbar">
-                  <div class="zoom-controls">
-                    <button class="toolbar-button" id="zoomOutButton" type="button">-</button>
-                    <span class="zoom-label" id="zoomLabel">100%</span>
-                    <button class="toolbar-button" id="zoomInButton" type="button">+</button>
-                    <button class="toolbar-button" id="zoomResetButton" type="button" data-ui-i18n="fit">适配</button>
+                  <div class="preview-toolbar-info">
+                    <div class="preview-meta">
+                      <span class="model-badge" id="previewModel">GPT Image 2.0</span>
+                      <span id="previewTime">等待生成</span>
+                      <span id="previewId">ID: --</span>
+                      <span id="previewSize">--</span>
+                    </div>
+
+                    <div class="zoom-controls">
+                      <button class="toolbar-button" id="zoomOutButton" type="button">-</button>
+                      <span class="zoom-label" id="zoomLabel">100%</span>
+                      <button class="toolbar-button" id="zoomInButton" type="button">+</button>
+                      <button class="toolbar-button" id="zoomResetButton" type="button" data-ui-i18n="fit">适配</button>
+                    </div>
                   </div>
 
                   <div class="preview-actions">
@@ -767,23 +769,27 @@
 
             <section class="studio-panel preview-panel image-decomposition-preview-panel">
               <div class="preview-stage image-decomposition-generation" id="imageDecompositionGenerationPanel">
-                <div class="preview-meta image-decomposition-preview-meta">
-                  <span class="model-badge">GPT Image 2.0</span>
-                  <span id="imageDecompositionGenerationMeta">等待生成</span>
-                </div>
-
-                <div class="preview-canvas image-decomposition-generation-canvas" id="imageDecompositionGenerationCanvas">
-                  <div class="image-decomposition-generation-placeholder preview-placeholder" id="imageDecompositionGenerationPlaceholder">
-                    <h3>拆解信息图会显示在这里</h3>
-                    <span>上传一张源图后开始生成，底部胶片条可快速切换结果。</span>
+                <div class="preview-surface">
+                  <div class="preview-canvas image-decomposition-generation-canvas" id="imageDecompositionGenerationCanvas">
+                    <div class="image-decomposition-generation-placeholder preview-placeholder" id="imageDecompositionGenerationPlaceholder">
+                      <h3>拆解信息图会显示在这里</h3>
+                      <span>上传一张源图后开始生成，底部胶片条可快速切换结果。</span>
+                    </div>
+                    <img id="imageDecompositionGenerationImage" alt="图片拆解生成结果" />
                   </div>
-                  <img id="imageDecompositionGenerationImage" alt="图片拆解生成结果" />
                 </div>
 
                 <div class="preview-toolbar image-decomposition-preview-toolbar">
-                  <div class="zoom-controls image-decomposition-preview-status" aria-live="polite">
-                    <span class="zoom-label">100%</span>
-                    <span>适配</span>
+                  <div class="preview-toolbar-info">
+                    <div class="preview-meta image-decomposition-preview-meta">
+                      <span class="model-badge">GPT Image 2.0</span>
+                      <span id="imageDecompositionGenerationMeta">等待生成</span>
+                    </div>
+
+                    <div class="zoom-controls image-decomposition-preview-status" aria-live="polite">
+                      <span class="zoom-label">100%</span>
+                      <span>适配</span>
+                    </div>
                   </div>
 
                   <div class="preview-actions">
@@ -914,22 +920,26 @@
 
             <section class="studio-panel preview-panel image-edit-preview-panel">
               <div class="preview-stage image-edit-generation" id="imageEditGenerationPanel">
-                <div class="preview-meta image-edit-preview-meta">
-                  <span class="model-badge">Image Edit</span>
-                  <span id="imageEditGenerationMeta">等待生成</span>
-                </div>
-
-                <div class="preview-canvas image-edit-generation-canvas" id="imageEditGenerationCanvas">
-                  <div class="image-edit-generation-placeholder preview-placeholder" id="imageEditGenerationPlaceholder">
-                    <h3>编辑结果会显示在这里</h3>
-                    <span>上传源图并填写编辑指令后开始生成</span>
+                <div class="preview-surface">
+                  <div class="preview-canvas image-edit-generation-canvas" id="imageEditGenerationCanvas">
+                    <div class="image-edit-generation-placeholder preview-placeholder" id="imageEditGenerationPlaceholder">
+                      <h3>编辑结果会显示在这里</h3>
+                      <span>上传源图并填写编辑指令后开始生成</span>
+                    </div>
+                    <img id="imageEditGenerationImage" alt="图片编辑生成结果" />
                   </div>
-                  <img id="imageEditGenerationImage" alt="图片编辑生成结果" />
                 </div>
 
                 <div class="preview-toolbar image-edit-preview-toolbar">
-                  <div class="zoom-controls image-edit-preview-status" aria-live="polite">
-                    <span id="imageEditPreviewStatus">等待任务</span>
+                  <div class="preview-toolbar-info">
+                    <div class="preview-meta image-edit-preview-meta">
+                      <span class="model-badge">Image Edit</span>
+                      <span id="imageEditGenerationMeta">等待生成</span>
+                    </div>
+
+                    <div class="zoom-controls image-edit-preview-status" aria-live="polite">
+                      <span id="imageEditPreviewStatus">等待任务</span>
+                    </div>
                   </div>
 
                   <div class="preview-actions">
@@ -1089,22 +1099,26 @@
 
             <section class="studio-panel preview-panel quick-blend-preview-panel">
               <div class="preview-stage quick-blend-generation" id="quickBlendGenerationPanel">
-                <div class="preview-meta quick-blend-preview-meta">
-                  <span class="model-badge">Quick Blend</span>
-                  <span id="quickBlendGenerationMeta">等待生成</span>
-                </div>
-
-                <div class="preview-canvas quick-blend-generation-canvas" id="quickBlendGenerationCanvas">
-                  <div class="quick-blend-generation-empty preview-placeholder" id="quickBlendGenerationEmpty">
-                    <h3>快速溶图结果会显示在这里</h3>
-                    <span>A/B 配对提交后，最新生成图会显示在画布中。</span>
+                <div class="preview-surface">
+                  <div class="preview-canvas quick-blend-generation-canvas" id="quickBlendGenerationCanvas">
+                    <div class="quick-blend-generation-empty preview-placeholder" id="quickBlendGenerationEmpty">
+                      <h3>快速溶图结果会显示在这里</h3>
+                      <span>A/B 配对提交后，最新生成图会显示在画布中。</span>
+                    </div>
+                    <img id="quickBlendGenerationImage" alt="快速溶图生成结果" />
                   </div>
-                  <img id="quickBlendGenerationImage" alt="快速溶图生成结果" />
                 </div>
 
                 <div class="preview-toolbar quick-blend-preview-toolbar">
-                  <div class="zoom-controls quick-blend-preview-status" aria-live="polite">
-                    <span id="quickBlendPreviewStatus">等待任务</span>
+                  <div class="preview-toolbar-info">
+                    <div class="preview-meta quick-blend-preview-meta">
+                      <span class="model-badge">Quick Blend</span>
+                      <span id="quickBlendGenerationMeta">等待生成</span>
+                    </div>
+
+                    <div class="zoom-controls quick-blend-preview-status" aria-live="polite">
+                      <span id="quickBlendPreviewStatus">等待任务</span>
+                    </div>
                   </div>
 
                   <div class="preview-actions">
@@ -3441,7 +3455,23 @@
                     <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
                     <span data-ui-i18n="paletteDunhuang">敦煌</span>
                   </button>
-              </div>
+                  <button class="palette-option" type="button" data-ui-palette-option="songshi" role="radio" aria-checked="false">
+                    <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <span data-ui-i18n="paletteSongshi">松石</span>
+                  </button>
+                  <button class="palette-option" type="button" data-ui-palette-option="meigui" role="radio" aria-checked="false">
+                    <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <span data-ui-i18n="paletteMeigui">玫瑰</span>
+                  </button>
+                  <button class="palette-option" type="button" data-ui-palette-option="yuebai" role="radio" aria-checked="false">
+                    <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <span data-ui-i18n="paletteYuebai">月白</span>
+                  </button>
+                  <button class="palette-option" type="button" data-ui-palette-option="liujin" role="radio" aria-checked="false">
+                    <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <span data-ui-i18n="paletteLiujin">流金</span>
+                  </button>
+                </div>
             </section>
               </div>
             </section>
@@ -3521,34 +3551,39 @@
         <div class="prompt-template-head">
           <div>
             <h2>提示词模板库</h2>
+            <p class="prompt-template-subtitle">520 组图片与提示词逐条配对，按场景、风格和主体筛选。</p>
           </div>
           <button class="toolbar-button" id="closePromptTemplateButton" type="button">关闭</button>
         </div>
 
         <div class="prompt-template-toolbar" role="toolbar" aria-label="模板库筛选与视图">
           <label class="prompt-template-search">
-            <input id="promptTemplateLibrarySearch" type="search" aria-label="搜索模板" placeholder="搜索模板名称或提示词" autocomplete="off" />
+            <input id="promptTemplateLibrarySearch" type="search" aria-label="搜索模板" placeholder="搜索标题、分类、提示词或作者" autocomplete="off" />
+          </label>
+          <label class="prompt-template-select-control">
+            <span>排序</span>
+            <select id="promptTemplateLibrarySort" aria-label="模板排序">
+              <option value="featured">推荐优先</option>
+              <option value="latest">最新发布</option>
+              <option value="name">名称排序</option>
+            </select>
           </label>
           <div class="prompt-template-view-switch" role="tablist" aria-label="模板显示方式">
             <button class="prompt-template-view-button active" type="button" role="tab" aria-selected="true" data-prompt-template-view="list">列表</button>
             <button class="prompt-template-view-button" type="button" role="tab" aria-selected="false" data-prompt-template-view="image">图片</button>
           </div>
-          <label class="prompt-template-font-control">
-            <span>列表字号</span>
-            <input id="promptTemplateLibraryFontSize" type="range" min="12" max="20" step="1" value="15" />
-            <output id="promptTemplateLibraryFontValue">15px</output>
-          </label>
+<button class="prompt-template-reset" id="promptTemplateLibraryReset" type="button">重置</button>
         </div>
 
         <div class="prompt-template-body">
           <aside class="prompt-template-sidebar" aria-label="模板分类">
             <div class="prompt-template-sidebar-head">
-              <span>一级分类</span>
-              <small>二级分类</small>
+              <span>浏览维度</span>
+              <small>细分筛选</small>
             </div>
             <nav class="prompt-template-library-nav" id="promptTemplateLibraryNav" aria-label="一级分类"></nav>
             <div class="prompt-template-library-subnav-wrap">
-              <div class="prompt-template-sidebar-head"><span>当前分类</span></div>
+              <div class="prompt-template-sidebar-head"><span>当前范围</span></div>
               <nav class="prompt-template-library-subnav" id="promptTemplateLibrarySubnav" aria-label="二级分类"></nav>
             </div>
             <p class="prompt-template-library-meta" id="promptTemplateLibraryMeta"></p>
@@ -3557,17 +3592,17 @@
           <section class="prompt-template-library-area" aria-label="模板目录">
             <div class="prompt-template-library-head">
               <div>
-                <h3 id="promptTemplateLibraryTitle">使用场景</h3>
+                <h3 id="promptTemplateLibraryTitle">全部模板</h3>
               </div>
-              <span class="prompt-template-library-count" id="promptTemplateLibraryCount">41 条可用模板</span>
+              <span class="prompt-template-library-count" id="promptTemplateLibraryCount">520 组配对模板</span>
             </div>
             <div class="prompt-template-library-grid" id="promptTemplateLibraryGrid" data-view="list"></div>
           </section>
 
-          <aside class="prompt-template-personal" aria-label="我的模板">
+          <aside class="prompt-template-personal" id="promptTemplatePersonal" aria-label="我的模板">
             <div class="prompt-template-personal-head">
               <div>
-                <h3>我的模板</h3>
+                <h3 id="promptTemplatePersonalTitle">我的模板</h3>
               </div>
               <button class="mini-action" id="newPromptTemplateButton" type="button">新建</button>
             </div>
@@ -3635,6 +3670,6 @@
 
     <div class="app-tooltip" id="appTooltip" role="tooltip" popover="manual"></div>
 
-    <script type="module" src="./app.js?v=20261022-obsidian-1"></script>
+    <script type="module" src="./app.js?v=20261024-studio-bottom-align-1"></script>
   </body>
 </html>

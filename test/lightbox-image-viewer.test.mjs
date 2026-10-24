@@ -63,15 +63,15 @@ function createButton() {
   };
 }
 
-function createViewerHarness({ shellWidth = 600, shellHeight = 400 } = {}) {
+function createViewerHarness({ shellWidth = 600, shellHeight = 400, naturalWidth = 1800, naturalHeight = 1200 } = {}) {
   const imageStyle = createStyleDeclaration();
   const refs = {
     lightbox: { classList: createClassList() },
     lightboxActualSizeButton: createButton(),
     lightboxFitButton: createButton(),
     lightboxImage: createEventTarget({
-      naturalWidth: 1800,
-      naturalHeight: 1200,
+      naturalWidth,
+      naturalHeight,
       style: imageStyle,
     }),
     lightboxImageShell: createEventTarget({
@@ -113,6 +113,36 @@ test("lightbox fitted mode can scale below the interactive minimum on narrow vie
   assert.equal(imageStyle.getPropertyValue("--lightbox-scale"), "0.1667");
   assert.equal(imageStyle.transform, "translate(-50%, -50%) translate3d(0px, 0px, 0) scale(0.1667)");
   assert.equal(refs.lightboxZoomOutButton.disabled, true);
+});
+
+test("lightbox fitted mode upscales small images until one side touches the stage edge", () => {
+  const { controller, imageStyle, refs, state } = createViewerHarness({
+    naturalWidth: 300,
+    naturalHeight: 200,
+  });
+
+  controller.syncMetrics();
+
+  assert.equal(state.lightboxViewer.mode, "view");
+  assert.equal(state.lightboxViewer.fitScale, 2);
+  assert.equal(imageStyle.width, "300px");
+  assert.equal(imageStyle.height, "200px");
+  assert.equal(imageStyle.getPropertyValue("--lightbox-scale"), "2");
+  assert.equal(imageStyle.transform, "translate(-50%, -50%) translate3d(0px, 0px, 0) scale(2)");
+  assert.equal(refs.lightboxZoomLabel.textContent, "200%");
+  assert.equal(refs.lightboxViewerControls.classList.contains("hidden"), false);
+});
+
+test("lightbox fitted mode keeps the interactive maximum scale as its ceiling", () => {
+  const { controller, imageStyle, state } = createViewerHarness({
+    naturalWidth: 10,
+    naturalHeight: 10,
+  });
+
+  controller.syncMetrics();
+
+  assert.equal(state.lightboxViewer.fitScale, 8);
+  assert.equal(imageStyle.getPropertyValue("--lightbox-scale"), "8");
 });
 
 test("lightbox viewer starts fitted with visible controls until the user inspects the image", () => {

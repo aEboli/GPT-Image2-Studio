@@ -56,7 +56,10 @@ function calculateFitScale(viewer, bounds) {
   if (!viewer.naturalWidth || !viewer.naturalHeight || !bounds.width || !bounds.height) {
     return 1;
   }
-  return Math.min(1, bounds.width / viewer.naturalWidth, bounds.height / viewer.naturalHeight);
+  // 等比铺满：显示尺寸只看容器，不看原图分辨率。小图也要放大到一边贴住容器边界，
+  // 不能停在 100%；上限与交互缩放共用 MAX_SCALE，避免极小图放大到失控。
+  const containScale = Math.min(bounds.width / viewer.naturalWidth, bounds.height / viewer.naturalHeight);
+  return Math.min(LIGHTBOX_VIEWER_MAX_SCALE, containScale);
 }
 
 function canPan(viewer, bounds) {

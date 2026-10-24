@@ -112,9 +112,9 @@ import { normalizeCreationModuleEnabled, resolveCreationPlanCounts } from "/lib/
 import { buildCreationQueuedRepairFormData, buildCreationQueuedSet as buildCreationQueuedSetFromState, createCreationQueueJob, getActiveCreationQueueJob as getActiveCreationQueueJobFromState, getCreationQueueJobs as getCreationQueueJobsFromState, getCreationRepairTargetSet as getCreationRepairTargetSetFromState, getPendingCreationQueueCount as getPendingCreationQueueCountFromState, getSelectedCreationQueueJob as getSelectedCreationQueueJobFromState, renderCreationQueueStrip as renderCreationQueueStripView, runCreationQueuedJob as runCreationQueuedJobFromQueue, scheduleCreationGenerationQueue as scheduleCreationGenerationQueueFromState, selectCreationQueueJob as selectCreationQueueJobInState, shouldSyncCreationQueueJobCurrentSet, syncActiveCreationQueueSet as syncActiveCreationQueueSetInState } from "/lib/creation-suite-queue.mjs?v=20261020-queue-label-product-1";
 import { DEFAULT_PORTRAIT_ACCESSORY_ASSETS, PORTRAIT_ACCESSORY_ASSET_CATEGORIES, getPortraitAccessoryAssetFileDescriptor } from "/lib/portrait-accessory-assets.mjs?v=20260528-portrait-assets-sort-1";
 import { createDefaultPortraitLocationState, createPortraitLocationSelectorController } from "/lib/portrait-location-selector.mjs?v=20260527-portrait-location-1";
-import { getLegacyPromptAgentTemplatePrompt, getPromptAgentDisplayName, getPromptAgentTemplateDisplayName, isStructuredImagePromptJson } from "/lib/prompt-agent-display-name.mjs?v=20260819-prompt-history-mode-1";
+import { getLegacyPromptAgentTemplatePrompt, getPromptAgentDisplayName, getPromptAgentTemplateDisplayName, isStructuredImagePromptJson } from "/lib/prompt-agent-display-name.mjs?v=20261024-prompt-name-anchor-1";
 import { mergePromptAgentHistoryTemplates } from "/lib/prompt-agent-template-sync.mjs?v=20260819-history-template-mode-1";
-import { flattenPromptTemplateLibrary, getPromptTemplateLibraryCategory, getPromptTemplateLibraryCounts, getPromptTemplateLibrarySubcategory, getPromptTemplatePreviewUrl, PROMPT_TEMPLATE_LIBRARY } from "/lib/prompt-template-library.mjs?v=20260925-prompt-library-ui-2";
+import { flattenPromptTemplateLibrary, getPromptTemplateLibraryCategory, getPromptTemplateLibraryCategoryCount, getPromptTemplateLibraryChildCount, getPromptTemplateLibraryCounts, getPromptTemplateLibrarySubcategory, getPromptTemplatePreviewUrl, PROMPT_TEMPLATE_LIBRARY, PROMPT_TEMPLATE_SORT_OPTIONS, sortPromptTemplateLibraryTemplates } from "/lib/prompt-template-library.mjs?v=20261024-prompt-library-json-lines-1";
 import { DEFAULT_GENERATION_CONCURRENCY, DEFAULT_GENERATION_START_DELAY_MS, MAX_PROMPT_PARALLEL_TASKS, MAX_PROMPT_QUEUE_SIZE } from "/lib/studio-constants.mjs?v=20260829-generation-schedule-1";
 import { GENERATION_START_DELAY_FIELD, normalizeGenerationStartDelayMs } from "/lib/generation-start-delay.mjs?v=20260829-generation-schedule-1";
 import { GENERATION_CONCURRENCY_FIELD, normalizeGenerationConcurrency } from "/lib/generation-concurrency.mjs?v=20260829-generation-schedule-1";
@@ -168,10 +168,11 @@ const REASONING_LABELS = {
 };
 const DEFAULT_LIMITS = { maxParallelTasksPerSession: 15, maxReferenceImages: 15, maxCreationReferenceImages: 15, maxPortraitPersonReferenceImages: 3, maxPortraitActionReferenceImages: 3, maxPortraitAccessoryReferenceImages: 9 }; const PROMPT_FILMSTRIP_INITIAL_HISTORY_LIMIT = 10; const PROMPT_FILMSTRIP_MAX_HISTORY_LIMIT = 50; const PROMPT_FILMSTRIP_JOB_LIMIT = MAX_PROMPT_QUEUE_SIZE;
 const CREATION_IMAGE_COUNT_OPTIONS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
-const DEFAULT_PROMPT_ENHANCE_TEXT = "Quality only; original prompt and references take priority. 8K ultra-HD look, clear subject, precise focus, natural edges, style-faithful detail, smooth gradients, clean tonal separation. Reduce unintended blur, aliasing, banding, compression artifacts, oversharpening, repeated details. Preserve subject, identity, count, composition, proportions, text, style, color, lighting, materials, intentional blur/grain/pixel art/minimalism. Add no objects, details or quality labels. Size follows settings."; function buildPromptModePrompt() { const prompt = refs.promptInput.value.trim(); if (!state.promptEnhanceEnabled) { return prompt; } const enhanceText = String(refs.promptEnhanceInput?.value || "").trim(); return enhanceText ? `${prompt}${enhanceText.startsWith(",") ? "" : "\n\n"}${enhanceText}` : prompt; } function syncPromptEnhanceMode() { refs.promptEnhanceToggle.classList.toggle("is-active", state.promptEnhanceEnabled); refs.promptEnhanceToggle.setAttribute("aria-checked", String(state.promptEnhanceEnabled)); refs.promptEnhanceToggle.querySelector("small").textContent = getUiLanguageText(state.promptEnhanceEnabled ? "promptEnhanceOn" : "promptEnhanceOff"); refs.promptEnhanceField.classList.toggle("hidden", !state.promptEnhanceEnabled); } function togglePromptEnhanceMode() { state.promptEnhanceEnabled = !state.promptEnhanceEnabled; syncPromptEnhanceMode(); if (state.promptEnhanceEnabled) { refs.promptEnhanceInput.focus(); } }
+const DEFAULT_PROMPT_ENHANCE_TEXT = "Quality only; original prompt and references take priority. 8K ultra-HD look, clear subject, precise focus, natural edges, style-faithful detail, smooth gradients, clean tonal separation. Reduce unintended blur, aliasing, banding, compression artifacts, oversharpening, repeated details. Preserve subject, identity, count, composition, proportions, text, style, color, lighting, materials, intentional blur/grain/pixel art/minimalism. Add no objects, details or quality labels. Size follows settings."; function buildPromptModePrompt() { const prompt = refs.promptInput.value.trim(); if (!state.promptEnhanceEnabled) { return prompt; } const enhanceText = String(refs.promptEnhanceInput?.value || "").trim(); return enhanceText ? `${prompt}${enhanceText.startsWith(",") ? "" : "\n\n"}${enhanceText}` : prompt; } function syncPromptEnhanceMode() { refs.promptEnhanceToggle.classList.toggle("is-active", state.promptEnhanceEnabled); refs.promptEnhanceToggle.setAttribute("aria-checked", String(state.promptEnhanceEnabled)); refs.promptEnhanceToggle.querySelector("small").textContent = getUiLanguageText(state.promptEnhanceEnabled ? "promptEnhanceOn" : "promptEnhanceOff"); refs.promptEnhanceField.classList.toggle("hidden", !state.promptEnhanceEnabled); scheduleStudioPromptFillSync(); } function togglePromptEnhanceMode() { state.promptEnhanceEnabled = !state.promptEnhanceEnabled; syncPromptEnhanceMode(); if (state.promptEnhanceEnabled) { refs.promptEnhanceInput.focus(); } }
 const PROMPT_TEMPLATE_STORAGE_KEY = "image-studio-prompt-templates-v2";
 const PROMPT_TEMPLATE_DISMISSED_HISTORY_KEY = "image-studio-prompt-template-dismissed-history-v1";
-const PROMPT_TEMPLATE_LIBRARY_ASSET_VERSION = "20260925-prompt-library-assets-1";
+const PROMPT_TEMPLATE_LIBRARY_ASSET_VERSION = "20261024-prompt-library-json-lines-1";
+let promptTemplateLibrarySearchTimer = 0;
 const DEFAULT_PROMPT_TEMPLATES = SURPRISE_PROMPTS.map((template, index) => ({
   id: `default-template-v2-${index + 1}`,
   name: template.name,
@@ -395,14 +396,18 @@ const UI_LANGUAGE_STORAGE_KEY = "image-studio-ui-language-v1";
 // catalogue.  CSS owns the complete token mapping; this table is the single
 // source for labels, swatches, and persistence validation in the UI.
 const UI_PALETTE_META = Object.freeze({
-  obsidian: { label: "黑曜", swatch: ["#14161c", "#8b95ff", "#a4adff"] },
-  default: { label: "靛蓝", swatch: ["#090d18", "#12192f", "#6f7cff"] },
-  qinghua: { label: "青花", swatch: ["#fffef9", "#1772b4", "#144a74"] },
-  jiangnan: { label: "竹影", swatch: ["#fbf2e3", "#6e8b74", "#a61b29"] },
-  songci: { label: "天青", swatch: ["#eef7f2", "#63bbd0", "#495c69"] },
-  gugong: { label: "朱墙", swatch: ["#f6dead", "#5d3d21", "#f43e06"] },
-  lacquer: { label: "朱漆", swatch: ["#131824", "#ed5126", "#f3bf4c"] },
-  dunhuang: { label: "敦煌", swatch: ["#15231b", "#be7e4a", "#e4bf11"] },
+  obsidian: { label: "黑曜", swatch: ["#090b10", "#8b95ff", "#a4adff"] },
+  default: { label: "靛蓝", swatch: ["#0b0e17", "#7b87ff", "#879cff"] },
+  qinghua: { label: "青花", swatch: ["#090d13", "#79b3dd", "#8ec2e6"] },
+  jiangnan: { label: "竹影", swatch: ["#0b0c0e", "#e9838d", "#9fb8a4"] },
+  songci: { label: "天青", swatch: ["#090e12", "#8fb8c6", "#8fd0dc"] },
+  gugong: { label: "朱墙", swatch: ["#0f0c0d", "#e8756a", "#e0b64d"] },
+  lacquer: { label: "朱漆", swatch: ["#0c0c0f", "#f07a52", "#f3bf4c"] },
+  dunhuang: { label: "敦煌", swatch: ["#0d0d0d", "#d69a68", "#e4bf11"] },
+  songshi: { label: "松石", swatch: ["#080f11", "#5cd0b4", "#7fdcc6"] },
+  meigui: { label: "玫瑰", swatch: ["#0e0a0f", "#ef8aa8", "#f5a8c0"] },
+  yuebai: { label: "月白", swatch: ["#080c12", "#93c4e6", "#b0d4ee"] },
+  liujin: { label: "流金", swatch: ["#0d0d0c", "#dfb554", "#e8c46a"] },
 });
 const UI_PALETTE_IDS = new Set(Object.keys(UI_PALETTE_META));
 const UI_LANGUAGE_TEXT = {
@@ -488,6 +493,10 @@ Object.assign(UI_LANGUAGE_TEXT["zh-CN"], {
   paletteGugong: "朱墙",
   paletteLacquer: "朱漆",
   paletteDunhuang: "敦煌",
+  paletteSongshi: "松石",
+  paletteMeigui: "玫瑰",
+  paletteYuebai: "月白",
+  paletteLiujin: "流金",
 });
 Object.assign(UI_LANGUAGE_TEXT.en, {
   gptSection: "GPT",
@@ -556,6 +565,10 @@ Object.assign(UI_LANGUAGE_TEXT.en, {
   paletteGugong: "Vermilion wall",
   paletteLacquer: "Vermilion lacquer",
   paletteDunhuang: "Dunhuang",
+  paletteSongshi: "Turquoise",
+  paletteMeigui: "Rose",
+  paletteYuebai: "Moon white",
+  paletteLiujin: "Flowing gold",
 });
 const CONNECTION_STATUS_ENTRY_LABEL = "API、LOG";
 const CONNECTION_STATUS_EMPTY_LABEL = "待填写API、LOG";
@@ -614,6 +627,10 @@ const VIEW_ACCENT_FAMILIES = {
   "ppt-record": "archive",
 };
 let studioHeightSyncFrame = 0;
+let studioPromptFillFrame = 0;
+let studioPromptManualHeight = 0;
+let studioPromptResizeCandidate = false;
+let studioPromptResizeStartHeight = 0;
 let studioHeightObserver = null;
 let studioDensitySyncFrame = 0;
 let adaptiveSectionSyncing = false;
@@ -815,14 +832,13 @@ const state = {
       slideNumber: 0,
     },
   },
-  promptTemplates: [], promptTemplateDismissedHistoryIds: new Set(), promptEnhanceEnabled: false,
+  promptTemplates: [], promptTemplateDismissedHistoryIds: new Set(), promptTemplateEditorOpen: false, promptEnhanceEnabled: false,
   promptTemplateLibrary: {
-    categoryId: "usage-scenario",
+    categoryId: "discovery",
     subcategoryId: "",
+    sortBy: "featured",
     query: "",
     view: "list",
-    fontSize: 15,
-    selectedId: "",
     scrollTop: 0,
   },
   reasoningEfforts: [...DEFAULT_REASONING_EFFORTS],
@@ -1365,16 +1381,18 @@ const refs = {
   promptTemplateFeedback: document.querySelector("#promptTemplateFeedback"),
   promptTemplateForm: document.querySelector("#promptTemplateForm"),
   promptTemplateList: document.querySelector("#promptTemplateList"),
+  promptTemplatePersonal: document.querySelector("#promptTemplatePersonal"),
+  promptTemplatePersonalTitle: document.querySelector("#promptTemplatePersonalTitle"),
   promptTemplateLibraryGrid: document.querySelector("#promptTemplateLibraryGrid"),
   promptTemplateLibraryMeta: document.querySelector("#promptTemplateLibraryMeta"),
   promptTemplateLibraryNav: document.querySelector("#promptTemplateLibraryNav"),
+  promptTemplateLibraryReset: document.querySelector("#promptTemplateLibraryReset"),
   promptTemplateLibrarySearch: document.querySelector("#promptTemplateLibrarySearch"),
+  promptTemplateLibrarySort: document.querySelector("#promptTemplateLibrarySort"),
   promptTemplateLibrarySubnav: document.querySelector("#promptTemplateLibrarySubnav"),
   promptTemplateLibraryTitle: document.querySelector("#promptTemplateLibraryTitle"),
   promptTemplateLibraryCount: document.querySelector("#promptTemplateLibraryCount"),
   promptTemplateLibraryViewButtons: [...document.querySelectorAll("[data-prompt-template-view]")],
-  promptTemplateLibraryFontSize: document.querySelector("#promptTemplateLibraryFontSize"),
-  promptTemplateLibraryFontValue: document.querySelector("#promptTemplateLibraryFontValue"),
   promptTemplateNameInput: document.querySelector("#promptTemplateNameInput"),
   promptTemplatePopover: document.querySelector("#promptTemplatePopover"),
   promptTemplateTextInput: document.querySelector("#promptTemplateTextInput"),
@@ -2296,6 +2314,7 @@ function setStudioGenerationMode(mode = "prompt") {
   refs.styleTransferBlock?.classList.toggle("hidden", nextMode !== "style-transfer");
   syncPromptTransparentBackgroundControl();
   updateGenerateButton();
+  scheduleStudioPromptFillSync();
 }
 async function ensureActiveViewModule(view) {
   if (view === "studio") {
@@ -2528,6 +2547,7 @@ function syncAdaptiveWorkbenchSections(layoutMode = getCurrentStudioLayoutMode()
     }
   });
   adaptiveSectionLayoutMode = layoutMode;
+  scheduleStudioPromptFillSync();
   window.setTimeout(() => {
     adaptiveSectionSyncing = false;
   }, 0);
@@ -2546,6 +2566,7 @@ function bindAdaptiveWorkbenchSections() {
         return;
       }
       section.dataset.adaptiveUserToggled = "true";
+      scheduleStudioPromptFillSync();
     });
   });
 }
@@ -2559,6 +2580,7 @@ function getGalleryLayoutWidth() {
 }
 function syncGalleryLayoutMode() { if (!refs.galleryView) return; const layoutMode = getGalleryLayoutModeForWidth(getGalleryLayoutWidth()); const changed = refs.galleryView.dataset.galleryLayout !== layoutMode; refs.galleryView.dataset.galleryLayout = layoutMode; if (changed && state.activeView === "gallery" && !state.galleryLoading) renderGalleryView(); }
 function syncStudioDensity() {
+  studioPromptManualHeight = 0;
   const viewportMetrics = getStudioViewportMetrics();
   const settings = getStudioDensitySettings(viewportMetrics);
   const layoutMode = settings.layoutMode || getStudioLayoutMode(viewportMetrics);
@@ -4540,6 +4562,7 @@ function renderReferenceGrid() {
       }),
     );
   }
+  scheduleStudioPromptFillSync();
 }
 function getReferenceAnalysisPrompts(item = state.referenceAnalysis.result) {
   const prompts = Array.isArray(item?.json?.prompts)
@@ -5284,6 +5307,94 @@ function restoreSettingsFormScrollTop(scrollTop) {
   restore();
   window.requestAnimationFrame(restore);
 }
+function getStudioFilmstripBaseline() {
+  const filmstrip = refs.filmstrip;
+  const row = filmstrip?.closest(".filmstrip-row");
+  if (!filmstrip || !row) {
+    return 0;
+  }
+  const label = filmstrip.querySelector(".filmstrip-item span, .filmstrip-placeholder-label");
+  if (label) {
+    const labelRect = label.getBoundingClientRect();
+    if (labelRect.height > 0) {
+      return labelRect.bottom;
+    }
+  }
+  const paddingBottom = Number.parseFloat(getComputedStyle(filmstrip).paddingBottom) || 0;
+  return row.getBoundingClientRect().bottom - paddingBottom;
+}
+function canFillStudioPrompt() {
+  return Boolean(
+    refs.generateForm
+    && refs.promptInput
+    && refs.filmstrip
+    && state.activeView === "studio"
+    && state.studioMode !== "style-transfer"
+    && !STACKED_STUDIO_LAYOUT_MODES.has(getCurrentStudioLayoutMode())
+    && refs.generateForm.getClientRects().length > 0
+    && refs.promptInput.getClientRects().length > 0
+    && [...refs.generateForm.querySelectorAll("[data-adaptive-section]")].every((section) => section.open),
+  );
+}
+// 左栏最后一块要与右侧胶片条的分辨率标签对齐：把多余高度交给提示词文本框，
+// 窗口变矮时也优先收提示词。用户手动拖过高度后暂停自动调整，直到分辨率再次变化。
+function syncStudioPromptFill() {
+  if (!canFillStudioPrompt()) {
+    studioPromptManualHeight = 0;
+    refs.promptInput?.style.removeProperty("height");
+    return;
+  }
+  if (studioPromptManualHeight > 0) {
+    return;
+  }
+  const form = refs.generateForm;
+  const prompt = refs.promptInput;
+  const formRect = form.getBoundingClientRect();
+  const baseline = getStudioFilmstripBaseline();
+  if (!baseline) {
+    return;
+  }
+  const visibleChildren = [...form.children].filter((child) => child.getClientRects().length > 0);
+  const lastChild = visibleChildren[visibleChildren.length - 1];
+  if (!lastChild) {
+    return;
+  }
+  const currentHeight = prompt.getBoundingClientRect().height;
+  const minHeight = Number.parseFloat(getComputedStyle(prompt).minHeight) || 0;
+  const measureSlack = () => {
+    const contentBottom = lastChild.getBoundingClientRect().bottom - formRect.top + form.scrollTop;
+    const targetBottom = baseline - formRect.top + form.scrollTop;
+    return targetBottom - contentBottom;
+  };
+  let slack = measureSlack();
+  if (Math.abs(slack) < 0.5) {
+    return;
+  }
+  let nextHeight = Math.max(minHeight, Math.round((currentHeight + slack) * 2) / 2);
+  if (Math.abs(nextHeight - currentHeight) < 0.5) {
+    return;
+  }
+  prompt.style.height = `${nextHeight}px`;
+  slack = measureSlack();
+  if (Math.abs(slack) > 0.5) {
+    nextHeight = Math.max(minHeight, Math.round((nextHeight + slack) * 2) / 2);
+    prompt.style.height = `${nextHeight}px`;
+  }
+}
+function scheduleStudioPromptFillSync() {
+  if (studioPromptFillFrame) {
+    window.cancelAnimationFrame(studioPromptFillFrame);
+  }
+  studioPromptFillFrame = window.requestAnimationFrame(() => {
+    studioPromptFillFrame = 0;
+    syncStudioPromptFill();
+    // 首轮测量可能发生在主题/字体/滚动条落位之前，下一帧再校一次，
+    // 差异小于 1px 时 syncStudioPromptFill 会直接返回，不会来回抖动。
+    if (canFillStudioPrompt() && studioPromptManualHeight <= 0) {
+      window.requestAnimationFrame(syncStudioPromptFill);
+    }
+  });
+}
 function syncStudioHeight() {
   if (!refs.settingsPanel || !refs.previewPanel || !refs.viewRoot) {
     return;
@@ -5305,6 +5416,7 @@ function syncStudioHeight() {
     document.documentElement.style.setProperty("--studio-column-height", `${resolvedHeight}px`);
   }
   restoreSettingsFormScrollTop(settingsScrollTop);
+  scheduleStudioPromptFillSync();
 }
 function scheduleStudioHeightSync() {
   if (studioHeightSyncFrame) {
@@ -5337,6 +5449,26 @@ function scheduleGalleryPanelHeightSync() {
     galleryPanelHeightSyncFrame = 0;
     syncGalleryPanelHeight();
     syncGalleryScrollUi();
+  });
+}
+function bindStudioPromptFillSync() {
+  const prompt = refs.promptInput;
+  if (!prompt) {
+    return;
+  }
+  prompt.addEventListener("pointerdown", (event) => {
+    const rect = prompt.getBoundingClientRect();
+    studioPromptResizeCandidate = rect.right - event.clientX <= 18 && rect.bottom - event.clientY <= 18;
+    studioPromptResizeStartHeight = prompt.offsetHeight;
+  });
+  window.addEventListener("pointerup", () => {
+    if (!studioPromptResizeCandidate) {
+      return;
+    }
+    studioPromptResizeCandidate = false;
+    if (Math.abs(prompt.offsetHeight - studioPromptResizeStartHeight) > 1) {
+      studioPromptManualHeight = prompt.offsetHeight;
+    }
   });
 }
 function bindStudioHeightSync() {
@@ -7258,6 +7390,7 @@ function renderFilmstrip() {
   if (entries.length === 0) {
     stopGenerationLoadingShells(refs.filmstrip);
     renderFilmstripPlaceholder();
+    scheduleStudioPromptFillSync();
     return;
   }
 
@@ -7268,6 +7401,7 @@ function renderFilmstrip() {
     tracker: promptFilmstripRevealTracker,
     render: renderFilmstripEntries,
   });
+  scheduleStudioPromptFillSync();
 }
 
 function createRecentOutputItem(item) {
@@ -7719,6 +7853,7 @@ function renderAll() {
   syncLightboxItem();
 
   restoreSettingsFormScrollTop(settingsScrollTop);
+  scheduleStudioPromptFillSync();
 }
 
 function mergeGalleryItemWithExistingBrowserImage(item) {
@@ -7885,29 +8020,34 @@ function setPromptTemplateFeedback(message = "") {
 
 function getPromptTemplateLibraryTemplates() {
   const libraryState = state.promptTemplateLibrary;
-  const allTemplates = flattenPromptTemplateLibrary({
-    categoryId: libraryState.categoryId,
-    subcategoryId: libraryState.subcategoryId,
-  });
+  const allTemplates = sortPromptTemplateLibraryTemplates(
+    flattenPromptTemplateLibrary({
+      categoryId: libraryState.categoryId,
+      subcategoryId: libraryState.subcategoryId,
+    }),
+    libraryState.sortBy,
+  );
   const query = String(libraryState.query || "").trim().toLocaleLowerCase();
   if (!query) {
     return allTemplates;
   }
 
-  return allTemplates.filter((template) =>
-    [template.name, template.categoryName, template.subcategoryName, template.prompt]
-      .join("\n")
-      .toLocaleLowerCase()
-      .includes(query),
-  );
+  return allTemplates.filter((template) => template.searchText.includes(query));
 }
 
 function selectPromptTemplateLibraryScope(categoryId, subcategoryId = "") {
   const category = getPromptTemplateLibraryCategory(categoryId);
   state.promptTemplateLibrary.categoryId = category?.id || PROMPT_TEMPLATE_LIBRARY[0]?.id || "";
   state.promptTemplateLibrary.subcategoryId = subcategoryId && category?.children.some((child) => child.id === subcategoryId) ? subcategoryId : "";
-  state.promptTemplateLibrary.selectedId = "";
   renderPromptTemplateLibrary();
+}
+
+function appendPromptTemplateLibraryCountButton(button, label, countLabel) {
+  const text = document.createElement("span");
+  text.textContent = label;
+  const amount = document.createElement("small");
+  amount.textContent = countLabel;
+  button.append(text, amount);
 }
 
 function renderPromptTemplateLibraryNavigation() {
@@ -7917,7 +8057,8 @@ function renderPromptTemplateLibraryNavigation() {
 
   refs.promptTemplateLibraryNav.replaceChildren();
   refs.promptTemplateLibrarySubnav.replaceChildren();
-  const activeCategory = getPromptTemplateLibraryCategory(state.promptTemplateLibrary.categoryId);
+  const libraryState = state.promptTemplateLibrary;
+  const activeCategory = getPromptTemplateLibraryCategory(libraryState.categoryId);
   if (!activeCategory) {
     return;
   }
@@ -7928,11 +8069,11 @@ function renderPromptTemplateLibraryNavigation() {
     button.className = "prompt-template-library-category-button";
     button.dataset.promptTemplateCategory = category.id;
     button.setAttribute("aria-pressed", String(category.id === activeCategory.id));
-    const label = document.createElement("span");
-    label.textContent = category.name;
-    const count = document.createElement("small");
-    count.textContent = `${category.children.reduce((sum, child) => sum + child.templates.length, 0)} 条`;
-    button.append(label, count);
+    appendPromptTemplateLibraryCountButton(
+      button,
+      category.name,
+      `${category.children.length} 类`,
+    );
     refs.promptTemplateLibraryNav.appendChild(button);
   });
 
@@ -7940,8 +8081,12 @@ function renderPromptTemplateLibraryNavigation() {
   allButton.type = "button";
   allButton.className = "prompt-template-library-subcategory-button";
   allButton.dataset.promptTemplateSubcategory = "";
-  allButton.setAttribute("aria-pressed", String(!state.promptTemplateLibrary.subcategoryId));
-  allButton.textContent = `全部 ${activeCategory.name}`;
+  allButton.setAttribute("aria-pressed", String(!libraryState.subcategoryId));
+  appendPromptTemplateLibraryCountButton(
+    allButton,
+    activeCategory.id === "discovery" ? "全部模板" : `全部 ${activeCategory.name}`,
+    `${getPromptTemplateLibraryCategoryCount(activeCategory.id)} 组`,
+  );
   refs.promptTemplateLibrarySubnav.appendChild(allButton);
 
   activeCategory.children.forEach((child) => {
@@ -7949,8 +8094,12 @@ function renderPromptTemplateLibraryNavigation() {
     button.type = "button";
     button.className = "prompt-template-library-subcategory-button";
     button.dataset.promptTemplateSubcategory = child.id;
-    button.setAttribute("aria-pressed", String(child.id === state.promptTemplateLibrary.subcategoryId));
-    button.innerHTML = `<span>${child.name}</span><small>${child.templates.length}</small>`;
+    button.setAttribute("aria-pressed", String(child.id === libraryState.subcategoryId));
+    appendPromptTemplateLibraryCountButton(
+      button,
+      child.name,
+      `${getPromptTemplateLibraryChildCount(activeCategory.id, child.id)} 组`,
+    );
     refs.promptTemplateLibrarySubnav.appendChild(button);
   });
 }
@@ -7982,7 +8131,7 @@ function openPromptTemplateLibraryPreview(template) {
     thumbnailUrl: imageUrl,
     previewUrl: imageUrl,
     prompt: template.prompt,
-    paramsText: `分类：${template.categoryName} / ${template.subcategoryName}\n模板：${template.name}`,
+    paramsText: `来源：${template.previewSourceLabel || "YouMind"}\n参考图：${template.needReferenceImages ? "需要" : "不需要"}\n作者：${template.authorName || "YouMind"}\n分类：${(template.tagNames || []).join(" / ")}\n模板：${template.name}\n来源页：${template.previewSourcePage || ""}`,
     imageModel: "Prompt Kit",
     promptTemplate: template,
     isPreviewLightboxItem: true,
@@ -8005,11 +8154,36 @@ function applyPromptTemplateLibrary(template) {
   if (!prompt) {
     return;
   }
-  state.promptTemplateLibrary.selectedId = template.id;
   refs.promptInput.value = prompt;
   updatePromptCounter();
   setPromptTemplatePopoverOpen(false);
   refs.promptInput.focus();
+}
+
+function resetPromptTemplateLibraryFilters() {
+  window.clearTimeout(promptTemplateLibrarySearchTimer);
+  const libraryState = state.promptTemplateLibrary;
+  libraryState.categoryId = "discovery";
+  libraryState.subcategoryId = "";
+  libraryState.sortBy = "featured";
+  libraryState.query = "";
+  if (refs.promptTemplateLibrarySearch) {
+    refs.promptTemplateLibrarySearch.value = "";
+  }
+  if (refs.promptTemplateLibrarySort) {
+    refs.promptTemplateLibrarySort.value = "featured";
+  }
+  renderPromptTemplateLibrary();
+}
+
+function getPromptTemplateTagPreview(template) {
+  const tags = Array.isArray(template.tagNames) ? template.tagNames.filter(Boolean) : [];
+  const visibleTags = tags.slice(0, 2);
+  const overflowCount = Math.max(0, tags.length - visibleTags.length);
+  return {
+    text: visibleTags.join(" · ") + (overflowCount > 0 ? ` +${overflowCount}` : ""),
+    title: tags.join(" / "),
+  };
 }
 
 function renderPromptTemplateLibrary() {
@@ -8023,38 +8197,45 @@ function renderPromptTemplateLibrary() {
   const subcategory = libraryState.subcategoryId
     ? getPromptTemplateLibrarySubcategory(libraryState.categoryId, libraryState.subcategoryId)
     : null;
+  const sortBy = PROMPT_TEMPLATE_SORT_OPTIONS.some((option) => option.id === libraryState.sortBy)
+    ? libraryState.sortBy
+    : "featured";
+  libraryState.sortBy = sortBy;
   const templates = getPromptTemplateLibraryTemplates();
   const stats = getPromptTemplateLibraryCounts();
   const view = ["list", "image"].includes(libraryState.view) ? libraryState.view : "list";
   libraryState.view = view;
   refs.promptTemplateLibraryGrid.dataset.view = view;
-  refs.promptTemplateLibraryGrid.style.setProperty("--prompt-template-list-font-size", `${libraryState.fontSize}px`);
   refs.promptTemplateLibraryViewButtons.forEach((button) => {
     const active = button.dataset.promptTemplateView === view;
     button.classList.toggle("active", active);
     button.setAttribute("aria-selected", String(active));
   });
-  if (refs.promptTemplateLibraryFontSize) {
-    refs.promptTemplateLibraryFontSize.value = String(libraryState.fontSize);
-  }
-  if (refs.promptTemplateLibraryFontValue) {
-    refs.promptTemplateLibraryFontValue.textContent = `${libraryState.fontSize}px`;
+  if (refs.promptTemplateLibrarySort) {
+    refs.promptTemplateLibrarySort.value = sortBy;
   }
   if (refs.promptTemplateLibraryTitle) {
     refs.promptTemplateLibraryTitle.textContent = subcategory?.name || category?.name || "提示词目录";
   }
   if (refs.promptTemplateLibraryCount) {
-    refs.promptTemplateLibraryCount.textContent = `${templates.length} 条可用模板`;
+    refs.promptTemplateLibraryCount.textContent = `${templates.length} 组配对模板`;
   }
   if (refs.promptTemplateLibraryMeta) {
-    refs.promptTemplateLibraryMeta.textContent = `${stats.categories} 个一级分类 · ${stats.subcategories} 个二级分类 · 当前显示 ${templates.length} 条`;
+    refs.promptTemplateLibraryMeta.textContent = `${stats.categories} 个浏览入口 · ${stats.subcategories} 个细分\n${stats.templates} 组图片与提示词配对`;
   }
 
   refs.promptTemplateLibraryGrid.replaceChildren();
   if (templates.length === 0) {
     const empty = document.createElement("div");
     empty.className = "prompt-template-library-empty";
-    empty.textContent = "没有匹配的模板";
+    const title = document.createElement("strong");
+    title.textContent = "没有匹配的模板";
+    const description = document.createElement("span");
+    description.textContent = libraryState.query
+      ? `没有找到包含“${libraryState.query}”的配对模板，试试放宽关键词或切换分类。`
+      : "当前筛选下没有模板，试试其他分类或筛选条件。";
+    const resetButton = createPromptTemplateLibraryActionButton("清除筛选", "mini-action", resetPromptTemplateLibraryFilters);
+    empty.append(title, description, resetButton);
     refs.promptTemplateLibraryGrid.appendChild(empty);
     return;
   }
@@ -8062,7 +8243,6 @@ function renderPromptTemplateLibrary() {
   templates.forEach((template) => {
     const card = document.createElement("article");
     card.className = "prompt-template-library-card";
-    card.classList.toggle("active", template.id === libraryState.selectedId);
     card.dataset.promptTemplateLibraryItem = template.id;
 
     const media = document.createElement("div");
@@ -8070,15 +8250,17 @@ function renderPromptTemplateLibrary() {
     const previewButton = document.createElement("button");
     previewButton.type = "button";
     previewButton.className = "prompt-template-library-preview-button";
-    previewButton.title = "放大查看图片与提示词";
-    previewButton.setAttribute("aria-label", `放大查看${template.name}`);
+    previewButton.title = "查看图片与完整提示词";
+    previewButton.setAttribute("aria-label", `查看${template.name}的图片与完整提示词`);
     const image = document.createElement("img");
     const syncPromptTemplateImageRatio = () => {
       if (image.naturalWidth > 0 && image.naturalHeight > 0) {
         image.style.aspectRatio = `${image.naturalWidth} / ${image.naturalHeight}`;
       }
     };
-    image.style.aspectRatio = template.previewImage ? "3 / 4" : "1 / 1";
+    image.style.aspectRatio = template.imageWidth > 0 && template.imageHeight > 0
+      ? `${template.imageWidth} / ${template.imageHeight}`
+      : "1 / 1";
     image.addEventListener("load", () => {
       syncPromptTemplateImageRatio();
     });
@@ -8096,42 +8278,73 @@ function renderPromptTemplateLibrary() {
       syncPromptTemplateImageRatio();
     }
     previewButton.appendChild(image);
-    previewButton.addEventListener("click", () => openPromptTemplateLibraryPreview(template));
+    previewButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      openPromptTemplateLibraryPreview(template);
+    });
     media.appendChild(previewButton);
-
-    const cardActions = document.createElement("div");
-    cardActions.className = "prompt-template-library-card-actions";
-    cardActions.appendChild(
-      createPromptTemplateLibraryActionButton("应用", "mini-action strong", () => applyPromptTemplateLibrary(template)),
-    );
-    card.appendChild(cardActions);
     card.appendChild(media);
 
     const content = document.createElement("div");
     content.className = "prompt-template-library-content";
+    const head = document.createElement("div");
+    head.className = "prompt-template-library-card-head";
     const title = document.createElement("h3");
     title.textContent = template.name;
     title.title = template.name;
-    const breadcrumb = document.createElement("p");
-    breadcrumb.className = "prompt-template-library-breadcrumb";
-    breadcrumb.textContent = `${template.categoryName} / ${template.subcategoryName}`;
-    const prompt = document.createElement("p");
-    prompt.className = "prompt-template-library-prompt";
-    prompt.textContent = template.prompt;
-    content.append(title, breadcrumb, prompt);
+    const applyButton = createPromptTemplateLibraryActionButton(
+      "应用",
+      "mini-action strong prompt-template-library-apply",
+      () => applyPromptTemplateLibrary(template),
+    );
+    applyButton.title = "应用这条提示词";
+    head.append(title, applyButton);
+
+    const summary = document.createElement("p");
+    summary.className = "prompt-template-library-summary";
+    summary.textContent = template.summary || template.description || template.prompt;
+    summary.title = summary.textContent;
+
+    const foot = document.createElement("div");
+    foot.className = "prompt-template-library-card-foot";
+    const tags = document.createElement("p");
+    tags.className = "prompt-template-library-breadcrumb";
+    const tagPreview = getPromptTemplateTagPreview(template);
+    const referenceStatus = document.createElement("span");
+    referenceStatus.className = "prompt-template-library-reference-status";
+    referenceStatus.dataset.requiresReference = String(template.needReferenceImages);
+    referenceStatus.textContent = template.needReferenceImages ? "需参考图" : "无需参考图";
+    referenceStatus.title = template.needReferenceImages
+      ? "这条提示词需要先上传参考图"
+      : "这条提示词可以直接生成";
+    tags.append(referenceStatus);
+    if (tagPreview.text) {
+      tags.append(document.createTextNode(` · ${tagPreview.text}`));
+    }
+    tags.title = tagPreview.title;
+    const previewLink = createPromptTemplateLibraryActionButton(
+      "查看提示词",
+      "prompt-template-library-preview-link",
+      () => openPromptTemplateLibraryPreview(template),
+    );
+    previewLink.title = `查看完整提示词（${template.promptLength || template.prompt.length} 字）`;
+    foot.append(tags, previewLink);
+    content.append(head, summary, foot);
     card.appendChild(content);
-    card.addEventListener("click", (event) => {
-      if (event.target.closest("button")) {
-        return;
-      }
-      libraryState.selectedId = template.id;
-      renderPromptTemplateLibrary();
-    });
     refs.promptTemplateLibraryGrid.appendChild(card);
     if (image.complete) {
       syncPromptTemplateImageRatio();
     }
   });
+}
+
+function syncPromptTemplateTextareaHeight() {
+  const textarea = refs.promptTemplateTextInput;
+  if (!textarea) {
+    return;
+  }
+  textarea.style.height = "auto";
+  textarea.style.height = `${Math.max(120, textarea.scrollHeight + 2)}px`;
 }
 
 function selectPromptTemplate(templateId) {
@@ -8140,10 +8353,26 @@ function selectPromptTemplate(templateId) {
   refs.promptTemplateNameInput.value = template?.name || "";
   refs.promptTemplateTextInput.value = template?.prompt || "";
   renderPromptTemplates();
+  syncPromptTemplateTextareaHeight();
+}
+
+function syncPromptTemplateEditorMode() {
+  const editing = Boolean(state.promptTemplateEditorOpen);
+  refs.promptTemplatePersonal?.classList.toggle("is-editing", editing);
+  if (refs.promptTemplatePersonalTitle) {
+    const templateCount = state.promptTemplates.length;
+    refs.promptTemplatePersonalTitle.textContent = editing
+      ? "编辑模板"
+      : `我的模板${templateCount > 0 ? ` · ${templateCount}` : ""}`;
+  }
+  if (refs.newPromptTemplateButton) {
+    refs.newPromptTemplateButton.textContent = editing ? "返回列表" : "新建";
+  }
 }
 
 function renderPromptTemplates() {
   renderPromptTemplateLibrary();
+  syncPromptTemplateEditorMode();
   refs.promptTemplateList.innerHTML = "";
 
   if (state.promptTemplates.length === 0) {
@@ -8224,12 +8453,14 @@ function renderPromptTemplates() {
 }
 
 function resetPromptTemplateForm() {
+  state.promptTemplateEditorOpen = true;
   state.selectedPromptTemplateId = "";
   refs.promptTemplateNameInput.value = "";
   refs.promptTemplateTextInput.value = "";
   refs.promptTemplateNameInput.focus();
   setPromptTemplateFeedback("");
   renderPromptTemplates();
+  syncPromptTemplateTextareaHeight();
 }
 
 function savePromptTemplate(event) {
@@ -8280,6 +8511,7 @@ function applyPromptTemplate(templateId = "") {
 }
 
 function editPromptTemplate(templateId) {
+  state.promptTemplateEditorOpen = true;
   selectPromptTemplate(templateId);
   setPromptTemplateFeedback("");
   refs.promptTemplateNameInput.focus();
@@ -8308,8 +8540,9 @@ function deletePromptTemplate(templateId = "") {
     state.selectedPromptTemplateId === selected.id
       ? state.promptTemplates[0] || null
       : getSelectedPromptTemplate() || state.promptTemplates[0] || null;
+  state.promptTemplateEditorOpen = false;
   state.selectedPromptTemplateId = next?.id || "";
-  selectPromptTemplate(state.selectedPromptTemplateId);
+  renderPromptTemplates();
   setPromptTemplateFeedback("模板已删除。");
 }
 
@@ -8322,11 +8555,13 @@ function setPromptTemplatePopoverOpen(open) {
   refs.surprisePromptButton.setAttribute("aria-expanded", open ? "true" : "false");
 
   if (open) {
+    state.promptTemplateEditorOpen = false;
     setPortraitAccessoryAssetPopoverOpen(false);
     if (!state.selectedPromptTemplateId && state.promptTemplates.length > 0) {
       state.selectedPromptTemplateId = state.promptTemplates[0].id;
     }
     selectPromptTemplate(state.selectedPromptTemplateId);
+    syncPromptTemplateTextareaHeight();
     refs.promptTemplateLibrarySearch?.focus({ preventScroll: true });
     loadPromptAgentHistory().catch((error) => {
       console.warn("load prompt agent history for templates failed", error);
@@ -19177,6 +19412,71 @@ function setCreationPlatformItemOverride(slotKey, field, value) {
   setFrozenCreationPlatformPayload({ ...getFrozenCreationEffectivePlan(), platformItemOverrides: overrides });
 }
 
+// 预览显示区按当前结果图的实际比例定形状：16:9 的图是 16:9 画框，1:1 的图就是 1:1 画框。
+// 比例不一致时会在图片两侧留出一条与面板不同色的底，看起来像图片被套进了黑框。
+function readPreviewImageRatio(image) {
+  const width = Number(image?.naturalWidth) || 0;
+  const height = Number(image?.naturalHeight) || 0;
+  return width > 0 && height > 0 ? width / height : 0;
+}
+
+function syncPreviewSurfaceRatio(surface, image) {
+  if (!surface) {
+    return;
+  }
+  const ratio = readPreviewImageRatio(image);
+  if (ratio > 0) {
+    surface.style.setProperty("--preview-ratio", String(Number(ratio.toFixed(6))));
+    return;
+  }
+  surface.style.removeProperty("--preview-ratio");
+}
+
+// 四个预览视图的结果图由各自模块换源，这里统一盯住 img 的 src/class 变化，
+// 不用逐个改动渲染逻辑就能让画框跟上结果图比例。
+function bindPreviewSurfaceRatios() {
+  document.querySelectorAll(".preview-surface").forEach((surface) => {
+    const image = surface.querySelector("img");
+    if (!image) {
+      return;
+    }
+    const sync = () => syncPreviewSurfaceRatio(surface, image);
+    image.addEventListener("load", sync);
+    if (typeof MutationObserver === "function") {
+      new MutationObserver(sync).observe(image, { attributes: true, attributeFilter: ["src", "class"] });
+    }
+    sync();
+  });
+}
+
+// 放大预览（待分析图片 / 参考图）同样按容器等比显示：短边贴边，小图不因分辨率小而缩小。
+// 宽高比写进 CSS 变量，样式再用 100svh 预算换算出贴边的宽度。
+function syncPreviewImageViewerRatio(image) {
+  if (!image) {
+    return;
+  }
+  const ratio = readPreviewImageRatio(image);
+  if (ratio > 0) {
+    image.style.setProperty("--preview-image-ratio", String(Number(ratio.toFixed(4))));
+    return;
+  }
+  image.style.removeProperty("--preview-image-ratio");
+}
+
+function bindPreviewImageViewerRatios() {
+  [refs.promptAgentImageViewerImage, refs.referencePreviewImage].forEach((image) => {
+    if (!image) {
+      return;
+    }
+    const sync = () => syncPreviewImageViewerRatio(image);
+    image.addEventListener("load", sync);
+    if (typeof MutationObserver === "function") {
+      new MutationObserver(sync).observe(image, { attributes: true, attributeFilter: ["src"] });
+    }
+    sync();
+  });
+}
+
 function bindEvents() {
   creationLogoLibrary.bind();
   productImageImportController.bind();
@@ -19184,6 +19484,8 @@ function bindEvents() {
   bindTopbarRevealEvents();
   bindAdaptiveWorkbenchSections();
   bindAppTooltips();
+  bindPreviewSurfaceRatios();
+  bindPreviewImageViewerRatios();
   assetWorkspaceController.bindEvents();
   assetRecordDeleteController.bindEvents();
   assetRecordTimeFilterController.bind();
@@ -20094,7 +20396,15 @@ function bindEvents() {
   refs.surprisePromptButton.addEventListener("click", selectRandomPrompt);
   refs.closePromptTemplateButton.addEventListener("click", () => setPromptTemplatePopoverOpen(false));
   refs.promptTemplateForm.addEventListener("submit", savePromptTemplate);
-  refs.newPromptTemplateButton.addEventListener("click", resetPromptTemplateForm);
+  refs.newPromptTemplateButton.addEventListener("click", () => {
+    if (state.promptTemplateEditorOpen) {
+      state.promptTemplateEditorOpen = false;
+      setPromptTemplateFeedback("");
+      renderPromptTemplates();
+      return;
+    }
+    resetPromptTemplateForm();
+  });
   refs.applyPromptTemplateButton.addEventListener("click", applyPromptTemplate);
   refs.deletePromptTemplateButton.addEventListener("click", deletePromptTemplate);
   refs.promptTemplateLibraryNav?.addEventListener("click", (event) => {
@@ -20112,19 +20422,25 @@ function bindEvents() {
     selectPromptTemplateLibraryScope(state.promptTemplateLibrary.categoryId, button.dataset.promptTemplateSubcategory || "");
   });
   refs.promptTemplateLibrarySearch?.addEventListener("input", (event) => {
-    state.promptTemplateLibrary.query = event.target.value;
+    const query = event.target.value;
+    window.clearTimeout(promptTemplateLibrarySearchTimer);
+    promptTemplateLibrarySearchTimer = window.setTimeout(() => {
+      state.promptTemplateLibrary.query = query;
+      renderPromptTemplateLibrary();
+    }, 140);
+  });
+  refs.promptTemplateLibrarySort?.addEventListener("change", (event) => {
+    state.promptTemplateLibrary.sortBy = event.target.value || "featured";
     renderPromptTemplateLibrary();
   });
+  refs.promptTemplateLibraryReset?.addEventListener("click", resetPromptTemplateLibraryFilters);
   refs.promptTemplateLibraryViewButtons.forEach((button) => {
     button.addEventListener("click", () => {
       state.promptTemplateLibrary.view = button.dataset.promptTemplateView || "list";
       renderPromptTemplateLibrary();
     });
   });
-  refs.promptTemplateLibraryFontSize?.addEventListener("input", (event) => {
-    state.promptTemplateLibrary.fontSize = Math.min(20, Math.max(12, Number(event.target.value) || 15));
-    renderPromptTemplateLibrary();
-  });
+  refs.promptTemplateTextInput?.addEventListener("input", syncPromptTemplateTextareaHeight);
   refs.promptInput.addEventListener("input", updatePromptCounter);
   refs.promptInput.addEventListener("keydown", handlePromptGenerationShortcut);
   refs.promptInput.addEventListener("paste", handleStudioImagePaste); refs.promptEnhanceToggle.addEventListener("click", togglePromptEnhanceMode); refs.promptEnhanceInput.addEventListener("keydown", handlePromptGenerationShortcut);
@@ -20647,6 +20963,7 @@ async function bootstrap() {
   bindEvents();
   bindStudioDensitySync();
   bindStudioHeightSync();
+  bindStudioPromptFillSync();
   bindGalleryPanelHeightSync();
   bindGalleryScrollSync();
   scheduleStudioDensitySync();

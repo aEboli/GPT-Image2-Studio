@@ -30,8 +30,8 @@ const generationClientPath = new URL("../lib/generation-client.mjs", import.meta
 const generationLogPanelPath = new URL("../lib/generation-log-panel.mjs", import.meta.url);
 const generationLogStorePath = new URL("../lib/generation-log-store.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20261022-obsidian-1";
-const appAssetVersion = "20261022-obsidian-1";
+const stylesAssetVersion = "20261024-studio-bottom-align-1";
+const appAssetVersion = "20261024-studio-bottom-align-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
 const creationQueueModuleAssetVersion = "20261020-queue-label-product-1";
 const quickBlendModuleAssetVersion = "20260928-aspect-ratio-value-only-1";
@@ -445,6 +445,7 @@ test("lightbox detail image exposes PS-style zoom and pan viewer controls", asyn
   assert.match(lightboxViewer, /export function createLightboxViewerState\(\) \{[\s\S]*scale:\s*1,[\s\S]*fitScale:\s*1,[\s\S]*mode:\s*"view",[\s\S]*lastInspectionScale:\s*1,/);
   assert.match(lightboxViewer, /function isInspectionMode\(/);
   assert.match(lightboxViewer, /function calculateFitScale\(/);
+  assert.doesNotMatch(lightboxViewer, /Math\.min\(1, bounds\.width \/ viewer\.naturalWidth/);
   assert.match(lightboxViewer, /function zoomAtPoint\(/);
   assert.match(lightboxViewer, /function panBy\(/);
   assert.match(lightboxViewer, /function toggleInspectionZoom\(/);
@@ -2113,7 +2114,7 @@ test("generation loading blurred background fills its host image slot at any siz
   assert.match(backgroundRule, /inset:\s*-/);
   assert.match(backgroundRule, /filter:\s*blur\(/);
   assert.match(backgroundRule, /animation:\s*generation-loading-aurora-drift/);
-  assert.doesNotMatch(backgroundRule, /radial-gradient|background-repeat:\s*repeat/);
+  assert.doesNotMatch(backgroundRule, /background-repeat:\s*repeat/);
 
   // 背景与压暗层铺满，中间文字压在它们之上，文字自身不参与尺寸变化。
   assert.match(styles, /\.generation-loading-shell::after\s*\{[\s\S]*?inset:\s*0;/);
@@ -2146,9 +2147,20 @@ test("the blurred background moves smoothly without water or tiling", async () =
 
   assert.match(backgroundRule, /linear-gradient/);
   assert.match(backgroundRule, /filter:\s*blur\(/);
-  assert.match(backgroundRule, /animation:\s*generation-loading-aurora-drift/);
+  // 单一匀速循环：老实现用 alternate + 整段缓动，每 7 秒速度归零再反向，看起来就是一顿。
+  assert.match(backgroundRule, /animation:\s*generation-loading-aurora-drift 28000ms linear infinite/);
+  assert.doesNotMatch(backgroundRule, /alternate|ease-in-out/);
+  // 透明度只由主题变量决定，不在关键帧里呼吸，否则浅色主题和排队态压不暗它。
+  assert.match(backgroundRule, /opacity:\s*var\(--generation-loading-aurora-opacity/);
   assert.match(driftKeyframes, /transform:/);
-  assert.match(driftKeyframes, /opacity:/);
+  assert.doesNotMatch(driftKeyframes, /opacity:/);
+  // 闭环：0% 与 100% 必须逐字一致，否则每轮循环会跳回起点。
+  const startTransform = driftKeyframes.match(/0% \{\s*transform:\s*([^;]+);/)?.[1]?.trim();
+  const endTransform = driftKeyframes.match(/100% \{\s*transform:\s*([^;]+);/)?.[1]?.trim();
+  assert.ok(startTransform, "关键帧要从 0% 开始");
+  assert.equal(endTransform, startTransform);
+  // 采样够密，方向才会一点点转过去，而不是一格一格地折。
+  assert.ok((driftKeyframes.match(/transform:/g) || []).length >= 8);
   assert.doesNotMatch(driftKeyframes, /background-position/);
   assert.doesNotMatch(styles, /generation-loading-(drop|wave|breathe|water-bubbles|water-flow|wave-drift)/);
   assert.match(
@@ -2156,6 +2168,40 @@ test("the blurred background moves smoothly without water or tiling", async () =
     /\.generation-loading-shell\[data-generation-loading-mode="waiting"\]::before\s*\{[\s\S]*?--generation-loading-aurora-opacity:/,
   );
 });
+
+
+// 七彩祥云：四条色带同时存在不同色相，整片云再沿色轮慢转，颜色才会“慢慢变化”。
+// 祥云化形：偶尔浮出淡淡的人/动物剪影，只允许动 opacity 与 transform。
+// 祥云化形：一次只凝出一只，收拢→停住→散开，四只靠随机相位错开时隙。
+test("the loading clouds keep several hues and drift through the spectrum", async () => {
+  const styles = await readFile(stylesPath, "utf8");
+  const shellRule = styles.match(/\n\.generation-loading-shell \{[\s\S]*?\n\}/)?.[0] || "";
+  const backgroundRule = styles.match(/\n\.generation-loading-shell::before\s*\{[\s\S]*?\n\}/)?.[0] || "";
+
+  // 主色带沿用阶段色相，另外三条沿色轮铺开，同一帧里就能看到多种颜色。
+  assert.match(shellRule, /--generation-loading-cloud-a:\s*var\(--generation-loading-fluid\)/);
+  assert.match(shellRule, /--generation-loading-cloud-b:\s*hsl\(\s*calc\(var\(--generation-loading-hue\) \+ 70\)/);
+  assert.match(shellRule, /--generation-loading-cloud-c:\s*hsl\(\s*calc\(var\(--generation-loading-hue\) \+ 145\)/);
+  assert.match(shellRule, /--generation-loading-cloud-d:\s*hsl\(\s*calc\(var\(--generation-loading-hue\) \+ 215\)/);
+  assert.match(backgroundRule, /var\(--generation-loading-cloud-b\)/);
+  assert.match(backgroundRule, /var\(--generation-loading-cloud-d\)/);
+
+  // 转色挂在外壳 filter 上：模糊层保持静态，不会为了换色每帧重绘。
+  assert.match(shellRule, /animation:\s*generation-loading-rainbow-color 60000ms linear infinite;/);
+  assert.doesNotMatch(backgroundRule, /hue-rotate/);
+  assert.match(styles, /@keyframes generation-loading-rainbow-color\s*\{[\s\S]*hue-rotate\(0deg\)[\s\S]*hue-rotate\(360deg\)/);
+
+  // 失败态保持纯红，不参与转色；减少动效时转色也要停。
+  assert.match(
+    styles,
+    /\.generation-loading-shell\[data-generation-loading-family="failed"\]\s*\{[\s\S]*?animation:\s*none;/
+  );
+  assert.match(
+    styles,
+    /@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?\.generation-loading-shell,[\s\S]*?animation:\s*none;/,
+  );
+});
+
 
 test("the centered text and heartbeat icon stay legible over the blurred background", async () => {
   const styles = await readFile(stylesPath, "utf8");
@@ -2592,6 +2638,15 @@ test("prompt agent preview marks uploaded images as zoomable and animates analys
   assert.match(promptAgentAnalysisAurora, /filter:\s*blur\([^;]+\);/);
   assert.match(promptAgentAnalysisAurora, /animation:\s*workbench-busy-aurora-drift/);
   assert.match(styles, /\.prompt-agent-image-viewer\.open[\s\S]*display:\s*grid;/);
+  // 放大预览按容器等比显示：小图也放大到贴边，不再退回原生像素。
+  const promptAgentViewerRule = styles.match(/#promptAgentImageViewerImage,[\s\S]*?\n\}/)?.[0] || "";
+  assert.match(promptAgentViewerRule, /width:\s*min\(100%,\s*calc\(\(100svh - 126px\) \* var\(--preview-image-ratio,\s*1\)\)\);/);
+  assert.match(promptAgentViewerRule, /object-fit:\s*contain;/);
+  assert.match(promptAgentViewerRule, /max-height:\s*calc\(100svh - 126px\);/);
+  assert.doesNotMatch(promptAgentViewerRule, /max-width:\s*100%;[\s\S]*?object-fit:\s*scale-down/);
+  assert.match(app, /function bindPreviewImageViewerRatios\(\) \{/);
+  assert.match(app, /bindPreviewImageViewerRatios\(\);/);
+  assert.match(app, /image\.style\.setProperty\("--preview-image-ratio", String\(Number\(ratio\.toFixed\(4\)\)\)\);/);
   assert.match(app, /function openPromptAgentImageViewer\(\)/);
   assert.match(app, /refs\.promptAgentPreviewButton\.addEventListener\("click", openPromptAgentImageViewer\)/);
   assert.match(app, /refs\.promptAgentPreview\.classList\.toggle\("is-analyzing", state\.promptAgent\.running\)/);
@@ -2973,6 +3028,38 @@ test("studio layout consumes density variables for wide-screen adaptation withou
   assert.match(styles, /html\[data-ui-layout="narrow-desktop"\] \.studio-grid\s*\{/);
 });
 
+test("studio reference slot and prompt fill keep the input column bottom aligned with the filmstrip labels", async () => {
+  const styles = await readFile(stylesPath, "utf8");
+  const app = await readFile(appPath, "utf8");
+
+  assert.match(styles, /\.reference-field-group\s*\{[\s\S]*container-type:\s*inline-size;/);
+  assert.match(
+    styles,
+    /\.reference-field-group > \.reference-grid\s*\{[\s\S]*grid-auto-rows:\s*calc\(\(100cqi - 20px\) \/ 3\);/,
+  );
+  assert.match(
+    styles,
+    /\.reference-field-group > \.reference-dropzone\s*\{[\s\S]*min-height:\s*calc\(\(100cqi - 20px\) \/ 3\);([\s\S]*grid-template-columns:\s*auto minmax\(0, 1fr\);)/,
+  );
+  assert.match(
+    styles,
+    /\.reference-field-group > \.reference-dropzone\.is-compact-hidden\s*\{[\s\S]*min-height:\s*0;[\s\S]*padding:\s*0;/,
+  );
+  assert.match(
+    styles,
+    /\.prompt-field textarea\s*\{[\s\S]*min-height:\s*max\(56px,\s*calc\(var\(--textarea-min-height,\s*96px\) - 24px\)\);/,
+  );
+  assert.match(app, /function getStudioFilmstripBaseline\(\) \{[\s\S]*filmstrip\.querySelector\("\.filmstrip-item span, \.filmstrip-placeholder-label"\)/);
+  assert.match(app, /function canFillStudioPrompt\(\) \{[\s\S]*state\.activeView === "studio"[\s\S]*state\.studioMode !== "style-transfer"[\s\S]*!STACKED_STUDIO_LAYOUT_MODES\.has\(getCurrentStudioLayoutMode\(\)\)/);
+  assert.match(app, /function syncStudioPromptFill\(\) \{[\s\S]*refs\.promptInput\?\.style\.removeProperty\("height"\)[\s\S]*studioPromptManualHeight > 0[\s\S]*const baseline = getStudioFilmstripBaseline\(\);[\s\S]*prompt\.style\.height = /);
+  assert.match(app, /function scheduleStudioPromptFillSync\(\) \{[\s\S]*window\.requestAnimationFrame\([\s\S]*syncStudioPromptFill\(\);/);
+  assert.match(app, /restoreSettingsFormScrollTop\(settingsScrollTop\);\s*scheduleStudioPromptFillSync\(\);/);
+  assert.match(app, /function renderFilmstrip\(\) \{[\s\S]*renderFilmstripPlaceholder\(\);\s*scheduleStudioPromptFillSync\(\);[\s\S]*renderFilmstripPreservingSelection[\s\S]*scheduleStudioPromptFillSync\(\);/);
+  assert.match(app, /function bindStudioPromptFillSync\(\) \{[\s\S]*pointerdown[\s\S]*pointerup[\s\S]*studioPromptManualHeight = prompt\.offsetHeight;/);
+  assert.match(app, /function syncStudioDensity\(\) \{\s*studioPromptManualHeight = 0;/);
+  assert.match(app, /bindStudioPromptFillSync\(\);/);
+});
+
 test("every density keeps the desktop app shell flush without a viewport breakpoint jump", async () => {
   const styles = await readFile(stylesPath, "utf8");
   const app = await readFile(appPath, "utf8");
@@ -3134,6 +3221,102 @@ test("compact preview toolbar keeps controls evenly distributed and centered", a
   );
   assert.match(zoomLabelRule, /display:\s*grid;/);
   assert.match(zoomLabelRule, /place-items:\s*center;/);
+});
+
+test("preview surfaces hold a 16:9 display area with the meta folded into the toolbar row", async () => {
+  const html = await readFile(indexPath, "utf8");
+  const styles = await readFile(stylesPath, "utf8");
+  const app = await readFile(appPath, "utf8");
+  const surfaceRule = readCssRule(styles, ".preview-surface");
+  const canvasRatioRule = readCssRule(styles, ".preview-surface > .preview-canvas");
+  const toolbarInfoRule = readCssRule(styles, ".preview-toolbar-info");
+  const toolbarMetaRule = readCssRule(styles, ".preview-toolbar-info .preview-meta");
+  const toolbarMetaItemRule = readCssRule(styles, ".preview-toolbar-info .preview-meta > span");
+
+  // 工作室预览和图片编辑 / 快速溶图 / 图片拆解共用一套显示区结构：
+  // 画布外面套 preview-surface（只负责量尺寸并居中），信息行走工具栏同一行。
+  const panelCases = [
+    {
+      label: "studio",
+      panel: html.match(/<section class="studio-panel preview-panel">[\s\S]*?<div class="filmstrip-row[^"]*"/)?.[0] || "",
+      surface: /class="prompt-preview-surface preview-surface"/,
+      metaIds: ["previewModel", "previewTime", "previewId", "previewSize"],
+      toolbarTail: /class="zoom-controls"[\s\S]*id="zoomOutButton"/,
+    },
+    {
+      label: "image-edit",
+      panel:
+        html.match(/<section class="studio-panel preview-panel image-edit-preview-panel">[\s\S]*?<div class="filmstrip-row[^"]*"/)?.[0] || "",
+      surface: /class="preview-surface"/,
+      metaIds: ["imageEditGenerationMeta"],
+      toolbarTail: /class="zoom-controls image-edit-preview-status"/,
+    },
+    {
+      label: "quick-blend",
+      panel:
+        html.match(/<section class="studio-panel preview-panel quick-blend-preview-panel">[\s\S]*?<div class="filmstrip-row[^"]*"/)?.[0] || "",
+      surface: /class="preview-surface"/,
+      metaIds: ["quickBlendGenerationMeta"],
+      toolbarTail: /class="zoom-controls quick-blend-preview-status"/,
+    },
+    {
+      label: "image-decomposition",
+      panel:
+        html.match(/<section class="studio-panel preview-panel image-decomposition-preview-panel">[\s\S]*?<div class="filmstrip-row[^"]*"/)?.[0] || "",
+      surface: /class="preview-surface"/,
+      metaIds: ["imageDecompositionGenerationMeta"],
+      toolbarTail: /class="zoom-controls image-decomposition-preview-status"/,
+    },
+  ];
+
+  for (const testCase of panelCases) {
+    assert.ok(testCase.panel.length > 0, testCase.label + " panel should exist");
+    const parts = testCase.panel.split(/<div class="preview-toolbar(?: [^"]*)?">/);
+    const beforeToolbar = parts[0] || "";
+    const toolbarBlock = parts[1] || "";
+    assert.match(beforeToolbar, testCase.surface, testCase.label + " keeps a preview-surface host");
+    // 画布上方不再单独占一行。
+    assert.equal(beforeToolbar.includes("preview-meta"), false, testCase.label + " meta should not sit above the canvas");
+    // 信息行 + 状态/缩放走工具栏同一行。
+    const metaPattern = ['class="preview-toolbar-info']
+      .concat('class="preview-meta')
+      .concat(testCase.metaIds.map((id) => 'id="' + id + '"'))
+      .join("[\\s\\S]*");
+    assert.match(toolbarBlock, new RegExp(metaPattern), testCase.label + " meta should move into the toolbar info row");
+    assert.match(toolbarBlock, testCase.toolbarTail, testCase.label + " toolbar keeps its status/zoom controls");
+  }
+
+  // 显示区比例由 16:9 决定：先宽度铺满，再用可用高度反推宽度封顶，永不撑破面板。
+  assert.match(surfaceRule, /display:\s*grid;/);
+  assert.match(surfaceRule, /place-items:\s*center;/);
+  assert.match(surfaceRule, /container-type:\s*size;/);
+  assert.match(surfaceRule, /--preview-ratio:\s*1\.7777778;/);
+  assert.match(canvasRatioRule, /aspect-ratio:\s*var\(--preview-ratio\);/);
+  assert.match(canvasRatioRule, /width:\s*min\(100%,\s*calc\(100cqh \* var\(--preview-ratio\)\)\);/);
+  assert.match(canvasRatioRule, /margin:\s*0;/);
+  // 有结果图时画布不再自己画底，避免图片四周出现与面板不同色的一圈。
+  assert.match(
+    styles,
+    /\.preview-surface > \.preview-canvas:has\(> img\.is-mounted\)\s*\{[\s\S]*background:\s*transparent;[\s\S]*border-color:\s*transparent;[\s\S]*box-shadow:\s*none;/,
+  );
+  // 画框比例由结果图实际尺寸驱动，四个视图共用同一处绑定。
+  assert.match(app, /function bindPreviewSurfaceRatios\(\) \{/);
+  assert.match(app, /bindPreviewSurfaceRatios\(\);/);
+  assert.match(app, /attributeFilter:\s*\["src", "class"\]/);
+  assert.match(app, /surface\.style\.setProperty\("--preview-ratio", String\(Number\(ratio\.toFixed\(6\)\)\)\);/);
+  assert.match(app, /surface\.style\.removeProperty\("--preview-ratio"\);/);
+  assert.match(toolbarInfoRule, /flex:\s*1 1 0%;/);
+  assert.match(toolbarMetaRule, /flex-wrap:\s*nowrap;/);
+  assert.match(toolbarMetaItemRule, /overflow:\s*hidden;/);
+  assert.match(toolbarMetaItemRule, /text-overflow:\s*ellipsis;/);
+
+  // 窄屏/堆叠布局是内容高度，容器查询拿不到确定高度，退回按宽度定比例，且不受旧 min-height 影响。
+  assert.match(
+    styles,
+    /html\[data-ui-layout="stacked"\] \.preview-surface,[\s\S]*html\[data-ui-layout="mobile"\] \.preview-surface\s*\{[\s\S]*container-type:\s*normal;/);
+  assert.match(
+    styles,
+    /html\[data-ui-layout="mobile"\] \.preview-surface > \.preview-canvas\s*\{[\s\S]*width:\s*100%;[\s\S]*min-height:\s*0;/);
 });
 
 test("compact image decomposition keeps operation panels before results without implicit grid tracks", async () => {
@@ -4058,14 +4241,17 @@ test("prompt template library exposes personal actions and list/image browse vie
   assert.match(app, /applyPromptTemplateLibrary\(template\)/);
   assert.doesNotMatch(app, /copyPromptTemplateLibraryToPersonal|复制到我的模板/);
   assert.match(app, /openPromptTemplateLibraryPreview\(template\)/);
-  assert.match(app, /prompt\.textContent = template\.prompt/);
+  assert.match(app, /summary\.textContent = template\.summary/);
+  assert.match(app, /prompt-template-library-preview-link/);
+  assert.match(app, /prompt-template-library-card-head/);
   assert.match(styles, /\.prompt-template-title-button\s*\{[\s\S]*white-space:\s*nowrap;/);
   assert.match(styles, /\.prompt-template-row-actions\s*\{[\s\S]*display:\s*flex;/);
   assert.match(styles, /\.prompt-template-row-actions \.mini-action\s*\{[\s\S]*width:\s*auto;[\s\S]*height:\s*24px;[\s\S]*white-space:\s*nowrap;/);
   assert.doesNotMatch(styles, /\.prompt-template-library-grid\[data-view="masonry"\]/);
   assert.match(styles, /\.prompt-template-library-grid\[data-view="list"\]/);
   assert.match(styles, /\.prompt-template-library-grid\[data-view="image"\]/);
-  assert.match(styles, /\.prompt-template-library-card-actions\s*\{[\s\S]*position:\s*absolute[\s\S]*top:\s*8px/);
+  assert.match(styles, /\.prompt-template-library-apply\s*\{[\s\S]*background:\s*var\(--accent\)/);
+  assert.match(styles, /\.prompt-template-personal \.prompt-template-list\s*\{[\s\S]*overflow-y:\s*auto/);
 });
 
 test("prompt template storage respects an intentionally empty saved list", async () => {

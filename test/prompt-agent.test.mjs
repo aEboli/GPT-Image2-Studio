@@ -1797,6 +1797,86 @@ test("prompt agent preserves the five-group structured reverse prompt without le
   assert.equal("style_tags" in result, false);
 });
 
+test("prompt agent rejects a hollow structured reverse prompt", () => {
+  const payload = {
+    output: [
+      {
+        content: [
+          {
+            type: "output_text",
+            text: JSON.stringify({
+              subject: { type: "", pose: "", expression: "", appearance: [], clothing: "", interaction: "" },
+              framing: {
+                aspect_ratio: "",
+                shot_size: "",
+                subject_scale: "",
+                placement: "",
+                negative_space: "",
+                foreground_frame: "",
+                camera: "",
+                angle: "",
+                crop: "",
+                perspective: "",
+                depth_of_field: "",
+              },
+              scene: "背景为无缝纯白色无影棚式空白环境。",
+              visual: "风格锁定：日式动漫全身立绘；柔和单向顶侧光。",
+              avoid: ["改变媒介"],
+            }),
+          },
+        ],
+      },
+    ],
+  };
+
+  assert.throws(() => extractPromptAgentJson(payload), /主体与构图信息/u);
+});
+
+test("prompt agent renders non-string structured fields as text instead of [object Object]", () => {
+  const payload = {
+    output: [
+      {
+        content: [
+          {
+            type: "output_text",
+            text: JSON.stringify({
+              subject: {
+                type: "夜景酒吧人像",
+                pose: "倚靠吧台站立",
+                expression: "",
+                appearance: [],
+                clothing: "黑色吊带裙",
+                interaction: "",
+              },
+              framing: {
+                aspect_ratio: "3:4 竖幅",
+                shot_size: "半身中景",
+                subject_scale: "约占画面高度一半",
+                placement: "人物居中偏左",
+                negative_space: "",
+                foreground_frame: "",
+                camera: { focal_length: "50mm", aperture: "f/2.8", focus: "人物眼睛" },
+                angle: "平视",
+                crop: "保留头顶与腰部",
+                perspective: "中焦压缩",
+                depth_of_field: "背景霓虹轻微虚化",
+              },
+              scene: "夜间露台酒吧。",
+              visual: "风格锁定：夜景人像；霓虹粉与深蓝对比。",
+              avoid: [],
+            }),
+          },
+        ],
+      },
+    ],
+  };
+
+  const result = extractPromptAgentJson(payload);
+
+  assert.equal(result.framing.camera, "50mm，f/2.8，人物眼睛");
+  assert.equal(JSON.stringify(result).includes("[object Object]"), false);
+});
+
 test("prompt agent still extracts legacy JSON prompt data from Responses output text", () => {
   const payload = {
     output: [

@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.073-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.074-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installer-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,7 +10,7 @@
 
 把提示词生图、参考图分析、图片编辑、电商套图、人物写真、文章插图、PPT 生成和素材管理集中到一个浏览器界面中。
 
-当前版本：`v0.2.073`
+当前版本：`v0.2.074`
 
 </div>
 
@@ -79,12 +79,12 @@ Windows 脚本入口（启动器、Native Messaging 安装/卸载、图片资源
 从包含桌面产物的 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
 
 ```text
-GPT-Image2-Studio-Desktop-Setup-v0.2.073-x64.exe
+GPT-Image2-Studio-Desktop-Setup-v0.2.074-x64.exe
 ```
 
 安装完成后通过桌面或开始菜单中的 `GPT-Image2-Studio` 启动。程序会在独立窗口中运行，内置服务使用动态回环端口，关闭窗口后不会遗留后台服务。无需另行安装 Node.js，完整说明见 [Windows 桌面程序文档](./docs/windows-desktop.md)。
 
-如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.073-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
+如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.074-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
 
 桌面开发使用 Electron `43`，要求 Node.js `22.12` 或更高版本；普通 `npm start` 服务仍支持 Node.js `20+`。
 
@@ -95,7 +95,7 @@ cmd /c npm run desktop
 
 ### 方式三：Windows 浏览器安装包（兼容旧版）
 
-旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.073` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
+旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.074` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
 
 ## 配置说明
 
@@ -134,7 +134,7 @@ cmd /c npm run desktop
 | Grok | xAI 官方或实现 Grok Imagine 图像协议的兼容服务 | 基础 URL、API Key、生图接口、图像模型 |
 | 配色 | 不是调用通道，只承载界面配色 | 无需填写；重新选回服务商配置区即恢复连接字段 |
 
-选中 **配色** 会隐藏连接字段，显示每行 4 个的 8 套简短配色色块。默认配色为「黑曜」——黑曜石的黑底配液态毛玻璃面层；其余 7 套里「靛蓝」沿用经典靛蓝，另外 6 套取自中国传统色库。选择会保存在浏览器本地，并同步到嵌入的 Temu 工作台。
+选中 **配色** 会隐藏连接字段，显示每行 4 个的 12 套配色色块。默认配色为「黑曜」；「靛蓝」继续保留，另有青花、竹影、天青、朱墙、朱漆、敦煌、松石、玫瑰、月白和流金等配色。选择会保存在浏览器本地，并同步到嵌入的 Temu 工作台。
 
 在 **配色** 和服务商配置区之间来回切换不会改动当前生效的生图路线，右上角状态仍显示该路线。
 
@@ -503,9 +503,9 @@ GPT-Image2-Studio 面向个人创作者、电商运营、设计师和内容团�
 - 生成队列、后台任务状态、错误信息和失败项重试；套图队列项同时显示队列位次和商品名。
 - 新生成图片使用带时分的描述性文件名；套图图片保留序号，同名文件递增后缀，画廊下载沿用实际保存的名称。
 - 生成日志按任务保留接口地址，结果行显示简短文件名，失败项保留错误详情。
-- **Prompt Kit** 现在提供可搜索的静态模板库：6 个一级分类、24 个二级分类，每个二级分类 10 条可直接复用的提示词。支持列表/图片视图，图片按每张预览图的原始宽高比显示，支持列表字号调节、完整提示词灯箱预览、一键应用和复制到我的模板；人像与头像分类随应用内置了从指定 YouMind 集合抓取并标注来源的 40 个不同预览资源，每张图片都绑定对应的来源标题和提示词。其他分类使用按模板稳定生成、构图和主体各不相同的离线预览，不再反复显示同一张占位图。已有自定义模板和 Prompt Agent 历史会保留，旧内置模板会按版本迁移到当前集合。
+- **Prompt Kit** 内置 520 组带来源标注的 YouMind GPT Image 2.5 / GPT Image 2 提示词与图片配对案例，分别为 321 组和 199 组。可按使用场景、视觉风格和主体浏览，按模型筛选、搜索或排序，并从列表或图片视图检查来源及应用提示词。预览图随应用本地分发，每条记录保留来源页面和 CC BY 4.0 署名信息；已有自定义模板和 Prompt Agent 历史会保留。
 - **图片转提示词**新增明确的风格锁定词汇，分别记录媒介、审美、色彩、光线、材质、景深和后期质感，并在规避项中指出可能的风格偏移。
-- 紧凑的 GPT / Gemini / Grok / 配色四配置区，GPT 下方紧贴路由/直连切换；API 历史隔离、接口字段对齐，长说明通过悬停/聚焦查看，生成日志独立滚动。当前调用摘要显示请求发起 IP 和可点击的生图服务 origin；8 套配色每行 4 个，默认「黑曜」，不再提供自定义颜色和花卉点缀。
+- 紧凑的 GPT / Gemini / Grok / 配色四配置区，GPT 下方紧贴路由/直连切换；API 历史按通道隔离，选择记录会一并恢复对应模型、地址、后缀和 Key，列表中的 Key 脱敏显示。接口字段对齐，长说明通过悬停/聚焦查看，生成日志独立滚动。当前调用摘要显示请求发起 IP 和可点击的生图服务 origin；12 套配色每行 4 个，默认「黑曜」。
 - 深色/浅色主题、中英文界面和跨桌面/平板/手机布局。
 
 ## 真实界面预览
@@ -660,8 +660,8 @@ cmd /c npm run build:desktop
 产物路径：
 
 ```text
-artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.073-x64.exe
-artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.073-x64.zip
+artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.074-x64.exe
+artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.074-x64.zip
 artifacts/desktop/win-unpacked/GPT-Image2-Studio.exe
 ```
 
@@ -679,7 +679,7 @@ cmd /c npm run build:installer
 产物路径格式：
 
 ```text
-artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.073.exe
+artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.074.exe
 ```
 
 脚本使用系统 `iexpress.exe` 生成自解压安装包，并把当前 Node.js 运行时和依赖打入安装目录；启动后仍使用默认浏览器显示工作台。
@@ -784,7 +784,13 @@ cmd /c npm run build:installer
 
 ## 版本更新说明
 
-完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.073](./docs/releases/v0.2.073.md)。
+完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.074](./docs/releases/v0.2.074.md)。
+
+### v0.2.074 更新说明
+
+- Prompt Kit 扩展为 520 组带来源署名的 YouMind GPT Image 2.5 / GPT Image 2 提示词和配对图片，新增模型筛选、分类浏览、搜索和排序。
+- API 历史会按连接恢复模型设置，选择器中的 Key 使用脱敏显示。
+- 配色扩展为 12 套，并改进生成等待动画与图片查看交互。
 
 ### v0.2.073 更新说明
 

@@ -1136,6 +1136,11 @@ test("detector 自检：/api/ 字面量扫描器报裸字面量、放行导出�
 //   openspec/**—— 提案与设计正当地记述被吸收项目的旧形态。
 const SHIPPED_SCAN_ROOTS = ["lib", "public", "scripts", "desktop"];
 const SHIPPED_SCAN_FILES = ["server.mjs", "package.json"];
+// 提示词快照是生成数据，作者链接/推文 ID 可能天然包含 4173 等数字。
+const STANDALONE_SCAN_EXCLUDED_FILES = new Set([
+  "lib/youmind-profile-entries.mjs",
+  "public/lib/youmind-profile-entries.mjs",
+]);
 
 const STANDALONE_NEEDLES = [
   { needle: "4173", label: "独立服务端口 4173" },
@@ -1163,6 +1168,9 @@ async function scanStandaloneNeedles(rootDirectory, { roots, files }) {
   const inComments = new Map();
   for (const file of targets) {
     const relativePath = relative(rootDirectory, file).split(sep).join("/");
+    if (STANDALONE_SCAN_EXCLUDED_FILES.has(relativePath)) {
+      continue;
+    }
     let content;
     try {
       content = await readFile(file, "utf8");

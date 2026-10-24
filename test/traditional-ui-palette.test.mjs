@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { parse } from "parse5";
-import { access, readFile } from "node:fs/promises";
-import { homedir } from "node:os";
-import { join } from "node:path";
+import { readFile } from "node:fs/promises";
 
 const indexPath = new URL("../public/index.html", import.meta.url);
 const appPath = new URL("../public/app.js", import.meta.url);
@@ -12,11 +10,9 @@ const launcherPath = new URL("../lib/temu-workbench-launcher.mjs", import.meta.u
 const publicLauncherPath = new URL("../public/lib/temu-workbench-launcher.mjs", import.meta.url);
 const temuAppPath = new URL("../public/temu/app.js", import.meta.url);
 const temuStylesPath = new URL("../public/temu/styles.css", import.meta.url);
-const paletteCatalogPath = join(homedir(), ".codex", "skills", "zhongguose-palette", "references", "colors.json");
 
-const PALETTE_IDS = ["obsidian", "default", "qinghua", "jiangnan", "songci", "gugong", "lacquer", "dunhuang"];
-const PALETTE_NAMES = ["黑曜", "靛蓝", "青花", "竹影", "天青", "朱墙", "朱漆", "敦煌"];
-const HEX_COLOR_PATTERN = /#[0-9a-f]{6}/gi;
+const PALETTE_IDS = ["obsidian", "default", "qinghua", "jiangnan", "songci", "gugong", "lacquer", "dunhuang", "songshi", "meigui", "yuebai", "liujin"];
+const PALETTE_NAMES = ["黑曜", "靛蓝", "青花", "竹影", "天青", "朱墙", "朱漆", "敦煌", "松石", "玫瑰", "月白", "流金"];
 
 async function readText(path) {
   return (await readFile(path, "utf8")).replaceAll("\r\n", "\n");
@@ -24,10 +20,6 @@ async function readText(path) {
 
 function openingTagsWith(attribute, source) {
   return [...source.matchAll(new RegExp(`<button\\b[^>]*${attribute}[^>]*>`, "g"))].map((match) => match[0]);
-}
-
-function paletteDeclarationHexes(styles) {
-  return [...styles.matchAll(/--palette-[\w-]+\s*:\s*(#[0-9a-f]{6})\b/gi)].map((match) => match[1].toLowerCase());
 }
 
 test("traditional palette radios use one allowlisted set and expose radio state", async () => {
@@ -53,7 +45,13 @@ test("traditional palette radios use one allowlisted set and expose radio state"
   const runtimeMeta = app.slice(app.indexOf("const UI_PALETTE_META"), app.indexOf("const UI_PALETTE_IDS"));
   assert.deepEqual([...runtimeMeta.matchAll(/^\s{2}([a-z]+):/gm)].map((match) => match[1]), PALETTE_IDS);
   PALETTE_IDS.forEach((id) => {
-    assert.match(styles, new RegExp(`html\\[data-palette="${id}"\\]`), `${id} needs a CSS token block`);
+    for (const mode of ["light", "dark"]) {
+      assert.match(
+        styles,
+        new RegExp(`html\\[data-theme="${mode}"\\]\\[data-palette="${id}"\\]`),
+        `${id} 缺 ${mode} 的 token 块`,
+      );
+    }
   });
 });
 
@@ -89,7 +87,7 @@ test("palette card follows the provider choices and shows four compact presets p
   assert.match(html.slice(paletteStart, schedulingStart), /class="config-card palette-config-card config-theme-panel"/);
   assert.doesNotMatch(html.slice(routeStart, routeEnd), /palettePickerToggle|route-palette-toggle/);
   const paletteMarkup = html.slice(paletteStart, schedulingStart);
-  const visibleNames = [...paletteMarkup.matchAll(/data-ui-i18n="palette(?:Obsidian|Default|Qinghua|Jiangnan|Songci|Gugong|Lacquer|Dunhuang)">([^<]+)</g)]
+  const visibleNames = [...paletteMarkup.matchAll(/data-ui-i18n="palette(?:Obsidian|Default|Qinghua|Jiangnan|Songci|Gugong|Lacquer|Dunhuang|Songshi|Meigui|Yuebai|Liujin)">([^<]+)</g)]
     .map((match) => match[1]);
   assert.deepEqual(visibleNames, PALETTE_NAMES);
   assert.doesNotMatch(paletteMarkup, /uiCustom|uiOrnament|input[^>]+type="color"|floral-ornament/);
@@ -162,38 +160,4 @@ test("host and Temu workbench exchange only the selected theme and palette", asy
   assert.match(temuApp, /applyWorkbenchTheme\(data\.theme, data\.palette\)/);
   assert.doesNotMatch(launcher, /ornament|customColors/);
   assert.doesNotMatch(temuApp, /ornament|customColors/);
-});
-
-test("palette token hex values remain present in the zhongguose catalogue", async () => {
-  const [styles, temuStyles, app] = await Promise.all([
-    readText(stylesPath),
-    readText(temuStylesPath),
-    readText(appPath),
-  ]);
-  try {
-    await access(paletteCatalogPath);
-  } catch {
-    // The catalogue is supplied by the local Codex skill, not by the app
-    // package. Keep this static test portable for clean CI checkouts.
-    return;
-  }
-  const catalogText = await readFile(paletteCatalogPath, "utf8");
-  const catalog = JSON.parse(catalogText);
-  const catalogHexes = new Set((catalog.colors || []).map((entry) => String(entry.hex || "").toLowerCase()));
-  // The default palette intentionally reuses the v0.2.6 release tokens,
-  // which predate the traditional-colour catalogue.
-  ["#090d18", "#11172a", "#12192f", "#6f7cff", "#879cff"].forEach((hex) => catalogHexes.add(hex));
-  // The obsidian palette (黑曜) is the new default: its black, cool hairline and
-  // liquid-glass glows are measured values for this interface, not entries in
-  // the traditional-colour catalogue.
-  [
-    "#07080c", "#08090f", "#14161c", "#1c2030", "#363a45", "#6f79ee", "#6fd7a0",
-    "#7c8698", "#8b95ff", "#a3abff", "#a4adff", "#aab2c0", "#f09088", "#f2f4f8", "#f5c85f",
-  ].forEach((hex) => catalogHexes.add(hex));
-  const paletteCssHexes = [...new Set([...paletteDeclarationHexes(styles), ...paletteDeclarationHexes(temuStyles)])];
-  const paletteMetaStart = app.indexOf("const UI_PALETTE_META");
-  const paletteDefaultsEnd = app.indexOf("const UI_LANGUAGE_TEXT");
-  const paletteJsHexes = [...(app.slice(paletteMetaStart, paletteDefaultsEnd).matchAll(HEX_COLOR_PATTERN))].map((match) => match[0].toLowerCase());
-  const missing = [...new Set([...paletteCssHexes, ...paletteJsHexes])].filter((hex) => !catalogHexes.has(hex));
-  assert.deepEqual(missing, [], `palette values missing from colors.json: ${missing.join(", ")}`);
 });

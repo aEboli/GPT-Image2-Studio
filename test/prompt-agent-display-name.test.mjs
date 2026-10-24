@@ -86,6 +86,48 @@ test("structured image prompt name uses a grounded scene anchor when subject det
   assert.equal(getPromptAgentDisplayName({ json, filename: "hash-analysis.jpg" }), "瑜伽垫·家居室内·暖光");
 });
 
+test("structured image prompt name falls back to a visual style anchor when subject and scene anchors are missing", () => {
+  const json = structuredPrompt({
+    scene: "背景为无缝纯白色无影棚式空白环境，没有可见地面、家具或叙事性场景。",
+    visual: "风格锁定：日式动漫全身立绘；赛璐璐平涂上色；柔和单向顶侧光。",
+  });
+
+  assert.equal(getStructuredImagePromptDisplayName(json), "日式动漫全身立绘·柔光");
+  assert.equal(
+    getPromptAgentDisplayName({ json, filename: "f803767745b34b23f08aaabce8694490.png" }),
+    "日式动漫全身立绘·柔光",
+  );
+});
+
+test("structured image prompt name does not accept a lone atmosphere word", () => {
+  const json = structuredPrompt({
+    scene: "背景为无缝纯白色无影棚式空白环境。",
+    visual: "柔和单向顶侧光，通透肤色。",
+  });
+
+  assert.equal(getStructuredImagePromptDisplayName(json), "");
+  assert.equal(
+    getPromptAgentDisplayName({ json, filename: "f803767745b34b23f08aaabce8694490.png" }),
+    "f803767745b34b23f08aaabce8694490",
+  );
+});
+
+test("structured image prompt name keeps only the leading phrase of a descriptive subject type", () => {
+  const json = structuredPrompt({
+    subject: { type: "anime 女性角色，二次元插画风格" },
+    scene: "高层露台夜间酒吧，右侧酒架与霓虹灯。",
+  });
+
+  assert.equal(getStructuredImagePromptDisplayName(json), "anime 女性·霓虹灯·夜晚");
+});
+
+test("structured image prompt name falls back to the filename when no grounded segment exists", () => {
+  const json = structuredPrompt();
+
+  assert.equal(getStructuredImagePromptDisplayName(json), "");
+  assert.equal(getPromptAgentDisplayName({ json, filename: "abc-123.png" }), "abc-123");
+});
+
 test("structured image prompt name preserves a descriptive non-human subject type", () => {
   const json = structuredPrompt({
     subject: {

@@ -63,7 +63,7 @@ The system SHALL return ordinary image-to-prompt analysis as one strict JSON obj
 
 ### Requirement: Reverse prompt records and templates use grounded descriptive names
 
-The system SHALL present each image-to-prompt result with one concise display name shared by its history row and automatically saved prompt template. An existing non-empty `json.title` SHALL remain authoritative. Otherwise, a new five-group structured result SHALL derive a grounded Chinese name in the order of subject or visible action, representative scene details, and one concise atmosphere segment based on time, weather, lighting, color, or tone; missing dimensions SHALL be skipped, repeated details SHALL be removed, and the result SHALL NOT exceed 40 Unicode characters. When subject fields are empty, a grounded representative scene object MAY serve as the first name segment. If no structured name can be derived, the system SHALL use the uploaded filename without its image extension, followed by `图片反推 JSON` only when no usable filename stem exists.
+The system SHALL present each image-to-prompt result with one concise display name shared by its history row and automatically saved prompt template. An existing non-empty `json.title` SHALL remain authoritative. Otherwise, a new five-group structured result SHALL derive a grounded Chinese name in the order of subject or visible action, representative scene details, and one concise atmosphere segment based on time, weather, lighting, color, or tone; missing dimensions SHALL be skipped, repeated details SHALL be removed, and the result SHALL NOT exceed 40 Unicode characters. When subject fields are empty, a grounded representative scene object MAY serve as the first name segment. The subject segment SHALL use only the leading phrase of `subject.type`, stopping at the first comma, semicolon, full stop, or slash. When neither subject nor scene yields a segment, the first concrete medium or aesthetic clause of the `visual` style-lock segment SHALL serve as the style anchor ahead of the atmosphere segment. A display name SHALL contain at least one grounded segment from the subject, the scene, or that style anchor; an atmosphere segment alone SHALL NOT become the display name. If no structured name can be derived, the system SHALL use the uploaded filename without its image extension, followed by `图片反推 JSON` only when no usable filename stem exists.
 
 #### Scenario: Structured result contains complementary visual details
 
@@ -76,6 +76,17 @@ The system SHALL present each image-to-prompt result with one concise display na
 - **WHEN** a five-group result has no reliable subject type but describes a representative scene object, location, and visible lighting or color treatment
 - **THEN** its history row and automatic template use the grounded scene object, location, and atmosphere as the available name segments
 - **AND** the name does not fall back to the uploaded filename while those structured details are available
+
+#### Scenario: Subject and scene anchors are both unavailable
+
+- **WHEN** a five-group result has no usable subject type and no representative scene object, but its `visual` starts with a style-lock segment
+- **THEN** its history row and automatic template use the first concrete medium or aesthetic clause from that style-lock segment as the leading name segment, followed by the atmosphere segment
+- **AND** the name does not fall back to the uploaded filename while that style anchor is available
+
+#### Scenario: Descriptive subject type carries a trailing style clause
+
+- **WHEN** `subject.type` reads like a leading subject phrase followed by a comma-separated style note
+- **THEN** only the leading subject phrase is used as the subject name segment
 
 #### Scenario: Existing result has a title
 
