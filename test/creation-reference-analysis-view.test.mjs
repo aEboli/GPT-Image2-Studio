@@ -8,6 +8,7 @@ import {
   getCreationReferenceAnalysisCategoryProductName,
   getCreationReferenceAnalysisProductNameSuggestion,
   getCreationReferenceAnalysisDisplayRoleLabel,
+  getCreationReferenceAnalysisGroupedSubjectUnitCount,
   getCreationReferenceAnalysisRoleCorrectionReason,
   normalizeCreationReferenceAnalysisUnitCountNote,
   resolveCreationReferenceAnalysisCategoryValue,
@@ -359,4 +360,32 @@ test("creation reference analysis removes model-generated singular product-body 
   );
 
   assert.equal(note, "这张图应主要影响银鲤色仿生鱼形路亚的外观配色、分节鱼身、三本钩和尾鳍细节");
+});
+
+
+test("creation reference analysis counts a matched pair of gloves as one sellable unit", () => {
+  const note =
+    "作为主图识别、移动端缩略图和 SKU 对比的主体参考，保留（两只黑色手套组成一双）及其腕部显示屏、按键和 HOT 字样；图中一共 2 个完整产品单位。";
+  const entry = { filename: "heated-gloves.png", role: "reference-product", note };
+  const skuSubjects = [{ filenames: ["heated-gloves.png"], note, subject_unit_count: 2 }];
+
+  assert.equal(getCreationReferenceAnalysisGroupedSubjectUnitCount(entry, skuSubjects), 1);
+
+  const normalized = normalizeCreationReferenceAnalysisUnitCountNote(note, 1);
+  assert.doesNotMatch(normalized, /2 个完整产品单位/);
+  assert.match(normalized, /1 个完整产品单位/);
+  assert.match(normalized, /一双/);
+  assert.match(normalized, /HOT 字样；图中共 1 个完整产品单位/);
+  assert.doesNotMatch(normalized, /图中一；/);
+});
+
+test("creation reference analysis keeps independently sold duplicates and extra pairs as multiple units", () => {
+  const lureNote =
+    "One product-subject reference image contains two complete visible lure bodies: orange top and silver bottom.";
+  assert.equal(getCreationReferenceAnalysisGroupedSubjectUnitCount({ filename: "lures.png", note: lureNote }, []), 2);
+  assert.match(normalizeCreationReferenceAnalysisUnitCountNote(lureNote, 2), /图中共 2 个完整产品单位/);
+
+  const twoPairsNote = "四只黑色手套组成两双，图中一共 4 个完整产品单位。";
+  assert.equal(getCreationReferenceAnalysisGroupedSubjectUnitCount({ filename: "two-pairs.png", note: twoPairsNote }, []), 2);
+  assert.match(normalizeCreationReferenceAnalysisUnitCountNote(twoPairsNote, 2), /按双计数/);
 });

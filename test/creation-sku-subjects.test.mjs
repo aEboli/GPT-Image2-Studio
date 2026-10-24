@@ -864,3 +864,40 @@ test("creation SKU payload drops a supplied label when it contains no recognized
   assert.deepEqual(subjects[0].colorNames, []);
   assert.equal(subjects[0].colorName, undefined);
 });
+
+
+test("creation SKU payload treats a matched pair of gloves as one sellable unit", () => {
+  const subjects = buildCreationSkuSubjectsForPayload({
+    referenceRoles: [
+      {
+        filename: "heated-gloves.png",
+        role: "product",
+        note: "两只黑色手套组成一双，保留腕部显示屏、按键和 HOT 字样。",
+        subjectUnitCount: 2,
+        colorNames: ["black", "black"],
+      },
+    ],
+  });
+
+  assert.equal(subjects.length, 1);
+  assert.equal(subjects[0].subjectUnitCount, undefined);
+  assert.deepEqual(subjects[0].colorNames, ["black"]);
+});
+
+test("creation SKU payload keeps multiple glove pairs as multiple sellable units", () => {
+  const subjects = buildCreationSkuSubjectsForPayload({
+    referenceRoles: [
+      {
+        filename: "two-glove-pairs.png",
+        role: "product",
+        note: "四只黑色手套组成两双，按双售卖。",
+        subjectUnitCount: 4,
+        colorNames: ["black", "black"],
+      },
+    ],
+  });
+
+  assert.equal(subjects.length, 1);
+  assert.equal(subjects[0].subjectUnitCount, 2);
+  assert.deepEqual(subjects[0].colorNames, ["black", "black"]);
+});

@@ -4768,3 +4768,33 @@ test("creation planner rejects missing product information", () => {
     /商品信息不能为空/,
   );
 });
+
+
+test("creation planner keeps a matched glove pair as one sellable unit in the SKU prompt", () => {
+  const note = "两只黑色手套组成一双，保留腕部显示屏、按键和 HOT 字样；图中一共 2 个完整产品单位。";
+  const plan = buildCreationPlan({
+    productName: "Heated gloves",
+    productDescription: "Black heated gloves sold as one pair",
+    sellingPoints: "one-button heat control, wrist display",
+    targetLanguage: "en",
+    selectedRoles: ["hero"],
+    referenceImageRoles: [{ filename: "heated-gloves.png", role: "reference-product", note }],
+    skuSubjects: [
+      {
+        id: "heated-gloves",
+        title: "Heated gloves",
+        filenames: ["heated-gloves.png"],
+        subjectUnitCount: 2,
+        colorNames: ["black", "black"],
+        note,
+      },
+    ],
+  });
+
+  const skuItem = plan.items.find((item) => item.role === "sku");
+
+  assert.equal(skuItem.skuSubject.subjectUnitCount, undefined);
+  assert.deepEqual(skuItem.skuSubject.colorNames, ["black"]);
+  assert.match(skuItem.prompt, /Matched pair unit/i);
+  assert.doesNotMatch(skuItem.prompt, /complete visible product units/i);
+});

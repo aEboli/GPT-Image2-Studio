@@ -1984,3 +1984,52 @@ test("prompt agent store preserves missing legacy mode and normalizes explicit m
     await rm(rootDir, { recursive: true, force: true });
   }
 });
+
+
+test("prompt agent instruction counts a matched pair as one sellable unit", () => {
+  const images = [{ filename: "heated-gloves.png", mimeType: "image/png", base64: "Z2xvdmVz" }];
+  const input = buildPromptAgentInput({ images, mode: CREATION_REFERENCE_ANALYSIS_MODE });
+  const instruction = input[0].content[0].text;
+
+  assert.match(instruction, /Count sellable units, not visible parts/i);
+  assert.match(instruction, /一双就是 1 个完整产品单位/);
+  assert.match(instruction, /成对售卖的左右套装不适用这一条/);
+});
+
+test("prompt agent normalizes a matched glove pair to one sellable unit", () => {
+  const note = "两只黑色手套组成一双，保留腕部显示屏、按键和 HOT 字样。";
+  const result = extractPromptAgentJson({
+    output: [
+      {
+        content: [
+          {
+            type: "output_text",
+            text: JSON.stringify({
+              summary: "Two black heated gloves sold as one pair.",
+              category_hint: "Apparel Accessories",
+              category_path: "Apparel Accessories > Gloves & Mittens > Heated Gloves",
+              reference_roles: [
+                { index: 1, filename: "heated-gloves.png", role: "product", note },
+              ],
+              sku_subjects: [
+                {
+                  id: "heated-gloves",
+                  title: "Heated gloves",
+                  reference_indexes: [1],
+                  filenames: ["heated-gloves.png"],
+                  subject_unit_count: 2,
+                  color_names: ["black", "black"],
+                  note,
+                },
+              ],
+              risks: [],
+            }),
+          },
+        ],
+      },
+    ],
+  });
+
+  assert.equal(result.sku_subjects[0].subject_unit_count, 1);
+  assert.deepEqual(result.sku_subjects[0].color_names, ["black"]);
+});

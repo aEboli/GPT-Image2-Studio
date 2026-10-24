@@ -1,5 +1,10 @@
 import { isCreationSubjectReferenceRole } from "./creation-reference-roles.mjs";
 import { normalizeCreationSkuColorLabels } from "./creation-sku-colors.mjs";
+import {
+  collapseCreationPairedSubjectColorLabels,
+  normalizeCreationPairedSubjectUnitCount,
+  resolveCreationPairedSubjectUnitCount,
+} from "./creation-paired-subject-units.mjs";
 
 function cleanString(value) {
   return String(value || "").trim();
@@ -305,11 +310,19 @@ function buildProductReferenceSkuSubjects(referenceRoles = []) {
   return getProductReferenceEntriesForSku(referenceRoles)
     .map((entry, index) => {
       const note = entry.note || "";
-      const subjectUnitCount = normalizeSubjectUnitCount(entry.subjectUnitCount ?? entry.subject_unit_count) ||
-        inferSubjectUnitCount([entry.filename, note].join(" "));
-      const colorNames = normalizeCreationSkuColorLabels(
-        entry.colorNames ?? entry.color_names ?? entry.colorName ?? entry.color_name ?? entry.colors ?? entry.colours,
-        subjectUnitCount > 1,
+      const subjectText = [entry.filename, note].join(" ");
+      const subjectUnitCount = normalizeCreationPairedSubjectUnitCount(
+        subjectText,
+        normalizeSubjectUnitCount(entry.subjectUnitCount ?? entry.subject_unit_count) ||
+          inferSubjectUnitCount(subjectText),
+      );
+      const colorNames = collapseCreationPairedSubjectColorLabels(
+        subjectText,
+        normalizeCreationSkuColorLabels(
+          entry.colorNames ?? entry.color_names ?? entry.colorName ?? entry.color_name ?? entry.colors ?? entry.colours,
+          subjectUnitCount > 1,
+        ),
+        subjectUnitCount,
       );
       const dimensionGroups = normalizeDimensionGroups(entry.dimensionGroups ?? entry.dimension_groups);
       return {
@@ -550,22 +563,30 @@ function enrichSkuSubjectFromProductReferences(subject = {}, productReferenceSub
   const note = !ownNote || (referenceNote && referenceNote.length > ownNote.length)
     ? mergeSubjectNotes(ownNote, referenceNote ? [referenceNote] : [])
     : ownNote;
-  const subjectUnitCount = Math.max(
-    normalizeSubjectUnitCount(subject.subjectUnitCount),
-    ...matchedSubjects.map((entry) => normalizeSubjectUnitCount(entry.subjectUnitCount)),
-    inferSubjectUnitCount([subject.title, inferenceNote].join(" ")),
+  const subjectText = [subject.title, inferenceNote].join(" ");
+  const subjectUnitCount = normalizeCreationPairedSubjectUnitCount(
+    subjectText,
+    Math.max(
+      normalizeSubjectUnitCount(subject.subjectUnitCount),
+      ...matchedSubjects.map((entry) => normalizeSubjectUnitCount(entry.subjectUnitCount)),
+      inferSubjectUnitCount(subjectText),
+    ),
   );
   const structuredColorSource = Array.isArray(subject.colorNames)
     ? subject.colorNames
     : matchedSubjects.find((entry) => Array.isArray(entry.colorNames))?.colorNames;
-  const colorNames = structuredColorSource !== undefined
-    ? normalizeCreationSkuColorLabels(structuredColorSource)
-    : uniqueColorNames([
-        ...normalizeCreationSkuColorLabels(subject.colorName, subjectUnitCount > 1),
-        ...matchedSubjects.flatMap((entry) =>
-          normalizeCreationSkuColorLabels(entry.colorName, normalizeSubjectUnitCount(entry.subjectUnitCount) > 1),
-        ),
-      ]);
+  const colorNames = collapseCreationPairedSubjectColorLabels(
+    subjectText,
+    structuredColorSource !== undefined
+      ? normalizeCreationSkuColorLabels(structuredColorSource)
+      : uniqueColorNames([
+          ...normalizeCreationSkuColorLabels(subject.colorName, subjectUnitCount > 1),
+          ...matchedSubjects.flatMap((entry) =>
+            normalizeCreationSkuColorLabels(entry.colorName, normalizeSubjectUnitCount(entry.subjectUnitCount) > 1),
+          ),
+        ]),
+    subjectUnitCount,
+  );
   const dimensionGroups = mergeDimensionGroups(
     subject.dimensionGroups ?? subject.dimension_groups,
     getDimensionGroupsForMatchedSubject(subject, matchedSubjects),
@@ -596,10 +617,13 @@ function hasSameSellableSubjectSignal(subject = {}) {
 }
 
 function hasGroupedSubjectUnitCount(subject = {}) {
+  const subjectText = [subject.title, subject.note, subject.description].join(" ");
   return (
-    normalizeSubjectUnitCount(subject.subjectUnitCount) ||
-    inferSubjectUnitCount([subject.title, subject.note, subject.description].join(" "))
-  ) > 1;
+    resolveCreationPairedSubjectUnitCount(
+      subjectText,
+      normalizeSubjectUnitCount(subject.subjectUnitCount) || inferSubjectUnitCount(subjectText),
+    ) > 1
+  );
 }
 
 function shouldPreserveAppliedGroupedSubjects(subjects = []) {
@@ -718,11 +742,19 @@ export function normalizeCreationSkuSubjectForPayload(entry = {}, index = 0) {
     entry.visible_unit_count ??
     entry.unitCount ??
     entry.unit_count;
-  const subjectUnitCount = normalizeSubjectUnitCount(rawSubjectUnitCount) || inferSubjectUnitCount([title, note].join(" "));
+  const subjectText = [title, note].join(" ");
+  const subjectUnitCount = normalizeCreationPairedSubjectUnitCount(
+    subjectText,
+    normalizeSubjectUnitCount(rawSubjectUnitCount) || inferSubjectUnitCount(subjectText),
+  );
   const hasStructuredColorNames = Array.isArray(entry.colorNames) || Array.isArray(entry.color_names);
-  const colorNames = normalizeCreationSkuColorLabels(
-    entry.colorNames ?? entry.color_names ?? entry.colorName ?? entry.color_name ?? entry.colors ?? entry.colours,
-    subjectUnitCount > 1,
+  const colorNames = collapseCreationPairedSubjectColorLabels(
+    subjectText,
+    normalizeCreationSkuColorLabels(
+      entry.colorNames ?? entry.color_names ?? entry.colorName ?? entry.color_name ?? entry.colors ?? entry.colours,
+      subjectUnitCount > 1,
+    ),
+    subjectUnitCount,
   );
   const dimensionGroups = normalizeDimensionGroups(entry.dimensionGroups ?? entry.dimension_groups);
 

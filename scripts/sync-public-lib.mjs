@@ -46,6 +46,7 @@ export const PUBLIC_LIB_SYNC_TARGETS = [
   "creation-record-list-model.mjs",
   "creation-record-list-view.mjs",
   "creation-preview-retention.mjs",
+  "creation-paired-subject-units.mjs",
   "creation-platform-policies.mjs",
   "creation-platform-resolver.mjs",
   "creation-browser-plan-state.mjs",
