@@ -79,6 +79,30 @@ test("creation store normalizes set manifests with output URLs and item ordering
   assert.deepEqual(manifest.items[0].conversionIntent, { conversionGoal: "建立首图识别" });
 });
 
+test("creation store preserves sourced product insights and per-item scene assignments", () => {
+  const productInsights = {
+    version: 1,
+    appearanceLocks: [{ text: "卡其色全指手套", referenceIndexes: [1] }],
+    confirmedFacts: [{ id: "f1", text: "手背可见控制器", kind: "appearance", source: "reference", referenceIndexes: [1] }],
+    sellingPoints: [{ id: "s1", text: "可操作手背控制器", factIds: ["f1"] }],
+    painPoints: [],
+    usageScenarios: [{ id: "scene-1", title: "户外操作", environment: "户外相机位", action: "按下控制器", framing: "hands-only", people: "hands", factIds: ["f1"], painPointIds: [], source: "analysis-suggestion" }],
+    unknowns: ["未确认温度"],
+    conflicts: [],
+  };
+  const sceneAssignment = { id: "scene-1-2", environment: "户外相机位", action: "按下控制器", factIds: ["f1"] };
+  const manifest = normalizeCreationSetManifest({
+    setId: "creation-set-insights",
+    productInsights,
+    effectivePlan: { productInsights, items: [{ itemId: "scene", slotIndex: 1, role: "scene", sceneAssignment }] },
+    items: [{ itemId: "scene", slotIndex: 1, role: "scene", sceneAssignment }],
+  });
+
+  assert.deepEqual(manifest.productInsights, productInsights);
+  assert.deepEqual(manifest.items[0].sceneAssignment, sceneAssignment);
+  assert.deepEqual(manifest.effectivePlan.productInsights, productInsights);
+});
+
 test("creation store reconciles saved counts with actual plan items", () => {
   const manifest = normalizeCreationSetManifest({
     setId: "creation-set-stale-counts",
@@ -123,8 +147,8 @@ test("creation store preserves scenario image count and reference image metadata
       productName: "AeroPress Clear",
       scenario: "social-seeding",
       scenarioLabel: "社媒种草",
-      platform: "amazon",
-      platformLabel: "Amazon",
+      platform: "universal",
+      platformLabel: "通用电商",
       visualLanguage: "premium-studio",
       visualLanguageLabel: "高端棚拍",
       industryTemplate: "food",
@@ -148,8 +172,8 @@ test("creation store preserves scenario image count and reference image metadata
 
   assert.equal(manifest.scenario, "social-seeding");
   assert.equal(manifest.scenarioLabel, "社媒种草");
-  assert.equal(manifest.platform, "amazon");
-  assert.equal(manifest.platformLabel, "Amazon");
+  assert.equal(manifest.platform, "universal");
+  assert.equal(manifest.platformLabel, "通用电商");
   assert.equal(manifest.visualLanguage, "premium-studio");
   assert.equal(manifest.visualLanguageLabel, "高端棚拍");
   assert.equal(manifest.industryTemplate, "food");

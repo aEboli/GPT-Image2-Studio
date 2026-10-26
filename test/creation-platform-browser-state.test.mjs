@@ -470,16 +470,16 @@ test("automatic count stays derived while an explicit count survives frozen-plan
   }), { imageCount: null, selectedRoles: [] });
 });
 
-test("explicit Creation parameters override Xiaohongshu defaults before preview and generation", async () => {
+test("explicit Creation parameters override platform defaults before preview and generation", async () => {
   const app = await readApp();
   const overrides = creationBrowserPlanState.mergeCreationPlatformSetParameters({}, {
-    targetLanguage: "en",
+    targetLanguage: "zh-CN",
     ratio: "4:3",
     resolutionTier: "2048x1536",
   });
 
   assert.deepEqual(overrides, {
-    targetLanguage: "en",
+    targetLanguage: "zh-CN",
     ratio: "4:3",
     resolutionTier: "2048x1536",
   });
@@ -487,13 +487,13 @@ test("explicit Creation parameters override Xiaohongshu defaults before preview 
   const plan = buildCreationPlan({
     productName: "Travel Mug",
     productDescription: "Product shown in supplied references",
-    platform: "xiaohongshu",
+    platform: "universal",
     platformSetOverrides: overrides,
     infographicRebuildEnabled: false,
   });
   const carouselItems = plan.items.filter((item) => item.itemKind === "carousel");
-  assert.equal(carouselItems.length, 6);
-  assert.ok(carouselItems.every((item) => item.targetLanguage === "en"));
+  assert.equal(carouselItems.length, 18);
+  assert.ok(carouselItems.every((item) => item.targetLanguage === "zh-CN"));
   assert.ok(carouselItems.every((item) => item.ratio === "4:3"));
   assert.ok(carouselItems.every((item) => item.resolutionTier === "2048x1536"));
   assert.deepEqual(plan.platformSetOverrides, overrides);
@@ -506,28 +506,39 @@ test("explicit Creation parameters override Xiaohongshu defaults before preview 
 
 test("all platform image-count options stop at the canonical profile slot count", () => {
   const baseOptions = [0, 4, 6, 7, 8, 9, 10, 12, 14, 16, 18];
-  assert.equal(CREATION_PLATFORM_PROFILES.length, 19);
+  assert.equal(CREATION_PLATFORM_PROFILES.length, 1);
 
   for (const profile of CREATION_PLATFORM_PROFILES) {
-    const state = creationBrowserPlanState.resolveCreationPlatformImageCountState({
+    const inBudget = creationBrowserPlanState.resolveCreationPlatformImageCountState({
       baseOptions,
-      currentValue: 18,
+      currentValue: profile.recommendedImageCount,
       profile,
     });
-    assert.equal(state.maxImageCount, profile.slots.length, profile.id);
-    assert.equal(Math.max(...state.options), profile.slots.length, profile.id);
-    assert.equal(state.value, profile.recommendedImageCount, profile.id);
-    assert.equal(state.clamped, profile.id !== "universal", profile.id);
+    assert.equal(inBudget.maxImageCount, profile.slots.length, profile.id);
+    assert.equal(Math.max(...inBudget.options), profile.slots.length, profile.id);
+    assert.equal(inBudget.value, profile.recommendedImageCount, profile.id);
+    assert.equal(inBudget.clamped, false, profile.id);
+
+    // A count above the profile slot budget is not offered and is clamped back to the
+    // recommendation instead of silently extending the set.
+    const requested = profile.slots.length + 6;
+    const overBudget = creationBrowserPlanState.resolveCreationPlatformImageCountState({
+      baseOptions,
+      currentValue: requested,
+      profile,
+    });
+    assert.equal(overBudget.maxImageCount, profile.slots.length, profile.id);
+    assert.equal(overBudget.options.includes(requested), false, profile.id);
+    assert.equal(overBudget.value, profile.recommendedImageCount, profile.id);
+    assert.equal(overBudget.clamped, true, profile.id);
   }
 });
 
-test("platform switching adopts the next profile recommendation instead of retaining an old valid count", async () => {
+test("移除平台选择后新计划固定使用通用电商，不读取隐藏字段", async () => {
   const app = await readApp();
-  const switchAction = getFunctionSource(app, "handleCreationPlatformChange", "invalidateCreationReferenceAnalysisRequest");
-
+  assert.doesNotMatch(app, /creationPlatformInput|handleCreationPlatformChange/);
+  assert.match(app, /function getCreationSelectedPlatform\(\) \{\s*return normalizeCreationPlatform\("universal"\);/);
   assert.match(app, /value: "universal"[\s\S]*recommendedImageCount: 18/);
-  assert.match(switchAction, /const nextProfile = getCreationPlatformImageCountProfile\(nextPlatform\);/);
-  assert.match(switchAction, /syncCreationPlatformImageCountOptions\(\{ preferredValue: nextProfile\.recommendedImageCount \}\);/);
 });
 
 test("the universal profile keeps its native 18-image plan without custom extension slots", () => {

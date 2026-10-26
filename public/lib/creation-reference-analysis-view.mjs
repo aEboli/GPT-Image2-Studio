@@ -1,7 +1,8 @@
 import {
   CREATION_PAIRED_SINGLE_UNIT_NOTE,
+  buildCreationPairedMultiUnitNote,
   isCreationPairedSellableSubject,
-  resolveCreationPairedSubjectUnitCount,
+  resolveCreationSubjectUnitCount,
 } from "./creation-paired-subject-units.mjs";
 
 function cleanCreationReferenceAnalysisText(value) {
@@ -286,6 +287,12 @@ function inferCreationReferenceAnalysisSubjectUnitCount(value = "") {
 }
 
 export function getCreationReferenceAnalysisGroupedSubjectUnitCount(entry = {}, skuSubjects = []) {
+  return getCreationReferenceAnalysisSubjectUnitResolution(entry, skuSubjects).count;
+}
+
+/* 与单位数一起返回口径是否待确认：件数与双数对不上、或成对品类出现奇数件时，
+   单位数保留可见件数，并把不确定点写进 ambiguity，交给界面提示用户。 */
+export function getCreationReferenceAnalysisSubjectUnitResolution(entry = {}, skuSubjects = []) {
   const filename = String(entry.filename || "").trim().toLowerCase();
   const referenceIndex = Number(entry.index) || 0;
   const entryText = [entry.title, entry.note, entry.description, entry.reason, entry.summary]
@@ -319,7 +326,7 @@ export function getCreationReferenceAnalysisGroupedSubjectUnitCount(entry = {}, 
   });
 
   const unitCount = Math.max(0, ...counts);
-  return resolveCreationPairedSubjectUnitCount(texts.filter(Boolean).join(" "), unitCount);
+  return resolveCreationSubjectUnitCount(texts.filter(Boolean).join(" "), unitCount);
 }
 
 export function shouldDowngradeReferenceProductAnalysisRole(entry = {}, subjectUnitCount = 0) {
@@ -417,10 +424,11 @@ function normalizeCreationReferenceAnalysisNotePunctuation(note = "") {
 
 export function normalizeCreationReferenceAnalysisUnitCountNote(note = "", subjectUnitCount = 0) {
   const rawNote = String(note || "").trim();
-  const pairedSubject = isCreationPairedSellableSubject(rawNote);
-  const unitCount = pairedSubject
-    ? resolveCreationPairedSubjectUnitCount(rawNote, subjectUnitCount)
-    : subjectUnitCount;
+  const resolved = resolveCreationSubjectUnitCount(rawNote, subjectUnitCount);
+  // subjectUnitCount 已经是折算后的值时，用 2 件反推这段说明是否在描述一双。
+  const pairProbe = resolved.paired ? resolved : resolveCreationSubjectUnitCount(rawNote, 2);
+  const pairedSubject = pairProbe.paired;
+  const unitCount = resolved.paired ? resolved.count : subjectUnitCount;
   const noteWithoutSingularCount = normalizeCreationReferenceAnalysisNotePunctuation(
     rawNote.replace(CREATION_REFERENCE_ANALYSIS_SINGULAR_UNIT_COUNT_PATTERN, ""),
   );
@@ -433,17 +441,17 @@ export function normalizeCreationReferenceAnalysisUnitCountNote(note = "", subje
     )
       .replace(/[.!?。！？]+$/u, "")
       .trim();
-    return pairPrefix ? `${pairPrefix}；${CREATION_PAIRED_SINGLE_UNIT_NOTE}` : CREATION_PAIRED_SINGLE_UNIT_NOTE;
+    return pairPrefix ? pairPrefix + "；" + CREATION_PAIRED_SINGLE_UNIT_NOTE : CREATION_PAIRED_SINGLE_UNIT_NOTE;
   }
   const cleanedNote = noteWithoutSingularCount
     .replace(CREATION_REFERENCE_ANALYSIS_ANY_UNIT_COUNT_PATTERN, "")
     .replace(/(?:^|([，,；;\s]))(?:单个|单件|单只|单条|单款|单一|一个|一件|一只|一条|一款|1\s*(?:个|件|只|条|款))\s*(?=[^，,；;。.!?！？]{0,24}(?:商品|产品|主体|单位|单元|色款|配色|款式|路亚|鱼饵|拟饵|主图|主体图|白底主体图))/gu, "$1")
     .trim();
   const countNote = pairedSubject
-    ? `图中共 ${unitCount} 个完整产品单位（按双计数，每双算 1 个）。`
-    : `图中共 ${unitCount} 个完整产品单位。`;
+    ? buildCreationPairedMultiUnitNote(unitCount)
+    : "图中共 " + unitCount + " 个完整产品单位。";
   const cleanedPrefix = normalizeCreationReferenceAnalysisNotePunctuation(cleanedNote)
     .replace(/[.!?。！？]+$/u, "")
     .trim();
-  return cleanedPrefix ? `${cleanedPrefix}；${countNote}` : countNote;
+  return cleanedPrefix ? cleanedPrefix + "；" + countNote : countNote;
 }

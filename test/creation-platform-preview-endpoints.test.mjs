@@ -8,11 +8,13 @@ import * as creationPlanner from "../lib/creation-planner.mjs";
 const serverUrl = new URL("../server.mjs", import.meta.url);
 const appUrl = new URL("../public/app.js", import.meta.url);
 
-const EXPLICIT_EIGHTEEN_ROLES = [
-  "hero", "benefit", "scene", "multi-angle", "product-detail", "size-capacity-fit",
-  "accessory-gift", "series-showcase", "usage-suggestion", "ingredient-material",
-  "craft-process", "effect-comparison", "spec-table", "atmosphere", "human-handheld",
-  "human-wearable", "brand-story", "after-sales",
+// The universal profile owns exactly 18 carousel slots, so an explicit role submission longer
+// than that must be cut back to the profile budget.
+const EXPLICIT_TWENTY_ONE_ROLES = [
+  "hero", "benefit", "scene", "multi-angle", "atmosphere", "product-detail", "brand-story",
+  "size-capacity-fit", "effect-comparison", "scene-fit-1", "scene-fit-2", "accessory-gift",
+  "series-showcase", "scene-fit-3", "after-sales", "usage-suggestion", "human-handheld",
+  "human-wearable", "spec-table", "craft-process", "ingredient-material",
 ];
 
 test("local preview builder forwards the normalized platform planning model", async () => {
@@ -41,9 +43,9 @@ test("invalid sourced hard-rule plans are rejected before generation starts", ()
   assert.throws(
     () => creationPlanner.assertCreationPlanCanGenerate({
       canGenerate: false,
-      errors: [{ message: "Amazon 主图必须保持居中白底商品构图。" }],
+      errors: [{ message: "参数表必须保持白底且不含营销文字。" }],
     }),
-    /Amazon 主图必须保持居中白底商品构图/,
+    /参数表必须保持白底且不含营销文字/,
   );
 });
 
@@ -51,20 +53,26 @@ test("planner caps explicit roles at the current platform image-type limit", () 
   const plan = creationPlanner.buildCreationPlan({
     productName: "Travel Bottle",
     productDescription: "Product shown in the supplied image",
-    platform: "amazon",
+    platform: "universal",
     imageCount: 18,
-    selectedRoles: EXPLICIT_EIGHTEEN_ROLES,
-    platformEvidence: { dimensions: true, packageContents: true },
+    selectedRoles: EXPLICIT_TWENTY_ONE_ROLES,
+    // Evidence is supplied for every evidence-gated slot so the platform does not fall back to
+    // replacement image types; this test is about the role cap, not the missing-evidence path.
+    platformEvidence: { dimensions: true, packageContents: true, skuVariants: true },
     infographicRebuildEnabled: false,
   });
   const carouselItems = plan.items.filter((item) => item.itemKind === "carousel");
 
-  assert.equal(plan.carouselImageCount, 7);
-  assert.equal(plan.platformSetOverrides.imageCount, 7);
-  assert.equal(carouselItems.length, 7);
-  assert.equal(new Set(carouselItems.map((item) => item.slotKey)).size, 7);
-  assert.deepEqual(carouselItems.map((item) => item.role), EXPLICIT_EIGHTEEN_ROLES.slice(0, 7));
+  assert.equal(plan.carouselImageCount, 18);
+  assert.equal(plan.platformSetOverrides.imageCount, 18);
+  assert.equal(carouselItems.length, 18);
+  assert.equal(new Set(carouselItems.map((item) => item.slotKey)).size, 18);
+  assert.deepEqual(carouselItems.map((item) => item.role), EXPLICIT_TWENTY_ONE_ROLES.slice(0, 18));
   assert.equal(carouselItems.some((item) => item.imageType === "custom"), false);
+  assert.ok(
+    plan.warnings.some((warning) => warning.code === "image-count-extension-limited"),
+    "a 21-role submission must be reduced to the 18 universal slots",
+  );
 });
 
 test("browser re-preview preserves only explicitly frozen target-language overrides", async () => {

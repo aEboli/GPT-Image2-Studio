@@ -29,6 +29,8 @@ test("browser request snapshots platform and files while manual category changes
   assert.match(app, /creationReferenceAnalysisAbortController\?\.abort\(\)/);
   assert.match(app, /signal:\s*requestController\.signal/);
   assert.match(snapshotBody, /platform:\s*getCreationSelectedPlatform\(\)\.value/);
+  assert.match(snapshotBody, /productName:\s*refs\.creationProductNameInput/);
+  assert.match(snapshotBody, /productDescription:\s*refs\.creationProductDescriptionInput/);
   assert.match(snapshotBody, /files:\s*state\.creationReferenceFiles\.map/);
   assert.doesNotMatch(snapshotBody, /category|getCreationSelectedIndustryTemplate/);
   assert.match(app, /refs\.creationIndustryTemplateInput\?\.addEventListener\("change", \(\) => \{[\s\S]*invalidateCreationReferenceAnalysisRequest\(\);/);

@@ -203,8 +203,8 @@ test("prompt template library browser contract covers the refreshed browse and a
   assert.match(html, /data-prompt-template-view="image"/);
   assert.match(html, /id="promptTemplateLibraryGrid"[^>]+data-view="list"/);
   assert.doesNotMatch(html, /promptTemplateLibraryFontSize|prompt-template-font-control/);
-  assert.match(html, /styles\.css\?v=20261024-studio-bottom-align-1/);
-  assert.match(html, /app\.js\?v=20261024-studio-bottom-align-1/);
+  assert.match(html, /styles\.css\?v=20261026-quick-suite-17/);
+  assert.match(html, /app\.js\?v=20261026-quick-suite-17/);
   assert.match(app, /flattenPromptTemplateLibrary\(\{[\s\S]*categoryId: libraryState\.categoryId[\s\S]*subcategoryId: libraryState\.subcategoryId[\s\S]*\}/);
   assert.match(app, /sortPromptTemplateLibraryTemplates\(/);
   assert.match(app, /template\.searchText\.includes\(query\)/);

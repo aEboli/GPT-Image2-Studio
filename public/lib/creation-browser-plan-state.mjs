@@ -178,7 +178,7 @@ export function resolveCreationSelectedRolesSubmission({
   if (hasExplicitImageCount && Number.isFinite(explicitImageCount)) {
     return {
       imageCount: Math.max(0, Math.trunc(explicitImageCount)),
-      selectedRoles: normalizedRoles.slice(0, Math.max(0, Math.trunc(explicitImageCount))),
+      selectedRoles: roleSelectionManuallyEdited ? normalizedRoles.slice(0, Math.max(0, Math.trunc(explicitImageCount))) : [],
     };
   }
   if (effectivePlan) return { imageCount: null, selectedRoles: null };

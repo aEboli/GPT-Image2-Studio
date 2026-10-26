@@ -46,41 +46,9 @@ test("programmatic hydration does not create a switch transaction", () => {
   assert.equal(beginCreationPlatformSwitch(previous, previous.platform, { programmatic: true }), null);
 });
 
-test("browser platform change directly resets and previews without confirmation", async () => {
+test("已移除的平台选择不再绑定事件或重置计划", async () => {
   const app = await readFile(appPath, "utf8");
-  const handler = app.match(
-    /async function handleCreationPlatformChange\(\{ programmatic = false \} = \{\}\) \{[\s\S]*?\r?\n\}\r?\n\r?\nfunction invalidateCreationReferenceAnalysisRequest/,
-  )?.[0] || "";
-  assert.doesNotMatch(handler, /window\.confirm|confirmed|refs\.creationPlatformInput\.value = previousPlatform/);
-  assert.match(
-    handler,
-    /if \(programmatic \|\| previousPlatform === nextPlatform\) \{[\s\S]*creationPreviousPlatformValue = nextPlatform;[\s\S]*return;/,
-  );
-  assert.match(
-    handler,
-    /creationPreviousPlatformValue = nextPlatform;[\s\S]*invalidateCreationReferenceAnalysisRequest\(\);[\s\S]*state\.creation\.platformSetOverrides = \{\};[\s\S]*state\.creation\.platformItemOverrides = \[\];[\s\S]*setFrozenCreationPlatformPayload\(\{ platformSetOverrides: \{\}, platformItemOverrides: \[\] \}\);[\s\S]*state\.creationRoleSelectionManuallyEdited = false;[\s\S]*resetCreationDraftPreview\(\);[\s\S]*await requestCreationPlanPreview\(\);/,
-  );
-  for (const protectedField of [
-    "creationProductNameInput",
-    "creationProductDescriptionInput",
-    "creationIndustryTemplateInput",
-    "creationLogoInput",
-    "creationSkuGenerationRuleInput",
-    "creationOutputFormatInput",
-  ]) {
-    assert.doesNotMatch(handler, new RegExp(`refs\\.${protectedField}\\.(?:value|checked)\\s*=`), protectedField);
-  }
-  assert.doesNotMatch(handler, /state\.creationReferenceFiles\s*=|state\.creationLogo\s*=/);
-  assert.doesNotMatch(app, /setCreationSelectValue\([\s\S]{0,120}dispatchEvent/);
-});
-
-test("platform confirmation removal stays isolated from automatic reference analysis", async () => {
-  const app = await readFile(appPath, "utf8");
-  const handler = app.match(
-    /async function handleCreationPlatformChange\(\{ programmatic = false \} = \{\}\) \{[\s\S]*?\r?\n\}\r?\n\r?\nfunction invalidateCreationReferenceAnalysisRequest/,
-  )?.[0] || "";
-  assert.doesNotMatch(handler, /window\.confirm/);
-  assert.match(handler, /invalidateCreationReferenceAnalysisRequest\(\)/);
+  assert.doesNotMatch(app, /creationPlatformInput|creationPreviousPlatformValue|handleCreationPlatformChange/);
   assert.doesNotMatch(app, /creationReferenceApplyAnalysisButton/);
   assert.match(app, /async function applyCreationReferenceAnalysis\(analysis\)[\s\S]*applyCreationReferenceAnalysisRecommendations\(\)/);
 });

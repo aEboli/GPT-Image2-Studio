@@ -13,7 +13,7 @@ function isReconciledMissingAsset(item = {}) {
 
 export function getCreationIncompleteItems(set = {}) {
   const items = Array.isArray(set?.items) ? set.items : [];
-  return items.filter((item) => isReconciledMissingAsset(item) || item.status !== "completed" || !item.filename || !hasCompletedCreationAsset(item));
+  return items.filter((item) => !item.evidenceBlocked && item.status !== "skipped" && (isReconciledMissingAsset(item) || item.status !== "completed" || !item.filename || !hasCompletedCreationAsset(item)));
 }
 
 function getGenerationAttemptCount(item = {}) {
@@ -73,7 +73,8 @@ export function getCreationAutoRepairNotice({
 
 export function getCreationCompletionFeedback(set = {}) {
   const incompleteCount = getCreationIncompleteItems(set).length;
+  const skippedCount = (set?.items || []).filter((item) => item.evidenceBlocked || item.status === "skipped").length;
   return incompleteCount > 0
     ? { message: `套图生成结束，仍有 ${incompleteCount} 个项目未完成，可手动补齐。`, tone: "error" }
-    : { message: "套图生成完成。", tone: "success" };
+    : { message: skippedCount > 0 ? `套图生成完成；${skippedCount} 张因缺少商品依据已跳过，未消耗生图额度。` : "套图生成完成。", tone: "success" };
 }

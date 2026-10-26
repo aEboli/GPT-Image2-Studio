@@ -27,6 +27,7 @@ const EXPECTED_VIEW_FAMILIES = {
   portrait: "suite",
   ppt: "suite",
   "article-illustration": "suite",
+  "quick-suite": "suite",
   gallery: "archive",
   "article-record": "archive",
   "creation-record": "archive",

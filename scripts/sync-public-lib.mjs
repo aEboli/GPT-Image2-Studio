@@ -55,6 +55,7 @@ export const PUBLIC_LIB_SYNC_TARGETS = [
   "creation-reference-roles.mjs",
   "creation-reference-coverage.mjs",
   "creation-reference-analysis-view.mjs",
+  "creation-product-insights.mjs",
   "creation-listing-view.mjs",
   "creation-plan-counts.mjs",
   "creation-suite-queue.mjs",

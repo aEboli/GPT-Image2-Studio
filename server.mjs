@@ -166,6 +166,7 @@ import {
 } from "./lib/creation-reference-upload-cache.mjs";
 import {
   applyCreationPlanOverrides,
+  applyCreationPlanEvidenceRequirements,
   assertCreationPlanCanGenerate,
   buildCreationPlan,
   buildCreationSubmittedPlan,
@@ -2673,6 +2674,7 @@ function updateCreationItems(items, itemId, patch = {}) {
 }
 
 function getCreationSetStatus(items) {
+  items = items.filter((item) => !item.evidenceBlocked && item.status !== "skipped");
   if (!items.length) {
     return "failed";
   }
@@ -2712,6 +2714,7 @@ function buildCreationSetManifest({
     productName: plan.productName,
     productDescription: plan.productDescription,
     sellingPoints: plan.sellingPoints,
+    productInsights: plan.productInsights || null,
     dimensionSpecs: plan.dimensionSpecs,
     dimensionSpecGroups: plan.dimensionSpecGroups || [],
     dimensionUnitMode: plan.dimensionUnitMode,
@@ -4458,6 +4461,7 @@ async function handleCreationReferenceAnalyze(request, response) {
       industryTemplatePath ? `类目路径：${industryTemplatePath}` : "",
       String(formData.get("productName") || "").trim() ? `商品名称：${String(formData.get("productName")).trim()}` : "",
       String(formData.get("productDescription") || "").trim() ? `商品描述：${String(formData.get("productDescription")).trim()}` : "",
+      `用户指定的参考图用途（reference-product 为全套主主体，识别不得取消）：${JSON.stringify(normalizeCreationReferenceRoles(formData.get("referenceImageRoles")).filter((entry) => entry.roleManuallyEdited || entry.role === "reference-product"))}`,
       "请根据该平台和商品类型判断每张参考图最适合支持主图、详情页信息、SKU 对比、规格核对、移动端缩略图或直播/内容场景中的哪类套图生成用途。",
     ]
       .filter(Boolean)
@@ -4466,6 +4470,10 @@ async function handleCreationReferenceAnalyze(request, response) {
   const analysis = normalizeCreationReferenceAnalysis(
     json,
     referenceImages.map((image) => image.filename).filter(Boolean),
+    {
+      referenceImageRoles: normalizeCreationReferenceRoles(formData.get("referenceImageRoles")),
+      userFacts: [formData.get("productName"), formData.get("productDescription")].filter(Boolean).join("\n"),
+    },
   );
 
   return sendJson(response, 200, {
@@ -4490,6 +4498,7 @@ async function handleCreationPlan(request, response) {
       platform: formData.get("platform"),
       imageCount: formData.get("imageCount"),
       scenario: formData.get("scenario"),
+      variationSeed: formData.get("variationSeed") || randomUUID(),
       visualLanguage: formData.get("visualLanguage"),
       industryTemplate: formData.get("industryTemplate"),
       categorySignals: formData.get("categorySignals"),
@@ -4500,6 +4509,8 @@ async function handleCreationPlan(request, response) {
       platformSetOverrides: formData.get("platformSetOverrides"),
       platformItemOverrides: formData.get("platformItemOverrides"),
       audienceStrategy: formData.get("audienceStrategy"),
+      productInsights: formData.get("productInsights"),
+      planOverrides: formData.get("planOverrides"),
       skuGenerationEnabled: formData.get("skuGenerationEnabled"),
       infographicRebuildEnabled: formData.get("infographicRebuildEnabled"),
       skuSubjects: formData.get("skuSubjects"),
@@ -4917,6 +4928,7 @@ async function handleCreationGenerate(request, response) {
       platformSetOverrides: formData.get("platformSetOverrides"),
       platformItemOverrides: formData.get("platformItemOverrides"),
       audienceStrategy: formData.get("audienceStrategy"),
+      productInsights: formData.get("productInsights"),
       effectivePlan: formData.get("effectivePlan"),
       planOverrides: formData.get("planOverrides"),
       skuGenerationEnabled: formData.get("skuGenerationEnabled"),
@@ -4957,6 +4969,7 @@ async function handleCreationGenerate(request, response) {
       config: getSelectedTextVisionConfig(config),
     });
     plan = promptTranslation.plan;
+    const generatableItems = plan.items.filter((item) => !item.evidenceBlocked);
 
     creationRelativeDir = buildCreationRelativeDir({
       createdAt,
@@ -4978,7 +4991,7 @@ async function handleCreationGenerate(request, response) {
       requestedSize: parameters.requestedSize,
       effectiveSize: parameters.finalSize,
       targetLanguage: parameters.targetLanguage,
-      status: "queued",
+      status: item.evidenceBlocked ? "skipped" : "queued",
       filename: "",
       relativePath: "",
       imageUrl: "",
@@ -5007,7 +5020,7 @@ async function handleCreationGenerate(request, response) {
     }
 
     const referenceUploadImages = collectCreationReferenceImagesForUpload(
-      plan.items,
+      generatableItems,
       referenceImages,
       referenceImageRoles,
     );
@@ -5027,7 +5040,7 @@ async function handleCreationGenerate(request, response) {
     );
 
     try {
-      await runWithConcurrency(plan.items, generationConcurrency, async (item, index, controls) => {
+      await runWithConcurrency(generatableItems, generationConcurrency, async (item, index, controls) => {
       const taskId = retryLedger.getTaskId(`${setId}-${item.itemId}`, item.itemId);
       const generationStartedAt = new Date().toISOString();
       const generationStartedAtMs = Date.now();
@@ -6108,8 +6121,30 @@ async function handleCreationRepair(request, response) {
       return;
     }
 
-    repairPlan = buildCreationRepairPlan(existingSet);
+    repairPlan = applyCreationPlanEvidenceRequirements(buildCreationRepairPlan(existingSet));
     repairItems = refreshCreationRepairItemsFromPlan(repairItems, repairPlan);
+    const blockedRepairItems = repairItems.filter((item) => item.evidenceBlocked);
+    repairItems = repairItems.filter((item) => !item.evidenceBlocked);
+    if (blockedRepairItems.length > 0) {
+      for (const item of blockedRepairItems) {
+        items = updateCreationItems(items, item.itemId, {
+          evidenceBlocked: true, evidenceRequirement: item.evidenceRequirement,
+          ...(item.status !== "completed" ? { status: "skipped", error: "" } : {}),
+        });
+        writeSseEvent(response, "item_status", {
+          setId, itemId: item.itemId, stage: "missing-evidence", blocked: true, evidenceRequirement: item.evidenceRequirement,
+          message: item.evidenceRequirement?.message || "缺少商品依据，已跳过生成。",
+        });
+      }
+      if (repairItems.length === 0) {
+        const skippedSet = await creationSetStore.saveManifest({
+          ...existingSet, items, effectivePlan: repairPlan, status: getCreationSetStatus(items), updatedAt: new Date().toISOString(),
+        });
+        writeSseEvent(response, "plan", { setId, items: skippedSet.items });
+        writeSseEvent(response, "error", { message: blockedRepairItems[0].evidenceRequirement?.message || "缺少商品依据，补图已拦截。" });
+        return;
+      }
+    }
     if (repairItemId) {
       repairItems = repairItems.map((item) =>
         applyCreationRepairOverrides(item, {

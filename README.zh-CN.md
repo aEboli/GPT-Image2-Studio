@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.075-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.076-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installer-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,7 +10,7 @@
 
 把提示词生图、参考图分析、图片编辑、电商套图、人物写真、文章插图、PPT 生成和素材管理集中到一个浏览器界面中。
 
-当前版本：`v0.2.075`
+当前版本：`v0.2.076`
 
 </div>
 
@@ -79,12 +79,12 @@ Windows 脚本入口（启动器、Native Messaging 安装/卸载、图片资源
 从包含桌面产物的 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
 
 ```text
-GPT-Image2-Studio-Desktop-Setup-v0.2.075-x64.exe
+GPT-Image2-Studio-Desktop-Setup-v0.2.076-x64.exe
 ```
 
 安装完成后通过桌面或开始菜单中的 `GPT-Image2-Studio` 启动。程序会在独立窗口中运行，内置服务使用动态回环端口，关闭窗口后不会遗留后台服务。无需另行安装 Node.js，完整说明见 [Windows 桌面程序文档](./docs/windows-desktop.md)。
 
-如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.075-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
+如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.076-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
 
 桌面开发使用 Electron `43`，要求 Node.js `22.12` 或更高版本；普通 `npm start` 服务仍支持 Node.js `20+`。
 
@@ -95,7 +95,7 @@ cmd /c npm run desktop
 
 ### 方式三：Windows 浏览器安装包（兼容旧版）
 
-旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.075` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
+旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.076` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
 
 ## 配置说明
 
@@ -396,39 +396,21 @@ GPT 路由模式和直连模式共享以下明确像素候选，第一档就是�
 | 图片编辑 | 1 张源图；局部模式每个上传蒙版不超过 50 MB | 源图与蒙版会规范化为同尺寸 PNG；50 MB 限制针对局部蒙版文件，不是对普通源图的统一承诺 |
 | 快速融图 | A/B 各至少 1 张且数量相同；C/D 可选，启用后数量也必须与 A/B 相同 | 当前应用未另设每组固定张数上限；批量规模仍受浏览器内存、15 个会话任务槽和上游限流影响 |
 | 图片压缩 | 可一次选择多张浏览器可解码图片 | 当前应用未设固定张数上限；全部在浏览器内逐张处理，数量和像素过大会增加内存占用 |
-| 电商套图 | 产品参考图最多 15 张；“上传图加 Logo”分支的 Logo 最多 1 张、源图最多 15 张 | 命名平台推荐轮播为 6 到 9 张且不得超过各自原生槽位上限；通用电商保留 18 个原生轮播槽位 |
+| 电商套图 | 产品参考图最多 15 张；“上传图加 Logo”分支的 Logo 最多 1 张、源图最多 15 张 | 当前自动画像为通用电商的 18 个原生轮播槽位；未知或已退役的平台 ID 回落到通用画像 |
 | 电商 SKU | 新套图计划固定一个 SKU 主体；SKU 生成规则仍可选择 | 冻结计划最多 64 项、序列化后最多 4 MiB，属于内部提交保护上限 |
 | 写真模式 | 人物参考图最多 3 张；动作参考图最多 3 张；服装/道具/配饰最多 9 张；生成 1 到 100 张 | 默认 12 张；高数量任务应先用小批量验证人物一致性和通道稳定性 |
 | 文章插图 | 正文、补充说明或多个文本文件；插图数量由文章结构和节奏规划 | 没有固定插图张数选择器；先生成参考卡可提升人物与场景一致性 |
 | PPT 生成 | 可上传多个文档；页数 1 到 20，默认 8 | 可从文档、文本或主题三种来源开始；大文件解析能力取决于本地解析器和上游上下文限制 |
 
-### 19 种平台推荐策略
+### 平台推荐策略
 
-平台表来自应用内版本 `2026-07-18.2` 的策略画像。推荐轮播数只统计平台画像的默认轮播槽位，不含按 SKU 追加的图片、信息图重构项或用户手动新增项。
+推荐轮播数只统计自动画像的默认轮播槽位，不含按 SKU 追加的图片、信息图重构项或用户手动新增项。当前套图自动画像仅提供通用电商；Listing 草稿的平台规则由独立策略表维护。
 
 | 平台 | 推荐轮播 | 分辨率档位 | 目标语言 | 证据级别 |
 | --- | ---: | --- | --- | --- |
-| 通用电商 | 18 | `1.5K` | English | baseline |
-| Amazon | 7 | `2K` | English | A |
-| 淘宝/天猫 | 8 | `2K` | 简体中文 | A |
-| 京东 | 8 | `2K` | 简体中文 | B |
-| 拼多多 | 8 | `1.5K` | 简体中文 | C |
-| 抖音电商 | 6 | `1.5K` | 简体中文 | C |
-| 小红书电商 | 6 | `1.5K` | 简体中文 | B |
-| Temu | 8 | `1.5K` | English | B |
-| TikTok Shop | 6 | `1.5K` | English | A |
-| Shopee | 9 | `1.5K` | English | A |
-| Lazada | 8 | `1.5K` | English | C |
-| Etsy | 8 | `2K` | English | A |
-| eBay | 8 | `2K` | English | A |
-| Walmart | 6 | `max` | English | A |
-| Shopify/DTC | 8 | `2K` | English | A |
-| AliExpress | 8 | `1.5K` | English | C |
-| Rakuten | 8 | `2K` | 日本語 | C |
-| Coupang | 8 | `2K` | 한국어 | C |
-| Mercado Libre | 8 | `1.5K` | Español | C |
+| 通用电商 | 18 | `1K` | English | baseline |
 
-证据级别含义：`A` 表示画像主要有官方规则或官方指南支撑；`B` 表示只有部分官方资料、真实页面或登录态观察；`C` 表示公开细则不足时采用的保守建议；`baseline` 是应用通用基线，不代表任何命名平台的官方要求。策略最后核对日期为 `2026-07-11`，平台规则可能随时变化，上架前仍需复查目标站点最新要求。
+`baseline` 是应用通用基线，不代表任何命名平台的官方要求。其他平台 ID 会回落到该通用画像；这不会删除 Listing 草稿中独立维护的平台策略。
 
 ### 固定工作流参数
 
@@ -491,7 +473,7 @@ GPT-Image2-Studio 面向个人创作者、电商运营、设计师和内容团�
 
 ### 业务工作流
 
-- **电商套图**：按平台、类目、商品事实、受众和 SKU 生成推荐轮播计划，支持套图级参数覆盖、兼容图片类型启停、补图队列和 Listing 草稿；通用 18 槽位改用 3 张彼此不同的真实场景适配图，平台专属配置仍保留自己的规格图角色；新计划固定一个 SKU 主体但保留 SKU 生成规则；另有独立的“上传图加 Logo”批处理分支。
+- **电商套图**：根据商品参考图和资料识别有来源的事实，再分配不同场景与信息任务；缺少可售变体或尺寸证据时跳过对应图片，避免重复操作和无依据宣称。支持通用 18 槽位、计划预览、套图级参数覆盖、兼容图片类型启停、补图队列和 Listing 草稿；新计划固定一个 SKU 主体但保留 SKU 生成规则；另有独立的“上传图加 Logo”批处理分支。
 - **写真模式**：组合人物、动作、服装、道具和地点，生成 1 到 100 张系列写真，并独立选择思考等级与质量。
 - **文章插图**：解析文章包，建立风格、角色和场景设定，再生成正式插图计划，并独立选择思考等级与质量。
 - **PPT 生成**：从主题或文档生成 1 到 20 页演示文稿，支持单页编辑、补图、普通 PPTX 和可编辑重建导出；整套操作保留 PPT 自己的思考等级与质量。
@@ -574,7 +556,7 @@ GPT-Image2-Studio 面向个人创作者、电商运营、设计师和内容团�
 | 图片编辑 | `#image-edit`，创作 -> 图片编辑 | 1 张源图；整图修改文字，或多个局部蒙版及逐区指令 | 整图模式直接编辑；局部模式将蒙版与源图规范化为同尺寸 PNG，可合并执行或逐区顺序执行 | PNG/JPG 编辑结果、局部区域管理、重试、下载、灯箱和画廊记录 |
 | 快速融图 | `#quick-blend`，创作 -> 快速溶图 | A/B 两组必选图片，C/D 两组可选；布局、位置形状、比例和分辨率 | 按相同序号配对；A/B 数量必须一致，启用的 C/D 也必须与 A/B 一致；每一对形成独立生成任务 | 每对一张 PNG/JPG 结果，可重排、移除整对、查看进度、下载和归档 |
 | 图片压缩 | `#image-compress`，创作 -> 图片压缩 | 多张浏览器可解码图片；质量或目标大小、输出格式、可选目标宽高 | 完全在浏览器本地以 Canvas 解码、等比缩放留边并重新编码，不上传到生图服务 | 保留原格式或转换为 PNG/JPEG/WebP；显示前后体积、压缩率、像素尺寸并逐张下载 |
-| 电商套图 | `#creation`，创作 -> 套图模式 | 商品事实、最多 15 张产品参考图、平台、类目、SKU、语言、思考等级、质量与计划覆盖项 | 智能识别参考图角色，按 19 种平台画像生成轮播计划，可覆盖套图级语言、比例和分辨率并启停兼容图片类型，再并发生成；新计划固定一个 SKU 主体 | 套图、队列、按冻结计划补齐失败项、Listing 草稿及套图记录；另有独立“上传图加 Logo”批处理分支 |
+| 电商套图 | `#creation`，创作 -> 套图模式 | 商品资料、最多 15 张产品参考图、平台、类目、SKU、语言、思考等级、质量与计划覆盖项 | 智能识别商品外观、来源事实、场景和未知项，按有效证据分配轮播任务；可覆盖套图级语言、比例和分辨率并启停兼容图片类型，再并发生成；新计划固定一个 SKU 主体 | 套图、队列、按冻结计划补齐失败项、Listing 草稿及套图记录；另有独立“上传图加 Logo”批处理分支 |
 | 写真模式 | `#portrait`，创作 -> 写真模式 | 人物图、动作图、服装道具配饰图、人物描述、地点、风格、景别、数量、思考等级和质量 | 先建立人物一致性和拍摄计划，再按动作、景别、地点与风格组合生成 | 1 到 100 张 PNG/JPG 写真、计划预览、失败项重试、写真记录和素材复用 |
 | 文章插图 | `#article-illustration`，创作 -> 文章插图 | 正文、补充说明，或多个 TXT/MD/CSV/JSON 文件；内容类型、风格预设、思考等级和质量 | 整体解析文章，建立风格圣经、人物/场景参考卡和阅读顺序分镜；可先生成参考图再生成正文插图 | PNG 参考图和正文插图、分镜编辑、说明文字、重新生成及文章插图记录 |
 | PPT 生成 | `#ppt`，创作 -> PPT生成 | PDF/DOCX/PPTX/TXT/MD/CSV 文档、直接文本或主题；1 到 20 页、视觉与动态预设、思考等级和质量 | 分析材料，生成大纲与逐页提示词，再以固定 16:9 画布生成页面；支持缺页补齐和单页编辑，并保留本次 PPT 操作参数 | 页面 PNG、整页图片型 PPTX、可编辑重建 PPTX、单页补图/编辑以及 PPT 记录 |
@@ -660,8 +642,8 @@ cmd /c npm run build:desktop
 产物路径：
 
 ```text
-artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.075-x64.exe
-artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.075-x64.zip
+artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.076-x64.exe
+artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.076-x64.zip
 artifacts/desktop/win-unpacked/GPT-Image2-Studio.exe
 ```
 
@@ -679,7 +661,7 @@ cmd /c npm run build:installer
 产物路径格式：
 
 ```text
-artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.075.exe
+artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.076.exe
 ```
 
 脚本使用系统 `iexpress.exe` 生成自解压安装包，并把当前 Node.js 运行时和依赖打入安装目录；启动后仍使用默认浏览器显示工作台。
@@ -784,7 +766,14 @@ cmd /c npm run build:installer
 
 ## 版本更新说明
 
-完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.075](./docs/releases/v0.2.075.md)。
+完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.076](./docs/releases/v0.2.076.md)。
+
+### v0.2.076 更新说明
+
+- 商品分析保留多张参考图中互补的事实，只把同一商品、同一属性和相同条件下的互斥值判为冲突；来源会贯穿计划、生成、补图和保存记录。
+- 套图按有来源的事实分配不同场景与信息图任务，不循环重复核心动作；缺少不同可售 SKU 或数值尺寸依据时跳过对应图片，并由服务端再次校验。
+- 图片文字护栏会过滤无依据的医疗、安全、认证、价格和绝对化宣称，同时保留品类名称；信息图重构逐项依据可读源内容，不从外观推导功能文案。
+- 成对售卖商品按完整可售单位计数，例如一双手套算一个 SKU 主体。当前套图自动画像仅提供通用电商，未知及已退役的平台 ID 回落到通用 18 槽方案；Listing 平台策略独立维护。
 
 ### v0.2.074 更新说明
 

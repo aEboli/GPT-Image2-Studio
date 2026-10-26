@@ -97,11 +97,12 @@ import { createPptAnalysisController } from "/lib/ppt-analysis-client.mjs?v=2026
 import { createPortraitReferenceAnalysisController } from "/lib/portrait-reference-analysis-client.mjs";
 import { appendPptDeckDownloadLinks } from "/lib/ppt-record-links.mjs";
 import { buildCreationSkuSubjectsForPayload, normalizeCreationSkuBundleCountForPayload, normalizeCreationSkuSubjectForPayload } from "/lib/creation-sku-subjects.mjs";
+import { normalizeCreationProductInsights } from "/lib/creation-product-insights.mjs";
 import { buildCreationReferenceLightboxItem } from "/lib/creation-reference-lightbox.mjs";
 import { bindCreationReferenceDrag, reorderCreationReferenceFiles } from "/lib/creation-reference-drag.mjs";
 import { isCreationSubjectReferenceRole } from "/lib/creation-reference-roles.mjs";
 import { applyCreationReferenceCoverageRolePlan, normalizeCreationCoverageFields, toggleCreationSelectedRoles } from "/lib/creation-reference-coverage.mjs?v=20260703-latest-restore-1";
-import { applyCreationReferenceAnalysisProductNameValue, buildCreationReferenceAnalysisAppliedFeedbackMessage, buildCreationReferenceAnalysisCategoryMatchText, getCreationReferenceAnalysisCategoryProductName, getCreationReferenceAnalysisDisplayRoleLabel, getCreationReferenceAnalysisGroupedSubjectUnitCount, getCreationReferenceAnalysisRoleCorrectionReason, normalizeCreationReferenceAnalysisUnitCountNote, resolveCreationReferenceAnalysisCategoryValue, resolveCreationReferenceAnalysisContextCategoryValue, shouldDowngradeReferenceProductAnalysisRole } from "/lib/creation-reference-analysis-view.mjs";
+import { applyCreationReferenceAnalysisProductNameValue, buildCreationReferenceAnalysisAppliedFeedbackMessage, buildCreationReferenceAnalysisCategoryMatchText, getCreationReferenceAnalysisCategoryProductName, getCreationReferenceAnalysisDisplayRoleLabel, getCreationReferenceAnalysisGroupedSubjectUnitCount, getCreationReferenceAnalysisRoleCorrectionReason, getCreationReferenceAnalysisSubjectUnitResolution, normalizeCreationReferenceAnalysisUnitCountNote, resolveCreationReferenceAnalysisCategoryValue, resolveCreationReferenceAnalysisContextCategoryValue, shouldDowngradeReferenceProductAnalysisRole } from "/lib/creation-reference-analysis-view.mjs?v=20261024-pair-unit-1";
 import { createCreationListingController, getCreationRecordListingMetaLabel, getCreationListingSearchValues, normalizeCreationListingDraftForView, renderCreationListingDrafts } from "/lib/creation-listing-view.mjs";
 import { getCreationItemDisplayTitle } from "/lib/creation-item-display.mjs";
 import { getCreationAutoRepairNotice, getCreationAutoRepairableItems, getCreationCompletionFeedback, getCreationIncompleteItems, shouldAutoRepairCreationSet } from "/lib/creation-auto-repair.mjs?v=20260829-generation-schedule-1";
@@ -601,7 +602,7 @@ const TOPBAR_REVEAL_EDGE_PX = 16;
 const WORKSPACE_BOTTOM_GAP_PX = 2;
 const APP_TOOLTIP_TRIGGER_SELECTOR = "[data-tooltip]";
 const PPT_SOURCE_MODES = new Set(["upload", "text", "topic"]);
-const CREATE_VIEW_IDS = new Set(["studio", "style-transfer", "reference-analysis", "image-decomposition", "image-edit", "quick-blend", "image-compress", "creation", "portrait", "article-illustration", "ppt"]);
+const CREATE_VIEW_IDS = new Set(["studio", "style-transfer", "reference-analysis", "image-decomposition", "image-edit", "quick-blend", "image-compress", "creation", "portrait", "article-illustration", "ppt", "quick-suite"]);
 const ASSET_VIEW_IDS = new Set(["gallery", "article-record", "ppt-record", "creation-record", "portrait-record"]);
 // Accent families: same-family views share one --accent, resolved by the
 // [data-view-family] rules in styles.css (just after the two theme blocks).
@@ -619,6 +620,7 @@ const VIEW_ACCENT_FAMILIES = {
   creation: "suite",
   portrait: "suite",
   ppt: "suite",
+  "quick-suite": "suite",
   "article-illustration": "suite",
   gallery: "archive",
   "article-record": "archive",
@@ -759,6 +761,7 @@ const state = {
     collapsed: false,
     dirty: false,
     productNameSuggestion: "",
+    updatingFromAnalysis: false,
     result: null,
     running: false,
   },
@@ -933,7 +936,6 @@ let promptAgentAnalysisRequestToken = 0;
 let promptAgentAnalysisAbortController = null;
 let referenceAnalysisRequestToken = 0;
 let referenceAnalysisAbortController = null;
-let creationPreviousPlatformValue = "universal";
 const refs = {
   appTooltip: document.querySelector("#appTooltip"),
   apiKeyInput: document.querySelector("#apiKeyInput"),
@@ -1053,7 +1055,6 @@ const refs = {
   creationGenerateButton: document.querySelector("#creationGenerateButton"),
   creationInfographicRebuildEnabledInput: document.querySelector("#creationInfographicRebuildEnabledInput"),
   creationListingAgentEnabledInput: document.querySelector("#creationListingAgentEnabledInput"),
-  creationDimensionUnitModeInput: document.querySelector("#creationDimensionUnitModeInput"),
   creationImageCountInput: document.querySelector("#creationImageCountInput"),
   creationInlineListingDrafts: document.querySelector("#creationInlineListingDrafts"),
   creationInlineListingStatus: document.querySelector("#creationInlineListingStatus"),
@@ -1087,6 +1088,8 @@ const refs = {
   creationPlanSummary: document.querySelector("#creationPlanSummary"),
   creationPlanValidation: document.querySelector("#creationPlanValidation"),
   creationPlanWarnings: document.querySelector("#creationPlanWarnings"),
+  creationContentPlan: document.querySelector("#creationContentPlan"),
+  creationContentPlanList: document.querySelector("#creationContentPlanList"),
   creationProductDescriptionInput: document.querySelector("#creationProductDescriptionInput"),
   creationProductNameInput: document.querySelector("#creationProductNameInput"),
   creationProgressText: document.querySelector("#creationProgressText"),
@@ -1206,7 +1209,6 @@ const refs = {
   creationResultGrid: document.querySelector("#creationResultGrid"),
   creationRoleCount: document.querySelector("#creationRoleCount"),
   creationRoleGrid: document.querySelector("#creationRoleGrid"),
-  creationPlatformInput: document.querySelector("#creationPlatformInput"),
   creationSetOnly: [...document.querySelectorAll("[data-creation-set-only]")],
   creationSetMeta: document.querySelector("#creationSetMeta"),
   creationSizeInput: document.querySelector("#creationSizeInput"),
@@ -2267,6 +2269,9 @@ function getViewFromHash() {
   if (window.location.hash === "#ppt") {
     return "ppt";
   }
+  if (window.location.hash === "#quick-suite") {
+    return "quick-suite";
+  }
   return "studio";
 }
 function syncHash(view) {
@@ -2297,7 +2302,9 @@ function syncHash(view) {
                 ? "#ppt-record"
                 : view === "ppt"
                   ? "#ppt"
-                  : "#studio";
+                  : view === "quick-suite"
+                    ? "#quick-suite"
+                    : "#studio";
   if (window.location.hash !== nextHash) {
     window.history.replaceState(null, "", nextHash);
   }
@@ -2657,6 +2664,9 @@ async function setActiveView(view) {
   }
   if (view === "creation") {
     ensureCreationCategoryTemplatesReady({ render: true });
+  }
+  if (view === "quick-suite") {
+    initQuickSuiteController();
   }
   if (view === "creation-record") {
     refreshCreationRecordSets();
@@ -9414,8 +9424,8 @@ const CREATION_PREVIEW_SLOTS = "1-hero|hero|首图成交主视觉|主商品占�
 
 const CREATION_SCENARIO_LABELS = { standard: "标准电商", "detail-page": "详情页转化", "social-seeding": "社媒种草", launch: "新品发布", promotion: "活动促销", livestream: "直播电商", "gift-guide": "礼品推荐", "marketplace-search": "平台搜索", "brand-story": "品牌故事" };
 const CREATION_VISUAL_LANGUAGE_LABELS = { "classic-commercial": "经典商业摄影", "premium-studio": "高端棚拍", "clean-marketplace": "平台清爽白底", "lifestyle-editorial": "生活方式杂志", "social-ugc": "社媒实拍", "detail-infographic": "详情页信息图", "macro-material": "微距材质", "outdoor-context": "户外场景", "minimal-luxury": "极简奢华", "bold-campaign": "活动海报", "warm-handcrafted": "手作温度" };
-const CREATION_PLATFORM_POLICY_MODULE_URL = "/lib/creation-platform-policies.mjs?v=20260711-platform-policy-1";
-const CREATION_PLATFORM_RESOLVER_MODULE_URL = "/lib/creation-platform-resolver.mjs?v=20260711-platform-policy-1";
+const CREATION_PLATFORM_POLICY_MODULE_URL = "/lib/creation-platform-policies.mjs?v=20261026-quick-suite-17";
+const CREATION_PLATFORM_RESOLVER_MODULE_URL = "/lib/creation-platform-resolver.mjs?v=20261026-quick-suite-17";
 const CREATION_PLATFORM_FORM_DATA_FIELDS = [
   "platformSetOverrides",
   "platformItemOverrides",
@@ -9441,7 +9451,7 @@ const CREATION_DIMENSION_UNIT_MODE_LABELS = { metric: "公制", imperial: "英�
 const DEFAULT_CREATION_SKU_GENERATION_RULE = "color-name-under-subject";
 const CREATION_SKU_GENERATION_RULE_LABELS = { "color-name-under-subject": "显示颜色", none: "无", "package-list": "显示清单", dimensions: "显示尺寸", "package-list-dimensions": "显示清单和尺寸" };
 
-const CREATION_CATEGORY_TEMPLATE_MODULE_URL = "/lib/creation-category-templates.mjs?v=20260509-category-search-2";
+const CREATION_CATEGORY_TEMPLATE_MODULE_URL = "/lib/creation-category-templates.mjs?v=20261026-category-focus-1";
 const CREATION_BASE_INDUSTRY_TEMPLATE_OPTIONS = [
   { value: "general", label: "通用电商", categoryPath: "", rolePreset: [] },
   { value: "apparel", label: "服饰鞋包", categoryPath: "", rolePreset: ["hero", "human-wearable", "scene", "product-detail", "size-capacity-fit", "benefit", "series-showcase", "after-sales"] },
@@ -9541,6 +9551,7 @@ function createEmptyCreationReferenceAnalysisState() {
     collapsed: false,
     dirty: false,
     productNameSuggestion: "",
+    updatingFromAnalysis: false,
     result: null,
     running: false,
   };
@@ -9553,6 +9564,10 @@ function setCreationSelectValue(select, value, fallback = "") {
 
   const normalizedValue = String(value || fallback || "");
   const fallbackValue = String(fallback || "");
+  if (!("options" in select)) {
+    select.value = normalizedValue || fallbackValue;
+    return;
+  }
   const hasOption = Array.from(select.options).some((option) => option.value === normalizedValue);
   select.value = hasOption ? normalizedValue : fallbackValue;
 }
@@ -9566,28 +9581,13 @@ function getCreationPlatformOptions() {
 }
 
 function renderCreationPlatformOptions() {
-  const select = refs.creationPlatformInput;
-  if (!select) return;
-  const previousValue = String(select.value || "universal").trim();
-  const options = getCreationPlatformOptions();
-  select.replaceChildren(
-    ...options.map((platform) => {
-      const option = document.createElement("option");
-      option.value = platform.value;
-      option.textContent = platform.label;
-      return option;
-    }),
-  );
-  select.value = options.some((platform) => platform.value === previousValue) ? previousValue : "universal";
-  select.dataset.policyState = state.creationPlatformPoliciesModule ? "ready" : "fallback";
-  select.title = state.creationPlatformPoliciesModule ? "" : "平台自动规划模块不可用，当前仅提供通用电商兜底。";
   syncCreationPlatformImageCountOptions();
   if (!state.creation.effectivePlan && Object.keys(state.creation.platformSetOverrides || {}).length === 0) {
-    syncCreationAutomaticPlatformControls(select.value);
+    syncCreationAutomaticPlatformControls();
   }
 }
 
-function getCreationPlatformImageCountProfile(platformValue = refs.creationPlatformInput?.value || "universal") {
+function getCreationPlatformImageCountProfile(platformValue = "universal") {
   const platform = getCreationPlatformOptions().find((entry) => entry.value === platformValue)
     || getCreationPlatformOptions().find((entry) => entry.value === "universal")
     || FALLBACK_CREATION_PLATFORM_OPTIONS[0];
@@ -9624,7 +9624,7 @@ function setCreationResolutionTierValue(value = "") {
   refs.creationSizeInput.value = matchingOption?.value || refs.creationSizeInput.options[0]?.value || "";
 }
 
-function syncCreationAutomaticPlatformControls(platformValue = refs.creationPlatformInput?.value || "universal") {
+function syncCreationAutomaticPlatformControls(platformValue = "universal") {
   const profile = getCreationPlatformImageCountProfile(platformValue);
   setCreationSelectValue(refs.creationTargetLanguageInput, profile.targetLanguage, "en");
   setCreationSelectValue(refs.creationRatioInput, profile.defaultRatio, DEFAULT_UI_RATIO);
@@ -9655,7 +9655,7 @@ async function loadCreationPlatformModules() {
       import(CREATION_PLATFORM_RESOLVER_MODULE_URL),
     ])
       .then(([policies, resolver]) => {
-        if (!Array.isArray(policies.CREATION_PLATFORM_OPTIONS) || policies.CREATION_PLATFORM_OPTIONS.length !== 19) {
+        if (!Array.isArray(policies.CREATION_PLATFORM_OPTIONS) || !policies.CREATION_PLATFORM_OPTIONS.some((entry) => entry.value === "universal")) {
           throw new Error("平台策略注册表不完整");
         }
         state.creationPlatformPoliciesModule = policies;
@@ -10233,7 +10233,7 @@ function getCreationSelectedScenario() {
 }
 
 function getCreationSelectedPlatform() {
-  return normalizeCreationPlatform(refs.creationPlatformInput?.value || "universal");
+  return normalizeCreationPlatform("universal");
 }
 
 function getCreationSelectedIndustryTemplate() {
@@ -10352,6 +10352,7 @@ function getCreationStatusLabel(status) {
 }
 
 function getCreationItemStatusLabel(item = {}) {
+  if (item.evidenceBlocked || item.status === "skipped") return "已跳过";
   const base = getCreationStatusLabel(item.status);
   // A fallback image was never confirmed by the upstream, and a retained preview is
   // an image from an earlier attempt. Both are in the output, so both say so.
@@ -10391,7 +10392,7 @@ function normalizeCreationPlatform(value) { const normalized = String(value || "
 function formatCreationPlatformLabel(value) { return normalizeCreationPlatform(value).label; }
 
 function getCreationSelectedDimensionUnitMode() {
-  return normalizeCreationDimensionUnitMode(refs.creationDimensionUnitModeInput?.value || "both");
+  return "both";
 }
 
 function getCreationSelectedSkuGenerationRule() { const value = refs.creationSkuGenerationRuleInput?.value || DEFAULT_CREATION_SKU_GENERATION_RULE; const normalizedValue = CREATION_SKU_GENERATION_RULE_LABELS[value] ? value : DEFAULT_CREATION_SKU_GENERATION_RULE; return { value: normalizedValue, label: CREATION_SKU_GENERATION_RULE_LABELS[normalizedValue] || CREATION_SKU_GENERATION_RULE_LABELS[DEFAULT_CREATION_SKU_GENERATION_RULE] }; }
@@ -11587,6 +11588,10 @@ function normalizeCreationItemForView(item = {}, fallbackIndex = 0) {
     imageUrl,
     thumbnailUrl: String(item.thumbnailUrl || imageUrl),
     error: String(item.error || ""),
+    evidenceBlocked: item.evidenceBlocked === true,
+    evidenceRequirement: cloneCreationPlanValue(item.evidenceRequirement, null),
+    sceneAssignment: cloneCreationPlanValue(item.sceneAssignment || item.scene_assignment, null),
+    contentAssignment: cloneCreationPlanValue(item.contentAssignment, null),
     // This normalizer is an allowlist, so both provenance flags must be listed or a
     // round-trip through it silently drops them.
     partialImageFallback: item.partialImageFallback === true || item.partial_image_fallback === true,
@@ -11654,6 +11659,7 @@ function normalizeCreationSetForView(set = {}) {
     productName: String(set.productName || ""),
     productDescription: String(set.productDescription || ""),
     sellingPoints: Array.isArray(set.sellingPoints) ? set.sellingPoints.map((item) => String(item)).filter(Boolean) : [],
+    productInsights: cloneCreationPlanValue(set.productInsights || planSource.productInsights, null),
     dimensionSpecs: String(set.dimensionSpecs || ""),
     ...(dimensionSpecGroups.length > 0 ? { dimensionSpecGroups } : {}),
     dimensionUnitMode: normalizeCreationDimensionUnitMode(set.dimensionUnitMode),
@@ -11987,6 +11993,16 @@ function resetCreationReferenceFilesForRecordReuse(normalized = null) {
   state.creationReferenceFiles = [];
   state.creationReferenceRestoreQueue = buildCreationReferenceRestoreQueue(normalized);
   state.creationReferenceAnalysis = createEmptyCreationReferenceAnalysisState();
+  if (normalized?.productInsights) {
+    state.creationReferenceAnalysis.result = {
+      summary: "已恢复历史商品分析",
+      recommendations: Array.isArray(normalized.referenceImageRoles) ? normalized.referenceImageRoles : [],
+      skuSubjects: Array.isArray(normalized.skuSubjects) ? normalized.skuSubjects : [],
+      productInsights: normalized.productInsights,
+      risks: [],
+    };
+    state.creationReferenceAnalysis.applied = true;
+  }
   if (refs.creationReferenceInput) {
     refs.creationReferenceInput.value = "";
   }
@@ -12056,9 +12072,7 @@ function applyCreationSetToForm(set) {
   if (refs.creationSkuGenerationEnabledInput) refs.creationSkuGenerationEnabledInput.checked = normalized.skuGenerationEnabled !== false;
   if (refs.creationInfographicRebuildEnabledInput) refs.creationInfographicRebuildEnabledInput.checked = normalized.infographicRebuildEnabled === true;
   setCreationSelectValue(refs.creationSkuGenerationRuleInput, normalized.skuGenerationRule, DEFAULT_CREATION_SKU_GENERATION_RULE);
-  setCreationSelectValue(refs.creationDimensionUnitModeInput, normalized.dimensionUnitMode, "both");
   setCreationSelectValue(refs.creationTargetLanguageInput, normalized.targetLanguage, "en");
-  setCreationSelectValue(refs.creationPlatformInput, normalized.platform, "universal");
   setCreationIndustryTemplateValue(normalized.industryTemplate, {
     searchText: normalized.industryTemplatePath || "",
   });
@@ -12140,12 +12154,14 @@ function isCreationDraftSet(set = getCreationCurrentSet()) {
 }
 
 function getCreationProgressSummary(set = getCreationCurrentSet()) {
-  const items = Array.isArray(set?.items) ? set.items : [];
+  const allItems = Array.isArray(set?.items) ? set.items : [];
+  const items = allItems.filter((item) => !item.evidenceBlocked && item.status !== "skipped");
   const imageCount = getFiniteCreationImageCount(set?.imageCount);
-  const total = (items.length || imageCount) ?? getCreationSelectedImageCount();
+  const total = allItems.length > 0 ? items.length : imageCount ?? getCreationSelectedImageCount();
   const completed = items.filter((item) => item.status === "completed").length;
   const failed = items.filter((item) => item.status === "failed").length;
-  return { total, completed, failed };
+  const skipped = allItems.length - items.length;
+  return { total, completed, failed, skipped };
 }
 
 function canRepairCreationSet(set = getCreationCurrentSet()) {
@@ -12153,7 +12169,7 @@ function canRepairCreationSet(set = getCreationCurrentSet()) {
 }
 
 function isCreationItemRepairActive(itemId) { return isCreationItemRepairActiveInQueue(state.creation, itemId); }
-function canRepairCreationItem(itemId) { return canRepairCreationItemFromQueue({ creationState: state.creation, itemId, canRepairSet: canRepairCreationSet(getCreationRepairTargetSet()) }); }
+function canRepairCreationItem(itemId) { const set = getCreationRepairTargetSet(); const item = set?.items?.find((entry) => entry.itemId === itemId); return !item?.evidenceBlocked && item?.status !== "skipped" && canRepairCreationItemFromQueue({ creationState: state.creation, itemId, canRepairSet: canRepairCreationSet(set) }); }
 function getCreationRepairButtonText(item = {}) { return getCreationRepairButtonTextFromQueue({ creationState: state.creation, item }); }
 function queueCreationItemRepair(itemId) { if (!canRepairCreationItem(itemId) || !queueCreationItemRepairInState(state.creation, itemId)) return false; setCreationFeedback("已加入单图重生成队列。", "busy"); renderCreationView(); return true; }
 async function runNextQueuedCreationItemRepair() { const nextItemId = shiftNextQueuedCreationItemRepair(state.creation, (candidate) => Boolean(getCreationCurrentSet()?.items.some((item) => item.itemId === candidate))); if (!nextItemId) { renderCreationView(); return; } renderCreationView(); await repairCreationItems({ itemId: nextItemId }); }
@@ -12346,7 +12362,7 @@ function updateCreationStreamItem(itemId, patch = {}, context = {}) {
 }
 
 function shouldShowCreationCardLoading(item = {}, showRecordActions = false) {
-  if (showRecordActions || !state.creation.generating) {
+  if (item.evidenceBlocked || item.status === "skipped" || showRecordActions || !state.creation.generating) {
     return false;
   }
 
@@ -12359,7 +12375,7 @@ function shouldShowCreationCardLoading(item = {}, showRecordActions = false) {
 }
 
 function shouldHideCreationCardDetails(item = {}, showRecordActions = false) {
-  if (showRecordActions || !state.creation.generating) {
+  if (item.evidenceBlocked || item.status === "skipped" || showRecordActions || !state.creation.generating) {
     return false;
   }
   if (state.creation.generationScope === "single") {
@@ -12453,15 +12469,34 @@ function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
     media.appendChild(image);
   } else {
     const placeholder = document.createElement("span");
-    const isWaitingPlaceholder = item.status !== "failed";
+    const evidenceRequirement = item.evidenceBlocked ? item.evidenceRequirement : null;
+    const isWaitingPlaceholder = item.status !== "failed" && !evidenceRequirement;
     if (isWaitingPlaceholder) {
       media.classList.add("is-waiting");
       media.setAttribute("aria-busy", "true");
     }
-    placeholder.textContent = isCreationMissingAssetItem(item) ? "历史图片文件缺失，可一键补图" : item.status === "failed" ? item.error || "生成失败" : "等待生成";
+    if (evidenceRequirement) {
+      media.classList.add("is-missing-evidence");
+      media.removeAttribute("aria-busy");
+    }
+    placeholder.textContent = evidenceRequirement
+      ? `缺少${evidenceRequirement.label}，已跳过生成`
+      : isCreationMissingAssetItem(item)
+        ? "历史图片文件缺失，可一键补图"
+        : item.status === "failed"
+          ? item.error || "生成失败"
+          : "等待生成";
     media.appendChild(placeholder);
   }
   card.appendChild(media);
+
+  if (item.evidenceBlocked) {
+    const missingBadge = document.createElement("span");
+    missingBadge.className = "creation-card-missing-badge";
+    missingBadge.textContent = "缺数据";
+    missingBadge.title = item.evidenceRequirement?.message || "缺少生成这张图所需的数据";
+    card.appendChild(missingBadge);
+  }
 
   const shouldRenderPath = !imageUrl && !showRecordActions && !hideGenerationDetails;
   if (shouldRenderPath) {
@@ -13428,9 +13463,9 @@ function updateCreationReferenceRole(referenceId, role) {
   state.creationReferenceFiles = state.creationReferenceFiles.map((item) => {
     const nextRole = CREATION_REFERENCE_ROLE_OPTIONS.some((option) => option.value === role) ? role : "product";
     return item.id === referenceId
-      ? { ...item, role: nextRole || "product" }
+      ? { ...item, role: nextRole || "product", roleManuallyEdited: true }
       : nextRole === "reference-product" && item.role === "reference-product"
-        ? { ...item, role: item.role === "reference-product" ? "product" : item.role }
+        ? { ...item, role: item.role === "reference-product" ? "product" : item.role, roleManuallyEdited: true }
         : item;
   });
   syncCreationReferenceGenerationCompressionProfiles();
@@ -13936,6 +13971,7 @@ function buildCreationReferenceRolePayload() {
         index: index + 1,
         filename: item.file?.name || `reference-image-${index + 1}`,
         role: item.role || "product",
+        ...(item.roleManuallyEdited ? { roleManuallyEdited: true } : {}),
         note: item.note || "",
         subjectUnitCount: item.subjectUnitCount || 0,
         ...(dimensionGroups.length > 0 ? { dimension_groups: dimensionGroups } : {}),
@@ -14092,6 +14128,15 @@ function markCreationReferenceAnalysisDirty({ invalidateCategorySuggestion = tru
   }
 }
 
+function markCreationProductAnalysisDirty() {
+  invalidateCreationReferenceAnalysisRequest();
+  if (!state.creationReferenceAnalysis.result || state.creationReferenceAnalysis.updatingFromAnalysis) return;
+  state.creationReferenceAnalysis.applied = false;
+  state.creationReferenceAnalysis.dirty = true;
+  state.creationReferenceAnalysis.categorySuggestionStale = true;
+  setCreationReferenceAnalysisFeedback("商品资料已变化，请重新识别。", "busy");
+}
+
 function clearCreationReferenceAnalysisManagedCategory() {
   const currentCategoryValue = refs.creationIndustryTemplateInput?.value || "general";
   const resolution = resolveCreationReferenceAnalysisCategoryValue({
@@ -14123,13 +14168,14 @@ function normalizeCreationReferenceAnalysisRecommendation(entry = {}, index = 0,
   const filename = String(state.creationReferenceFiles[index]?.file?.name || entry.filename || `reference-image-${index + 1}`).trim();
   if (!filename) return null;
   const normalizedEntry = { ...entry, filename, index: Number(entry.index) || index + 1 };
-  const subjectUnitCount = getCreationReferenceAnalysisGroupedSubjectUnitCount(normalizedEntry, skuSubjects);
+  const unitResolution = getCreationReferenceAnalysisSubjectUnitResolution(normalizedEntry, skuSubjects);
+  const subjectUnitCount = unitResolution.count;
   const roleCorrectionReason = getCreationReferenceAnalysisRoleCorrectionReason(normalizedEntry, subjectUnitCount);
   const shouldCorrectRole = Boolean(roleCorrectionReason) || shouldDowngradeReferenceProductAnalysisRole(normalizedEntry, subjectUnitCount);
   const role = shouldCorrectRole ? "product" : inferCreationReferenceAnalysisRole(normalizedEntry);
   const suppliedRole = String(entry.role || "").trim();
   const dimensionGroups = normalizeCreationDimensionGroupsForPayload(entry.dimensionGroups || entry.dimension_groups);
-  return { index: Number(entry.index) || index + 1, filename, role, subjectUnitCount, roleLabel: getCreationReferenceAnalysisDisplayRoleLabel({ role, roleLabel: String(role !== suppliedRole ? getCreationReferenceRoleLabel(role) : entry.roleLabel || getCreationReferenceRoleLabel(role)), subjectUnitCount }), roleCorrectionReason: roleCorrectionReason, note: normalizeCreationReferenceAnalysisUnitCountNote(entry.note, subjectUnitCount), ...(dimensionGroups.length > 0 ? { dimensionGroups } : {}) };
+  return { index: Number(entry.index) || index + 1, filename, role, subjectUnitCount, roleLabel: getCreationReferenceAnalysisDisplayRoleLabel({ role, roleLabel: String(role !== suppliedRole ? getCreationReferenceRoleLabel(role) : entry.roleLabel || getCreationReferenceRoleLabel(role)), subjectUnitCount }), roleCorrectionReason: roleCorrectionReason, ...(unitResolution.ambiguity ? { unitCountAmbiguity: unitResolution.ambiguity } : {}), note: normalizeCreationReferenceAnalysisUnitCountNote(entry.note, subjectUnitCount), ...(dimensionGroups.length > 0 ? { dimensionGroups } : {}) };
 }
 
 function normalizeCreationReferenceAnalysisPayload(payload = {}) {
@@ -14160,6 +14206,11 @@ function normalizeCreationReferenceAnalysisPayload(payload = {}) {
     categoryPath: String(analysis?.categoryPath || analysis?.category_path || "").trim(),
     recommendations,
     skuSubjects,
+    productInsights: normalizeCreationProductInsights(analysis?.productInsights || analysis?.product_insights, {
+      referenceCount: state.creationReferenceFiles.length,
+      primaryIndex: recommendations.find((entry) => entry.role === "reference-product")?.index || recommendations.find((entry) => entry.role === "product")?.index || 1,
+      userFacts: [refs.creationProductNameInput?.value, refs.creationProductDescriptionInput?.value].filter(Boolean).join("\n"),
+    }),
     ...(audienceStrategy ? { audienceStrategy } : {}),
     risks: Array.isArray(analysis?.risks) ? analysis.risks.map((item) => String(item).trim()).filter(Boolean) : [],
   };
@@ -14268,6 +14319,7 @@ function applyCreationReferenceAnalysisRecommendations() {
   }
 
   const recommendationsByFilename = new Map(analysis.recommendations.map((entry) => [entry.filename, entry]));
+  const manualPrimary = state.creationReferenceFiles.find((item) => item.role === "reference-product");
   state.creationReferenceFiles = state.creationReferenceFiles.map((item, index) => {
     const filename = item.file?.name || `reference-image-${index + 1}`;
     const recommendation = recommendationsByFilename.get(filename) || analysis.recommendations[index];
@@ -14279,8 +14331,10 @@ function applyCreationReferenceAnalysisRecommendations() {
     delete nextItem.dimensionGroups;
     return {
       ...nextItem,
-      role: recommendation.role || item.role || "product",
-      note: recommendation.note || "",
+      role: item.roleManuallyEdited || item.role === "reference-product"
+        ? item.role
+        : manualPrimary && recommendation.role === "reference-product" ? "product" : recommendation.role || item.role || "product",
+      note: (item.roleManuallyEdited || item.role === "reference-product") && item.note ? item.note : recommendation.note || "",
       subjectUnitCount: recommendation.subjectUnitCount || 0,
       ...(recommendation.dimensionGroups?.length > 0 ? { dimensionGroups: recommendation.dimensionGroups } : {}),
     };
@@ -14288,7 +14342,9 @@ function applyCreationReferenceAnalysisRecommendations() {
   syncCreationReferenceGenerationCompressionProfiles();
   state.creationReferenceAnalysis.applied = true;
   state.creationReferenceAnalysis.collapsed = true;
+  state.creationReferenceAnalysis.updatingFromAnalysis = true;
   const productNameApplied = applyCreationReferenceAnalysisProductNameSuggestion(analysis);
+  state.creationReferenceAnalysis.updatingFromAnalysis = false;
   refreshCreationAppliedReferencePlanningSignals();
   syncCreationSelectedRolesToReferenceCoverage(analysis);
   const appliedMessage = buildCreationReferenceAnalysisAppliedFeedbackMessage({
@@ -14369,8 +14425,40 @@ function renderCreationReferenceAnalysis() {
       item.appendChild(correction);
     }
 
+    if (entry.unitCountAmbiguity) {
+      const ambiguity = document.createElement("p");
+      ambiguity.className = "creation-reference-analysis-unit-ambiguity";
+      ambiguity.textContent = "单位数待确认：" + entry.unitCountAmbiguity;
+      item.appendChild(ambiguity);
+    }
+
     refs.creationReferenceAnalysisList.appendChild(item);
   });
+
+  const insights = analysis.productInsights;
+  if (insights) {
+    const insightCard = document.createElement("article");
+    insightCard.className = "reference-analysis-card creation-reference-analysis-card";
+    const heading = document.createElement("strong");
+    heading.textContent = "商品分析与场景建议";
+    insightCard.appendChild(heading);
+    const sections = [
+      ["外观锁", insights.appearanceLocks?.map((entry) => entry.text)],
+      ["买点", insights.sellingPoints?.map((entry) => entry.text)],
+      ["痛点", insights.painPoints?.map((entry) => entry.text)],
+      ["待补资料", insights.unknowns],
+      ["冲突资料", insights.conflicts?.map((entry) => entry.text)],
+      ["建议场景", insights.usageScenarios?.map((entry) => `${entry.environment}：${entry.action}`)],
+    ];
+    sections.forEach(([label, values]) => {
+      const entries = Array.isArray(values) ? values.filter(Boolean).slice(0, 8) : [];
+      if (!entries.length) return;
+      const paragraph = document.createElement("p");
+      paragraph.textContent = `${label}：${entries.join("；")}`;
+      insightCard.appendChild(paragraph);
+    });
+    refs.creationReferenceAnalysisList.appendChild(insightCard);
+  }
 
   analysis.risks.forEach((riskText) => {
     const risk = document.createElement("p");
@@ -14409,6 +14497,7 @@ async function buildCreationReferenceAnalysisFormData() {
   formData.set("industryTemplatePath", contextIndustryTemplate.categoryPath || "");
   formData.set("productName", refs.creationProductNameInput?.value?.trim() || "");
   formData.set("productDescription", refs.creationProductDescriptionInput?.value?.trim() || "");
+  formData.set("referenceImageRoles", JSON.stringify(buildCreationReferenceRolePayload()));
   appendCurrentConfigToFormData(formData);
   return formData;
 }
@@ -14499,7 +14588,7 @@ function renderCreationRolePicker() {
       input.dataset.creationPlanSlotKey = slot.slotKey;
 
       const text = document.createElement("span");
-      text.textContent = slot.imageTypeLabel || slot.title || slot.imageType || slot.role;
+      text.textContent = slot.contentAssignment?.title || slot.imageTypeLabel || slot.title || slot.imageType || slot.role;
 
       label.append(input, text);
       refs.creationRoleGrid.appendChild(label);
@@ -14672,6 +14761,23 @@ function renderCreationPlatformPlan() {
     );
     refs.creationPlanWarnings.classList.toggle("hidden", warnings.length === 0);
   }
+  if (refs.creationContentPlan && refs.creationContentPlanList) {
+    const assignedItems = (plan?.items || []).filter((item) => item.contentAssignment);
+    refs.creationContentPlan.classList.toggle("hidden", assignedItems.length === 0);
+    refs.creationContentPlanList.replaceChildren(...assignedItems.map((item) => {
+      const entry = document.createElement("li");
+      const heading = document.createElement("strong");
+      const assignment = item.contentAssignment;
+      heading.textContent = `${item.slotIndex}. ${item.title}${item.evidenceBlocked ? "（缺少依据，跳过）" : ""}`;
+      const description = document.createElement("p");
+      const evidence = (plan.productInsights?.confirmedFacts || []).filter((fact) => (assignment.factIds || []).includes(fact.id));
+      description.textContent = assignment.kind === "manual" ? assignment.summary || "遵循本图已保存的画面约束。"
+        : assignment.kind === "gap" ? assignment.evidenceRequirement?.message || "请补充资料或减少张数。"
+        : [item.sceneAssignment?.action || assignment.summary, ...evidence.map((fact) => fact.text)].filter(Boolean).join("；");
+      entry.append(heading, description);
+      return entry;
+    }));
+  }
   if (refs.creationPlanValidation) {
     const errors = Array.isArray(plan?.errors) ? plan.errors : [];
     refs.creationPlanValidation.dataset.state = errors.length > 0 ? "blocking" : plan ? "valid" : "idle";
@@ -14733,7 +14839,7 @@ function renderCreationView() {
     refs.creationPlanButton.textContent = state.creation.planning ? "预览中..." : "预览计划";
     refs.creationPlanButton.disabled = state.creation.planning;
   }
-  refs.creationProgressText.textContent = `${progress.completed} / ${progress.total}`;
+  refs.creationProgressText.textContent = `${progress.completed} / ${progress.total}${progress.skipped ? ` · 跳过 ${progress.skipped}` : ""}`;
   renderCreationRolePicker();
   renderCreationReferenceGrid();
   renderCreationLogoBatchSourceGrid();
@@ -14779,7 +14885,7 @@ function buildCreationPlanPreviewFormData() {
   const productDescription = refs.creationProductDescriptionInput.value.trim();
   formData.set("productDescription", productDescription);
   formData.set("dimensionSpecs", productDescription);
-  formData.set("dimensionUnitMode", refs.creationDimensionUnitModeInput.value || "both");
+  formData.set("dimensionUnitMode", getCreationSelectedDimensionUnitMode());
   formData.set("targetLanguage", targetLanguage.value);
   formData.set("imageCount", String(getCreationPlanPreviewImageCount(selectedRoles)));
   formData.set("skuGenerationEnabled", String(refs.creationSkuGenerationEnabledInput?.checked !== false));
@@ -14797,6 +14903,12 @@ function buildCreationPlanPreviewFormData() {
       : null
   );
   if (audienceStrategy) formData.set("audienceStrategy", JSON.stringify(audienceStrategy));
+  const productInsights = effectivePlan?.productInsights || (
+    state.creationReferenceAnalysis.applied && !state.creationReferenceAnalysis.dirty
+      ? state.creationReferenceAnalysis.result?.productInsights
+      : null
+  );
+  if (productInsights) formData.set("productInsights", JSON.stringify(productInsights));
   appendFrozenCreationPlatformPayload(formData);
 
   const roleSubmission = resolveCreationSelectedRolesSubmission({
@@ -15034,8 +15146,9 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
 
   if (eventName === "set_started") {
     upsertCreationSetForStream(payload.set, context);
-    setCreationFeedback(`套图任务已创建，正在生成 ${getFiniteCreationImageCount(payload.set?.imageCount) ?? getCreationSelectedImageCount()} 张营销图。`, "busy");
-    (Array.isArray(payload.set?.items) ? payload.set.items : []).forEach((item) => {
+    const generationProgress = getCreationProgressSummary(payload.set);
+    setCreationFeedback(`套图任务已创建，正在生成 ${generationProgress.total} 张营销图${generationProgress.skipped ? `，缺少依据跳过 ${generationProgress.skipped} 张` : ""}。`, "busy");
+    (Array.isArray(payload.set?.items) ? payload.set.items : []).filter((item) => !item.evidenceBlocked).forEach((item) => {
       recordCreationLogEvent({
         setId: payload.set?.setId,
         itemId: item.itemId,
@@ -15081,6 +15194,16 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
   }
 
   if (eventName === "item_status") {
+    if (payload.blocked) {
+      updateCreationStreamItem(payload.itemId, {
+        status: "skipped", evidenceBlocked: true,
+        ...(payload.evidenceRequirement ? { evidenceRequirement: payload.evidenceRequirement } : {}),
+        updatedAt: nowIso(),
+      }, context);
+      setCreationFeedback(payload.message || "缺少商品依据，已跳过生成。", "success");
+      renderCreationView();
+      return;
+    }
     const itemPatch = {
       status: "generating",
       updatedAt: nowIso(),
@@ -15548,7 +15671,8 @@ async function previewCreationPlan() {
     if (!state.creation.generating) {
       state.creation.currentSet = nextDraftSet;
     }
-    setCreationFeedback(`已生成 ${items.length} 张套图计划。`, "success");
+    const skippedCount = items.filter((item) => item.evidenceBlocked).length;
+    setCreationFeedback(`已生成套图计划：可生成 ${items.length - skippedCount} 张${skippedCount ? `，缺少依据跳过 ${skippedCount} 张` : ""}。`, "success");
   } catch (error) {
     if (error?.name === "AbortError" || !creationPlanPreviewRequests.isCurrent(request.revision)) return;
     const message = compactErrorMessage(error instanceof Error ? error.message : String(error), "套图计划生成失败");
@@ -15640,7 +15764,7 @@ async function startCreationLogoBatchGeneration() {
   }
 }
 
-function buildCreationQueuedSet(input = {}) { return { ...buildCreationQueuedSetFromState({ ...input, buildCreationReferenceRolePayload, buildCreationSkuSubjectPayload, creationState: state.creation, formatCreationDimensionUnitModeLabel, formatCreationVisualLanguageLabel: (value) => CREATION_VISUAL_LANGUAGE_LABELS[normalizeCreationVisualLanguage(value)], getCreationCurrentSet, getCreationDraftSet, getFrozenCreationEffectivePlan, getCreationLogoPayload, getCreationPreviewSlots, getCreationSelectedDimensionUnitMode, getCreationSelectedImageCount, getCreationSelectedIndustryTemplate, getCreationSelectedLanguage, getCreationSelectedPlatform, getCreationSelectedRoles, getCreationSelectedScenario, getCreationSelectedSkuGenerationRule, isCreationDraftSet, normalizeCreationSkuBundleCountForPayload, normalizeCreationVisualLanguage, normalizeSet: normalizeCreationSetForView, referenceFiles: state.creationReferenceFiles, refs }), listingAgentEnabled: Boolean(refs.creationListingAgentEnabledInput?.checked) }; }
+function buildCreationQueuedSet(input = {}) { return { ...buildCreationQueuedSetFromState({ ...input, productInsights: input.productInsights || (state.creationReferenceAnalysis.applied && !state.creationReferenceAnalysis.dirty ? state.creationReferenceAnalysis.result?.productInsights : null), buildCreationReferenceRolePayload, buildCreationSkuSubjectPayload, creationState: state.creation, formatCreationDimensionUnitModeLabel, formatCreationVisualLanguageLabel: (value) => CREATION_VISUAL_LANGUAGE_LABELS[normalizeCreationVisualLanguage(value)], getCreationCurrentSet, getCreationDraftSet, getFrozenCreationEffectivePlan, getCreationLogoPayload, getCreationPreviewSlots, getCreationSelectedDimensionUnitMode, getCreationSelectedImageCount, getCreationSelectedIndustryTemplate, getCreationSelectedLanguage, getCreationSelectedPlatform, getCreationSelectedRoles, getCreationSelectedScenario, getCreationSelectedSkuGenerationRule, isCreationDraftSet, normalizeCreationSkuBundleCountForPayload, normalizeCreationVisualLanguage, normalizeSet: normalizeCreationSetForView, referenceFiles: state.creationReferenceFiles, refs }), listingAgentEnabled: Boolean(refs.creationListingAgentEnabledInput?.checked) }; }
 
 function enqueueCreationGeneration({ formData, set }) {
   const job = createCreationQueueJob({ creationState: state.creation, formData, set, normalizeSet: normalizeCreationSetForView, nowIso });
@@ -15721,7 +15845,7 @@ async function startCreationGeneration(event) {
     const generationFormData = buildCreationFormData();
     const createdAt = nowIso();
     const queuedSet = buildCreationQueuedSet({ productName, productDescription, sellingPoints: [], createdAt });
-    enqueueCreationGeneration({ formData: generationFormData, set: queuedSet });
+    return enqueueCreationGeneration({ formData: generationFormData, set: queuedSet });
   } catch (error) {
     const message = compactErrorMessage(error instanceof Error ? error.message : String(error), "套图生成请求失败");
     setCreationFeedback(message, "error");
@@ -18507,6 +18631,8 @@ function appendImageEditReferencesToFormData(formData, job) {
 function getCreationReferenceAnalysisSnapshot() {
   return JSON.stringify({
     platform: getCreationSelectedPlatform().value,
+    productName: refs.creationProductNameInput?.value?.trim() || "",
+    productDescription: refs.creationProductDescriptionInput?.value?.trim() || "",
     files: state.creationReferenceFiles.map((item) => ({
     name: item?.file?.name || item?.name || "",
     size: item?.file?.size || item?.size || 0,
@@ -18514,26 +18640,6 @@ function getCreationReferenceAnalysisSnapshot() {
     lastModified: item?.file?.lastModified || item?.lastModified || 0,
     })),
   });
-}
-
-async function handleCreationPlatformChange({ programmatic = false } = {}) {
-  const nextPlatform = getCreationSelectedPlatform().value;
-  const previousPlatform = creationPreviousPlatformValue || nextPlatform;
-  if (programmatic || previousPlatform === nextPlatform) {
-    creationPreviousPlatformValue = nextPlatform;
-    return;
-  }
-  creationPreviousPlatformValue = nextPlatform;
-  invalidateCreationReferenceAnalysisRequest();
-  state.creation.platformSetOverrides = {};
-  state.creation.platformItemOverrides = [];
-  setFrozenCreationPlatformPayload({ platformSetOverrides: {}, platformItemOverrides: [] });
-  state.creationRoleSelectionManuallyEdited = false;
-  const nextProfile = getCreationPlatformImageCountProfile(nextPlatform);
-  syncCreationPlatformImageCountOptions({ preferredValue: nextProfile.recommendedImageCount });
-  syncCreationAutomaticPlatformControls(nextPlatform);
-  resetCreationDraftPreview();
-  await requestCreationPlanPreview();
 }
 
 function getPortraitPlanSnapshot() {
@@ -20101,19 +20207,12 @@ function bindEvents() {
     );
   });
   [refs.creationProductNameInput, refs.creationProductDescriptionInput].forEach((input) => input.addEventListener("input", resetCreationDraftPreview));
-  refs.creationDimensionUnitModeInput?.addEventListener("change", resetCreationDraftPreview);
+  [refs.creationProductNameInput, refs.creationProductDescriptionInput].forEach((input) => input.addEventListener("input", () => {
+    if (state.creationReferenceAnalysis.updatingFromAnalysis) return;
+    markCreationProductAnalysisDirty();
+  }));
   refs.creationTargetLanguageInput?.addEventListener("change", () => {
     refreshCreationPlanAfterExplicitSetParameterChange({ targetLanguage: getCreationSelectedLanguage().value });
-  });
-  // Legacy static contract: [refs.creationDimensionUnitModeInput, refs.creationTargetLanguageInput, refs.creationPlatformInput].forEach((input) => input?.addEventListener("change", resetCreationDraftPreview));
-  refs.creationPlatformInput?.addEventListener("pointerdown", () => {
-    creationPreviousPlatformValue = getCreationSelectedPlatform().value;
-  });
-  refs.creationPlatformInput?.addEventListener("focus", () => {
-    creationPreviousPlatformValue = getCreationSelectedPlatform().value;
-  });
-  refs.creationPlatformInput?.addEventListener("change", () => {
-    handleCreationPlatformChange().catch((error) => setCreationFeedback(error.message, "error"));
   });
   refs.creationIndustryTemplateInput?.addEventListener("change", () => {
     markCreationIndustryTemplateManuallyEdited();
@@ -20999,4 +21098,344 @@ async function bootstrap() {
   }
 }
 
-bootstrap();
+const QUICK_SUITE_RATIO_STORAGE_KEY = "image-studio-quick-suite-ratio-v1";
+const QUICK_SUITE_WIDTH_STORAGE_KEY = "image-studio-quick-suite-width-v1";
+const QUICK_SUITE_LANGUAGE_STORAGE_KEY = "image-studio-quick-suite-language-v1";
+const QUICK_SUITE_PRESET_STORAGE_KEY = "image-studio-quick-suite-preset-v1";
+
+function readQuickSuiteStorage(key, fallback) {
+  try {
+    const stored = window.localStorage.getItem(key);
+    return stored === null || stored === "" ? fallback : stored;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeQuickSuiteStorage(key, value) {
+  try {
+    window.localStorage.setItem(key, String(value));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+const quickSuiteState = {
+  files: [],
+  preset: readQuickSuiteStorage(QUICK_SUITE_PRESET_STORAGE_KEY, "standard"),
+  ratio: readQuickSuiteStorage(QUICK_SUITE_RATIO_STORAGE_KEY, "1:1"),
+  width: Number(readQuickSuiteStorage(QUICK_SUITE_WIDTH_STORAGE_KEY, "2048")) || 2048,
+  language: readQuickSuiteStorage(QUICK_SUITE_LANGUAGE_STORAGE_KEY, "en"),
+};
+
+function getQuickSuiteRefs() {
+  return {
+    images: document.querySelector("#quickSuiteImagesInput"),
+    dropzone: document.querySelector("#quickSuiteDropzone"),
+    imageSummary: document.querySelector("#quickSuiteImageSummary"),
+    productName: document.querySelector("#quickSuiteProductName"),
+    details: document.querySelector("#quickSuiteProductDetails"),
+    presets: document.querySelector("#quickSuitePresets"),
+    ratio: document.querySelector("#quickSuiteRatioSelect"),
+    resolution: document.querySelector("#quickSuiteResolutionSelect"),
+    language: document.querySelector("#quickSuiteLanguageSelect"),
+    summary: document.querySelector("#quickSuiteSummary"),
+    planList: document.querySelector("#quickSuitePlanList"),
+    analysisNote: document.querySelector("#quickSuiteAnalysisNote"),
+    planCount: document.querySelector("#quickSuitePlanCount"),
+    status: document.querySelector("#quickSuiteStatus"),
+    generate: document.querySelector("#quickSuiteGenerate"),
+  };
+}
+
+function getQuickSuiteSelectedCount() {
+  const checked = document.querySelector('input[name="quickSuitePreset"]:checked');
+  return Number(checked?.dataset.count) || 8;
+}
+
+function formatQuickSuiteWidthLabel(width) {
+  if (width >= 2880) return "2.8K";
+  if (width >= 2560) return "2.5K";
+  if (width >= 2048) return "2K";
+  return "1K";
+}
+
+function syncQuickSuiteSummary() {
+  const ui = getQuickSuiteRefs();
+  if (!ui.summary) return;
+  const ratio = quickSuiteState.ratio;
+  ui.summary.textContent = `${getQuickSuiteSelectedCount()} 张 · ${ratio} · ${formatQuickSuiteWidthLabel(quickSuiteState.width)}`;
+}
+
+function setQuickSuiteStatus(text) {
+  const ui = getQuickSuiteRefs();
+  if (!ui.status) return;
+  ui.status.textContent = text || "";
+  ui.status.hidden = !text;
+}
+
+function readQuickSuiteRatio() {
+  return quickSuiteState.ratio;
+}
+
+function getQuickSuiteGenerationSize(ratio, width) {
+  if (isModelProtocolImageRoute()) {
+    return width <= 1024 ? "1K" : width <= 2048 ? "2K" : "4K";
+  }
+  const options = getGenerationSizeOptions(ratio)
+    .map((option) => ({ value: option.value, edge: Math.min(...option.value.split("x").map(Number)) }))
+    .sort((left, right) => left.edge - right.edge);
+  return (options.find((option) => option.edge >= width) || options.at(-1)).value;
+}
+
+async function startQuickSuiteGeneration() {
+  const ui = getQuickSuiteRefs();
+  if (!ui.generate || ui.generate.disabled) return;
+  const files = [...quickSuiteState.files];
+  const productName = String(ui.productName?.value || "").trim();
+  const details = String(ui.details?.value || "").trim();
+  if (files.length === 0) {
+    setQuickSuiteStatus("请先拖入至少一张商品图。");
+    return;
+  }
+  if (!productName) {
+    setQuickSuiteStatus("请填写商品名。");
+    return;
+  }
+  const count = getQuickSuiteSelectedCount();
+  const ratio = quickSuiteState.ratio;
+  const language = quickSuiteState.language;
+  const size = getQuickSuiteGenerationSize(ratio, quickSuiteState.width);
+  ui.generate.disabled = true;
+  setQuickSuiteStatus("正在准备商品图…");
+  try {
+    await setActiveView("creation");
+    await waitForPendingCreationPlanPreview();
+    invalidateCreationReferenceAnalysisRequest();
+    resetCreationReferenceFilesForRecordReuse({});
+    setCreationBranch("set");
+    setCreationIndustryTemplateValue("general", { searchText: "" });
+    setFrozenCreationPlatformPayload({ platformSetOverrides: {}, platformItemOverrides: [] });
+    state.creationRoleSelectionManuallyEdited = false;
+    state.creationSelectedRoles = [];
+    refs.creationProductNameInput.value = productName;
+    refs.creationProductDescriptionInput.value = details;
+    refs.creationInfographicRebuildEnabledInput.checked = false;
+    refs.creationListingAgentEnabledInput.checked = false;
+    refs.creationSkuGenerationEnabledInput.checked = false;
+    resetCreationDraftPreview();
+    applyCreationReferenceFiles(files);
+    await ensureCreationReferenceGenerationFilesReady();
+    setQuickSuiteStatus("正在识别商品图…");
+    await analyzeCreationReferenceImages();
+    if (ui.analysisNote) {
+      ui.analysisNote.textContent = refs.creationReferenceAnalysisFeedback?.textContent || "";
+      ui.analysisNote.hidden = !ui.analysisNote.textContent;
+    }
+
+    // 一次性设置本批参数，避免逐个触发 change 导致多个计划互相覆盖。
+    setCreationImageCountValue(count);
+    syncCreationSelectedRolesToCount();
+    refs.creationRatioInput.value = ratio;
+    renderCreationSizeOptions();
+    refs.creationSizeInput.value = size;
+    refs.creationTargetLanguageInput.value = language;
+    syncCreationExplicitSetParameters({ imageCount: count, ratio, resolutionTier: size, targetLanguage: language });
+    setQuickSuiteStatus("正在生成套图计划…");
+    await requestCreationPlanPreview();
+    const plan = getFrozenCreationEffectivePlan();
+    if (state.creation.planDirty || !plan || plan.canGenerate === false) {
+      throw new Error(refs.creationFeedback?.textContent || "套图计划未就绪，请检查商品资料后重试。");
+    }
+    renderQuickSuitePlan(plan.items);
+    const job = await startCreationGeneration({ preventDefault() {} });
+    if (!job) {
+      throw new Error(refs.creationFeedback?.textContent || "套图未加入生成队列，请重试。");
+    }
+    setQuickSuiteStatus("已加入队列：" + count + " 张 · " + ratio + " · " + size + "，进度在套图模式查看");
+    return job;
+  } catch (error) {
+    setQuickSuiteStatus(error?.message || "快捷套图启动失败");
+    showError(error?.message || "快捷套图启动失败");
+  } finally {
+    ui.generate.disabled = false;
+  }
+}
+
+function applyQuickSuiteStoredState() {
+  const ui = getQuickSuiteRefs();
+  if (!ui.presets) return;
+  const presetInput = Array.from(ui.presets.querySelectorAll("input"))
+    .find((input) => input.value === quickSuiteState.preset);
+  if (presetInput) presetInput.checked = true;
+  else quickSuiteState.preset = "standard";
+  if (ui.ratio) {
+    const hasRatio = Array.from(ui.ratio.options || []).some((entry) => entry.value === quickSuiteState.ratio);
+    ui.ratio.value = hasRatio ? quickSuiteState.ratio : "1:1";
+    quickSuiteState.ratio = ui.ratio.value;
+  }
+  if (ui.resolution) {
+    const hasWidth = Array.from(ui.resolution.options).some((entry) => entry.value === String(quickSuiteState.width));
+    ui.resolution.value = hasWidth ? String(quickSuiteState.width) : "2048";
+    quickSuiteState.width = Number(ui.resolution.value);
+  }
+  if (ui.language) {
+    const hasLanguage = Array.from(ui.language.options).some((entry) => entry.value === quickSuiteState.language);
+    ui.language.value = hasLanguage ? quickSuiteState.language : "en";
+    quickSuiteState.language = ui.language.value;
+  }
+  syncQuickSuiteSummary();
+}
+
+let quickSuitePlanTimer = null;
+let quickSuitePlanRequestId = 0;
+
+function renderQuickSuitePlan(items = []) {
+  const ui = getQuickSuiteRefs();
+  if (!ui.planList) return;
+  const carousel = (items || []).filter((item) => item.itemKind === "carousel");
+  if (ui.planCount) ui.planCount.textContent = carousel.length > 0 ? `${carousel.length} 张` : "—";
+  ui.planList.replaceChildren(
+    ...(carousel.length > 0
+      ? carousel.map((item, index) => {
+          const li = document.createElement("li");
+          li.className = "quick-suite-plan-item";
+          const order = document.createElement("span");
+          order.className = "quick-suite-plan-order";
+          order.textContent = String(index + 1).padStart(2, "0");
+          const name = document.createElement("span");
+          name.className = "quick-suite-plan-name";
+          name.textContent = item.title || item.role || "未命名";
+          li.append(order, name);
+          return li;
+        })
+      : [Object.assign(document.createElement("li"), {
+          className: "quick-suite-plan-empty",
+          textContent: "填好商品名后自动生成计划",
+        })])
+  );
+}
+
+async function refreshQuickSuitePlanPreview() {
+  const ui = getQuickSuiteRefs();
+  if (!ui.planList) return;
+  const requestId = ++quickSuitePlanRequestId;
+  const productName = String(ui.productName?.value || "").trim();
+  if (!productName) {
+    renderQuickSuitePlan([]);
+    return;
+  }
+  const formData = new FormData();
+  formData.set("productName", productName);
+  formData.set("productDescription", String(ui.details?.value || "").trim());
+  formData.set("imageCount", String(getQuickSuiteSelectedCount()));
+  formData.set("targetLanguage", quickSuiteState.language);
+  formData.set("ratio", readQuickSuiteRatio());
+  formData.set("resolutionTier", getQuickSuiteGenerationSize(readQuickSuiteRatio(), quickSuiteState.width));
+  formData.set("platform", "universal");
+  formData.set("industryTemplate", "general");
+  formData.set("skuGenerationEnabled", "false");
+  formData.set("infographicRebuildEnabled", "false");
+  try {
+    const response = await fetch("/api/creation/plan", { method: "POST", body: formData });
+    const payload = await response.json().catch(() => ({}));
+    if (requestId !== quickSuitePlanRequestId) return;
+    if (!response.ok) throw new Error(payload.message || "套图计划预览失败，请重试。");
+    renderQuickSuitePlan(payload?.plan?.items || []);
+  } catch (error) {
+    if (requestId !== quickSuitePlanRequestId) return;
+    renderQuickSuitePlan([]);
+    setQuickSuiteStatus(error?.message || "套图计划预览失败，请重试。");
+  }
+}
+
+function scheduleQuickSuitePlanPreview(delay = 450) {
+  quickSuitePlanRequestId += 1;
+  if (quickSuitePlanTimer) window.clearTimeout(quickSuitePlanTimer);
+  quickSuitePlanTimer = window.setTimeout(() => {
+    quickSuitePlanTimer = null;
+    refreshQuickSuitePlanPreview();
+  }, delay);
+}
+
+function applyQuickSuiteFiles(fileList) {
+  const ui = getQuickSuiteRefs();
+  const files = Array.from(fileList || []).filter((file) => file.type.startsWith("image/"));
+  const limit = getCreationMaxProductReferenceImageCount();
+  if (files.length === 0 || files.length > limit) {
+    setQuickSuiteStatus(files.length === 0 ? "请选择图片文件。" : `商品图最多支持 ${limit} 张，请重新选择。`);
+    if (ui.images) ui.images.value = "";
+    return;
+  }
+  quickSuiteState.files = files;
+  if (ui.imageSummary) {
+    ui.imageSummary.textContent = `已选择 ${files.length} 张商品图，点击可重新选择`;
+    ui.imageSummary.title = files.map((file) => file.name).join("、");
+  }
+  setQuickSuiteStatus("");
+}
+
+function initQuickSuiteController() {
+  const ui = getQuickSuiteRefs();
+  if (!ui.presets || ui.presets.dataset.bound === "true") return;
+  ui.presets.dataset.bound = "true";
+  ui.images?.addEventListener("change", () => applyQuickSuiteFiles(ui.images.files));
+  ui.dropzone?.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    ui.dropzone.classList.add("dragover");
+  });
+  ui.dropzone?.addEventListener("dragleave", () => ui.dropzone.classList.remove("dragover"));
+  ui.dropzone?.addEventListener("drop", (event) => {
+    event.preventDefault();
+    ui.dropzone.classList.remove("dragover");
+    applyQuickSuiteFiles(event.dataTransfer?.files);
+  });
+  ui.presets.addEventListener("change", (event) => {
+    const input = event.target.closest('input[name="quickSuitePreset"]');
+    if (!input) return;
+    quickSuiteState.preset = input.value;
+    writeQuickSuiteStorage(QUICK_SUITE_PRESET_STORAGE_KEY, input.value);
+    syncQuickSuiteSummary();
+  });
+  ui.ratio?.addEventListener("change", () => {
+    quickSuiteState.ratio = String(ui.ratio.value || "1:1");
+    writeQuickSuiteStorage(QUICK_SUITE_RATIO_STORAGE_KEY, quickSuiteState.ratio);
+    syncQuickSuiteSummary();
+  });
+  ui.resolution?.addEventListener("change", () => {
+    quickSuiteState.width = Number(ui.resolution.value) || 2048;
+    writeQuickSuiteStorage(QUICK_SUITE_WIDTH_STORAGE_KEY, quickSuiteState.width);
+    syncQuickSuiteSummary();
+    scheduleQuickSuitePlanPreview(120);
+  });
+  ui.language?.addEventListener("change", () => {
+    quickSuiteState.language = String(ui.language.value || "en");
+    writeQuickSuiteStorage(QUICK_SUITE_LANGUAGE_STORAGE_KEY, quickSuiteState.language);
+  });
+  ui.generate?.addEventListener("click", () => {
+    startQuickSuiteGeneration().catch((error) => {
+      if (ui.generate) ui.generate.disabled = false;
+      setQuickSuiteStatus(error?.message || "快捷套图启动失败");
+      showError(error?.message || "快捷套图启动失败");
+    });
+  });
+  ui.productName?.addEventListener("input", () => scheduleQuickSuitePlanPreview());
+  ui.details?.addEventListener("input", () => scheduleQuickSuitePlanPreview());
+  ui.presets.addEventListener("change", () => scheduleQuickSuitePlanPreview(120));
+  ui.ratio?.addEventListener("change", () => scheduleQuickSuitePlanPreview(120));
+  ui.language?.addEventListener("change", () => scheduleQuickSuitePlanPreview(120));
+  applyQuickSuiteStoredState();
+  if (String(ui.productName?.value || "").trim()) scheduleQuickSuitePlanPreview(200);
+}
+
+window.addEventListener("load", () => {
+  const view = getViewFromHash();
+  if (view && state.activeView !== view) {
+    setActiveView(view).catch(() => {});
+  }
+});
+
+bootstrap().catch((error) => {
+  showError(error instanceof Error ? error.message : String(error));
+  setConnectionState("error", "初始化失败");
+});

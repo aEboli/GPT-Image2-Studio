@@ -22,7 +22,7 @@ function makeState(set) {
 }
 
 test("all selected Creation platforms enable manual Listing while missing and active records stay disabled", () => {
-  assert.equal(CREATION_PLATFORM_OPTIONS.length, 19);
+  assert.equal(CREATION_PLATFORM_OPTIONS.length, 1);
   for (const platform of [...CREATION_PLATFORM_OPTIONS.map((option) => option.value), ""]) {
     const set = { setId: platform || "legacy", platform, productName: `${platform || "legacy"} product` };
     const refs = { creationRecordGenerateListingsButton: makeButton() };
@@ -38,7 +38,7 @@ test("all selected Creation platforms enable manual Listing while missing and ac
   createCreationListingController({ refs: emptyRefs, state: makeState(null) }).syncRecordControls(null);
   assert.equal(emptyRefs.creationRecordGenerateListingsButton.disabled, true);
 
-  const busySet = { setId: "busy-temu", platform: "temu", productName: "Busy Temu product" };
+  const busySet = { setId: "busy-universal", platform: "universal", productName: "Busy universal product" };
   const busyRefs = { creationRecordGenerateListingsButton: makeButton() };
   const busyState = makeState(busySet);
   busyState.creation.listingGeneratingSetId = busySet.setId;

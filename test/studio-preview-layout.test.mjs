@@ -30,8 +30,8 @@ const generationClientPath = new URL("../lib/generation-client.mjs", import.meta
 const generationLogPanelPath = new URL("../lib/generation-log-panel.mjs", import.meta.url);
 const generationLogStorePath = new URL("../lib/generation-log-store.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20261024-studio-bottom-align-1";
-const appAssetVersion = "20261024-studio-bottom-align-1";
+const stylesAssetVersion = "20261026-quick-suite-17";
+const appAssetVersion = "20261026-quick-suite-17";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
 const creationQueueModuleAssetVersion = "20261020-queue-label-product-1";
 const quickBlendModuleAssetVersion = "20260928-aspect-ratio-value-only-1";
@@ -4576,7 +4576,8 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(html, /SKU 生成规则[\s\S]*id="creationSkuGenerationRuleInput"[\s\S]*name="skuGenerationRule"[\s\S]*<option value="color-name-under-subject" selected>显示颜色<\/option>[\s\S]*<option value="none">无<\/option>[\s\S]*<option value="package-list">显示清单<\/option>[\s\S]*<option value="dimensions">显示尺寸<\/option>[\s\S]*<option value="package-list-dimensions">显示清单和尺寸<\/option>/);
   assert.doesNotMatch(html, /id="creationScenarioInput"/);
   assert.doesNotMatch(html, /id="creationVisualLanguageInput"/);
-  assert.match(html, /平台选择[\s\S]*id="creationPlatformInput"[\s\S]*name="platform"[\s\S]*<option value="universal" selected>通用电商<\/option>/);
+  assert.doesNotMatch(html, /平台选择/);
+  assert.doesNotMatch(html, /id="creationPlatformInput"/);
   assert.doesNotMatch(html, /id="creationPlatformInput"[\s\S]*<option value="amazon">Amazon<\/option>/);
   assert.match(app, /const CREATION_PLATFORM_POLICY_MODULE_URL = "\/lib\/creation-platform-policies\.mjs[^\"]*";/);
   assert.match(app, /const CREATION_PLATFORM_RESOLVER_MODULE_URL = "\/lib\/creation-platform-resolver\.mjs[^\"]*";/);
@@ -4606,12 +4607,13 @@ test("creation mode has product references without a separate style-reference mo
   assert.doesNotMatch(creationIndustrySearchInput, /placeholder=/);
   assert.doesNotMatch(html, /placeholder="搜索三级\/四级类目名或编码"/);
   assert.doesNotMatch(html, /id="creationSellingPointsInput"|id="creationDimensionSpecsInput"|name="sellingPoints"|name="dimensionSpecs"/);
-  assert.match(html, /id="creationDimensionUnitModeInput"[\s\S]*name="dimensionUnitMode"[\s\S]*<option value="metric">[\s\S]*<option value="imperial">[\s\S]*<option value="both" selected>/);
+  assert.doesNotMatch(html, /id="creationDimensionUnitModeInput"/);
+  assert.doesNotMatch(html, /规格单位/);
   assert.doesNotMatch(html, /写清商品是什么|每行或用逗号分隔|只用于尺寸规格图/);
   assert.match(html, /id="creationProductDescriptionInput"[\s\S]*rows="2"[\s\S]*maxlength="1320"[\s\S]*placeholder="例如：透明手冲咖啡壶，适合办公室和露营，轻盈清透。"/);
   assert.match(html, /id="creationSkuGenerationEnabledInput" name="skuGenerationEnabled" type="checkbox" checked/);
   assert.match(html, /id="creationInfographicRebuildEnabledInput" name="infographicRebuildEnabled" type="checkbox" \/>/);
-  assert.match(html, /<div class="creation-control-row creation-option-grid">[\s\S]*id="creationImageCountInput"[\s\S]*id="creationPlatformInput"[\s\S]*id="creationReasoningEffortInput"[\s\S]*id="creationTargetLanguageInput"[\s\S]*id="creationOutputFormatInput"[\s\S]*id="creationRatioInput"[\s\S]*id="creationSizeInput"[\s\S]*id="creationQualityInput"[\s\S]*id="creationSkuGenerationRuleInput"[\s\S]*id="creationDimensionUnitModeInput"[\s\S]*id="creationSkuGenerationEnabledInput"[\s\S]*id="creationInfographicRebuildEnabledInput"[\s\S]*id="creationListingAgentEnabledInput"[\s\S]*id="creationIndustryTemplateBrowser"/);
+  assert.match(html, /<div class="creation-control-row creation-option-grid">[\s\S]*id="creationImageCountInput"[\s\S]*id="creationReasoningEffortInput"[\s\S]*id="creationTargetLanguageInput"[\s\S]*id="creationOutputFormatInput"[\s\S]*id="creationRatioInput"[\s\S]*id="creationSizeInput"[\s\S]*id="creationQualityInput"[\s\S]*id="creationSkuGenerationRuleInput"[\s\S]*id="creationSkuGenerationEnabledInput"[\s\S]*id="creationInfographicRebuildEnabledInput"[\s\S]*id="creationListingAgentEnabledInput"[\s\S]*id="creationIndustryTemplateBrowser"/);
   assert.match(html, /<select id="creationRatioInput" name="ratio">[\s\S]*<option value="1:1" selected>1:1<\/option>[\s\S]*<option value="9:21">9:21<\/option>[\s\S]*<option value="1:3">1:3<\/option>[\s\S]*<\/select>/);
   assert.match(html, /<select id="creationSizeInput" name="size">[\s\S]*<option value="1024x1024" selected>1024 x 1024<\/option>[\s\S]*<option value="2880x2880">2880 x 2880<\/option>[\s\S]*<\/select>/);
   assert.match(html, /<select id="portraitRatioInput" name="ratio">[\s\S]*<option value="4:5" selected>4:5<\/option>[\s\S]*<option value="3:1">3:1<\/option>[\s\S]*<\/select>/);
@@ -4701,8 +4703,6 @@ test("creation mode has product references without a separate style-reference mo
   const creationOptionGridControlRule = readCssRule(styles, ".creation-option-grid .compact-field select");
   const creationOptionGridOptionRule = readCssRule(styles, ".creation-option-grid .compact-field select option");
   const creationFormCompactLabelRule = readCssRule(styles, ".creation-form .compact-field > span");
-  const creationPlatformSelectRule = readCssRule(styles, "#creationPlatformInput");
-  const creationPlatformOptionRule = readCssRule(styles, "#creationPlatformInput option");
   const creationTemplateSearchLabelRule = readCssRule(styles, ".creation-template-search-field span");
   const creationTemplateSearchRule = readCssRule(styles, ".creation-template-search");
   const creationIndustryHeadLabelRule = readCssRule(styles, ".creation-industry-browser-head span");
@@ -4715,8 +4715,7 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(creationOptionGridControlRule, /font-size:\s*clamp\(0\.72rem,\s*8\.5cqw,\s*var\(--type-body-size\)\);/);
   assert.match(creationOptionGridOptionRule, /font-size:\s*14px;/);
   assert.match(creationFormCompactLabelRule, /font-size:\s*var\(--type-body-size\);/);
-  assert.match(creationPlatformSelectRule, /font-size:\s*clamp\(0\.72rem,\s*8\.5cqw,\s*var\(--type-body-size\)\);/);
-  assert.match(creationPlatformOptionRule, /font-size:\s*14px;/);
+  assert.doesNotMatch(styles, /#creationPlatformInput/);
   assert.match(creationTemplateSearchLabelRule, /font-size:\s*var\(--type-body-size\);/);
   assert.match(creationTemplateSearchRule, /font-size:\s*var\(--type-body-size\);/);
   assert.match(creationIndustryHeadLabelRule, /font-size:\s*var\(--type-body-size\);/);
@@ -4752,11 +4751,11 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(app, /creationReferenceAnalysisToggleButton: document\.querySelector\("#creationReferenceAnalysisToggleButton"\)/);
   assert.doesNotMatch(app, /creationReferenceApplyVisualLanguageButton: document\.querySelector\("#creationReferenceApplyVisualLanguageButton"\)/);
   assert.doesNotMatch(app, /creationSkuBundleCountInput/);
-  assert.match(app, /creationPlatformInput: document\.querySelector\("#creationPlatformInput"\)/);
+  assert.doesNotMatch(app, /creationPlatformInput|handleCreationPlatformChange/);
   assert.doesNotMatch(app, /creationScenarioInput: document\.querySelector\("#creationScenarioInput"\)/);
   assert.doesNotMatch(app, /creationVisualLanguageInput: document\.querySelector\("#creationVisualLanguageInput"\)/);
   assert.doesNotMatch(app, /creationSellingPointsInput|creationDimensionSpecsInput/);
-  assert.match(app, /creationDimensionUnitModeInput: document\.querySelector\("#creationDimensionUnitModeInput"\)/);
+  assert.doesNotMatch(app, /creationDimensionUnitModeInput/);
   assert.match(app, /creationIndustryTemplateBrowser: document\.querySelector\("#creationIndustryTemplateBrowser"\)/);
   assert.match(app, /creationIndustryTemplateTrigger: document\.querySelector\("#creationIndustryTemplateTrigger"\)/);
   assert.match(app, /creationIndustryTemplateCurrent: document\.querySelector\("#creationIndustryTemplateCurrent"\)/);
@@ -4768,9 +4767,9 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(app, /creationIndustryTemplateSearchInput: document\.querySelector\("#creationIndustryTemplateSearchInput"\)/);
   assert.match(app, /creationCategoryTemplatesModule:\s*null/);
   assert.match(app, /async function loadCreationCategoryTemplatesModule\(\) \{/);
-  assert.match(app, /const CREATION_CATEGORY_TEMPLATE_MODULE_URL = "\/lib\/creation-category-templates\.mjs\?v=20260509-category-search-2";/);
+  assert.match(app, /const CREATION_CATEGORY_TEMPLATE_MODULE_URL = "\/lib\/creation-category-templates\.mjs\?v=20261026-category-focus-1";/);
   assert.match(app, /import\(CREATION_CATEGORY_TEMPLATE_MODULE_URL\)/);
-  assert.doesNotMatch(app, /from "\/lib\/creation-category-templates\.mjs\?v=20260509-category-search-2"/);
+  assert.doesNotMatch(app, /from "\/lib\/creation-category-templates\.mjs\?v=20261026-category-focus-1"/);
   assert.match(app, /creationReferenceInput: document\.querySelector\("#creationReferenceInput"\)/);
   assert.match(app, /creationRoleGrid: document\.querySelector\("#creationRoleGrid"\)/);
   assert.match(app, /creationRoleCount: document\.querySelector\("#creationRoleCount"\)/);
@@ -4871,7 +4870,7 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(app, /findCreationIndustryTemplateProductNameMatch/);
   assert.match(app, /function applyCreationReferenceAnalysisRecommendations\(\) \{/);
   assert.doesNotMatch(app, /function applyCreationReferenceAnalysisVisualLanguage\(\) \{/);
-  assert.match(app, /from "\/lib\/creation-reference-analysis-view\.mjs"/);
+  assert.match(app, /from "\/lib\/creation-reference-analysis-view\.mjs(?:\?v=[^"]+)?"/);
   assert.match(queueModule, /const platform =\s*[\r\n]+\s*typeof getCreationSelectedPlatform === "function"\s*[\r\n]+\s*\? getCreationSelectedPlatform\(\)\s*[\r\n]+\s*: DEFAULT_CREATION_PLATFORM;/);
   assert.match(queueModule, /platform:\s*platform\.value/);
   assert.match(queueModule, /platformLabel:\s*platform\.label/);
@@ -4975,7 +4974,7 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(app, /function resetCreationDraftPreview\(\) \{/);
   assert.match(app, /const file = getCreationReferenceGenerationFile\(item\);[\s\S]*formData\.append\("referenceImages", file\)/);
   assert.match(app, /formData\.set\("dimensionSpecs", productDescription\)/);
-  assert.match(app, /formData\.set\("dimensionUnitMode", refs\.creationDimensionUnitModeInput\.value \|\| "both"\)/);
+  assert.match(app, /formData\.set\("dimensionUnitMode", getCreationSelectedDimensionUnitMode\(\)\)/);
   assert.match(app, /formData\.set\("referenceImageRoles", JSON\.stringify\(buildCreationReferenceRolePayload\(\)\)\)/);
   assert.match(app, /formData\.set\("skuSubjects", JSON\.stringify\(buildCreationSkuSubjectPayload\(\)\)\)/);
   assert.doesNotMatch(app, /formData\.set\("skuBundleCount"/);
@@ -5015,7 +5014,7 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(app, /"color-name-under-subject": "显示颜色"/);
   assert.match(app, /formData\.set\("industryTemplate", resolveCreationReferenceAnalysisContextCategoryValue\(\{ analysisDirty: state\.creationReferenceAnalysis\.dirty,[^\n]*categorySuggestionStale: state\.creationReferenceAnalysis\.categorySuggestionStale,[^\n]*previousAutoCategoryValue: state\.creationReferenceAnalysis\.categoryTemplateSuggestion \}\)\)/);
   assert.match(app, /\[refs\.creationProductNameInput, refs\.creationProductDescriptionInput\]\.forEach\(\(input\) => input\.addEventListener\("input", resetCreationDraftPreview\)\)/);
-  assert.match(app, /\[refs\.creationDimensionUnitModeInput, refs\.creationTargetLanguageInput, refs\.creationPlatformInput\]\.forEach\(\(input\) => input\?\.addEventListener\("change", resetCreationDraftPreview\)\)/);
+  assert.match(app, /refs\.creationTargetLanguageInput\?\.addEventListener\("change"/);
   assert.match(app, /refs\.creationImageCountInput\.addEventListener\("change",\s*\(\) => \{[\s\S]*syncCreationSelectedRolesToCount\(\)[\s\S]*requestCreationPlanPreview\(\)/);
   assert.match(app, /refs\.creationImageCountInput\.addEventListener\("click", syncCreationSelectedRolesToCurrentCount\)/);
   assert.match(app, /refs\.creationSkuGenerationEnabledInput\?\.addEventListener\("change", refreshCreationPlanAfterSkuGenerationToggle\)/);
@@ -5038,8 +5037,8 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(app, /refs\.creationRatioInput\.addEventListener\("pointerdown", \(\) => setCreationRatioOptionLabels\(\{ expanded: true \}\)\)/);
   assert.match(app, /refs\.creationRatioInput\.addEventListener\("blur", \(\) => setCreationRatioOptionLabels\(\{ expanded: false \}\)\)/);
   assert.match(app, /refs\.creationRatioInput\.addEventListener\("change", \(\) => \{[\s\S]*renderCreationSizeOptions\(\);[\s\S]*setCreationRatioOptionLabels\(\{ expanded: false \}\);[\s\S]*\}\)/);
-  assert.match(app, /setCreationSelectValue\(refs\.creationDimensionUnitModeInput, normalized\.dimensionUnitMode, "both"\)/);
-  assert.match(app, /setCreationSelectValue\(refs\.creationPlatformInput, normalized\.platform, "universal"\)/);
+  assert.doesNotMatch(app, /refs\.creationDimensionUnitModeInput/);
+  assert.doesNotMatch(app, /refs\.creationPlatformInput/);
   assert.doesNotMatch(app, /setCreationSelectValue\(refs\.creationVisualLanguageInput, normalized\.visualLanguage, "classic-commercial"\)/);
   assert.match(app, /refs\.creationPlanButton\.addEventListener\("click"/);
   assert.match(app, /refs\.creationReferenceGrid\.addEventListener\("change",[\s\S]*creationReferenceRoleId/);
@@ -5730,7 +5729,10 @@ test("asset record views include PPT records and Creation set records", async ()
     /function isCreationMissingAssetItem\(item = \{\}\) \{\s*return Boolean\(item\.missingAsset \|\| item\.missing_asset\);\s*\}/,
   );
   assert.match(app, /status\.textContent = getCreationItemStatusLabel\(item\);/);
-  assert.match(app, /placeholder\.textContent = isCreationMissingAssetItem\(item\) \? "历史图片文件缺失，可一键补图" : item\.status === "failed" \? item\.error \|\| "生成失败" : "等待生成";/);
+  assert.match(app, /placeholder\.textContent = evidenceRequirement[\s\S]{0,220}isCreationMissingAssetItem\(item\)[\s\S]{0,160}"历史图片文件缺失，可一键补图"[\s\S]{0,160}"等待生成";/);
+  assert.match(app, /缺少\$\{evidenceRequirement\.label\}，已跳过生成/);
+  assert.match(app, /creation-card-missing-badge/);
+  assert.match(styles, /\.creation-card-missing-badge\s*\{/);
   assert.match(app, /renderCreationRecordArchiveDetail\(set\)[\s\S]*formatCreationReferenceRoleSummary\(set\.referenceImageRoles\)/);
   assert.match(app, /function applyCreationSetToForm\(set\) \{/);
   assert.match(app, /function reuseCreationRecordSet\(\) \{/);
@@ -5777,7 +5779,7 @@ test("asset record views include PPT records and Creation set records", async ()
   assert.match(app, /function formatCreationProductDetails\(set = \{\}\) \{[\s\S]*set\.productDescription,[\s\S]*set\.dimensionSpecs[\s\S]*\.join\("\\n"\)/);
   assert.match(app, /refs\.creationProductDescriptionInput\.value = formatCreationProductDetails\(normalized\);/);
   assert.match(app, /setCreationSelectValue\(refs\.creationTargetLanguageInput, normalized\.targetLanguage, "en"\);/);
-  assert.match(app, /setCreationSelectValue\(refs\.creationPlatformInput, normalized\.platform, "universal"\);/);
+  assert.doesNotMatch(app, /refs\.creationPlatformInput/);
   assert.match(app, /setCreationIndustryTemplateValue\(normalized\.industryTemplate/);
   assert.match(app, /setCreationImageCountValue\(normalized\.imageCount\);/);
   assert.match(app, /state\.creationSelectedRoles = alignCreationRoleIdsToCount\(normalizedRoles, getCreationSelectedImageCount\(\)\);/);

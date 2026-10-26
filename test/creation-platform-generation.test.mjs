@@ -251,15 +251,24 @@ test("infographic rebuild runtime prompt honors only the four selected output co
 test("infographic rebuild prompt requires substantial visual redesign while locking source facts", () => {
   const prompt = buildCreationInfographicRebuildPrompt();
 
-  assert.match(prompt, /Redesign the attached source image as a professional infographic/i);
-  assert.match(prompt, /professional infographic with a new grid/i);
+  assert.match(prompt, /Reconstruct the attached source infographic as a faithful information graphic/i);
+  assert.match(prompt, /faithful information graphic with a new grid and architecture/i);
   assert.match(prompt, /change at least three of layout, background, typography, color, spacing, grouping, icons, or callouts/i);
 
-  assert.match(prompt, /attached source image/i);
-  assert.match(prompt, /treat off-product source wording as layout content, not product data/i);
-  assert.match(prompt, /All visible canvas text, including headings, labels, captions, specifications, badges, and corner graphics, uses only the selected target language/i);
-  assert.match(prompt, /Translate or rebuild off-product wording and replace source characters/i);
-  assert.match(prompt, /Keep source language only for text physically on the product or packaging/i);
+  assert.match(prompt, /attached source infographic/i);
+  assert.match(prompt, /closed inventory/i);
+  assert.match(prompt, /Each output element maps to source element\(s\) with the same meaning and scope/i);
+  assert.match(prompt, /Off-product wording is layout content, not product data/i);
+  assert.match(prompt, /Appearance guides depiction only; a written property or benefit needs source text or a qualifying derivation/i);
+  assert.match(prompt, /at least two readable facts support one direct, unambiguous inference/i);
+  assert.match(prompt, /use the target-language equivalent of Approx\.\/Estimated and round conservatively/i);
+  assert.match(prompt, /45°C ~6h, 55°C ~3h, and three settings support an approximate middle setting of 50°C ~4h/i);
+  assert.match(prompt, /Omit weak, conflicting, or ambiguous inferences; use no outside facts/i);
+  assert.match(prompt, /Every caption, benefit label, badge, side panel, icon, arrow, callout, and grouping maps to source element\(s\) or a qualifying derivation/i);
+  assert.match(prompt, /Leave unreadable wording as clean space/i);
+  assert.match(prompt, /All headings, labels, captions, specifications, badges, and corner graphics use only the target language/i);
+  assert.match(prompt, /Translate readable source wording/i);
+  assert.match(prompt, /Preserve text physically on the product or packaging/i);
   assert.match(prompt, /Keep physical product shape, variant, colors, parts, quantities, and surface text exact/i);
   assert.doesNotMatch(prompt, /preserve identifiers/i);
   assert.doesNotMatch(prompt, /\blogos?\b/i);
@@ -277,7 +286,7 @@ test("creation planning keeps unsafe analysis personas and unsupported claims ou
   assert.doesNotMatch(promptText, /Black buyers|25-34|Chinese consumers|FDA certified|\$19\.99|3x faster|4\.9\/5|million sold|销量第一|diabetes|clinically proven treatment/i);
 });
 
-test("submitted effective plans are bounded, normalized, recounted, and hard-rule revalidated", () => {
+test("submitted effective plans are bounded, normalized, and recounted", () => {
   const input = normalizedPlatformInput();
   const preview = buildCreationPlan(input);
   const submitted = buildCreationSubmittedPlan({
@@ -295,24 +304,25 @@ test("submitted effective plans are bounded, normalized, recounted, and hard-rul
   assert.equal(submitted.totalPlannedItemCount, submitted.items.length);
   assert.deepEqual(submitted.items.map((item) => item.prompt), preview.items.map((item) => item.prompt));
 
-  const amazon = buildCreationPlan({ productName: "Bottle", platform: "amazon" });
-  const tamperedItems = amazon.items.map((item, index) => index === 0
-    ? { ...item, textPolicy: "moderate", prompt: `${item.prompt} Add visible marketing text.` }
+  // None of the 20 surviving image types declares a blocking hard rule, so a frozen plan can no
+  // longer smuggle an archived blocking constraint in for revalidation. The assertions below keep
+  // the normalization guarantees that still apply: spoofed constraints are replaced by the
+  // registry definition and a submitted item cannot stay disabled.
+  const universal = buildCreationPlan({ productName: "Bottle", platform: "universal" });
+  const tamperedItems = universal.items.map((item, index) => index === 0
+    ? { ...item, constraints: [{ id: "spoofed-advisory", level: "advisory", field: "textPolicy", operator: "equals", value: "moderate", message: "spoofed" }], enabled: false, textPolicy: "moderate", prompt: `${item.prompt} Add visible marketing text.` }
     : item);
   const tampered = buildCreationSubmittedPlan({
-    effectivePlan: JSON.stringify({ ...amazon, items: tamperedItems, canGenerate: true, validation: { isValid: true } }),
+    effectivePlan: JSON.stringify({ ...universal, items: tamperedItems, canGenerate: true, validation: { isValid: true } }),
   });
-  assert.throws(() => assertCreationPlanCanGenerate(tampered), /Amazon 主图不得包含营销文字/);
+  assert.equal(tampered.items[0].imageType, "generic-hero");
+  assert.equal(tampered.items[0].enabled, true);
+  assert.equal(tampered.items[0].constraints.some((constraint) => constraint.id === "spoofed-advisory"), false);
+  assert.equal(assertCreationPlanCanGenerate(tampered), tampered);
 
-  const imageTypeTampered = buildCreationSubmittedPlan({ effectivePlan: JSON.stringify({ ...amazon, items: amazon.items.map((item, index) => index === 0 ? { ...item, imageType: "generic-hero", constraints: [], scenePolicy: "lifestyle", prompt: `${item.prompt} Create a lifestyle scene with decorative props.` } : item), canGenerate: true, validation: { isValid: true } }) });
-  assert.equal(imageTypeTampered.items[0].imageType, "amazon-main");
-  assert.throws(() => assertCreationPlanCanGenerate(imageTypeTampered), /Amazon 主图/);
-  const disabledTampered = buildCreationSubmittedPlan({ effectivePlan: JSON.stringify({ ...amazon, items: amazon.items.map((item, index) => index === 0 ? { ...item, enabled: false, textPolicy: "moderate", prompt: `${item.prompt} Add visible marketing text.` } : item), canGenerate: true, validation: { isValid: true } }) });
-  assert.equal(disabledTampered.items[0].enabled, true);
-  assert.throws(() => assertCreationPlanCanGenerate(disabledTampered), /Amazon 主图不得包含营销文字/);
-  const nestedPlan = buildCreationSubmittedPlan({ effectivePlan: JSON.stringify({ ...amazon, effectivePlan: { ...amazon, items: amazon.items.map((item) => ({ ...item, prompt: "unvalidated nested prompt" })) } }) });
+  const nestedPlan = buildCreationSubmittedPlan({ effectivePlan: JSON.stringify({ ...universal, effectivePlan: { ...universal, items: universal.items.map((item) => ({ ...item, prompt: "unvalidated nested prompt" })) } }) });
   assert.equal(Object.hasOwn(nestedPlan, "effectivePlan"), false);
-  assert.deepEqual(nestedPlan.items.map((item) => item.prompt), amazon.items.map((item) => item.prompt));
+  assert.deepEqual(nestedPlan.items.map((item) => item.prompt), universal.items.map((item) => item.prompt));
 
   assert.throws(
     () => buildCreationSubmittedPlan({ effectivePlan: "x".repeat(MAX_CREATION_EFFECTIVE_PLAN_BYTES + 1) }),

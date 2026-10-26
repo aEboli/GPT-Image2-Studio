@@ -11,11 +11,19 @@ import { once } from "node:events";
 import { File } from "node:buffer";
 import { setTimeout as delay } from "node:timers/promises";
 
+import { CREATION_VISUAL_LANGUAGE_OPTIONS } from "../lib/creation-planner.mjs";
 import { validateCreationListingDraft } from "../lib/creation-listing-draft.mjs";
 import { buildCreationInfographicRebuildPrompt } from "../lib/creation-generation-parameters.mjs";
 import { FINAL_IMAGE_CHUNK_SIZE, recordFinalImageChunk } from "../lib/generation-stream-protocol.mjs";
+import { gloveAnalysisInput } from "./fixtures/creation-glove-insights.mjs";
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+// The style sentence is owned by the selected visual-language option, so the test follows the
+// option instead of pinning a copy of the wording.
+const LIFESTYLE_EDITORIAL_STYLE = CREATION_VISUAL_LANGUAGE_OPTIONS.find(
+  (option) => option.value === "lifestyle-editorial",
+).promptInstruction;
 
 async function getFreePort() {
   const server = createTcpServer();
@@ -324,6 +332,147 @@ function summarizeCreationItems(set = {}) {
     error: item.error,
   }));
 }
+
+test("single-SKU and missing-size items never call the upstream during generation or repair", async (t) => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "creation-evidence-gate-"));
+  const outputDir = join(tempRoot, "output");
+  const requests = [];
+  const imageBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAADklEQVR4nGP4DwUMMAYAj4IP8TylVlEAAAAASUVORK5CYII=";
+  const upstreamServer = createHttpServer(async (request, response) => {
+    const parts = [];
+    for await (const chunk of request) parts.push(chunk);
+    const path = new URL(request.url, "http://localhost").pathname;
+    const raw = Buffer.concat(parts).toString("utf8");
+    requests.push({ path, body: path.endsWith("/responses") ? JSON.parse(raw) : null });
+    if (path.endsWith("/files")) {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ id: "file-local-reference", object: "file" }));
+    } else {
+      response.writeHead(200, { "content-type": "text/event-stream" });
+      response.end(`event: response.completed\ndata: ${JSON.stringify({ type: "response.completed", response: { id: "resp_local_evidence", status: "completed", output: [{ type: "image_generation_call", result: imageBase64 }] } })}\n\n`);
+    }
+  });
+  await new Promise((resolveListen) => upstreamServer.listen(0, "127.0.0.1", resolveListen));
+  const appPort = await getFreePort();
+  const baseUrl = `http://127.0.0.1:${appPort}`;
+  const server = spawn(process.execPath, ["server.mjs"], {
+    cwd: rootDir,
+    env: { ...process.env, PORT: String(appPort), VERCEL: "1", TMP: tempRoot, TEMP: tempRoot,
+      IMAGE_STUDIO_OUTPUT_DIR: outputDir, IMAGE_STUDIO_LOCAL_DATA_DIR: join(tempRoot, "local-data") },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const diagnostics = collectDiagnostics(server);
+  t.after(async () => {
+    await stopServer(server);
+    await stopHttpServer(upstreamServer);
+    await rm(tempRoot, { recursive: true, force: true });
+  });
+  await waitForServer(baseUrl, server, diagnostics);
+  const fields = {
+    productName: "Heated Gloves", productDescription: "One khaki pair of gloves", sellingPoints: "",
+    platform: "universal", industryTemplate: "general", skuGenerationEnabled: "false",
+    selectedRoles: JSON.stringify(["hero", "size-capacity-fit", "series-showcase", "spec-table"]),
+    skuSubjects: JSON.stringify([{ id: "khaki", filenames: ["front.png"], colorNames: ["khaki"], note: "One matched pair" }]),
+    baseUrl: `http://127.0.0.1:${upstreamServer.address().port}/v1`,
+  };
+  const preview = await postForm(baseUrl, "/api/creation/plan", makeCreationForm({ fields }));
+  const plan = JSON.parse(preview.text).plan;
+  assert.equal(plan.items.filter((item) => item.evidenceBlocked).length, 3);
+  for (const item of plan.items) {
+    delete item.evidenceBlocked;
+    delete item.evidenceRequirement;
+  }
+  const result = await postForm(baseUrl, "/api/creation/generate", makeCreationForm({ fields: { ...fields, effectivePlan: JSON.stringify(plan) } }));
+  const set = getCompleteSet(result.events);
+  assert.equal(set.status, "completed", JSON.stringify(summarizeCreationEvents(result.events)));
+  assert.equal(set.items.filter((item) => item.status === "completed").length, 1);
+  assert.equal(set.items.filter((item) => item.status === "skipped" && item.evidenceBlocked).length, 3);
+  assert.equal(requests.filter((entry) => entry.path.endsWith("/responses")).length, 1);
+  const requestCount = requests.length;
+  const blocked = set.items.find((item) => item.role === "series-showcase");
+  const repair = await postForm(baseUrl, "/api/creation/repair", makeCreationForm({ fields: { ...fields, setId: set.setId, itemId: blocked.itemId } }));
+  assert.equal(repair.events.some((event) => event.eventName === "error" && /SKU/.test(event.payload.message)), true, repair.text);
+  assert.equal(requests.length, requestCount, "blocked repair must not upload references or request an image");
+  const onlyBlocked = structuredClone(plan);
+  onlyBlocked.items = onlyBlocked.items.filter((item) => item.role !== "hero");
+  const rejected = await postForm(baseUrl, "/api/creation/generate", makeCreationForm({ fields: { ...fields, effectivePlan: JSON.stringify(onlyBlocked) } }));
+  assert.equal(rejected.events.some((event) => event.eventName === "error" && /拦截/.test(event.payload.message)), true);
+  assert.equal(requests.length, requestCount, "an entirely blocked plan must make zero upstream requests");
+});
+
+test("balanced content tasks survive preview, upstream generation, storage and repair", async (t) => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "creation-content-plan-"));
+  const outputDir = join(tempRoot, "output");
+  const requests = [];
+  const imageBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAADklEQVR4nGP4DwUMMAYAj4IP8TylVlEAAAAASUVORK5CYII=";
+  const upstream = createHttpServer(async (request, response) => {
+    const parts = [];
+    for await (const chunk of request) parts.push(chunk);
+    const pathname = new URL(request.url, "http://localhost").pathname;
+    if (pathname.endsWith("/files")) {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ id: "file-content-plan", object: "file" }));
+    } else {
+      requests.push(JSON.parse(Buffer.concat(parts).toString("utf8")));
+      response.writeHead(200, { "content-type": "text/event-stream" });
+      response.end(`event: response.completed\ndata: ${JSON.stringify({ type: "response.completed", response: { id: `resp_content_${requests.length}`, status: "completed", output: [{ type: "image_generation_call", result: imageBase64 }] } })}\n\n`);
+    }
+  });
+  await new Promise((resolveListen) => upstream.listen(0, "127.0.0.1", resolveListen));
+  const port = await getFreePort();
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const server = spawn(process.execPath, ["server.mjs"], {
+    cwd: rootDir,
+    env: { ...process.env, PORT: String(port), IMAGE_STUDIO_OUTPUT_DIR: outputDir, IMAGE_STUDIO_LOCAL_DATA_DIR: tempRoot },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  t.after(async () => { await stopServer(server); await stopHttpServer(upstream); await rm(tempRoot, { recursive: true, force: true }); });
+  await waitForServer(baseUrl, server, collectDiagnostics(server));
+  const input = gloveAnalysisInput({ imageCount: 12 });
+  const fields = {
+    ...Object.fromEntries(Object.entries(input).map(([key, value]) => [key, typeof value === "object" ? JSON.stringify(value) : String(value)])),
+    selectedRoles: "[]", targetLanguage: "zh-CN", industryTemplate: "general", sellingPoints: "",
+    baseUrl: `http://127.0.0.1:${upstream.address().port}/v1`,
+  };
+  const form = (extra = {}) => {
+    const result = makeCreationForm({ includeReferenceImage: false, fields: { ...fields, ...extra } });
+    result.append("referenceImages", makeReferenceFile("gloves.png"), "gloves.png");
+    return result;
+  };
+  const preview = await postForm(baseUrl, "/api/creation/plan", form());
+  assert.equal(preview.response.status, 200, preview.text);
+  const plan = JSON.parse(preview.text).plan;
+  assert.ok(plan.items.filter((item) => item.contentAssignment?.kind === "infographic" && !item.evidenceBlocked).length >= 3);
+  assert.ok(plan.items.filter((item) => /手机/.test(item.sceneAssignment?.action || "")).length <= 1);
+  const generation = await postForm(baseUrl, "/api/creation/generate", form({ effectivePlan: JSON.stringify(plan) }));
+  assert.deepEqual(generation.events.filter((event) => event.eventName === "error"), [], generation.text);
+  assert.deepEqual(generation.events.filter((event) => event.eventName === "item_failed"), [], generation.text);
+  const completed = generation.events.findLast((event) => event.eventName === "complete")?.payload.set;
+  assert.ok(completed, generation.text);
+  assert.equal(requests.length, plan.items.filter((item) => !item.evidenceBlocked).length);
+  for (const item of completed.items) {
+    const original = plan.items.find((entry) => entry.itemId === item.itemId);
+    assert.deepEqual(item.contentAssignment, original.contentAssignment);
+    assert.equal(item.prompt, original.prompt);
+  }
+  const path = await findCreationManifestPath(outputDir, completed.setId);
+  const manifest = JSON.parse(await readFile(path, "utf8"));
+  const target = manifest.items.find((item) => item.contentAssignment?.taskKey === "selling-overview");
+  assert.ok(target);
+  assert.deepEqual(target.contentAssignment, plan.items.find((item) => item.itemId === target.itemId).contentAssignment);
+  target.status = "failed";
+  target.error = "forced content-plan repair";
+  await writeFile(path, JSON.stringify(manifest));
+  const before = requests.length;
+  const repaired = await postForm(baseUrl, "/api/creation/repair", form({ setId: completed.setId, itemId: target.itemId }));
+  assert.deepEqual(repaired.events.filter((event) => event.eventName === "error"), [], repaired.text);
+  assert.equal(requests.length, before + 1);
+  const saved = JSON.parse(await readFile(path, "utf8"));
+  const repairedItem = saved.items.find((item) => item.itemId === target.itemId);
+  assert.equal(repairedItem.status, "completed", JSON.stringify({ error: repairedItem.error, events: repaired.events.map((event) => ({ event: event.eventName, message: event.payload.message, error: event.payload.item?.error })) }));
+  assert.deepEqual(repairedItem.contentAssignment, target.contentAssignment);
+  assert.equal(repairedItem.prompt, target.prompt);
+});
 
 test("creation recovers a known Responses task after the stream deadline without a second POST", async (t) => {
   const tempRoot = await mkdtemp(join(tmpdir(), "creation-timeout-recovery-"));
@@ -853,33 +1002,33 @@ test("creation workflow reuses history, reuploads references, tweaks prompts, re
   assert.match(planBody.plan.items[0].prompt, /manual historical binding/);
   assert.match(planBody.plan.items[0].prompt, /emphasize texture, swatches, skincare use, packaging, and evidence-based benefit hierarchy/i);
   assert.doesNotMatch(planBody.plan.items[1].prompt, /visual style:/i);
-  assert.match(planBody.plan.items[1].prompt, /lifestyle magazine editorial/);
+  assert.ok(planBody.plan.items[1].prompt.includes(LIFESTYLE_EDITORIAL_STYLE), planBody.plan.items[1].prompt);
 
-  const xiaohongshuForm = new FormData();
-  xiaohongshuForm.set("productName", "Travel mug");
-  xiaohongshuForm.set("productDescription", "Insulated travel mug shown in supplied references");
-  xiaohongshuForm.set("sellingPoints", "portable\nreusable");
-  xiaohongshuForm.set("dimensionSpecs", "Height 20 cm; width 8 cm");
-  xiaohongshuForm.set("platform", "xiaohongshu");
-  xiaohongshuForm.set("platformSetOverrides", JSON.stringify({
+  const universalForm = new FormData();
+  universalForm.set("productName", "Travel mug");
+  universalForm.set("productDescription", "Insulated travel mug shown in supplied references");
+  universalForm.set("sellingPoints", "portable\nreusable");
+  universalForm.set("dimensionSpecs", "Height 20 cm; width 8 cm");
+  universalForm.set("platform", "universal");
+  universalForm.set("platformSetOverrides", JSON.stringify({
     imageCount: 18,
-    targetLanguage: "en",
+    targetLanguage: "zh-CN",
     ratio: "4:3",
     resolutionTier: "2048x1536",
   }));
-  xiaohongshuForm.set("infographicRebuildEnabled", "false");
-  const xiaohongshuResponse = await fetch(`${baseUrl}/api/creation/plan`, {
+  universalForm.set("infographicRebuildEnabled", "false");
+  const universalResponse = await fetch(`${baseUrl}/api/creation/plan`, {
     method: "POST",
-    body: xiaohongshuForm,
+    body: universalForm,
   });
-  assert.equal(xiaohongshuResponse.status, 200);
-  const xiaohongshuPlan = (await xiaohongshuResponse.json()).plan;
-  assert.equal(xiaohongshuPlan.carouselImageCount, 6);
-  assert.equal(xiaohongshuPlan.platformSetOverrides.imageCount, 6);
-  assert.ok(xiaohongshuPlan.items.every((item) => item.targetLanguage === "en"));
-  assert.ok(xiaohongshuPlan.items.every((item) => item.ratio === "4:3"));
-  assert.ok(xiaohongshuPlan.items.every((item) => item.resolutionTier === "2048x1536"));
-  assert.equal(xiaohongshuPlan.items.some((item) => item.imageType === "custom"), false);
+  assert.equal(universalResponse.status, 200);
+  const universalPlan = (await universalResponse.json()).plan;
+  assert.equal(universalPlan.carouselImageCount, 18);
+  assert.equal(universalPlan.platformSetOverrides.imageCount, 18);
+  assert.ok(universalPlan.items.every((item) => item.targetLanguage === "zh-CN"));
+  assert.ok(universalPlan.items.every((item) => item.ratio === "4:3"));
+  assert.ok(universalPlan.items.every((item) => item.resolutionTier === "2048x1536"));
+  assert.equal(universalPlan.items.some((item) => item.imageType === "custom"), false);
 
   const generateResult = await postForm(
     baseUrl,
@@ -921,7 +1070,7 @@ test("creation workflow reuses history, reuploads references, tweaks prompts, re
   assert.equal(generatedSet.items[0].reasoningEffort, "low");
   assert.deepEqual(generatedSet.items[0].referenceImageNames, ["front.png"]);
   assert.doesNotMatch(generatedSet.items[1].prompt, /visual style:/i);
-  assert.match(generatedSet.items[1].prompt, /lifestyle magazine editorial/);
+  assert.ok(generatedSet.items[1].prompt.includes(LIFESTYLE_EDITORIAL_STYLE), generatedSet.items[1].prompt);
   assert.ok(generatedSet.items[0].relativePath);
   assert.match(generatedSet.items[0].filename, /^1-\d{4}-首图成交主视觉\.png$/u);
   assert.match(generatedSet.items[1].filename, /^2-\d{4}-目标人群共鸣图\.png$/u);

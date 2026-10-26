@@ -26,20 +26,22 @@ const ITEM_OVERRIDE_FIELDS = [
   "logoPolicy",
   "prompt",
 ];
-const SAFE_FALLBACK_IMAGE_TYPES = ["clean-product-proof", "detail-macro", "material-proof", "craft-proof"];
+const SAFE_FALLBACK_IMAGE_TYPES = ["detail-macro", "spec-table", "structure-cutaway", "multi-angle"];
+export const CREATION_GUARANTEED_CAROUSEL_ROLES = Object.freeze([
+  Object.freeze(["hero"]),
+  Object.freeze(["size-capacity-fit"]),
+  Object.freeze(["spec-table", "usage-suggestion"]),
+  Object.freeze(["product-detail"]),
+  Object.freeze(["scene"]),
+  Object.freeze(["multi-angle"]),
+]);
 const IMAGE_TYPE_EVIDENCE_KEYS = {
-  "value-bundle": "packageContents",
   "dimension-fit": "dimensions",
-  "scale-proof": "dimensions",
   "spec-table": "specifications",
   "in-box": "packageContents",
   "variant-comparison": "skuVariants",
-  "material-proof": "materials",
-  "craft-proof": "craft",
   "comparison-proof": "performance",
-  "condition-proof": "condition",
-  "defect-disclosure": "defects",
-  "gift-packaging": "packageContents",
+  "structure-cutaway": "craft",
 };
 const CUSTOM_ROLE_LIFESTYLE_ROLES = new Set([
   "scene",
@@ -89,65 +91,23 @@ const UNSUPPORTED_AUDIENCE_CLAIM_PATTERNS = [
 ];
 
 const CATEGORY_OVERLAYS = {
-  "apparel-fit": {
-    imageType: "scale-proof",
-    replaceImageTypes: ["multi-angle", "lifestyle-first", "benefit-proof"],
-  },
-  "electronics-specifications": {
-    imageType: "spec-table",
-    replaceImageTypes: ["lifestyle-first", "multi-angle", "benefit-proof"],
-  },
-  "food-ingredients": {
-    imageType: "material-proof",
-    replaceImageTypes: ["multi-angle", "lifestyle-first", "benefit-proof"],
-  },
-  "package-contents": {
-    imageType: "in-box",
-    replaceImageTypes: ["lifestyle-first", "multi-angle", "benefit-proof"],
-  },
-  condition: {
-    imageType: "condition-proof",
-    replaceImageTypes: ["lifestyle-first", "multi-angle", "benefit-proof"],
-  },
-  "multiple-skus": {
-    imageType: "variant-comparison",
-    replaceImageTypes: ["in-box", "multi-angle", "lifestyle-first"],
-  },
+  "apparel-fit": { imageType: "dimension-fit", replaceImageTypes: ["multi-angle", "scene-fit-2", "scene-fit-3"] },
+  "electronics-specifications": { imageType: "spec-table", replaceImageTypes: ["multi-angle", "scene-fit-3", "scene-fit-2"] },
+  "food-ingredients": { imageType: "detail-macro", replaceImageTypes: ["multi-angle", "scene-fit-3", "scene-fit-2"] },
+  "package-contents": { imageType: "in-box", replaceImageTypes: ["scene-fit-3", "multi-angle", "scene-fit-2"] },
+  condition: { imageType: "structure-cutaway", replaceImageTypes: ["scene-fit-3", "multi-angle", "scene-fit-2"] },
+  "multiple-skus": { imageType: "variant-comparison", replaceImageTypes: ["in-box", "multi-angle", "scene-fit-3"] },
 };
 
 const REFERENCE_COVERAGE_OVERLAYS = {
-  usage: {
-    imageType: "usage-demo",
-    replaceImageTypes: ["benefit-proof", "lifestyle-first", "multi-angle"],
-  },
-  scene: {
-    imageType: "lifestyle-first",
-    replaceImageTypes: ["benefit-proof", "multi-angle", "clean-product-proof"],
-  },
-  material: {
-    imageType: "material-proof",
-    replaceImageTypes: ["multi-angle", "benefit-proof", "lifestyle-first"],
-  },
-  feature: {
-    imageType: "comparison-proof",
-    replaceImageTypes: ["variant-comparison", "multi-angle", "benefit-proof", "lifestyle-first"],
-  },
-  dimensions: {
-    imageType: "dimension-fit",
-    replaceImageTypes: ["multi-angle", "benefit-proof", "lifestyle-first"],
-  },
-  package: {
-    imageType: "in-box",
-    replaceImageTypes: ["lifestyle-first", "multi-angle", "benefit-proof"],
-  },
-  condition: {
-    imageType: "condition-proof",
-    replaceImageTypes: ["lifestyle-first", "multi-angle", "benefit-proof"],
-  },
-  defect: {
-    imageType: "defect-disclosure",
-    replaceImageTypes: ["lifestyle-first", "multi-angle", "benefit-proof"],
-  },
+  usage: { imageType: "creator-demo", replaceImageTypes: ["scene-fit-2", "multi-angle", "scene-fit-3"] },
+  scene: { imageType: "ownership-atmosphere", replaceImageTypes: ["scene-fit-2", "multi-angle", "scene-fit-3"] },
+  material: { imageType: "detail-macro", replaceImageTypes: ["multi-angle", "scene-fit-3", "scene-fit-2"] },
+  feature: { imageType: "comparison-proof", replaceImageTypes: ["variant-comparison", "multi-angle", "scene-fit-3", "scene-fit-2"] },
+  dimensions: { imageType: "dimension-fit", replaceImageTypes: ["multi-angle", "scene-fit-3", "scene-fit-2"] },
+  package: { imageType: "in-box", replaceImageTypes: ["scene-fit-3", "multi-angle", "scene-fit-2"] },
+  condition: { imageType: "structure-cutaway", replaceImageTypes: ["scene-fit-3", "multi-angle", "scene-fit-2"] },
+  defect: { imageType: "pain-solution", replaceImageTypes: ["scene-fit-3", "multi-angle", "scene-fit-2"] },
 };
 
 function cleanString(value) {
@@ -502,6 +462,8 @@ function createRoleLedCustomSlot(slot = {}, {
 
 function replaceWithRecommendation(slots, recommendation, source) {
   if (!recommendation || slots.some((slot) => slot.imageType === recommendation.imageType)) return slots;
+  const recommendationRole = CREATION_PLATFORM_IMAGE_TYPE_REGISTRY[recommendation.imageType]?.role;
+  if (recommendationRole && slots.some((slot) => slot.role === recommendationRole)) return slots;
   const replacementIndex = recommendation.replaceImageTypes
     .map((imageTypeValue) => slots.findIndex((slot) => slot.imageType === imageTypeValue && !slot.required))
     .find((index) => index >= 0);
@@ -548,7 +510,7 @@ function applyEvidenceFallbacks(slots, evidence, warnings) {
   for (const slot of slots) {
     if (
       slot.role === "size-capacity-fit" &&
-      ["dimension-fit", "scale-proof"].includes(slot.imageType)
+      slot.imageType === "dimension-fit"
     ) {
       resolved.push(slot);
       continue;
@@ -588,7 +550,31 @@ function applyEvidenceFallbacks(slots, evidence, warnings) {
   return resolved;
 }
 
-function applySetOverrides(slots, setOverrides, { profile, warnings }) {
+function selectCreationEnabledSlotIndexes(slots, count, preserveOrder = false) {
+  const indexes = new Set();
+  const naturalOrder = () => {
+    for (let index = 0; index < slots.length && indexes.size < count; index += 1) {
+      if (slots[index].enabled !== false) indexes.add(index);
+    }
+    return indexes;
+  };
+  if (count >= slots.length) {
+    for (let index = 0; index < slots.length; index += 1) indexes.add(index);
+    return indexes;
+  }
+  if (preserveOrder || count < CREATION_GUARANTEED_CAROUSEL_ROLES.length) return naturalOrder();
+  for (const group of CREATION_GUARANTEED_CAROUSEL_ROLES) {
+    if (indexes.size >= count) break;
+    const match = slots.findIndex((slot, index) => !indexes.has(index) && slot.enabled !== false && group.includes(slot.role));
+    if (match >= 0) indexes.add(match);
+  }
+  for (let index = 0; index < slots.length && indexes.size < count; index += 1) {
+    if (!indexes.has(index) && slots[index].enabled !== false) indexes.add(index);
+  }
+  return indexes;
+}
+
+function applySetOverrides(slots, setOverrides, { profile, warnings, preserveOrder = false }) {
   let resized = [...slots];
   if (Number.isFinite(setOverrides.imageCount)) {
     const requestedCount = Math.max(0, setOverrides.imageCount);
@@ -603,9 +589,10 @@ function applySetOverrides(slots, setOverrides, { profile, warnings }) {
       });
     }
     setOverrides.imageCount = effectiveCount;
+    const enabledIndexes = selectCreationEnabledSlotIndexes(resized, effectiveCount, preserveOrder);
     resized = resized.map((slot, index) => ({
       ...slot,
-      enabled: index < effectiveCount && slot.enabled !== false,
+      enabled: enabledIndexes.has(index) && slot.enabled !== false,
     }));
   }
   return resized.map((slot) => {
@@ -1003,7 +990,7 @@ export function resolveCreationPlatformPlan(input = {}) {
     );
   }
   const selectedRoles = normalizeSelectedRoles(input.selectedRoles);
-  slots = applySetOverrides(slots, setOverrides, { profile, warnings });
+  slots = applySetOverrides(slots, setOverrides, { profile, warnings, preserveOrder: selectedRoles.length > 0 });
   slots = slots.map((slot, index) => selectedRoles[index] ? { ...slot, role: selectedRoles[index] } : slot);
   slots = applyItemOverrides(slots, itemOverrides, warnings);
   const referenceAudienceStrategy = getReferenceAnalysisAudienceStrategy(input.referenceAnalysis);

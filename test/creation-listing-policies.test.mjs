@@ -37,7 +37,7 @@ const COMPLETE_POLICY_FIELDS = [
   "fallback",
 ];
 
-test("listing policy registry has five archetypes and exact canonical platform coverage", () => {
+test("listing policy registry keeps every historical marketplace and covers every active Creation platform", () => {
   assert.equal(CREATION_LISTING_POLICY_VERSION, "listing-policy-2026-07-18.v3");
   assert.deepEqual(Object.keys(CREATION_LISTING_ARCHETYPES).sort(), [
     "content",
@@ -46,9 +46,15 @@ test("listing policy registry has five archetypes and exact canonical platform c
     "universal",
     "value",
   ]);
-  assert.equal(CANONICAL_IDS.length, 19);
-  assert.deepEqual(CREATION_LISTING_PLATFORM_POLICIES.map(({ id }) => id), CANONICAL_IDS);
-  assert.deepEqual(listCreationListingPolicies().map(({ id }) => id), CANONICAL_IDS);
+  assert.deepEqual(CANONICAL_IDS, ["universal"]);
+  const listingPolicyIds = CREATION_LISTING_PLATFORM_POLICIES.map(({ id }) => id);
+  // The Listing registry is independent of the Creation image-platform profiles: it keeps every
+  // historical marketplace even though Creation now only exposes the universal and Temu profiles.
+  assert.equal(listingPolicyIds.length, 19);
+  for (const id of CANONICAL_IDS) {
+    assert.ok(listingPolicyIds.includes(id), `active Creation platform ${id} is missing a listing policy`);
+  }
+  assert.deepEqual(listCreationListingPolicies().map(({ id }) => id), listingPolicyIds);
 
   for (const policy of CREATION_LISTING_PLATFORM_POLICIES) {
     COMPLETE_POLICY_FIELDS.forEach((field) => assert.ok(field in policy, `${policy.id}.${field}`));

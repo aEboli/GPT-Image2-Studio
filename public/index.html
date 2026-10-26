@@ -56,6 +56,7 @@
           creation: "suite",
           portrait: "suite",
           ppt: "suite",
+          "quick-suite": "suite",
           "article-illustration": "suite",
           gallery: "archive",
           "article-record": "archive",
@@ -105,7 +106,7 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="./styles.css?v=20261024-studio-bottom-align-1" />
+    <link rel="stylesheet" href="./styles.css?v=20261026-quick-suite-17" />
   </head>
   <body>
     <div class="app-shell">
@@ -121,7 +122,7 @@
         <span class="topbar-reveal-icon" aria-hidden="true"></span>
       </button>
       <header class="topbar" id="globalTopbar">
-        <small class="app-version" aria-label="当前版本 v0.2.075">v0.2.075</small>
+        <small class="app-version" aria-label="当前版本 v0.2.076">v0.2.076</small>
         <div class="brand-cluster">
           <div class="brand-mark" aria-hidden="true">
             <span class="brand-mark-core"></span>
@@ -156,6 +157,7 @@
                     <a class="mega-menu-link" href="#portrait" data-ui-i18n="menuPortrait">写真模式</a>
                     <a class="mega-menu-link" href="#article-illustration" data-ui-i18n="menuArticleIllustration">文章插图</a>
                     <a class="mega-menu-link" href="#ppt" data-ui-i18n="menuPpt">PPT生成</a>
+                    <a class="mega-menu-link" href="#quick-suite" data-ui-i18n="menuQuickSuite">快捷套图</a>
                   </section>
                   <section class="mega-menu-column" aria-label="创作工具" data-ui-i18n-aria-label="menuCreateTools">
                     <span class="mega-menu-title" data-ui-i18n="menuTools">工具</span>
@@ -1609,13 +1611,6 @@
                     </select>
                   </label>
 
-                  <label class="compact-field" data-creation-set-only>
-                    <span>平台选择</span>
-                    <select id="creationPlatformInput" name="platform">
-                      <option value="universal" selected>通用电商</option>
-                    </select>
-                  </label>
-
                   <label class="compact-field">
                     <span>思考等级</span>
                     <select id="creationReasoningEffortInput" name="reasoningEffort"></select>
@@ -1687,15 +1682,6 @@
                       <option value="package-list">显示清单</option>
                       <option value="dimensions">显示尺寸</option>
                       <option value="package-list-dimensions">显示清单和尺寸</option>
-                    </select>
-                  </label>
-
-                  <label class="compact-field creation-dimension-unit-field" data-creation-set-only>
-                    <span>规格单位</span>
-                    <select id="creationDimensionUnitModeInput" name="dimensionUnitMode">
-                      <option value="metric">公制</option>
-                      <option value="imperial">英制</option>
-                      <option value="both" selected>公制和英制</option>
                     </select>
                   </label>
 
@@ -1791,6 +1777,10 @@
                     </dl>
 
                     <ul class="creation-plan-message warning hidden" id="creationPlanWarnings" aria-live="polite"></ul>
+                    <details class="creation-content-plan hidden" id="creationContentPlan">
+                      <summary>逐图内容分工与依据</summary>
+                      <ol id="creationContentPlanList"></ol>
+                    </details>
                     <div class="creation-plan-message validation hidden" id="creationPlanValidation" aria-live="polite"></div>
                   </div>
 
@@ -2306,6 +2296,128 @@
               </div>
               <div class="ppt-outline-box" id="pptOutlineBox"></div>
               <div class="ppt-slide-list" id="pptSlideList"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view-panel quick-suite-view hidden" data-view-panel="quick-suite">
+          <div class="quick-suite-workspace">
+            <section class="studio-panel creation-settings-panel quick-suite-panel">
+              <form class="creation-form quick-suite-form" id="quickSuiteForm" onsubmit="return false">
+                <div class="panel-title between">
+                  <div>
+                    <h2>快捷套图</h2>
+                  </div>
+                  <span class="count-pill small" id="quickSuiteSummary">8 张 · 1:1 · 2K</span>
+                </div>
+
+                <div class="field-head">
+                  <div>
+                    <span>商品图</span>
+                  </div>
+                  <small>最多 15 张</small>
+                </div>
+                <label class="reference-dropzone" id="quickSuiteDropzone">
+                  <input id="quickSuiteImagesInput" type="file" accept="image/*" multiple />
+                  <div class="reference-icon" aria-hidden="true"></div>
+                  <span id="quickSuiteImageSummary">拖入白底商品图</span>
+                </label>
+
+                <label class="compact-field">
+                  <span>商品名</span>
+                  <input id="quickSuiteProductName" type="text" maxlength="80" placeholder="例如：加热手套" autocomplete="off" />
+                </label>
+
+                <label class="compact-field">
+                  <span>商品资料（卖点 / 尺寸 / 材质，可留空）</span>
+                  <textarea id="quickSuiteProductDetails" rows="2" maxlength="1320" placeholder="例如：速干透气；衣长 70cm；纯棉"></textarea>
+                </label>
+
+                <div class="field-head">
+                  <div>
+                    <span>这批做什么</span>
+                  </div>
+                </div>
+                <div class="creation-branch-tabs quick-suite-presets" id="quickSuitePresets" role="radiogroup" aria-label="套图套餐">
+                  <label class="creation-branch-option">
+                    <input name="quickSuitePreset" type="radio" value="trial" data-count="4" />
+                    <span>试水 4 张</span>
+                  </label>
+                  <label class="creation-branch-option">
+                    <input name="quickSuitePreset" type="radio" value="standard" data-count="8" checked />
+                    <span>标准 8 张</span>
+                  </label>
+                  <label class="creation-branch-option">
+                    <input name="quickSuitePreset" type="radio" value="full" data-count="18" />
+                    <span>全套 18 张</span>
+                  </label>
+                </div>
+
+                <div class="creation-control-row creation-option-grid">
+                  <label class="compact-field">
+                    <span>比例</span>
+                    <select id="quickSuiteRatioSelect">
+                      <option value="1:1" selected>1:1</option>
+                      <option value="4:3">4:3</option>
+                      <option value="3:4">3:4</option>
+                      <option value="3:2">3:2</option>
+                      <option value="2:3">2:3</option>
+                      <option value="5:4">5:4</option>
+                      <option value="4:5">4:5</option>
+                      <option value="16:9">16:9</option>
+                      <option value="9:16">9:16</option>
+                      <option value="21:9">21:9</option>
+                      <option value="9:21">9:21</option>
+                      <option value="2:1">2:1</option>
+                      <option value="1:2">1:2</option>
+                      <option value="3:1">3:1</option>
+                      <option value="1:3">1:3</option>
+                    </select>
+                  </label>
+                  <label class="compact-field">
+                    <span>分辨率</span>
+                    <select id="quickSuiteResolutionSelect">
+                      <option value="1024">1K</option>
+                      <option value="2048" selected>2K</option>
+                      <option value="2560">2.5K</option>
+                      <option value="2880">2.8K</option>
+                    </select>
+                  </label>
+                  <label class="compact-field">
+                    <span>语言</span>
+                    <select id="quickSuiteLanguageSelect">
+                      <option value="zh-CN">简体中文</option>
+                      <option value="en" selected>English</option>
+                      <option value="ja">日本語</option>
+                      <option value="ko">한국어</option>
+                      <option value="fr">Français</option>
+                      <option value="de">Deutsch</option>
+                      <option value="es">Español</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div class="quick-suite-actions">
+                  <span class="quick-suite-status" id="quickSuiteStatus" hidden></span>
+                  <div class="quick-suite-actions-right">
+                    <a class="quick-suite-link" href="#creation">去套图模式微调</a>
+                    <button class="generate-button" id="quickSuiteGenerate" type="button">生成套图</button>
+                  </div>
+                </div>
+              </form>
+            </section>
+
+            <section class="studio-panel quick-suite-plan-panel">
+              <div class="panel-title between">
+                <div>
+                  <h2>本次计划</h2>
+                </div>
+                <span class="count-pill small" id="quickSuitePlanCount">—</span>
+              </div>
+              <p class="quick-suite-analysis-note" id="quickSuiteAnalysisNote" hidden></p>
+              <ul class="quick-suite-plan-list" id="quickSuitePlanList">
+                <li class="quick-suite-plan-empty">填好商品名后自动生成计划</li>
+              </ul>
             </section>
           </div>
         </section>
@@ -3670,6 +3782,6 @@
 
     <div class="app-tooltip" id="appTooltip" role="tooltip" popover="manual"></div>
 
-    <script type="module" src="./app.js?v=20261024-studio-bottom-align-1"></script>
+    <script type="module" src="./app.js?v=20261026-quick-suite-17"></script>
   </body>
 </html>

@@ -326,7 +326,7 @@ test("public app shell delegates browser config and cache behavior to public mod
 
 test("browser bootstrap does not block first paint on record history requests", async () => {
   const app = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
-  const bootstrapBody = app.match(/async function bootstrap\(\) \{[\s\S]*?\r?\n}\r?\n\r?\nbootstrap\(\);/)?.[0] || "";
+  const bootstrapBody = app.match(/async function bootstrap\(\) \{[\s\S]*?\r?\n}/)?.[0] || "";
 
   assert.match(app, /function loadStartupRecordsInBackground\(\) \{/);
   assert.match(app, /function getStartupRecordLoaders\(\) \{ return \[loadGallery, loadGenerationTasks\]; \}/);

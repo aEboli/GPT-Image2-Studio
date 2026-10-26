@@ -420,7 +420,7 @@ test("creation infographic rebuild option is passed through local planning, gene
   assert.match(server, /skuGenerationEnabled:\s*plan\.skuGenerationEnabled/);
   assert.match(server, /infographicRebuildEnabled:\s*plan\.infographicRebuildEnabled/);
   const repairHandler = server.match(/async function handleCreationRepair[\s\S]*?\r?\n}\r?\n\r?\nasync function handleGenerate/)?.[0] || "";
-  assert.match(repairHandler, /repairPlan = buildCreationRepairPlan\(existingSet\)/);
+  assert.match(repairHandler, /repairPlan = applyCreationPlanEvidenceRequirements\(buildCreationRepairPlan\(existingSet\)\)/);
   assert.doesNotMatch(repairHandler, /skuGenerationEnabled:\s*formData\.get|infographicRebuildEnabled:\s*formData\.get/);
 });
 
@@ -467,7 +467,8 @@ test("local creation batch generation runs items with the configured parallel li
     assert.match(handler, /const generationConcurrency = resolveGenerationConcurrencyForLimit\(formData, config\);/);
     assert.match(handler, /maxParallelTasks: generationConcurrency/);
   });
-  assert.match(generateHandler, /await runWithConcurrency\(\s*plan\.items,\s*generationConcurrency,/);
+  assert.match(generateHandler, /const generatableItems = plan\.items\.filter\(\(item\) => !item\.evidenceBlocked\)/);
+  assert.match(generateHandler, /await runWithConcurrency\(\s*generatableItems,\s*generationConcurrency,/);
   assert.match(logoBatchHandler, /await runWithConcurrency\(\s*plan\.items,\s*generationConcurrency,/);
   assert.match(repairHandler, /await runWithConcurrency\(\s*repairItems,\s*generationConcurrency,/);
 });
@@ -591,7 +592,7 @@ test("local creation generation recovers known Responses tasks after its stream 
   assert.match(studioConstants, /export const DEFAULT_GENERATION_CONCURRENCY = 20;/);
   assert.match(server, /if \(scope === "creation"\) \{\s*return MAX_CREATION_PARALLEL_TASKS;/);
   assert.match(generateHandler, /const generationConcurrency = resolveGenerationConcurrencyForLimit\(formData, config\);/);
-  assert.match(generateHandler, /await runWithConcurrency\(plan\.items, generationConcurrency,/);
+  assert.match(generateHandler, /await runWithConcurrency\(generatableItems, generationConcurrency,/);
   assert.match(generateHandler, /maxParallelTasks: generationConcurrency/);
 });
 
