@@ -3,7 +3,7 @@
 每个并发扇出 worker 按以下顺序执行：
 
 1. 检查本次 fan-out 是否已中止。
-2. 在 `clientSessionId + generationScope` 的共享任务桶中取得 slot。桶首次变为活跃时绑定该请求的并发上限。
+2. 在 `clientSessionId + generation` 的共享任务桶中取得 slot。桶首次变为活跃时绑定该请求的并发上限。
 3. 完成本地提示词、参考图和请求快照准备。
 4. 在同一 scope 的共享 launch gate 中等待提交间隔。
 5. 递增需要持久化的套图条目尝试次数。

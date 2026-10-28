@@ -669,6 +669,34 @@ test("parsed numeric weight estimates are preserved when source evidence is abse
   assert.equal(draft.zhDisplay.productWeight, "预估：320 克");
 });
 
+test("chat completions Listing requests use messages and response_format", async () => {
+  const calls = [];
+  const source = { ...standardSource, forceV1: true };
+  const draft = makeMockCreationListingDraft(source);
+  const result = await requestCreationListingDraft({
+    baseUrl: "https://example.test/v1",
+    endpointPath: "chat/completions",
+    apiKey: "test-key",
+    responsesModel: "test-model",
+    source,
+    fetchImpl: async (_url, init) => {
+      calls.push(JSON.parse(init.body));
+      return new Response(JSON.stringify({
+        choices: [{ message: { content: JSON.stringify(draft) } }],
+      }), { status: 200 });
+    },
+  });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].model, "test-model");
+  assert.equal("input" in calls[0], false);
+  assert.equal(calls[0].messages[0].role, "user");
+  assert.match(calls[0].messages[0].content, /Listing SEO Agent/);
+  assert.equal(calls[0].response_format.type, "json_schema");
+  assert.equal(calls[0].response_format.json_schema.name, "creation_listing_draft_json");
+  assert.match(result.title, /Fishing Lure/u);
+});
+
 test("platform V1 prompt requests evidence-backed value copy and Amazon-style bullets", async () => {
   const calls = [];
   const source = {

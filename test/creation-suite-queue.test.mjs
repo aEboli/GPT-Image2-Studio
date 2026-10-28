@@ -253,6 +253,12 @@ test("creation suite queue compacts Chinese same-subject multi-color SKU titles"
         filenames: ["red-black-blue-lure.png"],
         colorNames: ["red black blue"],
       },
+      {
+        id: "blue-lure",
+        title: "Blue lure",
+        filenames: ["blue-lure.png"],
+        colorNames: ["blue"],
+      },
     ],
     createdAt: "2026-05-26T08:00:00.000Z",
     creationState: { generating: true },
@@ -287,12 +293,20 @@ test("creation suite queue compacts Chinese same-subject multi-color SKU titles"
 test("creation suite queue omits raw SKU identifiers from titles and filename tokens", () => {
   const set = buildCreationQueuedSet({
     buildCreationReferenceRolePayload: () => [{ filename: "260526-SKU-151142-5714.png", role: "product" }],
-    buildCreationSkuSubjectPayload: () => [{
-      id: "F4J16",
-      title: "SKU image 2 F4J16",
-      filenames: ["260526-SKU-151142-5714.png"],
-      referenceIndexes: [1],
-    }],
+    buildCreationSkuSubjectPayload: () => [
+      {
+        id: "F4J16",
+        title: "SKU image 2 F4J16",
+        filenames: ["260526-SKU-151142-5714.png"],
+        referenceIndexes: [1],
+      },
+      {
+        id: "blue",
+        title: "Blue lure",
+        filenames: ["blue.png"],
+        referenceIndexes: [2],
+      },
+    ],
     createdAt: "2026-08-06T08:00:00.000Z",
     creationState: { generating: true },
     formatCreationDimensionUnitModeLabel: (value) => value,
@@ -372,7 +386,10 @@ test("creation suite queue appends queued rebuild cards when enabled", () => {
 
   const set = buildCreationQueuedSet({
     buildCreationReferenceRolePayload: () => referenceRoles,
-    buildCreationSkuSubjectPayload: () => [{ id: "sku-a", title: "SKU A", filenames: ["sku-a.jpg"] }],
+    buildCreationSkuSubjectPayload: () => [
+      { id: "sku-a", title: "SKU A", filenames: ["sku-a.jpg"] },
+      { id: "sku-b", title: "SKU B", filenames: ["sku-b.jpg"] },
+    ],
     createdAt: "2026-05-26T08:00:00.000Z",
     creationState: { generating: true },
     formatCreationDimensionUnitModeLabel: (value) => `Unit ${value}`,
@@ -406,18 +423,18 @@ test("creation suite queue appends queued rebuild cards when enabled", () => {
 
   assert.equal(set.infographicRebuildEnabled, true);
   assert.equal(set.imageCount, 2);
-  assert.deepEqual(set.items.map((item) => item.role), ["hero", "scene", "sku", "infographic-rebuild", "infographic-rebuild"]);
-  assert.equal(set.items[3].itemId, "queued-infographic-rebuild-1");
-  assert.equal(set.items[3].slotIndex, 4);
-  assert.deepEqual(set.items[3].sourceInfographic, {
+  assert.deepEqual(set.items.map((item) => item.role), ["hero", "scene", "sku", "sku", "infographic-rebuild", "infographic-rebuild"]);
+  assert.equal(set.items[4].itemId, "queued-infographic-rebuild-1");
+  assert.equal(set.items[4].slotIndex, 5);
+  assert.deepEqual(set.items[4].sourceInfographic, {
     filename: "size-chart.jpg",
     role: "dimensions",
     roleLabel: "Dimensions",
     note: "Keep measurements",
     index: 3,
   });
-  assert.deepEqual(set.items[3].referenceImageNames, ["size-chart.jpg"]);
-  assert.deepEqual(set.items[4].referenceImageNames, ["steps.jpg"]);
+  assert.deepEqual(set.items[4].referenceImageNames, ["size-chart.jpg"]);
+  assert.deepEqual(set.items[5].referenceImageNames, ["steps.jpg"]);
 });
 
 test("creation suite queue defaults infographic rebuild off", () => {
@@ -461,7 +478,10 @@ test("creation suite queue defaults infographic rebuild off", () => {
 test("creation suite queue omits appended SKU cards when disabled", () => {
   const set = buildCreationQueuedSet({
     buildCreationReferenceRolePayload: () => [{ filename: "sku-a.jpg", role: "product" }],
-    buildCreationSkuSubjectPayload: () => [{ id: "sku-a", title: "SKU A", filenames: ["sku-a.jpg"] }],
+    buildCreationSkuSubjectPayload: () => [
+      { id: "sku-a", title: "SKU A", filenames: ["sku-a.jpg"] },
+      { id: "sku-b", title: "SKU B", filenames: ["sku-b.jpg"] },
+    ],
     createdAt: "2026-05-26T08:00:00.000Z",
     creationState: { generating: true },
     formatCreationDimensionUnitModeLabel: (value) => `Unit ${value}`,
@@ -491,7 +511,7 @@ test("creation suite queue omits appended SKU cards when disabled", () => {
   });
 
   assert.equal(set.skuGenerationEnabled, false);
-  assert.equal(set.skuSubjects.length, 1);
+  assert.equal(set.skuSubjects.length, 2);
   assert.deepEqual(set.items.map((item) => item.role), ["hero"]);
 });
 
@@ -649,8 +669,8 @@ test("creation suite queue keeps draft infographic rebuild items without changin
   });
 
   assert.equal(set.imageCount, 2);
-  assert.deepEqual(set.items.map((item) => item.role), ["hero", "scene", "sku", "infographic-rebuild"]);
-  assert.equal(set.items[3].sourceInfographic.filename, "size-chart.jpg");
+  assert.deepEqual(set.items.map((item) => item.role), ["hero", "scene", "infographic-rebuild"]);
+  assert.equal(set.items[2].sourceInfographic.filename, "size-chart.jpg");
 });
 
 test("creation suite queue rebuilds items when draft roles differ from current selected roles", () => {

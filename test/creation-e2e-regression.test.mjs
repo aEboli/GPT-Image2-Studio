@@ -429,6 +429,10 @@ test("balanced content tasks survive preview, upstream generation, storage and r
   t.after(async () => { await stopServer(server); await stopHttpServer(upstream); await rm(tempRoot, { recursive: true, force: true }); });
   await waitForServer(baseUrl, server, collectDiagnostics(server));
   const input = gloveAnalysisInput({ imageCount: 12 });
+  const surfaceLocks = ["画面左侧掌面蜂窝纹理，不与手背合并", "画面右侧手背HOT字样和控制器，按键在显示窗下方", "画面左右不等于左右手，翻盖状态按原图保留"];
+  input.productInsights.appearance_locks = surfaceLocks.map((text) => ({ text, reference_indexes: [1] }));
+  const marketingRecommendation = "突出掌心灰色纹理，用局部特写证明外观细节";
+  input.productInsights.marketing_recommendations = [{ id: "marketing-texture", text: marketingRecommendation, fact_ids: ["appearance"] }];
   const fields = {
     ...Object.fromEntries(Object.entries(input).map(([key, value]) => [key, typeof value === "object" ? JSON.stringify(value) : String(value)])),
     selectedRoles: "[]", targetLanguage: "zh-CN", industryTemplate: "general", sellingPoints: "",
@@ -442,6 +446,8 @@ test("balanced content tasks survive preview, upstream generation, storage and r
   const preview = await postForm(baseUrl, "/api/creation/plan", form());
   assert.equal(preview.response.status, 200, preview.text);
   const plan = JSON.parse(preview.text).plan;
+  assert.equal(plan.productInsights.marketingRecommendations[0].text, marketingRecommendation);
+  assert.ok(plan.items.some((item) => item.prompt.includes(marketingRecommendation)));
   assert.ok(plan.items.filter((item) => item.contentAssignment?.kind === "infographic" && !item.evidenceBlocked).length >= 3);
   assert.ok(plan.items.filter((item) => /手机/.test(item.sceneAssignment?.action || "")).length <= 1);
   const generation = await postForm(baseUrl, "/api/creation/generate", form({ effectivePlan: JSON.stringify(plan) }));
@@ -450,6 +456,8 @@ test("balanced content tasks survive preview, upstream generation, storage and r
   const completed = generation.events.findLast((event) => event.eventName === "complete")?.payload.set;
   assert.ok(completed, generation.text);
   assert.equal(requests.length, plan.items.filter((item) => !item.evidenceBlocked).length);
+  assert.ok(requests.some((request) => JSON.stringify(request).includes(marketingRecommendation)), "the image upstream receives the analyst recommendation");
+  assert.ok(requests.every((request) => surfaceLocks.every((lock) => JSON.stringify(request).includes(lock))), "template image requests keep each observed surface lock");
   for (const item of completed.items) {
     const original = plan.items.find((entry) => entry.itemId === item.itemId);
     assert.deepEqual(item.contentAssignment, original.contentAssignment);
@@ -457,8 +465,10 @@ test("balanced content tasks survive preview, upstream generation, storage and r
   }
   const path = await findCreationManifestPath(outputDir, completed.setId);
   const manifest = JSON.parse(await readFile(path, "utf8"));
+  assert.deepEqual(manifest.productInsights.marketingRecommendations, plan.productInsights.marketingRecommendations);
   const target = manifest.items.find((item) => item.contentAssignment?.taskKey === "selling-overview");
   assert.ok(target);
+  assert.ok(target.prompt.includes(marketingRecommendation));
   assert.deepEqual(target.contentAssignment, plan.items.find((item) => item.itemId === target.itemId).contentAssignment);
   target.status = "failed";
   target.error = "forced content-plan repair";
@@ -467,7 +477,9 @@ test("balanced content tasks survive preview, upstream generation, storage and r
   const repaired = await postForm(baseUrl, "/api/creation/repair", form({ setId: completed.setId, itemId: target.itemId }));
   assert.deepEqual(repaired.events.filter((event) => event.eventName === "error"), [], repaired.text);
   assert.equal(requests.length, before + 1);
+  assert.ok(JSON.stringify(requests.at(-1)).includes(marketingRecommendation), "repair keeps the saved analyst recommendation in its upstream prompt");
   const saved = JSON.parse(await readFile(path, "utf8"));
+  assert.deepEqual(saved.productInsights.marketingRecommendations, plan.productInsights.marketingRecommendations);
   const repairedItem = saved.items.find((item) => item.itemId === target.itemId);
   assert.equal(repairedItem.status, "completed", JSON.stringify({ error: repairedItem.error, events: repaired.events.map((event) => ({ event: event.eventName, message: event.payload.message, error: event.payload.item?.error })) }));
   assert.deepEqual(repairedItem.contentAssignment, target.contentAssignment);
@@ -1054,7 +1066,9 @@ test("creation workflow reuses history, reuploads references, tweaks prompts, re
   assert.equal(generatedSet.referenceImageRoles[0].filename, "front.png");
   assert.equal(generatedSet.referenceImageRoles[0].note, "manual historical binding");
   assert.equal(generatedSet.items.length, 4);
-  assert.equal(generatedSet.items.filter((item) => item.status === "completed").length, 4);
+  assert.equal(generatedSet.items.filter((item) => item.status === "completed").length, 3);
+  assert.equal(generatedSet.items.filter((item) => item.evidenceBlocked).length, 1);
+  assert.equal(generatedSet.items.find((item) => item.role === "accessory-gift")?.status, "skipped");
   assert.equal(generatedSet.items[0].prompt, "Custom hero prompt from regression.");
   assert.match(generatedSet.items[0].generationPrompt, /Custom hero prompt from regression\./);
   assert.notEqual(generatedSet.items[0].generationPrompt, generatedSet.items[0].prompt);
@@ -1074,7 +1088,8 @@ test("creation workflow reuses history, reuploads references, tweaks prompts, re
   assert.ok(generatedSet.items[0].relativePath);
   assert.match(generatedSet.items[0].filename, /^1-\d{4}-首图成交主视觉\.png$/u);
   assert.match(generatedSet.items[1].filename, /^2-\d{4}-目标人群共鸣图\.png$/u);
-  assert.match(generatedSet.items[2].filename, /^3-\d{4}-到手清单配件图\.png$/u);
+  assert.equal(generatedSet.items[2].role, "accessory-gift");
+  assert.equal(generatedSet.items[2].filename, "");
   assert.match(generatedSet.items[3].filename, /^4-\d{4}-痛点图\.png$/u);
   assert.doesNotMatch(generatedSet.items.map((item) => item.filename).join("\n"), /\b(?:hero|benefit|accessory|gift|after|sales)\b/i);
 
@@ -1184,7 +1199,7 @@ test("creation workflow reuses history, reuploads references, tweaks prompts, re
   const pathReport = await postJson(baseUrl, "/api/creation/sets/paths", { setId: generatedSet.setId });
   assert.equal(pathReport.response.status, 200);
   assert.equal(pathReport.body.setId, generatedSet.setId);
-  assert.equal(pathReport.body.items.length, 4);
+  assert.equal(pathReport.body.items.length, 3);
   assert.ok(pathReport.body.absoluteDir.startsWith(outputDir));
   assert.ok(pathReport.body.items.every((item) => item.absolutePath.startsWith(outputDir)));
 

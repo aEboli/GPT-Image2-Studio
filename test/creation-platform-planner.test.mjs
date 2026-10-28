@@ -21,7 +21,7 @@ const SKU_SUBJECTS = Object.freeze([
 ]);
 
 // Text-bearing prompts must carry one canvas-text policy that keeps new copy claim-free.
-const CANVAS_TEXT_CLAIM_BAN = /no performance, safety, certification, price, or superiority claims/i;
+const CANVAS_TEXT_CLAIM_BAN = /concise source-grounded labels|no performance, safety, certification, price, or superiority claims/i;
 
 function assertCanvasTextPolicy(prompt, label) {
   assert.match(prompt, /CANVAS TEXT:/i, label);
@@ -60,6 +60,9 @@ test("planner adapts conversion intent by universal audience without polluting t
   assert.ok(strictMain);
   assert.equal(strictMain.textPolicy, "none");
   assert.match(strictMain.prompt, /CANVAS TEXT: existing product markings only/i);
+  assert.match(strictMain.prompt, /reference-supported views.*observed surfaces.*detail crops/i);
+  assert.match(strictMain.prompt, /unseen surfaces stay unspecified/i);
+  assert.doesNotMatch(strictMain.prompt, /four separate|rear three-quarter|side profile/i);
   assert.doesNotMatch(strictMain.prompt, /new text in/i);
   assert.doesNotMatch(strictMain.prompt, /Creative range:/i);
 });
@@ -303,6 +306,25 @@ test("scene-fit items are each assigned a different supplied scene", () => {
   assert.equal(new Set(fallbackPrompts).size, 3);
 });
 
+test("scene-fit fallbacks separate environment fit from staged still life", () => {
+  const plan = buildCreationPlan({
+    productName: "Heated gloves",
+    productDescription: "A paired glove product",
+    imageCount: 18,
+    skuGenerationEnabled: false,
+  });
+  const first = plan.items.find((item) => item.role === "scene-fit-1");
+  const second = plan.items.find((item) => item.role === "scene-fit-2");
+  const third = plan.items.find((item) => item.role === "scene-fit-3");
+  assert.match(first.prompt, /working position|environment fit|real scale/i);
+  assert.match(first.prompt, /Dynamic environment-fit requirement|visible interaction|active state/i);
+  assert.doesNotMatch(first.prompt, /Visual format: environmental still-life|Visual format: .*tabletop still life/i);
+  assert.match(second.prompt, /hands-only|concrete operation|action/i);
+  assert.match(second.prompt, /Dynamic action-fit requirement|mid-action/i);
+  assert.match(third.prompt, /Dynamic context-fit requirement|wide real ownership or use moment/i);
+  assert.match(third.prompt, /product active|user-environment relationship/i);
+});
+
 test("only the scene role copies a scene reference as a blueprint and scene-fit items stay distinct", () => {
   const plan = buildCreationPlan({
     productName: "Jointed swimbait lure",
@@ -314,8 +336,8 @@ test("only the scene role copies a scene reference as a blueprint and scene-fit 
   });
   const byRole = Object.fromEntries(plan.items.map((item) => [item.role, item.prompt]));
 
-  assert.match(byRole.scene, /Scene source boat\.jpg is a visual blueprint/);
-  assert.match(byRole.atmosphere, /Scene source boat\.jpg is setting context: keep its kind of environment and activity, and create a new person/);
+  assert.match(byRole.scene, /Use scene source boat\.jpg for environment, action, placement, angle, scale, and spatial relationships/);
+  assert.match(byRole.atmosphere, /Use scene source boat\.jpg for environment and activity cues/);
   for (const role of ["human-handheld", "human-wearable"]) {
     assert.doesNotMatch(byRole[role], /boat\.jpg/, role);
   }
@@ -355,7 +377,7 @@ test("universal set gives every carousel item a distinct visual format and perso
     assert.doesNotMatch(prompt, /\b(?:woman|man|male|female|girl|boy|\d0s|late teens|20s|30s|40s|50s|60s)\b/i);
     return prompt;
   });
-  assert.ok(personLedPrompts.every((prompt) => /face outside the crop|no face required|hands lead the frame|relevant body area/i.test(prompt)));
+  assert.ok(personLedPrompts.every((prompt) => /face outside the crop|no face required|hands lead the frame|relevant body area|visible interaction|partial body|supporting detail|evidence inset|product and hands/i.test(prompt)));
 
   const wearable = carousel.find((item) => item.role === "human-wearable").prompt;
   // The wearable directive still carries the non-wearable fallback instead of leaving the slot empty.

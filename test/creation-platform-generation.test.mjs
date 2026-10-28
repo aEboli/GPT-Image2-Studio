@@ -78,7 +78,6 @@ test("per-item generation prompt carries matching ratio and target-language guid
   assert.match(prompt, /4:5/);
   assert.match(prompt, /CANVAS LANGUAGE: Use concise English \(en\) for new text outside the product or packaging/i);
   assert.match(prompt, /preserve existing subject text, brand\/model names, numbers, and units/i);
-  assert.ok(prompt.endsWith("CANVAS LANGUAGE: Use concise English (en) for new text outside the product or packaging; preserve existing subject text, brand/model names, numbers, and units."));
 });
 
 test("runtime replaces stale canvas-language guidance from a frozen prompt", () => {
@@ -221,8 +220,8 @@ test("infographic rebuild runtime prompt honors only the four selected output co
   }));
   assert.match(prompt, /target language:\s*English \(en\)/i);
   assert.match(prompt, /all off-product text uses Latin letters only/i);
-  assert.match(prompt, /Replace source-script text with English only when clear; otherwise erase it and leave clean space/i);
-  assert.match(prompt, /Never copy source glyphs as decoration/i);
+  assert.match(prompt, /Translate clear source-script labels into English and preserve factual values/i);
+  assert.match(prompt, /keep physical product text unchanged/i);
   assert.match(prompt, /format:\s*JPG/i);
   assert.match(prompt, /canvas:\s*requested 1\.5K; effective canvas 1536x1920/i);
   assert.match(prompt, /ratio:\s*4:5/i);

@@ -183,7 +183,7 @@ Requests with references use `/images/edits`; one request accepts at most five r
 
 If the provider gave you one complete address instead, press **完整 URL** (Full URL) next to the endpoint field and paste the whole thing, for example `https://vendor.example/v1/responses`. Studio splits it into a base URL and an endpoint suffix.
 
-Leave the generation scheduling card at its defaults (`20` concurrent requests, `1000` ms between submissions). Both fields lock while any generation task is running.
+Leave the generation scheduling card at its defaults (`20` concurrent requests, `1000` ms between submissions). The concurrency value is the total limit across image-generation modes in the current session. Both fields lock while any generation task is running.
 
 #### Step 5: test the connection, then save
 

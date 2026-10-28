@@ -287,11 +287,17 @@ test("every server concurrency fan-out resolves the configured concurrency", asy
   const slotOverrides = server.match(/maxParallelTasks: generationConcurrency/g) || [];
 
   assert.equal(fanOutCalls.length, 6, "creation, article, logo-batch, and portrait fan-outs use bounded concurrency");
-  assert.equal(resolved.length, 6, "every fan-out handler resolves the configured concurrency once");
+  assert.equal(resolved.length, 9, "every FormData generation handler resolves the configured concurrency once");
   assert.equal(usedAsLimit.length, 6, "every fan-out must use it as the worker limit");
   // Widening the fan-out without also raising the session slot ceiling would
   // park the extra workers in the 250ms slot-wait poll instead of generating.
-  assert.equal(slotOverrides.length, 6, "every fan-out must pass it as the slot ceiling");
+  assert.equal(slotOverrides.length, 9, "every image generation path must pass it as the slot ceiling");
+
+  assert.match(server, /const GLOBAL_GENERATION_REQUEST_SCOPE = "generation";/);
+  assert.match(server, /sessionTaskSlotLimiter\.claimSessionTaskSlot\(sessionId, taskId, GLOBAL_GENERATION_REQUEST_SCOPE\)/);
+  assert.match(server, /sessionTaskSlotLimiter\.waitForSessionTaskSlot\(sessionId, taskId, GLOBAL_GENERATION_REQUEST_SCOPE, options\)/);
+  assert.match(server, /sessionTaskSlotLimiter\.releaseSessionTaskSlot\(sessionId, taskId, GLOBAL_GENERATION_REQUEST_SCOPE\)/);
+  assert.match(server, /const generationConcurrency = resolveGenerationConcurrencyForLimit\(formData, config\);[\s\S]*?waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response, \{\s*maxParallelTasks: generationConcurrency/);
 
   // A bare constant as the limit would ignore the control entirely.
   assert.doesNotMatch(server, /await runWithConcurrency\([^,]+, MAX_[A-Z_]+,/);

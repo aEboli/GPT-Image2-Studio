@@ -590,7 +590,7 @@ test("local creation generation recovers known Responses tasks after its stream 
   // cap intact; it may hold a worker longer, but must not silently lower concurrency.
   assert.match(studioConstants, /export const MAX_CREATION_PARALLEL_TASKS = 20;/);
   assert.match(studioConstants, /export const DEFAULT_GENERATION_CONCURRENCY = 20;/);
-  assert.match(server, /if \(scope === "creation"\) \{\s*return MAX_CREATION_PARALLEL_TASKS;/);
+  assert.match(server, /function getSessionTaskSlotLimit\(requestScope\) \{\s*return DEFAULT_GENERATION_CONCURRENCY;/);
   assert.match(generateHandler, /const generationConcurrency = resolveGenerationConcurrencyForLimit\(formData, config\);/);
   assert.match(generateHandler, /await runWithConcurrency\(generatableItems, generationConcurrency,/);
   assert.match(generateHandler, /maxParallelTasks: generationConcurrency/);
@@ -605,7 +605,7 @@ test("local generation requests wait for a session slot instead of failing at th
   assert.match(server, /isActive: \(\) => isResponseWritable\(response\)/);
   // Serial paths still claim a slot without a ceiling override; the bounded
   // fan-outs pass the configured concurrency so a widened run gets slots.
-  assert.match(server, /await waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response\);/);
+  assert.match(server, /await waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response, \{\s*maxParallelTasks: generationConcurrency,\s*\}\);/);
   assert.match(server, /await waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response, \{ maxParallelTasks: generationConcurrency, controls \}\);/);
   assert.doesNotMatch(server, /if \(!claimSessionTaskSlot\(clientSessionId, taskId, generationRequestScope\)\) \{\s*throw new Error/);
 });
@@ -667,7 +667,8 @@ test("local creation plan preview exposes an independent route and shared overri
   assert.match(previewHandler, /dimensionUnitMode:\s*formData\.get\("dimensionUnitMode"\)/);
   assert.match(previewHandler, /formData\.get\("planOverrides"\)/);
   assert.match(previewHandler, /sendJson\(response,\s*200,\s*\{\s*ok:\s*true,\s*plan/);
-  assert.doesNotMatch(previewHandler, /mergeRequestPrivateConfig/);
+  assert.match(previewHandler, /if \(isCreationAiMarketingEnabled\(formData\.get\("aiMarketingEnabled"\)\)/);
+  assert.match(previewHandler, /requestCreationMarketingPlan\(/);
   assert.match(generateHandler, /dimensionSpecs:\s*formData\.get\("dimensionSpecs"\)/);
   assert.match(generateHandler, /dimensionUnitMode:\s*formData\.get\("dimensionUnitMode"\)/);
   assert.match(generateHandler, /formData\.get\("planOverrides"\)/);

@@ -59,7 +59,7 @@ test("selling overview receives multiple benefits and cannot become invented cha
   assert.ok(dimensions);
   assert.doesNotMatch(dimensions.prompt, /charging|step infographic|\[battery;/i);
   const functional = plan.items.find((item) => item.role === "effect-comparison");
-  assert.doesNotMatch(functional?.prompt || "", /exploded 3D|cutaway, arrows|separated pieces/i);
+  assert.match(functional?.prompt || "", /functional infographic|short labels|evidence insets/i);
 });
 
 test("insufficient evidence yields explicit gaps rather than repeated scenes or fabricated information", () => {

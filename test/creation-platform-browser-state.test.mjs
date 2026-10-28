@@ -124,6 +124,14 @@ test("Creation generation follows validation without blocking a pending plan ref
     }),
     false,
   );
+  assert.equal(
+    creationBrowserPlanState.shouldDisableCreationGenerateButton({
+      effectivePlan: { canGenerate: true },
+      planDirty: true,
+      requirePlan: true,
+    }),
+    true,
+  );
 });
 
 test("routine plan adjustments stay hidden while actionable warnings are deduplicated", () => {
@@ -416,7 +424,7 @@ test("applied reference analysis forwards product facts and audience strategy wi
 
 test("applying reference recommendations refreshes frozen coverage and evidence from applied roles", async () => {
   const app = await readApp();
-  const refresh = getFunctionSource(app, "refreshCreationAppliedReferencePlanningSignals", "toggleCreationReferenceAnalysisPanel");
+  const refresh = getFunctionSource(app, "refreshCreationAppliedReferencePlanningSignals", "applyCreationReferenceAnalysisRecommendations");
   const apply = getFunctionSource(app, "applyCreationReferenceAnalysisRecommendations", "renderCreationReferenceAnalysis");
 
   assert.match(refresh, /buildCreationReferencePlanningSignals/);

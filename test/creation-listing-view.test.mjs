@@ -1321,6 +1321,91 @@ test("listing generation accepts a successful service response without dimension
   assert.equal(feedback.at(-1)?.type, "success");
 });
 
+test("batch Listing generation skips records that already have Listing drafts", async () => {
+  const existingSet = { setId: "set-existing", productName: "Existing", listingDrafts: [{ title: "Saved Listing" }] };
+  const missingSet = { setId: "set-missing", productName: "Missing", listingDrafts: [] };
+  const secondMissingSet = { setId: "set-missing-2", productName: "Missing Two" };
+  const state = {
+    creation: {
+      listingGeneratingSetId: "",
+      sets: [existingSet, missingSet, secondMissingSet],
+    },
+  };
+  const requestedIds = [];
+  const feedback = [];
+  const controller = createCreationListingController({
+    compactErrorMessage: (message) => message,
+    fetchImpl: async (_url, options) => {
+      const body = JSON.parse(options.body);
+      requestedIds.push(body.setId);
+      return {
+        ok: true,
+        json: async () => ({
+          ok: true,
+          set: {
+            ...state.creation.sets.find((set) => set.setId === body.setId),
+            listingDrafts: [{ title: `${body.setId} Listing` }],
+          },
+        }),
+      };
+    },
+    refs: {},
+    setFeedback: (message, type) => feedback.push({ message, type }),
+    state,
+    upsertSet: (set) => {
+      state.creation.sets = [set, ...state.creation.sets.filter((entry) => entry.setId !== set.setId)];
+      return set;
+    },
+  });
+
+  const result = await controller.generateMissing();
+
+  assert.deepEqual(requestedIds, ["set-missing", "set-missing-2"]);
+  assert.equal(result.generatedCount, 2);
+  assert.equal(result.failedCount, 0);
+  assert.match(feedback.at(-1).message, /成功 2 套/u);
+  assert.equal(state.creation.listingGeneratingSetId, "");
+});
+
+test("batch Listing generation continues after one record fails", async () => {
+  const firstSet = { setId: "set-fails", listingDrafts: [] };
+  const secondSet = { setId: "set-succeeds", listingDrafts: [] };
+  const state = { creation: { sets: [firstSet, secondSet] } };
+  const requestedIds = [];
+  const controller = createCreationListingController({
+    compactErrorMessage: (message) => message,
+    fetchImpl: async (_url, options) => {
+      const setId = JSON.parse(options.body).setId;
+      requestedIds.push(setId);
+      if (setId === firstSet.setId) {
+        return { ok: false, json: async () => ({ message: "temporary upstream failure" }) };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          ok: true,
+          set: { ...secondSet, listingDrafts: [{ title: "Recovered Listing" }] },
+        }),
+      };
+    },
+    refs: {},
+    setFeedback: () => {},
+    state,
+    upsertSet: (set) => {
+      state.creation.sets = [set, ...state.creation.sets.filter((entry) => entry.setId !== set.setId)];
+      return set;
+    },
+  });
+
+  const result = await controller.generateMissing();
+
+  assert.deepEqual(requestedIds, ["set-fails", "set-succeeds"]);
+  assert.equal(result.generatedCount, 1);
+  assert.equal(result.failedCount, 1);
+  assert.equal(result.failures[0].setId, "set-fails");
+  assert.equal(state.creation.listingBatchGenerating, false);
+});
+
 test("listing generation accepts a successful service response without weight fields", async () => {
   const selectedSet = { setId: "set-stale-listing-weight-service", listingDrafts: [] };
   let upsertedSet = null;

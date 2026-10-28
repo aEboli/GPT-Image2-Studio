@@ -44,10 +44,39 @@ test("variant showcase requires at least two confirmed choices", () => {
   }), null);
 });
 
+test("appended SKU images require at least two sourced sellable variants", () => {
+  assert.equal(getCreationItemEvidenceRequirement({
+    role: "sku",
+    skuSubjects: [{ id: "khaki", filenames: ["khaki.png"], colorNames: ["khaki"] }],
+  })?.code, "variants");
+  assert.equal(getCreationItemEvidenceRequirement({
+    role: "sku",
+    skuSubjects: [
+      { id: "khaki", filenames: ["khaki.png"], colorNames: ["khaki"] },
+      { id: "black", filenames: ["black.png"], colorNames: ["black"] },
+    ],
+  }), null);
+});
+
+test("package image requires an actual included-item list", () => {
+  assert.equal(getCreationItemEvidenceRequirement({
+    role: "accessory-gift",
+    productDescription: "Heated gloves with a Type-C charging port",
+  })?.code, "package");
+  assert.equal(getCreationItemEvidenceRequirement({
+    role: "accessory-gift",
+    sellingPoints: ["Includes one USB charging cable and one storage pouch"],
+  }), null);
+  assert.equal(getCreationItemEvidenceRequirement({
+    role: "accessory-gift",
+    productInsights: { confirmedFacts: [{ id: "package", kind: "package", text: "包装内是一双手套" }] },
+  }), null);
+});
+
 test("a bare product name blocks both size roles and the variant role", () => {
   const plan = buildCreationPlan({ ...BASE, productDescription: "", sellingPoints: [] });
   const titles = blockedTitles(plan);
-  assert.deepEqual(titles.sort(), ["多款式/SKU选择图", "参数规格图", "尺寸容量适配图"].sort());
+  assert.deepEqual(titles.sort(), ["到手清单/配件图", "多款式/SKU选择图", "参数规格图", "尺寸容量适配图"].sort());
   for (const item of carousel(plan)) {
     if (!item.evidenceBlocked) continue;
     assert.equal(typeof item.evidenceRequirement?.message, "string");
@@ -63,8 +92,8 @@ test("supplying specification and variant data clears every block", () => {
     sellingPoints: ["颜色：米色 / 黑色"],
     dimensionSpecs: "Length 10cm; Width 8cm",
   });
-  assert.deepEqual(blockedTitles(plan), []);
-  assert.equal(plan.warnings.some((warning) => warning.code === "item-missing-evidence"), false);
+  assert.deepEqual(blockedTitles(plan), ["到手清单/配件图"]);
+  assert.equal(plan.warnings.some((warning) => warning.code === "item-missing-evidence"), true);
 });
 
 test("two sourced SKU subjects unlock variants even when individual SKU generation is off", () => {
@@ -79,7 +108,7 @@ test("two sourced SKU subjects unlock variants even when individual SKU generati
     ],
     skuGenerationEnabled: false,
   });
-  assert.deepEqual(blockedTitles(plan), []);
+  assert.deepEqual(blockedTitles(plan), ["到手清单/配件图"]);
 });
 
 test("one sourced SKU takes precedence over generic mentions of other colors", () => {
@@ -122,7 +151,7 @@ test("removing evidence flags from a frozen plan cannot bypass generation gates"
     item.evidenceRequirement = null;
   }
   const submitted = buildCreationSubmittedPlan({ effectivePlan: JSON.stringify(plan) });
-  assert.deepEqual(blockedTitles(submitted).sort(), ["多款式/SKU选择图", "参数规格图", "尺寸容量适配图"].sort());
+  assert.deepEqual(blockedTitles(submitted).sort(), ["到手清单/配件图", "多款式/SKU选择图", "参数规格图", "尺寸容量适配图"].sort());
 });
 
 test("evidence requirements are recalculated for saved repair plans", () => {

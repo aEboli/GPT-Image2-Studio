@@ -28,12 +28,12 @@
 
 ### Requirement: 套图调度使用共享会话控制
 
-套图生成、套图 Logo 批量和套图补图 SHALL 使用 `creation` scope 的共享任务 slot 与发车闸门。并发值 SHALL 同时作为 worker 上限和 slot 上限；提交间隔 SHALL 在每个真实上游生成调用之前生效。
+套图生成、套图 Logo 批量和套图补图 SHALL 使用 `generation` scope 的共享任务 slot 与发车闸门。并发值 SHALL 同时作为 worker 上限和 slot 上限；提交间隔 SHALL 在每个真实上游生成调用之前生效。
 
 #### Scenario: Logo 批量与普通套图共用预算
 
 - **WHEN** 同一会话同时运行普通套图和 Logo 批量
-- **THEN** 两者不各自创建独立的 creation 并发桶或提交计时器
+- **THEN** 两者不各自创建独立的并发桶或提交计时器
 
 ### Requirement: 已创建 Responses 任务的临时失败只回查原任务
 

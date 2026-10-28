@@ -1,5 +1,6 @@
 import { getCreationFatalUpstreamError } from "./creation-auto-repair.mjs";
 import { formatCreationSkuItemColorNames } from "./creation-sku-colors.mjs";
+import { hasCreationMultipleSourcedSkuEvidence } from "./creation-item-requirements.mjs";
 import { isFatalUpstreamError } from "./upstream-fatal-error.mjs";
 
 export function getCreationQueueJobs(creationState = {}) {
@@ -540,6 +541,8 @@ export function buildCreationQueuedSet({
     draftHasInfographicRebuildItems,
   );
   const skuSubjects = buildCreationSkuSubjectPayload();
+  const hasMultipleSkuEvidence = hasCreationMultipleSourcedSkuEvidence({ skuSubjects });
+  const effectiveSkuGenerationEnabled = skuGenerationEnabled && hasMultipleSkuEvidence;
   const infographicRebuildSources = infographicRebuildEnabled ? getCreationInfographicRebuildSources(referenceImageRoles) : [];
   const shouldUseDraftItems = draftItemsMatchSelectedRoles(draftItems, selectedRoles, {
     skuGenerationEnabled,
@@ -552,7 +555,7 @@ export function buildCreationQueuedSet({
   const imageCount = selectedImageCount === 0 ? 0 : selectedRoles.length || baseRoleCount || selectedImageCount;
   const rawVisualLanguage = refs.creationVisualLanguageInput?.value;
   const normalizedVisualLanguage = normalizeVisualLanguageForQueue(rawVisualLanguage, normalizeCreationVisualLanguage);
-  const queuedSkuSubjects = skuGenerationEnabled ? skuSubjects : [];
+  const queuedSkuSubjects = effectiveSkuGenerationEnabled ? skuSubjects : [];
   const baseItems = baseSlots.map((slot, index) => ({ ...slot, slotIndex: index + 1, status: slot.evidenceBlocked ? "skipped" : "queued" }));
   const items = shouldUseDraftItems
     ? baseItems
@@ -590,7 +593,7 @@ export function buildCreationQueuedSet({
     selectedRoles,
     referenceImageNames: referenceFiles.map((item) => item.file?.name || "").filter(Boolean),
     referenceImageRoles,
-    skuGenerationEnabled,
+    skuGenerationEnabled: effectiveSkuGenerationEnabled,
     infographicRebuildEnabled,
     infographicRebuildCount: infographicRebuildSources.length,
     skuSubjects,

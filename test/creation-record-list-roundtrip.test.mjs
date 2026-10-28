@@ -155,6 +155,11 @@ function createNavigationRuntime(appSource, state, refs, documentRef, referenceN
     getSourceSection(
       appSource,
       "function filterCreationRecordSets() {",
+      "\nfunction toggleCreationRecordSelectAll",
+    ),
+    getSourceSection(
+      appSource,
+      "function toggleCreationRecordSelectAll() {",
       "\nfunction hasCreationRecordActiveFilters",
     ),
     getSourceSection(
@@ -192,6 +197,7 @@ function createNavigationRuntime(appSource, state, refs, documentRef, referenceN
       getRenderCount: () => renderCount,
       renderCreationRecordSetList,
       selectCreationRecord,
+      toggleCreationRecordSelectAll,
     };
   `, context);
 
@@ -366,4 +372,68 @@ test("selecting a record preserves the visible list, filters, checks, loaded row
   assert.equal(refs.creationRecordLoadMoreButton.hidden, false);
   assert.equal(refs.creationRecordLoadMoreButton.textContent, "加载更多（剩余 10）");
   assert.equal(runtime.getRenderCount(), 1);
+});
+
+test("select-all toggles every filtered record across pagination and preserves hidden selections", async () => {
+  const appSource = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
+  const documentRef = createFakeDocument();
+  const matchingRecords = Array.from({ length: 130 }, (_, index) => makeRecord(index + 1));
+  const excludedRecord = makeRecord(201, { productName: "Hat record 201" });
+  const filterSignature = JSON.stringify(["shoe", "all", ""]);
+  const state = {
+    assetLoadErrors: { creation: "" },
+    assetLoading: { creation: false },
+    creation: {
+      recordCheckedSetIds: [excludedRecord.setId],
+      recordDateFilter: "",
+      recordDeleteBusy: false,
+      recordDetailExpanded: false,
+      recordListScrollTop: 0,
+      recordListState: createCreationRecordListState(filterSignature),
+      recordQuery: "shoe",
+      recordSetId: matchingRecords[0].setId,
+      recordTimeFilter: "all",
+      sets: [...matchingRecords, excludedRecord],
+    },
+  };
+  const refs = {
+    creationRecordListSummary: new FakeElement("span"),
+    creationRecordLoadMoreButton: new FakeElement("button"),
+    creationRecordSelectAllButton: new FakeElement("button"),
+    creationRecordSetList: new FakeElement("div"),
+  };
+  const runtime = createNavigationRuntime(
+    appSource,
+    state,
+    refs,
+    documentRef,
+    new Date("2026-08-05T12:00:00.000Z"),
+  );
+
+  runtime.renderCreationRecordSetList(runtime.filterCreationRecordSets());
+  assert.equal(refs.creationRecordSelectAllButton.textContent, "全选");
+  assert.equal(refs.creationRecordSelectAllButton.getAttribute("aria-pressed"), "false");
+  runtime.toggleCreationRecordSelectAll();
+  assert.equal(state.creation.recordCheckedSetIds.length, 131);
+  assert.equal(state.creation.recordCheckedSetIds.includes(excludedRecord.setId), true);
+  assert.equal(state.creation.recordCheckedSetIds.includes(matchingRecords[129].setId), true);
+  assert.equal(refs.creationRecordSelectAllButton.textContent, "取消全选");
+  assert.equal(refs.creationRecordSelectAllButton.getAttribute("aria-pressed"), "true");
+
+  runtime.toggleCreationRecordSelectAll();
+  assert.equal(state.creation.recordCheckedSetIds.length, 1);
+  assert.equal(state.creation.recordCheckedSetIds[0], excludedRecord.setId);
+  assert.equal(refs.creationRecordSelectAllButton.textContent, "全选");
+  assert.equal(refs.creationRecordSelectAllButton.getAttribute("aria-pressed"), "false");
+});
+
+test("creation records show a select-all button beside the paginated list controls", async () => {
+  const [app, html] = await Promise.all([
+    readFile(new URL("../public/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/index.html", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(html, /id="creationRecordSelectAllButton"[^>]*>全选<\/button>/u);
+  assert.match(app, /creationRecordSelectAllButton:\s*document\.querySelector\("#creationRecordSelectAllButton"\)/u);
+  assert.match(app, /creationRecordSelectAllButton\?\.addEventListener\("click", toggleCreationRecordSelectAll\)/u);
 });

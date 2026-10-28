@@ -2282,3 +2282,282 @@ SKU 生成提示词 SHALL 为成对主体声明左右两只同图保留，不得
 - **WHEN** 本图是卖点总览且分析提供多个不同的可靠买点
 - **THEN** 分配覆盖适量的不同买点及对应事实
 - **AND** 每个信息模块有明确内容，不用同一个尺寸事实填满多个卖点位置
+
+### Requirement: 分析师营销建议可见且参与套图生成
+
+套图参考图智能识别 SHALL 在现有请求中返回与当前商品事实关联的营销建议。每条建议 SHALL 使用简体中文说明具体营销重点及适合的画面表达，并引用至少一个有效事实 ID。资料充分时 SHALL 提供 3–6 条不同建议；资料不足时 SHALL 根据实际依据减少数量，MUST NOT 编造性能、参数、配件、认证或使用效果来凑足建议。
+
+套图记录详情 SHALL 在“分析师分析”区域独占一行展示“分析师提供建议内容：”，读取该记录或其冻结计划中实际保存的建议。普通轮播生图 SHALL 使用与本图任务和已分配事实匹配的建议及对应证据。建议 MUST NOT 覆盖商品身份、逐图事实边界、用户手动提示词和平台图型规则。
+
+建议 SHALL 随商品洞察贯穿预览、冻结计划、队列、保存记录与补图。旧记录缺少建议时 SHALL 保持可读，并显示重新识别提示；系统 MUST NOT 从平台默认买家语境伪造已完成的营销分析，MUST NOT 自动改写历史提示词和图片。
+
+#### Scenario: 分析师给出具体商品营销建议
+
+- **WHEN** 参考图确认商品有腕部调节带，并提供可引用的事实 ID
+- **THEN** 智能识别可建议用调节带操作近景表达穿戴细节，并将建议绑定到该事实
+- **AND** 建议不推断未提供的保暖温度、续航或防水等级
+
+#### Scenario: 展示与生图采用同一建议
+
+- **WHEN** 用户应用有效分析并预览或生成套图
+- **THEN** “分析师提供建议内容：”一行展示计划中实际保存的营销建议
+- **AND** 匹配的普通轮播图提示词包含对应建议及已分配事实，而不是只有界面展示
+
+#### Scenario: 建议服从逐图分工
+
+- **WHEN** 套图包含调节带细节图、尺寸图、SKU 图以及独立信息图重构
+- **THEN** 调节带营销建议可以进入对应的细节任务
+- **AND** 不能把该建议及其额外事实强塞进仅有尺寸任务的图、SKU 白底图或只依源图的信息图重构
+
+#### Scenario: 建议缺少有效依据
+
+- **WHEN** 某条建议未引用有效事实，或仅引用已排除的真实冲突事实
+- **THEN** 规范化排除该建议
+- **AND** 该建议不出现在分析师内容或后续生图提示词中
+
+#### Scenario: 查看没有建议的历史记录
+
+- **WHEN** 用户查看缺少营销建议的旧记录
+- **THEN** “分析师提供建议内容：”一行显示暂无营销建议及重新智能识别的提示
+- **AND** 旧记录的图片、提示词与补图依据保持可读，不混入当前其他商品的分析
+
+#### Scenario: 商品资料改变
+
+- **WHEN** 用户更换参考图或修改使现有分析失效的商品资料
+- **THEN** 营销建议随商品洞察一起失效
+- **AND** 新计划不使用旧资料对应的建议
+
+### Requirement: 电商视觉营销分析覆盖具体受众卖点与痛点
+
+套图智能识别 SHALL 以电商视觉营销专家职责分析当前商品，提供结构化的主次受众分组、独立卖点、独立痛点及营销建议。受众 SHALL 描述具体使用或购买语境、核心需求、购买触发点和主要顾虑，而不是只返回“此类商品的买家”。资料充分时 SHALL 提供 3–6 个不同受众群体；卖点 SHALL 关联商品依据与买家价值，痛点 SHALL 描述具体使用或购买阻碍及有依据的回应。数量 SHALL 服从实际资料，不通过近义改写或虚构商品能力凑数。
+
+分析区 SHALL 展示各个有效群体及其需求，同时保留卖点和痛点栏目。缺少内容时 SHALL 显示明确空态或资料缺口，MUST NOT 静默隐藏整栏或把平台默认内容当作实际分析。新分析 SHALL 兼容旧的买家摘要和商品洞察字段，并保留事实来源。
+
+#### Scenario: 商品有多个具体需求群体
+
+- **WHEN** 商品用途与资料支持多种不同的使用任务
+- **THEN** 分析分别给出对应的主次受众群体、需求、动机和犹豫点
+- **AND** 不把所有人合并成一个泛泛标签，也不以近义标签重复同一群体
+
+#### Scenario: 卖点和痛点分别回答购买问题
+
+- **WHEN** 资料支持某项商品功能或结构及其真实使用方式
+- **THEN** 卖点说明该依据如何形成买家价值，痛点说明相关的具体困扰或购买阻碍
+- **AND** 这些分析可以用于图片创作，但不能新增资料未提供的性能或参数
+
+#### Scenario: 旧分析缺少痛点
+
+- **WHEN** 用户查看没有痛点或受众分组的旧记录
+- **THEN** 界面仍保留对应栏目并显示重新识别或补充资料提示
+- **AND** 旧记录的图片与提示词保持可读
+
+### Requirement: 可选 AI 整套营销提示词一次规划全部图片
+
+套图 SHALL 提供默认开启且可记忆的“AI 整套营销提示词”开关。开启后 SHALL 由电商视觉营销专家在正常成功路径的一次规划请求中返回全部 N 条可直接用于生图的提示词，并提供每项的图片类型、营销目标、受众、卖点/痛点、营销建议和参考图分配。缺少有效分析时 SHALL 在同一次请求中按现有契约补齐商品分析与参考用途。系统 MUST NOT 为每张图单独发出一次提示词规划请求。
+
+AI 模式普通营销轮播 SHALL 支持 1–20 张，并以独立 ID 标识同一图型下不同的营销任务，MUST NOT 被现有 18 个固定槽位裁剪。SKU 与独立源图重构 SHALL 保持现有单独计数和执行规则。开关关闭时 SHALL 使用原有本地规划，0 张普通轮播 MUST NOT 发起空的 AI 规划请求。
+
+系统 SHALL 在图片生成前校验返回数量、ID、图型、非空提示词、策略与事实引用、参考图编号和商品主体绑定。对于商品分析已确认的主主体和事实来源，若模型仅漏写其参考编号，系统 SHALL 将对应的可信原始上传编号补入逐图分配，再执行数量和字节预算校验。用户手动锁定的主体优先；否则主体索引 SHALL 在分析请求前确定，分析响应 MUST NOT 通过重排或修改辅助图角色悄然更换全套主体。MUST NOT 猜测未知来源、静默丢弃无效编号，或在补齐后超过单图参考上限和字节预算。真正缺少来源或无效的结果 MUST NOT 进入图片生成。
+
+营销规划响应 SHALL 包含非空的顶层 `items`。系统 MUST NOT 将截断的整套对象解析为其内部的任意 JSON 子对象。首次响应缺少整套条目时，系统 MAY 对全套做一次携带完整规划 schema 和所需条目数量的重试；若重试仍不完整，SHALL 显示明确错误，MUST NOT 把它报告为成功的零条计划或发出图片请求。
+
+预览 SHALL 使用户能够核对逐图营销任务、最终提示词和参考分配。生成、队列、保存和补图 SHALL 使用同一份冻结的最终提示词与参考分配。系统生成的商品主体锁 SHALL 在预览最终提示词中只出现一次；同一有效计划提交生成时 MUST 保持提示词字节内容不变。已有有效预览、普通重试和补图 MUST NOT 自动重新规划整套提示词；输入发生相关变化后 SHALL 使新草稿计划失效，并拒绝陈旧响应覆盖当前结果。
+
+#### Scenario: AI 遗漏主体和事实来源编号
+
+- **WHEN** 20 条完整计划已引用有效商品事实，但部分条目的参考索引遗漏事实来源图或预先确定的主主体图
+- **THEN** 系统将分析已确认的来源编号补入逐图参考分配并保留原始上传编号
+- **AND** 相同参考分配进入预览与后续图片请求
+- **AND** 若补齐会超过 8 张或现有字节预算，系统明确拒绝，不静默删图
+
+#### Scenario: 辅助图分析响应尝试更换主主体
+
+- **WHEN** 规划前图 1 已被选作主主体，模型响应将图 2 提为商品主体或重排参考图
+- **THEN** 系统仍将图 1 用作本套图主体，且图 2 不会被提升为整体主主体
+
+#### Scenario: 流式规划响应被截断
+
+- **WHEN** 模型响应只包含一个完整的内部商品事实对象，而整套 JSON 在 `items` 返回前被截断
+- **THEN** 系统不将内部对象识别成完整套图计划
+- **AND** 系统最多重试一次完整整套规划，之后仍不完整则显示明确错误，且不发出生图请求
+
+#### Scenario: 已预览提示词包含主体锁
+
+- **WHEN** 用户提交一份已包含系统商品主体锁的有效预览计划
+- **THEN** 冻结和生成阶段保留相同提示词且不重复插入同一主体锁
+
+#### Scenario: 一次规划 20 张营销图
+
+- **WHEN** 用户开启开关并选择 20 张普通营销轮播，且当前资料足以支持计划
+- **THEN** 正常路径的一次规划请求返回 20 个唯一且完整的条目
+- **AND** 计划、预览和生图不将条目裁剪为 18，也不逐图重复请求提示词
+
+#### Scenario: 分配落实到实际图片请求
+
+- **WHEN** 某条提示词选择主主体图及一张功能说明图作为依据
+- **THEN** 该项图片请求使用计划中相同的提示词、图型和已校验参考分配
+- **AND** 不只在文案中提到这两张图却发送其他无关参考或错误编号
+
+#### Scenario: 生成直接使用已预览计划
+
+- **WHEN** 用户核对过有效的 AI 整套预览后开始生成
+- **THEN** 系统直接使用相同的最终提示词与参考图分配
+- **AND** 不再次调用模型生成另一套内容
+
+#### Scenario: 规划条目不完整
+
+- **WHEN** 用户选择 20 张但模型只返回 18 条，或返回空提示词、重复 ID 或不存在的参考图
+- **THEN** 系统说明规划无效并提供整体重新规划的途径
+- **AND** 不静默填入模板条目或发出图片生成请求
+
+#### Scenario: 用户补图
+
+- **WHEN** 某个已保存的 AI 规划图片生成失败并执行补图
+- **THEN** 补图继续采用原记录中的最终提示词和参考分配
+- **AND** 不重新生成整套提示词，也不使用当前其他商品的分析
+
+#### Scenario: 用户修改商品或规划条件
+
+- **WHEN** 商品资料、参考图、分析、语言、张数、平台、视觉风格、图型约束或开关发生影响规划的变化
+- **THEN** 新草稿旧计划失效，需要重新规划
+- **AND** 旧异步响应不能覆盖当前草稿，已排队和历史记录保留各自冻结计划
+
+#### Scenario: 用户锁定单图提示词
+
+- **WHEN** 用户在规划前明确锁定某张图的提示词或图型
+- **THEN** 整套规划保留该项约束，并为其余图片安排互补的营销任务
+- **AND** 用户手动内容不会被新规划静默覆盖
+
+### Requirement: Creation Mode 图片使用按角色区分的信息层级
+
+Creation Mode SHALL 根据分配给当前图片的商品和证据构建信息丰富的角色布局。首图 SHALL 请求一个占主导位置且与来源一致的商品、相关背景、在有依据时使用的两个至四个圆形使用场景小窗，以及由已提供的卖点、控制部件、材质或规格组成的紧凑底部功能区。卖点、功能、规格、尺寸、场景、包装、多角度和细节角色 SHALL 请求与其分配事实匹配的简洁辅助面板、标签、标注线或视图结构。所有视觉面板 SHALL 保持同一个商品身份，并且 SHALL 只使用分配给当前图片的事实。来源不支持某个面板或声明时，提示词 SHALL 留出该内容而不自行补充。
+
+#### Scenario: 首图具备商品与证据层级
+
+- **WHEN** 规划集合拥有商品参考图以及已确认的功能或场景证据
+- **THEN** 首图提示词请求大尺寸商品主体、相关背景、圆形场景小窗和底部功能区
+- **AND** 画面标签只使用选定语言中的已提供事实
+- **AND** 每个小窗都展示同一个已提供商品
+
+#### Scenario: 功能图和场景图使用信息化布局
+
+- **WHEN** 当前角色拥有功能、卖点、规格、场景、包装、细节或产品视图证据
+- **THEN** 提示词请求与角色匹配的面板、标签、标注线或视图，让分配事实易于比较
+- **AND** 商品身份、部件数量和实体文字继续绑定到主商品来源
+- **AND** 未确认事实和场景道具不会被当作商品功能或包装内物品
+
+#### Scenario: 提示词压缩保留必要约束
+
+- **WHEN** Creation Mode 组装一张规划图片的提示词
+- **THEN** 重复的主体、场景、参考图或语言说明被合并
+- **AND** 商品身份、来源事实、分配参考图、实体表面文字和目标语言要求仍保持明确
+- **AND** 系统不会为了满足字符长度上限而截断事实
+
+### Requirement: 配对商品的表面与位置锁定
+
+套图智能识别 SHALL 将可售单位计数与可见表面分开表达。对已确认按双售卖的手套等配对商品，一双计为1个完整产品单位；每个画面位置的掌面、手背、侧面、开口、纹理、缝线、文字、控制器和按键 SHALL 绑定到其实际出现的表面。画面左/右、上/下只表示图像位置，MUST NOT 单独作为左手/右手或额外商品件数的证据。
+
+#### Scenario: 一双手套同时展示掌面与手背
+
+- **WHEN** 参考图画面左侧展示一只手套的掌面蜂窝纹理，画面右侧展示另一只手套的手背 HOT 字样、显示窗和按键
+- **THEN** 识别说明保留一双手套为 1 个完整产品单位
+- **AND** 识别说明分别记录左侧为掌面、右侧为手背及各自可见细节
+- **AND** 生成约束禁止把掌面蜂窝纹理与手背HOT字样、显示窗和按键错误融合到同一可见表面，或复制到没有相应细节的另一表面
+
+#### Scenario: 多角度只能使用已有表面
+
+- **WHEN** 只有掌面和手背的清晰参考，缺少独立侧面或内部证据
+- **THEN** 多角度图只使用已见视角与细节裁切
+- **AND** 角色指令、视觉变体与图型元数据不强制补造四个视角或未知内部
+
+### Requirement: 套图提示词使用分层事实预算
+
+新套图计划 SHALL 按图片任务向每张提示词提供主体锁定、本图任务和已分配事实。每张图 SHALL 保留本图所需的主体锁、事实、数值条件、平台边界和用户手写提示词；不得因字符长度而拒绝或截断已通过来源校验的 AI 营销提示词。其它整套分析 MUST NOT 因为已被识别就重复注入每张图或附图标签。
+
+#### Scenario: 长分析不淹没主体锁定
+
+- **WHEN** 商品分析返回多个事实、场景、卖点和营销建议
+- **THEN** 首图和普通图只携带与本图任务匹配的有限事实
+- **AND** 每张提示词仍保留掌面/手背等主体表面锁定
+- **AND** 可选重复段落按完整单元删减，优先保留主体锁、逐图事实及其数值条件
+
+#### Scenario: 必需内容较长
+
+- **WHEN** 主体锁或完整规格使 AI 营销提示词较长
+- **THEN** 系统保留其完整内容，并继续执行来源、主体和图型校验
+- **AND** 系统不得仅因字符长度拒绝该计划或截断未知语义
+
+#### Scenario: SKU外观不得串到另一款式
+
+- **WHEN** 主主体是黑色手套，另一个有来源的SKU是红色手套
+- **THEN** 黑色主主体的表面锁只能进入匹配来源的SKU
+- **AND** 红色SKU使用自身来源的外观说明，不复制黑色款的控制器或表面标识
+
+#### Scenario: 已冻结记录保持兼容
+
+- **WHEN** 新计划经过预览、冻结、保存和补图
+- **THEN** 实际提示词和主体锁保持一致
+- **AND** 缺少新版本标记的旧冻结计划仍可读取，读取时不重写历史提示词
+
+### Requirement: Batch generation fills missing Listing records
+
+The suite records view SHALL provide a batch command that generates Listing only for records without existing Listing drafts. The command SHALL process records sequentially, skip records with existing drafts or an active Listing request, and continue after an individual failure. While the batch runs, record refresh, deletion, Temu export, and separate Listing generation SHALL be unavailable.
+
+#### Scenario: Batch generation skips existing Listing
+
+- **WHEN** the user activates batch Listing generation
+- **THEN** records with one or more existing `listingDrafts` are skipped
+- **AND** records without Listing are processed in sequence
+- **AND** a failed record does not prevent later missing records from being attempted
+
+#### Scenario: Record actions stay stable during batch generation
+
+- **WHEN** a batch Listing operation is running
+- **THEN** refreshing or deleting records, starting a Temu export, and starting another Listing generation are disabled
+- **AND** completion reports the numbers of successful and failed records
+
+### Requirement: Select all filtered Creation records
+
+The Creation records view SHALL provide a select-all control that selects every record in the current complete filtered result set, including records beyond the current rendered page. Toggling the control off SHALL remove only matching filtered record IDs and preserve selections outside the current filter.
+
+#### Scenario: Select all records across pages
+
+- **WHEN** the user activates select all while the current filter matches more records than are currently rendered
+- **THEN** every record matching the current search and time filters is selected
+- **AND** matching records beyond the current page are included
+
+#### Scenario: Clear only the current filtered selection
+
+- **WHEN** every record in the current filtered result set is selected and the user activates the control again
+- **THEN** the current filtered records are deselected
+- **AND** selections outside the current filter remain selected
+
+### Requirement: AI 营销图不受本地图型依据门槛拦截
+
+AI 整套营销计划的普通轮播项 SHALL 在预览、冻结提交、直接生成及补图阶段跳过本地图型依据禁用规则。缺少本地识别的多款式、尺寸参数或包装清单 MUST NOT 导致这些营销项被禁用、跳过或使整套计划报错。系统 SHALL 清除营销项已有的依据禁用标记，并保留最终提示词与参考分配。此规则 SHALL 仅适用于 AI 营销普通轮播项；独立 SKU、源图重构和本地模板规划 SHALL 保持现有规则。
+
+#### Scenario: 营销计划采用本地认为缺少依据的图型
+
+- **WHEN** AI 返回完整营销计划，包含款式对比、尺寸适配、到手清单或规格图，但本地未识别对应数据
+- **THEN** 预览仍返回这些营销项，且全部可生成
+- **AND** 直接生成、冻结提交及补图不再按该图型依据规则拦截
+- **AND** 提示词与参考分配保持一致
+
+#### Scenario: 营销计划保留旧依据禁用标记
+
+- **WHEN** 有效 AI 营销普通轮播项带有旧的依据禁用状态
+- **THEN** 重新检查时清除其依据禁用标记并恢复启用
+- **AND** 独立 SKU 和本地模板图仍遵循原有依据校验
+
+### Requirement: Creation canvas text follows the selected target language
+Creation Mode SHALL render newly authored text outside the supplied product or packaging only in the selected target language. Supplied facts, role titles, content-assignment titles, filenames, and reference annotations SHALL be translated before use as canvas text or omitted when they are internal metadata. Existing text physically present on the product or packaging SHALL remain unchanged in its original language. Stricter platform no-text constraints SHALL remain authoritative.
+
+#### Scenario: English is selected with Chinese source facts and planning labels
+- **WHEN** a Creation Mode item uses English and its assigned facts, task title, or reference notes contain Chinese
+- **THEN** newly authored canvas text uses English only
+- **AND** Chinese planning labels, filenames, and reference annotations are not copied onto the canvas
+- **AND** physical Chinese product or packaging text remains unchanged
+
+#### Scenario: Platform forbids added text
+- **WHEN** a platform-native slot has a no-text policy
+- **THEN** the platform policy remains authoritative and no translated marketing labels are added

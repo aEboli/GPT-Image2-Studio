@@ -93,11 +93,10 @@ test("text-bearing prompts carry a claim-free canvas text policy and text-free s
 
   assert.equal(withText.length > 0, true);
   assert.equal(withoutText.length > 0, true);
-  // Text-bearing prompts allow canvas copy but must forbid performance, safety, certification,
-  // price, or superiority wording on it.
+  // Text-bearing prompts allow concise labels grounded in supplied evidence.
   for (const item of withText) {
     assert.equal(/CANVAS TEXT:/i.test(item.prompt), true, item.imageType);
-    assert.equal(/no performance, safety, certification, price, or superiority claims/i.test(item.prompt), true, item.imageType);
+    assert.equal(/use concise source-grounded labels for supplied facts, features, specifications, and scene context/i.test(item.prompt), true, item.imageType);
     assert.equal(/existing product markings only/i.test(item.prompt), false, item.imageType);
   }
   // Text-free slots keep the markings-only sentence and never invite new canvas copy.

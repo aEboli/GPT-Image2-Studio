@@ -680,3 +680,14 @@ Listing 上游请求的超时 SHALL 覆盖连接、响应头和正文读取，�
 - **WHEN** 提供方先返回响应头但正文读取超过请求期限
 - **THEN** 上游读取被取消且任务返回明确超时错误
 - **AND** 不无限等待正文
+
+### Requirement: Listing request protocol follows the configured endpoint
+
+Listing Agent SHALL send a Responses API request when the configured endpoint is `responses` and SHALL send a Chat Completions request with a `messages` array when the configured endpoint is `chat/completions`.
+
+#### Scenario: Chat Completions Listing generation
+
+- **WHEN** a Listing request uses `endpointPath = chat/completions`
+- **THEN** the upstream request contains `messages[0].role = user`
+- **AND** the request contains Chat Completions `response_format.json_schema`
+- **AND** the request does not depend on a Responses-only `input` field

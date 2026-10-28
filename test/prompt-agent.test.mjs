@@ -452,7 +452,7 @@ test("prompt agent request can identify ecommerce creation reference roles", () 
     contextPrompt: "平台：Amazon。商品类型：数码电子 > 手机通讯 > 手机。",
   });
 
-  assert.match(input[0].content[0].text, /套图参考图识别/);
+  assert.match(input[0].content[0].text, /电商视觉营销专家/);
   assert.match(input[0].content[0].text, new RegExp(`1 到 ${MAX_CREATION_REFERENCE_IMAGES} 张电商套图参考图`));
   assert.match(input[0].content[0].text, /商品主体|包装清单|结构细节/);
   assert.match(input[0].content[0].text, /四级类目/);
@@ -1747,6 +1747,17 @@ test("prompt agent returns compact upstream HTTP errors", async () => {
       message: "图片分析请求失败：HTTP 524，错误码 524",
     },
   );
+});
+
+test("prompt agent exposes the transport cause when its model endpoint cannot be reached", async () => {
+  const cause = Object.assign(new Error("getaddrinfo ENOTFOUND model.example.test"), { code: "ENOTFOUND" });
+  await assert.rejects(() => requestPromptAgentAnalysis({
+    baseUrl: "https://model.example.test/v1",
+    apiKey: "test-key",
+    responsesModel: "test-model",
+    images: [{ filename: "test.png", mimeType: "image/png", base64: "dGVzdA==" }],
+    fetchImpl: async () => { throw new TypeError("fetch failed", { cause }); },
+  }), /模型服务连接失败：fetch failed（getaddrinfo ENOTFOUND model\.example\.test）.*检查文本\/视觉模型的 API 地址和网络连接/);
 });
 
 test("prompt agent preserves the five-group structured reverse prompt without legacy fields", () => {

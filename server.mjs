@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { requestCreationMarketingPlan, creationMarketingInputFingerprint } from "./lib/creation-marketing-agent.mjs";
+import { applyCreationMarketingPlan, isCreationAiMarketingEnabled } from "./lib/creation-marketing-plan.mjs";
 import dns from "node:dns";
 import { createServer } from "node:http";
 import { createReadStream } from "node:fs";
@@ -106,13 +108,11 @@ import { buildImageEditPrompt } from "./lib/image-edit-prompt.mjs";
 import { buildCreationGenerationSnapshot } from "./lib/creation-generation-snapshot.mjs";
 import {
   DEFAULT_REASONING_EFFORT,
+  DEFAULT_GENERATION_CONCURRENCY,
   CREATION_STATUS_HEARTBEAT_MS,
   MAX_ITEM_UPSTREAM_ATTEMPTS,
   MAX_GENERATION_CONCURRENCY,
   MAX_CREATION_REFERENCE_IMAGES,
-  MAX_CREATION_PARALLEL_TASKS,
-  MAX_PARALLEL_TASKS_PER_SESSION,
-  MAX_PROMPT_PARALLEL_TASKS,
   MAX_PORTRAIT_ACTION_REFERENCE_IMAGES,
   MAX_PORTRAIT_ACCESSORY_REFERENCE_IMAGES,
   MAX_PORTRAIT_PERSON_REFERENCE_IMAGES,
@@ -175,7 +175,6 @@ import {
   normalizeCreationReferenceAnalysis,
   normalizeCreationReferenceRoles,
 } from "./lib/creation-planner.mjs";
-import { translateCreationPlanPrompts } from "./lib/creation-prompt-translation.mjs";
 import {
   CREATION_LOGO_BATCH_REFERENCE_LABELS,
   buildCreationLogoBatchPlan,
@@ -304,23 +303,16 @@ const CREATION_ORIGINAL_RESPONSE_RECOVERY_MAX_POLLS = Math.max(
   Math.ceil(CREATION_ORIGINAL_RESPONSE_RECOVERY_TIMEOUT_MS / CREATION_ORIGINAL_RESPONSE_RECOVERY_POLL_DELAY_MS),
 );
 function getSessionTaskSlotLimit(requestScope) {
-  const scope = String(requestScope || "").trim().split(":", 1)[0];
-  if (scope === "prompt") {
-    return MAX_PROMPT_PARALLEL_TASKS;
-  }
-  if (scope === "creation") {
-    return MAX_CREATION_PARALLEL_TASKS;
-  }
-  return MAX_PARALLEL_TASKS_PER_SESSION;
+  return DEFAULT_GENERATION_CONCURRENCY;
 }
 const sessionTaskSlotLimiter = createSessionTaskSlotLimiter({
   maxParallelTasks: getSessionTaskSlotLimit,
   retryDelayMs: SESSION_TASK_SLOT_RETRY_DELAY_MS,
 });
-// Scoped exactly like the slot limiter above, so the concurrency ceiling and the
-// submit interval both mean "per session, per scope". A per-request gate would let
-// N concurrent fan-outs each pace on their own timer, and the upstream would see
-// roughly `interval / N` — measured at 458ms for two fan-outs configured at 1000ms.
+// Shared by every image-generation mode for one client session, so the configured
+// concurrency ceiling and submit interval both describe the total upstream load.
+// A per-mode gate would let N concurrent fan-outs each pace on their own timer,
+// and the upstream would see roughly `interval / N`.
 const generationLaunchGates = createGenerationLaunchGateRegistry();
 const PPT_SOURCE_EXTENSIONS = new Set([".pdf", ".docx", ".pptx", ".txt", ".md", ".csv"]);
 const ARTICLE_SOURCE_EXTENSIONS = new Set([".txt", ".md", ".csv", ".json"]);
@@ -437,18 +429,14 @@ function normalizePromptImageBackground(value) {
   return String(value || "").trim().toLowerCase() === "transparent" ? "transparent" : "opaque";
 }
 
-function getStudioGenerationRequestScope(generationMode, imageRoute) {
-  const mode = generationMode || "prompt";
-  if (mode === "prompt") {
-    return mode;
-  }
+const GLOBAL_GENERATION_REQUEST_SCOPE = "generation";
 
-  const route = String(imageRoute || "").trim().toLowerCase();
-  return route === "a" || route === "b" || route === "c" || route === "d" ? `${mode}:${route}` : mode;
+function getStudioGenerationRequestScope() {
+  return GLOBAL_GENERATION_REQUEST_SCOPE;
 }
 
-function getGenerationTaskSlotScopeKey(sessionId, requestScope) {
-  return sessionTaskSlotLimiter.getScopeKey(sessionId, requestScope);
+function getGenerationTaskSlotScopeKey(sessionId) {
+  return sessionTaskSlotLimiter.getScopeKey(sessionId, GLOBAL_GENERATION_REQUEST_SCOPE);
 }
 
 function sendJson(response, statusCode, payload, headers = {}) {
@@ -1066,11 +1054,11 @@ function isBackgroundGenerationRequest(formData) {
 }
 
 function claimSessionTaskSlot(sessionId, taskId, requestScope) {
-  return sessionTaskSlotLimiter.claimSessionTaskSlot(sessionId, taskId, requestScope);
+  return sessionTaskSlotLimiter.claimSessionTaskSlot(sessionId, taskId, GLOBAL_GENERATION_REQUEST_SCOPE);
 }
 
 async function waitForSessionTaskSlot(sessionId, taskId, requestScope, options = {}) {
-  return sessionTaskSlotLimiter.waitForSessionTaskSlot(sessionId, taskId, requestScope, options);
+  return sessionTaskSlotLimiter.waitForSessionTaskSlot(sessionId, taskId, GLOBAL_GENERATION_REQUEST_SCOPE, options);
 }
 
 // `controls` is optional but every set-based fan-out passes it. The abort has to
@@ -1105,7 +1093,7 @@ async function waitForResponseSessionTaskSlot(sessionId, taskId, requestScope, r
 }
 
 function releaseSessionTaskSlot(sessionId, taskId, requestScope) {
-  sessionTaskSlotLimiter.releaseSessionTaskSlot(sessionId, taskId, requestScope);
+  sessionTaskSlotLimiter.releaseSessionTaskSlot(sessionId, taskId, GLOBAL_GENERATION_REQUEST_SCOPE);
 }
 
 // Wait only after this worker has claimed its shared session slot and immediately
@@ -1873,6 +1861,9 @@ async function generateAndSavePptSlide({
   quality,
   pptDeckRelativeDir,
   referenceImages = [],
+  clientSessionId = "global-default-session",
+  taskId = "",
+  generationConcurrency = DEFAULT_GENERATION_CONCURRENCY,
 }) {
   writeSseEvent(response, "slide_started", {
     slideNumber: slidePrompt.slideNumber,
@@ -1886,85 +1877,97 @@ async function generateAndSavePptSlide({
   }
   const slideQuality = normalizeGenerationImageQuality(quality, generationConfig, config.defaults?.quality);
   const slideReasoningEffort = normalizeGenerationReasoningEffort(reasoningEffort, generationConfig);
-  const generationResult = await requestStudioImageGeneration({
-    baseUrl: generationConfig.baseUrl,
-    apiKey: generationConfig.apiKey,
-    prompt: slidePrompt.prompt,
-    referenceImages,
-    size: PPT_SLIDE_SIZE,
-    aspectRatio: "16:9",
-    quality: slideQuality,
-    format: toApiOutputFormat(PPT_SLIDE_FORMAT),
-    responsesModel: generationConfig.responsesModel,
-    imageRoute: generationConfig.imageRoute,
-    imageModel: generationConfig.imageModel,
-    includeImageToolModel: generationConfig.includeImageToolModel,
-    endpointPath: generationConfig.endpointPath,
-    directImageStream: config.directImageStream === true && generationConfig.imageRoute === IMAGE_ROUTE_B,
-    reasoningEffort: slideReasoningEffort,
-    async onEvent(event) {
-      if (event.type === "partial_image") {
-        writeSseEvent(response, "partial_image", {
-          slideNumber: slidePrompt.slideNumber,
-          dataUrl: event.dataUrl,
-        });
-        return;
-      }
-
-      if (event.type === "final_image") {
-        finalBase64 = event.base64;
-      }
-    },
-  });
-  const savedSize = generationResult.effectiveSize || PPT_SLIDE_SIZE;
-
-  if (!finalBase64) {
-    const error = new Error("上游响应结束，但没有拿到最终 PPT 页面图片。");
-    error.slideNumber = slidePrompt.slideNumber;
-    throw error;
-  }
-
-  const filename = createTimestampedFilename({
-    format: PPT_SLIDE_FORMAT,
-    prompt: `${outline.title}-${slidePrompt.title}`,
-    createdAt,
-  });
-  const saved = await saveGeneratedAsset({
-    outputDir,
-    relativeDir: pptDeckRelativeDir,
-    filename,
-    imageBuffer: decodeAndValidateGeneratedImage(finalBase64, "PPT 页面生成结果"),
-    metadata: {
-      prompt: slidePrompt.prompt,
-      createdAt,
+  const generationRequestScope = GLOBAL_GENERATION_REQUEST_SCOPE;
+  let slotClaimed = false;
+  try {
+    await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response, {
+      maxParallelTasks: generationConcurrency,
+    });
+    slotClaimed = true;
+    const generationResult = await requestStudioImageGeneration({
       baseUrl: generationConfig.baseUrl,
+      apiKey: generationConfig.apiKey,
+      prompt: slidePrompt.prompt,
+      referenceImages,
+      size: PPT_SLIDE_SIZE,
+      aspectRatio: "16:9",
+      quality: slideQuality,
+      format: toApiOutputFormat(PPT_SLIDE_FORMAT),
       responsesModel: generationConfig.responsesModel,
       imageRoute: generationConfig.imageRoute,
       imageModel: generationConfig.imageModel,
-      endpointPath: generationResult.endpointPath || generationConfig.endpointPath,
-      ratio: "16:9",
-      ratioLabel: "16:9",
-      size: savedSize,
-      quality: slideQuality,
-      format: PPT_SLIDE_FORMAT,
-      ...(slideReasoningEffort ? { reasoningEffort: slideReasoningEffort } : {}),
-      assetKind: "ppt-slide",
-      deckId,
-      slideNumber: String(slidePrompt.slideNumber),
-      galleryVisible: false,
-    },
-  });
+      includeImageToolModel: generationConfig.includeImageToolModel,
+      endpointPath: generationConfig.endpointPath,
+      directImageStream: config.directImageStream === true && generationConfig.imageRoute === IMAGE_ROUTE_B,
+      reasoningEffort: slideReasoningEffort,
+      async onEvent(event) {
+        if (event.type === "partial_image") {
+          writeSseEvent(response, "partial_image", {
+            slideNumber: slidePrompt.slideNumber,
+            dataUrl: event.dataUrl,
+          });
+          return;
+        }
 
-  return {
-    slideNumber: slidePrompt.slideNumber,
-    title: slidePrompt.title,
-    filename: saved.filename,
-    relativePath: saved.relativePath,
-    absolutePath: saved.absolutePath,
-    imageUrl: buildPptPublicUrl(saved.relativePath),
-    thumbnailUrl: buildPptPublicUrl(saved.relativePath),
-    prompt: slidePrompt.promptSummary || slidePrompt.prompt,
-  };
+        if (event.type === "final_image") {
+          finalBase64 = event.base64;
+        }
+      },
+    });
+    const savedSize = generationResult.effectiveSize || PPT_SLIDE_SIZE;
+
+    if (!finalBase64) {
+      const error = new Error("上游响应结束，但没有拿到最终 PPT 页面图片。");
+      error.slideNumber = slidePrompt.slideNumber;
+      throw error;
+    }
+
+    const filename = createTimestampedFilename({
+      format: PPT_SLIDE_FORMAT,
+      prompt: `${outline.title}-${slidePrompt.title}`,
+      createdAt,
+    });
+    const saved = await saveGeneratedAsset({
+      outputDir,
+      relativeDir: pptDeckRelativeDir,
+      filename,
+      imageBuffer: decodeAndValidateGeneratedImage(finalBase64, "PPT 页面生成结果"),
+      metadata: {
+        prompt: slidePrompt.prompt,
+        createdAt,
+        baseUrl: generationConfig.baseUrl,
+        responsesModel: generationConfig.responsesModel,
+        imageRoute: generationConfig.imageRoute,
+        imageModel: generationConfig.imageModel,
+        endpointPath: generationResult.endpointPath || generationConfig.endpointPath,
+        ratio: "16:9",
+        ratioLabel: "16:9",
+        size: savedSize,
+        quality: slideQuality,
+        format: PPT_SLIDE_FORMAT,
+        ...(slideReasoningEffort ? { reasoningEffort: slideReasoningEffort } : {}),
+        assetKind: "ppt-slide",
+        deckId,
+        slideNumber: String(slidePrompt.slideNumber),
+        galleryVisible: false,
+      },
+    });
+
+    return {
+      slideNumber: slidePrompt.slideNumber,
+      title: slidePrompt.title,
+      filename: saved.filename,
+      relativePath: saved.relativePath,
+      absolutePath: saved.absolutePath,
+      imageUrl: buildPptPublicUrl(saved.relativePath),
+      thumbnailUrl: buildPptPublicUrl(saved.relativePath),
+      prompt: slidePrompt.promptSummary || slidePrompt.prompt,
+    };
+  } finally {
+    if (slotClaimed) {
+      releaseSessionTaskSlot(clientSessionId, taskId, generationRequestScope);
+    }
+  }
 }
 
 async function saveCompletedPptDeck({
@@ -2170,6 +2173,8 @@ async function handlePptGenerate(request, response) {
     });
     const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
     const generationConfig = getSelectedImageGenerationConfig(config);
+    const clientSessionId = getClientSessionId(request, formData);
+    const generationConcurrency = resolveGenerationConcurrencyForLimit(formData, config);
     const quality = normalizeGenerationImageQuality(formData.get("quality"), generationConfig, config.defaults?.quality);
     const reasoningEffort = normalizeReasoningEffort(
       formData.get("reasoningEffort") || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
@@ -2213,6 +2218,9 @@ async function handlePptGenerate(request, response) {
           reasoningEffort,
           quality,
           pptDeckRelativeDir,
+          clientSessionId,
+          taskId: `${deckId}-slide-${slidePrompt.slideNumber}`,
+          generationConcurrency,
         });
         slides.push(slide);
         writeSseEvent(response, "slide_saved", { slide });
@@ -2283,6 +2291,8 @@ async function handlePptComplete(request, response) {
     );
 
     const generationConfig = getSelectedImageGenerationConfig(config);
+    const clientSessionId = String(request.headers["x-client-session-id"] || payload.clientSessionId || "global-default-session").trim() || "global-default-session";
+    const generationConcurrency = resolveGenerationConcurrencyForLimit(payload, config);
     const quality = normalizeGenerationImageQuality(payload.quality, generationConfig, config.defaults?.quality);
     if (!generationConfig.apiKey) {
       throw new Error("Missing API key for the selected image generation route.");
@@ -2318,6 +2328,9 @@ async function handlePptComplete(request, response) {
           reasoningEffort,
           quality,
           pptDeckRelativeDir,
+          clientSessionId,
+          taskId: `${deckId}-slide-${slidePrompt.slideNumber}`,
+          generationConcurrency,
         });
         generatedSlides.push(slide);
         writeSseEvent(response, "slide_saved", { slide });
@@ -2401,6 +2414,8 @@ async function handlePptSlideEdit(request, response) {
     });
     const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
     const generationConfig = getSelectedImageGenerationConfig(config);
+    const clientSessionId = getClientSessionId(request, formData);
+    const generationConcurrency = resolveGenerationConcurrencyForLimit(formData, config);
     const reasoningEffort = normalizeReasoningEffort(
       formData.get("reasoningEffort") || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
     );
@@ -2446,6 +2461,9 @@ async function handlePptSlideEdit(request, response) {
       quality,
       pptDeckRelativeDir,
       referenceImages,
+      clientSessionId,
+      taskId: `${deckId}-slide-${slideNumber}`,
+      generationConcurrency,
     });
 
     writeSseEvent(response, "slide_saved", { slide: generatedSlide });
@@ -2715,6 +2733,8 @@ function buildCreationSetManifest({
     productDescription: plan.productDescription,
     sellingPoints: plan.sellingPoints,
     productInsights: plan.productInsights || null,
+    promptPlanningMode: plan.promptPlanningMode || "template",
+    marketingPlan: plan.marketingPlan || null,
     dimensionSpecs: plan.dimensionSpecs,
     dimensionSpecGroups: plan.dimensionSpecGroups || [],
     dimensionUnitMode: plan.dimensionUnitMode,
@@ -3289,7 +3309,7 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
     }
 
     const clientSessionId = getClientSessionId(request, formData);
-    const generationRequestScope = "article-illustration";
+    const generationRequestScope = GLOBAL_GENERATION_REQUEST_SCOPE;
     const generationStartDelayMs = resolveGenerationStartDelayMs(formData, config);
     const generationConcurrency = resolveGenerationConcurrencyForLimit(formData, config);
     const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || "3:2"));
@@ -4519,6 +4539,15 @@ async function handleCreationPlan(request, response) {
     });
     plan = applyCreationPlanOverrides(plan, formData.get("planOverrides"));
 
+    if (isCreationAiMarketingEnabled(formData.get("aiMarketingEnabled")) && Number(formData.get("imageCount")) > 0) {
+      const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
+      const textConfig = getSelectedPromptAgentAnalysisConfig(config);
+      if (!textConfig.apiKey) throw new Error("AI 整套营销提示词需要先配置文本/视觉模型 API。");
+      const referenceImages = await toReferenceImages(formData.getAll("referenceImages"));
+      if (referenceImages.length > MAX_CREATION_REFERENCE_IMAGES || referenceImages.some((image) => !String(image.mimeType || "").startsWith("image/"))) throw new Error("AI 规划参考图无效或超过上传上限。");
+      plan = await requestCreationMarketingPlan({ input: Object.fromEntries(formData), referenceImages, config: textConfig });
+    }
+
     return sendJson(response, 200, {
       ok: true,
       plan,
@@ -4588,7 +4617,7 @@ async function handlePortraitGenerate(request, response) {
     }
 
     const clientSessionId = getClientSessionId(request, formData);
-    const generationRequestScope = "portrait";
+    const generationRequestScope = GLOBAL_GENERATION_REQUEST_SCOPE;
     const generationStartDelayMs = resolveGenerationStartDelayMs(formData, config);
     const generationConcurrency = resolveGenerationConcurrencyForLimit(formData, config);
     const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || plan.ratio || "4:5"));
@@ -4937,6 +4966,21 @@ async function handleCreationGenerate(request, response) {
       skuBundleCount: formData.get("skuBundleCount"),
       skuGenerationRule: formData.get("skuGenerationRule"),
     });
+    if (isCreationAiMarketingEnabled(formData.get("aiMarketingEnabled")) && Number(formData.get("imageCount")) > 0) {
+      const input = Object.fromEntries(formData);
+      if (plan.promptPlanningMode === "ai-batch" && plan.marketingPlan) {
+        if (plan.marketingPlan.inputFingerprint !== creationMarketingInputFingerprint(input, referenceImages)) throw new Error("商品资料或规划条件已变化，请重新预览 AI 整套营销提示词。");
+        const primary = plan.referenceImageRoles?.find((entry) => entry.role === "reference-product") || plan.referenceImageRoles?.find((entry) => entry.role === "product");
+        const payload = { items: plan.items.filter((item) => item.itemKind === "carousel").map((item) => ({ item_id: item.itemId, image_type: item.imageType, title: item.title, marketing_goal: item.marketingAssignment?.goal, prompt: item.prompt, audience_ids: item.marketingAssignment?.audienceIds, selling_point_ids: item.marketingAssignment?.sellingPointIds, pain_point_ids: item.marketingAssignment?.painPointIds, recommendation_ids: item.marketingAssignment?.recommendationIds, fact_ids: item.marketingAssignment?.factIds, reference_indexes: item.marketingAssignment?.referenceIndexes })) };
+        plan = applyCreationPlanEvidenceRequirements(applyCreationMarketingPlan(plan, payload, { count: Number(formData.get("imageCount")), referenceCount: referenceImages.length, primaryIndex: referenceImages.length ? Number(plan.marketingPlan.primaryReferenceIndex) || Number(primary?.index) || 1 : 0, selectedRoles: plan.marketingPlan.selectedRoles || [], lockedItems: plan.marketingPlan.lockedItems || [] }));
+      } else {
+        const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
+        const textConfig = getSelectedPromptAgentAnalysisConfig(config);
+        if (!textConfig.apiKey) throw new Error("AI 整套营销提示词需要先配置文本/视觉模型 API。");
+        plan = await requestCreationMarketingPlan({ input, referenceImages, config: textConfig });
+      }
+      referenceImageRoles = normalizeCreationReferenceRoles(plan.referenceImageRoles);
+    }
     assertCreationPlanCanGenerate(plan);
 
     const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
@@ -4949,7 +4993,7 @@ async function handleCreationGenerate(request, response) {
     }
 
     const clientSessionId = getClientSessionId(request, formData);
-    const generationRequestScope = "creation";
+    const generationRequestScope = GLOBAL_GENERATION_REQUEST_SCOPE;
     const generationStartDelayMs = resolveGenerationStartDelayMs(formData, config);
     const generationConcurrency = resolveGenerationConcurrencyForLimit(formData, config);
     const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || "1:1"));
@@ -4965,10 +5009,6 @@ async function handleCreationGenerate(request, response) {
       config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
     );
 
-    const promptTranslation = await translateCreationPlanPrompts(plan, {
-      config: getSelectedTextVisionConfig(config),
-    });
-    plan = promptTranslation.plan;
     const generatableItems = plan.items.filter((item) => !item.evidenceBlocked);
 
     creationRelativeDir = buildCreationRelativeDir({
@@ -5015,9 +5055,6 @@ async function handleCreationGenerate(request, response) {
 
     writeSseEvent(response, "set_started", { set: setManifest });
     writeSseEvent(response, "plan", { setId, items });
-    if (promptTranslation.warning) {
-      writeSseEvent(response, "prompt_translation_warning", { setId, message: promptTranslation.warning });
-    }
 
     const referenceUploadImages = collectCreationReferenceImagesForUpload(
       generatableItems,
@@ -5423,7 +5460,7 @@ async function handleCreationLogoBatchGenerate(request, response) {
     }
 
     const clientSessionId = getClientSessionId(request, formData);
-    const generationRequestScope = "creation";
+    const generationRequestScope = GLOBAL_GENERATION_REQUEST_SCOPE;
     const generationStartDelayMs = resolveGenerationStartDelayMs(formData, config);
     const generationConcurrency = resolveGenerationConcurrencyForLimit(formData, config);
     const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || "1:1"));
@@ -5814,7 +5851,7 @@ async function handlePortraitRepair(request, response) {
     }
 
     const clientSessionId = getClientSessionId(request, formData);
-    const generationRequestScope = "portrait";
+    const generationRequestScope = GLOBAL_GENERATION_REQUEST_SCOPE;
     const generationStartDelayMs = resolveGenerationStartDelayMs(formData, config);
     const generationConcurrency = resolveGenerationConcurrencyForLimit(formData, config);
     const ratioOption = resolveAspectRatioOption(String(formData.get("ratio") || setManifest.ratio || "4:5"));
@@ -6155,7 +6192,7 @@ async function handleCreationRepair(request, response) {
     }
 
     const clientSessionId = getClientSessionId(request, formData);
-    const generationRequestScope = "creation";
+    const generationRequestScope = GLOBAL_GENERATION_REQUEST_SCOPE;
     const generationStartDelayMs = resolveGenerationStartDelayMs(formData, config);
     const generationConcurrency = resolveGenerationConcurrencyForLimit(formData, config);
     const fallbackRatio = String(formData.get("ratio") || "1:1");
@@ -6853,6 +6890,7 @@ async function handleGenerate(request, response) {
 
     const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
     const generationConfig = getSelectedImageGenerationConfig(config);
+    const generationConcurrency = resolveGenerationConcurrencyForLimit(formData, config);
     generationTaskStore.updateTask(clientSessionId, taskId, {
       imageRoute: generationConfig.imageRoute,
       baseUrl: generationConfig.baseUrl,
@@ -6913,9 +6951,13 @@ async function handleGenerate(request, response) {
       }
 
     if (streamToResponse) {
-      await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response);
+      await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response, {
+        maxParallelTasks: generationConcurrency,
+      });
     } else {
-      await waitForSessionTaskSlot(clientSessionId, taskId, generationRequestScope);
+      await waitForSessionTaskSlot(clientSessionId, taskId, generationRequestScope, {
+        maxParallelTasks: generationConcurrency,
+      });
     }
     slotClaimed = true;
     const requestIpPromise = getOutboundRequestIp();

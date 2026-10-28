@@ -1501,28 +1501,6 @@
                     </button>
                     <p class="prompt-agent-feedback" id="creationReferenceAnalysisFeedback"></p>
                   </div>
-                  <div class="reference-analysis-panel creation-reference-analysis-panel hidden" id="creationReferenceAnalysisPanel">
-                    <div class="reference-analysis-head">
-                      <div class="creation-reference-analysis-head-copy">
-                        <span>识别结果</span>
-                      </div>
-                      <div class="creation-reference-analysis-head-actions">
-                        <button
-                          class="inline-button reference-analysis-toggle hidden"
-                          id="creationReferenceAnalysisToggleButton"
-                          type="button"
-                          aria-expanded="false"
-                          aria-controls="creationReferenceAnalysisList"
-                          disabled
-                        >
-                          收起结果
-                        </button>
-                      </div>
-                      <strong id="creationReferenceAnalysisSummary">--</strong>
-                      <small class="creation-reference-analysis-meta" id="creationReferenceAnalysisMeta">--</small>
-                    </div>
-                    <div class="reference-analysis-list" id="creationReferenceAnalysisList"></div>
-                  </div>
                 </div>
 
                 <div class="creation-logo-block hidden" data-creation-logo-batch-only>
@@ -1608,6 +1586,8 @@
                       <option value="16">16 张</option>
                       <option value="17">17 张</option>
                       <option value="18" selected>18 张</option>
+                      <option value="19">19 张</option>
+                      <option value="20">20 张</option>
                     </select>
                   </label>
 
@@ -1686,6 +1666,10 @@
                   </label>
 
                   <div class="creation-toggle-row" data-creation-set-only>
+                    <label class="creation-listing-toggle is-prominent">
+                      <input id="creationAiMarketingEnabledInput" name="aiMarketingEnabled" type="checkbox" checked />
+                      <span>AI 营销提示词</span>
+                    </label>
                     <label class="creation-listing-toggle">
                       <input id="creationSkuGenerationEnabledInput" name="skuGenerationEnabled" type="checkbox" checked />
                       <span>SKU 图</span>
@@ -2651,6 +2635,7 @@
                 <div class="asset-title-block"><h2>套图记录 <span class="count-pill" id="creationRecordCount">0 套</span></h2></div>
                 <div class="asset-head-actions creation-record-actions">
                   <button class="toolbar-button asset-primary-action creation-record-desktop-action" id="creationRecordRepairIncompleteButton" type="button" disabled>补齐未生成图像</button>
+                  <button class="toolbar-button asset-primary-action creation-record-desktop-action" id="creationRecordGenerateMissingListingsButton" type="button" disabled>批量生成 Listing</button>
                   <button class="toolbar-button asset-primary-action" id="creationRecordReuseButton" type="button" disabled>复用到当前套图</button>
                   <button class="toolbar-button asset-primary-action" id="creationRecordExportTemuButton" type="button">temuexcel导出工作台</button>
                   <button class="toolbar-button creation-record-desktop-action" id="creationRecordRefreshButton" type="button">刷新</button>
@@ -2701,7 +2686,10 @@
                 <div class="creation-set-list creation-record-list" id="creationRecordSetList" role="list" aria-label="套图记录"></div>
                 <div class="creation-record-list-footer">
                   <span id="creationRecordListSummary" aria-live="polite">已显示 0 / 匹配 0</span>
-                  <button class="toolbar-button" id="creationRecordLoadMoreButton" type="button" hidden>加载更多</button>
+                  <div class="creation-record-list-footer-actions">
+                    <button class="toolbar-button" id="creationRecordSelectAllButton" type="button" disabled>全选</button>
+                    <button class="toolbar-button" id="creationRecordLoadMoreButton" type="button" hidden>加载更多</button>
+                  </div>
                 </div>
               </div>
               <article class="creation-record-archive" aria-live="polite" tabindex="-1">
@@ -3626,7 +3614,7 @@
               <div>
                 <h2 data-ui-i18n="activityLog">生成日志</h2>
               </div>
-              <span class="count-pill small" id="liveCount">0 / 10</span>
+              <span class="count-pill small" id="liveCount">0 / 20</span>
             </div>
 
             <div class="error-banner hidden" id="errorBanner" role="alert" aria-live="assertive"></div>

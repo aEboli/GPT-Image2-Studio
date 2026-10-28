@@ -21,7 +21,7 @@ const indexPath = new URL("../public/index.html", import.meta.url);
 const limitedConcurrencyPath = new URL("../lib/limited-concurrency.mjs", import.meta.url);
 const serverPath = new URL("../server.mjs", import.meta.url);
 
-test("prompt mode keeps fifteen tasks visible while limiting generation to ten parallel tasks", async () => {
+test("prompt mode keeps its queue capacity while sharing the configured global generation limit", async () => {
   assert.equal(MAX_PARALLEL_TASKS_PER_SESSION, 15);
   assert.equal(MAX_PROMPT_PARALLEL_TASKS, 10);
   assert.equal(MAX_PROMPT_QUEUE_SIZE, 15);
@@ -31,20 +31,21 @@ test("prompt mode keeps fifteen tasks visible while limiting generation to ten p
 
   assert.doesNotMatch(app, /maxConcurrentTasksPerSession/);
   assert.match(app, /maxParallelTasksPerSession:\s*15/);
-  assert.match(index, /id="liveCount">0 \/ 10<\/span>/);
+  assert.match(index, /id="liveCount">0 \/ 20<\/span>/);
   assert.match(app, /function getMaxQueuedJobCount\(mode = getCurrentGenerationQueueMode\(\)\) \{[\s\S]*MAX_PROMPT_QUEUE_SIZE/);
-  assert.match(app, /function getMaxParallelJobCount\(mode = getCurrentGenerationQueueMode\(\)\) \{[\s\S]*MAX_PROMPT_PARALLEL_TASKS/);
+  assert.match(app, /function getMaxParallelJobCount\(\) \{\s*return getConfiguredGenerationConcurrency\(\);/);
+  assert.match(app, /function getGenerationJobSchedulingKey\(job\) \{\s*return "generation";/);
   assert.match(app, /selectNextQueuedGenerationJobsByMode\(state\.jobs, getMaxParallelJobCountForJob(?:, getGenerationJobSchedulingKey)?\)/);
   assert.match(app, /提示词模式最多保留 \$\{MAX_PROMPT_QUEUE_SIZE\} 个任务/);
 });
 
-test("creation mode has an independent twenty-task parallel limit shared with repair", async () => {
+test("creation mode uses the same global configured generation limit as repair", async () => {
   assert.equal(MAX_CREATION_PARALLEL_TASKS, 20);
   assert.equal(CREATION_UPSTREAM_TIMEOUT_MS, 20 * 60 * 1000);
   assert.equal(MAX_PROMPT_PARALLEL_TASKS, 10);
 
   const server = await readFile(serverPath, "utf8");
-  assert.match(server, /if \(scope === "creation"\) \{\s*return MAX_CREATION_PARALLEL_TASKS;/);
+  assert.match(server, /const GLOBAL_GENERATION_REQUEST_SCOPE = "generation";/);
   // The fan-out limit is now the configurable generation concurrency. Its
   // default equals this creation limit, so an untouched control keeps the
   // twenty-task behaviour this test guards.
@@ -131,7 +132,7 @@ test("studio reference limits keep standard references and creation references a
   assert.match(index, /id="creationReferenceCount">0 \/ 15<\/small>/);
 });
 
-test("local server counts active generation slots per request mode", async () => {
+test("local server shares active generation slots across all request modes", async () => {
   const server = await readFile(serverPath, "utf8");
   const generateHandler =
     server.match(/async function handleGenerate[\s\S]*?\r?\n}\r?\n\r?\nasync function routeRequest/)?.[0] || "";
@@ -142,13 +143,12 @@ test("local server counts active generation slots per request mode", async () =>
   const articleGenerateHandler =
     server.match(/async function handleArticleIllustrationGenerate[\s\S]*?\r?\n}\r?\n\r?\nasync function handleCreationSetsGet/)?.[0] || "";
 
-  assert.match(server, /function getStudioGenerationRequestScope\(generationMode, imageRoute\) \{/);
-  assert.match(server, /if \(mode === "prompt"\) \{\s*return mode;/);
-  assert.match(server, /function getGenerationTaskSlotScopeKey\(sessionId, requestScope\) \{/);
+  assert.match(server, /function getStudioGenerationRequestScope\(\) \{\s*return GLOBAL_GENERATION_REQUEST_SCOPE;/);
+  assert.match(server, /function getGenerationTaskSlotScopeKey\(sessionId\) \{/);
   assert.match(server, /function claimSessionTaskSlot\(sessionId, taskId, requestScope\) \{/);
   assert.match(server, /const sessionTaskSlotLimiter = createSessionTaskSlotLimiter\(/);
   assert.match(server, /function getSessionTaskSlotLimit\(requestScope\) \{/);
-  assert.match(server, /MAX_PROMPT_PARALLEL_TASKS/);
+  assert.match(server, /DEFAULT_GENERATION_CONCURRENCY/);
   assert.match(server, /function isResponseWritable\(response\) \{/);
   assert.match(server, /async function waitForSessionTaskSlot\(sessionId, taskId, requestScope, options = \{\}\) \{/);
   assert.match(server, /async function waitForResponseSessionTaskSlot\(sessionId, taskId, requestScope, response, options = \{\}\) \{/);
@@ -158,20 +158,20 @@ test("local server counts active generation slots per request mode", async () =>
   assert.doesNotMatch(server, /activeTasksBySession = new Map\(\)/);
 
   assert.match(generateHandler, /generationRequestScope = getStudioGenerationRequestScope\(generationMode, generationConfig\.imageRoute\);/);
-  assert.match(generateHandler, /waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response\)/);
+  assert.match(generateHandler, /waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response, \{\s*maxParallelTasks: generationConcurrency/);
   assert.match(generateHandler, /releaseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope\)/);
 
   // The bounded fan-outs claim their slot with the configured concurrency as the
   // ceiling, so a run wider than the scope default still gets slots.
-  assert.match(creationGenerateHandler, /const generationRequestScope = "creation";/);
+  assert.match(creationGenerateHandler, /const generationRequestScope = GLOBAL_GENERATION_REQUEST_SCOPE;/);
   assert.match(creationGenerateHandler, /waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response, \{ maxParallelTasks: generationConcurrency, controls \}\)/);
   assert.match(creationGenerateHandler, /releaseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope\)/);
 
-  assert.match(creationRepairHandler, /const generationRequestScope = "creation";/);
+  assert.match(creationRepairHandler, /const generationRequestScope = GLOBAL_GENERATION_REQUEST_SCOPE;/);
   assert.match(creationRepairHandler, /waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response, \{ maxParallelTasks: generationConcurrency, controls \}\)/);
   assert.match(creationRepairHandler, /releaseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope\)/);
 
-  assert.match(articleGenerateHandler, /const generationRequestScope = "article-illustration";/);
+  assert.match(articleGenerateHandler, /const generationRequestScope = GLOBAL_GENERATION_REQUEST_SCOPE;/);
   assert.match(articleGenerateHandler, /const generationConcurrency = resolveGenerationConcurrencyForLimit\(formData, config\);/);
   assert.match(articleGenerateHandler, /await runWithConcurrency\(wave, generationConcurrency,/);
   assert.match(articleGenerateHandler, /waitForResponseSessionTaskSlot\(clientSessionId, taskId, generationRequestScope, response, \{\s*maxParallelTasks: generationConcurrency,\s*controls,\s*\}\)/);

@@ -491,6 +491,16 @@ test("creation listing controller sends browser-private request config", async (
   assert.equal(currentViewRenderCount, 2);
 });
 
+test("creation records expose the batch Listing command and bind its controller ref", async () => {
+  const [html, app] = await Promise.all([
+    readFile(new URL("../public/index.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/app.js", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(html, /id="creationRecordGenerateMissingListingsButton"[^>]*>批量生成 Listing</u);
+  assert.match(app, /creationRecordGenerateMissingListingsButton:\s*document\.querySelector\("#creationRecordGenerateMissingListingsButton"\)/u);
+});
+
 test("creation listing controller upserts a successful draft without physical fields", async () => {
   let requestCount = 0;
   let upsertedSet = null;

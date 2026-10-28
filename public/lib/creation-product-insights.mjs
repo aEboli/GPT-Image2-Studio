@@ -1,3 +1,5 @@
+import { selectCreationPromptFacts } from "./creation-prompt-budget.mjs";
+
 const text = (value) => typeof value === "string" ? value.trim().slice(0, 600) : "";
 const list = (value) => Array.isArray(value) ? value.slice(0, 32) : [];
 const strings = (value) => [...new Set(list(value).map(text).filter(Boolean))];
@@ -69,7 +71,7 @@ export function normalizeCreationProductInsights(value, { referenceCount = 0, pr
   const disputed = new Set(conflicts.flatMap((entry) => entry.factIds));
   const ids = new Set();
   const confirmedFacts = list(source.confirmedFacts || source.confirmed_facts).map((entry) => ({
-    id: text(entry?.id), text: text(entry?.text),
+    id: text(entry?.id), text: typeof entry?.text === "string" ? entry.text.trim() : "",
     kind: ["appearance", "function", "spec", "package", "usage"].includes(entry?.kind) ? entry.kind : "appearance",
     source: entry?.source === "user" ? "user" : "reference",
     referenceIndexes: indexes(object(entry)),
@@ -87,6 +89,13 @@ export function normalizeCreationProductInsights(value, { referenceCount = 0, pr
       .filter((entry) => entry.text && entry.factIds.length && !seen.has(entry.id) && seen.add(entry.id));
   };
   const painPoints = groundedPoints(source.painPoints || source.pain_points, "pain");
+  const audienceSegments = list(source.audienceSegments || source.audience_segments).map((entry, index) => ({
+    id: text(entry?.id) || `audience-${index + 1}`, name: text(entry?.name),
+    context: text(entry?.context), need: text(entry?.need),
+    purchaseTrigger: text(entry?.purchaseTrigger || entry?.purchase_trigger), objection: text(entry?.objection),
+    priority: entry?.priority === "primary" ? "primary" : "secondary", factIds: factIds(entry),
+  })).filter((entry, index, entries) => entry.name && entry.context && entry.need && entry.factIds.length
+    && entries.findIndex((other) => other.id === entry.id || other.name === entry.name) === index).slice(0, 6);
   const painIds = new Set(painPoints.map((entry) => entry.id));
   const seenScenes = new Set();
   const usageScenarios = list(source.usageScenarios || source.usage_scenarios).map((entry, index) => ({
@@ -105,12 +114,17 @@ export function normalizeCreationProductInsights(value, { referenceCount = 0, pr
     return true;
   }).slice(0, 12);
   const appearanceLocks = list(source.appearanceLocks || source.appearance_locks).map((entry) => ({
-    text: text(entry?.text), referenceIndexes: indexes(object(entry)),
-  })).filter((entry) => entry.text && entry.referenceIndexes.length && (!primaryIndex || entry.referenceIndexes.includes(primaryIndex))).slice(0, 10);
+    text: typeof entry?.text === "string" ? entry.text.trim() : "", referenceIndexes: indexes(object(entry)),
+  })).filter((entry, index, entries) => entry.text && entry.referenceIndexes.length && (!primaryIndex || entry.referenceIndexes.includes(primaryIndex))
+    && entries.findIndex((other) => other.text.replace(/\s+/gu, " ") === entry.text.replace(/\s+/gu, " ")) === index).slice(0, 10);
+  const marketingRecommendations = groundedPoints(list(source.marketingRecommendations || source.marketing_recommendations).filter((entry) => {
+    const references = strings(entry?.factIds || entry?.fact_ids);
+    return references.length && references.every((id) => ids.has(id));
+  }), "marketing").filter((entry) => !conflicts.some((conflict) => conflict.claims.some((claim) => entry.text.toLowerCase().includes(claim.toLowerCase())))).slice(0, 6);
   return {
     version: 1, appearanceLocks, confirmedFacts,
     sellingPoints: groundedPoints(source.sellingPoints || source.selling_points, "selling"),
-    painPoints, usageScenarios, unknowns: strings(unknowns), conflicts,
+    audienceSegments, marketingRecommendations, painPoints, usageScenarios, unknowns: strings(unknowns), conflicts,
   };
 }
 
@@ -124,6 +138,13 @@ export function excludeCreationConflictingClaims(value, insights) {
 }
 
 const SCENE_ROLES = new Set(["benefit", "scene", "atmosphere", "brand-story", "scene-fit-1", "scene-fit-2", "scene-fit-3", "after-sales", "human-handheld", "human-wearable"]);
+
+export function buildCreationAppearanceLockPrompt(insights, { referenceIndexes = null } = {}) {
+  const locks = (insights?.appearanceLocks || []).filter((entry) => !referenceIndexes || entry.referenceIndexes.some((index) => referenceIndexes.includes(index)));
+  return locks.length ? `APPEARANCE LOCK: ${[...new Set(locks.map((entry) => entry.text))].join("; ")}. Preserve surface ownership; position is not handedness.` : "";
+}
+
+export const CREATION_SUPPORTED_VIEWS_INSTRUCTION = "Show only reference-supported views on one clean sheet; use observed surfaces and detail crops, with factual labels. Preserve the complete sellable unit, surface-specific parts, markings and opening states; unseen surfaces stay unspecified.";
 
 export function allocateCreationProductScenes(roles = [], insights, scenePresets = {}, seed = 0) {
   if (!insights?.usageScenarios?.length && !insights?.confirmedFacts?.length) {
@@ -154,7 +175,7 @@ export function allocateCreationProductScenes(roles = [], insights, scenePresets
   });
 }
 
-export function buildCreationProductInsightPrompt(insights, { role = "", index = 0, sceneAssignment = null, includeScene = true, contentAssignment = null } = {}) {
+export function buildCreationProductInsightPrompt(insights, { role = "", index = 0, sceneAssignment = null, includeScene = true, includeMarketingRecommendations = true, includeAppearance = true, contentAssignment = null } = {}) {
   if (!insights && !sceneAssignment) return "";
   const facts = insights?.confirmedFacts || [];
   const selling = insights?.sellingPoints || [];
@@ -164,7 +185,7 @@ export function buildCreationProductInsightPrompt(insights, { role = "", index =
   if (contentAssignment) {
     focus = facts.filter((fact) => contentAssignment.factIds.includes(fact.id));
     const assignedPoints = selling.filter((point) => contentAssignment.sellingPointIds.includes(point.id));
-    task = assignedPoints.length ? `ASSIGNED BUYING REASONS: ${assignedPoints.map((point) => point.text).join("; ")}. Treat these as creative angles, never as new performance claims.` : "";
+    task = assignedPoints.length ? `BUYING REASONS: ${assignedPoints.map((point) => point.text).join("; ")}.` : "";
   } else if (sceneAssignment?.factIds?.length) {
     focus = facts.filter((fact) => sceneAssignment.factIds.includes(fact.id)).slice(0, 2);
   } else {
@@ -176,16 +197,22 @@ export function buildCreationProductInsightPrompt(insights, { role = "", index =
   const point = (role === "after-sales" ? pain : selling)[index % ((role === "after-sales" ? pain : selling).length || 1)];
   const scenePain = insights?.painPoints?.filter((entry) => sceneAssignment?.painPointIds?.includes(entry.id)).slice(0, 1) || [];
   if (!contentAssignment && point && ["hero", "benefit", "usage-suggestion", "after-sales", "effect-comparison"].includes(role)) {
-    focus = facts.filter((fact) => point.factIds.includes(fact.id)).slice(0, 2);
-    task = `${role === "after-sales" ? "Buyer concern to address visually" : "Single buying reason"}: ${point.text}. Treat this as a creative angle, never as a new performance claim.`;
+    focus = facts.filter((fact) => point.factIds.includes(fact.id));
+    task = `${role === "after-sales" ? "Buyer concern to address visually" : "Single buying reason"}: ${point.text}. Express it through supplied visual evidence and concise labels.`;
   }
+  if (!["size-capacity-fit", "spec-table", "accessory-gift"].includes(role) && contentAssignment?.taskKey !== "usage-sequence") focus = selectCreationPromptFacts(focus, { role });
+  const focusIds = new Set(focus.map((fact) => fact.id));
+  if (!contentAssignment && point && !point.factIds.every((id) => focusIds.has(id))) task = "";
+  const recommendations = includeMarketingRecommendations && !["manual", "gap"].includes(contentAssignment?.kind)
+    ? (insights?.marketingRecommendations || []).filter((entry) => entry.factIds.length && entry.factIds.every((id) => focusIds.has(id))).slice(0, role === "usage-suggestion" ? 6 : 2)
+    : [];
   return [
-    insights?.appearanceLocks?.length ? `APPEARANCE LOCKS (primary image): ${insights.appearanceLocks.map((entry) => entry.text).join("; ")}.` : "",
+    includeAppearance ? buildCreationAppearanceLockPrompt(insights) : "",
     task,
-    scenePain.length ? `VISIBLE PAIN-POINT CONTEXT: ${scenePain[0].text}. Show the situation through the action or product placement; do not draw an unsupported failure state.` : "",
-    focus.length ? `EVIDENCE FOR THIS FRAME ONLY: ${focus.map((fact) => `[${fact.id}; ${fact.source === "user" ? "user facts" : `reference ${fact.referenceIndexes.join(",")}`}] ${fact.text}`).join("; ")}.` : "",
-    "Use only the evidence assigned to this frame. Preserve the product's state and coverage; crop closer instead of opening, removing, or inventing parts. No invented internal layers, test results, certifications, guarantees, temperatures, runtime, or extra variants.",
-    includeScene && sceneAssignment ? `SCENE TASK (creative suggestion, not performance evidence): environment ${sceneAssignment.environment}; action ${sceneAssignment.action}; framing ${sceneAssignment.framing || "product-focused action crop"}. People: ${sceneAssignment.people}. ${sceneAssignment.people === "none" ? "Product and relevant context only." : "Only hands or the body area needed for the action; keep faces outside the crop."} Incidental props establish use context only and are not included accessories. This setting does not imply waterproofing, heating, protection, compatibility, or other unverified performance.` : "",
+    recommendations.length ? `ANALYST MARKETING RECOMMENDATIONS FOR THIS FRAME: ${recommendations.map((entry) => entry.text).join("; ")}.` : "",
+    scenePain.length ? `PAIN-POINT CONTEXT: ${scenePain[0].text}.` : "",
+    focus.length ? `FRAME EVIDENCE: ${focus.map((fact) => `[${fact.id}; ${fact.source === "user" ? "user" : `ref ${fact.referenceIndexes.join(",")}`}] ${fact.text}`).join("; ")}.` : "",
+    includeScene && sceneAssignment ? `SCENE TASK: ${sceneAssignment.environment}; ${sceneAssignment.action}; framing ${sceneAssignment.framing || "product-focused action crop"}; people ${sceneAssignment.people}. Props are context only.` : "",
   ].filter(Boolean).join("\n");
 }
 
@@ -197,9 +224,11 @@ const strictObject = (properties) => ({ type: "object", additionalProperties: fa
 const arrayOf = (properties, maxItems) => ({ type: "array", maxItems, items: strictObject(properties) });
 const pointProperties = { id: stringSchema, text: stringSchema, fact_ids: stringListSchema };
 export const CREATION_PRODUCT_INSIGHTS_JSON_SCHEMA = strictObject({
-  appearance_locks: arrayOf({ text: stringSchema, reference_indexes: indexSchema }, 10),
+  appearance_locks: arrayOf({ text: { type: "string", description: "短的主体锁定事实，一条只记录一个表面/部件的归属、开合状态或数量关系；画面位置不等于左右手。不重复用途建议，不把多个表面的细节混在一起。" }, reference_indexes: indexSchema }, 10),
   confirmed_facts: arrayOf({ id: stringSchema, text: stringSchema, kind: { type: "string", enum: ["appearance", "function", "spec", "package", "usage"] }, source: { type: "string", enum: ["reference", "user"] }, reference_indexes: indexSchema }, 24),
   selling_points: arrayOf(pointProperties, 8),
+  audience_segments: arrayOf({ id: stringSchema, name: stringSchema, context: stringSchema, need: stringSchema, purchase_trigger: stringSchema, objection: stringSchema, priority: { type: "string", enum: ["primary", "secondary"] }, fact_ids: stringListSchema }, 6),
+  marketing_recommendations: arrayOf(pointProperties, 6),
   pain_points: arrayOf(pointProperties, 8),
   usage_scenarios: arrayOf({ id: stringSchema, title: stringSchema, environment: stringSchema, action: stringSchema, action_group: stringSchema, framing: stringSchema, people: { type: "string", enum: ["none", "hands", "partial-body"] }, fact_ids: stringListSchema, pain_point_ids: stringListSchema }, 12),
   unknowns: stringListSchema,

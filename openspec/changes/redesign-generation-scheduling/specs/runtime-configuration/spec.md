@@ -19,7 +19,7 @@
 
 ### Requirement: 发车闸门按会话与板块共享
 
-提交间隔的发车闸门 SHALL 按 `clientSessionId + generationScope` 共享。同一会话同一板块内，不论同时存在多少个并发扇出，上游相邻两次新的生成提交 SHALL 遵守同一个配置间隔。不同板块 SHALL 使用独立闸门。闸门 SHALL 位于会话任务槽位取得之后、真实上游生成调用之前；等待被中止的条目 SHALL NOT 消耗发车许可。
+提交间隔的发车闸门 SHALL 按 `clientSessionId + generation` 共享。同一会话内，不论同时存在多少个图片生成板块、路由或并发扇出，上游相邻两次新的生成提交 SHALL 遵守同一个配置间隔。闸门 SHALL 位于会话任务槽位取得之后、真实上游生成调用之前；等待被中止的条目 SHALL NOT 消耗发车许可。
 
 #### Scenario: 同一板块的多套请求共享节奏
 
@@ -27,15 +27,15 @@
 - **THEN** 两套合计的上游新提交不会各自独立计时
 - **AND** 相邻提交按共享闸门间隔发车
 
-#### Scenario: 不同板块互不阻塞
+#### Scenario: 不同板块共享提交节奏
 
 - **WHEN** 套图和写真同时运行
-- **THEN** 两者分别使用 `creation` 与 `portrait` scope 的闸门
-- **AND** 一方不会消耗另一方的提交许可
+- **THEN** 两者使用同一个 `generation` 闸门
+- **AND** 两者合计的提交节奏遵守同一个配置间隔
 
 ### Requirement: 活跃 scope 的并发上限唯一且稳定
 
-会话任务槽位限流器 SHALL 按 `clientSessionId + generationScope` 维护一个活跃桶。桶首次取得 slot 时绑定该请求的归一化并发上限；桶仍有活跃任务时，后续请求 SHALL 共享该上限，不能通过更大的前端值扩容。所有五处并发扇出 SHALL 同时把归一化并发值用于 worker 上限和 slot 上限。桶空闲后，下一次请求才可绑定新的并发值。
+会话任务槽位限流器 SHALL 按 `clientSessionId + generation` 维护一个活跃桶。桶首次取得 slot 时绑定该请求的归一化并发上限；桶仍有活跃任务时，后续模式、路由和请求 SHALL 共享该上限，不能通过更大的前端值扩容。所有图片生成扇出 SHALL 同时把归一化并发值用于 worker 上限和 slot 上限。桶空闲后，下一次请求才可绑定新的并发值。
 
 #### Scenario: 重叠请求不叠加并发预算
 

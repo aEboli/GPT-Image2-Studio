@@ -51,7 +51,7 @@ const IMAGE_TYPE_CONTRACT = {
   "scene-fit-1": ["scene-fit-1", "single-scene-adaptation", "none-or-short", "authentic-use", "allow-supplied"],
   "scene-fit-2": ["scene-fit-2", "single-scene-adaptation", "none-or-short", "authentic-use", "allow-supplied"],
   "scene-fit-3": ["scene-fit-3", "single-scene-adaptation", "none-or-short", "authentic-use", "allow-supplied"],
-  "multi-angle": ["multi-angle", "three-to-four-angles", "none", "studio-clean", "preserve-existing-only"],
+  "multi-angle": ["multi-angle", "reference-view-inspection-sheet", "none", "studio-clean", "preserve-existing-only"],
   "ownership-atmosphere": ["atmosphere", "ownership-atmosphere", "concise", "authentic-lifestyle", "allow-supplied"],
   "detail-macro": ["product-detail", "macro-detail-panels", "factual-short", "studio-clean", "allow-supplied"],
   "use-style-story": ["brand-story", "multi-scene-use-style-story", "moderate", "multi-context", "allow-supplied"],
