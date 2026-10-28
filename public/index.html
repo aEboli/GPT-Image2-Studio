@@ -122,7 +122,7 @@
         <span class="topbar-reveal-icon" aria-hidden="true"></span>
       </button>
       <header class="topbar" id="globalTopbar">
-        <small class="app-version" aria-label="当前版本 v0.2.076">v0.2.076</small>
+        <small class="app-version" aria-label="当前版本 v0.2.086">v0.2.086</small>
         <div class="brand-cluster">
           <div class="brand-mark" aria-hidden="true">
             <span class="brand-mark-core"></span>
@@ -1794,9 +1794,12 @@
                   <p id="creationSetMeta">等待生成</p>
                 </div>
                 <div class="creation-output-actions">
+                  <button class="toolbar-button creation-marketing-progress-button" id="creationMarketingProgressButton" type="button" aria-expanded="false" aria-controls="creationMarketingProgressPanel" hidden>AI 营销规划</button>
                   <button class="toolbar-button" id="creationRepairFailedButton" type="button" disabled>补齐未完成项</button>
                 </div>
               </div>
+              <span class="creation-marketing-announcement" id="creationMarketingProgressAnnouncement" role="status" aria-live="polite"></span>
+              <section class="creation-marketing-progress-panel" id="creationMarketingProgressPanel" aria-label="AI 营销规划过程" hidden></section>
               <div class="creation-queue-strip hidden" id="creationQueueStrip" aria-label="套图生成队列"></div>
               <div class="creation-record-detail" id="creationRecordDetail" aria-live="polite"></div>
               <div class="creation-result-grid" id="creationResultGrid"></div>

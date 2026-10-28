@@ -10,6 +10,7 @@ import { File } from "node:buffer";
 import { setTimeout as delay } from "node:timers/promises";
 import { createCreationSetStore } from "../lib/creation-store.mjs";
 import { marketingPlanFixture } from "./fixtures/creation-marketing-plan.mjs";
+import { consumeSse } from "../lib/generation-client.mjs";
 
 const png = "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAADklEQVR4nGP4DwUMMAYAj4IP8TylVlEAAAAASUVORK5CYII=";
 const surfaceLocks = ["画面左侧掌面有蜂窝纹理，翻盖保持原图状态", "画面右侧手背保留HOT字样、显示窗与下方按键，不能复制到掌面", "一双按1个可售单位计，画面左右不等于左右手"];
@@ -43,6 +44,8 @@ test("AI marketing plans once, generates 20, preserves assignments and repairs w
   let invalidCount = false;
   let repairReferences = false;
   let analysisOnlyResponses = 0;
+  let streamPlanning = false;
+  let releasePlanning = null;
   const imageRequests = [];
   const upstream = createServer(async (request, response) => {
     const parts = [];
@@ -70,6 +73,17 @@ test("AI marketing plans once, generates 20, preserves assignments and repairs w
       }
       if (analysisOnlyResponses > 0) { delete payload.items; analysisOnlyResponses -= 1; }
       if (invalidCount) payload.items.splice(18);
+      if (streamPlanning) {
+        response.writeHead(200, { "content-type": "text/event-stream" });
+        const source = JSON.stringify(payload);
+        const split = source.indexOf(',{"item_id":"ai-2"');
+        const send = (value) => response.write(`event: response.output_text.delta\ndata: ${JSON.stringify({ type: "response.output_text.delta", delta: value })}\n\n`);
+        send(source.slice(0, split));
+        await new Promise((done) => { releasePlanning = done; });
+        send(source.slice(split));
+        response.end("data: [DONE]\n\n");
+        return;
+      }
       response.writeHead(200, { "content-type": "application/json" });
       response.end(JSON.stringify({ output_text: JSON.stringify(payload) }));
       return;
@@ -195,4 +209,41 @@ test("AI marketing plans once, generates 20, preserves assignments and repairs w
   const directSet = direct.events.findLast((entry) => entry.event === "complete")?.data.set;
   assert.equal(directSet?.items.length, 4, direct.source);
   assert.ok(directSet.items.every((item) => item.status === "completed" && !item.evidenceBlocked));
+  assert.deepEqual(direct.events.filter((entry) => entry.event === "marketing_progress").map((entry) => entry.data.stage), ["preparing", "waiting", "validating", "complete"]);
+  assert.ok(generated.events.some((entry) => entry.event === "marketing_progress" && entry.data.stage === "reused"));
+  assert.equal(repaired.events.some((entry) => entry.event === "marketing_progress"), false, "repair does not replay planning");
+
+  streamPlanning = true;
+  const beforeStreaming = planningCalls;
+  const streamingResponse = await fetch(`${baseUrl}/api/creation/plan`, { method: "POST", headers: { Accept: "text/event-stream" }, body: form({ variationSeed: "progress-test" }) });
+  assert.match(streamingResponse.headers.get("content-type"), /text\/event-stream/);
+  const streamed = [];
+  let incremental = false;
+  const unblock = setTimeout(() => releasePlanning?.(), 5000);
+  try {
+    await consumeSse(streamingResponse.body, (event, data) => {
+      streamed.push({ event, data });
+      if (event === "marketing_progress" && data.stage === "receiving" && data.receivedCount === 1) {
+        incremental = true;
+        assert.equal(streamed.some((entry) => entry.event === "complete"), false);
+        assert.equal(data.total, 20);
+        assert.ok(data.summary.audiences.length);
+        assert.equal(Object.hasOwn(data, "text"), false, "raw model text is not transmitted");
+        releasePlanning();
+      }
+    });
+  } finally { clearTimeout(unblock); releasePlanning?.(); }
+  assert.equal(incremental, true, "progress must arrive before releasing the upstream final response");
+  assert.equal(planningCalls, beforeStreaming + 1);
+  const streamedPlan = streamed.find((entry) => entry.event === "complete")?.data.plan;
+  assert.equal(streamedPlan?.items.length, 20);
+  streamPlanning = false;
+  const equivalent = await post("/api/creation/plan", form({ variationSeed: "progress-test" }));
+  assert.deepEqual(streamedPlan.items, JSON.parse(equivalent.source).plan.items, "SSE and JSON preserve identical final prompts and bindings");
+  invalidCount = true;
+  const failedResponse = await fetch(`${baseUrl}/api/creation/plan`, { method: "POST", headers: { Accept: "text/event-stream" }, body: form() });
+  const failed = events(await failedResponse.text());
+  assert.ok(failed.some((entry) => entry.event === "error" && /20 条.*18 条/.test(entry.data.message)));
+  assert.equal(failed.some((entry) => entry.event === "complete" || (entry.event === "marketing_progress" && entry.data.stage === "complete")), false);
+  assert.equal(imageRequests.length, 45, "preview progress never starts image generation");
 });

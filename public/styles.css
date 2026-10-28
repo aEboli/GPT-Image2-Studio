@@ -4424,6 +4424,87 @@ ul.creation-plan-message {
   gap: 8px;
 }
 
+.creation-output-panel > .panel-title {
+  flex-wrap: wrap;
+}
+
+.creation-marketing-progress-button {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.creation-marketing-progress-button[hidden],
+.creation-marketing-progress-panel[hidden] {
+  display: none;
+}
+
+.creation-marketing-announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.creation-marketing-progress-panel {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-height: 440px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--border-color, #45465b);
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: var(--panel-bg, rgba(110, 112, 190, 0.06));
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.creation-marketing-progress-panel h3,
+.creation-marketing-progress-panel h4,
+.creation-marketing-progress-panel p {
+  margin: 0 0 8px;
+}
+
+.creation-marketing-timeline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+}
+
+.creation-marketing-timeline li {
+  border: 1px solid var(--border-color, #45465b);
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+
+.creation-marketing-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  gap: 14px;
+  margin: 12px 0;
+}
+
+.creation-marketing-summary ul,
+.creation-marketing-items {
+  padding-left: 20px;
+  margin: 0 0 8px;
+}
+
+.creation-marketing-items li {
+  margin-bottom: 10px;
+}
+
+.creation-marketing-caption {
+  opacity: 0.7;
+}
+
 /* 队列胶囊带商品名后单条明显变长，一行塞不下就换行，避免横向滚动把后面的队列藏起来。 */
 .creation-queue-strip {
   flex: 0 0 auto;

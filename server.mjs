@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { requestCreationMarketingPlan, creationMarketingInputFingerprint } from "./lib/creation-marketing-agent.mjs";
 import { applyCreationMarketingPlan, isCreationAiMarketingEnabled } from "./lib/creation-marketing-plan.mjs";
+import { summarizeCreationMarketingProgress } from "./lib/creation-marketing-progress.mjs";
 import dns from "node:dns";
 import { createServer } from "node:http";
 import { createReadStream } from "node:fs";
@@ -4502,7 +4503,31 @@ async function handleCreationReferenceAnalyze(request, response) {
   });
 }
 
+async function requestCreationMarketingPlanWithProgress(response, options) {
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  response.on("close", abort);
+  if (!isResponseWritable(response)) controller.abort();
+  const heartbeat = setInterval(() => {
+    if (isResponseWritable(response)) response.write(": planning heartbeat\n\n");
+  }, 15000);
+  heartbeat.unref?.();
+  try {
+    return await requestCreationMarketingPlan({ ...options, signal: controller.signal,
+      onProgress: (progress) => writeSseEvent(response, "marketing_progress", progress),
+    });
+  } finally {
+    clearInterval(heartbeat);
+    response.off("close", abort);
+  }
+}
+
 async function handleCreationPlan(request, response) {
+  const streaming = /text\/event-stream/i.test(request.headers.accept || "");
+  if (streaming) {
+    response.writeHead(200, { "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "Content-Type": "text/event-stream; charset=utf-8" });
+    response.flushHeaders?.();
+  }
   try {
     const formData = await readFormDataBody(request);
     const referenceImageRoles = normalizeCreationReferenceRoles(formData.get("referenceImageRoles"));
@@ -4545,17 +4570,28 @@ async function handleCreationPlan(request, response) {
       if (!textConfig.apiKey) throw new Error("AI 整套营销提示词需要先配置文本/视觉模型 API。");
       const referenceImages = await toReferenceImages(formData.getAll("referenceImages"));
       if (referenceImages.length > MAX_CREATION_REFERENCE_IMAGES || referenceImages.some((image) => !String(image.mimeType || "").startsWith("image/"))) throw new Error("AI 规划参考图无效或超过上传上限。");
-      plan = await requestCreationMarketingPlan({ input: Object.fromEntries(formData), referenceImages, config: textConfig });
+      const options = { input: Object.fromEntries(formData), referenceImages, config: textConfig };
+      plan = streaming ? await requestCreationMarketingPlanWithProgress(response, options) : await requestCreationMarketingPlan(options);
     }
 
+    if (streaming) {
+      writeSseEvent(response, "complete", { ok: true, plan });
+      return;
+    }
     return sendJson(response, 200, {
       ok: true,
       plan,
     });
   } catch (error) {
+    if (streaming) {
+      writeSseEvent(response, "error", { message: compactErrorMessage(error instanceof Error ? error.message : String(error), "套图计划生成失败") });
+      return;
+    }
     return sendJson(response, 400, {
       message: compactErrorMessage(error instanceof Error ? error.message : String(error), "套图计划生成失败"),
     });
+  } finally {
+    if (streaming && isResponseWritable(response)) response.end();
   }
 }
 
@@ -4973,11 +5009,12 @@ async function handleCreationGenerate(request, response) {
         const primary = plan.referenceImageRoles?.find((entry) => entry.role === "reference-product") || plan.referenceImageRoles?.find((entry) => entry.role === "product");
         const payload = { items: plan.items.filter((item) => item.itemKind === "carousel").map((item) => ({ item_id: item.itemId, image_type: item.imageType, title: item.title, marketing_goal: item.marketingAssignment?.goal, prompt: item.prompt, audience_ids: item.marketingAssignment?.audienceIds, selling_point_ids: item.marketingAssignment?.sellingPointIds, pain_point_ids: item.marketingAssignment?.painPointIds, recommendation_ids: item.marketingAssignment?.recommendationIds, fact_ids: item.marketingAssignment?.factIds, reference_indexes: item.marketingAssignment?.referenceIndexes })) };
         plan = applyCreationPlanEvidenceRequirements(applyCreationMarketingPlan(plan, payload, { count: Number(formData.get("imageCount")), referenceCount: referenceImages.length, primaryIndex: referenceImages.length ? Number(plan.marketingPlan.primaryReferenceIndex) || Number(primary?.index) || 1 : 0, selectedRoles: plan.marketingPlan.selectedRoles || [], lockedItems: plan.marketingPlan.lockedItems || [] }));
+        writeSseEvent(response, "marketing_progress", { stage: "reused", productName: plan.productName, total: Number(formData.get("imageCount")), ...summarizeCreationMarketingProgress(plan), message: "已复用确认过的营销提示词与参考分配。" });
       } else {
         const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
         const textConfig = getSelectedPromptAgentAnalysisConfig(config);
         if (!textConfig.apiKey) throw new Error("AI 整套营销提示词需要先配置文本/视觉模型 API。");
-        plan = await requestCreationMarketingPlan({ input, referenceImages, config: textConfig });
+        plan = await requestCreationMarketingPlanWithProgress(response, { input, referenceImages, config: textConfig });
       }
       referenceImageRoles = normalizeCreationReferenceRoles(plan.referenceImageRoles);
     }

@@ -41,6 +41,8 @@ import {
 import { filterLocallyTerminatedGenerationTaskSnapshots } from "/lib/generation-task-reconciler.mjs";
 import { readHttpResponseErrorMessage } from "/lib/http-response-error.mjs";
 import { consumeSseUntilTerminal } from "/lib/sse-terminal-client.mjs";
+import { getCreationMarketingProgressForView, isCreationMarketingProgressActive, summarizeCreationMarketingProgress, updateCreationMarketingProgress } from "/lib/creation-marketing-progress.mjs";
+import { createCreationMarketingProgressView } from "/lib/creation-marketing-progress-view.mjs";
 import { getStudioDensitySettings, getStudioLayoutMode, ALL_VARIABLE_NAMES } from "/lib/studio-density.mjs?v=20260713-cross-device-1";
 import { buildStyleTransferPresetComparisonItem } from "/lib/style-transfer-preset-lightbox.mjs";
 import { buildCreationRecordLightboxItem, normalizeCreationGenerationSnapshotForView } from "/lib/creation-record-lightbox.mjs";
@@ -704,6 +706,8 @@ const state = {
     logoBatchLoadingKey: "",
     planning: false,
     planDirty: true,
+    marketingPreviewProgress: null,
+    marketingPreviewSelected: false,
     platformItemOverrides: [],
     platformPayload: null,
     platformSetOverrides: {},
@@ -1206,6 +1210,9 @@ const refs = {
   creationRecordTimeFilters: document.querySelector("#creationRecordTimeFilters"),
   creationQueueStrip: document.querySelector("#creationQueueStrip"),
   creationRepairFailedButton: document.querySelector("#creationRepairFailedButton"),
+  creationMarketingProgressButton: document.querySelector("#creationMarketingProgressButton"),
+  creationMarketingProgressPanel: document.querySelector("#creationMarketingProgressPanel"),
+  creationMarketingProgressAnnouncement: document.querySelector("#creationMarketingProgressAnnouncement"),
   creationResultGrid: document.querySelector("#creationResultGrid"),
   creationRoleCount: document.querySelector("#creationRoleCount"),
   creationRoleGrid: document.querySelector("#creationRoleGrid"),
@@ -10344,6 +10351,8 @@ function getCreationPreviewSlots(count = getCreationSelectedImageCount()) { if (
 
 function resetCreationDraftPreview() {
   creationPlanPreviewRequests.invalidate();
+  state.creation.marketingPreviewProgress = null;
+  state.creation.marketingPreviewSelected = false;
   state.creation.planning = false;
   state.creation.draftSet = null;
   state.creation.effectivePlan = null;
@@ -12139,6 +12148,7 @@ function getCreationRepairTargetSet() { return getCreationRepairTargetSetFromSta
 function syncActiveCreationQueueSet(set) { syncActiveCreationQueueSetInState(state.creation, set, normalizeCreationSetForView); }
 function selectCreationQueueJob(queueId) {
   if (!selectCreationQueueJobInState(state.creation, queueId)) return;
+  state.creation.marketingPreviewSelected = false;
   renderCreationView();
 }
 
@@ -14764,6 +14774,29 @@ async function restoreCurrentCreationPlatformRecommendations() {
 }
 
 const creationPlanPreviewRequests = createCreationPlanPreviewRequestCoordinator();
+let creationMarketingProgressView = null;
+
+function renderCreationMarketingProgress() {
+  creationMarketingProgressView ||= createCreationMarketingProgressView({
+    button: refs.creationMarketingProgressButton,
+    panel: refs.creationMarketingProgressPanel,
+    announcement: refs.creationMarketingProgressAnnouncement,
+  });
+  creationMarketingProgressView.update(isCreationLogoBatchBranch() ? null : getCreationMarketingProgressForView({
+    preview: state.creation.marketingPreviewProgress,
+    planning: state.creation.planning,
+    previewSelected: state.creation.marketingPreviewSelected,
+    selectedJob: getSelectedCreationQueueJob(),
+    setId: getCreationDisplayedSet()?.setId || "",
+  }));
+}
+
+function applyCreationMarketingProgress(event, context = {}) {
+  const target = context.queueJob || state.creation;
+  const field = context.queueJob ? "marketingProgress" : "marketingPreviewProgress";
+  target[field] = updateCreationMarketingProgress(target[field], event);
+  renderCreationMarketingProgress();
+}
 
 function requestCreationPlanPreview() {
   return creationPlanPreviewRequests.track(previewCreationPlan());
@@ -14896,6 +14929,7 @@ function renderCreationView() {
   }
 
   syncCreationBranchPanels();
+  renderCreationMarketingProgress();
   syncCreationSkuGenerationControl();
   const logoBatchBranch = isCreationLogoBatchBranch();
   const selectedQueueJob = logoBatchBranch ? null : getSelectedCreationQueueJob();
@@ -15255,6 +15289,10 @@ function recordPortraitLogEvent({ setId, itemId, status, detail, imageUrl, at, s
 }
 
 async function handleCreationStreamEvent(eventName, payload = {}, context = {}) {
+  if (eventName === "marketing_progress") {
+    applyCreationMarketingProgress(payload, context);
+    return;
+  }
   if (eventName === "repair_started") {
     upsertCreationSetForStream(payload.set, context);
     setCreationFeedback("正在补齐套图项...", "busy");
@@ -15543,6 +15581,8 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
 
   if (eventName === "error") {
     const message = compactErrorMessage(payload.message, "套图生成请求失败");
+    const progress = context.queueJob?.marketingProgress || (!context.queueJob ? state.creation.marketingPreviewProgress : null);
+    if (progress && !["complete", "reused"].includes(progress.stage)) applyCreationMarketingProgress({ stage: "error", message }, context);
     const currentSet = getCreationStreamCurrentSet(context);
     if (currentSet) {
       upsertCreationSetForStream({
@@ -15577,6 +15617,10 @@ async function runCreationStream(response, context = {}) {
       },
       missingTerminalMessage: "套图生成连接已中断，未收到完成事件。",
     });
+  } catch (error) {
+    const progress = context.queueJob?.marketingProgress || (!context.queueJob ? state.creation.marketingPreviewProgress : null);
+    if (isCreationMarketingProgressActive(progress)) applyCreationMarketingProgress({ stage: "interrupted", message: "规划连接已中断，未收到有效终态。" }, context);
+    throw error;
   } finally {
     clearFinalImageChunks(getCreationFinalImageChunks(context));
     clearFinalImageChunks(getCreationPartialImageChunks(context));
@@ -15721,7 +15765,12 @@ async function previewCreationPlan() {
   }
 
   const request = creationPlanPreviewRequests.begin();
+  const aiMarketing = isCreationAiMarketingEnabled() && getCreationSelectedImageCount() > 0;
   state.creation.planning = true;
+  state.creation.marketingPreviewSelected = aiMarketing;
+  state.creation.marketingPreviewProgress = aiMarketing ? updateCreationMarketingProgress(null, {
+    stage: "preparing", total: getCreationSelectedImageCount(), productName, message: "正在准备商品资料与参考图。",
+  }) : null;
   setCreationFeedback(isCreationAiMarketingEnabled() ? `电商视觉营销专家正在一次规划 ${getCreationSelectedImageCount()} 张图片的提示词与参考分配...` : "正在生成套图计划...", "busy");
   renderCreationView();
 
@@ -15737,14 +15786,29 @@ async function previewCreationPlan() {
     }
     const response = await fetch("/api/creation/plan", {
       method: "POST",
+      ...(aiMarketing ? { headers: { Accept: "text/event-stream" } } : {}),
       body: previewFormData,
       signal: request.signal,
     });
-    const payload = await response.json().catch(() => ({}));
+    let payload = {};
+    if (/text\/event-stream/i.test(response.headers.get("content-type") || "")) {
+      await consumeSseUntilTerminal({ stream: response.body, consumeSse,
+        onEvent: async (eventName, data) => {
+          if (!creationPlanPreviewRequests.isCurrent(request.revision)) return;
+          if (eventName === "marketing_progress") applyCreationMarketingProgress(data);
+          if (eventName === "error") throw new Error(data.message || "套图计划生成失败");
+          if (eventName === "complete") payload = data;
+        },
+        missingTerminalMessage: "营销规划连接已中断，未收到完整计划。",
+      });
+    } else {
+      payload = await response.json().catch(() => ({}));
+    }
     if (!creationPlanPreviewRequests.isCurrent(request.revision)) return;
     if (!response.ok) {
       throw new Error(payload.message || "套图计划生成失败");
     }
+    if (!payload.plan || !Array.isArray(payload.plan.items)) throw new Error("未收到完整套图计划，请重新预览。");
 
     const plan = payload.plan || {};
     const effectivePlan = hydrateCreationEffectivePlan(plan);
@@ -15795,6 +15859,10 @@ async function previewCreationPlan() {
       items,
     });
     state.creation.draftSet = nextDraftSet;
+    if (aiMarketing) {
+      const progress = state.creation.marketingPreviewProgress;
+      state.creation.marketingPreviewProgress = { ...updateCreationMarketingProgress(progress, { stage: "complete", ...summarizeCreationMarketingProgress(plan), total: planImageCount, message: "营销提示词已通过校验，可查看逐图预览。" }), setId: nextDraftSet.setId };
+    }
     if (!state.creation.generating) {
       state.creation.currentSet = nextDraftSet;
     }
@@ -15802,8 +15870,13 @@ async function previewCreationPlan() {
     setCreationFeedback(`已生成套图计划：可生成 ${items.length - skippedCount} 张${skippedCount ? `，缺少依据跳过 ${skippedCount} 张` : ""}。`, "success");
   } catch (error) {
     if (error?.name === "AbortError" || !creationPlanPreviewRequests.isCurrent(request.revision)) return;
+    const failedProgress = state.creation.marketingPreviewProgress;
     resetCreationDraftPreview();
     const message = compactErrorMessage(error instanceof Error ? error.message : String(error), "套图计划生成失败");
+    if (aiMarketing) {
+      state.creation.marketingPreviewSelected = true;
+      state.creation.marketingPreviewProgress = updateCreationMarketingProgress(failedProgress, { stage: /中断|network|fetch/i.test(message) ? "interrupted" : "error", message });
+    }
     setCreationFeedback(message, "error");
     showError(message);
     renderCreationView();
@@ -15897,6 +15970,10 @@ function buildCreationQueuedSet(input = {}) { return { ...buildCreationQueuedSet
 
 function enqueueCreationGeneration({ formData, set }) {
   const job = createCreationQueueJob({ creationState: state.creation, formData, set, normalizeSet: normalizeCreationSetForView, nowIso });
+  state.creation.marketingPreviewSelected = false;
+  if (set.promptPlanningMode === "ai-batch" && state.creation.marketingPreviewProgress?.stage === "complete") {
+    job.marketingProgress = structuredClone(state.creation.marketingPreviewProgress);
+  }
   setCreationFeedback(`已加入队列 · 第 ${getPendingCreationQueueCount()} 位`, "busy");
   renderCreationView();
   scheduleCreationGenerationQueue();

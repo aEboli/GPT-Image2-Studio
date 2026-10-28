@@ -40,6 +40,8 @@ export const PUBLIC_LIB_SYNC_TARGETS = [
   "creation-logo-library.mjs",
   "creation-listing-content-gate.mjs",
   "creation-listing-policies.mjs",
+  "creation-marketing-progress.mjs",
+  "creation-marketing-progress-view.mjs",
   "creation-record-lightbox.mjs",
   "creation-record-delete.mjs",
   "creation-record-filter.mjs",
