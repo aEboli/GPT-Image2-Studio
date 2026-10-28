@@ -18,6 +18,7 @@ export const PUBLIC_VENDOR_SYNC_TARGETS = [
 ];
 
 export const PUBLIC_LIB_SYNC_TARGETS = [
+  "text-model-client.mjs",
   "asset-workspace.mjs",
   "asset-record-delete.mjs",
   "asset-record-delete-controller.mjs",

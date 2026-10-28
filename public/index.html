@@ -3,18 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Image Studio</title>
-    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-    <link rel="shortcut icon" href="/favicon.ico" />
-    <link rel="icon" type="image/png" sizes="1024x1024" href="/favicon.png?v=20260926-cat-2" />
-    <link rel="icon" type="image/png" sizes="1024x1024" href="/icon.png?v=20260926-cat-2" />
-    <link rel="apple-touch-icon" sizes="1024x1024" href="/apple-touch-icon.png?v=20260926-cat-2" />
-    <link rel="manifest" href="/site.webmanifest" />
+    <title>IS</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=20261029-is-5" />
+    <link rel="shortcut icon" href="/favicon.ico?v=20261029-is-5" />
+    <link rel="icon" type="image/png" sizes="1024x1024" href="/favicon.png?v=20261029-is-5" />
+    <link rel="icon" type="image/png" sizes="1024x1024" href="/icon.png?v=20261029-is-5" />
+    <link rel="apple-touch-icon" sizes="1024x1024" href="/apple-touch-icon.png?v=20261029-is-5" />
+    <link rel="manifest" href="/site.webmanifest?v=20261029-is-5" />
     <script>
       (() => {
         const themeKey = "image-studio-ui-theme-v1";
         const paletteKey = "image-studio-ui-palette-v1";
         const languageKey = "image-studio-ui-language-v1";
+        const floatingPanelOpacityKey = "image-studio-floating-panel-opacity-v1";
         const paletteIds = new Set(["obsidian","default","qinghua","jiangnan","songci","gugong","lacquer","dunhuang","songshi","meigui","yuebai","liujin"]);
         const readStored = (key) => {
           try {
@@ -25,6 +26,9 @@
         };
         const savedPalette = readStored(paletteKey);
         const root = document.documentElement;
+        const savedFloatingPanelOpacity = readStored(floatingPanelOpacityKey);
+        const opacity = savedFloatingPanelOpacity?.trim() ? Number(savedFloatingPanelOpacity) : NaN;
+        root.style.setProperty("--creation-floating-panel-opacity", `${Number.isFinite(opacity) ? Math.min(98, Math.max(70, Math.round(opacity))) : 90}%`);
         root.dataset.palette = paletteIds.has(savedPalette) ? savedPalette : "obsidian";
         try {
           const savedTheme = readStored(themeKey);
@@ -1794,14 +1798,15 @@
                   <p id="creationSetMeta">等待生成</p>
                 </div>
                 <div class="creation-output-actions">
-                  <button class="toolbar-button creation-marketing-progress-button" id="creationMarketingProgressButton" type="button" aria-expanded="false" aria-controls="creationMarketingProgressPanel" hidden>AI 营销规划</button>
+                  <button class="toolbar-button" id="creationAnalystButton" type="button" aria-expanded="false" aria-controls="creationRecordDetail" disabled>分析师分析</button>
+                  <button class="toolbar-button creation-marketing-progress-button" id="creationMarketingProgressButton" type="button" aria-expanded="false" aria-controls="creationMarketingProgressPanel" disabled>AI 营销规划</button>
                   <button class="toolbar-button" id="creationRepairFailedButton" type="button" disabled>补齐未完成项</button>
                 </div>
               </div>
               <span class="creation-marketing-announcement" id="creationMarketingProgressAnnouncement" role="status" aria-live="polite"></span>
               <section class="creation-marketing-progress-panel" id="creationMarketingProgressPanel" aria-label="AI 营销规划过程" hidden></section>
               <div class="creation-queue-strip hidden" id="creationQueueStrip" aria-label="套图生成队列"></div>
-              <div class="creation-record-detail" id="creationRecordDetail" aria-live="polite"></div>
+              <div class="creation-record-detail creation-analyst-floating" id="creationRecordDetail" role="region" aria-label="分析师分析" tabindex="-1" hidden></div>
               <div class="creation-result-grid" id="creationResultGrid"></div>
               <section class="creation-listing-panel hidden" aria-label="Listing 草稿">
                 <div class="panel-title between">
@@ -3574,6 +3579,14 @@
                     <span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
                     <span data-ui-i18n="paletteLiujin">流金</span>
                   </button>
+                </div>
+                <div class="floating-panel-opacity-control">
+                  <div class="floating-panel-opacity-heading">
+                    <label for="floatingPanelOpacityInput" data-ui-i18n="floatingPanelOpacityLabel">浮层背景不透明度</label>
+                    <output id="floatingPanelOpacityOutput" for="floatingPanelOpacityInput">90%</output>
+                  </div>
+                  <input id="floatingPanelOpacityInput" type="range" min="70" max="98" step="1" value="90" aria-describedby="floatingPanelOpacityHint" />
+                  <p id="floatingPanelOpacityHint" data-ui-i18n="floatingPanelOpacityHint">调节营销规划与分析师浮层的背景，数值越大越不透，自动记忆。</p>
                 </div>
             </section>
               </div>

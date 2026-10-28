@@ -1,4 +1,6 @@
-import { randomUUID } from "node:crypto";
+import { createSharedTextRequestPool } from "./lib/shared-text-request.mjs";
+import { runWithTextModelContext } from "./lib/text-model-stream.mjs";
+import { randomUUID, createHash } from "node:crypto";
 import { requestCreationMarketingPlan, creationMarketingInputFingerprint } from "./lib/creation-marketing-agent.mjs";
 import { applyCreationMarketingPlan, isCreationAiMarketingEnabled } from "./lib/creation-marketing-plan.mjs";
 import { summarizeCreationMarketingProgress } from "./lib/creation-marketing-progress.mjs";
@@ -441,6 +443,11 @@ function getGenerationTaskSlotScopeKey(sessionId) {
 }
 
 function sendJson(response, statusCode, payload, headers = {}) {
+  if (textEventResponses.has(response)) {
+    writeSseEvent(response, statusCode >= 400 ? "error" : "complete", payload);
+    response.end();
+    return;
+  }
   response.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
     ...headers,
@@ -4503,6 +4510,15 @@ async function handleCreationReferenceAnalyze(request, response) {
   });
 }
 
+const marketingPlanRequests = createSharedTextRequestPool();
+async function requestSharedCreationMarketingPlan(options) {
+  const session = options.input.clientSessionId;
+  if (!session) return requestCreationMarketingPlan(options);
+  const key = createHash("sha256").update(JSON.stringify({ input: options.input, config: options.config, references: options.referenceImages.map((image) => ({ filename: image.filename, content: image.base64 || image.buffer?.toString("base64") })) })).digest("hex");
+  const plan = await marketingPlanRequests.run(key, ({ signal, onProgress }) => runWithTextModelContext({ signal, requestId: randomUUID() }, () => requestCreationMarketingPlan({ ...options, signal, onProgress })), { signal: options.signal, onProgress: options.onProgress });
+  return structuredClone(plan);
+}
+
 async function requestCreationMarketingPlanWithProgress(response, options) {
   const controller = new AbortController();
   const abort = () => controller.abort();
@@ -4513,7 +4529,7 @@ async function requestCreationMarketingPlanWithProgress(response, options) {
   }, 15000);
   heartbeat.unref?.();
   try {
-    return await requestCreationMarketingPlan({ ...options, signal: controller.signal,
+    return await requestSharedCreationMarketingPlan({ ...options, signal: controller.signal,
       onProgress: (progress) => writeSseEvent(response, "marketing_progress", progress),
     });
   } finally {
@@ -4571,7 +4587,7 @@ async function handleCreationPlan(request, response) {
       const referenceImages = await toReferenceImages(formData.getAll("referenceImages"));
       if (referenceImages.length > MAX_CREATION_REFERENCE_IMAGES || referenceImages.some((image) => !String(image.mimeType || "").startsWith("image/"))) throw new Error("AI 规划参考图无效或超过上传上限。");
       const options = { input: Object.fromEntries(formData), referenceImages, config: textConfig };
-      plan = streaming ? await requestCreationMarketingPlanWithProgress(response, options) : await requestCreationMarketingPlan(options);
+      plan = streaming ? await requestCreationMarketingPlanWithProgress(response, options) : await requestSharedCreationMarketingPlan(options);
     }
 
     if (streaming) {
@@ -5007,8 +5023,13 @@ async function handleCreationGenerate(request, response) {
       if (plan.promptPlanningMode === "ai-batch" && plan.marketingPlan) {
         if (plan.marketingPlan.inputFingerprint !== creationMarketingInputFingerprint(input, referenceImages)) throw new Error("商品资料或规划条件已变化，请重新预览 AI 整套营销提示词。");
         const primary = plan.referenceImageRoles?.find((entry) => entry.role === "reference-product") || plan.referenceImageRoles?.find((entry) => entry.role === "product");
-        const payload = { items: plan.items.filter((item) => item.itemKind === "carousel").map((item) => ({ item_id: item.itemId, image_type: item.imageType, title: item.title, marketing_goal: item.marketingAssignment?.goal, prompt: item.prompt, audience_ids: item.marketingAssignment?.audienceIds, selling_point_ids: item.marketingAssignment?.sellingPointIds, pain_point_ids: item.marketingAssignment?.painPointIds, recommendation_ids: item.marketingAssignment?.recommendationIds, fact_ids: item.marketingAssignment?.factIds, reference_indexes: item.marketingAssignment?.referenceIndexes })) };
-        plan = applyCreationPlanEvidenceRequirements(applyCreationMarketingPlan(plan, payload, { count: Number(formData.get("imageCount")), referenceCount: referenceImages.length, primaryIndex: referenceImages.length ? Number(plan.marketingPlan.primaryReferenceIndex) || Number(primary?.index) || 1 : 0, selectedRoles: plan.marketingPlan.selectedRoles || [], lockedItems: plan.marketingPlan.lockedItems || [] }));
+        const payload = { items: plan.items.filter((item) => item.itemKind === "carousel").map((item) => ({ item_id: item.itemId, image_type: item.imageType, title: item.title, marketing_goal: item.marketingAssignment?.goal, creative_brief: item.marketingAssignment?.creativeBrief, prompt: item.prompt, audience_ids: item.marketingAssignment?.audienceIds, selling_point_ids: item.marketingAssignment?.sellingPointIds, pain_point_ids: item.marketingAssignment?.painPointIds, recommendation_ids: item.marketingAssignment?.recommendationIds, fact_ids: item.marketingAssignment?.factIds, reference_indexes: item.marketingAssignment?.referenceIndexes })) };
+        plan = applyCreationPlanEvidenceRequirements(applyCreationMarketingPlan(plan, payload, { count: Number(formData.get("imageCount")), referenceCount: referenceImages.length, primaryIndex: referenceImages.length ? Number(plan.marketingPlan.primaryReferenceIndex) || Number(primary?.index) || 1 : 0, selectedRoles: plan.marketingPlan.selectedRoles || [], lockedItems: plan.marketingPlan.lockedItems || [],
+          allowPartial: false,
+          sourceIndexes: plan.items.filter((item) => item.itemKind === "carousel").map((item, index) => item.marketingAssignment?.sourceIndex || index + 1),
+          constraintCount: plan.marketingPlan.validation?.requestedCount || Number(formData.get("imageCount")),
+          validateItem: (item) => buildCreationItemReferenceImages(item, referenceImages, plan.referenceImageRoles),
+        }));
         writeSseEvent(response, "marketing_progress", { stage: "reused", productName: plan.productName, total: Number(formData.get("imageCount")), ...summarizeCreationMarketingProgress(plan), message: "已复用确认过的营销提示词与参考分配。" });
       } else {
         const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
@@ -7695,18 +7716,39 @@ await migrateOutputDirectoryMonths({ outputDir });
 // raised body timeout applies to request #1 instead of silently falling back.
 await warmUpstreamStreamDispatcher();
 
-async function handleIncomingRequest(request, response) {
-  try {
-    await routeRequest(request, response);
-  } catch (error) {
-    if (!response.headersSent) {
-      sendJson(response, 500, {
-        message: error instanceof Error ? error.message : String(error),
-      });
-      return;
-    }
+const textEventResponses = new WeakSet();
+const textEventPaths = new Set(["/api/creation/reference/analyze", "/api/portrait/reference/analyze", "/api/prompt-agent/analyze", "/api/ppt/analyze", "/api/article-illustration/plan", "/api/creation/listings"]);
 
-    response.end();
+async function handleIncomingRequest(request, response) {
+  let pathname;
+  try { pathname = new URL(request.url, "http://localhost").pathname; }
+  catch { sendJson(response, 400, { message: "请求地址无效。" }); return; }
+  const acceptsEvents = /text\/event-stream/i.test(request.headers.accept || "");
+  const negotiatedText = request.method === "POST" && acceptsEvents && textEventPaths.has(pathname);
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  if (negotiatedText) {
+    textEventResponses.add(response);
+    response.writeHead(200, { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive" });
+    response.flushHeaders?.();
+  }
+  response.on("close", abort);
+  const heartbeat = negotiatedText ? setInterval(() => { if (isResponseWritable(response)) response.write(": text heartbeat\n\n"); }, 15000) : null;
+  heartbeat?.unref?.();
+  try {
+    await runWithTextModelContext({ signal: controller.signal, requestId: randomUUID(), onProgress: (event) => {
+      if (response.headersSent && /text\/event-stream/i.test(String(response.getHeader("Content-Type") || "")) && isResponseWritable(response)) writeSseEvent(response, "text_progress", { ...event, trigger: pathname });
+    } }, () => routeRequest(request, response));
+  } catch (error) {
+    if (negotiatedText && isResponseWritable(response)) {
+      writeSseEvent(response, "error", { message: error instanceof Error ? error.message : String(error) });
+      response.end();
+    } else if (!response.headersSent) {
+      sendJson(response, 500, { message: error instanceof Error ? error.message : String(error) });
+    } else response.end();
+  } finally {
+    if (heartbeat) clearInterval(heartbeat);
+    response.off("close", abort);
   }
 }
 

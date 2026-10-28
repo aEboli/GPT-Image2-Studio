@@ -668,7 +668,7 @@ test("local creation plan preview exposes an independent route and shared overri
   assert.match(previewHandler, /formData\.get\("planOverrides"\)/);
   assert.match(previewHandler, /sendJson\(response,\s*200,\s*\{\s*ok:\s*true,\s*plan/);
   assert.match(previewHandler, /if \(isCreationAiMarketingEnabled\(formData\.get\("aiMarketingEnabled"\)\)/);
-  assert.match(previewHandler, /requestCreationMarketingPlan\(/);
+  assert.match(previewHandler, /requestSharedCreationMarketingPlan\(/);
   assert.match(generateHandler, /dimensionSpecs:\s*formData\.get\("dimensionSpecs"\)/);
   assert.match(generateHandler, /dimensionUnitMode:\s*formData\.get\("dimensionUnitMode"\)/);
   assert.match(generateHandler, /formData\.get\("planOverrides"\)/);

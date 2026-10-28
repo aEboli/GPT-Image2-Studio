@@ -11,6 +11,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { createCreationSetStore } from "../lib/creation-store.mjs";
 import { marketingPlanFixture } from "./fixtures/creation-marketing-plan.mjs";
 import { consumeSse } from "../lib/generation-client.mjs";
+import { getCreationPlatformImageType } from "../lib/creation-platform-policies.mjs";
 
 const png = "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAADklEQVR4nGP4DwUMMAYAj4IP8TylVlEAAAAASUVORK5CYII=";
 const surfaceLocks = ["画面左侧掌面有蜂窝纹理，翻盖保持原图状态", "画面右侧手背保留HOT字样、显示窗与下方按键，不能复制到掌面", "一双按1个可售单位计，画面左右不等于左右手"];
@@ -42,6 +43,7 @@ test("AI marketing plans once, generates 20, preserves assignments and repairs w
   const outputDir = join(directory, "output");
   let planningCalls = 0;
   let invalidCount = false;
+  let invalidFact = false;
   let repairReferences = false;
   let analysisOnlyResponses = 0;
   let streamPlanning = false;
@@ -73,6 +75,7 @@ test("AI marketing plans once, generates 20, preserves assignments and repairs w
       }
       if (analysisOnlyResponses > 0) { delete payload.items; analysisOnlyResponses -= 1; }
       if (invalidCount) payload.items.splice(18);
+      if (invalidFact && payload.items[12]) payload.items[12].fact_ids.push("missing-fact");
       if (streamPlanning) {
         response.writeHead(200, { "content-type": "text/event-stream" });
         const source = JSON.stringify(payload);
@@ -135,6 +138,9 @@ test("AI marketing plans once, generates 20, preserves assignments and repairs w
   assert.equal(preview.response.status, 200, preview.source);
   const plan = JSON.parse(preview.source).plan;
   assert.equal(planningCalls, 1);
+  const cachedPreview = await post("/api/creation/plan", form());
+  assert.equal(cachedPreview.response.status, 200);
+  assert.equal(planningCalls, 1, "same session and identical inputs reuse the valid preview");
   assert.equal(plan.items.length, 20);
   assert.ok(plan.items.every((item) => item.enabled && !item.evidenceBlocked));
   assert.equal(plan.productInsights.audienceSegments.length, 3);
@@ -163,9 +169,9 @@ test("AI marketing plans once, generates 20, preserves assignments and repairs w
   assert.ok(changed.events.some((entry) => entry.event === "error" && /重新预览/.test(entry.data.message)), changed.source);
   assert.equal(imageRequests.length, 21);
   invalidCount = true;
-  const invalid = await post("/api/creation/plan", form());
-  assert.equal(invalid.response.status, 400, invalid.source);
-  assert.match(invalid.source, /20 条.*18 条/);
+  const invalid = await post("/api/creation/plan", form({ variationSeed: "invalid-count-test" }));
+  assert.equal(invalid.response.status, 200, invalid.source);
+  assert.equal(JSON.parse(invalid.source).plan.marketingPlan.validation.missingCount, 2);
   assert.equal(imageRequests.length, 21);
   const beforeTemplate = planningCalls;
   const template = await post("/api/creation/plan", form({ aiMarketingEnabled: false, imageCount: 6 }));
@@ -209,7 +215,7 @@ test("AI marketing plans once, generates 20, preserves assignments and repairs w
   const directSet = direct.events.findLast((entry) => entry.event === "complete")?.data.set;
   assert.equal(directSet?.items.length, 4, direct.source);
   assert.ok(directSet.items.every((item) => item.status === "completed" && !item.evidenceBlocked));
-  assert.deepEqual(direct.events.filter((entry) => entry.event === "marketing_progress").map((entry) => entry.data.stage), ["preparing", "waiting", "validating", "complete"]);
+  assert.deepEqual(direct.events.filter((entry) => entry.event === "marketing_progress").map((entry) => entry.data.stage), ["preparing", "waiting", "buffered", "validating", "complete"]);
   assert.ok(generated.events.some((entry) => entry.event === "marketing_progress" && entry.data.stage === "reused"));
   assert.equal(repaired.events.some((entry) => entry.event === "marketing_progress"), false, "repair does not replay planning");
 
@@ -228,7 +234,8 @@ test("AI marketing plans once, generates 20, preserves assignments and repairs w
         assert.equal(streamed.some((entry) => entry.event === "complete"), false);
         assert.equal(data.total, 20);
         assert.ok(data.summary.audiences.length);
-        assert.equal(Object.hasOwn(data, "text"), false, "raw model text is not transmitted");
+        assert.equal(typeof data.text, "string", "safe answer draft is streamed before the complete plan");
+        assert.doesNotMatch(data.text, /PRIVATE_REASONING/);
         releasePlanning();
       }
     });
@@ -237,13 +244,76 @@ test("AI marketing plans once, generates 20, preserves assignments and repairs w
   assert.equal(planningCalls, beforeStreaming + 1);
   const streamedPlan = streamed.find((entry) => entry.event === "complete")?.data.plan;
   assert.equal(streamedPlan?.items.length, 20);
+  // 两个真实 HTTP 消费者合并；首个客户端断开不能取消另一个消费者。
+  releasePlanning = null;
+  const beforeShared = planningCalls;
+  const abortShared = new AbortController();
+  const firstShared = await fetch(`${baseUrl}/api/creation/plan`, { method: "POST", headers: { Accept: "text/event-stream" }, signal: abortShared.signal, body: form({ variationSeed: "shared-cancel-test" }) });
+  const secondShared = await fetch(`${baseUrl}/api/creation/plan`, { method: "POST", headers: { Accept: "text/event-stream" }, body: form({ variationSeed: "shared-cancel-test" }) });
+  const sharedEvents = [];
+  let joined;
+  const joinedPromise = new Promise((resolve) => { joined = resolve; });
+  const sharedResult = consumeSse(secondShared.body, (event, data) => {
+    sharedEvents.push({ event, data });
+    if (event === "marketing_progress" && data.stage === "receiving") joined();
+  });
+  const sharedDeadline = setTimeout(() => releasePlanning?.(), 5000);
+  try {
+    await Promise.race([joinedPromise, delay(3000).then(() => { throw new Error("shared consumer did not receive progress"); })]);
+    abortShared.abort();
+    await firstShared.body.cancel().catch(() => {});
+    releasePlanning();
+    await sharedResult;
+  } finally { clearTimeout(sharedDeadline); releasePlanning?.(); }
+  assert.equal(planningCalls, beforeShared + 1);
+  assert.equal(sharedEvents.find((entry) => entry.event === "complete")?.data.plan.items.length, 20);
+  assert.equal(sharedEvents.some((entry) => entry.event === "error"), false);
   streamPlanning = false;
   const equivalent = await post("/api/creation/plan", form({ variationSeed: "progress-test" }));
   assert.deepEqual(streamedPlan.items, JSON.parse(equivalent.source).plan.items, "SSE and JSON preserve identical final prompts and bindings");
   invalidCount = true;
-  const failedResponse = await fetch(`${baseUrl}/api/creation/plan`, { method: "POST", headers: { Accept: "text/event-stream" }, body: form() });
+  const failedResponse = await fetch(`${baseUrl}/api/creation/plan`, { method: "POST", headers: { Accept: "text/event-stream" }, body: form({ variationSeed: "invalid-count-stream-test" }) });
   const failed = events(await failedResponse.text());
-  assert.ok(failed.some((entry) => entry.event === "error" && /20 条.*18 条/.test(entry.data.message)));
-  assert.equal(failed.some((entry) => entry.event === "complete" || (entry.event === "marketing_progress" && entry.data.stage === "complete")), false);
+  assert.ok(failed.some((entry) => entry.event === "marketing_progress" && entry.data.stage === "partial"));
+  assert.equal(failed.find((entry) => entry.event === "complete")?.data.plan.imageCount, 18);
   assert.equal(imageRequests.length, 45, "preview progress never starts image generation");
+
+  invalidCount = false;
+  invalidFact = true;
+  const beforePartial = planningCalls;
+  const partialPreview = await post("/api/creation/plan", form({ imageCount: 18 }));
+  assert.equal(partialPreview.response.status, 200, partialPreview.source);
+  const partialPlan = JSON.parse(partialPreview.source).plan;
+  assert.equal(partialPlan.imageCount, 17);
+  assert.equal(partialPlan.marketingPlan.validation.removedItems[0].sourceIndex, 13);
+  const partialGeneration = await post("/api/creation/generate", form({ imageCount: 17, effectivePlan: JSON.stringify(partialPlan) }));
+  assert.deepEqual(partialGeneration.events.filter((entry) => ["error", "item_failed"].includes(entry.event)), [], partialGeneration.source);
+  assert.equal(planningCalls, beforePartial + 1, "partial preview is reused without replanning after automatic count correction");
+  assert.equal(imageRequests.length, 62, "only the seventeen valid prompts become image requests");
+  const partialSet = partialGeneration.events.findLast((entry) => entry.event === "complete")?.data.set;
+  const partialSaved = await store.readManifest(partialSet.setId);
+  assert.equal(partialSaved.imageCount, 17);
+  assert.deepEqual(partialSaved.marketingPlan.validation, partialPlan.marketingPlan.validation);
+  assert.equal(partialSaved.items.some((item) => item.itemId === "ai-13"), false);
+  assert.deepEqual(partialSaved.items.map((item) => item.prompt), partialPlan.items.map((item) => item.prompt));
+  const partialTarget = partialSaved.items[12];
+  await store.saveManifest({ ...partialSaved, items: partialSaved.items.map((item) => item.itemId === partialTarget.itemId ? { ...item, status: "failed", error: "partial repair test" } : item) });
+  const partialRepair = await post("/api/creation/repair", form({ setId: partialSet.setId, itemId: partialTarget.itemId }));
+  assert.deepEqual(partialRepair.events.filter((entry) => ["error", "item_failed"].includes(entry.event)), [], partialRepair.source);
+  assert.equal(imageRequests.length, 63);
+  assert.equal(planningCalls, beforePartial + 1);
+  const changedPartial = await post("/api/creation/generate", form({ imageCount: 17, effectivePlan: JSON.stringify(partialPlan), productDescription: "changed partial product" }));
+  assert.ok(changedPartial.events.some((entry) => entry.event === "error" && /重新预览/.test(entry.data.message)));
+  assert.equal(imageRequests.length, 63);
+  const { payload: rolePayload } = marketingPlanFixture(18);
+  ["variant-comparison", "dimension-fit", "in-box", "spec-table"].forEach((imageType, index) => { rolePayload.items[index].image_type = imageType; });
+  const selectedRoles = rolePayload.items.map((item) => getCreationPlatformImageType(item.image_type).role);
+  const rolePreview = await post("/api/creation/plan", form({ imageCount: 18, selectedRoles }));
+  assert.equal(rolePreview.response.status, 200, rolePreview.source);
+  const rolePlan = JSON.parse(rolePreview.source).plan;
+  const rolePlanningCalls = planningCalls;
+  const roleGeneration = await post("/api/creation/generate", form({ imageCount: 17, selectedRoles: rolePlan.marketingPlan.effectiveSelectedRoles, effectivePlan: JSON.stringify(rolePlan) }));
+  assert.deepEqual(roleGeneration.events.filter((entry) => ["error", "item_failed"].includes(entry.event)), [], roleGeneration.source);
+  assert.equal(planningCalls, rolePlanningCalls, "selected roles keep their original mapping after the middle task is removed");
+  assert.equal(imageRequests.length, 80);
 });

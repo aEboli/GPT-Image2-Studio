@@ -154,7 +154,7 @@ test("portrait reference analysis is optional and requires explicit apply", asyn
   assert.match(html, /分析人物参考图/);
   assert.match(html, /应用分析草稿/);
   assert.match(app, /createPortraitReferenceAnalysisController/);
-  assert.match(referenceAnalysis, /fetchImpl\("\/api\/portrait\/reference\/analyze"/);
+  assert.match(referenceAnalysis, /requestTextModel\(fetchImpl, "\/api\/portrait\/reference\/analyze"/);
   assert.match(referenceAnalysis, /state\.portrait\.referenceAnalysis\.applied = true/);
   assert.match(app, /const appliedAnalysis = state\.portrait\.referenceAnalysis\.applied/);
   assert.match(app, /formData\.set\("analysis", JSON\.stringify\(appliedAnalysis\)\)/);
@@ -333,7 +333,7 @@ test("portrait lazy view modules delegate to portrait renderers", async () => {
   assert.match(app, /if \(view === "portrait-record"\) \{[\s\S]*loadPortraitSets\(\)/);
   assert.match(app, /requestGenerationStream\("\/api\/portrait\/generate"/);
   assert.match(app, /fetch\("\/api\/portrait\/plan"/);
-  assert.match(referenceAnalysis, /fetchImpl\("\/api\/portrait\/reference\/analyze"/);
+  assert.match(referenceAnalysis, /requestTextModel\(fetchImpl, "\/api\/portrait\/reference\/analyze"/);
 });
 
 test("portrait reference analysis browser module is synced from lib", async () => {

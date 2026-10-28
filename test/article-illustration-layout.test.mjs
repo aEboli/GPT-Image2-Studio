@@ -116,7 +116,7 @@ test("article illustration mode has independent create and assets entries", asyn
   assert.match(app, /createArticleImageOrderBadge\(item\)/);
   assert.match(app, /对话用漫画对话框\/旁白框呈现，不要直接印在画面物体上/);
   assert.match(app, /formatArticleDisplayText\(set\.title\)/);
-  assert.match(app, /fetch\("\/api\/article-illustration\/plan"/);
+  assert.match(app, /requestTextModel\(fetch, "\/api\/article-illustration\/plan"/);
   assert.match(app, /fetch\("\/api\/article-illustration\/generate"/);
   assert.match(app, /fetch\("\/api\/article-illustration\/sets"/);
 });

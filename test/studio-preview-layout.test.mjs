@@ -2321,7 +2321,7 @@ test("prompt agent opens from global navigation without adding another view tab"
   assert.match(html, /id="promptAgentHistoryList"/);
   assert.doesNotMatch(html, /data-view-tab="prompt-agent"/);
   assert.match(styles, /\.prompt-agent-modal\s*\{[\s\S]*position:\s*fixed;/);
-  assert.match(app, /fetch\("\/api\/prompt-agent\/analyze"/);
+  assert.match(app, /requestTextModel\(fetch, "\/api\/prompt-agent\/analyze"/);
   assert.match(app, /refs\.promptInput\.value = promptText;/);
   assert.match(app, /loadPromptAgentHistory/);
 });
@@ -2920,7 +2920,7 @@ test("reference orchestration analysis is a separate studio mode outside prompt 
   assert.match(app, /appendCurrentConfigToFormData\(formData\);/);
   assert.match(app, /const formData = await buildReferenceAnalysisFormData\(\);/);
   assert.match(app, /analysisSnapshot !== getReferenceAnalysisRequestSnapshot\(\)[\s\S]*body: formData,/);
-  assert.match(app, /fetch\("\/api\/prompt-agent\/analyze"/);
+  assert.match(app, /requestTextModel\(fetch, "\/api\/prompt-agent\/analyze"/);
   assert.match(app, /button\.dataset\.referenceAnalysisPromptIndex = String\(index\);/);
   assert.match(app, /function applyReferenceAnalysisPrompt\(index\) \{/);
   assert.match(app, /async function startReferenceAnalysisGeneration\(\) \{/);
@@ -4397,7 +4397,7 @@ test("PPT view exposes source options, page count, progress, retry and PPTX down
   assert.match(app, /createPptAnalysisController/);
   assert.match(app, /pptAnalysis\.render\(\)/);
   assert.match(app, /pptAnalysis\.bind\(\)/);
-  assert.match(pptAnalysisClient, /fetch\("\/api\/ppt\/analyze"/);
+  assert.match(pptAnalysisClient, /requestTextModel\(fetch, "\/api\/ppt\/analyze"/);
   assert.match(pptAnalysisClient, /refs\.pageCountInput\.value = String\(recommendedPageCount\)/);
   assert.match(pptAnalysisClient, /refs\.stylePresetInput\.value = recommendedStylePreset/);
   assert.match(app, /fetch\("\/api\/ppt\/generate"/);
@@ -4839,10 +4839,10 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(creationReferenceAnalysisFormBody, /formData\.set\("platformLabel", getCreationSelectedPlatform\(\)\.label\)/);
   assert.match(app, /function analyzeCreationReferenceImages\(\) \{/);
   const creationReferenceAnalyzeBody = app.match(/async function analyzeCreationReferenceImages\(\) \{[\s\S]*?\r?\n\}\r?\n\r?\nfunction renderCreationRolePicker/)?.[0] || "";
-  assert.match(creationReferenceAnalyzeBody, /const maxAutomaticRetries = 3;/);
-  assert.match(creationReferenceAnalyzeBody, /for \(let attempt = 0; attempt <= maxAutomaticRetries; attempt \+= 1\)/);
+  assert.doesNotMatch(creationReferenceAnalyzeBody, /maxAutomaticRetries/);
+  assert.match(creationReferenceAnalyzeBody, /requestTextModel\(fetch, "\/api\/creation\/reference\/analyze"/);
   assert.match(creationReferenceAnalyzeBody, /本次未识别到有效的参考图信息/);
-  assert.match(creationReferenceAnalyzeBody, /正在重试 \$\{attempt \+ 1\}\/\$\{maxAutomaticRetries\}/);
+  assert.match(creationReferenceAnalyzeBody, /preview\.update\(event\)/);
   assert.match(app, /async function applyCreationReferenceAnalysis\(analysis\) \{/);
   assert.match(app, /async function applyCreationReferenceAnalysisCategoryMatch\(analysis, isCurrent = \(\) => true\) \{/);
   assert.match(app, /await applyCreationReferenceAnalysisCategoryMatch\(normalized, isCurrent\)/);
@@ -4970,7 +4970,7 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(creationReferenceCoverage, /export function toggleCreationSelectedRoles\(/);
   assert.match(app, /function syncCreationSelectedRolesToReferenceCoverage\(analysis = state\.creationReferenceAnalysis\.result\) \{/);
   assert.match(app, /if \(state\.creationRoleSelectionManuallyEdited\) \{/);
-  assert.match(app, /fetch\("\/api\/creation\/reference\/analyze"/);
+  assert.match(app, /requestTextModel\(fetch, "\/api\/creation\/reference\/analyze"/);
   assert.match(app, /fetch\("\/api\/creation\/plan"/);
   assert.match(app, /formData\.set\("selectedRoles", JSON\.stringify\(getCreationSelectedRoles\(\)\)\)/);
   assert.match(app, /roleSelect\.dataset\.creationReferenceRoleId = item\.id;/);
@@ -5280,7 +5280,7 @@ test("creation mode exposes record detail and item repair actions", async () => 
   assert.match(app, /const detailToggle = document\.createElement\("button"\);[\s\S]*detailToggle\.dataset\.creationRecordDetailToggle = "true";/);
   assert.match(app, /refs\.creationRecordArchiveDetail\.addEventListener\("click",[\s\S]*closest\("\[data-creation-record-detail-toggle\]"\)[\s\S]*toggleCreationRecordArchiveDetail\(\);/);
   assert.match(app, /const detailSections = \[/);
-  assert.match(app, /const insights = set\.productInsights \|\| set\.effectivePlan\?\.productInsights \|\| null;/);
+  assert.match(app, /const insights = set\?\.productInsights \|\| set\?\.effectivePlan\?\.productInsights \|\| null;/);
   assert.match(app, /\["痛点", painPoints\.length \? painPoints : "尚未提炼具体痛点/);
   assert.match(app, /\["卖点", sellingPoints\.length \? sellingPoints : "尚未提炼商品卖点/);
   assert.match(app, /\["适用场景", scenarioValues\]/);
@@ -5363,7 +5363,7 @@ test("creation generation cards replace plan details with loading animation", as
   assert.match(app, /media\.classList\.add\("is-loading"\);[\s\S]*media\.appendChild\(createCreationCardLoading\(\s*item\.status,\s*fallbackIndex,\s*getCreationCardLoadingKey\(item, fallbackIndex, options\.keyScope\),\s*getCreationCardLogText\(item, "creation", options\.logGroupId\),\s*\)\);/);
   assert.match(app, /const shouldRenderPath = !imageUrl && !showRecordActions && !hideGenerationDetails;/);
   assert.match(app, /if \(shouldRenderPath\) \{/);
-  assert.match(app, /if \(showActions && !hideGenerationDetails\) \{/);
+  assert.match(app, /if \(showActions && !hideGenerationDetails && item\.status !== "missing"\) \{/);
   assert.match(queueModule, /creationState\.generationScope = "full";/);
   assert.match(app, /state\.creation\.generationScope = itemId \? "single" : "repair";/);
 
@@ -5391,7 +5391,7 @@ test("creation result grid keeps running card loading DOM stable across rerender
   assert.match(app, /createCreationCardLoadingShell\([^,]+,\s*null,\s*\{ sequenceIndex, key, logText \}\)/);
   assert.match(
     app,
-    /syncCreationResultGrid\(items, \{\s*showActions: showCreationResultActions,\s*keyScope: loadingKeyScope,\s*logGroupId: currentSet\?\.setId \|\| "",\s*\}\);/,
+    /syncCreationResultGrid\(currentSet \? getCreationMarketingDisplayItems\(currentSet\) : items, \{\s*showActions: showCreationResultActions,\s*keyScope: loadingKeyScope,\s*logGroupId: currentSet\?\.setId \|\| "",\s*\}\);/,
   );
   const renderCreationViewBody = extractFunctionBefore(app, "renderCreationView", "getCreationPlanPreviewImageCount");
   assert.doesNotMatch(renderCreationViewBody, /refs\.creationResultGrid\.innerHTML = "";/);
@@ -5704,7 +5704,7 @@ test("asset record views include PPT records and Creation set records", async ()
     /function isCreationMissingAssetItem\(item = \{\}\) \{\s*return Boolean\(item\.missingAsset \|\| item\.missing_asset\);\s*\}/,
   );
   assert.match(app, /status\.textContent = getCreationItemStatusLabel\(item\);/);
-  assert.match(app, /placeholder\.textContent = evidenceRequirement[\s\S]{0,220}isCreationMissingAssetItem\(item\)[\s\S]{0,160}"历史图片文件缺失，可一键补图"[\s\S]{0,160}"等待生成";/);
+  assert.match(app, /placeholder\.textContent = \["missing", "failed"\]\.includes\(item\.status\)[\s\S]{0,80}"缺失"[\s\S]{0,220}isCreationMissingAssetItem\(item\)[\s\S]{0,160}"历史图片文件缺失，可一键补图"[\s\S]{0,160}"等待生成";/);
   assert.match(app, /缺少\$\{evidenceRequirement\.label\}，已跳过生成/);
   assert.match(app, /creation-card-missing-badge/);
   assert.match(styles, /\.creation-card-missing-badge\s*\{/);
@@ -6058,7 +6058,7 @@ test("creation mode exposes listing agent controls and record listing drafts", a
   assert.match(listingView, /export function renderCreationListingDrafts\(\{ refs, state, set \} = \{\}\) \{/);
   assert.match(listingView, /async function generate\(setId = "", \{ batch = false \} = \{\}\) \{/);
   assert.match(listingView, /const requestedSetId = cleanCreationListingText\(setId\);/);
-  assert.match(listingView, /fetchImpl\("\/api\/creation\/listings",/);
+  assert.match(listingView, /requestTextModel\(context\.fetchImpl, "\/api\/creation\/listings",/);
   assert.match(listingView, /\.\.\.\(context\.getRequestConfig\?\.\(\) \|\| \{\}\),[\s\S]*setId: selectedSet\.setId,[\s\S]*set: selectedSet,/);
   assert.match(listingView, /async function copy\(\) \{[\s\S]*const selectedSet = context\.getSelectedSet\?\.\(\);[\s\S]*const text = buildCreationRecordListingText\(selectedSet\);/);
   assert.match(listingView, /function exportListings\(\) \{[\s\S]*const selectedSet = context\.getSelectedSet\?\.\(\);[\s\S]*buildCreationListingExportPayload\(selectedSet\)/);

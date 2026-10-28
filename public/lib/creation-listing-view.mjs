@@ -1,3 +1,4 @@
+import { requestTextModel } from "./text-model-client.mjs";
 import { getCreationListingPolicy } from "./creation-listing-policies.mjs";
 
 const CREATION_LISTING_BUCKET_LABELS = {
@@ -1141,7 +1142,7 @@ export function createCreationListingController(context = {}) {
     renderViews();
 
     try {
-      const response = await context.fetchImpl("/api/creation/listings", {
+      const response = await requestTextModel(context.fetchImpl, "/api/creation/listings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

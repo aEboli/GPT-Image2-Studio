@@ -1,3 +1,4 @@
+import { requestTextModel } from "./text-model-client.mjs";
 function findOption(select, value) {
   return [...(select?.options || [])].find((entry) => entry.value === value) || null;
 }
@@ -81,7 +82,7 @@ export function createPptAnalysisController({
   }
 
   async function requestAnalysis(signal) {
-    const response = await fetch("/api/ppt/analyze", { method: "POST", body: buildFormData(), signal });
+    const response = await requestTextModel(fetch, "/api/ppt/analyze", { method: "POST", body: buildFormData(), signal });
     const payload = await readAnalysisResponsePayload(response);
     if (!response.ok || payload.ok === false) {
       if (response.status === 404 || response.status === 405) {

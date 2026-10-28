@@ -185,3 +185,58 @@ The configuration drawer SHALL expose four mutually exclusive sections named `�
 - **WHEN** the `主题` section is narrower than the combined minimum width of the palette options
 - **THEN** every palette option remains on one horizontal row
 - **AND** the palette region can be scrolled horizontally without wrapping
+
+### Requirement: Browser title identifies the current page
+
+浏览器页签标题 SHALL 使用 IS - 当前页面名称的格式，页面名称 SHALL 复用当前界面语言下的导航名称。首次进入、页面切换和界面语言切换 SHALL 同步标题。初始静态标题和无法取得有效页面名称时的回退标题 SHALL 为 IS。
+
+#### Scenario: Open or switch a page
+- **WHEN** 用户直接打开套图模式，或从其他页面切换至套图模式
+- **THEN** 浏览器标题显示 IS - 套图模式
+- **AND** 其他页面使用各自的导航名称
+
+#### Scenario: Change interface language
+- **WHEN** 用户在套图记录页面切换界面语言为英文
+- **THEN** 浏览器标题显示 IS - Suite Records
+
+#### Scenario: No page label is available
+- **WHEN** 初始页面尚未完成初始化，或当前页面没有有效导航名称
+- **THEN** 浏览器标题显示 IS
+
+### Requirement: Browser icons share the selected artwork
+
+浏览器 ICO、PNG、触屏图标及网页清单图标 SHALL 使用同一张用户指定的图片。PNG SHALL 保留透明度并提供 1024x1024 尺寸，ICO SHALL 包含适用于浏览器页签的 16x16 和 32x32 尺寸。更换图片时，HTML 和网页清单中的图标引用 SHALL 更新缓存版本。
+
+#### Scenario: Replace the browser icon
+- **WHEN** 浏览器加载更新后的 HTML 或网页清单
+- **THEN** 图标引用使用新的缓存版本
+- **AND** 各图标入口返回由用户指定图片生成的静态资源
+
+### Requirement: 主题区提供浮层背景不透明度滑块
+
+系统 SHALL 在配置抽屉的主题区域提供「浮层背景不透明度」范围滑块与当前百分比，默认值为 90%，可选范围为 70%–98%，步长为 1%。拖动或键盘调整 SHALL 即时应用到 AI 营销规划和分析师分析浮层，并自动保存到本机。该设置 MUST NOT 改变其它弹窗、文字或按钮的不透明度，也 MUST NOT 触发 API 配置保存。
+
+#### Scenario: 初次打开页面
+
+- **WHEN** 本机没有保存过有效的浮层背景不透明度
+- **THEN** 浮层背景默认以 90% 不透明度显示
+- **AND** 主题区域滑块与百分比输出一致显示 90%
+
+#### Scenario: 拖动或使用键盘调整背景
+
+- **WHEN** 用户在主题区域将浮层背景不透明度调整到 70%–98% 内的值
+- **THEN** 两个浮层的背景即时更新为该值
+- **AND** 当前百分比输出同步更新且文字、按钮保持原有不透明度
+
+#### Scenario: 刷新后恢复设置
+
+- **WHEN** 用户调整过浮层背景不透明度后刷新页面
+- **THEN** 系统在首屏主题应用阶段恢复已保存的值
+- **AND** 主题滑块显示相同的值
+
+#### Scenario: 存储值异常或本地存储受限
+
+- **WHEN** 保存的值为空、无法转换为有限数字或读取本地存储失败
+- **THEN** 系统回退到 90%
+- **AND** 有限数字越界时钳制到 70%–98% 并取整
+- **AND** 写入本地存储失败时当前页面仍可即时调整背景

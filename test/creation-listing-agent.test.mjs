@@ -1189,7 +1189,7 @@ test("listing agent sends a strict JSON schema request with prompt guardrails", 
   assert.equal(calls[0].headers.Authorization, "Bearer test-key");
   assert.equal(calls[0].body.model, "gpt-5.4");
   assert.deepEqual(calls[0].body.reasoning, { effort: "medium" });
-  assert.equal(calls[0].body.stream, false);
+  assert.equal(calls[0].body.stream, true);
   assert.equal(calls[0].body.text.format.type, "json_schema");
   assert.equal(calls[0].body.text.format.name, "creation_listing_draft_json");
   assert.equal(calls[0].body.text.format.strict, true);

@@ -22,7 +22,7 @@ test("creation queue result thumbnails resolve images from the displayed queue s
   );
   assert.match(
     app,
-    /syncCreationResultGrid\(items, \{[\s\S]*showActions: showCreationResultActions,[\s\S]*keyScope: loadingKeyScope,[\s\S]*logGroupId: currentSet\?\.setId \|\| "",[\s\S]*\}\);/,
+    /syncCreationResultGrid\(currentSet \? getCreationMarketingDisplayItems\(currentSet\) : items, \{[\s\S]*showActions: showCreationResultActions,[\s\S]*keyScope: loadingKeyScope,[\s\S]*logGroupId: currentSet\?\.setId \|\| "",[\s\S]*\}\);/,
   );
   assert.match(
     app,

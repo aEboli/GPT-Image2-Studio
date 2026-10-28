@@ -68,10 +68,18 @@ test("partial JSON extracts only complete top-level fields and complete items ac
   assert.deepEqual(readCreationMarketingPartialJson('{"outer":{"items":[{"item_id":"nested"}]}}'), {});
   const summary = summarizeCreationMarketingProgress(readCreationMarketingPartialJson(source.slice(0, firstItemEnd)));
   assert.equal(summary.receivedCount, 1);
+  assert.equal(summary.items[0].itemId, "ai-1");
+  assert.equal(summary.items[0].sourceIndex, 1);
   assert.equal(summary.summary.audiences.length, 3);
   assert.ok(summary.summary.sellingPoints.length);
   assert.equal(summary.items[0].goal, payload.items[0].marketing_goal);
   assert.equal(Object.hasOwn(summary.items[0], "prompt"), false);
+  const sparse = summarizeCreationMarketingProgress({ items: [
+    { ...payload.items[0], prompt: "" },
+    { ...payload.items[1], marketingAssignment: { sourceIndex: 9, goal: payload.items[1].marketing_goal, referenceIndexes: [1] } },
+  ] });
+  assert.equal(sparse.items[0].itemId, "ai-2");
+  assert.equal(sparse.items[0].sourceIndex, 9, "filtered tasks retain the validated original slot");
 });
 
 test("retries reset partial output and late events cannot overwrite a terminal or newer attempt", () => {

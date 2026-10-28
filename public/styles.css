@@ -4449,30 +4449,78 @@ ul.creation-plan-message {
   white-space: nowrap;
 }
 
-.creation-marketing-progress-panel {
-  flex: 0 0 auto;
+.creation-marketing-progress-panel,
+#creationRecordDetail.creation-analyst-floating {
+  position: fixed;
+  top: clamp(78px, 8vh, 96px);
+  right: clamp(12px, 2vw, 28px);
+  z-index: 90;
+  width: min(1440px, calc(100vw - 24px));
   min-width: 0;
-  max-height: 440px;
+  max-height: 82dvh;
   overflow: auto;
+  overscroll-behavior: contain;
   overflow-wrap: anywhere;
   border: 1px solid var(--border-color, #45465b);
-  border-radius: 12px;
-  padding: 14px 16px;
-  background: var(--panel-bg, rgba(110, 112, 190, 0.06));
-  font-size: 12px;
+  border-radius: 14px;
+  padding: 20px 24px;
+  background: color-mix(in srgb, var(--palette-surface-base, var(--bg)) var(--creation-floating-panel-opacity, 90%), transparent);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  font-size: 15px;
   line-height: 1.65;
 }
 
-.creation-marketing-progress-panel h3,
+.creation-marketing-panel-head,
+.creation-marketing-items-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.creation-marketing-panel-head {
+  position: sticky;
+  top: -12px;
+  z-index: 1;
+  margin: -12px -14px 10px;
+  padding: 10px 14px 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color, #45465b) 65%, transparent);
+  background: var(--palette-surface-base, var(--bg));
+}
+
+.creation-marketing-panel-head h3,
 .creation-marketing-progress-panel h4,
 .creation-marketing-progress-panel p {
+  margin: 0;
+}
+
+.creation-marketing-panel-close {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 3px 9px;
+  border: 1px solid var(--border-color, #45465b);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.creation-marketing-panel-close:hover,
+.creation-marketing-panel-close:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.creation-marketing-progress-panel > p {
   margin: 0 0 8px;
 }
 
 .creation-marketing-timeline {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 16px;
+  gap: 5px 8px;
   list-style: none;
   padding: 0;
   margin: 8px 0;
@@ -4480,29 +4528,144 @@ ul.creation-plan-message {
 
 .creation-marketing-timeline li {
   border: 1px solid var(--border-color, #45465b);
-  border-radius: 6px;
+  border-radius: 999px;
   padding: 2px 8px;
+  font-size: 11px;
 }
 
 .creation-marketing-summary {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
-  gap: 14px;
-  margin: 12px 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 10px 0 14px;
 }
 
-.creation-marketing-summary ul,
+.creation-marketing-summary-card {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--border-color, #45465b) 72%, transparent);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+}
+
+.creation-marketing-summary-card h4 {
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.creation-marketing-summary-card ul,
 .creation-marketing-items {
-  padding-left: 20px;
-  margin: 0 0 8px;
+  padding-left: 17px;
+  margin: 0;
 }
 
-.creation-marketing-items li {
-  margin-bottom: 10px;
+.creation-marketing-summary-card ul {
+  max-height: 240px;
+  overflow: auto;
+}
+
+.creation-marketing-summary-card li + li {
+  margin-top: 4px;
+}
+
+.creation-marketing-items-head {
+  justify-content: flex-start;
+  margin: 0 0 7px;
+}
+
+.creation-marketing-items-head h4 {
+  font-size: 15px;
+}
+
+.creation-marketing-items {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  padding: 0;
+  list-style: none;
+}
+
+.creation-marketing-item-row {
+  min-width: 0;
+}
+
+.creation-marketing-item-button {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  gap: 9px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--border-color, #45465b) 76%, transparent);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--panel) 66%, transparent);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+.creation-marketing-item-button:hover,
+.creation-marketing-item-button:focus-visible {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  outline: none;
+}
+
+.creation-marketing-item-title {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 7px;
+}
+
+.creation-marketing-item-title strong {
+  min-width: 0;
+}
+
+.creation-marketing-type {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.creation-marketing-item-goal {
+  overflow-wrap: anywhere;
+}
+
+.creation-marketing-item-button .creation-marketing-caption {
+  font-size: 13px;
 }
 
 .creation-marketing-caption {
-  opacity: 0.7;
+  color: var(--muted);
+}
+
+@media (max-width: 760px) {
+  .creation-marketing-progress-panel,
+  #creationRecordDetail.creation-analyst-floating {
+    top: auto;
+    right: 12px;
+    bottom: 12px;
+    width: calc(100vw - 24px);
+    max-height: min(72dvh, calc(100dvh - 24px));
+  }
+
+  .creation-marketing-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .creation-marketing-summary-card ul {
+    max-height: 96px;
+  }
+
+  .creation-marketing-items {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* 队列胶囊带商品名后单条明显变长，一行塞不下就换行，避免横向滚动把后面的队列藏起来。 */
@@ -4609,6 +4772,61 @@ ul.creation-plan-message {
   padding: 10px 12px;
   font-size: var(--type-subtitle-size);
   line-height: 1.42;
+}
+
+#creationRecordDetail.creation-analyst-floating[hidden],
+#creationAnalystButton[hidden] {
+  display: none;
+}
+
+#creationRecordDetail.creation-analyst-floating {
+  gap: 12px;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.65;
+  padding: 20px 24px;
+}
+
+#creationRecordDetail.creation-analyst-floating .creation-analyst-header {
+  position: sticky;
+  top: -12px;
+  z-index: 1;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: -12px -14px 0;
+  padding: 10px 14px;
+  background: var(--panel-strong, #1d1e27);
+  border-bottom: 1px solid var(--border);
+}
+
+#creationRecordDetail.creation-analyst-floating .creation-analyst-meta {
+  flex: 1;
+  text-align: right;
+}
+
+#creationRecordDetail.creation-analyst-floating .creation-record-section {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  border-bottom-color: var(--border);
+}
+
+#creationRecordDetail.creation-analyst-floating .creation-record-section.is-wide {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+#creationRecordDetail.creation-analyst-floating .creation-record-field {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel-soft);
+}
+
+@media (max-width: 760px) {
+  #creationRecordDetail.creation-analyst-floating .creation-record-section {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 #creationRecordDetail .creation-record-section {
@@ -4861,6 +5079,15 @@ ul.creation-plan-message {
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent),
     0 0 16px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+.creation-card.is-marketing-focused {
+  z-index: 2;
+  border-color: var(--accent);
+  outline: 2px solid color-mix(in srgb, var(--accent) 74%, transparent);
+  outline-offset: 2px;
+  box-shadow: 0 0 24px color-mix(in srgb, var(--accent) 34%, transparent);
+  scroll-margin-block: 100px;
 }
 
 .creation-card.is-idle-rippling::after {
@@ -7356,6 +7583,51 @@ html[data-ui-layout="mobile"] .creation-listing-workspace-bar .asset-listing-act
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
+}
+
+.floating-panel-opacity-control {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.floating-panel-opacity-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--type-caption-size);
+}
+
+.floating-panel-opacity-heading label {
+  min-width: 0;
+  color: var(--text);
+}
+
+#floatingPanelOpacityOutput {
+  flex-shrink: 0;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+#floatingPanelOpacityInput {
+  min-width: 0;
+  width: 100%;
+  min-height: 28px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+#floatingPanelOpacityHint {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--type-caption-size);
+  line-height: 1.5;
 }
 
 .palette-option {
@@ -22302,6 +22574,22 @@ html[data-theme="light"] .settings-panel,
   background: color-mix(in srgb, #78350f 18%, transparent);
 }
 
+.creation-card-media.is-missing-plan {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+}
+
+.creation-card-media.is-missing-plan small {
+  max-width: 100%;
+  padding: 0 14px;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: center;
+}
+
 .creation-card-media.is-missing-evidence > span {
   color: #fbbf24;
   font-weight: 600;
@@ -22443,3 +22731,13 @@ html[data-theme="light"] .settings-panel,
   color: var(--success, #34d399);
   line-height: 1.5;
 }
+
+/* 文本模型的真实增量阅读区。 */
+.text-model-live-preview { position: fixed; z-index: 110; top: 88px; right: 24px; width: min(760px, calc(100vw - 32px)); max-height: 75dvh; overflow: auto; padding: 18px 22px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel-strong, #1d1e27); color: var(--text); box-shadow: 0 18px 48px #0005; }
+.text-model-live-preview summary { display: flex; justify-content: space-between; gap: 16px; cursor: pointer; font-weight: 600; }
+.text-model-live-meta { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.text-model-live-draft { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 15px; line-height: 1.7; margin: 14px 0; }
+.creation-marketing-live { border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; margin: 14px 0; }
+.creation-marketing-live summary { cursor: pointer; font-weight: 600; }
+.creation-marketing-duplicate { color: var(--warning, #f0b65b); }
+@media (max-width: 760px) { .creation-marketing-progress-panel, #creationRecordDetail.creation-analyst-floating { padding: 16px; font-size: 14px; } .text-model-live-preview { right: 12px; width: calc(100vw - 24px); } }

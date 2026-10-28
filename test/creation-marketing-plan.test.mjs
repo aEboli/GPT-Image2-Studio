@@ -171,8 +171,17 @@ for (const [name, mutation, error] of [
   ["role instead of image type", (payload) => { payload.items[8].image_type = "effect-comparison"; }, /第 9 条没有有效图型（effect-comparison）/],
   ["repeated ninth goal", (payload) => { payload.items[8].marketing_goal = payload.items[0].marketing_goal; }, /第 9 条营销目标.*重复/],
 ]) {
-  test(`invalid AI ${name} fails before generation`, async () => {
-    await assert.rejects(() => planned(20, (payload) => { mutation(payload); return payload; }), error);
+  test(`invalid AI ${name} removes only the unusable task`, async () => {
+    const { plan, calls } = await planned(20, (payload) => { mutation(payload); return payload; });
+    assert.equal(calls, 1);
+    assert.equal(plan.imageCount, 19);
+    assert.equal(plan.items.length, 19);
+    assert.equal(plan.platformSetOverrides.imageCount, 19);
+    const validation = plan.marketingPlan.validation;
+    assert.equal(validation.requestedCount, 20);
+    assert.equal(validation.acceptedCount, 19);
+    if (name === "short batch") assert.equal(validation.missingCount, 1);
+    else assert.match(validation.removedItems[0].reason, error);
   });
 }
 
@@ -184,7 +193,9 @@ test("planning context preserves user locks and a changed product invalidates th
   assert.equal(context.allowed_image_types.find((entry) => entry.image_type === "generic-hero").title, "首图成交主视觉");
   assert.equal(context.locked_items[0].prompt, base.items[0].prompt);
   assert.throws(() => applyCreationMarketingPlan(base, payload, { count: 6, referenceCount: 1, primaryIndex: 1, lockedItems: context.locked_items }), /锁定/);
-  assert.throws(() => applyCreationMarketingPlan(base, payload, { count: 6, referenceCount: 1, primaryIndex: 1, selectedRoles: ["multi-angle"] }), /用户选择的图片类型/);
+  const partial = applyCreationMarketingPlan(base, payload, { count: 6, referenceCount: 1, primaryIndex: 1, selectedRoles: ["multi-angle"] });
+  assert.equal(partial.items.length, 5);
+  assert.match(partial.marketingPlan.validation.removedItems[0].reason, /用户选择的图片类型/);
   assert.notEqual(creationMarketingInputFingerprint(input, referenceImages), creationMarketingInputFingerprint({ ...input, productDescription: "改变商品资料" }, referenceImages));
   assert.notEqual(creationMarketingInputFingerprint(input, referenceImages), creationMarketingInputFingerprint(input, [{ ...referenceImages[0], base64: "Y2hhbmdl" }]));
 });

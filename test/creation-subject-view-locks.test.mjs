@@ -9,6 +9,7 @@ import { normalizeCreationSetManifest } from "../lib/creation-store.mjs";
 import { buildCreationRepairPlan } from "../lib/creation-repair.mjs";
 import { marketingPlanFixture } from "./fixtures/creation-marketing-plan.mjs";
 import { gloveAnalysisInput } from "./fixtures/creation-glove-insights.mjs";
+import { buildCreationPromptSections } from "../lib/creation-prompt-budget.mjs";
 
 const palm = "画面左侧展示掌面，蜂窝纹理仅在掌心，拇指和食指翻盖打开";
 const back = "画面右侧展示手背，HOT字样和显示55的控制器仅在手背，按键在显示窗下方";
@@ -75,7 +76,6 @@ test("SKU locks are scoped to the selected SKU rather than recoloring every vari
   assert.ok(black.prompt.includes(palm));
   assert.ok(black.prompt.includes(back));
   assert.doesNotMatch(red.prompt, /HOT|显示55|蜂窝纹理/);
-  assert.ok(black.prompt.length <= 1000, `SKU: ${black.prompt.length}`);
   const selected = buildCreationItemReferenceImages(black, [image, { ...image, filename: "red.png" }], plan.referenceImageRoles);
   assert.equal(selected.length, 1);
   assert.doesNotMatch(buildCreationGenerationReferenceImageLabels(selected, plan.referenceImageRoles, black).join("\n"), /红色/);
@@ -91,20 +91,18 @@ test("long analysis keeps bounded per-frame facts and matching reference labels"
     const selected = buildCreationItemReferenceImages(item, [image], plan.referenceImageRoles);
     const labels = buildCreationGenerationReferenceImageLabels(selected, plan.referenceImageRoles, item).join("\n");
     assert.doesNotMatch(labels, /额外功能资料19/);
-    if (item.prompt.length > (item.role === "hero" ? 1200 : 1000)) {
-      assert.ok(plan.warnings.some((warning) => warning.code === "creation-prompt-budget" && warning.itemId === item.itemId), item.role);
-    }
+    assert.equal(plan.warnings.some((warning) => warning.code === "creation-prompt-budget" && warning.itemId === item.itemId), false, item.role);
     for (const lock of [palm, back, relation]) assert.ok(item.prompt.includes(lock), item.role);
   }
 });
 
-test("mandatory long locks survive with an explicit budget warning", () => {
+test("mandatory long locks survive without a length warning", () => {
   const input = blackInput({ selectedRoles: ["hero"] });
   const longLock = `${"保留每个接缝的真实位置；".repeat(140)}掌面不得出现控制器`;
   input.productInsights.appearance_locks.push({ text: longLock, reference_indexes: [1] });
   const plan = buildCreationPlan(input);
   assert.ok(plan.items[0].prompt.includes(longLock));
-  assert.ok(plan.warnings.some((warning) => warning.code === "creation-prompt-budget"));
+  assert.equal(plan.warnings.some((warning) => warning.code === "creation-prompt-budget"), false);
 });
 
 test("long sourced specifications keep trailing units and operating conditions", () => {
@@ -114,7 +112,32 @@ test("long sourced specifications keep trailing units and operating conditions",
   const plan = buildCreationPlan(input);
   assert.equal(plan.productInsights.confirmedFacts[0].text, fact);
   assert.ok(plan.items[0].prompt.includes(fact));
-  assert.ok(plan.warnings.some((warning) => warning.code === "creation-prompt-budget"));
+  assert.equal(plan.warnings.some((warning) => warning.code === "creation-prompt-budget"), false);
+});
+
+test("long prompt sections keep optional content and deduplicate complete sections", () => {
+  const required = "完整主体与数值条件。".repeat(200);
+  const optional = "保留购买理由及同系列商品的一致性。";
+  assert.equal(buildCreationPromptSections([required, "", required], [optional, "  ", optional, required]), `${required}\n${optional}`);
+});
+
+test("long template and SKU prompts survive frozen, stored and repaired plans without warnings", () => {
+  const input = blackInput({ selectedRoles: ["hero", "detail"], skuGenerationEnabled: true, skuSubjects: [
+    { id: "black", filenames: ["gloves.png"], referenceIndexes: [1], colorNames: ["black"], note: `${palm}；${back}；${relation}` },
+  ] });
+  const longLock = `${"保留每个接缝的真实位置；".repeat(140)}掌面不得出现控制器`;
+  input.productInsights.appearance_locks.push({ text: longLock, reference_indexes: [1] });
+  const plan = buildCreationPlan(input);
+  assert.ok(plan.items.some((item) => item.role === "sku"));
+  for (const item of plan.items) {
+    assert.ok(item.prompt.length > 1200, item.role);
+    assert.ok(item.prompt.includes(longLock), item.role);
+  }
+  assert.equal(plan.warnings.some((warning) => warning.code === "creation-prompt-budget"), false);
+  const frozen = buildCreationSubmittedPlan({ effectivePlan: JSON.stringify(plan) });
+  const saved = normalizeCreationSetManifest({ ...plan, setId: "long-template-test", effectivePlan: frozen });
+  const repaired = buildCreationRepairPlan(saved);
+  for (const candidate of [frozen, saved, repaired]) assert.deepEqual(candidate.items.map((item) => item.prompt), plan.items.map((item) => item.prompt));
 });
 
 async function aiPlan(mutate = () => {}) {
