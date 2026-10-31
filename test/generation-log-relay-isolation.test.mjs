@@ -11,14 +11,16 @@ import {
   upsertGenerationLogEntry,
 } from "../lib/generation-log-store.mjs";
 
-const app = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
+const app = (await readFile(new URL("../public/app.js", import.meta.url), "utf8")).replace(/\r?\n/gu, "\r\n");
 
 function readFunction(name) {
   const start = app.indexOf(`function ${name}(`);
   assert.ok(start >= 0, `missing ${name}`);
-  const end = app.slice(start).search(/\r?\n\}\r?\n/);
-  assert.ok(end > 0, `missing end of ${name}`);
-  return app.slice(start, start + end + 2);
+  const source = app.slice(start);
+  const closing = /\r?\n\}(\r?\n)/u.exec(source);
+  assert.ok(closing, `missing end of ${name}`);
+  const end = closing.index + closing[0].length - closing[1].length;
+  return source.slice(0, end);
 }
 
 function createHarness() {
