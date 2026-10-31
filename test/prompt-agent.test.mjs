@@ -43,27 +43,23 @@ function assertStrictJsonObjectSchema(schema, path = "$") {
   assertStrictJsonObjectSchema(schema.items, `${path}[]`);
 }
 
-test("server runtimes default prompt-agent image analysis to medium reasoning effort", async () => {
+test("server runtimes default prompt-agent analysis to the configured reasoning effort", async () => {
   const server = await readFile(serverPath, "utf8");
 
-  assert.match(server, /const PROMPT_AGENT_ANALYSIS_REASONING_EFFORT = "medium";/);
-  assert.match(
-    server,
-    /mode === REFERENCE_ORCHESTRATION_MODE[\s\S]*\? REFERENCE_ORCHESTRATION_REASONING_EFFORT[\s\S]*: PROMPT_AGENT_ANALYSIS_REASONING_EFFORT/,
-  );
+  assert.match(server, /const reasoningFallback = config\.defaults\?\.reasoningEffort \|\| DEFAULT_REASONING_EFFORT;/);
   assert.doesNotMatch(
     server,
     /mode === REFERENCE_ORCHESTRATION_MODE[\s\S]*\? REFERENCE_ORCHESTRATION_REASONING_EFFORT[\s\S]*: config\.defaults\?\.reasoningEffort \|\| DEFAULT_REASONING_EFFORT/,
   );
 });
 
-test("server runtimes keep reference orchestration analysis on low reasoning effort", async () => {
+test("server runtimes preserve the requested reasoning effort for reference orchestration", async () => {
   const server = await readFile(serverPath, "utf8");
 
-  assert.match(server, /const REFERENCE_ORCHESTRATION_REASONING_EFFORT = "low";/);
+  assert.doesNotMatch(server, /const REFERENCE_ORCHESTRATION_REASONING_EFFORT = "low";/);
   assert.match(
     server,
-    /mode === REFERENCE_ORCHESTRATION_MODE[\s\S]*\? REFERENCE_ORCHESTRATION_REASONING_EFFORT[\s\S]*: PROMPT_AGENT_ANALYSIS_REASONING_EFFORT/,
+    /normalizeReasoningEffort\(formData\.get\("reasoningEffort"\) \|\| reasoningFallback\)/,
   );
 });
 

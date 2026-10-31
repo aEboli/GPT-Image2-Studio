@@ -38,7 +38,7 @@ test("config store returns empty public config before any save", async () => {
     size: "1024x1280",
     quality: "high",
     format: "png",
-    reasoningEffort: "xhigh",
+    reasoningEffort: "high",
     generationStartDelayMs: 1000,
     generationConcurrency: 20,
   });
@@ -51,7 +51,7 @@ test("config store returns empty public config before any save", async () => {
     maxPortraitAccessoryReferenceImages: 9,
   });
   assert.equal("maxConcurrentTasksPerSession" in config.limits, false);
-  assert.deepEqual(config.reasoningEfforts, ["low", "medium", "high", "xhigh"]);
+  assert.deepEqual(config.reasoningEfforts, ["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
 });
 
 test("config store uses local environment variables as defaults before any save", async () => {

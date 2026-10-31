@@ -1,4 +1,4 @@
-import { createTextModelPreview, fitCreationReadingPanel } from "./text-model-client.mjs";
+import { createTextModelPreview, fitCreationReadingPanel, formatTextModelTiming } from "./text-model-client.mjs";
 import { CREATION_MARKETING_PROGRESS_LABELS as labels, isCreationMarketingProgressActive } from "./creation-marketing-progress.mjs";
 import { getCreationPlatformImageType } from "./creation-platform-policies.mjs";
 
@@ -15,6 +15,10 @@ export function createCreationMarketingProgressView({ button, panel, announcemen
   let live = null;
   let liveDetails = null;
   let signature = "";
+  let messageNode = null;
+  let infoNode = null;
+  let traceNode = null;
+  let traceSignature = "";
   const append = (parent, tag, value, className = "") => {
     const node = document.createElement(tag);
     node.textContent = value;
@@ -22,11 +26,12 @@ export function createCreationMarketingProgressView({ button, panel, announcemen
     parent.append(node);
     return node;
   };
-  const seconds = () => Math.floor(((current?.elapsedMs || 0) + (isCreationMarketingProgressActive(current) ? Math.max(0, Date.now() - current.updatedAt) : 0)) / 1000);
+  const elapsedMs = () => (current?.elapsedMs || 0) + (isCreationMarketingProgressActive(current) ? Math.max(0, Date.now() - current.updatedAt) : 0);
   const updateClock = () => {
     if (!current) { button.textContent = "AI 营销规划"; return; }
     const count = current.total && (current.receivedCount || ["complete", "partial", "reused"].includes(current.stage)) ? ` · ${current.receivedCount || 0}/${current.total}` : "";
-    button.textContent = `AI 营销规划 · ${labels[current.stage]}${count} · ${seconds()} 秒 ${expanded ? "▴" : "▾"}`;
+    button.textContent = `AI 营销规划 · ${labels[current.stage]}${count} · ${Math.floor(elapsedMs() / 1000)} 秒 ${expanded ? "▴" : "▾"}`;
+    if (expanded) live?.update({ ...current, elapsedMs: elapsedMs() });
   };
   const render = () => {
     panel.hidden = !expanded || !current;
@@ -45,19 +50,22 @@ export function createCreationMarketingProgressView({ button, panel, announcemen
       const details = append(panel, "details", "", "creation-marketing-live"); details.open = true; liveDetails = details;
       append(details, "summary", "实时接收 · 结构化卡片通过完整校验后可用于生图");
       live = createTextModelPreview({ document, panel: details, title: "整套营销规划" });
+      traceNode = append(panel, "section", "", "creation-marketing-timing");
       content = append(panel, "div", "", "creation-marketing-content");
     }
-    live.update(current);
-    const nextSignature = JSON.stringify([current.productName, current.stage, current.attempt, current.summary, current.items, current.validation, current.duplicateRisks]);
-    if (signature === nextSignature) return;
-    if (["complete", "partial", "reused"].includes(current.stage)) liveDetails.open = false;
-    signature = nextSignature;
-    content.replaceChildren();
-    if (current.productName) append(content, "p", `本次商品：${current.productName}`, "creation-marketing-caption");
-    append(content, "p", current.message || labels[current.stage], "creation-marketing-message");
-    const history = append(content, "ol", "", "creation-marketing-timeline");
-    for (const event of current.history || []) {
-      append(history, "li", `${Math.floor(event.elapsedMs / 1000)} 秒 · ${labels[event.stage]}${event.attempt > 1 ? `（第 ${event.attempt} 次请求）` : ""}`);
+    live.update({ ...current, elapsedMs: elapsedMs() });
+    const nextTrace = JSON.stringify(current.requestTrace || {});
+    if (traceSignature !== nextTrace) {
+      traceSignature = nextTrace;
+      traceNode.replaceChildren();
+      traceNode.hidden = !current.requestTrace?.calls?.length;
+      if (!traceNode.hidden) {
+        append(traceNode, "h4", "耗时明细");
+        const trace = current.requestTrace;
+        append(traceNode, "p", formatTextModelTiming({ timing: { prepareMs: trace.prepareMs, validationMs: trace.validationMs, totalMs: trace.totalMs } }), "creation-marketing-caption");
+        for (const call of trace.calls) append(traceNode, "p", `${call.repairRound ? `第 ${call.repairRound} 轮修复` : "初稿"} · 第 ${call.attempt} 次请求 · ${call.transport === "buffered" ? "整包返回 · " : ""}${formatTextModelTiming(call) || "等待上游响应"}`, "creation-marketing-caption");
+      }
+      panel.scrollTop = scrollTop;
     }
     const valid = ["complete", "partial", "reused"].includes(current.stage);
     const info = [];
@@ -69,7 +77,44 @@ export function createCreationMarketingProgressView({ button, panel, announcemen
       const { requestedCount, acceptedCount, removedItems = [], missingCount = 0 } = current.validation;
       if (acceptedCount !== requestedCount || removedItems.length) info.push(`可生成 ${acceptedCount} 张 · 已移除 ${removedItems.length} 条${missingCount ? ` · 未返回 ${missingCount} 条` : ""}`);
     }
-    if (info.length) append(content, "p", info.join(" · "), "creation-marketing-caption");
+    const message = current.message || labels[current.stage];
+    const caption = info.join(" · ");
+    if (messageNode) messageNode.textContent = message;
+    if (infoNode) { infoNode.textContent = caption; infoNode.hidden = !caption; }
+    const nextSignature = JSON.stringify([current.productName, current.stage, current.attempt, current.summary, current.items, current.validation, current.duplicateRisks, current.suiteStrategy, current.quality]);
+    if (signature === nextSignature) return;
+    if (valid) liveDetails.open = false;
+    signature = nextSignature;
+    content.replaceChildren();
+    if (current.productName) append(content, "p", `本次商品：${current.productName}`, "creation-marketing-caption");
+    messageNode = append(content, "p", message, "creation-marketing-message");
+    const history = append(content, "ol", "", "creation-marketing-timeline");
+    for (const event of current.history || []) {
+      append(history, "li", `${Math.floor(event.elapsedMs / 1000)} 秒 · ${labels[event.stage]}${event.attempt > 1 ? `（第 ${event.attempt} 次请求）` : ""}`);
+    }
+    infoNode = append(content, "p", caption, "creation-marketing-caption");
+    infoNode.hidden = !caption;
+    const strategy = current.suiteStrategy || {};
+    const buyingReason = strategy.coreBuyingReason || strategy.core_buying_reason;
+    if (buyingReason) {
+      const section = append(content, "section", "", "creation-marketing-summary-card");
+      append(section, "h4", "整套主购买理由");
+      append(section, "p", buyingReason);
+      for (const proof of strategy.functionalProofs || strategy.functional_proofs || []) {
+        append(section, "p", `${proof.buyerBenefit || proof.buyer_benefit}：${proof.visualEvidence || proof.visual_evidence}`, "creation-marketing-caption");
+      }
+    }
+    if (current.quality) {
+      const coverage = current.quality.functionalCoverage;
+      const status = coverage?.required ? coverage.covered ? "核心功能已有可见表现" : "建议补强核心功能表现" : "按现有外观与用途规划";
+      append(content, "p", `${status} · 局部修复 ${current.quality.repairRounds || current.repairRound || 0} 轮`, "creation-marketing-caption");
+      if (current.quality.status === "warning" && current.quality.issues?.length) {
+        const section = append(content, "section", "", "creation-marketing-summary-card");
+        append(section, "h4", "优化建议 · 不影响有效图片生成");
+        const rows = append(section, "ul", "");
+        for (const issue of current.quality.issues) append(rows, "li", `${issue.sourceIndex ? `第 ${issue.sourceIndex} 张：` : ""}${issue.message}`);
+      }
+    }
     const summary = current.summary || {};
     const columns = append(content, "div", "", "creation-marketing-summary");
     for (const [key, title] of [["audiences", "目标受众与需求"], ["sellingPoints", "核心卖点"], ["painPoints", "买家痛点"]]) {
@@ -96,7 +141,10 @@ export function createCreationMarketingProgressView({ button, panel, announcemen
         append(title, "span", type, "creation-marketing-type");
         append(task, "span", item.goal, "creation-marketing-item-goal");
         const brief = item.creativeBrief || {};
-        for (const [key, label] of [["purpose", "用途"], ["scene", "场景"], ["action", "动作"], ["framing", "景别"], ["evidence_focus", "证据"]]) {
+        const formLabels = { "product-photograph": "产品摄影", "use-scene": "真实使用场景", "macro-evidence": "微距证据", "functional-render": "功能效果表现", "commercial-cg": "商业 CG 渲染", "information-layout": "信息说明", "contents-layout": "到手清单", "variant-layout": "款式选择" };
+        const densityLabels = { none: "无新增文字", minimal: "少量文字", structured: "结构化说明" };
+        if (formLabels[brief.visual_form]) append(task, "span", `${formLabels[brief.visual_form]} · ${densityLabels[brief.text_density] || "按任务安排文字"}`, "creation-marketing-caption");
+        for (const [key, label] of [["purpose", "用途"], ["scene", "场景"], ["action", "动作"], ["framing", "景别"], ["evidence_focus", "证据"], ["new_information", "新增信息"], ["effect_visual", "可见功能"]]) {
           if (brief[key]) append(task, "span", `${label}：${brief[key]}`, "creation-marketing-caption");
         }
         const risk = current.duplicateRisks?.find((entry) => entry.itemId === item.itemId);

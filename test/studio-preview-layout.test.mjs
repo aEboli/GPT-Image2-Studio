@@ -30,10 +30,10 @@ const generationClientPath = new URL("../lib/generation-client.mjs", import.meta
 const generationLogPanelPath = new URL("../lib/generation-log-panel.mjs", import.meta.url);
 const generationLogStorePath = new URL("../lib/generation-log-store.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20261026-quick-suite-17";
-const appAssetVersion = "20261026-quick-suite-17";
+const stylesAssetVersion = "20261029-subject-boundaries-1";
+const appAssetVersion = "20261031-dual-concurrency-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
-const creationQueueModuleAssetVersion = "20261020-queue-label-product-1";
+const creationQueueModuleAssetVersion = "20261031-dual-concurrency-1";
 const quickBlendModuleAssetVersion = "20260928-aspect-ratio-value-only-1";
 
 test("static assets use the current cache-busting version", async () => {
@@ -2247,7 +2247,7 @@ test("studio panels start without redundant title blocks and merge parameters un
   assert.match(styles, /\.parameter-settings > \.ratio-grid\s*\{[\s\S]*margin-bottom:\s*calc\(var\(--field-gap,\s*6px\) \+ 2px\);/);
   assert.doesNotMatch(promptParameterSettings, /<small>Parameters<\/small>/);
   assert.match(html, /<details[\s\S]*class="field-group parameter-settings adaptive-section"[\s\S]*<label[^>]*class="compact-field"[^>]*>[\s\S]*<span data-ui-i18n="reasoningEffort">思考等级<\/span>[\s\S]*id="reasoningEffortInput"[\s\S]*<label[^>]*class="compact-field"[^>]*>[\s\S]*id="sizeInput"[\s\S]*<label[^>]*class="compact-field"[^>]*>[\s\S]*id="outputFormatInput"/);
-  assert.match(app, /const REASONING_LABELS = \{[\s\S]*low: "Low",[\s\S]*medium: "Medium",[\s\S]*high: "High",[\s\S]*xhigh: "XHigh",[\s\S]*\};/);
+  assert.match(app, /const REASONING_LABELS = \{[\s\S]*none: "None",[\s\S]*minimal: "Minimal",[\s\S]*low: "Low",[\s\S]*medium: "Medium",[\s\S]*high: "High",[\s\S]*xhigh: "XHigh",[\s\S]*max: "Max",[\s\S]*\};/);
   assert.doesNotMatch(app, /REASONING_ESTIMATES|30s\+|90s\+|150s\+|210s\+/);
   assert.match(app, /option\.textContent = label;/);
   assert.match(html, /<div class="advanced-controls">[\s\S]*<label class="compact-field">[\s\S]*<span data-ui-i18n="outputFormat">输出格式<\/span>[\s\S]*<\/label>[\s\S]*<label class="compact-field">[\s\S]*<span data-ui-i18n="quality">质量<\/span>[\s\S]*<select id="qualityInput" name="quality"><\/select>[\s\S]*<\/label>[\s\S]*<div class="parameter-meta" aria-label="当前生图调用" data-ui-i18n-aria-label="activeCallMeta"[^>]*>[\s\S]*<span data-ui-i18n="activeCall">当前调用<\/span>[\s\S]*<strong id="parameterGenerationMode">路由模式<\/strong>[\s\S]*<span data-ui-i18n="imageModel">生图模型<\/span>[\s\S]*<strong id="parameterToolModel">gpt-image-2<\/strong>[\s\S]*<\/div>[\s\S]*<\/div>/);
@@ -2733,7 +2733,7 @@ test("legacy image-to-prompt JSON templates normalize to their single prompt", a
 test("prompt image analysis compresses large browser uploads before posting to Vercel", async () => {
   const app = await readFile(appPath, "utf8");
 
-  assert.match(app, /const PROMPT_AGENT_ANALYSIS_REASONING_EFFORT = "medium";/);
+  assert.doesNotMatch(app, /const PROMPT_AGENT_ANALYSIS_REASONING_EFFORT = "medium";/);
   assert.match(app, /PROMPT_ANALYSIS_IMAGE_MAX_EDGE = 1024/);
   assert.match(app, /PROMPT_ANALYSIS_IMAGE_COMPRESS_THRESHOLD_BYTES = 900 \* 1024/);
   assert.match(app, /async function preparePromptAnalysisImageFile\(file\) \{/);
@@ -2742,7 +2742,7 @@ test("prompt image analysis compresses large browser uploads before posting to V
   assert.match(app, /new File\(\[blob\], makePromptAnalysisImageName\(file\.name\)/);
   assert.match(
     app,
-    /async function buildPromptAgentFormData\(\) \{[\s\S]*formData\.set\("image", await preparePromptAnalysisImageFile\(state\.promptAgent\.file\)\);[\s\S]*formData\.set\(\s*"reasoningEffort",\s*PROMPT_AGENT_ANALYSIS_REASONING_EFFORT,?\s*\);/,
+    /async function buildPromptAgentFormData\(\) \{[\s\S]*formData\.set\("image", await preparePromptAnalysisImageFile\(state\.promptAgent\.file\)\);[\s\S]*formData\.set\(\s*"reasoningEffort",\s*getSelectedReasoningEffort\(\),?\s*\);/,
   );
   const promptAgentFormDataBody = app.match(/async function buildPromptAgentFormData\(\) \{[\s\S]*?\n\}/)?.[0] || "";
   assert.match(promptAgentFormDataBody, /appendCurrentConfigToFormData\(formData\);/);
@@ -2910,10 +2910,10 @@ test("reference orchestration analysis is a separate studio mode outside prompt 
   assert.match(app, /button\.textContent = isSelected \? "已应用" : "应用提示词";/);
   assert.match(app, /async function buildReferenceAnalysisFormData\(\) \{/);
   assert.match(app, /formData\.set\("mode", "reference-orchestration"\);/);
-  assert.match(app, /const REFERENCE_ORCHESTRATION_REASONING_EFFORT = "low";/);
+  assert.doesNotMatch(app, /const REFERENCE_ORCHESTRATION_REASONING_EFFORT = "low";/);
   assert.match(
     app,
-    /async function buildReferenceAnalysisFormData\(\) \{[\s\S]*formData\.set\(\s*"reasoningEffort",\s*REFERENCE_ORCHESTRATION_REASONING_EFFORT,\s*\);/,
+    /async function buildReferenceAnalysisFormData\(\) \{[\s\S]*formData\.set\(\s*"reasoningEffort",\s*getSelectedReasoningEffort\(\),\s*\);/,
   );
   assert.match(app, /state\.referenceAnalysis\.files\.map\(\(item\) => preparePromptAnalysisImageFile\(item\.file\)\)/);
   assert.match(app, /formData\.append\("image", file\);/);
@@ -4637,7 +4637,8 @@ test("creation mode has product references without a separate style-reference mo
   assert.doesNotMatch(styles, /creationReferenceApplyAnalysisButton/);
   assert.match(styles, /\.creation-reference-note\s*\{/);
   assert.match(readCssRule(styles, ".creation-reference-note"), /padding:\s*0\s+8px\s+10px;/);
-  assert.doesNotMatch(readCssRule(styles, ".creation-reference-note"), /max-height|-webkit-line-clamp/);
+  assert.match(readCssRule(styles, ".creation-reference-note"), /max-height:\s*calc\(1\.35em \* 6 \+ 10px\);[\s\S]*overflow-y:\s*auto;/);
+  assert.doesNotMatch(readCssRule(styles, ".creation-reference-note"), /-webkit-line-clamp/);
   assert.doesNotMatch(styles, /\.creation-reference-role-readonly\s*\{/);
   assert.match(styles, /\.creation-reference-note\[contenteditable="true"\]\s*\{/);
   assert.match(styles, /\.creation-template-search\s*\{/);
@@ -4770,17 +4771,17 @@ test("creation mode has product references without a separate style-reference mo
   assert.doesNotMatch(app, /usage-steps/);
   assert.doesNotMatch(app, /review-qa/);
   assert.match(app, /1-hero\|hero\|首图成交主视觉/);
-  assert.match(app, /1-hero\|hero\|首图成交主视觉\|[^;]*小圆框/);
+  assert.match(app, /1-hero\|hero\|首图成交主视觉\|[^;]*一个最应记住的购买理由/);
   assert.match(app, /2-benefit\|benefit\|目标人群共鸣图/);
   assert.match(app, /3-scene\|scene\|适用多场景图/);
   assert.match(app, /4-multi-angle\|multi-angle\|多角度产品展示图/);
-  assert.match(app, /5-atmosphere\|atmosphere\|冲动下单氛围图/);
+  assert.match(app, /5-atmosphere\|atmosphere\|商业 CG 渲染图/);
   assert.match(app, /6-product-detail\|product-detail\|产品细节特写图/);
   assert.match(app, /7-brand-story\|brand-story\|品牌质感\/礼品价值图/);
   assert.match(app, /7-brand-story\|brand-story\|品牌质感\/礼品价值图\|用真实拥有或使用瞬间体现品牌气质/);
   assert.match(app, /8-size-capacity-fit\|size-capacity-fit\|尺寸容量适配图/);
   assert.match(app, /9-effect-comparison\|effect-comparison\|功能效果渲染图/);
-  assert.match(app, /9-effect-comparison\|effect-comparison\|功能效果渲染图\|以一个清晰完整的商品主体为核心覆盖所有可靠功能；同屏不清晰时使用连续无损场景拼接，不做对比或遗漏/);
+  assert.match(app, /9-effect-comparison\|effect-comparison\|功能效果渲染图\|以一个完整商品呈现核心功能与收益，加强材质体积、功能流动的遮挡纵深及局部光照，只使用有依据的作用效果/);
   assert.match(app, /10-scene-fit-1\|scene-fit-1\|场景适配图一/);
   assert.match(app, /11-scene-fit-2\|scene-fit-2\|场景适配图二/);
   assert.match(app, /12-accessory-gift\|accessory-gift\|到手清单\/配件图/);
@@ -4826,10 +4827,10 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(app, /function buildCreationReferenceAnalysisFormData\(\) \{/);
   const creationReferenceAnalysisFormBody =
     app.match(/async function buildCreationReferenceAnalysisFormData\(\) \{[\s\S]*?\r?\n\}\r?\n\r?\nasync function analyzeCreationReferenceImages/)?.[0] || "";
-  assert.match(app, /const CREATION_REFERENCE_ANALYSIS_REASONING_EFFORT = "low";/);
+  assert.doesNotMatch(app, /const CREATION_REFERENCE_ANALYSIS_REASONING_EFFORT = "low";/);
   assert.match(
     creationReferenceAnalysisFormBody,
-    /formData\.set\(\s*"reasoningEffort",\s*CREATION_REFERENCE_ANALYSIS_REASONING_EFFORT,\s*\);/,
+    /formData\.set\(\s*"reasoningEffort",\s*getSelectedReasoningEffort\(refs\.creationReasoningEffortInput\),\s*\);/,
   );
   assert.doesNotMatch(
     creationReferenceAnalysisFormBody,
@@ -4842,7 +4843,7 @@ test("creation mode has product references without a separate style-reference mo
   assert.doesNotMatch(creationReferenceAnalyzeBody, /maxAutomaticRetries/);
   assert.match(creationReferenceAnalyzeBody, /requestTextModel\(fetch, "\/api\/creation\/reference\/analyze"/);
   assert.match(creationReferenceAnalyzeBody, /本次未识别到有效的参考图信息/);
-  assert.match(creationReferenceAnalyzeBody, /preview\.update\(event\)/);
+  assert.match(creationReferenceAnalyzeBody, /preview\.update\(\{\s*\.\.\.event/);
   assert.match(app, /async function applyCreationReferenceAnalysis\(analysis\) \{/);
   assert.match(app, /async function applyCreationReferenceAnalysisCategoryMatch\(analysis, isCurrent = \(\) => true\) \{/);
   assert.match(app, /await applyCreationReferenceAnalysisCategoryMatch\(normalized, isCurrent\)/);
@@ -4945,7 +4946,7 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(app, /return currentTemplate\.label \|\| currentTemplate\.value;/);
   assert.doesNotMatch(app, /function getCreationPlanOverrides\(\) \{/);
   assert.doesNotMatch(app, /function canEditCreationItem\(/);
-  assert.match(app, /function previewCreationPlan\(\) \{/);
+  assert.match(app, /async function previewCreationPlan\(/);
   assert.match(app, /function resetCreationDraftPreview\(\) \{/);
   assert.match(app, /const file = getCreationReferenceGenerationFile\(item\);[\s\S]*formData\.append\("referenceImages", file\)/);
   assert.match(app, /formData\.set\("dimensionSpecs", productDescription\)/);
@@ -4959,7 +4960,7 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(app, /creationRoleSelectionManuallyEdited:\s*false/);
   assert.match(app, /const CREATION_REFERENCE_COVERAGE_ROLE_TARGETS = \{/);
   assert.match(app, /usage:\s*\["usage-suggestion"\]/);
-  assert.match(app, /scene:\s*\["scene",\s*"atmosphere"\]/);
+  assert.match(app, /scene:\s*\["scene"\]/);
   assert.match(app, /material:\s*\["product-detail",\s*"ingredient-material"\]/);
   assert.match(app, /dimensions:\s*\["size-capacity-fit",\s*"spec-table"\]/);
   assert.match(app, /package:\s*\["accessory-gift"\]/);
@@ -4988,7 +4989,7 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(app, /const DEFAULT_CREATION_SKU_GENERATION_RULE = "color-name-under-subject";/);
   assert.match(app, /"color-name-under-subject": "显示颜色"/);
   assert.match(app, /formData\.set\("industryTemplate", resolveCreationReferenceAnalysisContextCategoryValue\(\{ analysisDirty: state\.creationReferenceAnalysis\.dirty,[^\n]*categorySuggestionStale: state\.creationReferenceAnalysis\.categorySuggestionStale,[^\n]*previousAutoCategoryValue: state\.creationReferenceAnalysis\.categoryTemplateSuggestion \}\)\)/);
-  assert.match(app, /\[refs\.creationProductNameInput, refs\.creationProductDescriptionInput\]\.forEach\(\(input\) => input\.addEventListener\("input", resetCreationDraftPreview\)\)/);
+  assert.match(app, /\[refs\.creationProductNameInput, refs\.creationProductDescriptionInput\]\.forEach\(\(input\) => input\.addEventListener\("input", \(\) => \{[\s\S]*state\.creationReferenceAnalysis\.updatingFromAnalysis[\s\S]*autoFilledProductName = ""[\s\S]*resetCreationDraftPreview\(\);/);
   assert.match(app, /refs\.creationTargetLanguageInput\?\.addEventListener\("change"/);
   assert.match(app, /refs\.creationImageCountInput\.addEventListener\("change",\s*\(\) => \{[\s\S]*syncCreationSelectedRolesToCount\(\)[\s\S]*requestCreationPlanPreview\(\)/);
   assert.match(app, /refs\.creationImageCountInput\.addEventListener\("click", \(\) => \{ if \(!isCreationAiMarketingEnabled\(\)\) syncCreationSelectedRolesToCurrentCount\(\); \}\)/);
@@ -5160,21 +5161,24 @@ test("creation mode exposes upload-image logo batch branch", async () => {
   assert.match(logoBatchForm, /const title = firstSourceName \? `上传图加 Logo \$\{firstSourceName\}` : "上传图加 Logo";/);
 });
 
-test("creation reference analysis apply fills product name from fourth-level category", async () => {
+test("creation reference analysis fills only an eligible product name and reports the outcome", async () => {
   const app = await readFile(appPath, "utf8");
 
   assert.match(app, /function applyCreationReferenceAnalysisProductNameSuggestion\(analysis = \{\}\) \{/);
   assert.match(app, /productName: String\(analysis\?\.productName \|\| analysis\?\.product_name/);
-  assert.match(app, /applyCreationReferenceAnalysisProductNameValue\(\{[\s\S]*previousAutoProductName: state\.creationReferenceAnalysis\.productNameSuggestion,[\s\S]*\}\)/);
+  assert.match(app, /const currentProductName = refs\.creationProductNameInput\.value;\s*const result = applyCreationReferenceAnalysisProductNameValue\(\{\s*analysis,\s*currentProductName,\s*\}\);/);
   assert.match(app, /state\.creationReferenceAnalysis\.productNameSuggestion = result\.autoProductName;/);
-  assert.match(app, /setCreationReferenceProductNameValue\(result\.productName\);/);
+  assert.match(app, /if \(result\.applied\) \{\s*refs\.creationProductNameInput\.value = result\.productName;/);
+  assert.doesNotMatch(app, /setCreationReferenceProductNameValue/);
+  assert.match(app, /productNameSuggestion: state\.creationReferenceAnalysis\.productNameSuggestion/);
+  assert.match(app, /productNameSuggestion: state\.creationReferenceAnalysis\.productNameSuggestion,\s*productNameApplied,/);
   assert.match(
     app,
     /state\.creationReferenceAnalysis\.applied = true;[\s\S]*const productNameApplied = applyCreationReferenceAnalysisProductNameSuggestion\(analysis\);/,
   );
 });
 
-test("creation reference analysis auto-fills product name after recognition", async () => {
+test("creation reference analysis applies reference roles after recognition", async () => {
   const app = await readFile(appPath, "utf8");
   const applyBody = app.match(/async function applyCreationReferenceAnalysis\(analysis\) \{[\s\S]*?\n\}/)?.[0] || "";
 
@@ -5187,7 +5191,7 @@ test("creation reference analysis auto-fills product name after recognition", as
   assert.match(app, /markCreationReferenceAnalysisDirty\(\{ invalidateCategorySuggestion: false \}\); resetCreationDraftPreview\(\); renderCreationReferenceGrid\(\); renderCreationView\(\);/);
   assert.match(app, /function clearCreationReferenceAnalysisManagedCategory\(\) \{[\s\S]*resolveCreationReferenceAnalysisCategoryValue\([\s\S]*if \(!resolution\.cleared\)[\s\S]*setCreationIndustryTemplateValue\(resolution\.categoryValue/);
   assert.match(app, /state\.creationReferenceFiles = \[\];[\s\S]*clearCreationReferenceAnalysisManagedCategory\(\);[\s\S]*state\.creation\.planDirty = true;/);
-  assert.match(app, /const \{ appliedMessage, categoryApplied, categoryCleared, matchedTemplate \} = await applyCreationReferenceAnalysis\(payload\);/);
+  assert.match(app, /const \{ appliedMessage, categoryApplied, categoryCleared, matchedTemplate, stale \} = await applyCreationReferenceAnalysis\(payload\);/);
   assert.match(app, /categoryCleared[\s\S]*本轮未识别到可靠商品类目，已恢复为通用电商/);
 });
 
@@ -5474,7 +5478,7 @@ test("creation generation can enqueue another suite while one is running", async
   assert.match(queueModule, /export function scheduleCreationGenerationQueue\(context = \{\}\) \{/);
   assert.match(
     queueModule,
-    /if \(getRunningCreationQueueJobs\(creationState\)\.length > 0\) \{\s*render\(\);\s*return;/,
+    /while \(getRunningCreationQueueJobs\(creationState\)\.length < maxParallelSuites\)/,
   );
   assert.match(queueModule, /const nextJob = getCreationQueueJobs\(creationState\)\.find\(\(job\) => job\.status === "queued"\);/);
   assert.match(queueModule, /void runCreationQueuedJob\(nextJob, context\);/);

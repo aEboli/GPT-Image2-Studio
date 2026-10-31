@@ -2,6 +2,9 @@ import { getCreationFatalUpstreamError } from "./creation-auto-repair.mjs";
 import { formatCreationSkuItemColorNames } from "./creation-sku-colors.mjs";
 import { hasCreationMultipleSourcedSkuEvidence } from "./creation-item-requirements.mjs";
 import { isFatalUpstreamError } from "./upstream-fatal-error.mjs";
+import { normalizeGenerationConcurrency } from "./generation-concurrency.mjs";
+
+export const MAX_CREATION_PARALLEL_SUITES = 2;
 
 export function getCreationQueueJobs(creationState = {}) {
   return Array.isArray(creationState.queue) ? creationState.queue : [];
@@ -430,6 +433,7 @@ export function buildCreationQueuedSet({
   buildCreationSkuSubjectPayload,
   createdAt,
   creationState,
+  effectivePlanOverride = null,
   formatCreationDimensionUnitModeLabel,
   formatCreationVisualLanguageLabel,
   getCreationCurrentSet,
@@ -455,7 +459,25 @@ export function buildCreationQueuedSet({
   referenceFiles = [],
   refs,
   sellingPoints,
+  sourceFormData = null,
 } = {}) {
+  if (effectivePlanOverride) {
+    const snapshot = structuredClone(effectivePlanOverride);
+    const read = (field) => sourceFormData?.get(field);
+    return normalizeSet({
+      ...snapshot,
+      setId: createQueueId("creation-local"),
+      productName: snapshot.productName || read("productName") || "",
+      productDescription: snapshot.productDescription || read("productDescription") || "",
+      referenceImageNames: (sourceFormData?.getAll("referenceImages") || []).map((file) => file.name).filter(Boolean),
+      referenceImageRoles: snapshot.referenceImageRoles || JSON.parse(read("referenceImageRoles") || "[]"),
+      effectivePlan: snapshot,
+      createdAt,
+      updatedAt: createdAt,
+      status: "queued",
+      items: snapshot.items.map((item, index) => ({ ...item, slotIndex: index + 1, status: item.evidenceBlocked ? "skipped" : "queued" })),
+    });
+  }
   const frozenEffectivePlan = typeof getFrozenCreationEffectivePlan === "function"
     ? getFrozenCreationEffectivePlan()
     : null;
@@ -819,15 +841,16 @@ export async function runCreationQueuedJob(job, context = {}) {
 
 export function scheduleCreationGenerationQueue(context = {}) {
   const { creationState, render } = context;
-  if (getRunningCreationQueueJobs(creationState).length > 0) {
-    render();
-    return;
-  }
-
-  const nextJob = getCreationQueueJobs(creationState).find((job) => job.status === "queued");
-  if (nextJob) {
+  const maxParallelSuites = Math.min(MAX_CREATION_PARALLEL_SUITES, normalizeGenerationConcurrency(
+    creationState.schedulingSnapshot?.generationConcurrency ?? context.getMaxParallelTasks?.(),
+    MAX_CREATION_PARALLEL_SUITES,
+  ));
+  while (getRunningCreationQueueJobs(creationState).length < maxParallelSuites) {
+    const nextJob = getCreationQueueJobs(creationState).find((job) => job.status === "queued");
+    if (!nextJob) break;
     void runCreationQueuedJob(nextJob, context);
-  } else {
+  }
+  if (!getRunningCreationQueueJobs(creationState).length) {
     creationState.generating = false;
     creationState.generationScope = "";
     creationState.activeQueueId = "";

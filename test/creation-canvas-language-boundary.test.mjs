@@ -10,6 +10,13 @@ import { gloveAnalysisInput } from "./fixtures/creation-glove-insights.mjs";
 function assertEnglishCanvasBoundary(prompt, item = {}) {
   const parameters = resolveCreationItemGenerationParameters({ ...item, targetLanguage: "en" }, { imageRoute: "a" });
   const runtimePrompt = buildCreationItemGenerationPrompt(prompt, parameters, item);
+  if (item.textPolicy === "none") {
+    assert.match(runtimePrompt, /Use existing product or packaging markings only/i);
+    assert.match(runtimePrompt, /If any non-product text is unavoidable, use English \(en\)/i);
+    assert.match(runtimePrompt, /never render reference annotations, filenames, or internal notes/i);
+    assert.doesNotMatch(runtimePrompt, /new text in English|English \(en\) for new text/i);
+    return;
+  }
   assert.match(runtimePrompt, /(?:new text in English|English \(en\) for new text)/i);
   assert.match(runtimePrompt, /Translate supplied source facts before using them as canvas text/i);
   assert.match(runtimePrompt, /role titles, task names, filenames, and reference annotations are internal metadata/i);

@@ -125,6 +125,12 @@ async function createUpstreamEditServer(options = {}) {
     ? options.responses
     : [{ base64: validPngBase64 }];
   const server = createHttpServer(async (request, response) => {
+    if (request.method === "GET" && request.url === "/") {
+      request.resume();
+      response.writeHead(404, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ error: { message: "not found" } }));
+      return;
+    }
     const chunks = [];
     for await (const chunk of request) {
       chunks.push(Buffer.from(chunk));

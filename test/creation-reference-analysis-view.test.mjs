@@ -133,7 +133,7 @@ test("creation reference category replaces or clears only stale analysis-managed
   );
 });
 
-test("creation reference product name suggestion preserves form text and replaces only analysis-managed names", () => {
+test("creation reference names preserve existing text without a valid new subject and overwrite it with one", () => {
   assert.deepEqual(
     applyCreationReferenceAnalysisProductNameValue({
       analysis: { categoryTemplateLabel: "Women's Clothing Sets" },
@@ -141,9 +141,9 @@ test("creation reference product name suggestion preserves form text and replace
       previousAutoProductName: "Fishing Lure",
     }),
     {
-      applied: true,
+      applied: false,
       autoProductName: "Women's Clothing Sets",
-      productName: "Women's Clothing Sets",
+      productName: "Fishing Lure",
     },
   );
 
@@ -155,7 +155,7 @@ test("creation reference product name suggestion preserves form text and replace
     }),
     {
       applied: false,
-      autoProductName: "Fishing Lure",
+      autoProductName: "",
       productName: "Fishing Lure",
     },
   );
@@ -168,7 +168,7 @@ test("creation reference product name suggestion preserves form text and replace
     }),
     {
       applied: false,
-      autoProductName: "",
+      autoProductName: "Women's Clothing Sets",
       productName: "Manual Catalog Name",
     },
   );
@@ -181,10 +181,15 @@ test("creation reference product name suggestion preserves form text and replace
     }),
     {
       applied: false,
-      autoProductName: "",
+      autoProductName: "Women's Clothing Sets",
       productName: "Manual Catalog Name",
     },
   );
+  assert.deepEqual(
+    applyCreationReferenceAnalysisProductNameValue({ analysis: { productName: "加热手套" }, currentProductName: "" }),
+    { applied: true, autoProductName: "加热手套", productName: "加热手套" },
+  );
+  assert.equal(applyCreationReferenceAnalysisProductNameValue({ analysis: { sku_subjects: [{ title: "保温午餐包" }] }, currentProductName: "  用户原文  " }).productName, "保温午餐包");
 });
 
 test("creation reference product name suggestion falls back to SKU subject title", () => {
@@ -315,7 +320,7 @@ test("creation reference analysis correction summary reuses card reasons for app
 test("creation reference analysis apply feedback includes role correction summary", () => {
   const message = buildCreationReferenceAnalysisAppliedFeedbackMessage({
     recommendationCount: 2,
-    productNameApplied: true,
+    productNameSuggestion: "参考识别名称",
     recommendations: [
       {
         filename: "orange-silver-pair.png",
@@ -328,7 +333,7 @@ test("creation reference analysis apply feedback includes role correction summar
 
   assert.equal(
     message,
-    "已应用 2 张参考图用途建议，商品名称已填入四级类目。角色纠正：已从 reference-product 调整为 product：识别到 2 个完整产品单位。只有用户明确指定的单一全套主主体锚点才保留 reference-product。",
+    "已应用 2 张参考图用途建议。识别名称建议：参考识别名称，请核对后自行填写。角色纠正：已从 reference-product 调整为 product：识别到 2 个完整产品单位。只有用户明确指定的单一全套主主体锚点才保留 reference-product。",
   );
 });
 

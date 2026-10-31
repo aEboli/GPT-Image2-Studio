@@ -95,7 +95,7 @@ test("category overlays never duplicate a role already present in the set", () =
   }
 });
 
-const PERSON_LED_ROLES = ["benefit", "atmosphere", "human-handheld", "after-sales"];
+const PERSON_LED_ROLES = ["benefit", "human-handheld", "after-sales"];
 
 const GUARANTEED_ROLE_GROUPS = [
   ["hero"],
@@ -125,23 +125,23 @@ test("person-led roles shrink by at most one replacement per category budget", (
   const countPersonRoles = (industryTemplate) => rolesFor(industryTemplate)
     .filter((role) => PERSON_LED_ROLES.includes(role)).length;
 
-  // A full universal set carries four person-led jobs (benefit, atmosphere, human-handheld,
-  // after-sales). Categories whose budget is already five keep all four.
-  assert.equal(countPersonRoles("general"), 4);
-  assert.equal(countPersonRoles("apparel"), 4);
-  assert.equal(countPersonRoles("category:C02-002-003-001"), 4);
+  // Commercial CG is product-led; the three person-led jobs fit budgets of three or more.
+  assert.equal(countPersonRoles("general"), 3);
+  assert.equal(countPersonRoles("apparel"), 3);
+  assert.equal(countPersonRoles("category:C02-002-003-001"), 3);
 
   // structure-cutaway is the only replacement image type for a person role, so every lower
-  // budget can swap out exactly one person job: the floor is three, even where the budget is two.
+  // budget can swap out exactly one person job, leaving commercial CG intact.
   assert.equal(countPersonRoles("electronics"), 3);
-  assert.equal(countPersonRoles("category:C07-001-001-001"), 3);
-  assert.equal(countPersonRoles("category:C17-001-001-001"), 3);
-  assert.equal(countPersonRoles("category:C17-001-001-001") >= 3, true);
+  assert.equal(countPersonRoles("category:C07-001-001-001"), 2);
+  assert.equal(countPersonRoles("category:C17-001-001-001"), 2);
 
   // The removed person job is replaced by the structure-cutaway role, not dropped silently.
   assert.equal(rolesFor("general").includes("craft-process"), false);
-  assert.equal(rolesFor("electronics").includes("craft-process"), true);
-  assert.equal(rolesFor("electronics").includes("atmosphere"), false);
+  assert.equal(rolesFor("electronics").includes("craft-process"), false);
+  assert.equal(rolesFor("category:C07-001-001-001").includes("craft-process"), true);
+  assert.equal(rolesFor("electronics").includes("atmosphere"), true);
+  assert.equal(rolesFor("category:C07-001-001-001").includes("atmosphere"), true);
 });
 test("two different products do not share the same visual format lineup", () => {
   const formats = (productName) => carouselItems(buildUniversalPlan({

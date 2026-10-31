@@ -1148,6 +1148,7 @@ export function createCreationListingController(context = {}) {
         body: JSON.stringify({
           ...(context.getRequestConfig?.() || {}),
           setId: selectedSet.setId,
+          reasoningEffort: context.getReasoningEffort?.() || selectedSet.reasoningEffort,
           set: selectedSet,
         }),
       });

@@ -17,6 +17,12 @@ import { writeFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 let upstreamRequests = 0;
 const upstream = createServer((request, response) => {
+  if (request.method === 'GET' && request.url === '/') {
+    request.resume();
+    response.writeHead(404, { 'Content-Type': 'application/json' });
+    response.end(JSON.stringify({ message: 'not found' }));
+    return;
+  }
   upstreamRequests += 1;
   assert.equal(request.headers.authorization, 'Bearer request-owned-key');
   request.resume();

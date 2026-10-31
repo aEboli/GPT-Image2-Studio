@@ -1,6 +1,11 @@
 import { consumeSse } from "./generation-client.mjs";
 
-const fieldLabels = { summary: "摘要", title: "任务", name: "名称", need: "需求", text: "内容", marketing_goal: "购买问题", prompt: "画面", scene: "场景", action: "动作", framing: "景别", evidence_focus: "证据" };
+const fieldLabels = {
+  summary: "摘要", product_name: "商品", category_hint: "类目", category_path: "类目路径", filename: "参考图", note: "观察",
+  title: "任务", name: "名称", need: "需求", text: "内容", target_audience: "目标买家", context: "使用情境", purchase_trigger: "购买动机", objection: "购买顾虑",
+  marketing_goal: "购买问题", prompt: "画面", scene: "场景", environment: "环境", action: "动作", framing: "景别", evidence_focus: "证据",
+  core_buying_reason: "主购买理由", buyer_benefit: "买家收益", visual_evidence: "功能证据", new_information: "新增信息", effect_visual: "可见功能",
+};
 const readingPanels = new Set();
 const observedViews = new WeakSet();
 
@@ -15,8 +20,13 @@ export function fitCreationReadingPanel(panel) {
     view.addEventListener?.("resize", () => { for (const current of readingPanels) if (!current.hidden) fitCreationReadingPanel(current); });
   }
   const available = Math.min(rect.width, view.innerWidth - 24);
-  const width = Math.min(1440, available * (view.innerWidth > 760 ? 0.88 : 1));
-  const left = Math.max(12, Math.min(view.innerWidth - width - 12, rect.left + (rect.width - width) / 2));
+  const isAnalystPanel = panel.matches?.("#creationRecordDetail.creation-analyst-floating") === true;
+  const isNarrowViewport = view.innerWidth <= 760;
+  const width = isAnalystPanel
+    ? (isNarrowViewport ? available : Math.min(560, available, Math.max(420, available * 0.42)))
+    : Math.min(1440, available * (view.innerWidth > 760 ? 0.88 : 1));
+  const targetLeft = isAnalystPanel && !isNarrowViewport ? rect.right - width : rect.left + (rect.width - width) / 2;
+  const left = Math.max(12, Math.min(view.innerWidth - width - 12, targetLeft));
   const top = Math.max(72, Math.min(rect.top + 12, view.innerHeight - 260));
   panel.style.left = `${left}px`; panel.style.right = "auto";
   panel.style.top = `${top}px`; panel.style.bottom = "auto";
@@ -29,7 +39,7 @@ export function textModelDraftText(source = "") {
   const input = String(source);
   if (!/^\s*[\[{]/.test(input)) return input;
   const rows = [];
-  const pattern = /"(summary|title|name|need|text|marketing_goal|prompt|scene|action|framing|evidence_focus)"\s*:\s*"/g;
+  const pattern = new RegExp(`"(${Object.keys(fieldLabels).join("|")})"\\s*:\\s*"`, "g");
   let match;
   while ((match = pattern.exec(input))) {
     let value = "";
@@ -50,6 +60,14 @@ export function textModelDraftText(source = "") {
   return rows.join("\n\n");
 }
 
+export function formatTextModelTiming({ timing = {}, usage = {} } = {}) {
+  const values = [["clientPrepareMs", "图片准备"], ["prepareMs", "资料整理"], ["headersMs", "连接响应"], ["firstByteMs", "上游首包"], ["firstTextMs", "首段回答"], ["receiveMs", "回答接收"], ["validationMs", "校验"], ["totalMs", "总计"]]
+    .filter(([key]) => Number.isFinite(timing[key]) && timing[key] >= 0)
+    .map(([key, label]) => `${label} ${(timing[key] / 1000).toFixed(1)} 秒`);
+  if (Number.isFinite(usage.outputTokens)) values.push(`输出 ${usage.outputTokens.toLocaleString()} token`);
+  return values.join(" · ");
+}
+
 export function createTextModelPreview({ document = globalThis.document, panel, title = "模型实时输出" } = {}) {
   if (!document?.createElement) return { update() {}, finish() {} };
   const ownPanel = !panel;
@@ -65,21 +83,28 @@ export function createTextModelPreview({ document = globalThis.document, panel, 
     panel.append(summary); document.body.append(panel);
   }
   const meta = document.createElement("p"); meta.className = "text-model-live-meta";
+  const timing = document.createElement("p"); timing.className = "text-model-live-timing";
   const pre = document.createElement("pre"); pre.className = "text-model-live-draft";
-  panel.append(meta, pre);
+  panel.append(meta, timing, pre);
   let current = null;
   let timer = null;
+  let renderedText;
   const flush = () => {
     timer = null;
     if (!current || !panel.isConnected) return;
     const scrollTop = panel.scrollTop;
     const elapsed = Number(current.elapsedMs) / 1000;
-    meta.textContent = [current.purpose || title, current.requestId ? `请求 ${current.requestId.slice(0, 8)}` : "", current.attempt ? `第 ${current.attempt} 次` : "", Number.isFinite(current.firstTextMs) ? `首字 ${(current.firstTextMs / 1000).toFixed(1)} 秒` : "", Number.isFinite(elapsed) ? `${elapsed.toFixed(1)} 秒` : "", current.message || (current.stage === "receiving" ? "正在接收 · 待校验" : "等待模型")].filter(Boolean).join(" · ");
-    if (current.text !== undefined) pre.textContent = textModelDraftText(current.text);
+    meta.textContent = [current.purpose || title, current.requestId ? `请求 ${current.requestId.slice(0, 8)}` : "", current.attempt ? `第 ${current.attempt} 次` : "", current.requestedReasoningEffort ? `思考 ${current.requestedReasoningEffort} → ${current.actualReasoningEffort ?? "省略参数"}` : "", Number.isFinite(current.firstTextMs) ? `首字 ${(current.firstTextMs / 1000).toFixed(1)} 秒` : "", Number.isFinite(elapsed) ? `${elapsed.toFixed(1)} 秒` : "", current.message || (current.stage === "receiving" ? "正在接收 · 待校验" : "等待模型")].filter(Boolean).join(" · ");
+    timing.textContent = formatTextModelTiming(current);
+    timing.hidden = !timing.textContent;
+    if (current.text !== undefined && current.text !== renderedText) {
+      pre.textContent = textModelDraftText(current.text);
+      renderedText = current.text;
+    }
     panel.scrollTop = scrollTop;
   };
   return {
-    update(event) { current = { ...current, ...event }; if (event.stage === "waiting") { current.text = ""; current.firstTextMs = undefined; pre.textContent = ""; } if (timer === null) timer = setTimeout(flush, 50); },
+    update(event) { current = { ...current, ...event }; if (event.stage === "waiting") { current.text = ""; current.firstTextMs = undefined; current.usage = undefined; if (renderedText !== "") { pre.textContent = ""; renderedText = ""; } } if (timer === null) timer = setTimeout(flush, 50); },
     finish(error) { if (timer !== null) clearTimeout(timer); flush(); meta.textContent += error ? ` · ${error.message}` : " · 已结束，完整结果以校验后内容为准"; if (ownPanel && !error) panel.remove(); },
   };
 }

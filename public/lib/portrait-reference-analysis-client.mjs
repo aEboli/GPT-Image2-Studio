@@ -1,6 +1,8 @@
 import { requestTextModel } from "./text-model-client.mjs";
+import { DEFAULT_REASONING_EFFORT } from "./studio-constants.mjs";
 export function createPortraitReferenceAnalysisController({
   state,
+  getReasoningEffort = () => state.config?.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
   appendCurrentConfigToFormData,
   buildReferenceFingerprint,
   compactErrorMessage,
@@ -51,7 +53,7 @@ export function createPortraitReferenceAnalysisController({
     state.portrait.files.forEach((item) => formData.append("portraitReferenceImages", item.file));
     state.portrait.actionFiles.forEach((item) => formData.append("portraitActionReferenceImages", item.file));
     state.portrait.accessoryFiles.forEach((item) => formData.append("portraitAccessoryReferenceImages", item.file));
-    formData.set("reasoningEffort", "low");
+    formData.set("reasoningEffort", getReasoningEffort());
     appendCurrentConfigToFormData(formData);
     return formData;
   }

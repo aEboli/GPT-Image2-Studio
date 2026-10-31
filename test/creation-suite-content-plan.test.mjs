@@ -10,6 +10,7 @@ import { buildCreationQueuedSet as buildCreationQueuedSetFromState } from "../li
 import { buildCreationItemReferenceImages, buildCreationGenerationReferenceImageLabels } from "../lib/creation-reference-labels.mjs";
 import { resolveCreationSelectedRolesSubmission } from "../lib/creation-browser-plan-state.mjs";
 import { gloveAnalysisInput } from "./fixtures/creation-glove-insights.mjs";
+import { buildCreationSuiteContentPlan } from "../lib/creation-suite-content-plan.mjs";
 
 const sceneRoles = ["benefit", "scene", "atmosphere", "brand-story", "scene-fit-1", "scene-fit-2", "scene-fit-3", "after-sales", "human-handheld"].map((role) => ({ role }));
 const normalized = (value) => normalizeCreationProductInsights(value, { referenceCount: 1, primaryIndex: 1 });
@@ -36,12 +37,12 @@ test("legacy scene grouping merges phone paraphrases without merging different o
   assert.ok(assigned.some((scene) => /牵引绳/.test(scene.action)));
 });
 
-test("automatic carousel includes independent information jobs before appended rebuilds", () => {
+test("automatic carousel includes a functional effect and independent factual jobs before appended rebuilds", () => {
   for (const imageCount of [6, 8, 10, 12, 14, 18]) {
     const plan = buildCreationPlan(gloveAnalysisInput({ imageCount, infographicRebuildEnabled: true }));
     const items = plan.items.filter((item) => item.itemKind === "carousel");
     const information = items.filter((item) => item.contentAssignment?.kind === "infographic" && !item.evidenceBlocked);
-    assert.ok(information.length >= (imageCount >= 12 ? 3 : 2), `${imageCount} images contain ${information.length} information jobs`);
+    assert.ok(items.some((item) => item.contentAssignment?.kind === "functional-render" && !item.evidenceBlocked), `${imageCount} images preserve a visible functional task`);
     assert.equal(new Set(information.map((item) => item.contentAssignment.taskKey)).size, information.length);
     assert.ok(items.filter((item) => /手机/.test(item.sceneAssignment?.action || "")).length <= 1);
     assert.equal(items.length, imageCount);
@@ -59,7 +60,8 @@ test("selling overview receives multiple benefits and cannot become invented cha
   assert.ok(dimensions);
   assert.doesNotMatch(dimensions.prompt, /charging|step infographic|\[battery;/i);
   const functional = plan.items.find((item) => item.role === "effect-comparison");
-  assert.match(functional?.prompt || "", /functional infographic|short labels|evidence insets/i);
+  assert.match(functional?.prompt || "", /unified functional rendering|visible effect as the main proof/i);
+  assert.doesNotMatch(functional?.prompt || "", /2-4.*callouts|heat-flow rendering/i);
 });
 
 test("insufficient evidence yields explicit gaps rather than repeated scenes or fabricated information", () => {
@@ -68,10 +70,27 @@ test("insufficient evidence yields explicit gaps rather than repeated scenes or 
   raw.selling_points = [];
   raw.usage_scenarios = [];
   const plan = buildCreationPlan(gloveAnalysisInput({ dimensionSpecs: "", productInsights: raw }));
-  assert.ok(plan.warnings.some((warning) => warning.code === "suite-information-gap"));
+  assert.ok(plan.warnings.some((warning) => warning.code === "suite-content-gap"));
   assert.ok(plan.items.some((item) => item.evidenceBlocked && item.contentAssignment?.kind === "gap"));
   assert.ok(plan.items.filter((item) => item.contentAssignment?.kind === "infographic" && !item.evidenceBlocked).length < 3);
   assert.equal(plan.items.some((item) => item.sceneAssignment), false);
+});
+
+test("available parameters do not impose an information-image quota on distinct use tasks", () => {
+  const roles = ["benefit", "scene", "scene-fit-3", "brand-story", "scene-fit-1", "scene-fit-2"].map((role, index) => ({
+    role, title: role, platformSlot: { slotKey: `scene-${index}`, imageType: "scene-application" },
+  }));
+  const insights = {
+    confirmedFacts: [{ id: "look", text: "可见主体", kind: "appearance", referenceIndexes: [] },
+      { id: "size", text: "宽度10cm", kind: "spec", referenceIndexes: [] },
+      { id: "value", text: "资料标注3000mAh", kind: "spec", referenceIndexes: [] }],
+    sellingPoints: [], marketingRecommendations: [], painPoints: [],
+    usageScenarios: roles.map((entry, index) => ({ id: `use-${index}`, title: `独立用途${index}`, environment: `适用环境${index}`,
+      action: `执行已确认任务${index}`, actionGroup: `task-${index}`, factIds: ["look"], painPointIds: [], people: "hands" })),
+  };
+  const result = buildCreationSuiteContentPlan(roles, insights, { dimensionLines: ["宽度10cm"] });
+  assert.equal(result.assignments.filter((item) => item.kind === "scene").length, 6);
+  assert.equal(result.warnings.some((warning) => /information/.test(warning.code)), false);
 });
 
 test("manual role choices and individual prompts survive automatic balance", () => {
@@ -152,13 +171,27 @@ test("supporting appearance and a dimension-check scene cannot duplicate the mai
   assert.equal(plan.items.some((item) => item.sceneAssignment?.id === "size-scene"), false);
 });
 
+test("detail appearance follows the explicit primary role rather than the first product or legacy locks", () => {
+  const input = gloveAnalysisInput();
+  input.referenceImageRoles[0].role = "product";
+  input.referenceImageRoles.push({ index: 2, filename: "primary.png", role: "reference-product", note: "主参考商品" });
+  input.productInsights.appearance_locks = [{ text: "错误分析锁", reference_indexes: [1] }];
+  input.productInsights.confirmed_facts.push({ id: "primary-appearance", text: "主参考的真实外观", kind: "appearance", source: "reference", reference_indexes: [2] });
+  const plan = buildCreationPlan(input);
+  const details = plan.items.filter((item) => item.contentAssignment?.kind === "detail");
+  assert.ok(details.some((item) => item.contentAssignment.factIds.includes("primary-appearance")));
+  assert.ok(details.every((item) => !item.contentAssignment.factIds.includes("appearance")));
+});
+
 test("browser normalization and plan preview retain and display the assigned content", async () => {
   const app = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
   const normalizer = app.slice(app.indexOf("function normalizeCreationItemForView("), app.indexOf("function normalizeCreationSetForView("));
   const renderer = app.slice(app.indexOf("function renderCreationPlatformPlan("), app.indexOf("function renderCreationView("));
-  const element = () => ({ children: [], textContent: "", classList: { toggle() {} }, append(...children) { this.children.push(...children); }, replaceChildren(...children) { this.children = children; } });
+  const element = () => ({ children: [], textContent: "", classList: { toggle() {} }, append(...children) { this.children.push(...children); }, appendChild(child) { this.children.push(child); }, replaceChildren(...children) { this.children = children; } });
   const refs = { creationContentPlan: element(), creationContentPlanList: element() };
   const plan = buildCreationPlan(gloveAnalysisInput());
+  plan.items[0].marketingAssignment = { goal: "核对营销依据", referenceIndexes: [] };
+  plan.items[0].promptContext = { version: 1, subjectLock: "错误主体锁不应展示" };
   const context = vm.createContext({
     refs, document: { createElement: element }, state: {},
     CREATION_PREVIEW_SLOTS: [], cloneCreationPlanValue: (value, fallback) => value ?? fallback,
@@ -177,4 +210,9 @@ test("browser normalization and plan preview retain and display the assigned con
   assert.match(copy, /内置加热芯片/);
   assert.match(copy, /缺少依据，跳过/);
   assert.doesNotMatch(copy, /undefined|\[object Object\]/);
+  const texts = (entry) => [entry.textContent, ...entry.children.flatMap(texts)];
+  const evidenceCopy = refs.creationContentPlanList.children.flatMap(texts).join("\n");
+  assert.match(evidenceCopy, /图片作用：核对营销依据/);
+  assert.match(evidenceCopy, /商品事实：/);
+  assert.doesNotMatch(evidenceCopy, /主体锁|统一主体锁/);
 });

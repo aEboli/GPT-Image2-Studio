@@ -6,7 +6,6 @@ import {
   buildCreationItemReferenceImages,
   buildCreationReferenceImageLabels,
   MAX_CREATION_ITEM_REFERENCE_BYTES,
-  MAX_CREATION_ITEM_REFERENCE_IMAGES,
 } from "../lib/creation-reference-labels.mjs";
 import { normalizeCreationCoverageFields } from "../lib/creation-reference-coverage.mjs";
 
@@ -466,7 +465,7 @@ test("creation package references stay scoped to the package image role", () => 
   );
   assert.deepEqual(
     buildCreationItemReferenceImages({ role: "atmosphere" }, images, roles).map((image) => image.filename),
-    ["lure-main.png", "lake-scene.png"],
+    ["lure-main.png", "joint-detail.png"],
   );
 });
 
@@ -570,7 +569,7 @@ test("creation expanded suite roles keep the selected reference subject as the s
   );
   assert.deepEqual(
     buildCreationItemReferenceImages({ role: "atmosphere" }, images, roles).map((image) => image.filename),
-    ["orange-reference-subject.png", "trail-scene.png"],
+    ["orange-reference-subject.png", "mesh-detail.png"],
   );
   assert.deepEqual(
     buildCreationItemReferenceImages({ role: "product-detail" }, images, roles).map((image) => image.filename),
@@ -603,7 +602,6 @@ test("creation reference scheduling admits several relevant small references wit
     "detail-closeup.png",
   ]);
   assert.ok(selected.length > 3);
-  assert.ok(selected.length <= MAX_CREATION_ITEM_REFERENCE_IMAGES);
 });
 
 test("creation reference scheduling keeps distinct uploads with the same filename", () => {
@@ -753,7 +751,7 @@ test("creation coverage normalization retains reference indexes from browser pay
   ]);
 });
 
-test("creation reference scheduling enforces the eight-image hard cap", () => {
+test("creation reference scheduling and AI assignments can use more than eight images", () => {
   const images = [
     { filename: "product.png", byteLength: 200_000 },
     ...Array.from({ length: 14 }, (_, index) => ({
@@ -767,8 +765,9 @@ test("creation reference scheduling enforces the eight-image hard cap", () => {
   }));
 
   const selected = buildCreationItemReferenceImages({ role: "product-detail" }, images, roles);
-  assert.equal(selected.length, MAX_CREATION_ITEM_REFERENCE_IMAGES);
-  assert.deepEqual(selected.map((image) => image.filename), images.slice(0, MAX_CREATION_ITEM_REFERENCE_IMAGES).map((image) => image.filename));
+  assert.deepEqual(selected, images);
+  const assigned = buildCreationItemReferenceImages({ marketingAssignment: { referenceIndexes: images.map((_, index) => index + 1) } }, images, roles);
+  assert.deepEqual(assigned, images);
 });
 
 test("creation reference scheduling stops on the shared byte budget while keeping the anchor", () => {

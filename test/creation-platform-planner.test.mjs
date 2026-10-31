@@ -222,7 +222,7 @@ test("universal prompts stay platform-neutral and grounded in supplied source fa
     assertCanvasTextPolicy(item.prompt, item.imageType);
   }
   assert.ok(
-    textFreeItems.every((item) => /CANVAS TEXT: existing product markings only/i.test(item.prompt) && /Composition:/i.test(item.prompt)),
+    textFreeItems.every((item) => /CANVAS TEXT: existing product markings only/i.test(item.prompt) && (item.role === "atmosphere" ? /No added text/i.test(item.prompt) : /Composition:/i.test(item.prompt))),
   );
   // Evidence-gated slot replacement only runs for non-universal profiles, so the
   // universal baseline keeps its full native set even without packageContents evidence.
@@ -337,7 +337,7 @@ test("only the scene role copies a scene reference as a blueprint and scene-fit 
   const byRole = Object.fromEntries(plan.items.map((item) => [item.role, item.prompt]));
 
   assert.match(byRole.scene, /Use scene source boat\.jpg for environment, action, placement, angle, scale, and spatial relationships/);
-  assert.match(byRole.atmosphere, /Use scene source boat\.jpg for environment and activity cues/);
+  assert.doesNotMatch(byRole.atmosphere, /boat\.jpg|Use scene source/);
   for (const role of ["human-handheld", "human-wearable"]) {
     assert.doesNotMatch(byRole[role], /boat\.jpg/, role);
   }
@@ -371,7 +371,7 @@ test("universal set gives every carousel item a distinct visual format and perso
   assert.ok(formats.every(Boolean), "every item declares a visual format");
   assert.equal(new Set(formats).size, carousel.length);
 
-  const personLedRoles = ["benefit", "atmosphere", "human-handheld", "human-wearable", "after-sales"];
+  const personLedRoles = ["benefit", "human-handheld", "human-wearable", "after-sales"];
   const personLedPrompts = personLedRoles.map((role) => {
     const prompt = carousel.find((item) => item.role === role).prompt;
     assert.doesNotMatch(prompt, /\b(?:woman|man|male|female|girl|boy|\d0s|late teens|20s|30s|40s|50s|60s)\b/i);
@@ -427,7 +427,6 @@ test("scene and persona items carry a concrete setting while every item anchors 
     "scene-fit-1",
     "scene-fit-2",
     "scene-fit-3",
-    "atmosphere",
     "human-handheld",
     "human-wearable",
     "brand-story",

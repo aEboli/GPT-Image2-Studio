@@ -1321,6 +1321,20 @@ test("listing generation accepts a successful service response without dimension
   assert.equal(feedback.at(-1)?.type, "success");
 });
 
+test("Listing generation forwards the current panel reasoning choice", async () => {
+  const selectedSet = { setId: "set-reasoning", reasoningEffort: "low", listingDrafts: [] };
+  let payload;
+  const controller = createCreationListingController({
+    state: { creation: { sets: [selectedSet] } },
+    getSelectedSet: () => selectedSet,
+    getReasoningEffort: () => "max",
+    fetchImpl: async (_url, init) => { payload = JSON.parse(init.body); return Response.json({ set: selectedSet }); },
+  });
+  await controller.generate(selectedSet.setId);
+  assert.equal(payload.reasoningEffort, "max");
+  assert.equal(selectedSet.reasoningEffort, "low");
+});
+
 test("batch Listing generation skips records that already have Listing drafts", async () => {
   const existingSet = { setId: "set-existing", productName: "Existing", listingDrafts: [{ title: "Saved Listing" }] };
   const missingSet = { setId: "set-missing", productName: "Missing", listingDrafts: [] };

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { getImageUrl } from "../lib/browser-image-cache.mjs";
 
 const app = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
 
@@ -15,10 +16,11 @@ function getFunctionSource(source, name, nextName) {
 // assertions break if the wording or the condition changes.
 const statusLabel = new Function(
   "CREATION_ITEM_STATUS_LABELS",
+  "getImageUrl",
   `${getFunctionSource(app, "getCreationStatusLabel", "getCreationItemStatusLabel")}
    ${getFunctionSource(app, "getCreationItemStatusLabel", "getCreationSelectedLanguage")}
    return getCreationItemStatusLabel;`,
-)({ completed: "已完成", failed: "失败", generating: "生成中" });
+)({ completed: "已完成", failed: "失败", generating: "生成中" }, getImageUrl);
 
 test("a partial-image fallback result is labelled as not fully rendered", () => {
   const label = statusLabel({ status: "completed", partialImageFallback: true });
@@ -29,7 +31,11 @@ test("a partial-image fallback result is labelled as not fully rendered", () => 
 });
 
 test("a retained preview is labelled as retained", () => {
-  assert.match(statusLabel({ status: "failed", previewRetained: true }), /保留中途预览/);
+  assert.match(statusLabel({ status: "failed", previewRetained: true, previewUrl: "/output/retained-preview.png" }), /保留中途预览/);
+});
+
+test("a failed item without an image remains missing despite a retained-preview flag", () => {
+  assert.equal(statusLabel({ status: "failed", previewRetained: true }), "缺失");
 });
 
 test("an ordinary item keeps its plain status label", () => {

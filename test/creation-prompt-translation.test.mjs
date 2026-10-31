@@ -46,6 +46,7 @@ test("creation prompt translation replaces Chinese segments in non-Chinese items
   });
 
   assert.equal(calls.length, 1);
+  assert.equal(calls[0].body.reasoning.effort, "high");
   assert.match(calls[0].body.input, /into English/);
   assert.equal(result.warning, "");
   assert.equal(result.translatedCount, 1);

@@ -3,7 +3,8 @@ import { basename, dirname, extname, resolve } from "node:path";
 
 import { normalizeApiBaseUrl } from "./lib/api-base-url.mjs";
 import { DEFAULT_RESPONSES_MODEL } from "./lib/model-defaults.mjs";
-import { DEFAULT_BASE_URL } from "./lib/studio-constants.mjs";
+import { DEFAULT_BASE_URL, DEFAULT_REASONING_EFFORT, REASONING_EFFORT_OPTIONS } from "./lib/studio-constants.mjs";
+import { normalizeSelectedReasoningEffort, requestWithReasoningFallback } from "./lib/reasoning-effort.mjs";
 
 const DEFAULT_PROMPT =
   "生成一张美女抖音直播带货的写实风商业摄影图片，竖版构图，直播间灯光明亮，主播坐在桌前展示商品，画面精致自然，符合电商直播宣传海报质感。";
@@ -20,11 +21,13 @@ function printHelp() {
   --output      输出文件路径，默认写入 output/<timestamp>.<ext>
   --base-url    接口根路径，默认读取 OPENAI_BASE_URL 或 ${DEFAULT_BASE_URL}
   --model       外层 Responses 模型，默认读取 RESPONSES_MODEL 或 ${DEFAULT_RESPONSES_MODEL}
+  --reasoning-effort  思考等级：${REASONING_EFFORT_OPTIONS.join("、")}，默认 ${DEFAULT_REASONING_EFFORT}
 
 环境变量:
   OPENAI_API_KEY
   OPENAI_BASE_URL
-  RESPONSES_MODEL`);
+  RESPONSES_MODEL
+  REASONING_EFFORT`);
 }
 
 function parseArgs(argv) {
@@ -36,6 +39,7 @@ function parseArgs(argv) {
     output: "",
     baseUrl: process.env.OPENAI_BASE_URL || DEFAULT_BASE_URL,
     model: process.env.RESPONSES_MODEL || DEFAULT_RESPONSES_MODEL,
+    reasoningEffort: normalizeSelectedReasoningEffort(process.env.REASONING_EFFORT || process.env.IMAGE_STUDIO_REASONING_EFFORT),
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -85,6 +89,14 @@ function parseArgs(argv) {
 
     if (current === "--model" && next) {
       options.model = next;
+      index += 1;
+      continue;
+    }
+
+    if (current === "--reasoning-effort" && next) {
+      const effort = next.trim().toLowerCase();
+      if (!REASONING_EFFORT_OPTIONS.includes(effort)) throw new Error(`不支持的思考等级：${next}`);
+      options.reasoningEffort = effort;
       index += 1;
       continue;
     }
@@ -257,6 +269,7 @@ async function consumeSse(stream) {
 function buildRequestBody(options) {
   return {
     model: options.model,
+    reasoning: { effort: options.reasoningEffort },
     input: options.prompt,
     stream: true,
     tool_choice: {
@@ -296,7 +309,7 @@ async function main() {
   console.log("图片工具模型: gpt-image-2");
   console.log(`提示词: ${options.prompt}`);
 
-  const response = await fetch(`${baseUrl}/responses`, {
+  const response = await requestWithReasoningFallback(fetch, `${baseUrl}/responses`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -304,7 +317,7 @@ async function main() {
       Accept: "text/event-stream",
     },
     body: JSON.stringify(requestBody),
-  });
+  }, { onAdjustment: (event) => console.log(event.message) });
 
   if (!response.ok) {
     const errorText = await response.text();

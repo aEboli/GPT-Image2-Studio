@@ -29,8 +29,7 @@ test("browser request snapshots platform and files while manual category changes
   assert.match(app, /creationReferenceAnalysisAbortController\?\.abort\(\)/);
   assert.match(app, /signal:\s*requestController\.signal/);
   assert.match(snapshotBody, /platform:\s*getCreationSelectedPlatform\(\)\.value/);
-  assert.match(snapshotBody, /productName:\s*refs\.creationProductNameInput/);
-  assert.match(snapshotBody, /productDescription:\s*refs\.creationProductDescriptionInput/);
+  assert.doesNotMatch(snapshotBody, /creationProductNameInput|creationProductDescriptionInput/);
   assert.match(snapshotBody, /files:\s*state\.creationReferenceFiles\.map/);
   assert.doesNotMatch(snapshotBody, /category|getCreationSelectedIndustryTemplate/);
   assert.match(app, /refs\.creationIndustryTemplateInput\?\.addEventListener\("change", \(\) => \{[\s\S]*invalidateCreationReferenceAnalysisRequest\(\);/);
@@ -50,7 +49,7 @@ test("reference mutations invalidate analysis without clearing product form fiel
 
   assert.match(dirtyBody, /invalidateCreationReferenceAnalysisRequest\(\);/);
   assert.match(dirtyBody, /resetCreationDraftPreview\(\);/);
-  assert.doesNotMatch(dirtyBody, /creationProductNameInput|setCreationReferenceProductNameValue|clearCreationReferenceAnalysisProductNameSuggestion/);
+  assert.doesNotMatch(dirtyBody, /creationProductNameInput|setCreationReferenceProductNameValue|clearCreationReferenceAnalysisProductNameSuggestion|clearCreationReferenceAnalysisManagedProductName/);
 });
 
 test("reference analysis applies automatically and keeps the detected role editable", async () => {
@@ -65,7 +64,8 @@ test("reference analysis applies automatically and keeps the detected role edita
   assert.doesNotMatch(recommendationsBody, /roleLocked\s*:/);
   assert.match(renderGridBody, /roleSelect\.dataset\.creationReferenceRoleId = item\.id;/);
   assert.doesNotMatch(renderGridBody, /creation-reference-role-readonly/);
-  assert.match(app, /const \{ appliedMessage, categoryApplied, categoryCleared, matchedTemplate \} = await applyCreationReferenceAnalysis\(payload\);/);
+  assert.match(app, /const \{ appliedMessage, categoryApplied, categoryCleared, matchedTemplate, stale \} = await applyCreationReferenceAnalysis\(payload\);/);
+  assert.match(app, /if \(stale \|\| requestToken !== creationReferenceAnalysisRequestToken\) \{/);
   assert.doesNotMatch(app, /creationReferenceApplyAnalysisButton|应用建议/);
 
   const appliedIndex = recommendationsBody.indexOf("state.creationReferenceAnalysis.applied = true;");

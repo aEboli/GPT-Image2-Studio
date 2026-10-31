@@ -28,13 +28,13 @@ test("server exposes independent portrait generation and record endpoints", asyn
   assert.doesNotMatch(server, /\/api\/creation\/portrait/);
 });
 
-test("portrait reference analysis defaults to low reasoning effort on the local server", async () => {
+test("portrait reference analysis preserves selected effort and uses the configured default", async () => {
   const server = await readFile(serverPath, "utf8");
 
-  assert.match(server, /const PORTRAIT_REFERENCE_ANALYSIS_REASONING_EFFORT = "low";/);
+  assert.doesNotMatch(server, /const PORTRAIT_REFERENCE_ANALYSIS_REASONING_EFFORT = "low";/);
   assert.match(
     server,
-    /formData\.get\("reasoningEffort"\)\s*\|\|\s*PORTRAIT_REFERENCE_ANALYSIS_REASONING_EFFORT/,
+    /formData\.get\("reasoningEffort"\)\s*\|\|\s*config\.defaults\?\.reasoningEffort \|\| DEFAULT_REASONING_EFFORT/,
   );
 });
 

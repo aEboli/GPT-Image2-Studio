@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   allocateCreationProductScenes,
+  buildCreationProductInsightPrompt,
   normalizeCreationProductInsights,
 } from "../lib/creation-product-insights.mjs";
 import { buildCreationPlan } from "../lib/creation-planner.mjs";
@@ -31,11 +32,23 @@ const rawInsights = {
 
 test("product insights keep sourced facts, drop conflicted facts, and deduplicate scenes", () => {
   const normalized = normalizeCreationProductInsights(rawInsights, { referenceCount: 2, primaryIndex: 1 });
+  assert.equal(Object.hasOwn(normalized, "appearanceLocks"), false);
+  assert.equal(Object.hasOwn(normalized, "appearance_locks"), false);
   assert.equal(normalized.confirmedFacts.some((entry) => entry.id === "bad-number"), false);
   assert.equal(normalized.confirmedFacts.some((entry) => entry.id === "control-1"), true);
   assert.equal(normalized.sellingPoints[0].factIds[0], "control-1");
   assert.equal(normalized.usageScenarios.length, 2);
   assert.equal(normalized.conflicts[0].claims[0], "五档加热");
+});
+
+test("legacy appearance locks are ignored while sourced appearance facts remain available", () => {
+  const normalized = normalizeCreationProductInsights({
+    appearance_locks: [{ text: "APPEARANCE LOCK: incorrectly identified red open product", reference_indexes: [1] }],
+    confirmed_facts: rawInsights.confirmed_facts,
+  }, { referenceCount: 2, primaryIndex: 1 });
+  assert.equal(Object.hasOwn(normalized, "appearanceLocks"), false);
+  assert.ok(normalized.confirmedFacts.some((fact) => fact.id === "appearance-1"));
+  assert.doesNotMatch(buildCreationProductInsightPrompt(normalized), /APPEARANCE LOCK|incorrectly identified red/);
 });
 
 test("analysis scenes give separate product-led jobs to suite items", () => {
@@ -53,7 +66,8 @@ test("analysis scenes give separate product-led jobs to suite items", () => {
     referenceImageRoles: [{ index: 1, filename: "gloves.png", role: "reference-product", note: "主商品" }],
     productInsights: rawInsights,
   });
-  assert.match(plan.items.find((item) => item.role === "hero").prompt, /卡其色全指手套/);
+  assert.match(plan.items.find((item) => item.role === "hero").prompt, /PRODUCT FIDELITY: gloves\.png/);
+  assert.doesNotMatch(plan.items.find((item) => item.role === "hero").prompt, /APPEARANCE LOCK/);
   assert.match(plan.items.find((item) => item.role === "scene").prompt, /SCENE TASK/);
   assert.doesNotMatch(plan.items.find((item) => item.role === "scene").prompt, /五档加热/);
   assert.ok(plan.productInsights);

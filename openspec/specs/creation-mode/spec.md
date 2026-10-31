@@ -22,7 +22,7 @@ Necessary constraints SHALL be preserved as positive requirements. In particular
 
 Prompt composition SHALL NOT impose a character-length ceiling or truncate assembled sections to satisfy a total prompt length. Every role SHALL contribute one merged role directive instead of separate brief, shopper-question, buyer-decision, role-intent, role-focus, and rendering-constraint blocks.
 
-Ordinary carousel item prompts SHALL be organized as separate lines for the task, the assigned references, product fidelity, canvas text, and style. The task line SHALL carry the role directive without a `Role job` label. Universal carousel prompts SHALL omit internal composition and scene-policy labels and buyer-goal labels; platform-native slots SHALL keep their composition and scene policy. Product identity and surface-content preservation SHALL be expressed once as a single `PRODUCT FIDELITY` instruction naming the primary product anchor when one exists, and runtime generation SHALL treat that instruction as satisfying both subject locks. Each assigned reference and its note SHALL appear once per prompt.
+Ordinary carousel item prompts SHALL be organized as separate lines for the task, the assigned references, product fidelity, canvas text, and style. The task line SHALL carry the role directive without a `Role job` label. Universal carousel prompts SHALL omit internal composition and scene-policy labels and buyer-goal labels; preserved legacy platform-native slots SHALL keep their saved composition and scene policy. Product identity and surface-content preservation SHALL be expressed once as a single `PRODUCT FIDELITY` instruction naming the primary product anchor when one exists, and runtime generation SHALL treat that instruction as satisfying both subject locks. Each assigned reference and its note SHALL appear once per prompt.
 
 #### Scenario: Planner builds a standard eight-image set
 
@@ -59,7 +59,7 @@ Ordinary carousel item prompts SHALL be organized as separate lines for the task
 
 ### Requirement: Creation Mode generates configurable ecommerce sets
 
-The system SHALL generate one set for one product with quick presets of 4, 6, 8, 10, 12, 14, or 16 ecommerce marketing roles and SHALL allow the user to customize which of the 16 image roles are generated for the current set: hero, benefit, scene, multi-angle, atmosphere, product detail, brand story, size/capacity/fit, effect comparison, specification table, craft process, accessory/gift, series showcase, ingredient/material, after-sales, and usage suggestion. The system SHALL keep those role IDs stable while presenting conversion-oriented Chinese role labels: 首图成交主视觉, 目标人群共鸣图, 适用多场景图, 多角度产品展示图, 冲动下单氛围图, 产品细节特写图, 品牌质感/礼品价值图, 尺寸容量适配图, 功能效果渲染图, 参数规格图, 品质工艺证明图, 到手清单/配件图, 多款式/SKU选择图, 材质成分解析图, 痛点图, and 卖点图. The system SHALL also allow the user to choose an industry template for general ecommerce, apparel, beauty, food, consumer electronics, home/living products, or a searchable fourth-level ecommerce category template. The system SHALL support a set-level visual-language selector that defaults to `classic-commercial` and keeps the generated set visually consistent across lighting, tone, material treatment, realism level, and brand atmosphere. When the user uses a preset without custom role changes and no non-general industry template is selected, the first four roles SHALL remain 首图成交主视觉, 目标人群共鸣图, 适用多场景图, and 多角度产品展示图. Newly planned SKU items SHALL use one complete subject per distinct sellable SKU; only historical frozen plans may preserve a previously recorded combination count.
+The system SHALL generate one set for one product with quick presets of 4, 6, 8, 10, 12, 14, or 16 ecommerce marketing roles and SHALL allow the user to customize which of the 16 image roles are generated for the current set: hero, benefit, scene, multi-angle, atmosphere, product detail, brand story, size/capacity/fit, effect comparison, specification table, craft process, accessory/gift, series showcase, ingredient/material, after-sales, and usage suggestion. The system SHALL keep those role IDs stable while presenting conversion-oriented Chinese role labels: 首图成交主视觉, 目标人群共鸣图, 适用多场景图, 多角度产品展示图, 商业 CG 渲染图, 产品细节特写图, 品牌质感/礼品价值图, 尺寸容量适配图, 功能效果渲染图, 参数规格图, 品质工艺证明图, 到手清单/配件图, 多款式/SKU选择图, 材质成分解析图, 痛点图, and 卖点图. The system SHALL also allow the user to choose an industry template for general ecommerce, apparel, beauty, food, consumer electronics, home/living products, or a searchable fourth-level ecommerce category template. The system SHALL support a set-level visual-language selector that defaults to `classic-commercial` and keeps the generated set visually consistent across lighting, tone, material treatment, realism level, and brand atmosphere. When the user uses a preset without custom role changes and no non-general industry template is selected, the first four roles SHALL remain 首图成交主视觉, 目标人群共鸣图, 适用多场景图, and 多角度产品展示图. Newly planned SKU items SHALL use one complete subject per distinct sellable SKU; only historical frozen plans may preserve a previously recorded combination count.
 
 #### Scenario: User starts a conversion-oriented creation set
 
@@ -67,7 +67,7 @@ The system SHALL generate one set for one product with quick presets of 4, 6, 8,
 - **THEN** the first planned item remains `hero` / 首图成交主视觉 and the second remains `benefit` / 目标人群共鸣图
 - **AND** the hero prompt requests the reliable non-dimension product identity, description, selling-point, material, usage, scene, package, and trust facts that fit its bounded information hierarchy
 - **AND** newly authored hero canvas copy uses the selected target language while physical product and packaging text remains unchanged
-- **AND** the hero prompt retains 3–5 small circular scene frames around the dominant product
+- **AND** the hero prompt emphasizes one memorable source-grounded buying reason with one dominant product and a task-appropriate composition, without mandatory circular scene frames or feature strips
 
 #### Scenario: User selects the target-shopper resonance role
 
@@ -82,16 +82,17 @@ The system SHALL generate one set for one product with quick presets of 4, 6, 8,
 - **AND** the later `universal:selling-point-stack` item remains displayed as 卖点图
 - **AND** the stored manifest title, prompt, filename, and stable item ID are not rewritten
 
-#### Scenario: User generates a high-intent atmosphere image
+#### Scenario: User generates a commercial CG product image
 
-- **WHEN** the planned set includes `atmosphere` / 冲动下单氛围图
-- **THEN** the prompt places the exact product inside a specific decisive ownership or usage moment with a visible action, target-user cue, and purchase-trigger emotion
-- **AND** the prompt requires that purchase-triggering moment as the composition, with the product recognizable and commercially inspectable
+- **WHEN** the planned set includes `atmosphere` / 商业 CG 渲染图
+- **THEN** the prompt renders the reference-supported complete product with sculptural volume, actual material response, shaped key and rim lighting, contact shadows and coherent spatial reflections
+- **AND** it preserves the role and image-type IDs without requiring a real person, a use action, a fixed slogan or an independent use scene
+- **AND** the separate `effect-comparison` / 功能效果渲染图 keeps explaining a supported function and buyer benefit
 
-#### Scenario: Platform policy is stricter than conversion guidance
+#### Scenario: Preserved blocking policy is stricter than conversion guidance
 
-- **WHEN** a platform-native slot has a blocking no-text, white-background, transparent, or no-collage constraint
-- **THEN** the blocking platform policy remains authoritative
+- **WHEN** a current or preserved legacy slot has a blocking no-text, white-background, transparent, or no-collage constraint
+- **THEN** the blocking constraint remains authoritative
 - **AND** hero all-fact copy, circular scene frames, and scene stitching are omitted wherever they conflict with that policy
 
 #### Scenario: User starts a creation set
@@ -436,88 +437,54 @@ The system SHALL group waterfall gallery browsing, PPT records, Creation Mode se
 - **THEN** the workspace shows the current in-progress or planned Creation set output
 - **AND** saved Creation Mode history is not rendered as a history list inside the active workspace
 
-### Requirement: Creation Mode resolves platform-specific automatic plans
-The system SHALL provide versioned automatic planning profiles for `universal`, `amazon`, `tmall-taobao`, `jd`, `pdd`, `douyin`, `xiaohongshu`, `temu`, `tiktok-shop`, `shopee`, `lazada`, `etsy`, `ebay`, `walmart`, `shopify`, `aliexpress`, `rakuten`, `coupang`, and `mercado-libre`. When the user has not supplied a corresponding override, the selected profile SHALL determine the carousel image types, order, recommended count, per-item ratio, resolution tier, target language, composition, text policy, and scene policy. The `universal` profile SHALL preserve a generic ecommerce fallback.
+### Requirement: Creation Mode uses a universal automatic plan
+Creation Mode SHALL expose only the universal ecommerce profile for new user-created plans and SHALL NOT expose a marketplace platform selector. Browser submissions for new plans SHALL use `platform=universal`. The universal local plan SHALL retain up to 18 role-aligned carousel slots; AI marketing planning MAY independently create 1–20 ordinary carousel tasks. Product category, available evidence, and existing set-level overrides MAY shape the plan without selecting a marketplace. SKU and infographic rebuild items SHALL remain separately counted.
 
-#### Scenario: Amazon receives a strict marketplace plan
-- **WHEN** the user selects Amazon without platform-related overrides
-- **THEN** the planner creates seven carousel items before SKU and infographic rebuild additions
-- **AND** the first item is an Amazon white-background main-image type mapped to the legacy `hero` content role
-- **AND** the first item forbids visible marketing copy, collages, watermarks, unsupplied logos, badges, and misleading accessories
-- **AND** the automatic plan uses a square ratio, English, and the Amazon resolution tier
+#### Scenario: New Creation plan uses the universal profile
+- **WHEN** the user previews or generates a new Creation set
+- **THEN** the browser submits `platform=universal` without offering marketplace choices
+- **AND** the local plan uses the universal ecommerce profile
 
-#### Scenario: Xiaohongshu receives a content-native plan
-- **WHEN** the user selects Xiaohongshu without platform-related overrides
-- **THEN** the planner creates six carousel items before SKU and infographic rebuild additions
-- **AND** the first item is a 3:4 Xiaohongshu feed-cover type
-- **AND** the plan prioritizes lifestyle experience, steps or evidence, product detail, scale, and a clean product-proof image
-- **AND** the prompts forbid fabricated reviews, engagement, endorsements, and disguised user testimony
+#### Scenario: Universal local and AI marketing counts remain distinct
+- **WHEN** the user plans ordinary carousel images
+- **THEN** the local template path supports up to 18 role-aligned slots
+- **AND** the AI marketing path supports 1–20 independently planned tasks
+- **AND** SKU and infographic rebuild additions do not count against either carousel limit
 
-#### Scenario: Taobao receives mixed native image types
-- **WHEN** the user selects Taobao/Tmall without platform-related overrides
-- **THEN** the planner creates eight carousel items before SKU and infographic rebuild additions
-- **AND** the plan contains white-background, transparent-background, scene, selling-point, detail, dimension, SKU-choice, and 2:3 long-image types
-- **AND** the effective item ratios include both 1:1 and 2:3
+#### Scenario: Product category adjusts the universal plan
+- **WHEN** the selected category or applied reference evidence indicates apparel fit, electronic specifications, food ingredients, multiple SKUs, package contents, or product condition
+- **THEN** the resolver may substitute or prioritize relevant image types within the universal plan
+- **AND** it does not invent facts absent from product input and applied reference evidence
 
-#### Scenario: Universal fallback remains available
-- **WHEN** the platform value is absent, unknown, or explicitly `universal`
-- **THEN** the planner uses the universal ecommerce profile
-- **AND** the universal profile exposes the original 18 role-aligned native carousel slots and recommends 18 images without `custom` extension
-- **AND** missing platform-specific evidence does not reduce the universal carousel below those 18 generic role-led slots
-- **AND** an unknown explicit value produces a visible planning warning instead of being presented as a verified named-platform plan
+#### Scenario: Historical marketplace plans remain frozen
+- **WHEN** a saved set contains legacy marketplace profile metadata
+- **THEN** the system preserves and displays that saved plan without offering marketplace selection for new plans
+- **AND** ordinary retry and repair continue using the saved effective plan
 
-#### Scenario: Every platform keeps one size-related image type
-- **WHEN** any canonical platform automatic plan is resolved with or without exact dimension evidence
-- **THEN** its enabled carousel contains at least one `dimension-fit` or `scale-proof` item mapped to `size-capacity-fit`
-- **AND** missing dimension evidence does not replace or omit that size-related item
-- **AND** without supplied dimension values the prompt forbids invented measurements and permits only non-numeric, evidence-grounded scale or fit presentation
+### Requirement: Creation image types and evidence are first-class planning data
+The system SHALL store an `imageType` and effective `logoPolicy` for each universal-plan carousel item while preserving the stable `role` as its content intent. The universal profile SHALL include its strategy version, evidence level, verification date, and source metadata. Any blocking constraint retained for compatibility SHALL reference a verified source; lower-confidence guidance SHALL remain advisory. Browser-consumed policy and resolver modules SHALL be generated as exact `public/lib` mirrors of their canonical `lib` sources.
 
-#### Scenario: Platform strategy changes every item prompt
-- **WHEN** the same product facts are planned for two different canonical platforms
-- **THEN** every carousel item prompt includes the selected profile's platform-specific gallery instruction
-- **AND** the current slot's image type, composition, text and scene policies remain explicit
-- **AND** a generic legacy role brief does not replace the platform gallery strategy
+#### Scenario: Image type preserves role compatibility
+- **WHEN** the resolver creates a universal carousel slot
+- **THEN** the plan item stores its `imageType` and supported Creation `role`
+- **AND** reference selection, SKU, Logo, prompt allocation, filename, record, and repair behavior continue using the stable role where required
 
-#### Scenario: Product category adjusts platform slots
-- **WHEN** a selected fourth-level category or applied reference evidence indicates apparel fit, electronic specifications, food ingredients, multiple SKUs, package contents, or product condition
-- **THEN** the resolver substitutes or prioritizes relevant wearable, size, specification, ingredient, variant, included-item, or condition image types within the platform plan
-- **AND** it does not invent facts that are absent from product input and applied reference evidence
-- **AND** it does not remove official constraints bound to the retained image types
-
-#### Scenario: Variant carousel slot differs from appended SKU items
-- **WHEN** at least two distinct sellable SKU subjects are available and the selected platform recommends a variant image
-- **THEN** the carousel may contain one variant-comparison item covering only the supplied SKU choices
-- **AND** the planner still appends the existing one-item-per-SKU outputs after the carousel
-- **AND** appended SKU items do not count against the platform carousel recommendation
-
-#### Scenario: Single SKU does not receive an automatic variant comparison
-- **WHEN** fewer than two distinct sellable SKU subjects are available
-- **THEN** the automatic resolver omits or replaces the variant-comparison carousel slot unless the user explicitly keeps it as a custom slot
-
-### Requirement: Platform image types and evidence are first-class planning data
-The system SHALL store an `imageType` and effective `logoPolicy` for every platform-planned carousel item while preserving the existing stable `role` as its content intent. Each platform profile SHALL include a strategy version, evidence level, verification date, and source metadata. A blocking platform constraint SHALL reference a verified official source; lower-confidence guidance SHALL remain advisory. Browser-consumed policy and resolver modules SHALL be generated as exact `public/lib` mirrors of their canonical `lib` sources.
-
-#### Scenario: New image type preserves legacy role compatibility
-- **WHEN** the resolver creates a platform-native main-image, feed-cover, transparent-image, long-detail, condition, or lifestyle slot
-- **THEN** the plan item stores both its platform-native `imageType` and a supported legacy Creation `role`
-- **AND** existing reference selection, SKU, Logo, prompt allocation, filename, record, and repair behavior can continue to use the legacy role where required
-
-#### Scenario: Official hard constraint is validated
-- **WHEN** an effective item remains classified as an official platform main-image type
-- **AND** its overrides request a composition or visible text forbidden by that image type's sourced official rules
+#### Scenario: A retained blocking constraint is validated
+- **WHEN** a current or preserved legacy plan contains a sourced blocking constraint
+- **AND** its overrides request a composition or visible text forbidden by that constraint
 - **THEN** plan preview returns an item-level blocking conflict
 - **AND** generation does not start for that invalid plan
 
-#### Scenario: Strict main image does not receive an uploaded Logo overlay
-- **WHEN** the user has uploaded and enabled a Logo
-- **AND** an effective item is Amazon, TikTok Shop, Walmart, or another sourced strict main-image type whose `logoPolicy` is `forbid-overlay`
+#### Scenario: Preserved strict main image does not receive an uploaded Logo overlay
+- **WHEN** a preserved legacy item has a sourced strict main-image type whose `logoPolicy` is `forbid-overlay`
+- **AND** the user has uploaded and enabled a Logo
 - **THEN** the plan and generation-reference assembly omit the external Logo for that item
 - **AND** they preserve branding or identifiers already present on the supplied product subject
 - **AND** other eligible secondary items may still use the uploaded Logo
 - **AND** an item override that requests external Logo overlay produces a blocking conflict until the user restores `forbid-overlay` or changes the image type to `custom`
 
-#### Scenario: Low-evidence profile stays advisory
-- **WHEN** the selected profile or a specific rule has only conservative or non-authoritative evidence
+#### Scenario: Low-evidence policy stays advisory
+- **WHEN** the universal profile or a preserved legacy rule has only conservative or non-authoritative evidence
 - **THEN** the UI identifies it as a conservative recommendation
 - **AND** the resolver does not turn that rule into a blocking official constraint
 
@@ -530,9 +497,9 @@ The system SHALL store an `imageType` and effective `logoPolicy` for every platf
 - **THEN** the platform policy and browser-used resolver files in `public/lib` are byte-equivalent to their canonical `lib` files
 - **AND** an out-of-sync or missing mirror fails the repository sync check
 
-### Requirement: Users can adjust plans without editing prompts or advanced per-item parameters
+### Requirement: Users can adjust universal plans without editing prompts or advanced per-item parameters
 
-The system SHALL allow users to override platform-derived target language, default ratio, default resolution, visual language, enabled image count, compatible image-type enablement, thinking effort, and image quality. The SKU generation rule input SHALL remain editable and SHALL NOT be locked by the platform profile. New Creation plans SHALL use a fixed one-subject SKU count and SHALL NOT expose or submit an editable SKU bundle-count field. The Creation UI SHALL NOT expose item order, item image type, item ratio, item resolution, item language, item composition, item text density, item scene policy, item Logo policy, or item prompt editing, and SHALL NOT submit user-authored prompt overrides.
+The system SHALL allow users to override universal-plan target language, default ratio, default resolution, visual language, enabled image count, compatible image-type enablement, thinking effort, and image quality. The SKU generation rule input SHALL remain editable. New Creation plans SHALL use a fixed one-subject SKU count and SHALL NOT expose or submit an editable SKU bundle-count field. The Creation UI SHALL NOT expose marketplace selection, item order, item image type, item ratio, item resolution, item language, item composition, item text density, item scene policy, item Logo policy, or item prompt editing, and SHALL NOT submit user-authored prompt overrides.
 
 #### Scenario: User applies a set-level override
 
@@ -547,53 +514,51 @@ The system SHALL allow users to override platform-derived target language, defau
 - **AND** the planned carousel count equals the number of enabled carousel slots
 - **AND** no advanced per-item editor or prompt input is shown
 
-#### Scenario: 平台决定套图数量上限
+#### Scenario: Local template plan uses universal slot capacity
 
-- **WHEN** 当前平台 profile 只内置 6 个规范化轮播槽位
-- **THEN** 套图数量控件只提供不超过 6 的受支持选项
-- **AND** 浏览器、resolver 和本地端点均不得把请求扩展为第 7 至 18 个通用或 `custom` 轮播项
-- **AND** SKU 图和信息图重构仍作为独立追加项，不占用该平台轮播上限
+- **WHEN** the local template planning path is active
+- **THEN** its count control supports up to 18 universal role-aligned carousel slots
+- **AND** SKU images and infographic rebuilds remain independent additions
 
-#### Scenario: 通用电商保留 18 张原生套图
+#### Scenario: Universal local plan retains 18 native slots
 
-- **WHEN** 用户选择通用电商且未主动减少套图数量
+- **WHEN** the local template path is active and the user has not reduced the carousel count
 - **THEN** 数量控件默认选择 18，并提供 0 至 18 的受支持选项
 - **AND** resolver 和本地端点返回 18 个通用电商原生轮播项
 - **AND** 这些轮播项对应原有 18 个角色且不使用 `custom` 图片类型补足
 
-#### Scenario: 平台切换立即收紧数量
+#### Scenario: Marketplace selection is unavailable
 
-- **WHEN** 用户从内置 9 个轮播槽位的平台切换到内置 6 个轮播槽位的平台
-- **THEN** 数量控件立即移除 7 至 18 的选项
-- **AND** 若旧选择超过 6，当前值收紧为新平台推荐值并立即请求新计划
-- **AND** 冻结 `effectivePlan`、摘要、队列快照和实际生成均使用收紧后的轮播数量
+- **WHEN** the user opens Creation Mode
+- **THEN** no marketplace selector is shown and the profile label is universal ecommerce
+- **AND** new plan submissions use `platform=universal`
 
-#### Scenario: 首次显式数量预览保留平台范围内的已对齐角色
+#### Scenario: First explicit count preview preserves aligned roles
 
-- **WHEN** 用户在当前平台上限内修改数量，浏览器已保存显式 `imageCount` 和相同数量的已对齐角色，但新的 `effectivePlan` 尚未返回
+- **WHEN** the user changes the image count and an `effectivePlan` has not returned yet
 - **THEN** 首次预览仍提交显式数量及全部已对齐 `selectedRoles`
 - **AND** 未手动编辑角色不会被解释为清空角色
 - **AND** 只有不存在显式数量且不存在手动角色编辑时，浏览器才提交空角色选择以请求纯自动计划
 
-#### Scenario: 平台自动推荐数量保持可见且不冒充用户覆盖
+#### Scenario: Universal recommended count remains visible without becoming an override
 
-- **WHEN** 用户尚未主动修改数量，且 Amazon 自动计划解析为 7 个有效轮播项
-- **THEN** 数量控件和兼容图片类型区域显示当前有效轮播数量 7
+- **WHEN** the user has not changed the count and the universal local plan resolves to 18 carousel items
+- **THEN** the count control and compatible image-type area show 18
 - **AND** 浏览器不把该自动值保存为显式 `imageCount` 覆盖
 
-#### Scenario: 兼容图片类型区域使用当前有效轮播计划口径
+#### Scenario: Compatible image types follow the current effective plan
 
-- **WHEN** 当前平台计划已解析，或用户启用、禁用、增删、排序槽位后预览更新
+- **WHEN** the universal plan resolves or the user enables or disables a compatible slot
 - **THEN** 兼容图片类型区域仅列出当前 `effectivePlan` 的轮播槽位，并按每个槽位的 `enabled` 状态显示选择结果
 - **AND** 计数显示“已启用轮播槽位数 / 当前轮播槽位总数”
 - **AND** 追加 SKU 项和信息图重构项不进入该区域的列表或计数
 
-#### Scenario: 显式套图参数覆盖平台默认值
+#### Scenario: Explicit set parameters override universal defaults
 
-- **WHEN** 用户选择小红书平台，并显式选择 English、统一比例和分辨率
+- **WHEN** the user explicitly changes target language, ratio, or resolution
 - **THEN** 浏览器把 `targetLanguage`、`ratio` 和 `resolutionTier` 保存为套图级覆盖
 - **AND** 预览返回的每个轮播 item、冻结 `effectivePlan`、队列和实际逐图请求均使用这些显式值
-- **AND** 小红书的简体中文、3:4 和 1.5K 平台默认值不得重新覆盖用户选择
+- **AND** universal defaults do not override explicit values
 
 #### Scenario: Image count change is frozen before first generation
 
@@ -602,26 +567,26 @@ The system SHALL allow users to override platform-derived target language, defau
 - **AND** a generation submit waits for the latest preview to finish
 - **AND** the first queued generation uses the refreshed count without requiring a second click
 
-#### Scenario: SKU generation toggle preserves the platform carousel plan
+#### Scenario: SKU generation toggle preserves the universal carousel plan
 
-- **WHEN** a named-platform plan is visible and the user disables or enables SKU image generation
-- **THEN** the browser immediately refreshes the plan for the same selected platform
+- **WHEN** the user disables or enables SKU image generation
+- **THEN** the browser refreshes the plan using the universal profile
 - **AND** only appended SKU items, `skuImageCount`, and `totalPlannedItemCount` change
 - **AND** `carouselImageCount`, ordered carousel slot keys, image types, and compatible image-type state remain unchanged
 - **AND** the refresh does not show or submit the universal legacy role list
 
-#### Scenario: User restores the current platform recommendation
+#### Scenario: User restores the current universal recommendation
 
-- **WHEN** the user selects Restore current platform recommendation
-- **THEN** the system clears only platform-related set and item overrides
-- **AND** it recomputes the profile, category, and reference-derived plan
+- **WHEN** the user selects Restore current recommendation
+- **THEN** the system clears applicable set and item overrides
+- **AND** it recomputes the universal, category, and reference-derived plan
 - **AND** it preserves product information, category, dimensions, references, Logo, SKU, output format, and model/API configuration
 
 ### Requirement: Creation generation uses per-item effective parameters consistently
 The system SHALL include effective ratio, resolution tier, resolved size, and target language on each planned item. Local generation SHALL resolve and submit those values per item, and the same planning payload SHALL produce a deterministic effective plan.
 
 #### Scenario: One set uses mixed ratios
-- **WHEN** a platform plan contains square and portrait items
+- **WHEN** an effective plan contains square and portrait items
 - **THEN** each generation request uses the ratio saved on its matching item
 - **AND** the prompt ratio guidance, requested upstream aspect ratio, activity metadata, saved item metadata, and lightbox parameters agree for that item
 
@@ -632,15 +597,15 @@ The system SHALL include effective ratio, resolution tier, resolved size, and ta
 - **AND** the effective size is stored on the item for later retry and review
 
 #### Scenario: One mixed-parameter item fails
-- **WHEN** one item in a platform-planned set fails while another item completes
+- **WHEN** one item in a Creation set fails while another item completes
 - **THEN** the completed item remains saved with its own effective parameters
 - **AND** the set remains repairable without recalculating successful or failed items from current form values
 
-### Requirement: Platform plans are frozen in queues and Creation records
-The system SHALL snapshot the complete effective platform plan when a Creation set is queued and SHALL persist the strategy version, platform profile metadata, platform provenance, set overrides, count semantics, and per-item effective planning fields in new manifests. `carouselImageCount` and compatibility field `imageCount` SHALL count enabled carousel slots, `skuImageCount` SHALL count deduplicated appended SKU items, `infographicRebuildCount` SHALL count rebuild additions, and `totalPlannedItemCount` SHALL equal their sum. Repair and retry SHALL use the saved effective item plan unless the user explicitly requests re-planning.
+### Requirement: Creation plans are frozen in queues and records
+The system SHALL snapshot the complete effective universal plan when a new Creation set is queued and SHALL persist its strategy version, universal profile metadata, set overrides, count semantics, and per-item effective planning fields. Legacy marketplace metadata SHALL remain readable and frozen on saved records. `carouselImageCount` and compatibility field `imageCount` SHALL count enabled carousel slots, `skuImageCount` SHALL count deduplicated appended SKU items, `infographicRebuildCount` SHALL count rebuild additions, and `totalPlannedItemCount` SHALL equal their sum. Repair and retry SHALL use the saved effective item plan unless the user explicitly requests re-planning.
 
 #### Scenario: Plan exposes unambiguous final counts
-- **WHEN** a resolved plan contains platform carousel slots, appended SKU items, or infographic rebuild items
+- **WHEN** a resolved plan contains carousel slots, appended SKU items, or infographic rebuild items
 - **THEN** its carousel, SKU, rebuild, and total count fields match the corresponding item kinds
 - **AND** disabling or replacing a variant-comparison carousel slot does not remove appended one-item-per-SKU outputs
 - **AND** duplicate SKU references for the same stable SKU subject create only one appended SKU item
@@ -658,7 +623,7 @@ The system SHALL snapshot the complete effective platform plan when a Creation s
 - **AND** 若当前表单计划尚未重新计算，界面显示待刷新状态而不是把队列快照标记为当前自动方案
 
 #### Scenario: Form changes after enqueue do not affect the queued set
-- **WHEN** the user submits a platform-planned set and then edits platform, category, supported overrides, ratio, size, language, or compatible slot enablement while it is waiting
+- **WHEN** the user submits a set and then edits category, supported overrides, ratio, size, language, or compatible slot enablement while it is waiting
 - **THEN** the queued set starts with the frozen plan that existed at submission time
 
 #### Scenario: New record is reopened or repaired
@@ -670,28 +635,28 @@ The system SHALL snapshot the complete effective platform plan when a Creation s
 #### Scenario: Legacy record lacks platform strategy fields
 - **WHEN** a Creation manifest predates `strategyVersion`, `imageType`, set overrides, or per-item parameters
 - **THEN** the reader continues to display and repair it using saved roles, prompts, paths, and available set-level values
-- **AND** it does not automatically apply the current platform profile or rewrite the manifest
+- **AND** it does not automatically apply the current universal profile or rewrite the manifest
 - **AND** it records `platformProvenance` as `legacy-missing` before applying a display fallback
 - **AND** an explicit saved `platform=universal` remains distinguishable as `platformProvenance=explicit`
 
 #### Scenario: User explicitly replans a saved set
-- **WHEN** the user selects Re-plan with current platform rules on a saved or reused set
-- **THEN** the system resolves a new preview using the current profile version
+- **WHEN** the user selects Re-plan on a saved or reused set
+- **THEN** the system resolves a new preview using the current universal profile
 - **AND** it does not replace the saved plan until the user confirms and submits the new plan
 
-### Requirement: Platform planning degrades without fabricating evidence
+### Requirement: Universal planning degrades without fabricating evidence
 The system SHALL omit or replace image types that require unavailable factual evidence and SHALL surface policy-loading and validation failures before generation. It SHALL NOT fill missing dimensions, materials, package contents, condition, defects, prices, certifications, sales, rankings, guarantees, reviews, or performance claims with invented content.
 
 #### Scenario: Evidence-dependent slot has no evidence
 - **WHEN** a condition, defect, dimension, material, package, comparison, certification, or performance slot lacks supporting product input or applied reference evidence
-- **THEN** the resolver omits or replaces that slot with a safe product-detail or usage slot allowed by the selected profile
+- **THEN** the resolver omits or replaces that slot with an evidence-grounded product-detail or usage slot allowed by the universal profile
 - **AND** the plan warning explains the missing evidence
 
 #### Scenario: Browser policy module cannot load
-- **WHEN** the browser cannot load the canonical platform policy module
+- **WHEN** the browser cannot load the canonical universal policy module
 - **THEN** the UI preserves all entered product and asset state
-- **AND** it reports that platform automatic planning is unavailable
-- **AND** it does not silently display or submit a named-platform plan built from stale duplicated defaults
+- **AND** it reports that automatic planning is unavailable
+- **AND** it does not silently display or submit a plan built from stale duplicated defaults
 
 ### Requirement: Creation records display and expose Listing drafts in the old-style format
 The Creation record UI SHALL preserve every current Listing draft in the fixed field order 标题、卖点、痛点、五点描述、商品描述、后台搜索词、关键词分组 and SHALL display all seven fields continuously on one page without content-group or language-view controls. Within every field or list item, the UI SHALL display the English value first and its corresponding Simplified Chinese value immediately below it when that localized value exists; this bilingual comparison SHALL remain vertical at every supported viewport width. English and Simplified Chinese values belonging to the same list item SHALL form one compact visual pair. A divider SHALL appear only between adjacent list items, SHALL follow the complete bilingual pair rather than separate its two languages, and SHALL match the rendered width of the longer value in that pair without exceeding the available content width. Every visible English value SHALL remain an independent copy target that copies only that English value, and every visible Simplified Chinese value SHALL remain an independent copy target that copies only that Chinese value. Field-level English and Chinese copy controls SHALL copy the complete corresponding language value for that field, while full-copy and export actions SHALL preserve the complete bilingual field mapping. Generate, full-copy, and export controls SHALL remain available from a compact Listing workspace toolbar while the user reviews a long draft. All copy and export actions SHALL be immediately available without validation or review gating.
@@ -774,6 +739,19 @@ The system SHALL keep complete supplied dimension and package facts in the effec
 - **WHEN** the specification-table image uses a selected supplied value
 - **THEN** its digits, decimal point, units, and selected metric/imperial mode remain exact
 - **AND** the image does not add unsupported parameters or explain the value with an unsupported performance claim
+
+#### Scenario: AI 套图沿用默认双单位规则
+
+- **WHEN** 用户未单独选择单位模式，AI 套图的参数图、尺寸图或场景角标使用已确认的 `14.5 cm` 和 `35.8 g`
+- **THEN** 规划请求明确传入默认 `dimensionUnitMode: both`，并提供 `14.5 cm (5.71 in)` 和 `35.8 g (1.26 oz)` 的换算文本
+- **AND** 最终生成提示词要求每个新增测量标签同时显示公制值与英制值，换算保留本图事实的字段标签、所属款式与条件
+- **AND** 换算副本不作为额外规格事实，不把其他图片或款式的测量值带入本图
+
+#### Scenario: 单单位选择、无文字图和冻结计划保持原有边界
+
+- **WHEN** 用户明确选择 `metric` 或 `imperial`，或图片属于无文字渲染、用户锁定内容或已冻结计划
+- **THEN** 新规划遵循用户选择的单位模式，无文字图片不因单位规则新增标注，实物原有印字保持原样
+- **AND** 用户锁定或已冻结的提示词保持逐字一致，重复校验不重复追加单位约束
 
 #### Scenario: Included items are shown without packaging evidence
 
@@ -929,10 +907,10 @@ Each reliable complete visible SKU unit SHALL have one ordered pure-color label.
 - **AND** if no reliable subject color remains, the planner does not request a guessed or fallback label
 
 ### Requirement: Structured non-sensitive audience analysis
-The system SHALL let Creation reference analysis return a normalized `audienceStrategy` containing a product-use or purchase-context audience, purchase motivations, purchase objections, desired outcome, evidence basis, confidence, and source. The analysis MUST use only supplied product facts, visible product/use evidence, platform context, and category context, and MUST NOT infer protected or sensitive personal attributes from people in reference images.
+The system SHALL let Creation reference analysis return a normalized `audienceStrategy` containing a product-use or purchase-context audience, purchase motivations, purchase objections, desired outcome, evidence basis, confidence, and source. The analysis MUST use only supplied product facts, visible product/use evidence, universal ecommerce context, and category context, and MUST NOT infer protected or sensitive personal attributes from people in reference images.
 
 #### Scenario: Analysis returns evidence-backed audience guidance
-- **WHEN** the user analyzes product references with a selected platform, category, and supplied product facts
+- **WHEN** the user analyzes product references with a category and supplied product facts
 - **THEN** the response includes a normalized audience strategy whose motivations and objections cite supplied or visible evidence and whose source and confidence are explicit
 
 #### Scenario: Sensitive attributes are not inferred
@@ -943,23 +921,23 @@ The system SHALL let Creation reference analysis return a normalized `audienceSt
 - **WHEN** the product facts and references do not support a specific usage or buying context
 - **THEN** the analysis returns a generic category buyer suggestion with low confidence instead of inventing a precise persona
 
-### Requirement: Versioned platform marketing context
-The system SHALL define a structured `marketingContext` for the universal profile and every supported platform profile, including shopper intent, proof style, copy style, default motivations, and default objections. Marketing context MUST remain advisory and MUST NOT be represented as an official platform rule unless independently covered by the existing sourced constraint model.
+### Requirement: Versioned universal marketing context
+The system SHALL define a structured `marketingContext` for the universal profile, including shopper intent, proof style, copy style, default motivations, and default objections. Marketing context MUST remain advisory and MUST NOT be represented as an official marketplace rule.
 
-#### Scenario: Every platform has structured marketing context
-- **WHEN** the platform policy registry is loaded
-- **THEN** all supported platform profiles expose valid structured marketing context in addition to their existing sourced image policies
+#### Scenario: Universal profile has structured marketing context
+- **WHEN** the Creation policy registry is loaded
+- **THEN** the universal profile exposes valid structured marketing context
 
-#### Scenario: Platform advice does not become a hard rule
-- **WHEN** a profile marketing context has no official blocking source
+#### Scenario: Universal advice does not become a hard rule
+- **WHEN** universal marketing context has no blocking source
 - **THEN** it affects planning guidance only and does not create a blocking validation constraint
 
 ### Requirement: Deterministic audience strategy resolution
-The system SHALL resolve `effectiveAudienceStrategy` using `universal fallback < platform marketing context < category context < reference-analysis suggestion < user set input < user item override`. Empty values MUST NOT erase lower-priority evidence, list fields MUST be normalized and de-duplicated, and the resolved result MUST record provenance.
+The system SHALL resolve `effectiveAudienceStrategy` using `universal marketing context < category context < reference-analysis suggestion < user set input < user item override`. Empty values MUST NOT erase lower-priority evidence, list fields MUST be normalized and de-duplicated, and the resolved result MUST record provenance.
 
-#### Scenario: Reference analysis overrides platform fallback
-- **WHEN** a platform default describes value-comparison shoppers and an applied reference analysis provides evidence for a gift-buying context
-- **THEN** the effective strategy uses the evidence-backed gift context while retaining compatible platform proof and copy guidance
+#### Scenario: Reference analysis overrides universal fallback
+- **WHEN** the universal default describes general shoppers and an applied reference analysis provides evidence for a gift-buying context
+- **THEN** the effective strategy uses the evidence-backed gift context while retaining compatible universal proof and copy guidance
 
 #### Scenario: User input overrides analysis suggestion
 - **WHEN** a caller explicitly supplies a non-sensitive target audience or purchase objection after applying an analysis suggestion
@@ -977,7 +955,7 @@ The system SHALL deterministically assign each planned item a `conversionIntent`
 - **THEN** the hero handles recognition and the primary motivation, benefit and scene items show outcomes and use relevance, detail and size items reduce evidence or fit uncertainty, and package and SKU items reduce completeness or choice uncertainty
 
 #### Scenario: Conversion intent is deterministic
-- **WHEN** Local resolves a normalized platform, category, audience strategy, overrides, and product evidence
+- **WHEN** Local resolves the universal profile, category, audience strategy, overrides, and product evidence
 - **THEN** it produces a deterministic effective audience strategy and per-item conversion intents in the same order
 
 ### Requirement: Evidence-bounded conversion prompts
@@ -996,22 +974,22 @@ The system SHALL include the effective per-item conversion intent in eligible ca
 - **WHEN** the effective audience has a durability objection but no material, test, warranty, or durability evidence is supplied
 - **THEN** no item prompt invents durability proof, test results, warranty terms, ratings, sales, testimonials, or performance claims
 
-### Requirement: Platform hard rules override conversion strategy
+### Requirement: Preserved blocking rules override conversion strategy
 The system MUST apply official sourced blocking constraints and effective `textPolicy`, `logoPolicy`, and `scenePolicy` after all audience, conversion, set, item, and prompt overrides. A strict main image MUST NOT gain text, collage, external Logo, scene props, or unsupported claims from conversion guidance.
 
-#### Scenario: Amazon main image remains strict
-- **WHEN** an Amazon plan has a persuasive audience strategy and an Amazon main image slot
-- **THEN** the main image remains a compliant white-background product image with no added marketing text, collage, external Logo, scene, or unsupported claim while later eligible images may use the conversion strategy
+#### Scenario: Preserved strict main image remains strict
+- **WHEN** a preserved legacy plan has a persuasive audience strategy and a sourced strict main-image slot
+- **THEN** the main image retains its saved no-text, no-collage, Logo, scene, and evidence constraints while later eligible images may use conversion guidance
 
 #### Scenario: Invalid item override remains blocked
 - **WHEN** a per-item conversion or prompt override conflicts with a sourced blocking constraint
 - **THEN** validation reports the conflict and generation is rejected
 
 ### Requirement: Audience strategy is part of the frozen effective plan
-The system SHALL include original `audienceStrategy`, resolved `effectiveAudienceStrategy`, and every item's `conversionIntent` and final prompt in the versioned `effectivePlan`. Queue snapshots, Local manifests, record reuse, and repair MUST preserve these values without recomputing them from current form or current platform defaults. A source-only `infographic-rebuild` SHALL preserve compatible metadata but MUST execute the canonical reconstruction prompt at generation and repair time instead of a decorated historical saved prompt.
+The system SHALL include original `audienceStrategy`, resolved `effectiveAudienceStrategy`, and every item's `conversionIntent` and final prompt in the versioned `effectivePlan`. Queue snapshots, Local manifests, record reuse, and repair MUST preserve these values without recomputing them from current form or current universal defaults. A source-only `infographic-rebuild` SHALL preserve compatible metadata but MUST execute the canonical reconstruction prompt at generation and repair time instead of a decorated historical saved prompt.
 
 #### Scenario: Queue submission freezes audience decisions
-- **WHEN** a user previews a plan, submits it to the queue, and then changes platform, category, product fields, or reference analysis
+- **WHEN** a user previews a plan, submits it to the queue, and then changes category, product fields, or reference analysis
 - **THEN** the queued job retains the submitted audience strategy, item conversion intents, order, parameters, and prompts
 
 #### Scenario: Saved set round-trips conversion fields
@@ -1020,7 +998,7 @@ The system SHALL include original `audienceStrategy`, resolved `effectiveAudienc
 
 #### Scenario: Repair reuses saved item intent
 - **WHEN** a saved item is retried or repaired after current strategy defaults change
-- **THEN** repair reuses the saved conversion intent, eligible item prompt, ratio, size, language, and platform constraints unless the user explicitly edits that item
+- **THEN** repair reuses the saved conversion intent, eligible item prompt, ratio, size, language, and any preserved legacy constraints unless the user explicitly edits that item
 - **AND** an `infographic-rebuild` executes its canonical source-only prompt while retaining the saved compatible metadata and technical parameters
 
 ### Requirement: Generation submits and validates the frozen plan
@@ -1028,7 +1006,7 @@ The browser SHALL submit the complete frozen `effectivePlan` for formal Creation
 
 #### Scenario: Formal generation uses previewed items
 - **WHEN** a valid frozen plan is submitted after preview
-- **THEN** Local executes the submitted item order, eligible saved prompts, conversion intents, ratios, sizes, and languages without calling the current platform strategy to rebuild them
+- **THEN** Local executes the submitted item order, eligible saved prompts, conversion intents, ratios, sizes, and languages without calling the current universal strategy to rebuild them
 - **AND** any `infographic-rebuild` executes the canonical source-only reconstruction prompt instead of a decorated submitted prompt
 
 #### Scenario: Client cannot bypass hard-rule validation
@@ -1137,35 +1115,29 @@ Creation Mode SHALL 提供代码为 `C10-006-001-005`、名称为“骑行护目
 
 ### Requirement: Image-count overrides preserve the compatible image-type catalog
 
-The system SHALL keep every resolved carousel slot for the current platform addressable in `effectivePlan.slots` when a set-level image-count override is lower than the platform's compatible image-type count. The count override SHALL define the default enabled prefix without removing later compatible slots. `effectivePlan.items`, `carouselImageCount`, and actual generation SHALL continue to include only enabled carousel slots.
+The system SHALL keep every resolved universal carousel slot addressable in `effectivePlan.slots` when a set-level image-count override is lower than the universal profile's compatible image-type count. The count override SHALL define the default enabled prefix without removing later compatible slots. `effectivePlan.items`, `carouselImageCount`, and actual generation SHALL continue to include only enabled carousel slots.
 
-#### Scenario: 通用电商选择 5 张仍显示完整 18 种类型
+#### Scenario: Universal plan at five items still shows all 18 types
 
-- **WHEN** 用户在通用电商平台把套图数量设置为 5
+- **WHEN** the user sets the local template plan count to 5
 - **THEN** `effectivePlan.slots` 和兼容图片类型区域保留全部 18 个通用电商原生类型
 - **AND** 前 5 个默认槽位启用，其余 13 个槽位未启用
 - **AND** 兼容图片类型计数显示 `5 / 18`
 - **AND** `effectivePlan.items`、`carouselImageCount` 和实际生成只包含 5 个启用轮播项
 
-#### Scenario: 零张与完整数量使用同一类型目录
+#### Scenario: Zero and full counts use the same type catalog
 
-- **WHEN** 用户把通用电商套图数量设置为 0、1 或 18
+- **WHEN** the user sets the local template count to 0, 1, or 18
 - **THEN** 每种数量下兼容图片类型区域都显示相同的 18 个原生类型
 - **AND** 启用项数量分别为 0、1 或 18
 - **AND** 未启用类型不会进入生成请求
 
-#### Scenario: 用户等量替换兼容图片类型
+#### Scenario: User replaces a compatible image type at equal count
 
-- **WHEN** 通用电商当前启用 5 个类型，用户取消其中一个并启用第 18 个类型
+- **WHEN** the universal plan has 5 enabled types and the user disables one and enables the eighteenth type
 - **THEN** 第 18 个类型保持可见且可以直接启用
 - **AND** 最终 `effectivePlan.items` 和 `carouselImageCount` 仍为 5
 - **AND** 实际生成包含新启用类型且不包含被取消类型
-
-#### Scenario: 命名平台目录不扩展为通用 18 项
-
-- **WHEN** 当前命名平台只提供 6 个解析后可用的规范化轮播槽位，且用户选择少于 6 张
-- **THEN** 兼容图片类型区域持续显示该平台的 6 个槽位
-- **AND** resolver 不增加第 7 至 18 个通用或 `custom` 类型
 
 #### Scenario: 追加生成项不进入兼容类型目录
 
@@ -1201,51 +1173,27 @@ The Creation Mode main result grid SHALL display one selected set at a time inst
 - **AND** the user can switch back to the completed set without refreshing the page
 
 ### Requirement: Creation Mode can enqueue during generation
-The Creation Mode primary generation action SHALL remain available for valid set submissions while another set is running, up to the configured queue limit.
+The Creation Mode primary generation action SHALL remain available for valid set submissions while another set is running, up to the configured queue limit. New suites SHALL start when one of at most two suite slots is free, subject to the frozen global image-request concurrency limit.
 
 #### Scenario: User submits while another set is running
 - **WHEN** a Creation Mode set is already running
 - **AND** the user submits valid product inputs for another set
 - **THEN** the button communicates the queue action
-- **AND** the app stores a snapshot of that set's form data for later execution
-- **AND** the queued set starts after the active set finishes
+- **AND** the app stores a snapshot of that set's form data
+- **AND** the queued set may start alongside the active set if a suite slot is free, otherwise it waits for a slot
 
-### Requirement: Platform switching is immediate and race-safe
-The system SHALL accept a valid Creation platform selected by the user immediately, without displaying a confirmation dialog or offering a cancel rollback. The switch SHALL clear platform-related planning state, reset the draft preview, and resolve the new platform plan while preserving product evidence and generation configuration. Reference analysis results SHALL only apply to the platform and category snapshot that initiated them.
-
-#### Scenario: User switches directly to another platform
-- **WHEN** the user selects a valid platform different from the current Creation platform
-- **THEN** the selected platform becomes current without calling `window.confirm` or displaying another confirmation dialog
-- **AND** the system clears platform-related image types, order, enabled carousel count, automatic language, automatic ratios, automatic resolutions, composition strategy, and set/item overrides
-- **AND** it resets the previous draft preview and immediately exposes the newly resolved platform plan
-
-#### Scenario: Direct platform switching preserves product evidence and configuration
-- **WHEN** the system directly accepts a new Creation platform
-- **THEN** it preserves product name, description, selling points, category, dimensions, reference files and metadata, Logo, SKU, output format, and model/API configuration
-- **AND** only platform-related planning state is cleared
-
-#### Scenario: User selects the previous platform again
-- **WHEN** the user selects a platform that was active before an intervening platform switch
-- **THEN** the system directly accepts that selection and resolves the platform using current rules
-- **AND** it does not restore the platform-specific set or item overrides that were cleared by the earlier switch
-
-#### Scenario: Old reference analysis finishes after a direct switch
-- **WHEN** a reference analysis request was started for an earlier platform or category
-- **AND** its response arrives after the current platform or category has changed
-- **THEN** the response is ignored and cannot alter product suggestions, reference roles, notes, category, selected slots, or plan preview
-
-### Requirement: Platform confirmation removal is isolated to platform selection
-The system SHALL retain the existing Creation reference-analysis recommendation application flow and SHALL keep platform planning, preview, and generation contracts unchanged apart from removing confirmation and cancellation from the platform select interaction.
+### Requirement: Creation Mode keeps marketplace selection out of the user flow
+Creation Mode SHALL NOT offer marketplace selection. New previews and generation submissions SHALL use the universal profile. Reference-analysis recommendations SHALL retain their separate explicit apply action, and stale analysis responses SHALL NOT overwrite newer category or product inputs.
 
 #### Scenario: Reference analysis suggestions still require their existing apply action
 - **WHEN** Creation reference analysis returns role, note, product, category, or SKU suggestions
 - **THEN** the existing recommendation summary and Apply suggestions action remain available
-- **AND** changing platform does not automatically apply or discard those suggestions except through existing freshness rules
+- **AND** opening a new plan does not automatically apply or discard those suggestions except through existing freshness rules
 
-#### Scenario: Platform planner and APIs remain compatible
-- **WHEN** a directly accepted platform is previewed or submitted for generation
-- **THEN** the browser uses the existing platform, override, preview, and generation API fields
-- **AND** Local uses the existing platform resolver, Creation planner, validation, queue, and persistence behavior
+#### Scenario: Preview and generation use the universal profile
+- **WHEN** a new Creation plan is previewed or submitted for generation
+- **THEN** the existing API platform field contains `universal`
+- **AND** the resolver, planner, validation, queue, and persistence use the universal profile
 
 ### Requirement: SKU color recognition is context-safe and target-localized
 The SKU color normalizer SHALL reject ambiguous token occurrences inside unrelated words or conjunction phrases and SHALL emit canonical color-only values. When one unit has multiple recognized colors, the planner SHALL localize every color into the selected supported target language before composing the exact visible label.
@@ -1274,19 +1222,19 @@ Automatic fourth-level category matching from a product name SHALL use exact cat
 
 ### Requirement: 功能效果渲染图以单一主体呈现完整功能
 
-系统 SHALL 保持 `effect-comparison` 作为稳定内部角色 ID 和“功能效果渲染图”作为中文展示名。新建或重新规划的该角色 SHALL 在一个统一构图中以一个完整可见、占主导的商品主体呈现所有已提供且有证据支持的功能、机制、效果路径或结果。系统 SHALL 允许围绕同一主体使用箭头、局部剖视叠层、动态轨迹、能量或材质流向以及高级 3D/CGI 或电影级产品可视化，但 SHALL NOT 生成前后对比、左右并列、分屏、成对状态、重复商品主体或多面板对比布局。
+系统 SHALL 保持 `effect-comparison` 作为稳定内部角色 ID 和“功能效果渲染图”作为中文展示名。新建或重新规划的该角色 SHALL 在一个统一构图中以一个完整可见、占主导的商品主体突出有证据支持的主要功能、可见效果及买家收益，其他功能仅作为与当前任务相关的辅助证据。系统 SHALL 允许围绕同一主体使用箭头、局部剖视叠层、动态轨迹、能量或材质流向以及高级 3D/CGI 或电影级产品可视化，但 SHALL NOT 生成前后对比、左右并列、分屏、成对状态、重复商品主体或多面板对比布局。 系统 SHALL 加强商品材质与体积，用符合商品的功能流动、前后遮挡、空间纵深和合理局部光照表达作用，SHALL NOT 仅依赖平面箭头或装饰描边；结构、作用范围、视角和参数均保持参考及已确认事实边界。
 
 #### Scenario: 用户规划功能效果渲染图
 - **WHEN** 用户在 Creation Mode 中选择 `effect-comparison` 角色并提交商品资料
 - **THEN** 计划提示词要求一个完整可见、占主导的商品主体和统一的功能可视化构图
-- **AND** 提示词要求展示全部有证据支持的功能、机制、效果路径或结果
+- **AND** 提示词要求主要功能及其作用或收益在画面中可见，不以名称、参数卡或暖色背景代替效果，也不把创意示意说成实测
 - **AND** 提示词禁止前后对比、左右并列、分屏、成对状态、重复商品主体和多面板对比布局
 - **AND** 提示词仍禁止虚构未提供的技术结构、性能数字、认证或效果
 
-#### Scenario: 不同营销和平台规划路径保持单一主体语义
-- **WHEN** 用户在促销、平台搜索或平台原生规划中选择功能效果渲染图
-- **THEN** 该路径的场景、类目和平台图片类型提示词不重新引入比较或分栏构图
-- **AND** 平台计划继续使用兼容的内部图片类型 ID，但对用户显示“功能效果渲染图”并使用单一主体功能渲染构图策略
+#### Scenario: Different Creation entry points keep single-subject semantics
+- **WHEN** a Creation workflow plans a functional-effect image
+- **THEN** category and image-type guidance does not reintroduce comparison or split-panel composition
+- **AND** the workflow uses the compatible internal image-type ID and single-subject visualization
 
 ### Requirement: 套图 SKU 项名称使用可靠颜色标签
 
@@ -1917,13 +1865,13 @@ For each newly planned or locally queued SKU image, the system SHALL create a `f
 
 ### Requirement: 套图生图提示词避免冗余上下文
 
-普通 Creation 轮播图与 SKU 项的模型提示词 SHALL 使用简洁、可执行的控制文字。系统生成的角色、平台、类别、视觉风格和比例描述 SHALL 使用简洁英文或省略无动作含义的默认显示标签；Creation Mode 比例提示 SHALL 只说明所选比例值，不包含用途标签或冗长构图解释。用户提供的商品事实与参考图备注 SHALL 保持原文。
+普通 Creation 轮播图与 SKU 项的模型提示词 SHALL 使用简洁、可执行的控制文字。系统生成的角色、通用电商、类别、视觉风格和比例描述 SHALL 使用简洁英文或省略无动作含义的默认显示标签；Creation Mode 比例提示 SHALL 只说明所选比例值，不包含用途标签或冗长构图解释。用户提供的商品事实与参考图备注 SHALL 保持原文。
 
 规划提示词与运行时组装 SHALL 不重复表达商品身份锁、商品表面内容保护或新增画布文案语言边界。运行时仍 SHALL 为缺少必要保护的历史冻结提示词补上相应约束。参考图标签 SHALL 标识所附图片与角色，并保留分配给该角色的必要说明；主体身份说明 SHALL 不以多段近义文字重复出现，支撑参考图 SHALL 只贡献其分配角色的证据。
 
-精简 SHALL 通过删除重复或仅复述界面设置的文字完成，不得设置提示词字符数上限，也不得按总长度截断提示词。精简 SHALL 保留商品事实、画面角色、有效的平台/品类硬约束、参考图归属、主体身份与表面内容保护及目标语言边界。infographic-rebuild SHALL 继续使用其独立来源事实与翻译规则。
+精简 SHALL 通过删除重复或仅复述界面设置的文字完成，不得设置提示词字符数上限，也不得按总长度截断提示词。精简 SHALL 保留商品事实、画面角色、保留的历史硬约束、参考图归属、主体身份与表面内容保护及目标语言边界。infographic-rebuild SHALL 继续使用其独立来源事实与翻译规则。
 
-新增文案的目标语言规则 SHALL 只作用于新创作的画布文案。商品或包装本体上已有的图案、标记、表面文字和字符 SHALL 保持原样；角色、构图、场景和平台约束 SHALL 不因措辞精简而改变其画面含义。
+新增文案的目标语言规则 SHALL 只作用于新创作的画布文案。商品或包装本体上已有的图案、标记、表面文字和字符 SHALL 保持原样；角色、构图、场景和保留的历史约束 SHALL 不因措辞精简而改变其画面含义。
 
 #### Scenario: 英语通用首图只传递比例值
 
@@ -1936,7 +1884,7 @@ For each newly planned or locally queued SKU image, the system SHALL create a `f
 
 - **WHEN** 用户输入的商品名称、描述、卖点或参考图备注包含中文
 - **THEN** 系统保留这些用户提供的原文，不猜测翻译或删除商品事实
-- **AND** 系统生成的角色、平台、类别、视觉风格和比例控制文字使用简洁英文或省略默认标签
+- **AND** 系统生成的角色、通用电商、类别、视觉风格和比例控制文字使用简洁英文或省略默认标签
 
 #### Scenario: 商品主体约束只表达一次
 
@@ -2006,10 +1954,10 @@ Creation Mode SHALL present one 商品描述 textarea for product description, s
 - **THEN** 场景项分别分配不同操作，而非只换背景
 - **AND** 如果三个地点仍是同一手机操作，则只使用该核心操作一次
 
-#### Scenario: Named platforms keep specification slots
+#### Scenario: Legacy marketplace slots remain frozen
 
-- **WHEN** 当前图型包含平台硬约束，或读取已有的命名平台冻结项
-- **THEN** 本次自动分工不为满足信息图配比而改写该硬约束或历史冻结项
+- **WHEN** a saved legacy plan contains marketplace-specific hard constraints or frozen slots
+- **THEN** current automatic task allocation does not rewrite those saved constraints or slots
 
 #### Scenario: One scene reference does not repeat across lifestyle images
 
@@ -2065,16 +2013,16 @@ Creation Mode SHALL present one 商品描述 textarea for product description, s
 
 ### Requirement: Creation set divergence stays anchored to the product
 
-Every ordinary Creation carousel item that is not dominated by platform policy SHALL instruct the image model to extend ideas from the product's own category, function, visible features, and likely buyer, SHALL require every added prop, person, setting, or line of text to serve that product's real use, and SHALL keep product features, accessories, and claims within the supplied facts.
+Every ordinary Creation carousel item that is not governed by a preserved legacy blocking policy SHALL instruct the image model to extend ideas from the product's own category, function, visible features, and likely buyer, SHALL require every added prop, person, setting, or line of text to serve that product's real use, and SHALL keep product features, accessories, and claims within the supplied facts.
 
 #### Scenario: Universal item carries grounded creative range
 
 - **WHEN** the planner builds a universal 18-image set
 - **THEN** every carousel prompt contains the product-anchored creative range guidance
 
-#### Scenario: Platform-dominated slot stays strict
+#### Scenario: Preserved legacy policy stays strict
 
-- **WHEN** the planner builds an Amazon white-background main image
+- **WHEN** the planner rebuilds a preserved legacy slot with a sourced blocking policy
 - **THEN** that prompt does not contain the creative range guidance
 
 ### Requirement: Creation prompts are free of internal planning labels and translated to the target language
@@ -2154,7 +2102,7 @@ SKU 生成提示词 SHALL 为成对主体声明左右两只同图保留，不得
 
 ### Requirement: Product insights distinguish evidence from creative inference
 
-智能识别 SHALL 在同一次视觉请求中提供商品外观锁定点、带参考来源的事实、买点、痛点、使用场景、未知项和冲突项。使用场景 SHALL 作为创意建议，MUST NOT 自动转化为参数或性能承诺。没有来源的温度、档位、续航、材质成分、认证和防护等级 MUST NOT 进入画布文案。
+智能识别 SHALL 在同一次视觉请求中提供带参考来源的外观及商品事实、买点、痛点、使用场景、未知项和冲突项，MUST NOT 请求或生成独立的分析外观锁。使用场景 SHALL 作为创意建议，MUST NOT 自动转化为参数或性能承诺。没有来源的温度、档位、续航、材质成分、认证和防护等级 MUST NOT 进入画布文案。
 
 同一商品不同参考图提供的可读事实 SHALL 作为互补信息保留。冲突 SHALL 仅指同一商品、同一属性、相同条件存在互斥值；新分析 SHALL 为冲突提供商品、属性、条件和值的可比较项。无法独立核实、信息分布在不同图片、属性不同、变体不同或操作条件不同 MUST NOT 单独成为排除事实的理由。无法确认的关联 SHALL 保留为非阻断待确认项，MUST NOT 由独立事实合成未提供的性能承诺。
 
@@ -2253,18 +2201,21 @@ SKU 生成提示词 SHALL 为成对主体声明左右两只同图保留，不得
 
 ### Requirement: Main carousel information coverage is evidence based
 
-资料充分的通用电商自动方案 SHALL 在 6–10 张轮播中保留至少 2 张独立信息图，在 12–18 张轮播中保留至少 3 张独立信息图。信息图 SHALL 有不同的主要信息任务和对应事实，允许功能关系、可靠参数、尺寸、可见结构或有依据的使用步骤。首图上的标题、仅更换文案的同构照片及独立追加的信息图重构 MUST NOT 计入最低数量。事实不足时 SHALL 展示缺失资料并建议减少张数或跳过，MUST NOT 为满足配比虚构功能、步骤、内部结构、参数或商品变体。
+通用电商自动方案 SHALL 按独立购买问题与实际事实分配主轮播中的功能表现、场景、细节和必要信息说明，SHALL NOT 按图片数量强制设置固定信息图最低配额。有核心功能事实且有可调整位置时，功能的可见表现 SHALL 优先于重复的卖点总览或额外场景。追加源图重构 MUST NOT 代替主轮播的核心功能任务。事实不足时 SHALL 展示缺失资料并建议减少张数或跳过，MUST NOT 为满足配比虚构功能、步骤、内部结构、参数或商品变体。
+
+#### Scenario: 功能优先于重复的信息总览
+- **WHEN** 六张自动轮播有已确认功能，而没有独立功能表现位置
+- **THEN** 系统优先将可调整的重复总览或额外场景改为功能表现
+- **AND** 不因六张或十二张阈值额外强制加入信息图
 
 #### Scenario: 追加重构不替代主套图的信息分工
-
-- **WHEN** 用户选择 12 张自动轮播且启用额外信息图重构，资料支持至少 3 种独立信息任务
-- **THEN** 主轮播仍安排至少 3 张不同任务的信息图
-- **AND** 不能把全部信息图留到追加重构项
+- **WHEN** 用户启用额外源图重构且资料支持核心功能或其他独立购买信息
+- **THEN** 主轮播按事实保留必要的核心功能表现与独立任务
+- **AND** 追加重构不代替主轮播的功能覆盖，也不产生固定信息图配额
 
 #### Scenario: 有效信息不足
-
 - **WHEN** 商品只有少量可见外观事实，没有可靠参数、步骤或其他独立信息任务
-- **THEN** 系统明确显示不能满足的信息任务和所缺资料
+- **THEN** 系统明确显示不能满足的独立任务并建议减少张数
 - **AND** 不将同一卖点改写三次或重复同一照片来满足数量
 
 ### Requirement: Per-frame facts match the visual task
@@ -2357,18 +2308,18 @@ SKU 生成提示词 SHALL 为成对主体声明左右两只同图保留，不得
 
 AI 模式普通营销轮播 SHALL 支持 1–20 张，并以独立 ID 标识同一图型下不同的营销任务，MUST NOT 被现有 18 个固定槽位裁剪。SKU 与独立源图重构 SHALL 保持现有单独计数和执行规则。开关关闭时 SHALL 使用原有本地规划，0 张普通轮播 MUST NOT 发起空的 AI 规划请求。
 
-系统 SHALL 在图片生成前校验返回数量、ID、图型、非空提示词、策略与事实引用、参考图编号和商品主体绑定。对于商品分析已确认的主主体和事实来源，若模型仅漏写其参考编号，系统 SHALL 将对应的可信原始上传编号补入逐图分配，再执行数量和字节预算校验。用户手动锁定的主体优先；否则主体索引 SHALL 在分析请求前确定，分析响应 MUST NOT 通过重排或修改辅助图角色悄然更换全套主体。MUST NOT 猜测未知来源、静默丢弃无效编号，或在补齐后超过单图参考上限和字节预算。真正缺少来源或无效的结果 MUST NOT 进入图片生成。
+系统 SHALL 在图片生成前校验返回数量、ID、图型、非空提示词、策略与事实引用、参考图编号和商品主体绑定。对于商品分析已确认的主主体和事实来源，若模型仅漏写其参考编号，系统 SHALL 将对应的可信原始上传编号补入逐图分配，再执行字节预算校验。单项参考图 SHALL 不设固定八张数量上限。用户手动锁定的主体优先；否则主体索引 SHALL 在分析请求前确定，分析响应 MUST NOT 通过重排或修改辅助图角色悄然更换全套主体。MUST NOT 猜测未知来源、静默丢弃无效编号，或在补齐后超过字节预算。真正缺少来源或无效的结果 MUST NOT 进入图片生成。
 
-营销规划响应 SHALL 包含非空的顶层 `items`。系统 MUST NOT 将截断的整套对象解析为其内部的任意 JSON 子对象。首次响应缺少整套条目时，系统 MAY 对全套做一次携带完整规划 schema 和所需条目数量的重试；若重试仍不完整，SHALL 显示明确错误，MUST NOT 把它报告为成功的零条计划或发出图片请求。
+营销规划响应 SHALL 包含有事实依据的 `suite_strategy` 和非空的顶层 `items`；已有有效分析时只返回这两个字段。正常合格初稿仍为一次整套请求；初稿存在质量问题时 MAY 按有界审核修复循环对指定条目追加最多两轮局部修复。系统 MUST NOT 将截断的整套对象解析为其内部的任意 JSON 子对象。首次响应缺少整套条目时，系统 MAY 对全套做一次携带完整规划 schema 和所需条目数量的重试；若重试仍不完整，SHALL 显示明确错误，MUST NOT 把它报告为成功的零条计划或发出图片请求。
 
-预览 SHALL 使用户能够核对逐图营销任务、最终提示词和参考分配。生成、队列、保存和补图 SHALL 使用同一份冻结的最终提示词与参考分配。系统生成的商品主体锁 SHALL 在预览最终提示词中只出现一次；同一有效计划提交生成时 MUST 保持提示词字节内容不变。已有有效预览、普通重试和补图 MUST NOT 自动重新规划整套提示词；输入发生相关变化后 SHALL 使新草稿计划失效，并拒绝陈旧响应覆盖当前结果。
+预览 SHALL 使用户能够核对逐图营销任务、最终提示词和参考分配。生成、队列、保存和补图 SHALL 使用同一份冻结的最终提示词与参考分配。系统生成的 `PRODUCT FIDELITY` SHALL 在新预览最终提示词中只出现一次，不附加分析外观锁；同一有效计划提交生成时 MUST 保持提示词字节内容不变。已有有效预览、普通重试和补图 MUST NOT 自动重新规划整套提示词；输入发生相关变化后 SHALL 使新草稿计划失效，并拒绝陈旧响应覆盖当前结果。
 
 #### Scenario: AI 遗漏主体和事实来源编号
 
 - **WHEN** 20 条完整计划已引用有效商品事实，但部分条目的参考索引遗漏事实来源图或预先确定的主主体图
 - **THEN** 系统将分析已确认的来源编号补入逐图参考分配并保留原始上传编号
 - **AND** 相同参考分配进入预览与后续图片请求
-- **AND** 若补齐会超过 8 张或现有字节预算，系统明确拒绝，不静默删图
+- **AND** 超过八张的有效来源仍完整保留；若补齐会超过现有字节预算，系统明确拒绝，不静默删图
 
 #### Scenario: 辅助图分析响应尝试更换主主体
 
@@ -2381,10 +2332,10 @@ AI 模式普通营销轮播 SHALL 支持 1–20 张，并以独立 ID 标识同�
 - **THEN** 系统不将内部对象识别成完整套图计划
 - **AND** 系统最多重试一次完整整套规划，之后仍不完整则显示明确错误，且不发出生图请求
 
-#### Scenario: 已预览提示词包含主体锁
+#### Scenario: 已预览提示词包含参考图保真约束
 
-- **WHEN** 用户提交一份已包含系统商品主体锁的有效预览计划
-- **THEN** 冻结和生成阶段保留相同提示词且不重复插入同一主体锁
+- **WHEN** 用户提交一份已包含 `PRODUCT FIDELITY` 的有效预览计划
+- **THEN** 冻结和生成阶段保留相同提示词且不重复插入同一保真约束
 
 #### Scenario: 一次规划 20 张营销图
 
@@ -2475,18 +2426,18 @@ Creation Mode SHALL 根据分配给当前图片的商品和证据构建信息丰
 
 ### Requirement: 套图提示词使用分层事实预算
 
-新套图计划 SHALL 按图片任务向每张提示词提供主体锁定、本图任务和已分配事实。每张图 SHALL 保留本图所需的主体锁、事实、数值条件、平台边界和用户手写提示词；不得因字符长度而拒绝或截断已通过来源校验的 AI 营销提示词。模板首图、普通图及 SKU SHALL 完整保留已选提示词段落，去除空段和重复段落；MUST NOT 使用整条提示词字符压缩目标省略段落或产生长度超标警告。其它整套分析 MUST NOT 因为已被识别就重复注入每张图或附图标签。
+新套图计划 SHALL 按图片任务向每张提示词提供主参考图保真约束、本图任务和已分配事实。每张图 SHALL 保留本图所需的保真约束、事实、数值条件、平台边界和用户手写提示词，MUST NOT 额外注入分析外观锁；不得因字符长度而拒绝或截断已通过来源校验的 AI 营销提示词。模板首图、普通图及 SKU SHALL 完整保留已选提示词段落，去除空段和重复段落；MUST NOT 使用整条提示词字符压缩目标省略段落或产生长度超标警告。其它整套分析 MUST NOT 因为已被识别就重复注入每张图或附图标签。
 
-#### Scenario: 长分析不淹没主体锁定
+#### Scenario: 长分析不淹没参考图保真约束
 
 - **WHEN** 商品分析返回多个事实、场景、卖点和营销建议
 - **THEN** 首图和普通图只携带与本图任务匹配的有限事实
-- **AND** 每张提示词仍保留掌面/手背等主体表面锁定
-- **AND** 已选的主体锁、逐图事实、数值条件和辅助段落完整保留，仅合并重复段落
+- **AND** 每张提示词仍保留以主参考图为准的 `PRODUCT FIDELITY`
+- **AND** 已选的保真约束、逐图事实、数值条件和辅助段落完整保留，仅合并重复段落
 
 #### Scenario: 必需内容较长
 
-- **WHEN** 主体锁或完整规格使 AI 营销提示词较长
+- **WHEN** 保真约束或完整规格使 AI 营销提示词较长
 - **THEN** 系统保留其完整内容，并继续执行来源、主体和图型校验
 - **AND** 系统不得仅因字符长度拒绝该计划或截断未知语义
 
@@ -2499,13 +2450,13 @@ Creation Mode SHALL 根据分配给当前图片的商品和证据构建信息丰
 #### Scenario: SKU外观不得串到另一款式
 
 - **WHEN** 主主体是黑色手套，另一个有来源的SKU是红色手套
-- **THEN** 黑色主主体的表面锁只能进入匹配来源的SKU
+- **THEN** 每个SKU的保真约束只绑定自身参考图，不注入分析外观锁
 - **AND** 红色SKU使用自身来源的外观说明，不复制黑色款的控制器或表面标识
 
 #### Scenario: 已冻结记录保持兼容
 
 - **WHEN** 新计划经过预览、冻结、保存和补图
-- **THEN** 实际提示词和主体锁保持一致
+- **THEN** 实际提示词和参考图保真约束保持一致
 - **AND** 缺少新版本标记的旧冻结计划仍可读取，读取时不重写历史提示词
 
 ### Requirement: Batch generation fills missing Listing records
@@ -2568,8 +2519,8 @@ Creation Mode SHALL render newly authored text outside the supplied product or p
 - **AND** physical Chinese product or packaging text remains unchanged
 
 #### Scenario: Platform forbids added text
-- **WHEN** a platform-native slot has a no-text policy
-- **THEN** the platform policy remains authoritative and no translated marketing labels are added
+- **WHEN** a current or preserved legacy image type has a no-text policy
+- **THEN** that image-type policy remains authoritative and no translated marketing labels are added
 
 ### Requirement: AI 营销规划在套图产物标题区展示真实进度
 
@@ -2620,7 +2571,7 @@ Creation Mode SHALL render newly authored text outside the supplied product or p
 
 - **WHEN** 现有协议回退或整套响应重试实际发生
 - **THEN** 面板显示真实重试状态与尝试编号，并重置当前尝试的接收计数及部分摘要
-- **AND** 不累计前一尝试的条目，兼容格式回退与 JSON 修复共用一次重试预算，单次逻辑操作最多两次上游 POST
+- **AND** 不累计前一尝试的条目，兼容格式回退与 JSON 修复共用一次重试预算，单次协议请求最多两次上游 POST；有界质量修复属于明确展示的额外局部规划请求，最多两轮，并独立记录真实次数
 
 #### Scenario: 连接结束但缺少终态
 
@@ -2657,43 +2608,44 @@ Creation Mode SHALL render newly authored text outside the supplied product or p
 
 ### Requirement: AI 营销规划隔离不可用条目并同步有效数量
 
-系统 SHALL 在完整营销规划响应解析成功后独立校验每条任务。普通条目的事实失效、分析引用错误、无效或重复 ID／提示词／营销目标、空提示词或标题、图型错误、用户所选普通图型不匹配、参考图编号错误、单图参考数量或字节超限 SHALL 标记为条目错误并从生图计划移除。系统 SHALL 保留原始序号、可用的 ID／标题和原因以供用户查看。失败条目 MUST NOT 占用有效条目的去重键，MUST NOT 排队、补图或计入未完成数量。系统 MUST NOT 通过删除未知事实、虚构证据或任意裁剪参考图放行无效任务。
+系统 SHALL 在完整营销规划响应解析成功后独立校验每条任务。普通条目的事实失效、分析引用错误、无效或重复 ID／提示词／营销目标、空提示词或标题、图型错误、用户所选普通图型不匹配、参考图编号错误、单图参考数量或字节超限 SHALL 标记为条目错误并从生图计划移除。系统 SHALL 保留原始序号、可用的 ID／标题和原因，将请求范围内的被拒位置和未返回位置纳入现有最多两轮局部修复。修复 SHALL 复用服务端已确认分析，缺乏证据的方向 SHALL 重写为有依据的任务，MUST NOT 仅删除未知引用、替换事实 ID 或虚构证据来放行原有无依据画面。合格条目、选型、锁定内容和平台硬约束 SHALL 保留。修复仍未通过的条目 MUST NOT 排队、补图或计入未完成数量；失败条目 MUST NOT 占用有效条目的去重键，也 MUST NOT 任意裁剪依据图来绕过预算。
 
-系统 SHALL 显示请求数、实际可用数和移除／缺少数量。完整 JSON 少条 SHALL 在保留有效条目的同时标记缺少数量；多条 SHALL 将原请求范围外的任务标记为超范围并移除，MUST NOT 超过用户请求范围生成。当前草稿数量控件、显式平台数量覆盖、普通轮播计数、有效总数、队列和保存记录 SHALL 与保留的启用任务一致。SKU 和源图重构 SHALL 继续独立计数。
+系统 SHALL 显示请求数、最终实际可用数和移除／缺少数量。完整 JSON 少条 SHALL 先修复未返回位置，再保留有效条目并标记剩余缺少数量；多条 SHALL 将原请求范围外的任务标记为超范围并移除，MUST NOT 为超范围位置补规划或生成。当前表单的“套图数量” SHALL 保持用户选择，不因资料不足、少返回或移除无效条目而自动减少；显式平台数量覆盖、普通轮播计数、有效总数、队列和保存记录 SHALL 与保留的启用任务一致。SKU 和源图重构 SHALL 继续独立计数。
 
 #### Scenario: 第十三条事实失效
-
 - **WHEN** 用户请求 18 条且模型完整返回 18 条，其中只有第 13 条引用失效事实
-- **THEN** 系统保留其它 17 条，并在第 13 条的图片框中显示“缺失”及具体原因
-- **AND** 当前草稿普通生成数量自动变为 17，生图只提交这 17 条
-- **AND** 系统不重新请求整套规划，也不创建无效项的补图任务
+- **THEN** 系统保留其它 17 条，并局部请求修复第 13 条，成功时返回 18 条有效任务
+- **AND** 最多两轮后仍失败时，第 13 条显示“缺失”及具体原因，实际可生成数量为 17
+- **AND** 当前表单数量保持 18，不重新请求整套规划，不创建无效项的补图任务
 
 #### Scenario: 无效条目不占用独立任务标识
-
-- **WHEN** 一个条目因失效事实被移除，后续有相同 ID 但其它内容完整有效的条目
-- **THEN** 后续条目不因前一个无效条目而误判重复
-- **AND** 已接受条目之间的重复仍被标记并移除
+- **WHEN** 被拒条目复用了其它有效条目的 ID
+- **THEN** 系统使用不冲突的修复 ID 和原始位置修复被拒条目
+- **AND** 保留已有有效条目的 ID、位置、提示词和参考分配
 
 #### Scenario: 完整响应少条或多条
-
 - **WHEN** 请求 18 条但完整响应仅返回 16 条，或返回 20 条
-- **THEN** 少条时系统显示缺少 2 条并仅保留 16 条中的有效条目
-- **AND** 多条时系统标记并移除请求范围外的第 19、20 条，生成不超过请求范围
+- **THEN** 少条时系统仅修复第 17、18 个位置，失败后显示剩余缺少数量
+- **AND** 多条时系统标记并移除第 19、20 条，不为它们修复或生成
 
 #### Scenario: 单图参考预算超限
-
 - **WHEN** 只有一个普通条目所需的可信参考图超过单图数量或字节预算
-- **THEN** 系统标明并移除该条目，其余有效任务继续
-- **AND** 不随意丢弃该条目的依据参考图来绕过预算
+- **THEN** 系统在现有局部修复预算内要求有据的替代任务，仍超限时移除该条目
+- **AND** 不随意丢弃该条目的依据参考图来绕过预算，其余有效任务保持不变
 
 #### Scenario: 独立追加任务不影响轮播减量
-
-- **WHEN** 18 条普通轮播移除 1 条，同时存在启用的 2 条 SKU 和 1 条源图重构
+- **WHEN** 18 条普通轮播最终移除 1 条，同时存在启用的 2 条 SKU 和 1 条源图重构
 - **THEN** 普通轮播数为 17、SKU 数为 2、重构数为 1、总数为 20
+
+#### Scenario: 用户选择二十张但仅十五张有效
+- **WHEN** 用户选择 20 张，局部修复结束后只有 15 条有效普通任务
+- **THEN** 数量选择框保持 20，预览显示实际可生成 15 张及缺失原因
+- **AND** 再次规划仍请求 20 张，确认生成仅提交这 15 条有效任务
+- **AND** 加入队列不修改当前表单的数量选择
 
 ### Requirement: 部分可用计划保持冻结与进度一致
 
-存在可用任务且未破坏整套硬约束时，规划 SHALL 以部分可用终态展示通过数量，并在对应图片框直接展示缺失及原因，MUST NOT 报告为整套失败。预览、冻结提交、服务端复验、队列、保存和补图 SHALL 保留相同的有效条目 ID、最终提示词、参考分配和问题诊断；原始位置 SHALL 可用于锁定／平台约束复验。自动减量 SHALL 同步有效输入指纹，MUST NOT 导致刚确认的计划因自动更正而失效，MUST NOT 触发额外规划请求。后续真实输入变更及陈旧响应隔离 SHALL 继续有效。
+存在可用任务且未破坏整套硬约束时，规划 SHALL 以部分可用终态展示通过数量，并在对应图片框直接展示缺失及原因，MUST NOT 报告为整套失败。预览、冻结提交、服务端复验、队列、保存和补图 SHALL 保留相同的有效条目 ID、最终提示词、参考分配和问题诊断；原始位置 SHALL 可用于锁定／平台约束复验。实际任务减量 SHALL 保留用户的数量选择；冻结生成提交 SHALL 使用实际轮播数量匹配有效输入指纹，MUST NOT 导致刚确认的计划因所选数量与有效数量不同而失效，MUST NOT 触发额外规划请求。后续真实输入变更及陈旧响应隔离 SHALL 继续有效。
 
 #### Scenario: 部分可用计划进入队列
 
@@ -2716,20 +2668,18 @@ Creation Mode SHALL render newly authored text outside the supplied product or p
 
 ### Requirement: 错误隔离保留整套阻断边界
 
-无法完整解析的响应、缺少非空顶层 items 且已有协议修复仍失败、全部普通营销任务无效、共享主体无效、用户锁定项被更改／遗漏／移除或平台必需项被破坏时，系统 SHALL 明确报告整套阻断原因且不提交图片请求。部分接收的流式内容 MUST NOT 作为最终计划生图。已确认的账号级错误 SHALL 沿用现有停止规则；单张上游暂时性失败 SHALL 沿用现有单张失败和重试机制，MUST NOT 因本次规划剔除策略删除已生成结果。
+无法完整解析的响应、缺少非空顶层 items 且已有协议修复仍失败、全部普通营销任务在最多两轮局部修复后仍无效、共享主体无效、用户锁定项被更改／遗漏／移除或平台必需项被破坏时，系统 SHALL 明确报告整套阻断原因且不提交图片请求。初稿全部普通条目被拒但整套硬约束未被破坏时 SHALL 允许局部修复，不在修复前直接终止。部分接收的流式内容 MUST NOT 作为最终计划生图。已确认的账号级错误 SHALL 沿用现有停止规则；单张上游暂时性失败 SHALL 沿用现有单张失败和重试机制，MUST NOT 因本次规划剔除策略删除已生成结果。
 
 #### Scenario: 全部条目无效
-
 - **WHEN** 完整响应中所有普通营销条目均未通过校验
-- **THEN** 系统显示零条可用及错误原因，不报告成功，也不发出生图请求
+- **THEN** 系统使用已确认事实和原始位置进行最多两轮局部修复
+- **AND** 仍无有效条目时显示零条可用及错误原因，不报告成功，也不发出生图请求
 
 #### Scenario: 必需或锁定条目不可用
-
 - **WHEN** 待移除或遗漏条目破坏平台必需图要求或用户锁定内容
 - **THEN** 系统阻止本次生图并解释受影响约束，不静默缩减成不符合要求的计划
 
 #### Scenario: 响应截断或账号级错误
-
 - **WHEN** 规划响应中途截断，或生图确认发生账号级认证／计费错误
 - **THEN** 截断规划沿用完整解析与已有重试边界，账号级错误沿用既有停止规则
 - **AND** 系统不把半份响应当作成功计划，也不删除已完成图片
@@ -2791,7 +2741,7 @@ AI 营销规划摘要 SHALL 通过套图产物区的状态按钮展开为固定�
 
 ### Requirement: 营销任务区分真实使用价值并保持商品身份
 
-整套营销规划 SHALL 明确每图用途、主要购买问题、适用场景或证据焦点，并优先安排有事实支持的不同使用任务。系统 SHALL 提示只更换近义标题、背景或色调的重复风险，不为诊断额外自动调用模型或擅自删图。主体锁 SHALL 保护商品身份、部件和表面归属、标识、数量及参考支持的状态；场景适应 MAY 改变参考支持的姿态、动作、环境和光照，但 MUST NOT 创造商品能力。
+整套营销规划 SHALL 明确每图用途、主要购买问题、适用场景或证据焦点，并优先安排有事实支持的不同使用任务。系统 SHALL 审核只更换近义标题、背景或色调的重复任务，并在有界质量循环内仅修复冲突项，保护已确认合格项和用户锁定项；不能靠删去质量问题项伪装成合格整套。主参考图保真约束 SHALL 保护商品身份、部件和表面归属、标识、数量及参考支持的状态，MUST NOT 以分析外观锁作为第二外观依据；场景适应 MAY 改变参考支持的姿态、动作、环境和光照，但 MUST NOT 创造商品能力。
 
 #### Scenario: 白底图和到手清单姿态相似
 - **WHEN** 两图主体姿态相似但分别回答商品外观和实际包装内容两个有据可核对的问题
@@ -2799,7 +2749,7 @@ AI 营销规划摘要 SHALL 通过套图产物区的状态按钮展开为固定�
 
 #### Scenario: 两张雪景图只换近义标语
 - **WHEN** 两项购买问题、动作和证据表达相同，仅背景或标题近义改写
-- **THEN** 规划视图提示重复风险并显示可供核对的任务分工
+- **THEN** 规划视图显示真实审核和局部修复阶段，修复后的任务提供独立新增信息
 - **AND** 生成前仍遵守平台必需项、用户锁定项和原有事实校验
 
 #### Scenario: 手套从静物改为骑行佩戴
@@ -2809,7 +2759,7 @@ AI 营销规划摘要 SHALL 通过套图产物区的状态按钮展开为固定�
 
 ### Requirement: 相同规划复用并可追踪实际模型调用
 
-系统 SHALL 按完整输入和实际模型配置合并相同在途规划，依据既有失效规则复用有效分析与确认计划。无有效分析直接规划的正常成功路径 SHALL 为一次模型请求；先识别再规划 SHALL 为两次独立用途请求；有效冻结计划生成或补图 SHALL 不产生额外文本规划。系统 SHALL 关联逻辑请求 ID、用途、触发来源、真实尝试数、重试原因与首次回答耗时，不记录凭据或原始图片内容。
+系统 SHALL 按完整输入和实际模型配置合并相同在途规划，依据既有失效规则复用有效分析与确认计划。无有效分析直接规划的正常成功路径 SHALL 为一次模型请求；先识别再规划 SHALL 为两次独立用途请求；有效冻结计划生成或补图 SHALL 不产生额外文本规划。系统 SHALL 关联逻辑请求 ID、用途、触发来源、真实尝试数、重试原因与首次回答耗时，不记录凭据或原始图片内容。质量修复 SHALL 单独记录轮次、目标图片、剩余问题及失败原因；新规划契约 SHALL 使旧草稿缓存失效，但不改写历史产物或历史补图。
 
 #### Scenario: 同输入连续点击预览
 - **WHEN** 相同输入和模型配置已有进行中的预览请求
@@ -2847,3 +2797,502 @@ AI 营销规划和分析师分析浮层 SHALL 采用主题设置指定的不透�
 - **WHEN** 当前环境不支持背景模糊
 - **THEN** 浮层仍使用设置的不透明度提供背景遮挡
 - **AND** 浮层内容与操作继续可用
+
+### Requirement: Platformless AI marketing plans enforce confirmed restricted terms
+
+Creation Mode SHALL include confirmed restricted terms in the existing AI marketing request and SHALL validate generated ordinary marketing items locally before generation. Because Creation Mode has no marketplace selector and new plans use the universal ecommerce profile, these restrictions SHALL apply regardless of legacy platform metadata. The current confirmed list SHALL include the standalone English word `safe`, based on user feedback about SHEIN. Matching SHALL be case-insensitive in the final prompt, title, marketing goal, and creative brief fields, after system subject-lock text is assembled. A matching ordinary item SHALL be removed with a diagnostic naming its source index, field, and matched term; it MUST NOT be submitted for image generation. This check MUST NOT add a model request. Existing user-locked and required-item failure behavior SHALL remain authoritative.
+
+#### Scenario: Restricted term is filtered in the universal plan
+
+- **WHEN** an AI marketing item contains standalone `safe` in any letter case
+- **THEN** the server removes that item before generation
+- **AND** the diagnostic identifies the source item, field, and matched term
+- **AND** the planner does not issue an automatic repair request
+
+#### Scenario: Match boundaries avoid unrelated words
+
+- **WHEN** a marketing item contains `unsafe` or `safely` but not standalone `safe`
+- **THEN** the restricted-term validator does not remove it for this rule
+
+#### Scenario: Legacy platform metadata does not change filtering
+
+- **WHEN** a request contains legacy marketplace metadata or the normal `universal` value
+- **THEN** the same confirmed restricted terms are included and enforced
+
+### Requirement: Creation Mode grounds product fidelity in the primary reference
+
+Newly planned Creation Mode prompts SHALL express product appearance through one `PRODUCT FIDELITY` instruction grounded in the reference applicable to the image task. Ordinary single-product carousel items SHALL follow the selected primary product reference. Independent SKU items SHALL follow their own exact source references. Variant comparison and grouped size or specification items SHALL preserve each assigned variant from its matching source rather than copying the default product over all groups. The system MUST NOT request, normalize, inject, or display analysis-derived `APPEARANCE LOCK` text as an independent instruction. Legacy analysis payloads containing `appearance_locks` SHALL be accepted without allowing that field to affect new plans. Supporting references MAY contribute facts assigned to their roles, but MUST NOT replace the applicable product reference as the visual authority. Appearance facts assigned to ordinary detail tasks SHALL be scoped using the explicit primary-reference role, not analysis-derived appearance locks.
+
+识别成功并应用当前参考图建议时，系统 SHALL 用有效的识别商品主体名称直接覆盖当前商品名称，包括手动名称和上一轮自动名称；直接名称缺失时 MAY 使用有效的 SKU 主体名称。类目标签、类目路径、文件名、“商品”等泛称及 F2J14 这类独立货号、型号或纯数字编码 SHALL NOT 单独用于自动填写。含有具体商品描述的名称 MAY 保留其型号信息。没有有效新名称时 SHALL 保留当前名称。修改参考图 SHALL 保留当前名称直到新的有效识别结果替换，旧自动名称 SHALL NOT 作为下一次识别的用户事实。修改商品名称或描述 SHALL 使规划草稿失效，但 SHALL NOT 单独取消当前参考图识别、剔除已应用的参考图分析或阻止当前文件批次的新识别结果覆盖名称。系统 SHALL 继续按当前输入校验用户来源事实；文件、平台或请求版本已变化的过期响应 SHALL NOT 修改名称或发布成功反馈。显式清空参考图仍 SHALL 沿用原有重置流程。
+
+#### Scenario: Analysis returns an incorrect appearance lock
+
+- **WHEN** a legacy or upstream analysis payload includes an `appearance_locks` entry that conflicts with the applicable product reference
+- **THEN** normalization and newly planned prompts ignore that entry
+- **AND** the generated prompt retains `PRODUCT FIDELITY` grounded in the task's product reference
+
+#### Scenario: AI marketing planning uses primary-reference fidelity
+
+- **WHEN** Creation Mode builds an AI marketing plan with a primary product reference
+- **THEN** the planner context does not include an analysis-derived subject-lock contract and identifies the default fidelity contract as applying to ordinary single-product images
+- **AND** each unlocked final item prompt contains a task-scoped `PRODUCT FIDELITY` instruction without a separate `APPEARANCE LOCK`
+
+#### Scenario: SKU and generation reference labels omit analysis locks
+
+- **WHEN** a new SKU item or carousel item is planned from product analysis containing legacy appearance locks
+- **THEN** its prompt context and generation reference labels contain no analysis-derived subject lock
+- **AND** the SKU's own selected references and product-fidelity instruction remain in effect
+
+#### Scenario: Evidence-chain preview omits the separate lock row
+
+- **WHEN** the user opens an AI-planned item's evidence chain
+- **THEN** the preview shows its task, facts, recommendations, and sources without a separate subject-lock value
+
+#### Scenario: Primary-reference appearance facts remain scoped
+
+- **WHEN** primary and supporting references contain different appearance facts
+- **THEN** ordinary detail-task appearance facts are selected by the explicit primary-reference role index
+- **AND** removing `appearance_locks` does not promote supporting-reference appearance facts to primary-reference facts
+
+#### Scenario: Visually inferred product name remains a suggestion
+
+- **WHEN** reference analysis offers only a category label as a name suggestion without a valid identified product or SKU subject name
+- **THEN** applying reference roles and category recommendations leaves the product-name field unchanged
+- **AND** the inferred category label remains available as a suggestion for the user to review
+
+#### Scenario: 新识别直接覆盖已有名称
+
+- **WHEN** 当前参考图识别返回有效名称，当前字段已有手动名称或上一轮自动名称
+- **THEN** 成功应用识别结果直接覆盖名称，并显示已自动填写的成功反馈
+- **AND** 识别期间修改名称或描述不会仅因此丢弃当前文件批次的识别结果
+
+#### Scenario: 自动补全空商品名称
+
+- **WHEN** 当前名称为空或只含空白，识别返回有效的商品主体名称或 SKU 主体名称
+- **THEN** 名称输入框自动填入该名称，成功反馈显示已自动填写并提醒核对
+
+#### Scenario: 缺少有效名称或识别已过期
+
+- **WHEN** 识别只有类目、文件名或泛称，或者文件、平台或请求版本在异步识别期间发生变化
+- **THEN** 无效名称不覆盖或清空已有名称，过期响应不修改名称或发布成功反馈
+
+#### Scenario: 识别名称只有货号或型号
+
+- **WHEN** 识别直接名称或 SKU 名称为 F2J14、SKU-001、纯数字或带货号／型号前缀的独立编码
+- **THEN** 系统不把该编码自动填写为商品名称，也不提示该编码已自动填写
+- **AND** 若其它 SKU 提供有效的商品描述名称，则使用该有效名称；仅有编码时字段保持原值
+- **AND** 无有效识别名称时用户已有输入保持原文，带具体商品描述的有效新名称仍覆盖当前名称
+
+#### Scenario: 修改参考图不清空商品名称
+
+- **WHEN** 参考图变更使旧分析失效，但新的识别尚未成功
+- **THEN** 商品名称保持现值，旧自动名称不作为新识别的用户事实
+- **AND** 新的有效名称成功返回后覆盖现值；识别失败或没有有效名称时继续保留现值
+
+#### Scenario: 编辑商品文字保留参考图分析
+
+- **WHEN** 用户在同一参考图批次下修改商品名称或描述
+- **THEN** 规划草稿失效，参考图分析仍保留并进入下次规划载荷
+- **AND** 当前用户文字不再支持的用户来源事实仍被原有来源校验过滤
+
+### Requirement: 图片卡片提供唯一的全套主体锁
+
+套图 SHALL 仅通过图片卡片已有的参考用途下拉框选择全套主体，不显示独立的“主体锁”按钮或遮挡缩略图的锁定控件。用户指定的 `reference-product`（参考主体）SHALL 优先于所有普通 `product`（商品主体）；未指定参考主体时，系统 SHALL 使用当前排列顺序中最靠前的商品主体。其余商品主体 SHALL 继续保留为普通商品或 SKU 参考，不成为第二个全套主体。
+
+多 SKU 输入 SHALL 同样最多存在一个参考主体；选择新参考主体 SHALL 将旧参考主体恢复为普通商品主体。修改参考用途或拖动商品图顺序 SHALL 沿用压缩配置刷新、分析失效与草稿计划失效机制。系统 SHALL 在参考用途控件提供优先级和排序提示，MUST NOT 为主体选择要求或自动生成额外主体描述。没有可用商品主体时 SHALL 保持既有兼容回退及错误边界；SKU 款式来源和信息图重构 SHALL 保持现有规则。
+
+#### Scenario: 多 SKU 中更换唯一主体图
+
+- **WHEN** 用户在多张商品图的用途下拉框中依次将两张设为参考主体
+- **THEN** 仅最后一张为参考主体，原参考主体恢复为商品主体
+- **AND** 卡片不出现独立主体锁按钮，也不增加主体描述
+
+#### Scenario: 取消主体锁
+
+- **WHEN** 用户在用途下拉框中将参考主体改回商品主体
+- **THEN** 该图恢复为普通商品参考，系统按当前商品图顺序选择全套主体
+- **AND** 旧分析与草稿失效，不要求使用独立锁定按钮
+
+#### Scenario: 没有参考主体时按商品图顺序选择
+
+- **WHEN** 没有图片设为参考主体，当前列表包含辅助图和多张商品主体
+- **THEN** 全套使用排列最靠前的商品主体，忽略排在它前面的辅助图
+- **AND** 拖动另一商品图至其前方后，新草稿使用新的首个商品主体
+
+#### Scenario: 参考主体始终优先于更早的商品主体
+
+- **WHEN** 参考主体排在一个或多个普通商品主体之后
+- **THEN** 压缩优先级、普通套图规划和实际附件仍优先使用参考主体
+- **AND** 将该图用途改回商品主体后，按当前商品图顺序选择
+
+### Requirement: 紧凑生成参考标签只有一个主体身份依据
+
+普通单款套图的紧凑参考标签 SHALL 按实际所选参考图与角色元数据确定唯一主体，其它商品图 SHALL 仅为辅助证据。独立 SKU 的主体身份 SHALL 由该 SKU 精确匹配的自身原图定义，全套默认参考 MUST NOT 替换另一 SKU。
+
+多款式、尺寸分组和参数分组任务 SHALL 按本图实际分配保留各款来源。商品附件标签 SHALL 明确该款自身的配色、结构、完整可售单位和所属分组，MUST NOT 要求所有款式复制默认主参考图。辅助参数、数量与事实 SHALL 保持各自款式归属。标签 MUST NOT 从分析另造主体描述。信息图重构 SHALL 保持既有单一来源和无角色装饰行为。
+
+#### Scenario: 主体图与另一 SKU 图同时作为参考
+
+- **WHEN** 普通单款场景图的紧凑标签包含指定主体图和另一张商品图
+- **THEN** 仅指定主体图声明为本图主体，另一商品图只提供辅助证据
+
+#### Scenario: 多款图展示黑色与卡其两款
+
+- **WHEN** 多款式图使用黑色与卡其两张已提供的商品图
+- **THEN** 两张图分别为对应款式提供身份依据
+- **AND** 不会要求卡其款改成黑色或把多款图缩减成默认单款
+
+### Requirement: 主体选择遵循逐图任务的来源边界
+
+用户选择的全套参考主体 SHALL 决定普通单款轮播的默认商品；独立 SKU SHALL 继续使用自身准确来源。模板与 AI 规划的多款式、尺寸和参数分组任务 SHALL 保留实际分配的不同款式及其配色、件数、尺寸和型号条件，MUST NOT 套用普通单款图的跨面板统一配色与件数约束。
+
+有至少两个独立商品来源但缺少可靠颜色名称时，模板多款式任务 SHALL 仍保留这些来源，MUST NOT 将缺少名称误报为缺少多款资料。分析路径的多款式任务 SHALL 保留已提供的商品附件，不因该任务未分配普通事实而过滤其它款式。系统 SHALL 保持参考数量与字节预算、普通单款主体选择、信息图单源规则和历史冻结内容。
+
+#### Scenario: 参考主体为卡其但独立 SKU 为黑色
+
+- **WHEN** 全套参考主体是卡其款且当前生成项为有来源的黑色 SKU
+- **THEN** 普通主图以卡其参考为准，黑色 SKU 的提示词和实际附件只使用黑色 SKU 来源及允许的规格辅助图
+- **AND** 黑色 SKU 补图沿用同一款式来源
+
+#### Scenario: 有分析的多款式任务没有普通事实分配
+
+- **WHEN** 用户提供两张商品主体图，而自动分工中的多款式任务未分配普通事实
+- **THEN** 实际生成请求仍附加两张已提供的商品图
+- **AND** 不因空事实来源而只发送全套默认主体
+
+#### Scenario: 历史套图不被当前下拉选择回写
+
+- **WHEN** 用户在生成后将当前参考主体从黑色改为卡其
+- **THEN** 新草稿须重新规划，已保存图像、冻结提示词和已入队任务保持原有快照
+- **AND** 查看历史生成结果时以该套保存的参考角色为准
+
+### Requirement: 套图按事实规划核心购买理由与可见功能
+
+系统 SHALL 从当前已确认商品事实中规划整套主购买理由，明确主要事实、买家收益和功能的画面表现。已有功能事实时，自动规划 SHALL 安排实际可见的功能表现；仅有功能名称、参数、引用 ID 或暖色背景 SHALL NOT 视为功能覆盖。此规则 SHALL 跨类目生效，不依赖特定商品名称。
+
+#### Scenario: 加热手套的核心功能需要可见表现
+- **WHEN** 已确认资料支持手套加热且自动套图容纳功能表现
+- **THEN** 计划包含完整商品主体上的热量或温暖收益表现
+- **AND** 表现说明为创意示意，不凭空标注温度、发热范围或内部线路
+
+#### Scenario: 非加热类目与非功能商品
+- **WHEN** 当前事实支持其他商品功能或仅支持外观信息
+- **THEN** 功能商品按自身事实分配可见功能任务
+- **AND** 仅有外观事实的商品不套用加热、能量光效或虚构功能
+
+### Requirement: 营销套图执行有上限的审核修复循环
+
+系统 SHALL 在初稿逐图事实与引用校验后审核整套策略缺失或无效、功能遗漏、购买问题和证据重复及明显的版式同质化。存在可修复问题时 SHALL 最多进行两轮局部 AI 修复，每轮重新校验。合格项、用户锁定项、平台强制项和已确认分析 SHALL 保持不变。普通质量建议在修复后仍未解决或没有可调整位置时 SHALL 作为可见警告保留，MUST NOT 阻断通过逐图事实与来源校验的图片；合格初稿 SHALL 不增加修复请求。真实来源失效、无可用轮播项及平台必需项无法满足时 SHALL 保留明确错误。
+
+初稿中缺少购买理由、无效事实引用或功能证据不合格的整套策略 SHALL 进入该有界修复。只需修复策略时 SHALL 保留全部已通过图片及其提示词和参考分配，复用已确认分析，只返回修复后的策略与空 `items`。仅明确的策略修复请求 MAY 接受空 `items`，普通初稿 SHALL 继续要求非空图片任务。策略修复与图片修复 SHALL 共用最多两轮预算；策略元数据仍无效时 SHALL 不采用该元数据，并显示具体建议，MUST NOT 因此阻断图片事实与来源均有效的任务。无依据的单张功能表现 SHALL 单独排除并同步实际数量、冻结、生成和补图；MUST NOT 将无效引用写入最终提示词或伪造缺失内容。用户锁定提示词 MUST NOT 被静默改写。
+
+#### Scenario: 修复缺失的功能任务
+- **WHEN** 初稿遗漏已确认核心功能的可见表现
+- **THEN** 系统选择可调整位置进行局部修复并重新审核
+- **AND** 其余合格提示词与参考图分配保持原样
+
+#### Scenario: 修复耗尽或用户约束冲突
+- **WHEN** 两轮后仍有关键问题，或图片需要修改但所有可用位置都被用户或平台锁定
+- **THEN** 系统明确展示优化建议，保留可用图片继续生成
+- **AND** 不无限重试、不静默替换锁定提示词，不把功能覆盖、重复或版式建议当作整套失败条件
+
+#### Scenario: 已确认预览与历史补图
+- **WHEN** 用户提交修复后的冻结预览或补齐历史计划
+- **THEN** 生成与补图复用最终提示词、来源与审核元数据
+- **AND** 不再次发起整套审核修复请求
+
+#### Scenario: 策略事实 ID 错误但图片任务有效
+- **WHEN** 初稿策略引用不存在的事实而图片任务均已通过校验
+- **THEN** 系统只修复策略，向模型提供已确认事实和具体错误
+- **AND** 修复成功后保留原图片的最终提示词、数量和参考分配
+
+#### Scenario: 全部图片受约束但策略缺少购买理由
+- **WHEN** 策略缺少购买理由而合格图片被用户或平台锁定
+- **THEN** 系统允许只修复策略，不因没有可改写图片而直接失败
+- **AND** 不改写受约束图片
+
+#### Scenario: 策略修复失败或返回了未请求图片
+- **WHEN** 策略修复继续引用未知事实或试图返回已确认图片
+- **THEN** 系统拒绝该次修复并在共享预算内重试
+- **AND** 两轮后策略仍无效时不采用该元数据，显示具体建议，其余通过事实与来源校验的图片仍可生成
+
+#### Scenario: 单张功能表现无依据
+- **WHEN** 两轮后某张功能表现仍没有已确认功能依据，且该项不是平台必需项
+- **THEN** 系统仅移出该项，列出原序号和具体原因，保留其余有效图片
+- **AND** 实际张数、预览、冻结、生成重校验及补图采用相同的保留项
+
+#### Scenario: 普通质量建议或局部优化服务不可用
+- **WHEN** 图片事实和来源均有效，但缺少可见功能表达、任务相近、简报不完整或局部修复请求失败
+- **THEN** 系统保留可用计划并在预览展示不影响生成的优化建议
+- **AND** 用户可以直接生成，生成时复用该冻结计划而不再次触发整套审核
+
+### Requirement: 视觉表达依据任务而非固定信息图配额
+
+自动规则规划 SHALL 按有效内容分配信息图，SHALL NOT 因为图片数量达到固定阈值而强制插入信息图。主图与场景图 SHALL 按当前购买任务选择构图，不把圆框、拼图和卖点条作为通用必需元素。功能渲染 SHALL 在一个完整主体和统一构图中突出主要功能及其收益，并只保留与当前任务有关的辅助功能证据。
+
+#### Scenario: 功能渲染与场景图具有不同任务和画面
+- **WHEN** 同一套图包含功能表现、使用场景和规格说明
+- **THEN** 各图交代独立新增信息并使用适合任务的视觉形式和文字密度
+- **AND** 不把三者都组织为大商品周围的重复信息小框
+
+### Requirement: 商业 CG 渲染替换冲动下单氛围图
+
+系统 SHALL 在新规划中将原 atmosphere / ownership-atmosphere 图型显示为“商业 CG 渲染图”，保留既有角色、图型与槽位标识。该图 SHALL 以无新增文字的商业渲染呈现商品体积、真实材质区分、主光与轮廓光、接触阴影及空间反射；存在已确认功能时 SHALL 通过有依据的立体效果表达买家收益。系统 SHALL 沿用参考支持的商品结构、配色和视角，不以塑料质感或平面装饰光效代替渲染。该图 SHALL NOT 强制真人或生活操作场景，不消耗独立操作场景，不纳入真人角色配额。既有手动提示词、平台硬约束和历史冻结内容 SHALL 保持有效。
+
+#### Scenario: 同时选择商业 CG 与功能图
+
+- **WHEN** 用户选择 atmosphere 和 effect-comparison
+- **THEN** 两个角色分别保留，前者用无字商业 CG 表达材质、体积与有依据的功能感受，后者解释有依据的功能作用
+- **AND** 商业 CG 不因为缺少独立使用场景或不适合真人出镜而被跳过或替换
+
+#### Scenario: AI 自主安排商业 CG
+
+- **WHEN** AI 营销根据商品事实和整套任务策划图片
+- **THEN** 系统允许自主选择 commercial-cg 视觉形式，不强制每套张数，并要求无新增文案和有依据的空间效果
+- **AND** 纯外观 CG 不需要功能事实，也不自动视为核心功能覆盖；其他图型的文案仍自主安排
+
+### Requirement: 功能渲染加强空间作用表现
+
+系统 SHALL 保留 effect-comparison / comparison-proof 与“功能效果渲染图”，围绕一个完整商品呈现有依据的主要功能与买家收益。功能效果 SHALL 通过符合商品的流动、前后遮挡、纵深及合理局部光照表现空间关系，SHALL NOT 仅依靠平面箭头、装饰描边或暖色背景。系统 SHALL 保持参考支持的主体结构、材质、颜色、视角和可见数字，不补造内部元件、作用范围或参数。
+
+#### Scenario: 功能与材质任务独立
+
+- **WHEN** 同套图包含商业 CG 与功能效果渲染
+- **THEN** 功能图继续以有据的作用、流动或结果为主要证据，CG 图以无字商业视觉表达材质、体积与有依据的功能感受
+- **AND** 两者不能只替换背景、标题或重复同一购买信息
+
+### Requirement: 商业 CG 采用无字且有依据的效果渲染
+
+系统 SHALL 将新规划的 atmosphere / ownership-atmosphere 商业 CG 默认设为无新增画布文字的纯渲染，SHALL NOT 添加标题、卖点字、图标、参数卡、水印或标注，商品已有实物标记保持参考。规则规划与 AI 营销 SHALL 使用一致的渲染方向；AI commercial-cg 的 text_density SHALL 为 none。
+
+存在已确认功能时，系统 SHALL 向 CG 分配相关功能事实，并用商品本体与空间效果直观表现该功能。已确认的加热可用橙金暖光、体积热流、前后遮挡和局部光照表达暖意，SHALL NOT 仅依靠暖色背景。功能示意 SHALL 保持实物结构、表面与配色，SHALL NOT 虚构内部线路、具体作用区域、数值或实测结论。没有已确认功能时 SHALL 继续表现材质与体积，不因商品名称补造性能。
+
+#### Scenario: 加热手套的无字暖感 CG
+
+- **WHEN** 用户规划商业 CG，且商品资料已经确认加热功能
+- **THEN** CG 的事实链包含加热依据，画面指令包含可见的立体暖感效果和禁止新增文字的约束
+- **AND** 不是普通棚拍配卖点文字或仅更换暖色背景
+
+#### Scenario: 外观商品不虚构功能
+
+- **WHEN** 商品仅有外观事实或没有商品分析
+- **THEN** CG 保持无字材质与体积表现，所有功能效果仅限已提供依据
+
+#### Scenario: AI CG 的文案和功能依据校验
+
+- **WHEN** AI 提交 commercial-cg 视觉形式
+- **THEN** 非 none 的文字密度被拒绝并提供可修复原因，有功能效果时检查已确认功能事实
+- **AND** 原功能图继续独立存在，手动提示词、历史冻结内容和平台硬约束保持有效
+
+### Requirement: 分析与营销延迟可按真实执行阶段核对
+
+系统 SHALL 为同一逻辑分析或营销操作关联资料准备、每次上游请求、首包、首段回答、回答结束、本地校验和局部修复的可观测时长。系统 MUST NOT 把心跳当作回答，MUST NOT 把缓冲 JSON 伪装成实时增量，MUST NOT 记录凭据、原始图片或模型私密推理。
+
+#### Scenario: 网关延迟或缓冲回答
+
+- **WHEN** 上游连接已建立但尚未提供回答文本，或最终仅返回整包 JSON
+- **THEN** 分析师和营销面板分别展示真实等待、可核对的时间及最终传输方式
+- **AND** 不声称未知的模型内部步骤已经完成
+
+#### Scenario: 分析后规划并发生局部修复
+
+- **WHEN** 用户复用当前有效分析规划整套图，初稿需要局部修复
+- **THEN** 同一操作内可区分初稿及每次实际修复调用的耗时与次数
+- **AND** 当前 High 等用户选择、已校验事实 ID 和合格图片保持有效
+
+### Requirement: 规划减少重复内容并保留完整事实约束
+
+系统 SHALL 在已有有效分析时复用事实与 ID，减少重复分析、逐图元数据和修复上下文中的冗余。系统 MUST NOT 为缩短输出而截断提示词、事实、数值条件、主参考图保真或用户锁定内容，MUST NOT 自动降低思考等级或增加逐图规划请求。
+
+#### Scenario: 对同一二十图输入比较优化结果
+
+- **WHEN** 使用同商品资料、参考图、模型和思考等级比较输出
+- **THEN** 验证报告列出实际请求数、输出体量、首段及总时长和有效图片数量
+- **AND** 区分已实测收益与不能确认的上游延迟变化
+
+### Requirement: Repair rejected marketing directions before returning a partial plan
+The system SHALL include rejected or absent marketing image positions in the existing bounded local repair loop, using only confirmed product facts and preserving accepted tasks and user constraints.
+
+#### Scenario: Invalid fact references in multiple directions
+- **WHEN** a draft contains image directions referencing unavailable product fact IDs
+- **THEN** the system SHALL request replacements for their original positions using the confirmed analysis
+- **AND** unsupported directions SHALL be rewritten rather than having their fact IDs silently substituted
+- **AND** accepted prompts SHALL remain unchanged
+
+#### Scenario: Missing positions or no accepted images
+- **WHEN** a parseable draft has missing positions or every optional image is rejected
+- **THEN** the system SHALL allow those positions to be repaired within the same maximum of two repair rounds
+- **AND** an exhausted plan without usable images SHALL fail with a specific diagnostic
+
+#### Scenario: Bounded repair preserves constraints
+- **WHEN** local repair replaces rejected positions
+- **THEN** original positions, selected image types, locked content, platform requirements and factual source validation SHALL remain enforced
+- **AND** invalid replacement responses SHALL NOT displace already accepted tasks
+
+### Requirement: 批量营销方案使用两个独立规划槽位
+
+系统 SHALL 按方案序号领取批量营销任务，并同时执行最多两个方案。任一方案完成规划及自身副本入队后 SHALL 立即补充下一方案，而不等待另一活动方案。每个方案 SHALL 使用独立变化种子、规划请求、SSE 进度与冻结结果；每个副本 SHALL 具有独立队列快照与任务标识。并行结果 MUST NOT 通过共享预览草稿交接或互相覆盖。
+
+#### Scenario: 较快方案先完成
+- **WHEN** 五个方案每个需要生成两套，方案 1 尚未完成而方案 2 已完成
+- **THEN** 方案 2 的两个副本按自身顺序加入现有套图队列，并启动方案 3
+- **AND** 任意时刻同时执行的方案数不超过 2，全部完成后共计 10 个不同队列任务
+
+#### Scenario: 乱序结果不串用
+- **WHEN** 方案 2 的结果先于方案 1 返回
+- **THEN** 每个任务的提示词、变化种子、参考文件与营销进度均来自所属方案及批量启动快照
+- **AND** 后续表单编辑不改变已开始批量操作的输入与图片质量设置
+
+### Requirement: 并发规划暂停与取消保留可恢复进度
+
+系统 SHALL 将不可恢复规划错误、重试耗尽和入队失败隔离到所属方案，标记失败并继续领取其余方案。另一活动方案的有效结果 SHALL 正常入队，不因同伴失败而暂停。所有方案处理完毕后 SHALL 结束批次，失败方案 MUST NOT 计为成功，也 MUST NOT 无限重试或重复提交已入队副本。仅用户主动暂停或停止 SHALL 阻止后续方案执行；主动暂停 SHALL 保留有效冻结计划，继续时仅补充尚未入队的副本。重试等待后 SHALL 再次检查暂停和取消状态。取消后迟到响应或异常 MUST NOT 恢复执行或覆盖取消状态。已实际入队任务 SHALL 继续保留。
+
+#### Scenario: 同伴规划在失败后返回
+- **WHEN** 方案 1 失败，方案 2 已发出且随后返回有效结果
+- **THEN** 方案 1 标记失败，释放的槽位启动后续方案，方案 2 的副本正常入队
+- **AND** 全部方案均处理后结束批次，成功与失败数量分别记录
+
+#### Scenario: 规划重试耗尽
+- **WHEN** 方案发生瞬时错误且已耗尽既有自动重试预算
+- **THEN** 该方案标记失败，继续处理剩余方案，失败不暂停整个批次
+
+#### Scenario: 部分副本入队后失败
+- **WHEN** 某方案已有副本入队且后续副本提交失败
+- **THEN** 保留已入队副本并将方案标记失败，其余方案继续处理
+- **AND** 不将部分入队方案计为成功，不重复提交已有副本
+
+#### Scenario: 取消发生在两个规划期间
+- **WHEN** 用户取消剩余方案且两个规划随后分别成功或失败
+- **THEN** 批量状态保持已取消，未入队副本不再创建，未开始方案不发请求
+
+### Requirement: 套图队列支持两套同时生成
+
+系统 SHALL 同时执行最多两个套图队列任务，并遵守启动时冻结的全局图片请求并发与提交间隔。全局图片请求上限为 1 时 SHALL 只运行一套。自动补图结束前 SHALL 保留所属套图槽位。任务和图片进度 SHALL 按各自队列标识隔离，当前选中套图 MUST NOT 被另一任务更新覆盖。
+
+#### Scenario: 两套运行时补充下一套
+- **WHEN** 两套已开始生成，第二套完成而第一套仍在生成或自动补图
+- **THEN** 第三套可以开始，任意时刻运行套图数不超过 2
+- **AND** 图片上游总请求仍受同一会话的全局上限与提交间隔限制
+
+#### Scenario: 全局图片并发为一
+- **WHEN** 批量快照中的全局图片请求并发为 1
+- **THEN** 套图队列逐套执行，包括完成自动补图后才释放槽位
+
+### Requirement: 批量营销功能显式开启且默认关闭
+
+系统 SHALL 为“很多套 AI 提示词”提供明确的开启／关闭按钮，每次加载默认关闭。关闭时 SHALL 隐藏配置及启动、继续入口，并阻止程序调用启动或继续批量生成。开启后 SHALL 展示配置和适用操作，按钮文本与无障碍状态 SHALL 与启用状态一致。AI 营销提示词关闭时 SHALL 隐藏批量入口并重置启用状态。批量启动或运行期间 SHALL 禁用关闭按钮，剩余任务取消 SHALL 继续使用既有取消入口。运行中的批量配置因 AI 开关隐藏后，重新启用 AI SHALL 允许再次开启配置以查看状态和取消剩余任务。
+
+#### Scenario: 初始默认关闭
+- **WHEN** 用户首次加载 Creation 且 AI 营销提示词已勾选
+- **THEN** 批量入口显示“开启”按钮，配置隐藏且按钮的按下状态为 false
+- **AND** 未开启时调用启动或继续函数不发起规划或入队
+
+#### Scenario: 开启与关闭
+- **WHEN** 用户点击“开启”
+- **THEN** 显示批量配置，按钮显示“关闭”且按下状态为 true
+- **AND** 批量未执行时再次点击可关闭并隐藏配置
+
+#### Scenario: 执行期间保护开关
+- **WHEN** 批量正在启动或运行
+- **THEN** 关闭按钮禁用，原有取消剩余入口继续可用
+- **AND** 已入队任务的状态与生成流程不受影响
+
+### Requirement: 批量配置展示三因子预计图片总数
+
+系统 SHALL 用当前套图数量、方案数量和每方案生成套数的乘积展示预计营销图片总数，同时显示计算因子和方案数量 × 每方案生成套数得到的队列套数。修改任一数量 SHALL 立即更新预计值。预计值 SHALL 标明属于营销图片，SKU 图和信息图重构仍按现有独立任务规则追加，实际生成继续遵循冻结计划与校验结果。
+
+#### Scenario: 二十张十个方案各两套
+- **WHEN** 套图数量为 20、方案数量为 10、每方案生成套数为 2
+- **THEN** 配置显示预计生成 400 张营销图片，计算因子为 20 × 10 × 2
+- **AND** 配置显示预计加入 20 套队列任务
+
+#### Scenario: 修改任一数量
+- **WHEN** 用户修改套图数量、方案数量或每方案生成套数
+- **THEN** 预计图片总数与队列套数按最新有效输入立即刷新
+- **AND** 不改变每个方案只规划一次和套图队列的既有规则
+
+### Requirement: 批量后续任务可主动暂停和继续
+
+系统 SHALL 提供“暂停后续”和“继续”，供用户主动控制后续执行。方案失败 MUST NOT 自动暂停整个批次。主动暂停 SHALL 立即停止新方案、新重试及尚未入队副本的提交，已发出的规划请求 SHALL 完成收尾并保留有效冻结计划。收尾期间 SHALL 显示“正在暂停”，禁止继续；全部执行槽位退出后 SHALL 进入“已暂停”，允许继续且仅补充未完成工作。已入队任务 SHALL 保持执行，已完成方案、失败终态方案和已入队副本 MUST NOT 重复规划或入队。
+
+#### Scenario: 两个规划请求收尾后续跑
+- **WHEN** 两个方案正在规划且用户点击“暂停后续”
+- **THEN** 批量进入正在暂停，不启动新方案，不新增副本入队，不允许提前继续
+- **AND** 已发出的请求收尾后保留有效计划并显示已暂停
+- **AND** 点击继续后复用已保留计划，只生成或入队剩余部分
+
+#### Scenario: 一个方案部分入队后主动暂停
+- **WHEN** 一个方案需要三套且第一套已入队后用户暂停后续
+- **THEN** 第一套继续执行，剩余两套暂不入队，冻结方案保留
+- **AND** 用户继续时不重新规划该方案，仅加入剩余两套
+
+#### Scenario: 等待重试期间主动暂停
+- **WHEN** 当前方案正在等待自动重试且用户暂停后续
+- **THEN** 等待收尾后不再发起该次重试
+- **AND** 显示用户暂停，后续可继续
+
+### Requirement: 批量停止后续覆盖运行和暂停状态
+
+系统 SHALL 在批量运行、正在暂停和已暂停时提供“停止后续”。停止 SHALL 将未完成方案及未入队副本标记为已停止并丢弃未入队的缓存计划；已失败终态方案 SHALL 保留失败状态，已入队任务 SHALL 保持执行。停止后的批次 SHALL 不可继续，迟到的规划成功或错误 MUST NOT 改写停止终态或追加队列任务。用户再次开始 SHALL 创建新批次。停止 SHALL 取消本轮仍在等待响应或读取 SSE 的规划请求，完成取消清理后 SHALL 释放开始入口的启动锁，不等待原规划请求自然结束；暂停 SHALL 保留当前规划请求以供后续恢复，取消规划 SHALL NOT 中断已入队的图片生成。
+
+#### Scenario: 失败暂停后停止
+- **WHEN** 用户对已有的失败暂停批次点击停止后续
+- **THEN** 批量显示已停止，尚未处理的方案不再发起请求
+- **AND** 继续入口不可用，已入队任务不变；新批次仍遵循方案失败不自动暂停的规则
+
+#### Scenario: 方案失败后停止剩余任务
+- **WHEN** 某方案失败后批量仍继续执行且用户点击停止后续
+- **THEN** 批量显示已停止，待开始和活动方案不再提交新请求
+- **AND** 已失败方案保持失败，继续入口不可用，已入队任务不变
+
+#### Scenario: 暂停收尾期间停止
+- **WHEN** 用户已暂停后续但仍有请求收尾，此时点击停止后续
+- **THEN** 剩余方案进入停止终态
+- **AND** 迟到的结果不会入队，错误不会把批量改回已暂停
+
+#### Scenario: 卡住的规划停止后重新开始
+- **WHEN** 两个规划请求仍未返回响应头或 SSE 尚未结束，用户点击停止后续
+- **THEN** 当前规划请求收到本轮取消信号，停止清理完成后开始按钮恢复可用
+- **AND** 用户再次点击开始创建独立新批次，旧批次不追加入队任务，也不覆盖新批次状态
+
+### Requirement: 批量控制按钮与冻结数量保持一致
+
+系统 SHALL 在本轮未结束时稳定展示“继续、暂停后续、停止后续”三个操作。运行时 SHALL 启用暂停和停止；正在暂停时 SHALL 仅启用停止；已暂停且请求收尾完成时 SHALL 启用继续和停止。开始新批次 SHALL 仅在没有待继续批次时可用。未结束批次的数量输入 SHALL 锁定，预计图片数和套数 SHALL 使用原始批次参数；续跑 SHALL 继续使用原始请求快照。既有默认关闭开关与三因子总数 SHALL 保持有效。
+
+#### Scenario: 用户修改其他表单后继续
+- **WHEN** 20 张、10 个方案、每方案 2 套的批次暂停后用户修改上方套图数量
+- **THEN** 本批次仍显示预计 400 张和 20 套，批量数量输入保持锁定
+- **AND** 点击继续使用本批次原始快照，不重新提交已完成任务
+
+### Requirement: 批量营销状态仅展示数量汇总
+
+系统 SHALL 用固定行数展示批量状态及已处理、成功、失败、进行中、待处理、已入队和累计重试数量。系统 MUST NOT 逐方案展开错误正文或营销进度长文本。系统 MAY 在汇总下展示各已开始方案的简短计时行，但计时列表 SHALL 限制高度并在溢出时滚动，未开始方案 SHALL 不占用计时行。失败数量 SHALL 独立于成功数量；所有方案处理完毕但有失败时 SHALL 明确显示有失败，不宣称全部成功。方案错误 SHALL 保留在方案状态中以供诊断。
+
+#### Scenario: 多个方案含长错误
+- **WHEN** 二十个方案中部分失败且每个错误包含二十条提示词诊断
+- **THEN** 数量状态区域仍只展示固定行数的汇总，不输出错误正文或营销进度长文本
+- **AND** 已入队、成功、失败与剩余数量反映实际状态，计时列表限制高度
+
+### Requirement: 批量营销方案与批次独立显示执行耗时
+
+系统 SHALL 为每个已开始方案及整个批次记录独立的执行耗时。运行中 SHALL 在现有批量状态位置每秒刷新已用时，即使上游没有进度事件。方案完成入队、规划失败或停止后 SHALL 固定显示所属方案总耗时；整批结束后 SHALL 固定显示整批总耗时。批次耗时 SHALL 按实际并发执行的经过时间计算，不叠加各方案耗时。重试等待与主动暂停时的请求收尾 SHALL 计入耗时，收尾后暂停的空闲时间 SHALL 排除；继续后 SHALL 累计原耗时。未开始方案 MUST NOT 显示运行计时。时间 SHALL 使用分秒格式，超过一小时 SHALL 显示时分秒。计时 SHALL 表示规划和入队阶段，不将已入队误报为图片生成完成。
+
+#### Scenario: 两个方案独立完成
+- **WHEN** 同时开始的两个方案分别在三秒和五秒完成
+- **THEN** 两个方案分别保留三秒和五秒总耗时，整批保留五秒总耗时
+- **AND** 后续刷新和其他任务进度不改变已完成耗时
+
+#### Scenario: 没有上游事件仍更新
+- **WHEN** 规划请求仍在等待上游且没有新进度事件
+- **THEN** 方案已用时与批次已用时仍每秒更新
+- **AND** 完成、暂停收尾结束、停止或关闭展示后清理刷新定时器，重新展示活动批次时仅恢复一个定时器
+
+#### Scenario: 暂停后继续
+- **WHEN** 方案已执行三秒并完成暂停收尾，空闲暂停三十秒后继续执行两秒
+- **THEN** 方案及批次累计耗时为五秒，不计入三十秒空闲暂停
+- **AND** 保留原始开始时间，不重新规划已保留的结果
+
+#### Scenario: 重试失败后继续其他方案
+- **WHEN** 一个方案重试后失败而其他方案继续处理
+- **THEN** 失败方案固定显示包含重试等待的总耗时，活动方案继续计时
+- **AND** 失败不会自动暂停其余方案或重置批次耗时

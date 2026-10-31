@@ -1156,7 +1156,7 @@ test("creation suite queue resolves repair target from selected queue instead of
   assert.equal(target.items[0].itemId, "b-material");
 });
 
-test("creation suite queue schedules queued sets serially", async () => {
+test("creation suite queue stays serial when global concurrency is one", async () => {
   const creationState = {
     activeQueueId: "",
     autoRepairAttemptCount: 2,
@@ -1199,6 +1199,7 @@ test("creation suite queue schedules queued sets serially", async () => {
 
   const context = {
     creationState,
+    getMaxParallelTasks: () => 1,
     compactErrorMessage: (message) => message,
     fetchImpl: async (url, options) => {
       assert.equal(url, "/api/creation/generate");
@@ -1322,7 +1323,7 @@ test("creation suite queue keeps one scheduling snapshot for an active batch", (
   assert.equal(creationState.schedulingSnapshot, undefined);
 });
 
-test("creation suite queue waits for automatic repair before starting the next suite", async () => {
+test("a serial creation queue reserves its slot until automatic repair finishes", async () => {
   const creationState = {
     activeQueueId: "",
     autoRepairAttemptCount: 0,
@@ -1365,6 +1366,7 @@ test("creation suite queue waits for automatic repair before starting the next s
 
   scheduleCreationGenerationQueue({
     creationState,
+    getMaxParallelTasks: () => 1,
     compactErrorMessage: (message) => message,
     fetchImpl: async (url, options) => {
       assert.equal(url, "/api/creation/generate");

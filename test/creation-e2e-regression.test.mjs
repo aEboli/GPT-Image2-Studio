@@ -398,6 +398,59 @@ test("single-SKU and missing-size items never call the upstream during generatio
   const rejected = await postForm(baseUrl, "/api/creation/generate", makeCreationForm({ fields: { ...fields, effectivePlan: JSON.stringify(onlyBlocked) } }));
   assert.equal(rejected.events.some((event) => event.eventName === "error" && /拦截/.test(event.payload.message)), true);
   assert.equal(requests.length, requestCount, "an entirely blocked plan must make zero upstream requests");
+
+  // A selected khaki carousel anchor must not replace a separately requested black SKU.
+  const variantRoles = [
+    { index: 1, filename: "black.png", role: "product" },
+    { index: 2, filename: "khaki.png", role: "reference-product", roleManuallyEdited: true },
+  ];
+  const variantSubjects = [
+    { id: "black", title: "Black gloves", filenames: ["black.png"], referenceIndexes: [1], colorNames: ["black"] },
+    { id: "khaki", title: "Khaki gloves", filenames: ["khaki.png"], referenceIndexes: [2], colorNames: ["khaki"] },
+  ];
+  const variantBytes = ["black", "khaki"].map((color) => Buffer.concat([Buffer.from(imageBase64, "base64"), Buffer.from(color)]));
+  const variantFields = {
+    ...fields, productDescription: "Two supplied glove variants", selectedRoles: JSON.stringify(["hero", "series-showcase"]),
+    referenceImageRoles: JSON.stringify(variantRoles), skuSubjects: JSON.stringify(variantSubjects),
+    skuGenerationEnabled: "true", infographicRebuildEnabled: "false",
+  };
+  const variantForm = (overrides = {}) => {
+    const data = makeCreationForm({ includeReferenceImage: false, fields: { ...variantFields, ...overrides } });
+    variantRoles.forEach((role, index) => data.append("referenceImages", new File([variantBytes[index]], role.filename, { type: "image/png" })));
+    return data;
+  };
+  const variantPreview = await postForm(baseUrl, "/api/creation/plan", variantForm());
+  assert.equal(variantPreview.response.status, 200, variantPreview.text);
+  const variantPlan = JSON.parse(variantPreview.text).plan;
+  const generatedVariants = await postForm(baseUrl, "/api/creation/generate", variantForm({ effectivePlan: JSON.stringify(variantPlan) }));
+  const variantSet = getCompleteSet(generatedVariants.events);
+  assert.equal(variantSet.items.filter((item) => item.status === "completed").length, 4, generatedVariants.text);
+  const content = (body) => body.input.flatMap((entry) => entry.content || []);
+  const requestText = (body) => content(body).filter((part) => part.type === "input_text").map((part) => part.text).join("\n");
+  const requestImages = (body) => content(body).filter((part) => part.type === "input_image").map((part) => part.image_url);
+  const imageUrls = variantBytes.map((bytes) => `data:image/png;base64,${bytes.toString("base64")}`);
+  const variantRequests = requests.slice(requestCount).filter((entry) => entry.path.endsWith("/responses")).map((entry) => entry.body);
+  assert.equal(variantRequests.length, 4);
+  const requestForItem = (item) => {
+    assert.ok(item, "the requested image task exists in the preview");
+    const body = variantRequests.find((entry) => requestText(entry).includes(item.prompt));
+    assert.ok(body, `the frozen prompt reaches the image request for ${item.itemId}`);
+    return body;
+  };
+  const blackRequest = requestForItem(variantPlan.items.find((item) => item.skuSubject?.id === "black"));
+  const khakiRequest = requestForItem(variantPlan.items.find((item) => item.skuSubject?.id === "khaki"));
+  const heroRequest = requestForItem(variantPlan.items.find((item) => item.role === "hero"));
+  const comparisonRequest = requestForItem(variantPlan.items.find((item) => item.role === "series-showcase"));
+  assert.deepEqual(requestImages(blackRequest), [imageUrls[0]]);
+  assert.deepEqual(requestImages(khakiRequest), [imageUrls[1]]);
+  assert.deepEqual(requestImages(heroRequest), [imageUrls[1]]);
+  assert.deepEqual(requestImages(comparisonRequest), [imageUrls[1], imageUrls[0]]);
+  const blackItem = variantSet.items.find((item) => item.skuSubject?.id === "black");
+  const repairedVariant = await postForm(baseUrl, "/api/creation/repair", variantForm({ setId: variantSet.setId, itemId: blackItem.itemId }));
+  assert.equal(repairedVariant.events.some((event) => event.eventName === "error"), false, repairedVariant.text);
+  const repairedRequest = requests.filter((entry) => entry.path.endsWith("/responses")).at(-1).body;
+  assert.match(requestText(repairedRequest), /PRODUCT FIDELITY: black\.png/);
+  assert.deepEqual(requestImages(repairedRequest), [imageUrls[0]]);
 });
 
 test("balanced content tasks survive preview, upstream generation, storage and repair", async (t) => {
@@ -406,6 +459,11 @@ test("balanced content tasks survive preview, upstream generation, storage and r
   const requests = [];
   const imageBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAADklEQVR4nGP4DwUMMAYAj4IP8TylVlEAAAAASUVORK5CYII=";
   const upstream = createHttpServer(async (request, response) => {
+    if (request.method === "GET" && request.url === "/") {
+      response.writeHead(404, { "content-type": "application/json" });
+      response.end(JSON.stringify({ error: "not found" }));
+      return;
+    }
     const parts = [];
     for await (const chunk of request) parts.push(chunk);
     const pathname = new URL(request.url, "http://localhost").pathname;
@@ -457,7 +515,8 @@ test("balanced content tasks survive preview, upstream generation, storage and r
   assert.ok(completed, generation.text);
   assert.equal(requests.length, plan.items.filter((item) => !item.evidenceBlocked).length);
   assert.ok(requests.some((request) => JSON.stringify(request).includes(marketingRecommendation)), "the image upstream receives the analyst recommendation");
-  assert.ok(requests.every((request) => surfaceLocks.every((lock) => JSON.stringify(request).includes(lock))), "template image requests keep each observed surface lock");
+  assert.ok(requests.every((request) => JSON.stringify(request).includes("PRODUCT FIDELITY:")), "template image requests retain reference fidelity");
+  assert.ok(requests.every((request) => surfaceLocks.every((lock) => !JSON.stringify(request).includes(lock))), "template image requests ignore legacy analysis locks");
   for (const item of completed.items) {
     const original = plan.items.find((entry) => entry.itemId === item.itemId);
     assert.deepEqual(item.contentAssignment, original.contentAssignment);
@@ -574,7 +633,7 @@ test("creation recovers a known Responses task after the stream deadline without
   assert.equal(completedSet.items[0].status, "completed");
   assert.ok(completedSet.items[0].relativePath);
   assert.deepEqual(
-    upstreamRequests.map(({ method, pathname }) => `${method} ${pathname}`),
+    upstreamRequests.filter(({ pathname }) => pathname !== "/").map(({ method, pathname }) => `${method} ${pathname}`),
     ["POST /v1/responses", "GET /v1/responses/resp_timeout_recovery"],
   );
   assert.equal(result.text.includes("resp_timeout_recovery"), false, "upstream response IDs must stay private");
@@ -679,7 +738,7 @@ test("creation recovers after an image completion announcement arrives before it
   assert.equal(completedSet.items[0].status, "completed");
   assert.ok(completedSet.items[0].relativePath);
   assert.deepEqual(
-    upstreamRequests.map(({ method, pathname }) => `${method} ${pathname}`),
+    upstreamRequests.filter(({ pathname }) => pathname !== "/").map(({ method, pathname }) => `${method} ${pathname}`),
     ["POST /v1/responses", "GET /v1/responses/resp_completion_before_bytes"],
   );
   assert.equal(
@@ -785,7 +844,7 @@ test("creation keeps polling an in-progress original task after the stream deadl
   assert.ok(completedSet.items[0].relativePath);
   assert.equal(recoveryAttempt, 2);
   assert.deepEqual(
-    upstreamRequests.map(({ method, pathname }) => `${method} ${pathname}`),
+    upstreamRequests.filter(({ pathname }) => pathname !== "/").map(({ method, pathname }) => `${method} ${pathname}`),
     [
       "POST /v1/responses",
       "GET /v1/responses/resp_poll_after_deadline",

@@ -62,7 +62,7 @@ test("partial JSON extracts only complete top-level fields and complete items ac
     if (partial.items?.length) assert.deepEqual(partial.items[0], payload.items[0]);
   }
   assert.deepEqual(readCreationMarketingPartialJson(source), {
-    audience_strategy: payload.audience_strategy, product_insights: payload.product_insights, items: payload.items,
+    audience_strategy: payload.audience_strategy, product_insights: payload.product_insights, suite_strategy: payload.suite_strategy, items: payload.items,
   });
   assert.deepEqual(readCreationMarketingPartialJson('prose {"items":[{"item_id":"nested"}]}'), {});
   assert.deepEqual(readCreationMarketingPartialJson('{"outer":{"items":[{"item_id":"nested"}]}}'), {});
@@ -80,6 +80,16 @@ test("partial JSON extracts only complete top-level fields and complete items ac
   ] });
   assert.equal(sparse.items[0].itemId, "ai-2");
   assert.equal(sparse.items[0].sourceIndex, 9, "filtered tasks retain the validated original slot");
+});
+
+test("marketing progress preserves more than eight reference indexes", () => {
+  const { payload } = marketingPlanFixture(1);
+  const indexes = Array.from({ length: 10 }, (_, index) => index + 1);
+  payload.items[0].reference_indexes = indexes;
+  assert.deepEqual(summarizeCreationMarketingProgress(payload).items[0].referenceIndexes, indexes);
+  delete payload.items[0].reference_indexes;
+  payload.items[0].marketingAssignment = { referenceIndexes: indexes };
+  assert.deepEqual(summarizeCreationMarketingProgress(payload).items[0].referenceIndexes, indexes);
 });
 
 test("retries reset partial output and late events cannot overwrite a terminal or newer attempt", () => {

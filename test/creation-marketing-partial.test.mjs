@@ -13,7 +13,7 @@ import { buildCreationItemReferenceImages } from "../lib/creation-reference-labe
 const images = [{ filename: "gloves.png", base64: "Z2xvdmVz", buffer: Buffer.from("gloves"), mimeType: "image/png" }];
 const options = { count: 18, referenceCount: 1, primaryIndex: 1 };
 
-test("the thirteenth invalid fact leaves seventeen frozen tasks and a missing-image diagnostic", async () => {
+test("unresolved invalid facts leave seventeen frozen tasks after bounded repair", async () => {
   const { input, payload } = marketingPlanFixture(18);
   payload.items[12].fact_ids.push("missing");
   const events = [];
@@ -22,7 +22,7 @@ test("the thirteenth invalid fact leaves seventeen frozen tasks and a missing-im
     calls += 1;
     return Response.json({ output_text: JSON.stringify(payload) });
   } });
-  assert.equal(calls, 1);
+  assert.equal(calls, 3);
   assert.equal(plan.items.length, 17);
   assert.equal(plan.imageCount, 17);
   assert.equal(plan.platformSetOverrides.imageCount, 17);

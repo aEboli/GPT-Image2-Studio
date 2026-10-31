@@ -14,9 +14,11 @@ import {
 import { normalizeOutputFormat } from "../lib/output-format-options.mjs";
 import { normalizeGenerationSize, normalizeModelProtocolImageSize } from "../lib/generation-size-options.mjs";
 import { createConfigModelPickerController } from "../lib/config-model-picker.mjs";
+import { DEFAULT_REASONING_EFFORT, REASONING_EFFORT_OPTIONS } from "../lib/studio-constants.mjs";
 
 const app = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
 const qualityFields = ["qualityInput", "creationQualityInput", "portraitQualityInput", "articleIllustrationQualityInput", "pptQualityInput"];
+const reasoningFields = ["reasoningEffortInput", "creationReasoningEffortInput", "portraitReasoningEffortInput", "articleIllustrationReasoningEffortInput", "pptReasoningEffortInput"];
 const legacyModel = "gpt-image-2";
 const extendedModel = "gpt-image-2.5-sunburst";
 
@@ -46,7 +48,7 @@ function createControl(value = "") {
 
 function createHarness({ route = "a", browserConfig = {} } = {}) {
   const refs = Object.fromEntries([
-    ...qualityFields, "transparentBackgroundField", "transparentBackgroundInput", "outputFormatInput",
+    ...qualityFields, ...reasoningFields, "transparentBackgroundField", "transparentBackgroundInput", "outputFormatInput",
     "imageToolModelSelect", "directImageModelInput", "protocolImageModelInput", "directResponsesModelInput",
     "includeImageToolModelToggle", "directImageStreamToggle",
     "baseUrlInput", "apiKeyInput", "responsesModelInput", "protocolBaseUrlInput", "protocolApiKeyInput",
@@ -76,7 +78,8 @@ function createHarness({ route = "a", browserConfig = {} } = {}) {
     getGrokImageQualityOptions, getImageQualityOptions, normalizeGrokImageQuality, normalizeImageQualityForRoute, normalizeImageQuality, normalizeOutputFormat,
     normalizeGenerationSize, normalizeModelProtocolImageSize,
     getBrowserPrivateConfigRequestPayload: () => browserConfig,
-    DEFAULT_REASONING_EFFORTS: ["low", "medium", "high", "xhigh"],
+    DEFAULT_REASONING_EFFORT, DEFAULT_REASONING_EFFORTS: [...REASONING_EFFORT_OPTIONS],
+    REASONING_LABELS: { none: "None", minimal: "Minimal", low: "Low", medium: "Medium", high: "High", xhigh: "XHigh", max: "Max" },
     readEndpointFields: () => ({}), getConfiguredGenerationStartDelayMs: () => 1000, getConfiguredGenerationConcurrency: () => 20,
     GENERATION_START_DELAY_FIELD: "generationStartDelayMs", GENERATION_CONCURRENCY_FIELD: "generationConcurrency",
     VIEW_ACCENT_FAMILIES: {}, CREATE_VIEW_IDS: new Set(), ASSET_VIEW_IDS: new Set(),
@@ -89,7 +92,7 @@ function createHarness({ route = "a", browserConfig = {} } = {}) {
     getGenerationReferenceFile: (item) => item.file, buildGenerationTaskStatusText: () => "queued",
   };
   for (const name of [
-    "syncHash", "renderActiveView", "syncGalleryLayoutMode", "scheduleStudioHeightSync", "scheduleGalleryPanelHeightSync", "scheduleStudioPromptFillSync",
+    "syncHash", "syncDocumentTitle", "renderActiveView", "syncGalleryLayoutMode", "scheduleStudioHeightSync", "scheduleGalleryPanelHeightSync", "scheduleStudioPromptFillSync",
     "scheduleGalleryScrollSync", "updateGenerateButton", "syncConfigSectionControls", "updateGenerationModeStatus",
     "syncEndpointFieldsFromFullUrlModes", "syncProtocolEndpointPreview", "renderSizeOptions", "renderReferenceAnalysisSizeOptions",
     "renderImageDecompositionSizeOptions", "renderCreationSizeOptions", "renderPortraitSizeOptions",
@@ -101,6 +104,7 @@ function createHarness({ route = "a", browserConfig = {} } = {}) {
     "getImageQualityInputs", "getImageQualityInputKey", "getImageQualityRouteValues", "rememberImageQualityForRoute",
     "normalizeSelectedImageQuality", "renderImageQualityOptions", "getSelectedImageQuality", "syncMainImageReasoningControl",
     "getSelectedReasoningEffort", "getSelectedImageReasoningEffort",
+    "getReasoningEffortInputs", "renderReasoningOptions",
     "setActiveView", "setStudioGenerationMode", "normalizeSizeForSelectedRoute", "resolveGenerationSizeForSelectedRoute",
     "selectConfigSection", "createJob", "savePromptAttemptPreview",
     "applyQueuedJobConfigSnapshot", "appendJobConfigToFormData",
@@ -119,6 +123,24 @@ function createHarness({ route = "a", browserConfig = {} } = {}) {
   vm.runInNewContext([...functions, app.slice(pickerStart, pickerEnd), app.slice(eventsStart, eventsEnd), app.slice(toggleStart, toggleEnd)].join("\n"), context);
   return context;
 }
+
+test("all five reasoning controls default to high, offer all levels and retain independent selections", () => {
+  const context = createHarness();
+  context.renderReasoningOptions();
+  for (const name of reasoningFields) {
+    assert.equal(context.refs[name].value, "high");
+    assert.deepEqual(context.refs[name].children.map((option) => option.value), REASONING_EFFORT_OPTIONS);
+    assert.match(context.refs[name].title, /文本\/视觉分析/);
+  }
+  for (const [index, name] of reasoningFields.entries()) context.refs[name].value = ["none", "minimal", "max", "high", "xhigh"][index];
+  context.renderReasoningOptions();
+  for (const [index, name] of reasoningFields.entries()) assert.equal(context.refs[name].value, ["none", "minimal", "max", "high", "xhigh"][index]);
+  context.state.config.defaults.reasoningEffort = "xhigh";
+  context.refs.creationReasoningEffortInput.value = "";
+  assert.equal(context.getSelectedReasoningEffort(context.refs.creationReasoningEffortInput), "xhigh");
+  context.refs.creationReasoningEffortInput.value = "invalid";
+  assert.equal(context.getSelectedReasoningEffort(context.refs.creationReasoningEffortInput), "high");
+});
 
 test("工具模型开关更新请求值与无障碍状态，不改变直连流式开关", () => {
   const context = createHarness();

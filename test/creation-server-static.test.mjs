@@ -261,12 +261,11 @@ test("model list route uses independent direct image and text provider settings"
   ]);
 });
 
-test("creation listing uses an independent medium reasoning default", async () => {
+test("creation listing uses the selected, saved or configured reasoning effort", async () => {
   const server = await readFile(serverPath, "utf8");
   const localHandler = server.match(/async function handleCreationListingsGenerate[\s\S]*?\r?\n}\r?\n\r?\nasync function handlePortraitSetsGet/)?.[0] || "";
-  assert.match(server, /const DEFAULT_CREATION_LISTING_REASONING_EFFORT = "medium";/);
-  assert.match(localHandler, /payload\?\.reasoningEffort \|\| DEFAULT_CREATION_LISTING_REASONING_EFFORT/);
-  assert.doesNotMatch(localHandler, /config\.defaults\?\.reasoningEffort/);
+  assert.doesNotMatch(server, /const DEFAULT_CREATION_LISTING_REASONING_EFFORT = "medium";/);
+  assert.match(localHandler, /payload\?\.reasoningEffort \|\| set\.reasoningEffort \|\| config\.defaults\?\.reasoningEffort \|\| DEFAULT_REASONING_EFFORT/);
 });
 
 test("server saves creation assets into a dated creation folder and hides them from gallery", async () => {
@@ -639,12 +638,11 @@ test("generic prompt agent routes do not inject Creation Mode context", async ()
   assert.doesNotMatch(localHandler, /套图分析上下文|平台选择：|商品类目：|主图、详情页信息|SKU 对比|移动端缩略图/);
 });
 
-test("local creation reference analysis defaults to low reasoning effort", async () => {
+test("local creation reference analysis preserves the selected effort and configured default", async () => {
   const server = await readFile(serverPath, "utf8");
   const localHandler = server.match(/async function handleCreationReferenceAnalyze[\s\S]*?\r?\n}\r?\n\r?\nasync function handleCreationPlan/)?.[0] || "";
-  assert.match(server, /CREATION_REFERENCE_ANALYSIS_REASONING_EFFORT/);
-  assert.match(localHandler, /formData\.get\("reasoningEffort"\) \|\| CREATION_REFERENCE_ANALYSIS_REASONING_EFFORT/);
-  assert.doesNotMatch(localHandler, /formData\.get\("reasoningEffort"\) \|\| config\.defaults\?\.reasoningEffort \|\| DEFAULT_REASONING_EFFORT/);
+  assert.doesNotMatch(server, /const CREATION_REFERENCE_ANALYSIS_REASONING_EFFORT = "low";/);
+  assert.match(localHandler, /formData\.get\("reasoningEffort"\) \|\| config\.defaults\?\.reasoningEffort \|\| DEFAULT_REASONING_EFFORT/);
 });
 
 test("local creation generation accepts selected creation roles", async () => {

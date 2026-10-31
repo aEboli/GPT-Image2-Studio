@@ -39,7 +39,7 @@ if (!runtime.studioServerUrl || typeof runtime.closeStudioServer !== "function")
 const response = await fetch(runtime.studioServerUrl);
 const body = await response.text();
 console.log("LIFECYCLE_URL=" + runtime.studioServerUrl);
-console.log("LIFECYCLE_PAGE_OK=" + String(response.status === 200 && body.includes("<title>Image Studio</title>")));
+console.log("LIFECYCLE_PAGE_OK=" + String(response.status === 200 && body.includes("<title>IS</title>")));
 await runtime.closeStudioServer();
 await runtime.closeStudioServer();
 try {

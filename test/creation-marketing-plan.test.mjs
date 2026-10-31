@@ -23,6 +23,7 @@ test("marketing schema supports a complete batch and text-only product input", (
   assert.match(body.input[0].content[0].text, /一次回答.*完整的 task_count/);
   assert.match(body.input[0].content[0].text, /image_type 必须逐字使用 allowed_image_types 中的 image_type 值/);
   assert.match(body.input[0].content[0].text, /每条 marketing_goal 必须非空且互不相同/);
+  assert.equal(body.text.format.schema.properties.items.items.properties.reference_indexes.maxItems, undefined);
 });
 
 test("audience segments retain concrete contexts and reject invalid evidence", () => {
@@ -64,11 +65,113 @@ test("one model call returns 20 final prompts without the template slot limit", 
   assert.equal(plan.items[2].imageTypeLabel, "产品细节特写图");
 });
 
+test("AI marketing prompts ignore legacy appearance locks and retain primary-reference fidelity", () => {
+  const { input, payload } = marketingPlanFixture(1);
+  const wrongLock = "APPEARANCE LOCK: analyst guessed a red open lid and the wrong controls.";
+  input.productInsights.appearance_locks = [{ text: wrongLock, reference_indexes: [1] }];
+  payload.items[0].prompt += `\n${wrongLock}`;
+  const basePlan = buildCreationPlan(input);
+  const context = buildCreationMarketingContext(input, basePlan, referenceImages);
+  assert.equal(context.prompt_contract.subject_lock, undefined);
+  assert.doesNotMatch(JSON.stringify(context), /appearance_locks|analyst guessed a red open lid/);
+  const plan = applyCreationMarketingPlan(basePlan, payload, { count: 1, referenceCount: 1, primaryIndex: 1 });
+  assert.match(plan.items[0].prompt, /^PRODUCT FIDELITY: gloves\.png is the product:/);
+  assert.doesNotMatch(plan.items[0].prompt, /APPEARANCE LOCK|analyst guessed a red open lid/);
+  assert.equal(plan.items[0].promptContext?.subjectLock, undefined);
+});
+
+test("marketing fidelity names the selected primary even when another product appears first", () => {
+  const { input, payload } = marketingPlanFixture(1);
+  const base = buildCreationPlan(input);
+  base.referenceImageRoles = [{ index: 1, filename: "support.png", role: "product" }, { index: 2, filename: "chosen.png", role: "reference-product" }];
+  const plan = applyCreationMarketingPlan(base, payload, { count: 1, referenceCount: 2, primaryIndex: 2 });
+  assert.match(plan.items[0].prompt, /^PRODUCT FIDELITY: chosen\.png is the product:/);
+  assert.equal(plan.items[0].prompt.match(/PRODUCT FIDELITY:/gu).length, 1);
+});
+
+test("user-locked prompts and legacy frozen marketing prompts retain their exact text", () => {
+  const { input, payload } = marketingPlanFixture(1);
+  payload.items[0].prompt += "\r\nAPPEARANCE LOCK: frozen user content.";
+  const base = buildCreationPlan(input);
+  const lockedItems = [{ item_id: payload.items[0].item_id, image_type: payload.items[0].image_type, prompt: payload.items[0].prompt }];
+  const plan = applyCreationMarketingPlan(base, payload, { count: 1, referenceCount: 1, primaryIndex: 1, lockedItems });
+  assert.equal(plan.items[0].prompt, payload.items[0].prompt);
+  const frozen = applyCreationMarketingPlan(plan, payload, { count: 1, referenceCount: 1, primaryIndex: 1, allowPartial: false });
+  assert.equal(frozen.items[0].prompt, payload.items[0].prompt);
+});
+
+test("an analysis lock alone cannot become a usable image prompt", () => {
+  const { input, payload } = marketingPlanFixture(1);
+  payload.items[0].prompt = "APPEARANCE LOCK: wrong product.";
+  assert.throws(() => applyCreationMarketingPlan(buildCreationPlan(input), payload, { count: 1, referenceCount: 1, primaryIndex: 1 }), /缺少有效的画面提示词/);
+});
+
+test("restricted safe term removes only the matching item after bounded repair fails", async () => {
+  const { input, payload } = marketingPlanFixture(2);
+  payload.items[0].prompt += " Safe use instructions.";
+  let calls = 0;
+  let requestContext;
+  const plan = await requestCreationMarketingPlan({ input, referenceImages, config, fetchImpl: async (_url, init) => {
+    calls += 1;
+    requestContext = JSON.parse(JSON.parse(init.body).input[0].content[1].text);
+    return new Response(JSON.stringify({ output_text: JSON.stringify(payload) }), { headers: { "content-type": "application/json" } });
+  } });
+
+  assert.equal(calls, 3);
+  assert.deepEqual(requestContext.restricted_terms, [{ term: "safe", match: "standalone-word" }]);
+  assert.equal(plan.items.length, 1);
+  assert.equal(plan.marketingPlan.validation.removedItems[0].sourceIndex, 1);
+  assert.match(plan.marketingPlan.validation.removedItems[0].reason, /prompt.*safe/i);
+});
+
+test("restricted term matches standalone safe case-insensitively without matching substrings", async () => {
+  for (const [promptText, shouldRemove] of [["SAFE product", true], ["unsafe product", false], ["safely packed", false]]) {
+    const { input, payload } = marketingPlanFixture(2);
+    payload.items[0].prompt += ` ${promptText}`;
+    const plan = await requestCreationMarketingPlan({ input, referenceImages, config, fetchImpl: async () => (
+      new Response(JSON.stringify({ output_text: JSON.stringify(payload) }), { headers: { "content-type": "application/json" } })
+    ) });
+    assert.equal(plan.items.length, shouldRemove ? 1 : 2, promptText);
+  }
+});
+
+test("restricted term validation covers all generated marketing text fields", async () => {
+  for (const [field, expectedField] of [["title", "title"], ["marketing_goal", "marketing_goal"], ["creative_brief", "creative_brief.purpose"]]) {
+    const { input, payload } = marketingPlanFixture(2);
+    if (field === "creative_brief") payload.items[0].creative_brief = { purpose: "safe use", scene: "", action: "", framing: "", evidence_focus: "" };
+    else payload.items[0][field] += " safe";
+    const plan = await requestCreationMarketingPlan({ input, referenceImages, config, fetchImpl: async () => (
+      new Response(JSON.stringify({ output_text: JSON.stringify(payload) }), { headers: { "content-type": "application/json" } })
+    ) });
+    assert.equal(plan.items.length, 1, field);
+    assert.match(plan.marketingPlan.validation.removedItems[0].reason, new RegExp(expectedField.replaceAll(".", "\\."), "u"));
+  }
+});
+
+test("restricted term is enforced independently of legacy platform metadata", async () => {
+  for (const platform of ["universal", "shein", "amazon"]) {
+    const { input, payload } = marketingPlanFixture(2);
+    input.platform = platform;
+    payload.items[0].prompt += " safe handling.";
+    const plan = await requestCreationMarketingPlan({ input, referenceImages, config, fetchImpl: async () => (
+      new Response(JSON.stringify({ output_text: JSON.stringify(payload) }), { headers: { "content-type": "application/json" } })
+    ) });
+    assert.equal(plan.items.length, 1, platform);
+    assert.match(plan.marketingPlan.validation.removedItems[0].reason, /safe/u);
+  }
+});
+
 for (const imageType of ["variant-comparison", "dimension-fit", "in-box", "spec-table"]) {
   test(`AI marketing ${imageType} is not blocked by local evidence requirements`, async () => {
     const { input, payload } = marketingPlanFixture(1);
     input.dimensionSpecs = "";
     payload.product_insights.confirmed_facts = payload.product_insights.confirmed_facts.filter((fact) => !["spec", "package"].includes(fact.kind));
+    payload.product_insights.confirmed_facts = payload.product_insights.confirmed_facts.filter((fact) => fact.kind === "appearance");
+    for (const key of ["selling_points", "pain_points", "marketing_recommendations", "audience_segments"]) payload.product_insights[key] = [];
+    payload.suite_strategy = { core_buying_reason: "核对当前任务所需的商品外观", primary_fact_ids: ["appearance"], functional_proofs: [] };
+    Object.assign(payload.items[0], { fact_ids: ["appearance"], audience_ids: [], selling_point_ids: [], pain_point_ids: [], recommendation_ids: [], prompt: "展示参考支持的完整商品外观。" });
+    payload.items[0].creative_brief.visual_form = "product-photograph";
+    payload.items[0].creative_brief.effect_visual = "";
     payload.items[0].image_type = imageType;
     const plan = await requestCreationMarketingPlan({ input, referenceImages, config, fetchImpl: async () => (
       new Response(JSON.stringify({ output_text: JSON.stringify(payload) }), { headers: { "content-type": "application/json" } })
@@ -105,6 +208,7 @@ test("marketing assignments repair omitted facts from their grounded analysis en
     item.fact_ids = ["appearance"];
     item.audience_ids = ["commute"];
   });
+  payload.items[1].selling_point_ids = ["heat-benefit", "finger-benefit"];
   const plan = await requestCreationMarketingPlan({ input, referenceImages, config, fetchImpl: async () => (
     new Response(JSON.stringify({ output_text: JSON.stringify(payload) }), { headers: { "content-type": "application/json" } })
   ) });
@@ -128,7 +232,11 @@ test("text-only planning grounds marketing in the supplied product description",
   input.referenceImageRoles = [];
   payload.reference_roles = [];
   payload.product_insights = { confirmed_facts: [{ id: "description", text: input.productDescription, kind: "appearance", source: "user", reference_indexes: [] }], selling_points: [], pain_points: [], marketing_recommendations: [], audience_segments: [] };
+  payload.suite_strategy = { core_buying_reason: "核对棉质外观和腕口调节带", primary_fact_ids: ["description"], functional_proofs: [] };
   payload.items.forEach((item) => { item.fact_ids = ["description"]; item.reference_indexes = []; item.audience_ids = []; item.selling_point_ids = []; item.pain_point_ids = []; item.recommendation_ids = []; });
+  payload.items[1].creative_brief.visual_form = "product-photograph";
+  payload.items[1].creative_brief.effect_visual = "";
+  payload.items[1].prompt = "以参考支持的外观展示棉质手套和腕口调节带。";
   let calls = 0;
   const plan = await requestCreationMarketingPlan({ input, referenceImages: [], config, fetchImpl: async () => {
     calls += 1;
@@ -158,22 +266,22 @@ test("frozen plans, stored items and repair retain exact prompts and reference a
 
 for (const [name, mutation, error] of [
   ["short batch", (payload) => { payload.items.pop(); }, /20 条.*19 条/],
-  ["duplicate id", (payload) => { payload.items[1].item_id = payload.items[0].item_id; }, /独立任务/],
-  ["duplicate prompt", (payload) => { payload.items[1].prompt = payload.items[0].prompt; }, /独立任务/],
+  ["duplicate id", (payload) => { payload.items[2].item_id = payload.items[0].item_id; }, /独立任务/],
+  ["duplicate prompt", (payload) => { payload.items[2].prompt = payload.items[0].prompt; }, /独立任务/],
   ["unknown fact", (payload) => { payload.items[0].fact_ids.push("missing"); }, /商品事实/],
   ["unknown buyer", (payload) => { payload.items[0].audience_ids = ["missing"]; }, /audience_ids/],
   ["unknown reference", (payload) => { payload.items[0].reference_indexes = [2]; }, /参考图分配无效/],
   ["duplicate reference", (payload) => { payload.items[0].reference_indexes = [1, 1]; }, /参考图分配无效/],
   ["empty prompt", (payload) => { payload.items[0].prompt = ""; }, /完整提示词/],
   ["unknown type", (payload) => { payload.items[0].image_type = "not-a-type"; }, /有效图型/],
-  ["duplicate goal", (payload) => { payload.items[1].marketing_goal = payload.items[0].marketing_goal; }, /独立任务/],
+  ["duplicate goal", (payload) => { payload.items[2].marketing_goal = payload.items[0].marketing_goal; }, /独立任务/],
   ["missing title", (payload) => { payload.items[8].title = ""; }, /第 9 条缺少图片标题/],
   ["role instead of image type", (payload) => { payload.items[8].image_type = "effect-comparison"; }, /第 9 条没有有效图型（effect-comparison）/],
   ["repeated ninth goal", (payload) => { payload.items[8].marketing_goal = payload.items[0].marketing_goal; }, /第 9 条营销目标.*重复/],
 ]) {
-  test(`invalid AI ${name} removes only the unusable task`, async () => {
+  test(`invalid AI ${name} removes only the unusable task after bounded repair`, async () => {
     const { plan, calls } = await planned(20, (payload) => { mutation(payload); return payload; });
-    assert.equal(calls, 1);
+    assert.equal(calls, 3);
     assert.equal(plan.imageCount, 19);
     assert.equal(plan.items.length, 19);
     assert.equal(plan.platformSetOverrides.imageCount, 19);
@@ -222,11 +330,20 @@ test("reference repair uses distinct fact sources and keeps the chosen primary f
   assert.deepEqual(result.items[0].contentAssignment.referenceSources.map((source) => source.index), [2, 3]);
 });
 
-test("adding a missing primary cannot silently discard selected references at the eight-image limit", () => {
+test("adding a missing primary preserves more than eight selected references", () => {
   const { input, payload } = marketingPlanFixture(1);
   const base = buildCreationPlan(input);
   payload.items[0].reference_indexes = [2, 3, 4, 5, 6, 7, 8, 9];
-  assert.throws(() => applyCreationMarketingPlan(base, payload, { count: 1, referenceCount: 9, primaryIndex: 1 }), /超过 8 张/);
+  const result = applyCreationMarketingPlan(base, payload, { count: 1, referenceCount: 9, primaryIndex: 1 });
+  assert.deepEqual(result.items[0].marketingAssignment.referenceIndexes, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  assert.deepEqual(result.items[0].contentAssignment.referenceSources.map((source) => source.index), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  base.productInsights.confirmedFacts.forEach((fact) => { fact.referenceIndexes = [1, 2, 3, 4, 5, 6, 7, 8, 9]; });
+  payload.items[0].reference_indexes = [];
+  const restoredSources = applyCreationMarketingPlan(base, payload, { count: 1, referenceCount: 9, primaryIndex: 1 });
+  assert.deepEqual(restoredSources.items[0].marketingAssignment.referenceIndexes, result.items[0].marketingAssignment.referenceIndexes);
+  payload.items[0].reference_indexes = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+  const explicit = applyCreationMarketingPlan(base, payload, { count: 1, referenceCount: 9, primaryIndex: 1 });
+  assert.deepEqual(explicit.items[0].marketingAssignment.referenceIndexes, result.items[0].marketingAssignment.referenceIndexes);
 });
 
 test("frozen-plan validation preserves the previewed final prompt exactly", async () => {

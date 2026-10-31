@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.086-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.096-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installers-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,7 +10,7 @@
 
 Prompt-to-image, reference analysis, editing, ecommerce sets, portraits, article illustrations, PPT generation, and asset history in one browser-based workspace.
 
-Current version: `v0.2.086`
+Current version: `v0.2.096`
 
 [Chinese README](./README.zh-CN.md)
 
@@ -72,9 +72,9 @@ The pure Node.js/Electron start commands and `stop-studio-services.cmd` do not r
 
 ### Windows desktop app (recommended)
 
-Download `GPT-Image2-Studio-Desktop-Setup-v0.2.086-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
+Download `GPT-Image2-Studio-Desktop-Setup-v0.2.096-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
 
-For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.086-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
+For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.096-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
 
 For desktop development, Electron 43 requires Node.js 22.12 or newer:
 
@@ -85,7 +85,7 @@ cmd /c npm run desktop
 
 ### Windows browser installer
 
-The legacy browser-installer flow remains documented for local builds, but the `v0.2.086` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
+The legacy browser-installer flow remains documented for local builds, but the `v0.2.096` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
 
 ## Configuration
 
@@ -317,7 +317,7 @@ Open **Image-to-prompt** from the top bar or the Create menu, upload one image, 
 
 ### Commerce and content workflows
 
-- **Ecommerce sets** with reference analysis, evidence-grounded product facts, category and SKU planning, frozen carousel plans, retries, and Listing drafts. The universal profile provides 18 addressable carousel slots; automatic plans distribute distinct scene and information tasks from supplied evidence and block unsupported canvas claims. Named marketplace IDs fall back to the universal profile, while Listing drafts use their separate policy registry. A separate logo-batch branch adds one uploaded Logo to up to 15 source images.
+- **Ecommerce sets** with reference analysis, evidence-grounded product facts, category and SKU planning, frozen carousel plans, retries, and Listing drafts. AI marketing can plan batches of independent sets with up to two plans running concurrently, validate each plan, and enqueue it through the existing set queue; failures pause later plans and can resume without re-enqueueing completed work. Quality review checks supported functional visuals, the core buying reason, and repeated image tasks. The universal profile provides 18 addressable carousel slots; automatic plans distribute distinct scene and information tasks from supplied evidence and block unsupported canvas claims. Named marketplace IDs fall back to the universal profile, while Listing drafts use their separate policy registry. A separate logo-batch branch adds one uploaded Logo to up to 15 source images.
 - **Portrait mode** for consistent people, actions, clothing, props, locations, framing, and 1-100 image batches.
 - **Article illustration mode** for text packages, style bibles, character and scene references, reading-order storyboards, and final illustrations.
 - **PPT generation** from PDF, DOCX, PPTX, TXT, Markdown, CSV, pasted text, or a topic; supports 1-20 pages, page repair, image-based PPTX, and editable reconstruction.
@@ -556,7 +556,7 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 - The source and lockfile versions are authoritative; tags use `v<version>`.
 - Versions use `major.minor.patch` with a three-digit patch segment: major bumps reset minor and patch, minor bumps reset patch, feature bumps add `0.010`, and ordinary updates add `0.001`.
 - Use `npm run release:major`, `npm run release:minor`, `npm run release:feature`, or `npm run release:patch` with `--summary`; each release changes exactly one level.
-- Current release notes: [v0.2.086](./docs/releases/v0.2.086.md).
+- Current release notes: [v0.2.096](./docs/releases/v0.2.096.md).
 - Windows packages are distributed through [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Check the release notes for hashes and signing status.
 - `npm run check:release:strict` requires a clean worktree and a matching tag on the current commit.
 
@@ -571,7 +571,15 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 
 ## Version history
 
-Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.086](./docs/releases/v0.2.086.md).
+Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.096](./docs/releases/v0.2.096.md).
+
+### v0.2.096
+
+- Added batch AI marketing prompts for independent Creation set plans, with up to two plans running concurrently and validated plans sent through the existing queue.
+- Added per-plan progress, bounded retries, pause and resume behavior, and continuation that does not enqueue an already accepted plan twice.
+- Strengthened marketing quality review for evidence-backed functional visuals, core buying reasons, and duplicate image tasks while retaining valid items during repair.
+- Refined commercial CG and product-function visual guidance, and unified reasoning-effort mapping with bounded fallback only when an upstream rejects the parameter.
+- Batch controller progress is page-local: after a refresh, already-enqueued sets use the existing queue and records, while unsubmitted plans do not resume automatically.
 
 ### v0.2.086
 

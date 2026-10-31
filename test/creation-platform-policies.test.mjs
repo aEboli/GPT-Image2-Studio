@@ -52,7 +52,7 @@ const IMAGE_TYPE_CONTRACT = {
   "scene-fit-2": ["scene-fit-2", "single-scene-adaptation", "none-or-short", "authentic-use", "allow-supplied"],
   "scene-fit-3": ["scene-fit-3", "single-scene-adaptation", "none-or-short", "authentic-use", "allow-supplied"],
   "multi-angle": ["multi-angle", "reference-view-inspection-sheet", "none", "studio-clean", "preserve-existing-only"],
-  "ownership-atmosphere": ["atmosphere", "ownership-atmosphere", "concise", "authentic-lifestyle", "allow-supplied"],
+  "ownership-atmosphere": ["atmosphere", "commercial-cg-product-rendering", "none", "studio-render", "allow-supplied"],
   "detail-macro": ["product-detail", "macro-detail-panels", "factual-short", "studio-clean", "allow-supplied"],
   "use-style-story": ["brand-story", "multi-scene-use-style-story", "moderate", "multi-context", "allow-supplied"],
   "dimension-fit": ["size-capacity-fit", "dimension-lines-and-fit-reference", "factual-only", "neutral", "allow-supplied"],

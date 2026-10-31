@@ -8,3 +8,7 @@ export function isCreationSubjectReferenceRole(role = "") {
 export function isCreationReferenceProductRole(role = "") {
   return String(role || "").trim() === CREATION_REFERENCE_PRODUCT_ROLE;
 }
+
+export function isCreationVariantPresentationRole(role = "") {
+  return ["series-showcase", "size-capacity-fit", "spec-table"].includes(String(role || "").trim());
+}

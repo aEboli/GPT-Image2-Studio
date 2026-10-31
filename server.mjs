@@ -1,5 +1,5 @@
 import { createSharedTextRequestPool } from "./lib/shared-text-request.mjs";
-import { runWithTextModelContext } from "./lib/text-model-stream.mjs";
+import { recordTextModelCall, reportTextModelProgress, runWithTextModelContext } from "./lib/text-model-stream.mjs";
 import { randomUUID, createHash } from "node:crypto";
 import { requestCreationMarketingPlan, creationMarketingInputFingerprint } from "./lib/creation-marketing-agent.mjs";
 import { applyCreationMarketingPlan, isCreationAiMarketingEnabled } from "./lib/creation-marketing-plan.mjs";
@@ -287,11 +287,6 @@ if (!plainHttpBindingPolicy.allowed) {
     "非回环 HOST 不能直接使用明文 HTTP。请保持 HOST 为空并通过 TLS 反向代理访问；仅在明确接受风险时设置 IMAGE_STUDIO_ALLOW_INSECURE_REMOTE_HTTP=1。",
   );
 }
-const DEFAULT_CREATION_LISTING_REASONING_EFFORT = "medium";
-const CREATION_REFERENCE_ANALYSIS_REASONING_EFFORT = "low";
-const PORTRAIT_REFERENCE_ANALYSIS_REASONING_EFFORT = "low";
-const PROMPT_AGENT_ANALYSIS_REASONING_EFFORT = "medium";
-const REFERENCE_ORCHESTRATION_REASONING_EFFORT = "low";
 const SESSION_TASK_SLOT_RETRY_DELAY_MS = 250;
 // Shared with lib/upstream-stream-fetch.mjs so the socket body timeout is always
 // derived from the SAME effective deadline this abort uses.
@@ -2552,10 +2547,7 @@ async function handlePromptAgentAnalyze(request, response) {
     });
   }
 
-  const reasoningFallback =
-    mode === REFERENCE_ORCHESTRATION_MODE
-      ? REFERENCE_ORCHESTRATION_REASONING_EFFORT
-      : PROMPT_AGENT_ANALYSIS_REASONING_EFFORT;
+  const reasoningFallback = config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT;
   const reasoningEffort = normalizeReasoningEffort(formData.get("reasoningEffort") || reasoningFallback);
   const createdAt = new Date().toISOString();
   const json = await requestPromptAgentAnalysis({
@@ -4175,10 +4167,10 @@ async function handleCreationListingsGenerate(request, response) {
     });
   }
 
-  let reasoningEffort = DEFAULT_CREATION_LISTING_REASONING_EFFORT;
+  let reasoningEffort = DEFAULT_REASONING_EFFORT;
   try {
     reasoningEffort = normalizeReasoningEffort(
-      payload?.reasoningEffort || DEFAULT_CREATION_LISTING_REASONING_EFFORT,
+      payload?.reasoningEffort || set.reasoningEffort || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
     );
   } catch (error) {
     return sendJson(response, 400, {
@@ -4387,7 +4379,7 @@ async function handlePortraitReferenceAnalyze(request, response) {
   }
 
   const reasoningEffort = normalizeReasoningEffort(
-    formData.get("reasoningEffort") || PORTRAIT_REFERENCE_ANALYSIS_REASONING_EFFORT,
+    formData.get("reasoningEffort") || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
   );
   const json = await requestPromptAgentAnalysis({
     baseUrl: textVisionConfig.baseUrl,
@@ -4431,6 +4423,8 @@ async function handlePortraitPlan(request, response) {
 }
 
 async function handleCreationReferenceAnalyze(request, response) {
+  const startedAt = Date.now();
+  const requestTrace = { calls: [] };
   const formData = await readFormDataBody(request);
   const referenceImages = await toReferenceImages([
     ...formData.getAll("referenceImages"),
@@ -4464,13 +4458,14 @@ async function handleCreationReferenceAnalyze(request, response) {
   }
 
   const reasoningEffort = normalizeReasoningEffort(
-    formData.get("reasoningEffort") || CREATION_REFERENCE_ANALYSIS_REASONING_EFFORT,
+    formData.get("reasoningEffort") || config.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT,
   );
   const platform = normalizeCreationPlatform(formData.get("platform"));
   const platformLabel = String(formData.get("platformLabel") || platform.label).trim() || platform.label;
   const industryTemplateLabel =
     String(formData.get("industryTemplateLabel") || formData.get("industryTemplate") || "通用电商").trim() || "通用电商";
   const industryTemplatePath = String(formData.get("industryTemplatePath") || "").trim();
+  requestTrace.prepareMs = Date.now() - startedAt;
   const json = await requestPromptAgentAnalysis({
     baseUrl: textVisionConfig.baseUrl,
     endpointPath: textVisionConfig.endpointPath,
@@ -4482,6 +4477,7 @@ async function handleCreationReferenceAnalyze(request, response) {
     responsesModel: textVisionConfig.responsesModel,
     imageModel: textVisionConfig.imageModel,
     reasoningEffort,
+    onProgress: (event) => recordTextModelCall(requestTrace, event),
     contextPrompt: [
       "套图分析上下文：",
       `平台选择：${platformLabel}`,
@@ -4495,6 +4491,7 @@ async function handleCreationReferenceAnalyze(request, response) {
       .filter(Boolean)
       .join("\n"),
   });
+  const validationStartedAt = Date.now();
   const analysis = normalizeCreationReferenceAnalysis(
     json,
     referenceImages.map((image) => image.filename).filter(Boolean),
@@ -4503,10 +4500,18 @@ async function handleCreationReferenceAnalyze(request, response) {
       userFacts: [formData.get("productName"), formData.get("productDescription")].filter(Boolean).join("\n"),
     },
   );
+  requestTrace.validationMs = Date.now() - validationStartedAt;
+  requestTrace.totalMs = Date.now() - startedAt;
+  const lastCall = requestTrace.calls.at(-1);
+  reportTextModelProgress({ requestId: lastCall?.requestId, callId: lastCall?.callId, attempt: lastCall?.attempt, purpose: CREATION_REFERENCE_ANALYSIS_MODE, stage: "validating", elapsedMs: requestTrace.totalMs,
+    timing: { ...lastCall?.timing, prepareMs: requestTrace.prepareMs, validationMs: requestTrace.validationMs }, requestTrace,
+    usage: lastCall?.usage,
+    message: "回答已接收，商品事实与参考来源已完成校验。" });
 
   return sendJson(response, 200, {
     ok: true,
     analysis,
+    requestTrace,
   });
 }
 
@@ -4560,6 +4565,7 @@ async function handleCreationPlan(request, response) {
       imageCount: formData.get("imageCount"),
       scenario: formData.get("scenario"),
       variationSeed: formData.get("variationSeed") || randomUUID(),
+      marketingSupplement: formData.get("marketingSupplement"),
       visualLanguage: formData.get("visualLanguage"),
       industryTemplate: formData.get("industryTemplate"),
       categorySignals: formData.get("categorySignals"),
@@ -7737,7 +7743,7 @@ async function handleIncomingRequest(request, response) {
   heartbeat?.unref?.();
   try {
     await runWithTextModelContext({ signal: controller.signal, requestId: randomUUID(), onProgress: (event) => {
-      if (response.headersSent && /text\/event-stream/i.test(String(response.getHeader("Content-Type") || "")) && isResponseWritable(response)) writeSseEvent(response, "text_progress", { ...event, trigger: pathname });
+      if ((negotiatedText || response.headersSent && /text\/event-stream/i.test(String(response.getHeader("Content-Type") || ""))) && isResponseWritable(response)) writeSseEvent(response, "text_progress", { ...event, trigger: pathname });
     } }, () => routeRequest(request, response));
   } catch (error) {
     if (negotiatedText && isResponseWritable(response)) {

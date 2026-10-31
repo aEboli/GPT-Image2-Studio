@@ -25,9 +25,10 @@ function installDocument(elements) {
   return () => { globalThis.document = originalDocument; };
 }
 
-function createController({ state, fetchImpl }) {
+function createController({ state, fetchImpl, getReasoningEffort }) {
   return createPortraitReferenceAnalysisController({
     state,
+    getReasoningEffort,
     appendCurrentConfigToFormData() {},
     buildReferenceFingerprint: (file) => file?.name || "missing",
     compactErrorMessage: (message) => message,
@@ -73,6 +74,23 @@ test("portrait reference analysis ignores a response after reference files chang
   } finally {
     restoreDocument();
   }
+});
+
+test("portrait reference analysis uses the selected reasoning effort or defaults to high", async () => {
+  const restoreDocument = installDocument(new Map());
+  try {
+    for (const effort of [undefined, "none", "minimal", "max"]) {
+      let requested;
+      const state = { portrait: { files: [{ file: new File(["person"], "person.png", { type: "image/png" }) }], actionFiles: [], accessoryFiles: [], referenceAnalysis: { applied: false, result: null, running: false } } };
+      const controller = createController({ state, ...(effort ? { getReasoningEffort: () => effort } : {}), fetchImpl: async (_url, init) => {
+        requested = init.body.get("reasoningEffort");
+        return Response.json({ analysis: { summary: "人物参考" } });
+      } });
+      await controller.analyze();
+      assert.equal(requested, effort || "high");
+      assert.equal(state.portrait.referenceAnalysis.result.summary, "人物参考");
+    }
+  } finally { restoreDocument(); }
 });
 
 test("portrait reference analysis only updates the subject after explicit apply", async () => {

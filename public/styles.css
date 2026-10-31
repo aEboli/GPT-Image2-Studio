@@ -3300,6 +3300,114 @@ html:is([data-ui-layout="stacked"], [data-ui-layout="tablet"], [data-ui-layout="
   gap: 10px;
 }
 
+.creation-marketing-batch-panel {
+  grid-column: 1 / -1;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-color, rgba(255, 255, 255, .12));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel-bg, #171922) 88%, transparent);
+}
+
+.creation-marketing-batch-head,
+.creation-marketing-batch-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 10px;
+  min-width: 0;
+}
+
+.creation-marketing-batch-head {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.creation-marketing-batch-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.creation-marketing-batch-actions > button {
+  min-width: 0;
+  padding-inline: 8px;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+#creationMarketingBatchStartButton {
+  grid-column: 1 / -1;
+}
+
+.creation-marketing-batch-title {
+  font-size: 14px;
+  font-weight: 650;
+}
+
+#creationMarketingBatchToggle {
+  min-width: 64px;
+  white-space: nowrap;
+}
+
+.creation-marketing-batch-hint {
+  color: var(--muted-text, #9ca3b4);
+  font-size: 12px;
+}
+
+.creation-marketing-batch-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.creation-marketing-batch-estimate {
+  margin-top: 10px;
+  white-space: pre-line;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.creation-marketing-batch-fields .compact-field {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.creation-marketing-batch-fields .compact-field input {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.creation-marketing-batch-status {
+  margin-top: 10px;
+  white-space: pre-line;
+  color: var(--muted-text, #9ca3b4);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.creation-marketing-batch-elapsed,
+.creation-marketing-batch-timing {
+  margin-top: 6px;
+  color: var(--muted-text, #9ca3b4);
+  font-size: 12px;
+  line-height: 1.55;
+  font-variant-numeric: tabular-nums;
+}
+
+.creation-marketing-batch-timing {
+  max-height: 132px;
+  overflow-y: auto;
+  white-space: pre-line;
+}
+
 .creation-toggle-row .creation-listing-toggle {
   height: 100%;
   box-sizing: border-box;
@@ -4092,8 +4200,8 @@ html:is([data-ui-layout="stacked"], [data-ui-layout="tablet"], [data-ui-layout="
 
 .creation-reference-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(min(156px, 100%), 1fr));
+  gap: 10px;
   align-items: start;
 }
 
@@ -4407,6 +4515,14 @@ ul.creation-plan-message {
 
 .creation-plan-actions .toolbar-button {
   flex: 0 0 auto;
+}
+
+#creationPlanButton {
+  flex: 1;
+  width: 100%;
+  min-height: 42px;
+  justify-content: center;
+  font-weight: 600;
 }
 
 .creation-output-panel {
@@ -8248,6 +8364,8 @@ html:is([data-ui-layout="desktop"], [data-ui-layout="narrow-desktop"]) .referenc
   background: var(--input-bg);
   color: var(--text);
   font-size: var(--type-subtitle-size);
+  font-weight: 650;
+  line-height: 1.2;
 }
 
 .creation-reference-role:focus {
@@ -8283,11 +8401,14 @@ html:is([data-ui-layout="desktop"], [data-ui-layout="narrow-desktop"]) .referenc
   box-sizing: border-box;
   display: block;
   min-height: calc(1.35em + 10px);
+  max-height: calc(1.35em * 6 + 10px);
   padding: 0 8px 10px;
   color: var(--muted);
   font-size: var(--type-subtitle-size);
   line-height: 1.35;
+  overflow-y: auto;
   overflow-wrap: anywhere;
+  scrollbar-width: thin;
   cursor: text;
   user-select: text;
 }
@@ -8298,6 +8419,8 @@ html:is([data-ui-layout="desktop"], [data-ui-layout="narrow-desktop"]) .referenc
 }
 
 .creation-reference-note[contenteditable="true"] {
+  max-height: none;
+  overflow: visible;
   color: var(--text);
   border-radius: 4px;
   outline: 1px solid color-mix(in srgb, var(--accent) 54%, var(--border-strong));
@@ -15084,6 +15207,10 @@ html[data-ui-layout="mobile"] .creation-option-grid {
 
 html[data-ui-layout="mobile"] .creation-toggle-row {
   grid-template-columns: minmax(0, 1fr);
+}
+
+html[data-ui-layout="mobile"] .creation-marketing-batch-fields {
+  grid-template-columns: 1fr;
 }
 
 html[data-ui-layout="mobile"] .creation-logo-controls {
@@ -22735,7 +22862,7 @@ html[data-theme="light"] .settings-panel,
 /* 文本模型的真实增量阅读区。 */
 .text-model-live-preview { position: fixed; z-index: 110; top: 88px; right: 24px; width: min(760px, calc(100vw - 32px)); max-height: 75dvh; overflow: auto; padding: 18px 22px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel-strong, #1d1e27); color: var(--text); box-shadow: 0 18px 48px #0005; }
 .text-model-live-preview summary { display: flex; justify-content: space-between; gap: 16px; cursor: pointer; font-weight: 600; }
-.text-model-live-meta { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.text-model-live-meta, .text-model-live-timing { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
 .text-model-live-draft { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 15px; line-height: 1.7; margin: 14px 0; }
 .creation-marketing-live { border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; margin: 14px 0; }
 .creation-marketing-live summary { cursor: pointer; font-weight: 600; }

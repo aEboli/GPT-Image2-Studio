@@ -16,7 +16,7 @@ export function readCreationMarketingPartialJson(source = "") {
   let itemStart = -1;
   let expectKey = true;
   const accept = (end) => {
-    if (fieldStart < 0 || !["product_insights", "audience_strategy", "items"].includes(key)) return;
+    if (fieldStart < 0 || !["product_insights", "audience_strategy", "suite_strategy", "items"].includes(key)) return;
     try { result[key] = JSON.parse(input.slice(fieldStart, end)); } catch {}
   };
   for (let index = 0; index < input.length; index += 1) {
@@ -76,12 +76,14 @@ export function summarizeCreationMarketingProgress(payload = {}) {
       itemId: text(item.item_id || item.itemId, 160), sourceIndex: Number(item.marketingAssignment?.sourceIndex) || index + 1,
       title: text(item.title, 160), imageType: text(item.image_type || item.imageType, 80), goal: text(item.marketing_goal || item.marketingGoal || item.marketingAssignment?.goal),
       creativeBrief: item.creative_brief || item.marketingAssignment?.creativeBrief || {},
-      referenceIndexes: list(item.reference_indexes || item.marketingAssignment?.referenceIndexes).filter((value) => Number.isInteger(value) && value > 0).slice(0, 8),
+      referenceIndexes: list(item.reference_indexes || item.marketingAssignment?.referenceIndexes).filter((value) => Number.isInteger(value) && value > 0),
     }];
   });
   return {
     receivedCount: items.length,
     duplicateRisks: list(payload.marketingPlan?.duplicateRisks),
+    suiteStrategy: payload.marketingPlan?.suiteStrategy || payload.suite_strategy || null,
+    quality: payload.marketingPlan?.quality || null,
     ...(payload.marketingPlan?.validation ? { validation: payload.marketingPlan.validation } : {}),
     summary: {
       audiences,
@@ -93,8 +95,8 @@ export function summarizeCreationMarketingProgress(payload = {}) {
 }
 
 export const CREATION_MARKETING_PROGRESS_LABELS = {
-  preparing: "准备资料", waiting: "等待模型", receiving: "接收规划", retrying: "正在重试", buffered: "网关缓冲返回",
-  validating: "校验计划", complete: "规划完成", partial: "部分可用", error: "规划失败", interrupted: "连接中断", reused: "复用已确认计划",
+  preparing: "准备资料", waiting: "等待模型", connected: "上游已响应", receiving: "接收规划", retrying: "正在重试", buffered: "网关缓冲返回",
+  validating: "校验计划", reviewing: "审核功能与差异", repairing: "局部修复规划", complete: "规划完成", partial: "部分可用", error: "规划失败", interrupted: "连接中断", reused: "复用已确认计划",
 };
 export const isCreationMarketingProgressActive = (progress) => Boolean(progress) && !["complete", "partial", "error", "interrupted", "reused"].includes(progress.stage);
 
@@ -102,7 +104,7 @@ export function updateCreationMarketingProgress(previous, event, now = Date.now(
   if (!event || !Object.hasOwn(CREATION_MARKETING_PROGRESS_LABELS, event.stage)) return previous;
   const attempt = Number(event.attempt) || previous?.attempt || 0;
   if (previous && attempt < previous.attempt) return previous;
-  if (previous && !isCreationMarketingProgressActive(previous) && attempt === previous.attempt && ["preparing", "waiting", "receiving", "validating"].includes(event.stage)) return previous;
+  if (previous && !isCreationMarketingProgressActive(previous) && attempt === previous.attempt && ["preparing", "waiting", "connected", "receiving", "validating"].includes(event.stage)) return previous;
   const reset = event.stage === "waiting" && attempt > (previous?.attempt || 0);
   const next = { ...(reset ? {} : previous), ...event, attempt,
     startedAt: previous?.startedAt || now, updatedAt: now,

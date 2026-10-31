@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { runInNewContext } from "node:vm";
 import { createCreationMarketingProgressView } from "../lib/creation-marketing-progress-view.mjs";
 import { isCreationMarketingProgressActive, updateCreationMarketingProgress } from "../lib/creation-marketing-progress.mjs";
+import { createTextModelPreview } from "../lib/text-model-client.mjs";
 
 function documentFixture() {
   const document = { createElement: (tag) => {
@@ -26,6 +27,149 @@ function documentFixture() {
   return document;
 }
 const all = (node) => [node, ...node.children.flatMap(all)];
+
+test("marketing timing details retain separate initial and repair calls without replacing task cards", (t) => {
+  t.mock.timers.enable({ apis: ["Date", "setTimeout", "setInterval"], now: 1000 });
+  const document = documentFixture();
+  const button = document.createElement("button");
+  const panel = document.createElement("section");
+  const view = createCreationMarketingProgressView({ button, panel });
+  t.after(() => view.update(null));
+  let progress = updateCreationMarketingProgress(null, { stage: "receiving", attempt: 1, total: 20,
+    items: [{ itemId: "ai-1", title: "首图", goal: "核对外观" }],
+    requestTrace: { prepareMs: 12, calls: [{ callId: "draft", attempt: 1, repairRound: 0, transport: "buffered", timing: { firstByteMs: 100, totalMs: 1000 } }] },
+  });
+  view.update(progress);
+  button.click();
+  const task = all(panel).find((node) => node.className === "creation-marketing-item-button");
+  progress = updateCreationMarketingProgress(progress, { stage: "receiving", requestTrace: { prepareMs: 12, calls: [
+    { callId: "draft", attempt: 1, repairRound: 0, transport: "buffered", timing: { firstByteMs: 100, totalMs: 1000 } },
+    { callId: "repair", attempt: 2, repairRound: 1, timing: { firstByteMs: 50, firstTextMs: 200, receiveMs: 500 }, usage: { outputTokens: 42 } },
+  ] } });
+  view.update(progress);
+  const text = all(panel).map((node) => node.textContent).join("\n");
+  assert.match(text, /耗时明细/);
+  assert.match(text, /初稿.*整包返回.*上游首包 0\.1 秒.*总计 1\.0 秒/);
+  assert.match(text, /第 1 轮修复.*第 2 次请求.*首段回答 0\.2 秒.*回答接收 0\.5 秒.*输出 42 token/);
+  assert.equal(all(panel).find((node) => node.className === "creation-marketing-item-button"), task);
+});
+
+test("marketing waiting time advances in both the toolbar and live detail without inventing output", (t) => {
+  t.mock.timers.enable({ apis: ["Date", "setTimeout", "setInterval"], now: 1000 });
+  const document = documentFixture();
+  const button = document.createElement("button");
+  const panel = document.createElement("section");
+  const view = createCreationMarketingProgressView({ button, panel });
+  t.after(() => view.update(null));
+  let progress = updateCreationMarketingProgress(null, { stage: "waiting", attempt: 1, elapsedMs: 400, total: 20 });
+  view.update(progress);
+  button.click();
+  t.mock.timers.tick(50);
+  const meta = all(panel).find((node) => node.className === "text-model-live-meta");
+  assert.match(meta.textContent, /0\.4 秒/);
+  for (let second = 0; second < 3; second += 1) {
+    t.mock.timers.tick(950);
+    t.mock.timers.tick(50);
+  }
+  assert.match(button.textContent, /等待模型.*3 秒/);
+  assert.match(meta.textContent, /3\.4 秒/);
+  assert.equal(progress.receivedCharacters, 0);
+  assert.equal(progress.receivedCount, 0);
+  progress = updateCreationMarketingProgress(progress, { stage: "complete", receivedCount: 20 });
+  view.update(progress);
+  t.mock.timers.tick(50);
+  const finalMeta = meta.textContent;
+  const finalButton = button.textContent;
+  t.mock.timers.tick(3000);
+  assert.equal(meta.textContent, finalMeta);
+  assert.equal(button.textContent, finalButton);
+});
+
+test("same-stage receive counts and messages refresh without replacing readable task cards", (t) => {
+  t.mock.timers.enable({ apis: ["Date", "setTimeout", "setInterval"], now: 1000 });
+  const document = documentFixture();
+  const button = document.createElement("button");
+  const panel = document.createElement("section");
+  const view = createCreationMarketingProgressView({ button, panel });
+  t.after(() => view.update(null));
+  let progress = updateCreationMarketingProgress(null, { stage: "receiving", attempt: 1, total: 20, receivedCount: 1,
+    receivedCharacters: 100, message: "正在接收第一部分。", items: [{ itemId: "ai-1", title: "首图", goal: "确认商品用途" }],
+  });
+  view.update(progress);
+  button.click();
+  const task = all(panel).find((node) => node.className === "creation-marketing-item-button");
+  progress = updateCreationMarketingProgress(progress, { stage: "receiving", receivedCharacters: 250, message: "继续接收完整提示词。" });
+  view.update(progress);
+  const nodes = all(panel);
+  assert.ok(nodes.some((node) => node.textContent.includes("已接收 250 字符")));
+  assert.ok(nodes.some((node) => node.className === "creation-marketing-message" && node.textContent === "继续接收完整提示词。"));
+  assert.equal(nodes.find((node) => node.className === "creation-marketing-item-button"), task);
+});
+
+test("elapsed-only preview updates preserve unchanged draft text and reader position", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const document = documentFixture();
+  const panel = document.createElement("details");
+  panel.scrollTop = 80;
+  const preview = createTextModelPreview({ document, panel });
+  const pre = all(panel).find((node) => node.className === "text-model-live-draft");
+  let writes = 0;
+  let value = "";
+  Object.defineProperty(pre, "textContent", { get: () => value, set: (next) => { value = next; writes += 1; } });
+  preview.update({ stage: "receiving", elapsedMs: 1000, text: '{"title":"商品首图"' });
+  t.mock.timers.tick(50);
+  assert.equal(value, "任务：商品首图");
+  assert.equal(writes, 1);
+  preview.update({ elapsedMs: 2000 });
+  t.mock.timers.tick(50);
+  assert.equal(writes, 1);
+  assert.equal(panel.scrollTop, 80);
+  preview.update({ text: '{"title":"商品首图","scene":"户外"' });
+  t.mock.timers.tick(50);
+  assert.equal(writes, 2);
+  assert.match(value, /场景：户外/);
+  preview.finish();
+});
+
+test("marketing preview shows the core buying reason, visible function and actual repair count", (t) => {
+  const document = documentFixture();
+  const button = document.createElement("button");
+  const panel = document.createElement("section");
+  const view = createCreationMarketingProgressView({ button, panel });
+  t.after(() => view.update(null));
+  view.update(updateCreationMarketingProgress(null, { stage: "complete", total: 1, receivedCount: 1,
+    suiteStrategy: { coreBuyingReason: "已确认加热功能带来温暖", functionalProofs: [{ buyerBenefit: "加热带来的温暖", visualEvidence: "完整主体外表的半透明热流示意" }] },
+    quality: { functionalCoverage: { required: true, covered: true }, repairRounds: 1 },
+    items: [{ itemId: "function", title: "功能表现", imageType: "comparison-proof", goal: "看见功能作用", creativeBrief: {
+      visual_form: "functional-render", text_density: "minimal", new_information: "加热怎样带来温暖", effect_visual: "完整主体外表的半透明热流示意",
+    } }],
+  }));
+  button.click();
+  const content = all(panel).map((node) => node.textContent).join("\n");
+  assert.match(content, /整套主购买理由/);
+  assert.match(content, /核心功能已有可见表现.*局部修复 1 轮/);
+  assert.match(content, /功能效果表现.*少量文字/);
+  assert.match(content, /新增信息：加热怎样带来温暖/);
+  assert.match(content, /可见功能：完整主体外表的半透明热流示意/);
+});
+
+test("quality suggestions stay visible on a usable completed plan", (t) => {
+  const document = documentFixture();
+  const button = document.createElement("button");
+  const panel = document.createElement("section");
+  const view = createCreationMarketingProgressView({ button, panel });
+  t.after(() => view.update(null));
+  view.update(updateCreationMarketingProgress(null, { stage: "complete", total: 4, receivedCount: 4,
+    quality: { status: "warning", repairRounds: 2, functionalCoverage: { required: true, covered: false },
+      issues: [{ code: "functional-proof-missing", sourceIndex: 2, message: "建议补充完整商品上的功能表现。", severity: "warning" }] },
+  }));
+  button.click();
+  const content = all(panel).map((node) => node.textContent).join("\n");
+  assert.match(content, /优化建议 · 不影响有效图片生成/);
+  assert.match(content, /第 2 张：建议补充/);
+  assert.doesNotMatch(content, /核心功能表现尚未通过|规划失败/);
+  assert.equal(isCreationMarketingProgressActive({ stage: "complete" }), false);
+});
 
 test("analysis toolbar buttons stay visible and start disabled in the page markup", async () => {
   const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");

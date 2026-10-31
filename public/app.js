@@ -111,16 +111,17 @@ import { createCreationListingController, getCreationRecordListingMetaLabel, get
 import { getCreationItemDisplayTitle, getCreationMarketingDisplayItems } from "/lib/creation-item-display.mjs";
 import { getCreationAutoRepairNotice, getCreationAutoRepairableItems, getCreationCompletionFeedback, getCreationIncompleteItems, shouldAutoRepairCreationSet } from "/lib/creation-auto-repair.mjs?v=20260829-generation-schedule-1";
 import { getRequeueNotice } from "/lib/generation-item-retry.mjs";
+import { CREATION_MARKETING_BATCH_CONCURRENCY, canContinueCreationMarketingBatch, cancelPendingCreationMarketingBatch, createCreationMarketingBatchState, getCreationMarketingBatchElapsedMs, getCreationMarketingBatchScheme, normalizeCreationMarketingBatchCopies, normalizeCreationMarketingBatchSchemeCount, pausePendingCreationMarketingBatch, runCreationMarketingBatch } from "/lib/creation-marketing-batch.mjs";
 import { canRepairCreationItem as canRepairCreationItemFromQueue, getCreationRepairButtonText as getCreationRepairButtonTextFromQueue, isCreationItemRepairActive as isCreationItemRepairActiveInQueue, queueCreationItemRepair as queueCreationItemRepairInState, removeQueuedCreationItemRepair, shiftNextQueuedCreationItemRepair } from "/lib/creation-item-repair-queue.mjs";
 import { cloneCreationPlanValue, createCreationPlanPreviewRequestCoordinator, createCreationPlatformPayloadSnapshot, deepFreezeCreationPlanValue, formatCreationPlanWarning, getCreationCompatibleImageTypeState, getCreationEditablePlanDisplayCounts, getCreationSetPlanSource, getVisibleCreationPlanWarnings, mergeCreationPlatformSetParameters, resolveCreationDisplayedPlanContext, resolveCreationPlatformImageCountState, resolveCreationSelectedRolesSubmission, shouldDisableCreationGenerateButton, updateCreationPlatformItemOverride } from "/lib/creation-browser-plan-state.mjs";
 import { normalizeCreationModuleEnabled, resolveCreationPlanCounts } from "/lib/creation-plan-counts.mjs";
-import { buildCreationQueuedRepairFormData, buildCreationQueuedSet as buildCreationQueuedSetFromState, createCreationQueueJob, getActiveCreationQueueJob as getActiveCreationQueueJobFromState, getCreationQueueJobs as getCreationQueueJobsFromState, getCreationRepairTargetSet as getCreationRepairTargetSetFromState, getPendingCreationQueueCount as getPendingCreationQueueCountFromState, getSelectedCreationQueueJob as getSelectedCreationQueueJobFromState, renderCreationQueueStrip as renderCreationQueueStripView, runCreationQueuedJob as runCreationQueuedJobFromQueue, scheduleCreationGenerationQueue as scheduleCreationGenerationQueueFromState, selectCreationQueueJob as selectCreationQueueJobInState, shouldSyncCreationQueueJobCurrentSet, syncActiveCreationQueueSet as syncActiveCreationQueueSetInState } from "/lib/creation-suite-queue.mjs?v=20261020-queue-label-product-1";
+import { buildCreationQueuedRepairFormData, buildCreationQueuedSet as buildCreationQueuedSetFromState, createCreationQueueJob, getActiveCreationQueueJob as getActiveCreationQueueJobFromState, getCreationQueueJobs as getCreationQueueJobsFromState, getCreationRepairTargetSet as getCreationRepairTargetSetFromState, getPendingCreationQueueCount as getPendingCreationQueueCountFromState, getSelectedCreationQueueJob as getSelectedCreationQueueJobFromState, renderCreationQueueStrip as renderCreationQueueStripView, runCreationQueuedJob as runCreationQueuedJobFromQueue, scheduleCreationGenerationQueue as scheduleCreationGenerationQueueFromState, selectCreationQueueJob as selectCreationQueueJobInState, shouldSyncCreationQueueJobCurrentSet, syncActiveCreationQueueSet as syncActiveCreationQueueSetInState } from "/lib/creation-suite-queue.mjs?v=20261031-dual-concurrency-1";
 import { DEFAULT_PORTRAIT_ACCESSORY_ASSETS, PORTRAIT_ACCESSORY_ASSET_CATEGORIES, getPortraitAccessoryAssetFileDescriptor } from "/lib/portrait-accessory-assets.mjs?v=20260528-portrait-assets-sort-1";
 import { createDefaultPortraitLocationState, createPortraitLocationSelectorController } from "/lib/portrait-location-selector.mjs?v=20260527-portrait-location-1";
 import { getLegacyPromptAgentTemplatePrompt, getPromptAgentDisplayName, getPromptAgentTemplateDisplayName, isStructuredImagePromptJson } from "/lib/prompt-agent-display-name.mjs?v=20261024-prompt-name-anchor-1";
 import { mergePromptAgentHistoryTemplates } from "/lib/prompt-agent-template-sync.mjs?v=20260819-history-template-mode-1";
 import { flattenPromptTemplateLibrary, getPromptTemplateLibraryCategory, getPromptTemplateLibraryCategoryCount, getPromptTemplateLibraryChildCount, getPromptTemplateLibraryCounts, getPromptTemplateLibrarySubcategory, getPromptTemplatePreviewUrl, PROMPT_TEMPLATE_LIBRARY, PROMPT_TEMPLATE_SORT_OPTIONS, sortPromptTemplateLibraryTemplates } from "/lib/prompt-template-library.mjs?v=20261024-prompt-library-json-lines-1";
-import { DEFAULT_GENERATION_CONCURRENCY, DEFAULT_GENERATION_START_DELAY_MS, MAX_PROMPT_QUEUE_SIZE } from "/lib/studio-constants.mjs?v=20260829-generation-schedule-1";
+import { DEFAULT_GENERATION_CONCURRENCY, DEFAULT_GENERATION_START_DELAY_MS, DEFAULT_REASONING_EFFORT, REASONING_EFFORT_OPTIONS, MAX_PROMPT_QUEUE_SIZE } from "/lib/studio-constants.mjs?v=20261030-reasoning-effort-1";
 import { GENERATION_START_DELAY_FIELD, normalizeGenerationStartDelayMs } from "/lib/generation-start-delay.mjs?v=20260829-generation-schedule-1";
 import { GENERATION_CONCURRENCY_FIELD, normalizeGenerationConcurrency } from "/lib/generation-concurrency.mjs?v=20260829-generation-schedule-1";
 const SURPRISE_PROMPTS = [
@@ -166,10 +167,13 @@ const SURPRISE_PROMPTS = [
   },
 ];
 const REASONING_LABELS = {
+  none: "None",
+  minimal: "Minimal",
   low: "Low",
   medium: "Medium",
   high: "High",
   xhigh: "XHigh",
+  max: "Max",
 };
 const DEFAULT_LIMITS = { maxParallelTasksPerSession: 15, maxReferenceImages: 15, maxCreationReferenceImages: 15, maxPortraitPersonReferenceImages: 3, maxPortraitActionReferenceImages: 3, maxPortraitAccessoryReferenceImages: 9 }; const PROMPT_FILMSTRIP_INITIAL_HISTORY_LIMIT = 10; const PROMPT_FILMSTRIP_MAX_HISTORY_LIMIT = 50; const PROMPT_FILMSTRIP_JOB_LIMIT = MAX_PROMPT_QUEUE_SIZE;
 const CREATION_IMAGE_COUNT_OPTIONS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
@@ -195,10 +199,7 @@ const DEFAULT_GALLERY_COLUMN_PRESET = 12;
 const ARTICLE_RECORD_COLUMN_PRESETS = [2, 4, 6, 8];
 const DEFAULT_ARTICLE_RECORD_COLUMN_PRESET = 4;
 const DEFAULT_ARTICLE_ILLUSTRATION_STYLE_PRESET = "realist-magazine";
-const DEFAULT_REASONING_EFFORTS = ["low", "medium", "high", "xhigh"];
-const CREATION_REFERENCE_ANALYSIS_REASONING_EFFORT = "low";
-const PROMPT_AGENT_ANALYSIS_REASONING_EFFORT = "medium";
-const REFERENCE_ORCHESTRATION_REASONING_EFFORT = "low";
+const DEFAULT_REASONING_EFFORTS = [...REASONING_EFFORT_OPTIONS];
 const DEFAULT_UI_RATIO = "1:1";
 const DEFAULT_QUICK_BLEND_RATIO = "1:1";
 const DEFAULT_PORTRAIT_RATIO = "4:5";
@@ -714,6 +715,8 @@ const state = {
     planDirty: true,
     marketingPreviewProgress: null,
     marketingPreviewSelected: false,
+    marketingBatch: null,
+    marketingBatchEnabled: false,
     platformItemOverrides: [],
     platformPayload: null,
     platformSetOverrides: {},
@@ -769,6 +772,7 @@ const state = {
   creationReferenceRestoreQueue: [],
   creationReferenceAnalysis: {
     applied: false,
+    autoFilledProductName: "",
     categoryManuallyEdited: false, categorySuggestionStale: false, categoryTemplateSuggestion: "",
     collapsed: false,
     dirty: false,
@@ -1070,6 +1074,19 @@ const refs = {
   creationListingAgentEnabledInput: document.querySelector("#creationListingAgentEnabledInput"),
   creationImageCountInput: document.querySelector("#creationImageCountInput"),
   creationAiMarketingEnabledInput: document.querySelector("#creationAiMarketingEnabledInput"),
+  creationMarketingBatchPanel: document.querySelector("#creationMarketingBatchPanel"),
+  creationMarketingBatchToggle: document.querySelector("#creationMarketingBatchToggle"),
+  creationMarketingBatchConfig: document.querySelector("#creationMarketingBatchConfig"),
+  creationMarketingBatchCountInput: document.querySelector("#creationMarketingBatchCountInput"),
+  creationMarketingBatchCopiesInput: document.querySelector("#creationMarketingBatchCopiesInput"),
+  creationMarketingBatchEstimate: document.querySelector("#creationMarketingBatchEstimate"),
+  creationMarketingBatchStartButton: document.querySelector("#creationMarketingBatchStartButton"),
+  creationMarketingBatchContinueButton: document.querySelector("#creationMarketingBatchContinueButton"),
+  creationMarketingBatchPauseButton: document.querySelector("#creationMarketingBatchPauseButton"),
+  creationMarketingBatchCancelButton: document.querySelector("#creationMarketingBatchCancelButton"),
+  creationMarketingBatchStatus: document.querySelector("#creationMarketingBatchStatus"),
+  creationMarketingBatchElapsed: document.querySelector("#creationMarketingBatchElapsed"),
+  creationMarketingBatchTiming: document.querySelector("#creationMarketingBatchTiming"),
   creationInlineListingDrafts: document.querySelector("#creationInlineListingDrafts"),
   creationInlineListingStatus: document.querySelector("#creationInlineListingStatus"),
   creationIndustryTemplateBrowser: document.querySelector("#creationIndustryTemplateBrowser"),
@@ -1590,6 +1607,7 @@ const pptAnalysis = createPptAnalysisController({
 });
 const portraitReferenceAnalysis = createPortraitReferenceAnalysisController({
   state,
+  getReasoningEffort: () => getSelectedReasoningEffort(refs.portraitReasoningEffortInput),
   appendCurrentConfigToFormData,
   buildReferenceFingerprint,
   compactErrorMessage,
@@ -5054,8 +5072,8 @@ function getReasoningEffortInputs() {
 
 function getSelectedReasoningEffort(input = refs.reasoningEffortInput) {
   const reasoningEfforts = state.reasoningEfforts || DEFAULT_REASONING_EFFORTS;
-  const currentValue = input?.value || state.config?.defaults?.reasoningEffort || "xhigh";
-  return reasoningEfforts.includes(currentValue) ? currentValue : reasoningEfforts[0] || "xhigh";
+  const currentValue = String(input?.value || state.config?.defaults?.reasoningEffort || DEFAULT_REASONING_EFFORT).trim().toLowerCase();
+  return reasoningEfforts.includes(currentValue) ? currentValue : DEFAULT_REASONING_EFFORT;
 }
 
 function getSelectedImageReasoningEffort(input = refs.reasoningEffortInput) {
@@ -5086,6 +5104,9 @@ function renderReasoningOptions() {
       input.appendChild(option);
     });
     input.value = currentValue;
+    input.title = document.documentElement.lang === "en"
+      ? "Controls text/vision analysis and the outer Responses model. Default: High. Unsupported levels automatically use the nearest supported level."
+      : "用于文本/视觉分析及 Responses 外层模型，默认 High。不支持所选等级时自动适配附近等级；与图片质量独立。";
   });
 }
 function supportsPromptTransparentBackground() {
@@ -6242,7 +6263,7 @@ function syncConfigUi(config) {
         ? configLimits.maxPortraitAccessoryReferenceImages || DEFAULT_LIMITS.maxPortraitAccessoryReferenceImages
         : DEFAULT_LIMITS.maxPortraitAccessoryReferenceImages,
   };
-  state.reasoningEfforts = [...(config.reasoningEfforts || DEFAULT_REASONING_EFFORTS)];
+  state.reasoningEfforts = [...DEFAULT_REASONING_EFFORTS];
 
   if (!refs.ratioInput.value || !getRatioOption(refs.ratioInput.value)) {
     refs.ratioInput.value = DEFAULT_UI_RATIO;
@@ -9474,7 +9495,7 @@ const CREATION_ITEM_STATUS_LABELS = {
   planning: "待开始",
 };
 
-const CREATION_PREVIEW_SLOTS = "1-hero|hero|首图成交主视觉|主商品占主视觉，合并除尺寸外的可靠信息并用目标语言电商排版，周围保留多个小圆框展示工具、穿搭或使用场景;2-benefit|benefit|目标人群共鸣图|锁定一个目标买家和熟悉的需求或犹豫瞬间，让商品成为有共情的选择，不重复卖点列表;3-scene|scene|适用多场景图|用 2-4 个真实适用场景展示产品价值，带宣传片式层次和购买代入感;4-multi-angle|multi-angle|多角度产品展示图|3-4 个清晰视角展示形态、结构、厚度和表面，不堆营销字;5-atmosphere|atmosphere|冲动下单氛围图|把商品融入有动作、有目标人群、有情绪触发的决定性使用或拥有瞬间，而不是平淡陈列;6-product-detail|product-detail|产品细节特写图|用微距、局部和指向标注证明材质、结构、做工或关键部位;7-brand-story|brand-story|品牌质感/礼品价值图|用真实拥有或使用瞬间体现品牌气质，必须有人手、局部身体或可见动作，不做静物摆拍;8-size-capacity-fit|size-capacity-fit|尺寸容量适配图|用准确尺寸、容量、比例和适配参照降低买错风险;9-effect-comparison|effect-comparison|功能效果渲染图|以一个清晰完整的商品主体为核心覆盖所有可靠功能；同屏不清晰时使用连续无损场景拼接，不做对比或遗漏;10-scene-fit-1|scene-fit-1|场景适配图一|拍主使用环境中的真实操作，商品正在使用或处于可观察的工作状态，环境负责证明比例和适配;11-scene-fit-2|scene-fit-2|场景适配图二|拍一个具体操作进行中的瞬间，用手部或局部身体展示动作，不只把商品拿在手里摆拍;12-accessory-gift|accessory-gift|到手清单/配件图|完整展示到手包含物、数量、包装和配件，减少到货不确定;13-series-showcase|series-showcase|多款式/SKU选择图|只展示已提供的颜色、款式、尺码、套装或 SKU，帮助快速选择;14-scene-fit-3|scene-fit-3|场景适配图三|拍宽场景里的真实使用时刻，让商品、使用者和环境形成关系，不把未使用的商品居中陈列;15-after-sales|after-sales|痛点图|用同一场景、同一机位的真实照片左右对比：左边是使用普通替代品时的困扰，右边是用本商品解决后的效果;16-usage-suggestion|usage-suggestion|卖点图|用 3-5 个核心卖点连接功能证据和买后收益，让买家知道买它能获得什么好处;17-human-handheld|human-handheld|真人手持展示图|真人出镜，手持、举到镜头前或用鱼线悬挂展示商品，让尺度、细节和真实使用感更直观;18-human-wearable|human-wearable|真人穿戴场景图|真人穿着、背着、提着或佩戴商品，在真实场景里展示版型、比例、背负关系和生活代入感；不可穿戴商品改拍携带、打包或收纳场景".split(";").map((entry) => { const [itemId, role, title, brief] = entry.split("|"); return { itemId, role, title, brief }; });
+const CREATION_PREVIEW_SLOTS = "1-hero|hero|首图成交主视觉|用完整商品和一个最应记住的购买理由建立主视觉，按任务安排留白和少量文字;2-benefit|benefit|目标人群共鸣图|锁定一个目标买家和熟悉的需求或犹豫瞬间，让商品成为有共情的选择，不重复卖点列表;3-scene|scene|适用多场景图|用一个具体的真实使用瞬间展示商品价值，让动作、环境与比例提供新的购买信息;4-multi-angle|multi-angle|多角度产品展示图|3-4 个清晰视角展示形态、结构、厚度和表面，不堆营销字;5-atmosphere|atmosphere|商业 CG 渲染图|纯渲染、无新增文字或图标，用完整商品、真实材质、体积与商业布光表现有依据的功能效果；加热商品用暖光和立体热流表现暖意，无功能依据时只表现外观质感;6-product-detail|product-detail|产品细节特写图|用微距、局部和指向标注证明材质、结构、做工或关键部位;7-brand-story|brand-story|品牌质感/礼品价值图|用真实拥有或使用瞬间体现品牌气质，必须有人手、局部身体或可见动作，不做静物摆拍;8-size-capacity-fit|size-capacity-fit|尺寸容量适配图|用准确尺寸、容量、比例和适配参照降低买错风险;9-effect-comparison|effect-comparison|功能效果渲染图|以一个完整商品呈现核心功能与收益，加强材质体积、功能流动的遮挡纵深及局部光照，只使用有依据的作用效果;10-scene-fit-1|scene-fit-1|场景适配图一|拍主使用环境中的真实操作，商品正在使用或处于可观察的工作状态，环境负责证明比例和适配;11-scene-fit-2|scene-fit-2|场景适配图二|拍一个具体操作进行中的瞬间，用手部或局部身体展示动作，不只把商品拿在手里摆拍;12-accessory-gift|accessory-gift|到手清单/配件图|完整展示到手包含物、数量、包装和配件，减少到货不确定;13-series-showcase|series-showcase|多款式/SKU选择图|只展示已提供的颜色、款式、尺码、套装或 SKU，帮助快速选择;14-scene-fit-3|scene-fit-3|场景适配图三|拍宽场景里的真实使用时刻，让商品、使用者和环境形成关系，不把未使用的商品居中陈列;15-after-sales|after-sales|痛点图|用同一场景、同一机位的真实照片左右对比：左边是使用普通替代品时的困扰，右边是用本商品解决后的效果;16-usage-suggestion|usage-suggestion|卖点图|用 3-5 个核心卖点连接功能证据和买后收益，让买家知道买它能获得什么好处;17-human-handheld|human-handheld|真人手持展示图|真人出镜，手持、举到镜头前或用鱼线悬挂展示商品，让尺度、细节和真实使用感更直观;18-human-wearable|human-wearable|真人穿戴场景图|真人穿着、背着、提着或佩戴商品，在真实场景里展示版型、比例、背负关系和生活代入感；不可穿戴商品改拍携带、打包或收纳场景".split(";").map((entry) => { const [itemId, role, title, brief] = entry.split("|"); return { itemId, role, title, brief }; });
 
 const CREATION_SCENARIO_LABELS = { standard: "标准电商", "detail-page": "详情页转化", "social-seeding": "社媒种草", launch: "新品发布", promotion: "活动促销", livestream: "直播电商", "gift-guide": "礼品推荐", "marketplace-search": "平台搜索", "brand-story": "品牌故事" };
 const CREATION_VISUAL_LANGUAGE_LABELS = { "classic-commercial": "经典商业摄影", "premium-studio": "高端棚拍", "clean-marketplace": "平台清爽白底", "lifestyle-editorial": "生活方式杂志", "social-ugc": "社媒实拍", "detail-infographic": "详情页信息图", "macro-material": "微距材质", "outdoor-context": "户外场景", "minimal-luxury": "极简奢华", "bold-campaign": "活动海报", "warm-handcrafted": "手作温度" };
@@ -9584,7 +9605,7 @@ const CREATION_REFERENCE_ROLE_OPTIONS = [
   { value: "other", label: "其他" },
 ];
 
-const CREATION_REFERENCE_COVERAGE_ROLE_TARGETS = { usage: ["usage-suggestion"], scene: ["scene", "atmosphere"], material: ["product-detail", "ingredient-material"], feature: ["effect-comparison", "usage-suggestion"], dimensions: ["size-capacity-fit", "spec-table"], package: ["accessory-gift"] };
+const CREATION_REFERENCE_COVERAGE_ROLE_TARGETS = { usage: ["usage-suggestion"], scene: ["scene"], material: ["product-detail", "ingredient-material"], feature: ["effect-comparison", "usage-suggestion"], dimensions: ["size-capacity-fit", "spec-table"], package: ["accessory-gift"] };
 
 function getCreationReferenceRoleLabel(role) {
   return CREATION_REFERENCE_ROLE_OPTIONS.find((option) => option.value === role)?.label || CREATION_REFERENCE_ROLE_OPTIONS[0].label;
@@ -9601,6 +9622,7 @@ function isCreationZeroImageCountMode() { return getCreationSelectedImageCount()
 function createEmptyCreationReferenceAnalysisState() {
   return {
     applied: false,
+    autoFilledProductName: "",
     categoryManuallyEdited: false, categorySuggestionStale: false, categoryTemplateSuggestion: "",
     collapsed: false,
     dirty: false,
@@ -9817,13 +9839,13 @@ function normalizeCreationEffectivePlanForBrowser(plan = {}) {
   };
 }
 
-function hydrateCreationEffectivePlan(plan = {}) {
+function hydrateCreationEffectivePlan(plan = {}, { preserveImageCount = false } = {}) {
   const normalized = normalizeCreationEffectivePlanForBrowser(plan);
   state.creation.effectivePlan = deepFreezeCreationPlanValue(normalized);
   state.creation.planDirty = !normalized;
   if (normalized) {
     setFrozenCreationPlatformPayload(normalized);
-    setCreationImageCountValue(normalized.carouselImageCount);
+    if (!preserveImageCount) setCreationImageCountValue(normalized.carouselImageCount);
     syncCreationControlsFromEffectivePlan(normalized);
   }
   return state.creation.effectivePlan;
@@ -11723,6 +11745,8 @@ function normalizeCreationSetForView(set = {}) {
     productInsights: cloneCreationPlanValue(set.productInsights || planSource.productInsights, null),
     promptPlanningMode: String(set.promptPlanningMode || planSource.promptPlanningMode || "template"),
     marketingPlan: cloneCreationPlanValue(set.marketingPlan || planSource.marketingPlan, null),
+    marketingSupplement: String(set.marketingSupplement || planSource.marketingSupplement || planSource.marketingPlan?.marketingSupplement || ""),
+    marketingBatch: cloneCreationPlanValue(set.marketingBatch || planSource.marketingBatch, null),
     dimensionSpecs: String(set.dimensionSpecs || ""),
     ...(dimensionSpecGroups.length > 0 ? { dimensionSpecGroups } : {}),
     dimensionUnitMode: normalizeCreationDimensionUnitMode(set.dimensionUnitMode),
@@ -12032,12 +12056,13 @@ function clearCreationReferenceFiles() {
   ) {
     closeReferencePreview();
   }
-  creationReferenceAnalysisRequestToken += 1;
   state.creationReferenceFiles.forEach((item) => {
     revokeReferencePreview(item);
     markCreationReferenceRestoreEntryMissing(item.restoreEntryId);
   });
   state.creationReferenceFiles = [];
+  clearCreationReferenceAnalysisManagedProductName();
+  markCreationProductAnalysisDirty();
   clearCreationReferenceAnalysisManagedCategory();
   state.creation.planDirty = true;
   state.creationReferenceAnalysis.running = false;
@@ -12048,6 +12073,7 @@ function clearCreationReferenceFiles() {
 }
 
 function resetCreationReferenceFilesForRecordReuse(normalized = null) {
+  invalidateCreationReferenceAnalysisRequest();
   state.creationReferenceFiles.forEach((item) => {
     if (item.previewUrl) {
       URL.revokeObjectURL(item.previewUrl);
@@ -13041,6 +13067,7 @@ const creationListingController = createCreationListingController({
   downloadTextFile: downloadCreationRecordTextFile,
   fetchImpl: (...args) => fetch(...args),
   getRequestConfig: getBrowserPrivateConfigRequestPayload,
+  getReasoningEffort: () => getSelectedReasoningEffort(refs.creationReasoningEffortInput),
   getSelectedSet: getCreationRecordSelectedSet,
   normalizeSet: normalizeCreationSetForView,
   nowIso,
@@ -14078,6 +14105,7 @@ function renderCreationReferenceGrid() {
     roleSelect.className = "creation-reference-role";
     roleSelect.dataset.creationReferenceRoleId = item.id;
     roleSelect.setAttribute("aria-label", "选择套图参考图用途");
+    roleSelect.title = "主体优先级：参考主体 > 排在最靠前的商品主体 > 其余商品主体；拖动商品图可调整顺序。";
     CREATION_REFERENCE_ROLE_OPTIONS.forEach((option) => {
       const choice = document.createElement("option");
       choice.value = option.value;
@@ -14351,17 +14379,13 @@ function setCreationReferenceAnalysisFeedback(message, kind = "") {
   syncCreationReferenceResetButton();
 }
 
-function setCreationReferenceProductNameValue(value) {
-  if (!refs.creationProductNameInput) {
-    return false;
+function clearCreationReferenceAnalysisManagedProductName() {
+  const autoFilledProductName = state.creationReferenceAnalysis.autoFilledProductName;
+  if (autoFilledProductName && refs.creationProductNameInput?.value === autoFilledProductName) {
+    refs.creationProductNameInput.value = "";
   }
-  const nextValue = String(value || "").trim();
-  if (refs.creationProductNameInput.value === nextValue) {
-    return false;
-  }
-  refs.creationProductNameInput.value = nextValue;
-  refs.creationProductNameInput.dispatchEvent(new Event("input", { bubbles: true }));
-  return true;
+  state.creationReferenceAnalysis.autoFilledProductName = "";
+  state.creationReferenceAnalysis.productNameSuggestion = "";
 }
 
 function markCreationReferenceAnalysisDirty({ invalidateCategorySuggestion = true } = {}) {
@@ -14526,13 +14550,17 @@ function applyCreationReferenceAnalysisProductNameSuggestion(analysis = {}) {
     return false;
   }
 
+  const currentProductName = refs.creationProductNameInput.value;
   const result = applyCreationReferenceAnalysisProductNameValue({
     analysis,
-    currentProductName: refs.creationProductNameInput.value,
-    previousAutoProductName: state.creationReferenceAnalysis.productNameSuggestion,
+    currentProductName,
   });
   state.creationReferenceAnalysis.productNameSuggestion = result.autoProductName;
-  setCreationReferenceProductNameValue(result.productName);
+  if (result.applied) {
+    refs.creationProductNameInput.value = result.productName;
+    state.creationReferenceAnalysis.autoFilledProductName = result.productName;
+    resetCreationDraftPreview();
+  }
   return result.applied;
 }
 
@@ -14589,6 +14617,7 @@ function applyCreationReferenceAnalysisRecommendations() {
   syncCreationSelectedRolesToReferenceCoverage(analysis);
   const appliedMessage = buildCreationReferenceAnalysisAppliedFeedbackMessage({
     recommendationCount: analysis.recommendations.length,
+    productNameSuggestion: state.creationReferenceAnalysis.productNameSuggestion,
     productNameApplied,
     recommendations: analysis.recommendations,
   });
@@ -14612,7 +14641,7 @@ async function buildCreationReferenceAnalysisFormData() {
   const formData = new FormData();
   formData.set(
     "reasoningEffort",
-    CREATION_REFERENCE_ANALYSIS_REASONING_EFFORT,
+    getSelectedReasoningEffort(refs.creationReasoningEffortInput),
   );
   const analysisFiles = await Promise.all(
     state.creationReferenceFiles.map((item) => preparePromptAnalysisImageFile(item.file)),
@@ -14634,7 +14663,8 @@ async function buildCreationReferenceAnalysisFormData() {
   formData.set("industryTemplate", contextIndustryTemplate.value);
   formData.set("industryTemplateLabel", contextIndustryTemplate.label);
   formData.set("industryTemplatePath", contextIndustryTemplate.categoryPath || "");
-  formData.set("productName", refs.creationProductNameInput?.value?.trim() || "");
+  const productName = refs.creationProductNameInput?.value || "";
+  formData.set("productName", productName === state.creationReferenceAnalysis.autoFilledProductName ? "" : productName.trim());
   formData.set("productDescription", refs.creationProductDescriptionInput?.value?.trim() || "");
   formData.set("referenceImageRoles", JSON.stringify(buildCreationReferenceRolePayload()));
   appendCurrentConfigToFormData(formData);
@@ -14672,13 +14702,21 @@ async function analyzeCreationReferenceImages() {
     creationMarketingProgressView?.close();
     setCreationAnalystExpanded(true);
     const preview = createTextModelPreview({ panel, title: "商品分析" });
+    const previewStartedAt = Date.now();
+    preview.update({ stage: "preparing", elapsedMs: 0, message: `正在准备 ${state.creationReferenceFiles.length} 张参考图。` });
+    const previewClock = setInterval(() => preview.update({ elapsedMs: Date.now() - previewStartedAt }), 1000);
     let payload;
     try {
+      const formData = await buildCreationReferenceAnalysisFormData();
+      const clientPrepareMs = Date.now() - previewStartedAt;
+      requestController.signal.throwIfAborted();
+      if (requestToken !== creationReferenceAnalysisRequestToken || referenceSnapshot !== getCreationReferenceAnalysisSnapshot()) return;
+      preview.update({ stage: "waiting", elapsedMs: Date.now() - previewStartedAt, timing: { clientPrepareMs }, message: "参考图已准备，正在上传并等待模型回答。" });
       const response = await requestTextModel(fetch, "/api/creation/reference/analyze", {
-        method: "POST", signal: requestController.signal, body: await buildCreationReferenceAnalysisFormData(),
+        method: "POST", signal: requestController.signal, body: formData,
       }, { onProgress: (event) => {
         if (requestToken !== creationReferenceAnalysisRequestToken || referenceSnapshot !== getCreationReferenceAnalysisSnapshot()) return;
-        preview.update(event);
+        preview.update({ ...event, timing: { ...event.timing, clientPrepareMs }, elapsedMs: Date.now() - previewStartedAt });
       } });
       payload = await response.json();
       if (!response.ok) throw new Error(payload.message || "套图参考图识别失败。");
@@ -14687,12 +14725,13 @@ async function analyzeCreationReferenceImages() {
       if (!Array.isArray(recommendations) || !recommendations.length) throw new Error("本次未识别到有效的参考图信息。");
       preview.finish();
     } catch (error) { preview.finish(error); throw error; }
+    finally { clearInterval(previewClock); }
 
     creationReferenceAnalysisApplyGuard = () => requestToken === creationReferenceAnalysisRequestToken && referenceSnapshot === getCreationReferenceAnalysisSnapshot();
     // Compatibility shape retained for browser static contracts: applyCreationReferenceAnalysis(payload, { isCurrent })
-    const { appliedMessage, categoryApplied, categoryCleared, matchedTemplate } = await applyCreationReferenceAnalysis(payload);
+    const { appliedMessage, categoryApplied, categoryCleared, matchedTemplate, stale } = await applyCreationReferenceAnalysis(payload);
     creationReferenceAnalysisApplyGuard = null;
-    if (requestToken !== creationReferenceAnalysisRequestToken || referenceSnapshot !== getCreationReferenceAnalysisSnapshot()) {
+    if (stale || requestToken !== creationReferenceAnalysisRequestToken) {
       return;
     }
     const categoryMessage = categoryApplied && matchedTemplate
@@ -15016,7 +15055,6 @@ function renderCreationPlatformPlan() {
           ["卖点", sellingPoints.join("；") || "未指定"],
           ["痛点", painPoints.join("；") || "未指定"],
           ["证据来源", references.join("；") || "商品文字资料"],
-          ["主体锁", item.promptContext?.subjectLock || "已使用统一主体锁"],
         ].forEach(([label, value]) => {
           const row = document.createElement("p");
           row.textContent = `${label}：${value}`;
@@ -15063,6 +15101,7 @@ function renderCreationView() {
 
   syncCreationBranchPanels();
   renderCreationMarketingProgress();
+  renderCreationMarketingBatchConfig();
   syncCreationSkuGenerationControl();
   const logoBatchBranch = isCreationLogoBatchBranch();
   const selectedQueueJob = logoBatchBranch ? null : getSelectedCreationQueueJob();
@@ -15108,12 +15147,18 @@ function renderCreationView() {
     planDirty: state.creation.planDirty,
     requirePlan: isCreationAiMarketingEnabled(),
   });
+  if (isCreationMarketingBatchRunning()) refs.creationGenerateButton.disabled = true;
   if (logoBatchBranch && state.creation.generating) {
     refs.creationGenerateButton.disabled = true;
   }
   if (refs.creationPlanButton) {
-    refs.creationPlanButton.textContent = state.creation.planning ? "预览中..." : "预览计划";
+    const hasCompletedPlan = Boolean(state.creation.effectivePlan && !state.creation.planDirty);
+    refs.creationPlanButton.textContent = state.creation.planning ? "方案生成中..." : hasCompletedPlan ? "方案已完成" : "生成套图方案";
     refs.creationPlanButton.disabled = state.creation.planning;
+    if (isCreationMarketingBatchRunning()) refs.creationPlanButton.disabled = true;
+    refs.creationPlanButton.title = hasCompletedPlan && !state.creation.planning
+      ? "方案已完成，点击重新生成套图方案。"
+      : "根据当前商品资料与设置，规划每张图片的内容、提示词与参考图分配。";
   }
   refs.creationProgressText.textContent = `${progress.completed} / ${progress.total}${progress.skipped ? ` · 跳过 ${progress.skipped}` : ""}`;
   renderCreationRolePicker();
@@ -15149,6 +15194,121 @@ function renderCreationView() {
 }
 
 function isCreationAiMarketingEnabled() { return refs.creationAiMarketingEnabledInput?.checked === true; }
+
+function isCreationMarketingBatchRunning() {
+  return ["queued", "running", "pausing"].includes(state.creation.marketingBatch?.status);
+}
+
+function creationMarketingBatchStatusLabel(status) {
+  return ({ queued: "待开始", running: "批量执行中", planning: "规划中", enqueuing: "正在加入队列", retrying: "重试中", enqueued: "已加入队列", pausing: "正在暂停", paused: "已暂停", completed: "已完成", canceled: "已停止" })[status] || status || "待开始";
+}
+
+function cloneCreationMarketingBatchFormData(source) {
+  const clone = new FormData();
+  if (source && typeof source.entries === "function") {
+    for (const [key, value] of source.entries()) clone.append(key, value);
+  }
+  return clone;
+}
+
+let creationMarketingBatchClock = null;
+
+function formatCreationMarketingBatchElapsed(task) {
+  const seconds = Math.floor(getCreationMarketingBatchElapsedMs(task) / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const remainder = String(seconds % 60).padStart(2, "0");
+  return minutes >= 60 ? `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}:${remainder}` : `${String(minutes).padStart(2, "0")}:${remainder}`;
+}
+
+function renderCreationMarketingBatchTiming() {
+  const batch = state.creation.marketingBatch;
+  const elapsed = refs.creationMarketingBatchElapsed;
+  const timing = refs.creationMarketingBatchTiming;
+  const visible = Boolean(elapsed && timing && isCreationAiMarketingEnabled() && state.creation.marketingBatchEnabled && batch?.startedAt);
+  const ticking = visible && ["running", "pausing"].includes(batch.status) && Boolean(batch.timingStartedAt);
+  if (ticking && creationMarketingBatchClock === null) creationMarketingBatchClock = setInterval(renderCreationMarketingBatchTiming, 1000);
+  else if (!ticking && creationMarketingBatchClock !== null) {
+    clearInterval(creationMarketingBatchClock);
+    creationMarketingBatchClock = null;
+  }
+  if (elapsed) elapsed.hidden = !visible;
+  if (timing) timing.hidden = !visible;
+  if (!visible) return;
+  const label = batch.status === "completed" ? "整批规划总耗时" : batch.status === "paused" ? "整批规划累计耗时" : batch.status === "canceled" ? "整批停止时耗时" : "整批规划已用时";
+  elapsed.textContent = `${label} ${formatCreationMarketingBatchElapsed(batch)}`;
+  timing.textContent = batch.schemes.filter((scheme) => scheme.startedAt)
+    .sort((left, right) => Number(Boolean(left.finishedAt)) - Number(Boolean(right.finishedAt)) || left.index - right.index)
+    .map((scheme) => {
+      const status = ["enqueued", "completed"].includes(scheme.status) ? "入队完成 · 总耗时" : scheme.status === "failed" ? "失败 · 总耗时" : scheme.status === "canceled" ? "已停止 · 耗时" : scheme.status === "paused" ? "已暂停 · 累计" : scheme.status === "retrying" ? "重试中 · 已用时" : "进行中 · 已用时";
+      return `方案 ${scheme.index} · ${status} ${formatCreationMarketingBatchElapsed(scheme)}`;
+    }).join("\n");
+}
+
+function renderCreationMarketingBatchConfig() {
+  const panel = refs.creationMarketingBatchPanel;
+  const config = refs.creationMarketingBatchConfig;
+  if (!panel || !config) return;
+  const visible = isCreationAiMarketingEnabled();
+  panel.hidden = !visible;
+  if (!visible) state.creation.marketingBatchEnabled = false;
+  const enabled = state.creation.marketingBatchEnabled === true;
+  const active = isCreationMarketingBatchRunning();
+  const batch = state.creation.marketingBatch;
+  const paused = batch?.status === "paused";
+  const controllable = active || paused;
+  config.hidden = !enabled;
+  if (refs.creationMarketingBatchToggle) {
+    refs.creationMarketingBatchToggle.textContent = enabled ? "关闭" : "开启";
+    refs.creationMarketingBatchToggle.setAttribute("aria-label", `${enabled ? "关闭" : "开启"}很多套 AI 提示词`);
+    refs.creationMarketingBatchToggle.setAttribute("aria-expanded", String(enabled));
+    refs.creationMarketingBatchToggle.setAttribute("aria-pressed", String(enabled));
+    refs.creationMarketingBatchToggle.disabled = !visible || (enabled && (active || creationMarketingBatchStarting));
+  }
+  const count = normalizeCreationMarketingBatchSchemeCount((controllable ? batch?.total : null) ?? refs.creationMarketingBatchCountInput?.value ?? 1);
+  if (refs.creationMarketingBatchCountInput && String(count) !== refs.creationMarketingBatchCountInput.value) refs.creationMarketingBatchCountInput.value = String(count);
+  const copiesPerScheme = normalizeCreationMarketingBatchCopies((controllable ? batch?.copiesPerScheme : null) ?? refs.creationMarketingBatchCopiesInput?.value ?? 1);
+  if (refs.creationMarketingBatchCopiesInput && String(copiesPerScheme) !== refs.creationMarketingBatchCopiesInput.value) refs.creationMarketingBatchCopiesInput.value = String(copiesPerScheme);
+  if (refs.creationMarketingBatchEstimate) {
+    const imageCount = controllable && Number.isInteger(batch?.requestedImageCount) ? batch.requestedImageCount : getCreationSelectedImageCount();
+    refs.creationMarketingBatchEstimate.textContent = `预计生成：${imageCount * count * copiesPerScheme} 张营销图片（${imageCount} × ${count} × ${copiesPerScheme}）\n预计加入队列：${count * copiesPerScheme} 套（${count} 个方案 × 每方案 ${copiesPerScheme} 套）`;
+  }
+  if (refs.creationMarketingBatchStartButton) {
+    refs.creationMarketingBatchStartButton.hidden = controllable;
+    refs.creationMarketingBatchStartButton.disabled = !enabled || controllable || creationMarketingBatchStarting || state.creation.planning;
+  }
+  if (refs.creationMarketingBatchContinueButton) {
+    refs.creationMarketingBatchContinueButton.hidden = !controllable;
+    refs.creationMarketingBatchContinueButton.disabled = !enabled || !canContinueCreationMarketingBatch(batch) || state.creation.planning || creationMarketingBatchStarting;
+  }
+  if (refs.creationMarketingBatchPauseButton) {
+    refs.creationMarketingBatchPauseButton.hidden = !controllable;
+    refs.creationMarketingBatchPauseButton.disabled = !enabled || !["queued", "running"].includes(batch?.status);
+  }
+  if (refs.creationMarketingBatchCancelButton) {
+    refs.creationMarketingBatchCancelButton.hidden = !controllable;
+    refs.creationMarketingBatchCancelButton.disabled = !enabled || !controllable;
+  }
+  if (refs.creationMarketingBatchCountInput) refs.creationMarketingBatchCountInput.disabled = !enabled || controllable || creationMarketingBatchStarting;
+  if (refs.creationMarketingBatchCopiesInput) refs.creationMarketingBatchCopiesInput.disabled = !enabled || controllable || creationMarketingBatchStarting;
+  if (refs.creationMarketingBatchStatus) {
+    if (!batch) {
+      refs.creationMarketingBatchStatus.textContent = "每套营销图片张数按上方“套图数量”计算；SKU 图和信息图重构按启用情况另计。";
+    } else {
+      const failedCount = batch.schemes.filter((scheme) => scheme.status === "failed").length;
+      const pendingCount = batch.schemes.filter((scheme) => ["queued", "paused"].includes(scheme.status)).length;
+      const canceledCount = batch.schemes.filter((scheme) => scheme.status === "canceled").length;
+      const activeCount = (batch.activeIndexes || []).filter((index) => ["planning", "enqueuing", "retrying"].includes(batch.schemes[index]?.status)).length;
+      const status = batch.status === "completed" && failedCount ? "已结束（有失败）" : creationMarketingBatchStatusLabel(batch.status);
+      const summary = `${status} · 已处理 ${batch.completedCount + failedCount}/${batch.total} 个方案\n成功 ${batch.completedCount} · 失败 ${failedCount} · 进行中 ${activeCount}/${CREATION_MARKETING_BATCH_CONCURRENCY} · 待处理 ${pendingCount}\n已入队 ${batch.enqueuedCount}/${batch.targetQueueCount} 套 · 重试 ${batch.retryCount || 0} 次${canceledCount ? ` · 已停止 ${canceledCount}` : ""}`;
+      const note = batch.status === "pausing" ? "正在等待当前请求收尾；有效方案会保留，后续暂不入队。"
+        : paused && batch.pauseReason === "user" ? "已暂停后续，点击“继续”恢复剩余任务；已入队套图继续生成。"
+          : paused ? "已暂停，点击“继续”恢复剩余任务；已入队套图继续生成。"
+            : batch.status === "canceled" ? `${creationMarketingBatchStarting ? "等待当前请求收尾；" : ""}已停止本轮后续任务，已入队套图继续生成。` : "";
+      refs.creationMarketingBatchStatus.textContent = `${summary}${note ? `\n${note}` : ""}`;
+    }
+  }
+  renderCreationMarketingBatchTiming();
+}
 
 function getCreationPlanPreviewImageCount(selectedRoles = getCreationSelectedRoles()) { return isCreationZeroImageCountMode() ? 0 : isCreationAiMarketingEnabled() ? getCreationSelectedImageCount() : selectedRoles.length || getCreationSelectedImageCount(); }
 
@@ -15211,6 +15371,11 @@ function buildCreationPlanPreviewFormData() {
     formData.set("resolutionTier", frozenPayload.values.platformSetOverrides.resolutionTier);
   }
   formData.set("aiMarketingEnabled", String(isCreationAiMarketingEnabled()));
+  const marketingBatch = state.creation.marketingBatch;
+  const activeMarketingBatchScheme = marketingBatch && marketingBatch.currentIndex >= 0 ? getCreationMarketingBatchScheme(marketingBatch, marketingBatch.currentIndex) : null;
+  if (activeMarketingBatchScheme) {
+    formData.set("variationSeed", activeMarketingBatchScheme.variationSeed);
+  }
   if (isCreationAiMarketingEnabled()) {
     formData.set("imageCount", String(getCreationPlanPreviewImageCount(selectedRoles)));
     formData.set("targetLanguage", targetLanguage.value);
@@ -15233,10 +15398,13 @@ function getArticleIllustrationPlanSnapshot() {
   });
 }
 
-function buildCreationFormData() {
-  const formData = buildCreationPlanPreviewFormData();
-  const effectivePlan = getFrozenCreationEffectivePlan();
-  if (effectivePlan) formData.set("effectivePlan", JSON.stringify(effectivePlan));
+function buildCreationFormData({ sourceFormData = null, effectivePlanOverride = null } = {}) {
+  const formData = sourceFormData ? cloneCreationMarketingBatchFormData(sourceFormData) : buildCreationPlanPreviewFormData();
+  const effectivePlan = effectivePlanOverride || getFrozenCreationEffectivePlan();
+  if (effectivePlan) {
+    formData.set("effectivePlan", JSON.stringify(effectivePlan));
+    if (effectivePlan.promptPlanningMode === "ai-batch") formData.set("imageCount", String(effectivePlan.carouselImageCount));
+  }
 
   formData.set("format", normalizeOutputFormat(refs.creationOutputFormatInput.value || state.config?.defaults?.format || "png"));
   if (!effectivePlan) {
@@ -15249,13 +15417,13 @@ function buildCreationFormData() {
   formData.set("reasoningEffort", getSelectedReasoningEffort(refs.creationReasoningEffortInput));
   formData.set("quality", getSelectedImageQuality(refs.creationQualityInput));
   formData.set("clientSessionId", state.clientSessionId);
-  state.creationReferenceFiles.forEach((item) => {
-    const file = getCreationReferenceGenerationFile(item);
-    if (file) {
-      formData.append("referenceImages", file);
-    }
-  });
-  appendCurrentConfigToFormData(formData);
+  if (!sourceFormData) {
+    state.creationReferenceFiles.forEach((item) => {
+      const file = getCreationReferenceGenerationFile(item);
+      if (file) formData.append("referenceImages", file);
+    });
+    appendCurrentConfigToFormData(formData);
+  }
 
   return formData;
 }
@@ -15887,7 +16055,7 @@ function hasCreationPlanPreviewInput() {
   );
 }
 
-async function previewCreationPlan() {
+async function previewCreationPlan({ requestFormData = null, throwOnError = false } = {}) {
   clearError();
   setCreationFeedback("");
 
@@ -15911,9 +16079,9 @@ async function previewCreationPlan() {
   renderCreationView();
 
   try {
-    const previewFormData = buildCreationPlanPreviewFormData();
+    const previewFormData = requestFormData ? cloneCreationMarketingBatchFormData(requestFormData) : buildCreationPlanPreviewFormData();
     previewFormData.set("clientSessionId", state.clientSessionId);
-    if (isCreationAiMarketingEnabled()) {
+    if (isCreationAiMarketingEnabled() && !requestFormData) {
       await ensureCreationReferenceGenerationFilesReady();
       state.creationReferenceFiles.forEach((item) => {
         const file = getCreationReferenceGenerationFile(item);
@@ -15948,7 +16116,7 @@ async function previewCreationPlan() {
     if (!payload.plan || !Array.isArray(payload.plan.items)) throw new Error("未收到完整套图计划，请重新预览。");
 
     const plan = payload.plan || {};
-    const effectivePlan = hydrateCreationEffectivePlan(plan);
+    const effectivePlan = hydrateCreationEffectivePlan(plan, { preserveImageCount: true });
     const createdAt = nowIso();
     const previousDraft = getCreationDraftSet();
     const items = Array.isArray(plan.items)
@@ -16007,8 +16175,12 @@ async function previewCreationPlan() {
     }
     const skippedCount = items.filter((item) => item.evidenceBlocked).length;
     setCreationFeedback(`已生成套图计划：可生成 ${items.length - skippedCount} 张${skippedCount ? `，缺少依据跳过 ${skippedCount} 张` : ""}。`, "success");
+    return { plan, draftSet: nextDraftSet };
   } catch (error) {
-    if (error?.name === "AbortError" || !creationPlanPreviewRequests.isCurrent(request.revision)) return;
+    if (error?.name === "AbortError" || !creationPlanPreviewRequests.isCurrent(request.revision)) {
+      if (throwOnError) throw error;
+      return;
+    }
     const failedProgress = state.creation.marketingPreviewProgress;
     resetCreationDraftPreview();
     const message = compactErrorMessage(error instanceof Error ? error.message : String(error), "套图计划生成失败");
@@ -16019,6 +16191,7 @@ async function previewCreationPlan() {
     setCreationFeedback(message, "error");
     showError(message);
     renderCreationView();
+    if (throwOnError) throw error;
   } finally {
     if (creationPlanPreviewRequests.finish(request.revision)) {
       state.creation.planning = false;
@@ -16119,6 +16292,162 @@ function enqueueCreationGeneration({ formData, set }) {
   return job;
 }
 
+async function buildCreationMarketingBatchRequestFormData() {
+  await ensureCreationReferenceGenerationFilesReady();
+  const formData = buildCreationPlanPreviewFormData();
+  state.creationReferenceFiles.forEach((item) => {
+    const file = getCreationReferenceGenerationFile(item);
+    if (file) formData.append("referenceImages", file);
+  });
+  appendCurrentConfigToFormData(formData);
+  formData.set("format", normalizeOutputFormat(refs.creationOutputFormatInput.value || state.config?.defaults?.format || "png"));
+  formData.set("quality", getSelectedImageQuality(refs.creationQualityInput));
+  formData.set("clientSessionId", state.clientSessionId);
+  formData.set("listingAgentEnabled", String(Boolean(refs.creationListingAgentEnabledInput?.checked)));
+  return formData;
+}
+
+async function requestCreationMarketingBatchPlan(formData, scheme, batch, signal) {
+  scheme.marketingProgress = updateCreationMarketingProgress(null, {
+    stage: "preparing", total: Number(formData.get("imageCount")), productName: formData.get("productName"),
+  });
+  const response = await fetch("/api/creation/plan", {
+    method: "POST", headers: { Accept: "text/event-stream" }, body: formData, signal,
+  });
+  let payload = {};
+  if (/text\/event-stream/i.test(response.headers.get("content-type") || "")) {
+    await consumeSseUntilTerminal({ stream: response.body, consumeSse,
+      onEvent: async (eventName, data) => {
+        if (batch.status === "canceled") return;
+        if (eventName === "marketing_progress") {
+          scheme.marketingProgress = updateCreationMarketingProgress(scheme.marketingProgress, data);
+          renderCreationView();
+        }
+        if (eventName === "error") throw new Error(data.message || "套图计划生成失败");
+        if (eventName === "complete") payload = data;
+      },
+      missingTerminalMessage: "营销规划连接已中断，未收到完整计划。",
+    });
+  } else {
+    payload = await response.json().catch(() => ({}));
+  }
+  if (batch.status === "canceled") return null;
+  if (!response.ok) throw new Error(payload.message || "套图计划生成失败");
+  if (!payload.plan || !Array.isArray(payload.plan.items) || !payload.plan.items.length) {
+    throw new Error("未收到可提交的营销方案。");
+  }
+  const plan = deepFreezeCreationPlanValue(payload.plan);
+  const validation = plan.marketingPlan?.validation;
+  scheme.marketingProgress = updateCreationMarketingProgress(scheme.marketingProgress, {
+    stage: validation && (validation.removedItems?.length || validation.missingCount) ? "partial" : "complete",
+    ...summarizeCreationMarketingProgress(plan),
+  });
+  return { plan, marketingProgress: structuredClone(scheme.marketingProgress) };
+}
+
+let creationMarketingBatchSourceFormData = null;
+let creationMarketingBatchStarting = false;
+let creationMarketingBatchRequestController = null;
+
+async function runCreationMarketingBatchGeneration({ resume = false } = {}) {
+  if (!state.creation.marketingBatchEnabled || !isCreationAiMarketingEnabled() || state.creation.planning || creationMarketingBatchStarting) return;
+  if (resume && !canContinueCreationMarketingBatch(state.creation.marketingBatch)) return;
+  if (!resume && ["queued", "running", "pausing", "paused"].includes(state.creation.marketingBatch?.status)) return;
+  creationMarketingBatchStarting = true;
+  const requestController = new AbortController();
+  creationMarketingBatchRequestController = requestController;
+  let batch = null;
+  try {
+    const count = normalizeCreationMarketingBatchSchemeCount(refs.creationMarketingBatchCountInput?.value || 1);
+    const copiesPerScheme = normalizeCreationMarketingBatchCopies(refs.creationMarketingBatchCopiesInput?.value || 1);
+    if (!resume) {
+      creationMarketingBatchSourceFormData = await buildCreationMarketingBatchRequestFormData();
+      const productName = String(creationMarketingBatchSourceFormData.get("productName") || "").trim();
+      const productDescription = String(creationMarketingBatchSourceFormData.get("productDescription") || "").trim();
+      if (!productName && !productDescription) throw new Error("请至少填写商品名称或商品描述。");
+      creationMarketingBatchSourceFormData.delete("marketingSupplement");
+      creationMarketingBatchSourceFormData.delete("variationSeed");
+      state.creation.marketingBatch = createCreationMarketingBatchState({
+        count,
+        copiesPerScheme,
+      });
+      state.creation.marketingBatch.requestedImageCount = Number(creationMarketingBatchSourceFormData.get("imageCount"));
+    }
+    batch = state.creation.marketingBatch;
+    if (!batch || !creationMarketingBatchSourceFormData) return;
+    if (resume) {
+      for (const scheme of batch.schemes.filter((entry) => entry.status === "paused")) {
+        scheme.retryCount = 0;
+        scheme.lastRetryReason = "";
+        scheme.error = "";
+      }
+    }
+    resetCreationDraftPreview();
+    await waitForPendingCreationPlanPreview();
+    renderCreationView();
+    if (!resume && batch.status === "paused") return;
+    await runCreationMarketingBatch({
+      state: batch,
+      onUpdate: () => renderCreationView(),
+      generatePlan: async ({ scheme }) => {
+        const formData = cloneCreationMarketingBatchFormData(creationMarketingBatchSourceFormData);
+        formData.set("variationSeed", scheme.variationSeed);
+        return requestCreationMarketingBatchPlan(formData, scheme, batch, requestController.signal);
+      },
+      enqueuePlan: async ({ planResult, scheme, copyIndex, copyNumber, state: batchState }) => {
+        const sourceFormData = cloneCreationMarketingBatchFormData(creationMarketingBatchSourceFormData);
+        sourceFormData.set("variationSeed", scheme.variationSeed);
+        const generationFormData = sourceFormData;
+        generationFormData.set("effectivePlan", JSON.stringify(planResult.plan));
+        generationFormData.set("imageCount", String(planResult.plan.carouselImageCount ?? planResult.plan.imageCount));
+        const queuedSet = buildCreationQueuedSet({ effectivePlanOverride: planResult.plan, sourceFormData, createdAt: nowIso() });
+        queuedSet.listingAgentEnabled = sourceFormData.get("listingAgentEnabled") === "true";
+        queuedSet.marketingBatch = {
+          batchId: batchState.batchId,
+          schemeIndex: scheme.index,
+          schemeTotal: batchState.total,
+          copyIndex,
+          copyNumber,
+          copyTotal: batchState.copiesPerScheme,
+          totalQueueCount: batchState.targetQueueCount,
+        };
+        const job = enqueueCreationGeneration({ formData: generationFormData, set: queuedSet });
+        job.marketingProgress = structuredClone(planResult.marketingProgress);
+        return job;
+      },
+    });
+  } catch (error) {
+    const message = compactErrorMessage(error instanceof Error ? error.message : String(error), "批量 AI 营销规划失败");
+    if (batch && batch.status !== "paused" && batch.status !== "canceled") {
+      batch.status = "paused";
+      batch.pauseReason = "error";
+      batch.error = message;
+    }
+    setCreationFeedback(message, "error");
+    showError(message);
+  } finally {
+    creationMarketingBatchRequestController = null;
+    creationMarketingBatchStarting = false;
+    renderCreationView();
+  }
+}
+
+function pauseCreationMarketingBatch() {
+  const batch = state.creation.marketingBatch;
+  if (!batch || !["queued", "running"].includes(batch.status)) return;
+  pausePendingCreationMarketingBatch(batch);
+  setCreationFeedback("已暂停后续提交，当前请求收尾后可继续；已入队套图继续生成。", "success");
+  renderCreationView();
+}
+
+function cancelCreationMarketingBatch() {
+  if (!state.creation.marketingBatch) return;
+  cancelPendingCreationMarketingBatch(state.creation.marketingBatch);
+  creationMarketingBatchRequestController?.abort();
+  setCreationFeedback("已停止本轮后续任务，已入队套图继续生成；本轮不再继续。", "success");
+  renderCreationView();
+}
+
 function releaseCreationLoadingSources({ queueId = "", setId = "" } = {}) {
   const prefixes = new Set([
     String(queueId || "").trim(),
@@ -16178,7 +16507,7 @@ async function startCreationGeneration(event) {
   }
 
   if (isCreationAiMarketingEnabled() && (state.creation.planDirty || !getFrozenCreationEffectivePlan())) {
-    const message = "AI 整套营销提示词已变更，请先点击“预览计划”确认逐图作用和证据链。";
+    const message = "AI 整套营销提示词已变更，请先点击“生成套图方案”确认逐图作用和证据链。";
     setCreationFeedback(message, "error");
     showError(message);
     renderCreationView();
@@ -18985,9 +19314,8 @@ function appendImageEditReferencesToFormData(formData, job) {
 function getCreationReferenceAnalysisSnapshot() {
   return JSON.stringify({
     platform: getCreationSelectedPlatform().value,
-    productName: refs.creationProductNameInput?.value?.trim() || "",
-    productDescription: refs.creationProductDescriptionInput?.value?.trim() || "",
     files: state.creationReferenceFiles.map((item) => ({
+    id: item.id || "",
     name: item?.file?.name || item?.name || "",
     size: item?.file?.size || item?.size || 0,
     type: item?.file?.type || item?.type || "",
@@ -19059,7 +19387,7 @@ function invalidatePromptAgentAnalysisRequest() {
 async function buildPromptAgentFormData() {
   const formData = new FormData();
   formData.set("image", await preparePromptAnalysisImageFile(state.promptAgent.file));
-  formData.set("reasoningEffort", PROMPT_AGENT_ANALYSIS_REASONING_EFFORT);
+  formData.set("reasoningEffort", getSelectedReasoningEffort());
   appendCurrentConfigToFormData(formData);
   return formData;
 }
@@ -19072,7 +19400,7 @@ async function buildReferenceAnalysisFormData() {
   formData.set("targetLanguageLabel", targetLanguage.label);
   formData.set(
     "reasoningEffort",
-    REFERENCE_ORCHESTRATION_REASONING_EFFORT,
+    getSelectedReasoningEffort(),
   );
   const analysisFiles = await Promise.all(
     state.referenceAnalysis.files.map((item) => preparePromptAnalysisImageFile(item.file)),
@@ -20243,6 +20571,21 @@ function bindEvents() {
   refs.creationPlanButton.addEventListener("click", () => {
     requestCreationPlanPreview().catch((error) => setCreationFeedback(error.message, "error"));
   });
+  refs.creationMarketingBatchToggle?.addEventListener("click", () => {
+    if (!isCreationAiMarketingEnabled() || (state.creation.marketingBatchEnabled && (isCreationMarketingBatchRunning() || creationMarketingBatchStarting))) return;
+    state.creation.marketingBatchEnabled = !state.creation.marketingBatchEnabled;
+    renderCreationView();
+  });
+  refs.creationMarketingBatchCountInput?.addEventListener("input", () => renderCreationView());
+  refs.creationMarketingBatchCopiesInput?.addEventListener("input", () => renderCreationView());
+  refs.creationMarketingBatchStartButton?.addEventListener("click", () => {
+    runCreationMarketingBatchGeneration().catch((error) => setCreationFeedback(error.message, "error"));
+  });
+  refs.creationMarketingBatchContinueButton?.addEventListener("click", () => {
+    runCreationMarketingBatchGeneration({ resume: true }).catch((error) => setCreationFeedback(error.message, "error"));
+  });
+  refs.creationMarketingBatchPauseButton?.addEventListener("click", pauseCreationMarketingBatch);
+  refs.creationMarketingBatchCancelButton?.addEventListener("click", cancelCreationMarketingBatch);
   refs.creationPlanRestoreButton?.addEventListener("click", () => {
     restoreCurrentCreationPlatformRecommendations().catch((error) => {
       const message = error instanceof Error ? error.message : String(error);
@@ -20564,10 +20907,10 @@ function bindEvents() {
       setCreationFeedback(error.message, "error"),
     );
   });
-  [refs.creationProductNameInput, refs.creationProductDescriptionInput].forEach((input) => input.addEventListener("input", resetCreationDraftPreview));
   [refs.creationProductNameInput, refs.creationProductDescriptionInput].forEach((input) => input.addEventListener("input", () => {
     if (state.creationReferenceAnalysis.updatingFromAnalysis) return;
-    markCreationProductAnalysisDirty();
+    if (input === refs.creationProductNameInput) state.creationReferenceAnalysis.autoFilledProductName = "";
+    resetCreationDraftPreview();
   }));
   refs.creationTargetLanguageInput?.addEventListener("change", () => {
     refreshCreationPlanAfterExplicitSetParameterChange({ targetLanguage: getCreationSelectedLanguage().value });

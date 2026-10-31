@@ -22,6 +22,7 @@ function analystInput(overrides = {}) {
 
 test("reference analysis requests concrete Chinese marketing recommendations with fact references", () => {
   const schema = CREATION_REFERENCE_ANALYSIS_JSON_SCHEMA.properties.product_insights;
+  assert.equal(schema.properties.appearance_locks, undefined);
   assert.ok(schema.required.includes("marketing_recommendations"));
   const recommendations = schema.properties.marketing_recommendations;
   assert.equal(recommendations.maxItems, 6);
@@ -30,6 +31,7 @@ test("reference analysis requests concrete Chinese marketing recommendations wit
   assert.match(input[0].content[0].text, /marketing_recommendations/);
   assert.match(input[0].content[0].text, /营销重点.*画面表达/);
   assert.match(input[0].content[0].text, /建议.*简体中文/);
+  assert.doesNotMatch(input[0].content[0].text, /appearance_locks|APPEARANCE LOCK/);
 });
 
 test("recommendations keep sourced content and reject missing or partially invalid evidence", () => {

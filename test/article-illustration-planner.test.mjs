@@ -250,7 +250,7 @@ test("article image prompt keeps ordinary captions out of the rendered image tex
   assert.doesNotMatch(prompt, /Optional integrated text inside the image/);
 });
 
-test("article planning caps xhigh reasoning to medium for structured long-text parsing", async () => {
+test("article planning preserves selected xhigh reasoning for structured long-text parsing", async () => {
   let capturedReasoningEffort = "";
   let capturedPlanningPrompt = "";
   const bundle = buildArticleBundle({
@@ -288,7 +288,7 @@ test("article planning caps xhigh reasoning to medium for structured long-text p
     },
   });
 
-  assert.equal(capturedReasoningEffort, "medium");
+  assert.equal(capturedReasoningEffort, "xhigh");
   assert.match(capturedPlanningPrompt, /Character reference cards must follow this format/);
   assert.match(capturedPlanningPrompt, /Scene reference cards must follow this format/);
   assert.match(capturedPlanningPrompt, /joy, anger, sorrow, and happiness expression variations/);

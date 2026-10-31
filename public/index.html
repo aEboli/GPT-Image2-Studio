@@ -110,7 +110,7 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="./styles.css?v=20261026-quick-suite-17" />
+    <link rel="stylesheet" href="./styles.css?v=20261029-subject-boundaries-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -126,7 +126,7 @@
         <span class="topbar-reveal-icon" aria-hidden="true"></span>
       </button>
       <header class="topbar" id="globalTopbar">
-        <small class="app-version" aria-label="当前版本 v0.2.086">v0.2.086</small>
+        <small class="app-version" aria-label="当前版本 v0.2.096">v0.2.096</small>
         <div class="brand-cluster">
           <div class="brand-mark" aria-hidden="true">
             <span class="brand-mark-core"></span>
@@ -1690,6 +1690,37 @@
                     </label>
                   </div>
 
+                  <section class="creation-marketing-batch-panel" id="creationMarketingBatchPanel" data-creation-set-only hidden>
+                    <div class="creation-marketing-batch-head">
+                      <span class="creation-marketing-batch-title">很多套 AI 提示词</span>
+                      <button class="toolbar-button" id="creationMarketingBatchToggle" type="button" aria-label="开启很多套 AI 提示词" aria-expanded="false" aria-controls="creationMarketingBatchConfig" aria-pressed="false">开启</button>
+                    </div>
+                    <div id="creationMarketingBatchConfig" hidden>
+                      <p class="creation-marketing-batch-hint">同时规划 2 个方案，套图最多 2 套同时生成；每个方案只规划一次</p>
+                      <div class="creation-marketing-batch-fields">
+                        <label class="compact-field">
+                          <span>方案数量</span>
+                          <input id="creationMarketingBatchCountInput" type="number" min="1" max="20" value="1" inputmode="numeric" />
+                        </label>
+                        <label class="compact-field">
+                          <span>每个方案生成套数</span>
+                          <input id="creationMarketingBatchCopiesInput" type="number" min="1" max="20" value="1" inputmode="numeric" />
+                        </label>
+                      </div>
+                      <div class="creation-marketing-batch-estimate" id="creationMarketingBatchEstimate" aria-live="polite"></div>
+                      <div class="creation-marketing-batch-actions">
+                        <button class="toolbar-button" id="creationMarketingBatchStartButton" type="button">开始批量生成</button>
+                        <button class="toolbar-button" id="creationMarketingBatchContinueButton" type="button" hidden>继续</button>
+                        <button class="toolbar-button" id="creationMarketingBatchPauseButton" type="button" hidden>暂停后续</button>
+                        <button class="inline-button" id="creationMarketingBatchCancelButton" type="button" hidden>停止后续</button>
+                      </div>
+                      <p class="creation-marketing-batch-hint">暂停后可继续，停止后本轮不再继续；已入队套图继续生成。</p>
+                      <div class="creation-marketing-batch-status" id="creationMarketingBatchStatus" aria-live="polite"></div>
+                      <div class="creation-marketing-batch-elapsed" id="creationMarketingBatchElapsed" aria-live="off" title="统计方案规划与入队耗时，暂停后的空闲时间不计入。" hidden></div>
+                      <div class="creation-marketing-batch-timing" id="creationMarketingBatchTiming" aria-label="各方案规划与入队耗时" aria-live="off" hidden></div>
+                    </div>
+                  </section>
+
                   <section class="creation-industry-browser" id="creationIndustryTemplateBrowser" aria-label="行业模板" data-creation-set-only>
                     <input id="creationIndustryTemplateInput" name="industryTemplate" type="hidden" value="general" />
                     <div class="creation-industry-browser-head">
@@ -1784,7 +1815,7 @@
                 </section>
 
                 <div class="creation-plan-actions" data-creation-set-only>
-                  <button class="toolbar-button" id="creationPlanButton" type="button">预览计划</button>
+                  <button class="toolbar-button" id="creationPlanButton" type="button" title="根据当前商品资料与设置，规划每张图片的内容、提示词与参考图分配。">生成套图方案</button>
                 </div>
                 <button class="generate-button" id="creationGenerateButton" type="submit">生成营销套图</button>
                 <p class="ppt-feedback" id="creationFeedback"></p>
@@ -3786,6 +3817,6 @@
 
     <div class="app-tooltip" id="appTooltip" role="tooltip" popover="manual"></div>
 
-    <script type="module" src="./app.js?v=20261026-quick-suite-17"></script>
+    <script type="module" src="./app.js?v=20261031-dual-concurrency-1"></script>
   </body>
 </html>

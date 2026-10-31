@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.086-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.096-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installer-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,7 +10,7 @@
 
 把提示词生图、参考图分析、图片编辑、电商套图、人物写真、文章插图、PPT 生成和素材管理集中到一个浏览器界面中。
 
-当前版本：`v0.2.086`
+当前版本：`v0.2.096`
 
 </div>
 
@@ -79,12 +79,12 @@ Windows 脚本入口（启动器、Native Messaging 安装/卸载、图片资源
 从包含桌面产物的 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
 
 ```text
-GPT-Image2-Studio-Desktop-Setup-v0.2.086-x64.exe
+GPT-Image2-Studio-Desktop-Setup-v0.2.096-x64.exe
 ```
 
 安装完成后通过桌面或开始菜单中的 `GPT-Image2-Studio` 启动。程序会在独立窗口中运行，内置服务使用动态回环端口，关闭窗口后不会遗留后台服务。无需另行安装 Node.js，完整说明见 [Windows 桌面程序文档](./docs/windows-desktop.md)。
 
-如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.086-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
+如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.096-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
 
 桌面开发使用 Electron `43`，要求 Node.js `22.12` 或更高版本；普通 `npm start` 服务仍支持 Node.js `20+`。
 
@@ -95,7 +95,7 @@ cmd /c npm run desktop
 
 ### 方式三：Windows 浏览器安装包（兼容旧版）
 
-旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.086` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
+旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.096` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
 
 ## 配置说明
 
@@ -473,7 +473,7 @@ GPT-Image2-Studio 面向个人创作者、电商运营、设计师和内容团�
 
 ### 业务工作流
 
-- **电商套图**：根据商品参考图和资料识别有来源的事实，再分配不同场景与信息任务；缺少可售变体或尺寸证据时跳过对应图片，避免重复操作和无依据宣称。默认由电商视觉营销专家一次规划最多 20 条营销提示词，绑定图型与参考图，关闭后使用通用 18 槽位。支持计划预览、套图级参数覆盖、兼容图片类型启停、补图队列和 Listing 草稿；新计划固定一个 SKU 主体但保留 SKU 生成规则；另有独立的“上传图加 Logo”批处理分支。
+- **电商套图**：根据商品参考图和资料识别有来源的事实，再分配不同场景与信息任务；缺少可售变体或尺寸证据时跳过对应图片，避免重复操作和无依据宣称。默认由电商视觉营销专家一次规划最多 20 条营销提示词，绑定图型与参考图；批量模式可连续规划多套，每套最多两路并行，逐套校验并加入现有队列，遇到失败会暂停后续方案并支持续跑。质量审核检查功能依据、核心购买理由和逐图任务差异。关闭 AI 营销提示词后使用通用 18 槽位。支持计划预览、套图级参数覆盖、兼容图片类型启停、补图队列和 Listing 草稿；新计划固定一个 SKU 主体但保留 SKU 生成规则；另有独立的“上传图加 Logo”批处理分支。
 - **写真模式**：组合人物、动作、服装、道具和地点，生成 1 到 100 张系列写真，并独立选择思考等级与质量。
 - **文章插图**：解析文章包，建立风格、角色和场景设定，再生成正式插图计划，并独立选择思考等级与质量。
 - **PPT 生成**：从主题或文档生成 1 到 20 页演示文稿，支持单页编辑、补图、普通 PPTX 和可编辑重建导出；整套操作保留 PPT 自己的思考等级与质量。
@@ -644,8 +644,8 @@ cmd /c npm run build:desktop
 产物路径：
 
 ```text
-artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.086-x64.exe
-artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.086-x64.zip
+artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.096-x64.exe
+artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.096-x64.zip
 artifacts/desktop/win-unpacked/GPT-Image2-Studio.exe
 ```
 
@@ -663,7 +663,7 @@ cmd /c npm run build:installer
 产物路径格式：
 
 ```text
-artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.086.exe
+artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.096.exe
 ```
 
 脚本使用系统 `iexpress.exe` 生成自解压安装包，并把当前 Node.js 运行时和依赖打入安装目录；启动后仍使用默认浏览器显示工作台。
@@ -768,7 +768,15 @@ cmd /c npm run build:installer
 
 ## 版本更新说明
 
-完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.086](./docs/releases/v0.2.086.md)。
+完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.096](./docs/releases/v0.2.096.md)。
+
+### v0.2.096 更新说明
+
+- 新增 AI 营销提示词批量规划，可设置独立方案数量和每套入队数量；最多同时规划两套，已校验的方案会复用现有套图队列。
+- 批量进度显示逐方案状态、耗时和重试；可取消后续方案，瞬时错误按上限重试，失败或资料问题会暂停后续工作，并可从失败方案继续而不重复已入队内容。
+- 加强营销计划质量审核，检查核心功能是否有事实支持、是否形成可见效果，以及套图中的任务和构图是否重复；保留有效图片并修复可编辑的问题项。
+- 优化商业 CG 与商品功能画面指引，并统一文本模型的推理强度参数映射；仅在上游明确拒绝该参数时进行有界降级重试。
+- 批量进度目前仅保存在当前页面会话中；刷新后，已入队任务按现有队列和记录处理，尚未提交的方案不会自动恢复。
 
 ### v0.2.086 更新说明
 

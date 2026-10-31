@@ -347,7 +347,7 @@ test("preview and record reuse hydrate one recursively frozen effective plan", a
   );
   assert.match(
     app,
-    /async function previewCreationPlan\([\s\S]*hydrateCreationEffectivePlan\(plan\)/,
+    /async function previewCreationPlan\([\s\S]*hydrateCreationEffectivePlan\(plan, \{ preserveImageCount: true \}\)/,
   );
   assert.match(app, /state\.creation\.draftSet = nextDraftSet/);
   assert.match(app, /if \(!state\.creation\.generating\) \{\s*state\.creation\.currentSet = nextDraftSet;/);
@@ -375,7 +375,7 @@ test("preview and generation serialize the same frozen normalized platform paylo
     /function appendFrozenCreationPlatformPayload\(formData, snapshot = getFrozenCreationPlatformPayload\(\)\)[\s\S]*formData\.set\(field, snapshot\.serialized\[field\]\)/,
   );
   assert.match(previewBuilder, /appendFrozenCreationPlatformPayload\(formData\)/);
-  assert.match(generationBuilder, /const formData = buildCreationPlanPreviewFormData\(\)/);
+  assert.match(generationBuilder, /sourceFormData \? cloneCreationMarketingBatchFormData\(sourceFormData\) : buildCreationPlanPreviewFormData\(\)/);
   assert.match(generationBuilder, /formData\.set\("effectivePlan", JSON\.stringify\(effectivePlan\)\)/);
   assert.doesNotMatch(previewBuilder, /planOverrides|getCreationPlanOverrides/);
 });
@@ -453,7 +453,7 @@ test("a frozen plan does not promote derived legacy planning fields to overrides
   }), { imageCount: null, selectedRoles: null });
   assert.doesNotMatch(previewBuilder, /effectivePlan\?\.carouselImageCount/);
   assert.doesNotMatch(previewBuilder, /effectivePlan\?\.items/);
-  assert.match(generationBuilder, /const effectivePlan = getFrozenCreationEffectivePlan\(\)/);
+  assert.match(generationBuilder, /const effectivePlan = effectivePlanOverride \|\| getFrozenCreationEffectivePlan\(\)/);
   assert.match(generationBuilder, /if \(!effectivePlan\) \{/);
   assert.match(generationBuilder, /formData\.set\("ratio", refs\.creationRatioInput\.value/);
   assert.match(generationBuilder, /formData\.set\([\s\S]*"size",[\s\S]*normalizeSizeForSelectedRoute\([\s\S]*refs\.creationSizeInput\.value/);
@@ -645,7 +645,7 @@ test("Creation plan preview coordination aborts stale work and accepts only the 
   assert.match(resetSource, /state\.creation\.planning = false/);
 
   const previewSource = app.match(
-    /async function previewCreationPlan\(\)[\s\S]*?(?=\r?\nasync function startCreationLogoBatchGeneration)/,
+    /async function previewCreationPlan\([\s\S]*?(?=\r?\nasync function startCreationLogoBatchGeneration)/,
   )?.[0] || "";
   assert.match(previewSource, /creationPlanPreviewRequests\.begin\(\)/);
   assert.match(previewSource, /signal:\s*request\.signal/);
