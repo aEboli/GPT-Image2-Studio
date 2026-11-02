@@ -10,7 +10,9 @@ import {
 } from "../lib/creation-record-list-model.mjs";
 import { createCreationRecordListRow } from "../lib/creation-record-list-view.mjs";
 import {
+  filterCreationRecordSetsByFailure,
   filterCreationRecordSetsByTime,
+  normalizeCreationRecordFailureFilter,
   normalizeCreationRecordDateFilter,
   normalizeCreationRecordTimeFilter,
 } from "../lib/creation-record-filter.mjs";
@@ -126,6 +128,7 @@ function createNavigationRuntime(appSource, state, refs, documentRef, referenceN
     filterCreationRecordSetsByTime: (sets, filters) => (
       filterCreationRecordSetsByTime(sets, filters, referenceNow)
     ),
+    filterCreationRecordSetsByFailure,
     formatCreationPlatformLabel: (platform) => String(platform || "").toUpperCase(),
     formatTime: (value) => String(value || "").slice(0, 10),
     getCreationProgressSummary: (set) => set.progress,
@@ -136,6 +139,7 @@ function createNavigationRuntime(appSource, state, refs, documentRef, referenceN
       .toLowerCase(),
     hasCreationRecordActiveFilters: () => true,
     normalizeCreationRecordDateFilter,
+    normalizeCreationRecordFailureFilter,
     normalizeCreationRecordTimeFilter,
     refs,
     setCreationRecordFeedback: (...args) => feedback.push(args),
@@ -285,7 +289,7 @@ test("selecting a record preserves the visible list, filters, checks, loaded row
     makeRecord(202, { productName: "Hat record 202" }),
     makeRecord(203, { createdAt: "2026-07-20T08:00:00.000Z" }),
   ];
-  const filterSignature = JSON.stringify(["shoe", "recent", ""]);
+  const filterSignature = JSON.stringify(["shoe", "recent", "", "all"]);
   const loadedListState = loadMoreCreationRecordListState(
     createCreationRecordListState(filterSignature),
     filterSignature,
@@ -298,6 +302,7 @@ test("selecting a record preserves the visible list, filters, checks, loaded row
       recordDateFilter: "",
       recordDeleteBusy: false,
       recordDetailExpanded: false,
+      recordFailureFilter: "all",
       recordListScrollTop: 734,
       recordListState: loadedListState,
       recordQuery: " Shoe ",
@@ -379,7 +384,7 @@ test("select-all toggles every filtered record across pagination and preserves h
   const documentRef = createFakeDocument();
   const matchingRecords = Array.from({ length: 130 }, (_, index) => makeRecord(index + 1));
   const excludedRecord = makeRecord(201, { productName: "Hat record 201" });
-  const filterSignature = JSON.stringify(["shoe", "all", ""]);
+  const filterSignature = JSON.stringify(["shoe", "all", "", "all"]);
   const state = {
     assetLoadErrors: { creation: "" },
     assetLoading: { creation: false },
@@ -388,6 +393,7 @@ test("select-all toggles every filtered record across pagination and preserves h
       recordDateFilter: "",
       recordDeleteBusy: false,
       recordDetailExpanded: false,
+      recordFailureFilter: "all",
       recordListScrollTop: 0,
       recordListState: createCreationRecordListState(filterSignature),
       recordQuery: "shoe",
@@ -425,6 +431,71 @@ test("select-all toggles every filtered record across pagination and preserves h
   assert.equal(state.creation.recordCheckedSetIds[0], excludedRecord.setId);
   assert.equal(refs.creationRecordSelectAllButton.textContent, "全选");
   assert.equal(refs.creationRecordSelectAllButton.getAttribute("aria-pressed"), "false");
+});
+
+test("severe-failure filter combines with keyword and time for the complete record list", async () => {
+  const appSource = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
+  const documentRef = createFakeDocument();
+  const severeMatch = makeRecord(301, {
+    progress: { total: 20, completed: 4, failed: 16 },
+  });
+  const records = [
+    severeMatch,
+    makeRecord(302, {
+      productName: "Hat record 302",
+      progress: { total: 20, completed: 4, failed: 16 },
+    }),
+    makeRecord(303, {
+      progress: { total: 20, completed: 18, failed: 2 },
+    }),
+    makeRecord(304, {
+      createdAt: "2026-07-20T08:00:00.000Z",
+      progress: { total: 20, completed: 4, failed: 16 },
+    }),
+  ];
+  const filterSignature = JSON.stringify(["shoe", "recent", "", "severe"]);
+  const state = {
+    assetLoadErrors: { creation: "" },
+    assetLoading: { creation: false },
+    creation: {
+      recordCheckedSetIds: [],
+      recordDateFilter: "",
+      recordDeleteBusy: false,
+      recordDetailExpanded: false,
+      recordFailureFilter: "severe",
+      recordListScrollTop: 0,
+      recordListState: createCreationRecordListState(filterSignature),
+      recordQuery: "shoe",
+      recordSetId: severeMatch.setId,
+      recordTimeFilter: "recent",
+      sets: records,
+    },
+  };
+  const list = new FakeElement("div");
+  list.setAttribute("role", "list");
+  const refs = {
+    creationRecordArchiveDetail: null,
+    creationRecordListSummary: new FakeElement("span"),
+    creationRecordLoadMoreButton: new FakeElement("button"),
+    creationRecordSetList: list,
+  };
+  const runtime = createNavigationRuntime(
+    appSource,
+    state,
+    refs,
+    documentRef,
+    new Date("2026-08-05T12:00:00.000Z"),
+  );
+
+  const filteredSets = runtime.filterCreationRecordSets();
+  assert.deepEqual(filteredSets.map((set) => set.setId), [severeMatch.setId]);
+  assert.equal(runtime.getCreationRecordListFilterSignature(), filterSignature);
+  runtime.renderCreationRecordSetList(filteredSets);
+  assert.deepEqual(
+    getVisibleRecordButtons(list).map((button) => button.dataset.creationRecordSetId),
+    [severeMatch.setId],
+  );
+  assert.equal(refs.creationRecordListSummary.textContent, "已显示 1 / 匹配 1");
 });
 
 test("creation records show a select-all button beside the paginated list controls", async () => {

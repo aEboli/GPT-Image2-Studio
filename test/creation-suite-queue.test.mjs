@@ -55,7 +55,20 @@ function createFakeElement(tagName) {
     },
     appendChild(node) {
       this.children.push(node);
+      node.parentElement = this;
       return node;
+    },
+    insertBefore(node, next) {
+      node.remove?.();
+      const index = next ? this.children.indexOf(next) : this.children.length;
+      this.children.splice(index, 0, node);
+      node.parentElement = this;
+    },
+    remove() {
+      if (!this.parentElement) return;
+      const siblings = this.parentElement.children;
+      siblings.splice(siblings.indexOf(this), 1);
+      this.parentElement = null;
     },
     replaceChildren(...nodes) {
       this.children = [...nodes];
@@ -807,6 +820,60 @@ test("creation suite queue renders selectable active and queued suites", () => {
     assert.equal(strip.children[1].children[2].textContent, "0/4");
     assert.equal(strip.children[2].children[0].textContent, "三 - Completed");
     assert.equal(strip.children[2].children[1].textContent, "已完成");
+  } finally {
+    globalThis.document = originalDocument;
+  }
+});
+
+test("600 queued images reuse buttons and normalized display data over 100 unchanged refreshes", () => {
+  const originalDocument = globalThis.document;
+  let created = 0;
+  let normalized = 0;
+  globalThis.document = { createElement(tag) { created += 1; return createFakeElement(tag); } };
+  try {
+    const strip = createFakeElement("div");
+    const queueJobs = Array.from({ length: 30 }, (_, index) => ({
+      id: `queue-${index}`, status: index === 29 ? "running" : "completed",
+      set: { productName: `商品 ${index}`, status: index === 29 ? "generating" : "completed",
+        items: Array.from({ length: 20 }, (_, item) => ({ itemId: `item-${item}`, status: "completed" })) },
+    }));
+    const options = {
+      strip, queueJobs, selectedQueueId: "queue-29",
+      normalizeSet(set) { normalized += 1; return normalizeSet(set); },
+      getProgressSummary: (set) => ({ total: set.items.length, completed: set.items.filter((item) => item.status === "completed").length }),
+      getStatusLabel: (value) => value,
+    };
+    renderCreationQueueStrip(options);
+    const original = [...strip.children];
+    assert.equal(created, 120);
+    assert.equal(normalized, 30);
+    created = 0;
+    normalized = 0;
+    for (let index = 0; index < 100; index += 1) renderCreationQueueStrip(options);
+    assert.equal(created, 0);
+    assert.equal(normalized, 0);
+    assert.deepEqual(strip.children, original);
+
+    options.selectedQueueId = "queue-0";
+    renderCreationQueueStrip(options);
+    assert.equal(strip.children[0].attributes["aria-pressed"], "true");
+    assert.equal(strip.children[29].classList.contains("is-selected"), false);
+    queueJobs[29].status = "failed";
+    queueJobs[29].set = { ...queueJobs[29].set, status: "failed", items: [{ itemId: "failed", status: "failed" }] };
+    renderCreationQueueStrip(options);
+    assert.equal(normalized, 1);
+    assert.equal(strip.children[29].children[1].textContent, "失败");
+    assert.equal(strip.children[29].children[2].textContent, "0/1");
+    assert.equal(created, 0);
+
+    options.queueJobs = [queueJobs[29], queueJobs[0]];
+    renderCreationQueueStrip(options);
+    assert.deepEqual(strip.children, [original[29], original[0]]);
+    assert.equal(strip.children[0].children[0].textContent, "一 - 商品 29");
+    options.queueJobs = [];
+    renderCreationQueueStrip(options);
+    assert.equal(strip.children.length, 0);
+    assert.equal(strip.classList.contains("hidden"), true);
   } finally {
     globalThis.document = originalDocument;
   }

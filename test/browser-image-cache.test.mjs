@@ -2,11 +2,29 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  getCardThumbnailUrl,
   getThumbnailUrl,
   isServerImageProxyUrl,
   mergeServerAndBrowserGalleryItems,
   normalizeBrowserCachedGalleryItem,
 } from "../lib/browser-image-cache.mjs";
+
+test("saved local suite cards use bounded thumbnails and keep originals for full preview", () => {
+  const item = { imageUrl: "/output/套图/source.png", thumbnailUrl: "/output/套图/source.png", relativePath: "套图/source.png", updatedAt: "2026-11-01" };
+  const url = new URL(getCardThumbnailUrl(item), "http://localhost");
+  assert.equal(url.pathname, "/api/gallery/thumbnail");
+  assert.equal(url.searchParams.get("path"), item.relativePath);
+  assert.equal(url.searchParams.get("v"), item.updatedAt);
+  assert.equal(item.imageUrl, "/output/套图/source.png");
+});
+
+test("card thumbnails preserve explicit thumbnails, streamed previews and remote assets", () => {
+  for (const imageUrl of ["data:image/png;base64,YQ==", "blob:preview", "https://example.com/image.png", "/api/images/remote.png"]) {
+    assert.equal(getCardThumbnailUrl({ imageUrl, relativePath: "source.png" }), imageUrl);
+  }
+  assert.equal(getCardThumbnailUrl({ imageUrl: "/output/original.png", thumbnailUrl: "/thumb.webp", relativePath: "original.png" }), "/thumb.webp");
+  assert.equal(getCardThumbnailUrl({ imageUrl: "/output/original.png" }), "/output/original.png");
+});
 
 test("browser image cache retains background metadata without guessing for old records", () => {
   for (const imageBackground of ["transparent", "opaque", undefined]) {

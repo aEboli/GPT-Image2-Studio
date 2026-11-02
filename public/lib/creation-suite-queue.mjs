@@ -669,6 +669,8 @@ export function buildCreationQueuedRepairFormData(job = {}, {
   return formData;
 }
 
+const queueStripRows = new WeakMap();
+
 export function renderCreationQueueStrip({
   strip,
   queueJobs = [],
@@ -682,40 +684,63 @@ export function renderCreationQueueStrip({
     return;
   }
 
-  strip.replaceChildren();
+  let rows = queueStripRows.get(strip);
+  if (!rows) {
+    rows = new Map();
+    queueStripRows.set(strip, rows);
+  }
   strip.classList.toggle("hidden", queueJobs.length === 0);
-  if (queueJobs.length === 0) {
-    return;
+  const retainedIds = new Set(queueJobs.map((job) => job.id));
+  for (const [id, row] of rows) {
+    if (!retainedIds.has(id)) {
+      row.button.remove();
+      rows.delete(id);
+    }
   }
 
   queueJobs.forEach((job, index) => {
-    const set = normalizeSet(job.set || {});
-    const progress = getProgressSummary(set);
+    let row = rows.get(job.id);
+    if (!row) {
+      const button = document.createElement("button");
+      button.className = "creation-queue-item";
+      button.type = "button";
+      button.dataset.creationQueueId = job.id;
+      const label = document.createElement("strong");
+      label.className = "creation-queue-label";
+      const status = document.createElement("span");
+      status.className = "creation-queue-status";
+      const meta = document.createElement("small");
+      button.append(label, status, meta);
+      row = { button, label, status, meta };
+      rows.set(job.id, row);
+    }
+    // 生成、补图和载入记录都替换 set；仅切换选择或收到别套心跳时复用摘要。
+    if (!row.set || row.sourceSet !== job.set || row.normalizeSet !== normalizeSet || row.getProgressSummary !== getProgressSummary) {
+      row.sourceSet = job.set;
+      row.normalizeSet = normalizeSet;
+      row.getProgressSummary = getProgressSummary;
+      row.set = normalizeSet(job.set || {});
+      row.progress = getProgressSummary(row.set);
+    }
+    const { button, label, status, meta, set, progress } = row;
     const isActive = job.status === "running";
     const queueLabel = formatCreationQueueLabel(index + 1, set.productName);
-
-    const button = document.createElement("button");
-    button.className = "creation-queue-item";
-    button.type = "button";
-    button.title = `${queueLabel} · ${getStatusLabel(set.status)} ${progress.completed}/${progress.total}`;
-    button.dataset.creationQueueId = job.id;
-    button.classList.toggle("is-active", isActive);
-    button.classList.toggle("is-selected", selectedQueueId === job.id || (!selectedQueueId && isActive));
-    button.setAttribute("aria-pressed", String(selectedQueueId === job.id));
-
-    const label = document.createElement("strong");
-    label.className = "creation-queue-label";
-    label.textContent = queueLabel;
-
-    const status = document.createElement("span");
-    status.className = "creation-queue-status";
-    status.textContent = getCreationQueueStatusText(job, isActive);
-
-    const meta = document.createElement("small");
-    meta.textContent = `${progress.completed}/${progress.total}`;
-
-    button.append(label, status, meta);
-    strip.appendChild(button);
+    const statusText = getCreationQueueStatusText(job, isActive);
+    const title = `${queueLabel} · ${getStatusLabel(set.status)} ${progress.completed}/${progress.total}`;
+    const isSelected = selectedQueueId === job.id || (!selectedQueueId && isActive);
+    const signature = JSON.stringify([queueLabel, title, statusText, isActive, isSelected, selectedQueueId === job.id]);
+    if (row.signature !== signature) {
+      row.signature = signature;
+      button.title = title;
+      button.classList.toggle("is-active", isActive);
+      button.classList.toggle("is-selected", isSelected);
+      button.setAttribute("aria-pressed", String(selectedQueueId === job.id));
+      if (label.textContent !== queueLabel) label.textContent = queueLabel;
+      if (status.textContent !== statusText) status.textContent = statusText;
+      const progressText = `${progress.completed}/${progress.total}`;
+      if (meta.textContent !== progressText) meta.textContent = progressText;
+    }
+    if (strip.children[index] !== button) strip.insertBefore(button, strip.children[index] || null);
   });
 }
 

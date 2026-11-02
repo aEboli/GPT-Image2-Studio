@@ -16,13 +16,14 @@ import { createMorph as createHeartbeatMorph } from "/lib/vendor/morphicons/dom.
 import { beatCreationCardHeartbeat, createCreationCardLoading as createCreationCardLoadingShell, getCreationCardDomKey, getCreationCardLoadingKey, syncCreationLoadingCard, syncCreationResultGrid as syncCreationResultGridShell } from "/lib/creation-card-loading.mjs";
 import { createCreationCardIdleRippleController } from "/lib/creation-card-idle-ripple.mjs?v=20260725-creation-card-idle-ripple-1";
 import { createDisabledShakeController } from "/lib/disabled-shake.mjs";
+import { createDeferredUpdate } from "/lib/deferred-update.mjs";
 import { createFilmstripRevealTracker, renderFilmstripPreservingSelection, syncFilmstripSelectedMarker } from "/lib/filmstrip-selection.mjs?v=20260829-filmstrip-selection-1";
 import { isGenerationRequestRetryMessage, } from "/lib/generation-request-retry.mjs";
 import { cancelQueuedGenerationJob, getGenerationJobMode, getQueuedGenerationJobCount, getRunningGenerationJobCount, isQueuedGenerationJob, selectNextQueuedGenerationJobsByMode } from "/lib/generation-queue.mjs?v=20260821-prompt-global-queue-1";
 import { buildCanceledGenerationActivityDetail, buildGenerationTaskActivityDetail, buildGenerationTaskStatusText, formatGenerationActivityModeLabel, getGenerationActivityDisplayText, hasHeartbeatPrefix, sanitizeGenerationActivityDetail } from "/lib/generation-activity-feed.mjs?v=20260829-heartbeat-morph-1";
 import { GENERATION_LOG_ALL_CHANNELS, GENERATION_LOG_CHANNELS, createGenerationLogStore, getGenerationLogAllEntries, getGenerationLogChannelEntries, getGenerationLogChannelLabel, getGenerationLogGroupItemDetail, normalizeGenerationLogChannel, normalizeGenerationLogRelayUrl, parseGenerationLogStore, serializeGenerationLogStore, upsertGenerationLogEntry, upsertGenerationLogGroupEntry } from "/lib/generation-log-store.mjs?v=20260828-generation-log-partition-1";
 import { readGenerationLogChannelTabValue, readGenerationLogGroupToggleId, renderGenerationLogChannelTabs, renderGenerationLogRows, toggleGenerationLogGroup } from "/lib/generation-log-panel.mjs?v=20261016-compact-log-rows-1";
-import { CREATION_STREAM_EVENTS, GENERATION_STREAM_EVENTS, clearFinalImageChunks, recordFinalImageChunk, recordPartialImageChunk } from "/lib/generation-stream-protocol.mjs";
+import { CREATION_STREAM_EVENTS, GENERATION_STREAM_EVENTS, buildFinalImageChunkKey, clearFinalImageChunks, recordFinalImageChunk, recordPartialImageChunk } from "/lib/generation-stream-protocol.mjs";
 import { mergeCreationItemStreamUpdate, mergeCreationSetPreviews, shouldRetainCompletedCreationItem } from "/lib/creation-preview-retention.mjs";
 import {
   PROMPT_ATTEMPT_KIND,
@@ -52,12 +53,12 @@ import { createCreationTemuExportController } from "/lib/creation-temu-export-ui
 import { createTemuWorkbenchLauncher } from "/lib/temu-workbench-launcher.mjs";
 import { createAssetRecordDeleteController } from "/lib/asset-record-delete-controller.mjs?v=20260722-asset-record-delete-1";
 import { createAssetRecordTimeFilterController, getArticleRecordSearchText, getPortraitRecordSearchText } from "/lib/asset-record-time-filter-controller.mjs?v=20260724-asset-record-time-filter-controller-1";
-import { buildCreationRecordTimeFilterOptions, filterCreationRecordSetsByTime, formatCreationRecordTimeFilterLabel, hasActiveCreationRecordTimeFilter, normalizeCreationRecordDateFilter, normalizeCreationRecordTimeFilter } from "/lib/creation-record-filter.mjs?v=20260722-creation-record-time-filter-1";
+import { buildCreationRecordTimeFilterOptions, filterCreationRecordSetsByFailure, filterCreationRecordSetsByTime, formatCreationRecordFailureFilterLabel, formatCreationRecordTimeFilterLabel, hasActiveCreationRecordFailureFilter, hasActiveCreationRecordTimeFilter, normalizeCreationRecordDateFilter, normalizeCreationRecordFailureFilter, normalizeCreationRecordTimeFilter } from "/lib/creation-record-filter.mjs?v=20261102-severe-creation-filter-1";
 import { buildCreationRecordListModel, createCreationRecordListState, loadMoreCreationRecordListState } from "/lib/creation-record-list-model.mjs?v=20260807-creation-record-split-workspace-1";
 import { createCreationRecordListRow } from "/lib/creation-record-list-view.mjs?v=20260807-creation-record-split-workspace-1";
 import { ensureLazyViewModule, getMountedLazyViewModule } from "/lib/view-mode-loader.mjs?v=20261016-remove-workbench-1";
 import { appendBrowserConfigToFormData, getBrowserPrivateConfigRequestPayload, getOrCreateClientSessionId, readBrowserPrivateConfig, restoreDesktopBrowserConfig, saveBrowserPrivateConfig, toPublicBrowserConfig } from "/lib/browser-config.mjs";
-import { cacheBrowserGalleryItem, clearBrowserImageCache, dataUrlToBlob, deleteBrowserCachedGalleryItem, fetchServerImageAsDataUrl, getBrowserCachedImageData, getImageUrl, getServerImageUrl, getServerThumbnailUrl, getThumbnailUrl, isCacheableBrowserImageUrl, mergeServerAndBrowserGalleryItems, readBrowserCachedGalleryItems } from "/lib/browser-image-cache.mjs";
+import { cacheBrowserGalleryItem, clearBrowserImageCache, dataUrlToBlob, deleteBrowserCachedGalleryItem, fetchServerImageAsDataUrl, getBrowserCachedImageData, getCardThumbnailUrl, getImageUrl, getServerImageUrl, getServerThumbnailUrl, getThumbnailUrl, isCacheableBrowserImageUrl, mergeServerAndBrowserGalleryItems, readBrowserCachedGalleryItems } from "/lib/browser-image-cache.mjs";
 import { createImageEditShellBridge } from "/lib/image-edit-shell-bridge.mjs";
 import { createCreationLogoLibraryController } from "/lib/creation-logo-library.mjs";
 import { consumeSse, requestGenerationStream } from "/lib/generation-client.mjs";
@@ -73,6 +74,7 @@ import {
 import { createLightboxImageViewer, createLightboxViewerState } from "/lib/lightbox-image-viewer.mjs";
 import { createAssetWorkspaceController } from "/lib/asset-workspace.mjs";
 import { clearImageReveal, setImageRevealSource } from "/lib/image-reveal.mjs";
+import { setViewportImageSource } from "/lib/viewport-image.mjs";
 import { createPreviewKeyboardNavigationController } from "/lib/preview-keyboard-navigation.mjs";
 import { createProductImageImportController } from "/lib/product-image-import-controller.mjs";
 import {
@@ -107,7 +109,7 @@ import { bindCreationReferenceDrag, reorderCreationReferenceFiles } from "/lib/c
 import { isCreationSubjectReferenceRole } from "/lib/creation-reference-roles.mjs";
 import { applyCreationReferenceCoverageRolePlan, normalizeCreationCoverageFields, toggleCreationSelectedRoles } from "/lib/creation-reference-coverage.mjs?v=20260703-latest-restore-1";
 import { applyCreationReferenceAnalysisProductNameValue, buildCreationReferenceAnalysisAppliedFeedbackMessage, buildCreationReferenceAnalysisCategoryMatchText, getCreationReferenceAnalysisCategoryProductName, getCreationReferenceAnalysisDisplayRoleLabel, getCreationReferenceAnalysisGroupedSubjectUnitCount, getCreationReferenceAnalysisRoleCorrectionReason, getCreationReferenceAnalysisSubjectUnitResolution, normalizeCreationReferenceAnalysisUnitCountNote, resolveCreationReferenceAnalysisCategoryValue, resolveCreationReferenceAnalysisContextCategoryValue, shouldDowngradeReferenceProductAnalysisRole } from "/lib/creation-reference-analysis-view.mjs?v=20261024-pair-unit-1";
-import { createCreationListingController, getCreationRecordListingMetaLabel, getCreationListingSearchValues, normalizeCreationListingDraftForView, renderCreationListingDrafts } from "/lib/creation-listing-view.mjs";
+import { createCreationListingController, getCreationRecordListingMetaLabel, getCreationListingSearchValues, normalizeCreationListingDraftForView, renderCreationListingDrafts } from "/lib/creation-listing-view.mjs?v=20261102-listing-german-1";
 import { getCreationItemDisplayTitle, getCreationMarketingDisplayItems } from "/lib/creation-item-display.mjs";
 import { getCreationAutoRepairNotice, getCreationAutoRepairableItems, getCreationCompletionFeedback, getCreationIncompleteItems, shouldAutoRepairCreationSet } from "/lib/creation-auto-repair.mjs?v=20260829-generation-schedule-1";
 import { getRequeueNotice } from "/lib/generation-item-retry.mjs";
@@ -115,7 +117,7 @@ import { CREATION_MARKETING_BATCH_CONCURRENCY, canContinueCreationMarketingBatch
 import { canRepairCreationItem as canRepairCreationItemFromQueue, getCreationRepairButtonText as getCreationRepairButtonTextFromQueue, isCreationItemRepairActive as isCreationItemRepairActiveInQueue, queueCreationItemRepair as queueCreationItemRepairInState, removeQueuedCreationItemRepair, shiftNextQueuedCreationItemRepair } from "/lib/creation-item-repair-queue.mjs";
 import { cloneCreationPlanValue, createCreationPlanPreviewRequestCoordinator, createCreationPlatformPayloadSnapshot, deepFreezeCreationPlanValue, formatCreationPlanWarning, getCreationCompatibleImageTypeState, getCreationEditablePlanDisplayCounts, getCreationSetPlanSource, getVisibleCreationPlanWarnings, mergeCreationPlatformSetParameters, resolveCreationDisplayedPlanContext, resolveCreationPlatformImageCountState, resolveCreationSelectedRolesSubmission, shouldDisableCreationGenerateButton, updateCreationPlatformItemOverride } from "/lib/creation-browser-plan-state.mjs";
 import { normalizeCreationModuleEnabled, resolveCreationPlanCounts } from "/lib/creation-plan-counts.mjs";
-import { buildCreationQueuedRepairFormData, buildCreationQueuedSet as buildCreationQueuedSetFromState, createCreationQueueJob, getActiveCreationQueueJob as getActiveCreationQueueJobFromState, getCreationQueueJobs as getCreationQueueJobsFromState, getCreationRepairTargetSet as getCreationRepairTargetSetFromState, getPendingCreationQueueCount as getPendingCreationQueueCountFromState, getSelectedCreationQueueJob as getSelectedCreationQueueJobFromState, renderCreationQueueStrip as renderCreationQueueStripView, runCreationQueuedJob as runCreationQueuedJobFromQueue, scheduleCreationGenerationQueue as scheduleCreationGenerationQueueFromState, selectCreationQueueJob as selectCreationQueueJobInState, shouldSyncCreationQueueJobCurrentSet, syncActiveCreationQueueSet as syncActiveCreationQueueSetInState } from "/lib/creation-suite-queue.mjs?v=20261031-dual-concurrency-1";
+import { buildCreationQueuedRepairFormData, buildCreationQueuedSet as buildCreationQueuedSetFromState, createCreationQueueJob, getActiveCreationQueueJob as getActiveCreationQueueJobFromState, getCreationQueueJobs as getCreationQueueJobsFromState, getCreationRepairTargetSet as getCreationRepairTargetSetFromState, getPendingCreationQueueCount as getPendingCreationQueueCountFromState, getSelectedCreationQueueJob as getSelectedCreationQueueJobFromState, renderCreationQueueStrip as renderCreationQueueStripView, runCreationQueuedJob as runCreationQueuedJobFromQueue, scheduleCreationGenerationQueue as scheduleCreationGenerationQueueFromState, selectCreationQueueJob as selectCreationQueueJobInState, shouldSyncCreationQueueJobCurrentSet, syncActiveCreationQueueSet as syncActiveCreationQueueSetInState } from "/lib/creation-suite-queue.mjs?v=20261102-creation-render-1";
 import { DEFAULT_PORTRAIT_ACCESSORY_ASSETS, PORTRAIT_ACCESSORY_ASSET_CATEGORIES, getPortraitAccessoryAssetFileDescriptor } from "/lib/portrait-accessory-assets.mjs?v=20260528-portrait-assets-sort-1";
 import { createDefaultPortraitLocationState, createPortraitLocationSelectorController } from "/lib/portrait-location-selector.mjs?v=20260527-portrait-location-1";
 import { getLegacyPromptAgentTemplatePrompt, getPromptAgentDisplayName, getPromptAgentTemplateDisplayName, isStructuredImagePromptJson } from "/lib/prompt-agent-display-name.mjs?v=20261024-prompt-name-anchor-1";
@@ -725,6 +727,7 @@ const state = {
     recordQuery: "",
     recordTimeFilter: "all",
     recordDateFilter: "",
+    recordFailureFilter: "all",
     recordCheckedSetIds: [],
     recordDeleteBusy: false,
     recordDeleteRequest: null,
@@ -2025,6 +2028,11 @@ function writeGenerationLogStore() {
     // Ignore storage quota or privacy-mode failures; the in-memory log still works.
   }
 }
+const generationLogUpdates = createDeferredUpdate(() => {
+  writeGenerationLogStore();
+  if (!document.hidden && refs.configDrawer?.classList.contains("open")) renderTimeline();
+}, { delayMs: 250 });
+
 function readGalleryMetadataCache() {
   try {
     const raw = window.localStorage.getItem(GALLERY_METADATA_CACHE_KEY);
@@ -2530,6 +2538,7 @@ function setDrawerOpen(open) {
     // The drawer can be opened after a generation already started, so reflect
     // the lock on open instead of only when generation state changes.
     syncGenerationSchedulingLock();
+    if (!generationLogUpdates.flush()) renderTimeline();
     focusOverlayTarget(refs.closeConfigButton);
   } else {
     restoreOverlayTriggerFocus("config");
@@ -6662,8 +6671,7 @@ function recordActivity({ channel, key, title, detail, ratio, size, modeLabel, i
     relayUrl: normalizeGenerationLogRelayUrl(relayUrl),
     status, at: at || nowIso(), generationStartedAt, generationCompletedAt,
   });
-  writeGenerationLogStore();
-  renderTimeline();
+  generationLogUpdates.schedule();
 }
 
 /* 批量板块一个批次一条组行：子条目按图写入，组行汇总由子条目实时推导。 */
@@ -6677,8 +6685,7 @@ function recordGroupActivity({ channel, groupId, groupLabel, groupUnit, groupIte
     modeLabel, imageUrl, relayUrl: normalizeGenerationLogRelayUrl(relayUrl),
     at: at || nowIso(), generationStartedAt, generationCompletedAt,
   });
-  writeGenerationLogStore();
-  renderTimeline();
+  generationLogUpdates.schedule();
 }
 
 async function copyLightboxPrompt() {
@@ -7262,9 +7269,7 @@ function syncFilmstripMedia(button, item, key = "") {
     existingLoading?.remove();
     existingGhost?.remove();
     const image = existingImage || document.createElement("img");
-    if (image.getAttribute("src") !== imageUrl) {
-      image.src = imageUrl;
-    }
+    setViewportImageSource(image, imageUrl);
     image.alt = getDisplayPrompt(item);
     image.loading = "lazy";
     if (!existingImage) {
@@ -7496,7 +7501,7 @@ function createRecentOutputItem(item) {
   });
 
   const image = document.createElement("img");
-  image.src = getThumbnailUrl(item);
+  setViewportImageSource(image, getThumbnailUrl(item));
   image.alt = getDisplayPrompt(item);
   image.loading = "lazy";
   button.appendChild(image);
@@ -7578,7 +7583,7 @@ function createGalleryTile(item) {
   });
 
   const image = document.createElement("img");
-  image.src = getThumbnailUrl(item);
+  setViewportImageSource(image, getThumbnailUrl(item));
   image.alt = filename === "图片" ? "生成图片" : `生成图片 ${filename}`;
   image.loading = "lazy";
   button.appendChild(image);
@@ -10420,7 +10425,7 @@ function resetCreationDraftPreview() {
   state.creation.draftSet = null;
   state.creation.effectivePlan = null;
   state.creation.planDirty = true;
-  if (!state.creation.generating && !state.creation.planning) {
+  if (!state.creation.generating && isCreationDraftSet(state.creation.currentSet)) {
     state.creation.currentSet = null;
   }
   renderCreationView();
@@ -12235,6 +12240,7 @@ function syncCreationExplicitSetParameters(parameters = {}) {
 
 function refreshCreationPlanAfterExplicitSetParameterChange(parameters = {}) {
   syncCreationExplicitSetParameters(parameters);
+  if (isCreationAiMarketingEnabled()) return;
   if (!hasCreationPlanPreviewInput()) return;
   requestCreationPlanPreview().catch((error) => setCreationFeedback(error.message, "error"));
 }
@@ -12355,6 +12361,7 @@ function renderCreationRecordDetail(set) {
   heading.textContent = "分析师分析";
   const meta = document.createElement("span");
   meta.className = "creation-analyst-meta";
+  meta.dataset.creationAnalystProgress = String(hasAnalysis);
   meta.textContent = hasAnalysis
     ? `依据：参考图与商品资料 · 已完成 ${progress.completed}/${progress.total}`
     : "当前记录未保存参考图分析结果";
@@ -12451,7 +12458,7 @@ function upsertCreationSet(set) {
     state.creation.currentSet = normalized;
   }
   syncActiveCreationQueueSet(normalized);
-  renderCreationRecordView();
+  if (state.activeView === "creationRecord") renderCreationRecordView();
 
   return normalized;
 }
@@ -12519,7 +12526,7 @@ function upsertCreationSetForStream(set, { queueJob } = {}) {
     if (shouldSyncCreationQueueJobCurrentSet(state.creation, queueJob)) {
       state.creation.currentSet = normalized;
     }
-    renderCreationRecordView();
+    if (state.activeView === "creationRecord") renderCreationRecordView();
     return normalized;
   }
 
@@ -12684,7 +12691,7 @@ function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
     image.loading = "lazy";
     image.decoding = "async";
     image.alt = getCreationItemDisplayTitle(item, `套图 ${fallbackIndex + 1}`);
-    image.src = imageUrl;
+    setViewportImageSource(image, getCardThumbnailUrl(item));
     media.appendChild(image);
   } else {
     const placeholder = document.createElement("span");
@@ -12755,6 +12762,18 @@ function syncCreationResultGrid(items = [], { showActions = true, keyScope = "",
     grid: refs.creationResultGrid,
     items,
     createCard: (item, index, options) => createCreationCard(item, index, options),
+    getCardVersion: (item, index, options) => {
+      if (shouldShowCreationCardLoading(item, false) || isCacheableBrowserImageUrl(getImageUrl(item))) return "";
+      const hideDetails = shouldHideCreationCardDetails(item);
+      const hasActions = showActions && !hideDetails && item.status !== "missing";
+      return JSON.stringify([
+        index, options, item.itemId, item.slotIndex, item.role, item.imageType, item.title,
+        item.status, getCreationItemStatusLabel(item), getImageUrl(item), getCardThumbnailUrl(item),
+        item.relativePath, item.filename, item.storageKey,
+        item.error, item.evidenceBlocked, item.evidenceRequirement, item.marketingAssignment?.sourceIndex,
+        hideDetails, hasActions && canRepairCreationItem(item.itemId), hasActions && getCreationRepairButtonText(item),
+      ]);
+    },
     getItemOptions: (item, _index, { firstSkuItem, firstInfographicRebuildItem }) => ({
       showActions,
       keyScope,
@@ -12830,10 +12849,21 @@ function getCreationRecordTimeFilterSnapshot() {
   return { window, date };
 }
 
+function getCreationRecordFailureFilterSnapshot() {
+  const filter = normalizeCreationRecordFailureFilter(state.creation.recordFailureFilter);
+  state.creation.recordFailureFilter = filter;
+  return filter;
+}
+
 function filterCreationRecordSets() {
-  return filterCreationRecordSetsByTime(
+  const timeFilteredSets = filterCreationRecordSetsByTime(
     getCreationRecordKeywordMatchedSets(),
     getCreationRecordTimeFilterSnapshot(),
+  );
+  return filterCreationRecordSetsByFailure(
+    timeFilteredSets,
+    getCreationRecordFailureFilterSnapshot(),
+    getCreationProgressSummary,
   );
 }
 
@@ -12855,7 +12885,8 @@ function toggleCreationRecordSelectAll() {
 function hasCreationRecordActiveFilters() {
   return Boolean(
     String(state.creation.recordQuery || "").trim() ||
-      hasActiveCreationRecordTimeFilter(getCreationRecordTimeFilterSnapshot()),
+      hasActiveCreationRecordTimeFilter(getCreationRecordTimeFilterSnapshot()) ||
+      hasActiveCreationRecordFailureFilter(getCreationRecordFailureFilterSnapshot()),
   );
 }
 
@@ -12863,8 +12894,10 @@ function getCreationRecordFilterLabel() {
   const labels = [];
   const query = String(state.creation.recordQuery || "").trim();
   const timeLabel = formatCreationRecordTimeFilterLabel(getCreationRecordTimeFilterSnapshot());
+  const failureLabel = formatCreationRecordFailureFilterLabel(getCreationRecordFailureFilterSnapshot());
   if (query) labels.push(`关键词：${query}`);
   if (timeLabel) labels.push(`时间：${timeLabel}`);
+  if (failureLabel) labels.push(`结果：${failureLabel}（成功不足 10 张）`);
   return labels.join("、");
 }
 
@@ -12890,6 +12923,28 @@ function renderCreationRecordTimeFilters(keywordMatchedSets = getCreationRecordK
     });
     refs.creationRecordTimeFilters.appendChild(button);
   });
+
+  const severeFailureSets = filterCreationRecordSetsByFailure(
+    filterCreationRecordSetsByTime(keywordMatchedSets, filters),
+    "severe",
+    getCreationProgressSummary,
+  );
+  const failureFilter = getCreationRecordFailureFilterSnapshot();
+  const failureButton = document.createElement("button");
+  failureButton.type = "button";
+  failureButton.className = "toolbar-button creation-record-time-filter";
+  failureButton.dataset.creationRecordSevereFailureFilter = "true";
+  failureButton.setAttribute("aria-pressed", String(failureFilter === "severe"));
+  failureButton.title = "仅显示生成已结束、计划至少 10 张且成功少于 10 张的套图";
+  failureButton.textContent = `严重失败 · ${severeFailureSets.length}`;
+  failureButton.addEventListener("click", () => {
+    state.creation.recordFailureFilter = failureFilter === "severe" ? "all" : "severe";
+    state.creation.recordDetailExpanded = false;
+    state.creation.recordListScrollTop = 0;
+    if (refs.creationRecordSetList) refs.creationRecordSetList.scrollTop = 0;
+    renderCreationRecordView();
+  });
+  refs.creationRecordTimeFilters.appendChild(failureButton);
 }
 
 function getCreationRecordSelectedSet() {
@@ -13275,6 +13330,7 @@ function getCreationRecordListFilterSignature() {
     String(state.creation.recordQuery || "").trim().toLowerCase(),
     filters.window,
     filters.date,
+    getCreationRecordFailureFilterSnapshot(),
   ]);
 }
 
@@ -13731,7 +13787,9 @@ function updateCreationReferenceRole(referenceId, role) {
         : item;
   });
   syncCreationReferenceGenerationCompressionProfiles();
-  markCreationReferenceAnalysisDirty({ invalidateCategorySuggestion: false });
+  if (state.creationReferenceAnalysis.applied && !state.creationReferenceAnalysis.dirty) {
+    refreshCreationAppliedReferencePlanningSignals();
+  }
   resetCreationDraftPreview();
   renderCreationReferenceGrid();
 }
@@ -14979,6 +15037,10 @@ async function waitForPendingCreationPlanPreview() {
 }
 
 function refreshCreationPlanAfterSkuGenerationToggle() {
+  if (isCreationAiMarketingEnabled()) {
+    resetCreationDraftPreview();
+    return;
+  }
   state.creation.planDirty = true;
   renderCreationView();
   if (!hasCreationPlanPreviewInput()) return;
@@ -15095,6 +15157,7 @@ function renderCreationPlatformPlan() {
 
 function renderCreationView() {
   syncGenerationSchedulingLock();
+  creationProgressUpdates.cancel();
   if (!refs.creationResultGrid) {
     return;
   }
@@ -15191,6 +15254,64 @@ function renderCreationView() {
     logGroupId: currentSet?.setId || "",
   });
   renderCreationListingDrafts({ refs: getCreationInlineListingRefs(), state, set: currentSet });
+  flushCreationCardHeartbeats();
+}
+
+const creationCardHeartbeats = new Map();
+const creationProgressUpdates = createDeferredUpdate(renderCreationProgressView);
+
+function scheduleCreationProgressRender(context = {}, { immediate = false, heartbeatItemId = "" } = {}) {
+  if (heartbeatItemId) {
+    const queueId = context.queueJob?.id || "";
+    creationCardHeartbeats.set(`${queueId}::${heartbeatItemId}`, {
+      itemId: heartbeatItemId, queueId, setId: context.queueJob?.set?.setId || state.creation.currentSet?.setId || "",
+    });
+  }
+  creationProgressUpdates.schedule();
+  if (immediate) creationProgressUpdates.flush();
+}
+
+function flushCreationCardHeartbeats() {
+  const selectedJob = getSelectedCreationQueueJob();
+  const setId = selectedJob?.set?.setId || state.creation.currentSet?.setId || "";
+  if (!document.hidden && state.activeView === "creation") {
+    for (const heartbeat of creationCardHeartbeats.values()) {
+      if (heartbeat.queueId ? heartbeat.queueId === selectedJob?.id : !selectedJob && heartbeat.setId === setId) {
+        beatCreationCardHeartbeat(refs.creationResultGrid, heartbeat.itemId);
+      }
+    }
+  }
+  creationCardHeartbeats.clear();
+}
+
+function renderCreationProgressView() {
+  syncGenerationSchedulingLock();
+  if (!refs.creationResultGrid || document.hidden || state.activeView !== "creation") {
+    creationCardHeartbeats.clear();
+    return;
+  }
+  const selectedQueueJob = isCreationLogoBatchBranch() ? null : getSelectedCreationQueueJob();
+  const currentSet = getCreationDisplayedSet();
+  if (!currentSet) return;
+  const progress = getCreationProgressSummary(currentSet);
+  refs.creationProgressText.textContent = `${progress.completed} / ${progress.total}${progress.skipped ? ` · 跳过 ${progress.skipped}` : ""}`;
+  const analystMeta = refs.creationRecordDetail?.querySelector('[data-creation-analyst-progress="true"]');
+  if (analystMeta) {
+    const text = `依据：参考图与商品资料 · 已完成 ${progress.completed}/${progress.total}`;
+    if (analystMeta.textContent !== text) analystMeta.textContent = text;
+  }
+  renderCreationQueueStrip();
+  const loadingKeyScope = state.creation.generationScope === "logo-batch" && state.creation.logoBatchLoadingKey
+    ? state.creation.logoBatchLoadingKey : selectedQueueJob?.id || currentSet.setId || "";
+  syncCreationResultGrid(getCreationMarketingDisplayItems(currentSet), {
+    showActions: !selectedQueueJob, keyScope: loadingKeyScope, logGroupId: currentSet.setId || "",
+  });
+  const incompleteItems = getCreationIncompleteItems(currentSet);
+  if (refs.creationRepairFailedButton) {
+    refs.creationRepairFailedButton.disabled = state.creation.generating || !canRepairCreationSet(currentSet) || incompleteItems.length === 0;
+    refs.creationRepairFailedButton.textContent = incompleteItems.length > 0 ? `补齐未完成项 ${incompleteItems.length}` : "补齐未完成项";
+  }
+  flushCreationCardHeartbeats();
 }
 
 function isCreationAiMarketingEnabled() { return refs.creationAiMarketingEnabledInput?.checked === true; }
@@ -15649,7 +15770,7 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
     updateCreationStreamItem(payload.itemId, itemPatch, context);
     setCreationFeedback(`正在生成 ${payload.role || payload.itemId}。`, "busy");
     recordCreationLogEvent({ setId: payload.setId, itemId: payload.itemId, status: "active", detail: "正在生成图片", context });
-    renderCreationView();
+    scheduleCreationProgressRender(context);
     return;
   }
 
@@ -15661,7 +15782,7 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
         updatedAt: nowIso(),
       }, context);
       setCreationFeedback(payload.message || "缺少商品依据，已跳过生成。", "success");
-      renderCreationView();
+      scheduleCreationProgressRender(context, { immediate: true });
       return;
     }
     const itemPatch = {
@@ -15682,12 +15803,10 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
       detail: buildGenerationTaskActivityDetail({ statusStage: payload.stage, statusText: payload.message, fallback: "正在生成图片" }),
       context,
     });
-    renderCreationView();
-    /* 心跳的回执是图标变形，不是文字。必须放在 renderCreationView 之后：
-       卡片可能刚被这次渲染建出来，先变形会落在一个还不存在的壳上。 */
-    if (hasHeartbeatPrefix(payload.message)) {
-      beatCreationCardHeartbeat(refs.creationResultGrid, payload.itemId);
-    }
+    // 心跳随合并刷新一起执行，确保卡片已存在且属于当前显示的套图。
+    scheduleCreationProgressRender(context, {
+      heartbeatItemId: hasHeartbeatPrefix(payload.message) ? payload.itemId : "",
+    });
     return;
   }
 
@@ -15700,7 +15819,7 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
     };
     if (!shouldApplyCreationStreamItemUpdate(payload.itemId, itemPatch, context)) return;
     updateCreationStreamItem(payload.itemId, itemPatch, context);
-    renderCreationView();
+    scheduleCreationProgressRender(context);
     return;
   }
 
@@ -15715,7 +15834,7 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
       };
       if (!shouldApplyCreationStreamItemUpdate(payload.itemId, itemPatch, context)) return;
       updateCreationStreamItem(payload.itemId, itemPatch, context);
-      renderCreationView();
+      scheduleCreationProgressRender(context);
     }
     return;
   }
@@ -15731,7 +15850,7 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
       };
       if (!shouldApplyCreationStreamItemUpdate(payload.itemId, itemPatch, context)) return;
       updateCreationStreamItem(payload.itemId, itemPatch, context);
-      renderCreationView();
+      scheduleCreationProgressRender(context);
     }
     return;
   }
@@ -15748,11 +15867,17 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
     };
     if (!shouldApplyCreationStreamItemUpdate(payload.itemId, itemPatch, context)) return;
     updateCreationStreamItem(payload.itemId, itemPatch, context);
-    renderCreationView();
+    scheduleCreationProgressRender(context);
     return;
   }
 
   if (eventName === "item_saved") {
+    const chunkKey = buildFinalImageChunkKey({
+      setId: payload.setId || payload.set?.setId,
+      itemId: payload.item?.itemId || payload.itemId,
+    });
+    context.finalImageChunks?.delete(chunkKey);
+    context.partialImageChunks?.delete(chunkKey);
     if (payload.set) {
       upsertCreationSetForStream(payload.set, context);
     } else if (payload.item) {
@@ -15774,7 +15899,7 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
       set: payload.set,
       context,
     });
-    renderCreationView();
+    scheduleCreationProgressRender(context, { immediate: true });
     return;
   }
 
@@ -15792,7 +15917,7 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
       updateCreationStreamItem(payload.itemId, itemPatch, context);
     }
     if (!shouldApplyItemUpdate) {
-      renderCreationView();
+      scheduleCreationProgressRender(context);
       return;
     }
     const requeueNotice = payload.notice || getRequeueNotice({
@@ -15809,7 +15934,7 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
       set: payload.set,
       context,
     });
-    renderCreationView();
+    scheduleCreationProgressRender(context);
     return;
   }
 
@@ -15827,7 +15952,7 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
       updateCreationStreamItem(payload.itemId, itemPatch, context);
     }
     if (!shouldApplyItemUpdate) {
-      renderCreationView();
+      scheduleCreationProgressRender(context, { immediate: true });
       return;
     }
     const autoRepairAttemptCount = context.queueJob?.autoRepairAttemptCount ?? state.creation.autoRepairAttemptCount;
@@ -15854,7 +15979,7 @@ async function handleCreationStreamEvent(eventName, payload = {}, context = {}) 
       set: payload.set,
       context,
     });
-    renderCreationView();
+    scheduleCreationProgressRender(context, { immediate: true });
     return;
   }
 
@@ -17273,7 +17398,7 @@ function createPortraitCard(item = {}, fallbackIndex = 0, options = {}) {
     image.loading = "lazy";
     image.decoding = "async";
     image.alt = item.title || `写真 ${fallbackIndex + 1}`;
-    image.src = imageUrl;
+    setViewportImageSource(image, getCardThumbnailUrl(item));
     media.appendChild(image);
   } else {
     const placeholder = document.createElement("span");
@@ -20266,6 +20391,15 @@ function bindPreviewImageViewerRatios() {
 }
 
 function bindEvents() {
+  window.addEventListener("pagehide", () => generationLogUpdates.flush());
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      generationLogUpdates.flush();
+    } else {
+      if (state.activeView === "creation") renderCreationView();
+      if (refs.configDrawer?.classList.contains("open")) renderTimeline();
+    }
+  });
   creationLogoLibrary.bind();
   productImageImportController.bind();
   bindGlobalNavEvents();
@@ -20668,6 +20802,7 @@ function bindEvents() {
     state.creation.recordQuery = "";
     state.creation.recordTimeFilter = "all";
     state.creation.recordDateFilter = "";
+    state.creation.recordFailureFilter = "all";
     state.creation.recordDetailExpanded = false;
     state.creation.recordListScrollTop = 0;
     refs.creationRecordSetList.scrollTop = 0;

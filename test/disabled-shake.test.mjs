@@ -270,7 +270,7 @@ test("browser shell wires the controller and styles a layout-neutral, reduced-mo
     styles,
     new RegExp(`@media \\(prefers-reduced-motion: reduce\\) \\{\\r?\\n\\s*\\.${DISABLED_SHAKE_CLASS} \\{\\r?\\n\\s*animation: none;`),
   );
-  assert.match(index, /styles\.css\?v=20261029-subject-boundaries-1/);
+  assert.match(index, /styles\.css\?v=20261102-listing-german-1/);
   assert.match(index, /app\.js\?v=\d{8}-[a-z0-9-]+/);
 });
 

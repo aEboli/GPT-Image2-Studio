@@ -18,6 +18,7 @@ export const PUBLIC_VENDOR_SYNC_TARGETS = [
 ];
 
 export const PUBLIC_LIB_SYNC_TARGETS = [
+  "deferred-update.mjs",
   "text-model-client.mjs",
   "asset-workspace.mjs",
   "asset-record-delete.mjs",
@@ -90,6 +91,7 @@ export const PUBLIC_LIB_SYNC_TARGETS = [
   "http-response-error.mjs",
   "image-compress-browser.mjs",
   "image-reveal.mjs",
+  "viewport-image.mjs",
   "image-edit-local-mask.mjs",
   "image-edit-shell-bridge.mjs",
   "image-quality-options.mjs",

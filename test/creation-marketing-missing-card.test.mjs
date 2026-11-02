@@ -215,6 +215,8 @@ test("a missing image frame remains static during generation and exposes no retr
   const document = documentFixture();
   const context = { document, state: { creation: { generating: true } }, CREATION_PREVIEW_SLOTS: [],
     getImageUrl: (item) => item.imageUrl || "", getCreationItemDisplayTitle: (item) => item.title,
+    getCardThumbnailUrl: (item) => item.imageUrl || "",
+    setViewportImageSource: (image, source) => { image.src = source; },
     getCreationItemStatusLabel: () => "缺失", getCreationCardDomKey: (item) => item.itemId,
     createCreationCardLoading() { throw new Error("Missing task must never animate"); },
     canRepairCreationItem() { throw new Error("Missing task must never expose a retry action"); },

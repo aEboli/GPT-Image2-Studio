@@ -15,7 +15,7 @@ test("batch marketing controls are placed after the creation module toggles and 
   assert.ok(toggleIndex >= 0 && batchIndex > toggleIndex);
   assert.ok(batchIndex > infographicIndex);
   assert.match(html, /id="creationMarketingBatchPanel"[^>]*hidden/);
-  assert.match(html, /id="creationMarketingBatchCountInput"[^>]*min="1"[^>]*max="20"/);
+  assert.match(html, /id="creationMarketingBatchCountInput"[^>]*min="1"[^>]*max="50"/);
   assert.match(html, /方案数量/);
   assert.match(html, /id="creationMarketingBatchCopiesInput"[^>]*min="1"[^>]*max="20"/);
   assert.match(html, /每个方案生成套数/);
@@ -118,7 +118,7 @@ test("batch marketing has an explicit enable button and defaults to off", () => 
 
 test("batch estimate multiplies images per set, scheme count and copies and updates every factor", () => {
   const view = createBatchConfigHarness({ enabled: true });
-  for (const [images, count, copies, total, suites] of [[20, 10, 2, 400, 20], [5, 10, 2, 100, 20], [5, 3, 2, 30, 6], [5, 3, 4, 60, 12], [0, 3, 4, 0, 12], [20, 20, 20, 8000, 400]]) {
+  for (const [images, count, copies, total, suites] of [[20, 10, 2, 400, 20], [5, 10, 2, 100, 20], [5, 3, 2, 30, 6], [5, 3, 4, 60, 12], [0, 3, 4, 0, 12], [20, 20, 20, 8000, 400], [18, 50, 1, 900, 50], [20, 50, 20, 20000, 1000]]) {
     view.scope.imageCount = images;
     view.scope.refs.creationMarketingBatchCountInput.value = String(count);
     view.scope.refs.creationMarketingBatchCopiesInput.value = String(copies);

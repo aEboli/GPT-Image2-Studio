@@ -6,6 +6,11 @@ const TIME_FILTER_LABELS = {
   older: "更早",
 };
 const TIME_FILTER_VALUES = new Set(Object.keys(TIME_FILTER_LABELS));
+const FAILURE_FILTER_LABELS = {
+  all: "全部",
+  severe: "严重失败",
+};
+const FAILURE_FILTER_VALUES = new Set(Object.keys(FAILURE_FILTER_LABELS));
 
 function startOfLocalDay(value) {
   const date = value instanceof Date ? new Date(value.getTime()) : new Date(value);
@@ -78,6 +83,42 @@ export function filterCreationRecordSetsByTime(sets, filters = {}, referenceNow 
   return (Array.isArray(sets) ? sets : []).filter((set) =>
     matchesCreationRecordTime(set, { window, date }, referenceNow),
   );
+}
+
+export function normalizeCreationRecordFailureFilter(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return FAILURE_FILTER_VALUES.has(normalized) ? normalized : "all";
+}
+
+export function hasActiveCreationRecordFailureFilter(value) {
+  return normalizeCreationRecordFailureFilter(value) !== "all";
+}
+
+export function filterCreationRecordSetsByFailure(sets, filter = "all", getProgressSummary) {
+  const records = Array.isArray(sets) ? sets : [];
+  if (normalizeCreationRecordFailureFilter(filter) === "all") {
+    return records.filter(() => true);
+  }
+  if (typeof getProgressSummary !== "function") return [];
+
+  return records.filter((set) => {
+    const progress = getProgressSummary(set) || {};
+    const total = Number(progress.total);
+    const completed = Number(progress.completed);
+    const failed = Number(progress.failed);
+    return Number.isFinite(total)
+      && Number.isFinite(completed)
+      && Number.isFinite(failed)
+      && total >= 10
+      && failed > 0
+      && completed < 10
+      && completed + failed >= total;
+  });
+}
+
+export function formatCreationRecordFailureFilterLabel(value) {
+  const filter = normalizeCreationRecordFailureFilter(value);
+  return filter === "all" ? "" : FAILURE_FILTER_LABELS[filter];
 }
 
 export function buildCreationRecordTimeFilterOptions(sets, referenceNow = new Date()) {

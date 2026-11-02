@@ -23,10 +23,10 @@ const initialFiles = () => [
 function client() {
   const calls = [];
   const context = {
-    state: { creationReferenceFiles: initialFiles() },
+    state: { creationReferenceFiles: initialFiles(), creationReferenceAnalysis: { applied: true, dirty: false } },
     CREATION_REFERENCE_ROLE_OPTIONS: ["product", "reference-product", "material"].map((value) => ({ value })),
     syncCreationReferenceGenerationCompressionProfiles: () => calls.push("compression"),
-    markCreationReferenceAnalysisDirty: () => calls.push("analysis"),
+    refreshCreationAppliedReferencePlanningSignals: () => calls.push("analysis"),
     resetCreationDraftPreview: () => calls.push("draft"),
     renderCreationReferenceGrid: () => calls.push("render"),
   };

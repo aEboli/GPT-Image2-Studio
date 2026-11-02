@@ -8,6 +8,7 @@ const fieldLabels = {
 };
 const readingPanels = new Set();
 const observedViews = new WeakSet();
+const floatingPreviews = new WeakMap();
 
 export function fitCreationReadingPanel(panel) {
   const area = panel?.ownerDocument?.querySelector?.('.creation-output-panel');
@@ -72,13 +73,27 @@ export function createTextModelPreview({ document = globalThis.document, panel, 
   if (!document?.createElement) return { update() {}, finish() {} };
   const ownPanel = !panel;
   panel ||= document.createElement("details");
+  let timer = null;
+  let dismissTimer = null;
+  let disposed = false;
+  let finished = false;
+  const dispose = () => {
+    disposed = true;
+    if (timer !== null) clearTimeout(timer);
+    if (dismissTimer !== null) clearTimeout(dismissTimer);
+    panel.remove();
+    if (floatingPreviews.get(document) === dispose) floatingPreviews.delete(document);
+  };
   if (ownPanel) {
+    // 并发请求共用一个浮层位置，替换展示不影响后台请求。
+    floatingPreviews.get(document)?.();
+    floatingPreviews.set(document, dispose);
     panel.className = "text-model-live-preview";
     panel.open = true;
     const summary = document.createElement("summary"); summary.textContent = `${title} · 点击收起`;
     const close = document.createElement("button"); close.type = "button"; close.textContent = "关闭";
     close.setAttribute("aria-label", "关闭实时输出");
-    close.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); panel.remove(); });
+    close.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); dispose(); });
     summary.append(close);
     panel.append(summary); document.body.append(panel);
   }
@@ -87,11 +102,10 @@ export function createTextModelPreview({ document = globalThis.document, panel, 
   const pre = document.createElement("pre"); pre.className = "text-model-live-draft";
   panel.append(meta, timing, pre);
   let current = null;
-  let timer = null;
   let renderedText;
   const flush = () => {
     timer = null;
-    if (!current || !panel.isConnected) return;
+    if (disposed || !current || !panel.isConnected) return;
     const scrollTop = panel.scrollTop;
     const elapsed = Number(current.elapsedMs) / 1000;
     meta.textContent = [current.purpose || title, current.requestId ? `请求 ${current.requestId.slice(0, 8)}` : "", current.attempt ? `第 ${current.attempt} 次` : "", current.requestedReasoningEffort ? `思考 ${current.requestedReasoningEffort} → ${current.actualReasoningEffort ?? "省略参数"}` : "", Number.isFinite(current.firstTextMs) ? `首字 ${(current.firstTextMs / 1000).toFixed(1)} 秒` : "", Number.isFinite(elapsed) ? `${elapsed.toFixed(1)} 秒` : "", current.message || (current.stage === "receiving" ? "正在接收 · 待校验" : "等待模型")].filter(Boolean).join(" · ");
@@ -104,8 +118,18 @@ export function createTextModelPreview({ document = globalThis.document, panel, 
     panel.scrollTop = scrollTop;
   };
   return {
-    update(event) { current = { ...current, ...event }; if (event.stage === "waiting") { current.text = ""; current.firstTextMs = undefined; current.usage = undefined; if (renderedText !== "") { pre.textContent = ""; renderedText = ""; } } if (timer === null) timer = setTimeout(flush, 50); },
-    finish(error) { if (timer !== null) clearTimeout(timer); flush(); meta.textContent += error ? ` · ${error.message}` : " · 已结束，完整结果以校验后内容为准"; if (ownPanel && !error) panel.remove(); },
+    update(event) { if (disposed || finished) return; current = { ...current, ...event }; if (event.stage === "waiting") { current.text = ""; current.firstTextMs = undefined; current.usage = undefined; if (renderedText !== "") { pre.textContent = ""; renderedText = ""; } } if (timer === null) timer = setTimeout(flush, 50); },
+    finish(error) {
+      if (disposed || finished) return;
+      finished = true;
+      if (timer !== null) clearTimeout(timer);
+      flush();
+      meta.textContent += error ? ` · ${error.message}` : " · 已结束，完整结果以校验后内容为准";
+      if (ownPanel) {
+        if (error) dismissTimer = setTimeout(dispose, 5000);
+        else dispose();
+      }
+    },
   };
 }
 
@@ -133,8 +157,11 @@ export async function requestTextModel(fetchImpl, url, init, { onProgress, title
 const generationPreviews = new Map();
 export function showTextModelProgress(event) {
   const key = event.requestId || event.purpose || "text";
+  const failed = event.stage === "error" || event.stage === "interrupted";
+  const terminal = failed || event.stage === "received" || event.stage === "buffered";
+  if (terminal && !generationPreviews.has(key)) return;
   if (!generationPreviews.has(key)) generationPreviews.set(key, createTextModelPreview({ title: event.purpose || "文本规划" }));
   const view = generationPreviews.get(key);
   view.update(event);
-  if (event.stage === "received" || event.stage === "buffered") { view.finish(); generationPreviews.delete(key); }
+  if (terminal) { view.finish(failed ? new Error(event.message || "文本请求已结束。") : undefined); generationPreviews.delete(key); }
 }

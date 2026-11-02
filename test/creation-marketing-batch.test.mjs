@@ -7,6 +7,7 @@ import {
   getCreationMarketingBatchRetryPlan,
   cancelPendingCreationMarketingBatch,
   normalizeCreationMarketingBatchCopies,
+  normalizeCreationMarketingBatchSchemeCount,
   runCreationMarketingBatch,
 } from "../lib/creation-marketing-batch.mjs";
 
@@ -28,6 +29,24 @@ test("batch normalizes the per-scheme generation count and computes the queue ta
   const state = createCreationMarketingBatchState({ count: 3, copiesPerScheme: 2 });
   assert.equal(state.targetQueueCount, 6);
   assert.deepEqual(state.schemes.map((scheme) => scheme.targetCount), [2, 2, 2]);
+});
+
+test("batch accepts up to 50 schemes and clamps larger inputs", () => {
+  for (const count of [1, 20, 21, 49, 50]) {
+    assert.equal(normalizeCreationMarketingBatchSchemeCount(count), count);
+  }
+  assert.equal(normalizeCreationMarketingBatchSchemeCount(51), 50);
+  assert.equal(normalizeCreationMarketingBatchSchemeCount(99), 50);
+  assert.equal(normalizeCreationMarketingBatchSchemeCount(0), 1);
+  assert.equal(normalizeCreationMarketingBatchSchemeCount(""), 1);
+  assert.equal(normalizeCreationMarketingBatchSchemeCount("", 99), 50);
+  const state = createCreationMarketingBatchState({ count: 50, copiesPerScheme: 2 });
+  assert.equal(state.total, 50);
+  assert.equal(state.schemes.length, 50);
+  assert.equal(state.schemes[49].index, 50);
+  assert.equal(new Set(state.schemes.map((scheme) => scheme.variationSeed)).size, 50);
+  assert.equal(state.targetQueueCount, 100);
+  assert.equal(createCreationMarketingBatchState({ count: 51 }).schemes.length, 50);
 });
 
 test("batch retry plan only retries transient failures within the bounded budget", () => {

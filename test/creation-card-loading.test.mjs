@@ -341,6 +341,36 @@ test("creation card loading keys are namespaced per run scope", () => {
   assert.equal(getCreationCardLoadingKey({ itemId: "1-main" }, 0), "1-main");
 });
 
+test("completed card versions reuse DOM nodes and rebuild only changed cards", () => {
+  const documentRef = createTestDocument();
+  const grid = documentRef.createElement("div");
+  let created = 0;
+  const options = {
+    grid,
+    items: [{ itemId: "1", status: "completed", imageUrl: "/one.png" }, { itemId: "2", status: "completed", imageUrl: "/two.png" }],
+    getCardVersion: (item) => JSON.stringify(item),
+    createCard(item) {
+      created += 1;
+      const card = documentRef.createElement("article");
+      card.className = "creation-card";
+      card.dataset.creationCardKey = item.itemId;
+      return card;
+    },
+  };
+  syncCreationResultGrid(options);
+  const first = grid.children[0];
+  const second = grid.children[1];
+  syncCreationResultGrid(options);
+  assert.equal(created, 2);
+  assert.equal(grid.children[0], first);
+  assert.equal(grid.children[1], second);
+  options.items[1] = { ...options.items[1], imageUrl: "/replacement.png" };
+  syncCreationResultGrid(options);
+  assert.equal(created, 3);
+  assert.equal(grid.children[0], first);
+  assert.notEqual(grid.children[1], second);
+});
+
 test("replacing a finished loading card releases its shared progress source", () => {
   withFakeTimers(({ flush }) => {
     const documentRef = createTestDocument();

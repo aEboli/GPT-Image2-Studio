@@ -391,7 +391,7 @@ test("pending platform planning never renders the universal legacy role fallback
   assert.match(rolePicker, /if \(compatibleImageTypes\)[\s\S]*return;[\s\S]*if \(displayedPlanContext\.pending\)/);
 });
 
-test("SKU generation toggle refreshes the current platform plan without clearing it", async () => {
+test("SKU generation toggle defers AI planning and refreshes the non-AI platform plan", async () => {
   const app = await readApp();
   const handler = getFunctionSource(
     app,
@@ -401,7 +401,7 @@ test("SKU generation toggle refreshes the current platform plan without clearing
 
   assert.match(handler, /state\.creation\.planDirty = true/);
   assert.match(handler, /requestCreationPlanPreview\(\)/);
-  assert.doesNotMatch(handler, /resetCreationDraftPreview\(\)/);
+  assert.match(handler, /if \(isCreationAiMarketingEnabled\(\)\) \{\s*resetCreationDraftPreview\(\);\s*return;/);
   assert.match(
     app,
     /creationSkuGenerationEnabledInput\?\.addEventListener\("change", refreshCreationPlanAfterSkuGenerationToggle\)/,

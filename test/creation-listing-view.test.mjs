@@ -14,6 +14,75 @@ import {
 } from "../lib/creation-listing-view.mjs";
 import { CREATION_LISTING_POLICY_VERSION } from "../lib/creation-listing-policies.mjs";
 
+test("German content appears between English and Chinese in every Listing field and copies independently", () => {
+  const buckets = { exact: ["exact"], longTail: ["longTail"], traffic: ["traffic"], descriptive: ["descriptive"] };
+  const content = (prefix) => ({
+    title: `${prefix} title`,
+    sellingPoints: [`${prefix} selling 1`, `${prefix} selling 2`],
+    painPoints: [`${prefix} pain`],
+    fiveBullets: [`${prefix} bullet`],
+    description: `${prefix} description`,
+    backendSearchTerms: `${prefix} search`,
+    keywordBuckets: Object.fromEntries(Object.keys(buckets).map((key) => [key, [`${prefix} ${key}`]])),
+    packageDimensions: `${prefix} package size 20 x 15 x 8 cm`,
+    productDimensions: `${prefix} product size 18 x 12 x 6 cm`,
+    packageWeight: `${prefix} package weight 350 g`,
+    productWeight: `${prefix} product weight 250 g`,
+    warnings: [`${prefix} warning`],
+    missingInfo: [`${prefix} missing`],
+  });
+  const draft = { ...content("English"), deDisplay: content("Größe süß"), zhDisplay: content("中文") };
+  const previousDocument = globalThis.document;
+  const root = makeFakeElement("div");
+  globalThis.document = { createElement: makeFakeElement };
+  try {
+    renderCreationListingDrafts({ refs: { creationRecordListingDrafts: root }, set: { listingDrafts: [draft] } });
+  } finally {
+    globalThis.document = previousDocument;
+  }
+  const pairs = collectFakeElements(root, (node) => node.className === "creation-listing-copy-pair");
+  assert.equal(pairs.length, 17);
+  for (const pair of pairs) {
+    assert.deepEqual(pair.children.map((node) => node.dataset.creationListingCopyLanguage), ["en", "de", "zh"]);
+  }
+  const germanCopies = collectFakeElements(root, (node) => node.dataset?.creationListingCopyLanguage === "de"
+    && node.dataset.creationListingCopyText).map((node) => node.dataset.creationListingCopyText);
+  assert.ok(germanCopies.length >= 28);
+  assert.ok(germanCopies.every((value) => value.includes("Größe süß") && !/English|中文/u.test(value)));
+  const counts = collectFakeElements(root, (node) => node.className === "creation-listing-character-count german");
+  assert.equal(counts.length, 11);
+  assert.equal(counts[0].textContent, `DE ${Array.from(draft.deDisplay.title).length}`);
+  const copied = buildCreationRecordListingText({ listingDrafts: [draft] });
+  for (const value of [draft.deDisplay.title, ...draft.deDisplay.sellingPoints,
+    draft.deDisplay.painPoints[0], draft.deDisplay.fiveBullets[0], draft.deDisplay.description,
+    draft.deDisplay.backendSearchTerms, ...Object.values(draft.deDisplay.keywordBuckets).flat(),
+    draft.deDisplay.packageDimensions, draft.deDisplay.packageWeight, draft.deDisplay.productDimensions, draft.deDisplay.productWeight]) {
+    assert.ok(copied.includes(value), `full copy must include ${value}`);
+  }
+  assert.match(copied, /English title\n德文参考: Größe süß title\n中文参考: 中文 title/u);
+  for (const schemaVersion of ["", "2"]) {
+    const exported = buildCreationListingExportPayload({ listingDrafts: [{ ...draft, schemaVersion }] });
+    assert.equal(exported.listingDrafts[0].deDisplay.title, draft.deDisplay.title);
+    assert.deepEqual(exported.listingDrafts[0].deDisplay.keywordBuckets, draft.deDisplay.keywordBuckets);
+    assert.equal(exported.listingDrafts[0].deDisplay.productWeight, draft.deDisplay.productWeight);
+  }
+});
+
+test("historical Listing has no fabricated German translation or German controls", () => {
+  const draft = { title: "Original title", zhDisplay: { title: "原始标题" } };
+  assert.equal(normalizeCreationListingDraftForView(draft).deDisplay, undefined);
+  assert.doesNotMatch(buildCreationRecordListingText({ listingDrafts: [draft] }), /德文参考/u);
+  const previousDocument = globalThis.document;
+  const root = makeFakeElement("div");
+  globalThis.document = { createElement: makeFakeElement };
+  try {
+    renderCreationListingDrafts({ refs: { creationRecordListingDrafts: root }, set: { listingDrafts: [draft] } });
+    assert.equal(collectFakeElements(root, (node) => node.dataset?.creationListingCopyLanguage === "de").length, 0);
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
 function makeFakeElement(tagName) {
   const element = {
     tagName,

@@ -338,11 +338,14 @@ test("the creation stream drives the card heartbeat after the view renders", asy
   const app = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
 
   assert.match(app, /import \{ beatCreationCardHeartbeat,/);
-  // 必须在 renderCreationView 之后：卡片可能刚被这次渲染建出来
+  // 合并刷新先创建或更新卡片，再派发当前队列的心跳。
   assert.match(
     app,
-    /renderCreationView\(\);[\s\S]{0,320}?if \(hasHeartbeatPrefix\(payload\.message\)\) \{\s*\n\s*beatCreationCardHeartbeat\(refs\.creationResultGrid, payload\.itemId\);/,
+    /scheduleCreationProgressRender\(context, \{\s*heartbeatItemId: hasHeartbeatPrefix\(payload\.message\) \? payload\.itemId : "",/,
   );
+  const progressRender = app.slice(app.indexOf("function renderCreationProgressView("), app.indexOf("function isCreationAiMarketingEnabled("));
+  assert.ok(progressRender.indexOf("syncCreationResultGrid(") < progressRender.indexOf("flushCreationCardHeartbeats();"));
+  assert.match(app, /beatCreationCardHeartbeat\(refs\.creationResultGrid, heartbeat\.itemId\)/);
   // 心跳不进反馈条，否则会顶掉真正有信息的阶段文本
   assert.match(app, /if \(payload\.message && !hasHeartbeatPrefix\(payload\.message\)\) \{\s*\n\s*setCreationFeedback\(payload\.message, "busy"\);/);
   assert.match(app, /const feedbackText = hasHeartbeatPrefix\(statusText\) \? "" : statusText;/);

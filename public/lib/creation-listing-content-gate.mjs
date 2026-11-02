@@ -471,6 +471,10 @@ export function sanitizeCreationListingDraftContent(draft = {}, source = {}) {
   const zhDisplay = draft.zhDisplay && typeof draft.zhDisplay === "object"
     ? sanitizeCreationListingNoBrandContent(projectCreationListingContent(draft.zhDisplay), forbiddenTerms)
     : draft.zhDisplay;
+  const rawDeDisplay = draft.deDisplay ?? draft.de_display;
+  const deDisplay = rawDeDisplay && typeof rawDeDisplay === "object"
+    ? sanitizeCreationListingNoBrandContent(rawDeDisplay, forbiddenTerms)
+    : rawDeDisplay;
   return {
     ...draft,
     ...sanitized,
@@ -481,6 +485,7 @@ export function sanitizeCreationListingDraftContent(draft = {}, source = {}) {
       ? {}
       : { skuSubjectId: sanitizeCreationListingNoBrandContent(rawSkuSubjectId, forbiddenTerms) }),
     ...(zhDisplay === undefined ? {} : { zhDisplay: { ...draft.zhDisplay, ...zhDisplay } }),
+    ...(deDisplay === undefined ? {} : { deDisplay }),
   };
 }
 

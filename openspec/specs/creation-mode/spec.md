@@ -659,7 +659,7 @@ The system SHALL omit or replace image types that require unavailable factual ev
 - **AND** it does not silently display or submit a plan built from stale duplicated defaults
 
 ### Requirement: Creation records display and expose Listing drafts in the old-style format
-The Creation record UI SHALL preserve every current Listing draft in the fixed field order 标题、卖点、痛点、五点描述、商品描述、后台搜索词、关键词分组 and SHALL display all seven fields continuously on one page without content-group or language-view controls. Within every field or list item, the UI SHALL display the English value first and its corresponding Simplified Chinese value immediately below it when that localized value exists; this bilingual comparison SHALL remain vertical at every supported viewport width. English and Simplified Chinese values belonging to the same list item SHALL form one compact visual pair. A divider SHALL appear only between adjacent list items, SHALL follow the complete bilingual pair rather than separate its two languages, and SHALL match the rendered width of the longer value in that pair without exceeding the available content width. Every visible English value SHALL remain an independent copy target that copies only that English value, and every visible Simplified Chinese value SHALL remain an independent copy target that copies only that Chinese value. Field-level English and Chinese copy controls SHALL copy the complete corresponding language value for that field, while full-copy and export actions SHALL preserve the complete bilingual field mapping. Generate, full-copy, and export controls SHALL remain available from a compact Listing workspace toolbar while the user reviews a long draft. All copy and export actions SHALL be immediately available without validation or review gating.
+The Creation record UI SHALL preserve the existing Listing field order and display all fields continuously without content-group or language-view controls. Each field and list item SHALL show English, available German from `deDisplay`, and available Simplified Chinese from `zhDisplay` in that vertical order at every supported viewport width. Every available language SHALL have independent item and field copy targets and character counts. Full copy and structured export SHALL preserve the complete available trilingual field mapping. Generate, full-copy, and export controls SHALL remain available in the compact Listing workspace toolbar without validation or review gating. Historical drafts without German SHALL retain their existing content without fabricated translations or automatic model requests.
 
 #### Scenario: User opens a newly generated Listing draft
 - **WHEN** a completed Listing is rendered in a Creation record
@@ -671,13 +671,13 @@ The Creation record UI SHALL preserve every current Listing draft in the fixed f
 
 #### Scenario: User compares bilingual Listing values
 - **WHEN** a Listing field or list item has both English and corresponding Simplified Chinese content
-- **THEN** the English value is displayed above the corresponding Chinese value within the same field or item
-- **AND** the Chinese value immediately follows its English counterpart before the next field or item
+- **THEN** the English value is displayed first, followed by its available German translation and corresponding Chinese value within the same field or item
+- **AND** the Chinese value follows its German counterpart when present, otherwise its English counterpart, before the next field or item
 - **AND** desktop, stacked, and mobile layouts do not place the two values in side-by-side columns
 
 #### Scenario: User switches the Listing language view
 - **WHEN** an existing application session still contains a previous `en`, `zh`, or `compare` Listing language selection
-- **THEN** the UI ignores that obsolete selection and displays the fixed English-above-Chinese comparison
+- **THEN** the UI ignores that obsolete selection and displays the fixed English-German-Chinese comparison with available translations
 - **AND** the UI does not render a language-view control that can hide either language
 
 #### Scenario: User switches the Listing content view
@@ -703,8 +703,8 @@ The Creation record UI SHALL preserve every current Listing draft in the fixed f
 #### Scenario: User copies Listing keyword buckets
 - **WHEN** the Listing workspace displays or copies 精准关键词、长尾关键词、流量关键词 or 描述词
 - **THEN** each bucket name remains a visible, non-selectable page label and is not a copy target
-- **AND** clicking an English or Simplified Chinese keyword value copies only that row's actual keyword value
-- **AND** the field-level English or Chinese copy control copies only that language's keyword values without any bucket-name prefix
+- **AND** clicking an English, German or Simplified Chinese keyword value copies only that row's actual keyword value
+- **AND** the field-level English, German or Chinese copy control copies only that language's keyword values without any bucket-name prefix
 
 #### Scenario: User reviews a long Listing draft
 - **WHEN** the Listing workspace reaches the top of the scrollable Creation record result area
@@ -714,12 +714,12 @@ The Creation record UI SHALL preserve every current Listing draft in the fixed f
 #### Scenario: User reaches Listing controls on a narrow mobile screen
 - **WHEN** the user scrolls a mobile Creation record to its Listing workspace
 - **THEN** the record header and filter controls remain in normal document flow instead of covering the Listing workspace
-- **AND** the Listing actions and continuous vertical bilingual content remain visible and directly operable
+- **AND** the Listing actions and continuous vertical trilingual content remain visible and directly operable
 
 #### Scenario: User copies or exports a Listing draft
 - **WHEN** the user invokes generation, full copy, or export from the Listing workspace
 - **THEN** generation reuses the existing selected-record Listing controller and concurrent-generation guard
-- **AND** full copy and structured export retain the old-style bilingual field mapping for all seven fields
+- **AND** full copy and structured export retain the old-style field mapping including deDisplay and zhDisplay for all seven fields
 - **AND** the actions are not blocked by validation, review, warnings or access state
 
 ### Requirement: Hard-information images use decision-meaningful visual structures
@@ -2899,7 +2899,7 @@ Newly planned Creation Mode prompts SHALL express product appearance through one
 
 套图 SHALL 仅通过图片卡片已有的参考用途下拉框选择全套主体，不显示独立的“主体锁”按钮或遮挡缩略图的锁定控件。用户指定的 `reference-product`（参考主体）SHALL 优先于所有普通 `product`（商品主体）；未指定参考主体时，系统 SHALL 使用当前排列顺序中最靠前的商品主体。其余商品主体 SHALL 继续保留为普通商品或 SKU 参考，不成为第二个全套主体。
 
-多 SKU 输入 SHALL 同样最多存在一个参考主体；选择新参考主体 SHALL 将旧参考主体恢复为普通商品主体。修改参考用途或拖动商品图顺序 SHALL 沿用压缩配置刷新、分析失效与草稿计划失效机制。系统 SHALL 在参考用途控件提供优先级和排序提示，MUST NOT 为主体选择要求或自动生成额外主体描述。没有可用商品主体时 SHALL 保持既有兼容回退及错误边界；SKU 款式来源和信息图重构 SHALL 保持现有规则。
+多 SKU 输入 SHALL 同样最多存在一个参考主体；选择新参考主体 SHALL 将旧参考主体恢复为普通商品主体。修改参考用途 SHALL 刷新压缩配置和当前用途的规划信号，使草稿计划失效，但 SHALL 保留同一批图片已应用的识别事实、人群策略与 SKU 信息，MUST NOT 单独取消当前识别请求或将有效分析标记为过期。尚未成功应用或原本过期的分析 MUST NOT 因用途编辑变为有效。识别返回时 SHALL 尊重手动用途。拖动商品图顺序 SHALL 继续使分析和草稿计划失效，避免引用索引错位。系统 SHALL 在参考用途控件提供优先级和排序提示，MUST NOT 为主体选择要求或自动生成额外主体描述。没有可用商品主体时 SHALL 保持既有兼容回退及错误边界；SKU 款式来源和信息图重构 SHALL 保持现有规则。
 
 #### Scenario: 多 SKU 中更换唯一主体图
 
@@ -2911,7 +2911,7 @@ Newly planned Creation Mode prompts SHALL express product appearance through one
 
 - **WHEN** 用户在用途下拉框中将参考主体改回商品主体
 - **THEN** 该图恢复为普通商品参考，系统按当前商品图顺序选择全套主体
-- **AND** 旧分析与草稿失效，不要求使用独立锁定按钮
+- **AND** 旧草稿失效，同批已识别信息保留，不要求重新识别或使用独立锁定按钮
 
 #### Scenario: 没有参考主体时按商品图顺序选择
 
@@ -2924,6 +2924,17 @@ Newly planned Creation Mode prompts SHALL express product appearance through one
 - **WHEN** 参考主体排在一个或多个普通商品主体之后
 - **THEN** 压缩优先级、普通套图规划和实际附件仍优先使用参考主体
 - **AND** 将该图用途改回商品主体后，按当前商品图顺序选择
+
+#### Scenario: 识别后更正用途直接开始批量
+
+- **WHEN** 用户完成识别后更正图片用途，随后开始批量 AI 营销生成
+- **THEN** 批量请求使用最新用途，同时携带原有有效商品事实、人群策略和仍有商品来源的 SKU
+- **AND** 不要求重新识别，增删或替换图片造成的过期分析不会因此恢复有效
+
+#### Scenario: 识别期间更正用途
+
+- **WHEN** 同一批图片正在识别，用户手动更正用途
+- **THEN** 当前识别继续执行，成功应用时保留手动用途及唯一参考主体
 
 ### Requirement: 紧凑生成参考标签只有一个主体身份依据
 
@@ -3296,3 +3307,125 @@ The system SHALL include rejected or absent marketing image positions in the exi
 - **WHEN** 一个方案重试后失败而其他方案继续处理
 - **THEN** 失败方案固定显示包含重试等待的总耗时，活动方案继续计时
 - **AND** 失败不会自动暂停其余方案或重置批次耗时
+
+### Requirement: 批量方案数量最多五十套
+
+系统 SHALL 将批量 AI 营销的方案数量限制为 1–50 的整数，默认值为 1。界面控件与批量状态归一化 SHALL 使用相同上限；超出上限的输入 SHALL 归一化为 50。每个方案生成套数 SHALL 继续限制为 1–20，方案规划并发 SHALL 继续为 2。
+
+#### Scenario: 五十个方案完整保留
+- **WHEN** 用户设置方案数量为 50、每个方案生成套数为 2
+- **THEN** 配置保留方案数量 50，批量状态包含 50 个独立方案
+- **AND** 预计加入队列为 100 套，预计营销图片数按当前套图图片数量乘以 100 计算
+
+#### Scenario: 超过上限的输入
+- **WHEN** 用户输入方案数量 51 或更大的整数
+- **THEN** 界面和批量状态均将方案数量归一化为 50
+- **AND** 每个方案生成套数的上限仍为 20
+
+### Requirement: 批量生成进度刷新仅更新变化的界面
+
+系统 SHALL 在内存中即时接收生成事件，并将 120 毫秒内的高频进度事件合并为一次界面刷新。进度刷新 SHALL 保留队列按钮和显示内容不变的静态卡片，SHALL NOT 重建参考图、方案配置、分析正文和 Listing。单图保存、失败及整套完成或错误 SHALL 及时显示最新状态，队列切换 SHALL 立即显示所选任务。相同套图引用 SHALL 复用队列显示数据。心跳 SHALL 仅作用于当前显示任务且在卡片更新之后执行。页面不可见时 SHALL 继续接收数据，恢复可见后 SHALL 显示最新状态。
+
+#### Scenario: 不变队列连续刷新
+
+- **WHEN** 30 套、600 项的队列显示完成后连续刷新 100 次且数据不变
+- **THEN** 不新增队列节点，也不重复归一化套图
+- **AND** 选择、重排、删除及生成状态变化仍正确反映到对应节点
+
+#### Scenario: 突发进度与终态
+
+- **WHEN** 多张图在 120 毫秒内连续收到状态或预览事件
+- **THEN** 界面合并刷新并使用最新数据
+- **AND** 保存、失败和整套终态无需等待合并定时器
+- **AND** 后台套图的心跳不驱动前台另一套的同名图片
+
+### Requirement: 生成日志合并持久化并按需渲染
+
+系统 SHALL 在内存中即时更新日志，并将 250 毫秒内的日志写入合并为一次持久化。关闭配置面板时 SHALL NOT 因生成日志事件重建日志 DOM。打开配置面板时 SHALL 显示最新日志。页面隐藏或离开时 SHALL 刷新待处理持久化，不重复写入无变化数据。
+
+#### Scenario: 突发日志与页面离开
+
+- **WHEN** 短时间收到多条生成日志
+- **THEN** 保留全部内存状态并合并写入最后状态
+- **AND** 页面隐藏或离开前立即写入尚未保存的状态
+- **AND** 再次打开日志面板显示最新内容
+
+### Requirement: Creation set records can be filtered by severe generation failures
+
+The Creation records view SHALL provide a quick filter for ended sets that planned at least 10 eligible items, have at least one failed item, and have fewer than 10 completed items. A set SHALL be considered ended for this filter only when every eligible item is completed or failed. The filter SHALL combine with the existing keyword and time conditions using AND semantics, and the complete combined collection SHALL drive counts, empty state, detail selection, visible records, checked selection, and filtered deletion targets.
+
+#### Scenario: User keeps a set with enough successful images
+
+- **WHEN** a set planned 20 eligible images, generation has ended, and 17 or 18 images completed while the remainder failed
+- **THEN** the severe-failure filter does not include that set
+
+#### Scenario: User finds a set with too few successful images
+
+- **WHEN** a set planned at least 10 eligible images, generation has ended, at least one item failed, and fewer than 10 items completed
+- **THEN** the severe-failure filter includes that set
+
+#### Scenario: Exactly 10 images completed
+
+- **WHEN** a set planned at least 10 eligible images, generation has ended, and exactly 10 items completed
+- **THEN** the severe-failure filter does not include that set
+
+#### Scenario: A set is still generating
+
+- **WHEN** a set has a failed item but at least one eligible item is neither completed nor failed
+- **THEN** the severe-failure filter does not include that set
+
+#### Scenario: User combines severe failures with other filters
+
+- **WHEN** the user activates the severe-failure filter while a keyword or time condition is active
+- **THEN** only sets matching the severe-failure condition and every other active condition are included
+- **AND** the count, list, current detail fallback, and filtered deletion target use that same combined collection
+
+#### Scenario: User deletes the severe-failure results
+
+- **WHEN** the user activates Delete filtered while the severe-failure condition has matches and confirms the displayed count
+- **THEN** the request contains every set in the complete combined filtered collection, including sets beyond the currently rendered list
+- **AND** records outside that collection remain untouched
+- **AND** each deleted set loses only its manifest, dedicated generated-image directory, and corresponding JSON metadata directory
+
+#### Scenario: User clears all Creation record filters
+
+- **WHEN** the user activates Clear filters
+- **THEN** the severe-failure condition, keyword, quick time, and exact date return to their defaults
+- **AND** the complete Creation record collection becomes available again
+
+### Requirement: Listing German translations appear between English and Chinese everywhere
+
+The Listing workspace SHALL render each available German translation immediately after its corresponding English content and before Simplified Chinese content in every field and list item, including keyword buckets, dimensions, weights, and any displayed warnings or missing information. The vertical language order SHALL remain consistent across supported viewport widths. German content SHALL support independent item copy, complete field copy, and DE character counts. Full copy and structured JSON export SHALL preserve all three language mappings.
+
+#### Scenario: Review and copy German content
+
+- **WHEN** a draft contains all three languages for a field or list item
+- **THEN** the UI displays English, German, and Chinese in that order
+- **AND** copying German content includes only the selected German item or field
+- **AND** the field exposes the German character count alongside existing language counts
+
+#### Scenario: Copy all or export a trilingual draft
+
+- **WHEN** the user copies all content or exports JSON
+- **THEN** all available German fields are included together with existing English and Chinese fields
+- **AND** the JSON export includes `deDisplay`
+
+#### Scenario: Review a historical draft
+
+- **WHEN** a historical draft has no German translation for an item
+- **THEN** the UI preserves the existing content and does not substitute English or Chinese as German
+
+### Requirement: 小幅设置调整保留识别和已生成产物
+
+AI 营销模式修改目标语言、比例、分辨率或 SKU 开关 SHALL 使旧生成草稿失效，并在用户下次明确生成方案或批量生成时采用最新设置，MUST NOT 单独发起自动 AI 规划并锁住批量开始入口。非 AI 模式 SHALL 继续原有自动预览。思考等级等生成参数 SHALL 随下次请求读取当前值，不使同一批参考图识别失效。草稿失效 SHALL 清除旧有效计划和未生成草稿，但 MUST NOT 清空已生成套图、其图片或既有队列快照。
+
+#### Scenario: 语言比例和 SKU 调整不锁住批量入口
+
+- **WHEN** 已识别同批参考图，用户在 AI 营销模式修改语言、比例、分辨率或 SKU 开关
+- **THEN** 旧草稿失效，识别信息仍有效，不自动请求 AI 规划，空闲批量入口可继续使用
+- **AND** 下次批量请求采用最新设置
+
+#### Scenario: 修改设置保留已生成图片
+
+- **WHEN** 当前显示已生成套图，用户调整设置使新草稿失效
+- **THEN** 当前已生成图片与已有队列保持原快照，旧未生成草稿不可继续提交

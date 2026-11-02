@@ -30,10 +30,10 @@ const generationClientPath = new URL("../lib/generation-client.mjs", import.meta
 const generationLogPanelPath = new URL("../lib/generation-log-panel.mjs", import.meta.url);
 const generationLogStorePath = new URL("../lib/generation-log-store.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20261029-subject-boundaries-1";
-const appAssetVersion = "20261031-dual-concurrency-1";
+const stylesAssetVersion = "20261102-listing-german-1";
+const appAssetVersion = "20261102-listing-german-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
-const creationQueueModuleAssetVersion = "20261031-dual-concurrency-1";
+const creationQueueModuleAssetVersion = "20261102-creation-render-1";
 const quickBlendModuleAssetVersion = "20260928-aspect-ratio-value-only-1";
 
 test("static assets use the current cache-busting version", async () => {
@@ -717,7 +717,7 @@ test("filmstrip rendering reuses keyed thumbnail nodes instead of clearing the r
   assert.match(app, /refs\.filmstrip\.querySelectorAll\("\.filmstrip-entry\[data-filmstrip-key\]"\)/);
   assert.match(app, /const fragment = document\.createDocumentFragment\(\);/);
   assert.match(app, /refs\.filmstrip\.replaceChildren\(fragment\);/);
-  assert.match(app, /if \(image\.getAttribute\("src"\) !== imageUrl\) \{[\s\S]*image\.src = imageUrl;[\s\S]*\}/);
+  assert.match(app, /setViewportImageSource\(image, imageUrl\);/);
   assert.doesNotMatch(app, /refs\.filmstrip\.innerHTML = "";/);
 });
 
@@ -4155,8 +4155,8 @@ test("studio caches generated browser images for persistent preview and download
   assert.match(browserImageCache, /export async function readBrowserCachedGalleryItems\(\{ restoreImageData = false \} = \{\}\) \{/);
   assert.match(app, /function upsertGalleryItem\(item\) \{[\s\S]*void cacheBrowserGalleryItem\(hydratedItem\);/);
   assert.match(app, /function syncFilmstripMedia\([\s\S]*?const imageUrl = getThumbnailUrl\(item\);/);
-  assert.match(app, /function createRecentOutputItem\([\s\S]*?image\.src = getThumbnailUrl\(item\);/);
-  assert.match(app, /function createGalleryTile\([\s\S]*?image\.src = getThumbnailUrl\(item\);/);
+  assert.match(app, /function createRecentOutputItem\([\s\S]*?setViewportImageSource\(image, getThumbnailUrl\(item\)\);/);
+  assert.match(app, /function createGalleryTile\([\s\S]*?setViewportImageSource\(image, getThumbnailUrl\(item\)\);/);
   assert.match(app, /async function loadGallery\(\) \{[\s\S]*const browserCachedItems = await readBrowserCachedGalleryItems\(\{ restoreImageData: false \}\);[\s\S]*state\.gallery = sortGalleryItemsByCreatedAtDesc/);
   assert.match(app, /async function deleteGalleryItem\(item\) \{[\s\S]*await deleteBrowserCachedGalleryItem\(item\.filename\);/);
   assert.match(app, /async function clearHistory\(\) \{[\s\S]*await clearBrowserImageCache\(\);/);
@@ -4975,7 +4975,12 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(app, /fetch\("\/api\/creation\/plan"/);
   assert.match(app, /formData\.set\("selectedRoles", JSON\.stringify\(getCreationSelectedRoles\(\)\)\)/);
   assert.match(app, /roleSelect\.dataset\.creationReferenceRoleId = item\.id;/);
-  assert.match(app, /function updateCreationReferenceRole\(referenceId, role\) \{\s*state\.creationReferenceFiles = state\.creationReferenceFiles\.map\([\s\S]*?\);\s*markCreationReferenceAnalysisDirty\(\{ invalidateCategorySuggestion: false \}\);\s*resetCreationDraftPreview\(\);\s*renderCreationReferenceGrid\(\);\s*\}/);
+  const updateRoleBody = app.match(/function updateCreationReferenceRole\(referenceId, role\) \{[^]*?\n\}/)?.[0] || "";
+  assert.match(updateRoleBody, /state\.creationReferenceFiles = state\.creationReferenceFiles\.map\(/);
+  assert.match(updateRoleBody, /state\.creationReferenceAnalysis\.applied && !state\.creationReferenceAnalysis\.dirty/);
+  assert.match(updateRoleBody, /refreshCreationAppliedReferencePlanningSignals\(\)/);
+  assert.match(updateRoleBody, /resetCreationDraftPreview\(\)/);
+  assert.doesNotMatch(updateRoleBody, /markCreationReferenceAnalysisDirty|invalidateCreationReferenceAnalysisRequest/);
   assert.doesNotMatch(app, /creationStyleReference|applyCreationStyleReferenceFiles/);
   assert.match(app, /formData\.set\("imageCount", String\(getCreationPlanPreviewImageCount\(selectedRoles\)\)\)/);
   assert.doesNotMatch(app, /formData\.set\("scenario", refs\.creationScenarioInput\.value\)/);
@@ -5961,14 +5966,17 @@ test("creation records combine keyword and created-time filters across actions",
     readFile(stylesPath, "utf8"),
   ]);
 
-  assert.match(html, /id="creationRecordTimeFilters"[^>]*aria-label="套图记录时间筛选"/);
+  assert.match(html, /id="creationRecordTimeFilters"[^>]*aria-label="套图记录筛选"/);
   assert.match(html, /id="creationRecordDateInput"[^>]*type="date"/);
   assert.match(html, /id="creationRecordResetFiltersButton"[^>]*>清空筛选<\/button>/);
   assert.match(app, /from "\/lib\/creation-record-filter\.mjs(?:\?[^\"]+)?"/);
   assert.match(app, /recordTimeFilter:\s*"all"/);
   assert.match(app, /recordDateFilter:\s*""/);
+  assert.match(app, /recordFailureFilter:\s*"all"/);
   assert.match(app, /function getCreationRecordKeywordMatchedSets\(\) \{/);
   assert.match(app, /filterCreationRecordSetsByTime\(/);
+  assert.match(app, /filterCreationRecordSetsByFailure\(/);
+  assert.match(app, /failureButton\.dataset\.creationRecordSevereFailureFilter\s*=\s*"true"/);
   assert.match(app, /from "\/lib\/creation-record-list-model\.mjs(?:\?[^\"]+)?";/);
   assert.match(app, /const listModel = buildCreationRecordListModel\(filteredSets, \{/);
   assert.match(app, /refs\.creationRecordLoadMoreButton\?\.addEventListener\("click", \(\) => \{[\s\S]*loadMoreCreationRecordListState\([\s\S]*renderCreationRecordView\(\);[\s\S]*\}\);/);
@@ -5981,6 +5989,7 @@ test("creation records combine keyword and created-time filters across actions",
   assert.match(app, /filterLabel:\s*getCreationRecordFilterLabel\(\)/);
   assert.match(app, /refs\.creationRecordDateInput\.addEventListener\("input",/);
   assert.match(app, /refs\.creationRecordResetFiltersButton\.addEventListener\("click",/);
+  assert.match(app, /state\.creation\.recordFailureFilter\s*=\s*"all";/);
   assert.match(styles, /\.creation-record-time-filters\s*\{/);
   assert.match(styles, /\.creation-record-date\s*\{/);
   assert.match(styles, /\.creation-record-reset-filters\s*\{/);
@@ -6041,7 +6050,7 @@ test("creation mode exposes listing agent controls and record listing drafts", a
   assert.match(app, /creationRecordGenerateListingsButton: document\.querySelector\("#creationRecordGenerateListingsButton"\)/);
   assert.match(app, /creationRecordExportListingsButton: document\.querySelector\("#creationRecordExportListingsButton"\)/);
   assert.match(app, /creationRecordCopyListingsButton: document\.querySelector\("#creationRecordCopyListingsButton"\)/);
-  assert.match(app, /from "\/lib\/creation-listing-view\.mjs"/);
+  assert.match(app, /from "\/lib\/creation-listing-view\.mjs\?v=20261102-listing-german-1"/);
   assert.match(app, /function getCreationInlineListingRefs\(\) \{/);
   assert.match(app, /createCreationListingController\(\{/);
   assert.match(app, /renderCurrentView: renderCreationView,/);

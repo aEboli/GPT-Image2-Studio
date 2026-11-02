@@ -3,10 +3,14 @@ import assert from "node:assert/strict";
 
 import {
   buildCreationRecordTimeFilterOptions,
+  filterCreationRecordSetsByFailure,
   filterCreationRecordSetsByTime,
+  formatCreationRecordFailureFilterLabel,
   formatCreationRecordTimeFilterLabel,
+  hasActiveCreationRecordFailureFilter,
   hasActiveCreationRecordTimeFilter,
   normalizeCreationRecordDateFilter,
+  normalizeCreationRecordFailureFilter,
   normalizeCreationRecordTimeFilter,
 } from "../lib/creation-record-filter.mjs";
 
@@ -68,4 +72,35 @@ test("creation record time filter options count all and bounded records", () => 
   assert.equal(formatCreationRecordTimeFilterLabel({ window: "recent" }), "近 7 天");
   assert.equal(formatCreationRecordTimeFilterLabel({ window: "all", date: "2026-07-16" }), "日期 2026-07-16");
   assert.equal(formatCreationRecordTimeFilterLabel({ window: "all", date: "" }), "");
+});
+
+test("creation record failure filters normalize and label the severe-failure condition", () => {
+  assert.equal(normalizeCreationRecordFailureFilter(" severe "), "severe");
+  assert.equal(normalizeCreationRecordFailureFilter("unexpected"), "all");
+  assert.equal(hasActiveCreationRecordFailureFilter("all"), false);
+  assert.equal(hasActiveCreationRecordFailureFilter("severe"), true);
+  assert.equal(formatCreationRecordFailureFilterLabel("severe"), "严重失败");
+  assert.equal(formatCreationRecordFailureFilterLabel("all"), "");
+});
+
+test("severe-failure filter keeps only ended sets with fewer than ten successes", () => {
+  const sets = [
+    { setId: "keep-18", progress: { total: 20, completed: 18, failed: 2 } },
+    { setId: "severe-4", progress: { total: 20, completed: 4, failed: 16 } },
+    { setId: "severe-minimum", progress: { total: 10, completed: 9, failed: 1 } },
+    { setId: "keep-exact-10", progress: { total: 20, completed: 10, failed: 10 } },
+    { setId: "still-generating", progress: { total: 20, completed: 4, failed: 2 } },
+    { setId: "too-small", progress: { total: 9, completed: 4, failed: 5 } },
+    { setId: "no-failure", progress: { total: 20, completed: 20, failed: 0 } },
+  ];
+  const getProgressSummary = (set) => set.progress;
+
+  assert.deepEqual(
+    filterCreationRecordSetsByFailure(sets, "severe", getProgressSummary).map((set) => set.setId),
+    ["severe-4", "severe-minimum"],
+  );
+  assert.deepEqual(
+    filterCreationRecordSetsByFailure(sets, "all", getProgressSummary).map((set) => set.setId),
+    sets.map((set) => set.setId),
+  );
 });

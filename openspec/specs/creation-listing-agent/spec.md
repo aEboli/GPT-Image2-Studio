@@ -105,13 +105,13 @@ The system SHALL keep one versioned Listing policy for each canonical platform a
 
 ### Requirement: New Listing drafts use the old-style bilingual field contract
 
-The system SHALL request the existing old-style bilingual Listing contract for every successfully generated or explicitly test-mocked Listing. After a real upstream response is parsed as a usable Listing object and normalized, the system SHALL retain and display the resulting draft as `completed` even when local field, bilingual, dimension, weight, content, provenance, length, or policy validation finds differences from that contract. A usable Listing object SHALL be a non-null, non-array JSON object with at least one non-empty known Listing content field at the top level or under `zhDisplay`. Local validation SHALL NOT discard, fail, retry, or prevent persistence of a successfully generated Listing. Existing output normalization and sanitization MAY transform public content without blocking the draft. If the first real response is empty, malformed, non-object, or lacks recognizable Listing content, the system SHALL make one retry for the Listing JSON shape. A failed real request, timeout, or second empty, malformed, non-object, or unrecognized Listing response SHALL NOT create a Listing draft.
+The system SHALL request the old-style Listing contract with English content and German `deDisplay` and Simplified Chinese `zhDisplay` translations for every successfully generated or explicitly test-mocked Listing. After a real upstream response is parsed as a usable Listing object and normalized, the system SHALL retain and display the resulting draft as `completed` even when local field, bilingual, dimension, weight, content, provenance, length, or policy validation finds differences from that contract. A usable Listing object SHALL be a non-null, non-array JSON object with at least one non-empty known Listing content field at the top level or under `zhDisplay`. Local validation SHALL NOT discard, fail, retry, or prevent persistence of a successfully generated Listing. Existing output normalization and sanitization MAY transform public content without blocking the draft. If the first real response is empty, malformed, non-object, or lacks recognizable Listing content, the system SHALL make one retry for the Listing JSON shape. A failed real request, timeout, or second empty, malformed, non-object, or unrecognized Listing response SHALL NOT create a Listing draft.
 
 #### Scenario: A new Listing is generated
 
 - **WHEN** the model returns a parsed JSON object with old-style Listing fields
 - **THEN** English content is stored in the available top-level old-style fields
-- **AND** Simplified Chinese content is stored in available `zhDisplay` fields
+- **AND** German content is stored in available `deDisplay` fields and Simplified Chinese content in available `zhDisplay` fields
 - **AND** package dimensions precede product dimensions in display, full copy, and export when both fields are present
 - **AND** the status is `completed`
 
@@ -691,3 +691,19 @@ Listing Agent SHALL send a Responses API request when the configured endpoint is
 - **THEN** the upstream request contains `messages[0].role = user`
 - **AND** the request contains Chat Completions `response_format.json_schema`
 - **AND** the request does not depend on a Responses-only `input` field
+
+### Requirement: Listing generation includes complete German translations
+
+The system SHALL request and preserve a `deDisplay` object alongside existing Listing content and `zhDisplay` for every platform and generation entry point. German translations SHALL cover title, selling points, pain points, five bullets, description, backend search terms, all keyword buckets, package dimensions and weight, product dimensions and weight, warnings, and missing information. Translations SHALL preserve source facts, numeric values, list correspondence, and German characters without changing the selected marketplace. Existing nonblocking acceptance of usable model responses SHALL remain in effect.
+
+#### Scenario: Generate and reload a trilingual Listing
+
+- **WHEN** a model returns Listing content with German and Chinese translations
+- **THEN** normalization, sanitization, persistence, reload, and supported schema conversion preserve the complete `deDisplay` mapping
+- **AND** German umlauts and ß remain readable
+
+#### Scenario: Historical Listing lacks German
+
+- **WHEN** the system reads a historical draft without `deDisplay`
+- **THEN** existing content remains available without an automatic model request or invented German content
+- **AND** explicit regeneration requests German translations using the new contract

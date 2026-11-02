@@ -133,7 +133,7 @@ test("recommendations and their prompts survive frozen plans, queued sets, stora
 
 function element(tagName = "div") {
   return {
-    tagName, className: "", textContent: "", children: [],
+    tagName, className: "", textContent: "", children: [], dataset: {},
     classList: { add() {} },
     append(...children) { this.children.push(...children); },
     appendChild(child) { this.children.push(child); },

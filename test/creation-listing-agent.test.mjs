@@ -1716,7 +1716,7 @@ test("application Listing generation uses one platform-aware V1 request and remo
 
   assert.equal(calls.length, 1);
   assert.match(calls[0].input, /"platformId": "etsy"/);
-  assert.deepEqual(calls[0].text.format.schema.required.sort(), Object.keys(draftPayload).sort());
+  assert.deepEqual(calls[0].text.format.schema.required.sort(), [...Object.keys(draftPayload), "deDisplay"].sort());
   assert.equal(drafts[0].schemaVersion, undefined);
   assert.equal(drafts[0].status, "completed");
   assert.doesNotMatch(visibleDraftText(drafts[0]), /Acme/i);

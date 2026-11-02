@@ -110,7 +110,7 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="./styles.css?v=20261029-subject-boundaries-1" />
+    <link rel="stylesheet" href="./styles.css?v=20261102-listing-german-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -126,7 +126,7 @@
         <span class="topbar-reveal-icon" aria-hidden="true"></span>
       </button>
       <header class="topbar" id="globalTopbar">
-        <small class="app-version" aria-label="当前版本 v0.2.096">v0.2.096</small>
+        <small class="app-version" aria-label="当前版本 v0.2.106">v0.2.106</small>
         <div class="brand-cluster">
           <div class="brand-mark" aria-hidden="true">
             <span class="brand-mark-core"></span>
@@ -1700,7 +1700,7 @@
                       <div class="creation-marketing-batch-fields">
                         <label class="compact-field">
                           <span>方案数量</span>
-                          <input id="creationMarketingBatchCountInput" type="number" min="1" max="20" value="1" inputmode="numeric" />
+                          <input id="creationMarketingBatchCountInput" type="number" min="1" max="50" value="1" inputmode="numeric" />
                         </label>
                         <label class="compact-field">
                           <span>每个方案生成套数</span>
@@ -2713,7 +2713,7 @@
               <nav class="asset-view-nav" aria-label="资产视图"><a href="#gallery">瀑布画廊</a><a href="#article-record">文章插图</a><a href="#creation-record" aria-current="page">套图</a><a href="#portrait-record">写真</a><a href="#ppt-record">PPT</a></nav>
               <div class="asset-context-row creation-record-filter-bar">
                 <label class="creation-record-search"><span>搜索</span><input id="creationRecordSearchInput" type="search" placeholder="商品、场景、语言" autocomplete="off" /></label>
-                <div class="creation-record-time-filters" id="creationRecordTimeFilters" role="group" aria-label="套图记录时间筛选"></div>
+                <div class="creation-record-time-filters" id="creationRecordTimeFilters" role="group" aria-label="套图记录筛选"></div>
                 <label class="creation-record-date"><span>日期</span><input id="creationRecordDateInput" type="date" aria-label="按创建日期筛选套图记录" /></label>
                 <button class="toolbar-button creation-record-reset-filters" id="creationRecordResetFiltersButton" type="button" disabled>清空筛选</button>
                 <p class="prompt-agent-feedback creation-record-feedback" id="creationRecordActionFeedback" aria-live="polite"></p>
@@ -2745,8 +2745,8 @@
                       </div>
                       <div class="asset-listing-actions" role="group" aria-label="Listing 工作区操作">
                         <button class="toolbar-button asset-primary-action" id="creationRecordRegenerateListingsButton" type="button" disabled>重新生成</button>
-                        <button class="toolbar-button" id="creationRecordCopyListingsButton" type="button" title="复制完整双语 Listing" disabled>复制全部</button>
-                        <button class="toolbar-button" id="creationRecordExportListingsButton" type="button" title="导出完整双语 Listing JSON" disabled>导出 JSON</button>
+                        <button class="toolbar-button" id="creationRecordCopyListingsButton" type="button" title="复制完整三语 Listing" disabled>复制全部</button>
+                        <button class="toolbar-button" id="creationRecordExportListingsButton" type="button" title="导出完整三语 Listing JSON" disabled>导出 JSON</button>
                       </div>
                     </div>
                     <div class="creation-listing-drafts" id="creationRecordListingDrafts"></div>
@@ -3817,6 +3817,6 @@
 
     <div class="app-tooltip" id="appTooltip" role="tooltip" popover="manual"></div>
 
-    <script type="module" src="./app.js?v=20261031-dual-concurrency-1"></script>
+    <script type="module" src="./app.js?v=20261102-listing-german-1"></script>
   </body>
 </html>

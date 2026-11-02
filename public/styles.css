@@ -6243,6 +6243,11 @@ ul.creation-plan-message {
   color: color-mix(in srgb, var(--success) 62%, var(--muted));
 }
 
+.creation-listing-character-count.german,
+.creation-listing-value-copy.creation-listing-german {
+  color: color-mix(in srgb, var(--accent) 72%, var(--muted));
+}
+
 .creation-listing-field-copy:hover {
   border-color: color-mix(in srgb, var(--accent) 38%, transparent);
   background: color-mix(in srgb, var(--accent) 8%, transparent);
