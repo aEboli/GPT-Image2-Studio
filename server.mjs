@@ -6676,7 +6676,9 @@ async function handleGenerate(request, response) {
     });
 
     const formData = await readFormDataBody(request);
-    const backgroundGeneration = isBackgroundGenerationRequest(formData);
+    // 云端实例不共享内存任务和临时图片，必须在原请求内把成图传回浏览器。
+    // 本地常驻服务仍可提前结束请求，再由任务轮询取得结果。
+    const backgroundGeneration = !isServerlessRuntime && isBackgroundGenerationRequest(formData);
     taskId = String(formData.get("jobId") || fallbackTaskId).trim() || fallbackTaskId;
     let prompt = String(formData.get("prompt") || "").trim();
     const ratio = String(formData.get("ratio") || "4:5");
