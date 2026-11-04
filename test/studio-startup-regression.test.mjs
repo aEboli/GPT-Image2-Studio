@@ -7,10 +7,10 @@ import * as resolver from "../public/lib/creation-platform-resolver.mjs";
 
 const app = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
 
-test("Listing 三语更新使用新的应用、样式和模块加载版本", async () => {
+test("套图标识与批量状态更新使用新的应用和样式版本", async () => {
   const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
-  assert.match(html, /app\.js\?v=20261102-listing-german-1/u);
-  assert.match(html, /styles\.css\?v=20261102-listing-german-1/u);
+  assert.match(html, /app\.js\?v=20261103-current-suite-1/u);
+  assert.match(html, /styles\.css\?v=20261103-current-suite-1/u);
   assert.match(app, /creation-listing-view\.mjs\?v=20261102-listing-german-1/u);
   assert.doesNotMatch(html, /完整双语 Listing/u);
 });

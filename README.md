@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.106-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.116-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installers-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,7 +10,7 @@
 
 Prompt-to-image, reference analysis, editing, ecommerce sets, portraits, article illustrations, PPT generation, and asset history in one browser-based workspace.
 
-Current version: `v0.2.106`
+Current version: `v0.2.116`
 
 [Chinese README](./README.zh-CN.md)
 
@@ -72,9 +72,9 @@ The pure Node.js/Electron start commands and `stop-studio-services.cmd` do not r
 
 ### Windows desktop app (recommended)
 
-Download `GPT-Image2-Studio-Desktop-Setup-v0.2.106-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
+Download `GPT-Image2-Studio-Desktop-Setup-v0.2.116-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
 
-For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.106-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
+For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.116-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
 
 For desktop development, Electron 43 requires Node.js 22.12 or newer:
 
@@ -85,7 +85,7 @@ cmd /c npm run desktop
 
 ### Windows browser installer
 
-The legacy browser-installer flow remains documented for local builds, but the `v0.2.106` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
+The legacy browser-installer flow remains documented for local builds, but the `v0.2.116` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
 
 ## Configuration
 
@@ -327,7 +327,7 @@ Open **Image-to-prompt** from the top bar or the Create menu, upload one image, 
 
 - Waterfall gallery and a shared lightbox with fit, zoom, pan, download, deletion, prompt review, and request-parameter inspection. Creation results show the exact saved generation prompt and recorded per-image parameters; missing historical values are shown as unrecorded instead of inferred from current settings.
 - Separate records for Creation sets, portraits, article illustrations, and PPT decks.
-- Background queue status, progress, structured errors, and retry of failed items. Creation queue entries show both their position and product name.
+- Background queue status, progress, structured errors, and retry of failed items. Creation queue entries show both their position and product name; the output header identifies the set currently being viewed, including its marketing plan/copy or queue position when available.
 - Generated images use time-prefixed descriptive filenames; set items retain sequence numbers, collisions receive suffixes, and gallery downloads use the saved filename.
 - Generation log rows retain each task's endpoint and show a concise output filename; failed items keep their error details.
 - **Prompt Kit** includes 520 source-attributed YouMind GPT Image 2.5 and GPT Image 2 prompt-and-image pairs (321 and 199 respectively). Browse by use case, visual style, or subject; filter by model, search or sort the collection, inspect the original source, and apply prompts from list or image views. Images are bundled locally, and entries retain their source-page and CC BY 4.0 attribution. Existing personal templates and Prompt Agent history are preserved.
@@ -556,7 +556,7 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 - The source and lockfile versions are authoritative; tags use `v<version>`.
 - Versions use `major.minor.patch` with a three-digit patch segment: major bumps reset minor and patch, minor bumps reset patch, feature bumps add `0.010`, and ordinary updates add `0.001`.
 - Use `npm run release:major`, `npm run release:minor`, `npm run release:feature`, or `npm run release:patch` with `--summary`; each release changes exactly one level.
-- Current release notes: [v0.2.106](./docs/releases/v0.2.106.md).
+- Current release notes: [v0.2.116](./docs/releases/v0.2.116.md).
 - Windows packages are distributed through [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Check the release notes for hashes and signing status.
 - `npm run check:release:strict` requires a clean worktree and a matching tag on the current commit.
 
@@ -571,7 +571,12 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 
 ## Version history
 
-Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.106](./docs/releases/v0.2.106.md).
+Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.116](./docs/releases/v0.2.116.md).
+
+### v0.2.116
+
+- Added a current-set label above Creation outputs. It follows the selected queue item and shows the product name with its marketing plan/copy or queue position; drafts and the Logo batch branch stay unlabelled.
+- Reworked AI marketing batch estimates, progress, and per-plan timing into compact status indicators with distinct success, warning, and failure states.
 
 ### v0.2.106
 

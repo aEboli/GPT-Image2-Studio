@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.106-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.116-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installer-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,7 +10,7 @@
 
 把提示词生图、参考图分析、图片编辑、电商套图、人物写真、文章插图、PPT 生成和素材管理集中到一个浏览器界面中。
 
-当前版本：`v0.2.106`
+当前版本：`v0.2.116`
 
 </div>
 
@@ -79,12 +79,12 @@ Windows 脚本入口（启动器、Native Messaging 安装/卸载、图片资源
 从包含桌面产物的 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
 
 ```text
-GPT-Image2-Studio-Desktop-Setup-v0.2.106-x64.exe
+GPT-Image2-Studio-Desktop-Setup-v0.2.116-x64.exe
 ```
 
 安装完成后通过桌面或开始菜单中的 `GPT-Image2-Studio` 启动。程序会在独立窗口中运行，内置服务使用动态回环端口，关闭窗口后不会遗留后台服务。无需另行安装 Node.js，完整说明见 [Windows 桌面程序文档](./docs/windows-desktop.md)。
 
-如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.106-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
+如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.116-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
 
 桌面开发使用 Electron `43`，要求 Node.js `22.12` 或更高版本；普通 `npm start` 服务仍支持 Node.js `20+`。
 
@@ -95,7 +95,7 @@ cmd /c npm run desktop
 
 ### 方式三：Windows 浏览器安装包（兼容旧版）
 
-旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.106` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
+旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.116` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
 
 ## 配置说明
 
@@ -482,7 +482,7 @@ GPT-Image2-Studio 面向个人创作者、电商运营、设计师和内容团�
 
 - 瀑布画廊和图片详情灯箱，支持缩放、平移、下载和参数复盘；套图结果可查看实际生成提示词及逐图保存的请求参数，历史缺失值明确显示“未记录”，不会用当前配置猜测。
 - 套图、写真、文章插图和 PPT 独立记录页。
-- 生成队列、后台任务状态、错误信息和失败项重试；套图队列项同时显示队列位次和商品名。
+- 生成队列、后台任务状态、错误信息和失败项重试；套图队列项同时显示队列位次和商品名，产物区顶部会标出当前查看的套图，并在适用时显示营销方案／套数或队列位次。
 - 新生成图片使用带时分的描述性文件名；套图图片保留序号，同名文件递增后缀，画廊下载沿用实际保存的名称。
 - 生成日志按任务保留接口地址，结果行显示简短文件名，失败项保留错误详情。
 - **Prompt Kit** 内置 520 组带来源标注的 YouMind GPT Image 2.5 / GPT Image 2 提示词与图片配对案例，分别为 321 组和 199 组。可按使用场景、视觉风格和主体浏览，按模型筛选、搜索或排序，并从列表或图片视图检查来源及应用提示词。预览图随应用本地分发，每条记录保留来源页面和 CC BY 4.0 署名信息；已有自定义模板和 Prompt Agent 历史会保留。
@@ -644,8 +644,8 @@ cmd /c npm run build:desktop
 产物路径：
 
 ```text
-artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.106-x64.exe
-artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.106-x64.zip
+artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.116-x64.exe
+artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.116-x64.zip
 artifacts/desktop/win-unpacked/GPT-Image2-Studio.exe
 ```
 
@@ -663,7 +663,7 @@ cmd /c npm run build:installer
 产物路径格式：
 
 ```text
-artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.106.exe
+artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.116.exe
 ```
 
 脚本使用系统 `iexpress.exe` 生成自解压安装包，并把当前 Node.js 运行时和依赖打入安装目录；启动后仍使用默认浏览器显示工作台。
@@ -768,7 +768,12 @@ cmd /c npm run build:installer
 
 ## 版本更新说明
 
-完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.106](./docs/releases/v0.2.106.md)。
+完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.116](./docs/releases/v0.2.116.md)。
+
+### v0.2.116 更新说明
+
+- 在套图产物顶部增加当前套图标识，跟随所选队列项显示商品名、营销方案与套数，或普通队列位次；草稿和批量加 Logo 分支不显示。
+- 将 AI 营销批量预估、进度和逐方案耗时改为紧凑状态项，并区分成功、警告和失败状态。
 
 ### v0.2.106 更新说明
 

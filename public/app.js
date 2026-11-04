@@ -1246,6 +1246,7 @@ const refs = {
   creationRoleGrid: document.querySelector("#creationRoleGrid"),
   creationSetOnly: [...document.querySelectorAll("[data-creation-set-only]")],
   creationSetMeta: document.querySelector("#creationSetMeta"),
+  creationCurrentSet: document.querySelector("#creationCurrentSet"),
   creationSizeInput: document.querySelector("#creationSizeInput"),
   creationSkuGenerationEnabledInput: document.querySelector("#creationSkuGenerationEnabledInput"),
   creationSkuGenerationRuleInput: document.querySelector("#creationSkuGenerationRuleInput"),
@@ -14897,7 +14898,31 @@ function buildCreationLogoBatchPreviewItems(status = "idle") {
   }));
 }
 
+function renderCreationCurrentSet() {
+  const badge = refs.creationCurrentSet;
+  if (!badge) return;
+  const logoBatchBranch = isCreationLogoBatchBranch();
+  const selectedQueueJob = logoBatchBranch ? null : getSelectedCreationQueueJob();
+  const currentSet = logoBatchBranch ? null : selectedQueueJob?.set || state.creation.currentSet;
+  const batch = selectedQueueJob?.marketingBatch || currentSet?.marketingBatch;
+  let text = "";
+  if (currentSet && (selectedQueueJob || !isCreationDraftSet(currentSet))) {
+    const productName = String(currentSet.productName || "").trim() || "未命名商品";
+    text = `当前：${productName}`;
+    if (batch?.schemeIndex > 0 && batch.schemeTotal > 0 && batch.copyNumber > 0 && batch.copyTotal > 0) {
+      text += ` · 方案 ${batch.schemeIndex}/${batch.schemeTotal} · 第 ${batch.copyNumber}/${batch.copyTotal} 套`;
+    } else if (selectedQueueJob) {
+      const queueJobs = getCreationQueueJobs();
+      text += ` · 第 ${queueJobs.indexOf(selectedQueueJob) + 1}/${queueJobs.length} 套`;
+    }
+  }
+  if (badge.textContent !== text) badge.textContent = text;
+  badge.hidden = !text;
+  badge.title = text ? currentSet.productName || text : "";
+}
+
 function renderCreationQueueStrip() {
+  renderCreationCurrentSet();
   renderCreationQueueStripView({ strip: refs.creationQueueStrip, queueJobs: getCreationQueueJobs(), selectedQueueId: state.creation.selectedQueueId, normalizeSet: normalizeCreationSetForView, getProgressSummary: getCreationProgressSummary, getStatusLabel: getCreationStatusLabel, formatClock });
 }
 
@@ -15334,6 +15359,27 @@ function cloneCreationMarketingBatchFormData(source) {
 
 let creationMarketingBatchClock = null;
 
+function renderCreationMarketingBatchItems(container, items) {
+  items.forEach(({ kind = "pill", label, value = "", detail = "", tone = "", title = "" }, index) => {
+    let item = container.children[index];
+    if (!item) {
+      item = document.createElement("div");
+      item.append(document.createElement("span"), document.createElement("strong"), document.createElement("small"));
+      container.append(item);
+    }
+    const className = `creation-marketing-batch-item is-${kind}${tone ? ` tone-${tone}` : ""}`;
+    if (item.className !== className) item.className = className;
+    if (item.title !== title) item.title = title;
+    const texts = [label, value !== "" ? ` ${value}` : "", detail ? ` ${detail}` : ""];
+    texts.forEach((text, childIndex) => {
+      const child = item.children[childIndex];
+      if (child.textContent !== text) child.textContent = text;
+      child.hidden = !text;
+    });
+  });
+  while (container.children.length > items.length) container.lastElementChild.remove();
+}
+
 function formatCreationMarketingBatchElapsed(task) {
   const seconds = Math.floor(getCreationMarketingBatchElapsedMs(task) / 1000);
   const minutes = Math.floor(seconds / 60);
@@ -15356,13 +15402,15 @@ function renderCreationMarketingBatchTiming() {
   if (timing) timing.hidden = !visible;
   if (!visible) return;
   const label = batch.status === "completed" ? "整批规划总耗时" : batch.status === "paused" ? "整批规划累计耗时" : batch.status === "canceled" ? "整批停止时耗时" : "整批规划已用时";
-  elapsed.textContent = `${label} ${formatCreationMarketingBatchElapsed(batch)}`;
-  timing.textContent = batch.schemes.filter((scheme) => scheme.startedAt)
+  renderCreationMarketingBatchItems(elapsed, [{ kind: "total", label, value: formatCreationMarketingBatchElapsed(batch) }]);
+  renderCreationMarketingBatchItems(timing, batch.schemes.filter((scheme) => scheme.startedAt)
     .sort((left, right) => Number(Boolean(left.finishedAt)) - Number(Boolean(right.finishedAt)) || left.index - right.index)
     .map((scheme) => {
       const status = ["enqueued", "completed"].includes(scheme.status) ? "入队完成 · 总耗时" : scheme.status === "failed" ? "失败 · 总耗时" : scheme.status === "canceled" ? "已停止 · 耗时" : scheme.status === "paused" ? "已暂停 · 累计" : scheme.status === "retrying" ? "重试中 · 已用时" : "进行中 · 已用时";
-      return `方案 ${scheme.index} · ${status} ${formatCreationMarketingBatchElapsed(scheme)}`;
-    }).join("\n");
+      const duration = formatCreationMarketingBatchElapsed(scheme);
+      const tone = ["enqueued", "completed"].includes(scheme.status) ? "success" : scheme.status === "failed" ? "danger" : ["paused", "retrying"].includes(scheme.status) ? "warning" : scheme.status === "canceled" ? "" : "info";
+      return { kind: "scheme", label: `方案 ${scheme.index}`, value: duration, detail: status.split(" · ")[0], tone, title: `方案 ${scheme.index} · ${status} ${duration}` };
+    }));
 }
 
 function renderCreationMarketingBatchConfig() {
@@ -15391,7 +15439,10 @@ function renderCreationMarketingBatchConfig() {
   if (refs.creationMarketingBatchCopiesInput && String(copiesPerScheme) !== refs.creationMarketingBatchCopiesInput.value) refs.creationMarketingBatchCopiesInput.value = String(copiesPerScheme);
   if (refs.creationMarketingBatchEstimate) {
     const imageCount = controllable && Number.isInteger(batch?.requestedImageCount) ? batch.requestedImageCount : getCreationSelectedImageCount();
-    refs.creationMarketingBatchEstimate.textContent = `预计生成：${imageCount * count * copiesPerScheme} 张营销图片（${imageCount} × ${count} × ${copiesPerScheme}）\n预计加入队列：${count * copiesPerScheme} 套（${count} 个方案 × 每方案 ${copiesPerScheme} 套）`;
+    renderCreationMarketingBatchItems(refs.creationMarketingBatchEstimate, [
+      { kind: "estimate", label: "预计营销图片", value: `${imageCount * count * copiesPerScheme} 张`, detail: `${imageCount} × ${count} × ${copiesPerScheme}`, title: "每套图片张数 × 方案数量 × 每方案套数" },
+      { kind: "estimate", label: "预计加入队列", value: `${count * copiesPerScheme} 套`, detail: `${count} 方案 × ${copiesPerScheme} 套` },
+    ]);
   }
   if (refs.creationMarketingBatchStartButton) {
     refs.creationMarketingBatchStartButton.hidden = controllable;
@@ -15413,19 +15464,29 @@ function renderCreationMarketingBatchConfig() {
   if (refs.creationMarketingBatchCopiesInput) refs.creationMarketingBatchCopiesInput.disabled = !enabled || controllable || creationMarketingBatchStarting;
   if (refs.creationMarketingBatchStatus) {
     if (!batch) {
-      refs.creationMarketingBatchStatus.textContent = "每套营销图片张数按上方“套图数量”计算；SKU 图和信息图重构按启用情况另计。";
+      renderCreationMarketingBatchItems(refs.creationMarketingBatchStatus, [{ kind: "note", label: "每套营销图片张数按上方“套图数量”计算；SKU 图和信息图重构按启用情况另计。" }]);
     } else {
       const failedCount = batch.schemes.filter((scheme) => scheme.status === "failed").length;
       const pendingCount = batch.schemes.filter((scheme) => ["queued", "paused"].includes(scheme.status)).length;
       const canceledCount = batch.schemes.filter((scheme) => scheme.status === "canceled").length;
       const activeCount = (batch.activeIndexes || []).filter((index) => ["planning", "enqueuing", "retrying"].includes(batch.schemes[index]?.status)).length;
       const status = batch.status === "completed" && failedCount ? "已结束（有失败）" : creationMarketingBatchStatusLabel(batch.status);
-      const summary = `${status} · 已处理 ${batch.completedCount + failedCount}/${batch.total} 个方案\n成功 ${batch.completedCount} · 失败 ${failedCount} · 进行中 ${activeCount}/${CREATION_MARKETING_BATCH_CONCURRENCY} · 待处理 ${pendingCount}\n已入队 ${batch.enqueuedCount}/${batch.targetQueueCount} 套 · 重试 ${batch.retryCount || 0} 次${canceledCount ? ` · 已停止 ${canceledCount}` : ""}`;
+      const items = [
+        { kind: "summary", label: status, value: `已处理 ${batch.completedCount + failedCount}/${batch.total}`, tone: batch.status === "completed" ? failedCount ? "warning" : "success" : paused || batch.status === "pausing" ? "warning" : batch.status === "canceled" ? "" : "info" },
+        { label: "成功", value: batch.completedCount, tone: batch.completedCount ? "success" : "" },
+        { label: "失败", value: failedCount, tone: failedCount ? "danger" : "" },
+        { label: "进行中", value: `${activeCount}/${CREATION_MARKETING_BATCH_CONCURRENCY}`, tone: activeCount ? "info" : "" },
+        { label: "待处理", value: pendingCount },
+        { label: "已入队", value: `${batch.enqueuedCount}/${batch.targetQueueCount}`, title: `已入队 ${batch.enqueuedCount}/${batch.targetQueueCount} 套` },
+        { label: "重试", value: `${batch.retryCount || 0} 次` },
+      ];
+      if (canceledCount) items.push({ kind: "note", label: `已停止 ${canceledCount} 个方案` });
       const note = batch.status === "pausing" ? "正在等待当前请求收尾；有效方案会保留，后续暂不入队。"
         : paused && batch.pauseReason === "user" ? "已暂停后续，点击“继续”恢复剩余任务；已入队套图继续生成。"
           : paused ? "已暂停，点击“继续”恢复剩余任务；已入队套图继续生成。"
             : batch.status === "canceled" ? `${creationMarketingBatchStarting ? "等待当前请求收尾；" : ""}已停止本轮后续任务，已入队套图继续生成。` : "";
-      refs.creationMarketingBatchStatus.textContent = `${summary}${note ? `\n${note}` : ""}`;
+      if (note) items.push({ kind: "note", label: note });
+      renderCreationMarketingBatchItems(refs.creationMarketingBatchStatus, items);
     }
   }
   renderCreationMarketingBatchTiming();
@@ -16537,6 +16598,7 @@ async function runCreationMarketingBatchGeneration({ resume = false } = {}) {
           totalQueueCount: batchState.targetQueueCount,
         };
         const job = enqueueCreationGeneration({ formData: generationFormData, set: queuedSet });
+        job.marketingBatch = { ...queuedSet.marketingBatch };
         job.marketingProgress = structuredClone(planResult.marketingProgress);
         return job;
       },

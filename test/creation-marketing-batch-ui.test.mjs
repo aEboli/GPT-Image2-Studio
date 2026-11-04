@@ -49,6 +49,17 @@ test("batch controls have responsive layout coverage", () => {
   assert.match(styles, /html\[data-ui-layout="mobile"\] \.creation-marketing-batch-fields\s*\{[\s\S]*grid-template-columns:\s*1fr/);
 });
 
+function batchElement() {
+  return {
+    children: [], className: "", title: "", hidden: false, ownText: "",
+    get textContent() { return this.ownText + this.children.map((child) => child.textContent).join(""); },
+    set textContent(value) { this.ownText = value; this.children = []; },
+    get lastElementChild() { return this.children.at(-1); },
+    append(...children) { for (const child of children) { child.parent = this; this.children.push(child); } },
+    remove() { this.parent.children.splice(this.parent.children.indexOf(this), 1); },
+  };
+}
+
 function createBatchConfigHarness({ enabled = false, imageCount = 20, count = 10, copies = 2 } = {}) {
   const attributes = {};
   const timers = new Map();
@@ -60,11 +71,12 @@ function createBatchConfigHarness({ enabled = false, imageCount = 20, count = 10
       creationMarketingBatchToggle: { setAttribute: (key, value) => { attributes[key] = value; } },
       creationMarketingBatchCountInput: { value: String(count) },
       creationMarketingBatchCopiesInput: { value: String(copies) },
-      creationMarketingBatchEstimate: {}, creationMarketingBatchStartButton: {},
+      creationMarketingBatchEstimate: batchElement(), creationMarketingBatchStartButton: {},
       creationMarketingBatchContinueButton: {}, creationMarketingBatchPauseButton: {}, creationMarketingBatchCancelButton: {},
-      creationMarketingBatchStatus: {},
-      creationMarketingBatchElapsed: {}, creationMarketingBatchTiming: {},
+      creationMarketingBatchStatus: batchElement(),
+      creationMarketingBatchElapsed: batchElement(), creationMarketingBatchTiming: batchElement(),
     },
+    document: { createElement: batchElement },
     aiMarketing: true, imageCount, creationMarketingBatchStarting: false,
     isCreationAiMarketingEnabled: () => scope.aiMarketing,
     isCreationMarketingBatchRunning: () => ["queued", "running", "pausing"].includes(scope.state.creation.marketingBatch?.status),
@@ -80,7 +92,7 @@ function createBatchConfigHarness({ enabled = false, imageCount = 20, count = 10
   assert.ok(render);
   vm.createContext(scope);
   vm.runInContext("let creationMarketingBatchClock = null;", scope);
-  for (const name of ["formatCreationMarketingBatchElapsed", "renderCreationMarketingBatchTiming"]) {
+  for (const name of ["renderCreationMarketingBatchItems", "formatCreationMarketingBatchElapsed", "renderCreationMarketingBatchTiming"]) {
     const source = app.match(new RegExp(`function ${name}\\([^]*?\\r?\\n\\}`))?.[0];
     assert.ok(source);
     vm.runInContext(source, scope);
@@ -124,9 +136,9 @@ test("batch estimate multiplies images per set, scheme count and copies and upda
     view.scope.refs.creationMarketingBatchCopiesInput.value = String(copies);
     view.render();
     const estimate = view.scope.refs.creationMarketingBatchEstimate.textContent;
-    assert.match(estimate, new RegExp(`${total} 张营销图片`));
+    assert.match(estimate, new RegExp(`预计营销图片 ${total} 张`));
     assert.match(estimate, new RegExp(`${images} × ${count} × ${copies}`));
-    assert.match(estimate, new RegExp(`预计加入队列：${suites} 套`));
+    assert.match(estimate, new RegExp(`预计加入队列 ${suites} 套`));
   }
 });
 
@@ -188,7 +200,7 @@ test("paused batches keep frozen quantities and cannot continue before draining"
   view.scope.refs.creationMarketingBatchCountInput.value = "3";
   view.scope.refs.creationMarketingBatchCopiesInput.value = "4";
   view.render();
-  assert.match(view.scope.refs.creationMarketingBatchEstimate.textContent, /400 张营销图片（20 × 10 × 2）/);
+  assert.match(view.scope.refs.creationMarketingBatchEstimate.textContent, /400 张 20 × 10 × 2/);
   assert.equal(view.scope.refs.creationMarketingBatchCountInput.value, "10");
   assert.equal(view.scope.refs.creationMarketingBatchCopiesInput.value, "2");
   assert.equal(view.scope.refs.creationMarketingBatchCountInput.disabled, true);
@@ -220,14 +232,14 @@ test("batch status only counts schemes and never expands long errors or progress
   assert.match(status, /已入队 10\/40/);
   assert.match(status, /重试 4 次/);
   assert.doesNotMatch(status, /缺少完整提示词|方案 \d+：|当前方案/);
-  assert.equal(status.split("\n").length, 3);
+  assert.equal(view.scope.refs.creationMarketingBatchStatus.children.length, 7);
   assert.ok(status.length < 160);
   Object.assign(batch, { status: "completed", completedCount: 18, enqueuedCount: 36, activeIndexes: [] });
   for (const scheme of batch.schemes.slice(7)) Object.assign(scheme, { status: "enqueued", enqueuedCount: 2 });
   view.render();
   assert.match(view.scope.refs.creationMarketingBatchStatus.textContent, /已结束（有失败）/);
   assert.match(view.scope.refs.creationMarketingBatchStatus.textContent, /已处理 20\/20/);
-  assert.match(view.scope.refs.creationMarketingBatchStatus.textContent, /成功 18 · 失败 2/);
+  assert.match(view.scope.refs.creationMarketingBatchStatus.textContent, /成功 18失败 2/);
 });
 
 test("all-failed batches and stopped batches retain compact and honest totals", () => {
@@ -238,14 +250,14 @@ test("all-failed batches and stopped batches retain compact and honest totals", 
   view.scope.state.creation.marketingBatch = batch;
   view.render();
   let status = view.scope.refs.creationMarketingBatchStatus.textContent;
-  assert.match(status, /已结束（有失败） · 已处理 20\/20/);
-  assert.match(status, /成功 0 · 失败 20 · 进行中 0\/2 · 待处理 0/);
-  assert.equal(status.split("\n").length, 3);
+  assert.match(status, /已结束（有失败） 已处理 20\/20/);
+  assert.match(status, /成功 0失败 20进行中 0\/2待处理 0/);
+  assert.equal(view.scope.refs.creationMarketingBatchStatus.children.length, 7);
   Object.assign(batch, { status: "paused", error: "缺少完整提示词".repeat(200) });
   batch.schemes[19].status = "paused";
   view.render();
   status = view.scope.refs.creationMarketingBatchStatus.textContent;
-  assert.equal(status.split("\n").length, 4);
+  assert.equal(view.scope.refs.creationMarketingBatchStatus.children.length, 8);
   assert.doesNotMatch(status, /缺少完整提示词/);
   batch.status = "canceled";
   batch.schemes[19].status = "canceled";
@@ -253,7 +265,7 @@ test("all-failed batches and stopped batches retain compact and honest totals", 
   status = view.scope.refs.creationMarketingBatchStatus.textContent;
   assert.match(status, /失败 19/);
   assert.match(status, /已停止 1/);
-  assert.equal(status.split("\n").length, 4);
+  assert.equal(view.scope.refs.creationMarketingBatchStatus.children.length, 9);
 });
 
 test("scheme and batch clocks update without progress events and completed durations stay fixed", (t) => {
@@ -270,13 +282,20 @@ test("scheme and batch clocks update without progress events and completed durat
   assert.equal(view.timers.size, 1);
   const timer = [...view.timers.values()][0];
   assert.equal(timer.milliseconds, 1000);
-  assert.match(view.scope.refs.creationMarketingBatchTiming.textContent, /^方案 2 · 进行中 · 已用时 00:00/);
+  assert.match(view.scope.refs.creationMarketingBatchTiming.textContent, /^方案 2 00:00 进行中/);
   assert.doesNotMatch(view.scope.refs.creationMarketingBatchTiming.textContent, /方案 3/);
+  const timingRow = view.scope.refs.creationMarketingBatchTiming.children[0];
+  const timingValue = timingRow.children[1];
+  const statusRow = view.scope.refs.creationMarketingBatchStatus.children[0];
   now += 65000;
   timer.callback();
   assert.equal(view.scope.refs.creationMarketingBatchElapsed.textContent, "整批规划已用时 01:05");
-  assert.match(view.scope.refs.creationMarketingBatchTiming.textContent, /方案 1 · 入队完成 · 总耗时 00:03/);
-  assert.match(view.scope.refs.creationMarketingBatchTiming.textContent, /方案 2 · 进行中 · 已用时 01:05/);
+  assert.match(view.scope.refs.creationMarketingBatchTiming.textContent, /方案 1 00:03 入队完成/);
+  assert.match(view.scope.refs.creationMarketingBatchTiming.textContent, /方案 2 01:05 进行中/);
+  assert.equal(view.scope.refs.creationMarketingBatchTiming.children[0], timingRow);
+  assert.equal(timingRow.children[1], timingValue, "clock ticks preserve existing time nodes");
+  assert.equal(view.scope.refs.creationMarketingBatchStatus.children[0], statusRow);
+  assert.match(timingRow.title, /进行中 · 已用时 01:05/);
   assert.equal(view.scope.refs.creationMarketingBatchStatus.textContent, summary, "clock ticks only update timing text");
   Object.assign(batch, { status: "completed", timingStartedAt: "", elapsedMs: 65000, finishedAt: new Date(now).toISOString() });
   Object.assign(batch.schemes[1], { status: "enqueued", timingStartedAt: "", elapsedMs: 65000, finishedAt: batch.finishedAt });
