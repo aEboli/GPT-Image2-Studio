@@ -120,6 +120,9 @@ test("the real reference byte budget is enforced independently for each task", (
   const { input, payload } = marketingPlanFixture(18);
   const base = buildCreationPlan(input);
   payload.items[12].reference_indexes.push(2);
+  base.productInsights.confirmedFacts.push({ id: "large-only", text: "本图唯一必要的结构细节", kind: "appearance", source: "reference", referenceIndexes: [2] });
+  payload.items[12].fact_ids.push("large-only");
+  payload.items[12].reference_needs = [{ reference_index: 2, purpose: "detail", fact_ids: ["large-only"], reason: "主体没有显示的必要细节" }];
   const references = [images[0], { ...images[0], filename: "large.png", buffer: Buffer.alloc(6 * 1024 * 1024) }];
   const plan = applyCreationMarketingPlan(base, payload, { ...options, referenceCount: 2, validateItem: (item) => buildCreationItemReferenceImages(item, references, base.referenceImageRoles) });
   assert.equal(plan.imageCount, 17);

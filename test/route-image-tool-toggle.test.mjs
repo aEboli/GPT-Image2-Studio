@@ -16,10 +16,10 @@ import { createResponsesRequestBody, requestImageGeneration } from "../lib/respo
 
 const model = "gpt-image-2.5-sunburst";
 
-test("工具模型开关默认关闭，开启时发送选中的模型", () => {
+test("工具模型开关默认开启，保留显式关闭并发送选中的模型", () => {
   for (const includeImageToolModel of [undefined, null, true, false]) {
     const config = { imageToolModel: model, includeImageToolModel };
-    const expected = includeImageToolModel === true;
+    const expected = includeImageToolModel !== false;
     assert.equal(normalizeImageRouteConfig(config).includeImageToolModel, expected);
     assert.equal(normalizeBrowserPrivateConfig(config).includeImageToolModel, expected);
     const selected = getSelectedImageGenerationConfig(config);
@@ -28,11 +28,11 @@ test("工具模型开关默认关闭，开启时发送选中的模型", () => {
   }
 });
 
-test("本地配置保存关闭状态，旧配置默认关闭，公开配置同步状态", async (t) => {
+test("本地配置默认开启，显式关闭可持久化且公开配置同步状态", async (t) => {
   const rootDir = await mkdtemp(join(tmpdir(), "image-studio-route-toggle-"));
   t.after(() => rm(rootDir, { recursive: true, force: true }));
   const store = createConfigStore({ rootDir, env: {} });
-  assert.equal((await store.readPrivateConfig()).includeImageToolModel, false);
+  assert.equal((await store.readPrivateConfig()).includeImageToolModel, true);
   await store.saveConfig({ imageToolModel: model, includeImageToolModel: false });
   await store.saveConfig({ responsesModel: "test-text-model" });
   assert.equal((await store.readPrivateConfig()).includeImageToolModel, false);
@@ -40,6 +40,19 @@ test("本地配置保存关闭状态，旧配置默认关闭，公开配置同�
   assert.equal((await store.readPrivateConfig()).imageToolModel, model);
   await store.saveConfig({ includeImageToolModel: true });
   assert.equal((await store.readPublicConfig()).includeImageToolModel, true);
+});
+
+test("浏览器新配置默认开启，局部保存不改变开关", () => {
+  const values = new Map();
+  const storage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };
+  saveBrowserPrivateConfig({ imageToolModel: model }, storage);
+  saveBrowserPrivateConfig({ responsesModel: "test-text-model" }, storage);
+  const config = readBrowserPrivateConfig(storage);
+  assert.equal(config.includeImageToolModel, true);
+  assert.equal(toPublicBrowserConfig(config).includeImageToolModel, true);
+  assert.equal(appendBrowserConfigToFormData(new FormData(), () => config).get("includeImageToolModel"), "true");
+  assert.equal(getBrowserPrivateConfigRequestPayload(() => config).includeImageToolModel, true);
+  assert.equal(getBrowserPrivateConfigRequestPayload(() => ({ imageToolModel: model })).includeImageToolModel, true);
 });
 
 test("浏览器保存、公开配置、JSON 和表单均保留关闭状态", () => {
@@ -110,8 +123,8 @@ test("路由生成真实构造的请求按默认、关闭、重开状态发送�
     assert.equal(body.model, "text-model");
     assert.equal(body.stream, true);
     assert.equal(body.tools[0].quality, "max");
-    assert.equal(Object.hasOwn(body.tools[0], "model"), includeImageToolModel === true);
-    if (includeImageToolModel === true) assert.equal(body.tools[0].model, model);
+    assert.equal(Object.hasOwn(body.tools[0], "model"), includeImageToolModel !== false);
+    if (includeImageToolModel !== false) assert.equal(body.tools[0].model, model);
   }
 });
 
@@ -135,11 +148,11 @@ test("服务端配置保存接口往返开关，省略字段时保留已保存�
   await context.handleConfigPost({ includeImageToolModel: false }, {});
   assert.equal(result.status, 403);
   assert.equal((await configStore.readPrivateConfig()).includeImageToolModel, true);
-  const generationCalls = [...source.matchAll(/imageModel: (generationConfig|itemGenerationConfig)\.imageModel,\r?\n\s+includeImageToolModel: \1\.includeImageToolModel,\r?\n\s+endpointPath: \1\.endpointPath,/g)];
+  const generationCalls = [...source.matchAll(/imageModel: (generationConfig|itemGenerationConfig)\.imageModel,\r?\n(?:\s+\.\.\.getImageModelMappingMetadata\(\1\),\r?\n)?\s+includeImageToolModel: \1\.includeImageToolModel,\r?\n\s+endpointPath: \1\.endpointPath,/g)];
   assert.equal(generationCalls.length, 8, "所有生成入口都应传递路由开关，包括套图修复与共享生图选项");
 });
 
-test("路由模型并排布局与默认关闭开关仅存在于路由面板", async () => {
+test("路由模型并排布局与默认开启开关仅存在于路由面板", async () => {
   const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
   const css = await readFile(new URL("../public/styles.css", import.meta.url), "utf8");
   const nodes = [];
@@ -156,7 +169,7 @@ test("路由模型并排布局与默认关闭开关仅存在于路由面板", as
   const toggle = toggles[0];
   assert.equal(toggle.parentNode, fields[4]);
   assert.equal(attr(toggle, "role"), "switch");
-  assert.equal(attr(toggle, "aria-checked"), "false");
+  assert.equal(attr(toggle, "aria-checked"), "true");
   assert.equal(attr(toggle, "data-ui-i18n-aria-label"), "includeImageToolModel");
   assert.match(attr(toggle, "class"), /reference-analysis-auto-collapse/);
   assert.match(css, /\.route-config-panel\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\);/);

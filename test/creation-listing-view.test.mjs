@@ -14,6 +14,316 @@ import {
 } from "../lib/creation-listing-view.mjs";
 import { CREATION_LISTING_POLICY_VERSION } from "../lib/creation-listing-policies.mjs";
 
+function listingBatchHarness(count = 8) {
+  const sets = Array.from({ length: count }, (_, index) => ({ setId: "batch-" + index, listingDrafts: [] }));
+  const state = { creation: { sets, recordSetId: sets[0].setId } };
+  const pending = new Map();
+  const requests = [];
+  const feedback = [];
+  const events = [];
+  let active = 0;
+  let peak = 0;
+  const context = {
+    state, refs: {},
+    getSelectedSet: () => state.creation.sets.find((set) => set.setId === state.creation.recordSetId),
+    compactErrorMessage: (message) => message,
+    setFeedback: (message, type) => feedback.push({ message, type }),
+    onListingEvent: (event) => events.push(event),
+    upsertSet: (set) => {
+      state.creation.sets = state.creation.sets.map((entry) => entry.setId === set.setId ? set : entry);
+      return set;
+    },
+    fetchImpl: async (_url, init) => {
+      const body = JSON.parse(init.body);
+      requests.push(body);
+      active += 1;
+      peak = Math.max(peak, active);
+      return new Promise((resolve) => pending.set(body.setId, (response) => {
+        pending.delete(body.setId);
+        active -= 1;
+        resolve(response);
+      }));
+    },
+  };
+  const settle = (setId, error) => {
+    const response = error
+      ? Response.json({ ok: false, ...error }, { status: error.httpStatus || 500 })
+      : Response.json({ set: { setId, listingDrafts: [{ title: setId + " saved" }] } });
+    pending.get(setId)?.(response);
+  };
+  const drain = async () => {
+    for (let index = 0; index < count + 2; index += 1) {
+      for (const id of [...pending.keys()]) settle(id);
+      await new Promise(setImmediate);
+    }
+  };
+  return { context, state, requests, feedback, events, pending, settle, drain, get peak() { return peak; } };
+}
+
+test("Listing controls ignore null records and count only eligible missing drafts", () => {
+  const button = {};
+  const state = { creation: {
+    sets: [null, undefined, {}, { setId: "busy" }, { setId: "missing" }, { setId: "saved", listingDrafts: [{ title: "saved" }] }],
+    listingGeneratingSetIds: ["busy"],
+  } };
+  createCreationListingController({ refs: { creationRecordGenerateMissingListingsButton: button }, state }).syncRecordControls(null);
+  assert.equal(button.disabled, false);
+  assert.equal(button.title, "生成 1 套缺少的 Listing");
+});
+
+test("batch Listing skips null records without losing valid candidates", async () => {
+  const state = { creation: { sets: [null, {}, { setId: "valid", listingDrafts: [] }] } };
+  const controller = createCreationListingController({
+    state,
+    fetchImpl: async () => Response.json({ set: { setId: "valid", listingDrafts: [{ title: "Saved" }] } }),
+  });
+  const result = await controller.generateMissing();
+  assert.equal(result.generatedCount, 1);
+  assert.equal(result.failedCount, 0);
+});
+
+test("batch Listing uses three workers, skips saved and busy records, and guards duplicate batches", async (t) => {
+  const h = listingBatchHarness();
+  h.state.creation.sets[6].listingDrafts = [{ title: "Existing draft" }];
+  h.state.creation.listingGeneratingSetIds = ["batch-7"];
+  h.state.creation.sets.push(h.state.creation.sets[0]);
+  const controller = createCreationListingController(h.context);
+  const run = controller.generateMissing();
+  t.after(async () => { await h.drain(); await run; });
+  await new Promise(setImmediate);
+  assert.equal(h.requests.length, 3);
+  assert.equal(h.peak, 3);
+  const duplicate = await controller.generateMissing();
+  assert.equal(h.requests.length, 3);
+  assert.equal(duplicate.batchId, h.state.creation.listingBatchProgress.batchId);
+  assert.equal(duplicate.activeCount, 3);
+  h.settle("batch-1");
+  await new Promise(setImmediate);
+  assert.equal(h.requests.length, 4, "a free worker starts only one next request");
+  assert.equal(h.state.creation.recordSetId, "batch-0");
+  await h.drain();
+  const result = await run;
+  assert.equal(h.peak, 3);
+  assert.deepEqual(h.requests.map((body) => body.setId), Array.from({ length: 6 }, (_, index) => "batch-" + index));
+  assert.equal(result.totalCount, 6);
+  assert.equal(result.generatedCount, 6);
+  assert.equal(result.failedCount, 0);
+  assert.equal(result.activeCount, 0);
+  assert.equal(result.unstartedCount, 0);
+  assert.ok(h.requests.every((body) => body.batchId === result.batchId && !("set" in body)));
+  assert.deepEqual(h.state.creation.listingGeneratingSetIds, ["batch-7"]);
+  assert.equal(h.state.creation.listingBatchGenerating, false);
+  assert.ok(h.feedback.every(({ message }) => /总计.*成功.*失败.*活动.*未开始.*耗时/u.test(message)));
+  const completed = h.events.filter((event) => event.stage === "batch-completed");
+  assert.equal(completed.length, 1);
+  assert.equal(completed[0].batchId, result.batchId);
+  assert.equal(completed[0].totalCount, 6);
+  assert.equal(completed[0].generatedCount, 6);
+  assert.equal(completed[0].failedCount, 0);
+  assert.equal(completed[0].unstartedCount, 0);
+  assert.equal(completed[0].stopReason, "");
+  assert.equal("setId" in completed[0], false);
+});
+
+test("batch Listing rechecks pending records and protects the current selection and saved drafts", async (t) => {
+  const h = listingBatchHarness(6);
+  const run = createCreationListingController(h.context).generateMissing();
+  t.after(async () => { await h.drain(); await run; });
+  await new Promise(setImmediate);
+  h.state.creation.sets[3].listingDrafts = [{ title: "Saved elsewhere" }];
+  h.state.creation.listingGeneratingSetIds.push("batch-4");
+  h.state.creation.recordSetId = "batch-3";
+  h.settle("batch-0");
+  await new Promise(setImmediate);
+  await h.drain();
+  const result = await run;
+  assert.deepEqual(h.requests.map((body) => body.setId), ["batch-0", "batch-1", "batch-2", "batch-5"]);
+  assert.equal(result.generatedCount, 4);
+  assert.equal(result.skippedCount, 2);
+  assert.equal(result.unstartedCount, 0);
+  assert.equal(h.state.creation.recordSetId, "batch-3");
+  assert.equal(h.state.creation.sets.find((set) => set.setId === "batch-3").listingDrafts[0].title, "Saved elsewhere");
+});
+
+for (const failure of [
+  { message: "额度用尽", errorKind: "quota", httpStatus: 402, stopBatch: true },
+  { message: "认证失败", errorKind: "authentication", httpStatus: 401, fatal: true },
+]) {
+  test("batch Listing stops new work on " + failure.errorKind + " and drains in-flight success", async (t) => {
+    const h = listingBatchHarness();
+    const run = createCreationListingController(h.context).generateMissing();
+    t.after(async () => { await h.drain(); await run; });
+    await new Promise(setImmediate);
+    h.settle("batch-0", { ...failure, requestId: "failed-request", attempt: 2, retryAfterMs: 90000 });
+    await new Promise(setImmediate);
+    assert.equal(h.requests.length, 3);
+    assert.equal(h.state.creation.listingBatchGenerating, true);
+    assert.equal(h.state.creation.listingBatchProgress.stopped, true);
+    assert.equal(h.state.creation.listingBatchProgress.activeCount, 2);
+    h.state.creation.recordSetId = "batch-7";
+    h.settle("batch-1");
+    h.settle("batch-2");
+    const result = await run;
+    assert.equal(result.generatedCount, 2);
+    assert.equal(result.failedCount, 1);
+    assert.equal(result.unstartedCount, 5);
+    assert.equal(result.activeCount, 0);
+    for (const key of ["errorKind", "httpStatus"]) assert.equal(result.failures[0][key], failure[key]);
+    assert.equal(result.failures[0].requestId, "failed-request");
+    assert.equal(result.failures[0].attempt, 2);
+    assert.equal(result.failures[0].retryAfterMs, 90000);
+    assert.equal(h.state.creation.recordSetId, "batch-7");
+    assert.equal(h.state.creation.sets.find((set) => set.setId === "batch-1").listingDrafts[0].title, "batch-1 saved");
+    const completed = h.events.at(-1);
+    assert.equal(completed.stage, "batch-completed");
+    assert.equal(completed.totalCount, 8);
+    assert.equal(completed.generatedCount, 2);
+    assert.equal(completed.failedCount, 1);
+    assert.equal(completed.unstartedCount, 5);
+    assert.ok(completed.elapsedMs >= 0);
+    assert.equal(completed.stopReason, failure.message);
+  });
+}
+
+test("batch Listing continues ordinary failures but stops after three consecutive temporary limits", async (t) => {
+  const h = listingBatchHarness(9);
+  const run = createCreationListingController(h.context).generateMissing();
+  t.after(async () => { await h.drain(); await run; });
+  await new Promise(setImmediate);
+  h.settle("batch-0", { message: "单项异常", errorKind: "request", httpStatus: 500 });
+  await new Promise(setImmediate);
+  assert.equal(h.requests.length, 4);
+  for (const id of ["batch-1", "batch-2", "batch-3"]) {
+    h.settle(id, { message: "上游暂时限流", errorKind: "rate_limit", httpStatus: 429, retryAfterMs: 1000 });
+    await new Promise(setImmediate);
+  }
+  assert.equal(h.requests.length, 6);
+  assert.equal(h.state.creation.listingBatchProgress.stopped, true);
+  await h.drain();
+  const result = await run;
+  assert.equal(result.failedCount, 4);
+  assert.equal(result.generatedCount, 2);
+  assert.equal(result.unstartedCount, 3);
+  assert.equal(result.failures.at(-1).errorKind, "rate_limit");
+});
+
+test("batch Listing feedback advances elapsed without events and clears its timer", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"] });
+  const h = listingBatchHarness(3);
+  const run = createCreationListingController(h.context).generateMissing();
+  t.after(async () => { await h.drain(); await run; });
+  t.mock.timers.tick(2500);
+  assert.ok(h.state.creation.listingBatchProgress.elapsedMs >= 2000);
+  assert.match(h.feedback.at(-1).message, /活动 3.*耗时 2[.]5 秒/u);
+  await h.drain();
+  await run;
+  const count = h.feedback.length;
+  t.mock.timers.tick(10000);
+  assert.equal(h.feedback.length, count);
+});
+
+test("Listing SSE diagnostics retain safe metadata and stop new work before the active stream ends", async (t) => {
+  const h = listingBatchHarness(7);
+  let stream;
+  const encoder = new TextEncoder();
+  h.context.fetchImpl = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    h.requests.push(body);
+    if (body.setId !== "batch-0") {
+      return new Promise((resolve) => h.pending.set(body.setId, resolve));
+    }
+    return new Response(new ReadableStream({ start(controller) { stream = controller; } }), { headers: { "content-type": "text/event-stream" } });
+  };
+  const run = createCreationListingController(h.context).generateMissing();
+  t.after(async () => { try { stream.close(); } catch {} await h.drain(); await run; });
+  await new Promise(setImmediate);
+  const send = (stage, data) => stream.enqueue(encoder.encode("event: " + stage + "\ndata: " + JSON.stringify(data) + "\n\n"));
+  const metadata = {
+    requestId: "request-batch-0", attempt: 2,
+    timing: { headersMs: 40, raw: "PRIVATE_TIMING" }, usage: { outputTokens: 10 },
+    text: "PRIVATE_DRAFT", delta: "PRIVATE_DELTA", apiKey: "PRIVATE_KEY", raw: { key: "PRIVATE_RAW" },
+  };
+  send("text_progress", { ...metadata, stage: "queued" });
+  send("text_progress", { ...metadata, stage: "cooldown", stopBatch: true, errorKind: "rate_limit", retryAfterMs: 65000, message: "等待上游" });
+  await new Promise(setImmediate);
+  h.settle("batch-1");
+  await new Promise(setImmediate);
+  assert.equal(h.requests.length, 3, "a successful peer cannot take new work after a stop signal");
+  send("error", { message: "暂时超并发", errorKind: "rate_limit", httpStatus: 429, stopBatch: true, retryAfterMs: 65000 });
+  stream.close();
+  h.settle("batch-2");
+  const result = await run;
+  assert.equal(result.generatedCount, 2);
+  assert.equal(result.failedCount, 1);
+  assert.equal(result.unstartedCount, 4);
+  const event = h.events.find((item) => item.stage === "cooldown");
+  assert.equal(event.batchId, result.batchId);
+  assert.equal(event.setId, "batch-0");
+  assert.equal(event.requestId, "request-batch-0");
+  assert.equal(event.attempt, 2);
+  assert.deepEqual(event.timing, { headersMs: 40 });
+  assert.deepEqual(event.usage, { outputTokens: 10 });
+  assert.equal(event.errorKind, "rate_limit");
+  assert.equal(event.message, "等待上游");
+  assert.equal(event.totalCount, 7);
+  assert.doesNotMatch(JSON.stringify(h.events), /PRIVATE_/u);
+  assert.equal(result.failures[0].stopBatch, true);
+  assert.equal(result.failures[0].requestId, "request-batch-0");
+});
+
+test("successful completion resets the batch temporary-limit streak", async (t) => {
+  const h = listingBatchHarness(9);
+  const run = createCreationListingController(h.context).generateMissing();
+  t.after(async () => { await h.drain(); await run; });
+  await new Promise(setImmediate);
+  const limited = { message: "临时限流", errorKind: "rate_limit", httpStatus: 429, retryAfterMs: 1000 };
+  h.settle("batch-0", limited);
+  await new Promise(setImmediate);
+  h.settle("batch-1", limited);
+  await new Promise(setImmediate);
+  h.settle("batch-2");
+  await new Promise(setImmediate);
+  h.settle("batch-3", limited);
+  await new Promise(setImmediate);
+  assert.equal(h.state.creation.listingBatchProgress.stopped, false);
+  await h.drain();
+  const result = await run;
+  assert.equal(result.generatedCount, 6);
+  assert.equal(result.failedCount, 3);
+  assert.equal(result.unstartedCount, 0);
+});
+
+test("Listing background completion preserves a changed selection and diagnostics cannot break generation", async () => {
+  const h = listingBatchHarness(2);
+  h.context.getRequestConfig = () => ({ set: { private: "redundant" }, textApiKey: "PRIVATE_REQUEST_KEY" });
+  h.context.onListingEvent = () => { throw new Error("诊断存储不可用"); };
+  const run = createCreationListingController(h.context).generate("batch-0");
+  await new Promise(setImmediate);
+  h.state.creation.recordSetId = "batch-1";
+  h.settle("batch-0");
+  const result = await run;
+  assert.equal(result.listingDrafts[0].title, "batch-0 saved");
+  assert.equal(h.state.creation.recordSetId, "batch-1");
+  assert.equal("set" in h.requests[0], false);
+  assert.ok(h.requests[0].batchId);
+});
+
+test("failed Listing regeneration preserves a successful draft and scheduling metadata", async () => {
+  const h = listingBatchHarness(1);
+  h.state.creation.sets[0].listingDrafts = [{ title: "Previously saved" }];
+  const run = createCreationListingController(h.context).generate("batch-0");
+  const detail = { message: "暂时限流", errorKind: "rate_limit", retryAfterMs: 2000, httpStatus: 429 };
+  h.settle("batch-0", detail);
+  await assert.rejects(run, (error) => {
+    assert.equal(error.errorKind, detail.errorKind);
+    assert.equal(error.retryAfterMs, detail.retryAfterMs);
+    assert.equal(error.httpStatus, detail.httpStatus);
+    return true;
+  });
+  assert.deepEqual(h.state.creation.sets[0].listingDrafts, [{ title: "Previously saved" }]);
+  assert.deepEqual(h.state.creation.listingGeneratingSetIds, []);
+});
+
 test("German content appears between English and Chinese in every Listing field and copies independently", () => {
   const buckets = { exact: ["exact"], longTail: ["longTail"], traffic: ["traffic"], descriptive: ["descriptive"] };
   const content = (prefix) => ({

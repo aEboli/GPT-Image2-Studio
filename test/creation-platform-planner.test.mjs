@@ -325,7 +325,7 @@ test("scene-fit fallbacks separate environment fit from staged still life", () =
   assert.match(third.prompt, /product active|user-environment relationship/i);
 });
 
-test("only the scene role copies a scene reference as a blueprint and scene-fit items stay distinct", () => {
+test("scene references supply context without imposing a blueprint and scene-fit items stay distinct", () => {
   const plan = buildCreationPlan({
     productName: "Jointed swimbait lure",
     imageCount: 18,
@@ -336,7 +336,9 @@ test("only the scene role copies a scene reference as a blueprint and scene-fit 
   });
   const byRole = Object.fromEntries(plan.items.map((item) => [item.role, item.prompt]));
 
-  assert.match(byRole.scene, /Use scene source boat\.jpg for environment, action, placement, angle, scale, and spatial relationships/);
+  assert.match(byRole.scene, /Use verified scene facts as context only/);
+  assert.match(byRole.scene, /distinct supported action, product pose, camera and framing/);
+  assert.doesNotMatch(byRole.scene, /Use scene source boat\.jpg/);
   assert.doesNotMatch(byRole.atmosphere, /boat\.jpg|Use scene source/);
   for (const role of ["human-handheld", "human-wearable"]) {
     assert.doesNotMatch(byRole[role], /boat\.jpg/, role);

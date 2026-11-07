@@ -30,8 +30,8 @@ const generationClientPath = new URL("../lib/generation-client.mjs", import.meta
 const generationLogPanelPath = new URL("../lib/generation-log-panel.mjs", import.meta.url);
 const generationLogStorePath = new URL("../lib/generation-log-store.mjs", import.meta.url);
 const pptAnalysisClientPath = new URL("../lib/ppt-analysis-client.mjs", import.meta.url);
-const stylesAssetVersion = "20261103-current-suite-1";
-const appAssetVersion = "20261103-current-suite-1";
+const stylesAssetVersion = "20261105-output-toggle-1";
+const appAssetVersion = "20261106-output-no-hints-1";
 const pptModuleAssetVersion = "20260527-density-overlap-1";
 const creationQueueModuleAssetVersion = "20261102-creation-render-1";
 const quickBlendModuleAssetVersion = "20260928-aspect-ratio-value-only-1";
@@ -2296,14 +2296,17 @@ test("ratio picker renders every configured aspect ratio instead of a featured s
   assert.doesNotMatch(styles, /\.ratio-chip-orientation/);
 });
 
-test("studio output format can be selected as png or jpg", async () => {
+test("studio output format offers automatic and manual choices", async () => {
   const html = await readFile(indexPath, "utf8");
   const app = await readFile(appPath, "utf8");
 
   assert.match(html, /<span data-ui-i18n="outputFormat">输出格式<\/span>[\s\S]*<select id="outputFormatInput" name="format"><\/select>/);
   assert.match(app, /getOutputFormatOptions,[\s\S]*normalizeOutputFormat,/);
   assert.match(app, /outputFormatInput: document\.querySelector\("#outputFormatInput"\)/);
-  assert.match(app, /function renderOutputFormatOptions\(\) \{[\s\S]*getOutputFormatOptions\(\)\.forEach/);
+  assert.match(app, /getOutputFormatOptions\(\{ special: automatic, automatic \}\)\.forEach/);
+  assert.match(html, /data-prompt-output-auto/);
+  assert.equal((html.match(/data-prompt-output-format=/g) || []).length, 5);
+  assert.match(app, /outputDecision\?\.format \|\| normalizeOutputFormat/);
   assert.match(app, /format: normalizeOutputFormat\(refs\.outputFormatInput\.value/);
   assert.match(app, /formData\.set\("format", job\.format\);/);
 });
@@ -4776,12 +4779,13 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(app, /3-scene\|scene\|适用多场景图/);
   assert.match(app, /4-multi-angle\|multi-angle\|多角度产品展示图/);
   assert.match(app, /5-atmosphere\|atmosphere\|商业 CG 渲染图/);
+  assert.match(app, /5-atmosphere\|atmosphere\|商业 CG 渲染图\|干净白底的无字商业 CG，重构来源支持的姿态、视角与完整商品组合/);
   assert.match(app, /6-product-detail\|product-detail\|产品细节特写图/);
   assert.match(app, /7-brand-story\|brand-story\|品牌质感\/礼品价值图/);
   assert.match(app, /7-brand-story\|brand-story\|品牌质感\/礼品价值图\|用真实拥有或使用瞬间体现品牌气质/);
   assert.match(app, /8-size-capacity-fit\|size-capacity-fit\|尺寸容量适配图/);
   assert.match(app, /9-effect-comparison\|effect-comparison\|功能效果渲染图/);
-  assert.match(app, /9-effect-comparison\|effect-comparison\|功能效果渲染图\|以一个完整商品呈现核心功能与收益，加强材质体积、功能流动的遮挡纵深及局部光照，只使用有依据的作用效果/);
+  assert.match(app, /9-effect-comparison\|effect-comparison\|功能效果渲染图\|干净白底，重新安排来源支持的动作、视角与空间作用，以完整商品、有据光效/);
   assert.match(app, /10-scene-fit-1\|scene-fit-1\|场景适配图一/);
   assert.match(app, /11-scene-fit-2\|scene-fit-2\|场景适配图二/);
   assert.match(app, /12-accessory-gift\|accessory-gift\|到手清单\/配件图/);
@@ -4931,7 +4935,10 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(app, /button\.title = \[name, metaText\]\.filter\(Boolean\)\.join\(" · "\)/);
   assert.match(app, /function getCreationIndustryTemplateActiveLevel\(/);
   assert.match(app, /function focusCreationIndustryTemplateBrowserOnSelectedTemplate\(\) \{/);
-  assert.match(app, /const currentTemplate = getCreationSelectedIndustryTemplate\(\);[\s\S]*if \(!currentTemplate\.categoryPath\) \{[\s\S]*return;[\s\S]*\}[\s\S]*setCreationIndustryTemplateBrowserPath\(currentTemplate\);/);
+  const focusTemplateStart = app.indexOf("function focusCreationIndustryTemplateBrowserOnSelectedTemplate()");
+  const focusTemplateEnd = app.indexOf("\nfunction ", focusTemplateStart + 1);
+  const focusTemplateBody = app.slice(focusTemplateStart, focusTemplateEnd);
+  assert.match(focusTemplateBody, /const currentTemplate = getCreationSelectedIndustryTemplate\(\);[\s\S]*if \(!currentTemplate\.categoryPath\) \{[\s\S]*return;[\s\S]*\}[\s\S]*setCreationIndustryTemplateBrowserPath\(currentTemplate\);/);
   assert.match(app, /function goBackCreationIndustryTemplateLevel\(\) \{/);
   assert.match(app, /function setCreationIndustryTemplateBrowserOpen\(/);
   assert.doesNotMatch(app, /function renderCreationIndustryTemplateLevel\(/);
@@ -6069,10 +6076,11 @@ test("creation mode exposes listing agent controls and record listing drafts", a
   assert.match(app, /renderCreationListingDrafts\(\{[\s\S]*refs:\s*getCreationInlineListingRefs\(\),[\s\S]*set:\s*currentSet/);
   assert.match(listingView, /export function getCreationListingDraftAccessState\(draft = \{\}, source = \{\}\) \{[\s\S]*canUse: true,[\s\S]*reason: "direct-output"/);
   assert.match(listingView, /export function renderCreationListingDrafts\(\{ refs, state, set \} = \{\}\) \{/);
-  assert.match(listingView, /async function generate\(setId = "", \{ batch = false \} = \{\}\) \{/);
+  assert.match(listingView, /async function generate\(setId = "", \{ batch = false, batchId = "" \} = \{\}\) \{/);
   assert.match(listingView, /const requestedSetId = cleanCreationListingText\(setId\);/);
   assert.match(listingView, /requestTextModel\(context\.fetchImpl, "\/api\/creation\/listings",/);
-  assert.match(listingView, /\.\.\.\(context\.getRequestConfig\?\.\(\) \|\| \{\}\),[\s\S]*setId: selectedSet\.setId,[\s\S]*set: selectedSet,/);
+  assert.match(listingView, /\.\.\.\(context\.getRequestConfig\?\.\(\) \|\| \{\}\),[\s\S]*setId: selectedSet\.setId,[\s\S]*batchId,/);
+  assert.doesNotMatch(listingView, /set: selectedSet,/);
   assert.match(listingView, /async function copy\(\) \{[\s\S]*const selectedSet = context\.getSelectedSet\?\.\(\);[\s\S]*const text = buildCreationRecordListingText\(selectedSet\);/);
   assert.match(listingView, /function exportListings\(\) \{[\s\S]*const selectedSet = context\.getSelectedSet\?\.\(\);[\s\S]*buildCreationListingExportPayload\(selectedSet\)/);
   assert.match(listingView, /export function buildCreationListingDraftText\(draft, index = 0, source = \{\}\) \{[\s\S]*bilingualScalar[\s\S]*bilingualList/);

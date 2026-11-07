@@ -24,7 +24,7 @@ const SUNBURST = "gpt-image-2.5-sunburst";
 const FLARE = "gpt-image-2.5-flare";
 
 test("image tool model options are the official ids with gpt-image-2 as the default", () => {
-  assert.deepEqual(IMAGE_TOOL_MODEL_OPTIONS, ["gpt-image-2", SUNBURST, FLARE]);
+  assert.deepEqual(IMAGE_TOOL_MODEL_OPTIONS, ["gpt-image-2", SUNBURST, FLARE, "gpt-image-2.6-sunburst", "gpt-image-2.6-flare"]);
   assert.equal(DEFAULT_IMAGE_TOOL_MODEL, "gpt-image-2");
 });
 

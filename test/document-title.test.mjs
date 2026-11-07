@@ -27,6 +27,7 @@ function createContext() {
     CREATE_VIEW_IDS: new Set(),
     ASSET_VIEW_IDS: new Set(),
     ensureActiveViewModule: async () => false,
+    getImageOptionsView: () => ({ refresh() {} }),
     normalizeUiLanguage: (value) => value === "en" ? "en" : "zh-CN",
     configModelPicker: { render() {} },
   };

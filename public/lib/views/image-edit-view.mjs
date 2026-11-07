@@ -72,6 +72,8 @@ function hasImageEditContext({ refs, state } = {}) {
   return Boolean(refs?.imageEditSourceInput && refs?.imageEditPromptInput && state?.imageEdit);
 }
 
+function normalizeImageEditStrategy(value) { return value === "markup" ? "markup" : normalizeLocalMaskExecutionStrategy(value); }
+
 export function createImageEditController(options = {}) {
   const refs = options.refs || getImageEditRefs();
   const state = options.state;
@@ -156,7 +158,7 @@ export function createImageEditController(options = {}) {
     };
     localEdit.brushSize = Number.parseInt(String(localEdit.brushSize || 48), 10) || 48;
     localEdit.tool = localEdit.tool === "eraser" ? "eraser" : "brush";
-    localEdit.executionStrategy = normalizeLocalMaskExecutionStrategy(localEdit.executionStrategy);
+    localEdit.executionStrategy = normalizeImageEditStrategy(localEdit.executionStrategy);
     localEdit.nextRegionIndex = Number.parseInt(String(localEdit.nextRegionIndex || 1), 10) || 1;
     state.imageEdit.localEdit = localEdit;
     return localEdit;
@@ -941,7 +943,7 @@ export function createImageEditController(options = {}) {
 
   async function buildLocalMaskPayload() {
     const validRegions = getValidLocalMaskRegions();
-    const executionStrategy = normalizeLocalMaskExecutionStrategy(refs.imageEditExecutionStrategyInput?.value);
+    const executionStrategy = normalizeImageEditStrategy(refs.imageEditExecutionStrategyInput?.value);
     const basePayload = {
       editMode: IMAGE_EDIT_LOCAL_MASK_MODE,
       executionStrategy,
@@ -955,6 +957,15 @@ export function createImageEditController(options = {}) {
       })),
     };
 
+    if (executionStrategy === "markup") {
+      return {
+        ...basePayload,
+        editMode: "markup",
+        executionStrategy: "",
+        markup: await canvasToPngFile(refs.imageEditMaskOverlayCanvas, "image-edit-markup.png"),
+        prompt: String(refs.imageEditPromptInput?.value || "").trim() + "\nUse the colored markup overlay to guide the edit. Do not render the annotations in the output.\n" + basePayload.regionInstructions.map((region) => `Region ${region.index} (${region.color}): ${region.instruction}`).join("\n"),
+      };
+    }
     if (executionStrategy === "sequential") {
       return {
         ...basePayload,
@@ -1162,7 +1173,7 @@ export function createImageEditController(options = {}) {
       element.textContent = option.label;
       refs.imageEditOutputFormatInput.appendChild(element);
     });
-    refs.imageEditOutputFormatInput.value = currentValue;
+    refs.imageEditOutputFormatInput.value = [...refs.imageEditOutputFormatInput.options].some((option) => option.value === currentValue) ? currentValue : "png";
   }
 
   function syncImageEditSize(value) {
@@ -1189,6 +1200,7 @@ export function createImageEditController(options = {}) {
       prompt,
       editInstruction: prompt,
       editMode: payload?.editMode || "",
+      markup: payload?.markup || null,
       executionStrategy: payload?.executionStrategy || "",
       regionInstructions: payload?.regionInstructions || [],
       localMask: payload
@@ -1719,7 +1731,7 @@ export function createImageEditController(options = {}) {
     });
     refs.imageEditExecutionStrategyInput?.addEventListener("change", (event) => {
       const localEdit = ensureLocalEditState();
-      localEdit.executionStrategy = normalizeLocalMaskExecutionStrategy(event.target.value);
+      localEdit.executionStrategy = normalizeImageEditStrategy(event.target.value);
       refs.imageEditExecutionStrategyInput.value = localEdit.executionStrategy;
     });
     refs.imageEditAddRegionButton?.addEventListener("click", () => {

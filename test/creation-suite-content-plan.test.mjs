@@ -155,10 +155,12 @@ test("assigned reference selection and labels exclude unrelated facts even when 
   const item = plan.items.find((item) => item.contentAssignment.taskKey === "function-explanation");
   const references = input.referenceImageRoles.map((role) => ({ name: role.filename, referenceIndex: role.index, buffer: Buffer.from("reference") }));
   const selected = buildCreationItemReferenceImages(item, references, plan.referenceImageRoles);
-  assert.ok(selected.some((image) => image.name === "function.png"));
+  assert.deepEqual(selected.map((image) => image.name), ["gloves.png"]);
   assert.equal(selected.some((image) => image.name === "other-function.png"), false);
   const labels = buildCreationGenerationReferenceImageLabels(selected, plan.referenceImageRoles, item).join("\n");
-  assert.match(labels, /内置加热芯片/);
+  assert.match(item.prompt, /内置加热芯片/);
+  assert.deepEqual(plan.productInsights.confirmedFacts.find((fact) => fact.id === "heat").referenceIndexes, [2]);
+  assert.doesNotMatch(item.prompt, /ref 2/);
   assert.doesNotMatch(labels, /UNRELATED_NOTE/);
 });
 

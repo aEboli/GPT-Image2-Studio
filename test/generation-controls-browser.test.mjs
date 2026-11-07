@@ -12,8 +12,13 @@ import {
   normalizeImageQuality,
 } from "../lib/image-quality-options.mjs";
 import { normalizeOutputFormat } from "../lib/output-format-options.mjs";
+import { normalizePromptOutputSelection, resolvePromptOutputFormat } from "../lib/prompt-output-format.mjs";
 import { normalizeGenerationSize, normalizeModelProtocolImageSize } from "../lib/generation-size-options.mjs";
 import { createConfigModelPickerController } from "../lib/config-model-picker.mjs";
+import { resolveDirectImageModelMapping } from "../lib/direct-image-model-mapping.mjs";
+import { isGptImage26 } from "../lib/image-model-capabilities.mjs";
+import { formatImageModelLabel } from "../lib/studio-formatters.mjs";
+import { getOutputFormatOptions } from "../lib/output-format-options.mjs";
 import { DEFAULT_REASONING_EFFORT, REASONING_EFFORT_OPTIONS } from "../lib/studio-constants.mjs";
 
 const app = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
@@ -29,6 +34,7 @@ function createControl(value = "") {
   return {
     value, checked: false, dataset: {}, children: [],
     set innerHTML(_value) { this.children = []; },
+    get options() { return this.children; },
     appendChild(child) { this.children.push(child); },
     setAttribute(name, value) { attributes.set(name, String(value)); },
     getAttribute(name) { return attributes.get(name) ?? null; },
@@ -55,7 +61,7 @@ function createHarness({ route = "a", browserConfig = {} } = {}) {
     "configFeedback", "testConnectionButton", "fetchModelsButton", "modelPickerToggle", "modelOptionsList",
     "directModelPickerToggle", "directModelOptionsList", "protocolModelPickerToggle", "protocolModelOptionsList",
     "grokImageModelInput", "grokModelPickerToggle", "grokModelOptionsList",
-    "ratioInput", "reasoningEffortField", "reasoningEffortInput",
+    "ratioInput", "reasoningEffortField", "reasoningEffortInput", "promptInput",
   ].map((name) => [name, createControl()]));
   refs.imageRouteInputs = ["a", "b", "c", "d"].map((value) => Object.assign(createControl(value), { checked: value === route }));
   const configSection = route === "c" ? "gemini" : route === "d" ? "grok" : "gpt";
@@ -73,10 +79,20 @@ function createHarness({ route = "a", browserConfig = {} } = {}) {
   const document = { ...createControl(), createElement: createControl, querySelector: () => ({}), documentElement: { dataset: {} } };
   refs.modelOptionsList.ownerDocument = document;
   const context = {
+    mappingDrafts: structuredClone(browserConfig.directImageModelMappings || []),
+    directImageModelMappingView: {
+      read: () => structuredClone(context.mappingDrafts),
+      refreshCandidates() {}, setCandidates() {},
+    },
+    resolveDirectImageModelMapping, isGptImage26, formatImageModelLabel,
+    imageOptions: {}, structuredClone,
+    getImageOptionsView: () => ({ read: () => context.imageOptions, refresh() {} }),
+    formatRenderCount: 0,
+    renderOutputFormatOptions() { context.formatRenderCount += 1; },
     ...imageRouteConfig, refs, document, FormData, createConfigModelPickerController, appendBrowserConfigToFormData,
     state: { activeView: "studio", studioMode: "prompt", referenceFiles: [], configSection, config: { defaults: { quality: "high" } } },
     getGrokImageQualityOptions, getImageQualityOptions, normalizeGrokImageQuality, normalizeImageQualityForRoute, normalizeImageQuality, normalizeOutputFormat,
-    normalizeGenerationSize, normalizeModelProtocolImageSize,
+    normalizeGenerationSize, normalizeModelProtocolImageSize, normalizePromptOutputSelection, resolvePromptOutputFormat, getOutputFormatOptions,
     getBrowserPrivateConfigRequestPayload: () => browserConfig,
     DEFAULT_REASONING_EFFORT, DEFAULT_REASONING_EFFORTS: [...REASONING_EFFORT_OPTIONS],
     REASONING_LABELS: { none: "None", minimal: "Minimal", low: "Low", medium: "Medium", high: "High", xhigh: "XHigh", max: "Max" },
@@ -108,6 +124,8 @@ function createHarness({ route = "a", browserConfig = {} } = {}) {
     "setActiveView", "setStudioGenerationMode", "normalizeSizeForSelectedRoute", "resolveGenerationSizeForSelectedRoute",
     "selectConfigSection", "createJob", "savePromptAttemptPreview",
     "applyQueuedJobConfigSnapshot", "appendJobConfigToFormData",
+    "getCurrentImageCapabilityModel", "getCurrentMaxReferenceImages", "formatMappedImageModelLabel",
+    "supportsAutomaticPromptOutput", "getPromptOutputDecision",
   ].map((name) => {
     const source = app.match(new RegExp(`(?:async )?function ${name}\\([^]*?\\n\\}`))?.[0];
     assert.ok(source, `${name} must be present`);
@@ -123,6 +141,49 @@ function createHarness({ route = "a", browserConfig = {} } = {}) {
   vm.runInNewContext([...functions, app.slice(pickerStart, pickerEnd), app.slice(eventsStart, eventsEnd), app.slice(toggleStart, toggleEnd)].join("\n"), context);
   return context;
 }
+
+test("提示词默认自动、双向切换工作流和模型后保留手动格式", () => {
+  const context = createHarness();
+  const source = app.match(/function renderOutputFormatOptions\([^]*?\n\}/)?.[0];
+  vm.runInNewContext(source, context);
+  context.refs.outputFormatInput.value = "";
+  context.renderOutputFormatOptions();
+  assert.equal(context.refs.outputFormatInput.value, "auto");
+  context.refs.outputFormatInput.value = "gif";
+  context.refs.imageToolModelSelect.value = "gpt-image-2.6-flare";
+  context.renderOutputFormatOptions();
+  context.refs.imageToolModelSelect.value = "gpt-image-2";
+  context.renderOutputFormatOptions();
+  assert.equal(context.refs.outputFormatInput.value, "gif", "模型切换不能静默改成 PNG");
+  context.state.activeView = "style-transfer";
+  context.state.studioMode = "style-transfer";
+  context.renderOutputFormatOptions();
+  assert.equal(context.refs.outputFormatInput.value, "png");
+  assert.equal(context.refs.outputFormatInput.options.some((item) => item.value === "auto"), false);
+  context.state.activeView = "studio";
+  context.state.studioMode = "prompt";
+  context.renderOutputFormatOptions();
+  assert.equal(context.refs.outputFormatInput.value, "gif");
+});
+
+test("自动 GIF 在入队时固定具体格式与帧参数，后续控件修改不影响请求快照", () => {
+  const context = createHarness({ route: "b" });
+  context.refs.outputFormatInput.value = "auto";
+  context.refs.promptInput.value = "请生成 GIF 动画";
+  context.imageOptions = { frameCount: 12, frameDurationMs: 160 };
+  const job = context.createJob();
+  context.applyQueuedJobConfigSnapshot(job);
+  assert.equal(job.format, "gif");
+  assert.equal(job.outputFormatSelection, "auto");
+  assert.equal(job.outputFormatSource, "prompt");
+  context.refs.outputFormatInput.value = "png";
+  context.refs.promptInput.value = "改成静态 PNG";
+  context.imageOptions.frameCount = 4;
+  const form = context.appendJobConfigToFormData(new FormData(), job);
+  assert.equal(job.format, "gif");
+  assert.equal(JSON.parse(form.get("imageOptions")).frameCount, 12);
+  assert.equal(JSON.parse(form.get("imageOptions")).frameDurationMs, 160);
+});
 
 test("all five reasoning controls default to high, offer all levels and retain independent selections", () => {
   const context = createHarness();
@@ -140,6 +201,73 @@ test("all five reasoning controls default to high, offer all levels and retain i
   assert.equal(context.getSelectedReasoningEffort(context.refs.creationReasoningEffortInput), "xhigh");
   context.refs.creationReasoningEffortInput.value = "invalid";
   assert.equal(context.getSelectedReasoningEffort(context.refs.creationReasoningEffortInput), "high");
+});
+
+test("直连映射按已知能力刷新质量、参考图限制和显示，同时保留所选模型", () => {
+  const context = createHarness({ route: "b", browserConfig: { directImageModelMappings: [{ source: "IMAGE-2.6", target: "gpt-image-2.6-flare" }] } });
+  context.state.limits = { maxReferenceImages: 15 };
+  context.refs.directImageModelInput.value = "IMAGE-2.6";
+  context.refs.qualityInput.value = "max";
+  context.renderImageQualityOptions();
+  assert.equal(context.refs.qualityInput.value, "max");
+  assert.equal(context.getCurrentImageCapabilityModel(), "gpt-image-2.6-flare");
+  assert.ok(getOutputFormatOptions({ imageModel: context.getCurrentImageCapabilityModel(), special: true }).some((option) => option.value === "svg"));
+  assert.equal(context.getCurrentMaxReferenceImages(), 16);
+  const job = context.applyQueuedJobConfigSnapshot({});
+  assert.equal(job.selectedImageModel, "IMAGE-2.6");
+  assert.equal(job.requestImageModel, "gpt-image-2.6-flare");
+  assert.equal(job.imageModel, "gpt-image-2.6-flare");
+  assert.equal(context.getCurrentPrivateConfigRequestPayload().directImageModel, "IMAGE-2.6");
+  assert.equal(context.formatMappedImageModelLabel(job), "IMAGE-2.6 → gpt-image-2.6-flare");
+  context.refs.directImageModelInput.value = "unknown-2.6-model";
+  context.renderImageQualityOptions();
+  assert.equal(context.refs.qualityInput.value, "high");
+  assert.equal(context.getCurrentMaxReferenceImages(), 15);
+});
+
+test("已知直连模型映射成别名仍使用原能力；映射不改变其他通道", () => {
+  for (const route of ["a", "b", "c", "d"]) {
+    const source = "gpt-image-2.6-sunburst";
+    const context = createHarness({ route, browserConfig: { directImageModelMappings: [{ source, target: "provider-image" }] } });
+    context.refs.directImageModelInput.value = source;
+    const job = context.applyQueuedJobConfigSnapshot({});
+    if (route === "b") {
+      assert.equal(job.imageModel, source);
+      assert.equal(job.selectedImageModel, source);
+      assert.equal(job.requestImageModel, "provider-image");
+    } else {
+      assert.equal(job.imageModel, route === "a" ? legacyModel : route === "c" ? "gemini-3.1-flash-image-preview" : "grok-imagine-image-2.0");
+      assert.equal(job.requestImageModel, undefined);
+      assert.equal(job.selectedImageModel, undefined);
+    }
+  }
+});
+
+test("入队映射深拷贝，发送 FormData 使用任务快照且显式空数组保持清空", () => {
+  const original = [{ source: "custom", target: "gpt-image-2.6-flare" }];
+  const context = createHarness({ route: "b", browserConfig: { directImageModelMappings: original } });
+  context.refs.directImageModelInput.value = "custom";
+  const job = context.applyQueuedJobConfigSnapshot({});
+  const emptyJob = { ...job, directImageModelMappings: [] };
+  context.mappingDrafts[0].target = "changed-after-queue";
+  context.refs.directImageModelInput.value = "new-selected-model";
+  assert.deepEqual(job.directImageModelMappings, original);
+  const form = context.appendJobConfigToFormData(new FormData(), job);
+  assert.deepEqual(JSON.parse(form.get("directImageModelMappings")), original);
+  assert.equal(form.get("directImageModel"), "custom");
+  const emptyForm = context.appendJobConfigToFormData(new FormData(), emptyJob);
+  assert.deepEqual(JSON.parse(emptyForm.get("directImageModelMappings")), []);
+});
+
+test("切换路由 A/B 的 2.6 模型立即刷新输出格式", () => {
+  const context = createHarness();
+  context.refs.imageToolModelSelect.value = "gpt-image-2.6-sunburst";
+  context.refs.imageToolModelSelect.dispatch("change");
+  assert.ok(context.formatRenderCount > 0);
+  const beforeDirect = context.formatRenderCount;
+  context.refs.directImageModelInput.value = "gpt-image-2.6-flare";
+  context.refs.directImageModelInput.dispatch("input");
+  assert.ok(context.formatRenderCount > beforeDirect);
 });
 
 test("工具模型开关更新请求值与无障碍状态，不改变直连流式开关", () => {
@@ -235,6 +363,7 @@ test("saving a prompt preview retains its job background after the current contr
   const context = createHarness();
   context.refs.transparentBackgroundInput.checked = true;
   const job = context.createJob();
+  Object.assign(job, { selectedImageModel: "IMAGE-2.6", requestImageModel: "gpt-image-2.6-flare", imageModel: "gpt-image-2.6-flare" });
   context.state.jobs = [job];
   context.refs.transparentBackgroundInput.checked = false;
   context.getPromptDeckCardsForKey = () => [{ attemptIndex: 1, previewUrl: "data:image/png;base64,AQID" }];
@@ -250,6 +379,8 @@ test("saving a prompt preview retains its job background after the current contr
   await context.savePromptAttemptPreview(job.id, 1);
   assert.equal(savedPayload.imageBackground, "transparent");
   assert.equal(savedPayload.format, "png");
+  assert.equal(savedPayload.selectedImageModel, "IMAGE-2.6");
+  assert.equal(savedPayload.requestImageModel, "gpt-image-2.6-flare");
 });
 
 test("all five quality controls follow the active image model and retain independent choices", () => {

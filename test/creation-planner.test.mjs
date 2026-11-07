@@ -34,6 +34,7 @@ import {
   buildCreationItemGenerationPrompt,
   resolveCreationItemGenerationParameters,
 } from "../lib/creation-generation-parameters.mjs";
+import { CREATION_WHITE_RENDER_DIRECTIVE } from "../lib/creation-suite-content-plan.mjs";
 
 test("creation submitted plans accept a legitimate 33-item snapshot above the legacy byte threshold", () => {
   const prompt = "平台套图事实提示词。".repeat(3500);
@@ -252,7 +253,7 @@ test("creation planner keeps compact contracts and explicit product fidelity bou
   );
 
   assert.equal(ordinaryItems.length, 19);
-  assert.ok(ordinaryItems.every((item) => !prohibitionPattern.test(stripDynamicSceneGuard(item.prompt.replace(/^PRODUCT FIDELITY:.*$/gmu, "").replace(/Variant scope:[^.]+\.[^.]+\./gu, "")))));
+  assert.ok(ordinaryItems.every((item) => !prohibitionPattern.test(stripDynamicSceneGuard(item.prompt.replace(CREATION_WHITE_RENDER_DIRECTIVE, "").replace("Do not copy the source canvas or repeat the same interaction.", "").replace(/^PRODUCT FIDELITY:.*$/gmu, "").replace(/Variant scope:[^.]+\.[^.]+\./gu, "")))));
   assert.ok(ordinaryItems.filter((item) => item.itemKind === "carousel").every((item) =>
     ["series-showcase", "size-capacity-fit", "spec-table"].includes(item.role)
       ? /each supplied variant from its own matching reference/i.test(item.prompt)
@@ -1109,12 +1110,12 @@ test("creation planner maps reference analysis coverage onto the matching carous
   assert.deepEqual(byRole["usage-suggestion"].coverageWarnings, []);
   assert.match(byRole["usage-suggestion"].prompt, /Reference coverage:/);
   assert.match(byRole["usage-suggestion"].prompt, /selling-point infographic|visible product evidence/i);
-  assert.match(byRole["usage-suggestion"].prompt, /setup-guide\.png/);
+  assert.doesNotMatch(byRole["usage-suggestion"].prompt, /setup-guide\.png/);
   assert.match(byRole["usage-suggestion"].prompt, /three setup steps for first use/);
   assert.doesNotMatch(byRole["usage-suggestion"].prompt, /faithfully reconstruct the original instruction card|preserve the original sequence/i);
 });
 
-test("creation planner treats scene coverage as visual blueprints and usage coverage as selling-point evidence", () => {
+test("creation planner uses scene facts for an independent composition and usage as text evidence", () => {
   const plan = buildCreationPlan({
     productName: "Countertop purifier",
     productDescription: "Compact purifier with tap connector and filter cartridge.",
@@ -1128,8 +1129,8 @@ test("creation planner treats scene coverage as visual blueprints and usage cove
   });
   const byRole = Object.fromEntries(plan.items.map((item) => [item.role, item]));
 
-  assert.match(byRole.scene.prompt, /Use scene source .* for environment, action, placement/i);
-  assert.match(byRole.scene.prompt, /recompose around the current product/i);
+  assert.match(byRole.scene.prompt, /Use verified scene facts as context only/i);
+  assert.match(byRole.scene.prompt, /distinct supported action, product pose, camera and framing/i);
   assert.match(byRole.scene.prompt, /Use assigned source facts and scene relationships/i);
   assert.match(byRole["usage-suggestion"].prompt, /selling-point infographic|visible product evidence/i);
   assert.match(byRole["usage-suggestion"].prompt, /buyer payoff/i);
@@ -2069,7 +2070,7 @@ test("creation planner supports the refactored ecommerce image types with dedica
 test("creation planner applies SKU generation rules for package-list content and dimensions", () => {
   assert.deepEqual(
     CREATION_SKU_GENERATION_RULE_OPTIONS.map((option) => option.value),
-    ["color-name-under-subject", "none", "package-list", "dimensions", "package-list-dimensions"],
+    ["color-name-under-subject", "none", "package-list", "dimensions", "package-list-dimensions", "white-effect-render"],
   );
   assert.equal(normalizeCreationSkuGenerationRule("").value, "color-name-under-subject");
   assert.equal(normalizeCreationSkuGenerationRule("package-list-dimensions").value, "package-list-dimensions");
@@ -4168,8 +4169,8 @@ test("creation planner injects reference image role guidance", () => {
     (["series-showcase", "size-capacity-fit", "spec-table"].includes(item.role)
       ? item.prompt.includes("each supplied variant from its own matching reference")
       : item.prompt.includes("is the product: match"))));
-  assert.match(plan.items.find((item) => item.role === "accessory-gift").prompt, /box\.png \(package \/ package-list content and included items\)/);
-  assert.match(plan.items.find((item) => item.role === "product-detail").prompt, /texture\.png \([\w-]+ \/ detail and structure reference\)/);
+  assert.match(plan.items.find((item) => item.role === "accessory-gift").coverageSummary, /box\.png \(package \/ package-list content and included items\)/);
+  assert.match(plan.items.find((item) => item.role === "product-detail").coverageSummary, /texture\.png \([\w-]+ \/ detail and structure reference\)/);
   assert.doesNotMatch(plan.items.find((item) => item.role === "hero").prompt, /box\.png|texture\.png/);
   assert.ok(plan.items.every((item) => !item.prompt.includes("legacy-style.png")));
 });
@@ -4295,7 +4296,8 @@ test("creation reference analysis normalizes role suggestions and prompt notes",
   );
   assert.deepEqual(analysis.risks, ["包装信息不足"]);
   assert.match(plan.items.find((item) => item.role === "product-detail").prompt, /texture\.png \([\w-]+ \/ detail and structure reference\): 磨砂纹理和边缘细节/);
-  assert.match(plan.items.find((item) => item.role === "scene").prompt, /kitchen\.png \(scene \/ usage scene\): 厨房台面使用环境/);
+  assert.match(plan.items.find((item) => item.role === "scene").coverageSummary, /kitchen\.png \(scene \/ usage scene\): 厨房台面使用环境/);
+  assert.match(plan.items.find((item) => item.role === "scene").prompt, /Verified scene facts.*厨房台面使用环境/);
   assert.doesNotMatch(plan.items.find((item) => item.role === "hero").prompt, /texture\.png|kitchen\.png/);
 });
 

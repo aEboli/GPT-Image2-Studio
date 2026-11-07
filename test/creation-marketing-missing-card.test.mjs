@@ -28,6 +28,21 @@ function documentFixture() {
 }
 const all = (node) => [node, ...node.children.flatMap(all)];
 
+test("confirmed repeated scenes appear as pending adjustments rather than ordinary advice", (t) => {
+  const document = documentFixture();
+  const button = document.createElement("button");
+  const panel = document.createElement("section");
+  const view = createCreationMarketingProgressView({ button, panel });
+  t.after(() => view.update(null));
+  view.update(updateCreationMarketingProgress(null, { stage: "partial", total: 4, receivedCount: 4,
+    quality: { status: "needs-adjustment", repairRounds: 2, blockedItemIds: ["ai-3"], issues: [{ sourceIndex: 3, message: "同一握把与近景重复，暂不生成。" }] },
+  }));
+  button.click();
+  const content = all(panel).map((node) => node.textContent).join("\n");
+  assert.match(content, /重复画面待调整 · 其他合格项可继续/u);
+  assert.match(content, /第 3 张：同一握把与近景重复/u);
+});
+
 test("marketing timing details retain separate initial and repair calls without replacing task cards", (t) => {
   t.mock.timers.enable({ apis: ["Date", "setTimeout", "setInterval"], now: 1000 });
   const document = documentFixture();

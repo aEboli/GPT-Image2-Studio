@@ -13,6 +13,7 @@ test("output format options expose png and jpg for the studio UI", () => {
   assert.deepEqual(getOutputFormatOptions(), [
     { value: "png", label: "PNG" },
     { value: "jpg", label: "JPG" },
+    { value: "webp", label: "WebP" },
   ]);
 });
 
@@ -21,7 +22,7 @@ test("output format normalization accepts png, jpg and jpeg aliases", () => {
   assert.equal(normalizeOutputFormat("jpg"), "jpg");
   assert.equal(normalizeOutputFormat("jpeg"), "jpg");
   assert.equal(normalizeOutputFormat(".JPG"), "jpg");
-  assert.equal(normalizeOutputFormat("webp"), "png");
+  assert.equal(normalizeOutputFormat("webp"), "webp");
 });
 
 test("output format helpers use jpeg for the upstream API but jpg for local files", () => {

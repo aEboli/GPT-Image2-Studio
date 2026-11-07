@@ -12,6 +12,7 @@ import { createCreationSetStore } from "../lib/creation-store.mjs";
 import { marketingPlanFixture } from "./fixtures/creation-marketing-plan.mjs";
 import { consumeSse } from "../lib/generation-client.mjs";
 import { getCreationPlatformImageType } from "../lib/creation-platform-policies.mjs";
+import { creationMarketingInputFingerprint } from "../lib/creation-marketing-agent.mjs";
 
 const png = "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAADklEQVR4nGP4DwUMMAYAj4IP8TylVlEAAAAASUVORK5CYII=";
 const surfaceLocks = ["画面左侧掌面有蜂窝纹理，翻盖保持原图状态", "画面右侧手背保留HOT字样、显示窗与下方按键，不能复制到掌面", "一双按1个可售单位计，画面左右不等于左右手"];
@@ -55,6 +56,8 @@ test("AI marketing plans once, generates 20, preserves assignments and repairs w
   let rejectQualityRepairs = false;
   let invalidStrategy = false;
   let unsupportedFunction = false;
+  let duplicateSceneTasks = false;
+  let duplicateVisualPrompts = false;
   const imageRequests = [];
   const upstream = createServer(async (request, response) => {
     if (request.method === "GET" && request.url === "/") { response.writeHead(200); response.end("ok"); return; }
@@ -86,6 +89,14 @@ test("AI marketing plans once, generates 20, preserves assignments and repairs w
         payload.product_insights.appearance_locks.forEach((entry) => { entry.reference_indexes = [9]; });
         payload.product_insights.confirmed_facts.forEach((fact) => { fact.reference_indexes = fact.id === "appearance" ? [9] : fact.id === "control" ? [2] : [3]; });
         payload.items.forEach((item) => { item.reference_indexes = assignAllReferences ? context.references.map((entry) => entry.index) : [3]; });
+        if (assignAllReferences) {
+          const views = context.references.map((entry) => ({ id: "view-" + entry.index, text: "本任务确认的独立视面" + entry.index, kind: "appearance", source: "reference", reference_indexes: [entry.index] }));
+          payload.product_insights.confirmed_facts.push(...views);
+          payload.items.forEach((item) => {
+            item.fact_ids.push(...views.map((fact) => fact.id));
+            item.reference_needs = views.map((fact) => ({ reference_index: fact.reference_indexes[0], purpose: "view", fact_ids: [fact.id], reason: fact.text }));
+          });
+        }
       }
       if (analysisOnlyResponses > 0) { delete payload.items; analysisOnlyResponses -= 1; }
       if (invalidCount) payload.items.splice(18);
@@ -100,6 +111,19 @@ test("AI marketing plans once, generates 20, preserves assignments and repairs w
       if (unsupportedFunction) {
         payload.product_insights.confirmed_facts.forEach((fact) => { fact.kind = "appearance"; });
         payload.suite_strategy = { core_buying_reason: "核对已确认外观", primary_fact_ids: ["appearance"], functional_proofs: [] };
+      }
+      if (duplicateSceneTasks) {
+        for (const index of [0, 2]) {
+          payload.items[index].image_type = "scene-application";
+          Object.assign(payload.items[index].creative_brief, { scene: "冬季城市通勤", action: "戴手套握住摩托车车把", framing: "手部与车把近景", visual_form: "use-scene" });
+        }
+      }
+      if (duplicateVisualPrompts) {
+        for (const [index, action, framing] of [[2, "握车把骑行", "俯拍手部近景"], [3, "整理营地装备", "侧面全景"]]) {
+          payload.items[index].image_type = "scene-application";
+          Object.assign(payload.items[index].creative_brief, { action, framing, visual_form: "use-scene" });
+          payload.items[index].prompt = 'Image #' + (index + 1) + '. Photograph the reference gloves gripping bicycle handlebars in an overhead close-up. Overlay text: "' + (index === 2 ? 'Ride' : 'Camp') + '".';
+        }
       }
       if (context.repair_request) payload.items = payload.items.filter((item) => context.repair_request.target_item_ids.includes(item.item_id));
       if (streamPlanning) {
@@ -219,7 +243,7 @@ test("AI marketing plans once, generates 20, preserves assignments and repairs w
   const nineReferenceForm = (changes = {}) => {
     const data = form({ referenceImageRoles: Array.from({ length: 9 }, (_, index) => ({ index: index + 1, filename: `reference-${index + 1}.png`, role: index === 8 ? "reference-product" : "feature", ...(index === 8 ? { roleManuallyEdited: true } : {}) })), ...changes });
     data.delete("referenceImages");
-    for (let index = 1; index <= 9; index += 1) data.append("referenceImages", new File([Buffer.from(png, "base64")], `reference-${index}.png`, { type: "image/png" }));
+    for (let index = 1; index <= 9; index += 1) data.append("referenceImages", new File([Buffer.from(png, "base64"), ...(assignAllReferences ? [Buffer.from(String(index))] : [])], `reference-${index}.png`, { type: "image/png" }));
     return data;
   };
   const nineReferencePreview = await post("/api/creation/plan", nineReferenceForm());
@@ -228,7 +252,8 @@ test("AI marketing plans once, generates 20, preserves assignments and repairs w
   assert.equal(planningCalls, beforeTemplate + 2, "analysis-only response is repaired as one whole-set retry");
   assert.equal(repairedPlan.items.length, 20);
   assert.equal(repairedPlan.marketingPlan.primaryReferenceIndex, 9);
-  assert.ok(repairedPlan.items.every((item) => JSON.stringify(item.marketingAssignment.referenceIndexes) === "[9,2,3]"));
+  assert.ok(repairedPlan.items.every((item) => JSON.stringify(item.marketingAssignment.referenceIndexes) === "[9]"));
+  assert.deepEqual(repairedPlan.productInsights.confirmedFacts.find((fact) => fact.id === "control").referenceIndexes, [2]);
   const beforeRepairedGeneration = planningCalls;
   const generatedWithNineReferences = await post("/api/creation/generate", nineReferenceForm({ effectivePlan: JSON.stringify(repairedPlan) }));
   assert.deepEqual(generatedWithNineReferences.events.filter((entry) => ["error", "item_failed"].includes(entry.event)), [], generatedWithNineReferences.source);
@@ -237,9 +262,8 @@ test("AI marketing plans once, generates 20, preserves assignments and repairs w
   for (const request of imageRequests.slice(-20)) {
     const texts = requestTexts(request);
     assert.ok(texts.some((text) => text.includes("Reference 9:")));
-    assert.ok(texts.some((text) => text.includes("Reference 2:")));
-    assert.ok(texts.some((text) => text.includes("Reference 3:")));
-    assert.equal(request.input.flatMap((entry) => entry.content || []).filter((part) => part.type === "input_image").length, 3);
+    assert.equal(texts.some((text) => text.includes("Reference 2:") || text.includes("Reference 3:")), false);
+    assert.equal(request.input.flatMap((entry) => entry.content || []).filter((part) => part.type === "input_image").length, 1);
   }
   repairReferences = false;
   const beforeDirectPlanning = planningCalls;
@@ -449,7 +473,7 @@ test("AI marketing plans once, generates 20, preserves assignments and repairs w
   const recoveredPlan = JSON.parse(recoveredPreview.source).plan;
   assert.equal(planningCalls, beforeRecovered + 2, "ten rejected directions share one local repair request");
   assert.equal(recoveredPlan.imageCount, 18);
-  assert.equal(recoveredPlan.marketingPlan.version, 5);
+  assert.equal(recoveredPlan.marketingPlan.version, 9);
   assert.equal(recoveredPlan.marketingPlan.validation.removedItems.length, 0);
   assert.deepEqual(recoveredPlan.items.map((item) => item.marketingAssignment.sourceIndex), Array.from({ length: 18 }, (_, index) => index + 1));
   assert.deepEqual(recoveredPlan.items.map((item) => item.role), selectedRoles);
@@ -484,4 +508,101 @@ test("AI marketing plans once, generates 20, preserves assignments and repairs w
   assert.deepEqual(allReferenceRepair.events.filter((entry) => ["error", "item_failed"].includes(entry.event)), [], allReferenceRepair.source);
   assert.equal(imageRequests.at(-1).input.flatMap((entry) => entry.content || []).filter((part) => part.type === "input_image").length, 9);
   assert.equal(planningCalls, beforeAllReferenceGeneration, "nine-reference generation and repair reuse the frozen plan");
+
+  repairReferences = false;
+  assignAllReferences = false;
+  duplicateSceneTasks = true;
+  const beforePending = planningCalls;
+  const beforePendingImages = imageRequests.length;
+  const pendingFields = { imageCount: 4, variationSeed: "confirmed-repeat-test", productDescription: "卡其色一双手套；重复场景闭环验证" };
+  const pendingPreview = await post("/api/creation/plan", form(pendingFields));
+  assert.equal(pendingPreview.response.status, 200, pendingPreview.source);
+  const pendingPlan = JSON.parse(pendingPreview.source).plan;
+  assert.equal(planningCalls, beforePending + 3);
+  assert.equal(pendingPlan.items.length, 4);
+  assert.equal(pendingPlan.imageCount, 3);
+  assert.equal(pendingPlan.marketingPlan.validation.pendingCount, 1);
+  const pending = pendingPlan.items.find((item) => item.evidenceRequirement?.code === "duplicate-task");
+  assert.ok(pending);
+  const pendingGeneration = await post("/api/creation/generate", form({ ...pendingFields, imageCount: 3, effectivePlan: JSON.stringify(pendingPlan) }));
+  assert.deepEqual(pendingGeneration.events.filter((entry) => ["error", "item_failed"].includes(entry.event)), [], pendingGeneration.source);
+  assert.equal(imageRequests.length, beforePendingImages + 3);
+  assert.equal(planningCalls, beforePending + 3, "frozen pending tasks do not trigger replanning");
+  const pendingSet = pendingGeneration.events.findLast((entry) => entry.event === "complete")?.data.set;
+  const pendingSaved = await store.readManifest(pendingSet.setId);
+  assert.equal(pendingSaved.imageCount, 3);
+  assert.equal(pendingSaved.items.find((item) => item.itemId === pending.itemId).status, "skipped");
+  await post("/api/creation/repair", form({ ...pendingFields, imageCount: 3, setId: pendingSet.setId, itemId: pending.itemId }));
+  assert.equal(imageRequests.length, beforePendingImages + 3, "a pending duplicate cannot be sent through explicit repair");
+  assert.equal(planningCalls, beforePending + 3);
+  duplicateSceneTasks = false;
+  duplicateVisualPrompts = true;
+  const beforePromptImages = imageRequests.length;
+  const beforePromptPlanning = planningCalls;
+  const promptFields = { imageCount: 4, productDescription: "卡其色一双手套；实际提示词重复前置拦截" };
+  const promptPreview = await post("/api/creation/plan", form(promptFields));
+  assert.equal(promptPreview.response.status, 200, promptPreview.source);
+  const promptPlan = JSON.parse(promptPreview.source).plan;
+  assert.equal(planningCalls, beforePromptPlanning + 3);
+  assert.equal(imageRequests.length, beforePromptImages, "all visual duplicate detection and repairs precede every image request");
+  assert.equal(promptPlan.imageCount, 3);
+  assert.equal(promptPlan.pendingAdjustmentCount, 1);
+  assert.ok(promptPlan.marketingPlan.quality.issues.some((issue) => issue.basis === "prompt" && issue.severity === "blocking"));
+  const promptGeneration = await post("/api/creation/generate", form({ ...promptFields, imageCount: 3, effectivePlan: JSON.stringify(promptPlan) }));
+  assert.deepEqual(promptGeneration.events.filter((entry) => ["error", "item_failed"].includes(entry.event)), [], promptGeneration.source);
+  assert.equal(imageRequests.length, beforePromptImages + 3, "only preflight-approved prompts reach the image model");
+  assert.equal(planningCalls, beforePromptPlanning + 3);
+  duplicateVisualPrompts = false;
+  const legacyPlan = structuredClone(plan);
+  legacyPlan.items = legacyPlan.items.slice(0, 4);
+  legacyPlan.items.forEach((item) => { delete item.referenceSelection; });
+  Object.assign(legacyPlan, { imageCount: 4, carouselImageCount: 4, totalPlannedItemCount: 4 });
+  legacyPlan.platformSetOverrides.imageCount = 4;
+  legacyPlan.marketingPlan.version = 5;
+  legacyPlan.marketingPlan.validation = { requestedCount: 4, returnedCount: 4, acceptedCount: 4, missingCount: 0, removedItems: [] };
+  const legacyForm = form({ imageCount: 4 });
+  legacyPlan.marketingPlan.inputFingerprint = creationMarketingInputFingerprint(Object.fromEntries(legacyForm), [{ filename: "gloves.png", base64: png }], { planningContractVersion: 6 });
+  legacyForm.set("effectivePlan", JSON.stringify(legacyPlan));
+  const beforeLegacyImages = imageRequests.length;
+  const beforeLegacyPlanning = planningCalls;
+  const legacyGenerated = await post("/api/creation/generate", legacyForm);
+  assert.deepEqual(legacyGenerated.events.filter((entry) => ["error", "item_failed"].includes(entry.event)), [], legacyGenerated.source);
+  assert.equal(imageRequests.length, beforeLegacyImages + 4);
+  assert.equal(planningCalls, beforeLegacyPlanning, "old queued plans retain their original fingerprint contract");
+  const legacySet = legacyGenerated.events.findLast((entry) => entry.event === "complete")?.data.set;
+  const legacySaved = await store.readManifest(legacySet.setId);
+  assert.deepEqual(legacySaved.items.map((item) => item.prompt), legacyPlan.items.map((item) => item.prompt));
+  assert.ok(legacySaved.items.every((item) => !item.referenceSelection));
+  await store.saveManifest({ ...legacySaved, items: legacySaved.items.map((item, index) => index ? item : { ...item, status: "failed" }) });
+  const legacyRepair = await post("/api/creation/repair", form({ imageCount: 4, setId: legacySet.setId, itemId: legacySaved.items[0].itemId }));
+  assert.deepEqual(legacyRepair.events.filter((entry) => ["error", "item_failed"].includes(entry.event)), [], legacyRepair.source);
+  assert.equal(imageRequests.length, beforeLegacyImages + 5);
+  assert.equal(planningCalls, beforeLegacyPlanning);
+  const previousPlan = structuredClone(legacyPlan);
+  previousPlan.marketingPlan.version = 6;
+  const previousForm = form({ imageCount: 4 });
+  previousPlan.marketingPlan.inputFingerprint = creationMarketingInputFingerprint(Object.fromEntries(previousForm), [{ filename: "gloves.png", base64: png }], { planningContractVersion: 7 });
+  previousForm.set("effectivePlan", JSON.stringify(previousPlan));
+  const previousGenerated = await post("/api/creation/generate", previousForm);
+  assert.deepEqual(previousGenerated.events.filter((entry) => ["error", "item_failed"].includes(entry.event)), [], previousGenerated.source);
+  assert.equal(imageRequests.length, beforeLegacyImages + 9);
+  assert.equal(planningCalls, beforeLegacyPlanning, "version 6 frozen plans keep their original contract after diversity upgrades");
+  const previousScenePlan = structuredClone(legacyPlan);
+  previousScenePlan.marketingPlan.version = 7;
+  const previousSceneForm = form({ imageCount: 4 });
+  previousScenePlan.marketingPlan.inputFingerprint = creationMarketingInputFingerprint(Object.fromEntries(previousSceneForm), [{ filename: "gloves.png", base64: png }], { planningContractVersion: 8 });
+  previousSceneForm.set("effectivePlan", JSON.stringify(previousScenePlan));
+  const previousSceneGenerated = await post("/api/creation/generate", previousSceneForm);
+  assert.deepEqual(previousSceneGenerated.events.filter((entry) => ["error", "item_failed"].includes(entry.event)), [], previousSceneGenerated.source);
+  assert.equal(imageRequests.length, beforeLegacyImages + 13);
+  assert.equal(planningCalls, beforeLegacyPlanning, "version 7 frozen plans survive the scene-divergence contract upgrade");
+  const previousPromptPlan = structuredClone(legacyPlan);
+  previousPromptPlan.marketingPlan.version = 8;
+  const previousPromptForm = form({ imageCount: 4 });
+  previousPromptPlan.marketingPlan.inputFingerprint = creationMarketingInputFingerprint(Object.fromEntries(previousPromptForm), [{ filename: "gloves.png", base64: png }], { planningContractVersion: 9 });
+  previousPromptForm.set("effectivePlan", JSON.stringify(previousPromptPlan));
+  const previousPromptGenerated = await post("/api/creation/generate", previousPromptForm);
+  assert.deepEqual(previousPromptGenerated.events.filter((entry) => ["error", "item_failed"].includes(entry.event)), [], previousPromptGenerated.source);
+  assert.equal(imageRequests.length, beforeLegacyImages + 17);
+  assert.equal(planningCalls, beforeLegacyPlanning, "version 8 frozen plans survive actual-prompt preflight");
 });

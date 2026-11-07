@@ -18,6 +18,7 @@ import {
   normalizeImageRouteConfig,
 } from "./image-route-config.mjs";
 import { DEFAULT_IMAGE_TOOL_MODEL, DEFAULT_RESPONSES_MODEL } from "./model-defaults.mjs";
+import { normalizeDirectImageModelMappings, resolveDirectImageModelMapping } from "./direct-image-model-mapping.mjs";
 import { normalizeImageQualityForRoute } from "./image-quality-options.mjs";
 import { getDefaultGenerationSize, getDefaultModelProtocolImageSize } from "./generation-size-options.mjs";
 
@@ -62,6 +63,7 @@ export function normalizeBrowserPrivateConfig(source = {}, { preserveRootBaseUrl
 
   return {
     imageRoute: routeConfig.imageRoute,
+    ...(routeConfig.imageOptions ? { imageOptions: routeConfig.imageOptions } : {}),
     baseUrl: routeConfig.baseUrl || DEFAULT_BROWSER_BASE_URL,
     apiKey: routeConfig.apiKey,
     endpointPath: routeConfig.endpointPath,
@@ -72,6 +74,7 @@ export function normalizeBrowserPrivateConfig(source = {}, { preserveRootBaseUrl
     directImageApiKey: routeConfig.directImageApiKey,
     directImageEndpointPath: routeConfig.directImageEndpointPath,
     directImageModel: routeConfig.directImageModel || DEFAULT_DIRECT_IMAGE_MODEL,
+    directImageModelMappings: routeConfig.directImageModelMappings,
     directImageStream: normalizeDirectImageStream(source.directImageStream),
     directTextBaseUrl: routeConfig.directTextBaseUrl || DEFAULT_BROWSER_BASE_URL,
     directTextApiKey: routeConfig.directTextApiKey,
@@ -138,7 +141,7 @@ export function toPublicBrowserConfig(privateConfig, baseConfig = {}) {
       : imageRoute === "c"
         ? normalized.protocolImageModel
         : imageRoute === "b"
-          ? normalized.directImageModel
+          ? resolveDirectImageModelMapping(normalized.directImageModel, normalized.directImageModelMappings).imageModel
           : normalized.imageToolModel;
     publicDefaults.quality = normalizeImageQualityForRoute(publicDefaults.quality, { imageRoute, imageModel });
   }
@@ -153,6 +156,7 @@ export function toPublicBrowserConfig(privateConfig, baseConfig = {}) {
   const grokApiKeyConfigured = Boolean(normalized.grokApiKey) || Boolean(baseConfig.grokApiKeyConfigured);
   return {
     ...baseConfig,
+    ...(normalized.imageOptions ? { imageOptions: normalized.imageOptions } : {}),
     baseUrl: normalized.baseUrl,
     apiKeyConfigured,
     apiKeyMask: normalized.apiKey ? maskBrowserApiKey(normalized.apiKey) : baseConfig.apiKeyMask,
@@ -168,6 +172,7 @@ export function toPublicBrowserConfig(privateConfig, baseConfig = {}) {
       : baseConfig.directImageApiKeyMask,
     directImageEndpointPath: normalized.directImageEndpointPath,
     directImageModel: normalized.directImageModel,
+    directImageModelMappings: normalized.directImageModelMappings,
     directImageStream: normalized.directImageStream,
     directTextBaseUrl: normalized.directTextBaseUrl,
     directTextApiKeyConfigured,
@@ -203,12 +208,13 @@ export function saveBrowserPrivateConfig(payload, storage = getLocalStorage()) {
   const next = normalizeBrowserPrivateConfig(
     {
       ...current,
+      ...(payload.imageOptions !== undefined ? { imageOptions: payload.imageOptions } : {}),
       baseUrl: payload.baseUrl,
       apiKey: payload.apiKey ? payload.apiKey : current.apiKey,
       endpointPath: payload.endpointPath || current.endpointPath,
       responsesModel: payload.responsesModel,
       imageToolModel: payload.imageToolModel || current.imageToolModel,
-      includeImageToolModel: payload.includeImageToolModel === true,
+      includeImageToolModel: payload.includeImageToolModel ?? current.includeImageToolModel,
       imageRoute: payload.imageRoute || current.imageRoute,
       directImageBaseUrl: payload.directImageBaseUrl || payload.directBaseUrl || current.directImageBaseUrl,
       directImageApiKey: payload.directImageApiKey
@@ -221,6 +227,9 @@ export function saveBrowserPrivateConfig(payload, storage = getLocalStorage()) {
       directImageStream: payload.directImageStream === undefined
         ? current.directImageStream
         : normalizeDirectImageStream(payload.directImageStream),
+      directImageModelMappings: payload.directImageModelMappings === undefined
+        ? current.directImageModelMappings
+        : payload.directImageModelMappings,
       directTextBaseUrl: payload.directTextBaseUrl || payload.directBaseUrl || current.directTextBaseUrl,
       directTextApiKey: payload.directTextApiKey
         ? payload.directTextApiKey
@@ -317,12 +326,14 @@ export function appendBrowserConfigToFormData(formData, readConfig = readBrowser
   formData.set("endpointPath", config.endpointPath);
   formData.set("responsesModel", config.responsesModel);
   formData.set("imageToolModel", config.imageToolModel);
+  if (config.imageOptions) formData.set("imageOptions", JSON.stringify(config.imageOptions));
   formData.set("includeImageToolModel", String(config.includeImageToolModel));
   formData.set("imageRoute", config.imageRoute);
   formData.set("directImageBaseUrl", config.directImageBaseUrl);
   formData.set("directImageApiKey", config.directImageApiKey);
   formData.set("directImageEndpointPath", config.directImageEndpointPath);
   formData.set("directImageModel", config.directImageModel);
+  formData.set("directImageModelMappings", JSON.stringify(config.directImageModelMappings));
   formData.set("directImageStream", String(config.directImageStream));
   formData.set("directTextBaseUrl", config.directTextBaseUrl);
   formData.set("directTextApiKey", config.directTextApiKey);
@@ -353,13 +364,15 @@ export function getBrowserPrivateConfigRequestPayload(readConfig = readBrowserPr
         endpointPath: browserConfig.endpointPath,
         responsesModel: browserConfig.responsesModel,
         imageToolModel: browserConfig.imageToolModel,
-        includeImageToolModel: browserConfig.includeImageToolModel === true,
+        ...(browserConfig.imageOptions ? { imageOptions: browserConfig.imageOptions } : {}),
+        includeImageToolModel: (browserConfig.includeImageToolModel ?? true) === true,
         imageRoute: browserConfig.imageRoute,
         directImageBaseUrl: browserConfig.directImageBaseUrl,
         directImageApiKey: browserConfig.directImageApiKey,
         directImageEndpointPath: browserConfig.directImageEndpointPath,
         directImageModel: browserConfig.directImageModel,
         directImageStream: browserConfig.directImageStream,
+        directImageModelMappings: normalizeDirectImageModelMappings(browserConfig.directImageModelMappings),
         directTextBaseUrl: browserConfig.directTextBaseUrl,
         directTextApiKey: browserConfig.directTextApiKey,
         directTextEndpointPath: browserConfig.directTextEndpointPath,

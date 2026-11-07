@@ -1,3 +1,6 @@
+import { requestImageGeneration, requestDirectImageGeneration } from "./lib/responses-workflow.mjs";
+import { validateGeneratedImage } from "./lib/generated-image-validation.mjs";
+import { normalizeOutputFormat, toApiOutputFormat } from "./lib/output-format-options.mjs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, resolve } from "node:path";
 
@@ -18,6 +21,17 @@ function printHelp() {
   --size        图片尺寸，默认 1024x1536
   --quality     图片质量，默认 high
   --format      输出格式，默认 jpeg
+  --image-model 图像模型，例如 gpt-image-2.6-flare（启用共享生图管线）
+  --endpoint    responses 或 images/generations，默认 responses
+  --complexity  图像规划复杂度：low、medium、high
+  --background  auto、opaque、transparent
+  --output-compression  JPG/WebP 压缩质量 0–100
+  --partial-images      静态中间预览数 0–3
+  --frame-count         GIF 帧数 2–64（17–64 需提供方支持）
+  --frame-duration-ms   GIF 每帧毫秒 20–2000
+  --svg-model           SVG 作者模型（需要权限）
+  --svg-reasoning-effort SVG 作者思考等级
+  --count       Images 生图候选数 1–10
   --output      输出文件路径，默认写入 output/<timestamp>.<ext>
   --base-url    接口根路径，默认读取 OPENAI_BASE_URL 或 ${DEFAULT_BASE_URL}
   --model       外层 Responses 模型，默认读取 RESPONSES_MODEL 或 ${DEFAULT_RESPONSES_MODEL}
@@ -46,6 +60,15 @@ function parseArgs(argv) {
     const current = argv[index];
     const next = argv[index + 1];
 
+    const advancedNames = { "--complexity": "complexity", "--background": "background", "--output-compression": "outputCompression", "--partial-images": "partialImages", "--frame-count": "frameCount", "--frame-duration-ms": "frameDurationMs", "--svg-model": "svgModel", "--svg-reasoning-effort": "svgReasoningEffort", "--count": "n" };
+    if (["--image-model", "--endpoint", ...Object.keys(advancedNames)].includes(current)) {
+      if (!next || next.startsWith("--")) throw new Error(`缺少参数值：${current}`);
+      if (current === "--image-model") options.imageModel = next;
+      else if (current === "--endpoint") options.endpointPath = next;
+      else { options.imageOptions ||= {}; options.imageOptions[advancedNames[current]] = next; }
+      index++;
+      continue;
+    }
     if (current === "--help" || current === "-h") {
       options.help = true;
       continue;
@@ -299,6 +322,29 @@ async function main() {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error("缺少 OPENAI_API_KEY 环境变量");
+  }
+
+  if (options.imageModel || options.imageOptions) {
+    const endpointPath = options.endpointPath || "responses";
+    if (!["responses", "images/generations"].includes(endpointPath)) throw new Error("CLI 仅支持 responses 或 images/generations。");
+    const imageModel = options.imageModel || "gpt-image-2";
+    const format = toApiOutputFormat(options.format);
+    const common = { baseUrl: normalizeBaseUrl(options.baseUrl), apiKey, prompt: options.prompt, size: options.size, quality: options.quality, format, imageModel, includeImageToolModel: true, imageOptions: options.imageOptions, responsesModel: options.model, reasoningEffort: options.reasoningEffort, onEvent: (event) => { if (event.type === "status") console.log(event.message); } };
+    const result = endpointPath === "responses" ? await requestImageGeneration(common) : await requestDirectImageGeneration({ ...common, endpointPath, directImageStream: false });
+    const images = result.images || [{ base64: result.finalImageBase64 }];
+    await mkdir(dirname(buildOutputPath(options.output, normalizeOutputFormat(format))), { recursive: true });
+    for (const [index, image] of images.entries()) {
+      const bytes = Buffer.from(normalizeBase64(image.base64), "base64");
+      const inspection = validateGeneratedImage(bytes);
+      // 上游给什么格式就存什么格式：按真实编码决定扩展名，不因与请求格式不同而丢弃结果。
+      const actualFormat = inspection.format === "jpeg" ? "jpg" : String(inspection.format || format);
+      const outputPath = buildOutputPath(options.output, normalizeOutputFormat(actualFormat));
+      await mkdir(dirname(outputPath), { recursive: true });
+      const path = index ? outputPath.slice(0, -extname(outputPath).length) + `-${index + 1}` + extname(outputPath) : outputPath;
+      await writeFile(path, bytes);
+      console.log(`已保存原始图片：${path}`);
+    }
+    return;
   }
 
   const baseUrl = normalizeBaseUrl(options.baseUrl);

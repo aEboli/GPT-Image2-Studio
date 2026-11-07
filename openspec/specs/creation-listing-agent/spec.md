@@ -707,3 +707,49 @@ The system SHALL request and preserve a `deDisplay` object alongside existing Li
 - **WHEN** the system reads a historical draft without `deDisplay`
 - **THEN** existing content remains available without an automatic model request or invented German content
 - **AND** explicit regeneration requests German translations using the new contract
+
+### Requirement: Listing 模型输入精简并保留关键证据
+
+系统 SHALL 为 Listing 模型构建独立的精简输入，保留商品事实、SKU 数量与变体、尺寸重量及其来源或估算状态、语言单位、必要图片证据和内容限制。系统 MUST NOT 向模型重复提交整套画图 slots/items 规划或等价重复图片证据。完整本地来源 SHALL 继续用于归一化和内容校验，英文、德文、中文草稿契约 SHALL 保持一致。
+
+#### Scenario: 已完成套图包含庞大的冻结计划
+- **WHEN** 套图 effectivePlan 包含完整 slots 和 items，且已生成图片有对应证据元数据
+- **THEN** 模型只收到 Listing 所需的事实投影和去重证据
+- **AND** 本地原始计划、SKU 数量、完整尺寸轴、重量与禁用词边界得以保留
+- **AND** 代表性大计划 fixture 的 source 序列化字符数至少减少 70%
+
+#### Scenario: 图片全部失败
+- **WHEN** 套图没有完成图片
+- **THEN** 精简输入仍包含商品输入和必要的计划证据，并保留 input-only 标记及未知信息
+- **AND** 系统不编造实际图片已经证明的事实
+
+### Requirement: 所有 Listing 入口共享服务端有界并发与活动去重
+
+同一服务进程的所有 Listing 入口 SHALL 共用上游活动请求上限为 3 的调度器，槽位 SHALL 持有至响应体消费与请求收尾完成。同套图、相同来源及模型配置的活动请求 SHALL 合并等待，不重复生成或保存。排队时间 MUST NOT 消耗单次上游请求截止时间。取消一个等待者 MUST NOT 中断仍有其他等待者的执行；取消与异常 SHALL 正确释放资源。
+
+#### Scenario: 多页面同时生成不同套图
+- **WHEN** 两个页面或自动/手动入口同时请求不同套图的 Listing
+- **THEN** 最多三个 Listing 上游请求活动，其他请求保持可观察的等待状态
+- **AND** 已占满三个槽位时，至少一个活动请求收尾后后续请求才能提交
+
+#### Scenario: 相同 Listing 请求重复到达
+- **WHEN** 同套图、来源和模型配置相同的请求在执行期间重复到达
+- **THEN** 调度器复用同一活动执行并向仍连接的调用方返回同一结果
+- **AND** 日志和响应不暴露原始认证信息
+
+#### Scenario: 排队请求失去所有等待者
+- **WHEN** 一个尚未开始的任务的所有调用方断开连接
+- **THEN** 该任务不向上游发出 POST，后续有效任务仍能继续
+
+### Requirement: Listing 临时限流共享冷却且重试预算有界
+
+系统 SHALL 保留 Listing 上游的状态、错误码和有效 Retry-After，区分明确临时限流与认证/额度问题。明确临时拒绝 SHALL 在共享冷却后有限重试，单条 Listing 的参数兼容、格式修复和限流恢复合计 SHALL 最多产生 2 次上游 POST。冷却期间 MUST NOT 提交队列后续项。系统 MUST NOT 自动重放状态未知或已经收到部分回答的请求。
+
+#### Scenario: 上游明确临时限流
+- **WHEN** 上游明确返回临时限流并提供有效 Retry-After
+- **THEN** 所有 Listing 等待至该提交时间后才可再次请求
+- **AND** 当前条最多在剩余 POST 预算内恢复一次
+
+#### Scenario: 429 正文表示额度耗尽
+- **WHEN** 上游返回 429 且明确错误码或正文表示账号额度耗尽
+- **THEN** 系统保留额度原因并停止本批剩余提交，不将其作为普通短暂并发限流循环重试

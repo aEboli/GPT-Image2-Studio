@@ -255,7 +255,8 @@ test("model list route uses independent direct image and text provider settings"
   assert.equal(textResponse.status, 200);
   assert.deepEqual(await textResponse.json(), { ok: true, models: ["text-model"] });
 
-  assert.deepEqual(upstreamRequests, [
+  assert.ok(upstreamRequests.filter(({ pathname }) => !pathname.endsWith("/models")).every(({ authorization }) => !authorization));
+  assert.deepEqual(upstreamRequests.filter(({ pathname }) => pathname.endsWith("/models")), [
     { pathname: "/image/v1/models", authorization: "Bearer synthetic-image-key" },
     { pathname: "/text/v1/models", authorization: "Bearer synthetic-text-key" },
   ]);
@@ -326,7 +327,7 @@ test("local server has an isolated mock image path for creation regression tests
   assert.match(server, /\.filter\(\(item\) => !isInvalidGeneratedImageMetadata\(item\)\)/);
   assert.doesNotMatch(server, /imageBuffer:\s*Buffer\.from\(normalizeBase64\(finalBase64\)/);
   assert.match(server, /type:\s*"final_image"/);
-  assert.match(server, /finalImageBase64:\s*MOCK_IMAGE_BASE64/);
+  assert.match(server, /finalImageBase64:\s*mockImageBase64/);
 });
 
 test("creation logo batch uses each uploaded image with the shared logo reference", async () => {

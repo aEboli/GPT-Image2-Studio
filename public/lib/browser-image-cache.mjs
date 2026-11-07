@@ -89,15 +89,32 @@ export function getServerThumbnailUrl(item = {}) {
   return getServerImageUrl(item);
 }
 
+export function isSvgImage(item = {}) {
+  if (!item) return false;
+  return String(item.format || "").toLowerCase() === "svg" ||
+    [item.filename, item.relativePath, item.serverImageUrl, item.imageUrl].some((value) => /[.]svg(?:[?#]|$)|^data:image[/]svg[+]xml[;,]/i.test(String(value || "")));
+}
+
+function getSvgOriginalUrl(item = {}) {
+  if (!isSvgImage(item)) return "";
+  return [item.serverImageUrl, item.imageUrl, item.previewUrl].find((value) => value && !/^data:image[/](?:png|jpe?g|webp|gif)[;,]/i.test(value) && !String(value).includes("/api/gallery/thumbnail")) || "";
+}
+
 export function getImageUrl(item) {
+  const svg = getSvgOriginalUrl(item);
+  if (svg) return svg;
   return item?.imageUrl || item?.thumbnailUrl || item?.previewUrl || item?.serverImageUrl || item?.serverThumbnailUrl || "";
 }
 
 export function getThumbnailUrl(item) {
+  const svg = getSvgOriginalUrl(item);
+  if (svg) return svg;
   return item?.serverThumbnailUrl || item?.thumbnailUrl || item?.serverImageUrl || item?.imageUrl || item?.previewUrl || "";
 }
 
 export function getCardThumbnailUrl(item = {}) {
+  const svg = getSvgOriginalUrl(item);
+  if (svg) return svg;
   const thumbnailUrl = getThumbnailUrl(item);
   const imageUrl = getImageUrl(item);
   // 仅本地已保存原图复用现有缩略图接口；远端地址和生成中预览保持原样。

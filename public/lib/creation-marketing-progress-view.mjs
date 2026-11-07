@@ -1,4 +1,4 @@
-import { createTextModelPreview, fitCreationReadingPanel, formatTextModelTiming } from "./text-model-client.mjs";
+import { createCreationProcessSteps, createTextModelPreview, fitCreationReadingPanel, formatTextModelTiming } from "./text-model-client.mjs";
 import { CREATION_MARKETING_PROGRESS_LABELS as labels, isCreationMarketingProgressActive } from "./creation-marketing-progress.mjs";
 import { getCreationPlatformImageType } from "./creation-platform-policies.mjs";
 
@@ -18,6 +18,7 @@ export function createCreationMarketingProgressView({ button, panel, announcemen
   let messageNode = null;
   let infoNode = null;
   let traceNode = null;
+  let process = null;
   let traceSignature = "";
   const append = (parent, tag, value, className = "") => {
     const node = document.createElement(tag);
@@ -47,13 +48,16 @@ export function createCreationMarketingProgressView({ button, panel, announcemen
       const close = append(head, "button", "收起", "creation-marketing-panel-close");
       close.type = "button"; close.setAttribute("aria-label", "收起 AI 营销规划");
       close.addEventListener("click", () => { expanded = false; render(); button.focus?.(); });
-      const details = append(panel, "details", "", "creation-marketing-live"); details.open = true; liveDetails = details;
-      append(details, "summary", "实时接收 · 结构化卡片通过完整校验后可用于生图");
+      process = createCreationProcessSteps({ document, parent: panel, kind: "marketing" });
+      const details = append(panel, "details", "", "creation-marketing-live"); details.open = false; liveDetails = details;
+      const liveSummary = append(details, "summary", "实时回答 · 展开查看已接收草稿");
+      liveSummary.className = "creation-marketing-live-summary";
       live = createTextModelPreview({ document, panel: details, title: "整套营销规划" });
       traceNode = append(panel, "section", "", "creation-marketing-timing");
       content = append(panel, "div", "", "creation-marketing-content");
     }
     live.update({ ...current, elapsedMs: elapsedMs() });
+    process?.update(current.stage, { attempt: current.attempt, requestKey: current.requestId });
     const nextTrace = JSON.stringify(current.requestTrace || {});
     if (traceSignature !== nextTrace) {
       traceSignature = nextTrace;
@@ -88,7 +92,10 @@ export function createCreationMarketingProgressView({ button, panel, announcemen
     content.replaceChildren();
     if (current.productName) append(content, "p", `本次商品：${current.productName}`, "creation-marketing-caption");
     messageNode = append(content, "p", message, "creation-marketing-message");
-    const history = append(content, "ol", "", "creation-marketing-timeline");
+    const historyDetails = append(content, "details", "", "creation-marketing-history");
+    const historySummary = append(historyDetails, "summary", `阶段记录 · ${(current.history || []).length} 次变化`);
+    historySummary.className = "creation-marketing-history-summary";
+    const history = append(historyDetails, "ol", "", "creation-marketing-timeline");
     for (const event of current.history || []) {
       append(history, "li", `${Math.floor(event.elapsedMs / 1000)} 秒 · ${labels[event.stage]}${event.attempt > 1 ? `（第 ${event.attempt} 次请求）` : ""}`);
     }
@@ -108,9 +115,9 @@ export function createCreationMarketingProgressView({ button, panel, announcemen
       const coverage = current.quality.functionalCoverage;
       const status = coverage?.required ? coverage.covered ? "核心功能已有可见表现" : "建议补强核心功能表现" : "按现有外观与用途规划";
       append(content, "p", `${status} · 局部修复 ${current.quality.repairRounds || current.repairRound || 0} 轮`, "creation-marketing-caption");
-      if (current.quality.status === "warning" && current.quality.issues?.length) {
+      if (["warning", "needs-adjustment"].includes(current.quality.status) && current.quality.issues?.length) {
         const section = append(content, "section", "", "creation-marketing-summary-card");
-        append(section, "h4", "优化建议 · 不影响有效图片生成");
+        append(section, "h4", current.quality.status === "needs-adjustment" ? "重复画面待调整 · 其他合格项可继续" : "优化建议 · 不影响有效图片生成");
         const rows = append(section, "ul", "");
         for (const issue of current.quality.issues) append(rows, "li", `${issue.sourceIndex ? `第 ${issue.sourceIndex} 张：` : ""}${issue.message}`);
       }
@@ -140,16 +147,19 @@ export function createCreationMarketingProgressView({ button, panel, announcemen
         append(title, "strong", `${item.sourceIndex || index + 1}. ${item.title}`);
         append(title, "span", type, "creation-marketing-type");
         append(task, "span", item.goal, "creation-marketing-item-goal");
+        const detail = append(row, "details", "", "creation-marketing-item-detail");
+        append(detail, "summary", "展开画面要求与参考依据");
+        const detailContent = append(detail, "div", "", "creation-marketing-item-detail-content");
         const brief = item.creativeBrief || {};
         const formLabels = { "product-photograph": "产品摄影", "use-scene": "真实使用场景", "macro-evidence": "微距证据", "functional-render": "功能效果表现", "commercial-cg": "商业 CG 渲染", "information-layout": "信息说明", "contents-layout": "到手清单", "variant-layout": "款式选择" };
         const densityLabels = { none: "无新增文字", minimal: "少量文字", structured: "结构化说明" };
         if (formLabels[brief.visual_form]) append(task, "span", `${formLabels[brief.visual_form]} · ${densityLabels[brief.text_density] || "按任务安排文字"}`, "creation-marketing-caption");
         for (const [key, label] of [["purpose", "用途"], ["scene", "场景"], ["action", "动作"], ["framing", "景别"], ["evidence_focus", "证据"], ["new_information", "新增信息"], ["effect_visual", "可见功能"]]) {
-          if (brief[key]) append(task, "span", `${label}：${brief[key]}`, "creation-marketing-caption");
+          if (brief[key]) append(detailContent, "p", `${label}：${brief[key]}`, "creation-marketing-caption");
         }
         const risk = current.duplicateRisks?.find((entry) => entry.itemId === item.itemId);
-        if (risk) append(task, "span", `与第 ${risk.similarSourceIndex} 张相近：${risk.reason}`, "creation-marketing-duplicate");
-        append(task, "span", item.referenceIndexes?.length ? `参考图：${item.referenceIndexes.map((index) => `图 ${index}`).join("、")}` : "依据：本次商品文字资料", "creation-marketing-caption");
+        if (risk) append(detailContent, "p", `与第 ${risk.similarSourceIndex} 张相近：${risk.reason}`, "creation-marketing-duplicate");
+        append(detailContent, "p", item.referenceIndexes?.length ? `参考图：${item.referenceIndexes.map((index) => `图 ${index}`).join("、")}` : "依据：本次商品文字资料", "creation-marketing-caption");
         task.addEventListener("click", () => {
           if (onItemSelect?.({ itemId: item.itemId || "", sourceIndex: item.sourceIndex || index + 1, title: item.title || "" }) !== false) {
             expanded = false;

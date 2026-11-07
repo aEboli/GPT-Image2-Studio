@@ -1,5 +1,9 @@
+import { buildImageOptionParameters, getImageOptionsForFormat, getImageModelCapabilities, normalizeImageOptions } from "./lib/image-model-capabilities.mjs";
+import { Jimp } from "jimp";
 import { createSharedTextRequestPool } from "./lib/shared-text-request.mjs";
-import { recordTextModelCall, reportTextModelProgress, runWithTextModelContext } from "./lib/text-model-stream.mjs";
+import { getTextModelContext, recordTextModelCall, reportTextModelProgress, runWithTextModelContext } from "./lib/text-model-stream.mjs";
+import { createCreationListingScheduler } from "./lib/creation-listing-scheduler.mjs";
+import { creationListingErrorMetadata } from "./lib/creation-listing-error.mjs";
 import { randomUUID, createHash } from "node:crypto";
 import { requestCreationMarketingPlan, creationMarketingInputFingerprint } from "./lib/creation-marketing-agent.mjs";
 import { applyCreationMarketingPlan, isCreationAiMarketingEnabled } from "./lib/creation-marketing-plan.mjs";
@@ -379,6 +383,7 @@ const MIME_TYPES = {
   ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   ".svg": "image/svg+xml",
   ".webp": "image/webp",
+  ".gif": "image/gif",
   ".webmanifest": "application/manifest+json; charset=utf-8",
   ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 };
@@ -463,11 +468,20 @@ function compactErrorMessage(message, fallbackLabel = "请求失败") {
 }
 
 async function requestStudioImageGeneration(options) {
+  if (options.imageRoute !== IMAGE_ROUTE_C && options.imageRoute !== IMAGE_ROUTE_D) {
+    const format = options.format || "png";
+    const imageOptions = getImageOptionsForFormat(options.imageOptions, format, options.generationMode !== "");
+    buildImageOptionParameters(imageOptions, { imageModel: options.imageModel, format, endpointPath: options.endpointPath || "responses", operation: options.generationMode === IMAGE_EDIT_MODE ? "edit" : "generate", mode: options.generationMode ?? "static", mask: options.mask, markup: options.markup, referenceCount: options.referenceImages?.length || (options.sourceImage ? 1 : 0) });
+    if (options.imageRoute === "a" && options.includeImageToolModel !== true && Object.keys(imageOptions).some((key) => !["frameCount", "frameDurationMs"].includes(key))) throw new Error("使用 2.6 高级能力前，请在配置中开启发送 tools[].model，确保请求指定所选模型。");
+    options = { ...options, imageOptions, ...(imageOptions.size ? { size: imageOptions.size } : {}) };
+  }
+
   const originalOnEvent = options.onEvent;
   options = {
     ...options,
     async onEvent(event) {
       if (event?.type === "final_image") {
+        // 只解码（顺带缓存），不判定：字节是否"像图片"不在这里拦。
         decodeAndValidateGeneratedImage(event.base64, "上游生成结果");
       }
       await originalOnEvent?.(event);
@@ -498,9 +512,10 @@ async function requestStudioImageGeneration(options) {
     stage: "mock",
     message: "Using local mock image generation.",
   });
+  const mockImageBase64 = options.format === "jpeg" ? (await new Jimp({ width: 2, height: 2, color: 0xffffffff }).getBuffer("image/jpeg")).toString("base64") : MOCK_IMAGE_BASE64;
   await options.onEvent({
     type: "final_image",
-    base64: MOCK_IMAGE_BASE64,
+    base64: mockImageBase64,
   });
 
   const mockSize = options.imageRoute === IMAGE_ROUTE_C
@@ -508,7 +523,7 @@ async function requestStudioImageGeneration(options) {
     : normalizeGenerationSize(options.aspectRatio || "4:5", options.size);
 
   return {
-    finalImageBase64: MOCK_IMAGE_BASE64,
+    finalImageBase64: mockImageBase64,
     responseCompleted: true,
     fallbackUsed: false,
     streamFallbackUsed: false,
@@ -526,32 +541,43 @@ async function requestStudioImageGeneration(options) {
 // optimisation, never a wrong result.
 let lastValidatedGeneratedImage = null;
 
-function decodeAndValidateGeneratedImage(base64, context = "生成结果") {
+// 网关只负责转发，这里不做任何拦截：读不出格式、尺寸对不上、编码与请求不一致，
+// 都照样把字节交出去，校验结果只作为元数据记录，绝不阻断保存。
+function inspectGeneratedImageSafely(imageBuffer) {
+  try {
+    return validateGeneratedImage(imageBuffer);
+  } catch (error) {
+    return {
+      valid: false,
+      format: "",
+      width: 0,
+      height: 0,
+      actualSize: "",
+      reason: String(error?.reason || error?.details?.reason || "invalid-image"),
+    };
+  }
+}
+
+function decodeAndValidateGeneratedImage(base64, _context = "生成结果") {
   const normalized = normalizeBase64(String(base64 || ""));
   if (lastValidatedGeneratedImage?.base64 === normalized) {
     return lastValidatedGeneratedImage.imageBuffer;
   }
 
+  // 只解码，不判定。空内容没有字节可存，其余一律放行。
   const imageBuffer = Buffer.from(normalized, "base64");
-
-  try {
-    validateGeneratedImage(imageBuffer);
-    lastValidatedGeneratedImage = { base64: normalized, imageBuffer };
-  } catch (error) {
-    const reason = String(error?.reason || error?.details?.reason || "invalid-image");
-    const reasonLabel = {
-      empty: "返回内容为空",
-      "unsupported-format": "不是受支持的 PNG 或 JPEG",
-      "malformed-image": "图片数据损坏",
-      "invalid-dimensions": "图片尺寸无效",
-      "too-small": "图片尺寸过小",
-    }[reason] || reason;
-    const actualSize = String(error?.details?.actualSize || "");
-    const sizeDetail = actualSize ? `，实际尺寸 ${actualSize}` : "";
-    throw new Error(`${context}无效：${reasonLabel}${sizeDetail}。已阻止保存，请重新生成。`, { cause: error });
+  if (!imageBuffer.length) {
+    throw new Error("上游没有返回任何图片字节。");
   }
-
+  lastValidatedGeneratedImage = { base64: normalized, imageBuffer };
   return imageBuffer;
+}
+
+// 上游（网关直传）可能是 JPEG/WebP/GIF 等与请求不同的编码。以字节实际格式为准：
+// 扩展名、元数据、预览 MIME 全部跟着实际格式走，不再用请求格式去卡结果。
+function resolveActualOutputFormat(inspection, requestedFormat) {
+  const actual = inspection && inspection.format === "jpeg" ? "jpg" : String((inspection && inspection.format) || "");
+  return ["jpg", "png", "webp", "gif", "svg"].includes(actual) ? actual : normalizeOutputFormat(requestedFormat);
 }
 
 function isResponseWritable(response) {
@@ -1287,6 +1313,7 @@ function normalizeGenerationImageQuality(value, generationConfig = {}, fallback 
     return normalizeImageQualityForRoute(value, {
       imageRoute,
       imageModel: generationConfig.imageModel,
+      ...getImageModelMappingMetadata(generationConfig),
       fallback: "",
     });
   }
@@ -1294,8 +1321,18 @@ function normalizeGenerationImageQuality(value, generationConfig = {}, fallback 
   return normalizeImageQualityForRoute(value || fallback, {
     imageRoute,
     imageModel: generationConfig.imageModel,
+    ...getImageModelMappingMetadata(generationConfig),
     fallback,
   });
+}
+
+function getImageModelMappingMetadata(config = {}) {
+  return config.requestImageModel ? {
+    imageRoute: config.imageRoute,
+    imageModel: config.imageModel,
+    selectedImageModel: config.selectedImageModel || config.imageModel,
+    requestImageModel: config.requestImageModel,
+  } : {};
 }
 
 function normalizeGenerationReasoningEffort(value, generationConfig = {}, fallback = DEFAULT_REASONING_EFFORT) {
@@ -1343,12 +1380,14 @@ async function handleConfigPost(request, response) {
     endpointPath: payload.endpointPath,
     responsesModel: payload.responsesModel,
     imageToolModel: payload.imageToolModel,
+    ...(payload.imageOptions !== undefined ? { imageOptions: normalizeImageOptions(payload.imageOptions) } : {}),
     ...(payload.includeImageToolModel !== undefined ? { includeImageToolModel: payload.includeImageToolModel } : {}),
     imageRoute: payload.imageRoute,
     directImageBaseUrl: payload.directImageBaseUrl,
     directImageApiKey: payload.directImageApiKey,
     directImageEndpointPath: payload.directImageEndpointPath,
     directImageModel: payload.directImageModel,
+    ...(payload.directImageModelMappings !== undefined ? { directImageModelMappings: payload.directImageModelMappings } : {}),
     directTextBaseUrl: payload.directTextBaseUrl,
     directTextApiKey: payload.directTextApiKey,
     directTextEndpointPath: payload.directTextEndpointPath,
@@ -1585,11 +1624,12 @@ async function handlePromptPreviewSave(request, response) {
 
   let imageBuffer;
   try {
-    imageBuffer = decodeAndValidateGeneratedImage(base64, "中途预览");
+    imageBuffer = Buffer.from(base64, "base64");
+    validateGeneratedImage(imageBuffer);
   } catch (error) {
     return sendJson(response, 400, {
       ok: false,
-      message: error instanceof Error ? error.message : "中途预览无效，已阻止保存。",
+      message: error instanceof Error ? `中途预览无效：${error.message}` : "中途预览无效，已阻止保存。",
     });
   }
 
@@ -1878,6 +1918,7 @@ async function generateAndSavePptSlide({
   if (!generationConfig.apiKey) {
     throw new Error("Missing API key for the selected image generation route.");
   }
+  if (generationConfig.imageOptions) generationConfig.imageOptions = getImageOptionsForFormat(generationConfig.imageOptions, toApiOutputFormat(PPT_SLIDE_FORMAT), true);
   const slideQuality = normalizeGenerationImageQuality(quality, generationConfig, config.defaults?.quality);
   const slideReasoningEffort = normalizeGenerationReasoningEffort(reasoningEffort, generationConfig);
   const generationRequestScope = GLOBAL_GENERATION_REQUEST_SCOPE;
@@ -1899,8 +1940,10 @@ async function generateAndSavePptSlide({
       responsesModel: generationConfig.responsesModel,
       imageRoute: generationConfig.imageRoute,
       imageModel: generationConfig.imageModel,
+      ...getImageModelMappingMetadata(generationConfig),
       includeImageToolModel: generationConfig.includeImageToolModel,
       endpointPath: generationConfig.endpointPath,
+      ...(generationConfig.imageOptions ? { imageOptions: generationConfig.imageOptions } : {}),
       directImageStream: config.directImageStream === true && generationConfig.imageRoute === IMAGE_ROUTE_B,
       reasoningEffort: slideReasoningEffort,
       async onEvent(event) {
@@ -1942,6 +1985,8 @@ async function generateAndSavePptSlide({
         responsesModel: generationConfig.responsesModel,
         imageRoute: generationConfig.imageRoute,
         imageModel: generationConfig.imageModel,
+        ...getImageModelMappingMetadata(generationConfig),
+        ...(generationConfig.imageOptions ? { imageOptions: generationConfig.imageOptions } : {}),
         endpointPath: generationResult.endpointPath || generationConfig.endpointPath,
         ratio: "16:9",
         ratioLabel: "16:9",
@@ -2594,6 +2639,8 @@ function buildSavedItem({
   responsesModel,
   imageRoute = "a",
   imageModel = "gpt-image-2",
+  selectedImageModel,
+  requestImageModel,
   endpointPath = "",
   ratioOption,
   size,
@@ -2646,6 +2693,7 @@ function buildSavedItem({
     responsesModel,
     imageRoute,
     imageModel,
+    ...(requestImageModel ? { selectedImageModel: selectedImageModel || imageModel, requestImageModel } : {}),
     endpointPath,
     hasReferenceImage: referenceImages.length > 0,
     referenceImageNames: referenceImages.map((image) => image.filename),
@@ -3317,6 +3365,7 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
     const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
     const finalQuality = normalizeGenerationImageQuality(formData.get("quality"), generationConfig, config.defaults?.quality);
     const finalFormat = normalizeOutputFormat(String(formData.get("format") || config.defaults?.format || ARTICLE_ILLUSTRATION_FORMAT));
+    if (generationConfig.imageOptions) generationConfig.imageOptions = getImageOptionsForFormat(generationConfig.imageOptions, toApiOutputFormat(finalFormat), true);
     const reasoningEffort = normalizeGenerationReasoningEffort(
       formData.get("reasoningEffort"),
       generationConfig,
@@ -3367,7 +3416,10 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
       generationStartDelayMs,
     );
 
+    const submittedGenerationConfig = generationConfig;
     async function generateArticleIllustrationItem(item, controls) {
+      const generationConfig = item.status === "planned" ? submittedGenerationConfig : resolveCreationRepairGenerationConfig(item, submittedGenerationConfig);
+      const imageOptions = getImageOptionsForFormat(item.imageOptions || (item.status === "planned" ? generationConfig.imageOptions : {}), toApiOutputFormat(finalFormat), true);
       const taskId = `${setId}-${item.itemId}`;
       const generationStartedAt = new Date().toISOString();
       const generationStartedAtMs = Date.now();
@@ -3383,6 +3435,8 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
         slotClaimed = true;
         items = updateArticleItems(items, item.itemId, {
           status: "generating",
+          ...getImageModelMappingMetadata(generationConfig),
+          imageOptions,
           error: "",
           generationStartedAt,
         });
@@ -3473,8 +3527,10 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
           responsesModel: generationConfig.responsesModel,
           imageRoute: generationConfig.imageRoute,
           imageModel: generationConfig.imageModel,
+          ...getImageModelMappingMetadata(generationConfig),
           includeImageToolModel: generationConfig.includeImageToolModel,
           endpointPath: generationConfig.endpointPath,
+          imageOptions,
           directImageStream: config.directImageStream === true,
           ...(reasoningEffort ? { reasoningEffort } : {}),
           async onEvent(event) {
@@ -3502,6 +3558,8 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
             responsesModel: generationConfig.responsesModel,
             imageRoute: generationConfig.imageRoute,
             imageModel: generationConfig.imageModel,
+            ...getImageModelMappingMetadata(generationConfig),
+            imageOptions,
             endpointPath: generationResult.endpointPath || generationConfig.endpointPath,
             ratio: ratioOption.value,
             ratioLabel: ratioOption.value,
@@ -3530,6 +3588,8 @@ async function handleArticleIllustrationGenerate(request, response, { referenceO
 
         items = updateArticleItems(items, item.itemId, {
           status: "completed",
+          ...getImageModelMappingMetadata(generationConfig),
+          imageOptions,
           filename: saved.filename,
           relativePath: saved.relativePath,
           imageUrl,
@@ -4129,6 +4189,8 @@ async function handleCreationSetPathsGet(request, response) {
   return sendJson(response, 200, buildCreationSetPathReport(set));
 }
 
+const creationListingScheduler = createCreationListingScheduler({ concurrency: 3 });
+
 async function handleCreationListingsGenerate(request, response) {
   let payload = {};
   try {
@@ -4179,32 +4241,38 @@ async function handleCreationListingsGenerate(request, response) {
   }
 
   try {
-    const listingDrafts = await generateCreationListingDrafts({
-      set,
-      config: {
-        baseUrl: textVisionConfig.baseUrl,
-        endpointPath: textVisionConfig.endpointPath,
-        apiKey: textVisionConfig.apiKey,
-        responsesModel: textVisionConfig.responsesModel,
-        reasoningEffort,
-      },
-      mock,
-    });
-    const latestSet = await creationSetStore.readManifest(setId);
-    const nextSet = await creationSetStore.saveManifest({
-      ...latestSet,
-      listingDrafts,
-      updatedAt: new Date().toISOString(),
-    });
+    const scope = getTextModelContext();
+    const batchId = String(payload.batchId || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 100);
+    const listingSource = { ...set };
+    delete listingSource.listingDrafts;
+    delete listingSource.updatedAt;
+    const key = createHash("sha256").update(JSON.stringify({ set: listingSource, config: textVisionConfig, reasoningEffort, mock })).digest("hex");
+    const nextSet = await creationListingScheduler.run(key, ({ signal, onProgress, requestId }) => runWithTextModelContext({ signal, requestId, onProgress, callCounter: { attempt: 0 } }, async () => {
+      const listingDrafts = await generateCreationListingDrafts({
+        set,
+        config: {
+          baseUrl: textVisionConfig.baseUrl,
+          endpointPath: textVisionConfig.endpointPath,
+          apiKey: textVisionConfig.apiKey,
+          responsesModel: textVisionConfig.responsesModel,
+          reasoningEffort,
+          requestScheduler: creationListingScheduler,
+        },
+        mock,
+      });
+      signal.throwIfAborted();
+      reportTextModelProgress({ purpose: "Listing", stage: "validating", message: "Listing 已校验，正在保存。" });
+      const latestSet = await creationSetStore.readManifest(setId);
+      return creationSetStore.saveManifest({ ...latestSet, listingDrafts, updatedAt: new Date().toISOString() });
+    }), { signal: scope?.signal, onProgress: (event) => scope?.onProgress?.({ ...event, setId, batchId }) });
     return sendJson(response, 200, {
       ok: true,
       set: nextSet,
       listingDrafts: nextSet.listingDrafts,
     });
   } catch (error) {
-    return sendJson(response, 502, {
-      message: error instanceof Error ? error.message : String(error),
-    });
+    if (!isResponseWritable(response)) return;
+    return sendJson(response, 502, creationListingErrorMetadata(error));
   }
 }
 
@@ -4552,7 +4620,10 @@ async function handleCreationPlan(request, response) {
   try {
     const formData = await readFormDataBody(request);
     const referenceImageRoles = normalizeCreationReferenceRoles(formData.get("referenceImageRoles"));
+    const referenceImages = await toReferenceImages([...formData.getAll("referenceImages"), ...formData.getAll("referenceImage")]);
+    if (referenceImages.length > MAX_CREATION_REFERENCE_IMAGES || referenceImages.some((image) => !String(image.mimeType || "").startsWith("image/"))) throw new Error("套图参考图无效或超过上传上限。");
     let plan = buildCreationPlan({
+      referenceImages: isCreationAiMarketingEnabled(formData.get("aiMarketingEnabled")) ? [] : referenceImages,
       productName: formData.get("productName"),
       productDescription: formData.get("productDescription"),
       sellingPoints: formData.get("sellingPoints"),
@@ -4590,7 +4661,6 @@ async function handleCreationPlan(request, response) {
       const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
       const textConfig = getSelectedPromptAgentAnalysisConfig(config);
       if (!textConfig.apiKey) throw new Error("AI 整套营销提示词需要先配置文本/视觉模型 API。");
-      const referenceImages = await toReferenceImages(formData.getAll("referenceImages"));
       if (referenceImages.length > MAX_CREATION_REFERENCE_IMAGES || referenceImages.some((image) => !String(image.mimeType || "").startsWith("image/"))) throw new Error("AI 规划参考图无效或超过上传上限。");
       const options = { input: Object.fromEntries(formData), referenceImages, config: textConfig };
       plan = streaming ? await requestCreationMarketingPlanWithProgress(response, options) : await requestSharedCreationMarketingPlan(options);
@@ -4683,6 +4753,7 @@ async function handlePortraitGenerate(request, response) {
     const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
     const finalQuality = normalizeGenerationImageQuality(formData.get("quality"), generationConfig, config.defaults?.quality);
     const finalFormat = normalizeOutputFormat(String(formData.get("format") || plan.format || config.defaults?.format || "png"));
+    if (generationConfig.imageOptions) generationConfig.imageOptions = getImageOptionsForFormat(generationConfig.imageOptions, toApiOutputFormat(finalFormat), true);
     const reasoningEffort = normalizeGenerationReasoningEffort(
       formData.get("reasoningEffort"),
       generationConfig,
@@ -4696,6 +4767,7 @@ async function handlePortraitGenerate(request, response) {
     });
     items = plan.items.map((item) => ({
       ...item,
+      ...(generationConfig.imageOptions ? { imageOptions: structuredClone(generationConfig.imageOptions) } : {}),
       status: "queued",
       filename: "",
       relativePath: "",
@@ -4739,6 +4811,7 @@ async function handlePortraitGenerate(request, response) {
         await waitForResponseSessionTaskSlot(clientSessionId, taskId, generationRequestScope, response, { maxParallelTasks: generationConcurrency, controls });
         slotClaimed = true;
         items = updatePortraitItems(items, item.itemId, {
+          ...getImageModelMappingMetadata(generationConfig),
           status: "generating",
           generationStartedAt,
         });
@@ -4765,8 +4838,10 @@ async function handlePortraitGenerate(request, response) {
           responsesModel: generationConfig.responsesModel,
           imageRoute: generationConfig.imageRoute,
           imageModel: generationConfig.imageModel,
+          ...getImageModelMappingMetadata(generationConfig),
           includeImageToolModel: generationConfig.includeImageToolModel,
           endpointPath: generationConfig.endpointPath,
+          ...(generationConfig.imageOptions ? { imageOptions: generationConfig.imageOptions } : {}),
           directImageStream: config.directImageStream === true,
           ...(reasoningEffort ? { reasoningEffort } : {}),
           async onEvent(event) {
@@ -4826,6 +4901,8 @@ async function handlePortraitGenerate(request, response) {
             responsesModel: generationConfig.responsesModel,
             imageRoute: generationConfig.imageRoute,
             imageModel: generationConfig.imageModel,
+            ...getImageModelMappingMetadata(generationConfig),
+            ...(generationConfig.imageOptions ? { imageOptions: generationConfig.imageOptions } : {}),
             endpointPath: generationConfig.endpointPath,
             generationMode: "portrait",
             ratio: ratioOption.value,
@@ -4856,7 +4933,9 @@ async function handlePortraitGenerate(request, response) {
         const imageUrl = buildPublicAssetUrl("/output", saved.relativePath, saved.createdAt);
 
         items = updatePortraitItems(items, item.itemId, {
+          ...getImageModelMappingMetadata(generationConfig),
           status: "completed",
+          ...(generationConfig.imageOptions ? { imageOptions: generationConfig.imageOptions } : {}),
           filename: saved.filename,
           relativePath: saved.relativePath,
           imageUrl,
@@ -4994,6 +5073,7 @@ async function handleCreationGenerate(request, response) {
     referenceImageNames = referenceImages.map((image) => image.filename).filter(Boolean);
     referenceImageRoles = normalizeCreationReferenceRoles(formData.get("referenceImageRoles"));
     plan = buildCreationSubmittedPlan({
+      referenceImages: isCreationAiMarketingEnabled(formData.get("aiMarketingEnabled")) ? [] : referenceImages,
       productName: formData.get("productName"),
       productDescription: formData.get("productDescription"),
       sellingPoints: formData.get("sellingPoints"),
@@ -5027,10 +5107,11 @@ async function handleCreationGenerate(request, response) {
     if (isCreationAiMarketingEnabled(formData.get("aiMarketingEnabled")) && Number(formData.get("imageCount")) > 0) {
       const input = Object.fromEntries(formData);
       if (plan.promptPlanningMode === "ai-batch" && plan.marketingPlan) {
-        if (plan.marketingPlan.inputFingerprint !== creationMarketingInputFingerprint(input, referenceImages)) throw new Error("商品资料或规划条件已变化，请重新预览 AI 整套营销提示词。");
+        const planningContractVersion = Number(plan.marketingPlan.version) >= 9 ? 10 : Number(plan.marketingPlan.version) >= 8 ? 9 : Number(plan.marketingPlan.version) >= 7 ? 8 : Number(plan.marketingPlan.version) >= 6 ? 7 : 6;
+        if (plan.marketingPlan.inputFingerprint !== creationMarketingInputFingerprint(input, referenceImages, { planningContractVersion })) throw new Error("商品资料或规划条件已变化，请重新预览 AI 整套营销提示词。");
         const primary = plan.referenceImageRoles?.find((entry) => entry.role === "reference-product") || plan.referenceImageRoles?.find((entry) => entry.role === "product");
         const payload = { items: plan.items.filter((item) => item.itemKind === "carousel").map((item) => ({ item_id: item.itemId, image_type: item.imageType, title: item.title, marketing_goal: item.marketingAssignment?.goal, creative_brief: item.marketingAssignment?.creativeBrief, prompt: item.prompt, audience_ids: item.marketingAssignment?.audienceIds, selling_point_ids: item.marketingAssignment?.sellingPointIds, pain_point_ids: item.marketingAssignment?.painPointIds, recommendation_ids: item.marketingAssignment?.recommendationIds, fact_ids: item.marketingAssignment?.factIds, reference_indexes: item.marketingAssignment?.referenceIndexes })) };
-        plan = applyCreationPlanEvidenceRequirements(applyCreationMarketingPlan(plan, payload, { count: Number(formData.get("imageCount")), referenceCount: referenceImages.length, primaryIndex: referenceImages.length ? Number(plan.marketingPlan.primaryReferenceIndex) || Number(primary?.index) || 1 : 0, selectedRoles: plan.marketingPlan.selectedRoles || [], lockedItems: plan.marketingPlan.lockedItems || [],
+        plan = applyCreationPlanEvidenceRequirements(applyCreationMarketingPlan(plan, payload, { count: payload.items.length, referenceCount: referenceImages.length, referenceImages, primaryIndex: referenceImages.length ? Number(plan.marketingPlan.primaryReferenceIndex) || Number(primary?.index) || 1 : 0, selectedRoles: plan.marketingPlan.selectedRoles || [], lockedItems: plan.marketingPlan.lockedItems || [],
           allowPartial: false,
           sourceIndexes: plan.items.filter((item) => item.itemKind === "carousel").map((item, index) => item.marketingAssignment?.sourceIndex || index + 1),
           constraintCount: plan.marketingPlan.validation?.requestedCount || Number(formData.get("imageCount")),
@@ -5067,6 +5148,7 @@ async function handleCreationGenerate(request, response) {
     const fallbackSize = requestedSizeInput;
     const finalQuality = normalizeGenerationImageQuality(formData.get("quality"), generationConfig, config.defaults?.quality);
     const finalFormat = normalizeOutputFormat(String(formData.get("format") || config.defaults?.format || "png"));
+    if (generationConfig.imageOptions) generationConfig.imageOptions = getImageOptionsForFormat(generationConfig.imageOptions, toApiOutputFormat(finalFormat), true);
     const reasoningEffort = normalizeGenerationReasoningEffort(
       formData.get("reasoningEffort"),
       generationConfig,
@@ -5229,8 +5311,10 @@ async function handleCreationGenerate(request, response) {
           responsesModel: generationConfig.responsesModel,
           imageRoute: generationConfig.imageRoute,
           imageModel: generationConfig.imageModel,
+          ...getImageModelMappingMetadata(generationConfig),
           includeImageToolModel: generationConfig.includeImageToolModel,
           endpointPath: generationConfig.endpointPath,
+          ...(generationConfig.imageOptions ? { imageOptions: generationConfig.imageOptions } : {}),
           directImageStream: config.directImageStream === true,
           ...(reasoningEffort ? { reasoningEffort } : {}),
           onResponseId: () =>
@@ -5317,6 +5401,8 @@ async function handleCreationGenerate(request, response) {
             responsesModel: generationConfig.responsesModel,
             imageRoute: generationConfig.imageRoute,
             imageModel: generationConfig.imageModel,
+            ...getImageModelMappingMetadata(generationConfig),
+            ...(generationConfig.imageOptions ? { imageOptions: generationConfig.imageOptions } : {}),
             endpointPath: generationConfig.endpointPath,
             ratio: itemGenerationParameters.ratioOption.value,
             ratioLabel: itemGenerationParameters.ratioOption.value,
@@ -5532,6 +5618,7 @@ async function handleCreationLogoBatchGenerate(request, response) {
     const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
     const finalQuality = normalizeGenerationImageQuality(formData.get("quality"), generationConfig, config.defaults?.quality);
     const finalFormat = normalizeOutputFormat(String(formData.get("format") || config.defaults?.format || "png"));
+    if (generationConfig.imageOptions) generationConfig.imageOptions = getImageOptionsForFormat(generationConfig.imageOptions, toApiOutputFormat(finalFormat), true);
     const reasoningEffort = normalizeGenerationReasoningEffort(
       formData.get("reasoningEffort"),
       generationConfig,
@@ -5633,8 +5720,10 @@ async function handleCreationLogoBatchGenerate(request, response) {
           responsesModel: generationConfig.responsesModel,
           imageRoute: generationConfig.imageRoute,
           imageModel: generationConfig.imageModel,
+          ...getImageModelMappingMetadata(generationConfig),
           includeImageToolModel: generationConfig.includeImageToolModel,
           endpointPath: generationConfig.endpointPath,
+          ...(generationConfig.imageOptions ? { imageOptions: generationConfig.imageOptions } : {}),
           directImageStream: config.directImageStream === true,
           ...(reasoningEffort ? { reasoningEffort } : {}),
           onResponseId: () =>
@@ -5712,6 +5801,8 @@ async function handleCreationLogoBatchGenerate(request, response) {
             responsesModel: generationConfig.responsesModel,
             imageRoute: generationConfig.imageRoute,
             imageModel: generationConfig.imageModel,
+            ...getImageModelMappingMetadata(generationConfig),
+            ...(generationConfig.imageOptions ? { imageOptions: generationConfig.imageOptions } : {}),
             endpointPath: generationConfig.endpointPath,
             ratio: ratioOption.value,
             ratioLabel: ratioOption.value,
@@ -5923,6 +6014,7 @@ async function handlePortraitRepair(request, response) {
     const { finalSize } = resolveGenerationSizeForRoute(ratioOption, requestedSizeInput, generationConfig.imageRoute);
     const finalQuality = normalizeGenerationImageQuality(formData.get("quality"), generationConfig, config.defaults?.quality);
     const finalFormat = normalizeOutputFormat(String(formData.get("format") || setManifest.format || config.defaults?.format || "png"));
+    if (generationConfig.imageOptions) generationConfig.imageOptions = getImageOptionsForFormat(generationConfig.imageOptions, toApiOutputFormat(finalFormat), true);
     const reasoningEffort = normalizeGenerationReasoningEffort(
       formData.get("reasoningEffort"),
       generationConfig,
@@ -5945,7 +6037,10 @@ async function handlePortraitRepair(request, response) {
     );
 
     try {
+      const submittedGenerationConfig = generationConfig;
       await runWithConcurrency(repairItems, generationConcurrency, async (item, index, controls) => {
+      const generationConfig = resolveCreationRepairGenerationConfig(item, submittedGenerationConfig);
+      const imageOptions = getImageOptionsForFormat(item.imageOptions, toApiOutputFormat(finalFormat), true);
       const taskId = retryLedger.getTaskId(`${setId}-${item.itemId}-repair`, item.itemId);
       const generationStartedAt = new Date().toISOString();
       const generationStartedAtMs = Date.now();
@@ -5958,6 +6053,8 @@ async function handlePortraitRepair(request, response) {
         slotClaimed = true;
         items = updatePortraitItems(items, item.itemId, {
           ...item,
+          imageOptions,
+          ...getImageModelMappingMetadata(generationConfig),
           status: "generating",
           generationStartedAt,
           error: "",
@@ -5985,8 +6082,10 @@ async function handlePortraitRepair(request, response) {
           responsesModel: generationConfig.responsesModel,
           imageRoute: generationConfig.imageRoute,
           imageModel: generationConfig.imageModel,
+          ...getImageModelMappingMetadata(generationConfig),
           includeImageToolModel: generationConfig.includeImageToolModel,
           endpointPath: generationConfig.endpointPath,
+          imageOptions,
           directImageStream: config.directImageStream === true,
           ...(reasoningEffort ? { reasoningEffort } : {}),
           async onEvent(event) {
@@ -6044,6 +6143,8 @@ async function handlePortraitRepair(request, response) {
             responsesModel: generationConfig.responsesModel,
             imageRoute: generationConfig.imageRoute,
             imageModel: generationConfig.imageModel,
+            ...getImageModelMappingMetadata(generationConfig),
+            imageOptions,
             endpointPath: generationConfig.endpointPath,
             generationMode: "portrait",
             ratio: ratioOption.value,
@@ -6263,6 +6364,7 @@ async function handleCreationRepair(request, response) {
     const fallbackSize = String(formData.get("size") || "").trim();
     const finalQuality = normalizeGenerationImageQuality(formData.get("quality"), generationConfig, config.defaults?.quality);
     const finalFormat = normalizeOutputFormat(String(formData.get("format") || config.defaults?.format || "png"));
+    if (generationConfig.imageOptions) generationConfig.imageOptions = getImageOptionsForFormat(generationConfig.imageOptions, toApiOutputFormat(finalFormat), true);
     const reasoningEffort = normalizeGenerationReasoningEffort(
       formData.get("reasoningEffort"),
       generationConfig,
@@ -6332,6 +6434,7 @@ async function handleCreationRepair(request, response) {
       const itemGenerationConfig = resolveCreationRepairGenerationConfig(repairItem, generationConfig);
       const referenceUploadTargetKey = referenceUploads.getTargetKey(itemGenerationConfig);
       const itemFormat = normalizeOutputFormat(repairItem.format || finalFormat);
+      if (itemGenerationConfig.imageOptions) itemGenerationConfig.imageOptions = getImageOptionsForFormat(itemGenerationConfig.imageOptions, toApiOutputFormat(itemFormat), true);
       // 补图条目自带上游目标，模型可能与本次运行的不同，按它自己的模型收敛质量档。
       const itemQuality = normalizeGenerationImageQuality(repairItem.quality, itemGenerationConfig, finalQuality);
       const itemReasoningEffort = normalizeReasoningEffort(repairItem.reasoningEffort || reasoningEffort);
@@ -6420,8 +6523,10 @@ async function handleCreationRepair(request, response) {
           responsesModel: itemGenerationConfig.responsesModel,
           imageRoute: itemGenerationConfig.imageRoute,
           imageModel: itemGenerationConfig.imageModel,
+          ...getImageModelMappingMetadata(itemGenerationConfig),
           includeImageToolModel: itemGenerationConfig.includeImageToolModel,
           endpointPath: itemGenerationConfig.endpointPath,
+          ...(itemGenerationConfig.imageOptions ? { imageOptions: itemGenerationConfig.imageOptions } : {}),
           directImageStream: config.directImageStream === true,
           ...(itemReasoningEffort ? { reasoningEffort: itemReasoningEffort } : {}),
           onResponseId: () =>
@@ -6500,6 +6605,8 @@ async function handleCreationRepair(request, response) {
             responsesModel: itemGenerationConfig.responsesModel,
             imageRoute: itemGenerationConfig.imageRoute,
             imageModel: itemGenerationConfig.imageModel,
+            ...getImageModelMappingMetadata(itemGenerationConfig),
+            ...(itemGenerationConfig.imageOptions ? { imageOptions: itemGenerationConfig.imageOptions } : {}),
             endpointPath: itemGenerationConfig.endpointPath,
             ratio: itemGenerationParameters.ratioOption.value,
             ratioLabel: itemGenerationParameters.ratioOption.value,
@@ -6783,14 +6890,31 @@ async function handleGenerate(request, response) {
       ...formData.getAll("referenceImage"),
     ];
     const referenceImages = await toReferenceImages(rawReferenceImages);
-    if (referenceImages.length > MAX_REFERENCE_IMAGES) {
+    const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
+    const generationConfig = getSelectedImageGenerationConfig(config);
+    const maxReferenceImages = getImageModelCapabilities(generationConfig.imageModel).maxReferenceImages;
+    if (referenceImages.length > maxReferenceImages) {
       generationTaskStore.failTask(clientSessionId, taskId, {
-        errorMessage: `参考图最多支持 ${MAX_REFERENCE_IMAGES} 张。`,
+        errorMessage: `参考图最多支持 ${maxReferenceImages} 张。`,
       });
       writeSseEvent(response, "error", {
-        message: `参考图最多支持 ${MAX_REFERENCE_IMAGES} 张。`,
+        message: `参考图最多支持 ${maxReferenceImages} 张。`,
       });
       return;
+    }
+    let markup = null;
+    if (imageEditMode === "markup" || formData.get("markup")) {
+      if (!isImageEdit || formData.get("mask") || formData.getAll("masks[]").length || isLocalMaskImageEdit) throw new Error("标注引导仅支持图片编辑，不能与 mask 同时使用。");
+      const files = await toReferenceImages(formData.getAll("markup"));
+      if (files.length !== 1 || referenceImages.length !== 1) throw new Error("标注引导需要一张源图和一个透明 PNG 标注。");
+      [markup] = files;
+      if (markup.buffer.length > 50 * 1024 * 1024 || validateGeneratedImage(markup.buffer).format !== "png") throw new Error("标注必须是有效透明 PNG，最大 50 MB。");
+      const source = await Jimp.read(referenceImages[0].buffer);
+      const overlay = await Jimp.read(markup.buffer);
+      if (source.bitmap.width !== overlay.bitmap.width || source.bitmap.height !== overlay.bitmap.height) throw new Error("标注与方向归一化后的源图尺寸必须一致。");
+      let transparent = false;
+      for (let i = 3; i < overlay.bitmap.data.length; i += 4) if (overlay.bitmap.data[i] < 255) { transparent = true; break; }
+      if (!transparent) throw new Error("标注 PNG 必须包含透明像素。");
     }
     if (isImageDecomposition && referenceImages.length !== 1) {
       generationTaskStore.failTask(clientSessionId, taskId, {
@@ -6954,8 +7078,7 @@ async function handleGenerate(request, response) {
       return;
     }
 
-    const config = mergeRequestPrivateConfig(formData, await configStore.readPrivateConfig());
-    const generationConfig = getSelectedImageGenerationConfig(config);
+
     const generationConcurrency = resolveGenerationConcurrencyForLimit(formData, config);
     generationTaskStore.updateTask(clientSessionId, taskId, {
       imageRoute: generationConfig.imageRoute,
@@ -7053,6 +7176,8 @@ async function handleGenerate(request, response) {
       responsesModel: generationConfig.responsesModel,
       imageRoute: generationConfig.imageRoute,
       imageModel: generationConfig.imageModel,
+      ...getImageModelMappingMetadata(generationConfig),
+      ...(generationConfig.imageOptions ? { imageOptions: generationConfig.imageOptions } : {}),
       endpointPath: generationConfig.endpointPath,
       hasReferenceImage: referenceImages.length > 0,
       referenceImageNames: referenceImages.map((image) => image.filename),
@@ -7107,10 +7232,12 @@ async function handleGenerate(request, response) {
 
       if (event.type === "final_image") {
         finalBase64 = event.base64;
-        if (generationConfig.imageRoute === IMAGE_ROUTE_D) {
-          const inspection = validateGeneratedImage(Buffer.from(normalizeBase64(event.base64), "base64"));
-          finalFormat = inspection.format === "jpeg" ? "jpg" : "png";
-        }
+        // 所有路由都按实际字节判定格式：预览 MIME 和落盘扩展名跟真实编码一致，
+        // 不再假定上游一定按请求的 output_format 返回。
+        finalFormat = resolveActualOutputFormat(
+          inspectGeneratedImageSafely(Buffer.from(normalizeBase64(event.base64), "base64")),
+          finalFormat,
+        );
         if (!emitFinalImage) {
           return;
         }
@@ -7137,10 +7264,13 @@ async function handleGenerate(request, response) {
       responsesModel: generationConfig.responsesModel,
       imageRoute: generationConfig.imageRoute,
       imageModel: generationConfig.imageModel,
+      ...getImageModelMappingMetadata(generationConfig),
       includeImageToolModel: generationConfig.includeImageToolModel,
       endpointPath: generationConfig.endpointPath,
+      ...(generationConfig.imageOptions ? { imageOptions: generationConfig.imageOptions } : {}),
       directImageStream: config.directImageStream === true,
       generationMode,
+      markup,
       ...(reasoningEffort ? { reasoningEffort } : {}),
     };
     let generationResult;
@@ -7220,6 +7350,7 @@ async function handleGenerate(request, response) {
         },
       });
     }
+    generationConfig.imageOptions = getImageOptionsForFormat(generationConfig.imageOptions, toApiOutputFormat(finalFormat), Boolean(generationMode));
     const generationCompletedAt = new Date().toISOString();
     const generationDurationMs = Math.max(0, Date.now() - generationStartedAtMs);
     const savedSize = generationResult.effectiveSize || finalSize;
@@ -7238,113 +7369,143 @@ async function handleGenerate(request, response) {
       message: "正在保存到本地图片目录",
     });
 
-    const filename = createTimestampedFilename({
-      format: finalFormat,
-      prompt,
-      createdAt,
-      filenameKeyword: quickBlendFilenameToken,
-    });
-    const imageBuffer = decodeAndValidateGeneratedImage(finalBase64, "生成结果");
-    const saved = await saveGeneratedAsset({
-      outputDir,
-      filename,
-      imageBuffer,
-      metadata: {
-        prompt,
-        createdAt,
-        baseUrl: generationConfig.baseUrl,
-        requestIp,
-        responsesModel: generationConfig.responsesModel,
-        imageRoute: generationConfig.imageRoute,
-        imageModel: generationConfig.imageModel,
-        endpointPath: generationResult.endpointPath || generationConfig.endpointPath,
-        ratio: ratioOption.value,
-        ratioLabel: ratioOption.value,
-        size: savedSize,
-        quality: finalQuality,
-        format: finalFormat,
-        ...(generationMode === "" ? { imageBackground } : {}),
-        ...(generationConfig.imageRoute === IMAGE_ROUTE_A
-          ? { includeImageToolModel: generationConfig.includeImageToolModel === true }
-          : {}),
-        ...(generationConfig.imageRoute === IMAGE_ROUTE_B
-          ? { directImageStream: config.directImageStream === true }
-          : {}),
-        hasReferenceImage: referenceImages.length > 0,
-        referenceImageNames: referenceImages.map((image) => image.filename),
-        referenceImageName: referenceImages[0]?.filename || "",
-        generationMode,
-        styleTransferSourceImageName,
-        styleTransferReferenceImageName,
-        styleTransferStylePreset,
-        quickBlendPairIndex,
-        quickBlendAImageName,
-        quickBlendBImageName,
-        quickBlendCImageName,
-        quickBlendDImageName,
-        quickBlendLayoutOrder,
-        quickBlendPlacementShape,
-        assetKind,
-        targetLanguage,
-        sourceImageName,
-        editInstruction,
-        ...localMaskMetadata,
-        featureCardsEnabled,
-        ...(reasoningEffort ? { reasoningEffort } : {}),
-        generationStartedAt,
-        generationCompletedAt,
-        generationDurationMs,
-      },
-    });
+    const results = generationResult.images?.length ? generationResult.images : [{ base64: finalBase64, format: finalFormat }];
+    const savedResults = [];
+    try {
+      for (let resultIndex = 0; resultIndex < results.length; resultIndex++) {
+        const result = results[resultIndex];
+        // 网关透传：拿到什么字节就存什么字节。只要非空就落盘，格式差异只写进元数据。
+        const imageBuffer = decodeAndValidateGeneratedImage(result.base64, "生成结果");
+        const inspection = inspectGeneratedImageSafely(imageBuffer);
+        // 扩展名跟真实编码走，不再用请求格式去卡结果。
+        const resultFormat = resolveActualOutputFormat(inspection, finalFormat);
+        const filename = createTimestampedFilename({
+          format: resultFormat,
+          prompt,
+          createdAt,
+          filenameKeyword: quickBlendFilenameToken,
+        });
+        const saved = await saveGeneratedAsset({
+          outputDir,
+          filename,
+          imageBuffer,
+          metadata: {
+            prompt,
+            createdAt,
+            taskId,
+            resultIndex,
+            actualSize: inspection.actualSize,
+            ...(generationResult.svgUsage ? { svgUsage: generationResult.svgUsage } : {}),
+            ...(generationResult.usage ? { usage: generationResult.usage } : {}),
+            ...(generationResult.actualQuality ? { actualQuality: generationResult.actualQuality } : {}),
+            ...(markup ? { editMode: "markup" } : {}),
+            baseUrl: generationConfig.baseUrl,
+            requestIp,
+            responsesModel: generationConfig.responsesModel,
+            imageRoute: generationConfig.imageRoute,
+            imageModel: generationConfig.imageModel,
+            ...getImageModelMappingMetadata(generationConfig),
+            ...(generationConfig.imageOptions ? { imageOptions: generationConfig.imageOptions } : {}),
+            endpointPath: generationResult.endpointPath || generationConfig.endpointPath,
+            ratio: ratioOption.value,
+            ratioLabel: ratioOption.value,
+            size: savedSize,
+            quality: finalQuality,
+            format: resultFormat,
+            ...(generationMode === "" ? { imageBackground } : {}),
+            ...(generationConfig.imageRoute === IMAGE_ROUTE_A
+              ? { includeImageToolModel: generationConfig.includeImageToolModel === true }
+              : {}),
+            ...(generationConfig.imageRoute === IMAGE_ROUTE_B
+              ? { directImageStream: config.directImageStream === true }
+              : {}),
+            hasReferenceImage: referenceImages.length > 0,
+            referenceImageNames: referenceImages.map((image) => image.filename),
+            referenceImageName: referenceImages[0]?.filename || "",
+            generationMode,
+            styleTransferSourceImageName,
+            styleTransferReferenceImageName,
+            styleTransferStylePreset,
+            quickBlendPairIndex,
+            quickBlendAImageName,
+            quickBlendBImageName,
+            quickBlendCImageName,
+            quickBlendDImageName,
+            quickBlendLayoutOrder,
+            quickBlendPlacementShape,
+            assetKind,
+            targetLanguage,
+            sourceImageName,
+            editInstruction,
+            ...localMaskMetadata,
+            featureCardsEnabled,
+            ...(reasoningEffort ? { reasoningEffort } : {}),
+            generationStartedAt,
+            generationCompletedAt,
+            generationDurationMs,
+          },
+        });
 
-    const item = buildSavedItem({
-      filename: saved.filename,
-      absolutePath: saved.absolutePath,
-      relativePath: saved.relativePath,
-      createdAt: saved.createdAt,
-      prompt,
-      baseUrl: generationConfig.baseUrl,
-      responsesModel: generationConfig.responsesModel,
-      imageRoute: generationConfig.imageRoute,
-      imageModel: generationConfig.imageModel,
-      endpointPath: generationResult.endpointPath || generationConfig.endpointPath,
-      ratioOption,
-      size: savedSize,
-      actualSize: saved.metadata?.actualSize || "",
-      quality: finalQuality,
-      format: finalFormat,
-      referenceImages,
-      reasoningEffort,
-      generationMode,
-      imageBackground: generationMode === "" ? imageBackground : "",
-      ...(generationConfig.imageRoute === IMAGE_ROUTE_A
-        ? { includeImageToolModel: generationConfig.includeImageToolModel === true }
-        : {}),
-      ...(generationConfig.imageRoute === IMAGE_ROUTE_B
-        ? { directImageStream: config.directImageStream === true }
-        : {}),
-      requestIp,
-      styleTransferSourceImageName,
-      styleTransferReferenceImageName,
-      styleTransferStylePreset,
-      quickBlendPairIndex,
-      quickBlendAImageName,
-      quickBlendBImageName,
-      quickBlendCImageName,
-      quickBlendDImageName,
-      quickBlendLayoutOrder,
-      quickBlendPlacementShape,
-      assetKind,
-      targetLanguage,
-      sourceImageName,
-      editInstruction,
-      ...localMaskMetadata,
-      featureCardsEnabled,
-      generationStartedAt,
-      generationCompletedAt,
-      generationDurationMs,
-    });
+        const item = buildSavedItem({
+          filename: saved.filename,
+          absolutePath: saved.absolutePath,
+          relativePath: saved.relativePath,
+          createdAt: saved.createdAt,
+          prompt,
+          baseUrl: generationConfig.baseUrl,
+          responsesModel: generationConfig.responsesModel,
+          imageRoute: generationConfig.imageRoute,
+          imageModel: generationConfig.imageModel,
+          ...getImageModelMappingMetadata(generationConfig),
+          ...(generationConfig.imageOptions ? { imageOptions: generationConfig.imageOptions } : {}),
+          endpointPath: generationResult.endpointPath || generationConfig.endpointPath,
+          ratioOption,
+          size: savedSize,
+          actualSize: saved.metadata?.actualSize || "",
+          quality: finalQuality,
+          format: resultFormat,
+          referenceImages,
+          reasoningEffort,
+          generationMode,
+          imageBackground: generationMode === "" ? imageBackground : "",
+          ...(markup ? { editMode: "markup" } : {}),
+          ...(generationConfig.imageRoute === IMAGE_ROUTE_A
+            ? { includeImageToolModel: generationConfig.includeImageToolModel === true }
+            : {}),
+          ...(generationConfig.imageRoute === IMAGE_ROUTE_B
+            ? { directImageStream: config.directImageStream === true }
+            : {}),
+          requestIp,
+          styleTransferSourceImageName,
+          styleTransferReferenceImageName,
+          styleTransferStylePreset,
+          quickBlendPairIndex,
+          quickBlendAImageName,
+          quickBlendBImageName,
+          quickBlendCImageName,
+          quickBlendDImageName,
+          quickBlendLayoutOrder,
+          quickBlendPlacementShape,
+          assetKind,
+          targetLanguage,
+          sourceImageName,
+          editInstruction,
+          ...localMaskMetadata,
+          featureCardsEnabled,
+          generationStartedAt,
+          generationCompletedAt,
+          generationDurationMs,
+        });
 
+        Object.assign(item, saved.metadata, { filename: saved.filename, resultIndex });
+        savedResults.push({ saved, item });
+      }
+    } catch (error) {
+      throw new Error(`已保存 ${savedResults.length}/${results.length} 张，其他结果保存失败：${error.message}`);
+    }
+    const { saved, item } = savedResults[0];
+    const filename = saved.filename;
+    if (savedResults.length > 1) item.additionalItems = savedResults.slice(1).map((entry) => entry.item);
     generationTaskStore.completeTask(clientSessionId, taskId, {
       filename,
       absolutePath: saved.absolutePath,

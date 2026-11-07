@@ -325,18 +325,19 @@ test("reference repair uses distinct fact sources and keeps the chosen primary f
   const base = buildCreationPlan(input);
   base.productInsights.confirmedFacts = base.productInsights.confirmedFacts.map((fact) => ({ ...fact, referenceIndexes: fact.id === "fingers" ? [3] : [2] }));
   payload.items[0].reference_indexes = [3];
+  payload.items[0].reference_needs = [{ reference_index: 3, purpose: "state", fact_ids: ["fingers"], reason: "本图展示的露指操作状态" }];
   const result = applyCreationMarketingPlan(base, payload, { count: 1, referenceCount: 3, primaryIndex: 2 });
   assert.deepEqual(result.items[0].marketingAssignment.referenceIndexes, [2, 3]);
   assert.deepEqual(result.items[0].contentAssignment.referenceSources.map((source) => source.index), [2, 3]);
 });
 
-test("adding a missing primary preserves more than eight selected references", () => {
+test("a missing primary does not turn redundant fact sources into mandatory attachments", () => {
   const { input, payload } = marketingPlanFixture(1);
   const base = buildCreationPlan(input);
   payload.items[0].reference_indexes = [2, 3, 4, 5, 6, 7, 8, 9];
   const result = applyCreationMarketingPlan(base, payload, { count: 1, referenceCount: 9, primaryIndex: 1 });
-  assert.deepEqual(result.items[0].marketingAssignment.referenceIndexes, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
-  assert.deepEqual(result.items[0].contentAssignment.referenceSources.map((source) => source.index), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  assert.deepEqual(result.items[0].marketingAssignment.referenceIndexes, [1]);
+  assert.deepEqual(result.items[0].contentAssignment.referenceSources.map((source) => source.index), [1]);
   base.productInsights.confirmedFacts.forEach((fact) => { fact.referenceIndexes = [1, 2, 3, 4, 5, 6, 7, 8, 9]; });
   payload.items[0].reference_indexes = [];
   const restoredSources = applyCreationMarketingPlan(base, payload, { count: 1, referenceCount: 9, primaryIndex: 1 });
@@ -442,6 +443,7 @@ test("explicit reference assignments keep original upload numbers and enforce th
   const roles = images.map((image, index) => ({ index: index + 1, filename: image.filename, role: index ? "feature" : "reference-product" }));
   const item = structuredClone(plan.items[0]);
   item.marketingAssignment.referenceIndexes = [1, 3];
+  item.referenceSelection.referenceIndexes = [1, 3];
   item.contentAssignment.referenceSources = [{ index: 1, note: "主主体" }, { index: 3, note: "本图证据" }];
   const selected = buildCreationItemReferenceImages(item, images, roles);
   assert.deepEqual(selected.map((image) => image.referenceIndex), [1, 3]);

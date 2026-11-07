@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.116-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.138-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installers-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,7 +10,7 @@
 
 Prompt-to-image, reference analysis, editing, ecommerce sets, portraits, article illustrations, PPT generation, and asset history in one browser-based workspace.
 
-Current version: `v0.2.116`
+Current version: `v0.2.138`
 
 [Chinese README](./README.zh-CN.md)
 
@@ -72,9 +72,9 @@ The pure Node.js/Electron start commands and `stop-studio-services.cmd` do not r
 
 ### Windows desktop app (recommended)
 
-Download `GPT-Image2-Studio-Desktop-Setup-v0.2.116-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
+Download `GPT-Image2-Studio-Desktop-Setup-v0.2.138-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
 
-For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.116-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
+For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.138-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
 
 For desktop development, Electron 43 requires Node.js 22.12 or newer:
 
@@ -85,7 +85,7 @@ cmd /c npm run desktop
 
 ### Windows browser installer
 
-The legacy browser-installer flow remains documented for local builds, but the `v0.2.116` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
+The legacy browser-installer flow remains documented for local builds, but the `v0.2.138` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
 
 ## Configuration
 
@@ -151,7 +151,7 @@ The Responses model is the outer model. The image tool model is chosen from the 
 | `gpt-image-2.5-sunburst` | Most capable; more precise editing, longer generation times. |
 | `gpt-image-2.5-flare` | Fast, high-quality everyday generation. |
 
-The **发送 tools[].model** switch is off by default. With it off, Route requests omit `tools[].model` and let the configured service choose its image-tool model; the dropdown selection is still saved and retained for queued jobs. Turn the switch on when the relay requires an explicit tool model, and Studio then sends the selected allowlisted model. Older configurations that do not have this field are normalized to off.
+The **发送 tools[].model** switch is on by default, so Route requests send the selected allowlisted image-tool model. Older configurations without the field also default to on. An explicitly saved false remains off, and partial configuration saves retain the existing setting. When off, requests omit `tools[].model` and let the configured service choose the tool model; the dropdown selection and queued snapshots are retained.
 
 The prompt page parameter row also has a **质量** (quality) dropdown: `low`, `medium`, `high` (default), plus `xhigh` and `max`, which exist only on the 2.5 models. Switching back to `gpt-image-2` while `xhigh`/`max` is selected clamps quality to `high`. Grok offers only `low` and `medium`, defaulting to `medium`; quality selections are remembered separately for GPT, Gemini, and Grok. Legacy automatic values migrate to concrete defaults and are never offered as options or sent upstream. Prompt-to-image also has an optional **透明背景** (transparent background) switch on GPT's Route and Direct image routes. Enabling it forces PNG, sends `background=transparent`, and stores the choice with the queued job. Gemini and Grok keep this switch hidden and do not send a background parameter.
 
@@ -161,6 +161,10 @@ The prompt page parameter row also has a **质量** (quality) dropdown: `low`, `
 Image API:       https://api.openai.com/v1   suffix images/generations   model gpt-image-2
 Text/vision API: https://api.openai.com/v1   suffix responses            model gpt-6-luna
 ```
+
+If a provider uses a different image-model name, add a **生图模型映射** (Image model mapping) below **流式输出** (Streaming output), using `request model → actual request model`, for example `gpt-image-2.6-sunburst → IMAGE-2.6`: the left side matches the model named in the request, and the right side is the model ID actually sent to the provider. Both capsules accept manual IDs or model candidates; Fetch Models updates the mapping candidates too. Add or remove multiple rules, then save to persist them. Removing all rules and saving clears the mapping.
+
+Rules match complete, case-sensitive IDs once and apply only to GPT Direct image generation and editing. Unmatched models keep their original IDs. Text/vision models and other channels remain independent, known-model capability checks are retained, and queued jobs keep their original mapping snapshots.
 
 **Gemini.** The image endpoint suffix is fixed to `images/generations` and displayed in the same position as the GPT and Grok suffix controls:
 
@@ -302,6 +306,31 @@ The repository also contains a Vercel configuration. Vercel functions use tempor
 ### Reverse a reference image into a prompt
 
 Open **Image-to-prompt** from the top bar or the Create menu, upload one image, and analyze it. The reusable JSON keeps detailed subject and framing fields and gives `visual` a prioritized style lock for the source medium, aesthetic, palette, lighting, material response, depth, and finishing. It also asks for a sharply focused subject, naturally clear source-visible texture, clean edges, and a `4K/8K` visual-quality intent; this wording does not guarantee the generated image's pixel dimensions. `avoid` targets plausible style drift, accidental blur, artifacts, and unrelated clutter while preserving intentional bokeh, soft focus, grain, or motion. Copy the JSON into the prompt workflow to keep those source-specific visual cues explicit during a second generation.
+
+## GPT Image 2.6
+
+Choose **gpt-image-2.6-sunburst** or **gpt-image-2.6-flare** in configuration. Existing model selections remain unchanged. Route A uses Responses; “Send tools[].model” now defaults to on. If previously disabled explicitly, enable it for advanced features. Route B supports Images API or Responses; Responses keeps its outer text model separate from the image tool model.
+
+All GPT prompt-generation models and direct aliases on routes A/B share Auto / PNG / JPG / WebP / GIF animation / SVG vector shortcuts. Auto is the default: explicit format or animation requests select that format; otherwise PNG is used. Animation styles and format names within depicted text do not imply an animated output. Manual choices take priority, with conflicts shown as advisory messages. Unconfirmed model format support is also advisory: requests retain the chosen format for the provider to accept or reject, without a PNG fallback. The effective format, selection source, and GIF timing appear before Generate and are frozen when queued. GIF frames and timing are editable there; More 2.6 settings opens the shared advanced panel for 2.6 models.
+
+The shared advanced panel exposes complexity, background, compression, partial previews, size override, candidate count, GIF frames/timing, and SVG author settings. Blank fields retain upstream defaults. Image complexity, render quality, outer reasoning, and SVG author reasoning remain independent. The 2.6 quality choices include auto, low, medium, high, xhigh, and max.
+
+- Prompt generation supports PNG, JPG, WebP, GIF, and SVG. Ordinary Images requests support 1–10 candidates and up to 16 references; GIF/SVG generation requires no reference image.
+- Image editing adds a markup strategy using the existing drawing canvas. It submits a transparent PNG matching the source dimensions; markup and mask are mutually exclusive.
+- GIF originals retain animation and support pause/play in the lightbox. GIF requests that return PNG or a single-frame GIF report a format or animation validation error. SVG gallery tiles, filmstrip images, and details prefer the validated vector original even when a bitmap thumbnail is cached. Tiles identify SVG vectors and download controls explicitly offer the SVG original. Downloads retain GIF/SVG/WebP rather than silently converting to PNG.
+- Ecommerce, portrait, article, and PPT image slots remain static, single-result workflows with applicable shared options. Task snapshots and repairs preserve advanced settings.
+- Images GIF/SVG requests use JSON completion. Responses GIF may retain lifecycle SSE; neither requests partial image previews. Transparency requires PNG/WebP; compression applies to JPG/WebP.
+
+GIF requires preview access, and selecting an SVG author model requires separate permission. Leave SVG author settings blank without that access. GIF defaults to 9 frames at 200 ms. The guide permits 2–64 frames while the current API reference/SDK says 2–16; 17–64 requires provider verification. Custom sizes receive basic positive-integer validation; actual bounds remain provider/model enforced. Unsupported combinations surface errors without changing the selected model or format.
+
+CLI examples:
+
+~~~powershell
+cmd /c npm run generate -- --image-model gpt-image-2.6-flare --endpoint images/generations --prompt "A simple blue icon" --format svg --output ./output/icon.svg
+cmd /c npm run generate -- --image-model gpt-image-2.6-sunburst --endpoint images/generations --prompt "A looping floating balloon" --format gif --frame-count 9 --frame-duration-ms 200 --output ./output/balloon.gif
+~~~
+
+Run npm run help for all flags. Mock transport integration, browser checks, and Electron startup were verified; this development configuration has no usable API key, so real model calls and account permissions remain unverified. See the [v0.2.127 release notes](./docs/releases/v0.2.127.md).
 
 ## Core capabilities
 
@@ -556,7 +585,7 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 - The source and lockfile versions are authoritative; tags use `v<version>`.
 - Versions use `major.minor.patch` with a three-digit patch segment: major bumps reset minor and patch, minor bumps reset patch, feature bumps add `0.010`, and ordinary updates add `0.001`.
 - Use `npm run release:major`, `npm run release:minor`, `npm run release:feature`, or `npm run release:patch` with `--summary`; each release changes exactly one level.
-- Current release notes: [v0.2.116](./docs/releases/v0.2.116.md).
+- Current release notes: [v0.2.138](./docs/releases/v0.2.138.md).
 - Windows packages are distributed through [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Check the release notes for hashes and signing status.
 - `npm run check:release:strict` requires a clean worktree and a matching tag on the current commit.
 
@@ -571,7 +600,7 @@ Desktop and installer changes additionally require `npm run test:desktop-smoke`,
 
 ## Version history
 
-Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.116](./docs/releases/v0.2.116.md).
+Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.138](./docs/releases/v0.2.138.md).
 
 ### v0.2.116
 

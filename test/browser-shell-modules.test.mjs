@@ -108,11 +108,12 @@ test("browser config module normalizes private config without requiring window g
     endpointPath: "responses",
     responsesModel: "gpt-5.5",
     imageToolModel: "gpt-image-2",
-    includeImageToolModel: false,
+    includeImageToolModel: true,
     directImageBaseUrl: "https://image-direct.example.test/v1",
     directImageApiKey: "sk-image-secret",
     directImageEndpointPath: "images/generations",
     directImageModel: "custom-image-model",
+    directImageModelMappings: [],
     directImageStream: true,
     directTextBaseUrl: "https://text-direct.example.test/v1",
     directTextApiKey: "sk-text-secret",
@@ -478,12 +479,13 @@ test("creation listing controller sends browser-private request config", async (
   const nextSet = await controller.generate();
 
   assert.equal(capturedRequest.url, "/api/creation/listings");
-  assert.deepEqual(capturedRequest.body, {
+  assert.match(capturedRequest.body.batchId, /^listing-/);
+  const { batchId, ...requestBody } = capturedRequest.body;
+  assert.deepEqual(requestBody, {
     baseUrl: "https://api.example.test/v1",
     apiKey: "sk-browser-secret",
     responsesModel: "gpt-5.5",
     setId: selectedSet.setId,
-    set: selectedSet,
   });
   assert.equal(nextSet.listingDrafts.length, 1);
   assert.equal(state.creation.listingGeneratingSetId, "");

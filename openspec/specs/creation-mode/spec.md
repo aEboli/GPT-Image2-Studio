@@ -2308,7 +2308,7 @@ SKU 生成提示词 SHALL 为成对主体声明左右两只同图保留，不得
 
 AI 模式普通营销轮播 SHALL 支持 1–20 张，并以独立 ID 标识同一图型下不同的营销任务，MUST NOT 被现有 18 个固定槽位裁剪。SKU 与独立源图重构 SHALL 保持现有单独计数和执行规则。开关关闭时 SHALL 使用原有本地规划，0 张普通轮播 MUST NOT 发起空的 AI 规划请求。
 
-系统 SHALL 在图片生成前校验返回数量、ID、图型、非空提示词、策略与事实引用、参考图编号和商品主体绑定。对于商品分析已确认的主主体和事实来源，若模型仅漏写其参考编号，系统 SHALL 将对应的可信原始上传编号补入逐图分配，再执行字节预算校验。单项参考图 SHALL 不设固定八张数量上限。用户手动锁定的主体优先；否则主体索引 SHALL 在分析请求前确定，分析响应 MUST NOT 通过重排或修改辅助图角色悄然更换全套主体。MUST NOT 猜测未知来源、静默丢弃无效编号，或在补齐后超过字节预算。真正缺少来源或无效的结果 MUST NOT 进入图片生成。
+系统 SHALL 在图片生成前校验返回数量、ID、图型、非空提示词、策略与事实引用、参考图编号和商品主体绑定。已确认事实的完整原始来源 SHALL 保留为可追溯依据，但 SHALL NOT 因其被受众、卖点或建议引用就自动全部附加。系统 SHALL 按本图必要的身份、细节、视角、状态和款式信息规范化最终视觉附件，只补入遗漏的主体与不可替代的视觉来源，再执行字节预算校验。已核验文字参数 MAY 直接进入提示词，无需附加每张信息卡。单项参考图 SHALL 不设固定八张数量上限，但每张额外附件 SHALL 对未覆盖的必要视觉信息有明确贡献。用户手动锁定的主体优先；否则主体索引 SHALL 在分析请求前确定，分析响应 MUST NOT 通过重排或修改辅助图角色悄然更换全套主体。MUST NOT 猜测未知来源、静默丢弃无效编号，或在补齐后超过字节预算。真正缺少来源或无效的结果 MUST NOT 进入图片生成。
 
 营销规划响应 SHALL 包含有事实依据的 `suite_strategy` 和非空的顶层 `items`；已有有效分析时只返回这两个字段。正常合格初稿仍为一次整套请求；初稿存在质量问题时 MAY 按有界审核修复循环对指定条目追加最多两轮局部修复。系统 MUST NOT 将截断的整套对象解析为其内部的任意 JSON 子对象。首次响应缺少整套条目时，系统 MAY 对全套做一次携带完整规划 schema 和所需条目数量的重试；若重试仍不完整，SHALL 显示明确错误，MUST NOT 把它报告为成功的零条计划或发出图片请求。
 
@@ -2316,10 +2316,10 @@ AI 模式普通营销轮播 SHALL 支持 1–20 张，并以独立 ID 标识同�
 
 #### Scenario: AI 遗漏主体和事实来源编号
 
-- **WHEN** 20 条完整计划已引用有效商品事实，但部分条目的参考索引遗漏事实来源图或预先确定的主主体图
-- **THEN** 系统将分析已确认的来源编号补入逐图参考分配并保留原始上传编号
-- **AND** 相同参考分配进入预览与后续图片请求
-- **AND** 超过八张的有效来源仍完整保留；若补齐会超过现有字节预算，系统明确拒绝，不静默删图
+- **WHEN** 完整计划已引用有效事实，但遗漏主体或目标细节唯一可用的视觉来源
+- **THEN** 系统补入对应可信原始上传编号
+- **AND** 其他仅作文字事实溯源或重复证明的来源留在分析中，不自动变为附件
+- **AND** 相同分配进入预览与请求；超过八张的必要来源仍按需求及字节预算处理，超预算时明确拒绝，不静默丢证据
 
 #### Scenario: 辅助图分析响应尝试更换主主体
 
@@ -2461,20 +2461,19 @@ Creation Mode SHALL 根据分配给当前图片的商品和证据构建信息丰
 
 ### Requirement: Batch generation fills missing Listing records
 
-The suite records view SHALL provide a batch command that generates Listing only for records without existing Listing drafts. The command SHALL process records sequentially, skip records with existing drafts or an active Listing request, and continue after an individual failure. While the batch runs, record refresh, deletion, Temu export, and separate Listing generation SHALL be unavailable.
+The suite records view SHALL provide a batch command that generates Listing only for records without existing Listing drafts. The command SHALL use at most three concurrent workers under the shared server-side Listing request limit, skip records with existing drafts or an active Listing request, and continue after an ordinary individual failure. Account-level failures, excessive upstream cooldown, or three consecutive explicit temporary rate-limit failures SHALL stop taking new records while already-started workers settle. While the batch runs, record refresh, deletion, Temu export, and separate Listing generation SHALL be unavailable. Background completions SHALL preserve the user's selected record.
 
 #### Scenario: Batch generation skips existing Listing
-
 - **WHEN** the user activates batch Listing generation
-- **THEN** records with one or more existing `listingDrafts` are skipped
-- **AND** records without Listing are processed in sequence
-- **AND** a failed record does not prevent later missing records from being attempted
+- **THEN** records with one or more existing `listingDrafts` or an active Listing request are skipped
+- **AND** missing records run with at most three concurrent workers rather than an unbounded request fan-out
+- **AND** an ordinary failed record does not prevent later missing records from being attempted
 
 #### Scenario: Record actions stay stable during batch generation
-
 - **WHEN** a batch Listing operation is running
 - **THEN** refreshing or deleting records, starting a Temu export, and starting another Listing generation are disabled
-- **AND** completion reports the numbers of successful and failed records
+- **AND** background results do not change the user's selected record
+- **AND** completion reports successful, failed, skipped and unstarted counts
 
 ### Requirement: Select all filtered Creation records
 
@@ -2757,6 +2756,14 @@ AI 营销规划摘要 SHALL 通过套图产物区的状态按钮展开为固定�
 - **THEN** 场景和姿态可适应握持动作
 - **AND** 掌面防滑区域、手背控制部件和标识保持正确归属
 
+对真实使用图，系统 SHALL 独立核对实际操作、商品与使用者或设备的关系、景别和构图，SHALL NOT 只因更换卖点、标题、近义背景或交通工具就视为独立画面。相同操作与近似取景的重复任务 SHALL 进入局部修复；微距、白底展示和到手清单等不同任务 SHALL NOT 仅因共享商品或事实误报。
+
+#### Scenario: 握把近景只换卖点
+
+- **WHEN** 两张图同为冬季骑行戴手套握把的手部近景，但分别强调保暖和按钮便利
+- **THEN** 标记实际操作和画面重复，不因不同 evidence_focus 或 marketing_goal 漏报
+- **AND** 只修冲突项，改为有依据的不同动作、使用关系或独立证据任务
+
 ### Requirement: 相同规划复用并可追踪实际模型调用
 
 系统 SHALL 按完整输入和实际模型配置合并相同在途规划，依据既有失效规则复用有效分析与确认计划。无有效分析直接规划的正常成功路径 SHALL 为一次模型请求；先识别再规划 SHALL 为两次独立用途请求；有效冻结计划生成或补图 SHALL 不产生额外文本规划。系统 SHALL 关联逻辑请求 ID、用途、触发来源、真实尝试数、重试原因与首次回答耗时，不记录凭据或原始图片内容。质量修复 SHALL 单独记录轮次、目标图片、剩余问题及失败原因；新规划契约 SHALL 使旧草稿缓存失效，但不改写历史产物或历史补图。
@@ -2993,7 +3000,7 @@ Newly planned Creation Mode prompts SHALL express product appearance through one
 
 ### Requirement: 营销套图执行有上限的审核修复循环
 
-系统 SHALL 在初稿逐图事实与引用校验后审核整套策略缺失或无效、功能遗漏、购买问题和证据重复及明显的版式同质化。存在可修复问题时 SHALL 最多进行两轮局部 AI 修复，每轮重新校验。合格项、用户锁定项、平台强制项和已确认分析 SHALL 保持不变。普通质量建议在修复后仍未解决或没有可调整位置时 SHALL 作为可见警告保留，MUST NOT 阻断通过逐图事实与来源校验的图片；合格初稿 SHALL 不增加修复请求。真实来源失效、无可用轮播项及平台必需项无法满足时 SHALL 保留明确错误。
+系统 SHALL 在初稿逐图事实与引用校验后审核整套策略缺失或无效、功能遗漏、购买问题和证据重复及明显的版式同质化。存在可修复问题时 SHALL 最多进行两轮局部 AI 修复，每轮重新校验。合格项、用户锁定项、平台强制项和已确认分析 SHALL 保持不变。除下述高置信重复任务外，普通质量建议在修复后仍未解决或没有可调整位置时 SHALL 作为可见警告保留，MUST NOT 阻断通过逐图事实与来源校验的图片；合格初稿 SHALL 不增加修复请求。真实来源失效、无可用轮播项及平台必需项无法满足时 SHALL 保留明确错误。
 
 初稿中缺少购买理由、无效事实引用或功能证据不合格的整套策略 SHALL 进入该有界修复。只需修复策略时 SHALL 保留全部已通过图片及其提示词和参考分配，复用已确认分析，只返回修复后的策略与空 `items`。仅明确的策略修复请求 MAY 接受空 `items`，普通初稿 SHALL 继续要求非空图片任务。策略修复与图片修复 SHALL 共用最多两轮预算；策略元数据仍无效时 SHALL 不采用该元数据，并显示具体建议，MUST NOT 因此阻断图片事实与来源均有效的任务。无依据的单张功能表现 SHALL 单独排除并同步实际数量、冻结、生成和补图；MUST NOT 将无效引用写入最终提示词或伪造缺失内容。用户锁定提示词 MUST NOT 被静默改写。
 
@@ -3005,7 +3012,7 @@ Newly planned Creation Mode prompts SHALL express product appearance through one
 #### Scenario: 修复耗尽或用户约束冲突
 - **WHEN** 两轮后仍有关键问题，或图片需要修改但所有可用位置都被用户或平台锁定
 - **THEN** 系统明确展示优化建议，保留可用图片继续生成
-- **AND** 不无限重试、不静默替换锁定提示词，不把功能覆盖、重复或版式建议当作整套失败条件
+- **AND** 不无限重试、不静默替换锁定提示词，不把功能覆盖、相似疑点或版式建议当作整套失败条件；已确认重复任务按待调整规则单独处理
 
 #### Scenario: 已确认预览与历史补图
 - **WHEN** 用户提交修复后的冻结预览或补齐历史计划
@@ -3037,6 +3044,15 @@ Newly planned Creation Mode prompts SHALL express product appearance through one
 - **THEN** 系统保留可用计划并在预览展示不影响生成的优化建议
 - **AND** 用户可以直接生成，生成时复用该冻结计划而不再次触发整套审核
 
+对新规划中经实际操作、使用关系和取景确认的高置信重复任务，修复耗尽后 SHALL 保留任务及待调整状态，MUST NOT 自动发起其生成、重试或补图，MUST NOT 静默删除并宣称原张数全部可用。其余合格项 SHALL 可继续；界面、队列和冻结计划 SHALL 同步可生成及待调整数量。仅有语义相似疑点的普通建议仍 SHALL 为警告，不扩大为整套失败；手动锁定内容不被静默改写。
+
+#### Scenario: 高置信重复在两轮后未解决
+
+- **WHEN** 新计划同操作和近似取景的重复图在最多两轮修复后仍相同
+- **THEN** 保留原任务和原因，标为待调整且不发该项图片请求
+- **AND** 其他合格项可生成，实际可生成和待调整数量与冻结状态一致
+- **AND** 不无限修复，不覆盖锁定提示词
+
 ### Requirement: 视觉表达依据任务而非固定信息图配额
 
 自动规则规划 SHALL 按有效内容分配信息图，SHALL NOT 因为图片数量达到固定阈值而强制插入信息图。主图与场景图 SHALL 按当前购买任务选择构图，不把圆框、拼图和卖点条作为通用必需元素。功能渲染 SHALL 在一个完整主体和统一构图中突出主要功能及其收益，并只保留与当前任务有关的辅助功能证据。
@@ -3062,6 +3078,15 @@ Newly planned Creation Mode prompts SHALL express product appearance through one
 - **THEN** 系统允许自主选择 commercial-cg 视觉形式，不强制每套张数，并要求无新增文案和有依据的空间效果
 - **AND** 纯外观 CG 不需要功能事实，也不自动视为核心功能覆盖；其他图型的文案仍自主安排
 
+新自动规划 SHALL 默认纯白商业棚景，独立重构来源支持的姿态、相机、商品组合和留白；参考图提供身份或材质依据，不提供必须照抄的完整画布。系统 MUST NOT 将复用源图布局并叠热流、描边或滤镜作为目标。商品身份、表面部件归属、完整可售单位和有来源的状态 SHALL 保持不变，不得为变化虚构未知表面或内部。用户显式提示词、背景选择及平台硬约束继续优先，历史内容不自动重写。
+
+#### Scenario: 平铺手套参考用于商业 CG
+
+- **WHEN** 新规划用并排平铺的一双手套作为主体
+- **THEN** 指令要求纯白背景和来源支持的独立组合、姿态或相机构图
+- **AND** 有据热流与真实材质建立空间作用，不直接覆盖原参考画布
+- **AND** 保留完整一双和正确掌背部件归属
+
 ### Requirement: 功能渲染加强空间作用表现
 
 系统 SHALL 保留 effect-comparison / comparison-proof 与“功能效果渲染图”，围绕一个完整商品呈现有依据的主要功能与买家收益。功能效果 SHALL 通过符合商品的流动、前后遮挡、纵深及合理局部光照表现空间关系，SHALL NOT 仅依靠平面箭头、装饰描边或暖色背景。系统 SHALL 保持参考支持的主体结构、材质、颜色、视角和可见数字，不补造内部元件、作用范围或参数。
@@ -3071,6 +3096,15 @@ Newly planned Creation Mode prompts SHALL express product appearance through one
 - **WHEN** 同套图包含商业 CG 与功能效果渲染
 - **THEN** 功能图继续以有据的作用、流动或结果为主要证据，CG 图以无字商业视觉表达材质、体积与有依据的功能感受
 - **AND** 两者不能只替换背景、标题或重复同一购买信息
+
+新自动功能效果图 SHALL 默认纯白背景，按独立功能任务重构来源支持的动作、状态、视角和空间作用。功能图与商业 CG 同时出现时 SHALL 有不同证据职责和画面任务，SHALL NOT 仅换背景或标题。白底功能辅助图 MAY 有基于事实的概念效果，但 MUST NOT 因此被标为严格商品主图或已满足 Amazon 主图政策。
+
+#### Scenario: 白底功能效果与严格商品图共存
+
+- **WHEN** 同套图规划白底商品展示和加热效果辅助图
+- **THEN** 前者仅展示实际商品，无新增文案、概念热流和额外道具
+- **AND** 后者用白底独立功能画面表达有据暖感，不复用商品图姿态只叠效果
+- **AND** 不将带效果辅助图声明为平台合规主图
 
 ### Requirement: 商业 CG 采用无字且有依据的效果渲染
 
@@ -3451,3 +3485,181 @@ AI 营销模式修改目标语言、比例、分辨率或 SKU 开关 SHALL 使�
 - **WHEN** 用户查看无队列的既有套图
 - **THEN** 标识显示该商品名称，缺少名称时显示“未命名商品”
 - **AND** 回到无产物、未入队草稿或批量加 Logo 分支时隐藏标识
+
+### Requirement: 逐图参考依据最小必要视觉信息分配
+
+系统 SHALL 对每张新规划图明确需要从图片读取的身份、细节、视角、状态或款式信息。主体图已覆盖需求时 SHALL 停止追加；只有额外图片带来不可替代的未覆盖信息时才加入。角色匹配、事实溯源、模型填入编号、文件较小或预算有余量 SHALL NOT 单独构成追加理由。完整来源 SHALL 继续可追溯，不得因精简附件改变数值、单位、条件、部件归属或款式绑定。
+
+#### Scenario: 简单白底存在多张说明卡
+
+- **WHEN** 清晰主体已足以展示完整商品，同时上传控制器说明、尺寸卡和场景海报，当前任务仅为白底展示
+- **THEN** 最终只附加本款主体，不因受众或卖点关联发送上述说明图
+- **AND** 原始事实来源仍保存在已确认分析中
+
+#### Scenario: 单部件特写存在多张细节参考
+
+- **WHEN** 控制器微距任务只有一张细节图能补足主体不可辨认的按钮结构，其他图证明掌纹、尺寸和骑行背景
+- **THEN** 附件为主体及必要控制器细节
+- **AND** 主体已足够清晰时不追加，不为同角色多图凑满数量
+
+#### Scenario: 复杂任务需要多个不可替代来源
+
+- **WHEN** 多视面、多款式或款式与尺寸分组任务确实需要多个不同来源
+- **THEN** 每个必要视面和款式均保留可核对依据，允许超过简单图常见的 1–2 张
+- **AND** 不因固定八张或统一两张规则删除必要证据，仍遵守全局上传、路线及字节限制
+
+#### Scenario: 同一事实有多个替代来源
+
+- **WHEN** 已确认参数在多张信息卡重复出现，或多张图提供同一可见部件证据
+- **THEN** 事实保留全部可信溯源，但当前视觉需求选择最小充分来源集合
+- **AND** 参数作为文字时完整保留数值及条件，不强制附加所有信息卡
+
+#### Scenario: 文件名不足以判断重复
+
+- **WHEN** 两张不同内容图同名，或同一内容图以不同名上传
+- **THEN** 前者继续按稳定原始身份区分，后者不因改名重复附加
+- **AND** 不丢失唯一视面、款式或状态证据
+
+### Requirement: 新规划冻结实际附件用途且兼容历史
+
+新规划 SHALL 在预览前完成附件规范化，保存实际原始编号、逐图用途及对应最终提示词；生成、队列、保存、重试和补图 SHALL 复用该分配，SHALL NOT 在生成时另选图片。标签和最终提示词的附件编号 SHALL 指向实际发送列表，不引用剔除图片。无新版本的历史冻结计划和用户锁定内容 SHALL 保持已有提示词与分配，只有重新规划才采用新策略。SKU 自身主体和信息图重构单一来源边界 SHALL 有效。
+
+#### Scenario: 精简分配进入实际请求
+
+- **WHEN** 新预览从原始 8 张上传中选择主体图 2 和必要细节图 5
+- **THEN** 后续各阶段使用同一两张、同一主体先序和最终提示词
+- **AND** 标签和提示词不会把实际第二张误认为原始图 2，也不引用未发送图片
+
+#### Scenario: 历史补图保持原输入
+
+- **WHEN** 用户补齐没有新附件契约版本的历史计划
+- **THEN** 使用保存的原始提示词与附件
+- **AND** 不自动精简、重规划或重写历史
+
+### Requirement: 严格白底商品展示不混入概念功能效果
+
+新规划的 clean-catalog-main SHALL 要求纯白背景、真实完整可售商品和来源支持的外观。系统 SHALL 禁止新增画布文案、图标、参数卡、概念光效、热流和非售卖道具，仅保留商品实体标记。该约束 SHALL 区别于白底 CG 和白底功能辅助图。白底设计或提示词校验 SHALL NOT 被报告为真实图片像素验收或 Amazon 审核通过。
+
+#### Scenario: 主图与带热流白底辅助图
+
+- **WHEN** 同时规划严格白底商品展示和热流白底辅助图
+- **THEN** 商品展示无热流或营销装饰，功能辅助图保留独立有据效果
+- **AND** 不将二者混称为已满足平台主图要求
+
+### Requirement: 批量 Listing 显示实际进度并隔离普通失败
+
+批量 Listing SHALL 使用最多三个工作者补缺并跳过已有草稿，普通单条失败后继续。系统 SHALL 显示总数、成功、失败、活动、未开始数、实际耗时以及排队、等待回答、接收、校验或限流冷却状态。单条反馈 MUST NOT 覆盖批次计数，耗时 MUST NOT 因上游未推送新文本而停留在首包时刻。系统 SHALL 保留可追溯的请求元数据与脱敏错误，MUST NOT 持久化认证内容或完整模型提示词。
+
+#### Scenario: 上游首包后长时间思考
+- **WHEN** 上游已建立连接但尚未返回 Listing 回答文本
+- **THEN** 界面继续更新实际经过时间并显示等待回答状态
+- **AND** 系统不把连接或首包时间当作完整请求耗时，也不显示虚构完成百分比
+
+#### Scenario: 普通单条内容失败
+- **WHEN** 一条 Listing 因普通内容或解析错误失败
+- **THEN** 系统记录该套图和原因、继续后续条目，并保留已生成草稿
+
+#### Scenario: 临时限流持续未恢复
+- **WHEN** 连续 3 条 Listing 经允许的冷却和有限恢复仍因明确临时限流失败，或上游要求等待超过 60 秒
+- **THEN** 系统停止继续提交并清楚列出未开始项
+- **AND** 用户再次运行补缺时跳过已完成草稿
+
+#### Scenario: 用户追查批量结果
+- **WHEN** 用户查看 Listing 诊断记录
+- **THEN** 可以按 batchId、setId、requestId、attempt 和阶段定位排队、执行、冷却及最终结果
+- **AND** 诊断不包含完整提示词、密钥或不必要的私有请求数据
+
+### Requirement: SKU 功能效果白底渲染规则
+
+系统 SHALL 在 SKU 生成规则中提供 white-effect-render /“SKU 渲染效果白底图”，且 SHALL 保留原有默认值和其他规则。该规则 SHALL 使用纯白 RGB 255/255/255 背景，以完整、匹配的可售商品主体表现有依据的功能效果，保持外观、原有印字和数量。局部效果及自然接触阴影 SHALL 保持白底纯净，MUST NOT 改为场景、渐变或被效果染色的背景。该规则 MUST NOT 添加色名标签、清单、尺寸标注、营销文字或非包含道具。
+
+#### Scenario: 用户选择功能效果白底 SKU
+
+- **WHEN** 用户选择“SKU 渲染效果白底图”并规划包含 SKU 的套图
+- **THEN** 计划保留 white-effect-render 和中文标签
+- **AND** SKU 提示词要求纯净白底、完整匹配主体及局部有依据的功能效果
+- **AND** 视觉风格不会将白底替换为场景背景
+- **AND** 普通营销轮播及其他 SKU 规则保持现有行为
+
+#### Scenario: 商品缺少功能效果依据
+
+- **WHEN** 用户选择该规则但未提供可靠功能依据
+- **THEN** 提示词仅允许材质、体积与合理光照表现
+- **AND** 提示词禁止虚构功能、内部结构、性能数值、认证或实测结果
+
+#### Scenario: 新规则经过保存与恢复
+
+- **WHEN** 使用新规则的套图经过预览、冻结提交、队列、记录恢复或补图
+- **THEN** 现有 skuGenerationRule 字段保留 white-effect-render
+- **AND** 对应 SKU 的白底功能渲染要求不会降级为默认色名规则
+
+### Requirement: 近似画面备选不超过两张
+
+系统 SHALL 在新营销规划和已有局部修复中，对近似静态商品姿态与尺寸规格版式遵守两张备选上限，不得随请求张数增加重复预算。该上限 MUST NOT 用作场景图、操作组、来源事实或摄影版式的数量配额。同一商品姿态或近似尺寸版式 SHALL 按实际画面任务审核，MUST NOT 因更换图型名称、标题或同义文案认定为独立任务；场景图 SHALL 仅对实际重复操作与近似取景沿用重复任务审核，不因共用事实或动作组直接判重。高置信重复项 SHALL 进入最多两轮局部修复；修复后仍重复 SHALL 保留待调整且禁止生成和补图。系统 SHALL 优先保留用户锁定及平台必需项，不静默改写其提示词。
+
+#### Scenario: 尺寸和规格图重复占用套图
+
+- **WHEN** 四张任务分别叫尺寸对照、选码、尺寸规格和长宽标注，却展示相同商品关系和近似版式
+- **THEN** 同一组最多保留两张近似备选，其余只局部改为有依据的独立操作、细节或证据表达
+- **AND** 两轮后仍重复的任务保留原位置和原因，可生成与待调整数量一致
+
+#### Scenario: 同义场景描述不能绕过去重
+
+- **WHEN** 两项分别描述握电动车车把特写和握摩托车车把近距离镜头
+- **THEN** 审核识别同一实际操作和近似取景，沿用已有重复任务修复规则
+- **AND** 不要求必须保留两个重复场景；真正不同的使用关系与镜头可作为备选
+
+#### Scenario: 共用事实但展示不同部件
+
+- **WHEN** 多张微距图共用商品事实与景别，但分别展示掌心纹理、腕口接缝、指尖开口和按钮外形
+- **THEN** 不只因事实、图型和景别相同将其标为高置信重复任务
+
+#### Scenario: 同一操作组支持多种场景镜头
+
+- **WHEN** 四张骑行场景共用商品事实和握车把动作组，分别采用俯拍近景、侧面全景、正面中景和过肩近景
+- **THEN** 四张均可保留，不触发两张备选上限或相同摄影版式配额
+- **AND** 相同商品收益、事实或分析摘要不会单独触发场景重复修复
+- **AND** 本地场景分配保留不同取景，同一动作组不是只能使用一次的资源
+
+#### Scenario: 依据来源创作不同使用画面
+
+- **WHEN** 新规划使用源图和已确认商品事实构想新的生活场景
+- **THEN** 场景、环境、人物互动、动作、道具和镜头可按商品用途合理推演，不必已在源图或 usage_scenarios 中出现
+- **AND** 已有场景候选仅作为灵感，不构成白名单；不要求每张场景新增商品事实或固定改变两个视觉维度
+- **AND** 最终生成提示词要求重新创作实际互动与镜头，保持商品身份和真实能力
+- **AND** 创意情境不写入 confirmed_facts，也不转化为虚构功能、参数、认证、包装内容或经过验证的兼容性声明
+- **AND** 合理的新场景不会仅因缺少对应源图而降级为非场景图或触发额外修复
+
+#### Scenario: 历史冻结计划与新草稿
+
+- **WHEN** 规划契约升级后继续使用历史产物或请求新规划
+- **THEN** 新草稿指纹失效并应用场景发散规则，历史冻结计划及锁定提示词保持原样
+- **AND** 先前版本的冻结计划继续沿用其原指纹契约提交生成，不触发重新规划
+
+### Requirement: 提示词阶段校验实际画面指令
+
+系统 SHALL 在首次文字规划中完成每图具体场景、动作、使用关系及镜头的差异化，并在调用图片生成前审核实际提示词，MUST NOT 仅依靠标题或分工摘要区分图片。系统 SHALL 识别仅序号、标点排版或明确画布文案不同的相同画面指令，复用最多两轮局部文字修复；仍重复的项 SHALL 保留待调整且禁止生成。正常方案 SHALL 保持一次规划，不新增模型审核请求或先生成图片用于查重。商品事实、数值及合理场景发散 SHALL 保持既有规则，旧冻结计划与用户锁定提示词 SHALL 保持原样。
+
+#### Scenario: 分工不同但实际提示词重复
+
+- **WHEN** 两项分工声称不同动作和镜头，但实际提示词只改变图片序号和画布标题
+- **THEN** 在返回可生成方案前发现实际画面指令重复
+- **AND** 仅对重复项局部重写，并提供发生冲突的已通过画面指令作为必要对照
+- **AND** 已通过项保持不变，不调用图片模型或发送整套提示词进行额外审核
+
+#### Scenario: 修复后仍重复
+
+- **WHEN** 两轮文字修复后实际画面指令仍重复
+- **THEN** 该项在生图前进入待调整状态，冻结提交和补图均不能绕过
+
+#### Scenario: 实际提示词经过编辑
+
+- **WHEN** 实际提示词已编辑，但保存的原始提示词元数据尚未同步
+- **THEN** 以当前实际提示词为审核依据，不因旧元数据误拦不同画面
+- **AND** 复制相同最终提示词不能通过不同元数据绕过去重
+
+#### Scenario: 合理差异无需额外审核请求
+
+- **WHEN** 多项提示词共用商品身份、事实与风格，但明确描述不同实际画面
+- **THEN** 保留其创意选择，一次规划即可通过
+- **AND** 不删除真实数值差异，不将共用事实或动作组当作场景数量配额

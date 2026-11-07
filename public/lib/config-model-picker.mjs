@@ -12,6 +12,8 @@ export function createConfigModelPickerController({
   getBrowserPrivateConfigRequestPayload,
   getUiText,
   onModelChange,
+  getDirectImageModelMappings,
+  onDirectImageModelsFetched,
   isTargetEnabled,
   fetchImpl = fetch,
   FormDataCtor = FormData,
@@ -188,6 +190,7 @@ export function createConfigModelPickerController({
         browserPayload.directImageModel ||
         state.config?.directImageModel ||
         DEFAULT_DIRECT_IMAGE_MODEL,
+      directImageModelMappings: getDirectImageModelMappings?.() ?? browserPayload.directImageModelMappings ?? state.config?.directImageModelMappings ?? [],
       directResponsesModel:
         getInputValue(refs.directResponsesModelInput) ||
         browserPayload.directResponsesModel ||
@@ -283,6 +286,7 @@ export function createConfigModelPickerController({
     formData.set("directEndpointPath", payload.directEndpointPath);
     formData.set("directApiKey", payload.directApiKey);
     formData.set("directImageModel", payload.directImageModel);
+    formData.set("directImageModelMappings", JSON.stringify(payload.directImageModelMappings));
     formData.set("directResponsesModel", payload.directResponsesModel);
     formData.set("directImageBaseUrl", payload.directImageBaseUrl);
     formData.set("directImageApiKey", payload.directImageApiKey);
@@ -458,6 +462,7 @@ export function createConfigModelPickerController({
 
       const modelState = getModelState(requestTarget);
       modelState.items = models;
+      if (requestTarget === MODEL_TARGET_DIRECT) onDirectImageModelsFetched?.([...models]);
       modelState.searchQuery = "";
       modelState.open = Boolean(openAfterFetch)
         && (typeof isTargetEnabled !== "function" || isTargetEnabled(requestTarget));

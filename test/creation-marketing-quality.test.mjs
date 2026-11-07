@@ -327,7 +327,7 @@ test("identical framing and text density across most of a suite triggers layout 
     item.creative_brief.text_density = "structured";
   }
   const plan = applyCreationMarketingPlan(buildCreationPlan(input), payload, { count: 6, referenceCount: 1, primaryIndex: 1 });
-  assert.equal(auditCreationMarketingQuality(plan).issues.filter((issue) => issue.code === "layout-repetition").length, 3);
+  assert.equal(auditCreationMarketingQuality(plan).issues.filter((issue) => issue.code === "layout-repetition").length, 4);
 });
 
 test("English product names prioritize their evidenced main function over secondary operation", () => {

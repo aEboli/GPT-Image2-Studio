@@ -96,7 +96,7 @@ test("gallery thumbnail rejects dangerous and non-image relative paths", async (
       "nested/image:stream.webp",
       "json/metadata.png",
       "nested/readme.txt",
-      "nested/image.gif",
+      "nested/image.html",
     ];
 
     for (const relativeImagePath of rejectedPaths) {

@@ -1,4 +1,4 @@
-import { requestTextModel } from "./text-model-client.mjs";
+import { createTextModelError, getTextModelEventMetadata, requestTextModel } from "./text-model-client.mjs";
 import { getCreationListingPolicy } from "./creation-listing-policies.mjs";
 
 const CREATION_LISTING_BUCKET_LABELS = {
@@ -1198,6 +1198,40 @@ export function renderCreationListingDrafts({ refs, state, set } = {}) {
 
 export function createCreationListingController(context = {}) {
   let batchGenerating = false;
+  let batchProgress = null;
+  let batchStartedAt = 0;
+  const emitListingEvent = (event) => {
+    try {
+      const result = context.onListingEvent?.(event);
+      result?.catch?.(() => {});
+    } catch {
+    }
+  };
+  const batchSnapshot = () => ({
+    ...batchProgress,
+    failures: [...(batchProgress?.failures || [])],
+    failedCount: batchProgress?.failures.length || 0,
+    elapsedMs: Math.max(0, Date.now() - batchStartedAt),
+  });
+  const reportBatch = () => {
+    if (!batchProgress) return;
+    const progress = batchSnapshot();
+    context.state.creation.listingBatchProgress = progress;
+    const label = progress.stopped ? "批量生成已停止取新项" : batchGenerating ? "正在批量生成 Listing" : "批量生成完成";
+    context.setFeedback?.(
+      `${label}：总计 ${progress.totalCount} 套，成功 ${progress.generatedCount} 套，失败 ${progress.failedCount} 套，活动 ${progress.activeCount} 套，未开始 ${progress.unstartedCount} 套${progress.skippedCount ? `，跳过 ${progress.skippedCount} 套` : ""}，耗时 ${(progress.elapsedMs / 1000).toFixed(1)} 秒。${progress.stopReason || ""}`,
+      batchGenerating ? "busy" : progress.stopped || progress.failedCount ? "error" : "success",
+    );
+  };
+  const stopBatch = (reason) => {
+    if (!batchProgress || batchProgress.stopped) return;
+    batchProgress.stopped = true;
+    batchProgress.stopReason = reason || "上游暂不可用，请稍后补缺。";
+    reportBatch();
+  };
+  const isFatal = (error) => error?.fatal === true || error?.stopBatch === true
+    || ["quota", "authentication"].includes(error?.errorKind);
+  const newBatchId = () => `listing-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
   const renderViews = () => {
     context.renderRecordView?.();
     context.renderCurrentView?.();
@@ -1207,71 +1241,104 @@ export function createCreationListingController(context = {}) {
     if (!requestedSetId) {
       return context.getSelectedSet?.() || null;
     }
-    return context.state?.creation?.sets?.find((set) => set.setId === requestedSetId)
+    return context.state?.creation?.sets?.find((set) => set?.setId === requestedSetId)
       || context.normalizeSet?.({ setId: requestedSetId })
       || { setId: requestedSetId };
   };
 
-  async function generate(setId = "", { batch = false } = {}) {
+  async function generate(setId = "", { batch = false, batchId = "" } = {}) {
     const selectedSet = getSelectedSet(setId);
     if (!selectedSet?.setId) {
       context.setFeedback?.("请先选择一套记录。", "error");
       return null;
     }
 
-    if (isCreationListingGenerating(context.state, selectedSet.setId)) {
-      context.setFeedback?.("当前套图 Listing 正在生成。", "busy");
+    if ((batchGenerating || context.state?.creation?.listingBatchGenerating) && !batch) {
+      if (batchProgress) reportBatch();
+      else context.setFeedback?.("批量生成 Listing 正在运行。", "busy");
       return selectedSet;
     }
-    if (batchGenerating && !batch) {
-      context.setFeedback?.("批量生成 Listing 正在运行。", "busy");
-      return selectedSet;
+    if (isCreationListingGenerating(context.state, selectedSet.setId)) {
+      if (!batch) context.setFeedback?.("当前套图 Listing 正在生成。", "busy");
+      return null;
     }
 
     setCreationListingGenerating(context, selectedSet.setId, true);
-    context.setFeedback?.("正在生成 Listing...", "busy");
+    if (!batch) context.setFeedback?.("正在生成 Listing...", "busy");
     renderViews();
+    const startedAt = Date.now();
+    batchId ||= newBatchId();
+    let metadata = { batchId, setId: selectedSet.setId, requestId: "", attempt: 0, timing: {}, usage: {} };
+    const emit = (event) => {
+      metadata = {
+        ...metadata, ...getTextModelEventMetadata(event),
+        batchId, setId: selectedSet.setId, elapsedMs: Math.max(0, Date.now() - startedAt),
+      };
+      emitListingEvent({ ...metadata, totalCount: batch ? batchProgress?.totalCount || 1 : 1 });
+    };
+    emit({ stage: "started" });
 
     try {
+      const body = {
+        ...(context.getRequestConfig?.() || {}),
+        setId: selectedSet.setId,
+        batchId,
+        reasoningEffort: context.getReasoningEffort?.() || selectedSet.reasoningEffort,
+      };
+      delete body.set;
       const response = await requestTextModel(context.fetchImpl, "/api/creation/listings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...(context.getRequestConfig?.() || {}),
-          setId: selectedSet.setId,
-          reasoningEffort: context.getReasoningEffort?.() || selectedSet.reasoningEffort,
-          set: selectedSet,
-        }),
+        body: JSON.stringify(body),
+      }, {
+        title: "Listing",
+        showPreview: true,
+        onProgress: (event) => {
+          emit(event);
+          if (batch && isFatal(event)) stopBatch(metadata.message || "上游要求停止批量提交。");
+        },
       });
       let payload;
       try {
         payload = await response.json();
       } catch {
-        throw new Error(response.ok ? "Listing 生成服务返回了无效的 JSON。" : "Listing 生成失败。");
+        throw createTextModelError({ httpStatus: response.status }, response.ok ? "Listing 生成服务返回了无效的 JSON。" : "Listing 生成失败。");
       }
       if (!response.ok) {
-        throw new Error(payload.message || "Listing 生成失败。");
+        throw createTextModelError({ ...payload, httpStatus: payload.httpStatus ?? response.status }, "Listing 生成失败。");
       }
       if (payload?.ok === false) {
-        throw new Error(payload.message || "Listing 生成失败。");
+        throw createTextModelError(payload, "Listing 生成失败。");
       }
 
+      emit({ stage: "validating" });
       const nextSetPayload = payload.set || {
-        ...selectedSet,
+        ...getSelectedSet(selectedSet.setId),
         listingDrafts: Array.isArray(payload.listingDrafts) ? payload.listingDrafts : [],
         updatedAt: context.nowIso?.(),
       };
+      const { recordSetId, currentSet } = context.state.creation;
       const nextSet = context.upsertSet?.(nextSetPayload) || nextSetPayload;
-      context.state.creation.recordSetId = nextSet?.setId || selectedSet.setId;
-      context.setFeedback?.("Listing 已生成。", "success");
+      context.state.creation.recordSetId = recordSetId || selectedSet.setId;
+      if (currentSet && currentSet.setId !== selectedSet.setId) context.state.creation.currentSet = currentSet;
+      emit({ stage: "completed" });
+      if (!batch && !batchGenerating) context.setFeedback?.("Listing 已生成。", "success");
       return nextSet;
     } catch (error) {
+      const originalMessage = error instanceof Error ? error.message : String(error);
       const message = context.compactErrorMessage?.(
-        error instanceof Error ? error.message : String(error),
+        originalMessage,
         "Listing 生成失败",
-      ) || "Listing 生成失败";
-      context.setFeedback?.(message, "error");
-      throw new Error(message);
+      ) || originalMessage || "Listing 生成失败";
+      const failure = createTextModelError({
+        ...metadata, ...getTextModelEventMetadata(error), message,
+        stage: error?.name === "AbortError" ? "interrupted" : "error",
+        elapsedMs: Math.max(0, Date.now() - startedAt),
+      });
+      emit(failure);
+      if (batch && isFatal(failure)) stopBatch(failure.message);
+      if (!batch && !batchGenerating) context.setFeedback?.(failure.message, "error");
+      throw failure;
     } finally {
       setCreationListingGenerating(context, selectedSet.setId, false);
       renderViews();
@@ -1279,50 +1346,94 @@ export function createCreationListingController(context = {}) {
   }
 
   async function generateMissing() {
+    if (batchGenerating || context.state?.creation?.listingBatchGenerating) {
+      if (batchProgress) reportBatch();
+      return context.state?.creation?.listingBatchProgress || { generatedCount: 0, failedCount: 0, failures: [] };
+    }
     const sets = Array.isArray(context.state?.creation?.sets) ? context.state.creation.sets : [];
     const busyIds = getCreationListingGeneratingSetIds(context.state);
-    if (busyIds.size > 0) {
-      context.setFeedback?.("请等待当前 Listing 生成完成后再批量处理。", "busy");
-      return { generatedCount: 0, failedCount: 0, failures: [] };
-    }
-    const candidates = sets.filter((set) =>
-      cleanCreationListingText(set?.setId)
-      && getCreationListingDrafts(set).length === 0
-      && !busyIds.has(cleanCreationListingText(set.setId))
-    );
+    const seen = new Set();
+    const candidates = sets.filter((set) => {
+      const id = cleanCreationListingText(set?.setId);
+      if (!id || seen.has(id) || busyIds.has(id) || getCreationListingDrafts(set).length > 0) return false;
+      seen.add(id);
+      return true;
+    });
     if (candidates.length === 0) {
       context.setFeedback?.("所有套图都已有 Listing，或正在生成中。", "success");
-      return { generatedCount: 0, failedCount: 0, failures: [] };
+      return { totalCount: 0, generatedCount: 0, failedCount: 0, activeCount: 0, unstartedCount: 0, skippedCount: 0, failures: [], elapsedMs: 0 };
     }
 
+    context.state ||= {};
+    context.state.creation ||= {};
+    context.state.creation.recordSetId ||= context.getSelectedSet?.()?.setId || sets.find((set) => set?.setId)?.setId || "";
     batchGenerating = true;
-    if (context.state?.creation) context.state.creation.listingBatchGenerating = true;
+    context.state.creation.listingBatchGenerating = true;
+    batchStartedAt = Date.now();
+    batchProgress = {
+      batchId: newBatchId(), totalCount: candidates.length, generatedCount: 0,
+      activeCount: 0, unstartedCount: candidates.length, skippedCount: 0,
+      failures: [], stopped: false, stopReason: "",
+    };
+    reportBatch();
     renderViews();
-    let generatedCount = 0;
-    const failures = [];
-    try {
-      for (const [index, set] of candidates.entries()) {
-        context.setFeedback?.(`正在批量生成 Listing（${index + 1}/${candidates.length}）：${set.productName || "未命名商品"}`, "busy");
+    let cursor = 0;
+    let consecutiveLimits = 0;
+    let timer;
+    const tick = () => {
+      reportBatch();
+      timer = setTimeout(tick, 1000);
+      timer.unref?.();
+    };
+    timer = setTimeout(tick, 1000);
+    timer.unref?.();
+    const worker = async () => {
+      while (!batchProgress.stopped && cursor < candidates.length) {
+        const set = candidates[cursor++];
+        batchProgress.unstartedCount -= 1;
+        const currentSet = context.state.creation.sets?.find((entry) => entry?.setId === set.setId);
+        if (!currentSet || getCreationListingDrafts(currentSet).length > 0 || isCreationListingGenerating(context.state, set.setId)) {
+          batchProgress.skippedCount += 1;
+          reportBatch();
+          continue;
+        }
+        batchProgress.activeCount += 1;
+        reportBatch();
         try {
-          await generate(set.setId, { batch: true });
-          generatedCount += 1;
+          const result = await generate(set.setId, { batch: true, batchId: batchProgress.batchId });
+          if (result) {
+            batchProgress.generatedCount += 1;
+            consecutiveLimits = 0;
+          } else batchProgress.skippedCount += 1;
         } catch (error) {
-          failures.push({
-            setId: set.setId,
-            message: error instanceof Error ? error.message : String(error),
-          });
+          batchProgress.failures.push({ ...getTextModelEventMetadata(error), setId: set.setId });
+          const limited = error.errorKind === "rate_limit" || !error.errorKind && error.httpStatus === 429;
+          consecutiveLimits = limited ? consecutiveLimits + 1 : 0;
+          if (isFatal(error)) stopBatch(error.message);
+          else if (consecutiveLimits >= 3) stopBatch("连续 3 次上游临时限流，已停止继续提交，请稍后补缺。");
+        } finally {
+          batchProgress.activeCount -= 1;
+          reportBatch();
         }
       }
-      context.setFeedback?.(
-        `批量生成完成：成功 ${generatedCount} 套，失败 ${failures.length} 套。`,
-        failures.length > 0 ? "error" : "success",
-      );
-      return { generatedCount, failedCount: failures.length, failures };
+    };
+    try {
+      await Promise.all(Array.from({ length: Math.min(3, candidates.length) }, () => worker()));
     } finally {
+      clearTimeout(timer);
       batchGenerating = false;
-      if (context.state?.creation) context.state.creation.listingBatchGenerating = false;
+      context.state.creation.listingBatchGenerating = false;
+      reportBatch();
+      const result = batchSnapshot();
+      emitListingEvent({
+        stage: "batch-completed", batchId: result.batchId, totalCount: result.totalCount,
+        generatedCount: result.generatedCount, failedCount: result.failedCount,
+        unstartedCount: result.unstartedCount, skippedCount: result.skippedCount,
+        elapsedMs: result.elapsedMs, stopReason: result.stopReason,
+      });
       renderViews();
     }
+    return batchSnapshot();
   }
 
   async function copy() {
@@ -1366,18 +1477,19 @@ export function createCreationListingController(context = {}) {
         return;
       }
       renderCreationListingGenerateButton(button, {
-        disabled: !selectedSet || isGenerating || batchGenerating,
+        disabled: !selectedSet || isGenerating || batchGenerating || context.state?.creation?.listingBatchGenerating,
         isGenerating,
         idleLabel,
       });
       button.title = "";
     });
     const allSets = Array.isArray(context.state?.creation?.sets) ? context.state.creation.sets : [];
-    const anyGenerating = getCreationListingGeneratingSetIds(context.state).size > 0;
-    const missingCount = allSets.filter((set) => getCreationListingDrafts(set).length === 0).length;
+    const missingCount = allSets.filter((set) => cleanCreationListingText(set?.setId)
+      && getCreationListingDrafts(set).length === 0
+      && !isCreationListingGenerating(context.state, set.setId)).length;
     if (context.refs.creationRecordGenerateMissingListingsButton) {
       renderCreationListingGenerateButton(context.refs.creationRecordGenerateMissingListingsButton, {
-        disabled: batchGenerating || anyGenerating || missingCount === 0,
+        disabled: batchGenerating || context.state?.creation?.listingBatchGenerating || missingCount === 0,
         isGenerating: batchGenerating,
         idleLabel: missingCount > 0 ? "批量生成 Listing" : "无缺失 Listing",
       });

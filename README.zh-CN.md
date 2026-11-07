@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v0.2.116-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.138-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
 [![Windows](https://img.shields.io/badge/Windows-Installer-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
 
@@ -10,7 +10,7 @@
 
 把提示词生图、参考图分析、图片编辑、电商套图、人物写真、文章插图、PPT 生成和素材管理集中到一个浏览器界面中。
 
-当前版本：`v0.2.116`
+当前版本：`v0.2.138`
 
 </div>
 
@@ -79,12 +79,12 @@ Windows 脚本入口（启动器、Native Messaging 安装/卸载、图片资源
 从包含桌面产物的 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
 
 ```text
-GPT-Image2-Studio-Desktop-Setup-v0.2.116-x64.exe
+GPT-Image2-Studio-Desktop-Setup-v0.2.138-x64.exe
 ```
 
 安装完成后通过桌面或开始菜单中的 `GPT-Image2-Studio` 启动。程序会在独立窗口中运行，内置服务使用动态回环端口，关闭窗口后不会遗留后台服务。无需另行安装 Node.js，完整说明见 [Windows 桌面程序文档](./docs/windows-desktop.md)。
 
-如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.116-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
+如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.138-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
 
 桌面开发使用 Electron `43`，要求 Node.js `22.12` 或更高版本；普通 `npm start` 服务仍支持 Node.js `20+`。
 
@@ -95,7 +95,7 @@ cmd /c npm run desktop
 
 ### 方式三：Windows 浏览器安装包（兼容旧版）
 
-旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.116` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
+旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.138` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
 
 ## 配置说明
 
@@ -160,7 +160,7 @@ Responses 模型：gpt-6-luna
 | `gpt-image-2.5-sunburst` | 能力最强，精修更准，出图更慢。 |
 | `gpt-image-2.5-flare` | 日常生图，速度更快。 |
 
-「发送 tools[].model」开关默认关闭。关闭时，路由请求会省略 `tools[].model`，交给当前服务决定生图工具模型；下拉框的选择仍会保存，排队任务也会保留提交时的选择。只有中转服务要求明确指定工具模型时才需要打开，打开后才会发送下拉框当前选中的白名单模型。旧配置缺少这个字段时也会归一化为关闭。
+「发送 tools[].model」开关默认开启，路由请求会发送下拉框当前选中的白名单图像模型。旧配置缺少该字段时也默认开启；明确保存为关闭的配置继续保持关闭。关闭后请求省略 `tools[].model`，交给当前服务决定工具模型，下拉框选择与排队任务快照仍保留；局部保存配置不会重置开关。
 
 提示词页的参数区还有「质量」下拉：`low`、`medium`、`high`（默认），以及只有 2.5 模型才有的 `xhigh` 和 `max`。选中 `xhigh` / `max` 后切回 `gpt-image-2` 时，质量会收敛为 `high`。Grok 只提供 `low`、`medium`，默认 `medium`；GPT、Gemini、Grok 分别记住各自的质量选择。旧配置中的自动值会迁移为确定默认值，不再作为选项显示，也不发送给上游。提示词生图还提供可选的「透明背景」开关，仅在 GPT 的路由模式和直连生图路线显示；开启后固定输出 PNG，发送 `background=transparent`，并把选择随任务保存。Gemini 和 Grok 隐藏此开关，不发送背景参数。
 
@@ -170,6 +170,10 @@ Responses 模型：gpt-6-luna
 生图 API：https://api.openai.com/v1        后缀 images/generations   生图模型 gpt-image-2
 文本/视觉 API：https://api.openai.com/v1    后缀 responses            文本/视觉模型 gpt-6-luna
 ```
+
+渠道的生图模型名称不一致时，在「流式输出」下方添加「生图模型映射」，按 `请求模型 → 实际请求模型` 填写，例如 `gpt-image-2.6-sunburst → IMAGE-2.6`：左侧是请求中匹配的模型名称，右侧是实际发送给渠道的模型 ID。两端均支持手动输入或选择候选；上方「获取模型列表」会同时更新映射候选。可添加或删除多条规则，保存后会恢复，全部删除并保存即清空映射。
+
+映射按完整模型 ID 区分大小写匹配一次，仅影响 GPT 直连的生图和编辑请求；未匹配时使用原名称。文本/视觉模型和其他通道不受影响，已知模型的能力校验仍保留，排队任务使用入队时的映射快照。
 
 **Gemini**，生图接口后缀固定为 `images/generations`，与 GPT、Grok 的接口控件在相同位置对齐显示：
 
@@ -459,6 +463,31 @@ GPT-Image2-Studio 面向个人创作者、电商运营、设计师和内容团�
 
 仓库还包含 `vercel.json`。Vercel 环境使用临时目录，不能当作本地持久化存储；部署前应在 Preview 环境验证长任务、SSE 和文件生命周期。
 
+## GPT Image 2.6
+
+配置中可选择 **gpt-image-2.6-sunburst** 或 **gpt-image-2.6-flare**。默认图像模型保持原值。路由 A 使用 Responses，“发送 tools[].model”现已默认开启；如果之前明确关闭，使用高级能力前需重新开启；路由 B 可选择 Images API 或 Responses。Responses 的外层文本模型与图像工具模型分别配置。
+
+GPT 提示词页（路由 A/B）的所有模型及直连别名共用“自动 / PNG / JPG / WebP / GIF 动画 / SVG 矢量”快捷入口，默认自动。明确要求 GIF、动图或其他格式时会使用该格式；未指定时使用 PNG，动画风格及画面内的格式字样不会触发动图。手动指定优先，冲突只提示；模型格式能力未确认也只提示，仍正常发送，由实际接口判断，不自动降级为 PNG。开始生成前会显示本次格式、选择来源及 GIF 帧参数，入队后固定。选择 GIF 可就地调整帧数与时长；2.6 的“更多 2.6 参数”会展开共享高级设置。
+
+配置抽屉的共享高级设置包含图像规划复杂度、背景、压缩质量、中间预览数、尺寸覆盖、候选数、GIF 帧数/时长以及 SVG 作者配置。留空表示沿用上游默认。图像 complexity、图像 quality、外层文本 reasoning 和 SVG 作者 reasoning 是独立参数；2.6 质量可选 auto、low、medium、high、xhigh、max。
+
+- 普通提示词生图提供 PNG、JPG、WebP、GIF、SVG；普通 Images 生图支持 1–10 个候选结果并逐一保存，最多 16 张参考图。GIF/SVG 仅支持无参考图生成。
+- 图片编辑的执行策略增加“标注引导”：上传源图、涂画区域、填写区域说明后提交。发送与源图等尺寸的透明 PNG markup，不能同时使用 mask；既有蒙版策略继续可用。
+- GIF 原件保留动画，灯箱可暂停/播放；GIF 请求若返回 PNG 或单帧 GIF，会报告格式或动画校验错误。SVG 在画廊、胶片条和详情中优先直接显示经校验的矢量原件，画廊标注“SVG 矢量”，下载按钮显示“下载 SVG 原件”。已有位图缩略缓存不会覆盖可用的 SVG 原件；下载 GIF/SVG/WebP 不会自动转成 PNG。
+- 套图、写真、文章、PPT 等业务的单个图片槽位继续交付静态结果，共享适用的高级参数。新任务、历史快照和补图会保存相应高级设置。
+- Images GIF/SVG 使用 JSON 完成响应；Responses GIF 可保留状态事件流；两者均无中间图片预览。透明背景仅用于 PNG/WebP，压缩仅用于 JPG/WebP。
+
+GIF 需要提供方的 preview 权限；SVG 作者模型选择也需权限，无权限时作者配置留空。GIF 默认 9 帧、200 ms；指南写 2–64 帧，接口参考/SDK 当前写 2–16 帧，17–64 帧需另行验证上游支持。自定义尺寸只做正整数格式检查，具体范围由模型和提供方校验。权限或格式不兼容会返回原因，不自动换模型或输出格式。
+
+CLI 可使用相同参数，例如：
+
+~~~powershell
+cmd /c npm run generate -- --image-model gpt-image-2.6-flare --endpoint images/generations --prompt "简洁的蓝色图标" --format svg --output ./output/icon.svg
+cmd /c npm run generate -- --image-model gpt-image-2.6-sunburst --endpoint images/generations --prompt "循环漂浮的气球" --format gif --frame-count 9 --frame-duration-ms 200 --output ./output/balloon.gif
+~~~
+
+更多参数见 npm run help。本版完成了模拟上游集成、浏览器和 Electron 启动验证；当前开发配置没有可用 API Key，因此尚未完成两个模型及账户权限的真实付费调用验收。详见 [v0.2.127 发布说明](./docs/releases/v0.2.127.md)。
+
 ## 核心功能
 
 ### 图像创作
@@ -644,8 +673,8 @@ cmd /c npm run build:desktop
 产物路径：
 
 ```text
-artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.116-x64.exe
-artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.116-x64.zip
+artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.138-x64.exe
+artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.138-x64.zip
 artifacts/desktop/win-unpacked/GPT-Image2-Studio.exe
 ```
 
@@ -663,7 +692,7 @@ cmd /c npm run build:installer
 产物路径格式：
 
 ```text
-artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.116.exe
+artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.138.exe
 ```
 
 脚本使用系统 `iexpress.exe` 生成自解压安装包，并把当前 Node.js 运行时和依赖打入安装目录；启动后仍使用默认浏览器显示工作台。
@@ -768,7 +797,7 @@ cmd /c npm run build:installer
 
 ## 版本更新说明
 
-完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.116](./docs/releases/v0.2.116.md)。
+完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.138](./docs/releases/v0.2.138.md)。
 
 ### v0.2.116 更新说明
 

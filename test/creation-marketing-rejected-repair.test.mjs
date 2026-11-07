@@ -14,8 +14,8 @@ const requestContext = (init) => {
 };
 
 test("the planning contract rejects unsupported directions rather than relabeling their facts", () => {
-  assert.match(CREATION_MARKETING_PLAN_INSTRUCTION, /先核对本图需要的事实、视角、规格、配件和来源是否已确认/);
-  assert.match(CREATION_MARKETING_PLAN_INSTRUCTION, /没有支持的方向不要推荐/);
+  assert.match(CREATION_MARKETING_PLAN_INSTRUCTION, /先核对本图的商品外观、功能、规格、配件和来源是否已确认/);
+  assert.match(CREATION_MARKETING_PLAN_INSTRUCTION, /不能把未知性能、未见结构、未提供款式或包装内容写成已知事实/);
   assert.match(CREATION_MARKETING_PLAN_INSTRUCTION, /不得只删除无效引用或替换事实 ID/);
 });
 

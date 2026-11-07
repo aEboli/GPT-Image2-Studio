@@ -110,7 +110,7 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="./styles.css?v=20261103-current-suite-1-batch-pills-2" />
+    <link rel="stylesheet" href="./styles.css?v=20261105-output-toggle-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -126,7 +126,7 @@
         <span class="topbar-reveal-icon" aria-hidden="true"></span>
       </button>
       <header class="topbar" id="globalTopbar">
-        <small class="app-version" aria-label="当前版本 v0.2.116">v0.2.116</small>
+        <small class="app-version" aria-label="当前版本 v0.2.138">v0.2.138</small>
         <div class="brand-cluster">
           <div class="brand-mark" aria-hidden="true">
             <span class="brand-mark-core"></span>
@@ -416,6 +416,27 @@
                     <textarea id="promptEnhanceInput" rows="3" maxlength="500">Quality only; original prompt and references take priority. 8K ultra-HD look, clear subject, precise focus, natural edges, style-faithful detail, smooth gradients, clean tonal separation. Reduce unintended blur, aliasing, banding, compression artifacts, oversharpening, repeated details. Preserve subject, identity, count, composition, proportions, text, style, color, lighting, materials, intentional blur/grain/pixel art/minimalism. Add no objects, details or quality labels. Size follows settings.</textarea>
                   </label>
                 </div>
+
+                <section class="prompt-output-controls" id="promptImage26Controls" data-prompt-mode-block hidden aria-label="GPT Image 输出">
+                  <div class="prompt-output-heading">
+                    <strong>输出格式</strong>
+                    <button type="button" class="prompt-output-auto" data-prompt-output-auto role="switch" aria-checked="true" aria-controls="promptOutputFormats" aria-label="根据提示词自动选择输出格式">
+                      <span>自动</span><span class="prompt-output-auto-track" aria-hidden="true"></span>
+                    </button>
+                    <button type="button" data-prompt-output-settings>更多 2.6 参数</button>
+                  </div>
+                  <div class="prompt-output-formats" id="promptOutputFormats" role="group" aria-label="选择生成文件格式">
+                    <button type="button" data-prompt-output-format="png" aria-pressed="false">PNG</button>
+                    <button type="button" data-prompt-output-format="jpg" aria-pressed="false">JPG</button>
+                    <button type="button" data-prompt-output-format="webp" aria-pressed="false">WebP</button>
+                    <button type="button" data-prompt-output-format="gif" aria-pressed="false">GIF 动画</button>
+                    <button type="button" data-prompt-output-format="svg" aria-pressed="false">SVG 矢量</button>
+                  </div>
+                  <div class="advanced-controls prompt-output-gif-fields" data-prompt-output-gif hidden>
+                    <label class="compact-field"><span>GIF 帧数</span><input type="number" min="2" max="64" step="1" placeholder="9" data-prompt-image-option="frameCount" aria-label="生图页 GIF 帧数" /></label>
+                    <label class="compact-field"><span>每帧时长（毫秒）</span><input type="number" min="20" max="2000" step="1" placeholder="200" data-prompt-image-option="frameDurationMs" aria-label="生图页 GIF 每帧时长" /></label>
+                  </div>
+                </section>
 
                 <button
                   class="generate-button"
@@ -871,6 +892,7 @@
                     <select id="imageEditExecutionStrategyInput">
                       <option value="merge">一次合并（快）</option>
                       <option value="sequential">逐区精修（准）</option>
+                      <option value="markup">标注引导（GPT Image 2.5 / 2.6）</option>
                     </select>
                   </label>
                   <div class="image-edit-region-list" id="imageEditRegionList"></div>
@@ -1666,6 +1688,7 @@
                       <option value="package-list">显示清单</option>
                       <option value="dimensions">显示尺寸</option>
                       <option value="package-list-dimensions">显示清单和尺寸</option>
+                      <option value="white-effect-render">SKU 渲染效果白底图</option>
                     </select>
                   </label>
 
@@ -3376,10 +3399,12 @@
                         <option value="gpt-image-2">gpt-image-2</option>
                         <option value="gpt-image-2.5-sunburst">gpt-image-2.5-sunburst</option>
                         <option value="gpt-image-2.5-flare">gpt-image-2.5-flare</option>
+                        <option value="gpt-image-2.6-sunburst">gpt-image-2.6-sunburst</option>
+                        <option value="gpt-image-2.6-flare">gpt-image-2.6-flare</option>
                       </select>
                     </label>
                     <div class="field route-tool-model-toggle-field">
-                      <button class="reference-analysis-auto-collapse route-tool-model-toggle" id="includeImageToolModelToggle" type="button" role="switch" aria-checked="false" aria-label="发送 tools[].model" data-ui-i18n-aria-label="includeImageToolModel">
+                      <button class="reference-analysis-auto-collapse route-tool-model-toggle is-active" id="includeImageToolModelToggle" type="button" role="switch" aria-checked="true" aria-label="发送 tools[].model" data-ui-i18n-aria-label="includeImageToolModel">
                         <span class="reference-analysis-switch-label" data-ui-i18n="includeImageToolModel">发送 tools[].model</span>
                         <span class="reference-analysis-switch-track" aria-hidden="true"><span class="reference-analysis-switch-thumb"></span></span>
                       </button>
@@ -3433,6 +3458,17 @@
                       </button>
                     </div>
 
+                    <div class="field direct-image-model-mappings-field" id="directImageModelMappings">
+                      <div class="field-heading inline">
+                        <span>生图模型映射</span>
+                        <button class="inline-button" type="button" data-mapping-add>添加映射</button>
+                      </div>
+                      <small class="field-hint">请求模型 → 实际请求模型；两端均可选择或手填，候选共用上方的「获取模型列表」。</small>
+                      <div class="direct-image-model-mapping-rows" data-mapping-rows></div>
+                      <datalist id="directImageMappingCandidates" data-mapping-candidates></datalist>
+                      <small class="field-hint" data-mapping-feedback role="status" aria-live="polite"></small>
+                    </div>
+
                     <div class="field endpoint-field direct-text-endpoint-field">
                       <div class="field-heading inline endpoint-heading">
                         <label for="directTextBaseUrlInput" data-ui-i18n="directTextApi">文本/视觉 API</label>
@@ -3471,6 +3507,8 @@
                       </div>
                     </div>
                   </div>
+
+                  <details class="field-group" id="image26Options" hidden><summary>GPT Image 2.6 高级参数（全部生图面板共享）</summary></details>
 
                   <div class="route-config-panel" data-route-panel="c">
                     <div class="field endpoint-field protocol-endpoint-field">
@@ -3818,6 +3856,6 @@
 
     <div class="app-tooltip" id="appTooltip" role="tooltip" popover="manual"></div>
 
-    <script type="module" src="./app.js?v=20261103-current-suite-1-batch-pills-1"></script>
+    <script type="module" src="./app.js?v=20261106-output-no-hints-1"></script>
   </body>
 </html>

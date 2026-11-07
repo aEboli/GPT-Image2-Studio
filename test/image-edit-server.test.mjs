@@ -534,7 +534,8 @@ test("local Grok edit rejects more than five references before contacting xAI", 
   assert.equal(events.some((event) => event.eventName === "saved"), false);
 });
 
-test("local generation rejects a 1x1 upstream image before publishing or saving it", async (t) => {
+// 网关只转发、不拦截：1x1 这类"可疑"结果也照样落盘，尺寸只记进元数据。
+test("local generation saves an upstream 1x1 image and records its actual size", async (t) => {
   const upstream = await createUpstreamEditServer({
     responses: [{
       base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==",
@@ -551,13 +552,15 @@ test("local generation rejects a 1x1 upstream image before publishing or saving 
   });
   const events = parseSseEvents(await response.text());
   const error = events.find((event) => event.eventName === "error");
+  const saved = events.find((event) => event.eventName === "saved");
 
   assert.equal(response.status, 200);
   assert.equal(upstream.requests.length, 1);
-  assert.ok(error, "expected invalid generated image error");
-  assert.match(error.payload.message, /图片尺寸过小.*实际尺寸 1x1/);
-  assert.equal(events.some((event) => event.eventName === "saved"), false);
-  assert.deepEqual(await findJsonFiles(join(outputDir, "json")), []);
+  assert.equal(error, undefined, JSON.stringify(error?.payload));
+  assert.ok(saved, "expected the image to be saved");
+  const item = saved.payload?.item || {};
+  assert.equal(item.actualSize, "1x1");
+  assert.ok((await findJsonFiles(join(outputDir, "json"))).length > 0, "expected gallery metadata");
 });
 
 test("local generate rejects invalid local-mask requests before upstream edits", async (t) => {

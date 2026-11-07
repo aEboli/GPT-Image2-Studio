@@ -125,13 +125,16 @@ function normalizeEntry(entry, existing = null) {
 /* 组行汇总只从子条目实时推导，不缓存计数，重渲染即与卡片一致。 */
 export function summarizeGenerationLogGroup(group = {}) {
   const children = Array.isArray(group?.children) ? group.children : [];
-  const completedCount = children.filter((child) => child?.status === "done").length;
-  const failedCount = children.filter((child) => child?.status === "error").length;
-  const runningCount = children.filter((child) => GENERATION_LOG_RUNNING_STATUSES.includes(child?.status)).length;
+  const listingResult = group?.listingBatchResult;
+  const completedCount = Number.isFinite(listingResult?.generatedCount) ? listingResult.generatedCount : children.filter((child) => child?.status === "done").length;
+  const failedCount = Number.isFinite(listingResult?.failedCount) ? listingResult.failedCount : children.filter((child) => child?.status === "error").length;
+  const runningCount = listingResult ? 0 : children.filter((child) => GENERATION_LOG_RUNNING_STATUSES.includes(child?.status)).length;
   const totalCount = Math.max(normalizeTotal(group?.totalCount), children.length);
-  const pendingCount = Math.max(0, totalCount - completedCount - failedCount - runningCount);
+  const unstartedCount = Math.max(0, Number(group?.listingBatchResult?.unstartedCount) || 0);
+  const skippedCount = Math.max(0, Number(group?.listingBatchResult?.skippedCount) || 0);
+  const pendingCount = Math.max(0, totalCount - completedCount - failedCount - runningCount - unstartedCount - skippedCount);
   const status = runningCount > 0 || pendingCount > 0 ? "active" : failedCount > 0 ? "error" : completedCount > 0 ? "done" : "active";
-  return { totalCount, completedCount, failedCount, runningCount: runningCount + pendingCount, status };
+  return { totalCount, completedCount, failedCount, runningCount: runningCount + pendingCount, status, ...(unstartedCount ? { unstartedCount } : {}), ...(skippedCount ? { skippedCount } : {}) };
 }
 
 export function formatGenerationLogGroupSummary(group = {}, unit = DEFAULT_GENERATION_LOG_GROUP_UNIT) {
@@ -142,6 +145,8 @@ export function formatGenerationLogGroupSummary(group = {}, unit = DEFAULT_GENER
     `完成 ${summary.completedCount}`,
     `失败 ${summary.failedCount}`,
     `进行中 ${summary.runningCount}`,
+    ...(summary.unstartedCount ? [`未开始 ${summary.unstartedCount}`] : []),
+    ...(summary.skippedCount ? [`跳过 ${summary.skippedCount}`] : []),
   ].join(" · ");
 }
 

@@ -26,6 +26,12 @@ test("card thumbnails preserve explicit thumbnails, streamed previews and remote
   assert.equal(getCardThumbnailUrl({ imageUrl: "/output/original.png" }), "/output/original.png");
 });
 
+test("SVG 缩略图优先使用原件，旧位图缓存不覆盖矢量预览", () => {
+  const item = { format: "svg", filename: "icon.svg", relativePath: "icons/icon.svg", serverImageUrl: "/output/icons/icon.svg?v=1", imageUrl: "data:image/png;base64,YQ==", serverThumbnailUrl: "/api/gallery/thumbnail?path=icons%2Ficon.svg" };
+  assert.equal(getThumbnailUrl(item), item.serverImageUrl);
+  assert.equal(getCardThumbnailUrl(item), item.serverImageUrl);
+});
+
 test("browser image cache retains background metadata without guessing for old records", () => {
   for (const imageBackground of ["transparent", "opaque", undefined]) {
     const item = normalizeBrowserCachedGalleryItem({ filename: "background.png", imageBackground });
