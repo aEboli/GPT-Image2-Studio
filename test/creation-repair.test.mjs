@@ -249,8 +249,8 @@ test("creation repair generation keeps the saved route and model snapshot", asyn
     endpointPath: "images/generations",
   }, {
     apiKey: "current-secret",
-    baseUrl: "https://current.example/v1",
-    imageRoute: "route-c",
+    baseUrl: "https://saved.example/v1",
+    imageRoute: "route-b",
     responsesModel: "current-responses",
     imageModel: "current-image",
     endpointPath: "chat/completions",
@@ -264,6 +264,32 @@ test("creation repair generation keeps the saved route and model snapshot", asyn
     imageModel: "saved-image",
     endpointPath: "images/generations",
   });
+});
+
+test("creation repair refuses credentials for a different provider or saved route", async () => {
+  const { resolveCreationRepairGenerationConfig } = await import("../lib/creation-repair.mjs");
+  const saved = { baseUrl: "https://saved.example/v1", imageRoute: "b" };
+  for (const current of [
+    { baseUrl: "https://current.example/v1", imageRoute: "b" },
+    { baseUrl: "https://saved.example/other-tenant", imageRoute: "b" },
+    { baseUrl: "https://saved.example/v1", imageRoute: "a" },
+  ]) {
+    assert.throws(
+      () => resolveCreationRepairGenerationConfig(saved, { ...current, apiKey: "current-secret" }),
+      (error) => error.code === "CREATION_REPAIR_PROVIDER_MISMATCH" && !error.message.includes("current-secret"),
+    );
+  }
+});
+
+test("creation repair accepts equivalent provider URLs and route aliases", async () => {
+  const { resolveCreationRepairGenerationConfig } = await import("../lib/creation-repair.mjs");
+  const resolved = resolveCreationRepairGenerationConfig(
+    { baseUrl: "https://SAVED.example:443/v1/", imageRoute: "route-b", imageModel: "saved-model" },
+    { baseUrl: "https://saved.example/v1", imageRoute: "b", apiKey: "matching-secret", imageModel: "new-model" },
+  );
+  assert.equal(resolved.apiKey, "matching-secret");
+  assert.equal(resolved.imageModel, "saved-model");
+  assert.equal(resolveCreationRepairGenerationConfig({}, { apiKey: "legacy-secret" }).apiKey, "legacy-secret");
 });
 
 test("creation repair ignores the current visual language and keeps the saved prompt", () => {

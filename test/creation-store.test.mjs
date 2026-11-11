@@ -565,6 +565,24 @@ test("creation store preserves optional logo metadata for creation set detail di
   assert.deepEqual(JSON.parse(raw).logo, logo);
 });
 
+test("creation store preserves omitted export metadata and honors explicit replacements", async (t) => {
+  const outputDir = await mkdtemp(join(tmpdir(), "creation-export-preserve-"));
+  t.after(() => rm(outputDir, { recursive: true, force: true }));
+  const store = createCreationSetStore({ outputDir });
+  const setId = "export-preserve";
+  await store.saveManifest({ setId, temuExport: { stock: 42 }, listingDrafts: [{ title: "原草稿" }], items: [] });
+  await store.saveManifest({ setId, listingDrafts: [{ title: "更新草稿" }], items: [] });
+  assert.deepEqual((await store.readManifest(setId)).temuExport, { stock: 42 });
+  await store.saveManifest({ setId, temuExport: { stock: 12 }, items: [] });
+  const updated = await store.readManifest(setId);
+  assert.deepEqual(updated.temuExport, { stock: 12 });
+  assert.equal(updated.listingDrafts[0].title, "更新草稿");
+  await store.saveManifest({ setId, temuExport: null, listingDrafts: [], items: [] });
+  const cleared = await store.readManifest(setId);
+  assert.equal("temuExport" in cleared, false);
+  assert.deepEqual(cleared.listingDrafts, []);
+});
+
 test("creation store preserves listing drafts on manifest updates", async () => {
   const rootDir = await mkdtemp(join(tmpdir(), "creation-listing-store-"));
   const store = createCreationSetStore({ outputDir: rootDir });

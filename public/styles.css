@@ -6592,6 +6592,20 @@ ul.creation-plan-message {
   gap: 5px;
 }
 
+.creation-listing-field.has-title-translations .creation-listing-field-head {
+  flex-wrap: wrap;
+}
+
+.creation-listing-field.has-title-translations .creation-listing-field-tools {
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+.creation-listing-field.has-title-translations .creation-listing-character-counts {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
 .creation-listing-field-copy {
   min-height: 28px;
   display: inline-flex;
@@ -23348,8 +23362,19 @@ html[data-theme="light"] .settings-panel,
 
 /* 文本模型的真实增量阅读区。 */
 .text-model-live-preview { position: fixed; z-index: 110; top: 88px; right: 24px; width: min(760px, calc(100vw - 32px)); max-height: 75dvh; overflow: auto; padding: 18px 22px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel-strong, #1d1e27); color: var(--text); box-shadow: 0 18px 48px #0005; }
+.text-model-live-preview.is-listing {
+  top: auto;
+  right: 16px;
+  bottom: 16px;
+  width: min(560px, calc(100vw - 32px));
+  max-height: 45dvh;
+}
 .text-model-live-preview summary { display: flex; justify-content: space-between; gap: 16px; cursor: pointer; font-weight: 600; }
 .text-model-live-meta, .text-model-live-timing { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.text-model-metric-type { color: var(--info); }
+.text-model-metric-request { color: #c4b5fd; }
+html[data-theme="light"] .text-model-metric-request { color: #815c94; }
+.text-model-metric-time { color: var(--warning); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .text-model-live-draft { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 15px; line-height: 1.7; margin: 14px 0; }
 
 #creationRecordDetail.creation-analyst-floating:has(> .text-model-live-meta.is-structured):not([hidden]) {
@@ -23412,6 +23437,7 @@ html[data-theme="light"] .settings-panel,
 }
 
 .text-model-analysis-elapsed {
+  color: var(--warning);
   margin-left: auto;
   font-size: 12px;
   font-variant-numeric: tabular-nums;

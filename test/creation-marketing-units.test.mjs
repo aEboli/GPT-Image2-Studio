@@ -15,7 +15,7 @@ function measurementFixture(mode) {
     { id: "other-variant", kind: "spec", text: "Other variant: Length 20 cm", referenceIndexes: [1] },
   );
   payload.items.forEach((item, index) => {
-    item.image_type = ["spec-table", "scene-application", "dimension-fit"][index];
+    item.image_type = ["spec-table", "dimension-fit", "spec-table"][index];
     item.fact_ids.push("lure-measurements");
     item.prompt = `Create image ${index + 1}: keep the original product markings. Add labels Length 14.5 cm and Weight 35.8 g.`;
     item.creative_brief.text_density = "structured";
@@ -44,7 +44,7 @@ test("AI marketing retains selected units when context falls back to the effecti
   assert.doesNotMatch(context.dimensionSpecs, /14\.5 cm|35\.8 g/u);
 });
 
-test("specification, scene and fit prompts enforce both units using only assigned facts", () => {
+test("dedicated specification and fit prompts enforce both units using only assigned facts", () => {
   const { base, payload } = measurementFixture();
   const plan = apply(base, payload);
   assert.equal(plan.items.length, 3);
@@ -68,10 +68,11 @@ test("the marketing request and accepted plan both retain measurement conversion
   const { input, payload } = marketingPlanFixture(3);
   Object.assign(input, { targetLanguage: "en", dimensionSpecs: "Length 14.5 cm\nWeight 35.8 g" });
   input.productInsights.confirmed_facts.push({ id: "lure-measurements", kind: "spec", text: "Length 14.5 cm; Weight 35.8 g", source: "reference", reference_indexes: [1] });
-  payload.items.forEach((item) => {
+  payload.items.forEach((item, index) => {
+    if (index !== 1) item.image_type = index ? "dimension-fit" : "spec-table";
     item.fact_ids.push("lure-measurements");
     item.creative_brief.text_density = "structured";
-    item.prompt += " Add measurement labels Length 14.5 cm and Weight 35.8 g.";
+    if (index !== 1) item.prompt += " Add measurement labels Length 14.5 cm and Weight 35.8 g.";
   });
   let calls = 0;
   const plan = await requestCreationMarketingPlan({
@@ -90,7 +91,8 @@ test("the marketing request and accepted plan both retain measurement conversion
   });
   assert.equal(calls, 1);
   assert.equal(plan.items.length, 3);
-  for (const item of plan.items) {
+  assert.doesNotMatch(plan.items[1].prompt, /MEASUREMENT DISPLAY|Assigned measurement equivalents/u);
+  for (const item of plan.items.filter((item) => item.role !== "effect-comparison")) {
     assert.match(item.prompt, /14\.5 cm \(5\.71 in\)/u);
     assert.match(item.prompt, /35\.8 g \(1\.26 oz\)/u);
   }

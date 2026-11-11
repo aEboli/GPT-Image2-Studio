@@ -8,10 +8,12 @@ import { createTextModelPreview } from "../lib/text-model-client.mjs";
 
 function documentFixture() {
   const document = { createElement: (tag) => {
-    const node = { tag, ownerDocument: document, children: [], dataset: {}, attributes: {}, textContent: "", className: "", hidden: false, isConnected: true,
+    const node = { tag, ownerDocument: document, children: [], dataset: {}, attributes: {}, ownText: "", className: "", hidden: false, isConnected: true,
+      get textContent() { return this.ownText + this.children.map((child) => child.textContent).join(""); },
+      set textContent(value) { this.ownText = value; this.children = []; },
       append(...children) { this.children.push(...children); },
       appendChild(child) { this.children.push(child); return child; },
-      replaceChildren(...children) { this.children = children; },
+      replaceChildren(...children) { this.ownText = ""; this.children = children; },
       setAttribute(key, value) { this.attributes[key] = value; },
       removeAttribute(key) { delete this.attributes[key]; },
       addEventListener(event, callback) { this[event] = callback; },

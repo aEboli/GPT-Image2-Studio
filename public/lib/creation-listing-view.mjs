@@ -1,5 +1,10 @@
 import { createTextModelError, getTextModelEventMetadata, requestTextModel } from "./text-model-client.mjs";
 import { getCreationListingPolicy } from "./creation-listing-policies.mjs";
+import { normalizeCreationListingTitleTranslations } from "./creation-listing-content-gate.mjs";
+
+const CREATION_LISTING_TITLE_LANGUAGE_LABELS = {
+  es: "西班牙语", fr: "法语", it: "意大利语", pl: "波兰语",
+};
 
 const CREATION_LISTING_BUCKET_LABELS = {
   exact: "精准关键词",
@@ -416,6 +421,9 @@ export function normalizeCreationListingDraftForView(draft = {}, fallbackIndex =
     isCurrentContractReady: accessState.canUse,
     ...(zhDisplay ? { zhDisplay } : {}),
     ...(deDisplay ? { deDisplay } : {}),
+    ...(draft.titleTranslations === undefined ? {} : {
+      titleTranslations: normalizeCreationListingTitleTranslations(draft.titleTranslations),
+    }),
   };
 }
 
@@ -590,6 +598,7 @@ function createCreationListingValueCopyTarget(displayText, copyText, label, {
   localized = false,
   german = false,
   prominent = false,
+  language,
 } = {}) {
   const target = document.createElement("button");
   target.className = [
@@ -601,7 +610,7 @@ function createCreationListingValueCopyTarget(displayText, copyText, label, {
   target.textContent = displayText;
   target.title = `点击复制${label}`;
   target.setAttribute("aria-label", `复制${label}`);
-  target.dataset.creationListingCopyLanguage = german ? "de" : localized ? "zh" : "en";
+  target.dataset.creationListingCopyLanguage = language || (german ? "de" : localized ? "zh" : "en");
   applyCreationListingCopyData(target, label, copyText);
   return target;
 }
@@ -610,7 +619,7 @@ function hasCreationListingFieldValue(value, { list = false } = {}) {
   return list ? cleanCreationListingArray(value).length > 0 : Boolean(cleanCreationListingText(value));
 }
 
-function createCreationListingCharacterCountsNode(counts) {
+function createCreationListingCharacterCountsNode(counts, titleTranslations = {}) {
   const stats = document.createElement("span");
   stats.className = "creation-listing-character-counts";
   const labels = [`英文字符 ${counts.english}`];
@@ -627,6 +636,15 @@ function createCreationListingCharacterCountsNode(counts) {
     german.textContent = `DE ${counts.german}`;
     stats.appendChild(german);
   }
+  for (const [language, title] of Object.entries(titleTranslations)) {
+    const count = Array.from(title).length;
+    labels.push(`${CREATION_LISTING_TITLE_LANGUAGE_LABELS[language]}字符 ${count}`);
+    const translation = document.createElement("span");
+    translation.className = "creation-listing-character-count";
+    translation.dataset.creationListingCopyLanguage = language;
+    translation.textContent = `${language.toUpperCase()} ${count}`;
+    stats.appendChild(translation);
+  }
   if (counts.chinese > 0) {
     labels.push(`中文字符 ${counts.chinese}`);
     const chinese = document.createElement("span");
@@ -639,15 +657,15 @@ function createCreationListingCharacterCountsNode(counts) {
   return stats;
 }
 
-function createCreationListingFieldCopyButton(label, value, { localized = false, german = false, list = false } = {}) {
-  const languageLabel = german ? "德文" : localized ? "中文" : "英文";
+function createCreationListingFieldCopyButton(label, value, { localized = false, german = false, list = false, language } = {}) {
+  const languageLabel = CREATION_LISTING_TITLE_LANGUAGE_LABELS[language] || (german ? "德文" : localized ? "中文" : "英文");
   const button = document.createElement("button");
   button.className = "creation-listing-field-copy";
   button.type = "button";
   button.textContent = `复制${languageLabel}`;
   button.title = `复制${label}${languageLabel}`;
   button.setAttribute("aria-label", `复制${label}${languageLabel}`);
-  button.dataset.creationListingCopyLanguage = german ? "de" : localized ? "zh" : "en";
+  button.dataset.creationListingCopyLanguage = language || (german ? "de" : localized ? "zh" : "en");
   applyCreationListingCopyData(button, `${label}${languageLabel}`, value, { list });
   return button;
 }
@@ -666,9 +684,11 @@ function createCreationListingField(label, value, {
   copyable = true,
   prominent = false,
   labeledRows,
+  titleTranslations,
 } = {}) {
   const field = document.createElement("div");
-  field.className = "creation-listing-field";
+  const translatedTitles = normalizeCreationListingTitleTranslations(titleTranslations);
+  field.className = `creation-listing-field${Object.keys(translatedTitles).length ? " has-title-translations" : ""}`;
   const copySource = copyValue ?? value;
   const localizedCopySource = localizedCopyValue ?? localizedValue;
   const germanCopySource = germanCopyValue ?? germanValue;
@@ -685,6 +705,7 @@ function createCreationListingField(label, value, {
   fieldTools.className = "creation-listing-field-tools";
   fieldTools.appendChild(createCreationListingCharacterCountsNode(
     buildCreationListingFieldCharacterCounts(value, localizedValue, { list, countValue, localizedCountValue, germanValue, germanCountValue }),
+    translatedTitles,
   ));
   if (copyable) {
     fieldTools.appendChild(createCreationListingFieldCopyButton(label, copySource, { list: copyList }));
@@ -693,6 +714,9 @@ function createCreationListingField(label, value, {
         german: true,
         list: germanCopyList,
       }));
+    }
+    for (const [language, title] of Object.entries(translatedTitles)) {
+      fieldTools.appendChild(createCreationListingFieldCopyButton(label, title, { language }));
     }
     if (hasCreationListingFieldValue(localizedCopySource, { list: localizedCopyList })) {
       fieldTools.appendChild(createCreationListingFieldCopyButton(label, localizedCopySource, {
@@ -795,6 +819,11 @@ function createCreationListingField(label, value, {
         { german: true, prominent },
       ));
     }
+    for (const [language, title] of Object.entries(translatedTitles)) {
+      pair.appendChild(createCreationListingValueCopyTarget(
+        title, title, `${itemLabel}${CREATION_LISTING_TITLE_LANGUAGE_LABELS[language]}`, { language, prominent },
+      ));
+    }
     if (localizedText) {
       pair.appendChild(createCreationListingValueCopyTarget(
         localizedText,
@@ -866,9 +895,10 @@ export function buildCreationListingDraftText(draft, index = 0, source = {}) {
   } = normalizedDraft || {};
   const zhDisplay = normalizedDraft?.zhDisplay || {};
   const deDisplay = normalizedDraft?.deDisplay || {};
-  const bilingualScalar = (label, value, localizedValue, germanValue) => [
+  const bilingualScalar = (label, value, localizedValue, germanValue, titleTranslations = {}) => [
     `${label}: ${value || "无"}`,
     ...(germanValue ? [`德文参考: ${germanValue}`] : []),
+    ...Object.entries(titleTranslations).map(([language, title]) => `${CREATION_LISTING_TITLE_LANGUAGE_LABELS[language]}参考: ${title}`),
     `中文参考: ${localizedValue || "无"}`,
   ];
   const bilingualList = (label, values, localizedValues, germanValues = []) => {
@@ -913,7 +943,7 @@ export function buildCreationListingDraftText(draft, index = 0, source = {}) {
 
   return [
     `Listing ${index + 1}`,
-    ...bilingualScalar("标题", title, zhDisplay.title, deDisplay.title),
+    ...bilingualScalar("标题", title, zhDisplay.title, deDisplay.title, normalizedDraft?.titleTranslations),
     ...bilingualList("卖点", sellingPoints, zhDisplay.sellingPoints, deDisplay.sellingPoints),
     ...bilingualList("痛点", painPoints, zhDisplay.painPoints, deDisplay.painPoints),
     ...bilingualList("五点描述", fiveBullets, zhDisplay.fiveBullets, deDisplay.fiveBullets),
@@ -966,6 +996,7 @@ function buildCreationListingV1ExportDraft(sourceDraft = {}, index = 0) {
     evidenceMode: draft.evidenceMode,
     status: "completed",
     title: cleanCreationListingText(draft.title),
+    ...(Object.keys(draft.titleTranslations || {}).length ? { titleTranslations: draft.titleTranslations } : {}),
     sellingPoints: cleanCreationListingArray(draft.sellingPoints),
     painPoints: cleanCreationListingArray(draft.painPoints),
     fiveBullets: cleanCreationListingArray(draft.fiveBullets),
@@ -1064,6 +1095,7 @@ export function renderCreationListingDrafts({ refs, state, set } = {}) {
     const contentFrame = document.createElement("div");
     contentFrame.className = "creation-listing-content-frame";
     contentFrame.appendChild(createCreationListingField("标题", draft.title, {
+      titleTranslations: draft.titleTranslations,
       germanValue: draft.deDisplay?.title,
       localizedValue: draft.zhDisplay?.title,
       prominent: true,
@@ -1345,22 +1377,24 @@ export function createCreationListingController(context = {}) {
     }
   }
 
-  async function generateMissing() {
+  async function generateBatch({ selectedOnly = false } = {}) {
     if (batchGenerating || context.state?.creation?.listingBatchGenerating) {
       if (batchProgress) reportBatch();
       return context.state?.creation?.listingBatchProgress || { generatedCount: 0, failedCount: 0, failures: [] };
     }
     const sets = Array.isArray(context.state?.creation?.sets) ? context.state.creation.sets : [];
+    const checkedIds = new Set(context.state?.creation?.recordCheckedSetIds || []);
     const busyIds = getCreationListingGeneratingSetIds(context.state);
     const seen = new Set();
     const candidates = sets.filter((set) => {
       const id = cleanCreationListingText(set?.setId);
-      if (!id || seen.has(id) || busyIds.has(id) || getCreationListingDrafts(set).length > 0) return false;
+      if (!id || seen.has(id) || busyIds.has(id)) return false;
+      if (selectedOnly ? !checkedIds.has(id) : getCreationListingDrafts(set).length > 0) return false;
       seen.add(id);
       return true;
     });
     if (candidates.length === 0) {
-      context.setFeedback?.("所有套图都已有 Listing，或正在生成中。", "success");
+      context.setFeedback?.(selectedOnly ? "请先勾选未在生成 Listing 的套图记录。" : "所有套图都已有 Listing，或正在生成中。", selectedOnly ? "error" : "success");
       return { totalCount: 0, generatedCount: 0, failedCount: 0, activeCount: 0, unstartedCount: 0, skippedCount: 0, failures: [], elapsedMs: 0 };
     }
 
@@ -1392,7 +1426,7 @@ export function createCreationListingController(context = {}) {
         const set = candidates[cursor++];
         batchProgress.unstartedCount -= 1;
         const currentSet = context.state.creation.sets?.find((entry) => entry?.setId === set.setId);
-        if (!currentSet || getCreationListingDrafts(currentSet).length > 0 || isCreationListingGenerating(context.state, set.setId)) {
+        if (!currentSet || (!selectedOnly && getCreationListingDrafts(currentSet).length > 0) || isCreationListingGenerating(context.state, set.setId)) {
           batchProgress.skippedCount += 1;
           reportBatch();
           continue;
@@ -1434,6 +1468,14 @@ export function createCreationListingController(context = {}) {
       renderViews();
     }
     return batchSnapshot();
+  }
+
+  function generateMissing() {
+    return generateBatch();
+  }
+
+  function generateSelected() {
+    return generateBatch({ selectedOnly: true });
   }
 
   async function copy() {
@@ -1497,6 +1539,21 @@ export function createCreationListingController(context = {}) {
         ? `生成 ${missingCount} 套缺少的 Listing`
         : "所有套图都已有 Listing";
     }
+    if (context.refs.creationRecordGenerateSelectedListingsButton) {
+      const checkedIds = new Set(context.state?.creation?.recordCheckedSetIds || []);
+      const checkedCount = new Set(allSets.filter((set) => cleanCreationListingText(set?.setId)
+        && checkedIds.has(set.setId)
+        && !isCreationListingGenerating(context.state, set.setId)).map((set) => set.setId)).size;
+      renderCreationListingGenerateButton(context.refs.creationRecordGenerateSelectedListingsButton, {
+        disabled: batchGenerating || context.state?.creation?.listingBatchGenerating
+          || context.state?.creation?.recordTemuExportBusy || context.state?.creation?.recordDeleteBusy || checkedCount === 0,
+        isGenerating: batchGenerating,
+        idleLabel: "生成 Listing",
+      });
+      context.refs.creationRecordGenerateSelectedListingsButton.title = checkedCount > 0
+        ? `为勾选的 ${checkedCount} 套记录生成 Listing，已有的也会重新生成`
+        : "请先勾选未在生成 Listing 的套图记录";
+    }
     if (context.refs.creationRecordCopyListingsButton) {
       context.refs.creationRecordCopyListingsButton.disabled = drafts.length === 0 || isGenerating;
     }
@@ -1521,6 +1578,9 @@ export function createCreationListingController(context = {}) {
     context.refs.creationRecordGenerateMissingListingsButton?.addEventListener("click", () => {
       generateMissing().catch((error) => context.setFeedback?.(error.message, "error"));
     });
+    context.refs.creationRecordGenerateSelectedListingsButton?.addEventListener("click", () => {
+      generateSelected().catch((error) => context.setFeedback?.(error.message, "error"));
+    });
     context.refs.creationRecordCopyListingsButton?.addEventListener("click", () => {
       copy().catch((error) => context.setFeedback?.(error.message, "error"));
     });
@@ -1544,6 +1604,7 @@ export function createCreationListingController(context = {}) {
     exportListings,
     generate,
     generateMissing,
+    generateSelected,
     syncRecordControls,
   };
 }

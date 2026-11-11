@@ -35,7 +35,6 @@ cmd /c npm run sync:public-lib -- --check
 cmd /c npm test
 cmd /c npm run sync:public-lib -- --check
 cmd /c npm run check:release
-cmd /c npm run build:pages
 cmd /c npx --no-install openspec validate --all --strict
 git diff --check
 ```

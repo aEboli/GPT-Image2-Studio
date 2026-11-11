@@ -1,4 +1,4 @@
-import { createCreationProcessSteps, createTextModelPreview, fitCreationReadingPanel, formatTextModelTiming } from "./text-model-client.mjs";
+import { createCreationProcessSteps, createTextModelPreview, fitCreationReadingPanel, formatTextModelTiming, renderTextModelMetrics } from "./text-model-client.mjs";
 import { CREATION_MARKETING_PROGRESS_LABELS as labels, isCreationMarketingProgressActive } from "./creation-marketing-progress.mjs";
 import { getCreationPlatformImageType } from "./creation-platform-policies.mjs";
 
@@ -31,7 +31,7 @@ export function createCreationMarketingProgressView({ button, panel, announcemen
   const updateClock = () => {
     if (!current) { button.textContent = "AI 营销规划"; return; }
     const count = current.total && (current.receivedCount || ["complete", "partial", "reused"].includes(current.stage)) ? ` · ${current.receivedCount || 0}/${current.total}` : "";
-    button.textContent = `AI 营销规划 · ${labels[current.stage]}${count} · ${Math.floor(elapsedMs() / 1000)} 秒 ${expanded ? "▴" : "▾"}`;
+    renderTextModelMetrics(button, `AI 营销规划 · ${labels[current.stage]}${count} · ${Math.floor(elapsedMs() / 1000)} 秒 ${expanded ? "▴" : "▾"}`, { document, type: true });
     if (expanded) live?.update({ ...current, elapsedMs: elapsedMs() });
   };
   const render = () => {
@@ -66,8 +66,12 @@ export function createCreationMarketingProgressView({ button, panel, announcemen
       if (!traceNode.hidden) {
         append(traceNode, "h4", "耗时明细");
         const trace = current.requestTrace;
-        append(traceNode, "p", formatTextModelTiming({ timing: { prepareMs: trace.prepareMs, validationMs: trace.validationMs, totalMs: trace.totalMs } }), "creation-marketing-caption");
-        for (const call of trace.calls) append(traceNode, "p", `${call.repairRound ? `第 ${call.repairRound} 轮修复` : "初稿"} · 第 ${call.attempt} 次请求 · ${call.transport === "buffered" ? "整包返回 · " : ""}${formatTextModelTiming(call) || "等待上游响应"}`, "creation-marketing-caption");
+        const summary = append(traceNode, "p", "", "creation-marketing-caption");
+        renderTextModelMetrics(summary, formatTextModelTiming({ timing: { prepareMs: trace.prepareMs, validationMs: trace.validationMs, totalMs: trace.totalMs } }));
+        for (const call of trace.calls) {
+          const row = append(traceNode, "p", "", "creation-marketing-caption");
+          renderTextModelMetrics(row, `${call.repairRound ? `第 ${call.repairRound} 轮修复` : "初稿"} · 第 ${call.attempt} 次请求 · ${call.transport === "buffered" ? "整包返回 · " : ""}${formatTextModelTiming(call) || "等待上游响应"}`, { type: true });
+        }
       }
       panel.scrollTop = scrollTop;
     }

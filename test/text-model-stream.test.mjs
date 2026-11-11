@@ -51,3 +51,33 @@ test("aborting a text stream cancels the reader promptly", async () => {
   await assert.rejects(pending, /abort/i);
   assert.equal(cancelled, true);
 });
+
+test("buffered Chat answers retain the original payload and usage", async () => {
+  const payload = {
+    id: "chat-test",
+    choices: [{ message: { role: "assistant", content: "完整回答" }, finish_reason: "stop" }],
+    usage: { prompt_tokens: 12, completion_tokens: 34, total_tokens: 46, completion_tokens_details: { reasoning_tokens: 20 } },
+  };
+  const response = await requestStreamingText(async () => Response.json(payload), "https://example.test/v1/chat/completions", { body: '{"input":[]}' });
+  assert.deepEqual(await response.json(), { ...payload, output_text: "完整回答" });
+  assert.notEqual(response.textModelStreamed, true);
+});
+
+test("buffered Responses payloads preserve structured content and error details", async () => {
+  for (const payload of [
+    { output: [{ type: "message", content: [{ type: "output_json", json: { title: "结构化结果" } }] }], usage: { input_tokens: 1, output_tokens: 2 } },
+    { error: { code: "permission_denied", type: "invalid_request_error", message: "Access rejected" }, usage: { input_tokens: 1 } },
+  ]) {
+    const response = await requestStreamingText(async () => Response.json(payload), "https://example.test/v1/responses", { body: '{"input":[]}' });
+    assert.deepEqual(await response.json(), payload);
+  }
+});
+
+test("buffered Chat error payloads are preserved", async () => {
+  const payload = { error: { code: "invalid_api_key", message: "Access rejected" } };
+  for (const status of [200, 401, 403]) {
+    const response = await requestStreamingText(async () => Response.json(payload, { status }), "https://example.test/v1/chat/completions", { body: '{"input":[]}' });
+    assert.equal(response.status, status);
+    assert.deepEqual(await response.json(), payload);
+  }
+});

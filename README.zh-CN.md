@@ -1,52 +1,33 @@
 # GPT-Image2-Studio
 
-<div align="center">
+[![Version](https://img.shields.io/badge/version-v0.2.148-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases/latest) [![CI](https://github.com/aEboli/GPT-Image2-Studio/actions/workflows/ci.yml/badge.svg)](https://github.com/aEboli/GPT-Image2-Studio/actions/workflows/ci.yml) [![Windows](https://img.shields.io/badge/Windows-x64-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases/latest)
 
-[![Version](https://img.shields.io/badge/version-v0.2.138-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
-[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
-[![Windows](https://img.shields.io/badge/Windows-Installer-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+**在自己电脑上运行的 AI 图像与视觉创作工作台。**
 
-**本地优先的 AI 图像生成与视觉创作工作台**
+从图片生成与编辑，到电商套图、多语言 Listing、文章插图和 PPT，把参考素材、生成队列、失败重试与历史资产放在同一套工作流中。可以通过浏览器使用，也可以安装独立 Windows 桌面程序。
 
-把提示词生图、参考图分析、图片编辑、电商套图、人物写真、文章插图、PPT 生成和素材管理集中到一个浏览器界面中。
+[English](./README.md) · **简体中文**
 
-当前版本：`v0.2.138`
+[下载](https://github.com/aEboli/GPT-Image2-Studio/releases/latest) · [快速开始](#快速开始) · [配置 API](#配置-api) · [功能](#功能) · [文档](#文档)
 
-</div>
+当前版本：`v0.2.148`
 
-<p align="center">
-  <a href="#快速开始">快速开始</a> ·
-  <a href="#配置说明">API 配置</a> ·
-  <a href="#核心功能">核心功能</a> ·
-  <a href="#页面介绍">工作流</a> ·
-  <a href="#开发与验证">开发</a> ·
-  <a href="#版本发布">发行版</a>
-</p>
+![提示词生图工作台](./docs/images/studio-prompt.jpg)
 
 ## 快速开始
 
-装好之后还需要填入你自己的 API 凭据才能生成图片，第一次使用请按 [新手配置 API 教程](#新手配置-api-教程) 操作。
+### Windows
 
-### 先选一种运行方式
+从[最新发行版](https://github.com/aEboli/GPT-Image2-Studio/releases/latest)选择一种方式：
 
-| 目标 | 推荐入口 | 适合场景 |
-| --- | --- | --- |
-| Windows 日常使用 | 从 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载桌面安装包 | 独立 Electron 窗口，安装后不需要另装 Node.js |
-| 本地试用或开发 | 使用 Node.js 20+ 运行源码 | 直接调试界面和服务端源码，管理本地文件并执行开发命令 |
-| 部署预览 | 使用 Vercel 部署仓库 | 获得浏览器访问地址；云端使用临时文件，长任务上线前要先做 Preview 验证 |
+- **[桌面安装包](https://github.com/aEboli/GPT-Image2-Studio/releases/latest/download/GPT-Image2-Studio-Desktop-Setup-v0.2.148-x64.exe)**：安装后，从桌面或开始菜单启动。
+- **[便携 ZIP](https://github.com/aEboli/GPT-Image2-Studio/releases/latest/download/GPT-Image2-Studio-Portable-v0.2.148-x64.zip)**：完整解压后，运行 `GPT-Image2-Studio.exe`。
 
-Windows 日常使用优先选桌面安装包；不想写入安装记录时选择免安装 ZIP；需要开发或检查生成文件时选择源码运行。
+两种方式均自带运行时，无需另装 Node.js。便携版的解压文件需要放在一起。安装、数据位置与构建说明见 [Windows 桌面文档](./docs/windows-desktop.md)。
 
-### 图片转提示词并锁定风格
+### 源码运行
 
-从顶栏或创作菜单打开“图片转提示词”，上传一张图片并开始分析。结果为可复用 JSON：`visual` 会优先锁定原图最有辨识度的媒介、审美、色彩、用光和材质词，并要求主体焦点清楚、可见纹理分明、边缘自然、层次整洁，加入一次“4K/8K级超高清成像质感”作为生图视觉目标；这只是提示词表达，不代表实际输出像素。`avoid` 针对可能的风格漂移、意外虚焦、伪影和额外杂物，同时保留原图有意的散景、柔焦、颗粒或运动效果。复制 JSON 到提示词生图流程，可让第二次生成更明确地延续原图风格与清晰观感。
-
-### 方式一：源码运行
-
-前置条件：
-
-- Node.js `20` 或更高版本
-- 一个可用的 OpenAI API Key 或兼容服务凭据
+完整开发环境使用 **Node.js 22.12+**，包含 Electron 依赖；独立 Node.js 服务支持 Node.js 20+。
 
 ```powershell
 git clone https://github.com/aEboli/GPT-Image2-Studio.git
@@ -55,719 +36,125 @@ cmd /c npm ci
 cmd /c npm start
 ```
 
-浏览器打开：
-
-```text
-http://127.0.0.1:3600
-```
-
-端口被占用时：
+打开 **http://127.0.0.1:3600**。需要其他端口时，先设置 `PORT`：
 
 ```powershell
 $env:PORT="3601"
 cmd /c npm start
 ```
 
-Windows 用户也可以双击 `launch-studio.cmd` 启动，使用 `stop-studio-services.cmd` 停止 `3600-3606` 端口上的本项目服务。
+Windows 也可使用 `launch-studio.cmd` 启动浏览器工作台，支持 `-Port 3601`。该启动器要求 PowerShell 7.4+（`pwsh.exe`）；`npm start` 与桌面程序不要求 PowerShell 7。
 
-Windows 脚本入口（启动器、Native Messaging 安装/卸载、图片资源生成）需要 [PowerShell 7.4 或更高版本](https://learn.microsoft.com/powershell/scripting/install/installing-powershell-on-windows)，使用 `pwsh.exe`，不回退到 Windows PowerShell 5.1。安装后重新打开终端并用 `pwsh --version` 检查。可运行 `launch-studio.cmd -Port 3601`，或 `pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./launch-studio.ps1 -Root "项目目录" -Port 3601`。缺少运行时或脚本时入口明确失败；启动器只在健康检查成功后打开浏览器，超时返回非零。纯 Node/Electron 启动与停止服务 CMD 不依赖 PowerShell 7。
+## 配置 API
 
-维护者可用 `pwsh -NoLogo -NoProfile -File ./scripts/generate-portrait-accessory-color-assets.ps1` 生成配件 PNG；该脚本使用 System.Drawing，仅支持 Windows，输出目录必须已存在，可从任意当前目录运行。
+Studio 需要**自行提供 API 密钥和模型权限**，模型调用费用由所选服务商收取。
 
-### 方式二：Windows 桌面程序（推荐）
+1. 打开右上角**配置**，通过 **CN / EN** 切换界面语言。
+2. 选择通道，填写接口地址、API Key 和模型名称。
+3. 测试连接；服务商支持时获取模型列表，然后**保存**。
+4. 回到**提示词生图**，输入简短提示词，先用默认尺寸生成一张图。
 
-从包含桌面产物的 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases) 下载：
-
-```text
-GPT-Image2-Studio-Desktop-Setup-v0.2.138-x64.exe
-```
-
-安装完成后通过桌面或开始菜单中的 `GPT-Image2-Studio` 启动。程序会在独立窗口中运行，内置服务使用动态回环端口，关闭窗口后不会遗留后台服务。无需另行安装 Node.js，完整说明见 [Windows 桌面程序文档](./docs/windows-desktop.md)。
-
-如果不想安装，可下载同一 Release 中的 `GPT-Image2-Studio-Portable-v0.2.138-x64.zip`，完整解压后直接运行压缩包根目录的 `GPT-Image2-Studio.exe`。便携版不创建安装项或卸载记录，运行时请保持解压后的文件结构完整。
-
-桌面开发使用 Electron `43`，要求 Node.js `22.12` 或更高版本；普通 `npm start` 服务仍支持 Node.js `20+`。
-
-```powershell
-cmd /c npm ci
-cmd /c npm run desktop
-```
-
-### 方式三：Windows 浏览器安装包（兼容旧版）
-
-旧版浏览器安装流程仍保留本地构建说明，但 `v0.2.138` GitHub Release 不附带 IExpress 兼容安装包。请优先使用上面的 Windows 桌面安装包或免安装 ZIP；只有需要自行构建兼容流程时，再参考 [Windows 浏览器安装包文档](./docs/windows-installer.md)。
-
-## 配置说明
-
-### 新手配置 API 教程
-
-第一次使用请从这一节开始。Studio 不提供模型额度，也不代管密钥。它把你自己的 API 凭据保存在本机，再用这份凭据调用你选定的服务。下面是第一次跑通的最短路径。
-
-#### 第 1 步：先准备三样东西
-
-| 需要准备 | 说明 | 示例 |
-| --- | --- | --- |
-| 接口地址（Base URL） | 服务方给出的 API 根地址，通常以 `/v1` 结尾 | `https://api.openai.com/v1` |
-| API Key | 在服务方控制台生成的密钥 | `sk-****` |
-| 模型名 | 与该服务方命名一致的模型标识 | `gpt-6-luna`、`gpt-image-2` |
-
-官方渠道在 OpenAI 控制台创建 Key；兼容服务或第三方中转按其自身文档获取地址和 Key。费用、限额和内容政策都以实际服务方为准。
-
-#### 第 2 步：打开配置面板
-
-- 源码运行：执行 `cmd /c npm start`，浏览器打开 `http://127.0.0.1:3600`。
-- 桌面程序：直接启动 `GPT-Image2-Studio`，内置服务使用动态回环端口，不需要手动输入地址。
-- 点右上角的**配置**按钮，或顶部导航的**配置 → 配置 API**，面板顶部即可选择配置区。
-- 保存成功之前，右上角状态一直显示「配置未保存」。
-
-#### 第 3 步：选择一个配置区
-
-配置抽屉顶部统一为四个互斥配置区：**GPT**、**Gemini**、**Grok** 和 **配色**。选中 GPT 后，紧贴配置区下方显示「路由模式 / 直连模式」切换。只显示当前配置区的字段，未使用的连接控件和「获取模型列表」按钮保持禁用；配色区不含连接字段。
-
-各生图路线独立保存连接配置，图片生成只使用当前生效的路线。不确定时先选 GPT 下默认的「路由模式」。
-
-| 配置区 | 适合的服务 | 需要填写 |
-| --- | --- | --- |
-| GPT / 路由模式（默认） | 支持 `POST /responses` 并允许 `image_generation` 工具的服务，例如 OpenAI 官方或对齐官方协议的中转 | 接口地址、API Key、Responses 模型 |
-| GPT / 直连模式 | 只提供 `images/generations` 或 `chat/completions` 的服务，或者生图与文本来自两家不同服务 | 独立的生图与文本/视觉配置 |
-| Gemini | 按 OpenAI 兼容的图像生成协议调用的 Gemini 图像模型 | 基础 URL、API Key、图像模型 |
-| Grok | xAI 官方或实现 Grok Imagine 图像协议的兼容服务 | 基础 URL、API Key、生图接口、图像模型 |
-| 配色 | 不是调用通道，只承载界面配色 | 无需填写；重新选回服务商配置区即恢复连接字段 |
-
-选中 **配色** 会隐藏连接字段，显示每行 4 个的 12 套配色色块。默认配色为「黑曜」；「靛蓝」继续保留，另有青花、竹影、天青、朱墙、朱漆、敦煌、松石、玫瑰、月白和流金等配色。选择会保存在浏览器本地，并同步到嵌入的 Temu 工作台。
-
-在 **配色** 和服务商配置区之间来回切换不会改动当前生效的生图路线，右上角状态仍显示该路线。
-
-长说明可通过鼠标悬停或键盘聚焦说明标记查看；配置表单与生成日志各自滚动，日志标题和配置区切换保持可见。
-
-#### 第 4 步：按通道填写字段
-
-**路由模式**，接口后缀固定为 `responses`：
-
-```text
-接口地址：https://api.openai.com/v1
-API Key：sk-****
-Responses 模型：gpt-6-luna
-```
-
-文本/视觉模型默认使用 `gpt-6-luna`。已有的非空模型配置会继续生效，直到你主动修改。
-
-这里的「Responses 模型」是外层模型；生图工具模型在它下面的「生图工具模型」下拉框里选，提示词页的参数区会同步显示「工具模型 <所选模型>」。该项只能从下拉选项里选，不支持自定义填写：
-
-| 选项 | 说明 |
+| 通道 | 配置方式 |
 | --- | --- |
-| `gpt-image-2` | 默认值。 |
-| `gpt-image-2.5-sunburst` | 能力最强，精修更准，出图更慢。 |
-| `gpt-image-2.5-flare` | 日常生图，速度更快。 |
+| GPT · 路由模式 | 配置支持图像生成工具的 Responses 接口。 |
+| GPT · 直连模式 | 分别配置生图与文字／视觉接口，可使用不同服务商。 |
+| Gemini | 配置与所选 Gemini 路线兼容的生图接口。 |
+| Grok | 配置 Grok 生图／编辑接口。 |
 
-「发送 tools[].model」开关默认开启，路由请求会发送下拉框当前选中的白名单图像模型。旧配置缺少该字段时也默认开启；明确保存为关闭的配置继续保持关闭。关闭后请求省略 `tools[].model`，交给当前服务决定工具模型，下拉框选择与排队任务快照仍保留；局部保存配置不会重置开关。
+规划、分析和 Listing 使用已配置的文字／视觉接口。连接测试成功只表示模型列表接口可访问；实际生图还需验证选用的模型与格式。
 
-提示词页的参数区还有「质量」下拉：`low`、`medium`、`high`（默认），以及只有 2.5 模型才有的 `xhigh` 和 `max`。选中 `xhigh` / `max` 后切回 `gpt-image-2` 时，质量会收敛为 `high`。Grok 只提供 `low`、`medium`，默认 `medium`；GPT、Gemini、Grok 分别记住各自的质量选择。旧配置中的自动值会迁移为确定默认值，不再作为选项显示，也不发送给上游。提示词生图还提供可选的「透明背景」开关，仅在 GPT 的路由模式和直连生图路线显示；开启后固定输出 PNG，发送 `background=transparent`，并把选择随任务保存。Gemini 和 Grok 隐藏此开关，不发送背景参数。
+各通道字段、模型映射、环境变量和常见错误见 [API 配置教程](./docs/configuration.zh-CN.md)。可用模型和支持的格式以服务商及账户权限为准。
 
-**直连模式**分成两组，各自独立填写。生图组只负责图片生成和编辑，文本/视觉组负责提示词增强、参考图分析和 Listing 等模型调用，两组可以分别指向不同服务商：
+## 功能
 
-```text
-生图 API：https://api.openai.com/v1        后缀 images/generations   生图模型 gpt-image-2
-文本/视觉 API：https://api.openai.com/v1    后缀 responses            文本/视觉模型 gpt-6-luna
-```
-
-渠道的生图模型名称不一致时，在「流式输出」下方添加「生图模型映射」，按 `请求模型 → 实际请求模型` 填写，例如 `gpt-image-2.6-sunburst → IMAGE-2.6`：左侧是请求中匹配的模型名称，右侧是实际发送给渠道的模型 ID。两端均支持手动输入或选择候选；上方「获取模型列表」会同时更新映射候选。可添加或删除多条规则，保存后会恢复，全部删除并保存即清空映射。
-
-映射按完整模型 ID 区分大小写匹配一次，仅影响 GPT 直连的生图和编辑请求；未匹配时使用原名称。文本/视觉模型和其他通道不受影响，已知模型的能力校验仍保留，排队任务使用入队时的映射快照。
-
-**Gemini**，生图接口后缀固定为 `images/generations`，与 GPT、Grok 的接口控件在相同位置对齐显示：
-
-```text
-基础 URL：https://api.vendor.example/v1
-API Key：<服务方提供的 Key>
-图像模型：gemini-3.1-flash-image-preview
-```
-
-**Grok**，使用 xAI 的图片生成与编辑 JSON 协议，连接配置独立保存：
-
-```text
-基础 URL：https://api.x.ai/v1
-API Key：<xAI 或兼容服务方提供的 Key>
-接口后缀：images/generations
-图像模型：grok-imagine-image-2.0
-```
-
-带参考图时请求 `/images/edits`，单次最多 5 张参考图。应用把所选尺寸映射为 `1k` 或 `2k`，不支持的比例按 Grok 支持值就近匹配；质量仅发送 `low` 或 `medium`。Grok 图片请求不带 GPT 思考等级、输出格式和背景参数，也不支持本地蒙版编辑。文本/视觉规划仍使用单独配置的 GPT 通道。
-
-如果服务方只给了一条完整地址，点接口地址右侧的**完整 URL**按钮，粘贴 `https://vendor.example/v1/responses` 这样的整条地址，Studio 会自动拆成基础地址与接口后缀。
-
-「生成调度」卡片里的请求并发数量和任务提交间隔保持默认即可（`20` 个、`1000` 毫秒）。请求并发数量是当前会话内所有生图模式合计的全局上限；有任务在跑时这两项会暂时锁定。
-
-#### 第 5 步：测试连接并保存
-
-- 点**测试连接**。它会针对当前通道请求 `GET <基础地址>/v1/models`（地址未以 `/v1` 结尾时自动补上），带 `Authorization: Bearer <你的 Key>`。刚输入、还没保存的 Key 也会参与这次测试。
-- 点**获取模型列表**使用同一个接口，成功后可以直接从下拉列表里选模型名，不用手打。
-- 点**保存**。右上角状态变为「配置已保存」，API Key 输入框旁边显示脱敏掩码。
-- API Key 留空再保存表示保留上次保存的 Key，不会把它清空。
-
-连接测试只证明凭据和 `/models` 接口可用，不代表该通道支持生图、图片编辑、参考图或最大分辨率。部分中转不实现 `/models`，这时测试会失败但生图仍可能正常：直接手填模型名保存，用一次真实生成来验证。
-
-#### 第 6 步：生成第一张图确认打通
-
-关闭配置面板，回到**提示词生图**，写一句提示词，比例选 `1:1`，使用明确的默认分辨率（GPT 为 `1024x1024`，Gemini 为 `1K`，Grok 根据方图默认尺寸映射为 `1k`），点生成。进度在预览区查看；完整「生成日志」在宽屏时位于配置右侧，窄屏时位于下方。当前调用参数摘要可见时，还会显示所选生图服务的可点击 origin（`协议://域名[:端口]`），不包含接口路径或凭据。成功后图片保存在：
-
-```text
-%USERPROFILE%\Pictures\YYYY-MM\MM-DD\prompt\
-```
-
-#### 常见问题对照
-
-| 现象 | 常见原因 | 处理方式 |
-| --- | --- | --- |
-| 右上角一直显示「配置未保存」 | 没点保存，或填写的组与当前选中的通道不是同一个 | 确认选中的通道就是你填写的那一组，再点保存 |
-| 测试连接返回 401 或提示密钥无效 | Key 填错、粘贴时带了空格、Key 与接口地址不属于同一服务方 | 重新粘贴 Key，确认地址与 Key 来自同一服务方 |
-| 测试连接返回 404，或提示未找到可调用模型 | 该服务不提供 `/models` 列表接口 | 跳过测试，手填模型名保存，用一次真实生成验证 |
-| 生成时提示模型不存在 | 模型标识与该服务方的命名不一致 | 用「获取模型列表」查看真实模型名后再填 |
-| 路由模式生图失败，但文本类调用正常 | 该服务不支持 Responses 的 `image_generation` 工具 | 改用直连模式，生图组后缀选 `images/generations` |
-| 提示需要令牌或远程访问认证 | 正在通过非回环地址访问本地服务 | 见下方「局域网访问与请求令牌」 |
-
-配置保存在本机：本地 Node 服务写入 `.local/config.json`，桌面程序写入 Electron 应用数据目录，云端部署由浏览器侧保存。不要在公共设备上保留密钥。
-
-### 在界面中配置 API
-
-第一次使用请按[新手配置 API 教程](#新手配置-api-教程)操作。已存在的配置仍兼容 `directBaseUrl`、`directApiKey`、`directEndpointPath`、`directImageModel`、`directResponsesModel`。新填写的用途专属字段按组独立优先；API Key 留空表示保留之前保存的私有 Key，不会清除它。
-
-常见接口后缀：`responses`、`images/generations`、`images/edits`、`chat/completions`。供应商若只给一条完整地址，点「完整 URL」按钮粘贴即可，Studio 会拆成基础地址和后缀。
-
-#### 可复用的 API 清单
-
-每个接口地址输入框都带一个展开按钮，列出此前保存过的 API，换一个 API 不再等于覆盖掉上一个。选中一条即把该通道的接口地址、协议后缀和配套 Key 一起填好——Key 跟着 API 走，不单独挑。模型不动，仍需点「保存」生效。
-
-- 五个入口（GPT 路由、GPT 直连生图、GPT 直连文本/视觉、Gemini、Grok）分别维护独立清单，每份上限 20 条；在一个入口保存或删除 API，不影响其他入口。
-- 一条记录的身份是「接口地址 + Key」，同一家的第二把钥匙是另一条 API。缺地址或缺 Key 的组合不入清单，因为它无法整套切回来。
-- 协议后缀只在当前通道确实提供该选项时才跟着换：存下的 `responses` 不会把直连生图的 `images/generations` 顶掉。
-- 列表每行上行是接口地址，下行是「后缀 · Key 掩码」；每行的删除按钮只从清单移除，不影响当前已保存的配置。
-- 清单只存在浏览器本地 `localStorage`（键 `image-studio-api-endpoint-books-v2`）。旧版 v1 历史仅归入 GPT 路由，不复制到其他入口。`.local/config.json`、`.env` 与 `/api/config` 不增加历史清单，请求载荷不带该清单，桌面端与其他浏览器不共享。明文 Key 不进 DOM，列表只渲染地址与掩码。
-
-### 使用环境变量
-
-`.env.example` 是环境变量清单和参考模板。当前 Node.js 入口直接读取 `process.env`，不会自动加载本地 `.env` 文件；请在 PowerShell、系统环境变量或部署平台中显式注入。仓库中的示例值为：
-
-```dotenv
-OPENAI_API_KEY=<your-api-key>
-OPENAI_BASE_URL=https://api.openai.com/v1
-RESPONSES_MODEL=gpt-6-luna
-IMAGE_TOOL_MODEL=gpt-image-2
-IMAGE_QUALITY=high
-DIRECT_IMAGE_BASE_URL=https://api.openai.com/v1
-DIRECT_IMAGE_API_KEY=
-DIRECT_IMAGE_ENDPOINT_PATH=images/generations
-DIRECT_IMAGE_MODEL=gpt-image-2
-DIRECT_TEXT_BASE_URL=https://api.openai.com/v1
-DIRECT_TEXT_API_KEY=
-DIRECT_TEXT_ENDPOINT_PATH=responses
-DIRECT_TEXT_MODEL=gpt-6-luna
-GROK_BASE_URL=https://api.x.ai/v1
-GROK_API_KEY=
-GROK_ENDPOINT_PATH=images/generations
-GROK_IMAGE_MODEL=grok-imagine-image-2.0
-
-HOST=
-IMAGE_STUDIO_REQUEST_TOKEN=
-IMAGE_STUDIO_ALLOW_INSECURE_REMOTE_HTTP=0
-
-IMAGE_STUDIO_DISABLE_DNS_FALLBACK=0
-IMAGE_STUDIO_DNS_FALLBACK_SERVERS=
-```
-
-| 变量 | 用途 |
+| 工作区 | 主要用途 |
 | --- | --- |
-| `OPENAI_API_KEY` | 默认 API Key |
-| `OPENAI_BASE_URL` | 默认 API Base URL |
-| `RESPONSES_MODEL` | 默认 Responses 模型，未配置时为 `gpt-6-luna`；应以实际服务支持的模型为准 |
-| `DIRECT_IMAGE_BASE_URL` / `DIRECT_IMAGE_API_KEY` / `DIRECT_IMAGE_ENDPOINT_PATH` / `DIRECT_IMAGE_MODEL` | 直连模式的生图 API 配置；分别对应地址、密钥、接口后缀和生图模型 |
-| `DIRECT_TEXT_BASE_URL` / `DIRECT_TEXT_API_KEY` / `DIRECT_TEXT_ENDPOINT_PATH` / `DIRECT_TEXT_MODEL` | 直连模式的文本/视觉 API 配置；分别对应地址、密钥、接口后缀和文本/视觉模型 |
-| `GROK_BASE_URL` / `GROK_API_KEY` / `GROK_ENDPOINT_PATH` / `GROK_IMAGE_MODEL` | 独立的 Grok 生图与编辑配置；分别对应地址、密钥、接口后缀和图像模型 |
-| `DIRECT_BASE_URL` / `DIRECT_API_KEY` / `DIRECT_ENDPOINT_PATH` / `DIRECT_RESPONSES_MODEL` | 旧版直接调用变量，仅用于兼容回退；新配置请使用上面两组变量 |
-| `PORT` | 本地服务端口，默认 `3600` |
-| `HOST` | 监听地址；留空时为 `127.0.0.1` |
-| `IMAGE_STUDIO_OUTPUT_DIR` | 自定义生成文件根目录 |
-| `IMAGE_STUDIO_LOCAL_DATA_DIR` | 自定义本地配置和记录根目录 |
-| `IMAGE_STUDIO_REQUEST_TOKEN` | 固定所有非回环请求使用的远程访问令牌 |
-| `IMAGE_STUDIO_ALLOW_INSECURE_REMOTE_HTTP` | 设为 `1` 时显式允许非回环地址直接使用未加密 HTTP；默认拒绝 |
-| `IMAGE_STUDIO_DISABLE_DNS_FALLBACK` | 设为 `1` 时禁用 Node DNS fallback |
-| `IMAGE_STUDIO_DNS_FALLBACK_SERVERS` | 自定义 fallback DNS，支持逗号、分号或空白分隔 |
-| `IMAGE_STUDIO_CREATION_UPSTREAM_TIMEOUT_MS` | 套图单项上游请求的最长时间，默认 `1200000`（20 分钟）；有效范围为 1 秒到 1 小时，超出会被收敛到边界 |
-| `IMAGE_STUDIO_ENABLE_TEST_MOCKS` | 仅测试用途。必须与 `IMAGE_STUDIO_MOCK_IMAGE_GENERATION=1`、`IMAGE_STUDIO_OUTPUT_DIR` 和 `IMAGE_STUDIO_LOCAL_DATA_DIR` 同时设置，才会启用本地假图生成；缺一即忽略并打印告警 |
+| **图片创作** | 提示词与参考图生图、提示词增强、生成队列。 |
+| **图片编辑** | 整图与局部编辑、风格迁移、参考图混合、产品结构分解。 |
+| **图片转提示词** | 提取主体、构图和视觉风格，形成可复用的提示词。 |
+| **电商套图** | 规划商品及 SKU 图片，生成整套素材，单独补图与修复。 |
+| **Listing 草稿** | 为勾选记录生成或重新生成，审阅与复制多语言标题和商品文案。 |
+| **写真** | 根据人物、服装、姿态和场景参考生成系列图片。 |
+| **文章插图** | 根据文章内容规划分镜，生成风格一致的插图。 |
+| **PPT** | 根据文档或主题生成幻灯片图片并导出 PPTX。 |
+| **资产库** | 浏览、筛选、预览、下载，并回看生成记录。 |
 
-真实 `.env` 已被 `.gitignore` 排除，但仅创建该文件不会让本地服务自动读取它。云端部署请使用平台 Secret 或环境变量，不要把密钥写入仓库。
+GPT 提示词生图提供 PNG、JPG、WebP、GIF 和 SVG 控件，实际支持取决于所选模型。GIF／SVG 有额外限制；套图、写真、文章和 PPT 的图片槽位仍使用静态图像。详见[格式与参数参考](./docs/reference.zh-CN.md)。
 
-### 局域网访问与请求令牌
+### 电商工具
 
-本地服务默认仅监听回环地址。远程访问推荐保持 `HOST` 为空，由 TLS 反向代理连接 `127.0.0.1`。该模式应在启动前显式设置固定的 `IMAGE_STUDIO_REQUEST_TOKEN`，由反向代理完成外部认证，并向每个后端请求注入同一个 `X-Image-Studio-Token` 或 Bearer 令牌。
+- **Temu 表格工作台**：维护商品和 SKU 字段，手动导入 Studio 记录，导出模板工作簿；同一面板也提供批量快捷导出。
+- **商品图采集插件**：在 Chrome／Edge 中采集和审阅已支持商品页面的图片，安装方式见[插件说明](./extensions/product-image-collector/README.md)。
+- **多语言标题**：存在对应译文时，展示英、德、西、法、意、波、中七语标题；其他字段沿用原有语言规则。
 
-仅在隔离且可信的网络中需要保留直接局域网 HTTP 兼容时，才显式设置：
+Listing 草稿和导出表格需要人工复核。Studio 不会自动登录店铺或发布商品。
 
-```powershell
-$env:HOST="0.0.0.0"
-$env:IMAGE_STUDIO_REQUEST_TOKEN="<strong-random-token>"
-$env:IMAGE_STUDIO_ALLOW_INSECURE_REMOTE_HTTP="1"
-cmd /c npm start
-```
+## 界面预览
 
-该兼容模式不会加密 HTTP Basic、Bearer、提示词或生成资产，局域网监听者可以读取这些内容。没有显式开启兼容变量时，非回环 `HOST` 会在监听前失败。
+以下为界面示例，示例内容不代表模型的固定输出。展开后可查看完整宽度截图。
 
-在显式开启的直接局域网 HTTP 兼容模式下，远程浏览器首次访问时会显示 HTTP Basic 登录框：用户名固定为 `studio`，密码为当前远程访问令牌。认证后，浏览器会为同源页面、静态资源、API 和输出文件复用凭据。
+<details>
+<summary>电商套图规划</summary>
 
-命令行与代理可以使用任一请求头：
+![电商套图规划](./docs/images/creation-suite.jpg)
 
-```text
-Authorization: Bearer <strong-random-token>
-X-Image-Studio-Token: <strong-random-token>
-```
+</details>
 
-所有非回环 Host 请求都必须认证，同源请求头和回环代理连接不能绕过认证。只有回环 socket 与回环 Host 同时成立时才保留免登录体验。后端会故意拒绝无令牌的“回环 socket + 非回环 Host”请求，不会为这类请求发起 Basic 登录挑战，因此 TLS 反向代理不能依赖后端弹出登录框。
-
-如果没有设置 `IMAGE_STUDIO_REQUEST_TOKEN`，服务会在每次启动时随机生成令牌并打印到终端；反向代理必须在远程访问前同步该令牌并重新加载配置。长期运行的反向代理应显式配置固定强令牌，避免每次服务重启后代理继续发送已失效的旧值。
-
-### Node DNS fallback
-
-Node 服务优先使用系统默认的 `dns.lookup`。只有系统解析上游域名失败时，才会尝试备用解析器；内置候选包括 `223.5.5.5`、`1.1.1.1` 和系统已有 DNS 服务器。
-
-```powershell
-# 禁用 fallback
-$env:IMAGE_STUDIO_DISABLE_DNS_FALLBACK="1"
-
-# 自定义备用 DNS
-$env:IMAGE_STUDIO_DNS_FALLBACK_SERVERS="1.1.1.1,8.8.8.8"
-```
-
-## 参数、分辨率与限制
-
-> [!IMPORTANT]
-> 下表描述的是当前应用提供的候选值、工作流约束和平台保守建议，不代表所有上游模型、兼容网关或电商平台都官方支持这些尺寸、数量和策略。实际接受的参数、计费、输出像素、图片格式和平台审核规则，以所选服务与目标平台当前规则为准。第三方网关可能忽略、改写或拒绝应用传入的参数。
-
-### 比例与像素尺寸候选
-
-GPT 路由模式和直连模式共享以下明确像素候选，第一档就是当前比例的默认值，不再显示或发送自动分辨率选项。“其余候选”按界面顺序列出，不包含默认与最大值。
-
-参数选择器现在保持直白显示：思考等级只显示 `Low`、`Medium`、`High`、`XHigh`，具体 GPT 分辨率只显示 `宽 x 高`；提交给服务商的 `value` 不变。Gemini 的 `512`/`1K`/`2K`/`4K` 与 Grok 的 `1k`/`2k` 仍然是各自协议的分辨率档位。
-
-| 比例 | 常见用途 | 默认尺寸 | 其余候选 | 最大候选 |
-| --- | --- | --- | --- | --- |
-| `1:1` | 电商主图、头像、社交媒体 | `1024x1024` | `1536x1536`、`2048x2048`、`2560x2560` | `2880x2880` |
-| `4:3` | PPT、网页配图 | `1360x1024` | `2048x1536`、`2720x2048` | `3312x2480` |
-| `3:4` | 海报、人像 | `1024x1360` | `1536x2048`、`2048x2720` | `2480x3312` |
-| `3:2` | 横版摄影 | `1536x1024` | `2304x1536`、`3072x2048` | `3520x2352` |
-| `2:3` | 竖版摄影 | `1024x1536` | `1536x2304`、`2048x3072` | `2352x3520` |
-| `5:4` | 商品展示 | `1280x1024` | `1920x1536`、`2560x2048` | `3200x2560` |
-| `4:5` | 竖版社交帖子 | `1024x1280` | `1536x1920`、`2048x2560` | `2560x3200` |
-| `16:9` | 横版封面、视频封面 | `1824x1024` | `2736x1536`、`3648x2048` | `3840x2160` |
-| `9:16` | 短视频封面、手机壁纸 | `1024x1824` | `1536x2736`、`2048x3648` | `2160x3840` |
-| `21:9` | 超宽横幅 | `2384x1024` | `1680x720`、`3584x1536` | `3840x1648` |
-| `9:21` | 超长竖图 | `1024x2384` | `720x1680`、`1536x3584` | `1648x3840` |
-| `2:1` | Banner 横幅 | `2048x1024` | `3072x1536` | `3840x1920` |
-| `1:2` | 长海报 | `1024x2048` | `1536x3072` | `1920x3840` |
-| `3:1` | 超宽广告图 | `3072x1024` | 无 | `3840x1280` |
-| `1:3` | 超长竖版广告 | `1024x3072` | 无 | `1280x3840` |
-
-有两点容易看错。`21:9` 和 `9:21` 的候选不按像素从小到大排列：它们的 `720P` 档（`1680x720` / `720x1680`）在界面里排在默认尺寸之后，实际却更小。`3:1` 和 `1:3` 每个比例只有两个选项（默认尺寸、最大），所以“其余候选”一栏确实为空，不是漏写。
-
-### 各生图路线的尺寸差异
-
-| 界面名称 | 典型协议 | 应用提供的尺寸参数 | 明确默认值 | 重要限制 |
-| --- | --- | --- | --- | --- |
-| 路由模式 | Responses API + 图像工具 | 上表中与比例绑定的明确像素值 | 当前比例的基础尺寸 | 界面只提供 `responses` 后缀，最终像素仍可能被上游调整；图片编辑是例外，始终改走 `images/edits` 并忽略已配置的后缀 |
-| 直连模式 | `images/generations`、`responses` 或 `chat/completions` | 与路由模式相同的明确像素值 | 当前比例的基础尺寸 | 兼容程度取决于网关和模型；图片编辑请求可能改走 `images/edits` |
-| Gemini | Gemini 图片生成形态；非 Gemini 模型可走模型 `chat/completions` 兼容形态 | `512`、`1K`、`2K`、`4K` | `1K` | 尺寸是档位而非承诺像素；默认模型名为 `gemini-3.1-flash-image-preview`，仅表示应用默认值，不保证服务端存在；不同模型/网关可能不接受参考图、比例或 `4K` |
-| Grok | xAI JSON `images/generations` / `images/edits` | `resolution: 1k` 或 `2k`，配合受支持的 `aspect_ratio` | 根据当前比例的明确默认尺寸映射 | 不以 `size` 发送请求像素；最多 5 张参考图，质量仅 `low` / `medium`，不支持本地蒙版 |
-
-“Gemini”是当前界面的通道名称，不等同于“任意 Gemini API 都完整兼容”。Studio 会根据模型名选择图片生成或聊天兼容请求体，连接测试通过也不保证所有生图工作流和最大尺寸都可用。
-
-选比例之前，以下限制值得先知道：
-
-- **分辨率只对它自己的比例合法。** 请求的像素必须是当前比例列出的候选之一，否则在调用上游之前就会被拒绝，报 `当前比例 <比例> 不支持分辨率 <尺寸>`。这也是 `1:1` 不接受 `1824x1024` 的原因，即使 `16:9` 提供这个尺寸。
-- **切换像素与档位路线时，不兼容尺寸会归一化为明确默认值。** 已选的 `2048x2048` 在 Gemini 下变为 `1K`；已选的 `4K` 回到 GPT 时变为当前比例的默认像素。旧配置中的自动值也按这一规则处理。
-- **Gemini 生图路径只支持 15 个比例中的 10 个。** 它接受 `1:1`、`2:3`、`3:2`、`3:4`、`4:3`、`4:5`、`5:4`、`9:16`、`16:9` 和 `21:9`。其余五个会替换为方向一致且最接近的受支持比例：`2:1` 与 `3:1` 分别变成 `16:9` 和 `21:9`，`1:2`、`9:21`、`1:3` 都变成 `9:16`。所以在这个通道上，画面比例是接近请求值而非精确值，但横向和纵向不会被改掉。
-- **质量与输出格式到不了 Gemini 生图路径。** 请求体只带 `aspectRatio` 和 `imageSize`，界面上的 PNG/JPG 和 High 质量在这个通道没有效果。
-- **透明背景只用于 GPT 路由和直连生图。** Gemini 与 Grok 隐藏此开关，不向上游发送背景参数。
-- **Grok 使用独立的生图参数。** 图片请求仅发送 `low` / `medium` 质量与 `1k` / `2k` 分辨率，不带 GPT 思考等级；GPT 文本/视觉规划仍保留自己的思考设置。
-- **走哪一种请求体由模型名决定，不是由通道名决定。** 模型名必须同时包含 `gemini` 和 `image`、`banana`、`图像`、`生图` 之一，才会发送 Gemini 图像请求体。这个通道上的其他模型会改走 `chat/completions`，既不带尺寸也不带比例。
-
-### 工作流上传与数量限制
-
-| 工作流 | 上传/数量限制 | 补充说明 |
-| --- | --- | --- |
-| 提示词生图 | 参考图最多 15 张，Grok 单次最多 5 张；GPT 路由/直连路线支持透明背景 | 与其他生图模式共享配置中的单个会话全局并发上限；透明背景固定 PNG，不等于上游并发额度 |
-| 风格迁移 | 原图 1 张；风格参考图 1 张或选择内置预设 | 有内置预设时可不上传风格图；原图仍是独立输入 |
-| 融图分析 | 1 到 15 张图片 | 分析后再确认是否生成，生成结果计入统一队列 |
-| 图片拆解 | 1 张源图 | 一次围绕一张产品/设备/包装图生成拆解结果 |
-| 图片编辑 | 1 张源图；局部模式每个上传蒙版不超过 50 MB | 源图与蒙版会规范化为同尺寸 PNG；50 MB 限制针对局部蒙版文件，不是对普通源图的统一承诺 |
-| 快速融图 | A/B 各至少 1 张且数量相同；C/D 可选，启用后数量也必须与 A/B 相同 | 当前应用未另设每组固定张数上限；批量规模仍受浏览器内存、15 个会话任务槽和上游限流影响 |
-| 图片压缩 | 可一次选择多张浏览器可解码图片 | 当前应用未设固定张数上限；全部在浏览器内逐张处理，数量和像素过大会增加内存占用 |
-| 电商套图 | 产品参考图最多 15 张；“上传图加 Logo”分支的 Logo 最多 1 张、源图最多 15 张 | 默认开启 AI 整套营销提示词，普通营销轮播支持 1–20 张；关闭时使用通用电商的 18 个原生槽位；SKU 与源图重构另计 |
-| 电商 SKU | 新套图计划固定一个 SKU 主体；SKU 生成规则仍可选择 | 冻结计划最多 64 项、序列化后最多 4 MiB，属于内部提交保护上限 |
-| 写真模式 | 人物参考图最多 3 张；动作参考图最多 3 张；服装/道具/配饰最多 9 张；生成 1 到 100 张 | 默认 12 张；高数量任务应先用小批量验证人物一致性和通道稳定性 |
-| 文章插图 | 正文、补充说明或多个文本文件；插图数量由文章结构和节奏规划 | 没有固定插图张数选择器；先生成参考卡可提升人物与场景一致性 |
-| PPT 生成 | 可上传多个文档；页数 1 到 20，默认 8 | 可从文档、文本或主题三种来源开始；大文件解析能力取决于本地解析器和上游上下文限制 |
-
-### 平台推荐策略
-
-推荐轮播数只统计自动画像的默认轮播槽位，不含按 SKU 追加的图片、信息图重构项或用户手动新增项。当前套图自动画像仅提供通用电商；Listing 草稿的平台规则由独立策略表维护。
-
-| 平台 | 推荐轮播 | 分辨率档位 | 目标语言 | 证据级别 |
-| --- | ---: | --- | --- | --- |
-| 通用电商 | 18 | `1K` | English | baseline |
-
-`baseline` 是应用通用基线，不代表任何命名平台的官方要求。其他平台 ID 会回落到该通用画像；这不会删除 Listing 草稿中独立维护的平台策略。
-
-### 固定工作流参数
-
-| 工作流 | 固定或默认参数 | 说明 |
-| --- | --- | --- |
-| 文章插图 | `3:2`、明确默认尺寸、PNG | 页面没有单独尺寸控件；GPT 为 `1536x1024`，Gemini 为 `1K`，Grok 映射为 `1k` |
-| PPT 页面 | `16:9`、请求尺寸 `2048x1152`、PNG | 最终有效尺寸可能由上游调整；导出时使用实际保存的页面图片 |
-| 写真模式 | 默认 12 张、`4:5`、PNG | 数量可改为 1 到 100，比例/尺寸/格式可在页面调整 |
-| 电商套图 | 默认 PNG；平台画像决定默认比例、档位、语言和图片类型 | 用户显式设置的套图级语言、比例、分辨率和兼容类型状态以提交时冻结的有效计划为准 |
-| 普通 AI 生图 | 默认格式 PNG，用户可改 JPG；路由/直连提示词生图可请求透明 PNG | 应用向 API 传递 JPG 时使用 `jpeg`，本地保存扩展名为 `.jpg`；透明背景会固定为 PNG |
-
-### 文件与格式支持
-
-| 用途 | 输入格式 | 输出格式/说明 |
-| --- | --- | --- |
-| 普通参考图、风格迁移、融图、拆解、编辑、套图、写真、Prompt Agent | 浏览器识别的 `image/*` | AI 生成结果仅提供 PNG 或 JPG；实际输入解码和上游接受范围取决于浏览器与接口 |
-| 图片编辑局部蒙版 | 图片文件，每个不超过 50 MB | 服务端规范化为与源图同尺寸的 PNG 蒙版，再按合并或顺序策略编辑 |
-| 图片压缩 | 浏览器可解码的图片，界面提示 JPG/PNG/WebP 等 | 可保留原格式，或输出 PNG、JPEG、WebP；JPEG/WebP 支持质量/目标体积控制，PNG 不支持有损质量参数 |
-| 文章插图材料 | TXT、MD、CSV、JSON，可多选；也可直接粘贴正文 | 参考卡和正文插图固定输出 PNG |
-| PPT 材料 | PDF、DOCX、PPTX、TXT、MD、CSV，可多选；也可输入文本或主题 | 页面固定输出 PNG；可导出整页图片型 PPTX 或可编辑重建 PPTX |
-| 套图/写真记录导出 | 应用内记录 | 套图可导出 TXT/JSON，勾选记录还可生成 Temu 标准 Excel；写真可导出 JSON。Temu Excel 需要本地运行、可用 HTTPS 图片链接和人工上传前核对 |
-
-高分辨率、大文件和大批量任务更容易触发浏览器内存压力、上游超时、限流或“响应结束但没有最终图片”。建议先用当前路线的明确默认尺寸、小批量验证画面方向和协议兼容性，再提高尺寸或数量。
-
-套图、写真、文章插图和 PPT 各自提供独立的「思考等级」与「质量」选择。GPT 规划保留思考等级，Grok 图片请求及图片元数据省略 GPT 专属思考字段；质量按当前路线与模型归一化（GPT 2.5 模型才提供 `xhigh` / `max`，Grok 仅 `low` / `medium`）。入队后的套图或 PPT 保留有效参数，用于生成、补图、失败重试和单页编辑。套图仍可选择 SKU 生成规则，但新计划固定一个 SKU 主体。
-
-## 重要说明
-
-- 本项目会调用你配置的官方 API、兼容 API 或第三方中转服务，产生的费用、限额和内容政策以实际服务提供方为准。
-- 第三方网关对模型名称、接口后缀、流式响应和图像协议的实现可能不同，请先使用界面中的连接测试确认兼容性。
-- API Key、生成图片和工作记录可能包含敏感信息。不要提交 `.env`、`.local/`、`output/`、`artifacts/` 或真实生成记录。
-- 本地服务默认只监听 `127.0.0.1`。除非理解网络暴露风险，否则不要把服务开放到公网。
-- 生成内容仍需人工检查事实准确性、品牌规范、肖像权、版权和目标平台规则。
-
-## 项目概述
-
-GPT-Image2-Studio 面向个人创作者、电商运营、设计师和内容团队。它不是单一的生图表单，而是一套围绕参考素材、创作计划、生成队列、失败重试、历史记录和本地输出目录组织的工作台。
-
-项目提供三种主要运行形态：
-
-| 运行方式 | 适合场景 | 数据特点 |
-| --- | --- | --- |
-| 本地 Node.js | 日常创作、完整本地工作流 | 配置、历史和输出默认保存在本机，功能最完整 |
-| Windows 桌面程序 | 需要独立窗口、任务栏和标准安装卸载的 Windows 用户 | Electron 内置运行时，动态回环端口，关窗即停止服务 |
-| Windows 浏览器安装包 | 需要保留旧版浏览器启动方式的 Windows 用户 | 内置 `node.exe`，安装后通过快捷方式打开默认浏览器 |
-
-仓库还包含 `vercel.json`。Vercel 环境使用临时目录，不能当作本地持久化存储；部署前应在 Preview 环境验证长任务、SSE 和文件生命周期。
-
-## GPT Image 2.6
-
-配置中可选择 **gpt-image-2.6-sunburst** 或 **gpt-image-2.6-flare**。默认图像模型保持原值。路由 A 使用 Responses，“发送 tools[].model”现已默认开启；如果之前明确关闭，使用高级能力前需重新开启；路由 B 可选择 Images API 或 Responses。Responses 的外层文本模型与图像工具模型分别配置。
-
-GPT 提示词页（路由 A/B）的所有模型及直连别名共用“自动 / PNG / JPG / WebP / GIF 动画 / SVG 矢量”快捷入口，默认自动。明确要求 GIF、动图或其他格式时会使用该格式；未指定时使用 PNG，动画风格及画面内的格式字样不会触发动图。手动指定优先，冲突只提示；模型格式能力未确认也只提示，仍正常发送，由实际接口判断，不自动降级为 PNG。开始生成前会显示本次格式、选择来源及 GIF 帧参数，入队后固定。选择 GIF 可就地调整帧数与时长；2.6 的“更多 2.6 参数”会展开共享高级设置。
-
-配置抽屉的共享高级设置包含图像规划复杂度、背景、压缩质量、中间预览数、尺寸覆盖、候选数、GIF 帧数/时长以及 SVG 作者配置。留空表示沿用上游默认。图像 complexity、图像 quality、外层文本 reasoning 和 SVG 作者 reasoning 是独立参数；2.6 质量可选 auto、low、medium、high、xhigh、max。
-
-- 普通提示词生图提供 PNG、JPG、WebP、GIF、SVG；普通 Images 生图支持 1–10 个候选结果并逐一保存，最多 16 张参考图。GIF/SVG 仅支持无参考图生成。
-- 图片编辑的执行策略增加“标注引导”：上传源图、涂画区域、填写区域说明后提交。发送与源图等尺寸的透明 PNG markup，不能同时使用 mask；既有蒙版策略继续可用。
-- GIF 原件保留动画，灯箱可暂停/播放；GIF 请求若返回 PNG 或单帧 GIF，会报告格式或动画校验错误。SVG 在画廊、胶片条和详情中优先直接显示经校验的矢量原件，画廊标注“SVG 矢量”，下载按钮显示“下载 SVG 原件”。已有位图缩略缓存不会覆盖可用的 SVG 原件；下载 GIF/SVG/WebP 不会自动转成 PNG。
-- 套图、写真、文章、PPT 等业务的单个图片槽位继续交付静态结果，共享适用的高级参数。新任务、历史快照和补图会保存相应高级设置。
-- Images GIF/SVG 使用 JSON 完成响应；Responses GIF 可保留状态事件流；两者均无中间图片预览。透明背景仅用于 PNG/WebP，压缩仅用于 JPG/WebP。
-
-GIF 需要提供方的 preview 权限；SVG 作者模型选择也需权限，无权限时作者配置留空。GIF 默认 9 帧、200 ms；指南写 2–64 帧，接口参考/SDK 当前写 2–16 帧，17–64 帧需另行验证上游支持。自定义尺寸只做正整数格式检查，具体范围由模型和提供方校验。权限或格式不兼容会返回原因，不自动换模型或输出格式。
-
-CLI 可使用相同参数，例如：
-
-~~~powershell
-cmd /c npm run generate -- --image-model gpt-image-2.6-flare --endpoint images/generations --prompt "简洁的蓝色图标" --format svg --output ./output/icon.svg
-cmd /c npm run generate -- --image-model gpt-image-2.6-sunburst --endpoint images/generations --prompt "循环漂浮的气球" --format gif --frame-count 9 --frame-duration-ms 200 --output ./output/balloon.gif
-~~~
-
-更多参数见 npm run help。本版完成了模拟上游集成、浏览器和 Electron 启动验证；当前开发配置没有可用 API Key，因此尚未完成两个模型及账户权限的真实付费调用验收。详见 [v0.2.127 发布说明](./docs/releases/v0.2.127.md)。
-
-## 核心功能
-
-### 图像创作
-
-- **提示词生图**：最多上传 15 张参考图，支持提示词增强、比例、分辨率、PNG/JPG 输出、路由/直连路线透明 PNG 和实时预览。可编辑的英文增强默认文本优先保留原提示词与参考图，着重改善清晰观感，同时保留有意的柔焦、颗粒、像素风和简约表现；其中 `8K` 表示视觉目标，不承诺实际输出分辨率。
-- **风格迁移**：组合原图与风格参考图，也可使用内置风格预设。
-- **融图分析**：分析多张参考图的主体、风格和组合关系，再生成目标提示词。
-- **图片拆解**：将产品、设备或包装图转成结构化说明图和卖点信息图。
-- **图片编辑**：支持整图修改，也支持在画布上绘制多个局部蒙版并分别描述修改内容。
-- **快速融图**：按 A/B/C/D 素材组和相同序号批量配对生成。
-- **图片压缩**：在浏览器本地完成压缩、改尺寸和格式转换，不上传到服务端。
-
-### 业务工作流
-
-- **电商套图**：根据商品参考图和资料识别有来源的事实，再分配不同场景与信息任务；缺少可售变体或尺寸证据时跳过对应图片，避免重复操作和无依据宣称。默认由电商视觉营销专家一次规划最多 20 条营销提示词，绑定图型与参考图；批量模式可连续规划多套，每套最多两路并行，逐套校验并加入现有队列，遇到失败会暂停后续方案并支持续跑。质量审核检查功能依据、核心购买理由和逐图任务差异。关闭 AI 营销提示词后使用通用 18 槽位。支持计划预览、套图级参数覆盖、兼容图片类型启停、补图队列和 Listing 草稿；新计划固定一个 SKU 主体但保留 SKU 生成规则；另有独立的“上传图加 Logo”批处理分支。
-- **写真模式**：组合人物、动作、服装、道具和地点，生成 1 到 100 张系列写真，并独立选择思考等级与质量。
-- **文章插图**：解析文章包，建立风格、角色和场景设定，再生成正式插图计划，并独立选择思考等级与质量。
-- **PPT 生成**：从主题或文档生成 1 到 20 页演示文稿，支持单页编辑、补图、普通 PPTX 和可编辑重建导出；整套操作保留 PPT 自己的思考等级与质量。
-
-### 资产与任务
-
-- 瀑布画廊和图片详情灯箱，支持缩放、平移、下载和参数复盘；套图结果可查看实际生成提示词及逐图保存的请求参数，历史缺失值明确显示“未记录”，不会用当前配置猜测。
-- 套图、写真、文章插图和 PPT 独立记录页。
-- 生成队列、后台任务状态、错误信息和失败项重试；套图队列项同时显示队列位次和商品名，产物区顶部会标出当前查看的套图，并在适用时显示营销方案／套数或队列位次。
-- 新生成图片使用带时分的描述性文件名；套图图片保留序号，同名文件递增后缀，画廊下载沿用实际保存的名称。
-- 生成日志按任务保留接口地址，结果行显示简短文件名，失败项保留错误详情。
-- **Prompt Kit** 内置 520 组带来源标注的 YouMind GPT Image 2.5 / GPT Image 2 提示词与图片配对案例，分别为 321 组和 199 组。可按使用场景、视觉风格和主体浏览，按模型筛选、搜索或排序，并从列表或图片视图检查来源及应用提示词。预览图随应用本地分发，每条记录保留来源页面和 CC BY 4.0 署名信息；已有自定义模板和 Prompt Agent 历史会保留。
-- **图片转提示词**新增明确的风格锁定词汇，分别记录媒介、审美、色彩、光线、材质、景深和后期质感，并在规避项中指出可能的风格偏移。
-- 紧凑的 GPT / Gemini / Grok / 配色四配置区，GPT 下方紧贴路由/直连切换；API 历史按通道隔离，选择记录会一并恢复对应模型、地址、后缀和 Key，列表中的 Key 脱敏显示。接口字段对齐，长说明通过悬停/聚焦查看，生成日志独立滚动。当前调用摘要显示请求发起 IP 和可点击的生图服务 origin；12 套配色每行 4 个，默认「黑曜」。
-- 深色/浅色主题、中英文界面和跨桌面/平板/手机布局。
-
-## 真实界面预览
-
-以下截图来自当前版本的真实隔离浏览器页面。截图用于展示界面结构，示例输入与预览内容不代表上游模型的固定输出。
-
-### 提示词生图
-
-上传参考图、编写或增强提示词，并在同一工作台设置比例、分辨率和输出格式。
-
-![提示词生图页面](./docs/images/studio-prompt.jpg)
+<details>
+<summary>风格迁移与图片编辑</summary>
 
 ### 风格迁移
 
-分别管理原图和风格参考图，也可以直接选用内置风格预设。
-
-![风格迁移页面](./docs/images/style-transfer.jpg)
+![风格迁移](./docs/images/style-transfer.jpg)
 
 ### 图片编辑
 
-支持整图编辑，以及在画布上绘制多个局部区域并为每个区域填写修改要求。
+![图片编辑](./docs/images/image-edit.jpg)
 
-![图片编辑页面](./docs/images/image-edit.jpg)
+</details>
 
-### 电商套图
+<details>
+<summary>写真、文章插图与 PPT</summary>
 
-从商品事实、参考图和目标平台生成套图计划，再检查计划并批量执行。
+### 写真
 
-“AI 整套营销提示词”默认开启并记住选择。电商视觉营销专家会分析具体的主要/次要买家、卖点、痛点及营销建议；一次规划请求返回全部所选图片的完整提示词、营销任务、图型和参考图分配，普通营销轮播最多 20 张，SKU 与源图重构另计。展开逐图分工可核对最终提示词与参考图，生成、排队、保存及补图复用这份计划；修改商品资料或规划条件后需重新规划。关闭开关则使用原有最多 18 张的本地规划。
-
-![电商套图页面](./docs/images/creation-suite.jpg)
-
-### 写真模式
-
-组合人物、动作、服装道具、地点、摄影风格和景别，生成一致的系列写真。
-
-![写真模式页面](./docs/images/portrait-mode.jpg)
+![写真工作台](./docs/images/portrait-mode.jpg)
 
 ### 文章插图
 
-先解析文章和建立风格圣经，再生成角色/场景参考图与正文分镜插图。
+![文章插图工作台](./docs/images/article-illustration.jpg)
 
-![文章插图页面](./docs/images/article-illustration.jpg)
+### PPT
 
-### PPT 生成
+![PPT 工作台](./docs/images/ppt-generation.jpg)
 
-从文档、文本或主题生成大纲与页面图片，并导出 PPTX。
+</details>
 
-![PPT 生成页面](./docs/images/ppt-generation.jpg)
+<details>
+<summary>资产画廊</summary>
 
-### 瀑布画廊
+![资产画廊](./docs/images/gallery.jpg)
 
-集中浏览各工作流的生成结果，通过筛选、列数切换和详情灯箱进行复盘。
+</details>
 
-![瀑布画廊页面](./docs/images/gallery.jpg)
+## 数据与部署
 
-## 页面介绍
+本地输出默认位于 `%USERPROFILE%\Pictures\YYYY-MM\MM-DD\`，记录索引通常位于 `%USERPROFILE%\Pictures\json\`。可通过 `IMAGE_STUDIO_OUTPUT_DIR` 指定输出位置。桌面配置保存在 `%APPDATA%\GPT-Image2-Studio`，源码模式的服务端私有配置保存在 `.local/`。
 
-### 创作页面
+密钥和已保存资产存放在所选运行环境中。提示词、参考图和请求会发送给你配置的 API 服务商。不要把 `.env`、`.local/`、生成资产或真实请求日志提交到仓库。
 
-| 页面 | 入口 | 输入 | 核心流程 | 输出与管理能力 |
-| --- | --- | --- | --- | --- |
-| 提示词生图 | `#studio`，创作 -> 提示词生图 | 提示词、最多 15 张参考图、可选增强文本、比例、分辨率、格式、透明背景 | 可从模板开始，先增强提示词，再提交后台生成任务并接收进度；透明背景任务固定输出 PNG | PNG/JPG 或透明 PNG 生成图、实时预览、胶片条切换、下载、删除、灯箱查看、参数复盘和当前服务 origin |
-| 图片转提示词 | 顶栏“图片转提示词”或创作菜单 | 1 张源图 | 锁定原图辨识度最高的风格锚点；强化主体对焦、可见纹理与整洁层次，并加入 `4K/8K` 级视觉质量词；`avoid` 保留有意虚化并约束意外模糊、伪影和杂物 | 可复制、映射到提示词生图并保留历史的结构化 JSON |
-| 风格迁移 | `#style-transfer`，创作 -> 风格迁移 | 1 张原图；1 张风格参考图或一个内置风格预设；补充提示词 | 分离主体内容与风格来源，将参考关系和提示词一起交给当前生图通道 | PNG/JPG 结果、预览与下载；任务同时进入统一生成队列和画廊 |
-| 融图分析 | `#reference-analysis`，创作 -> 融图分析 | 1 到 15 张图片、分析语言、目标描述 | 先分析每张图的主体、角色、关系和风险，再形成融合提示词；确认后生成目标图 | 结构化分析卡片、可应用的融合提示词、PNG/JPG 结果与历史资产 |
-| 图片拆解 | `#image-decomposition`，创作 -> 图片拆解 | 1 张产品、设备或包装图，拆解方向和补充要求 | 识别结构、部件、卖点和信息层级，构造说明图/信息图提示词后生成 | 拆解分析、PNG/JPG 说明图、胶片条预览、下载和画廊归档 |
-| 图片编辑 | `#image-edit`，创作 -> 图片编辑 | 1 张源图；整图修改文字，或多个局部蒙版及逐区指令 | 整图模式直接编辑；局部模式将蒙版与源图规范化为同尺寸 PNG，可合并执行或逐区顺序执行 | PNG/JPG 编辑结果、局部区域管理、重试、下载、灯箱和画廊记录 |
-| 快速融图 | `#quick-blend`，创作 -> 快速溶图 | A/B 两组必选图片，C/D 两组可选；布局、位置形状、比例和分辨率 | 按相同序号配对；A/B 数量必须一致，启用的 C/D 也必须与 A/B 一致；每一对形成独立生成任务 | 每对一张 PNG/JPG 结果，可重排、移除整对、查看进度、下载和归档 |
-| 图片压缩 | `#image-compress`，创作 -> 图片压缩 | 多张浏览器可解码图片；质量或目标大小、输出格式、可选目标宽高 | 完全在浏览器本地以 Canvas 解码、等比缩放留边并重新编码，不上传到生图服务 | 保留原格式或转换为 PNG/JPEG/WebP；显示前后体积、压缩率、像素尺寸并逐张下载 |
-| 电商套图 | `#creation`，创作 -> 套图模式 | 商品资料、最多 15 张产品参考图、平台、类目、SKU、语言、思考等级、质量与计划覆盖项 | 智能识别商品外观、来源事实、场景和未知项，按有效证据分配轮播任务；可覆盖套图级语言、比例和分辨率并启停兼容图片类型，再并发生成；新计划固定一个 SKU 主体 | 套图、队列、按冻结计划补齐失败项、Listing 草稿及套图记录；另有独立“上传图加 Logo”批处理分支 |
-| 写真模式 | `#portrait`，创作 -> 写真模式 | 人物图、动作图、服装道具配饰图、人物描述、地点、风格、景别、数量、思考等级和质量 | 先建立人物一致性和拍摄计划，再按动作、景别、地点与风格组合生成 | 1 到 100 张 PNG/JPG 写真、计划预览、失败项重试、写真记录和素材复用 |
-| 文章插图 | `#article-illustration`，创作 -> 文章插图 | 正文、补充说明，或多个 TXT/MD/CSV/JSON 文件；内容类型、风格预设、思考等级和质量 | 整体解析文章，建立风格圣经、人物/场景参考卡和阅读顺序分镜；可先生成参考图再生成正文插图 | PNG 参考图和正文插图、分镜编辑、说明文字、重新生成及文章插图记录 |
-| PPT 生成 | `#ppt`，创作 -> PPT生成 | PDF/DOCX/PPTX/TXT/MD/CSV 文档、直接文本或主题；1 到 20 页、视觉与动态预设、思考等级和质量 | 分析材料，生成大纲与逐页提示词，再以固定 16:9 画布生成页面；支持缺页补齐和单页编辑，并保留本次 PPT 操作参数 | 页面 PNG、整页图片型 PPTX、可编辑重建 PPTX、单页补图/编辑以及 PPT 记录 |
+仓库提供 `vercel.json`。Vercel 运行时文件使用临时存储，需要先验证 SSE、任务时长和持久化需求；需要长期保留创作内容时，默认使用本地或桌面版本。
 
-### 资产与记录页面
+远程访问时，应通过完成身份认证的 TLS 反向代理连接回环服务，并显式设置 `IMAGE_STUDIO_REQUEST_TOKEN`。TLS 反向代理不能依赖后端弹出登录框；长期运行的反向代理应显式配置固定强令牌，并为后端请求携带该令牌。Basic、Bearer 和 `X-Image-Studio-Token` 的规则见[安全说明](./SECURITY.md)。
 
-| 页面 | 入口 | 输入/筛选 | 核心流程 | 输出与管理能力 |
-| --- | --- | --- | --- | --- |
-| 瀑布画廊 | `#gallery`，资产 -> 瀑布画廊 | 工作流、日期、关键词和列数 | 合并服务端记录与浏览器缓存，按筛选条件构建瀑布流 | 灯箱缩放/平移、前后切换、下载、复制路径、查看完整参数，以及删除当前或勾选图片 |
-| 文章插图记录 | `#article-record`，资产 -> 文章插图记录 | 记录搜索、列数、文章插图集 | 按文章集加载参考卡、正文插图、标题和说明文字 | 继续创作、复制说明、逐图查看/下载和重新生成，以及删除当前或勾选记录 |
-| 套图记录 | `#creation-record`，资产 -> 套图记录 | 商品/平台搜索、创建时间与已保存套图 | 按关键词、今天、近 7 天、更早或精确日期筛选，恢复生成快照、有效计划、进度、Listing 和逐图结果 | 导出 TXT/JSON、勾选多套记录导出 Temu 标准 Excel、按冻结计划补齐缺失项、查看灯箱和下载；支持删除当前、勾选批量删除和按显式筛选结果删除 |
-| 写真记录 | `#portrait-record`，资产 -> 写真记录 | 写真集搜索与已保存计划 | 恢复人物、地点、风格、景别、动作和生成进度 | 导出 JSON、重试失败项、查看/下载结果、继续创作，以及删除当前或勾选记录 |
-| PPT 记录 | `#ppt-record`，资产 -> PPT记录 | 已生成演示文稿列表 | 读取大纲、页面缩略图、导出文件和完成状态 | 逐页预览、下载 PPTX、继续补页或进入单页编辑器，以及删除当前或勾选记录 |
+<details>
+<summary>DNS 故障排查</summary>
 
-### Temu 快速上架 Excel
+Node 服务优先使用系统 `dns.lookup`。解析失败时，备用候选包括 `223.5.5.5`、`1.1.1.1` 和系统 DNS。设置 `IMAGE_STUDIO_DISABLE_DNS_FALLBACK=1` 可禁用；`IMAGE_STUDIO_DNS_FALLBACK_SERVERS` 支持用逗号、分号或空白分隔的自定义服务器列表。
 
-在“套图记录”勾选一套或多套记录后，进入“temuexcel导出工作台”并切换到“批量快速导出”，即可生成基于项目内置标准模板的 `.xlsx`。每个 SKU 独占一行；已有的公网 HTTPS 图片链接会直接写入模板，本地输出图片可选使用 Cloudinary unsigned upload 转成 `secure_url`。`cloudName` 与 `uploadPreset` 不是 API Secret，应用不会收集或保存 Cloudinary API Key、API Secret、签名、Authorization 或 Cookie。
+</details>
 
-这项能力只在本地 Node.js 或 Windows 桌面运行时可用，不会自动登录、导入或发布到 Temu。缺少 Listing、价格、尺寸、重量、库存、产地或公网图片时，导出的工作簿会保留空单元格，并在“导出问题”工作表列出待补全项目；上传前仍需人工核对模板和 Temu 的实际校验结果。Cloudinary 远端资源的配额、生命周期和删除由 Cloudinary 账户自行管理。
-
-### Temu 上品工作台
-
-在“套图记录”点击“temuexcel导出工作台”会全屏打开内置的 Temu 上品工作台，不需要勾选商品，也不需要另外启动服务或管理第二个端口。无论当前是否勾选记录，入口都会先进入工作台主界面；需要带入已有套图时，在工作台内主动点击“从 Studio 导入”。工作台可逐个商品人工补齐 51 列模板字段、维护双变种 SKU 矩阵、逐 SKU 覆盖价格尺寸重量库存、管理轮播图与外包装图，并直接导出工作簿。
-
-覆盖层顶部有两个平级标签：
-
-- **上品工作台**：默认标签，用于人工逐字段编辑与导出。导出的工作簿保持模板原有的两张工作表。
-- **批量快速导出**：即原有的批量导出流程，预检、严格导出/待补全导出、批次默认值表单与记录导出状态回写均与以前一致，导出的工作簿仍附带“导出问题”工作表。
-
-关闭覆盖层只是隐藏，编辑中的草稿、滚动位置和尚未上传的本地图片预览都会保留，重新打开即可继续。工作台的商品草稿保存在当前浏览器中；跨浏览器或重装后需要用工作台自带的草稿备份导出/恢复来搬迁。
-
-工作台只读取已有的套图记录，不会启动生成任务，也不会登录店铺或发布商品。SKU 图片要求为宽高均大于 800 像素的正方形，轮播图最多 10 张、外包装图最多 6 张，所有模板图片字段都必须是服务端实时验证过的公网 HTTPS 链接。
-
-## 重要工具与弹窗
-
-| 工具 | 入口 | 能力与数据去向 |
-| --- | --- | --- |
-| 图片详情灯箱 | 生成预览中的“查看”，或点击画廊/记录页图片 | 支持适配、缩放、平移、前后切换、下载、删除、复制相对/完整路径，并展示提示词、模型、比例、尺寸和工作流快照 |
-| Prompt Agent | 顶栏“图片转提示词”，或创作菜单中的同名入口 | 上传 1 张图片，分析为可复制的 JSON 提示词；历史记录长期保存在当前运行环境的数据存储中 |
-| 商品图采集插件 | 创作 -> 工具 -> 商品图采集插件 | 鼠标悬停或键盘聚焦名称可查看完整说明；点击后下载 Chrome/Edge 插件 ZIP，用于从受支持商城详情页采集主图、详情图和 SKU 图，再复制到 Studio、批量复制到聊天软件或按商品文件夹下载 |
-| 连接配置 / 生成日志 | 顶栏“配置”，或配置菜单 -> 生成日志 | 在 GPT / Gemini / Grok / 配色之间切换，GPT 内部选择路由/直连；各用途独立管理端点、API Key、模型与 API 历史，可获取模型、测试和保存，未选中控件保持禁用；配色区只管理界面配色；日志展示通道、时间、参数、进度、结果和错误，支持独立滚动与完整信息查看 |
-| Prompt Kit | 提示词输入区的模板按钮 | 从内置模板开始组织主体、场景、构图和视觉语言，再把模板内容带回提示词编辑区继续修改 |
-| Logo 库 | “上传图加 Logo”分支 | 上传、长期保存、选择和删除常用 Logo；可设置位置和背景策略，也可对最多 15 张上传图执行同一 Logo 批处理 |
-| 写真搭配库 | 写真模式 -> 服装道具配饰参考图 -> 搭配库 | 保存并复用服装、道具和配饰素材，将选中素材带入写真参考图与提示词摘要 |
-| PPT 单页编辑器 | PPT 生成结果或 PPT 记录中的页面编辑操作 | 对指定页填写修改要求并重新生成，保留演示文稿上下文；也可补齐缺失页面后重新导出 |
-| 打开输出目录 | 顶栏或资产菜单 -> 打开输出目录 | 本地 Node.js/Windows 运行时打开实际图片根目录；Vercel 等云端环境不提供本机目录打开能力 |
-
-### 商品图采集插件
-
-该浏览器扩展支持 1688、Amazon、Temu、TikTok Shop、SHEIN 和大健云仓消费者商品详情页。它按平台边界识别主图、详情图和带名称的 SKU 图，提供分组筛选、原图预览、复制到 Studio、Windows 多文件“复制图片”、单图下载和按商品文件夹批量下载；页面结构不受支持时会停止，不扫描整页图片。“复制图片”由扩展专用的 Windows Native Messaging 助手完成，不要求启动或打开 Studio；单批最多支持 1000 张，成功后插件内会短暂显示半透明提示，当前选中图片可一次粘贴到聊天软件。
-
-扩展只在用户主动点击采集后读取已支持的商品区域，不读取 Cookie、API Key、密码或其他登录凭据。Studio 菜单只负责生成并下载可审查的 ZIP，不会静默安装或更新浏览器扩展；Chrome/Edge 仍需用户在扩展管理页确认加载或重载，本地剪贴板助手也需用户运行包内安装脚本。详细安装、平台路由和操作说明见 [商品图采集插件说明](./extensions/product-image-collector/README.md)。
-
-## 部署方式
-
-### Vercel
-
-仓库中的 `vercel.json` 为 `server.mjs` 配置了依赖包含范围和 `300` 秒函数时长，并在云端安装时使用 `npm ci --omit=dev`，避免把仅供桌面开发的 Electron/Electron Builder 带入 Serverless Function。可通过 Vercel 导入仓库或 CLI 创建 Preview 部署：
-
-```powershell
-vercel deploy
-```
-
-确认预览环境中的静态资源、API、SSE 和长任务后再发布：
-
-```powershell
-vercel deploy --prod
-```
-
-Vercel 运行时的输出和本地数据目录位于临时文件系统，实例回收后可能丢失。需要长期保存图片和历史时，优先使用本地运行，或为云端接入持久化存储。
-
-### 构建 Windows 桌面程序
-
-在 Windows x64 和 Node.js `22.12+` 环境运行：
-
-```powershell
-cmd /c npm ci
-node --test test/desktop-application.test.mjs
-cmd /c npm run test:desktop-smoke
-cmd /c npm run build:desktop
-```
-
-产物路径：
-
-```text
-artifacts/desktop/GPT-Image2-Studio-Desktop-Setup-v0.2.138-x64.exe
-artifacts/desktop/GPT-Image2-Studio-Portable-v0.2.138-x64.zip
-artifacts/desktop/win-unpacked/GPT-Image2-Studio.exe
-```
-
-桌面版使用 Electron 独立窗口和 Electron Builder NSIS 安装包。完整说明见 [Windows 桌面程序文档](./docs/windows-desktop.md)。
-
-### 构建 Windows 浏览器安装包（兼容旧版）
-
-在 Windows 上运行：
-
-```powershell
-cmd /c npm ci
-cmd /c npm run build:installer
-```
-
-产物路径格式：
-
-```text
-artifacts/windows-installer/<build-id>/GPT-Image2-Studio-Setup-v0.2.138.exe
-```
-
-脚本使用系统 `iexpress.exe` 生成自解压安装包，并把当前 Node.js 运行时和依赖打入安装目录；启动后仍使用默认浏览器显示工作台。
-
-## 输出与本地数据
-
-本地服务默认将图片保存到：
-
-```text
-%USERPROFILE%\Pictures\YYYY-MM\MM-DD\
-```
-
-不同工作流会创建独立目录，例如：
-
-```text
-YYYY-MM-DD-prompt\
-YYYY-MM-DD-style-transfer\
-YYYY-MM-DD-reference-analysis\
-YYYY-MM-DD-image-edit\
-YYYY-MM-DD-creation\
-YYYY-MM-DD-portrait\
-YYYY-MM-DD-article\
-YYYY-MM-DD-ppt\
-```
-
-记录索引默认位于 `%USERPROFILE%\Pictures\json\`，服务端配置默认位于 `.local/config.json`。可以使用 `IMAGE_STUDIO_OUTPUT_DIR` 和 `IMAGE_STUDIO_LOCAL_DATA_DIR` 改写这两个根目录。
-
-## 项目结构
-
-```text
-GPT-Image2-Studio/
-|-- build/desktop/                # Windows 桌面应用图标资产
-|-- desktop/                     # Electron 主进程与桌面安全策略
-|-- docs/                         # 安装、设计和开发文档
-|-- examples/                     # API 请求与 SSE 示例
-|-- lib/                          # 服务端与前端共享逻辑
-|-- openspec/                     # 变更规格、设计和验收场景
-|-- public/                       # 浏览器界面、样式、模块与内置资产
-|-- scripts/                      # 同步与安装包脚本
-|-- test/                         # Node.js 测试
-|-- generate-image.mjs            # 命令行单图生成入口
-|-- server.mjs                    # 本地 Node.js 服务入口
-|-- launch-studio.cmd             # Windows 快速启动器
-|-- launch-studio.ps1             # Windows PowerShell 7.4+ 启动器
-|-- stop-studio-services.cmd      # Windows 停止脚本
-|-- vercel.json                   # Vercel 函数配置
-|-- package-lock.json
-`-- package.json
-```
-
-## 开发与验证
-
-常用命令：
-
-```powershell
-# 启动开发服务
-cmd /c npm run dev
-
-# 启动 Electron 桌面开发版
-cmd /c npm run desktop
-
-# 查看命令行生图帮助
-cmd /c npm run help
-
-# 同步共享模块到 public/lib
-cmd /c npm run sync:public-lib
-
-# 运行测试
-cmd /c npm test
-
-# 检查版本与发布文档一致性
-cmd /c npm run check:release
-```
-
-发布前建议执行：
+## 开发
 
 ```powershell
 cmd /c npm test
@@ -777,207 +164,23 @@ cmd /c npx --no-install openspec validate --all --strict
 git diff --check
 ```
 
-Windows 桌面与兼容安装包发布还应运行：
+`npm run desktop` 用于 Electron 开发；`npm run help` 查看命令行生图参数。桌面发行还需执行 `npm run test:desktop-smoke` 和 `npm run build:desktop`。
 
-```powershell
-cmd /c npm run test:desktop-smoke
-cmd /c npm run build:desktop
-cmd /c npm run build:installer
-```
+应用行为变更遵循 [OpenSpec 与贡献流程](./CONTRIBUTING.md)。浏览器共享模块在 `lib/` 维护，通过 `npm run sync:public-lib` 同步到 `public/lib/`。
 
-## 版本发布
+## 文档
 
-- 版本号以 `package.json` 和 `package-lock.json` 为准。
-- 版本格式为 `major.minor.patch`，其中 `patch` 固定三位数字：大版本主版本 `+1` 并将下级归零，小版本次版本 `+1` 并将更新位归零，小功能更新更新位 `+0.010`，普通更新更新位 `+0.001`。
-- 分别使用 `npm run release:major`、`npm run release:minor`、`npm run release:feature` 或 `npm run release:patch`，每次只改变一个层级，并通过 `--summary` 传入更新摘要。
-- Git tag 使用 `v<version>`，与 `package.json` 的版本一致。
-- Release 标题建议使用 `GPT-Image2-Studio v<version>`。
-- Release 应附带变更说明、验证结果、Windows 桌面安装包、免安装 ZIP；如仍分发兼容版，应明确区分三个文件的启动形态。
-- 正式发布提交与标签就绪后运行 `npm run check:release:strict`，确认工作树干净且标签与版本一致。
+| 文档 | 内容 |
+| --- | --- |
+| [API 配置](./docs/configuration.zh-CN.md) | 接口设置、服务商清单、环境变量和故障排查。 |
+| [工作流与参数参考](./docs/reference.zh-CN.md) | 输出格式、分辨率、数量限制和 Temu 导出。 |
+| [Windows 桌面程序](./docs/windows-desktop.md) | 安装、便携运行、数据位置和打包。 |
+| [商品图采集插件](./extensions/product-image-collector/README.md) | 插件安装和支持的商品页面采集。 |
+| [安全说明](./SECURITY.md) · [贡献指南](./CONTRIBUTING.md) | 信任边界、验证和发行维护。 |
+| [旧版浏览器安装包](./docs/windows-installer.md) | 在本地构建兼容安装包。 |
 
-## 版本更新说明
+## 发行版
 
-完整说明、产物校验值和验证记录在 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases)。当前版本说明：[v0.2.138](./docs/releases/v0.2.138.md)。
+当前版本说明：[v0.2.148](./docs/releases/v0.2.148.md)。下载与 SHA-256 校验值见 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases/latest)；较早记录保留在[发行说明目录](./docs/releases/)和[历史更新记录](./docs/history.zh-CN.md)。
 
-### v0.2.116 更新说明
-
-- 在套图产物顶部增加当前套图标识，跟随所选队列项显示商品名、营销方案与套数，或普通队列位次；草稿和批量加 Logo 分支不显示。
-- 将 AI 营销批量预估、进度和逐方案耗时改为紧凑状态项，并区分成功、警告和失败状态。
-
-### v0.2.106 更新说明
-
-- Listing 新增德语，与英文、中文一起覆盖生成结果展示、逐项和字段复制、字符统计及 JSON 导出；没有德文的历史草稿保持原样，重新生成后再补齐。
-- AI 营销方案数量上限提高到 50；每个方案的套图数量与规划并发限制保持不变。
-- 套图记录新增“严重失败”筛选：仅匹配已完成、计划图片不少于 10 张且成功少于 10 张的套图，可与关键词和日期筛选组合。
-- 修改规划设置时保留已完成的参考图分析和已生成结果；仅使尚未提交的旧方案失效并清理旧草稿。
-- 优化大队列渲染：复用稳定节点、合并高频进度和日志更新，并改进视口图片加载与离屏资源释放。
-
-### v0.2.096 更新说明
-
-- 新增 AI 营销提示词批量规划，可设置独立方案数量和每套入队数量；最多同时规划两套，已校验的方案会复用现有套图队列。
-- 批量进度显示逐方案状态、耗时和重试；可取消后续方案，瞬时错误按上限重试，失败或资料问题会暂停后续工作，并可从失败方案继续而不重复已入队内容。
-- 加强营销计划质量审核，检查核心功能是否有事实支持、是否形成可见效果，以及套图中的任务和构图是否重复；保留有效图片并修复可编辑的问题项。
-- 优化商业 CG 与商品功能画面指引，并统一文本模型的推理强度参数映射；仅在上游明确拒绝该参数时进行有界降级重试。
-- 批量进度目前仅保存在当前页面会话中；刷新后，已入队任务按现有队列和记录处理，尚未提交的方案不会自动恢复。
-
-### v0.2.086 更新说明
-
-- AI 电商套图在一次规划请求中生成最多 20 张完整提示词，并为每张图分配营销目标、受众、依据和参考图。
-- 规划过程通过事件流展示准备、等待、接收、校验和完成状态，逐步呈现已接收条目及营销摘要，不向界面暴露模型原始输出。
-- 商品分析新增具体受众、卖点、痛点和关联事实的营销建议；同一份冻结提示词与参考图绑定贯穿生成、记录、重试和补图。
-- 计划不完整或不符合依据要求时，在生图前明确拒绝；已有有效计划的重试和补图继续复用原计划，不会悄悄重新规划。
-
-### v0.2.076 更新说明
-
-- 商品分析保留多张参考图中互补的事实，只把同一商品、同一属性和相同条件下的互斥值判为冲突；来源会贯穿计划、生成、补图和保存记录。
-- 套图按有来源的事实分配不同场景与信息图任务，不循环重复核心动作；缺少不同可售 SKU 或数值尺寸依据时跳过对应图片，并由服务端再次校验。
-- 图片文字护栏会过滤无依据的医疗、安全、认证、价格和绝对化宣称，同时保留品类名称；信息图重构逐项依据可读源内容，不从外观推导功能文案。
-- 成对售卖商品按完整可售单位计数，例如一双手套算一个 SKU 主体。当前套图自动画像仅提供通用电商，未知及已退役的平台 ID 回落到通用 18 槽方案；Listing 平台策略独立维护。
-
-### v0.2.074 更新说明
-
-- Prompt Kit 扩展为 520 组带来源署名的 YouMind GPT Image 2.5 / GPT Image 2 提示词和配对图片，新增模型筛选、分类浏览、搜索和排序。
-- API 历史会按连接恢复模型设置，选择器中的 Key 使用脱敏显示。
-- 配色扩展为 12 套，并改进生成等待动画与图片查看交互。
-
-### v0.2.073 更新说明
-
-- 新生成图片改用时分加描述的文件名；套图保留序号，同名结果使用递增后缀，画廊下载名称与实际保存名称一致。
-- 新增「黑曜」配色并设为默认，同时保留「靛蓝」和六套传统配色。
-- 套图队列项同时显示商品名与队列位次；配置抽屉关闭时不再允许键盘焦点进入其中的控件。
-
-### v0.2.072 更新说明
-
-- 将提示词增强默认文本改为可编辑的英文清晰度指令，优先保留原提示词与参考图，尊重有意的风格表现；`8K` 只表示画质目标，不承诺输出分辨率。
-- 当前调用参数摘要新增所选生图服务的可点击 origin，不显示接口路径或凭据。
-- 简化生成日志行，结果显示简短文件名，并保留任务接口地址和失败详情。
-- 移除图片裂变工作台及其专属分析契约；不删除已有图片资产和历史发行记录，旧 `#product-agent` 地址会回到提示词生图。
-
-### v0.2.071 更新说明
-
-- 提示词模板库调整为嵌入图片预览区域，并按容器宽度自适应；列表卡片收紧布局，同时保留标题、分类和三行提示词摘要。
-- 生成日志按任务自身快照保留接口地址，切换 API 后查看历史记录或失败任务时不会串用当前地址；长中转 URL 支持键盘聚焦和横向检查。
-- 加宽并重新排布桌面端 API 配置抽屉，为较长接口地址补充完整值提示。
-
-### v0.2.070 更新说明
-
-- 优化提示词模板卡片摘要，最多显示三行提示词内容。
-- 修正请求出口 IP 的记录来源：通过上游 HTTP transport 查询；查询失败时显示“未记录”，且查询不发送 API 凭据、提示词或生成图片。
-
-### v0.2.069 更新说明
-
-- 商品图采集扩展升级到 `1.1.34`，支持有并发上限的多图下载，并改进部分失败状态提示。
-- 调整深色基础主题及六套传统配色的文字、边框、按钮、输入框和弹出层对比度。
-
-### v0.2.068 更新说明
-
-- 强化图片反推风格锁定，优先保留原图最有辨识度的风格锚点，并明确要求主体清晰、可见纹理分明、边缘自然、层次整洁；加入 `4K/8K` 级视觉质量提示词，但不承诺实际输出像素。
-- 按原图证据规避意外模糊、纹理涂抹、伪影和无关杂物，同时保留有意的散景、柔焦、颗粒与运动效果。
-
-### v0.2.067 更新说明
-
-- 优化提示词模板库卡片：移除卡片上的“复制到我的模板”，列表视图只显示完整容纳的文字；图片视图改为瀑布流，在图片下方完整展示名称和分类，并突出“应用”按钮。详情灯箱仍保留复制和应用操作。
-
-### v0.2.066 更新说明
-
-- API 历史现在会按通道恢复最后保存的模型，路由模式同时恢复生图工具模型；未保存的模型修改不会覆盖历史记录。
-- 当前生图参数摘要和图片详情会显示请求发起 IP；没有该字段的旧记录显示“未记录”。
-- 修复 Vercel Serverless 启动：忽略平台注入的 `HOST` 绑定值，并由函数直接处理请求，避免线上服务因本地 HTTP 绑定策略启动失败。
-
-### v0.2.056 更新说明
-
-- 图片转提示词新增风格锁定词汇，强调保留原图媒介、审美、色彩、光线、材质、景深和后期质感，并记录容易发生的风格偏移。
-- 修复提供方密钥与目标地址绑定、清单和提示词历史并发保存、运行中任务被裁剪、PPT 清单路径校验、扩展页面注入和 Listing 超时边界。
-- 桌面 API 配置通过受限沙盒 IPC 跨重启与动态端口持久保存。
-
-### v0.2.046 更新说明
-
-- 思考等级选择器只显示等级名，具体 GPT 分辨率只显示像素宽高；提交值和 Gemini/Grok 各自的档位参数保持不变。
-- 快速开始新增运行方式选择表，并说明界面标签与服务商请求值的关系。
-
-### v0.2.045 更新说明
-
-- 重做通用电商套图：将原先重叠的参数规格、品质工艺和材质成分槽位替换为 3 个彼此不同的场景适配角色，按商品场景事实分配不同环境和镜头；平台专属配置仍保留自己的规格图角色。
-- 增加以商品为锚点的画面差异化：每个普通角色声明独立画面形式和人物设定，限制辅助参考图重复使用；只有场景角色忠实重建场景参考图，其余角色使用新的动作、人物、机位和时刻；不可穿戴商品会改为携带、打包或收纳表达。
-- 精简普通套图提示词，移除内部规划标签，合并商品锁定指令；目标语言不是中文时，生成前用配置的文本模型翻译提示词中的中文片段。翻译失败仍继续生成，并通过界面提示原因。
-- 套图结果灯箱新增实际生成提示词和逐图参数复现信息，展示比例、尺寸、质量、透明背景、路线开关、模型、参考图、端点和耗时；历史缺失值显示“未记录”。
-- 比例元数据统一保存规范比例值，补齐 favicon 与 Web Manifest 路由，文本/视觉模型默认更新为 `gpt-6-luna`；已有非空模型配置保持不变。
-
-### v0.2.044 更新说明
-
-- 路由模式默认不再发送 `tools[].model`，兼容中转可以自行选择生图工具模型，也不会因为多出的字段拒绝请求。
-- 新增「发送 tools[].model」开关；打开后才发送当前下拉框选中的白名单生图工具模型。开关会随路线配置、浏览器私有请求和排队任务保存，直连生图路线继续保持原有的明确模型行为。
-- 本地配置、浏览器存储、请求载荷、服务端默认值和 `public/lib` 公共模块镜像统一把缺失或旧版 `includeImageToolModel` 归一化为关闭。
-- 同步运行时规范、归档变更记录、中英文 README 说明，以及默认、关闭、重新开启、持久化和请求体行为的回归测试。
-
-### v0.2.043 更新说明
-
-- 新增 YouMind GPT Image 2 Prompt Kit 本地快照：按「用途场景 × 视觉风格 × 主体」组织带来源元数据的配对预览，支持搜索、列表/图片浏览、灯箱查看、一键应用和复制到我的模板。
-- 新增图片裂变工作台：最多上传 15 张商品母图，提炼有证据支持的商品事实和人群策略，并生成受上限约束的「工作区 × 渠道 × 方向」任务板；每格保留母图、比例、纯英文提示词与简体中文对照，支持单格或批量生成。
-- 路由模式新增生图工具模型下拉框和启用/停用开关。排队任务会冻结工具模型与质量参数，长任务提供加载壳、胶片条、重试、恢复轮询和中途预览来源标记。
-- 写真模式加入 COS 人像参考资源；套图模式把商品描述、核心卖点和尺寸规格合并到一个输入框，同时保留历史记录中的商品事实；Windows 启动器与端口展示同步更新到 PowerShell 7.4+ 运行边界。
-- 同步浏览器公共模块、Prompt 本地资源、图标、OpenSpec 归档和回归测试，发布前可用完整校验命令复核。
-
-### v0.2.020 更新说明
-
-- 新增分层 Prompt Kit 模板库：6 个一级分类、24 个二级分类、每类 10 条提示词，支持搜索、列表/图片视图、字号调节、完整提示词灯箱、一键应用和复制到我的模板。人像与头像预览图从指定 YouMind 集合抓取后随应用本地打包并记录归属，运行时不依赖外站。
-- 十条旧的日常场景默认模板替换为证件照、商务头像、电商主图、生活写真、室内家居、城市旅行和营销海报等实用模板；迁移只替换旧内置 ID，不删除用户自定义模板或 Prompt Agent 历史。
-- 套图与信息图提示词改为有长度边界的正向指令，减少重复的否定约束，让新计划更短、更聚焦；已保存的历史提示词保持不变。
-- 项目自有 Windows 脚本统一要求 PowerShell 7.4+，缺少运行时或脚本时明确失败；纯 Node/Electron 入口与停止服务 CMD 不新增 PowerShell 依赖。
-- 发布工具新增 major/minor/feature/patch 四种升级入口，采用三位更新位并同步 README、Windows 文档、锁文件、工作台和发行说明中的版本事实。
-
-### v0.2.19 更新说明
-
-- 新增 Grok 图片生成与参考图编辑，独立配置 xAI 地址、密钥、接口与模型；最多 5 张参考图，按服务商协议构造参数。
-- Grok 质量仅 `low` / `medium`，默认 `medium`；图片请求、任务快照和图片元数据不再混入 GPT 思考等级。各路线隔离 API 历史与质量选择。
-- 全工作台移除自动质量与自动分辨率选项，旧值在显示、入队、保存和上游请求前归一化为明确默认值。
-- 配置区统一为 GPT / Gemini / Grok / 配色，GPT 下方显示路由/直连；压缩留白、对齐字段和 Gemini 接口，精简按钮与日志叫法，长内容单行显示并提供完整提示。
-
-- 套图、写真、文章插图和 PPT 新增各自独立的思考等级与质量控制。计划、队列任务、补图、失败重试和 PPT 单页编辑都会保留所选值，质量按当前生图模型能力收敛。
-- 提示词生图在路由/直连生图路线支持透明背景。选择会按任务保存，自动固定 PNG，并写入结果元数据；Gemini/模型协议路线隐藏该控制。
-- 新套图计划固定一个 SKU 主体，但仍保留 SKU 生成规则选择。
-- 「配色」区改为每行 4 个的 7 套简短配色色块，移除自定义颜色和花卉点缀，默认配色改为「靛蓝」。
-
-### v0.2.18 更新说明
-
-- 配置抽屉改为四个互斥配置区：**路由模式** / **直连模式** / **Gemini** / **主题**。只渲染当前配置区的字段，未选中配置区的控件（含「获取模型列表」）改为禁用而不只是隐藏，不会再误改或误查一个没在用的通道。
-- 界面配色不再是 Gemini 选项后面那个入口按钮展开的浮层，而是「主题」里的一张独立卡片；「主题」不含任何连接字段。在「主题」和通道之间来回切换不改动当前生效的调用通道。
-- 配色选项固定为一行并在窄抽屉里横向滚动，不再按 4 列、2 列网格换行。
-- 默认配色为「经典靛蓝」，恢复 v0.2.6 的靛蓝色值（`#6f7cff` / `#12192f` / `#879cff`），Studio 与嵌入的 Temu 工作台一致。其余 6 套保持各自的传统色值，配色 ID 全部未变，已保存的选择仍能正确还原。
-- 配色显示名收短（`青花甜白` → `青花`，`江南竹影` → `竹影`，`雨过天青` → `天青`，`故宫朱墙` → `朱墙`，`漆器朱漆` → `朱漆`，`敦煌石青` → `敦煌`），两个过长的配置区名收短为 `直连模式` 和 `Gemini`。
-- 文档订正：平台画像表的版本为 `2026-07-18.2`；两份 README 改为描述四配置区抽屉，不再描述已移除的配色入口按钮。
-
-### v0.2.17 更新说明
-
-- 配置抽屉重新整理：长说明改为鼠标悬停或键盘聚焦时显示的提示标记，配置表单与生成日志分区滚动，日志保持固定可见高度，不再被说明文字推走。
-- 通道选择栏改为“路由模式 / 直接调用模式 / Gemini模型 / 配色”，配色入口紧跟 Gemini 模式；点击后展开完整配色、自定义颜色和花卉点缀设置。
-- 新增 7 套来自中国传统色库的界面配色，并支持按钮与焦点、界面面层、花卉与装饰三类自定义颜色；设置会持久化并同步到 Temu 工作台。
-- 新增折枝梅、兰叶小丛、竹节竖列和牡丹团花 4 种低干扰装饰，装饰不拦截交互并对辅助技术隐藏。
-- 维护 OpenSpec 规范与回归测试，覆盖配色白名单、颜色校验、提示标记、日志独立滚动、主题消息同步和 Gemini 后配色入口。
-
-### v0.2.16 更新说明
-
-- 深色主题改为纯黑 `#000000` 铺底。面层只混入 6%–12% 的中国传统色（山梗紫、秋波蓝、粉绿、朱红），整体仍读作黑色，同时让面板、输入框和预览台分得开。样式表里写死的蓝黑值已一处不剩，并由测试钉住。
-- 主按钮、选中导航和常规交互统一为魏紫 `#7e1671`（悬停青莲 `#8b2671`，按下绀紫 `#461629`），深色五个视图族共用同一支。`select` 的 option 弹窗改为随主题切换，不再写死浅色。浅色主题不变。
-- 提示词模板按钮从 `⭐` emoji 改为 lucide sparkles 描边图标，跟随 `currentColor`，线宽与参数区其余图标一致。
-- 仓库整理：删除两张未被引用的根目录截图、一份设计 QA 草稿，以及已被 `openspec/` 覆盖的 `docs/superpowers/`。
-
-### v0.2.15 更新说明
-
-- 路由模式的生图工具模型可选：`gpt-image-2`（默认）、`gpt-image-2.5-sunburst`、`gpt-image-2.5-flare`。此前写死在代码里，记录里还会谎报一个没实际使用的模型。
-- 出图质量可选并按模型能力收敛：`low`、`medium`、`high`，2.5 变体额外提供 `xhigh` 与 `max`；Grok 只提供 `low` 与 `medium`。质量改为随请求逐次提交，不再只读配置默认值。
-- 用过的接口地址与 Key 保留成一份可复用清单（存在浏览器本地），换一个 API 不再覆盖掉上一把 Key；选中一条即把地址、后缀和 Key 整套填回。
-- 配色在中国传统色库内重调：夜场抬亮并做出三级面层台阶，昼纸改用纸感暖白让卡片有边界，点缀统一降彩度，控件轮廓补到 WCAG 3:1 下限。
-- 商品图采集扩展更新到 `1.1.33`：采集器、采集窗与悬浮入口停留在同一隔离世界，读取不再因后台通信而超时。
-
-### v0.2.14 更新说明
-
-- Gemini 通道不再把不受支持的比例静默变成方图。它接受 15 个比例中的 10 个，其余五个改为按方向就近匹配（`2:1` → `16:9`，`3:1` → `21:9`，`1:2`、`9:21`、`1:3` → `9:16`），不再一律返回 `1:1`。该通道发送的是尺寸档位而非像素，所以就近匹配现在以用户选择的比例作为依据。
-- `release:patch` 与 `check:release` 开始维护派生版本事实：两份 README 的徽章、正文引用的安装包与免安装 ZIP 文件名、发行说明链接，以及 `v<version>` GitHub Release 表述。此前每个文件只校验一条锚定事实，升版可能通过检查却仍在 README 里推荐上一个版本的下载。
-
-### v0.2.13 更新说明
-
-- 文章插图规划改为连续关键帧分镜：每个段落或独立视觉节拍至少一张成品插图，动作、情绪、对话、镜头或地点变化时追加连续帧。不再设置插图数量上限，`recommendedImageCount` 按实际产出的帧数返回。
-- 文章插图生成改为整套并发扩散，遵循配置中的请求并发数量和任务提交间隔。同一批次里待生成的参考卡会先于分镜完成。
-- 直连图片请求连接失败时会指明实际使用的端点，并把 Node 的 `fetch failed` 展开为底层原因。该路线在附带参考图后会把 `images/generations` 改写为 `images/edits`。
-- 两份 README 新增分步的[新手配置 API 教程](#新手配置-api-教程)。
+版本格式为 `major.minor.patch`，更新位固定三位数字。小功能更新加 `0.010`，普通更新加 `0.001`；通过 `release:major`、`release:minor`、`release:feature` 或 `release:patch` 配合 `--summary` 维护。正式发布提交和标签需在干净工作树中通过 `npm run check:release:strict`。

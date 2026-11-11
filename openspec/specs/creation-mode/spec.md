@@ -659,9 +659,11 @@ The system SHALL omit or replace image types that require unavailable factual ev
 - **AND** it does not silently display or submit a plan built from stale duplicated defaults
 
 ### Requirement: Creation records display and expose Listing drafts in the old-style format
-The Creation record UI SHALL preserve the existing Listing field order and display all fields continuously without content-group or language-view controls. Each field and list item SHALL show English, available German from `deDisplay`, and available Simplified Chinese from `zhDisplay` in that vertical order at every supported viewport width. Every available language SHALL have independent item and field copy targets and character counts. Full copy and structured export SHALL preserve the complete available trilingual field mapping. Generate, full-copy, and export controls SHALL remain available in the compact Listing workspace toolbar without validation or review gating. Historical drafts without German SHALL retain their existing content without fabricated translations or automatic model requests.
+
+The Creation record UI SHALL preserve the existing Listing field order and display all fields continuously without content-group or language-view controls. Each non-title field and list item SHALL show English, available German from `deDisplay`, and available Simplified Chinese from `zhDisplay` in that vertical order at every supported viewport width. The title field SHALL additionally show available Spanish, French, Italian, and Polish titles from `titleTranslations` after German and before Simplified Chinese, in that order, using the existing vertical layout and styles. Every available language SHALL have independent item and field copy targets and character counts. Full copy and structured export SHALL preserve the existing trilingual field mapping and the available additional title translations. Generate, full-copy, and export controls SHALL remain available in the compact Listing workspace toolbar without validation or review gating. Historical drafts without German or additional title translations SHALL retain their existing content without fabricated translations or automatic model requests. Non-title content, its language coverage, existing field order, page layout, and workbench export mappings MUST retain their existing behavior.
 
 #### Scenario: User opens a newly generated Listing draft
+
 - **WHEN** a completed Listing is rendered in a Creation record
 - **THEN** 标题、卖点、痛点、五点描述、商品描述、后台搜索词 and 关键词分组 are all visible on the same page in that fixed order
 - **AND** 后台搜索词 and 关键词分组 follow 商品描述 without requiring a content-group switch
@@ -670,56 +672,81 @@ The Creation record UI SHALL preserve the existing Listing field order and displ
 - **AND** the UI does not show validation, retry-review or `needs-review` controls
 
 #### Scenario: User compares bilingual Listing values
-- **WHEN** a Listing field or list item has both English and corresponding Simplified Chinese content
+
+- **WHEN** a non-title Listing field or list item has both English and corresponding Simplified Chinese content
 - **THEN** the English value is displayed first, followed by its available German translation and corresponding Chinese value within the same field or item
 - **AND** the Chinese value follows its German counterpart when present, otherwise its English counterpart, before the next field or item
 - **AND** desktop, stacked, and mobile layouts do not place the two values in side-by-side columns
 
+#### Scenario: User reviews the additional title languages
+
+- **WHEN** a Listing contains title translations for all supported languages
+- **THEN** only the title field displays English, German, Spanish, French, Italian, Polish, and Simplified Chinese in that vertical order
+- **AND** each available new title translation has an accurate language label, character count, and independent copy target using the existing controls
+- **AND** missing translations are omitted without invented content or placeholder rows
+- **AND** non-title fields retain their existing content, language coverage, controls, and copy results
+
 #### Scenario: User switches the Listing language view
+
 - **WHEN** an existing application session still contains a previous `en`, `zh`, or `compare` Listing language selection
-- **THEN** the UI ignores that obsolete selection and displays the fixed English-German-Chinese comparison with available translations
+- **THEN** the UI ignores that obsolete selection and displays the existing fixed comparison with available translations and any additional title languages
 - **AND** the UI does not render a language-view control that can hide either language
 
 #### Scenario: User switches the Listing content view
+
 - **WHEN** an existing application session still contains a previous `copy` or `search` Listing content selection
 - **THEN** the UI ignores that obsolete selection and displays all seven fields on the same page
 - **AND** the UI does not render a content-group control that can hide product-copy or search fields
 
 #### Scenario: Historical Listing value has no Chinese counterpart
+
 - **WHEN** a historical Listing field or item has an English value but no corresponding Simplified Chinese value
 - **THEN** the English value remains visible and copyable in the fixed field order
 - **AND** the UI does not invent or display a Chinese placeholder
 
 #### Scenario: User copies a visible English Listing value
+
 - **WHEN** the user clicks a visible English title, field value, list information point, or English field-level copy control
 - **THEN** the clipboard contains only the selected English value or complete English field
 - **AND** the clipboard does not contain its Chinese counterpart
 
 #### Scenario: User copies a visible Chinese Listing reference
+
 - **WHEN** the user clicks a visible Simplified Chinese value or Chinese field-level copy control
 - **THEN** the clipboard contains only the selected Chinese value or complete Chinese field
 - **AND** the clipboard does not contain the English value
 
+#### Scenario: User copies an additional title translation
+
+- **WHEN** the user clicks a Spanish, French, Italian, or Polish title value or its title-field copy control
+- **THEN** the clipboard contains only the selected language's actual title
+- **AND** the clipboard does not include a language label, any other title language, or a non-title field
+
 #### Scenario: User copies Listing keyword buckets
+
 - **WHEN** the Listing workspace displays or copies 精准关键词、长尾关键词、流量关键词 or 描述词
 - **THEN** each bucket name remains a visible, non-selectable page label and is not a copy target
 - **AND** clicking an English, German or Simplified Chinese keyword value copies only that row's actual keyword value
 - **AND** the field-level English, German or Chinese copy control copies only that language's keyword values without any bucket-name prefix
 
 #### Scenario: User reviews a long Listing draft
+
 - **WHEN** the Listing workspace reaches the top of the scrollable Creation record result area
 - **THEN** the Listing heading, generation action, complete-copy action, and export action remain visible while the draft content scrolls
 - **AND** character counts are presented as secondary metadata rather than primary status badges
 
 #### Scenario: User reaches Listing controls on a narrow mobile screen
+
 - **WHEN** the user scrolls a mobile Creation record to its Listing workspace
 - **THEN** the record header and filter controls remain in normal document flow instead of covering the Listing workspace
-- **AND** the Listing actions and continuous vertical trilingual content remain visible and directly operable
+- **AND** the Listing actions and continuous vertical content, including available additional title languages, remain visible and directly operable
 
 #### Scenario: User copies or exports a Listing draft
+
 - **WHEN** the user invokes generation, full copy, or export from the Listing workspace
 - **THEN** generation reuses the existing selected-record Listing controller and concurrent-generation guard
 - **AND** full copy and structured export retain the old-style field mapping including deDisplay and zhDisplay for all seven fields
+- **AND** full copy includes available additional title translations only in the title section, and structured JSON export preserves their `titleTranslations` language mapping
 - **AND** the actions are not blocked by validation, review, warnings or access state
 
 ### Requirement: Hard-information images use decision-meaningful visual structures
@@ -742,10 +769,18 @@ The system SHALL keep complete supplied dimension and package facts in the effec
 
 #### Scenario: AI 套图沿用默认双单位规则
 
-- **WHEN** 用户未单独选择单位模式，AI 套图的参数图、尺寸图或场景角标使用已确认的 `14.5 cm` 和 `35.8 g`
+- **WHEN** 用户未单独选择单位模式，AI 套图的专门参数图或尺寸图使用已确认的 `14.5 cm` 和 `35.8 g`
 - **THEN** 规划请求明确传入默认 `dimensionUnitMode: both`，并提供 `14.5 cm (5.71 in)` 和 `35.8 g (1.26 oz)` 的换算文本
 - **AND** 最终生成提示词要求每个新增测量标签同时显示公制值与英制值，换算保留本图事实的字段标签、所属款式与条件
 - **AND** 换算副本不作为额外规格事实，不把其他图片或款式的测量值带入本图
+
+#### Scenario: 普通营销图不继承尺寸标注
+
+- **WHEN** 首图、场景、手持、细节、清单、卖点或多款式展示引用包含尺寸和重量的商品事实
+- **THEN** 完整事实仍保留在计划与证据链中，但不会向这些图片自动追加测量数值、单位换算段落、尺寸线或重量角标
+- **AND** 规划与生成提示词明确禁止复制参考图外围的测量版式，以自然比例表达便携和适配，保留实物印字、数量和正常营销文案
+- **AND** 新自动提示词明确要求叠加尺寸标线或重量标签时，仅该项进入既有的最多两轮局部修复，合格项保持不变；修复失败的项不得进入生图
+- **AND** 专门尺寸和规格任务继续按所选单位显示已分配数值，用户锁定与历史冻结提示词不自动重写
 
 #### Scenario: 单单位选择、无文字图和冻结计划保持原有边界
 
@@ -3548,7 +3583,7 @@ AI 营销模式修改目标语言、比例、分辨率或 SKU 开关 SHALL 使�
 
 ### Requirement: 批量 Listing 显示实际进度并隔离普通失败
 
-批量 Listing SHALL 使用最多三个工作者补缺并跳过已有草稿，普通单条失败后继续。系统 SHALL 显示总数、成功、失败、活动、未开始数、实际耗时以及排队、等待回答、接收、校验或限流冷却状态。单条反馈 MUST NOT 覆盖批次计数，耗时 MUST NOT 因上游未推送新文本而停留在首包时刻。系统 SHALL 保留可追溯的请求元数据与脱敏错误，MUST NOT 持久化认证内容或完整模型提示词。
+批量 Listing SHALL 使用最多三个工作者，原补缺命令 SHALL 跳过已有草稿，按勾选生成命令 SHALL 对启动时勾选的已有及缺失草稿记录均生成，普通单条失败后继续。系统 SHALL 显示总数、成功、失败、活动、未开始数、实际耗时以及排队、等待回答、接收、校验或限流冷却状态。单条反馈 MUST NOT 覆盖批次计数，耗时 MUST NOT 因上游未推送新文本而停留在首包时刻。系统 SHALL 保留可追溯的请求元数据与脱敏错误，MUST NOT 持久化认证内容或完整模型提示词。
 
 #### Scenario: 上游首包后长时间思考
 - **WHEN** 上游已建立连接但尚未返回 Listing 回答文本
@@ -3663,3 +3698,57 @@ AI 营销模式修改目标语言、比例、分辨率或 SKU 开关 SHALL 使�
 - **WHEN** 多项提示词共用商品身份、事实与风格，但明确描述不同实际画面
 - **THEN** 保留其创意选择，一次规划即可通过
 - **AND** 不删除真实数值差异，不将共用事实或动作组当作场景数量配额
+
+### Requirement: 按勾选记录生成 Listing
+
+套图记录“更多”菜单 SHALL 提供“生成 Listing”命令，点击时以复选框勾选的有效套图记录为本批次快照，无论记录是否已有 Listing 草稿均生成。命令 MUST NOT 隐式使用当前查看记录、全部记录或筛选结果。系统 SHALL 去重并跳过无效、已删除或正在生成的记录。无可处理勾选记录时命令 SHALL 禁用，不提交请求。
+
+该命令 SHALL 复用既有批量 Listing 的最多三个工作者、共享服务端队列、进度、普通失败继续、严重错误停止取新项和操作互斥规则。成功时 SHALL 保存新草稿，失败时 SHALL 保留旧草稿。原有补缺命令 SHALL 继续跳过已有草稿，后台完成 SHALL 保持用户当前查看记录。
+
+#### Scenario: 勾选已有和缺失 Listing 的记录
+
+- **WHEN** 用户勾选一套已有 Listing 和一套缺失 Listing 的记录，再点击“更多”中的“生成 Listing”
+- **THEN** 两套记录均生成 Listing，未勾选记录不提交
+- **AND** 已有草稿只在新结果成功返回后更新
+
+#### Scenario: 未勾选或记录正在生成
+
+- **WHEN** 没有有效勾选记录，或所有勾选记录均正在生成
+- **THEN** 菜单命令禁用且不会回退到当前查看记录或全部记录
+- **AND** 无效或重复勾选不会产生额外请求
+
+#### Scenario: 批次中变更勾选范围
+
+- **WHEN** 用户启动按勾选生成后更改复选框勾选范围或当前查看记录
+- **THEN** 本批继续处理启动时的有效勾选快照，不增加新勾选记录，也不取消原有待处理项
+- **AND** 已有草稿不会在工作者取下一项时导致该项被跳过
+
+#### Scenario: 重新生成失败及原补缺兼容
+
+- **WHEN** 某套已有 Listing 的勾选记录重新生成发生普通错误
+- **THEN** 该套原有草稿保留，批次继续处理后续项并显示失败计数
+- **AND** 再次使用原补缺命令仍跳过已有草稿
+
+### Requirement: 补图凭据与历史请求地址一致
+系统 SHALL 仅将与历史补图地址匹配的已配置凭据用于补图，MUST NOT 将任意当前服务商密钥附加到其他历史地址。找不到对应凭据时 SHALL 在上游请求前失败并提供可操作错误。
+
+#### Scenario: 更换服务商后补图旧记录
+- **WHEN** 历史图片使用服务商 A，而当前所选配置使用不同服务商 B
+- **THEN** 系统使用可匹配 A 的配置，或在发送上游请求前停止
+- **AND** 服务商 A 不得收到服务商 B 的密钥
+
+### Requirement: 同套图补图保持持久化一致性
+系统 SHALL 协调同一套图的补图请求，使每个成功图片结果在后续请求结束后仍被保留。失败、取消和最终保存 SHALL 遵循同一一致性策略，并释放操作状态供后续请求继续。
+
+#### Scenario: 两个请求补不同图片
+- **WHEN** 两个客户端对同一套图的不同图片提交补图
+- **THEN** 两个请求成功后，持久记录同时包含两张完成图片及正确路径
+- **AND** 较晚完成请求不得将较早完成图片覆盖为失败或空路径
+
+### Requirement: 补图保留独立导出元数据
+系统 SHALL 在补图保存时保留既有 Temu 商品数据、导出历史及未变化图片的上传缓存。生成数据变化 SHALL 继续通过既有时间和源图片匹配规则判定导出及缓存有效性。
+
+#### Scenario: 导出后补另一张图
+- **WHEN** 已保存 Temu 库存、申报价、导出记录和图片上传缓存的套图补生成另一张图片
+- **THEN** 原商品资料和导出历史仍可读取
+- **AND** 未修改图片的缓存仍可用于后续导出

@@ -1227,6 +1227,7 @@ const refs = {
   creationRecordExportPromptsButton: document.querySelector("#creationRecordExportPromptsButton"),
   creationRecordGenerateListingsButton: document.querySelector("#creationRecordGenerateListingsButton"),
   creationRecordGenerateMissingListingsButton: document.querySelector("#creationRecordGenerateMissingListingsButton"),
+  creationRecordGenerateSelectedListingsButton: document.querySelector("#creationRecordGenerateSelectedListingsButton"),
   creationRecordRegenerateListingsButton: document.querySelector("#creationRecordRegenerateListingsButton"),
   creationRecordListingDrafts: document.querySelector("#creationRecordListingDrafts"),
   creationRecordListingStatus: document.querySelector("#creationRecordListingStatus"),

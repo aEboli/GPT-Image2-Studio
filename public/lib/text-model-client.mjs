@@ -208,6 +208,27 @@ export function formatTextModelTiming({ timing = {}, usage = {} } = {}) {
   return values.join(" · ");
 }
 
+export function renderTextModelMetrics(node, text, { document = node.ownerDocument, type = false } = {}) {
+  node.textContent = "";
+  String(text).split(" · ").forEach((part, index) => {
+    if (index) {
+      const separator = document.createElement("span"); separator.textContent = " · "; node.append(separator);
+    }
+    const item = document.createElement("span");
+    if ((type && index === 0) || /^(?:初稿|第 \d+ 轮修复|整包返回)$/.test(part)) item.className = "text-model-metric-type";
+    else if (/^第 \d+ 次(?:请求)?$/.test(part)) item.className = "text-model-metric-request";
+    const duration = part.match(/^(.*?)(\d+(?:\.\d+)? 秒)(.*)$/);
+    if (duration) {
+      item.textContent = duration[1];
+      const value = document.createElement("span"); value.className = "text-model-metric-time"; value.textContent = duration[2]; item.append(value);
+      if (duration[3]) {
+        const suffix = document.createElement("span"); suffix.textContent = duration[3]; item.append(suffix);
+      }
+    } else item.textContent = part;
+    node.append(item);
+  });
+}
+
 export function createTextModelPreview({ document = globalThis.document, panel, title = "模型实时输出", structured = false } = {}) {
   if (!document?.createElement || !panel && !document.body?.append) return { update() {}, finish() {} };
   const ownPanel = !panel;
@@ -231,7 +252,7 @@ export function createTextModelPreview({ document = globalThis.document, panel, 
     // 并发请求共用一个浮层位置，替换展示不影响后台请求。
     floatingPreviews.get(document)?.();
     floatingPreviews.set(document, dispose);
-    panel.className = "text-model-live-preview";
+    panel.className = `text-model-live-preview${title === "Listing" ? " is-listing" : ""}`;
     panel.open = true;
     const summary = document.createElement("summary"); summary.textContent = `${title} · 点击收起`;
     const close = document.createElement("button"); close.type = "button"; close.textContent = "关闭";
@@ -282,7 +303,8 @@ export function createTextModelPreview({ document = globalThis.document, panel, 
       message.textContent = failure ? failure.message : finished ? "已结束，完整结果以校验后内容为准。" : current.stage === "receiving" ? "内容实时更新，识别结果待校验。" : current.stage === "cooldown" && retryAfterMs ? `约 ${Math.ceil(retryAfterMs / 1000)} 秒后重试。` : current.message || "";
       message.hidden = !message.textContent;
     } else {
-      meta.textContent = [current.purpose || title, current.requestId ? `请求 ${current.requestId.slice(0, 8)}` : "", current.attempt ? `第 ${current.attempt} 次` : "", current.requestedReasoningEffort ? `思考 ${current.requestedReasoningEffort} → ${current.actualReasoningEffort ?? "省略参数"}` : "", Number.isFinite(current.firstTextMs) ? `首字 ${(current.firstTextMs / 1000).toFixed(1)} 秒` : "", `${elapsed.toFixed(1)} 秒`, stageMessage, current.stage === "cooldown" && retryAfterMs ? `约 ${Math.ceil(retryAfterMs / 1000)} 秒后重试` : "", current.message].filter(Boolean).join(" · ");
+      const metaText = [current.purpose || title, current.requestId ? `请求 ${current.requestId.slice(0, 8)}` : "", current.attempt ? `第 ${current.attempt} 次` : "", current.requestedReasoningEffort ? `思考 ${current.requestedReasoningEffort} → ${current.actualReasoningEffort ?? "省略参数"}` : "", Number.isFinite(current.firstTextMs) ? `首字 ${(current.firstTextMs / 1000).toFixed(1)} 秒` : "", `${elapsed.toFixed(1)} 秒`, stageMessage, current.stage === "cooldown" && retryAfterMs ? `约 ${Math.ceil(retryAfterMs / 1000)} 秒后重试` : "", current.message].filter(Boolean).join(" · ");
+      renderTextModelMetrics(meta, metaText, { document, type: true });
     }
     const timingText = formatTextModelTiming(current);
     const timingDetail = [current.requestId ? `请求 ${current.requestId.slice(0, 8)}` : "", current.attempt ? `第 ${current.attempt} 次` : "", timingText].filter(Boolean).join(" · ");
@@ -290,10 +312,13 @@ export function createTextModelPreview({ document = globalThis.document, panel, 
       timing.textContent = "";
       const summary = document.createElement("summary"); summary.textContent = "请求详情"; timing.append(summary);
       for (const value of timingDetail.split(" · ").filter(Boolean)) {
-        const item = document.createElement("span"); item.textContent = value; timing.append(item);
+        const item = document.createElement("span"); renderTextModelMetrics(item, value, { document }); timing.append(item);
       }
       renderedTiming = timingDetail;
-    } else if (!structured) timing.textContent = timingText;
+    } else if (!structured && timingText !== renderedTiming) {
+      renderTextModelMetrics(timing, timingText, { document });
+      renderedTiming = timingText;
+    }
     timing.hidden = structured ? !timingDetail : !timingText;
     if (current.text !== undefined && current.text !== renderedText) {
       renderDraft(current.text);
@@ -330,7 +355,9 @@ export function createTextModelPreview({ document = globalThis.document, panel, 
       if (elapsedTimer !== null) clearTimeout(elapsedTimer);
       failure = error;
       flush();
-      if (!structured) meta.textContent += error ? ` · ${error.message}` : " · 已结束，完整结果以校验后内容为准";
+      if (!structured) {
+        const result = document.createElement("span"); result.textContent = error ? ` · ${error.message}` : " · 已结束，完整结果以校验后内容为准"; meta.append(result);
+      }
       if (ownPanel) {
         if (error) dismissTimer = setTimeout(dispose, 5000);
         else dispose();

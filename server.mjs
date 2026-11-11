@@ -19,6 +19,7 @@ import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
 import { createConfigStore } from "./lib/config-store.mjs";
+import { withFileTransaction } from "./lib/atomic-json-file.mjs";
 import {
   appendRatioHintToPrompt,
   getAspectRatioOptions,
@@ -5107,7 +5108,7 @@ async function handleCreationGenerate(request, response) {
     if (isCreationAiMarketingEnabled(formData.get("aiMarketingEnabled")) && Number(formData.get("imageCount")) > 0) {
       const input = Object.fromEntries(formData);
       if (plan.promptPlanningMode === "ai-batch" && plan.marketingPlan) {
-        const planningContractVersion = Number(plan.marketingPlan.version) >= 9 ? 10 : Number(plan.marketingPlan.version) >= 8 ? 9 : Number(plan.marketingPlan.version) >= 7 ? 8 : Number(plan.marketingPlan.version) >= 6 ? 7 : 6;
+        const planningContractVersion = Number(plan.marketingPlan.version) >= 10 ? 11 : Number(plan.marketingPlan.version) >= 9 ? 10 : Number(plan.marketingPlan.version) >= 8 ? 9 : Number(plan.marketingPlan.version) >= 7 ? 8 : Number(plan.marketingPlan.version) >= 6 ? 7 : 6;
         if (plan.marketingPlan.inputFingerprint !== creationMarketingInputFingerprint(input, referenceImages, { planningContractVersion })) throw new Error("商品资料或规划条件已变化，请重新预览 AI 整套营销提示词。");
         const primary = plan.referenceImageRoles?.find((entry) => entry.role === "reference-product") || plan.referenceImageRoles?.find((entry) => entry.role === "product");
         const payload = { items: plan.items.filter((item) => item.itemKind === "carousel").map((item) => ({ item_id: item.itemId, image_type: item.imageType, title: item.title, marketing_goal: item.marketingAssignment?.goal, creative_brief: item.marketingAssignment?.creativeBrief, prompt: item.prompt, audience_ids: item.marketingAssignment?.audienceIds, selling_point_ids: item.marketingAssignment?.sellingPointIds, pain_point_ids: item.marketingAssignment?.painPointIds, recommendation_ids: item.marketingAssignment?.recommendationIds, fact_ids: item.marketingAssignment?.factIds, reference_indexes: item.marketingAssignment?.referenceIndexes })) };
@@ -6251,14 +6252,30 @@ async function handlePortraitRepair(request, response) {
 }
 
 async function handleCreationRepair(request, response) {
-  const writeCreationItemPartialImage = createCreationItemPartialImageWriter(response);
   response.writeHead(200, {
     "Cache-Control": "no-cache, no-transform",
     Connection: "keep-alive",
     "Content-Type": "text/event-stream; charset=utf-8",
   });
 
-  let setId = "";
+  try {
+    const formData = await readFormDataBody(request);
+    const setId = String(formData.get("setId") || "").trim();
+    if (!setId) throw new Error("缺少套图记录 ID。");
+    // 与单次文件写入分开排队，覆盖读取、生成和最终保存的整个补图操作。
+    await withFileTransaction(`${creationSetStore.manifestPath(setId)}.repair`, () => {
+      if (!isResponseWritable(response)) return;
+      return runCreationRepair(request, response, formData, setId);
+    });
+  } catch (error) {
+    writeSseEvent(response, "error", { message: error instanceof Error ? error.message : String(error) });
+  } finally {
+    if (isResponseWritable(response)) response.end();
+  }
+}
+
+async function runCreationRepair(request, response, formData, setId) {
+  const writeCreationItemPartialImage = createCreationItemPartialImageWriter(response);
   let existingSet = null;
   let items = [];
   let repairPlan = null;
@@ -6266,12 +6283,6 @@ async function handleCreationRepair(request, response) {
   let referenceImageRoles = [];
 
   try {
-    const formData = await readFormDataBody(request);
-    setId = String(formData.get("setId") || "").trim();
-    if (!setId) {
-      throw new Error("缺少套图记录 ID。");
-    }
-
     existingSet = await creationSetStore.readManifest(setId);
     items = Array.isArray(existingSet.items) ? existingSet.items : [];
     const referenceImages = await toReferenceImages([
@@ -6323,6 +6334,7 @@ async function handleCreationRepair(request, response) {
       return;
     }
 
+    for (const item of repairItems) resolveCreationRepairGenerationConfig(item, generationConfig);
     repairPlan = applyCreationPlanEvidenceRequirements(buildCreationRepairPlan(existingSet));
     repairItems = refreshCreationRepairItemsFromPlan(repairItems, repairPlan);
     const blockedRepairItems = repairItems.filter((item) => item.evidenceBlocked);
@@ -6755,10 +6767,6 @@ async function handleCreationRepair(request, response) {
       );
     }
     writeSseEvent(response, "error", { message });
-  } finally {
-    if (!response.destroyed && !response.writableEnded) {
-      response.end();
-    }
   }
 }
 

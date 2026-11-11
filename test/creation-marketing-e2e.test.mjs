@@ -473,7 +473,7 @@ test("AI marketing plans once, generates 20, preserves assignments and repairs w
   const recoveredPlan = JSON.parse(recoveredPreview.source).plan;
   assert.equal(planningCalls, beforeRecovered + 2, "ten rejected directions share one local repair request");
   assert.equal(recoveredPlan.imageCount, 18);
-  assert.equal(recoveredPlan.marketingPlan.version, 9);
+  assert.equal(recoveredPlan.marketingPlan.version, 10);
   assert.equal(recoveredPlan.marketingPlan.validation.removedItems.length, 0);
   assert.deepEqual(recoveredPlan.items.map((item) => item.marketingAssignment.sourceIndex), Array.from({ length: 18 }, (_, index) => index + 1));
   assert.deepEqual(recoveredPlan.items.map((item) => item.role), selectedRoles);
@@ -605,4 +605,13 @@ test("AI marketing plans once, generates 20, preserves assignments and repairs w
   assert.deepEqual(previousPromptGenerated.events.filter((entry) => ["error", "item_failed"].includes(entry.event)), [], previousPromptGenerated.source);
   assert.equal(imageRequests.length, beforeLegacyImages + 17);
   assert.equal(planningCalls, beforeLegacyPlanning, "version 8 frozen plans survive actual-prompt preflight");
+  const previousMeasurementPlan = structuredClone(legacyPlan);
+  previousMeasurementPlan.marketingPlan.version = 9;
+  const previousMeasurementForm = form({ imageCount: 4 });
+  previousMeasurementPlan.marketingPlan.inputFingerprint = creationMarketingInputFingerprint(Object.fromEntries(previousMeasurementForm), [{ filename: "gloves.png", base64: png }], { planningContractVersion: 10 });
+  previousMeasurementForm.set("effectivePlan", JSON.stringify(previousMeasurementPlan));
+  const previousMeasurementGenerated = await post("/api/creation/generate", previousMeasurementForm);
+  assert.deepEqual(previousMeasurementGenerated.events.filter((entry) => ["error", "item_failed"].includes(entry.event)), [], previousMeasurementGenerated.source);
+  assert.equal(imageRequests.length, beforeLegacyImages + 21);
+  assert.equal(planningCalls, beforeLegacyPlanning, "version 9 frozen plans survive measurement-scope correction");
 });

@@ -1,50 +1,33 @@
 # GPT-Image2-Studio
 
-<div align="center">
+[![Version](https://img.shields.io/badge/version-v0.2.148-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases/latest) [![CI](https://github.com/aEboli/GPT-Image2-Studio/actions/workflows/ci.yml/badge.svg)](https://github.com/aEboli/GPT-Image2-Studio/actions/workflows/ci.yml) [![Windows](https://img.shields.io/badge/Windows-x64-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases/latest)
 
-[![Version](https://img.shields.io/badge/version-v0.2.138-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
-[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933.svg)](https://nodejs.org/)
-[![Windows](https://img.shields.io/badge/Windows-Installers-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases)
+**An AI image and visual production workbench that runs on your computer.**
 
-**A local-first AI image generation and visual production workbench**
+Create and edit images, plan ecommerce sets, draft multilingual listings, and turn articles or documents into illustrations and slides. Keep references, generation queues, retries, and saved assets together in a browser or a dedicated Windows app.
 
-Prompt-to-image, reference analysis, editing, ecommerce sets, portraits, article illustrations, PPT generation, and asset history in one browser-based workspace.
+**English** · [简体中文](./README.zh-CN.md)
 
-Current version: `v0.2.138`
+[Download](https://github.com/aEboli/GPT-Image2-Studio/releases/latest) · [Quick start](#quick-start) · [API setup](#api-setup) · [Workflows](#workflows) · [Documentation](#documentation)
 
-[Chinese README](./README.zh-CN.md)
+Current version: `v0.2.148`
 
-</div>
-
-<p align="center">
-  <a href="#quick-start">Quick start</a> ·
-  <a href="#configuration">API setup</a> ·
-  <a href="#core-capabilities">Capabilities</a> ·
-  <a href="#workflow-map">Workflows</a> ·
-  <a href="#development-and-verification">Development</a> ·
-  <a href="#releases">Releases</a>
-</p>
+![Prompt-to-image workbench](./docs/images/studio-prompt.jpg)
 
 ## Quick start
 
-Installing is not enough on its own: nothing generates until you enter your own API credentials. On a first run, follow [Beginner API setup](#beginner-api-setup).
+### Windows
 
-### Choose a path
+Choose a package from [the latest release](https://github.com/aEboli/GPT-Image2-Studio/releases/latest):
 
-| Goal | Recommended start | What you get |
-| --- | --- | --- |
-| Use Studio on Windows | Download the [desktop installer](https://github.com/aEboli/GPT-Image2-Studio/releases) | A self-contained Electron window; Node.js is not required after installation |
-| Try or develop locally | Run the source service with Node.js 20+ | Direct access to the UI and server source, local files, and development commands |
-| Host a preview | Deploy the repository with Vercel | A browser endpoint for validation; use temporary storage and validate long jobs before production |
+- **[Desktop installer](https://github.com/aEboli/GPT-Image2-Studio/releases/latest/download/GPT-Image2-Studio-Desktop-Setup-v0.2.148-x64.exe)** — install the app and launch it from the desktop or Start menu.
+- **[Portable ZIP](https://github.com/aEboli/GPT-Image2-Studio/releases/latest/download/GPT-Image2-Studio-Portable-v0.2.148-x64.zip)** — extract the entire archive, then run `GPT-Image2-Studio.exe`.
 
-The desktop installer is the shortest path for daily Windows use. Use the portable ZIP when you do not want an install record. Use the source checkout when you need local development or want to inspect the generated files.
+Both packages include the runtime; no separate Node.js installation is needed. Keep all portable files together. Installation, data paths, and build instructions are in the [Windows desktop guide](./docs/windows-desktop.md).
 
-### Run from source
+### From source
 
-Requirements:
-
-- Node.js 20 or newer for the local service.
-- An OpenAI API key or credentials for a compatible image service.
+Use **Node.js 22.12+** for the full development checkout, including Electron. The standalone Node.js service supports Node.js 20+.
 
 ```powershell
 git clone https://github.com/aEboli/GPT-Image2-Studio.git
@@ -53,524 +36,127 @@ cmd /c npm ci
 cmd /c npm start
 ```
 
-Open `http://127.0.0.1:3600`. To use another free port:
+Open **http://127.0.0.1:3600**. To use a different port, set `PORT` before starting:
 
 ```powershell
 $env:PORT="3601"
 cmd /c npm start
 ```
 
-On Windows, `launch-studio.cmd` starts the workbench and `stop-studio-services.cmd` stops this project's services on ports 3600-3606. The launcher, Native Messaging install/uninstall scripts, and image-asset scripts require [PowerShell 7.4 or newer](https://learn.microsoft.com/powershell/scripting/install/installing-powershell-on-windows) through `pwsh.exe`; they do not fall back to Windows PowerShell 5.1. Reopen the terminal after installing PowerShell and confirm it with `pwsh --version`.
+On Windows, `launch-studio.cmd` provides a browser launcher and accepts `-Port 3601`. It requires PowerShell 7.4+ (`pwsh.exe`). The `npm start` and desktop app paths do not require PowerShell 7.
 
-Start the launcher on another port with `launch-studio.cmd -Port 3601`, or call the script directly:
+## API setup
 
-```powershell
-pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./launch-studio.ps1 -Root "project directory" -Port 3601
-```
+Studio requires **your own API credentials and model access**. Model usage is billed by the provider you configure.
 
-The pure Node.js/Electron start commands and `stop-studio-services.cmd` do not require PowerShell 7. The legacy IExpress installer only needs PowerShell 7.4+ to extract its archive when `tar.exe` is unavailable.
+1. Open **Configuration / 配置**. Use **CN / EN** to switch the interface language.
+2. Select a channel and enter its base URL, API key, and model name.
+3. Test the connection, fetch the available models if supported, and **save**.
+4. Open **Prompt-to-image**, enter a short prompt, and try one image at the default size.
 
-### Windows desktop app (recommended)
-
-Download `GPT-Image2-Studio-Desktop-Setup-v0.2.138-x64.exe` from [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). The Electron app runs in a dedicated window and includes its runtime, so Node.js is not required after installation. See [Windows desktop documentation](./docs/windows-desktop.md).
-
-For a no-install desktop copy, download `GPT-Image2-Studio-Portable-v0.2.138-x64.zip`, extract the complete archive, and run `GPT-Image2-Studio.exe` at the archive root. Keep the extracted files together; this portable copy does not create an installer entry or uninstall record.
-
-For desktop development, Electron 43 requires Node.js 22.12 or newer:
-
-```powershell
-cmd /c npm ci
-cmd /c npm run desktop
-```
-
-### Windows browser installer
-
-The legacy browser-installer flow remains documented for local builds, but the `v0.2.138` GitHub Release does not include its IExpress package. Use the desktop NSIS installer or the portable ZIP above; see [Windows installer documentation](./docs/windows-installer.md) only if you need to build the compatibility flow yourself.
-
-## Configuration
-
-### Beginner API setup
-
-Start here on a first run. Studio ships no model quota and never holds keys for you. It stores your own API credentials on the local machine and calls the service you choose with them.
-
-#### Step 1: collect three things
-
-| What you need | Meaning | Example |
-| --- | --- | --- |
-| Base URL | The API root the provider gives you, usually ending in `/v1` | `https://api.openai.com/v1` |
-| API key | The key created in the provider's console | `sk-****` |
-| Model name | A model identifier spelled the way that provider spells it | `gpt-6-luna`, `gpt-image-2` |
-
-Create keys in the OpenAI console for the official channel; compatible services and third-party gateways publish their own base URL and key. Billing, rate limits, and content policy come from the provider you configure.
-
-#### Step 2: open the configuration panel
-
-- From source: run `cmd /c npm start` and open `http://127.0.0.1:3600`.
-- Desktop app: launch `GPT-Image2-Studio`. The built-in service uses a dynamic loopback port, so there is no address to type.
-- Click **配置** (Configuration) in the top-right corner, or use the top navigation **配置 → 配置 API**. The panel opens on the configuration sections.
-- The drawer header carries a `CN` / `EN` switch. Press `EN` once and the whole interface, including every label below, turns English.
-- Until a save succeeds, the top-right status stays on `配置未保存` (Configuration not saved).
-
-#### Step 3: pick one configuration section
-
-The drawer opens on four mutually exclusive sections: **GPT**, **Gemini**, **Grok**, and **配色** (Palette). Selecting GPT reveals a **路由模式** (Route mode) / **直连模式** (Direct mode) switch directly below the section row. Only the selected section's fields are shown; inactive connection controls and Fetch Models buttons stay disabled. Palette contains no connection fields.
-
-Each image route stores its connection settings independently, and only the active route is used for image generation. When in doubt, keep GPT's default Route mode.
-
-| Section | Fits a provider that | You fill in |
-| --- | --- | --- |
-| GPT / Route mode (default) | Supports `POST /responses` with the `image_generation` tool, such as OpenAI itself or a gateway aligned with it | Endpoint URL, API key, Responses model |
-| GPT / Direct mode | Only offers `images/generations` or `chat/completions`, or when image and text come from two different providers | Independent image and text/vision settings |
-| Gemini | Serves Gemini image models over an OpenAI-compatible image-generation protocol | Base URL, API key, image model |
-| Grok | xAI or a gateway implementing the Grok Imagine image protocol | Base URL, API key, image endpoint, image model |
-| Palette | Not a call channel. Holds the interface palette instead | Nothing; selecting a provider section again restores the connection fields |
-
-Selecting **配色** hides the connection fields and shows 12 palette swatches in a four-column grid. The default palette is `黑曜` (Obsidian); `靛蓝` (Indigo) remains available alongside palettes inspired by Chinese traditional colours. The selected palette is saved locally and mirrored to the embedded Temu workbench.
-
-Switching to **配色** and back does not change the active image route; the top-right status keeps reporting that route.
-
-Long explanations are available from their hover/focus help markers; the configuration form and generation log scroll independently, while the log heading and section switch stay visible.
-
-#### Step 4: fill in the fields for that channel
-
-**Route mode.** The endpoint suffix is fixed to `responses`:
-
-```text
-Endpoint URL: https://api.openai.com/v1
-API key:      sk-****
-Responses model: gpt-6-luna
-```
-
-The default text/vision model is `gpt-6-luna`. Existing non-empty model settings remain in effect until you change them.
-
-The Responses model is the outer model. The image tool model is chosen from the **生图工具模型** dropdown right below it, and the prompt page parameter row echoes it as `工具模型 <model>`. The dropdown is the only way to set it — there is no free-text field:
-
-| Option | Notes |
+| Channel | Configuration |
 | --- | --- |
-| `gpt-image-2` | Default. |
-| `gpt-image-2.5-sunburst` | Most capable; more precise editing, longer generation times. |
-| `gpt-image-2.5-flare` | Fast, high-quality everyday generation. |
+| GPT · Route | A Responses connection with an image-generation tool. |
+| GPT · Direct | Separate image and text/vision connections; they can use different providers. |
+| Gemini | An image connection compatible with the selected Gemini route. |
+| Grok | A Grok image-generation/editing connection. |
 
-The **发送 tools[].model** switch is on by default, so Route requests send the selected allowlisted image-tool model. Older configurations without the field also default to on. An explicitly saved false remains off, and partial configuration saves retain the existing setting. When off, requests omit `tools[].model` and let the configured service choose the tool model; the dropdown selection and queued snapshots are retained.
+Text planning, analysis, and Listing drafts use the configured text/vision connection. A successful connection test verifies the model-list endpoint; check actual generation with the model and format you intend to use.
 
-The prompt page parameter row also has a **质量** (quality) dropdown: `low`, `medium`, `high` (default), plus `xhigh` and `max`, which exist only on the 2.5 models. Switching back to `gpt-image-2` while `xhigh`/`max` is selected clamps quality to `high`. Grok offers only `low` and `medium`, defaulting to `medium`; quality selections are remembered separately for GPT, Gemini, and Grok. Legacy automatic values migrate to concrete defaults and are never offered as options or sent upstream. Prompt-to-image also has an optional **透明背景** (transparent background) switch on GPT's Route and Direct image routes. Enabling it forces PNG, sends `background=transparent`, and stores the choice with the queued job. Gemini and Grok keep this switch hidden and do not send a background parameter.
+See [API configuration](./docs/configuration.md) for channel fields, model mappings, environment variables, and troubleshooting. Available models and accepted formats depend on your provider and account.
 
-**Direct mode** splits into two independent groups. The image group only generates and edits images; the text/vision group handles prompt enhancement, reference analysis, Listing drafts, and other model calls. The two groups can point at different providers:
+## Workflows
 
-```text
-Image API:       https://api.openai.com/v1   suffix images/generations   model gpt-image-2
-Text/vision API: https://api.openai.com/v1   suffix responses            model gpt-6-luna
-```
-
-If a provider uses a different image-model name, add a **生图模型映射** (Image model mapping) below **流式输出** (Streaming output), using `request model → actual request model`, for example `gpt-image-2.6-sunburst → IMAGE-2.6`: the left side matches the model named in the request, and the right side is the model ID actually sent to the provider. Both capsules accept manual IDs or model candidates; Fetch Models updates the mapping candidates too. Add or remove multiple rules, then save to persist them. Removing all rules and saving clears the mapping.
-
-Rules match complete, case-sensitive IDs once and apply only to GPT Direct image generation and editing. Unmatched models keep their original IDs. Text/vision models and other channels remain independent, known-model capability checks are retained, and queued jobs keep their original mapping snapshots.
-
-**Gemini.** The image endpoint suffix is fixed to `images/generations` and displayed in the same position as the GPT and Grok suffix controls:
-
-```text
-Base URL:    https://api.vendor.example/v1
-API key:     <key from the provider>
-Image model: gemini-3.1-flash-image-preview
-```
-
-**Grok.** Uses the xAI image-generation and editing JSON protocol with its own connection settings:
-
-```text
-Base URL:    https://api.x.ai/v1
-API key:     <xAI key or a compatible provider's key>
-Endpoint:    images/generations
-Image model: grok-imagine-image-2.0
-```
-
-Requests with references use `/images/edits`; one request accepts at most five reference images. The app maps the selected dimensions to `1k` or `2k`, matches unsupported ratios to the nearest supported Grok ratio, and sends only `low` or `medium` quality. Grok image calls omit GPT reasoning effort, output-format and background parameters, and do not support local mask editing. Text/vision planning continues through the separately configured GPT channel.
-
-If the provider gave you one complete address instead, press **完整 URL** (Full URL) next to the endpoint field and paste the whole thing, for example `https://vendor.example/v1/responses`. Studio splits it into a base URL and an endpoint suffix.
-
-Leave the generation scheduling card at its defaults (`20` concurrent requests, `1000` ms between submissions). The concurrency value is the total limit across image-generation modes in the current session. Both fields lock while any generation task is running.
-
-#### Step 5: test the connection, then save
-
-- Press **测试连接** (Test connection). For the selected channel it requests `GET <base URL>/v1/models` (appending `/v1` when the address does not already end with it) using `Authorization: Bearer <your key>`. A key you just typed and have not saved yet is included in that test.
-- **获取模型列表** (Fetch Models) uses the same endpoint, so you can pick a model name from the list instead of typing it.
-- Press **保存** (Save). The top-right status turns into `配置已保存` (Configuration saved) and a masked hint appears next to the API key field.
-- Saving with the API key box empty keeps the previously saved key rather than clearing it.
-
-A passing connection test only proves that the credentials and the `/models` endpoint work. It is not proof that the channel supports generation, editing, references, or the largest sizes. Some gateways never implement `/models`, so the test can fail while generation still works: type the model name by hand, save, and verify with one real generation.
-
-#### Step 6: generate one image to confirm
-
-Close the panel, go back to **提示词生图** (Prompt-to-image), write one short prompt, choose `1:1`, and use the concrete default resolution (`1024x1024` on GPT, `1K` on Gemini; Grok derives `1k` from the square default). Progress shows on the preview stage; the full log lives in the configuration drawer's `生成日志` (Generation log) panel, beside the fields on wide screens and below them on narrow screens. Where the current-call parameter summary is visible, it also shows the selected image service's clickable origin (`scheme://host[:port]`) without the API path or credentials. A successful image is written to:
-
-```text
-%USERPROFILE%\Pictures\YYYY-MM\MM-DD\prompt\
-```
-
-#### Common first-run problems
-
-| Symptom | Usual cause | What to do |
-| --- | --- | --- |
-| Status stays on `配置未保存` | Save was never pressed, or the filled-in group is not the selected channel | Confirm the selected channel is the group you filled in, then save |
-| Test connection returns 401 or reports an invalid key | Wrong key, whitespace pasted with it, or a key that does not belong to that base URL | Paste the key again and confirm key and address come from the same provider |
-| Test connection returns 404, or reports no callable model | The provider serves no `/models` list | Skip the test, type the model name, save, and verify with a real generation |
-| Generation reports an unknown model | The identifier is not spelled the way that provider spells it | Use Fetch Models to read the real names |
-| Route mode fails for images while text calls succeed | The provider does not support the Responses `image_generation` tool | Switch to direct-call mode and set the image suffix to `images/generations` |
-| A token or remote authentication prompt appears | You are reaching the local service over a non-loopback address | See [Remote access](#remote-access) |
-
-Configuration stays local: the Node service writes `.local/config.json`, the desktop build writes the Electron app-data directory, and cloud deployments keep private values in the browser. Do not leave keys on a shared machine.
-
-### Configure in the UI
-
-The first-run walkthrough is in [Beginner API setup](#beginner-api-setup). Existing installations using `directBaseUrl`, `directApiKey`, `directEndpointPath`, `directImageModel`, and `directResponsesModel` continue to work as a bounded compatibility fallback. New channel-specific values take precedence independently, and a blank key input keeps the previously saved private key.
-
-#### Reusable API list
-
-Each endpoint field carries a toggle that opens the list of endpoints you have already saved, so switching providers no longer overwrites the previous one. Selecting an entry fills that channel's endpoint URL, endpoint suffix, and matching key together — the key follows the address rather than being picked separately. The model is left alone, and **保存** (Save) still has to be pressed.
-
-- The five endpoint fields (GPT Route, GPT Direct image, GPT Direct text/vision, Gemini, and Grok) have isolated lists, each capped at 20 entries. Saving or deleting an entry in one list never changes another list.
-- An entry's identity is "endpoint URL + key", so a second key for the same provider is a separate entry. A combination missing either part is not recorded, because it could not be restored as a set.
-- The suffix only follows along when the current channel actually offers that option, so a stored `responses` never overwrites the direct image channel's `images/generations`.
-- Each row shows the address above and `suffix · masked key` below, with a delete button that only removes it from the list and leaves the saved configuration untouched.
-- The lists live solely in browser `localStorage` (`image-studio-api-endpoint-books-v2`). Legacy v1 history is assigned only to GPT Route, not copied into every channel. Nothing is added to `.local/config.json`, `.env`, or `/api/config`; request payloads never carry these lists, and they are not shared with the desktop build or other browsers. Plaintext keys never reach the DOM; rows render only the address and a mask.
-
-Common endpoint suffixes:
-
-| Suffix | Typical use |
+| Workspace | What you can do |
 | --- | --- |
-| `responses` | Responses-style routed requests |
-| `chat/completions` | Chat Completions-compatible gateways |
-| `images/generations` | Direct image generation |
-| `images/edits` | Image editing requests |
+| **Image creation** | Generate from prompts and references, enhance prompts, and manage queued tasks. |
+| **Image editing** | Edit a whole image or selected regions; transfer styles, blend references, and decompose product images. |
+| **Image-to-prompt** | Extract reusable subject, composition, and visual-style instructions from a reference. |
+| **Ecommerce sets** | Plan product and SKU images, create a coordinated set, and repair individual results. |
+| **Listing drafts** | Generate or regenerate selected records; review and copy multilingual titles and product copy. |
+| **Portraits** | Plan and generate a series from person, clothing, pose, and scene references. |
+| **Article illustrations** | Build a storyboard and coordinated illustrations from article content. |
+| **PPT** | Turn documents or a topic into slide images and export PPTX. |
+| **Asset library** | Browse, filter, inspect, download, and revisit saved results and generation records. |
 
-Direct-call environment variables are split by purpose:
+GPT prompt workflows offer PNG, JPG, WebP, GIF, and SVG controls where the configured model supports them. GIF/SVG requests have additional restrictions; ecommerce, portrait, article, and PPT image slots remain static workflows. See the [format and parameter reference](./docs/reference.md).
 
-| Variables | Purpose |
-| --- | --- |
-| `DIRECT_IMAGE_BASE_URL`, `DIRECT_IMAGE_API_KEY`, `DIRECT_IMAGE_ENDPOINT_PATH`, `DIRECT_IMAGE_MODEL` | Direct image-generation and editing channel |
-| `DIRECT_TEXT_BASE_URL`, `DIRECT_TEXT_API_KEY`, `DIRECT_TEXT_ENDPOINT_PATH`, `DIRECT_TEXT_MODEL` | Direct text/vision analysis channel |
-| `GROK_BASE_URL`, `GROK_API_KEY`, `GROK_ENDPOINT_PATH`, `GROK_IMAGE_MODEL` | Independent Grok image-generation and editing channel |
-| `DIRECT_BASE_URL`, `DIRECT_API_KEY`, `DIRECT_ENDPOINT_PATH`, `DIRECT_RESPONSES_MODEL` | Legacy fallback accepted for existing configurations |
+### Ecommerce tools
 
-### Environment variables
+- **Temu workbook:** open the built-in editing workbench, maintain product and SKU fields, import Studio records explicitly, and export the template workbook. Batch quick export is available in the same panel.
+- **Product image collector:** optionally collect and review images from supported product pages in Chrome or Edge. Follow the [extension guide](./extensions/product-image-collector/README.md) to install it.
+- **Multilingual titles:** review English, German, Spanish, French, Italian, Polish, and Chinese titles when those translations are present. Non-title fields retain their existing language rules.
 
-Copy `.env.example` for a local starting point. Important variables include:
+Listing drafts and exported workbooks require review. Studio does not log in to a marketplace or publish products automatically.
 
-```text
-OPENAI_API_KEY=your_api_key_here
-OPENAI_BASE_URL=https://api.openai.com/v1
-RESPONSES_MODEL=gpt-6-luna
-IMAGE_TOOL_MODEL=gpt-image-2
-IMAGE_QUALITY=high
-DIRECT_IMAGE_BASE_URL=https://api.openai.com/v1
-DIRECT_IMAGE_API_KEY=
-DIRECT_IMAGE_ENDPOINT_PATH=images/generations
-DIRECT_IMAGE_MODEL=gpt-image-2
-DIRECT_TEXT_BASE_URL=https://api.openai.com/v1
-DIRECT_TEXT_API_KEY=
-DIRECT_TEXT_ENDPOINT_PATH=responses
-DIRECT_TEXT_MODEL=gpt-6-luna
-GROK_BASE_URL=https://api.x.ai/v1
-GROK_API_KEY=
-GROK_ENDPOINT_PATH=images/generations
-GROK_IMAGE_MODEL=grok-imagine-image-2.0
-HOST=
-PORT=3600
-IMAGE_STUDIO_OUTPUT_DIR=
-IMAGE_STUDIO_LOCAL_DATA_DIR=
-IMAGE_STUDIO_REQUEST_TOKEN=
-IMAGE_STUDIO_ALLOW_INSECURE_REMOTE_HTTP=0
-IMAGE_STUDIO_DISABLE_DNS_FALLBACK=0
-IMAGE_STUDIO_DNS_FALLBACK_SERVERS=
-```
+## Interface previews
 
-The Node service keeps the system `dns.lookup` path first. When system resolution fails, the fallback sequence defaults to `223.5.5.5`, `1.1.1.1`, then the system's existing servers. Set `IMAGE_STUDIO_DISABLE_DNS_FALLBACK=1` to disable it, or provide a comma-, semicolon-, or space-separated list in `IMAGE_STUDIO_DNS_FALLBACK_SERVERS`.
+These are interface examples; sample content is not a guarantee of model output. Open a section to view its screenshot at full width.
 
-### Remote access
+<details>
+<summary>Ecommerce set planning</summary>
 
-The default listener is `127.0.0.1`. Do not expose it directly to the public internet. Non-loopback requests require the startup token through HTTP Basic, `Authorization: Bearer <token>`, or `X-Image-Studio-Token: <token>`. A reverse proxy must terminate TLS, authenticate users, enforce request limits, and inject an explicit fixed token for each backend request. Read [SECURITY.md](./SECURITY.md) before enabling LAN or hosted access.
+![Ecommerce set planning](./docs/images/creation-suite.jpg)
 
-## Why this workbench
+</details>
 
-GPT-Image2-Studio is designed for creators, ecommerce operators, designers, and content teams who need more than a single image prompt. It keeps references, plans, queued jobs, retries, generated assets, and request metadata together while preserving a local-first trust boundary.
-
-The same application can run in three ways:
-
-| Runtime | Best for | Data boundary |
-| --- | --- | --- |
-| Local Node.js service | Full daily workflow and development | Configuration, records, and outputs stay on the local machine by default |
-| Windows desktop app | A dedicated window, taskbar identity, and standard uninstall flow | Electron provides the runtime; closing the last window stops the local service |
-| Windows browser installer | The legacy browser-launch workflow | The installer includes `node.exe` and opens the default browser |
-
-The repository also contains a Vercel configuration. Vercel functions use temporary storage, so Preview validation is required for long jobs, SSE, and file lifecycles before production deployment.
-
-### Reverse a reference image into a prompt
-
-Open **Image-to-prompt** from the top bar or the Create menu, upload one image, and analyze it. The reusable JSON keeps detailed subject and framing fields and gives `visual` a prioritized style lock for the source medium, aesthetic, palette, lighting, material response, depth, and finishing. It also asks for a sharply focused subject, naturally clear source-visible texture, clean edges, and a `4K/8K` visual-quality intent; this wording does not guarantee the generated image's pixel dimensions. `avoid` targets plausible style drift, accidental blur, artifacts, and unrelated clutter while preserving intentional bokeh, soft focus, grain, or motion. Copy the JSON into the prompt workflow to keep those source-specific visual cues explicit during a second generation.
-
-## GPT Image 2.6
-
-Choose **gpt-image-2.6-sunburst** or **gpt-image-2.6-flare** in configuration. Existing model selections remain unchanged. Route A uses Responses; “Send tools[].model” now defaults to on. If previously disabled explicitly, enable it for advanced features. Route B supports Images API or Responses; Responses keeps its outer text model separate from the image tool model.
-
-All GPT prompt-generation models and direct aliases on routes A/B share Auto / PNG / JPG / WebP / GIF animation / SVG vector shortcuts. Auto is the default: explicit format or animation requests select that format; otherwise PNG is used. Animation styles and format names within depicted text do not imply an animated output. Manual choices take priority, with conflicts shown as advisory messages. Unconfirmed model format support is also advisory: requests retain the chosen format for the provider to accept or reject, without a PNG fallback. The effective format, selection source, and GIF timing appear before Generate and are frozen when queued. GIF frames and timing are editable there; More 2.6 settings opens the shared advanced panel for 2.6 models.
-
-The shared advanced panel exposes complexity, background, compression, partial previews, size override, candidate count, GIF frames/timing, and SVG author settings. Blank fields retain upstream defaults. Image complexity, render quality, outer reasoning, and SVG author reasoning remain independent. The 2.6 quality choices include auto, low, medium, high, xhigh, and max.
-
-- Prompt generation supports PNG, JPG, WebP, GIF, and SVG. Ordinary Images requests support 1–10 candidates and up to 16 references; GIF/SVG generation requires no reference image.
-- Image editing adds a markup strategy using the existing drawing canvas. It submits a transparent PNG matching the source dimensions; markup and mask are mutually exclusive.
-- GIF originals retain animation and support pause/play in the lightbox. GIF requests that return PNG or a single-frame GIF report a format or animation validation error. SVG gallery tiles, filmstrip images, and details prefer the validated vector original even when a bitmap thumbnail is cached. Tiles identify SVG vectors and download controls explicitly offer the SVG original. Downloads retain GIF/SVG/WebP rather than silently converting to PNG.
-- Ecommerce, portrait, article, and PPT image slots remain static, single-result workflows with applicable shared options. Task snapshots and repairs preserve advanced settings.
-- Images GIF/SVG requests use JSON completion. Responses GIF may retain lifecycle SSE; neither requests partial image previews. Transparency requires PNG/WebP; compression applies to JPG/WebP.
-
-GIF requires preview access, and selecting an SVG author model requires separate permission. Leave SVG author settings blank without that access. GIF defaults to 9 frames at 200 ms. The guide permits 2–64 frames while the current API reference/SDK says 2–16; 17–64 requires provider verification. Custom sizes receive basic positive-integer validation; actual bounds remain provider/model enforced. Unsupported combinations surface errors without changing the selected model or format.
-
-CLI examples:
-
-~~~powershell
-cmd /c npm run generate -- --image-model gpt-image-2.6-flare --endpoint images/generations --prompt "A simple blue icon" --format svg --output ./output/icon.svg
-cmd /c npm run generate -- --image-model gpt-image-2.6-sunburst --endpoint images/generations --prompt "A looping floating balloon" --format gif --frame-count 9 --frame-duration-ms 200 --output ./output/balloon.gif
-~~~
-
-Run npm run help for all flags. Mock transport integration, browser checks, and Electron startup were verified; this development configuration has no usable API key, so real model calls and account permissions remain unverified. See the [v0.2.127 release notes](./docs/releases/v0.2.127.md).
-
-## Core capabilities
-
-### Image creation
-
-- **Prompt-to-image** with up to 15 reference images, prompt enhancement, aspect-ratio presets, explicit pixel sizes, PNG/JPG output or a transparent PNG, and live progress. The editable English enhancement default prioritizes the original prompt and references, targets a clearer image while preserving intentional softness, grain, pixel art, and minimalism; its `8K` wording describes visual intent, not output dimensions.
-- **Style transfer** with a separate source image, style reference, built-in presets, and a two-image before/after comparison viewer.
-- **Reference analysis** that turns 1-15 images into structured subjects, relationships, risks, and an applied generation prompt.
-- **Image decomposition** for products, devices, and packaging, producing structured callouts and selling-point visuals.
-- **Image editing** for whole-image changes or multiple local masks, with merged or sequential region execution.
-- **Quick blend** that pairs A/B/C/D material groups by index for repeatable batch composition.
-- **Browser-local compression** with resizing, format conversion, quality/target-size controls, and no upload to the image service.
-
-### Commerce and content workflows
-
-- **Ecommerce sets** with reference analysis, evidence-grounded product facts, category and SKU planning, frozen carousel plans, retries, and Listing drafts. AI marketing can plan batches of independent sets with up to two plans running concurrently, validate each plan, and enqueue it through the existing set queue; failures pause later plans and can resume without re-enqueueing completed work. Quality review checks supported functional visuals, the core buying reason, and repeated image tasks. The universal profile provides 18 addressable carousel slots; automatic plans distribute distinct scene and information tasks from supplied evidence and block unsupported canvas claims. Named marketplace IDs fall back to the universal profile, while Listing drafts use their separate policy registry. A separate logo-batch branch adds one uploaded Logo to up to 15 source images.
-- **Portrait mode** for consistent people, actions, clothing, props, locations, framing, and 1-100 image batches.
-- **Article illustration mode** for text packages, style bibles, character and scene references, reading-order storyboards, and final illustrations.
-- **PPT generation** from PDF, DOCX, PPTX, TXT, Markdown, CSV, pasted text, or a topic; supports 1-20 pages, page repair, image-based PPTX, and editable reconstruction.
-- **Independent generation controls** in Creation, Portrait, Article Illustration, and PPT: each mode has its own reasoning-effort and quality selectors, and queued work, repairs, missing-slide completion, and slide edits retain those values.
-
-### Assets and operations
-
-- Waterfall gallery and a shared lightbox with fit, zoom, pan, download, deletion, prompt review, and request-parameter inspection. Creation results show the exact saved generation prompt and recorded per-image parameters; missing historical values are shown as unrecorded instead of inferred from current settings.
-- Separate records for Creation sets, portraits, article illustrations, and PPT decks.
-- Background queue status, progress, structured errors, and retry of failed items. Creation queue entries show both their position and product name; the output header identifies the set currently being viewed, including its marketing plan/copy or queue position when available.
-- Generated images use time-prefixed descriptive filenames; set items retain sequence numbers, collisions receive suffixes, and gallery downloads use the saved filename.
-- Generation log rows retain each task's endpoint and show a concise output filename; failed items keep their error details.
-- **Prompt Kit** includes 520 source-attributed YouMind GPT Image 2.5 and GPT Image 2 prompt-and-image pairs (321 and 199 respectively). Browse by use case, visual style, or subject; filter by model, search or sort the collection, inspect the original source, and apply prompts from list or image views. Images are bundled locally, and entries retain their source-page and CC BY 4.0 attribution. Existing personal templates and Prompt Agent history are preserved.
-- **Image-to-prompt** returns structured JSON with a dedicated style-lock vocabulary for medium, aesthetic, palette, lighting, material, depth, and finishing, plus image-specific style-drift constraints.
-- A compact GPT / Gemini / Grok / Palette configuration drawer, with GPT's Route / Direct switch directly below the section row, isolated API history, aligned endpoint fields, hover/focus help, and an independently scrolling generation log. Saved API entries restore their channel's model selection along with its address, suffix, and key; keys are masked in the picker. The current-call summary includes the outbound request IP and a clickable image-service origin. Twelve interface palettes are shown four per row, with `黑曜` (Obsidian) as the default.
-- Dark/light themes, Chinese/English UI, and responsive desktop, tablet, and mobile layouts.
-
-## Interface preview
-
-These screenshots come from isolated browser sessions of the current workbench. They show layout and interaction structure; prompts and generated results are examples, not a promise of fixed upstream model output.
-
-### Prompt-to-image
-
-![Prompt-to-image workspace](./docs/images/studio-prompt.jpg)
+<details>
+<summary>Style transfer and image editing</summary>
 
 ### Style transfer
 
-![Style transfer workspace](./docs/images/style-transfer.jpg)
+![Style transfer](./docs/images/style-transfer.jpg)
 
 ### Image editing
 
-![Image editing workspace](./docs/images/image-edit.jpg)
+![Image editing](./docs/images/image-edit.jpg)
 
-### Ecommerce set planning
+</details>
 
-![Ecommerce set workspace](./docs/images/creation-suite.jpg)
+<details>
+<summary>Portraits, article illustrations, and PPT</summary>
 
-### Portrait mode
+### Portraits
 
-![Portrait mode workspace](./docs/images/portrait-mode.jpg)
+![Portrait workspace](./docs/images/portrait-mode.jpg)
 
 ### Article illustrations
 
 ![Article illustration workspace](./docs/images/article-illustration.jpg)
 
-### PPT generation
+### PPT
 
-![PPT generation workspace](./docs/images/ppt-generation.jpg)
+![PPT workspace](./docs/images/ppt-generation.jpg)
 
-### Gallery
+</details>
 
-![Waterfall gallery workspace](./docs/images/gallery.jpg)
+<details>
+<summary>Asset gallery</summary>
 
-## Workflow map
+![Asset gallery](./docs/images/gallery.jpg)
 
-| Workflow | Inputs | Result |
-| --- | --- | --- |
-| Prompt-to-image | Prompt, up to 15 references, optional enhancement, ratio, size, format, optional transparent background | PNG/JPG assets or transparent PNGs, progress, filmstrip, download, metadata review, and the current service origin |
-| Image-to-prompt | One image | Reusable subject and framing JSON with prioritized source-style anchors, crisp subject/texture intent, `4K/8K` visual-quality wording, and image-specific drift constraints |
-| Style transfer | Source image, style image or preset, optional prompt | A generated result plus a before/after preset comparison |
-| Reference analysis | 1-15 images, analysis language, target description | Structured analysis and an optional generation prompt/result |
-| Image decomposition | One product/device/package image and a decomposition brief | Callout or infographic-style PNG/JPG and saved analysis |
-| Image editing | Source image, whole-image instruction, or local masks | Edited PNG/JPG, region retry, and lightbox review |
-| Quick blend | Indexed A/B groups, optional C/D groups, layout settings | One independent generation task per matched group |
-| Ecommerce set | Product facts, references, platform, category, SKU | Frozen carousel plan, generated set, Listing draft, and record; separate logo-batch processing for uploaded source images |
-| Portraits | Person/action/clothing references, location, style, framing, count | A consistent 1-100 image series and retryable record |
-| Article illustrations | Text package or pasted article, style and content type | Style bible, reference cards, storyboard, and PNG illustrations |
-| PPT | Documents, text, or topic; 1-20 pages | Page PNGs, image-based PPTX, or editable reconstructed PPTX |
+</details>
 
-## Temu Excel export
+## Data and deployment
 
-Select one or more Creation records, open **temuexcel导出工作台**, and switch to **Batch quick export**. The exporter uses the versioned template shipped in the repository, writes one row per SKU, reuses public HTTPS image URLs, and can convert local images through a Cloudinary unsigned upload (`cloudName` plus `uploadPreset`). It never asks for or stores a Cloudinary API key, API secret, signature, Authorization header, or browser cookie.
+Local outputs default to `%USERPROFILE%\Pictures\YYYY-MM\MM-DD\`; record indexes normally live under `%USERPROFILE%\Pictures\json\`. Use `IMAGE_STUDIO_OUTPUT_DIR` to choose an output location. Desktop configuration lives under `%APPDATA%\GPT-Image2-Studio`; source-mode private service configuration lives in `.local/`.
 
-This is a local Node.js / Windows desktop capability. It does not log in to Temu, import the workbook, solve verification challenges, or publish a product. Missing product facts or public images remain blank and are reported in the `Export issues` sheet. Review the workbook and Temu's current validation results before uploading.
+Credentials and saved assets stay in the selected runtime's storage. Prompts, reference images, and requests are sent to the API provider you configure. Keep `.env`, `.local/`, generated assets, and real request logs out of commits.
 
-### Temu listing workbench
+The repository includes `vercel.json` for cloud deployment. Vercel runtime files use temporary storage: validate SSE, job duration, and persistence needs before relying on a hosted deployment. Local or desktop use is the default for persistent creative work.
 
-**temuexcel导出工作台** opens the built-in Temu listing workbench as a full-screen overlay. No record selection is required, and selected Creation records never trigger an automatic import. There is no second service to start and no second port to manage. The workbench opens on its main editing interface; use its explicit **Import from Studio** action when you want to bring in existing Creation records. It lets you fill in the 51 template columns by hand per product, maintain the two-variant SKU matrix, override price, dimensions, weight and stock per SKU, manage carousel and packaging images, and export the workbook directly.
+For remote access, put the loopback service behind an authenticated TLS **reverse proxy** and configure an explicit **fixed token** with `IMAGE_STUDIO_REQUEST_TOKEN`. The proxy must send that token on backend requests. Read the [security guide](./SECURITY.md) for Basic, Bearer, and `X-Image-Studio-Token` behavior.
 
-The overlay has two sibling tabs:
+<details>
+<summary>DNS troubleshooting</summary>
 
-- **Listing workbench** — the default tab, for manual per-field editing and export. Its workbook keeps the template's original two sheets.
-- **Batch quick export** — the existing batch flow. Preflight, strict versus fill-in export modes, the batch defaults form, and per-record export state write-back all behave exactly as before, and its workbook still carries the `Export issues` sheet.
+The Node service tries system `dns.lookup` first. On lookup failure, fallback candidates include `223.5.5.5`, `1.1.1.1`, and the system DNS servers. Set `IMAGE_STUDIO_DISABLE_DNS_FALLBACK=1` to disable fallback, or set `IMAGE_STUDIO_DNS_FALLBACK_SERVERS` to a comma-, semicolon-, or whitespace-separated list.
 
-Closing the overlay only hides it: in-progress drafts, scroll position, and not-yet-uploaded local image previews survive, so reopening resumes where you left off. Workbench drafts live in the current browser; use the workbench's own draft backup export/restore to move them across browsers or reinstalls.
+</details>
 
-The workbench only reads existing Creation records. It never starts a generation job, logs in to a store, or publishes a product. SKU images must be square and larger than 800 pixels on both sides, carousel images are capped at 10 and packaging images at 6, and every template image field must be a public HTTPS URL verified by the local server.
-
-## Product image collector extension
-
-The repository includes an optional Chrome/Edge extension for supported 1688, Amazon, Temu, TikTok Shop, SHEIN, and Dajian Yuncang consumer product pages. It can collect main, detail, and named SKU images, filter groups, preview originals, copy selected images to Studio, and download individual or product-folder batches.
-
-The extension reads supported product regions only after the user starts a collection. It does not read cookies, API keys, passwords, or other credentials. Studio only downloads a reviewable ZIP; Chrome/Edge still requires the user to load or reload the extension manually. See the [extension guide](./extensions/product-image-collector/README.md).
-
-## Deployment and packaging
-
-### Vercel
-
-The repository includes `vercel.json` and a standard request handler for Serverless functions. Vercel uses ephemeral filesystems and cloud-specific request lifecycles. Validate a Preview deployment, SSE completion, long-running jobs, and `/api/config` before a production deployment.
-
-### Windows packages
+## Development
 
 ```powershell
-cmd /c npm run build:desktop
-cmd /c npm run build:installer
-```
-
-Artifacts are written below `artifacts/desktop/` and `artifacts/windows-installer/`. Build output, runtime data, logs, and credentials are ignored and must not be committed.
-
-## Local data and privacy
-
-The local service stores generated images by date under:
-
-```text
-%USERPROFILE%\Pictures\YYYY-MM\MM-DD\
-```
-
-Typical workflow folders include `prompt`, `style-transfer`, `reference-analysis`, `image-decomposition`, `image-edit`, `creation`, `portrait`, `article`, and `ppt`. Record indexes are normally under `%USERPROFILE%\Pictures\json\`; private service configuration is under `.local/config.json`, or under the Electron app-data directory for the desktop build.
-
-API keys, prompts, references, generated images, manifests, and request logs can contain sensitive information. Keep `.env`, `.local/`, `output/`, `outputs/`, `artifacts/`, `dist/`, and real generation records out of commits. Third-party gateways receive the credentials and media that you send to them; review their data policies independently.
-
-Generated content still needs human review for factual accuracy, brand rules, portrait rights, copyright, platform policy, and unsupported claims. The app does not automatically log in to Temu or publish listings.
-
-## Parameters, resolutions, and limits
-
-> [!IMPORTANT]
-> These tables describe the candidates this application offers and the constraints it applies. They are not a promise that every upstream model, compatible gateway, or ecommerce platform supports these sizes. Accepted parameters, billing, delivered pixels, formats, and platform review rules come from the provider and target platform you choose, and a gateway may ignore, rewrite, or reject what the app sends.
-
-### Aspect ratios and pixel sizes
-
-GPT's Route and Direct modes share the explicit pixel candidates below. The first candidate is the default for the selected ratio; no automatic resolution option is displayed or sent. The middle column lists the other candidates in UI order, excluding the default and largest values.
-
-The parameter selectors keep the visible values literal: reasoning options show only `Low`, `Medium`, `High`, and `XHigh`, while concrete GPT sizes show only `width x height`. The `value` sent to the provider is unchanged. Gemini's `512`/`1K`/`2K`/`4K` and Grok's `1k`/`2k` remain provider-specific resolution tiers.
-
-| Ratio | Typical use | Default size | Other candidates | Largest |
-| --- | --- | --- | --- | --- |
-| `1:1` | Ecommerce hero images, avatars, social posts | `1024x1024` | `1536x1536`, `2048x2048`, `2560x2560` | `2880x2880` |
-| `4:3` | Slides, in-page web imagery | `1360x1024` | `2048x1536`, `2720x2048` | `3312x2480` |
-| `3:4` | Posters, portraits | `1024x1360` | `1536x2048`, `2048x2720` | `2480x3312` |
-| `3:2` | Landscape photography | `1536x1024` | `2304x1536`, `3072x2048` | `3520x2352` |
-| `2:3` | Portrait photography | `1024x1536` | `1536x2304`, `2048x3072` | `2352x3520` |
-| `5:4` | Product display | `1280x1024` | `1920x1536`, `2560x2048` | `3200x2560` |
-| `4:5` | Vertical social posts | `1024x1280` | `1536x1920`, `2048x2560` | `2560x3200` |
-| `16:9` | Landscape covers, video thumbnails | `1824x1024` | `2736x1536`, `3648x2048` | `3840x2160` |
-| `9:16` | Short-video covers, phone wallpaper | `1024x1824` | `1536x2736`, `2048x3648` | `2160x3840` |
-| `21:9` | Ultra-wide banners | `2384x1024` | `1680x720`, `3584x1536` | `3840x1648` |
-| `9:21` | Ultra-tall images | `1024x2384` | `720x1680`, `1536x3584` | `1648x3840` |
-| `2:1` | Banners | `2048x1024` | `3072x1536` | `3840x1920` |
-| `1:2` | Tall posters | `1024x2048` | `1536x3072` | `1920x3840` |
-| `3:1` | Ultra-wide advertising images | `3072x1024` | none | `3840x1280` |
-| `1:3` | Ultra-tall advertising images | `1024x3072` | none | `1280x3840` |
-
-Two details are easy to misread. The `21:9` and `9:21` lists are not sorted by pixel count: their `720P` candidate (`1680x720` / `720x1680`) sits after the default in the UI but is smaller than it. And `3:1` and `1:3` offer only two choices each (the default and largest), so their middle column is empty rather than incomplete.
-
-### How size differs across image routes
-
-| Channel | Protocol | Size values the app sends | Concrete default | Constraint to know |
-| --- | --- | --- | --- | --- |
-| Route mode | Responses API plus the image tool | The explicit ratio-bound pixels above | Base size for the current ratio | The UI offers only the `responses` suffix, and the upstream can still adjust delivered pixels. Image editing is the exception: it always posts to `images/edits` and ignores the configured suffix |
-| Direct mode | `images/generations`, `responses`, or `chat/completions` | The same explicit pixels as route mode | Base size for the current ratio | Compatibility depends on the gateway and model; edit requests may be rerouted to `images/edits` |
-| Gemini | Gemini image generation, or a `chat/completions`-compatible shape for non-Gemini models | `512`, `1K`, `2K`, `4K` | `1K` | These are tiers, not promised pixel counts; the default model identifier is an app default, not proof the provider serves it, and some models or gateways reject references, ratios, or `4K` |
-| Grok | xAI JSON `images/generations` / `images/edits` | `resolution: 1k` or `2k`, plus a supported `aspect_ratio` | Derived from the current ratio's explicit default dimensions | Requested pixels are not sent as `size`; references are limited to five, quality to `low` / `medium`, and local masks are unsupported |
-
-The following constraints are worth knowing before you pick a ratio:
-
-- **A size is only legal for its own ratio.** The requested pixels must be one of the candidates listed for the selected ratio; anything else is rejected before the upstream call with `当前比例 <ratio> 不支持分辨率 <size>` ("the current ratio does not support that resolution"). That is why `1:1` will not accept `1824x1024` even though `16:9` offers it.
-- **Switching between pixel and tier routes resolves an incompatible size to a concrete default.** A saved `2048x2048` becomes `1K` on Gemini; a saved `4K` becomes the selected ratio's default pixels on GPT. Legacy automatic values follow the same normalization.
-- **The Gemini image path supports 10 of the 15 ratios.** It accepts `1:1`, `2:3`, `3:2`, `3:4`, `4:3`, `4:5`, `5:4`, `9:16`, `16:9`, and `21:9`. The other five are substituted with the closest supported ratio that keeps the requested orientation: `2:1` and `3:1` become `16:9` and `21:9`; `1:2`, `9:21`, and `1:3` become `9:16`. On this channel the delivered shape is therefore close to your request rather than exact, and it stays landscape or portrait as asked.
-- **Quality, output format, and transparent backgrounds never reach the Gemini image path.** The request body only carries `aspectRatio` and `imageSize`; PNG vs JPG, the High quality control, and the prompt background switch have no effect here.
-- **Transparent prompt backgrounds are supported on GPT Route and Direct image routes only.** The control is hidden for Gemini and Grok, and their requests omit the background parameter.
-- **Grok uses its own image controls.** Image requests send only `low` / `medium` quality and `1k` / `2k` resolution, never GPT reasoning effort. Quality and reasoning remain independent for GPT text/vision planning.
-- **The Gemini image body is selected by the model name, not by the channel.** The name must contain `gemini` plus one of `image`, `banana`, `图像`, or `生图`. Any other model on this channel is posted to `chat/completions` with neither size nor ratio.
-
-### Workflow limits
-
-The UI exposes conservative application candidates, not a guarantee from every upstream model or gateway. Actual accepted parameters, billing, output pixels, image formats, and platform review rules are controlled by the selected provider.
-
-| Area | Current application boundary |
-| --- | --- |
-| Prompt references | Up to 15 images, or five on Grok; a session has up to 15 parallel task slots |
-| Style transfer | One source image plus one style reference or built-in preset |
-| Image-edit masks | Each local mask is limited to 50 MB and normalized to the source dimensions |
-| Ecommerce SKU plans | New plans use one subject per SKU bundle; frozen plans are limited to 64 items and 4 MiB serialized size |
-| Portrait batches | 1-100 images; the default is 12 |
-| PPT pages | 1-20 pages; the default is 8 |
-| Output formats | PNG or JPG for generated images; prompt jobs on Route/Direct can request a transparent PNG; browser compression can also produce WebP |
-
-Large images, high resolutions, and large batches increase browser memory use and the chance of upstream timeouts or rate limits. Start with the selected route's explicit default size and a small batch, then increase scale after compatibility is proven.
-
-Creation, Portrait, Article Illustration, and PPT each expose independent reasoning-effort and image-quality selectors. GPT planning retains its reasoning setting, while Grok image calls and their saved metadata omit GPT-only reasoning. Quality is normalized for the selected route and model (`xhigh` / `max` only on GPT 2.5 image models; `low` / `medium` on Grok). A queued set or deck keeps its effective values for generation, repair, missing-slide completion, and slide editing. Creation keeps the SKU generation rule editable while new plans use a fixed one-subject SKU count.
-
-## Project structure
-
-```text
-GPT-Image2-Studio/
-|-- desktop/                     # Electron main process and security policy
-|-- docs/                        # Installation, release, design, and screenshots
-|-- examples/                    # API and SSE examples
-|-- lib/                         # Server and browser-shared modules
-|-- openspec/                    # Current specs and in-progress changes
-|-- public/                      # Browser UI, styles, modules, and assets
-|-- scripts/                     # Sync, cloud, and Windows packaging scripts
-|-- test/                        # Node.js tests
-|-- server.mjs                   # Local Node.js service
-|-- generate-image.mjs           # CLI image-generation entry point
-|-- package.json
-`-- package-lock.json
-```
-
-## Development and verification
-
-```powershell
-cmd /c npm run dev
-cmd /c npm run desktop
-cmd /c npm run help
-cmd /c npm run sync:public-lib
-cmd /c npm test
-cmd /c npm run check:release
-```
-
-Before a pull request or release, run the maintained contract from a clean checkout or isolated worktree:
-
-```powershell
-cmd /c npm ci
 cmd /c npm test
 cmd /c npm run sync:public-lib -- --check
 cmd /c npm run check:release
@@ -578,218 +164,23 @@ cmd /c npx --no-install openspec validate --all --strict
 git diff --check
 ```
 
-Desktop and installer changes additionally require `npm run test:desktop-smoke`, `npm run build:desktop`, and `npm run build:installer`. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the OpenSpec workflow and dirty-worktree rules.
+Use `npm run desktop` for Electron development and `npm run help` for the image-generation CLI. Desktop releases also require `npm run test:desktop-smoke` and `npm run build:desktop`.
 
-## Releases
-
-- The source and lockfile versions are authoritative; tags use `v<version>`.
-- Versions use `major.minor.patch` with a three-digit patch segment: major bumps reset minor and patch, minor bumps reset patch, feature bumps add `0.010`, and ordinary updates add `0.001`.
-- Use `npm run release:major`, `npm run release:minor`, `npm run release:feature`, or `npm run release:patch` with `--summary`; each release changes exactly one level.
-- Current release notes: [v0.2.138](./docs/releases/v0.2.138.md).
-- Windows packages are distributed through [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Check the release notes for hashes and signing status.
-- `npm run check:release:strict` requires a clean worktree and a matching tag on the current commit.
+Changes to application behavior follow the [OpenSpec and contribution workflow](./CONTRIBUTING.md). Shared browser modules are maintained in `lib/` and synchronized into `public/lib/` with `npm run sync:public-lib`.
 
 ## Documentation
 
-- [Chinese README](./README.zh-CN.md)
-- [Windows desktop app](./docs/windows-desktop.md)
-- [Windows browser installer](./docs/windows-installer.md)
-- [Product image collector extension](./extensions/product-image-collector/README.md)
-- [Security policy](./SECURITY.md)
-- [Contribution and maintenance guide](./CONTRIBUTING.md)
+| Guide | Contents |
+| --- | --- |
+| [API configuration](./docs/configuration.md) | Connection setup, saved providers, environment variables, and troubleshooting. |
+| [Workflow and parameter reference](./docs/reference.md) | Formats, resolutions, workflow limits, and Temu export. |
+| [Windows desktop](./docs/windows-desktop.md) | Installation, portable use, data storage, and packaging. |
+| [Product image collector](./extensions/product-image-collector/README.md) | Browser extension setup and supported page collection. |
+| [Security](./SECURITY.md) · [Contributing](./CONTRIBUTING.md) | Trust boundaries, verification, and release maintenance. |
+| [Legacy browser installer](./docs/windows-installer.md) | Building the compatibility installer locally. |
 
-## Version history
+## Releases
 
-Full notes, hashes, and verification records live on [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases). Current-version notes: [v0.2.138](./docs/releases/v0.2.138.md).
+Current release notes: [v0.2.148](./docs/releases/v0.2.148.md). Download packages and check their SHA-256 values in [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases/latest). Older notes remain in the [release archive](./docs/releases/) and [version history](./docs/history.md).
 
-### v0.2.116
-
-- Added a current-set label above Creation outputs. It follows the selected queue item and shows the product name with its marketing plan/copy or queue position; drafts and the Logo batch branch stay unlabelled.
-- Reworked AI marketing batch estimates, progress, and per-plan timing into compact status indicators with distinct success, warning, and failure states.
-
-### v0.2.106
-
-- Added German alongside English and Chinese for generated Creation listings, including display, individual and full-field copying, character counts, and JSON export. Existing drafts without German remain unchanged until regenerated.
-- Increased the AI marketing plan count limit to 50 while retaining the existing per-plan generation and planning-concurrency limits.
-- Added a **Severe failures** filter to Creation history for completed plans with at least 10 planned images and fewer than 10 successful outputs. It combines with the existing keyword and date filters.
-- Preserved completed reference analysis and generated results when editing planning settings; only unsubmitted plans become stale and are cleared.
-- Reduced redundant Creation rendering for large queues by reusing keyed nodes and coalescing progress and log updates; improved viewport image loading and cleanup.
-
-### v0.2.096
-
-- Added batch AI marketing prompts for independent Creation set plans, with up to two plans running concurrently and validated plans sent through the existing queue.
-- Added per-plan progress, bounded retries, pause and resume behavior, and continuation that does not enqueue an already accepted plan twice.
-- Strengthened marketing quality review for evidence-backed functional visuals, core buying reasons, and duplicate image tasks while retaining valid items during repair.
-- Refined commercial CG and product-function visual guidance, and unified reasoning-effort mapping with bounded fallback only when an upstream rejects the parameter.
-- Batch controller progress is page-local: after a refresh, already-enqueued sets use the existing queue and records, while unsubmitted plans do not resume automatically.
-
-### v0.2.086
-
-- AI ecommerce planning now builds the complete set of up to 20 image prompts in one planning request, with per-image goals, audiences, evidence, and reference assignments.
-- Planning progress is streamed through preparation, response, validation, and completion. The interface shows received work and useful marketing summaries without exposing raw model output.
-- Product analysis adds specific audience groups, selling points, pain points, and fact-linked marketing advice. The same frozen prompts and reference bindings carry into generation, saved records, retries, and missing-image repairs.
-- Invalid or incomplete plans are rejected before image generation; retries and repairs reuse the accepted plan instead of silently replanning it.
-
-### v0.2.076
-
-- Product analysis now keeps complementary facts from multiple references, distinguishes real conflicts from unverified relationships, and carries evidence into planning, generation, retries, and saved records.
-- Ecommerce sets assign distinct, evidence-backed scene and infographic tasks. They avoid repeating the same core action, skip unsupported SKU and measurement images, and revalidate evidence gates on the server.
-- Canvas text filters unsupported medical, safety, certification, price, and absolute claims while preserving product-category terms. Image-to-infographic rebuilds map every output claim to readable source content.
-- Paired sellable products such as gloves count as one SKU unit per pair. Marketplace IDs without an active automatic profile fall back to the universal 18-slot plan; Listing policies remain separate.
-
-### v0.2.074
-
-- Expanded Prompt Kit to 520 paired, source-attributed YouMind prompts for GPT Image 2.5 and GPT Image 2, with model, category, search, and sort controls.
-- Saved API history now restores the model settings for each connection and masks keys in the picker.
-- Expanded the interface palette set from eight to twelve and refined generation loading and image review interactions.
-
-### v0.2.073
-
-- Generated images now use descriptive time-prefixed filenames. Set images retain their sequence number, duplicate names receive collision suffixes, and gallery downloads use the saved filename.
-- Added the Obsidian palette as the default while retaining Indigo and the six traditional-colour palettes.
-- Creation queue entries show the product name alongside the queue position; closed configuration controls are inert to keyboard interaction.
-
-### v0.2.072
-
-- Replaced the prompt enhancer's default with an editable English clarity instruction that prioritizes the original prompt and references, preserves intentional style choices, and treats `8K` as a visual-quality goal rather than a resolution guarantee.
-- Added a clickable origin for the selected image-generation service to the current-call summary; it omits API paths and credentials.
-- Simplified generation-log rows, showing concise output filenames and retaining task endpoint details and failure messages.
-- Removed the Product Image Replication Workbench and its dedicated analysis contract. Existing generated assets and historical release notes remain intact; the old `#product-agent` route falls back to Prompt-to-image.
-
-### v0.2.071
-
-- Reworked the Prompt Kit library to stay inside the image preview surface, with compact list cards and container-based layouts for narrow panels.
-- Generation logs now keep the endpoint snapshot belonging to each task, including failures and history viewed after switching API routes; long relay URLs can be inspected with the keyboard.
-- Expanded and reorganized the desktop API configuration drawer, and added full-value hints for long endpoint addresses.
-
-### v0.2.070
-
-- Improved Prompt Kit card summaries with a three-line preview of each prompt.
-- Corrected the recorded outbound IP source. Lookup uses the configured upstream HTTP transport, sends no API credentials or generation content, and reports "Not recorded" when unavailable.
-
-### v0.2.069
-
-- Updated the product image collector extension to `1.1.34`, including bounded concurrent downloads and clearer partial-failure feedback.
-- Improved contrast and surface hierarchy across the dark base theme and six traditional palettes.
-
-### v0.2.068
-
-- Strengthened image-to-prompt style locking with prioritized source-specific visual anchors and clear subject/texture intent, plus `4K/8K` visual-quality wording that does not promise actual output dimensions.
-- Added image-grounded constraints against unintended blur, smudging, artifacts, and unrelated clutter while preserving intentional bokeh, soft focus, grain, and motion.
-
-### v0.2.067
-
-- Refined Prompt Kit cards: removed the card-level copy-to-personal-template action, showed only complete text in list view, and changed image view to masonry with full labels below each image and a prominent Apply action. Copy and Apply remain available in the detail lightbox.
-
-### v0.2.066
-
-- API history now restores the last saved model for each provider and channel, including the Route image-tool model; unsaved model edits do not replace the saved history.
-- Current generation details and saved image records show the request IP. Older records without an IP are labeled "Not recorded".
-- Fixed Vercel Serverless startup so the deployed function ignores the platform's injected `HOST` binding and exports its request handler without starting a local HTTP listener.
-
-### v0.2.056
-
-- Added explicit style-lock vocabulary to image-to-prompt results so a second generation can preserve the source medium, aesthetic, palette, lighting, material response, depth, and finishing cues.
-- Added image-specific style-drift constraints to the structured `avoid` field and clarified the Prompt Agent entry point in the interface.
-- Hardened provider credential routing, concurrent record/history persistence, running task retention, PPT record paths, extension page injection, and Listing response timeouts.
-- Persisted desktop API configuration across application restarts and dynamically assigned local ports through restricted sandboxed IPC.
-
-### v0.2.046
-
-- Simplified reasoning selectors to show only the effort name and concrete GPT resolution selectors to show only pixel dimensions; submitted values and provider-specific Gemini/Grok tiers are unchanged.
-- Reworked the quick-start entry with a runtime choice table and clarified how selector labels relate to provider request values.
-
-### v0.2.045
-
-- Reworked the universal ecommerce set so the former overlapping specification, craft, and material slots become three distinct scene-fit roles. Scene facts are distributed across different settings and shots, while platform-native profiles keep their own specification roles.
-- Added product-grounded visual divergence: distinct visual formats and casts, bounded supporting-reference reuse, new scene references for non-blueprint roles, and usable carry/pack/store directions for products that cannot be worn.
-- Simplified ordinary Creation prompts by removing internal planning labels, merging subject locks into one product-fidelity instruction, and translating Chinese prompt segments at generation time for non-Chinese target languages. Translation failures keep generation running and surface a warning.
-- Added saved generation detail inspection for Creation results, including the actual prompt, ratio, size, quality, transparency, route switches, models, reference images, endpoint, and duration. Historical gaps remain explicitly unrecorded.
-- Updated ratio metadata to canonical values, added favicon and web-manifest routes, and changed the default text/vision model to `gpt-6-luna` while preserving existing non-empty settings.
-
-### v0.2.044
-
-- Route mode now leaves `tools[].model` out of image-generation requests by default, which lets compatible relays choose the image-tool model without rejecting an extra field.
-- Added the **发送 tools[].model** switch to opt into sending the selected allowlisted image-tool model; the setting is saved with route configuration, browser-private requests, and queued jobs, while direct image routes keep their existing explicit model behavior.
-- Normalized missing or legacy `includeImageToolModel` values to off across local config, browser storage, request payloads, server defaults, and the public browser module mirror.
-- Updated the runtime specification, archived change records, English and Simplified Chinese README guidance, and regression coverage for default, disabled, enabled, persistence, and request-body behavior.
-
-### v0.2.043
-
-- Added the YouMind GPT Image 2 Prompt Kit snapshot as a local, source-attributed library with scenario, visual-style, and subject taxonomy, paired previews, search, list/image browsing, lightbox review, apply, and personal-template actions.
-- Added the Product Image Replication Workbench for up to 15 mother images, evidence-backed product facts and audience strategy, a bounded workspace-by-channel-by-direction task board, English prompts with Simplified Chinese counterparts, and per-task or batch generation.
-- Added a Route-mode image tool model selector with an explicit enable/disable switch. Queued jobs freeze the effective tool model and quality settings, while loading shells, filmstrips, retries, recovery polling, and partial-preview provenance keep long generations inspectable.
-- Added COS cosplay reference assets for Portrait Mode, merged Creation product description, selling-point, and dimension inputs without dropping historical facts, and refreshed the Windows PowerShell 7.4+ launcher and port display.
-- Synced browser modules and release contracts, including the new local prompt assets, favicon, OpenSpec changes, and regression coverage for the updated workbench behavior.
-
-### v0.2.033
-
-- Added the Product Image Replication Workbench. Upload up to 15 mother images, add an optional goal, and run an evidence-backed product-group analysis that keeps uncertain claims in a reviewable risk list.
-- Added a routed task board that combines compatible workspaces, channels, and content directions. Every task keeps its source references, aspect ratio, English generation prompt, Simplified Chinese counterpart, and per-task or batch generate/download controls.
-- Added the product-image-agent structured JSON contract and default text/vision configuration path, while continuing to use the existing image-generation endpoint for routed outputs.
-- Added deterministic local Prompt Kit preview assets and corrected preview filename handling; image editing now normalizes English target clauses without duplicating user requirements.
-- Compressed ordinary Creation and SKU prompt control text while keeping product facts, reference roles, platform constraints, subject identity, surface content, and target-language boundaries.
-
-### v0.2.020
-
-- Added the categorized Prompt Kit library: six categories, 24 subcategories, ten prompts per subcategory, search, list/image views, adjustable list typography, lightbox prompt review, direct apply, and copy-to-personal-template actions. The library's profile/avatar previews are bundled locally from the requested YouMind collection with attribution; runtime browsing does not depend on the third-party site.
-- Replaced the ten legacy daily-scene Prompt Kit defaults with practical identity-photo, business-avatar, ecommerce, portrait, home, travel, and marketing templates. Existing custom templates and Prompt Agent history remain intact during the versioned default migration.
-- Simplified Creation and infographic prompt construction into bounded, positive instructions so generated requests stay focused instead of repeating long negative constraint lists.
-- Standardized project-owned Windows scripts on PowerShell 7.4+, added explicit runtime and failure checks, and kept pure Node/Electron and stop-service CMD entry points independent of PowerShell.
-- Added major/minor/feature/patch release commands with a three-digit patch policy and synchronized README, Windows package, lockfile, workbench, and release-note version facts.
-
-### v0.2.19
-
-- Added Grok image generation and reference-image editing with independent xAI connection settings, five-reference validation, and provider-specific request parameters.
-- Grok quality is limited to `low` / `medium` (default `medium`); GPT reasoning never leaks into Grok image calls, task snapshots, or saved image metadata. API histories and quality choices are isolated by route.
-- Removed automatic quality and resolution options throughout the workbench. Existing values normalize to concrete defaults before display, queueing, storage, and upstream requests.
-- Unified the configuration sections as GPT / Gemini / Grok / Palette, with Route / Direct nested under GPT. Refined spacing, aligned fields and the Gemini endpoint, and shortened controls and log labels with full-value tooltips.
-
-- Creation, Portrait, Article Illustration, and PPT now expose independent reasoning-effort and quality controls. Plans, queued operations, repairs, missing-slide completion, and slide edits retain the selected values, with quality clamped to the active image model.
-- Prompt-to-image can request a transparent background on the Route and Direct image routes. The choice is captured per job, forces PNG output, and is recorded in saved metadata; the Gemini/model-protocol route keeps the control hidden.
-- New Creation plans use a fixed one-subject SKU count while the SKU generation rule remains editable.
-- The Palette section now shows seven concise palette swatches in a four-column grid. Custom colour roles and floral ornaments were removed, and the default palette is `靛蓝` (Indigo).
-
-### v0.2.18
-
-- The configuration drawer is now four mutually exclusive sections: **路由模式** / **直连模式** / **Gemini** / **主题**. Only the selected section's fields render, and the hidden sections' controls — Fetch Models included — are disabled rather than merely invisible, so a hidden channel can no longer be edited or queried by mistake.
-- The palette is no longer a popover opened from a trigger after the Gemini option. It is a standalone card inside **主题**, which carries no connection fields at all. Switching to **主题** and back leaves the active call channel unchanged.
-- Palette options stay on one horizontal row and scroll sideways in a narrow drawer, instead of reflowing into a 4-column then 2-column grid.
-- The default palette is `经典靛蓝` (Classic indigo) and restores the v0.2.6 indigo tokens (`#6f7cff` / `#12192f` / `#879cff`) across Studio and the embedded Temu workbench. The other six palettes keep their traditional-colour values, and every stored palette ID is unchanged, so an existing selection still resolves.
-- Visible palette names are shorter (`青花甜白` → `青花`, `江南竹影` → `竹影`, `雨过天青` → `天青`, `故宫朱墙` → `朱墙`, `漆器朱漆` → `朱漆`, `敦煌石青` → `敦煌`), and the two long section labels were shortened to `直连模式` and `Gemini`.
-- Corrected in the docs: the platform-profile table is version `2026-07-18.2`, and both READMEs describe the four-section drawer instead of the retired palette trigger.
-
-### v0.2.17
-
-- The configuration drawer is compact: long explanations are hover/focus help markers, and the configuration form and generation log scroll independently so the log stays visible.
-- The channel row is now **Route mode / Direct-call mode / Gemini model / Palette**. The Palette trigger sits immediately after Gemini and opens the full palette, custom-colour, and floral-accent controls.
-- Added seven allowlisted Chinese traditional-colour palettes, three custom colour roles for buttons/focus, surfaces, and floral details, and local persistence mirrored to the embedded Temu workbench.
-- Added four low-interference decorative motifs: plum branch, orchid sprig, bamboo nodes, and peony medallion. They cannot intercept interaction and are hidden from assistive technology.
-- Added OpenSpec coverage and regression tests for the palette allowlist, colour validation, tooltip affordances, independent logs, theme-message synchronization, and the Gemini-adjacent palette trigger.
-
-### v0.2.16
-
-- The dark theme now sits on pure black `#000000`. Surfaces mix in only 6–12% of a traditional color (山梗紫, 秋波蓝, 粉绿, 朱红) so the page still reads as black while panels, inputs, and the preview stage stay distinguishable. Every hardcoded blue-black value is gone from the stylesheet, and a test pins that.
-- Primary actions, the selected nav item, and general interaction are 魏紫 `#7e1671` (hover 青莲 `#8b2671`, active 绀紫 `#461629`) across all five view families in dark mode. `select` option popups follow the theme instead of a hardcoded light pair. The light theme is unchanged.
-- The prompt-template button is a lucide sparkles SVG instead of a `⭐` emoji, so it follows `currentColor` and matches the stroke weight of the other parameter-row icons.
-- Repository cleanup: two unreferenced root screenshots, a scratch design-QA log, and `docs/superpowers/` (superseded by `openspec/`) were removed.
-
-### v0.2.15
-
-- Route mode's image tool model is selectable: `gpt-image-2` (default), `gpt-image-2.5-sunburst`, and `gpt-image-2.5-flare`. It used to be hardcoded, and the record entries reported a model that was never actually used.
-- Output quality is selectable and clamped to what the model supports: `low`, `medium`, and `high`, plus `xhigh` and `max` on the 2.5 variants. Grok exposes only `low` and `medium`; legacy automatic values are migrated to a concrete default and are never sent upstream. Quality is submitted per request instead of read from the config default only.
-- Endpoints and keys you have used are kept in a reusable list in browser local storage, so switching providers no longer overwrites the previous key. Selecting an entry restores address, suffix, and key as one set.
-- The palette was retuned within the Chinese traditional color library: a lighter night ground with three surface steps, a paper-toned day theme with real card boundaries, desaturated accents, and control outlines lifted to the WCAG 3:1 floor.
-- The product image collector extension moved to `1.1.33`; the collector, panel, and launcher now stay in one isolated world, so reads no longer time out waiting on background messaging.
-
-### v0.2.14
-
-- The Gemini channel no longer turns an unsupported ratio into a square. It accepts 10 of the 15 ratios; the other five now resolve to the closest supported ratio in the same orientation (`2:1` → `16:9`, `3:1` → `21:9`, and `1:2`, `9:21`, `1:3` → `9:16`) instead of collapsing to `1:1`. Because this channel sends a size tier rather than pixels, the ratio the user picked is now the fallback source for that match.
-- `release:patch` and `check:release` maintain the derived version facts as well: both README badges, the installer and portable filenames quoted in prose, the release-note links, and the `v<version>` GitHub Release references. Previously only one anchored fact per file was checked, so a bump could pass while the README still advertised the previous version's download.
-
-### v0.2.13
-
-- Article illustration planning now produces a dense consecutive-keyframe storyboard. The planner counts the source's natural paragraph clusters and asks for at least one finished frame per paragraph or distinct visual beat, plus extra consecutive frames whenever action, emotion, dialogue, camera angle, or location changes. No maximum illustration count is applied, and `recommendedImageCount` reports the frames actually produced.
-- Article illustration generation fans out the whole planned set through the same bounded-concurrency loop the other set modes use, honoring the configured generation concurrency and start delay instead of walking one item at a time. Pending reference cards in a run finish before storyboard items start, so later frames can use them.
-- A failed direct-route image request now names the endpoint it actually used and unwraps Node's bare `fetch failed` into the underlying reason (`ENOTFOUND`, `ECONNREFUSED`, a TLS error, or `UND_ERR_CONNECT_TIMEOUT`). This route rewrites `images/generations` to `images/edits` once references are attached, so the failing URL is not always the configured one.
-- Both READMEs gained a step-by-step [Beginner API setup](#beginner-api-setup) walkthrough.
+Versions use `major.minor.patch` with a three-digit patch segment. Feature releases add `0.010`; ordinary updates add `0.001`. Use the maintained `release:major`, `release:minor`, `release:feature`, or `release:patch` command with `--summary`. A tagged release must pass `npm run check:release:strict` from a clean worktree.

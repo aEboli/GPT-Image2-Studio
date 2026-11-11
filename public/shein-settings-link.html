@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="referrer" content="no-referrer"><title>同步图片软件设置</title>
+<body><p id="status">正在同步文字模型设置…</p>
+<script type="module">
+import { installSettingsLink } from './studio-settings-link.mjs';
+import { readBrowserPrivateConfig, restoreDesktopBrowserConfig } from '/lib/browser-config.mjs';
+import { getSelectedTextVisionConfig } from '/lib/image-route-config.mjs';
+const active = installSettingsLink(window, { restore: restoreDesktopBrowserConfig, read: readBrowserPrivateConfig, select: getSelectedTextVisionConfig });
+document.querySelector('#status').textContent = active ? '正在同步文字模型设置，请返回上品工作台查看结果。' : '请从上品工作台点击“同步图片软件设置”。';
+</script></body></html>

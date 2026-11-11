@@ -1,5 +1,14 @@
 import { listCreationListingPolicies } from "./creation-listing-policies.mjs";
 
+export const CREATION_LISTING_TITLE_LANGUAGES = Object.freeze(["es", "fr", "it", "pl"]);
+
+export function normalizeCreationListingTitleTranslations(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(CREATION_LISTING_TITLE_LANGUAGES
+    .filter((language) => typeof value[language] === "string" && cleanString(value[language]))
+    .map((language) => [language, cleanString(value[language])]));
+}
+
 export const CREATION_LISTING_BILINGUAL_CONTENT_FIELDS = Object.freeze([
   "title",
   "sellingPoints",
@@ -475,6 +484,9 @@ export function sanitizeCreationListingDraftContent(draft = {}, source = {}) {
   const deDisplay = rawDeDisplay && typeof rawDeDisplay === "object"
     ? sanitizeCreationListingNoBrandContent(rawDeDisplay, forbiddenTerms)
     : rawDeDisplay;
+  const titleTranslations = sanitizeCreationListingNoBrandContent(
+    normalizeCreationListingTitleTranslations(draft.titleTranslations), forbiddenTerms,
+  );
   return {
     ...draft,
     ...sanitized,
@@ -486,6 +498,7 @@ export function sanitizeCreationListingDraftContent(draft = {}, source = {}) {
       : { skuSubjectId: sanitizeCreationListingNoBrandContent(rawSkuSubjectId, forbiddenTerms) }),
     ...(zhDisplay === undefined ? {} : { zhDisplay: { ...draft.zhDisplay, ...zhDisplay } }),
     ...(deDisplay === undefined ? {} : { deDisplay }),
+    ...(draft.titleTranslations === undefined ? {} : { titleTranslations }),
   };
 }
 

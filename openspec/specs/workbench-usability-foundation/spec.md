@@ -240,3 +240,14 @@ The configuration drawer SHALL expose four mutually exclusive sections named `�
 - **THEN** 系统回退到 90%
 - **AND** 有限数字越界时钳制到 70%–98% 并取整
 - **AND** 写入本地存储失败时当前页面仍可即时调整背景
+
+### Requirement: 失败视图加载可恢复
+懒加载视图 SHALL 复用进行中和成功的加载，失败时 SHALL 清除该次失败缓存，允许后续进入重新尝试。旧失败回调 MUST NOT 清除其他成功或更新的加载状态。
+
+#### Scenario: 首次加载失败后恢复
+- **WHEN** 第一次进入视图遇到临时下载或挂载错误，随后再次进入
+- **THEN** 系统重新尝试加载并能在依赖恢复后正常挂载
+
+#### Scenario: 同时打开同一视图
+- **WHEN** 同一模块加载进行中再次被请求
+- **THEN** 两次调用复用同一个加载操作，成功挂载仅执行一次

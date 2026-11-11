@@ -378,6 +378,64 @@ test("German content appears between English and Chinese in every Listing field 
   }
 });
 
+test("additional Listing title languages leave all non-title fields and copy results unchanged", () => {
+  const titleTranslations = {
+    es: "2 señuelos de pesca azules", fr: "2 leurres de pêche bleus",
+    it: "2 esche da pesca azzurre", pl: "2 niebieskie przynęty wędkarskie",
+  };
+  const original = {
+    title: "2 Pack Blue Fishing Lures", sellingPoints: ["Blue body"], description: "Two blue lures.",
+    deDisplay: { title: "2 Stück blaue Angelköder", sellingPoints: ["Blauer Körper"], description: "Zwei blaue Köder." },
+    zhDisplay: { title: "2件装蓝色鱼饵", sellingPoints: ["蓝色鱼身"], description: "两件蓝色鱼饵。" },
+  };
+  const render = (draft) => {
+    const previousDocument = globalThis.document;
+    const root = makeFakeElement("div");
+    globalThis.document = { createElement: makeFakeElement };
+    try {
+      renderCreationListingDrafts({ refs: { creationRecordListingDrafts: root }, set: { listingDrafts: [draft] } });
+    } finally {
+      globalThis.document = previousDocument;
+    }
+    return root;
+  };
+  for (const schemaVersion of ["", "2"]) {
+    const baseline = { ...original, schemaVersion };
+    const draft = { ...baseline, titleTranslations };
+    const root = render(draft);
+    const fields = collectFakeElements(root, (node) => String(node.className).split(/\s+/).includes("creation-listing-field"));
+    const baselineFields = collectFakeElements(render(baseline), (node) => String(node.className).split(/\s+/).includes("creation-listing-field"));
+    const pairs = collectFakeElements(fields[0], (node) => node.className === "creation-listing-copy-pair");
+    assert.deepEqual(pairs[0].children.map((node) => node.dataset.creationListingCopyLanguage), ["en", "de", "es", "fr", "it", "pl", "zh"]);
+    assert.deepEqual(pairs[0].children.map((node) => node.dataset.creationListingCopyText), [
+      original.title, original.deDisplay.title, ...Object.values(titleTranslations), original.zhDisplay.title,
+    ]);
+    for (const [language, title] of Object.entries(titleTranslations)) {
+      const copies = collectFakeElements(fields[0], (node) => node.dataset?.creationListingCopyLanguage === language
+        && node.dataset.creationListingCopyText);
+      assert.equal(copies.length, 2, language);
+      assert.ok(copies.every((node) => node.dataset.creationListingCopyText === title), language);
+      const counts = collectFakeElements(fields[0], (node) => String(node.className).split(/\s+/).includes("creation-listing-character-count")
+        && node.dataset?.creationListingCopyLanguage === language);
+      assert.equal(counts.length, 1);
+      assert.equal(counts[0].textContent, `${language.toUpperCase()} ${Array.from(title).length}`);
+    }
+    const snapshot = (field) => ({ text: getFakeTextContent(field), copies: field.querySelectorAll("[data-creation-listing-copy-text]").map((node) => ({ ...node.dataset })) });
+    assert.deepEqual(fields.slice(1).map(snapshot), baselineFields.slice(1).map(snapshot));
+    const fullCopy = buildCreationRecordListingText({ listingDrafts: [draft] });
+    assert.match(fullCopy, /德文参考: 2 Stück blaue Angelköder\n西班牙语参考: 2 señuelos de pesca azules\n法语参考: 2 leurres de pêche bleus\n意大利语参考: 2 esche da pesca azzurre\n波兰语参考: 2 niebieskie przynęty wędkarskie\n中文参考: 2件装蓝色鱼饵/u);
+    const baselineCopy = buildCreationRecordListingText({ listingDrafts: [baseline] });
+    assert.equal(fullCopy.slice(fullCopy.indexOf("卖点:")), baselineCopy.slice(baselineCopy.indexOf("卖点:")));
+    const { titleTranslations: exportedTitles, ...rest } = buildCreationListingExportPayload({ listingDrafts: [draft] }).listingDrafts[0];
+    assert.deepEqual(exportedTitles, titleTranslations);
+    assert.deepEqual(rest, buildCreationListingExportPayload({ listingDrafts: [baseline] }).listingDrafts[0]);
+  }
+  const partial = render({ ...original, titleTranslations: { pl: titleTranslations.pl, fr: " ", es: {} } });
+  const partialPairs = collectFakeElements(partial, (node) => node.className === "creation-listing-copy-pair");
+  assert.deepEqual(partialPairs[0].children.map((node) => node.dataset.creationListingCopyLanguage), ["en", "de", "pl", "zh"]);
+  assert.equal(buildCreationListingExportPayload({ listingDrafts: [original] }).listingDrafts[0].titleTranslations, undefined);
+});
+
 test("historical Listing has no fabricated German translation or German controls", () => {
   const draft = { title: "Original title", zhDisplay: { title: "原始标题" } };
   assert.equal(normalizeCreationListingDraftForView(draft).deDisplay, undefined);
