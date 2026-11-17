@@ -8,6 +8,7 @@ import {
   canContinueCreationMarketingBatch,
   cancelPendingCreationMarketingBatch,
   createCreationMarketingBatchState,
+  getCreationMarketingBatchVariationSeed,
   normalizeCreationMarketingBatchCopies,
   normalizeCreationMarketingBatchSchemeCount,
   pausePendingCreationMarketingBatch,
@@ -54,7 +55,7 @@ test("two planning slots refill independently and never launch a third simultane
     await tick();
     assert.ok(state.activeIndexes.length <= CREATION_MARKETING_BATCH_CONCURRENCY);
   }
-  assert.deepEqual(started, [1, 2, 3, 4, 5]);
+  assert.deepEqual(started, [1, 2, 2, 3, 3, 4, 4, 5, 5]);
   assert.equal(state.schemes[0].status, "planning");
   gates[0].resolve({ index: 1 });
   await run;
@@ -158,7 +159,7 @@ test("two injected transient faults recover independently and enqueue each copy 
   assert.equal(state.retryCount, 2);
   assert.equal(state.enqueuedCount, 6);
   assert.equal(new Set(queued).size, 6);
-  assert.deepEqual([...attempts], [[1, 2], [2, 2], [3, 1]]);
+  assert.deepEqual([...attempts], [[1, 3], [2, 3], [3, 2]]);
 });
 
 test("two suite slots include automatic repair and refill while another suite is slow", async () => {
@@ -262,7 +263,12 @@ function browserFixture({ count = 3, copies = 2, productName = "原商品", prod
     },
     fetch: async (url, options) => {
       assert.equal(url, "/api/creation/plan");
-      const gate = deferred(); requests.push({ ...options, gate }); return gate.promise;
+      const gate = deferred();
+      const request = { ...options, gate, settled: false };
+      const resolve = gate.resolve;
+      gate.resolve = (value) => { request.settled = true; resolve(value); };
+      requests.push(request);
+      return gate.promise;
     },
   };
   const start = app.indexOf("async function requestCreationMarketingBatchPlan(");
@@ -271,10 +277,27 @@ function browserFixture({ count = 3, copies = 2, productName = "原商品", prod
   runInNewContext(app.slice(start, end), context);
   return { context, creation, requests, jobs, source };
 }
-function ssePlanResponse(index) {
+function ssePlanResponse(index, { copyNumber = 1, variationSeed } = {}) {
+  const plan = planFor(index);
+  if (copyNumber > 1) plan.items[0].prompt += "-" + copyNumber;
+  if (variationSeed) plan.marketingPlan.variationSeed = variationSeed;
   const data = "event: marketing_progress\ndata: " + JSON.stringify({ stage: "receiving", message: "接收方案 " + index }) +
-    "\n\nevent: complete\ndata: " + JSON.stringify({ plan: planFor(index) }) + "\n\n";
+    "\n\nevent: complete\ndata: " + JSON.stringify({ plan }) + "\n\n";
   return new Response(data, { headers: { "content-type": "text/event-stream" } });
+}
+
+async function finishBrowserPlans(view) {
+  for (let step = 0; step < 30; step += 1) {
+    await tick();
+    for (const request of view.requests.filter((entry) => !entry.settled)) {
+      const variationSeed = request.body.get("variationSeed");
+      const scheme = view.creation.marketingBatch.schemes.find((entry) => variationSeed === entry.variationSeed || variationSeed.startsWith(entry.variationSeed + "-suite-"));
+      assert.ok(scheme, variationSeed);
+      request.gate.resolve(ssePlanResponse(scheme.index, { copyNumber: scheme.enqueuedCount + 1, variationSeed }));
+    }
+    if (view.creation.marketingBatch.status === "completed") return;
+  }
+  assert.fail("browser suite planning did not finish within its bounded fixture");
 }
 
 test("disabled browser batch cannot start or resume planning", async () => {
@@ -325,6 +348,7 @@ test("browser batch accepts a product name or description on its own", async () 
     await tick();
     assert.equal(view.requests.length, 1);
     view.requests[0].gate.resolve(ssePlanResponse(1));
+    await finishBrowserPlans(view);
     await run;
     assert.equal(view.creation.marketingBatch.completedCount, 1);
     assert.equal(view.jobs.length, 2);
@@ -341,18 +365,27 @@ test("real browser batch wiring keeps out-of-order SSE results, snapshots and co
   view.context.refs.creationProductNameInput = { value: "后来修改的商品" };
   view.requests[1].gate.resolve(ssePlanResponse(2));
   await tick();
-  assert.equal(view.requests.length, 3, "a free slot starts scheme 3 before slow scheme 1 finishes");
-  view.requests[2].gate.resolve(ssePlanResponse(3));
+  assert.equal(view.requests.length, 3, "the second scheme independently plans its next suite");
+  assert.equal(view.requests[2].body.get("variationSeed"), getCreationMarketingBatchVariationSeed(view.creation.marketingBatch.schemes[1], 1));
+  view.requests[2].gate.resolve(ssePlanResponse(2, { copyNumber: 2 }));
+  await tick();
+  assert.equal(view.requests.length, 4, "the next scheme starts before slow scheme 1 finishes");
+  view.requests[3].gate.resolve(ssePlanResponse(3));
   view.requests[0].gate.resolve(ssePlanResponse(1));
+  await finishBrowserPlans(view);
   await run;
   assert.equal(view.creation.marketingBatch.status, "completed");
   assert.equal(view.jobs.length, 6);
+  assert.equal(view.requests.length, 6);
+  assert.equal(new Set(view.requests.map((request) => request.body.get("variationSeed"))).size, 6);
   assert.equal(new Set(view.jobs.map((job) => job.set.setId)).size, 6);
   for (const job of view.jobs) {
     const index = job.set.marketingBatch.schemeIndex;
-    assert.equal(job.set.items[0].prompt, "prompt-" + index);
-    assert.equal(JSON.parse(job.formData.get("effectivePlan")).items[0].prompt, "prompt-" + index);
-    assert.equal(job.formData.get("variationSeed"), view.creation.marketingBatch.schemes[index - 1].variationSeed);
+    const copyNumber = job.set.marketingBatch.copyNumber;
+    const prompt = "prompt-" + index + (copyNumber > 1 ? "-" + copyNumber : "");
+    assert.equal(job.set.items[0].prompt, prompt);
+    assert.equal(JSON.parse(job.formData.get("effectivePlan")).items[0].prompt, prompt);
+    assert.equal(job.formData.get("variationSeed"), getCreationMarketingBatchVariationSeed(view.creation.marketingBatch.schemes[index - 1], copyNumber - 1));
     assert.equal(job.set.productName, "原商品");
     assert.equal(job.formData.get("quality"), "high");
     assert.equal(job.set.listingAgentEnabled, true);
@@ -374,19 +407,20 @@ test("browser batch continues all remaining SSE plans after a scheme fails", asy
   assert.equal(view.requests.length, 3);
   view.requests[2].gate.resolve(ssePlanResponse(3));
   view.requests[1].gate.resolve(ssePlanResponse(2));
+  await finishBrowserPlans(view);
   await run;
   assert.equal(view.creation.marketingBatch.status, "completed");
-  assert.equal(view.requests.length, 3);
+  assert.equal(view.requests.length, 5);
   assert.equal(view.jobs.length, 4);
   assert.equal(view.creation.marketingBatch.schemes[0].status, "failed");
   assert.equal(view.creation.marketingBatch.completedCount, 2);
   assert.equal(view.creation.marketingBatch.schemes[1].pendingPlan, null);
   await view.context.runCreationMarketingBatchGeneration({ resume: true });
-  assert.equal(view.requests.length, 3);
+  assert.equal(view.requests.length, 5);
   assert.equal(view.jobs.length, 4);
 });
 
-test("browser pause and continue preserve snapshots and never replan cached schemes", async () => {
+test("browser pause and continue preserve snapshots and never replan cached suites", async () => {
   const view = browserFixture();
   const run = view.context.runCreationMarketingBatchGeneration();
   await tick();
@@ -407,8 +441,8 @@ test("browser pause and continue preserve snapshots and never replan cached sche
   view.context.refs.creationMarketingBatchCopiesInput.value = "20";
   const resumed = view.context.runCreationMarketingBatchGeneration({ resume: true });
   await tick();
-  assert.equal(view.requests.length, 3);
-  view.requests[2].gate.resolve(ssePlanResponse(3));
+  assert.equal(view.requests.length, 4);
+  await finishBrowserPlans(view);
   await resumed;
   assert.equal(view.jobs.length, 6);
   assert.equal(view.creation.marketingBatch.batchId, batchId);

@@ -118,10 +118,11 @@ import { applyCreationReferenceCoverageRolePlan, normalizeCreationCoverageFields
 import { applyCreationReferenceAnalysisProductNameValue, buildCreationReferenceAnalysisAppliedFeedbackMessage, buildCreationReferenceAnalysisCategoryMatchText, getCreationReferenceAnalysisCategoryProductName, getCreationReferenceAnalysisDisplayRoleLabel, getCreationReferenceAnalysisGroupedSubjectUnitCount, getCreationReferenceAnalysisRoleCorrectionReason, getCreationReferenceAnalysisSubjectUnitResolution, normalizeCreationReferenceAnalysisUnitCountNote, resolveCreationReferenceAnalysisCategoryValue, resolveCreationReferenceAnalysisContextCategoryValue, shouldDowngradeReferenceProductAnalysisRole } from "/lib/creation-reference-analysis-view.mjs?v=20261024-pair-unit-1";
 import { createCreationListingController, getCreationRecordListingMetaLabel, getCreationListingSearchValues, normalizeCreationListingDraftForView, renderCreationListingDrafts } from "/lib/creation-listing-view.mjs?v=20261102-listing-german-1";
 import { getCreationItemDisplayTitle, getCreationMarketingDisplayItems } from "/lib/creation-item-display.mjs";
+import { getCreationSetLanguageLabel } from "/lib/creation-set-language.mjs";
 import { getCreationAutoRepairNotice, getCreationAutoRepairableItems, getCreationCompletionFeedback, getCreationIncompleteItems, shouldAutoRepairCreationSet } from "/lib/creation-auto-repair.mjs?v=20260829-generation-schedule-1";
 import { getRequeueNotice } from "/lib/generation-item-retry.mjs";
-import { CREATION_MARKETING_BATCH_CONCURRENCY, canContinueCreationMarketingBatch, cancelPendingCreationMarketingBatch, createCreationMarketingBatchState, getCreationMarketingBatchElapsedMs, getCreationMarketingBatchScheme, normalizeCreationMarketingBatchCopies, normalizeCreationMarketingBatchSchemeCount, pausePendingCreationMarketingBatch, runCreationMarketingBatch } from "/lib/creation-marketing-batch.mjs";
-import { canRepairCreationItem as canRepairCreationItemFromQueue, getCreationRepairButtonText as getCreationRepairButtonTextFromQueue, isCreationItemRepairActive as isCreationItemRepairActiveInQueue, queueCreationItemRepair as queueCreationItemRepairInState, removeQueuedCreationItemRepair, shiftNextQueuedCreationItemRepair } from "/lib/creation-item-repair-queue.mjs";
+import { CREATION_MARKETING_BATCH_CONCURRENCY, canContinueCreationMarketingBatch, cancelPendingCreationMarketingBatch, createCreationMarketingBatchState, getCreationMarketingBatchElapsedMs, getCreationMarketingBatchScheme, getCreationMarketingBatchVariationSeed, normalizeCreationMarketingBatchCopies, normalizeCreationMarketingBatchSchemeCount, pausePendingCreationMarketingBatch, runCreationMarketingBatch } from "/lib/creation-marketing-batch.mjs";
+import { canRepairCreationItem as canRepairCreationItemFromQueue, isCreationItemRepairActive as isCreationItemRepairActiveInQueue, queueCreationItemRepair as queueCreationItemRepairInState, removeQueuedCreationItemRepair, shiftNextQueuedCreationItemRepair } from "/lib/creation-item-repair-queue.mjs";
 import { cloneCreationPlanValue, createCreationPlanPreviewRequestCoordinator, createCreationPlatformPayloadSnapshot, deepFreezeCreationPlanValue, formatCreationPlanWarning, getCreationCompatibleImageTypeState, getCreationEditablePlanDisplayCounts, getCreationSetPlanSource, getVisibleCreationPlanWarnings, mergeCreationPlatformSetParameters, resolveCreationDisplayedPlanContext, resolveCreationPlatformImageCountState, resolveCreationSelectedRolesSubmission, shouldDisableCreationGenerateButton, updateCreationPlatformItemOverride } from "/lib/creation-browser-plan-state.mjs";
 import { normalizeCreationModuleEnabled, resolveCreationPlanCounts } from "/lib/creation-plan-counts.mjs";
 import { buildCreationQueuedRepairFormData, buildCreationQueuedSet as buildCreationQueuedSetFromState, createCreationQueueJob, getActiveCreationQueueJob as getActiveCreationQueueJobFromState, getCreationQueueJobs as getCreationQueueJobsFromState, getCreationRepairTargetSet as getCreationRepairTargetSetFromState, getPendingCreationQueueCount as getPendingCreationQueueCountFromState, getSelectedCreationQueueJob as getSelectedCreationQueueJobFromState, renderCreationQueueStrip as renderCreationQueueStripView, runCreationQueuedJob as runCreationQueuedJobFromQueue, scheduleCreationGenerationQueue as scheduleCreationGenerationQueueFromState, selectCreationQueueJob as selectCreationQueueJobInState, shouldSyncCreationQueueJobCurrentSet, syncActiveCreationQueueSet as syncActiveCreationQueueSetInState } from "/lib/creation-suite-queue.mjs?v=20261102-creation-render-1";
@@ -185,7 +186,7 @@ const REASONING_LABELS = {
   max: "Max",
 };
 const DEFAULT_LIMITS = { maxParallelTasksPerSession: 15, maxReferenceImages: 15, maxCreationReferenceImages: 15, maxPortraitPersonReferenceImages: 3, maxPortraitActionReferenceImages: 3, maxPortraitAccessoryReferenceImages: 9 }; const PROMPT_FILMSTRIP_INITIAL_HISTORY_LIMIT = 10; const PROMPT_FILMSTRIP_MAX_HISTORY_LIMIT = 50; const PROMPT_FILMSTRIP_JOB_LIMIT = MAX_PROMPT_QUEUE_SIZE;
-const CREATION_IMAGE_COUNT_OPTIONS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+const CREATION_IMAGE_COUNT_OPTIONS = [0, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
 const DEFAULT_PROMPT_ENHANCE_TEXT = "Quality only; original prompt and references take priority. 8K ultra-HD look, clear subject, precise focus, natural edges, style-faithful detail, smooth gradients, clean tonal separation. Reduce unintended blur, aliasing, banding, compression artifacts, oversharpening, repeated details. Preserve subject, identity, count, composition, proportions, text, style, color, lighting, materials, intentional blur/grain/pixel art/minimalism. Add no objects, details or quality labels. Size follows settings."; function buildPromptModePrompt() { const prompt = refs.promptInput.value.trim(); if (!state.promptEnhanceEnabled) { return prompt; } const enhanceText = String(refs.promptEnhanceInput?.value || "").trim(); return enhanceText ? `${prompt}${enhanceText.startsWith(",") ? "" : "\n\n"}${enhanceText}` : prompt; } function syncPromptEnhanceMode() { refs.promptEnhanceToggle.classList.toggle("is-active", state.promptEnhanceEnabled); refs.promptEnhanceToggle.setAttribute("aria-checked", String(state.promptEnhanceEnabled)); refs.promptEnhanceToggle.querySelector("small").textContent = getUiLanguageText(state.promptEnhanceEnabled ? "promptEnhanceOn" : "promptEnhanceOff"); refs.promptEnhanceField.classList.toggle("hidden", !state.promptEnhanceEnabled); scheduleStudioPromptFillSync(); } function togglePromptEnhanceMode() { state.promptEnhanceEnabled = !state.promptEnhanceEnabled; syncPromptEnhanceMode(); if (state.promptEnhanceEnabled) { refs.promptEnhanceInput.focus(); } }
 const PROMPT_TEMPLATE_STORAGE_KEY = "image-studio-prompt-templates-v2";
 const PROMPT_TEMPLATE_DISMISSED_HISTORY_KEY = "image-studio-prompt-template-dismissed-history-v1";
@@ -1090,6 +1091,7 @@ const refs = {
   creationMarketingBatchPanel: document.querySelector("#creationMarketingBatchPanel"),
   creationMarketingBatchToggle: document.querySelector("#creationMarketingBatchToggle"),
   creationMarketingBatchConfig: document.querySelector("#creationMarketingBatchConfig"),
+  creationMarketingBatchDirectionInput: document.querySelector("#creationMarketingBatchDirectionInput"),
   creationMarketingBatchCountInput: document.querySelector("#creationMarketingBatchCountInput"),
   creationMarketingBatchCopiesInput: document.querySelector("#creationMarketingBatchCopiesInput"),
   creationMarketingBatchEstimate: document.querySelector("#creationMarketingBatchEstimate"),
@@ -12404,7 +12406,6 @@ function canRepairCreationSet(set = getCreationCurrentSet()) {
 
 function isCreationItemRepairActive(itemId) { return isCreationItemRepairActiveInQueue(state.creation, itemId); }
 function canRepairCreationItem(itemId) { const set = getCreationRepairTargetSet(); const item = set?.items?.find((entry) => entry.itemId === itemId); return !item?.evidenceBlocked && item?.status !== "skipped" && canRepairCreationItemFromQueue({ creationState: state.creation, itemId, canRepairSet: canRepairCreationSet(set) }); }
-function getCreationRepairButtonText(item = {}) { return getCreationRepairButtonTextFromQueue({ creationState: state.creation, item }); }
 function queueCreationItemRepair(itemId) { if (!canRepairCreationItem(itemId) || !queueCreationItemRepairInState(state.creation, itemId)) return false; setCreationFeedback("已加入单图重生成队列。", "busy"); renderCreationView(); return true; }
 async function runNextQueuedCreationItemRepair() { const nextItemId = shiftNextQueuedCreationItemRepair(state.creation, (candidate) => Boolean(getCreationCurrentSet()?.items.some((item) => item.itemId === candidate))); if (!nextItemId) { renderCreationView(); return; } renderCreationView(); await repairCreationItems({ itemId: nextItemId }); }
 
@@ -12768,8 +12769,79 @@ function getCreationCardLogText(item = {}, channel = "creation", groupId = "") {
   return getGenerationLogItemDetail(channel, item.itemId, groupId) || String(getCreationItemStatusLabel(item) || "").trim();
 }
 
+let creationCardReferenceSnapshot = { source: null, files: [] };
+
+function getCreationCardReferenceFiles(set = getCreationDisplayedSet()) {
+  const source = getCreationQueueJobForSet(set || {})?.formData || null;
+  if (source !== creationCardReferenceSnapshot.source) {
+    creationCardReferenceSnapshot.files.forEach((file) => URL.revokeObjectURL(file.previewUrl));
+    creationCardReferenceSnapshot = {
+      source,
+      files: (source?.getAll("referenceImages") || []).filter((file) => file?.name).map((file, index) => ({
+        referenceIndex: index + 1, filename: file.name, previewUrl: URL.createObjectURL(file),
+      })),
+    };
+  }
+  if (isCreationLogoBatchBranch()) return [];
+  if (source) return creationCardReferenceSnapshot.files;
+  if (set && !shouldUseCreationRepairDraftFiles(set)) return [];
+  const names = set?.referenceImageNames || state.creationReferenceFiles.map((entry) => entry.file?.name);
+  return names.map((filename, index) => {
+    const reference = state.creationReferenceFiles.find((entry) => entry.file?.name === filename);
+    return { referenceIndex: index + 1, filename, previewUrl: reference?.previewUrl || "" };
+  }).filter((reference) => reference.previewUrl);
+}
+
+function getCreationCardReferences(item = {}, referenceFiles = []) {
+  if (item.hasReferenceImage === false) return [];
+  const names = item.referenceImageNames?.length ? item.referenceImageNames
+    : item.referenceImageName ? [item.referenceImageName] : null;
+  const indexes = item.referenceSelection?.referenceIndexes ?? item.marketingAssignment?.referenceIndexes;
+  let selected;
+  if (names) {
+    selected = names.map((filename) => referenceFiles.find((reference) => reference.filename === filename));
+  } else if (Array.isArray(indexes)) {
+    selected = indexes.map((index) => referenceFiles.find((reference) => reference.referenceIndex === index));
+  } else if (item.role === "infographic-rebuild" && item.sourceInfographic) {
+    const source = item.sourceInfographic;
+    selected = [referenceFiles.find((reference) => source.index
+      ? reference.referenceIndex === Number(source.index) : reference.filename === source.filename)];
+  } else if (item.role === "sku" && item.skuSubject) {
+    const subject = item.skuSubject;
+    selected = (subject.referenceIndexes || []).map((index) => referenceFiles.find((reference) => reference.referenceIndex === index));
+    if (selected.length === 0) selected = (subject.filenames || []).map((filename) => referenceFiles.find((reference) => reference.filename === filename));
+  } else {
+    selected = [];
+  }
+  return [...new Set(selected.filter((reference) => reference?.previewUrl))];
+}
+
+function syncCreationCardReferences(card, item, referenceFiles = []) {
+  const references = getCreationCardReferences(item, referenceFiles);
+  let strip = card.querySelector(".creation-card-reference-thumbs");
+  const signature = JSON.stringify(references);
+  if (strip?.dataset.referenceSignature === signature) return;
+  if (!strip) {
+    strip = document.createElement("div");
+    strip.className = "creation-card-reference-thumbs";
+    strip.setAttribute("role", "group");
+    strip.setAttribute("aria-label", "参考图");
+    card.appendChild(strip);
+  }
+  strip.setAttribute("aria-hidden", String(references.length === 0));
+  strip.dataset.referenceSignature = signature;
+  strip.replaceChildren(...references.map((reference) => {
+    const image = document.createElement("img");
+    image.src = reference.previewUrl;
+    image.alt = `参考图 ${reference.referenceIndex}`;
+    image.title = reference.filename;
+    image.loading = "lazy";
+    image.decoding = "async";
+    return image;
+  }));
+}
+
 function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
-  const showActions = options.showActions !== false;
   const showRecordActions = options.showRecordActions === true;
   const isLoadingCard = shouldShowCreationCardLoading(item, showRecordActions);
   const hideGenerationDetails = shouldHideCreationCardDetails(item, showRecordActions);
@@ -12882,24 +12954,13 @@ function createCreationCard(item = {}, fallbackIndex = 0, options = {}) {
     card.appendChild(path);
   }
 
-  if (showActions && !hideGenerationDetails && item.status !== "missing") {
-    const actions = document.createElement("div");
-    actions.className = "creation-card-actions";
-    const button = document.createElement("button");
-    button.className = "mini-action";
-    button.type = "button";
-    button.dataset.creationRetryItemId = item.itemId;
-    button.textContent = getCreationRepairButtonText(item);
-    button.disabled = !canRepairCreationItem(item.itemId);
-    button.setAttribute("aria-label", `${getCreationItemDisplayTitle(item, "套图项")}${button.textContent}`);
-    actions.appendChild(button);
-    card.appendChild(actions);
-  }
+  if (!showRecordActions) syncCreationCardReferences(card, item, options.referenceFiles);
 
   return card;
 }
 
-function syncCreationResultGrid(items = [], { showActions = true, keyScope = "", logGroupId = "" } = {}) {
+function syncCreationResultGrid(items = [], { keyScope = "", logGroupId = "" } = {}) {
+  const referenceFiles = getCreationCardReferenceFiles();
   syncCreationResultGridShell({
     grid: refs.creationResultGrid,
     items,
@@ -12907,17 +12968,16 @@ function syncCreationResultGrid(items = [], { showActions = true, keyScope = "",
     getCardVersion: (item, index, options) => {
       if (shouldShowCreationCardLoading(item, false) || isCacheableBrowserImageUrl(getImageUrl(item))) return "";
       const hideDetails = shouldHideCreationCardDetails(item);
-      const hasActions = showActions && !hideDetails && item.status !== "missing";
       return JSON.stringify([
         index, options, item.itemId, item.slotIndex, item.role, item.imageType, item.title,
         item.status, getCreationItemStatusLabel(item), getImageUrl(item), getCardThumbnailUrl(item),
         item.relativePath, item.filename, item.storageKey,
         item.error, item.evidenceBlocked, item.evidenceRequirement, item.marketingAssignment?.sourceIndex,
-        hideDetails, hasActions && canRepairCreationItem(item.itemId), hasActions && getCreationRepairButtonText(item),
+        hideDetails, getCreationCardReferences(item, referenceFiles),
       ]);
     },
     getItemOptions: (item, _index, { firstSkuItem, firstInfographicRebuildItem }) => ({
-      showActions,
+      referenceFiles,
       keyScope,
       logGroupId,
       isSkuStart: item === firstSkuItem,
@@ -12933,6 +12993,7 @@ function syncCreationResultGrid(items = [], { showActions = true, keyScope = "",
         shouldShowLoading: (entry) => shouldShowCreationCardLoading(entry, false),
       });
       if (target) {
+        syncCreationCardReferences(target, item, referenceFiles);
         target.dataset.creationItemId = String(item.itemId || "");
         target.dataset.creationMarketingSourceIndex = String(item.marketingAssignment?.sourceIndex || (item.status === "missing" ? item.slotIndex || "" : ""));
       }
@@ -13674,7 +13735,8 @@ function renderCreationRecordArchiveDetail(set) {
   refs.creationRecordArchiveDetail.innerHTML = ""; const archive = refs.creationRecordArchiveDetail.closest(".creation-record-archive"); archive?.classList.toggle("is-empty", !set); refs.creationRecordArchiveDetail.classList.remove("is-toggleable", "is-expanded", "is-collapsed");
   if (!set) { const empty = document.createElement("span"); empty.textContent = "还没有套图记录。"; refs.creationRecordArchiveDetail.appendChild(empty); return; }
   const progress = getCreationProgressSummary(set); const isExpanded = state.creation.recordDetailExpanded === true; refs.creationRecordArchiveDetail.classList.add("is-toggleable", isExpanded ? "is-expanded" : "is-collapsed");
-  const detailSummary = document.createElement("div"); detailSummary.className = "creation-record-detail-summary"; const summaryTitle = document.createElement("strong"); summaryTitle.textContent = set.productName || "未命名商品"; const summaryMeta = document.createElement("span"); summaryMeta.textContent = [set.platformLabel || formatCreationPlatformLabel(set.platform), `${progress.completed}/${progress.total}`, formatClock(set.createdAt)].filter(Boolean).join(" / "); detailSummary.append(summaryTitle, summaryMeta);
+  const language = getCreationSetLanguageLabel(set);
+  const detailSummary = document.createElement("div"); detailSummary.className = "creation-record-detail-summary"; const summaryTitle = document.createElement("strong"); summaryTitle.textContent = `${set.productName || "未命名商品"}${language ? ` · ${language}` : ""}`; const summaryMeta = document.createElement("span"); summaryMeta.textContent = [set.platformLabel || formatCreationPlatformLabel(set.platform), `${progress.completed}/${progress.total}`, formatClock(set.createdAt)].filter(Boolean).join(" / "); detailSummary.append(summaryTitle, summaryMeta);
   const detailToggle = document.createElement("button"); detailToggle.className = "creation-record-detail-toggle"; detailToggle.type = "button"; detailToggle.dataset.creationRecordDetailToggle = "true"; detailToggle.setAttribute("aria-expanded", String(isExpanded)); detailToggle.setAttribute("aria-label", isExpanded ? "折叠套图详情" : "展开套图详情"); detailToggle.title = isExpanded ? "折叠套图详情" : "展开套图详情";
   const detailBody = document.createElement("div"); detailBody.className = "creation-record-detail-body"; refs.creationRecordArchiveDetail.append(detailSummary, detailToggle, detailBody);
   if (refs.creationRecordGenerateListingsButton) refs.creationRecordArchiveDetail.insertBefore(refs.creationRecordGenerateListingsButton, detailToggle);
@@ -13803,7 +13865,6 @@ function renderCreationRecordView() {
   getCreationMarketingDisplayItems(selectedSet).forEach((item, index) =>
     refs.creationRecordResultGrid.appendChild(
       createCreationCard(item, index, {
-        showActions: false,
         showRecordActions: true,
         creationSetId: selectedSet.setId,
         isSkuStart: item === firstRecordSkuItem,
@@ -15054,7 +15115,8 @@ function renderCreationCurrentSet() {
   let text = "";
   if (currentSet && (selectedQueueJob || !isCreationDraftSet(currentSet))) {
     const productName = String(currentSet.productName || "").trim() || "未命名商品";
-    text = `当前：${productName}`;
+    const language = getCreationSetLanguageLabel(currentSet, selectedQueueJob?.createdAt);
+    text = `当前：${productName}${language ? ` · ${language}` : ""}`;
     if (batch?.schemeIndex > 0 && batch.schemeTotal > 0 && batch.copyNumber > 0 && batch.copyTotal > 0) {
       text += ` · 方案 ${batch.schemeIndex}/${batch.schemeTotal} · 第 ${batch.copyNumber}/${batch.copyTotal} 套`;
     } else if (selectedQueueJob) {
@@ -15346,7 +15408,6 @@ function renderCreationView() {
     refs.creationListingAgentEnabledInput.disabled = false;
     refs.creationListingAgentEnabledInput.title = "Listing";
   }
-  const showCreationResultActions = !selectedQueueJob;
   syncCreationInfographicRebuildRequiredState();
   const previewSlots = logoBatchBranch
     ? buildCreationLogoBatchPreviewItems(state.creation.generating ? "queued" : "idle")
@@ -15422,7 +15483,6 @@ function renderCreationView() {
       ? state.creation.logoBatchLoadingKey
       : selectedQueueJob?.id || currentSet?.setId || "";
   syncCreationResultGrid(currentSet ? getCreationMarketingDisplayItems(currentSet) : items, {
-    showActions: showCreationResultActions,
     keyScope: loadingKeyScope,
     logGroupId: currentSet?.setId || "",
   });
@@ -15477,7 +15537,7 @@ function renderCreationProgressView() {
   const loadingKeyScope = state.creation.generationScope === "logo-batch" && state.creation.logoBatchLoadingKey
     ? state.creation.logoBatchLoadingKey : selectedQueueJob?.id || currentSet.setId || "";
   syncCreationResultGrid(getCreationMarketingDisplayItems(currentSet), {
-    showActions: !selectedQueueJob, keyScope: loadingKeyScope, logGroupId: currentSet.setId || "",
+    keyScope: loadingKeyScope, logGroupId: currentSet.setId || "",
   });
   const incompleteItems = getCreationIncompleteItems(currentSet);
   if (refs.creationRepairFailedButton) {
@@ -15608,6 +15668,7 @@ function renderCreationMarketingBatchConfig() {
     refs.creationMarketingBatchCancelButton.hidden = !controllable;
     refs.creationMarketingBatchCancelButton.disabled = !enabled || !controllable;
   }
+  if (refs.creationMarketingBatchDirectionInput) refs.creationMarketingBatchDirectionInput.disabled = !enabled || controllable || creationMarketingBatchStarting;
   if (refs.creationMarketingBatchCountInput) refs.creationMarketingBatchCountInput.disabled = !enabled || controllable || creationMarketingBatchStarting;
   if (refs.creationMarketingBatchCopiesInput) refs.creationMarketingBatchCopiesInput.disabled = !enabled || controllable || creationMarketingBatchStarting;
   if (refs.creationMarketingBatchStatus) {
@@ -15704,7 +15765,7 @@ function buildCreationPlanPreviewFormData() {
   const marketingBatch = state.creation.marketingBatch;
   const activeMarketingBatchScheme = marketingBatch && marketingBatch.currentIndex >= 0 ? getCreationMarketingBatchScheme(marketingBatch, marketingBatch.currentIndex) : null;
   if (activeMarketingBatchScheme) {
-    formData.set("variationSeed", activeMarketingBatchScheme.variationSeed);
+    formData.set("variationSeed", getCreationMarketingBatchVariationSeed(activeMarketingBatchScheme));
   }
   if (isCreationAiMarketingEnabled()) {
     formData.set("imageCount", String(getCreationPlanPreviewImageCount(selectedRoles)));
@@ -15733,7 +15794,10 @@ function buildCreationFormData({ sourceFormData = null, effectivePlanOverride = 
   const effectivePlan = effectivePlanOverride || getFrozenCreationEffectivePlan();
   if (effectivePlan) {
     formData.set("effectivePlan", JSON.stringify(effectivePlan));
-    if (effectivePlan.promptPlanningMode === "ai-batch") formData.set("imageCount", String(effectivePlan.carouselImageCount));
+    if (effectivePlan.promptPlanningMode === "ai-batch") {
+      formData.set("imageCount", String(effectivePlan.carouselImageCount));
+      if (effectivePlan.marketingPlan?.variationSeed) formData.set("variationSeed", effectivePlan.marketingPlan.variationSeed);
+    }
   }
 
   formData.set("format", normalizeOutputFormat(refs.creationOutputFormatInput.value || state.config?.defaults?.format || "png"));
@@ -16415,6 +16479,9 @@ async function previewCreationPlan({ requestFormData = null, throwOnError = fals
   try {
     const previewFormData = requestFormData ? cloneCreationMarketingBatchFormData(requestFormData) : buildCreationPlanPreviewFormData();
     previewFormData.set("clientSessionId", state.clientSessionId);
+    if (aiMarketing && (!requestFormData || !previewFormData.get("variationSeed"))) {
+      previewFormData.set("variationSeed", globalThis.crypto?.randomUUID?.() || `marketing-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    }
     if (isCreationAiMarketingEnabled() && !requestFormData) {
       await ensureCreationReferenceGenerationFilesReady();
       state.creationReferenceFiles.forEach((item) => {
@@ -16628,8 +16695,10 @@ function enqueueCreationGeneration({ formData, set }) {
 }
 
 async function buildCreationMarketingBatchRequestFormData() {
+  const direction = String(refs.creationMarketingBatchDirectionInput?.value || "").trim();
   await ensureCreationReferenceGenerationFilesReady();
   const formData = buildCreationPlanPreviewFormData();
+  if (direction) formData.set("marketingSupplement", direction);
   state.creationReferenceFiles.forEach((item) => {
     const file = getCreationReferenceGenerationFile(item);
     if (file) formData.append("referenceImages", file);
@@ -16693,6 +16762,7 @@ async function runCreationMarketingBatchGeneration({ resume = false } = {}) {
   creationMarketingBatchRequestController = requestController;
   let batch = null;
   try {
+    renderCreationView();
     const count = normalizeCreationMarketingBatchSchemeCount(refs.creationMarketingBatchCountInput?.value || 1);
     const copiesPerScheme = normalizeCreationMarketingBatchCopies(refs.creationMarketingBatchCopiesInput?.value || 1);
     if (!resume) {
@@ -16700,7 +16770,6 @@ async function runCreationMarketingBatchGeneration({ resume = false } = {}) {
       const productName = String(creationMarketingBatchSourceFormData.get("productName") || "").trim();
       const productDescription = String(creationMarketingBatchSourceFormData.get("productDescription") || "").trim();
       if (!productName && !productDescription) throw new Error("请至少填写商品名称或商品描述。");
-      creationMarketingBatchSourceFormData.delete("marketingSupplement");
       creationMarketingBatchSourceFormData.delete("variationSeed");
       state.creation.marketingBatch = createCreationMarketingBatchState({
         count,
@@ -16724,14 +16793,14 @@ async function runCreationMarketingBatchGeneration({ resume = false } = {}) {
     await runCreationMarketingBatch({
       state: batch,
       onUpdate: () => renderCreationView(),
-      generatePlan: async ({ scheme }) => {
+      generatePlan: async ({ scheme, variationSeed }) => {
         const formData = cloneCreationMarketingBatchFormData(creationMarketingBatchSourceFormData);
-        formData.set("variationSeed", scheme.variationSeed);
+        formData.set("variationSeed", variationSeed);
         return requestCreationMarketingBatchPlan(formData, scheme, batch, requestController.signal);
       },
-      enqueuePlan: async ({ planResult, scheme, copyIndex, copyNumber, state: batchState }) => {
+      enqueuePlan: async ({ planResult, scheme, copyIndex, copyNumber, variationSeed, state: batchState }) => {
         const sourceFormData = cloneCreationMarketingBatchFormData(creationMarketingBatchSourceFormData);
-        sourceFormData.set("variationSeed", scheme.variationSeed);
+        sourceFormData.set("variationSeed", variationSeed);
         const generationFormData = sourceFormData;
         generationFormData.set("effectivePlan", JSON.stringify(planResult.plan));
         generationFormData.set("imageCount", String(planResult.plan.carouselImageCount ?? planResult.plan.imageCount));
@@ -16860,6 +16929,11 @@ async function startCreationGeneration(event) {
 
   try {
     await ensureCreationReferenceGenerationFilesReady();
+    const previousFingerprint = getFrozenCreationEffectivePlan()?.marketingPlan?.inputFingerprint;
+    if (isCreationAiMarketingEnabled() && previousFingerprint && state.creation.queue.some((job) => job.set?.marketingPlan?.inputFingerprint === previousFingerprint)) {
+      await previewCreationPlan({ throwOnError: true });
+      if (state.creation.planDirty || !getFrozenCreationEffectivePlan()) return;
+    }
     const generationFormData = buildCreationFormData();
     const createdAt = nowIso();
     const queuedSet = buildCreationQueuedSet({ productName, productDescription, sellingPoints: [], createdAt });

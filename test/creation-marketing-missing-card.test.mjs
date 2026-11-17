@@ -237,6 +237,7 @@ test("a missing image frame remains static during generation and exposes no retr
     getCreationItemStatusLabel: () => "缺失", getCreationCardDomKey: (item) => item.itemId,
     createCreationCardLoading() { throw new Error("Missing task must never animate"); },
     canRepairCreationItem() { throw new Error("Missing task must never expose a retry action"); },
+    syncCreationCardReferences() {},
   };
   runInNewContext(extract("shouldShowCreationCardLoading", "shouldHideCreationCardDetails") + extract("shouldHideCreationCardDetails", "createCreationCardLoading") + extract("createCreationCard", "syncCreationResultGrid") + "this.render = createCreationCard;", context);
   const reason = '<script>alert("untrusted")</script>：商品事实失效';
@@ -246,10 +247,10 @@ test("a missing image frame remains static during generation and exposes no retr
   assert.ok(nodes.some((node) => node.tag === "small" && node.textContent === reason));
   assert.equal(nodes.some((node) => node.tag === "button" || node.tag === "script"), false);
   assert.equal(nodes.some((node) => node.attributes["aria-busy"] === "true"), false);
-  const failed = context.render({ itemId: "failed-image", title: "生图失败", status: "failed", error: "单张请求超时" }, 0, { showActions: false });
+  const failed = context.render({ itemId: "failed-image", title: "生图失败", status: "failed", error: "单张请求超时" });
   assert.ok(all(failed).some((node) => node.tag === "span" && node.textContent === "缺失"));
   assert.ok(all(failed).some((node) => node.tag === "small" && node.textContent === "单张请求超时"));
-  const retained = context.render({ itemId: "retained-image", title: "保留结果", status: "failed", imageUrl: "/output/retained.png" }, 0, { showActions: false });
+  const retained = context.render({ itemId: "retained-image", title: "保留结果", status: "failed", imageUrl: "/output/retained.png" });
   assert.ok(all(retained).some((node) => node.tag === "img" && node.src === "/output/retained.png"));
   assert.equal(all(retained).some((node) => node.tag === "small"), false);
 });

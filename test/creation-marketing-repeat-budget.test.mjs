@@ -63,14 +63,14 @@ test("manual role selection cannot bypass the repeat budget", () => {
   assert.deepEqual(duplicates(plan, { selectedRoles: plan.items.map((item) => item.role) }).map((issue) => issue.itemId), ["ai-5", "ai-6"]);
 });
 
-test("explicitly different camera viewpoints remain distinct despite matching boilerplate", () => {
+test("different camera viewpoints cannot repeat the same product use scene", () => {
   const fixture = marketingPlanFixture(4);
   for (const [index, angle] of [[2, "俯拍"], [3, "侧面"]]) {
     fixture.payload.items[index].image_type = "scene-application";
     Object.assign(fixture.payload.items[index].creative_brief, { visual_form: "use-scene", action: "戴手套握住摩托车车把",
       framing: angle + "手部近景，商品完整清晰，背景虚化保留实际使用环境与真实光影，主体位于画面中央，前景保留车把" });
   }
-  assert.deepEqual(duplicates(apply(fixture)), []);
+  assert.deepEqual(duplicates(apply(fixture)).map((issue) => issue.itemId), ["ai-4"]);
 });
 
 test("paraphrased riding closeups still identify the same camera relationship", () => {
@@ -84,7 +84,7 @@ test("paraphrased riding closeups still identify the same camera relationship", 
   plan.items[3].marketingAssignment.goal = plan.items[0].marketingAssignment.goal;
   assert.deepEqual(duplicates(plan).map((issue) => issue.itemId), ["ai-4"], "an earlier advisory match must not hide a later confirmed duplicate");
   plan.items[3].marketingAssignment.creativeBrief.framing = "侧面全景，骑行者与整辆车及道路";
-  assert.deepEqual(duplicates(plan), []);
+  assert.deepEqual(duplicates(plan).map((issue) => issue.itemId), ["ai-4"], "a wider camera shot still repeats the same core use scene");
 });
 
 test("locked alternatives take priority without silently rewriting or exceeding the budget", () => {

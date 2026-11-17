@@ -825,6 +825,37 @@ test("creation suite queue renders selectable active and queued suites", () => {
   }
 });
 
+test("今天的多语言队列使用各自保存的语言且保持独立可见", () => {
+  const originalDocument = globalThis.document;
+  globalThis.document = { createElement: createFakeElement };
+  try {
+    const strip = createFakeElement("div");
+    const options = {
+      strip,
+      queueJobs: [
+        { id: "de", createdAt: "2026-11-17T04:00:00Z", status: "completed", set: { productName: "手套", targetLanguage: "de", targetLanguageLabel: "Deutsch", status: "completed" } },
+        { id: "pt", createdAt: "2026-11-17T04:00:00Z", status: "queued", set: { productName: "手套", targetLanguage: "pt", status: "queued" } },
+      ],
+      normalizeSet,
+      getProgressSummary: () => ({ completed: 0, total: 16 }),
+      getStatusLabel: (value) => value,
+    };
+    renderCreationQueueStrip(options);
+    assert.equal(strip.children[0].children[0].textContent, "一 - 手套");
+    assert.equal(strip.children[0].children[1].textContent, "· 德语");
+    assert.equal(strip.children[0].children[1].className, "creation-queue-language");
+    assert.equal(strip.children[1].children[1].textContent, "· 葡萄牙语");
+    assert.equal(strip.children[0].title, "一 - 手套 · 德语 · completed 0/16");
+    const row = strip.children[1];
+    options.queueJobs[1].set = { ...options.queueJobs[1].set, targetLanguage: "nl" };
+    renderCreationQueueStrip(options);
+    assert.equal(strip.children[1], row);
+    assert.equal(row.children[1].textContent, "· 荷兰语");
+  } finally {
+    globalThis.document = originalDocument;
+  }
+});
+
 test("600 queued images reuse buttons and normalized display data over 100 unchanged refreshes", () => {
   const originalDocument = globalThis.document;
   let created = 0;

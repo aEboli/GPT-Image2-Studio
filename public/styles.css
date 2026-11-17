@@ -3393,6 +3393,7 @@ html:is([data-ui-layout="stacked"], [data-ui-layout="tablet"], [data-ui-layout="
   gap: 8px;
 }
 
+.creation-marketing-batch-direction,
 .creation-marketing-batch-fields .compact-field {
   min-width: 0;
   width: 100%;
@@ -3400,6 +3401,7 @@ html:is([data-ui-layout="stacked"], [data-ui-layout="tablet"], [data-ui-layout="
   box-sizing: border-box;
 }
 
+.creation-marketing-batch-direction input,
 .creation-marketing-batch-fields .compact-field input {
   min-width: 0;
   width: 100%;
@@ -5006,7 +5008,7 @@ ul.creation-plan-message {
   position: relative;
   flex: 0 0 auto;
   min-height: 22px;
-  max-width: 220px;
+  max-width: 280px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -5060,6 +5062,13 @@ ul.creation-plan-message {
   flex: 0 0 auto;
   color: var(--muted);
   font-size: 10px;
+  line-height: 1.1;
+}
+
+.creation-queue-language {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: 11px;
   line-height: 1.1;
 }
 
@@ -5836,6 +5845,24 @@ ul.creation-plan-message {
   grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   margin-top: 2px;
+}
+
+.creation-card-reference-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+  min-height: 36px;
+}
+
+.creation-card-reference-thumbs img {
+  width: 36px;
+  height: 36px;
+  max-width: 100%;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--control-bg);
 }
 
 .creation-card-actions .mini-action {

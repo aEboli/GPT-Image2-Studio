@@ -469,7 +469,7 @@ test("creation planner builds the fixed four-image ecommerce set", () => {
   });
 
   assert.equal(plan.targetLanguage, "en");
-  assert.equal(plan.targetLanguageLabel, "English");
+  assert.equal(plan.targetLanguageLabel, "英语");
   assert.deepEqual(
     plan.items.map((item) => item.role),
     ["hero", "benefit", "scene", "multi-angle"],
@@ -835,7 +835,7 @@ test("creation submitted plans let an explicit language replace stale frozen ite
   });
 
   assert.equal(submitted.targetLanguage, "en");
-  assert.equal(submitted.targetLanguageLabel, "English");
+  assert.equal(submitted.targetLanguageLabel, "英语");
   assert.ok(submitted.slots.every((slot) => slot.targetLanguage === "en"));
   assert.ok(submitted.items.every((item) => item.targetLanguage === "en"));
   assert.ok(submitted.items.every((item) => item.marketingCopyLanguage === "en"));
@@ -1110,7 +1110,8 @@ test("creation planner maps reference analysis coverage onto the matching carous
   assert.deepEqual(byRole["usage-suggestion"].coverageWarnings, []);
   assert.match(byRole["usage-suggestion"].prompt, /Reference coverage:/);
   assert.match(byRole["usage-suggestion"].prompt, /selling-point infographic|visible product evidence/i);
-  assert.doesNotMatch(byRole["usage-suggestion"].prompt, /setup-guide\.png/);
+  assert.match(byRole["usage-suggestion"].prompt, /setup-guide\.png/);
+  assert.ok(byRole["usage-suggestion"].referenceSelection.referenceIndexes.includes(6));
   assert.match(byRole["usage-suggestion"].prompt, /three setup steps for first use/);
   assert.doesNotMatch(byRole["usage-suggestion"].prompt, /faithfully reconstruct the original instruction card|preserve the original sequence/i);
 });
@@ -1718,9 +1719,9 @@ test("creation planner normalizes supported target languages", () => {
 
 test("creation planner injects common international target-language guidance", () => {
   const cases = [
-    ["fr", "Français", /CANVAS TEXT: new text in French/],
-    ["de", "Deutsch", /CANVAS TEXT: new text in German/],
-    ["es", "Español", /CANVAS TEXT: new text in Spanish/],
+    ["fr", "法语", /CANVAS TEXT: new text in French/],
+    ["de", "德语", /CANVAS TEXT: new text in German/],
+    ["es", "西班牙语", /CANVAS TEXT: new text in Spanish/],
   ];
 
   for (const [targetLanguage, targetLanguageLabel, promptPattern] of cases) {
@@ -1750,7 +1751,7 @@ test("creation planner defaults to English copy and metric-plus-imperial specs",
   assert.equal(normalizeCreationTargetLanguage("").value, "en");
   assert.equal(normalizeCreationDimensionUnitMode("").value, "both");
   assert.equal(plan.targetLanguage, "en");
-  assert.equal(plan.targetLanguageLabel, "English");
+  assert.equal(plan.targetLanguageLabel, "英语");
   assert.equal(plan.dimensionUnitMode, "both");
   assert.match(plan.items[0].prompt, /Length 13cm \(5\.12 in\) \/ Weight 35g \(1\.23 oz\)/);
   assert.match(plan.items[0].prompt, /CANVAS TEXT: new text in English; use concise source-grounded labels/);
@@ -4297,7 +4298,8 @@ test("creation reference analysis normalizes role suggestions and prompt notes",
   assert.deepEqual(analysis.risks, ["包装信息不足"]);
   assert.match(plan.items.find((item) => item.role === "product-detail").prompt, /texture\.png \([\w-]+ \/ detail and structure reference\): 磨砂纹理和边缘细节/);
   assert.match(plan.items.find((item) => item.role === "scene").coverageSummary, /kitchen\.png \(scene \/ usage scene\): 厨房台面使用环境/);
-  assert.match(plan.items.find((item) => item.role === "scene").prompt, /Verified scene facts.*厨房台面使用环境/);
+  assert.match(plan.items.find((item) => item.role === "scene").prompt, /kitchen\.png \(scene \/ usage scene\): 厨房台面使用环境/);
+  assert.ok(plan.items.find((item) => item.role === "scene").referenceSelection.referenceIndexes.includes(3));
   assert.doesNotMatch(plan.items.find((item) => item.role === "hero").prompt, /texture\.png|kitchen\.png/);
 });
 

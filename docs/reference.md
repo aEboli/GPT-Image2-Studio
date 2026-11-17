@@ -122,6 +122,7 @@ The UI exposes conservative application candidates, not a guarantee from every u
 | Style transfer | One source image plus one style reference or built-in preset |
 | Image-edit masks | Each local mask is limited to 50 MB and normalized to the source dimensions |
 | Ecommerce SKU plans | New plans use one subject per SKU bundle; frozen plans are limited to 64 items and 4 MiB serialized size |
+| Ecommerce image counts | New sets offer 6–20 images, with six in the quick trial; reference reconstruction also supports zero generated images. SKU and reconstructed images are counted separately |
 | Portrait batches | 1-100 images; the default is 12 |
 | PPT pages | 1-20 pages; the default is 8 |
 | Output formats | GPT prompt jobs offer PNG/JPG/WebP/GIF/SVG; other workflows use static formats. Actual support follows the selected model and endpoint |

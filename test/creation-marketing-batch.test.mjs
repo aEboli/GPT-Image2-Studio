@@ -84,7 +84,7 @@ test("batch plans two schemes together and keeps copy order within each scheme",
 
   assert.deepEqual(events.slice(0, 2), ["plan-1", "plan-2"]);
   for (const index of [1, 2, 3]) {
-    assert.equal(events.filter((event) => event === `plan-${index}`).length, 1);
+    assert.equal(events.filter((event) => event === `plan-${index}`).length, 2);
     assert.deepEqual(queued.filter(([scheme]) => scheme === index), [[index, 1], [index, 2]]);
   }
   assert.equal(state.status, "completed");
@@ -148,7 +148,7 @@ test("a queue failure preserves queued copies and continues other schemes withou
     enqueuePlan: async ({ copyNumber }) => ({ id: `job-recovered-${copyNumber}`, set: { setId: `set-recovered-${copyNumber}` } }),
   });
 
-  assert.equal(planningCalls, 3);
+  assert.equal(planningCalls, 6);
   assert.equal(state.status, "completed");
   assert.equal(state.enqueuedCount, 5);
   assert.deepEqual(state.schemes[0].queueJobIds, ["job-1-1"]);

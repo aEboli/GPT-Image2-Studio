@@ -46,7 +46,7 @@ test("static assets use the current cache-busting version", async () => {
 test("creation image count keeps role checkbox defaults synchronized", async () => {
   const app = await readFile(appPath, "utf8");
 
-  assert.match(app, /const CREATION_IMAGE_COUNT_OPTIONS = \[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20\];/);
+  assert.match(app, /const CREATION_IMAGE_COUNT_OPTIONS = \[0, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20\];/);
   assert.match(app, /function alignCreationRoleIdsToCount\(/);
   assert.match(app, /function syncCreationSelectedRolesToCurrentCount\(\) \{/);
   assert.match(app, /refs\.creationImageCountInput\.addEventListener\("click", \(\) => \{ if \(!isCreationAiMarketingEnabled\(\)\) syncCreationSelectedRolesToCurrentCount\(\); \}\)/);
@@ -1973,7 +1973,7 @@ test("reference analysis generation applies selected output language", async () 
 
   assert.match(
     html,
-    /<span>输出语言<\/span>[\s\S]*<select id="referenceAnalysisLanguageInput" name="targetLanguage">[\s\S]*<option value="zh-CN" selected>简体中文<\/option>[\s\S]*<option value="en">English<\/option>/,
+    /<span>输出语言<\/span>[\s\S]*<select id="referenceAnalysisLanguageInput" name="targetLanguage">[\s\S]*<option value="zh-CN" selected>简体中文<\/option>[\s\S]*<option value="en">英语<\/option>/,
   );
   assert.match(app, /normalizeReferenceAnalysisLanguage,/);
   assert.doesNotMatch(app, /appendReferenceAnalysisLanguageInstruction/);
@@ -4488,8 +4488,8 @@ test("creation mode is a separate studio view with isolated state and routes", a
   assert.match(html, /data-view-panel="creation"/);
   assert.match(html, /id="creationForm"/);
   assert.match(html, /id="creationTargetLanguageInput"/);
-  assert.match(html, /id="creationTargetLanguageInput"[\s\S]*<option value="zh-CN">[\s\S]*<option value="en" selected>English<\/option>/);
-  assert.match(html, /id="creationTargetLanguageInput"[\s\S]*<option value="fr">Français<\/option>[\s\S]*<option value="de">Deutsch<\/option>[\s\S]*<option value="es">Español<\/option>/);
+  assert.match(html, /id="creationTargetLanguageInput"[\s\S]*<option value="zh-CN">[\s\S]*<option value="en" selected>英语<\/option>/);
+  assert.match(html, /id="creationTargetLanguageInput"[\s\S]*<option value="fr">法语<\/option>[\s\S]*<option value="de">德语<\/option>[\s\S]*<option value="es">西班牙语<\/option>/);
   assert.match(html, /id="creationGenerateButton"/);
   assert.match(html, /id="creationPlanButton"/);
   assert.doesNotMatch(html, /id="creationPlanMeta"/);
@@ -4563,7 +4563,7 @@ test("creation mode has product references without a separate style-reference mo
   assert.match(app, /refs\.creationReferenceResetButton\.addEventListener\("click", clearCreationReferenceFiles\)/);
   assert.doesNotMatch(html, /SKU 组合件数|id="creationSkuBundleCountInput"|name="skuBundleCount"/);
   const creationImageCountMarkup = html.match(/<select id="creationImageCountInput"[\s\S]*?<\/select>/)?.[0] || "";
-  assert.match(creationImageCountMarkup, /<option value="0">0 张<\/option>[\s\S]*<option value="1">1 张<\/option>[\s\S]*<option value="18" selected>18 张<\/option>/);
+  assert.match(creationImageCountMarkup, /<option value="0">0 张<\/option>[\s\S]*<option value="6">6 张<\/option>[\s\S]*<option value="18" selected>18 张<\/option>/);
   assert.match(app, /function syncCreationPlatformImageCountOptions\(/);
   assert.match(app, /resolveCreationPlatformImageCountState\(/);
   assert.match(html, /SKU 生成规则[\s\S]*id="creationSkuGenerationRuleInput"[\s\S]*name="skuGenerationRule"[\s\S]*<option value="color-name-under-subject" selected>显示颜色<\/option>[\s\S]*<option value="none">无<\/option>[\s\S]*<option value="package-list">显示清单<\/option>[\s\S]*<option value="dimensions">显示尺寸<\/option>[\s\S]*<option value="package-list-dimensions">显示清单和尺寸<\/option>/);
@@ -5317,7 +5317,8 @@ test("creation mode exposes record detail and item repair actions", async () => 
   assert.doesNotMatch(app, /function getCreationItemDraftKey|function toggleCreationItemEditor|function closeCreationItemEditor|function saveCreationItemDraft/);
   assert.match(app, /fetch\("\/api\/creation\/repair"/);
   assert.doesNotMatch(app, /formData\.set\("promptOverride"/);
-  assert.match(app, /button\.dataset\.creationRetryItemId = item\.itemId;/);
+  assert.doesNotMatch(app, /button\.dataset\.creationRetryItemId = item\.itemId;/);
+  assert.match(app, /strip\.className = "creation-card-reference-thumbs";/);
   assert.doesNotMatch(app, /creationEditItemId|creationClosePromptEditor|creationSavePromptItemId|creationPromptEditor/);
   assert.match(app, /path\.className = "creation-card-path";/);
   assert.match(app, /card\.classList\.toggle\("is-sku", item\.role === "sku"\);/);
@@ -5379,7 +5380,7 @@ test("creation generation cards replace plan details with loading animation", as
   assert.match(app, /media\.classList\.add\("is-loading"\);[\s\S]*media\.appendChild\(createCreationCardLoading\(\s*item\.status,\s*fallbackIndex,\s*getCreationCardLoadingKey\(item, fallbackIndex, options\.keyScope\),\s*getCreationCardLogText\(item, "creation", options\.logGroupId\),\s*\)\);/);
   assert.match(app, /const shouldRenderPath = !imageUrl && !showRecordActions && !hideGenerationDetails;/);
   assert.match(app, /if \(shouldRenderPath\) \{/);
-  assert.match(app, /if \(showActions && !hideGenerationDetails && item\.status !== "missing"\) \{/);
+  assert.match(app, /if \(!showRecordActions\) syncCreationCardReferences\(card, item, options\.referenceFiles\);/);
   assert.match(queueModule, /creationState\.generationScope = "full";/);
   assert.match(app, /state\.creation\.generationScope = itemId \? "single" : "repair";/);
 
@@ -5401,13 +5402,13 @@ test("creation result grid keeps running card loading DOM stable across rerender
   const loadingModule = await readFile(creationCardLoadingPath, "utf8");
 
   assert.match(app, /from "\/lib\/creation-card-loading\.mjs"/);
-  assert.match(app, /function syncCreationResultGrid\(items = \[\], \{ showActions = true, keyScope = "", logGroupId = "" \} = \{\}\) \{/);
+  assert.match(app, /function syncCreationResultGrid\(items = \[\], \{ keyScope = "", logGroupId = "" \} = \{\}\) \{/);
   assert.match(app, /syncCreationResultGridShell\(\{/);
   assert.match(app, /syncCreationLoadingCard\(card,\s*item,\s*index/);
   assert.match(app, /createCreationCardLoadingShell\([^,]+,\s*null,\s*\{ sequenceIndex, key, logText \}\)/);
   assert.match(
     app,
-    /syncCreationResultGrid\(currentSet \? getCreationMarketingDisplayItems\(currentSet\) : items, \{\s*showActions: showCreationResultActions,\s*keyScope: loadingKeyScope,\s*logGroupId: currentSet\?\.setId \|\| "",\s*\}\);/,
+    /syncCreationResultGrid\(currentSet \? getCreationMarketingDisplayItems\(currentSet\) : items, \{\s*keyScope: loadingKeyScope,\s*logGroupId: currentSet\?\.setId \|\| "",\s*\}\);/,
   );
   const renderCreationViewBody = extractFunctionBefore(app, "renderCreationView", "getCreationPlanPreviewImageCount");
   assert.doesNotMatch(renderCreationViewBody, /refs\.creationResultGrid\.innerHTML = "";/);
@@ -5420,19 +5421,18 @@ test("creation result grid keeps running card loading DOM stable across rerender
   assert.doesNotMatch(styles, /creation-card-loading-sketch|creation-card-loading-waiting|creation-card-loading-steps|creation-card-loading-progress|creation-card-loading-signal/);
 });
 
-test("creation single-item repair keeps other action buttons available while one item runs", async () => {
+test("creation single-item repair queue remains available without card action buttons", async () => {
   const app = await readFile(appPath, "utf8");
 
   assert.match(app, /queuedRepairItemIds:\s*\[\]/);
   assert.match(app, /repairingItemId:\s*""/);
   assert.match(app, /from "\/lib\/creation-item-repair-queue\.mjs"/);
-  assert.match(app, /function getCreationRepairButtonText\(item = \{\}\) \{/);
   assert.match(app, /function queueCreationItemRepair\(itemId\) \{/);
   assert.match(app, /function runNextQueuedCreationItemRepair\(\) \{/);
   assert.match(app, /state\.creation\.generationScope === "single"/);
   assert.match(app, /const hideGenerationDetails = shouldHideCreationCardDetails\(item, showRecordActions\);/);
-  assert.match(app, /button\.disabled = !canRepairCreationItem\(item\.itemId\);/);
-  assert.match(app, /button\.textContent = getCreationRepairButtonText\(item\);/);
+  assert.doesNotMatch(app, /button\.dataset\.creationRetryItemId = item\.itemId;/);
+  assert.match(app, /syncCreationCardReferences\(target, item, referenceFiles\);/);
 });
 
 test("creation mode exposes a set-level queue strip for queued suites", async () => {
@@ -5466,7 +5466,8 @@ test("creation mode exposes a set-level queue strip for queued suites", async ()
   assert.match(styles, /\.creation-queue-strip\s*\{[\s\S]*min-height:\s*22px;/);
   assert.match(styles, /\.creation-queue-strip\s*\{[\s\S]*overflow-y:\s*hidden;/);
   assert.match(styles, /\.creation-queue-item\s*\{/);
-  assert.match(styles, /\.creation-queue-item\s*\{[\s\S]*max-width:\s*220px;/);
+  assert.match(styles, /\.creation-queue-item\s*\{[\s\S]*max-width:\s*280px;/);
+  assert.match(styles, /\.creation-queue-language\s*\{[^}]*flex:\s*0 0 auto;/);
   assert.match(styles, /\.creation-queue-item\s*\{[\s\S]*border-radius:\s*999px;/);
   assert.match(styles, /\.creation-queue-item\s*\{[\s\S]*background:/);
   assert.match(styles, /\.creation-queue-label\s*\{/);

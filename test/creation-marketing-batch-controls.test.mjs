@@ -42,12 +42,12 @@ test("manual pause drains both planning slots and resumes cached plans without d
     enqueuePlan,
   });
   assert.equal(state.status, "completed");
-  assert.deepEqual(calls, [1, 2, 3, 4]);
+  assert.deepEqual(calls, [1, 2, 1, 2, 3, 4, 3, 4]);
   assert.equal(new Set(queued).size, 8);
   assert.equal(state.enqueuedCount, 8);
 });
 
-test("pause after the first copy preserves the plan and queues only remaining copies on continue", async () => {
+test("pause after the first suite releases its plan and independently plans remaining suites", async () => {
   assert.equal(typeof batch.pausePendingCreationMarketingBatch, "function");
   const state = batch.createCreationMarketingBatchState({ count: 1, copiesPerScheme: 3 });
   let plans = 0;
@@ -62,11 +62,11 @@ test("pause after the first copy preserves the plan and queues only remaining co
   });
   assert.equal(state.status, "paused");
   assert.equal(state.enqueuedCount, 1);
-  assert.equal(state.schemes[0].pendingPlan.frozen, true);
+  assert.equal(state.schemes[0].pendingPlan, null);
   await batch.runCreationMarketingBatch({ state, generatePlan,
     enqueuePlan: async ({ copyNumber }) => { queued.push(copyNumber); return { id: `copy-${copyNumber}` }; },
   });
-  assert.equal(plans, 1);
+  assert.equal(plans, 3);
   assert.deepEqual(queued, [1, 2, 3]);
   assert.equal(state.status, "completed");
 });

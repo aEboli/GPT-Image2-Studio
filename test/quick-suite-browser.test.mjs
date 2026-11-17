@@ -27,7 +27,7 @@ function harness() {
     state: { creation: { planDirty: true }, creationReferenceFiles: [{ name: "old.png" }] },
     quickSuitePlanRequestId: 0,
     getQuickSuiteRefs: () => ui,
-    getQuickSuiteSelectedCount: () => 4,
+    getQuickSuiteSelectedCount: () => 6,
     readQuickSuiteRatio: () => context.quickSuiteState.ratio,
     getCreationMaxProductReferenceImageCount: () => 15,
     isModelProtocolImageRoute: () => false,
@@ -62,7 +62,7 @@ test("快捷套图替换旧参考图、关闭额外模块并提交可核对的�
   assert.equal(context.refs.creationSkuGenerationEnabledInput.checked, false);
   assert.equal(context.refs.creationInfographicRebuildEnabledInput.checked, false);
   assert.equal(context.refs.creationListingAgentEnabledInput.checked, false);
-  assert.deepEqual({ ...context.parameters }, { imageCount: 4, ratio: "4:3", resolutionTier: "2720x2048", targetLanguage: "zh-CN" });
+  assert.deepEqual({ ...context.parameters }, { imageCount: 6, ratio: "4:3", resolutionTier: "2720x2048", targetLanguage: "zh-CN" });
   assert.equal(context.submissions, 1);
   assert.match(context.status, /已加入队列/);
   assert.equal(context.ui.generate.disabled, false);
@@ -126,7 +126,7 @@ test("快捷预览提交所选尺寸并展示接口错误", async () => {
   };
   await context.refreshQuickSuitePlanPreview();
   assert.equal(submitted.get("resolutionTier"), "2720x2048");
-  assert.equal(submitted.get("imageCount"), "4");
+  assert.equal(submitted.get("imageCount"), "6");
   assert.equal(submitted.get("infographicRebuildEnabled"), "false");
   assert.equal(context.status, "预览测试错误");
 });

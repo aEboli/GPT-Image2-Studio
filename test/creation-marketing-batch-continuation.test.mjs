@@ -24,7 +24,8 @@ test("all twenty schemes are processed despite long invalid-plan errors", async 
     },
     onUpdate: (snapshot) => statuses.push(snapshot.status),
   });
-  assert.deepEqual(started, Array.from({ length: 20 }, (_, index) => index + 1));
+  assert.deepEqual([...new Set(started)].sort((a, b) => a - b), Array.from({ length: 20 }, (_, index) => index + 1));
+  for (let index = 1; index <= 20; index += 1) assert.equal(started.filter((entry) => entry === index).length, [6, 7].includes(index) ? 1 : 2);
   assert.equal(state.status, "completed");
   assert.equal(state.pauseReason, "");
   assert.equal(state.completedCount, 18);

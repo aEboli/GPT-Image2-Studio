@@ -1,6 +1,6 @@
 # GPT-Image2-Studio
 
-[![Version](https://img.shields.io/badge/version-v0.2.148-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases/latest) [![CI](https://github.com/aEboli/GPT-Image2-Studio/actions/workflows/ci.yml/badge.svg)](https://github.com/aEboli/GPT-Image2-Studio/actions/workflows/ci.yml) [![Windows](https://img.shields.io/badge/Windows-x64-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases/latest)
+[![Version](https://img.shields.io/badge/version-v0.2.158-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases/latest) [![CI](https://github.com/aEboli/GPT-Image2-Studio/actions/workflows/ci.yml/badge.svg)](https://github.com/aEboli/GPT-Image2-Studio/actions/workflows/ci.yml) [![Windows](https://img.shields.io/badge/Windows-x64-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases/latest)
 
 **在自己电脑上运行的 AI 图像与视觉创作工作台。**
 
@@ -8,11 +8,20 @@
 
 [English](./README.md) · **简体中文**
 
-[下载](https://github.com/aEboli/GPT-Image2-Studio/releases/latest) · [快速开始](#快速开始) · [配置 API](#配置-api) · [功能](#功能) · [文档](#文档)
+[下载](https://github.com/aEboli/GPT-Image2-Studio/releases/latest) · [快速开始](#快速开始) · [服务器部署](#linux-服务器) · [配置 API](#配置-api) · [功能](#功能) · [文档](#文档)
 
-当前版本：`v0.2.148`
+当前版本：`v0.2.158`
 
 ![提示词生图工作台](./docs/images/studio-prompt.jpg)
+
+## v0.2.158 更新
+
+- 从八类共 64 位视觉营销 Agent 中，为每套营销图片独立规划；批量生成时可填写统一设计方向。
+- 检查套内重复的商品操作场景，改进功能图与商业 CG 提示词，并恢复模板方案的逐图参考分配。
+- 在图片卡片查看实际使用的参考图，按输出语言识别套图记录；新建套图可选 6–20 张，参考图重构保留零张选项。
+- 补充 Linux 安装、SSH 访问、systemd 常驻、HTTPS 代理和更新步骤。
+
+升级细节与验证结果见[发行说明](./docs/releases/v0.2.158.md)。每套独立方案分别调用文字模型；已保存方案继续使用原提示词。
 
 ## 快速开始
 
@@ -20,12 +29,140 @@
 
 从[最新发行版](https://github.com/aEboli/GPT-Image2-Studio/releases/latest)选择一种方式：
 
-- **[桌面安装包](https://github.com/aEboli/GPT-Image2-Studio/releases/latest/download/GPT-Image2-Studio-Desktop-Setup-v0.2.148-x64.exe)**：安装后，从桌面或开始菜单启动。
-- **[便携 ZIP](https://github.com/aEboli/GPT-Image2-Studio/releases/latest/download/GPT-Image2-Studio-Portable-v0.2.148-x64.zip)**：完整解压后，运行 `GPT-Image2-Studio.exe`。
+- **[桌面安装包](https://github.com/aEboli/GPT-Image2-Studio/releases/latest/download/GPT-Image2-Studio-Desktop-Setup-v0.2.158-x64.exe)**：安装后，从桌面或开始菜单启动。
+- **[便携 ZIP](https://github.com/aEboli/GPT-Image2-Studio/releases/latest/download/GPT-Image2-Studio-Portable-v0.2.158-x64.zip)**：完整解压后，运行 `GPT-Image2-Studio.exe`。
 
 两种方式均自带运行时，无需另装 Node.js。便携版的解压文件需要放在一起。安装、数据位置与构建说明见 [Windows 桌面文档](./docs/windows-desktop.md)。
 
-### 源码运行
+### Linux 服务器
+
+服务器运行浏览器工作台，无需桌面环境。已安装 **Git 和 Node.js 22.12+** 时，在准备存放项目的父目录执行这一行，即可下载、安装全部运行依赖并启动：
+
+```bash
+git clone https://github.com/aEboli/GPT-Image2-Studio.git && cd GPT-Image2-Studio && npm ci --omit=dev && HOST=127.0.0.1 PORT=3600 NODE_ENV=production npm start
+```
+
+`--omit=dev` 跳过 Electron 和开发工具。以下安装命令用于首次部署，目标目录不能已存在；已有部署更新时见本节末尾。
+
+<details>
+<summary>新服务器：一并安装 Node.js、Git 和项目（Ubuntu / Debian）</summary>
+
+以下以 Ubuntu 22.04 / 24.04、Debian 12 为例。使用有 `sudo` 权限的普通账号，复制整段执行。Node.js 22 通过 NodeSource 软件源安装，项目放在 `~/apps/GPT-Image2-Studio`：
+
+```bash
+bash <<'BASH'
+set -euo pipefail
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl git
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt-get install -y nodejs
+mkdir -p "$HOME/apps"
+cd "$HOME/apps"
+git clone https://github.com/aEboli/GPT-Image2-Studio.git
+cd GPT-Image2-Studio
+npm ci --omit=dev
+HOST=127.0.0.1 PORT=3600 NODE_ENV=production npm start
+BASH
+```
+
+</details>
+
+启动后，服务地址是**服务器自身**的 `http://127.0.0.1:3600`。个人远程使用可在**自己电脑**上建立 SSH 隧道，把 `your-user@server-ip` 换成服务器登录信息：
+
+```bash
+ssh -N -L 127.0.0.1:13600:127.0.0.1:3600 your-user@server-ip
+```
+
+保持隧道终端打开，在自己电脑浏览器访问 **http://127.0.0.1:13600**，然后按下文配置 API。无需开放服务器的 `3600` 端口。
+
+<details>
+<summary>后台常驻与开机启动（systemd）</summary>
+
+先按 `Ctrl+C` 结束前台试运行，再进入服务器上的项目目录（完整安装示例为 `cd ~/apps/GPT-Image2-Studio`），使用同一个普通账号执行：
+
+```bash
+bash <<'BASH'
+set -euo pipefail
+test -f server.mjs
+studio_dir="$(pwd -P)"
+studio_node="$(command -v node)"
+sudo tee /etc/systemd/system/gpt-image2-studio.service >/dev/null <<EOF
+[Unit]
+Description=GPT-Image2-Studio
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$(id -un)
+WorkingDirectory=$studio_dir
+ExecStart="$studio_node" "$studio_dir/server.mjs"
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=3600
+EnvironmentFile=-$studio_dir/.env
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo systemctl daemon-reload
+sudo systemctl enable --now gpt-image2-studio
+sudo systemctl status gpt-image2-studio --no-pager
+BASH
+```
+
+查看日志：`sudo journalctl -u gpt-image2-studio -f`。重启：`sudo systemctl restart gpt-image2-studio`。停止并取消开机启动：`sudo systemctl disable --now gpt-image2-studio`。
+
+此 systemd 配置会读取项目根目录的 `.env`；直接执行 `npm start` 不会自动读取它。服务配置修改后需要重启；如果改变了 Node.js 路径或项目目录，需要同步修改服务文件并执行 `sudo systemctl daemon-reload`。
+
+</details>
+
+<details>
+<summary>通过域名访问（Nginx HTTPS 反向代理）</summary>
+
+前提：域名和 HTTPS 证书已配置，Nginx 与 Studio 在同一台服务器，且已用 `htpasswd` 创建 `/etc/nginx/studio.htpasswd` 登录密码文件。代理负责浏览器登录，后端使用独立的固定令牌。
+
+用以下命令生成令牌，将结果填入项目 `.env` 的 `IMAGE_STUDIO_REQUEST_TOKEN`，执行 `chmod 600 .env` 后重启上面的 systemd 服务：
+
+```bash
+node -p "require('node:crypto').randomBytes(32).toString('hex')"
+```
+
+```dotenv
+IMAGE_STUDIO_REQUEST_TOKEN=replace-with-generated-token
+```
+
+将以下 `location` 放入已经配置证书的 HTTPS `server` 块，并把 `replace-with-generated-token` 替换为同一个令牌：
+
+```nginx
+location / {
+    auth_basic "GPT-Image2-Studio";
+    auth_basic_user_file /etc/nginx/studio.htpasswd;
+    client_max_body_size 128m;
+    proxy_pass http://127.0.0.1:3600;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+    proxy_set_header Authorization "";
+    proxy_set_header X-Image-Studio-Token "replace-with-generated-token";
+    proxy_buffering off;
+    proxy_cache off;
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
+}
+```
+
+执行 `sudo nginx -t && sudo systemctl reload nginx` 后，通过 HTTPS 域名访问。流式进度需要关闭代理缓冲；单次上传上限可按实际素材大小调整。保留回环监听，不要把 `3600` 端口直接开放到公网。身份认证和令牌规则见[安全说明](./SECURITY.md)。
+
+</details>
+
+Linux 生成文件默认在运行账号的 `~/Pictures/`，私有配置在项目的 `.local/`；请一并备份。自定义路径可设置 `IMAGE_STUDIO_OUTPUT_DIR` 和 `IMAGE_STUDIO_LOCAL_DATA_DIR`，在 `.env` 中使用绝对路径。
+
+更新已有部署时，先备份配置与生成文件，等待生成任务结束并停止服务，再在项目目录执行 `git pull --ff-only && npm ci --omit=dev`。使用上述 systemd 配置时，更新前用 `sudo systemctl stop gpt-image2-studio` 停止服务，更新成功后用 `sudo systemctl start gpt-image2-studio` 启动。
+
+### 源码开发（Windows）
 
 完整开发环境使用 **Node.js 22.12+**，包含 Electron 依赖；独立 Node.js 服务支持 Node.js 20+。
 
@@ -181,6 +318,6 @@ git diff --check
 
 ## 发行版
 
-当前版本说明：[v0.2.148](./docs/releases/v0.2.148.md)。下载与 SHA-256 校验值见 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases/latest)；较早记录保留在[发行说明目录](./docs/releases/)和[历史更新记录](./docs/history.zh-CN.md)。
+当前版本说明：[v0.2.158](./docs/releases/v0.2.158.md)。下载与 SHA-256 校验值见 [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases/latest)；较早记录保留在[发行说明目录](./docs/releases/)和[历史更新记录](./docs/history.zh-CN.md)。
 
 版本格式为 `major.minor.patch`，更新位固定三位数字。小功能更新加 `0.010`，普通更新加 `0.001`；通过 `release:major`、`release:minor`、`release:feature` 或 `release:patch` 配合 `--summary` 维护。正式发布提交和标签需在干净工作树中通过 `npm run check:release:strict`。

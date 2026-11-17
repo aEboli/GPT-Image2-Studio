@@ -18,7 +18,7 @@ function draft() {
   }
   return fixture;
 }
-const apply = ({ input, payload }) => applyCreationMarketingPlan(buildCreationPlan(input), payload, { count: 4, referenceCount: 1, primaryIndex: 1 });
+const apply = ({ input, payload }, creativeAgent) => applyCreationMarketingPlan(buildCreationPlan(input), payload, { count: 4, referenceCount: 1, primaryIndex: 1, creativeAgent });
 const promptIssues = (plan) => auditCreationMarketingQuality(plan).issues.filter((issue) => issue.code === "duplicate-task" && issue.basis === "prompt");
 
 test("different briefs cannot disguise identical visual prompts behind numbering and captions", () => {
@@ -90,7 +90,7 @@ for (const repaired of [true, false]) {
     assert.equal(calls, repaired ? 2 : 3);
     assert.equal(plan.imageCount, repaired ? 4 : 3);
     assert.equal(plan.pendingAdjustmentCount, repaired ? 0 : 1);
-    assert.deepEqual(plan.items.slice(0, 3).map((row) => row.prompt), apply(fixture).items.slice(0, 3).map((row) => row.prompt));
+    assert.deepEqual(plan.items.slice(0, 3).map((row) => row.prompt), apply(fixture, plan.marketingPlan.creativeAgent).items.slice(0, 3).map((row) => row.prompt));
     if (!repaired) {
       const frozen = buildCreationSubmittedPlan({ effectivePlan: JSON.stringify(plan) });
       assert.equal(frozen.items[3].enabled, false);

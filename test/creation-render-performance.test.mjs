@@ -123,10 +123,8 @@ test("suite completion cancels pending progress and hidden pages keep receiving 
   assert.equal(f.calls.cards[0].imageUrl, "latest-hidden-preview");
 });
 
-test("static card versions ignore prompt payloads but track image, failure and retry permissions", () => {
+test("static card versions ignore prompt payloads but track image, failure and reference thumbnails", () => {
   let options;
-  let repairEnabled = true;
-  let repairChecks = 0;
   const context = {
     refs: { creationResultGrid: {} },
     syncCreationResultGridShell(value) { options = value; },
@@ -136,25 +134,24 @@ test("static card versions ignore prompt payloads but track image, failure and r
     shouldShowCreationCardLoading: (item) => item.status === "generating",
     isCacheableBrowserImageUrl: (url) => url.startsWith("data:"),
     shouldHideCreationCardDetails: () => false,
-    canRepairCreationItem() { repairChecks += 1; return repairEnabled; },
-    getCreationRepairButtonText: () => "重新生成",
+    getCreationCardReferenceFiles: () => [],
+    getCreationCardReferences: (item) => item.referenceImageNames || [],
+    canRepairCreationItem() { throw Error("card rendering must not check removed retry buttons"); },
   };
   runInNewContext(between("function syncCreationResultGrid(", "function getCreationRecordSearchText("), context);
   const item = { itemId: "static", status: "completed", imageUrl: "/final.png", title: "首图" };
   Object.defineProperty(item, "prompt", { enumerable: true, get() { throw Error("large prompt must not be serialized"); } });
-  context.syncCreationResultGrid([item], { showActions: false });
+  context.syncCreationResultGrid([item]);
   const before = options.getCardVersion(item, 0, {});
-  assert.equal(repairChecks, 0);
   item.imageUrl = "/changed.png";
   assert.notEqual(options.getCardVersion(item, 0, {}), before);
   item.status = "failed";
   const failed = options.getCardVersion(item, 0, {});
   item.error = "失败原因变更";
   assert.notEqual(options.getCardVersion(item, 0, {}), failed);
-  context.syncCreationResultGrid([item], { showActions: true });
-  const enabled = options.getCardVersion(item, 0, {});
-  repairEnabled = false;
-  assert.notEqual(options.getCardVersion(item, 0, {}), enabled);
+  const withoutReferences = options.getCardVersion(item, 0, {});
+  item.referenceImageNames = ["reference-2.png"];
+  assert.notEqual(options.getCardVersion(item, 0, {}), withoutReferences);
   item.imageUrl = "data:image/png;base64,preview";
   assert.equal(options.getCardVersion(item, 0, {}), "");
 });

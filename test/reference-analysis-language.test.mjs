@@ -13,7 +13,7 @@ test("reference analysis language normalization supports Chinese and English", (
   });
   assert.deepEqual(normalizeReferenceAnalysisLanguage("en"), {
     value: "en",
-    label: "English",
+    label: "英语",
   });
 });
 

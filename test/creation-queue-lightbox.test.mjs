@@ -14,7 +14,7 @@ test("creation queue result thumbnails resolve images from the displayed queue s
   );
   assert.match(
     app,
-    /function renderCreationView\(\) \{[\s\S]*const selectedQueueJob = logoBatchBranch \? null : getSelectedCreationQueueJob\(\);[\s\S]*const currentSet = getCreationDisplayedSet\(\);[\s\S]*const showCreationResultActions = !selectedQueueJob;/,
+    /function renderCreationView\(\) \{[\s\S]*const selectedQueueJob = logoBatchBranch \? null : getSelectedCreationQueueJob\(\);[\s\S]*const currentSet = getCreationDisplayedSet\(\);/,
   );
   assert.match(
     app,
@@ -22,11 +22,11 @@ test("creation queue result thumbnails resolve images from the displayed queue s
   );
   assert.match(
     app,
-    /syncCreationResultGrid\(currentSet \? getCreationMarketingDisplayItems\(currentSet\) : items, \{[\s\S]*showActions: showCreationResultActions,[\s\S]*keyScope: loadingKeyScope,[\s\S]*logGroupId: currentSet\?\.setId \|\| "",[\s\S]*\}\);/,
+    /syncCreationResultGrid\(currentSet \? getCreationMarketingDisplayItems\(currentSet\) : items, \{[\s\S]*keyScope: loadingKeyScope,[\s\S]*logGroupId: currentSet\?\.setId \|\| "",[\s\S]*\}\);/,
   );
   assert.match(
     app,
-    /function syncCreationResultGrid\(items = \[\], \{ showActions = true, keyScope = "", logGroupId = "" \} = \{\}\) \{[\s\S]*getItemOptions: \(item, _index, \{ firstSkuItem, firstInfographicRebuildItem \}\) => \(\{[\s\S]*showActions,[\s\S]*keyScope,[\s\S]*logGroupId,[\s\S]*isSkuStart: item === firstSkuItem,/,
+    /function syncCreationResultGrid\(items = \[\], \{ keyScope = "", logGroupId = "" \} = \{\}\) \{[\s\S]*getItemOptions: \(item, _index, \{ firstSkuItem, firstInfographicRebuildItem \}\) => \(\{[\s\S]*referenceFiles,[\s\S]*keyScope,[\s\S]*logGroupId,[\s\S]*isSkuStart: item === firstSkuItem,/,
   );
   assert.match(
     app,

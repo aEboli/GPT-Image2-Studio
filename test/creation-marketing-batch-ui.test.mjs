@@ -26,7 +26,7 @@ test("batch marketing controls are placed after the creation module toggles and 
 test("batch marketing wiring uses the existing plan and suite queue paths", () => {
   assert.match(app, /runCreationMarketingBatch\(/);
   assert.match(app, /requestCreationMarketingBatchPlan\(formData, scheme, batch, requestController\.signal\)/);
-  assert.match(html, /同时规划 2 个方案/);
+  assert.match(html, /id="creationMarketingBatchDirectionInput"[^>]*type="text"/);
   assert.match(app, /batch\.activeIndexes/);
   assert.match(app, /effectivePlanOverride: planResult\.plan, sourceFormData/);
   assert.match(app, /enqueueCreationGeneration\(\{ formData: generationFormData, set: queuedSet \}\)/);

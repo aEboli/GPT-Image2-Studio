@@ -6,9 +6,16 @@ const DEFAULT_REFERENCE_ANALYSIS_LANGUAGE = {
 
 export const REFERENCE_ANALYSIS_LANGUAGE_OPTIONS = [
   DEFAULT_REFERENCE_ANALYSIS_LANGUAGE,
-  { value: "en", label: "English", instructionName: "English" },
-  { value: "ja", label: "日本語", instructionName: "Japanese" },
-  { value: "ko", label: "한국어", instructionName: "Korean" },
+  { value: "en", label: "英语", instructionName: "English" },
+  { value: "ja", label: "日语", instructionName: "Japanese" },
+  { value: "ko", label: "韩语", instructionName: "Korean" },
+  { value: "fr", label: "法语", instructionName: "French" },
+  { value: "de", label: "德语", instructionName: "German" },
+  { value: "es", label: "西班牙语", instructionName: "Spanish" },
+  { value: "it", label: "意大利语", instructionName: "Italian" },
+  { value: "pt", label: "葡萄牙语", instructionName: "Portuguese" },
+  { value: "nl", label: "荷兰语", instructionName: "Dutch" },
+  { value: "pl", label: "波兰语", instructionName: "Polish" },
 ];
 
 const LANGUAGE_ALIASES = new Map([
@@ -32,6 +39,12 @@ const LANGUAGE_ALIASES = new Map([
   ["한국어", REFERENCE_ANALYSIS_LANGUAGE_OPTIONS[3]],
   ["韩语", REFERENCE_ANALYSIS_LANGUAGE_OPTIONS[3]],
 ]);
+
+for (const language of REFERENCE_ANALYSIS_LANGUAGE_OPTIONS) {
+  for (const alias of [language.value, language.label, language.instructionName]) {
+    LANGUAGE_ALIASES.set(alias.toLowerCase(), language);
+  }
+}
 
 function cloneLanguage(language) {
   return {

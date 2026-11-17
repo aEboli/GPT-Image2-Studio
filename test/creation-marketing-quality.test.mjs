@@ -151,15 +151,19 @@ test("a valid draft needs one call and freezes quality with the exact prompts", 
 });
 
 test("missing functional expression is repaired locally without touching accepted items", async () => {
-  const { input, payload, plan: acceptedPlan } = draft();
+  const { input, payload } = draft();
   const initial = structuredClone(payload);
   initial.items[1].creative_brief.effect_visual = "";
   initial.items[1].prompt = "商品陈列并写加热两个字，米黄色温暖背景。";
   let calls = 0; let context;
   const events = [];
+  let acceptedPlan;
   const plan = await requestCreationMarketingPlan({ input, referenceImages, config, onProgress: (event) => events.push(event), fetchImpl: async (_url, init) => {
     calls += 1; context = requestContext(init);
-    if (calls === 1) return modelResponse(initial);
+    if (calls === 1) {
+      acceptedPlan = applyCreationMarketingPlan(buildCreationPlan(input), initial, { count: 4, referenceCount: 1, primaryIndex: 1, creativeAgent: context.creative_agent });
+      return modelResponse(initial);
+    }
     assert.equal(context.task_count, 1);
     assert.equal(context.reuse_analysis, true);
     assert.deepEqual(context.repair_request.target_item_ids, ["ai-2"]);

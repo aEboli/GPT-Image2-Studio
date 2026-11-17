@@ -20,7 +20,6 @@ for (const [name, corrupt] of [
 ]) {
   test(`${name} repairs the strategy and preserves every accepted image`, async () => {
     const { input, payload } = marketingPlanFixture(4);
-    const expected = applyCreationPlanEvidenceRequirements(applyCreationMarketingPlan(buildCreationPlan(input), payload, { count: 4, referenceCount: 1, primaryIndex: 1 }));
     const initial = structuredClone(payload);
     corrupt(initial.suite_strategy, initial);
     const events = [];
@@ -39,6 +38,7 @@ for (const [name, corrupt] of [
       return response({ suite_strategy: payload.suite_strategy, items: [] });
     } });
     assert.equal(calls, 2);
+    const expected = applyCreationPlanEvidenceRequirements(applyCreationMarketingPlan(buildCreationPlan(input), payload, { count: 4, referenceCount: 1, primaryIndex: 1, creativeAgent: plan.marketingPlan.creativeAgent }));
     assert.equal(plan.marketingPlan.quality.repairRounds, 1);
     assert.deepEqual(plan.marketingPlan.quality.issues, []);
     assert.deepEqual(plan.items, expected.items);

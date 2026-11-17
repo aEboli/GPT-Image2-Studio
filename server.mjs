@@ -5108,7 +5108,7 @@ async function handleCreationGenerate(request, response) {
     if (isCreationAiMarketingEnabled(formData.get("aiMarketingEnabled")) && Number(formData.get("imageCount")) > 0) {
       const input = Object.fromEntries(formData);
       if (plan.promptPlanningMode === "ai-batch" && plan.marketingPlan) {
-        const planningContractVersion = Number(plan.marketingPlan.version) >= 10 ? 11 : Number(plan.marketingPlan.version) >= 9 ? 10 : Number(plan.marketingPlan.version) >= 8 ? 9 : Number(plan.marketingPlan.version) >= 7 ? 8 : Number(plan.marketingPlan.version) >= 6 ? 7 : 6;
+        const planningContractVersion = Number(plan.marketingPlan.version) >= 14 ? 15 : Number(plan.marketingPlan.version) >= 13 ? 14 : Number(plan.marketingPlan.version) >= 12 ? 13 : Number(plan.marketingPlan.version) >= 11 ? 12 : Number(plan.marketingPlan.version) >= 10 ? 11 : Number(plan.marketingPlan.version) >= 9 ? 10 : Number(plan.marketingPlan.version) >= 8 ? 9 : Number(plan.marketingPlan.version) >= 7 ? 8 : Number(plan.marketingPlan.version) >= 6 ? 7 : 6;
         if (plan.marketingPlan.inputFingerprint !== creationMarketingInputFingerprint(input, referenceImages, { planningContractVersion })) throw new Error("商品资料或规划条件已变化，请重新预览 AI 整套营销提示词。");
         const primary = plan.referenceImageRoles?.find((entry) => entry.role === "reference-product") || plan.referenceImageRoles?.find((entry) => entry.role === "product");
         const payload = { items: plan.items.filter((item) => item.itemKind === "carousel").map((item) => ({ item_id: item.itemId, image_type: item.imageType, title: item.title, marketing_goal: item.marketingAssignment?.goal, creative_brief: item.marketingAssignment?.creativeBrief, prompt: item.prompt, audience_ids: item.marketingAssignment?.audienceIds, selling_point_ids: item.marketingAssignment?.sellingPointIds, pain_point_ids: item.marketingAssignment?.painPointIds, recommendation_ids: item.marketingAssignment?.recommendationIds, fact_ids: item.marketingAssignment?.factIds, reference_indexes: item.marketingAssignment?.referenceIndexes })) };
@@ -5161,6 +5161,8 @@ async function handleCreationGenerate(request, response) {
     creationRelativeDir = buildCreationRelativeDir({
       createdAt,
       productName: plan.productName || plan.productDescription,
+      targetLanguage: plan.targetLanguage,
+      targetLanguageLabel: plan.targetLanguageLabel,
       setId,
     });
     items = plan.items.map((item) => {
@@ -5629,6 +5631,8 @@ async function handleCreationLogoBatchGenerate(request, response) {
     creationRelativeDir = buildCreationRelativeDir({
       createdAt,
       productName: plan.productName,
+      targetLanguage: plan.targetLanguage,
+      targetLanguageLabel: plan.targetLanguageLabel,
       setId,
     });
     items = plan.items.map((item) => ({
@@ -6387,6 +6391,8 @@ async function runCreationRepair(request, response, formData, setId) {
       buildCreationRelativeDir({
         createdAt: existingSet.createdAt,
         productName: existingSet.productName || existingSet.productDescription,
+        targetLanguage: existingSet.targetLanguage,
+        targetLanguageLabel: existingSet.targetLanguageLabel,
         setId,
       });
 

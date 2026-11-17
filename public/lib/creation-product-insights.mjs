@@ -7,14 +7,14 @@ const object = (value) => value && typeof value === "object" && !Array.isArray(v
 
 export function getCreationSceneActionGroup(scene = {}) {
   // 旧分析没有操作组；常见交互先合并，不能用换环境或换手机应用绕过去。
-  const action = text(scene.action);
+  const action = text(scene.action).replace(/(?:不操作|不出现|不展示|不使用|不握|没有|不要|避免|\b(?:do not|don't|without|no)\s+)[^，,。.;；\n]*/giu, "");
   if (/手机|smartphone|\bphone\b/iu.test(action)) return "phone-operation";
-  const explicit = text(scene.actionGroup || scene.action_group).toLowerCase().replace(/\s+/gu, "-");
-  if (explicit) return explicit;
   if (/相机|camera/iu.test(action)) return "camera-operation";
   if (/牵引绳|遛狗|\bleash\b|walking (?:a |the )?dog/iu.test(action)) return "leash-holding";
-  if (/握把|车把|handlebar/iu.test(action)) return "handlebar-grip";
-  if (/控制器|controller/iu.test(action)) return "control-operation";
+  if (/车把|(?:骑行|自行车|摩托车|电动车)[^，,。.;；]{0,16}握把|handlebar/iu.test(action)) return "handlebar-grip";
+  if (/(?:按下|按压|点按|操作|调节|调整|切换)[^，,。.;；]{0,16}(?:控制器|按键|按钮)|(?:控制器|按键|按钮)[^，,。.;；]{0,16}(?:按下|按压|点按|操作|调节|调整|切换)|\b(?:press|tap|adjust|operate|switch)\w*\b[^,.;]{0,30}\b(?:controller|button|control)\b/iu.test(action)) return "control-operation";
+  const explicit = text(scene.actionGroup || scene.action_group).toLowerCase().replace(/\s+/gu, "-");
+  if (explicit) return explicit;
   return action.toLowerCase().replace(/[\p{P}\p{Z}\s]/gu, "");
 }
 
@@ -135,6 +135,14 @@ export function excludeCreationConflictingClaims(value, insights) {
 
 const SCENE_ROLES = new Set(["benefit", "scene", "brand-story", "scene-fit-1", "scene-fit-2", "scene-fit-3", "after-sales", "human-handheld", "human-wearable"]);
 
+export function isCreationUseSceneTask(item = {}) {
+  const brief = item.marketingAssignment?.creativeBrief || item.creative_brief || {};
+  if (brief.visual_form === "use-scene") return true;
+  if (brief.visual_form && brief.visual_form !== "product-photograph") return false;
+  return Boolean(item.sceneAssignment) || item.contentAssignment?.kind === "scene" || SCENE_ROLES.has(item.role)
+    || ["authentic-use", "multi-context"].includes(item.scenePolicy);
+}
+
 export const CREATION_SUPPORTED_VIEWS_INSTRUCTION = "Show only reference-supported views on one clean sheet; use observed surfaces and detail crops, with factual labels. Preserve the complete sellable unit, surface-specific parts, markings and opening states; unseen surfaces stay unspecified.";
 
 export function allocateCreationProductScenes(roles = [], insights, scenePresets = {}, seed = 0) {
@@ -142,12 +150,14 @@ export function allocateCreationProductScenes(roles = [], insights, scenePresets
     return roles.map(() => null);
   }
   const scenes = insights?.usageScenarios || [];
-  const usedCompositions = new Set();
+  const usedGroups = new Set();
+  const usedActions = new Set();
   const candidates = scenes.filter((scene) => {
     const group = getCreationSceneActionGroup(scene);
-    const composition = group + "|" + text(scene.framing).toLowerCase().replace(/\s+/gu, "");
-    if (!group || usedCompositions.has(composition)) return false;
-    usedCompositions.add(composition);
+    const action = getCreationSceneActionGroup({ action: scene.action });
+    if (!group || usedGroups.has(group) || usedActions.has(action)) return false;
+    usedGroups.add(group);
+    usedActions.add(action);
     return true;
   });
   const offset = candidates.length ? Math.abs(seed) % candidates.length : 0;
@@ -209,7 +219,7 @@ export function buildCreationProductInsightPrompt(insights, { role = "", index =
       const source = fact.source === "user" ? "user" : attached.length ? "ref " + attached.join(",") : "verified source text";
       return `[${fact.id}; ${source}] ${fact.text}`;
     }).join("; ")}.` : "",
-    includeScene && sceneAssignment ? `SCENE TASK: ${sceneAssignment.environment}; ${sceneAssignment.action}; framing ${sceneAssignment.framing || "product-focused action crop"}; people ${sceneAssignment.people}. Props are context only.` : "",
+    includeScene && sceneAssignment ? `SCENE TASK: ${sceneAssignment.environment}; ${sceneAssignment.action}; framing ${sceneAssignment.framing || "product-focused action crop"}; people ${sceneAssignment.people}. Keep the product central and the interaction physically plausible for its actual scale, structure and use conditions. Props are context only.` : "",
   ].filter(Boolean).join("\n");
 }
 

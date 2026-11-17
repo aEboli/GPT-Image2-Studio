@@ -1,6 +1,6 @@
 # GPT-Image2-Studio
 
-[![Version](https://img.shields.io/badge/version-v0.2.148-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases/latest) [![CI](https://github.com/aEboli/GPT-Image2-Studio/actions/workflows/ci.yml/badge.svg)](https://github.com/aEboli/GPT-Image2-Studio/actions/workflows/ci.yml) [![Windows](https://img.shields.io/badge/Windows-x64-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases/latest)
+[![Version](https://img.shields.io/badge/version-v0.2.158-2563eb.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases/latest) [![CI](https://github.com/aEboli/GPT-Image2-Studio/actions/workflows/ci.yml/badge.svg)](https://github.com/aEboli/GPT-Image2-Studio/actions/workflows/ci.yml) [![Windows](https://img.shields.io/badge/Windows-x64-0078d4.svg)](https://github.com/aEboli/GPT-Image2-Studio/releases/latest)
 
 **An AI image and visual production workbench that runs on your computer.**
 
@@ -8,11 +8,20 @@ Create and edit images, plan ecommerce sets, draft multilingual listings, and tu
 
 **English** · [简体中文](./README.zh-CN.md)
 
-[Download](https://github.com/aEboli/GPT-Image2-Studio/releases/latest) · [Quick start](#quick-start) · [API setup](#api-setup) · [Workflows](#workflows) · [Documentation](#documentation)
+[Download](https://github.com/aEboli/GPT-Image2-Studio/releases/latest) · [Quick start](#quick-start) · [Server setup](#linux-server) · [API setup](#api-setup) · [Workflows](#workflows) · [Documentation](#documentation)
 
-Current version: `v0.2.148`
+Current version: `v0.2.158`
 
 ![Prompt-to-image workbench](./docs/images/studio-prompt.jpg)
+
+## What's new in v0.2.158
+
+- Plan each marketing set independently with one of 64 visual agents across eight creative directions; optionally guide a batch with a shared design direction.
+- Detect repeated product actions across a set, improve functional and commercial CG prompts, and restore image-specific references for template plans.
+- Review the references used by each image, identify saved sets by output language, and choose 6–20 images for new sets; reference reconstruction also supports zero generated images.
+- Follow the expanded Linux deployment guide for installation, SSH access, systemd, HTTPS proxying, and updates.
+
+See the [release notes](./docs/releases/v0.2.158.md) for upgrade details and verification. Each independently planned set uses a separate text-model request; saved plans keep their original prompts.
 
 ## Quick start
 
@@ -20,12 +29,140 @@ Current version: `v0.2.148`
 
 Choose a package from [the latest release](https://github.com/aEboli/GPT-Image2-Studio/releases/latest):
 
-- **[Desktop installer](https://github.com/aEboli/GPT-Image2-Studio/releases/latest/download/GPT-Image2-Studio-Desktop-Setup-v0.2.148-x64.exe)** — install the app and launch it from the desktop or Start menu.
-- **[Portable ZIP](https://github.com/aEboli/GPT-Image2-Studio/releases/latest/download/GPT-Image2-Studio-Portable-v0.2.148-x64.zip)** — extract the entire archive, then run `GPT-Image2-Studio.exe`.
+- **[Desktop installer](https://github.com/aEboli/GPT-Image2-Studio/releases/latest/download/GPT-Image2-Studio-Desktop-Setup-v0.2.158-x64.exe)** — install the app and launch it from the desktop or Start menu.
+- **[Portable ZIP](https://github.com/aEboli/GPT-Image2-Studio/releases/latest/download/GPT-Image2-Studio-Portable-v0.2.158-x64.zip)** — extract the entire archive, then run `GPT-Image2-Studio.exe`.
 
 Both packages include the runtime; no separate Node.js installation is needed. Keep all portable files together. Installation, data paths, and build instructions are in the [Windows desktop guide](./docs/windows-desktop.md).
 
-### From source
+### Linux server
+
+Run the browser workbench without a desktop environment. With **Git and Node.js 22.12+** installed, run this one line from the directory where you want the checkout to download the project, install all runtime dependencies, and start it:
+
+```bash
+git clone https://github.com/aEboli/GPT-Image2-Studio.git && cd GPT-Image2-Studio && npm ci --omit=dev && HOST=127.0.0.1 PORT=3600 NODE_ENV=production npm start
+```
+
+`--omit=dev` skips Electron and development tools. These installation commands are for a new deployment; the destination directory must not already exist. See the end of this section for updates.
+
+<details>
+<summary>New server: install Node.js, Git, and the project together (Ubuntu / Debian)</summary>
+
+The following example targets Ubuntu 22.04 / 24.04 and Debian 12. Paste the entire block as a regular user with `sudo` access. It installs Node.js 22 through the NodeSource repository and puts the project in `~/apps/GPT-Image2-Studio`:
+
+```bash
+bash <<'BASH'
+set -euo pipefail
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl git
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt-get install -y nodejs
+mkdir -p "$HOME/apps"
+cd "$HOME/apps"
+git clone https://github.com/aEboli/GPT-Image2-Studio.git
+cd GPT-Image2-Studio
+npm ci --omit=dev
+HOST=127.0.0.1 PORT=3600 NODE_ENV=production npm start
+BASH
+```
+
+</details>
+
+The service listens at `http://127.0.0.1:3600` **on the server**. For personal remote access, run an SSH tunnel **on your own computer**, replacing `your-user@server-ip` with your server login:
+
+```bash
+ssh -N -L 127.0.0.1:13600:127.0.0.1:3600 your-user@server-ip
+```
+
+Keep the tunnel terminal open, visit **http://127.0.0.1:13600** in your local browser, and configure your API below. You do not need to open server port `3600`.
+
+<details>
+<summary>Run in the background and start on boot (systemd)</summary>
+
+Press `Ctrl+C` to stop the foreground trial run, enter the project directory on the server (`cd ~/apps/GPT-Image2-Studio` for the full installation example), and run this as the same regular user:
+
+```bash
+bash <<'BASH'
+set -euo pipefail
+test -f server.mjs
+studio_dir="$(pwd -P)"
+studio_node="$(command -v node)"
+sudo tee /etc/systemd/system/gpt-image2-studio.service >/dev/null <<EOF
+[Unit]
+Description=GPT-Image2-Studio
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$(id -un)
+WorkingDirectory=$studio_dir
+ExecStart="$studio_node" "$studio_dir/server.mjs"
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=3600
+EnvironmentFile=-$studio_dir/.env
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo systemctl daemon-reload
+sudo systemctl enable --now gpt-image2-studio
+sudo systemctl status gpt-image2-studio --no-pager
+BASH
+```
+
+Logs: `sudo journalctl -u gpt-image2-studio -f`. Restart: `sudo systemctl restart gpt-image2-studio`. Stop and disable startup: `sudo systemctl disable --now gpt-image2-studio`.
+
+This systemd configuration reads `.env` from the project root; `npm start` by itself does not. Restart after changing environment settings. If the Node.js or project path changes, update the unit file and run `sudo systemctl daemon-reload`.
+
+</details>
+
+<details>
+<summary>Access through a domain (Nginx HTTPS reverse proxy)</summary>
+
+Prerequisites: a domain and HTTPS certificate are configured, Nginx runs on the same server as Studio, and you have created `/etc/nginx/studio.htpasswd` with `htpasswd` for browser login. The proxy authenticates users; a separate fixed token authenticates backend requests.
+
+Generate a token with this command, put its value in `IMAGE_STUDIO_REQUEST_TOKEN` in the project's `.env`, run `chmod 600 .env`, and restart the systemd service above:
+
+```bash
+node -p "require('node:crypto').randomBytes(32).toString('hex')"
+```
+
+```dotenv
+IMAGE_STUDIO_REQUEST_TOKEN=replace-with-generated-token
+```
+
+Add this `location` to the HTTPS `server` block that already has your certificate configured, replacing `replace-with-generated-token` with the same token:
+
+```nginx
+location / {
+    auth_basic "GPT-Image2-Studio";
+    auth_basic_user_file /etc/nginx/studio.htpasswd;
+    client_max_body_size 128m;
+    proxy_pass http://127.0.0.1:3600;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+    proxy_set_header Authorization "";
+    proxy_set_header X-Image-Studio-Token "replace-with-generated-token";
+    proxy_buffering off;
+    proxy_cache off;
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
+}
+```
+
+Run `sudo nginx -t && sudo systemctl reload nginx`, then visit the HTTPS domain. Streaming progress requires proxy buffering to be disabled; adjust the upload limit for your assets. Keep the loopback listener and do not expose port `3600` directly to the internet. Read the [security guide](./SECURITY.md) for authentication and token rules.
+
+</details>
+
+On Linux, generated files default to the service user's `~/Pictures/`, and private configuration lives in the project's `.local/`; back up both. Set `IMAGE_STUDIO_OUTPUT_DIR` and `IMAGE_STUDIO_LOCAL_DATA_DIR` to customize these locations, using absolute paths in `.env`.
+
+To update an existing deployment, back up configuration and generated files, wait for generation jobs to finish, and stop the service before running `git pull --ff-only && npm ci --omit=dev` in the project directory. With the systemd setup above, stop it with `sudo systemctl stop gpt-image2-studio`, then run `sudo systemctl start gpt-image2-studio` after the update succeeds.
+
+### Source development (Windows)
 
 Use **Node.js 22.12+** for the full development checkout, including Electron. The standalone Node.js service supports Node.js 20+.
 
@@ -181,6 +318,6 @@ Changes to application behavior follow the [OpenSpec and contribution workflow](
 
 ## Releases
 
-Current release notes: [v0.2.148](./docs/releases/v0.2.148.md). Download packages and check their SHA-256 values in [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases/latest). Older notes remain in the [release archive](./docs/releases/) and [version history](./docs/history.md).
+Current release notes: [v0.2.158](./docs/releases/v0.2.158.md). Download packages and check their SHA-256 values in [GitHub Releases](https://github.com/aEboli/GPT-Image2-Studio/releases/latest). Older notes remain in the [release archive](./docs/releases/) and [version history](./docs/history.md).
 
 Versions use `major.minor.patch` with a three-digit patch segment. Feature releases add `0.010`; ordinary updates add `0.001`. Use the maintained `release:major`, `release:minor`, `release:feature`, or `release:patch` command with `--summary`. A tagged release must pass `npm run check:release:strict` from a clean worktree.

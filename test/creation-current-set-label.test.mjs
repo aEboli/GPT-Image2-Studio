@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
+import { getCreationSetLanguageLabel } from "../lib/creation-set-language.mjs";
 
 const app = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
 const start = app.indexOf("function renderCreationCurrentSet() {");
@@ -18,6 +19,7 @@ function createView({ jobs = [], selectedJob = null, currentSet = null, logoBatc
     isCreationLogoBatchBranch: () => logoBatch,
     getSelectedCreationQueueJob: () => selectedJob,
     getCreationQueueJobs: () => jobs,
+    getCreationSetLanguageLabel,
     isCreationDraftSet: (set) => Boolean(set?.draft),
   };
   vm.createContext(scope);
@@ -51,6 +53,13 @@ test("ordinary queue label uses the selected job's current queue position", () =
   view.render();
 
   assert.equal(view.badge.textContent, "当前：二号商品 · 第 2/2 套");
+});
+
+test("当前套图语言读取所选记录，包含今天已保存的旧外文标签", () => {
+  const selected = { createdAt: "2026-11-17T04:00:00Z", set: { productName: "手套", targetLanguage: "de", targetLanguageLabel: "Deutsch" } };
+  const view = createView({ jobs: [selected], selectedJob: selected, currentSet: { productName: "手套", targetLanguage: "fr" } });
+  view.render();
+  assert.equal(view.badge.textContent, "当前：手套 · 德语 · 第 1/1 套");
 });
 
 test("existing sets show a name while drafts and the logo branch hide the label", () => {

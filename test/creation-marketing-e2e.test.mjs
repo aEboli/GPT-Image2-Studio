@@ -12,6 +12,7 @@ import { createCreationSetStore } from "../lib/creation-store.mjs";
 import { marketingPlanFixture } from "./fixtures/creation-marketing-plan.mjs";
 import { consumeSse } from "../lib/generation-client.mjs";
 import { getCreationPlatformImageType } from "../lib/creation-platform-policies.mjs";
+import { buildCreationSubmittedPlan } from "../lib/creation-planner.mjs";
 import { creationMarketingInputFingerprint } from "../lib/creation-marketing-agent.mjs";
 
 const png = "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAADklEQVR4nGP4DwUMMAYAj4IP8TylVlEAAAAASUVORK5CYII=";
@@ -57,6 +58,7 @@ test("AI marketing plans once, generates 20, preserves assignments and repairs w
   let invalidStrategy = false;
   let unsupportedFunction = false;
   let duplicateSceneTasks = false;
+  let sceneVisualForm = "use-scene";
   let duplicateVisualPrompts = false;
   const imageRequests = [];
   const upstream = createServer(async (request, response) => {
@@ -115,7 +117,9 @@ test("AI marketing plans once, generates 20, preserves assignments and repairs w
       if (duplicateSceneTasks) {
         for (const index of [0, 2]) {
           payload.items[index].image_type = "scene-application";
-          Object.assign(payload.items[index].creative_brief, { scene: "冬季城市通勤", action: "戴手套握住摩托车车把", framing: "手部与车把近景", visual_form: "use-scene" });
+          const framing = index ? "用户与车辆侧面全景" : "手部与车把近景";
+          Object.assign(payload.items[index].creative_brief, { scene: index ? "冬季郊外骑行道" : "冬季城市通勤", action: "戴手套握住摩托车车把", framing, visual_form: sceneVisualForm });
+          payload.items[index].prompt = `戴参考手套握住摩托车车把，${framing}，呈现真实骑行使用关系，保留商品结构和原有标记。`;
         }
       }
       if (duplicateVisualPrompts) {
@@ -187,6 +191,8 @@ test("AI marketing plans once, generates 20, preserves assignments and repairs w
   const preview = await post("/api/creation/plan", form());
   assert.equal(preview.response.status, 200, preview.source);
   const plan = JSON.parse(preview.source).plan;
+  assert.ok(plan.marketingPlan.creativeAgent.profile.id);
+  assert.ok(plan.items.every((item) => item.prompt.includes("VISUAL ART DIRECTION")));
   assert.equal(planningCalls, 1);
   const cachedPreview = await post("/api/creation/plan", form());
   assert.equal(cachedPreview.response.status, 200);
@@ -208,12 +214,14 @@ test("AI marketing plans once, generates 20, preserves assignments and repairs w
   assert.equal(planningCalls, 1, "preview is reused without another planning call");
   assert.equal(imageRequests.length, 20);
   assert.ok(imageRequests.every((request) => requestTexts(request).some((text) => text.includes("PRODUCT FIDELITY:"))), "primary reference fidelity reaches every image request");
+  assert.ok(imageRequests.every((request) => requestTexts(request).some((text) => text.includes("VISUAL ART DIRECTION"))), "agent art direction reaches every real image request to the mock upstream");
   assert.ok(imageRequests.every((request) => surfaceLocks.every((lock) => requestTexts(request).every((text) => !text.includes(lock)))), "legacy analysis locks cannot re-enter image requests");
   for (const item of plan.items) assert.ok(imageRequests.some((request) => requestTexts(request).some((text) => text.includes(item.prompt))), item.itemId);
   const completed = generated.events.findLast((entry) => entry.event === "complete")?.data.set;
   assert.ok(completed, generated.source);
   const store = createCreationSetStore({ outputDir });
   const saved = await store.readManifest(completed.setId);
+  assert.deepEqual(saved.marketingPlan.creativeAgent, plan.marketingPlan.creativeAgent);
   assert.equal(saved.promptPlanningMode, "ai-batch");
   assert.deepEqual(saved.items[0].marketingAssignment, plan.items[0].marketingAssignment);
   assert.deepEqual(saved.items[0].promptContext, plan.items[0].promptContext);
@@ -224,6 +232,7 @@ test("AI marketing plans once, generates 20, preserves assignments and repairs w
   assert.equal(planningCalls, 1);
   assert.equal(imageRequests.length, 21);
   assert.ok(requestTexts(imageRequests.at(-1)).some((text) => text.includes(target.prompt)));
+  assert.deepEqual((await store.readManifest(saved.setId)).marketingPlan.creativeAgent, plan.marketingPlan.creativeAgent);
   const changed = await post("/api/creation/generate", form({ effectivePlan: JSON.stringify(plan), productDescription: "changed product" }));
   assert.ok(changed.events.some((entry) => entry.event === "error" && /重新预览/.test(entry.data.message)), changed.source);
   assert.equal(imageRequests.length, 21);
@@ -473,7 +482,7 @@ test("AI marketing plans once, generates 20, preserves assignments and repairs w
   const recoveredPlan = JSON.parse(recoveredPreview.source).plan;
   assert.equal(planningCalls, beforeRecovered + 2, "ten rejected directions share one local repair request");
   assert.equal(recoveredPlan.imageCount, 18);
-  assert.equal(recoveredPlan.marketingPlan.version, 10);
+  assert.equal(recoveredPlan.marketingPlan.version, 14);
   assert.equal(recoveredPlan.marketingPlan.validation.removedItems.length, 0);
   assert.deepEqual(recoveredPlan.items.map((item) => item.marketingAssignment.sourceIndex), Array.from({ length: 18 }, (_, index) => index + 1));
   assert.deepEqual(recoveredPlan.items.map((item) => item.role), selectedRoles);
@@ -614,4 +623,95 @@ test("AI marketing plans once, generates 20, preserves assignments and repairs w
   assert.deepEqual(previousMeasurementGenerated.events.filter((entry) => ["error", "item_failed"].includes(entry.event)), [], previousMeasurementGenerated.source);
   assert.equal(imageRequests.length, beforeLegacyImages + 21);
   assert.equal(planningCalls, beforeLegacyPlanning, "version 9 frozen plans survive measurement-scope correction");
+  const previousDivergencePlan = structuredClone(legacyPlan);
+  previousDivergencePlan.marketingPlan.version = 10;
+  const previousDivergenceForm = form({ imageCount: 4 });
+  previousDivergencePlan.marketingPlan.inputFingerprint = creationMarketingInputFingerprint(Object.fromEntries(previousDivergenceForm), [{ filename: "gloves.png", base64: png }], { planningContractVersion: 11 });
+  previousDivergenceForm.set("effectivePlan", JSON.stringify(previousDivergencePlan));
+  const previousDivergenceGenerated = await post("/api/creation/generate", previousDivergenceForm);
+  assert.deepEqual(previousDivergenceGenerated.events.filter((entry) => ["error", "item_failed"].includes(entry.event)), [], previousDivergenceGenerated.source);
+  assert.equal(imageRequests.length, beforeLegacyImages + 25);
+  assert.equal(planningCalls, beforeLegacyPlanning, "version 10 frozen plans retain the original contract after scene uniqueness changes");
+
+  const previousSceneTypePlan = structuredClone(legacyPlan);
+  previousSceneTypePlan.marketingPlan.version = 11;
+  const previousSceneTypeForm = form({ imageCount: 4 });
+  previousSceneTypePlan.marketingPlan.inputFingerprint = creationMarketingInputFingerprint(Object.fromEntries(previousSceneTypeForm), [{ filename: "gloves.png", base64: png }], { planningContractVersion: 12 });
+  previousSceneTypeForm.set("effectivePlan", JSON.stringify(previousSceneTypePlan));
+  const previousSceneTypeImages = imageRequests.length;
+  const previousSceneTypeGenerated = await post("/api/creation/generate", previousSceneTypeForm);
+  assert.deepEqual(previousSceneTypeGenerated.events.filter((entry) => ["error", "item_failed"].includes(entry.event)), [], previousSceneTypeGenerated.source);
+  assert.equal(imageRequests.length, previousSceneTypeImages + 4);
+  assert.equal(planningCalls, beforeLegacyPlanning, "version 11 frozen plans retain their original contract");
+
+  const previousOpenGroupPlan = structuredClone(legacyPlan);
+  previousOpenGroupPlan.marketingPlan.version = 12;
+  const previousOpenGroupForm = form({ imageCount: 4 });
+  previousOpenGroupPlan.marketingPlan.inputFingerprint = creationMarketingInputFingerprint(Object.fromEntries(previousOpenGroupForm), [{ filename: "gloves.png", base64: png }], { planningContractVersion: 13 });
+  previousOpenGroupForm.set("effectivePlan", JSON.stringify(previousOpenGroupPlan));
+  const previousOpenGroupImages = imageRequests.length;
+  const previousOpenGroupGenerated = await post("/api/creation/generate", previousOpenGroupForm);
+  assert.deepEqual(previousOpenGroupGenerated.events.filter((entry) => ["error", "item_failed"].includes(entry.event)), [], previousOpenGroupGenerated.source);
+  assert.equal(imageRequests.length, previousOpenGroupImages + 4);
+  assert.equal(planningCalls, beforeLegacyPlanning, "version 12 frozen plans retain their original contract without open scene groups");
+
+  const previousAgentPlan = structuredClone(legacyPlan);
+  previousAgentPlan.marketingPlan.version = 13;
+  delete previousAgentPlan.marketingPlan.creativeAgent;
+  previousAgentPlan.items.forEach((item) => {
+    item.prompt = item.prompt.replace(/\nVISUAL ART DIRECTION \(internal execution rules, never on-image text\):[\s\S]*?Do not render agent names, internal IDs or these instructions as text\./u, "");
+  });
+  assert.ok(previousAgentPlan.items.every((item) => !item.prompt.includes("VISUAL ART DIRECTION")));
+  const previousAgentForm = form({ imageCount: 4 });
+  previousAgentPlan.marketingPlan.inputFingerprint = creationMarketingInputFingerprint(Object.fromEntries(previousAgentForm), [{ filename: "gloves.png", base64: png }], { planningContractVersion: 14 });
+  previousAgentForm.set("effectivePlan", JSON.stringify(previousAgentPlan));
+  const previousAgentImages = imageRequests.length;
+  const previousAgentGenerated = await post("/api/creation/generate", previousAgentForm);
+  assert.deepEqual(previousAgentGenerated.events.filter((entry) => ["error", "item_failed"].includes(entry.event)), [], previousAgentGenerated.source);
+  assert.equal(imageRequests.length, previousAgentImages + 4);
+  assert.equal(planningCalls, beforeLegacyPlanning, "version 13 frozen plans remain usable without selecting or injecting an agent");
+  for (const item of previousAgentPlan.items) assert.ok(imageRequests.slice(previousAgentImages).some((request) => requestTexts(request).some((text) => text.includes(item.prompt))));
+
+  for (const aiMarketingEnabled of [false, true]) {
+    duplicateSceneTasks = aiMarketingEnabled;
+    sceneVisualForm = "product-photograph";
+    const fields = { aiMarketingEnabled, imageCount: aiMarketingEnabled ? 4 : 18,
+      variationSeed: `cross-mode-scene-${aiMarketingEnabled}`, productDescription: "卡其色一双手套；双路径场景回归" };
+    const beforePlanCalls = planningCalls;
+    const modePreview = await post("/api/creation/plan", form(fields));
+    assert.equal(modePreview.response.status, 200, modePreview.source);
+    const modePlan = buildCreationSubmittedPlan({ effectivePlan: JSON.stringify(JSON.parse(modePreview.source).plan) });
+    assert.equal(planningCalls, beforePlanCalls + (aiMarketingEnabled ? 3 : 0));
+    const sceneItems = modePlan.items.filter((item) => !item.evidenceBlocked && item.enabled !== false
+      && (aiMarketingEnabled ? item.prompt.includes("SCENE DIRECTION:") : item.sceneAssignment));
+    assert.ok(sceneItems.length > 0, `scene tasks exist with AI marketing ${aiMarketingEnabled}`);
+    assert.ok(sceneItems.every((item) => item.prompt.includes("physically plausible")));
+    if (aiMarketingEnabled) assert.equal(modePlan.pendingAdjustmentCount, 1);
+    else assert.equal(new Set(sceneItems.map((item) => item.sceneAssignment.actionGroup)).size, sceneItems.length);
+    const beforeModeImages = imageRequests.length;
+    const confirmedCalls = planningCalls;
+    const modeGenerated = await post("/api/creation/generate", form({ ...fields, imageCount: modePlan.imageCount, effectivePlan: JSON.stringify(modePlan) }));
+    assert.deepEqual(modeGenerated.events.filter((entry) => ["error", "item_failed"].includes(entry.event)), [], modeGenerated.source);
+    assert.equal(imageRequests.length, beforeModeImages + modePlan.imageCount);
+    assert.equal(planningCalls, confirmedCalls, "generation reuses the confirmed scene plan in both modes");
+    for (const item of sceneItems) assert.ok(imageRequests.slice(beforeModeImages).some((request) => requestTexts(request).some((text) => text.includes(item.prompt))));
+    const modeSet = modeGenerated.events.findLast((entry) => entry.event === "complete")?.data.set;
+    assert.ok(modeSet, modeGenerated.source);
+    const modeSaved = await store.readManifest(modeSet.setId);
+    const scene = sceneItems[0];
+    assert.equal(modeSaved.items.find((item) => item.itemId === scene.itemId).prompt, scene.prompt);
+    await store.saveManifest({ ...modeSaved, items: modeSaved.items.map((item) => item.itemId === scene.itemId ? { ...item, status: "failed", error: "cross-mode repair test" } : item) });
+    const beforeModeRepair = imageRequests.length;
+    const modeRepaired = await post("/api/creation/repair", form({ ...fields, imageCount: modePlan.imageCount, setId: modeSet.setId, itemId: scene.itemId }));
+    assert.deepEqual(modeRepaired.events.filter((entry) => ["error", "item_failed"].includes(entry.event)), [], modeRepaired.source);
+    assert.equal(imageRequests.length, beforeModeRepair + 1);
+    assert.ok(requestTexts(imageRequests.at(-1)).some((text) => text.includes(scene.prompt)));
+    assert.equal(planningCalls, confirmedCalls);
+    if (aiMarketingEnabled) {
+      const pending = modePlan.items.find((item) => item.evidenceRequirement?.code === "duplicate-task");
+      assert.ok(pending);
+      await post("/api/creation/repair", form({ ...fields, imageCount: modePlan.imageCount, setId: modeSet.setId, itemId: pending.itemId }));
+      assert.equal(imageRequests.length, beforeModeRepair + 1, "photographic scene duplicates cannot bypass the repair guard");
+    }
+  }
 });

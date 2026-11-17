@@ -280,6 +280,15 @@ test("ordinary creation records render as listitems with independent checkbox an
   assert.deepEqual(formattedTimestamps, [record.createdAt]);
 });
 
+test("今天的套图记录标题显示中文语言且不修改商品名", () => {
+  const set = makeRecord(1, { productName: "电加热触屏手套", createdAt: "2026-11-17T04:00:00Z", targetLanguage: "de", targetLanguageLabel: "Deutsch" });
+  const row = createCreationRecordListRow({ set, documentRef: createFakeDocument() });
+  const button = row.children[1];
+  assert.equal(button.children[0].children[0].textContent, "电加热触屏手套 · 德语");
+  assert.equal(button.getAttribute("aria-label"), "查看 电加热触屏手套 · 德语 的套图内容");
+  assert.equal(set.productName, "电加热触屏手套");
+});
+
 test("selecting a record preserves the visible list, filters, checks, loaded rows, and scroll", async () => {
   const appSource = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
   const documentRef = createFakeDocument();

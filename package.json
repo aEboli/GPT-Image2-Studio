@@ -1,6 +1,6 @@
 {
   "name": "gpt-image2-studio",
-  "version": "0.2.148",
+  "version": "0.2.158",
   "private": true,
   "type": "module",
   "main": "desktop/main.mjs",

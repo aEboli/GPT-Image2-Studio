@@ -436,8 +436,11 @@ test("scene and persona items carry a concrete setting while every item anchors 
   for (const item of plan.items.filter((entry) => entry.itemKind === "carousel")) {
     // The product-first anchor opens every prompt.
     assert.match(item.prompt, /^PRODUCT FIDELITY:/, item.role);
-    // The removed Creative range / Look / Shot paragraphs must stay removed.
-    assert.doesNotMatch(item.prompt, /Creative range|Look: |Shot: /, item.role);
+    // Legacy standalone creative-range, look and shot blocks stay removed.
+    assert.doesNotMatch(item.prompt, /^Creative range|Look: |Shot: /mu, item.role);
+    if (sceneLedRoles.has(item.role) || ["benefit", "after-sales"].includes(item.role)) {
+      assert.match(item.prompt, /physically plausible/, item.role);
+    }
     // Scene-led roles get a concrete setting cue; studio and information roles do not.
     const hasSettingCue = /Situation: |Setting: /.test(item.prompt);
     assert.equal(hasSettingCue, sceneLedRoles.has(item.role), item.role);
